@@ -1,0 +1,2750 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sevaro Outpatient Clinical Note - MVP Prototype</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      background: #F9FAFB;
+      color: #111827;
+      font-size: 14px;
+      line-height: 1.5;
+    }
+
+    /* Color Variables */
+    :root {
+      --primary: #0D9488;
+      --primary-light: #14B8A6;
+      --primary-dark: #0F766E;
+      --bg-white: #FFFFFF;
+      --bg-gray: #F9FAFB;
+      --bg-dark: #F3F4F6;
+      --text-primary: #111827;
+      --text-secondary: #6B7280;
+      --text-muted: #9CA3AF;
+      --border: #E5E7EB;
+      --error: #EF4444;
+      --success: #10B981;
+      --warning: #F59E0B;
+    }
+
+    /* Layout */
+    .app-container {
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+    }
+
+    /* Top Navigation */
+    .top-nav {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 12px 20px;
+      background: var(--bg-white);
+      border-bottom: 1px solid var(--border);
+      gap: 16px;
+    }
+
+    .nav-left {
+      display: flex;
+      align-items: center;
+      gap: 20px;
+    }
+
+    .logo {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .logo svg {
+      width: 32px;
+      height: 32px;
+    }
+
+    .search-bar {
+      display: flex;
+      align-items: center;
+      background: var(--bg-gray);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 8px 12px;
+      width: 280px;
+    }
+
+    .search-bar input {
+      border: none;
+      background: transparent;
+      outline: none;
+      width: 100%;
+      font-size: 14px;
+    }
+
+    .search-bar svg {
+      color: var(--text-muted);
+      margin-right: 8px;
+    }
+
+    .queue-filters {
+      display: flex;
+      gap: 8px;
+    }
+
+    .queue-pill {
+      padding: 6px 12px;
+      border-radius: 20px;
+      font-size: 13px;
+      font-weight: 500;
+      cursor: pointer;
+      border: 1px solid var(--border);
+      background: var(--bg-white);
+      color: var(--text-secondary);
+    }
+
+    .queue-pill.active {
+      background: var(--text-primary);
+      color: white;
+      border-color: var(--text-primary);
+    }
+
+    .nav-right {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+
+    .timer {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      background: var(--primary);
+      color: white;
+      padding: 6px 12px;
+      border-radius: 6px;
+      font-weight: 500;
+      font-size: 13px;
+    }
+
+    .nav-icon {
+      width: 36px;
+      height: 36px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 8px;
+      cursor: pointer;
+      color: var(--text-secondary);
+    }
+
+    .nav-icon:hover {
+      background: var(--bg-gray);
+    }
+
+    .user-avatar {
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      background: var(--primary);
+      color: white;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 600;
+      font-size: 14px;
+    }
+
+    /* Main Content Area */
+    .main-content {
+      display: flex;
+      flex: 1;
+      overflow: hidden;
+    }
+
+    /* Left Sidebar */
+    .left-sidebar {
+      width: 260px;
+      background: var(--bg-white);
+      border-right: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      overflow-y: auto;
+    }
+
+    .patient-card {
+      padding: 16px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .patient-header {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 12px;
+    }
+
+    .patient-avatar {
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      background: var(--bg-dark);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .patient-info h3 {
+      font-size: 15px;
+      font-weight: 600;
+    }
+
+    .patient-info p {
+      font-size: 13px;
+      color: var(--text-secondary);
+    }
+
+    .patient-badges {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .badge {
+      padding: 4px 10px;
+      border-radius: 12px;
+      font-size: 12px;
+      font-weight: 500;
+    }
+
+    .badge-teal {
+      background: #CCFBF1;
+      color: var(--primary-dark);
+    }
+
+    .badge-blue {
+      background: #DBEAFE;
+      color: #1D4ED8;
+    }
+
+    .badge-green {
+      background: #D1FAE5;
+      color: #059669;
+    }
+
+    .badge-red {
+      background: #FEE2E2;
+      color: #DC2626;
+    }
+
+    .action-buttons {
+      display: flex;
+      gap: 8px;
+      margin-top: 12px;
+    }
+
+    .btn-video, .btn-phone {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 8px 16px;
+      border-radius: 8px;
+      font-size: 13px;
+      font-weight: 500;
+      cursor: pointer;
+      border: none;
+    }
+
+    .btn-video {
+      background: var(--primary);
+      color: white;
+    }
+
+    .btn-phone {
+      background: var(--primary-light);
+      color: white;
+    }
+
+    .sidebar-links {
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .sidebar-links a {
+      color: var(--primary);
+      text-decoration: none;
+      font-size: 13px;
+    }
+
+    .sidebar-links a:hover {
+      text-decoration: underline;
+    }
+
+    .sidebar-section {
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .sidebar-section-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      cursor: pointer;
+      padding: 4px 0;
+    }
+
+    .sidebar-section-header h4 {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text-primary);
+    }
+
+    .sidebar-section-header .toggle-icon {
+      color: var(--text-muted);
+      transition: transform 0.2s;
+    }
+
+    .sidebar-section-header.collapsed .toggle-icon {
+      transform: rotate(-90deg);
+    }
+
+    .sidebar-section-content {
+      margin-top: 8px;
+    }
+
+    .timeline-item {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 8px 0;
+    }
+
+    .timeline-dot {
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      background: var(--bg-gray);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--text-muted);
+    }
+
+    .timeline-info p {
+      font-size: 13px;
+    }
+
+    .timeline-info span {
+      font-size: 12px;
+      color: var(--text-muted);
+    }
+
+    /* Prior Visits */
+    .prior-visit-card {
+      background: var(--bg-gray);
+      border-radius: 8px;
+      padding: 12px;
+      margin-bottom: 8px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .prior-visit-card:hover {
+      background: var(--bg-dark);
+      box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+    }
+
+    .prior-visit-card.expanded {
+      background: var(--bg-white);
+      border: 1px solid var(--primary);
+    }
+
+    .visit-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: start;
+      margin-bottom: 4px;
+    }
+
+    .visit-date {
+      font-weight: 600;
+      font-size: 13px;
+    }
+
+    .visit-type {
+      font-size: 11px;
+      padding: 2px 8px;
+      border-radius: 10px;
+    }
+
+    .visit-chief {
+      font-size: 12px;
+      color: var(--text-secondary);
+      margin-bottom: 4px;
+    }
+
+    .visit-provider {
+      font-size: 11px;
+      color: var(--text-muted);
+    }
+
+    .visit-expanded-content {
+      display: none;
+      margin-top: 12px;
+      padding-top: 12px;
+      border-top: 1px solid var(--border);
+    }
+
+    .prior-visit-card.expanded .visit-expanded-content {
+      display: block;
+    }
+
+    .ai-summary-box {
+      background: linear-gradient(135deg, #F0FDFA 0%, #ECFDF5 100%);
+      border: 1px solid #A7F3D0;
+      border-radius: 8px;
+      padding: 12px;
+      margin-top: 8px;
+    }
+
+    .ai-summary-header {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-weight: 600;
+      font-size: 12px;
+      color: var(--primary-dark);
+      margin-bottom: 8px;
+    }
+
+    .ai-summary-content {
+      font-size: 12px;
+      color: var(--text-secondary);
+    }
+
+    /* Center Panel */
+    .center-panel {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    .tab-nav {
+      display: flex;
+      gap: 4px;
+      padding: 0 24px;
+      background: var(--bg-white);
+      border-bottom: 1px solid var(--border);
+    }
+
+    .tab-btn {
+      padding: 16px 20px;
+      font-size: 14px;
+      font-weight: 500;
+      color: var(--text-secondary);
+      background: none;
+      border: none;
+      cursor: pointer;
+      position: relative;
+      transition: color 0.2s;
+    }
+
+    .tab-btn:hover {
+      color: var(--text-primary);
+    }
+
+    .tab-btn.active {
+      color: var(--primary);
+    }
+
+    .tab-btn.active::after {
+      content: '';
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      height: 2px;
+      background: var(--primary);
+    }
+
+    .tab-content {
+      flex: 1;
+      overflow-y: auto;
+      padding: 24px;
+      background: var(--bg-gray);
+    }
+
+    .tab-pane {
+      display: none;
+    }
+
+    .tab-pane.active {
+      display: block;
+    }
+
+    /* Form Sections */
+    .form-section {
+      background: var(--bg-white);
+      border-radius: 12px;
+      padding: 20px;
+      margin-bottom: 16px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+    }
+
+    .section-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 16px;
+    }
+
+    .section-title {
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--text-primary);
+    }
+
+    .required-badge {
+      background: var(--error);
+      color: white;
+      font-size: 11px;
+      font-weight: 500;
+      padding: 3px 8px;
+      border-radius: 4px;
+    }
+
+    .optional-badge {
+      background: var(--bg-dark);
+      color: var(--text-secondary);
+      font-size: 11px;
+      font-weight: 500;
+      padding: 3px 8px;
+      border-radius: 4px;
+    }
+
+    /* Chips */
+    .chips-container {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .chip {
+      padding: 8px 14px;
+      border-radius: 20px;
+      font-size: 13px;
+      cursor: pointer;
+      border: 1px solid var(--border);
+      background: var(--bg-white);
+      color: var(--text-secondary);
+      transition: all 0.2s;
+    }
+
+    .chip:hover {
+      border-color: var(--primary);
+      color: var(--primary);
+    }
+
+    .chip.selected {
+      background: var(--primary);
+      border-color: var(--primary);
+      color: white;
+    }
+
+    /* Text Areas */
+    .form-textarea {
+      width: 100%;
+      min-height: 120px;
+      padding: 12px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      font-family: inherit;
+      font-size: 14px;
+      resize: vertical;
+      outline: none;
+    }
+
+    .form-textarea:focus {
+      border-color: var(--primary);
+      box-shadow: 0 0 0 3px rgba(13, 148, 136, 0.1);
+    }
+
+    .form-textarea::placeholder {
+      color: var(--primary);
+    }
+
+    /* Form Inputs */
+    .form-row {
+      display: flex;
+      gap: 16px;
+      margin-bottom: 16px;
+    }
+
+    .form-group {
+      flex: 1;
+    }
+
+    .form-label {
+      display: block;
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--text-secondary);
+      margin-bottom: 6px;
+    }
+
+    .form-input {
+      width: 100%;
+      padding: 10px 12px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      font-size: 14px;
+      outline: none;
+    }
+
+    .form-input:focus {
+      border-color: var(--primary);
+      box-shadow: 0 0 0 3px rgba(13, 148, 136, 0.1);
+    }
+
+    .form-select {
+      width: 100%;
+      padding: 10px 12px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      font-size: 14px;
+      outline: none;
+      background: var(--bg-white);
+      cursor: pointer;
+    }
+
+    /* Radio/Checkbox Groups */
+    .option-group {
+      display: flex;
+      gap: 16px;
+      flex-wrap: wrap;
+    }
+
+    .option-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      cursor: pointer;
+    }
+
+    .option-item input {
+      accent-color: var(--primary);
+    }
+
+    /* Accordion */
+    .accordion {
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      margin-bottom: 8px;
+      overflow: hidden;
+    }
+
+    .accordion-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 14px 16px;
+      background: var(--bg-white);
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+
+    .accordion-header:hover {
+      background: var(--bg-gray);
+    }
+
+    .accordion-title {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      font-weight: 500;
+    }
+
+    .accordion-title .status-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--border);
+    }
+
+    .accordion-title .status-dot.filled {
+      background: var(--success);
+    }
+
+    .accordion-chevron {
+      color: var(--text-muted);
+      transition: transform 0.2s;
+    }
+
+    .accordion.open .accordion-chevron {
+      transform: rotate(180deg);
+    }
+
+    .accordion-content {
+      display: none;
+      padding: 16px;
+      border-top: 1px solid var(--border);
+      background: var(--bg-gray);
+    }
+
+    .accordion.open .accordion-content {
+      display: block;
+    }
+
+    /* Scales Section */
+    .scale-item {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      padding: 12px 0;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .scale-item:last-child {
+      border-bottom: none;
+    }
+
+    .scale-name {
+      flex: 1;
+      font-weight: 500;
+    }
+
+    .scale-input {
+      width: 80px;
+      padding: 8px;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      text-align: center;
+    }
+
+    .scale-interpretation {
+      width: 150px;
+    }
+
+    /* Study Cards (Imaging Tab) */
+    .study-card {
+      background: var(--bg-white);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      margin-bottom: 8px;
+      overflow: hidden;
+    }
+
+    .study-card-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 14px 16px;
+      cursor: pointer;
+    }
+
+    .study-card-header:hover {
+      background: var(--bg-gray);
+    }
+
+    .study-card-title {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .study-card-summary {
+      font-size: 12px;
+      color: var(--text-muted);
+    }
+
+    .study-card-content {
+      display: none;
+      padding: 16px;
+      border-top: 1px solid var(--border);
+      background: var(--bg-gray);
+    }
+
+    .study-card.open .study-card-content {
+      display: block;
+    }
+
+    .study-card.open .study-chevron {
+      transform: rotate(180deg);
+    }
+
+    /* Neuro Exam */
+    .exam-quick-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 10px 16px;
+      background: linear-gradient(135deg, var(--primary) 0%, var(--primary-light) 100%);
+      color: white;
+      border: none;
+      border-radius: 8px;
+      font-weight: 500;
+      cursor: pointer;
+      margin-bottom: 16px;
+    }
+
+    .exam-subsection {
+      margin-bottom: 16px;
+    }
+
+    .exam-subsection h5 {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text-primary);
+      margin-bottom: 10px;
+      padding-bottom: 6px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .exam-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+      gap: 12px;
+    }
+
+    .exam-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .exam-item label {
+      font-size: 13px;
+    }
+
+    /* Recommendation Tab */
+    .diagnosis-search {
+      position: relative;
+      margin-bottom: 16px;
+    }
+
+    .diagnosis-input {
+      width: 100%;
+      padding: 12px 16px;
+      padding-left: 40px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      font-size: 14px;
+      outline: none;
+    }
+
+    .diagnosis-input:focus {
+      border-color: var(--primary);
+    }
+
+    .diagnosis-search-icon {
+      position: absolute;
+      left: 14px;
+      top: 50%;
+      transform: translateY(-50%);
+      color: var(--text-muted);
+    }
+
+    .diagnosis-dropdown {
+      position: absolute;
+      top: 100%;
+      left: 0;
+      right: 0;
+      background: var(--bg-white);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+      margin-top: 4px;
+      max-height: 250px;
+      overflow-y: auto;
+      z-index: 100;
+      display: none;
+    }
+
+    .diagnosis-dropdown.show {
+      display: block;
+    }
+
+    .diagnosis-option {
+      padding: 12px 16px;
+      cursor: pointer;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .diagnosis-option:hover {
+      background: var(--bg-gray);
+    }
+
+    .diagnosis-code {
+      font-weight: 600;
+      color: var(--primary);
+    }
+
+    .diagnosis-name {
+      color: var(--text-primary);
+    }
+
+    .diagnosis-category {
+      font-size: 12px;
+      color: var(--text-muted);
+    }
+
+    .selected-diagnoses {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-bottom: 16px;
+    }
+
+    .diagnosis-pill {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 12px;
+      background: var(--bg-gray);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      font-size: 13px;
+    }
+
+    .diagnosis-pill .remove-btn {
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      background: var(--text-muted);
+      color: white;
+      border: none;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 12px;
+    }
+
+    .diagnosis-pill .plan-btn {
+      width: 24px;
+      height: 24px;
+      border-radius: 4px;
+      background: var(--primary);
+      color: white;
+      border: none;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .ai-generate-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 12px 20px;
+      background: var(--primary);
+      color: white;
+      border: none;
+      border-radius: 8px;
+      font-weight: 500;
+      cursor: pointer;
+      margin-bottom: 16px;
+    }
+
+    .ai-generate-btn:hover {
+      background: var(--primary-dark);
+    }
+
+    .output-preview {
+      background: #1F2937;
+      border-radius: 8px;
+      padding: 16px;
+      margin-top: 16px;
+    }
+
+    .output-preview-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 12px;
+    }
+
+    .output-preview-header h4 {
+      color: white;
+      font-size: 13px;
+    }
+
+    .copy-btn {
+      padding: 6px 12px;
+      background: var(--primary);
+      color: white;
+      border: none;
+      border-radius: 6px;
+      font-size: 12px;
+      cursor: pointer;
+    }
+
+    .output-preview pre {
+      color: #E5E7EB;
+      font-family: 'Monaco', 'Menlo', monospace;
+      font-size: 12px;
+      white-space: pre-wrap;
+      line-height: 1.6;
+    }
+
+    /* Right Action Bar */
+    .right-action-bar {
+      width: 60px;
+      background: var(--bg-white);
+      border-left: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 16px 8px;
+      gap: 8px;
+    }
+
+    .action-btn {
+      width: 40px;
+      height: 40px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      background: var(--bg-white);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      color: var(--text-secondary);
+      transition: all 0.2s;
+    }
+
+    .action-btn:hover {
+      background: var(--bg-gray);
+      border-color: var(--primary);
+      color: var(--primary);
+    }
+
+    .action-btn-primary {
+      background: var(--primary);
+      border-color: var(--primary);
+      color: white;
+    }
+
+    .action-btn-primary:hover {
+      background: var(--primary-dark);
+    }
+
+    .action-spacer {
+      flex: 1;
+    }
+
+    .pend-btn {
+      padding: 10px 12px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      background: var(--bg-white);
+      font-size: 12px;
+      font-weight: 500;
+      cursor: pointer;
+      writing-mode: vertical-rl;
+      text-orientation: mixed;
+    }
+
+    .sign-btn {
+      padding: 10px 8px;
+      background: var(--primary);
+      color: white;
+      border: none;
+      border-radius: 8px;
+      font-size: 11px;
+      font-weight: 500;
+      cursor: pointer;
+      writing-mode: vertical-rl;
+      text-orientation: mixed;
+    }
+
+    /* Plan Builder Modal */
+    .modal-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0,0,0,0.5);
+      display: none;
+      align-items: center;
+      justify-content: flex-end;
+      z-index: 1000;
+    }
+
+    .modal-overlay.show {
+      display: flex;
+    }
+
+    .plan-builder-modal {
+      width: 500px;
+      height: 100%;
+      background: var(--bg-white);
+      box-shadow: -4px 0 20px rgba(0,0,0,0.1);
+      display: flex;
+      flex-direction: column;
+      animation: slideIn 0.3s ease;
+    }
+
+    @keyframes slideIn {
+      from {
+        transform: translateX(100%);
+      }
+      to {
+        transform: translateX(0);
+      }
+    }
+
+    .plan-builder-header {
+      padding: 20px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .plan-builder-header h2 {
+      font-size: 18px;
+      margin-bottom: 12px;
+    }
+
+    .plan-builder-tabs {
+      display: flex;
+      gap: 4px;
+    }
+
+    .plan-tab {
+      padding: 8px 16px;
+      border-radius: 6px;
+      font-size: 13px;
+      font-weight: 500;
+      cursor: pointer;
+      border: 1px solid var(--border);
+      background: var(--bg-white);
+    }
+
+    .plan-tab.active {
+      background: var(--primary);
+      color: white;
+      border-color: var(--primary);
+    }
+
+    .plan-builder-content {
+      flex: 1;
+      overflow-y: auto;
+      padding: 20px;
+    }
+
+    .plan-section {
+      margin-bottom: 20px;
+    }
+
+    .plan-section-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 12px;
+      background: var(--bg-gray);
+      border-radius: 8px;
+      cursor: pointer;
+      margin-bottom: 8px;
+    }
+
+    .plan-section-title {
+      font-weight: 600;
+      font-size: 14px;
+    }
+
+    .plan-checkbox-list {
+      padding-left: 16px;
+    }
+
+    .plan-checkbox-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 8px 0;
+    }
+
+    .plan-checkbox-item input {
+      accent-color: var(--primary);
+    }
+
+    .plan-checkbox-item label {
+      font-size: 13px;
+    }
+
+    .plan-checkbox-item.sub-item {
+      padding-left: 24px;
+      font-size: 12px;
+      color: var(--text-secondary);
+    }
+
+    .plan-builder-footer {
+      padding: 16px 20px;
+      border-top: 1px solid var(--border);
+      display: flex;
+      gap: 12px;
+    }
+
+    .plan-builder-footer button {
+      flex: 1;
+      padding: 12px;
+      border-radius: 8px;
+      font-weight: 500;
+      cursor: pointer;
+    }
+
+    .btn-cancel {
+      background: var(--bg-white);
+      border: 1px solid var(--border);
+    }
+
+    .btn-apply {
+      background: var(--primary);
+      color: white;
+      border: none;
+    }
+
+    /* Toast Notification */
+    .toast {
+      position: fixed;
+      bottom: 24px;
+      right: 24px;
+      padding: 12px 20px;
+      background: #1F2937;
+      color: white;
+      border-radius: 8px;
+      display: none;
+      align-items: center;
+      gap: 10px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+      z-index: 2000;
+    }
+
+    .toast.show {
+      display: flex;
+      animation: fadeIn 0.3s ease;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(20px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .toast-success {
+      background: var(--success);
+    }
+
+    /* AI Toggle */
+    .ai-toggle {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .toggle-switch {
+      width: 40px;
+      height: 22px;
+      background: var(--border);
+      border-radius: 11px;
+      position: relative;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+
+    .toggle-switch.active {
+      background: var(--primary);
+    }
+
+    .toggle-switch::after {
+      content: '';
+      position: absolute;
+      width: 18px;
+      height: 18px;
+      background: white;
+      border-radius: 50%;
+      top: 2px;
+      left: 2px;
+      transition: transform 0.2s;
+    }
+
+    .toggle-switch.active::after {
+      transform: translateX(18px);
+    }
+  </style>
+</head>
+<body>
+  <div class="app-container">
+    <!-- Top Navigation -->
+    <nav class="top-nav">
+      <div class="nav-left">
+        <div class="logo">
+          <svg viewBox="0 0 32 32" fill="none">
+            <circle cx="16" cy="16" r="14" fill="#0D9488"/>
+            <path d="M10 16C10 12.686 12.686 10 16 10C19.314 10 22 12.686 22 16C22 19.314 19.314 22 16 22" stroke="white" stroke-width="2" stroke-linecap="round"/>
+            <circle cx="16" cy="16" r="3" fill="white"/>
+          </svg>
+        </div>
+        <div class="search-bar">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/>
+          </svg>
+          <input type="text" placeholder="Search for patient name or MRN">
+        </div>
+        <div class="queue-filters">
+          <span class="queue-pill">Acute Care <strong>0</strong></span>
+          <span class="queue-pill active">Rounding <strong>1</strong></span>
+          <span class="queue-pill">EEG <strong>0</strong></span>
+        </div>
+      </div>
+      <div class="nav-right">
+        <div class="timer">
+          <span>MD2</span>
+          <span id="timer">08:20:22</span>
+        </div>
+        <span style="color: var(--primary); font-size: 13px; cursor: pointer;">What's New</span>
+        <div class="nav-icon" title="PHI Mode">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0110 0v4"/>
+          </svg>
+        </div>
+        <div class="nav-icon" title="Notifications">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 01-3.46 0"/>
+          </svg>
+        </div>
+        <div class="nav-icon" title="Dark Mode">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z"/>
+          </svg>
+        </div>
+        <div class="user-avatar">SA</div>
+      </div>
+    </nav>
+
+    <!-- Main Content -->
+    <div class="main-content">
+      <!-- Left Sidebar -->
+      <aside class="left-sidebar">
+        <div class="patient-card">
+          <div class="patient-header">
+            <div class="patient-avatar">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#9CA3AF" stroke-width="2">
+                <path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/>
+              </svg>
+            </div>
+            <div class="patient-info">
+              <h3>Marshall</h3>
+              <p>TNK | PST</p>
+            </div>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-left: auto; cursor: pointer;">
+              <path d="M7 17l9.2-9.2M17 17V7H7"/>
+            </svg>
+          </div>
+          <div style="margin-bottom: 12px;">
+            <div class="patient-header" style="margin-bottom: 8px;">
+              <div class="patient-avatar">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#9CA3AF" stroke-width="2">
+                  <path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/>
+                </svg>
+              </div>
+              <div class="patient-info">
+                <h3>Test Test</h3>
+                <p>50, M #123123</p>
+              </div>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-left: auto; cursor: pointer;">
+                <path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/>
+              </svg>
+            </div>
+          </div>
+          <div class="patient-badges">
+            <span class="badge badge-teal">Non-Emergent</span>
+          </div>
+          <div class="action-buttons">
+            <button class="btn-video">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/>
+              </svg>
+              Video
+            </button>
+            <button class="btn-phone">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07 19.5 19.5 0 01-6-6 19.79 19.79 0 01-3.07-8.67A2 2 0 014.11 2h3a2 2 0 012 1.72 12.84 12.84 0 00.7 2.81 2 2 0 01-.45 2.11L8.09 9.91a16 16 0 006 6l1.27-1.27a2 2 0 012.11-.45 12.84 12.84 0 002.81.7A2 2 0 0122 16.92z"/>
+              </svg>
+            </button>
+          </div>
+        </div>
+
+        <div class="sidebar-links">
+          <a href="#">PACS viewer</a> | <a href="#">VizAI</a> | <a href="#">Epic</a>
+        </div>
+
+        <div class="sidebar-section">
+          <div class="sidebar-section-header">
+            <h4>Prior Visits</h4>
+            <div class="ai-toggle">
+              <span style="font-size: 11px; color: var(--text-muted);">AI Summary</span>
+              <div class="toggle-switch active" onclick="this.classList.toggle('active')"></div>
+            </div>
+          </div>
+          <div class="sidebar-section-content">
+            <div class="prior-visit-card expanded" onclick="toggleVisitCard(this)">
+              <div class="visit-header">
+                <span class="visit-date">Jan 10, 2026</span>
+                <span class="visit-type badge badge-blue">Follow-up</span>
+              </div>
+              <div class="visit-chief">Headache, memory concerns</div>
+              <div class="visit-provider">Dr. Smith</div>
+              <div class="visit-expanded-content">
+                <div class="ai-summary-box">
+                  <div class="ai-summary-header">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
+                    </svg>
+                    AI Summary
+                  </div>
+                  <div class="ai-summary-content">
+                    Patient reports improved headache frequency with current prophylaxis. MoCA stable at 26/30. Continue current regimen.
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div class="prior-visit-card" onclick="toggleVisitCard(this)">
+              <div class="visit-header">
+                <span class="visit-date">Dec 15, 2025</span>
+                <span class="visit-type badge badge-green">New Patient</span>
+              </div>
+              <div class="visit-chief">New onset headaches, 3 months</div>
+              <div class="visit-provider">Dr. Johnson</div>
+              <div class="visit-expanded-content">
+                <div class="ai-summary-box">
+                  <div class="ai-summary-header">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
+                    </svg>
+                    AI Summary
+                  </div>
+                  <div class="ai-summary-content">
+                    Initial evaluation for chronic daily headache. Started on topiramate 25mg. MRI brain ordered.
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="sidebar-section">
+          <div class="sidebar-section-header">
+            <h4>Timeline</h4>
+            <svg class="toggle-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <polyline points="6 9 12 15 18 9"/>
+            </svg>
+          </div>
+          <div class="sidebar-section-content">
+            <div class="timeline-item">
+              <div class="timeline-dot">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07 19.5 19.5 0 01-6-6 19.79 19.79 0 01-3.07-8.67A2 2 0 014.11 2h3a2 2 0 012 1.72"/>
+                </svg>
+              </div>
+              <div class="timeline-info">
+                <p>Initial call</p>
+                <span>N/A</span>
+              </div>
+            </div>
+            <div class="timeline-item">
+              <div class="timeline-dot">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/>
+                </svg>
+              </div>
+              <div class="timeline-info">
+                <p>Time on video</p>
+                <span>N/A</span>
+              </div>
+            </div>
+            <div class="timeline-item">
+              <div class="timeline-dot">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
+                </svg>
+              </div>
+              <div class="timeline-info">
+                <p>Assessment time</p>
+                <span>N/A</span>
+              </div>
+            </div>
+            <div class="timeline-item">
+              <div class="timeline-dot">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <polyline points="20 6 9 17 4 12"/>
+                </svg>
+              </div>
+              <div class="timeline-info">
+                <p>Final recommendation</p>
+                <span>N/A</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </aside>
+
+      <!-- Center Panel -->
+      <main class="center-panel">
+        <div class="tab-nav">
+          <button class="tab-btn active" onclick="switchTab('history')">History</button>
+          <button class="tab-btn" onclick="switchTab('imaging')">Imaging/results</button>
+          <button class="tab-btn" onclick="switchTab('exam')">Physical exams</button>
+          <button class="tab-btn" onclick="switchTab('recommendation')">Recommendation</button>
+        </div>
+
+        <div class="tab-content">
+          <!-- History Tab -->
+          <div id="history-tab" class="tab-pane active">
+            <div class="form-section">
+              <div class="section-header">
+                <span class="section-title">Reason for visit</span>
+                <span class="required-badge">Required</span>
+              </div>
+              <div class="chips-container">
+                <span class="chip" onclick="toggleChip(this)">Altered mental status</span>
+                <span class="chip" onclick="toggleChip(this)">Amnesia</span>
+                <span class="chip" onclick="toggleChip(this)">Blurry vision</span>
+                <span class="chip" onclick="toggleChip(this)">Chronic pain</span>
+                <span class="chip" onclick="toggleChip(this)">Dizziness/Vertigo</span>
+                <span class="chip" onclick="toggleChip(this)">Double vision</span>
+                <span class="chip selected" onclick="toggleChip(this)">Headache</span>
+                <span class="chip" onclick="toggleChip(this)">Memory problem</span>
+                <span class="chip" onclick="toggleChip(this)">Movement problem</span>
+                <span class="chip" onclick="toggleChip(this)">Neuropathy</span>
+                <span class="chip" onclick="toggleChip(this)">Numbness</span>
+                <span class="chip" onclick="toggleChip(this)">Parkinson Disease</span>
+                <span class="chip" onclick="toggleChip(this)">Seizure</span>
+                <span class="chip" onclick="toggleChip(this)">Stroke like symptoms</span>
+                <span class="chip" onclick="toggleChip(this)">Syncope</span>
+                <span class="chip" onclick="toggleChip(this)">TIA</span>
+                <span class="chip" onclick="toggleChip(this)">Tremor</span>
+                <span class="chip" onclick="toggleChip(this)">Vision loss</span>
+                <span class="chip" onclick="toggleChip(this)">Weakness</span>
+                <span class="chip" onclick="toggleChip(this)">Other</span>
+              </div>
+            </div>
+
+            <div class="form-section">
+              <div class="section-header">
+                <span class="section-title">History of presenting illness</span>
+                <span class="required-badge">Required</span>
+              </div>
+              <textarea class="form-textarea" placeholder="Min. 25 words">50-year-old male presents for follow-up of chronic daily headaches. Patient reports headaches have improved from daily to approximately 3-4 per week since starting topiramate. Current dose is 50mg twice daily. Denies aura, nausea, or photophobia with recent episodes.</textarea>
+            </div>
+
+            <div class="form-section">
+              <div class="section-header">
+                <span class="section-title">Clinical Scales</span>
+                <span class="optional-badge">Optional</span>
+              </div>
+
+              <div class="accordion open" onclick="toggleAccordion(this)">
+                <div class="accordion-header">
+                  <span class="accordion-title">
+                    <span class="status-dot filled"></span>
+                    Headache Scales
+                  </span>
+                  <svg class="accordion-chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <polyline points="6 9 12 15 18 9"/>
+                  </svg>
+                </div>
+                <div class="accordion-content" onclick="event.stopPropagation()">
+                  <div class="scale-item">
+                    <span class="scale-name">MIDAS Score</span>
+                    <input type="number" class="scale-input" value="18" placeholder="0-270">
+                    <select class="form-select scale-interpretation">
+                      <option>Moderate disability</option>
+                      <option>Little/No disability</option>
+                      <option>Mild disability</option>
+                      <option>Severe disability</option>
+                    </select>
+                  </div>
+                  <div class="scale-item">
+                    <span class="scale-name">HIT-6 Score</span>
+                    <input type="number" class="scale-input" value="58" placeholder="36-78">
+                    <select class="form-select scale-interpretation">
+                      <option>Substantial impact</option>
+                      <option>Little/No impact</option>
+                      <option>Some impact</option>
+                      <option>Severe impact</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
+
+              <div class="accordion" onclick="toggleAccordion(this)">
+                <div class="accordion-header">
+                  <span class="accordion-title">
+                    <span class="status-dot"></span>
+                    Cognitive Scales
+                  </span>
+                  <svg class="accordion-chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <polyline points="6 9 12 15 18 9"/>
+                  </svg>
+                </div>
+                <div class="accordion-content" onclick="event.stopPropagation()">
+                  <div class="scale-item">
+                    <span class="scale-name">MoCA Score</span>
+                    <input type="number" class="scale-input" placeholder="0-30">
+                    <select class="form-select scale-interpretation">
+                      <option value="">Select...</option>
+                      <option>Normal (26+)</option>
+                      <option>Mild impairment (18-25)</option>
+                      <option>Moderate impairment (10-17)</option>
+                      <option>Severe impairment (&lt;10)</option>
+                    </select>
+                  </div>
+                  <div class="scale-item">
+                    <span class="scale-name">Mini-Cog</span>
+                    <input type="number" class="scale-input" placeholder="0-5">
+                    <select class="form-select scale-interpretation">
+                      <option value="">Select...</option>
+                      <option>Normal (3-5)</option>
+                      <option>Abnormal (0-2)</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
+
+              <div class="accordion" onclick="toggleAccordion(this)">
+                <div class="accordion-header">
+                  <span class="accordion-title">
+                    <span class="status-dot"></span>
+                    Mental Health Screens
+                  </span>
+                  <svg class="accordion-chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <polyline points="6 9 12 15 18 9"/>
+                  </svg>
+                </div>
+                <div class="accordion-content" onclick="event.stopPropagation()">
+                  <div class="scale-item">
+                    <span class="scale-name">PHQ-9</span>
+                    <input type="number" class="scale-input" placeholder="0-27">
+                    <select class="form-select scale-interpretation">
+                      <option value="">Select...</option>
+                      <option>Minimal (0-4)</option>
+                      <option>Mild (5-9)</option>
+                      <option>Moderate (10-14)</option>
+                      <option>Mod-Severe (15-19)</option>
+                      <option>Severe (20-27)</option>
+                    </select>
+                  </div>
+                  <div class="scale-item">
+                    <span class="scale-name">GAD-7</span>
+                    <input type="number" class="scale-input" placeholder="0-21">
+                    <select class="form-select scale-interpretation">
+                      <option value="">Select...</option>
+                      <option>Minimal (0-4)</option>
+                      <option>Mild (5-9)</option>
+                      <option>Moderate (10-14)</option>
+                      <option>Severe (15-21)</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="form-section">
+              <div class="section-header">
+                <span class="section-title">Review of systems</span>
+                <span class="required-badge">Required</span>
+              </div>
+              <div class="option-group">
+                <label class="option-item">
+                  <input type="radio" name="ros" checked> Reviewed
+                </label>
+                <label class="option-item">
+                  <input type="radio" name="ros"> Unable to obtain due to:
+                </label>
+                <label class="option-item">
+                  <input type="radio" name="ros"> Other
+                </label>
+              </div>
+            </div>
+
+            <div class="form-section">
+              <div class="section-header">
+                <span class="section-title">Allergies</span>
+                <span class="required-badge">Required</span>
+              </div>
+              <div class="option-group">
+                <label class="option-item">
+                  <input type="radio" name="allergies" checked> NKDA
+                </label>
+                <label class="option-item">
+                  <input type="radio" name="allergies"> Reviewed in EHR
+                </label>
+                <label class="option-item">
+                  <input type="radio" name="allergies"> Unknown
+                </label>
+                <label class="option-item">
+                  <input type="radio" name="allergies"> Other
+                </label>
+              </div>
+            </div>
+
+            <div class="form-section">
+              <div class="section-header">
+                <span class="section-title">Is medical, surgical, family and social history available?</span>
+                <span class="optional-badge">Optional</span>
+              </div>
+              <div class="option-group">
+                <label class="option-item">
+                  <input type="radio" name="history" checked> Yes
+                </label>
+                <label class="option-item">
+                  <input type="radio" name="history"> No, due to patient limitation
+                </label>
+                <label class="option-item">
+                  <input type="radio" name="history"> N/A due to phone consult
+                </label>
+              </div>
+            </div>
+          </div>
+
+          <!-- Imaging Tab -->
+          <div id="imaging-tab" class="tab-pane">
+            <div class="form-section">
+              <div class="section-header">
+                <span class="section-title">Imaging Studies</span>
+                <span class="optional-badge">Optional</span>
+              </div>
+
+              <div class="study-card open" onclick="toggleStudyCard(this)">
+                <div class="study-card-header">
+                  <div class="study-card-title">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
+                    </svg>
+                    <span>MRI Brain</span>
+                  </div>
+                  <div style="display: flex; align-items: center; gap: 12px;">
+                    <span class="study-card-summary">01/05/2026 - Normal</span>
+                    <svg class="study-chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="transition: transform 0.2s;">
+                      <polyline points="6 9 12 15 18 9"/>
+                    </svg>
+                  </div>
+                </div>
+                <div class="study-card-content" onclick="event.stopPropagation()">
+                  <div class="form-row">
+                    <div class="form-group">
+                      <label class="form-label">Date</label>
+                      <input type="date" class="form-input" value="2026-01-05">
+                    </div>
+                    <div class="form-group">
+                      <label class="form-label">Interpretation</label>
+                      <select class="form-select">
+                        <option selected>Normal</option>
+                        <option>Abnormal - acute</option>
+                        <option>Abnormal - chronic</option>
+                        <option>Pending</option>
+                      </select>
+                    </div>
+                  </div>
+                  <div class="form-group">
+                    <label class="form-label">Findings</label>
+                    <textarea class="form-textarea" style="min-height: 80px;">No acute intracranial abnormality. No evidence of mass, hemorrhage, or territorial infarct. Mild nonspecific white matter changes, likely age-related.</textarea>
+                  </div>
+                  <div class="form-group">
+                    <label class="form-label">Link to PACS</label>
+                    <input type="url" class="form-input" placeholder="https://pacs.hospital.com/...">
+                  </div>
+                </div>
+              </div>
+
+              <div class="study-card" onclick="toggleStudyCard(this)">
+                <div class="study-card-header">
+                  <div class="study-card-title">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
+                    </svg>
+                    <span>CT Head</span>
+                  </div>
+                  <div style="display: flex; align-items: center; gap: 12px;">
+                    <span class="study-card-summary" style="color: var(--text-muted);">Not documented</span>
+                    <svg class="study-chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="transition: transform 0.2s;">
+                      <polyline points="6 9 12 15 18 9"/>
+                    </svg>
+                  </div>
+                </div>
+                <div class="study-card-content" onclick="event.stopPropagation()">
+                  <div class="form-row">
+                    <div class="form-group">
+                      <label class="form-label">Date</label>
+                      <input type="date" class="form-input">
+                    </div>
+                    <div class="form-group">
+                      <label class="form-label">Interpretation</label>
+                      <select class="form-select">
+                        <option value="">Select...</option>
+                        <option>Normal</option>
+                        <option>Abnormal - acute</option>
+                        <option>Abnormal - chronic</option>
+                        <option>Pending</option>
+                      </select>
+                    </div>
+                  </div>
+                  <div class="form-group">
+                    <label class="form-label">Findings</label>
+                    <textarea class="form-textarea" style="min-height: 80px;" placeholder="Enter imaging findings..."></textarea>
+                  </div>
+                </div>
+              </div>
+
+              <div class="study-card" onclick="toggleStudyCard(this)">
+                <div class="study-card-header">
+                  <div class="study-card-title">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
+                    </svg>
+                    <span>CTA Head & Neck</span>
+                  </div>
+                  <svg class="study-chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <polyline points="6 9 12 15 18 9"/>
+                  </svg>
+                </div>
+                <div class="study-card-content" onclick="event.stopPropagation()">
+                  <div class="form-row">
+                    <div class="form-group">
+                      <label class="form-label">Date</label>
+                      <input type="date" class="form-input">
+                    </div>
+                    <div class="form-group">
+                      <label class="form-label">Interpretation</label>
+                      <select class="form-select">
+                        <option value="">Select...</option>
+                        <option>Normal</option>
+                        <option>Abnormal - acute</option>
+                        <option>Abnormal - chronic</option>
+                        <option>Pending</option>
+                      </select>
+                    </div>
+                  </div>
+                  <div class="form-group">
+                    <label class="form-label">Findings</label>
+                    <textarea class="form-textarea" style="min-height: 80px;" placeholder="Enter imaging findings..."></textarea>
+                  </div>
+                </div>
+              </div>
+
+              <button style="display: flex; align-items: center; gap: 6px; padding: 10px 16px; background: var(--bg-gray); border: 1px dashed var(--border); border-radius: 8px; color: var(--primary); cursor: pointer; width: 100%; justify-content: center; margin-top: 8px;">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+                </svg>
+                Add Study
+              </button>
+            </div>
+
+            <div class="form-section">
+              <div class="section-header">
+                <span class="section-title">Neurodiagnostic Studies</span>
+                <span class="optional-badge">Optional</span>
+              </div>
+
+              <div class="study-card" onclick="toggleStudyCard(this)">
+                <div class="study-card-header">
+                  <div class="study-card-title">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
+                    </svg>
+                    <span>EEG</span>
+                  </div>
+                  <svg class="study-chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <polyline points="6 9 12 15 18 9"/>
+                  </svg>
+                </div>
+                <div class="study-card-content" onclick="event.stopPropagation()">
+                  <div class="form-row">
+                    <div class="form-group">
+                      <label class="form-label">Date</label>
+                      <input type="date" class="form-input">
+                    </div>
+                    <div class="form-group">
+                      <label class="form-label">Type</label>
+                      <select class="form-select">
+                        <option>Routine</option>
+                        <option>LTM</option>
+                        <option>Ambulatory</option>
+                      </select>
+                    </div>
+                    <div class="form-group">
+                      <label class="form-label">Duration</label>
+                      <input type="text" class="form-input" placeholder="e.g., 20 min">
+                    </div>
+                  </div>
+                  <div class="form-group">
+                    <label class="form-label">Findings</label>
+                    <textarea class="form-textarea" style="min-height: 80px;" placeholder="Enter EEG findings..."></textarea>
+                  </div>
+                </div>
+              </div>
+
+              <div class="study-card" onclick="toggleStudyCard(this)">
+                <div class="study-card-header">
+                  <div class="study-card-title">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
+                    </svg>
+                    <span>EMG/NCS</span>
+                  </div>
+                  <svg class="study-chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <polyline points="6 9 12 15 18 9"/>
+                  </svg>
+                </div>
+                <div class="study-card-content" onclick="event.stopPropagation()">
+                  <div class="form-row">
+                    <div class="form-group">
+                      <label class="form-label">Date</label>
+                      <input type="date" class="form-input">
+                    </div>
+                    <div class="form-group">
+                      <label class="form-label">Interpretation</label>
+                      <select class="form-select">
+                        <option value="">Select...</option>
+                        <option>Normal</option>
+                        <option>Abnormal</option>
+                      </select>
+                    </div>
+                  </div>
+                  <div class="form-group">
+                    <label class="form-label">Findings</label>
+                    <textarea class="form-textarea" style="min-height: 80px;" placeholder="Enter EMG/NCS findings..."></textarea>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="form-section">
+              <div class="section-header">
+                <span class="section-title">Laboratory Results</span>
+                <span class="optional-badge">Optional</span>
+              </div>
+              <div class="chips-container">
+                <span class="chip" onclick="toggleChip(this)">CBC</span>
+                <span class="chip" onclick="toggleChip(this)">CMP</span>
+                <span class="chip" onclick="toggleChip(this)">TSH</span>
+                <span class="chip" onclick="toggleChip(this)">Lipid panel</span>
+                <span class="chip" onclick="toggleChip(this)">HbA1c</span>
+                <span class="chip" onclick="toggleChip(this)">Vitamin B12</span>
+                <span class="chip" onclick="toggleChip(this)">Vitamin D</span>
+                <span class="chip" onclick="toggleChip(this)">Drug levels</span>
+                <span class="chip" onclick="toggleChip(this)">Other labs</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Physical Exam Tab -->
+          <div id="exam-tab" class="tab-pane">
+            <div class="form-section">
+              <div class="section-header">
+                <span class="section-title">Initial Assessment</span>
+                <span class="optional-badge">Optional</span>
+              </div>
+              <div class="form-row">
+                <div class="form-group">
+                  <label class="form-label">Select date</label>
+                  <input type="date" class="form-input" value="2026-01-16">
+                </div>
+                <div class="form-group">
+                  <label class="form-label">Military Time (PST)</label>
+                  <div style="display: flex; gap: 8px; align-items: center;">
+                    <input type="text" class="form-input" style="width: 60px;" placeholder="HH" value="14">
+                    <span>:</span>
+                    <input type="text" class="form-input" style="width: 60px;" placeholder="MM" value="30">
+                    <button style="padding: 10px 16px; background: var(--bg-gray); border: 1px solid var(--border); border-radius: 6px; cursor: pointer;">Now</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="form-section">
+              <div class="section-header">
+                <span class="section-title">Vital Signs</span>
+                <span class="optional-badge">Optional</span>
+              </div>
+              <div class="form-row">
+                <div class="form-group">
+                  <label class="form-label">Blood Pressure (mm/Hg)</label>
+                  <input type="text" class="form-input" placeholder="120/80">
+                </div>
+                <div class="form-group">
+                  <label class="form-label">Pulse (bpm)</label>
+                  <input type="text" class="form-input" placeholder="72">
+                </div>
+              </div>
+              <div class="form-row">
+                <div class="form-group">
+                  <label class="form-label">Oxygen saturation (%)</label>
+                  <input type="text" class="form-input" placeholder="98">
+                </div>
+                <div class="form-group">
+                  <label class="form-label">Temperature</label>
+                  <input type="text" class="form-input" placeholder="98.6">
+                </div>
+              </div>
+              <div class="form-group">
+                <label class="form-label">Fever symptoms</label>
+                <div style="display: flex; gap: 8px; margin-top: 6px;">
+                  <button class="chip" onclick="toggleChip(this)">Febrile</button>
+                  <button class="chip selected" onclick="toggleChip(this)">Afebrile</button>
+                </div>
+              </div>
+            </div>
+
+            <div class="form-section">
+              <div class="section-header">
+                <span class="section-title">Neurological Examination</span>
+                <span class="optional-badge">Optional</span>
+              </div>
+
+              <button class="exam-quick-btn" onclick="fillNormalExam()">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <polyline points="20 6 9 17 4 12"/>
+                </svg>
+                Normal Neurological Exam
+              </button>
+
+              <div class="accordion open" onclick="toggleAccordion(this)">
+                <div class="accordion-header">
+                  <span class="accordion-title">
+                    <span class="status-dot filled"></span>
+                    General Appearance
+                  </span>
+                  <svg class="accordion-chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <polyline points="6 9 12 15 18 9"/>
+                  </svg>
+                </div>
+                <div class="accordion-content" onclick="event.stopPropagation()">
+                  <select class="form-select">
+                    <option selected>In no apparent distress</option>
+                    <option>Appears uncomfortable</option>
+                    <option>Appears ill</option>
+                    <option>Appears anxious</option>
+                  </select>
+                </div>
+              </div>
+
+              <div class="accordion open" onclick="toggleAccordion(this)">
+                <div class="accordion-header">
+                  <span class="accordion-title">
+                    <span class="status-dot filled"></span>
+                    Mental Status
+                  </span>
+                  <svg class="accordion-chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <polyline points="6 9 12 15 18 9"/>
+                  </svg>
+                </div>
+                <div class="accordion-content" onclick="event.stopPropagation()">
+                  <div class="exam-subsection">
+                    <h5>Level of Consciousness</h5>
+                    <div class="exam-grid">
+                      <label class="option-item"><input type="radio" name="loc" checked> Awake, Alert</label>
+                      <label class="option-item"><input type="radio" name="loc"> Drowsy</label>
+                      <label class="option-item"><input type="radio" name="loc"> Obtunded</label>
+                      <label class="option-item"><input type="radio" name="loc"> Comatose</label>
+                    </div>
+                  </div>
+                  <div class="exam-subsection">
+                    <h5>Orientation</h5>
+                    <div class="exam-grid">
+                      <label class="option-item"><input type="checkbox" checked> Name</label>
+                      <label class="option-item"><input type="checkbox" checked> Date</label>
+                      <label class="option-item"><input type="checkbox" checked> Location</label>
+                      <label class="option-item"><input type="checkbox" checked> Situation</label>
+                    </div>
+                  </div>
+                  <div class="exam-subsection">
+                    <label class="option-item"><input type="checkbox" checked> Following commands</label>
+                  </div>
+                </div>
+              </div>
+
+              <div class="accordion open" onclick="toggleAccordion(this)">
+                <div class="accordion-header">
+                  <span class="accordion-title">
+                    <span class="status-dot filled"></span>
+                    Cranial Nerves
+                  </span>
+                  <svg class="accordion-chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <polyline points="6 9 12 15 18 9"/>
+                  </svg>
+                </div>
+                <div class="accordion-content" onclick="event.stopPropagation()">
+                  <div class="exam-grid">
+                    <label class="option-item"><input type="checkbox" checked> Visual fields full to confrontation</label>
+                    <label class="option-item"><input type="checkbox" checked> Pupils equal and reactive</label>
+                    <label class="option-item"><input type="checkbox" checked> EOMs full, no nystagmus</label>
+                    <label class="option-item"><input type="checkbox" checked> Facial sensation intact</label>
+                    <label class="option-item"><input type="checkbox" checked> Face symmetric</label>
+                    <label class="option-item"><input type="checkbox" checked> Hearing grossly intact</label>
+                    <label class="option-item"><input type="checkbox" checked> Palate elevates symmetrically</label>
+                    <label class="option-item"><input type="checkbox" checked> Tongue midline</label>
+                  </div>
+                </div>
+              </div>
+
+              <div class="accordion open" onclick="toggleAccordion(this)">
+                <div class="accordion-header">
+                  <span class="accordion-title">
+                    <span class="status-dot filled"></span>
+                    Motor
+                  </span>
+                  <svg class="accordion-chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <polyline points="6 9 12 15 18 9"/>
+                  </svg>
+                </div>
+                <div class="accordion-content" onclick="event.stopPropagation()">
+                  <div class="exam-grid">
+                    <label class="option-item"><input type="checkbox" checked> Normal bulk</label>
+                    <label class="option-item"><input type="checkbox" checked> Normal tone</label>
+                    <label class="option-item"><input type="checkbox" checked> Strength 5/5 all extremities</label>
+                    <label class="option-item"><input type="checkbox" checked> No pronator drift</label>
+                  </div>
+                </div>
+              </div>
+
+              <div class="accordion open" onclick="toggleAccordion(this)">
+                <div class="accordion-header">
+                  <span class="accordion-title">
+                    <span class="status-dot filled"></span>
+                    Sensation
+                  </span>
+                  <svg class="accordion-chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <polyline points="6 9 12 15 18 9"/>
+                  </svg>
+                </div>
+                <div class="accordion-content" onclick="event.stopPropagation()">
+                  <div class="exam-grid">
+                    <label class="option-item"><input type="checkbox" checked> Light touch intact</label>
+                    <label class="option-item"><input type="checkbox" checked> Pinprick intact</label>
+                    <label class="option-item"><input type="checkbox" checked> Vibration intact</label>
+                    <label class="option-item"><input type="checkbox" checked> Proprioception intact</label>
+                  </div>
+                </div>
+              </div>
+
+              <div class="accordion open" onclick="toggleAccordion(this)">
+                <div class="accordion-header">
+                  <span class="accordion-title">
+                    <span class="status-dot filled"></span>
+                    Coordination
+                  </span>
+                  <svg class="accordion-chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <polyline points="6 9 12 15 18 9"/>
+                  </svg>
+                </div>
+                <div class="accordion-content" onclick="event.stopPropagation()">
+                  <div class="exam-grid">
+                    <label class="option-item"><input type="checkbox" checked> Finger-to-nose intact</label>
+                    <label class="option-item"><input type="checkbox" checked> Heel-to-shin intact</label>
+                    <label class="option-item"><input type="checkbox" checked> Rapid alternating movements intact</label>
+                  </div>
+                </div>
+              </div>
+
+              <div class="accordion" onclick="toggleAccordion(this)">
+                <div class="accordion-header">
+                  <span class="accordion-title">
+                    <span class="status-dot"></span>
+                    Gait
+                  </span>
+                  <svg class="accordion-chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <polyline points="6 9 12 15 18 9"/>
+                  </svg>
+                </div>
+                <div class="accordion-content" onclick="event.stopPropagation()">
+                  <div class="option-group" style="margin-bottom: 12px;">
+                    <label class="option-item"><input type="radio" name="gait" checked> Evaluated</label>
+                    <label class="option-item"><input type="radio" name="gait"> Not evaluated</label>
+                  </div>
+                  <div class="exam-grid">
+                    <label class="option-item"><input type="checkbox"> Station normal</label>
+                    <label class="option-item"><input type="checkbox"> Casual gait normal</label>
+                    <label class="option-item"><input type="checkbox"> Tandem gait normal</label>
+                    <label class="option-item"><input type="checkbox"> Romberg negative</label>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="form-section">
+              <div class="section-header">
+                <span class="section-title">General Notes</span>
+                <span class="optional-badge">Optional</span>
+              </div>
+              <textarea class="form-textarea" placeholder="Additional examination notes..."></textarea>
+            </div>
+          </div>
+
+          <!-- Recommendation Tab -->
+          <div id="recommendation-tab" class="tab-pane">
+            <div class="form-section">
+              <div class="section-header">
+                <span class="section-title">Differential diagnosis</span>
+                <span class="required-badge">Required</span>
+              </div>
+
+              <div class="diagnosis-search">
+                <svg class="diagnosis-search-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/>
+                </svg>
+                <input type="text" class="diagnosis-input" placeholder="Search ICD-10 diagnosis..." oninput="showDiagnosisDropdown(this)" onfocus="showDiagnosisDropdown(this)">
+                <div class="diagnosis-dropdown" id="diagnosis-dropdown">
+                  <div class="diagnosis-option" onclick="selectDiagnosis('G43.909', 'Migraine, unspecified', 'Headache')">
+                    <div>
+                      <span class="diagnosis-code">G43.909</span>
+                      <span class="diagnosis-name"> - Migraine, unspecified</span>
+                    </div>
+                    <span class="diagnosis-category">Headache</span>
+                  </div>
+                  <div class="diagnosis-option" onclick="selectDiagnosis('G43.711', 'Chronic migraine without aura, intractable', 'Headache')">
+                    <div>
+                      <span class="diagnosis-code">G43.711</span>
+                      <span class="diagnosis-name"> - Chronic migraine without aura, intractable</span>
+                    </div>
+                    <span class="diagnosis-category">Headache</span>
+                  </div>
+                  <div class="diagnosis-option" onclick="selectDiagnosis('G44.52', 'New daily persistent headache', 'Headache')">
+                    <div>
+                      <span class="diagnosis-code">G44.52</span>
+                      <span class="diagnosis-name"> - New daily persistent headache</span>
+                    </div>
+                    <span class="diagnosis-category">Headache</span>
+                  </div>
+                  <div class="diagnosis-option" onclick="selectDiagnosis('G40.909', 'Epilepsy, unspecified', 'Seizure')">
+                    <div>
+                      <span class="diagnosis-code">G40.909</span>
+                      <span class="diagnosis-name"> - Epilepsy, unspecified</span>
+                    </div>
+                    <span class="diagnosis-category">Seizure</span>
+                  </div>
+                  <div class="diagnosis-option" onclick="selectDiagnosis('G35', 'Multiple sclerosis', 'Demyelinating')">
+                    <div>
+                      <span class="diagnosis-code">G35</span>
+                      <span class="diagnosis-name"> - Multiple sclerosis</span>
+                    </div>
+                    <span class="diagnosis-category">Demyelinating</span>
+                  </div>
+                </div>
+              </div>
+
+              <div class="selected-diagnoses" id="selected-diagnoses">
+                <div class="diagnosis-pill">
+                  <span>G43.711 - Chronic migraine</span>
+                  <button class="plan-btn" onclick="openPlanBuilder()" title="Open Plan Builder">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-2 2 2 2 0 01-2-2v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83 0 2 2 0 010-2.83l.06-.06a1.65 1.65 0 00.33-1.82 1.65 1.65 0 00-1.51-1H3a2 2 0 01-2-2 2 2 0 012-2h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 010-2.83 2 2 0 012.83 0l.06.06a1.65 1.65 0 001.82.33H9a1.65 1.65 0 001-1.51V3a2 2 0 012-2 2 2 0 012 2v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 0 2 2 0 010 2.83l-.06.06a1.65 1.65 0 00-.33 1.82V9a1.65 1.65 0 001.51 1H21a2 2 0 012 2 2 2 0 01-2 2h-.09a1.65 1.65 0 00-1.51 1z"/>
+                    </svg>
+                  </button>
+                  <button class="remove-btn" onclick="this.parentElement.remove()">×</button>
+                </div>
+              </div>
+            </div>
+
+            <div class="form-section">
+              <div class="section-header">
+                <span class="section-title">Assessment</span>
+                <span class="required-badge">Required</span>
+              </div>
+
+              <button class="ai-generate-btn" onclick="generateAssessment()">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
+                </svg>
+                Generate assessment
+              </button>
+
+              <textarea class="form-textarea" id="assessment-text" placeholder="Enter a detailed assessment...">50-year-old male with chronic daily headache, likely chronic migraine without aura based on clinical presentation. Patient reports improvement with current prophylactic therapy (topiramate 50mg BID). Headache frequency reduced from daily to 3-4 per week. No red flags present. MRI brain unremarkable. MIDAS score indicates moderate disability (18), HIT-6 indicates substantial impact (58). Plan to continue current regimen and reassess at next visit.</textarea>
+            </div>
+
+            <div class="form-section">
+              <div class="section-header">
+                <span class="section-title">Recommendations</span>
+                <span class="required-badge">Required</span>
+              </div>
+
+              <div style="display: flex; gap: 8px; margin-bottom: 16px;">
+                <span class="chip selected" onclick="toggleChip(this)">Pro-note template</span>
+                <span class="chip" onclick="toggleChip(this)">Free-text recommendations</span>
+              </div>
+
+              <textarea class="form-textarea" id="recommendations-text">1. Continue topiramate 50mg twice daily
+2. May increase to 75mg BID if headaches persist at current frequency
+3. Headache diary - continue tracking frequency, severity, triggers
+4. Avoid known triggers (stress, irregular sleep, skipped meals)
+5. Follow up in 3 months or sooner if worsening
+6. Call clinic if experiencing new neurological symptoms
+7. Consider CGRP antagonist if inadequate response to topiramate optimization</textarea>
+            </div>
+
+            <div class="form-section">
+              <div class="section-header">
+                <span class="section-title">Final recommendation time</span>
+                <span class="optional-badge">Optional</span>
+              </div>
+              <div class="form-row">
+                <div class="form-group">
+                  <label class="form-label">Select date</label>
+                  <input type="date" class="form-input" value="2026-01-16">
+                </div>
+                <div class="form-group">
+                  <label class="form-label">Military Time (PST)</label>
+                  <div style="display: flex; gap: 8px; align-items: center;">
+                    <input type="text" class="form-input" style="width: 60px;" placeholder="HH" value="15">
+                    <span>:</span>
+                    <input type="text" class="form-input" style="width: 60px;" placeholder="MM" value="00">
+                    <button style="padding: 10px 16px; background: var(--bg-gray); border: 1px solid var(--border); border-radius: 6px; cursor: pointer;">Now</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="output-preview">
+              <div class="output-preview-header">
+                <h4>Note Preview (Plain Text for EHR)</h4>
+                <button class="copy-btn" onclick="copyToClipboard()">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right: 4px;">
+                    <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/>
+                  </svg>
+                  Copy for EHR
+                </button>
+              </div>
+              <pre>NEUROLOGY OUTPATIENT CONSULTATION
+
+PATIENT: Test Test | 50 M | MRN: 123123
+DATE: 01/16/2026
+
+REASON FOR VISIT: Headache
+
+HPI: 50-year-old male presents for follow-up of chronic
+daily headaches. Patient reports headaches have improved
+from daily to approximately 3-4 per week since starting
+topiramate.
+
+CLINICAL SCALES:
+- MIDAS: 18 (Moderate disability)
+- HIT-6: 58 (Substantial impact)
+
+NEUROLOGICAL EXAMINATION:
+General: In no apparent distress
+Mental Status: Awake, alert, oriented x4
+Cranial Nerves: II-XII intact
+Motor: 5/5 strength all extremities, normal tone
+Sensory: Intact to light touch
+Coordination: FTN, HTS intact bilaterally
+
+IMAGING: MRI Brain (01/05/2026) - Normal
+
+ASSESSMENT:
+Chronic migraine without aura (G43.711)
+- Improved on current prophylaxis
+- No red flags
+
+PLAN:
+1. Continue topiramate 50mg twice daily
+2. May increase to 75mg BID if needed
+3. Continue headache diary
+4. Follow up in 3 months
+5. Consider CGRP antagonist if inadequate response
+
+Electronically signed by: Dr. Steve Arbogast
+01/16/2026 15:00 PST</pre>
+            </div>
+          </div>
+        </div>
+      </main>
+
+      <!-- Right Action Bar -->
+      <aside class="right-action-bar">
+        <button class="action-btn" title="More options">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="1"/><circle cx="12" cy="5" r="1"/><circle cx="12" cy="19" r="1"/>
+          </svg>
+        </button>
+        <button class="action-btn" title="Thumbs up">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M14 9V5a3 3 0 00-3-3l-4 9v11h11.28a2 2 0 002-1.7l1.38-9a2 2 0 00-2-2.3zM7 22H4a2 2 0 01-2-2v-7a2 2 0 012-2h3"/>
+          </svg>
+        </button>
+        <button class="action-btn" title="Voice record">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M12 1a3 3 0 00-3 3v8a3 3 0 006 0V4a3 3 0 00-3-3z"/><path d="M19 10v2a7 7 0 01-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/>
+          </svg>
+        </button>
+        <button class="action-btn action-btn-primary" title="Add">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+          </svg>
+        </button>
+        <button class="action-btn" title="Copy">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/>
+          </svg>
+        </button>
+
+        <div class="action-spacer"></div>
+
+        <button class="pend-btn">Pend</button>
+        <button class="sign-btn" onclick="showToast('Note signed and completed!', 'success')">Sign & complete</button>
+      </aside>
+    </div>
+  </div>
+
+  <!-- Plan Builder Modal -->
+  <div class="modal-overlay" id="plan-builder-modal">
+    <div class="plan-builder-modal">
+      <div class="plan-builder-header">
+        <h2>Recommendation plan for Chronic Migraine</h2>
+        <div class="plan-builder-tabs">
+          <button class="plan-tab active">Customize</button>
+          <button class="plan-tab">Use standard</button>
+        </div>
+      </div>
+      <div class="plan-builder-content">
+        <div class="plan-section">
+          <div class="plan-section-header">
+            <span class="plan-section-title">Laboratory Testing</span>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <polyline points="6 9 12 15 18 9"/>
+            </svg>
+          </div>
+          <div class="plan-checkbox-list">
+            <div class="plan-checkbox-item">
+              <input type="checkbox" id="lab-cbc">
+              <label for="lab-cbc">CBC</label>
+            </div>
+            <div class="plan-checkbox-item">
+              <input type="checkbox" id="lab-cmp">
+              <label for="lab-cmp">CMP</label>
+            </div>
+            <div class="plan-checkbox-item">
+              <input type="checkbox" id="lab-tsh">
+              <label for="lab-tsh">TSH</label>
+            </div>
+            <div class="plan-checkbox-item">
+              <input type="checkbox" id="lab-mg">
+              <label for="lab-mg">Magnesium level</label>
+            </div>
+          </div>
+        </div>
+
+        <div class="plan-section">
+          <div class="plan-section-header">
+            <span class="plan-section-title">Diagnostic Studies</span>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <polyline points="6 9 12 15 18 9"/>
+            </svg>
+          </div>
+          <div class="plan-checkbox-list">
+            <div class="plan-checkbox-item">
+              <input type="checkbox" id="img-mri" checked>
+              <label for="img-mri">MRI brain without contrast</label>
+            </div>
+            <div class="plan-checkbox-item">
+              <input type="checkbox" id="img-mra">
+              <label for="img-mra">MRA head</label>
+            </div>
+            <div class="plan-checkbox-item">
+              <input type="checkbox" id="img-ct">
+              <label for="img-ct">CT head without contrast</label>
+            </div>
+          </div>
+        </div>
+
+        <div class="plan-section">
+          <div class="plan-section-header">
+            <span class="plan-section-title">Treatments - Preventive</span>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <polyline points="6 9 12 15 18 9"/>
+            </svg>
+          </div>
+          <div class="plan-checkbox-list">
+            <div class="plan-checkbox-item">
+              <input type="checkbox" id="med-topiramate" checked>
+              <label for="med-topiramate">Topiramate 25-100mg BID</label>
+            </div>
+            <div class="plan-checkbox-item">
+              <input type="checkbox" id="med-propranolol">
+              <label for="med-propranolol">Propranolol 40-160mg daily</label>
+            </div>
+            <div class="plan-checkbox-item">
+              <input type="checkbox" id="med-amitriptyline">
+              <label for="med-amitriptyline">Amitriptyline 10-50mg QHS</label>
+            </div>
+            <div class="plan-checkbox-item">
+              <input type="checkbox" id="med-cgrp">
+              <label for="med-cgrp">CGRP antagonist (Aimovig, Ajovy, Emgality)</label>
+            </div>
+            <div class="plan-checkbox-item">
+              <input type="checkbox" id="med-botox">
+              <label for="med-botox">OnabotulinumtoxinA (Botox) q12 weeks</label>
+            </div>
+          </div>
+        </div>
+
+        <div class="plan-section">
+          <div class="plan-section-header">
+            <span class="plan-section-title">Treatments - Abortive</span>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <polyline points="6 9 12 15 18 9"/>
+            </svg>
+          </div>
+          <div class="plan-checkbox-list">
+            <div class="plan-checkbox-item">
+              <input type="checkbox" id="med-triptan" checked>
+              <label for="med-triptan">Sumatriptan 50-100mg PRN</label>
+            </div>
+            <div class="plan-checkbox-item">
+              <input type="checkbox" id="med-nsaid">
+              <label for="med-nsaid">NSAIDs (Ibuprofen, Naproxen) PRN</label>
+            </div>
+            <div class="plan-checkbox-item">
+              <input type="checkbox" id="med-gepant">
+              <label for="med-gepant">Ubrogepant/Rimegepant PRN</label>
+            </div>
+          </div>
+        </div>
+
+        <div class="plan-section">
+          <div class="plan-section-header">
+            <span class="plan-section-title">Referrals</span>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <polyline points="6 9 12 15 18 9"/>
+            </svg>
+          </div>
+          <div class="plan-checkbox-list">
+            <div class="plan-checkbox-item">
+              <input type="checkbox" id="ref-neuro">
+              <label for="ref-neuro">Neurology follow-up</label>
+            </div>
+            <div class="plan-checkbox-item">
+              <input type="checkbox" id="ref-headache">
+              <label for="ref-headache">Headache specialist</label>
+            </div>
+            <div class="plan-checkbox-item">
+              <input type="checkbox" id="ref-psych">
+              <label for="ref-psych">Psychology/CBT for headache</label>
+            </div>
+            <div class="plan-checkbox-item">
+              <input type="checkbox" id="ref-pt">
+              <label for="ref-pt">Physical therapy</label>
+            </div>
+          </div>
+        </div>
+
+        <div class="plan-section">
+          <div class="plan-section-header">
+            <span class="plan-section-title">Patient Education</span>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <polyline points="6 9 12 15 18 9"/>
+            </svg>
+          </div>
+          <div class="plan-checkbox-list">
+            <div class="plan-checkbox-item">
+              <input type="checkbox" id="edu-diary" checked>
+              <label for="edu-diary">Maintain headache diary</label>
+            </div>
+            <div class="plan-checkbox-item">
+              <input type="checkbox" id="edu-triggers" checked>
+              <label for="edu-triggers">Avoid known triggers</label>
+            </div>
+            <div class="plan-checkbox-item">
+              <input type="checkbox" id="edu-sleep">
+              <label for="edu-sleep">Regular sleep schedule</label>
+            </div>
+            <div class="plan-checkbox-item">
+              <input type="checkbox" id="edu-moh">
+              <label for="edu-moh">Medication overuse headache counseling</label>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="plan-builder-footer">
+        <button class="btn-cancel" onclick="closePlanBuilder()">Cancel</button>
+        <button class="btn-apply" onclick="applyPlan()">Apply to Recommendations</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast Notification -->
+  <div class="toast" id="toast">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <polyline points="20 6 9 17 4 12"/>
+    </svg>
+    <span id="toast-message">Copied to clipboard!</span>
+  </div>
+
+  <script>
+    // Tab switching
+    function switchTab(tabName) {
+      document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+      document.querySelectorAll('.tab-pane').forEach(pane => pane.classList.remove('active'));
+
+      event.target.classList.add('active');
+      document.getElementById(tabName + '-tab').classList.add('active');
+    }
+
+    // Chip toggle
+    function toggleChip(chip) {
+      chip.classList.toggle('selected');
+    }
+
+    // Accordion toggle
+    function toggleAccordion(accordion) {
+      accordion.classList.toggle('open');
+    }
+
+    // Study card toggle
+    function toggleStudyCard(card) {
+      card.classList.toggle('open');
+    }
+
+    // Visit card toggle
+    function toggleVisitCard(card) {
+      document.querySelectorAll('.prior-visit-card').forEach(c => {
+        if (c !== card) c.classList.remove('expanded');
+      });
+      card.classList.toggle('expanded');
+    }
+
+    // Diagnosis dropdown
+    function showDiagnosisDropdown(input) {
+      const dropdown = document.getElementById('diagnosis-dropdown');
+      if (input.value.length > 0) {
+        dropdown.classList.add('show');
+      } else {
+        dropdown.classList.remove('show');
+      }
+    }
+
+    function selectDiagnosis(code, name, category) {
+      const container = document.getElementById('selected-diagnoses');
+      const pill = document.createElement('div');
+      pill.className = 'diagnosis-pill';
+      pill.innerHTML = `
+        <span>${code} - ${name}</span>
+        <button class="plan-btn" onclick="openPlanBuilder()" title="Open Plan Builder">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-2 2 2 2 0 01-2-2v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83 0 2 2 0 010-2.83l.06-.06a1.65 1.65 0 00.33-1.82 1.65 1.65 0 00-1.51-1H3a2 2 0 01-2-2 2 2 0 012-2h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 010-2.83 2 2 0 012.83 0l.06.06a1.65 1.65 0 001.82.33H9a1.65 1.65 0 001-1.51V3a2 2 0 012-2 2 2 0 012 2v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 0 2 2 0 010 2.83l-.06.06a1.65 1.65 0 00-.33 1.82V9a1.65 1.65 0 001.51 1H21a2 2 0 012 2 2 2 0 01-2 2h-.09a1.65 1.65 0 00-1.51 1z"/>
+          </svg>
+        </button>
+        <button class="remove-btn" onclick="this.parentElement.remove()">×</button>
+      `;
+      container.appendChild(pill);
+
+      document.querySelector('.diagnosis-input').value = '';
+      document.getElementById('diagnosis-dropdown').classList.remove('show');
+    }
+
+    // Close dropdown when clicking outside
+    document.addEventListener('click', function(e) {
+      if (!e.target.closest('.diagnosis-search')) {
+        document.getElementById('diagnosis-dropdown').classList.remove('show');
+      }
+    });
+
+    // Plan Builder
+    function openPlanBuilder() {
+      document.getElementById('plan-builder-modal').classList.add('show');
+    }
+
+    function closePlanBuilder() {
+      document.getElementById('plan-builder-modal').classList.remove('show');
+    }
+
+    function applyPlan() {
+      closePlanBuilder();
+      showToast('Plan applied to recommendations', 'success');
+    }
+
+    // Close modal when clicking overlay
+    document.getElementById('plan-builder-modal').addEventListener('click', function(e) {
+      if (e.target === this) {
+        closePlanBuilder();
+      }
+    });
+
+    // Generate assessment
+    function generateAssessment() {
+      const btn = event.target.closest('button');
+      const originalText = btn.innerHTML;
+      btn.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="animation: spin 1s linear infinite;"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg> Generating...';
+      btn.disabled = true;
+
+      setTimeout(() => {
+        btn.innerHTML = originalText;
+        btn.disabled = false;
+        document.getElementById('assessment-text').value = `50-year-old male with chronic daily headache, likely chronic migraine without aura based on clinical presentation. Patient reports improvement with current prophylactic therapy (topiramate 50mg BID). Headache frequency reduced from daily to 3-4 per week. No red flags present. MRI brain unremarkable. MIDAS score indicates moderate disability (18), HIT-6 indicates substantial impact (58). Plan to continue current regimen and reassess at next visit.`;
+        showToast('Assessment generated', 'success');
+      }, 1500);
+    }
+
+    // Fill normal exam
+    function fillNormalExam() {
+      document.querySelectorAll('#exam-tab .accordion').forEach(acc => {
+        acc.classList.add('open');
+        acc.querySelector('.status-dot')?.classList.add('filled');
+      });
+      document.querySelectorAll('#exam-tab input[type="checkbox"]').forEach(cb => {
+        if (!cb.closest('.accordion-content')?.querySelector('h5')?.textContent.includes('Gait')) {
+          cb.checked = true;
+        }
+      });
+      showToast('Normal exam populated', 'success');
+    }
+
+    // Copy to clipboard
+    function copyToClipboard() {
+      const preText = document.querySelector('.output-preview pre').textContent;
+      navigator.clipboard.writeText(preText).then(() => {
+        showToast('Copied to clipboard!', 'success');
+      });
+    }
+
+    // Toast notification
+    function showToast(message, type) {
+      const toast = document.getElementById('toast');
+      const toastMessage = document.getElementById('toast-message');
+      toastMessage.textContent = message;
+      toast.className = 'toast show';
+      if (type === 'success') {
+        toast.classList.add('toast-success');
+      }
+      setTimeout(() => {
+        toast.classList.remove('show');
+      }, 3000);
+    }
+
+    // Timer
+    function updateTimer() {
+      const now = new Date();
+      const hours = String(now.getHours()).padStart(2, '0');
+      const minutes = String(now.getMinutes()).padStart(2, '0');
+      const seconds = String(now.getSeconds()).padStart(2, '0');
+      document.getElementById('timer').textContent = hours + ':' + minutes + ':' + seconds;
+    }
+    setInterval(updateTimer, 1000);
+
+    // Add CSS animation for spinner
+    const style = document.createElement('style');
+    style.textContent = '@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }';
+    document.head.appendChild(style);
+  </script>
+</body>
+</html>
