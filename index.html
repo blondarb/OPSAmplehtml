@@ -2301,7 +2301,43 @@
                   </div>
                   <div class="form-group">
                     <label class="form-label">Findings</label>
-                    <textarea class="form-textarea" style="min-height: 80px;">No acute intracranial abnormality. No evidence of mass, hemorrhage, or territorial infarct. Mild nonspecific white matter changes, likely age-related.</textarea>
+                    <div class="ai-textarea-wrapper">
+                      <div class="ai-textarea-icons">
+                        <button class="ai-icon-btn" onclick="toggleRecording(this)" title="Dictate with AI">
+                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M12 1a3 3 0 00-3 3v8a3 3 0 006 0V4a3 3 0 00-3-3z"/><path d="M19 10v2a7 7 0 01-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/>
+                          </svg>
+                        </button>
+                        <div style="position: relative;">
+                          <button class="ai-icon-btn sparkle" onclick="toggleAiDropdown(this)" title="AI Actions">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                              <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
+                            </svg>
+                          </button>
+                          <div class="ai-actions-dropdown">
+                            <div class="ai-action-item" onclick="triggerAiAction('question', this)">
+                              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 015.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/>
+                              </svg>
+                              <span>Ask a question about this</span>
+                            </div>
+                            <div class="ai-action-item" onclick="triggerAiAction('improve', this)">
+                              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/>
+                              </svg>
+                              <span>Improve this text</span>
+                            </div>
+                            <div class="ai-action-item" onclick="triggerAiAction('summarize', this)">
+                              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <line x1="21" y1="10" x2="3" y2="10"/><line x1="21" y1="6" x2="3" y2="6"/><line x1="21" y1="14" x2="3" y2="14"/><line x1="21" y1="18" x2="3" y2="18"/>
+                              </svg>
+                              <span>Summarize</span>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                      <textarea class="form-textarea" style="min-height: 80px; padding-right: 80px;">No acute intracranial abnormality. No evidence of mass, hemorrhage, or territorial infarct. Mild nonspecific white matter changes, likely age-related.</textarea>
+                    </div>
                   </div>
                   <div class="form-group">
                     <label class="form-label">Link to PACS</label>
@@ -2344,7 +2380,43 @@
                   </div>
                   <div class="form-group">
                     <label class="form-label">Findings</label>
-                    <textarea class="form-textarea" style="min-height: 80px;" placeholder="Enter imaging findings..."></textarea>
+                    <div class="ai-textarea-wrapper">
+                      <div class="ai-textarea-icons">
+                        <button class="ai-icon-btn" onclick="toggleRecording(this)" title="Dictate with AI">
+                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M12 1a3 3 0 00-3 3v8a3 3 0 006 0V4a3 3 0 00-3-3z"/><path d="M19 10v2a7 7 0 01-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/>
+                          </svg>
+                        </button>
+                        <div style="position: relative;">
+                          <button class="ai-icon-btn sparkle" onclick="toggleAiDropdown(this)" title="AI Actions">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                              <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
+                            </svg>
+                          </button>
+                          <div class="ai-actions-dropdown">
+                            <div class="ai-action-item" onclick="triggerAiAction('question', this)">
+                              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 015.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/>
+                              </svg>
+                              <span>Ask a question about this</span>
+                            </div>
+                            <div class="ai-action-item" onclick="triggerAiAction('improve', this)">
+                              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/>
+                              </svg>
+                              <span>Improve this text</span>
+                            </div>
+                            <div class="ai-action-item" onclick="triggerAiAction('summarize', this)">
+                              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <line x1="21" y1="10" x2="3" y2="10"/><line x1="21" y1="6" x2="3" y2="6"/><line x1="21" y1="14" x2="3" y2="14"/><line x1="21" y1="18" x2="3" y2="18"/>
+                              </svg>
+                              <span>Summarize</span>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                      <textarea class="form-textarea" style="min-height: 80px; padding-right: 80px;" placeholder="Enter imaging findings..."></textarea>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -2380,7 +2452,43 @@
                   </div>
                   <div class="form-group">
                     <label class="form-label">Findings</label>
-                    <textarea class="form-textarea" style="min-height: 80px;" placeholder="Enter imaging findings..."></textarea>
+                    <div class="ai-textarea-wrapper">
+                      <div class="ai-textarea-icons">
+                        <button class="ai-icon-btn" onclick="toggleRecording(this)" title="Dictate with AI">
+                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M12 1a3 3 0 00-3 3v8a3 3 0 006 0V4a3 3 0 00-3-3z"/><path d="M19 10v2a7 7 0 01-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/>
+                          </svg>
+                        </button>
+                        <div style="position: relative;">
+                          <button class="ai-icon-btn sparkle" onclick="toggleAiDropdown(this)" title="AI Actions">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                              <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
+                            </svg>
+                          </button>
+                          <div class="ai-actions-dropdown">
+                            <div class="ai-action-item" onclick="triggerAiAction('question', this)">
+                              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 015.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/>
+                              </svg>
+                              <span>Ask a question about this</span>
+                            </div>
+                            <div class="ai-action-item" onclick="triggerAiAction('improve', this)">
+                              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/>
+                              </svg>
+                              <span>Improve this text</span>
+                            </div>
+                            <div class="ai-action-item" onclick="triggerAiAction('summarize', this)">
+                              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <line x1="21" y1="10" x2="3" y2="10"/><line x1="21" y1="6" x2="3" y2="6"/><line x1="21" y1="14" x2="3" y2="14"/><line x1="21" y1="18" x2="3" y2="18"/>
+                              </svg>
+                              <span>Summarize</span>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                      <textarea class="form-textarea" style="min-height: 80px; padding-right: 80px;" placeholder="Enter imaging findings..."></textarea>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -2432,7 +2540,43 @@
                   </div>
                   <div class="form-group">
                     <label class="form-label">Findings</label>
-                    <textarea class="form-textarea" style="min-height: 80px;" placeholder="Enter EEG findings..."></textarea>
+                    <div class="ai-textarea-wrapper">
+                      <div class="ai-textarea-icons">
+                        <button class="ai-icon-btn" onclick="toggleRecording(this)" title="Dictate with AI">
+                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M12 1a3 3 0 00-3 3v8a3 3 0 006 0V4a3 3 0 00-3-3z"/><path d="M19 10v2a7 7 0 01-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/>
+                          </svg>
+                        </button>
+                        <div style="position: relative;">
+                          <button class="ai-icon-btn sparkle" onclick="toggleAiDropdown(this)" title="AI Actions">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                              <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
+                            </svg>
+                          </button>
+                          <div class="ai-actions-dropdown">
+                            <div class="ai-action-item" onclick="triggerAiAction('question', this)">
+                              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 015.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/>
+                              </svg>
+                              <span>Ask a question about this</span>
+                            </div>
+                            <div class="ai-action-item" onclick="triggerAiAction('improve', this)">
+                              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/>
+                              </svg>
+                              <span>Improve this text</span>
+                            </div>
+                            <div class="ai-action-item" onclick="triggerAiAction('summarize', this)">
+                              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <line x1="21" y1="10" x2="3" y2="10"/><line x1="21" y1="6" x2="3" y2="6"/><line x1="21" y1="14" x2="3" y2="14"/><line x1="21" y1="18" x2="3" y2="18"/>
+                              </svg>
+                              <span>Summarize</span>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                      <textarea class="form-textarea" style="min-height: 80px; padding-right: 80px;" placeholder="Enter EEG findings..."></textarea>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -2466,7 +2610,43 @@
                   </div>
                   <div class="form-group">
                     <label class="form-label">Findings</label>
-                    <textarea class="form-textarea" style="min-height: 80px;" placeholder="Enter EMG/NCS findings..."></textarea>
+                    <div class="ai-textarea-wrapper">
+                      <div class="ai-textarea-icons">
+                        <button class="ai-icon-btn" onclick="toggleRecording(this)" title="Dictate with AI">
+                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M12 1a3 3 0 00-3 3v8a3 3 0 006 0V4a3 3 0 00-3-3z"/><path d="M19 10v2a7 7 0 01-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/>
+                          </svg>
+                        </button>
+                        <div style="position: relative;">
+                          <button class="ai-icon-btn sparkle" onclick="toggleAiDropdown(this)" title="AI Actions">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                              <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
+                            </svg>
+                          </button>
+                          <div class="ai-actions-dropdown">
+                            <div class="ai-action-item" onclick="triggerAiAction('question', this)">
+                              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 015.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/>
+                              </svg>
+                              <span>Ask a question about this</span>
+                            </div>
+                            <div class="ai-action-item" onclick="triggerAiAction('improve', this)">
+                              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/>
+                              </svg>
+                              <span>Improve this text</span>
+                            </div>
+                            <div class="ai-action-item" onclick="triggerAiAction('summarize', this)">
+                              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <line x1="21" y1="10" x2="3" y2="10"/><line x1="21" y1="6" x2="3" y2="6"/><line x1="21" y1="14" x2="3" y2="14"/><line x1="21" y1="18" x2="3" y2="18"/>
+                              </svg>
+                              <span>Summarize</span>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                      <textarea class="form-textarea" style="min-height: 80px; padding-right: 80px;" placeholder="Enter EMG/NCS findings..."></textarea>
+                    </div>
                   </div>
                 </div>
               </div>
