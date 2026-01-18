@@ -20,7 +20,7 @@
       line-height: 1.5;
     }
 
-    /* Color Variables */
+    /* Color Variables - Light Mode */
     :root {
       --primary: #0D9488;
       --primary-light: #14B8A6;
@@ -35,6 +35,76 @@
       --error: #EF4444;
       --success: #10B981;
       --warning: #F59E0B;
+    }
+
+    /* Color Variables - Dark Mode */
+    [data-theme="dark"] {
+      --primary: #14B8A6;
+      --primary-light: #2DD4BF;
+      --primary-dark: #0D9488;
+      --bg-white: #1F2937;
+      --bg-gray: #111827;
+      --bg-dark: #0F172A;
+      --text-primary: #F9FAFB;
+      --text-secondary: #D1D5DB;
+      --text-muted: #9CA3AF;
+      --border: #374151;
+      --error: #F87171;
+      --success: #34D399;
+      --warning: #FBBF24;
+    }
+
+    [data-theme="dark"] body {
+      background: #111827;
+      color: #F9FAFB;
+    }
+
+    [data-theme="dark"] .form-textarea,
+    [data-theme="dark"] .form-input,
+    [data-theme="dark"] .form-select,
+    [data-theme="dark"] .diagnosis-input {
+      background: var(--bg-dark);
+      color: var(--text-primary);
+    }
+
+    [data-theme="dark"] .chip:not(.selected) {
+      background: var(--bg-dark);
+      color: var(--text-secondary);
+    }
+
+    [data-theme="dark"] .output-preview {
+      background: #0F172A;
+    }
+
+    [data-theme="dark"] .ai-summary-box {
+      background: linear-gradient(135deg, #064E3B 0%, #065F46 100%);
+      border-color: #059669;
+    }
+
+    [data-theme="dark"] .patient-summary-box {
+      background: linear-gradient(135deg, #064E3B 0%, #065F46 100%);
+      border-color: #059669;
+    }
+
+    [data-theme="dark"] .ai-drawer-header {
+      background: linear-gradient(135deg, #064E3B 0%, #065F46 100%);
+    }
+
+    [data-theme="dark"] .ai-launcher-menu-header {
+      background: linear-gradient(135deg, #064E3B 0%, #065F46 100%);
+    }
+
+    [data-theme="dark"] .ai-live-indicator {
+      background: linear-gradient(135deg, #78350F 0%, #92400E 100%);
+      border-color: #B45309;
+    }
+
+    [data-theme="dark"] .ai-live-text h5 {
+      color: #FDE68A;
+    }
+
+    [data-theme="dark"] .ai-live-text p {
+      color: #FCD34D;
     }
 
     /* Layout */
@@ -148,6 +218,23 @@
 
     .nav-icon:hover {
       background: var(--bg-gray);
+    }
+
+    .notification-badge {
+      position: absolute;
+      top: 2px;
+      right: 2px;
+      width: 16px;
+      height: 16px;
+      background: var(--error);
+      color: white;
+      font-size: 10px;
+      font-weight: 600;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border: 2px solid var(--bg-white);
     }
 
     .user-avatar {
@@ -1328,6 +1415,69 @@
       50% { box-shadow: 0 0 0 6px rgba(239, 68, 68, 0); }
     }
 
+    /* Voice Waveform during recording */
+    .recording-waveform {
+      display: none;
+      position: absolute;
+      top: 8px;
+      left: 8px;
+      right: 80px;
+      height: 28px;
+      background: linear-gradient(135deg, #FEE2E2 0%, #FECACA 100%);
+      border: 1px solid #F87171;
+      border-radius: 6px;
+      align-items: center;
+      justify-content: center;
+      gap: 2px;
+      padding: 0 12px;
+      z-index: 5;
+    }
+
+    .recording-waveform.active {
+      display: flex;
+    }
+
+    .recording-waveform .wave-bar {
+      width: 3px;
+      background: #EF4444;
+      border-radius: 2px;
+      animation: wave-animate 0.5s ease-in-out infinite;
+    }
+
+    .recording-waveform .wave-bar:nth-child(1) { height: 8px; animation-delay: 0s; }
+    .recording-waveform .wave-bar:nth-child(2) { height: 14px; animation-delay: 0.1s; }
+    .recording-waveform .wave-bar:nth-child(3) { height: 10px; animation-delay: 0.15s; }
+    .recording-waveform .wave-bar:nth-child(4) { height: 18px; animation-delay: 0.2s; }
+    .recording-waveform .wave-bar:nth-child(5) { height: 12px; animation-delay: 0.25s; }
+    .recording-waveform .wave-bar:nth-child(6) { height: 16px; animation-delay: 0.3s; }
+    .recording-waveform .wave-bar:nth-child(7) { height: 8px; animation-delay: 0.35s; }
+    .recording-waveform .wave-bar:nth-child(8) { height: 14px; animation-delay: 0.4s; }
+    .recording-waveform .wave-bar:nth-child(9) { height: 10px; animation-delay: 0.45s; }
+    .recording-waveform .wave-bar:nth-child(10) { height: 6px; animation-delay: 0.5s; }
+
+    @keyframes wave-animate {
+      0%, 100% { transform: scaleY(0.5); }
+      50% { transform: scaleY(1); }
+    }
+
+    .recording-waveform .recording-text {
+      font-size: 11px;
+      font-weight: 600;
+      color: #DC2626;
+      margin-left: 8px;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .recording-waveform .recording-text .rec-dot {
+      width: 6px;
+      height: 6px;
+      background: #EF4444;
+      border-radius: 50%;
+      animation: blink-live 0.8s infinite;
+    }
+
     .ai-icon-btn.sparkle {
       background: linear-gradient(135deg, #F0FDFA 0%, #ECFDF5 100%);
       border-color: #A7F3D0;
@@ -1386,6 +1536,84 @@
 
     .ai-action-item span {
       flex: 1;
+    }
+
+    /* Quick Phrases Button */
+    .quick-phrases-btn {
+      width: 28px;
+      height: 28px;
+      border-radius: 6px;
+      border: 1px solid var(--border);
+      background: var(--bg-white);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--text-secondary);
+      transition: all 0.2s;
+    }
+
+    .quick-phrases-btn:hover {
+      border-color: var(--primary);
+      color: var(--primary);
+      background: #F0FDFA;
+    }
+
+    .quick-phrases-dropdown {
+      position: absolute;
+      top: 100%;
+      right: 0;
+      margin-top: 4px;
+      background: var(--bg-white);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+      min-width: 280px;
+      display: none;
+      z-index: 100;
+      max-height: 300px;
+      overflow-y: auto;
+    }
+
+    .quick-phrases-dropdown.show {
+      display: block;
+    }
+
+    .quick-phrases-header {
+      padding: 10px 14px;
+      border-bottom: 1px solid var(--border);
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .quick-phrase-item {
+      padding: 10px 14px;
+      cursor: pointer;
+      font-size: 13px;
+      color: var(--text-primary);
+      border-bottom: 1px solid var(--border);
+      transition: background 0.15s;
+    }
+
+    .quick-phrase-item:last-child {
+      border-bottom: none;
+    }
+
+    .quick-phrase-item:hover {
+      background: var(--bg-gray);
+    }
+
+    .quick-phrase-item .phrase-shortcut {
+      font-size: 11px;
+      color: var(--text-muted);
+      font-family: monospace;
+      background: var(--bg-dark);
+      padding: 2px 6px;
+      border-radius: 4px;
+      margin-right: 8px;
     }
 
     /* AI Response Modal */
@@ -2022,6 +2250,306 @@
       color: #D97706;
     }
 
+    /* AI Confidence Indicator */
+    .ai-confidence {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      font-size: 11px;
+      padding: 3px 8px;
+      border-radius: 4px;
+      font-weight: 500;
+    }
+
+    .ai-confidence.high {
+      background: #D1FAE5;
+      color: #059669;
+    }
+
+    .ai-confidence.medium {
+      background: #FEF3C7;
+      color: #D97706;
+    }
+
+    .ai-confidence.low {
+      background: #FEE2E2;
+      color: #DC2626;
+    }
+
+    .ai-confidence svg {
+      width: 12px;
+      height: 12px;
+    }
+
+    .confidence-bar {
+      display: flex;
+      gap: 2px;
+      margin-left: 4px;
+    }
+
+    .confidence-bar .bar {
+      width: 3px;
+      height: 10px;
+      border-radius: 1px;
+      background: currentColor;
+      opacity: 0.3;
+    }
+
+    .confidence-bar .bar.filled {
+      opacity: 1;
+    }
+
+    /* Drug Interaction Alert */
+    .drug-interaction-alert {
+      background: linear-gradient(135deg, #FEF3C7 0%, #FDE68A 100%);
+      border: 1px solid #F59E0B;
+      border-left: 4px solid #F59E0B;
+      border-radius: 8px;
+      padding: 12px 16px;
+      margin-bottom: 16px;
+      display: flex;
+      align-items: flex-start;
+      gap: 12px;
+    }
+
+    .drug-interaction-alert.severe {
+      background: linear-gradient(135deg, #FEE2E2 0%, #FECACA 100%);
+      border-color: #EF4444;
+      border-left-color: #EF4444;
+    }
+
+    .drug-interaction-icon {
+      width: 24px;
+      height: 24px;
+      border-radius: 50%;
+      background: #F59E0B;
+      color: white;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+
+    .drug-interaction-alert.severe .drug-interaction-icon {
+      background: #EF4444;
+    }
+
+    .drug-interaction-content {
+      flex: 1;
+    }
+
+    .drug-interaction-content h5 {
+      font-size: 13px;
+      font-weight: 600;
+      color: #92400E;
+      margin-bottom: 4px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .drug-interaction-alert.severe .drug-interaction-content h5 {
+      color: #991B1B;
+    }
+
+    .drug-interaction-content p {
+      font-size: 12px;
+      color: #A16207;
+      line-height: 1.5;
+    }
+
+    .drug-interaction-alert.severe .drug-interaction-content p {
+      color: #B91C1C;
+    }
+
+    .drug-interaction-dismiss {
+      background: none;
+      border: none;
+      color: #92400E;
+      cursor: pointer;
+      padding: 4px;
+      border-radius: 4px;
+    }
+
+    .drug-interaction-dismiss:hover {
+      background: rgba(0,0,0,0.1);
+    }
+
+    /* Guided Tour Styles */
+    .tour-overlay {
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0, 0, 0, 0.5);
+      z-index: 9998;
+    }
+
+    .tour-overlay.active {
+      display: block;
+    }
+
+    .tour-highlight {
+      position: relative;
+      z-index: 9999;
+      box-shadow: 0 0 0 4px var(--primary), 0 0 0 5000px rgba(0, 0, 0, 0.5);
+      border-radius: 8px;
+    }
+
+    .tour-tooltip {
+      display: none;
+      position: fixed;
+      background: var(--bg-white);
+      border-radius: 12px;
+      box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+      padding: 20px;
+      max-width: 340px;
+      z-index: 10000;
+      animation: tour-fade-in 0.3s ease;
+    }
+
+    .tour-tooltip.active {
+      display: block;
+    }
+
+    @keyframes tour-fade-in {
+      from { opacity: 0; transform: translateY(10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .tour-tooltip-header {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 12px;
+    }
+
+    .tour-tooltip-icon {
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, var(--primary) 0%, var(--primary-light) 100%);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: white;
+    }
+
+    .tour-tooltip-title {
+      font-size: 16px;
+      font-weight: 600;
+      color: var(--text-primary);
+    }
+
+    .tour-tooltip-step {
+      font-size: 12px;
+      color: var(--text-muted);
+    }
+
+    .tour-tooltip-content {
+      font-size: 14px;
+      color: var(--text-secondary);
+      line-height: 1.6;
+      margin-bottom: 16px;
+    }
+
+    .tour-tooltip-footer {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .tour-dots {
+      display: flex;
+      gap: 6px;
+    }
+
+    .tour-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--border);
+    }
+
+    .tour-dot.active {
+      background: var(--primary);
+    }
+
+    .tour-dot.completed {
+      background: var(--success);
+    }
+
+    .tour-buttons {
+      display: flex;
+      gap: 8px;
+    }
+
+    .tour-btn {
+      padding: 8px 16px;
+      border-radius: 6px;
+      font-size: 13px;
+      font-weight: 500;
+      cursor: pointer;
+      border: none;
+      transition: all 0.2s;
+    }
+
+    .tour-btn-skip {
+      background: transparent;
+      color: var(--text-muted);
+    }
+
+    .tour-btn-skip:hover {
+      color: var(--text-secondary);
+    }
+
+    .tour-btn-next {
+      background: var(--primary);
+      color: white;
+    }
+
+    .tour-btn-next:hover {
+      background: var(--primary-dark);
+    }
+
+    .tour-btn-prev {
+      background: var(--bg-gray);
+      color: var(--text-primary);
+      border: 1px solid var(--border);
+    }
+
+    .tour-btn-prev:hover {
+      background: var(--bg-dark);
+    }
+
+    /* Tour Start Button in Header */
+    .tour-start-btn {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 12px;
+      background: linear-gradient(135deg, var(--primary) 0%, var(--primary-light) 100%);
+      color: white;
+      border: none;
+      border-radius: 6px;
+      font-size: 12px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .tour-start-btn:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 4px 12px rgba(13, 148, 136, 0.3);
+    }
+
+    .tour-start-btn svg {
+      width: 14px;
+      height: 14px;
+    }
+
     /* Document Interaction Styles */
     .doc-interaction-section {
       margin-bottom: 16px;
@@ -2356,6 +2884,125 @@
     @keyframes spin {
       to { transform: rotate(360deg); }
     }
+
+    /* AI Live Listening Indicator */
+    .ai-live-indicator {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 12px 16px;
+      background: linear-gradient(135deg, #FEF3C7 0%, #FDE68A 100%);
+      border: 1px solid #F59E0B;
+      border-radius: 10px;
+      margin-bottom: 16px;
+    }
+
+    .ai-live-icon {
+      position: relative;
+      width: 36px;
+      height: 36px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .ai-live-icon .pulse-ring {
+      position: absolute;
+      width: 100%;
+      height: 100%;
+      border-radius: 50%;
+      background: rgba(239, 68, 68, 0.3);
+      animation: pulse-live 1.5s ease-out infinite;
+    }
+
+    .ai-live-icon .pulse-ring:nth-child(2) {
+      animation-delay: 0.5s;
+    }
+
+    .ai-live-icon .core {
+      position: relative;
+      width: 20px;
+      height: 20px;
+      background: #EF4444;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 1;
+    }
+
+    .ai-live-icon .core svg {
+      color: white;
+    }
+
+    @keyframes pulse-live {
+      0% {
+        transform: scale(0.5);
+        opacity: 1;
+      }
+      100% {
+        transform: scale(1.5);
+        opacity: 0;
+      }
+    }
+
+    .ai-live-text {
+      flex: 1;
+    }
+
+    .ai-live-text h5 {
+      font-size: 13px;
+      font-weight: 600;
+      color: #92400E;
+      margin-bottom: 2px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .ai-live-text h5 .live-dot {
+      width: 8px;
+      height: 8px;
+      background: #EF4444;
+      border-radius: 50%;
+      animation: blink-live 1s ease-in-out infinite;
+    }
+
+    @keyframes blink-live {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.3; }
+    }
+
+    .ai-live-text p {
+      font-size: 11px;
+      color: #A16207;
+    }
+
+    /* Sound wave bars animation */
+    .sound-waves {
+      display: flex;
+      align-items: center;
+      gap: 2px;
+      height: 20px;
+    }
+
+    .sound-waves .bar {
+      width: 3px;
+      background: #EF4444;
+      border-radius: 2px;
+      animation: sound-wave 0.8s ease-in-out infinite;
+    }
+
+    .sound-waves .bar:nth-child(1) { height: 8px; animation-delay: 0s; }
+    .sound-waves .bar:nth-child(2) { height: 14px; animation-delay: 0.1s; }
+    .sound-waves .bar:nth-child(3) { height: 10px; animation-delay: 0.2s; }
+    .sound-waves .bar:nth-child(4) { height: 16px; animation-delay: 0.3s; }
+    .sound-waves .bar:nth-child(5) { height: 12px; animation-delay: 0.4s; }
+
+    @keyframes sound-wave {
+      0%, 100% { transform: scaleY(1); }
+      50% { transform: scaleY(0.4); }
+    }
   </style>
 </head>
 <body>
@@ -2388,22 +3035,29 @@
           <span>MD2</span>
           <span id="timer">08:20:22</span>
         </div>
-        <span style="color: var(--primary); font-size: 13px; cursor: pointer;">What's New</span>
         <div class="nav-icon" title="PHI Mode">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0110 0v4"/>
           </svg>
         </div>
-        <div class="nav-icon" title="Notifications">
+        <div class="nav-icon" title="Notifications" style="position: relative;">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 01-3.46 0"/>
           </svg>
+          <span class="notification-badge">2</span>
         </div>
-        <div class="nav-icon" title="Dark Mode">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <div class="nav-icon" id="dark-mode-toggle" title="Toggle Dark Mode" onclick="toggleDarkMode()" style="cursor: pointer;">
+          <svg id="dark-mode-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z"/>
           </svg>
         </div>
+        <!-- Guided Tour Button -->
+        <button class="tour-start-btn" onclick="startTour()" title="Take a Tour">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 015.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/>
+          </svg>
+          Tour
+        </button>
         <!-- Global AI Launcher -->
         <div class="ai-launcher-container">
           <button class="ai-launcher-btn" onclick="toggleAiLauncherMenu()" title="AI Tools">
@@ -2494,7 +3148,12 @@
             </div>
             <div class="patient-info">
               <h3>Marshall</h3>
-              <p>TNK | PST</p>
+              <p style="display: flex; align-items: center; gap: 4px;">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/>
+                </svg>
+                <span id="local-time-marshall">--:-- PST</span>
+              </p>
             </div>
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-left: auto; cursor: pointer;">
               <path d="M7 17l9.2-9.2M17 17V7H7"/>
@@ -2515,9 +3174,6 @@
                 <path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/>
               </svg>
             </div>
-          </div>
-          <div class="patient-badges">
-            <span class="badge badge-teal">Non-Emergent</span>
           </div>
           <div class="action-buttons">
             <button class="btn-video">
@@ -2740,7 +3396,27 @@
                 <span class="required-badge">Required</span>
               </div>
               <div class="ai-textarea-wrapper">
+                <div class="recording-waveform">
+                  <div class="wave-bar"></div><div class="wave-bar"></div><div class="wave-bar"></div><div class="wave-bar"></div><div class="wave-bar"></div>
+                  <div class="wave-bar"></div><div class="wave-bar"></div><div class="wave-bar"></div><div class="wave-bar"></div><div class="wave-bar"></div>
+                  <span class="recording-text"><span class="rec-dot"></span>Recording...</span>
+                </div>
                 <div class="ai-textarea-icons">
+                  <div style="position: relative;">
+                    <button class="quick-phrases-btn" onclick="toggleQuickPhrases(this)" title="Quick Phrases">
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M4 7V4h16v3"/><path d="M9 20h6"/><path d="M12 4v16"/>
+                      </svg>
+                    </button>
+                    <div class="quick-phrases-dropdown">
+                      <div class="quick-phrases-header">Quick Phrases</div>
+                      <div class="quick-phrase-item" onclick="insertQuickPhrase(this, 'Patient denies any recent changes in symptoms.')"><span class="phrase-shortcut">.deny</span>Patient denies any recent changes...</div>
+                      <div class="quick-phrase-item" onclick="insertQuickPhrase(this, 'No new neurological deficits noted on examination.')"><span class="phrase-shortcut">.neuro</span>No new neurological deficits...</div>
+                      <div class="quick-phrase-item" onclick="insertQuickPhrase(this, 'Patient reports compliance with current medication regimen.')"><span class="phrase-shortcut">.comp</span>Patient reports compliance...</div>
+                      <div class="quick-phrase-item" onclick="insertQuickPhrase(this, 'Symptoms are stable compared to last visit.')"><span class="phrase-shortcut">.stable</span>Symptoms are stable...</div>
+                      <div class="quick-phrase-item" onclick="insertQuickPhrase(this, 'Will continue current treatment plan and reassess at next visit.')"><span class="phrase-shortcut">.cont</span>Will continue current treatment...</div>
+                    </div>
+                  </div>
                   <button class="ai-icon-btn" onclick="toggleRecording(this)" title="Dictate with AI">
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                       <path d="M12 1a3 3 0 00-3 3v8a3 3 0 006 0V4a3 3 0 00-3-3z"/><path d="M19 10v2a7 7 0 01-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/>
@@ -2990,7 +3666,26 @@
                   <div class="form-group">
                     <label class="form-label">Findings</label>
                     <div class="ai-textarea-wrapper">
+                      <div class="recording-waveform">
+                        <div class="wave-bar"></div><div class="wave-bar"></div><div class="wave-bar"></div><div class="wave-bar"></div><div class="wave-bar"></div>
+                        <div class="wave-bar"></div><div class="wave-bar"></div><div class="wave-bar"></div><div class="wave-bar"></div><div class="wave-bar"></div>
+                        <span class="recording-text"><span class="rec-dot"></span>Recording...</span>
+                      </div>
                       <div class="ai-textarea-icons">
+                        <div style="position: relative;">
+                          <button class="quick-phrases-btn" onclick="toggleQuickPhrases(this)" title="Quick Phrases">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                              <path d="M4 7V4h16v3"/><path d="M9 20h6"/><path d="M12 4v16"/>
+                            </svg>
+                          </button>
+                          <div class="quick-phrases-dropdown">
+                            <div class="quick-phrases-header">Quick Phrases</div>
+                            <div class="quick-phrase-item" onclick="insertQuickPhrase(this, 'No acute intracranial abnormality.')"><span class="phrase-shortcut">.normal</span>No acute intracranial abnormality</div>
+                            <div class="quick-phrase-item" onclick="insertQuickPhrase(this, 'No evidence of acute hemorrhage, mass effect, or midline shift.')"><span class="phrase-shortcut">.neg</span>No hemorrhage, mass effect...</div>
+                            <div class="quick-phrase-item" onclick="insertQuickPhrase(this, 'Findings consistent with prior study.')"><span class="phrase-shortcut">.prior</span>Consistent with prior study</div>
+                            <div class="quick-phrase-item" onclick="insertQuickPhrase(this, 'Recommend clinical correlation.')"><span class="phrase-shortcut">.corr</span>Recommend clinical correlation</div>
+                          </div>
+                        </div>
                         <button class="ai-icon-btn" onclick="toggleRecording(this)" title="Dictate with AI">
                           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                             <path d="M12 1a3 3 0 00-3 3v8a3 3 0 006 0V4a3 3 0 00-3-3z"/><path d="M19 10v2a7 7 0 01-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/>
@@ -3069,7 +3764,26 @@
                   <div class="form-group">
                     <label class="form-label">Findings</label>
                     <div class="ai-textarea-wrapper">
+                      <div class="recording-waveform">
+                        <div class="wave-bar"></div><div class="wave-bar"></div><div class="wave-bar"></div><div class="wave-bar"></div><div class="wave-bar"></div>
+                        <div class="wave-bar"></div><div class="wave-bar"></div><div class="wave-bar"></div><div class="wave-bar"></div><div class="wave-bar"></div>
+                        <span class="recording-text"><span class="rec-dot"></span>Recording...</span>
+                      </div>
                       <div class="ai-textarea-icons">
+                        <div style="position: relative;">
+                          <button class="quick-phrases-btn" onclick="toggleQuickPhrases(this)" title="Quick Phrases">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                              <path d="M4 7V4h16v3"/><path d="M9 20h6"/><path d="M12 4v16"/>
+                            </svg>
+                          </button>
+                          <div class="quick-phrases-dropdown">
+                            <div class="quick-phrases-header">Quick Phrases</div>
+                            <div class="quick-phrase-item" onclick="insertQuickPhrase(this, 'No acute intracranial abnormality.')"><span class="phrase-shortcut">.normal</span>No acute intracranial abnormality</div>
+                            <div class="quick-phrase-item" onclick="insertQuickPhrase(this, 'No evidence of acute hemorrhage, mass effect, or midline shift.')"><span class="phrase-shortcut">.neg</span>No hemorrhage, mass effect...</div>
+                            <div class="quick-phrase-item" onclick="insertQuickPhrase(this, 'Findings consistent with prior study.')"><span class="phrase-shortcut">.prior</span>Consistent with prior study</div>
+                            <div class="quick-phrase-item" onclick="insertQuickPhrase(this, 'Recommend clinical correlation.')"><span class="phrase-shortcut">.corr</span>Recommend clinical correlation</div>
+                          </div>
+                        </div>
                         <button class="ai-icon-btn" onclick="toggleRecording(this)" title="Dictate with AI">
                           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                             <path d="M12 1a3 3 0 00-3 3v8a3 3 0 006 0V4a3 3 0 00-3-3z"/><path d="M19 10v2a7 7 0 01-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/>
@@ -3141,7 +3855,26 @@
                   <div class="form-group">
                     <label class="form-label">Findings</label>
                     <div class="ai-textarea-wrapper">
+                      <div class="recording-waveform">
+                        <div class="wave-bar"></div><div class="wave-bar"></div><div class="wave-bar"></div><div class="wave-bar"></div><div class="wave-bar"></div>
+                        <div class="wave-bar"></div><div class="wave-bar"></div><div class="wave-bar"></div><div class="wave-bar"></div><div class="wave-bar"></div>
+                        <span class="recording-text"><span class="rec-dot"></span>Recording...</span>
+                      </div>
                       <div class="ai-textarea-icons">
+                        <div style="position: relative;">
+                          <button class="quick-phrases-btn" onclick="toggleQuickPhrases(this)" title="Quick Phrases">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                              <path d="M4 7V4h16v3"/><path d="M9 20h6"/><path d="M12 4v16"/>
+                            </svg>
+                          </button>
+                          <div class="quick-phrases-dropdown">
+                            <div class="quick-phrases-header">Quick Phrases</div>
+                            <div class="quick-phrase-item" onclick="insertQuickPhrase(this, 'No acute intracranial abnormality.')"><span class="phrase-shortcut">.normal</span>No acute intracranial abnormality</div>
+                            <div class="quick-phrase-item" onclick="insertQuickPhrase(this, 'No evidence of acute hemorrhage, mass effect, or midline shift.')"><span class="phrase-shortcut">.neg</span>No hemorrhage, mass effect...</div>
+                            <div class="quick-phrase-item" onclick="insertQuickPhrase(this, 'Findings consistent with prior study.')"><span class="phrase-shortcut">.prior</span>Consistent with prior study</div>
+                            <div class="quick-phrase-item" onclick="insertQuickPhrase(this, 'Recommend clinical correlation.')"><span class="phrase-shortcut">.corr</span>Recommend clinical correlation</div>
+                          </div>
+                        </div>
                         <button class="ai-icon-btn" onclick="toggleRecording(this)" title="Dictate with AI">
                           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                             <path d="M12 1a3 3 0 00-3 3v8a3 3 0 006 0V4a3 3 0 00-3-3z"/><path d="M19 10v2a7 7 0 01-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/>
@@ -3229,7 +3962,26 @@
                   <div class="form-group">
                     <label class="form-label">Findings</label>
                     <div class="ai-textarea-wrapper">
+                      <div class="recording-waveform">
+                        <div class="wave-bar"></div><div class="wave-bar"></div><div class="wave-bar"></div><div class="wave-bar"></div><div class="wave-bar"></div>
+                        <div class="wave-bar"></div><div class="wave-bar"></div><div class="wave-bar"></div><div class="wave-bar"></div><div class="wave-bar"></div>
+                        <span class="recording-text"><span class="rec-dot"></span>Recording...</span>
+                      </div>
                       <div class="ai-textarea-icons">
+                        <div style="position: relative;">
+                          <button class="quick-phrases-btn" onclick="toggleQuickPhrases(this)" title="Quick Phrases">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                              <path d="M4 7V4h16v3"/><path d="M9 20h6"/><path d="M12 4v16"/>
+                            </svg>
+                          </button>
+                          <div class="quick-phrases-dropdown">
+                            <div class="quick-phrases-header">Quick Phrases</div>
+                            <div class="quick-phrase-item" onclick="insertQuickPhrase(this, 'No acute intracranial abnormality.')"><span class="phrase-shortcut">.normal</span>No acute intracranial abnormality</div>
+                            <div class="quick-phrase-item" onclick="insertQuickPhrase(this, 'No evidence of acute hemorrhage, mass effect, or midline shift.')"><span class="phrase-shortcut">.neg</span>No hemorrhage, mass effect...</div>
+                            <div class="quick-phrase-item" onclick="insertQuickPhrase(this, 'Findings consistent with prior study.')"><span class="phrase-shortcut">.prior</span>Consistent with prior study</div>
+                            <div class="quick-phrase-item" onclick="insertQuickPhrase(this, 'Recommend clinical correlation.')"><span class="phrase-shortcut">.corr</span>Recommend clinical correlation</div>
+                          </div>
+                        </div>
                         <button class="ai-icon-btn" onclick="toggleRecording(this)" title="Dictate with AI">
                           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                             <path d="M12 1a3 3 0 00-3 3v8a3 3 0 006 0V4a3 3 0 00-3-3z"/><path d="M19 10v2a7 7 0 01-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/>
@@ -3299,7 +4051,26 @@
                   <div class="form-group">
                     <label class="form-label">Findings</label>
                     <div class="ai-textarea-wrapper">
+                      <div class="recording-waveform">
+                        <div class="wave-bar"></div><div class="wave-bar"></div><div class="wave-bar"></div><div class="wave-bar"></div><div class="wave-bar"></div>
+                        <div class="wave-bar"></div><div class="wave-bar"></div><div class="wave-bar"></div><div class="wave-bar"></div><div class="wave-bar"></div>
+                        <span class="recording-text"><span class="rec-dot"></span>Recording...</span>
+                      </div>
                       <div class="ai-textarea-icons">
+                        <div style="position: relative;">
+                          <button class="quick-phrases-btn" onclick="toggleQuickPhrases(this)" title="Quick Phrases">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                              <path d="M4 7V4h16v3"/><path d="M9 20h6"/><path d="M12 4v16"/>
+                            </svg>
+                          </button>
+                          <div class="quick-phrases-dropdown">
+                            <div class="quick-phrases-header">Quick Phrases</div>
+                            <div class="quick-phrase-item" onclick="insertQuickPhrase(this, 'No acute intracranial abnormality.')"><span class="phrase-shortcut">.normal</span>No acute intracranial abnormality</div>
+                            <div class="quick-phrase-item" onclick="insertQuickPhrase(this, 'No evidence of acute hemorrhage, mass effect, or midline shift.')"><span class="phrase-shortcut">.neg</span>No hemorrhage, mass effect...</div>
+                            <div class="quick-phrase-item" onclick="insertQuickPhrase(this, 'Findings consistent with prior study.')"><span class="phrase-shortcut">.prior</span>Consistent with prior study</div>
+                            <div class="quick-phrase-item" onclick="insertQuickPhrase(this, 'Recommend clinical correlation.')"><span class="phrase-shortcut">.corr</span>Recommend clinical correlation</div>
+                          </div>
+                        </div>
                         <button class="ai-icon-btn" onclick="toggleRecording(this)" title="Dictate with AI">
                           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                             <path d="M12 1a3 3 0 00-3 3v8a3 3 0 006 0V4a3 3 0 00-3-3z"/><path d="M19 10v2a7 7 0 01-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/>
@@ -3599,7 +4370,27 @@
                 <span class="optional-badge">Optional</span>
               </div>
               <div class="ai-textarea-wrapper">
+                <div class="recording-waveform">
+                  <div class="wave-bar"></div><div class="wave-bar"></div><div class="wave-bar"></div><div class="wave-bar"></div><div class="wave-bar"></div>
+                  <div class="wave-bar"></div><div class="wave-bar"></div><div class="wave-bar"></div><div class="wave-bar"></div><div class="wave-bar"></div>
+                  <span class="recording-text"><span class="rec-dot"></span>Recording...</span>
+                </div>
                 <div class="ai-textarea-icons">
+                  <div style="position: relative;">
+                    <button class="quick-phrases-btn" onclick="toggleQuickPhrases(this)" title="Quick Phrases">
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M4 7V4h16v3"/><path d="M9 20h6"/><path d="M12 4v16"/>
+                      </svg>
+                    </button>
+                    <div class="quick-phrases-dropdown">
+                      <div class="quick-phrases-header">Quick Phrases</div>
+                      <div class="quick-phrase-item" onclick="insertQuickPhrase(this, 'Patient denies any recent changes in symptoms.')"><span class="phrase-shortcut">.deny</span>Patient denies any recent changes...</div>
+                      <div class="quick-phrase-item" onclick="insertQuickPhrase(this, 'No new neurological deficits noted on examination.')"><span class="phrase-shortcut">.neuro</span>No new neurological deficits...</div>
+                      <div class="quick-phrase-item" onclick="insertQuickPhrase(this, 'Patient reports compliance with current medication regimen.')"><span class="phrase-shortcut">.comp</span>Patient reports compliance...</div>
+                      <div class="quick-phrase-item" onclick="insertQuickPhrase(this, 'Symptoms are stable compared to last visit.')"><span class="phrase-shortcut">.stable</span>Symptoms are stable...</div>
+                      <div class="quick-phrase-item" onclick="insertQuickPhrase(this, 'Will continue current treatment plan and reassess at next visit.')"><span class="phrase-shortcut">.cont</span>Will continue current treatment...</div>
+                    </div>
+                  </div>
                   <button class="ai-icon-btn" onclick="toggleRecording(this)" title="Dictate with AI">
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                       <path d="M12 1a3 3 0 00-3 3v8a3 3 0 006 0V4a3 3 0 00-3-3z"/><path d="M19 10v2a7 7 0 01-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/>
@@ -3717,7 +4508,27 @@
               </button>
 
               <div class="ai-textarea-wrapper">
+                <div class="recording-waveform">
+                  <div class="wave-bar"></div><div class="wave-bar"></div><div class="wave-bar"></div><div class="wave-bar"></div><div class="wave-bar"></div>
+                  <div class="wave-bar"></div><div class="wave-bar"></div><div class="wave-bar"></div><div class="wave-bar"></div><div class="wave-bar"></div>
+                  <span class="recording-text"><span class="rec-dot"></span>Recording...</span>
+                </div>
                 <div class="ai-textarea-icons">
+                  <div style="position: relative;">
+                    <button class="quick-phrases-btn" onclick="toggleQuickPhrases(this)" title="Quick Phrases">
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M4 7V4h16v3"/><path d="M9 20h6"/><path d="M12 4v16"/>
+                      </svg>
+                    </button>
+                    <div class="quick-phrases-dropdown">
+                      <div class="quick-phrases-header">Quick Phrases</div>
+                      <div class="quick-phrase-item" onclick="insertQuickPhrase(this, 'Patient denies any recent changes in symptoms.')"><span class="phrase-shortcut">.deny</span>Patient denies any recent changes...</div>
+                      <div class="quick-phrase-item" onclick="insertQuickPhrase(this, 'No new neurological deficits noted on examination.')"><span class="phrase-shortcut">.neuro</span>No new neurological deficits...</div>
+                      <div class="quick-phrase-item" onclick="insertQuickPhrase(this, 'Patient reports compliance with current medication regimen.')"><span class="phrase-shortcut">.comp</span>Patient reports compliance...</div>
+                      <div class="quick-phrase-item" onclick="insertQuickPhrase(this, 'Symptoms are stable compared to last visit.')"><span class="phrase-shortcut">.stable</span>Symptoms are stable...</div>
+                      <div class="quick-phrase-item" onclick="insertQuickPhrase(this, 'Will continue current treatment plan and reassess at next visit.')"><span class="phrase-shortcut">.cont</span>Will continue current treatment...</div>
+                    </div>
+                  </div>
                   <button class="ai-icon-btn" onclick="toggleRecording(this)" title="Dictate with AI">
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                       <path d="M12 1a3 3 0 00-3 3v8a3 3 0 006 0V4a3 3 0 00-3-3z"/><path d="M19 10v2a7 7 0 01-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/>
@@ -3767,7 +4578,27 @@
               </div>
 
               <div class="ai-textarea-wrapper">
+                <div class="recording-waveform">
+                  <div class="wave-bar"></div><div class="wave-bar"></div><div class="wave-bar"></div><div class="wave-bar"></div><div class="wave-bar"></div>
+                  <div class="wave-bar"></div><div class="wave-bar"></div><div class="wave-bar"></div><div class="wave-bar"></div><div class="wave-bar"></div>
+                  <span class="recording-text"><span class="rec-dot"></span>Recording...</span>
+                </div>
                 <div class="ai-textarea-icons">
+                  <div style="position: relative;">
+                    <button class="quick-phrases-btn" onclick="toggleQuickPhrases(this)" title="Quick Phrases">
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M4 7V4h16v3"/><path d="M9 20h6"/><path d="M12 4v16"/>
+                      </svg>
+                    </button>
+                    <div class="quick-phrases-dropdown">
+                      <div class="quick-phrases-header">Quick Phrases</div>
+                      <div class="quick-phrase-item" onclick="insertQuickPhrase(this, 'Patient denies any recent changes in symptoms.')"><span class="phrase-shortcut">.deny</span>Patient denies any recent changes...</div>
+                      <div class="quick-phrase-item" onclick="insertQuickPhrase(this, 'No new neurological deficits noted on examination.')"><span class="phrase-shortcut">.neuro</span>No new neurological deficits...</div>
+                      <div class="quick-phrase-item" onclick="insertQuickPhrase(this, 'Patient reports compliance with current medication regimen.')"><span class="phrase-shortcut">.comp</span>Patient reports compliance...</div>
+                      <div class="quick-phrase-item" onclick="insertQuickPhrase(this, 'Symptoms are stable compared to last visit.')"><span class="phrase-shortcut">.stable</span>Symptoms are stable...</div>
+                      <div class="quick-phrase-item" onclick="insertQuickPhrase(this, 'Will continue current treatment plan and reassess at next visit.')"><span class="phrase-shortcut">.cont</span>Will continue current treatment...</div>
+                    </div>
+                  </div>
                   <button class="ai-icon-btn" onclick="toggleRecording(this)" title="Dictate with AI">
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                       <path d="M12 1a3 3 0 00-3 3v8a3 3 0 006 0V4a3 3 0 00-3-3z"/><path d="M19 10v2a7 7 0 01-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/>
@@ -4171,6 +5002,33 @@ Electronically signed by: Dr. Steve Arbogast
     </div>
   </div>
 
+  <!-- Guided Tour Overlay and Tooltip -->
+  <div class="tour-overlay" id="tour-overlay"></div>
+  <div class="tour-tooltip" id="tour-tooltip">
+    <div class="tour-tooltip-header">
+      <div class="tour-tooltip-icon">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
+        </svg>
+      </div>
+      <div>
+        <div class="tour-tooltip-title" id="tour-title">Welcome</div>
+        <div class="tour-tooltip-step" id="tour-step">Step 1 of 7</div>
+      </div>
+    </div>
+    <div class="tour-tooltip-content" id="tour-content">
+      Welcome to the Sevaro Outpatient Clinical Note demo. This tour will guide you through the key features.
+    </div>
+    <div class="tour-tooltip-footer">
+      <div class="tour-dots" id="tour-dots"></div>
+      <div class="tour-buttons">
+        <button class="tour-btn tour-btn-skip" onclick="endTour()">Skip</button>
+        <button class="tour-btn tour-btn-prev" id="tour-prev-btn" onclick="prevTourStep()" style="display: none;">Back</button>
+        <button class="tour-btn tour-btn-next" id="tour-next-btn" onclick="nextTourStep()">Next</button>
+      </div>
+    </div>
+  </div>
+
   <!-- AI Drawer Overlay and Panel -->
   <div class="ai-drawer-overlay" id="ai-drawer-overlay" onclick="closeAiDrawer()"></div>
   <div class="ai-drawer" id="ai-drawer">
@@ -4197,6 +5055,33 @@ Electronically signed by: Dr. Steve Arbogast
     <div class="ai-drawer-content">
       <!-- Chart Prep Pane -->
       <div class="ai-drawer-pane active" id="pane-chart-prep">
+        <!-- AI Live Listening Indicator -->
+        <div class="ai-live-indicator">
+          <div class="ai-live-icon">
+            <div class="pulse-ring"></div>
+            <div class="pulse-ring"></div>
+            <div class="core">
+              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3">
+                <path d="M12 1a3 3 0 00-3 3v8a3 3 0 006 0V4a3 3 0 00-3-3z"/><path d="M19 10v2a7 7 0 01-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/>
+              </svg>
+            </div>
+          </div>
+          <div class="ai-live-text">
+            <h5>
+              <span class="live-dot"></span>
+              AI Listening
+            </h5>
+            <p>Monitoring conversation for real-time chart updates</p>
+          </div>
+          <div class="sound-waves">
+            <div class="bar"></div>
+            <div class="bar"></div>
+            <div class="bar"></div>
+            <div class="bar"></div>
+            <div class="bar"></div>
+          </div>
+        </div>
+
         <div class="ai-context-section" onclick="toggleAiContext(this)">
           <div class="ai-context-header">
             <h5>AI Context (from chart)</h5>
@@ -4270,6 +5155,33 @@ Electronically signed by: Dr. Steve Arbogast
 
       <!-- Document Interaction Pane -->
       <div class="ai-drawer-pane" id="pane-document">
+        <!-- AI Live Listening Indicator -->
+        <div class="ai-live-indicator">
+          <div class="ai-live-icon">
+            <div class="pulse-ring"></div>
+            <div class="pulse-ring"></div>
+            <div class="core">
+              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3">
+                <path d="M12 1a3 3 0 00-3 3v8a3 3 0 006 0V4a3 3 0 00-3-3z"/><path d="M19 10v2a7 7 0 01-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/>
+              </svg>
+            </div>
+          </div>
+          <div class="ai-live-text">
+            <h5>
+              <span class="live-dot"></span>
+              AI Listening
+            </h5>
+            <p>Transcribing and documenting patient interaction</p>
+          </div>
+          <div class="sound-waves">
+            <div class="bar"></div>
+            <div class="bar"></div>
+            <div class="bar"></div>
+            <div class="bar"></div>
+            <div class="bar"></div>
+          </div>
+        </div>
+
         <div class="ai-context-section" onclick="toggleAiContext(this)">
           <div class="ai-context-header">
             <h5>AI Context (from chart)</h5>
@@ -4280,24 +5192,65 @@ Electronically signed by: Dr. Steve Arbogast
         </div>
 
         <div class="doc-interaction-section">
-          <div class="doc-interaction-label">HPI (History of Present Illness)</div>
+          <div class="doc-interaction-label" style="display: flex; align-items: center; justify-content: space-between;">
+            <span>HPI (History of Present Illness)</span>
+            <span class="ai-confidence high">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+              High Confidence
+              <span class="confidence-bar"><span class="bar filled"></span><span class="bar filled"></span><span class="bar filled"></span></span>
+            </span>
+          </div>
           <textarea class="doc-interaction-textarea" id="doc-hpi" placeholder="AI-generated HPI will appear here...">Patient is a 50-year-old male presenting for follow-up of chronic migraines. Reports headache frequency has decreased from daily to approximately 3-4 times per week since starting current preventive regimen. Headaches are described as bilateral, throbbing, moderate intensity (6/10), lasting 4-6 hours. Associated with photophobia and occasional nausea. Denies visual aura. Current abortive therapy (sumatriptan) provides relief within 2 hours.</textarea>
         </div>
 
         <div class="doc-interaction-section">
-          <div class="doc-interaction-label">Assessment</div>
+          <div class="doc-interaction-label" style="display: flex; align-items: center; justify-content: space-between;">
+            <span>Assessment</span>
+            <span class="ai-confidence high">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+              High Confidence
+              <span class="confidence-bar"><span class="bar filled"></span><span class="bar filled"></span><span class="bar filled"></span></span>
+            </span>
+          </div>
           <textarea class="doc-interaction-textarea" id="doc-assessment" placeholder="AI-generated assessment will appear here...">1. Chronic migraine without aura (G43.709) - improving on current regimen
 2. Medication overuse headache - resolved with current management
 3. Mild depression (F32.0) - stable on current treatment</textarea>
         </div>
 
         <div class="doc-interaction-section">
-          <div class="doc-interaction-label">Plan</div>
+          <div class="doc-interaction-label" style="display: flex; align-items: center; justify-content: space-between;">
+            <span>Plan</span>
+            <span class="ai-confidence medium">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+              Medium Confidence
+              <span class="confidence-bar"><span class="bar filled"></span><span class="bar filled"></span><span class="bar"></span></span>
+            </span>
+          </div>
           <textarea class="doc-interaction-textarea" id="doc-plan" placeholder="AI-generated plan will appear here...">1. Continue topiramate 100mg BID - good tolerance and efficacy
 2. Continue sumatriptan 100mg PRN for acute attacks (limit to 2x/week)
 3. Maintain headache diary
 4. Return in 3 months or sooner if worsening
 5. Consider CGRP inhibitor if frequency does not continue to improve</textarea>
+        </div>
+
+        <!-- Drug Interaction Alert -->
+        <div class="drug-interaction-alert" id="drug-alert-1">
+          <div class="drug-interaction-icon">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>
+            </svg>
+          </div>
+          <div class="drug-interaction-content">
+            <h5>
+              Potential Interaction Detected
+            </h5>
+            <p><strong>Topiramate + Sumatriptan:</strong> Monitor for CNS depression. Both medications may increase sedation risk. Consider spacing doses or reducing if drowsiness reported.</p>
+          </div>
+          <button class="drug-interaction-dismiss" onclick="dismissDrugAlert('drug-alert-1')" title="Dismiss">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+            </svg>
+          </button>
         </div>
 
         <div class="doc-interaction-actions">
@@ -4625,25 +5578,32 @@ Electronically signed by: Dr. Steve Arbogast
     // Toggle recording state
     function toggleRecording(btn) {
       btn.classList.toggle('recording');
+      const wrapper = btn.closest('.ai-textarea-wrapper');
+      const waveform = wrapper.querySelector('.recording-waveform');
+
       if (btn.classList.contains('recording')) {
-        showToast('Recording started... Speak now', 'success');
+        // Show waveform
+        if (waveform) waveform.classList.add('active');
+        showToast('Recording started... Speak now');
         // Simulate stopping after 3 seconds
         setTimeout(() => {
           if (btn.classList.contains('recording')) {
             btn.classList.remove('recording');
+            if (waveform) waveform.classList.remove('active');
             // Find the textarea in the wrapper and add simulated dictation
-            const wrapper = btn.closest('.ai-textarea-wrapper');
             const textarea = wrapper.querySelector('textarea');
             if (textarea) {
               const currentText = textarea.value;
               const dictatedText = " The patient also reports occasional aura with visual disturbances approximately 30 minutes before headache onset.";
               textarea.value = currentText + dictatedText;
             }
-            showToast('Dictation complete', 'success');
+            showToast('Dictation complete');
           }
         }, 3000);
       } else {
-        showToast('Recording stopped', 'success');
+        // Hide waveform
+        if (waveform) waveform.classList.remove('active');
+        showToast('Recording stopped');
       }
     }
 
@@ -4651,15 +5611,59 @@ Electronically signed by: Dr. Steve Arbogast
     function toggleAiDropdown(btn) {
       // Close all other dropdowns first
       document.querySelectorAll('.ai-actions-dropdown').forEach(d => d.classList.remove('show'));
+      document.querySelectorAll('.quick-phrases-dropdown').forEach(d => d.classList.remove('show'));
       const dropdown = btn.nextElementSibling;
       dropdown.classList.toggle('show');
       event.stopPropagation();
+    }
+
+    // Toggle quick phrases dropdown
+    function toggleQuickPhrases(btn) {
+      // Close all other dropdowns first
+      document.querySelectorAll('.ai-actions-dropdown').forEach(d => d.classList.remove('show'));
+      document.querySelectorAll('.quick-phrases-dropdown').forEach(d => d.classList.remove('show'));
+      const dropdown = btn.nextElementSibling;
+      dropdown.classList.toggle('show');
+      event.stopPropagation();
+    }
+
+    // Insert quick phrase into textarea
+    function insertQuickPhrase(element, phrase) {
+      const wrapper = element.closest('.ai-textarea-wrapper');
+      const textarea = wrapper.querySelector('textarea');
+      if (textarea) {
+        const currentText = textarea.value;
+        const cursorPos = textarea.selectionStart;
+        const needsSpace = currentText.length > 0 && !currentText.endsWith(' ') && !currentText.endsWith('\n');
+        const textToInsert = (needsSpace ? ' ' : '') + phrase;
+        textarea.value = currentText.slice(0, cursorPos) + textToInsert + currentText.slice(cursorPos);
+        textarea.focus();
+        textarea.selectionStart = textarea.selectionEnd = cursorPos + textToInsert.length;
+      }
+      // Close the dropdown
+      document.querySelectorAll('.quick-phrases-dropdown').forEach(d => d.classList.remove('show'));
+      showToast('Phrase inserted');
+    }
+
+    // Dismiss drug interaction alert
+    function dismissDrugAlert(alertId) {
+      const alert = document.getElementById(alertId);
+      if (alert) {
+        alert.style.opacity = '0';
+        alert.style.transform = 'translateX(20px)';
+        alert.style.transition = 'all 0.3s ease';
+        setTimeout(() => {
+          alert.style.display = 'none';
+        }, 300);
+        showToast('Alert dismissed');
+      }
     }
 
     // Close dropdowns when clicking outside
     document.addEventListener('click', function(e) {
       if (!e.target.closest('.ai-textarea-icons')) {
         document.querySelectorAll('.ai-actions-dropdown').forEach(d => d.classList.remove('show'));
+        document.querySelectorAll('.quick-phrases-dropdown').forEach(d => d.classList.remove('show'));
       }
     });
 
@@ -5240,8 +6244,232 @@ Electronically signed by: Dr. Steve Arbogast
     }
 
     // =====================================================
+    // GUIDED TOUR FUNCTIONS
+    // =====================================================
+
+    // Tour steps configuration
+    const tourSteps = [
+      {
+        title: 'Welcome to Sevaro',
+        content: 'Welcome to the Sevaro Outpatient Clinical Note demo. This tour will guide you through the key AI-powered features designed to streamline clinical documentation.',
+        element: null, // No highlight for welcome
+        position: 'center'
+      },
+      {
+        title: 'AI Tools Launcher',
+        content: 'Click the star icon to access the Global AI Tools menu. This gives you quick access to Chart Prep, Document Interaction, Ask AI, Patient Summary, and Handout generation.',
+        element: '.ai-launcher-btn',
+        position: 'bottom-left'
+      },
+      {
+        title: 'Dark Mode Toggle',
+        content: 'Switch between light and dark mode for comfortable viewing in any environment. Click the moon icon to toggle.',
+        element: '#dark-mode-toggle',
+        position: 'bottom-left'
+      },
+      {
+        title: 'Patient Summary Card',
+        content: 'View the patient\'s key information at a glance, including their MIDAS score history showing treatment progress. The AI-generated summary highlights important clinical details.',
+        element: '.patient-summary-box',
+        position: 'right'
+      },
+      {
+        title: 'Voice Dictation',
+        content: 'Click the microphone icon in any text field to start voice dictation. Watch for the animated waveform indicating active recording.',
+        element: '.mic-btn',
+        position: 'top'
+      },
+      {
+        title: 'Quick Phrases',
+        content: 'Click the lightning bolt icon to insert common clinical phrases quickly. These are contextual - different phrases appear for different sections.',
+        element: '.quick-phrases-btn',
+        position: 'top'
+      },
+      {
+        title: 'AI Text Actions',
+        content: 'Use the sparkle menu on any text field to ask AI questions, improve text clarity, or generate summaries of your clinical notes.',
+        element: '.ai-actions-btn',
+        position: 'top'
+      },
+      {
+        title: 'You\'re Ready!',
+        content: 'That\'s the tour! Explore the demo to discover more features like drug interaction alerts, AI confidence indicators, and the full AI drawer experience.',
+        element: null,
+        position: 'center'
+      }
+    ];
+
+    let currentTourStep = 0;
+    let previousHighlight = null;
+
+    function startTour() {
+      currentTourStep = 0;
+      showTourStep(0);
+    }
+
+    function showTourStep(stepIndex) {
+      const overlay = document.getElementById('tour-overlay');
+      const tooltip = document.getElementById('tour-tooltip');
+      const title = document.getElementById('tour-title');
+      const step = document.getElementById('tour-step');
+      const content = document.getElementById('tour-content');
+      const dots = document.getElementById('tour-dots');
+      const prevBtn = document.getElementById('tour-prev-btn');
+      const nextBtn = document.getElementById('tour-next-btn');
+
+      // Remove previous highlight
+      if (previousHighlight) {
+        previousHighlight.classList.remove('tour-highlight');
+        previousHighlight = null;
+      }
+
+      const tourStep = tourSteps[stepIndex];
+
+      // Update content
+      title.textContent = tourStep.title;
+      step.textContent = `Step ${stepIndex + 1} of ${tourSteps.length}`;
+      content.textContent = tourStep.content;
+
+      // Update dots
+      dots.innerHTML = tourSteps.map((_, i) => {
+        let className = 'tour-dot';
+        if (i < stepIndex) className += ' completed';
+        if (i === stepIndex) className += ' active';
+        return `<div class="${className}"></div>`;
+      }).join('');
+
+      // Update buttons
+      prevBtn.style.display = stepIndex > 0 ? 'block' : 'none';
+      nextBtn.textContent = stepIndex === tourSteps.length - 1 ? 'Finish' : 'Next';
+
+      // Show overlay
+      overlay.classList.add('active');
+      tooltip.classList.add('active');
+
+      // Highlight element if specified
+      if (tourStep.element) {
+        const el = document.querySelector(tourStep.element);
+        if (el) {
+          el.classList.add('tour-highlight');
+          previousHighlight = el;
+
+          // Position tooltip relative to element
+          const rect = el.getBoundingClientRect();
+          positionTooltip(tooltip, rect, tourStep.position);
+        }
+      } else {
+        // Center tooltip for welcome/end steps
+        tooltip.style.top = '50%';
+        tooltip.style.left = '50%';
+        tooltip.style.transform = 'translate(-50%, -50%)';
+      }
+    }
+
+    function positionTooltip(tooltip, rect, position) {
+      const tooltipRect = tooltip.getBoundingClientRect();
+      const padding = 16;
+
+      tooltip.style.transform = 'none';
+
+      switch (position) {
+        case 'right':
+          tooltip.style.top = rect.top + 'px';
+          tooltip.style.left = (rect.right + padding) + 'px';
+          break;
+        case 'left':
+          tooltip.style.top = rect.top + 'px';
+          tooltip.style.left = (rect.left - tooltipRect.width - padding) + 'px';
+          break;
+        case 'top':
+          tooltip.style.top = (rect.top - tooltipRect.height - padding) + 'px';
+          tooltip.style.left = rect.left + 'px';
+          break;
+        case 'bottom':
+          tooltip.style.top = (rect.bottom + padding) + 'px';
+          tooltip.style.left = rect.left + 'px';
+          break;
+        case 'bottom-left':
+          tooltip.style.top = (rect.bottom + padding) + 'px';
+          tooltip.style.left = Math.max(padding, rect.left - 200) + 'px';
+          break;
+        default:
+          tooltip.style.top = (rect.bottom + padding) + 'px';
+          tooltip.style.left = rect.left + 'px';
+      }
+
+      // Ensure tooltip stays within viewport
+      const newRect = tooltip.getBoundingClientRect();
+      if (newRect.right > window.innerWidth - padding) {
+        tooltip.style.left = (window.innerWidth - tooltipRect.width - padding) + 'px';
+      }
+      if (newRect.bottom > window.innerHeight - padding) {
+        tooltip.style.top = (rect.top - tooltipRect.height - padding) + 'px';
+      }
+    }
+
+    function nextTourStep() {
+      if (currentTourStep < tourSteps.length - 1) {
+        currentTourStep++;
+        showTourStep(currentTourStep);
+      } else {
+        endTour();
+      }
+    }
+
+    function prevTourStep() {
+      if (currentTourStep > 0) {
+        currentTourStep--;
+        showTourStep(currentTourStep);
+      }
+    }
+
+    function endTour() {
+      const overlay = document.getElementById('tour-overlay');
+      const tooltip = document.getElementById('tour-tooltip');
+
+      overlay.classList.remove('active');
+      tooltip.classList.remove('active');
+
+      if (previousHighlight) {
+        previousHighlight.classList.remove('tour-highlight');
+        previousHighlight = null;
+      }
+
+      showToast('Tour completed! Explore the demo on your own.');
+    }
+
+    // Close tour on ESC key
+    document.addEventListener('keydown', function(e) {
+      if (e.key === 'Escape') {
+        const tooltip = document.getElementById('tour-tooltip');
+        if (tooltip && tooltip.classList.contains('active')) {
+          endTour();
+        }
+      }
+    });
+
+    // =====================================================
     // UTILITY FUNCTIONS
     // =====================================================
+
+    // Dark Mode Toggle
+    function toggleDarkMode() {
+      const html = document.documentElement;
+      const icon = document.getElementById('dark-mode-icon');
+      const isDark = html.getAttribute('data-theme') === 'dark';
+
+      if (isDark) {
+        html.removeAttribute('data-theme');
+        // Moon icon for light mode
+        icon.innerHTML = '<path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z"/>';
+        showToast('Light mode enabled');
+      } else {
+        html.setAttribute('data-theme', 'dark');
+        // Sun icon for dark mode
+        icon.innerHTML = '<circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>';
+        showToast('Dark mode enabled');
+      }
+    }
 
     function showToast(message) {
       // Create toast element
@@ -5277,7 +6505,46 @@ Electronically signed by: Dr. Steve Arbogast
     // Initialize context on page load
     document.addEventListener('DOMContentLoaded', function() {
       // Pre-populate context when drawer opens
+
+      // Start the local time clock
+      updateLocalTime();
+      setInterval(updateLocalTime, 1000);
     });
+
+    // Update local time display (PST/PDT)
+    function updateLocalTime() {
+      const now = new Date();
+
+      // Format time for PST (America/Los_Angeles)
+      const options = {
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: true,
+        timeZone: 'America/Los_Angeles'
+      };
+
+      const timeStr = now.toLocaleTimeString('en-US', options);
+
+      // Determine if it's PST or PDT
+      const janDate = new Date(now.getFullYear(), 0, 1);
+      const julDate = new Date(now.getFullYear(), 6, 1);
+      const janOffset = janDate.getTimezoneOffset();
+      const julOffset = julDate.getTimezoneOffset();
+      const stdOffset = Math.max(janOffset, julOffset);
+
+      // Check if currently in DST for Pacific time
+      const pacificFormatter = new Intl.DateTimeFormat('en-US', {
+        timeZone: 'America/Los_Angeles',
+        timeZoneName: 'short'
+      });
+      const tzName = pacificFormatter.format(now).split(' ').pop(); // Gets PST or PDT
+
+      // Update the Marshall clock
+      const marshallClock = document.getElementById('local-time-marshall');
+      if (marshallClock) {
+        marshallClock.textContent = timeStr + ' ' + tzName;
+      }
+    }
   </script>
 </body>
 </html>
