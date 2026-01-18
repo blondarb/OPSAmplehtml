@@ -578,6 +578,117 @@
       display: block;
     }
 
+    /* Draggable Tabs */
+    .tab-btn.dragging {
+      opacity: 0.5;
+      background: var(--primary-light);
+      color: white;
+    }
+
+    .tab-btn.drag-over {
+      border-left: 3px solid var(--primary);
+    }
+
+    .tab-nav-wrapper {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      background: var(--bg-white);
+      border-bottom: 1px solid var(--border);
+      padding-right: 16px;
+    }
+
+    .tab-nav {
+      border-bottom: none;
+    }
+
+    .view-toggle-btn {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 12px;
+      background: var(--bg-gray);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      font-size: 12px;
+      font-weight: 500;
+      color: var(--text-secondary);
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .view-toggle-btn:hover {
+      background: var(--bg-dark);
+      color: var(--text-primary);
+    }
+
+    .view-toggle-btn.active {
+      background: var(--primary);
+      color: white;
+      border-color: var(--primary);
+    }
+
+    .view-toggle-btn svg {
+      width: 14px;
+      height: 14px;
+    }
+
+    /* Vertical Scroll View */
+    .tab-content.vertical-view .tab-pane {
+      display: block;
+      margin-bottom: 24px;
+      padding-bottom: 24px;
+      border-bottom: 2px solid var(--border);
+    }
+
+    .tab-content.vertical-view .tab-pane:last-child {
+      border-bottom: none;
+    }
+
+    .tab-content.vertical-view .section-divider {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 20px;
+      padding-bottom: 12px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .tab-content.vertical-view .section-divider h3 {
+      font-size: 18px;
+      font-weight: 600;
+      color: var(--primary);
+      margin: 0;
+    }
+
+    .tab-content.vertical-view .section-divider .section-icon {
+      width: 32px;
+      height: 32px;
+      border-radius: 8px;
+      background: linear-gradient(135deg, var(--primary) 0%, var(--primary-light) 100%);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: white;
+    }
+
+    .section-divider {
+      display: none;
+    }
+
+    .tab-content.vertical-view .section-divider {
+      display: flex;
+    }
+
+    /* Hide tab nav in vertical view */
+    .vertical-mode .tab-nav {
+      display: none;
+    }
+
+    .vertical-mode .view-toggle-btn {
+      margin-left: auto;
+    }
+
     /* Form Sections */
     .form-section {
       background: var(--bg-white);
@@ -3350,17 +3461,33 @@
       </aside>
 
       <!-- Center Panel -->
-      <main class="center-panel">
-        <div class="tab-nav">
-          <button class="tab-btn active" onclick="switchTab('history')">History</button>
-          <button class="tab-btn" onclick="switchTab('imaging')">Imaging/results</button>
-          <button class="tab-btn" onclick="switchTab('exam')">Physical exams</button>
-          <button class="tab-btn" onclick="switchTab('recommendation')">Recommendation</button>
+      <main class="center-panel" id="center-panel">
+        <div class="tab-nav-wrapper" id="tab-nav-wrapper">
+          <div class="tab-nav" id="tab-nav">
+            <button class="tab-btn active" draggable="true" data-tab="history" onclick="switchTab('history')">History</button>
+            <button class="tab-btn" draggable="true" data-tab="imaging" onclick="switchTab('imaging')">Imaging/results</button>
+            <button class="tab-btn" draggable="true" data-tab="exam" onclick="switchTab('exam')">Physical exams</button>
+            <button class="tab-btn" draggable="true" data-tab="recommendation" onclick="switchTab('recommendation')">Recommendation</button>
+          </div>
+          <button class="view-toggle-btn" id="view-toggle-btn" onclick="toggleVerticalView()" title="Toggle vertical scroll view">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/>
+            </svg>
+            <span id="view-toggle-text">Scroll View</span>
+          </button>
         </div>
 
-        <div class="tab-content">
+        <div class="tab-content" id="tab-content">
           <!-- History Tab -->
-          <div id="history-tab" class="tab-pane active">
+          <div id="history-tab" class="tab-pane active" data-order="0">
+            <div class="section-divider">
+              <div class="section-icon">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
+                </svg>
+              </div>
+              <h3>History</h3>
+            </div>
             <div class="form-section">
               <div class="section-header">
                 <span class="section-title">Reason for visit</span>
@@ -3625,7 +3752,15 @@
           </div>
 
           <!-- Imaging Tab -->
-          <div id="imaging-tab" class="tab-pane">
+          <div id="imaging-tab" class="tab-pane" data-order="1">
+            <div class="section-divider">
+              <div class="section-icon">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/>
+                </svg>
+              </div>
+              <h3>Imaging/Results</h3>
+            </div>
             <div class="form-section">
               <div class="section-header">
                 <span class="section-title">Imaging Studies</span>
@@ -4131,7 +4266,15 @@
           </div>
 
           <!-- Physical Exam Tab -->
-          <div id="exam-tab" class="tab-pane">
+          <div id="exam-tab" class="tab-pane" data-order="2">
+            <div class="section-divider">
+              <div class="section-icon">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M16 4h2a2 2 0 012 2v14a2 2 0 01-2 2H6a2 2 0 01-2-2V6a2 2 0 012-2h2"/><rect x="8" y="2" width="8" height="4" rx="1" ry="1"/><path d="M9 14l2 2 4-4"/>
+                </svg>
+              </div>
+              <h3>Physical Exams</h3>
+            </div>
             <div class="form-section">
               <div class="section-header">
                 <span class="section-title">Initial Assessment</span>
@@ -4430,7 +4573,15 @@
           </div>
 
           <!-- Recommendation Tab -->
-          <div id="recommendation-tab" class="tab-pane">
+          <div id="recommendation-tab" class="tab-pane" data-order="3">
+            <div class="section-divider">
+              <div class="section-icon">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/>
+                </svg>
+              </div>
+              <h3>Recommendation</h3>
+            </div>
             <div class="form-section">
               <div class="section-header">
                 <span class="section-title">Differential diagnosis</span>
@@ -5418,12 +5569,216 @@ Electronically signed by: Dr. Steve Arbogast
   <script>
     // Tab switching
     function switchTab(tabName) {
+      // Don't switch tabs in vertical view
+      const tabContent = document.getElementById('tab-content');
+      if (tabContent.classList.contains('vertical-view')) return;
+
       document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
       document.querySelectorAll('.tab-pane').forEach(pane => pane.classList.remove('active'));
 
-      event.target.classList.add('active');
+      document.querySelector(`.tab-btn[data-tab="${tabName}"]`).classList.add('active');
       document.getElementById(tabName + '-tab').classList.add('active');
     }
+
+    // =====================================================
+    // DRAG AND DROP TAB REORDERING
+    // =====================================================
+
+    let draggedTab = null;
+
+    function initDraggableTabs() {
+      const tabNav = document.getElementById('tab-nav');
+      const tabs = tabNav.querySelectorAll('.tab-btn');
+
+      tabs.forEach(tab => {
+        tab.addEventListener('dragstart', handleDragStart);
+        tab.addEventListener('dragend', handleDragEnd);
+        tab.addEventListener('dragover', handleDragOver);
+        tab.addEventListener('dragenter', handleDragEnter);
+        tab.addEventListener('dragleave', handleDragLeave);
+        tab.addEventListener('drop', handleDrop);
+      });
+
+      // Load saved tab order
+      loadTabOrder();
+    }
+
+    function handleDragStart(e) {
+      draggedTab = this;
+      this.classList.add('dragging');
+      e.dataTransfer.effectAllowed = 'move';
+      e.dataTransfer.setData('text/plain', this.dataset.tab);
+    }
+
+    function handleDragEnd(e) {
+      this.classList.remove('dragging');
+      document.querySelectorAll('.tab-btn').forEach(tab => {
+        tab.classList.remove('drag-over');
+      });
+      draggedTab = null;
+    }
+
+    function handleDragOver(e) {
+      e.preventDefault();
+      e.dataTransfer.dropEffect = 'move';
+    }
+
+    function handleDragEnter(e) {
+      e.preventDefault();
+      if (this !== draggedTab) {
+        this.classList.add('drag-over');
+      }
+    }
+
+    function handleDragLeave(e) {
+      this.classList.remove('drag-over');
+    }
+
+    function handleDrop(e) {
+      e.preventDefault();
+      this.classList.remove('drag-over');
+
+      if (draggedTab && this !== draggedTab) {
+        const tabNav = document.getElementById('tab-nav');
+        const allTabs = [...tabNav.querySelectorAll('.tab-btn')];
+        const draggedIndex = allTabs.indexOf(draggedTab);
+        const dropIndex = allTabs.indexOf(this);
+
+        if (draggedIndex < dropIndex) {
+          this.parentNode.insertBefore(draggedTab, this.nextSibling);
+        } else {
+          this.parentNode.insertBefore(draggedTab, this);
+        }
+
+        // Also reorder the tab panes
+        reorderTabPanes();
+
+        // Save the new order
+        saveTabOrder();
+
+        showToast('Tab order saved');
+      }
+    }
+
+    function reorderTabPanes() {
+      const tabNav = document.getElementById('tab-nav');
+      const tabContent = document.getElementById('tab-content');
+      const tabs = tabNav.querySelectorAll('.tab-btn');
+
+      tabs.forEach((tab, index) => {
+        const tabId = tab.dataset.tab;
+        const pane = document.getElementById(tabId + '-tab');
+        if (pane) {
+          pane.dataset.order = index;
+        }
+      });
+
+      // Sort panes by order
+      const panes = [...tabContent.querySelectorAll('.tab-pane')];
+      panes.sort((a, b) => parseInt(a.dataset.order) - parseInt(b.dataset.order));
+      panes.forEach(pane => tabContent.appendChild(pane));
+    }
+
+    function saveTabOrder() {
+      const tabNav = document.getElementById('tab-nav');
+      const tabs = tabNav.querySelectorAll('.tab-btn');
+      const order = [...tabs].map(tab => tab.dataset.tab);
+      localStorage.setItem('sevaro-tab-order', JSON.stringify(order));
+    }
+
+    function loadTabOrder() {
+      const saved = localStorage.getItem('sevaro-tab-order');
+      if (saved) {
+        try {
+          const order = JSON.parse(saved);
+          const tabNav = document.getElementById('tab-nav');
+          const tabContent = document.getElementById('tab-content');
+
+          order.forEach((tabId, index) => {
+            const tab = document.querySelector(`.tab-btn[data-tab="${tabId}"]`);
+            const pane = document.getElementById(tabId + '-tab');
+            if (tab) {
+              tabNav.appendChild(tab);
+            }
+            if (pane) {
+              pane.dataset.order = index;
+            }
+          });
+
+          // Sort panes
+          const panes = [...tabContent.querySelectorAll('.tab-pane')];
+          panes.sort((a, b) => parseInt(a.dataset.order) - parseInt(b.dataset.order));
+          panes.forEach(pane => tabContent.appendChild(pane));
+        } catch (e) {
+          console.log('Could not load tab order');
+        }
+      }
+    }
+
+    // =====================================================
+    // VERTICAL SCROLL VIEW TOGGLE
+    // =====================================================
+
+    let isVerticalView = false;
+
+    function toggleVerticalView() {
+      const tabContent = document.getElementById('tab-content');
+      const tabNavWrapper = document.getElementById('tab-nav-wrapper');
+      const toggleBtn = document.getElementById('view-toggle-btn');
+      const toggleText = document.getElementById('view-toggle-text');
+
+      isVerticalView = !isVerticalView;
+
+      if (isVerticalView) {
+        tabContent.classList.add('vertical-view');
+        tabNavWrapper.classList.add('vertical-mode');
+        toggleBtn.classList.add('active');
+        toggleText.textContent = 'Tab View';
+
+        // Make all panes visible
+        document.querySelectorAll('.tab-pane').forEach(pane => {
+          pane.classList.add('active');
+        });
+
+        showToast('Vertical scroll view enabled');
+      } else {
+        tabContent.classList.remove('vertical-view');
+        tabNavWrapper.classList.remove('vertical-mode');
+        toggleBtn.classList.remove('active');
+        toggleText.textContent = 'Scroll View';
+
+        // Restore tab behavior - show only active tab
+        document.querySelectorAll('.tab-pane').forEach(pane => {
+          pane.classList.remove('active');
+        });
+
+        // Activate the first tab
+        const firstTab = document.querySelector('.tab-btn');
+        if (firstTab) {
+          const tabId = firstTab.dataset.tab;
+          document.querySelector(`.tab-btn[data-tab="${tabId}"]`).classList.add('active');
+          document.getElementById(tabId + '-tab').classList.add('active');
+        }
+
+        showToast('Tab view enabled');
+      }
+
+      // Save preference
+      localStorage.setItem('sevaro-vertical-view', isVerticalView);
+    }
+
+    function loadViewPreference() {
+      const saved = localStorage.getItem('sevaro-vertical-view');
+      if (saved === 'true') {
+        toggleVerticalView();
+      }
+    }
+
+    // Initialize on page load
+    document.addEventListener('DOMContentLoaded', function() {
+      initDraggableTabs();
+      loadViewPreference();
+    });
 
     // Chip toggle
     function toggleChip(chip) {
@@ -6290,6 +6645,18 @@ Electronically signed by: Dr. Steve Arbogast
         content: 'Use the sparkle menu on any text field to ask AI questions, improve text clarity, or generate summaries of your clinical notes.',
         element: '.ai-actions-btn',
         position: 'top'
+      },
+      {
+        title: 'Customizable Tabs',
+        content: 'Drag and drop tabs to reorder them to your preference. Your custom order is saved automatically for your next visit.',
+        element: '.tab-nav',
+        position: 'bottom'
+      },
+      {
+        title: 'Vertical Scroll View',
+        content: 'Click "Scroll View" to see all note sections in a continuous vertical layout instead of tabs. Great for reviewing the complete note.',
+        element: '#view-toggle-btn',
+        position: 'bottom'
       },
       {
         title: 'You\'re Ready!',
