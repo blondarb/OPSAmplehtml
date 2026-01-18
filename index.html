@@ -1741,6 +1741,621 @@
       font-weight: 600;
       color: var(--primary);
     }
+
+    /* Global AI Launcher */
+    .ai-launcher-container {
+      position: relative;
+    }
+
+    .ai-launcher-btn {
+      width: 36px;
+      height: 36px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 8px;
+      cursor: pointer;
+      background: linear-gradient(135deg, var(--primary) 0%, var(--primary-light) 100%);
+      border: none;
+      color: white;
+      transition: transform 0.2s, box-shadow 0.2s;
+    }
+
+    .ai-launcher-btn:hover {
+      transform: scale(1.05);
+      box-shadow: 0 4px 12px rgba(13, 148, 136, 0.4);
+    }
+
+    .ai-launcher-menu {
+      position: absolute;
+      top: 100%;
+      right: 0;
+      margin-top: 8px;
+      background: var(--bg-white);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.15);
+      width: 280px;
+      display: none;
+      z-index: 1000;
+      overflow: hidden;
+    }
+
+    .ai-launcher-menu.show {
+      display: block;
+    }
+
+    .ai-launcher-menu-header {
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--border);
+      background: linear-gradient(135deg, #F0FDFA 0%, #ECFDF5 100%);
+    }
+
+    .ai-launcher-menu-header h4 {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--primary-dark);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .ai-launcher-menu-item {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 12px 16px;
+      cursor: pointer;
+      transition: background 0.15s;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .ai-launcher-menu-item:last-child {
+      border-bottom: none;
+    }
+
+    .ai-launcher-menu-item:hover {
+      background: var(--bg-gray);
+    }
+
+    .ai-launcher-menu-icon {
+      width: 32px;
+      height: 32px;
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: var(--bg-gray);
+      color: var(--primary);
+    }
+
+    .ai-launcher-menu-text h5 {
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--text-primary);
+      margin-bottom: 2px;
+    }
+
+    .ai-launcher-menu-text p {
+      font-size: 11px;
+      color: var(--text-muted);
+    }
+
+    /* AI Drawer */
+    .ai-drawer-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0,0,0,0.3);
+      z-index: 1500;
+      display: none;
+    }
+
+    .ai-drawer-overlay.show {
+      display: block;
+    }
+
+    .ai-drawer {
+      position: fixed;
+      top: 0;
+      right: -420px;
+      width: 420px;
+      height: 100vh;
+      background: var(--bg-white);
+      box-shadow: -4px 0 24px rgba(0,0,0,0.15);
+      z-index: 1600;
+      display: flex;
+      flex-direction: column;
+      transition: right 0.3s ease;
+    }
+
+    .ai-drawer.show {
+      right: 0;
+    }
+
+    .ai-drawer-header {
+      padding: 16px 20px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      background: linear-gradient(135deg, #F0FDFA 0%, #ECFDF5 100%);
+    }
+
+    .ai-drawer-header-left {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .ai-drawer-header-left h3 {
+      font-size: 16px;
+      font-weight: 600;
+      color: var(--primary-dark);
+    }
+
+    .ai-drawer-close {
+      width: 32px;
+      height: 32px;
+      border-radius: 8px;
+      border: none;
+      background: transparent;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--text-secondary);
+    }
+
+    .ai-drawer-close:hover {
+      background: var(--bg-gray);
+    }
+
+    .ai-drawer-tabs {
+      display: flex;
+      border-bottom: 1px solid var(--border);
+      background: var(--bg-white);
+      overflow-x: auto;
+    }
+
+    .ai-drawer-tab {
+      padding: 12px 16px;
+      font-size: 12px;
+      font-weight: 500;
+      color: var(--text-secondary);
+      background: none;
+      border: none;
+      cursor: pointer;
+      white-space: nowrap;
+      position: relative;
+    }
+
+    .ai-drawer-tab:hover {
+      color: var(--text-primary);
+    }
+
+    .ai-drawer-tab.active {
+      color: var(--primary);
+    }
+
+    .ai-drawer-tab.active::after {
+      content: '';
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      height: 2px;
+      background: var(--primary);
+    }
+
+    .ai-drawer-content {
+      flex: 1;
+      overflow-y: auto;
+      padding: 20px;
+    }
+
+    .ai-drawer-pane {
+      display: none;
+    }
+
+    .ai-drawer-pane.active {
+      display: block;
+    }
+
+    /* Chart Prep Styles */
+    .chart-prep-section {
+      margin-bottom: 20px;
+    }
+
+    .chart-prep-section h4 {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text-primary);
+      margin-bottom: 12px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .chart-prep-content {
+      background: var(--bg-gray);
+      border-radius: 8px;
+      padding: 14px;
+      font-size: 13px;
+      line-height: 1.6;
+      color: var(--text-secondary);
+    }
+
+    .chart-prep-content ul {
+      margin: 0;
+      padding-left: 16px;
+    }
+
+    .chart-prep-content li {
+      margin-bottom: 6px;
+    }
+
+    .chart-prep-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      font-size: 11px;
+      padding: 4px 8px;
+      border-radius: 4px;
+      font-weight: 500;
+    }
+
+    .chart-prep-badge.normal {
+      background: #D1FAE5;
+      color: #059669;
+    }
+
+    .chart-prep-badge.abnormal {
+      background: #FEE2E2;
+      color: #DC2626;
+    }
+
+    .chart-prep-badge.pending {
+      background: #FEF3C7;
+      color: #D97706;
+    }
+
+    /* Document Interaction Styles */
+    .doc-interaction-section {
+      margin-bottom: 16px;
+    }
+
+    .doc-interaction-label {
+      font-size: 12px;
+      font-weight: 500;
+      color: var(--text-secondary);
+      margin-bottom: 8px;
+    }
+
+    .doc-interaction-textarea {
+      width: 100%;
+      min-height: 100px;
+      padding: 12px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      font-family: inherit;
+      font-size: 13px;
+      resize: vertical;
+      outline: none;
+    }
+
+    .doc-interaction-textarea:focus {
+      border-color: var(--primary);
+      box-shadow: 0 0 0 3px rgba(13, 148, 136, 0.1);
+    }
+
+    .doc-interaction-actions {
+      display: flex;
+      gap: 8px;
+      margin-top: 12px;
+    }
+
+    .doc-interaction-btn {
+      padding: 10px 16px;
+      border-radius: 8px;
+      font-size: 13px;
+      font-weight: 500;
+      cursor: pointer;
+      border: none;
+    }
+
+    .doc-interaction-btn.primary {
+      background: var(--primary);
+      color: white;
+    }
+
+    .doc-interaction-btn.primary:hover {
+      background: var(--primary-dark);
+    }
+
+    .doc-interaction-btn.secondary {
+      background: var(--bg-gray);
+      color: var(--text-primary);
+      border: 1px solid var(--border);
+    }
+
+    .doc-interaction-btn.secondary:hover {
+      background: var(--bg-dark);
+    }
+
+    /* Ask AI Styles */
+    .ask-ai-tabs {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 16px;
+    }
+
+    .ask-ai-tab {
+      padding: 8px 16px;
+      border-radius: 20px;
+      font-size: 12px;
+      font-weight: 500;
+      cursor: pointer;
+      border: 1px solid var(--border);
+      background: var(--bg-white);
+      color: var(--text-secondary);
+    }
+
+    .ask-ai-tab.active {
+      background: var(--primary);
+      color: white;
+      border-color: var(--primary);
+    }
+
+    .ask-ai-input-container {
+      position: relative;
+      margin-bottom: 16px;
+    }
+
+    .ask-ai-input {
+      width: 100%;
+      padding: 12px 16px;
+      padding-right: 44px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      font-size: 13px;
+      outline: none;
+    }
+
+    .ask-ai-input:focus {
+      border-color: var(--primary);
+      box-shadow: 0 0 0 3px rgba(13, 148, 136, 0.1);
+    }
+
+    .ask-ai-send {
+      position: absolute;
+      right: 8px;
+      top: 50%;
+      transform: translateY(-50%);
+      width: 32px;
+      height: 32px;
+      border-radius: 6px;
+      border: none;
+      background: var(--primary);
+      color: white;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .ask-ai-response {
+      background: var(--bg-gray);
+      border-radius: 8px;
+      padding: 16px;
+      font-size: 13px;
+      line-height: 1.6;
+      color: var(--text-secondary);
+      max-height: 300px;
+      overflow-y: auto;
+    }
+
+    /* Summarize for Patient Styles */
+    .patient-summary-box {
+      background: linear-gradient(135deg, #F0FDFA 0%, #ECFDF5 100%);
+      border: 1px solid #A7F3D0;
+      border-radius: 12px;
+      padding: 16px;
+      margin-bottom: 16px;
+    }
+
+    .patient-summary-header {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 12px;
+    }
+
+    .patient-summary-header h4 {
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--primary-dark);
+    }
+
+    .patient-summary-content {
+      font-size: 14px;
+      line-height: 1.7;
+      color: var(--text-primary);
+    }
+
+    .reading-level-selector {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 16px;
+    }
+
+    .reading-level-selector label {
+      font-size: 12px;
+      font-weight: 500;
+      color: var(--text-secondary);
+    }
+
+    .reading-level-selector select {
+      padding: 8px 12px;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      font-size: 13px;
+      outline: none;
+    }
+
+    /* Create Handout Styles */
+    .handout-options {
+      margin-bottom: 16px;
+    }
+
+    .handout-option {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 10px 0;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .handout-option:last-child {
+      border-bottom: none;
+    }
+
+    .handout-option input {
+      accent-color: var(--primary);
+    }
+
+    .handout-option label {
+      font-size: 13px;
+      color: var(--text-primary);
+    }
+
+    .handout-preview {
+      background: var(--bg-gray);
+      border-radius: 8px;
+      padding: 16px;
+      margin-bottom: 16px;
+      font-size: 13px;
+      line-height: 1.6;
+    }
+
+    .handout-preview h5 {
+      font-size: 14px;
+      font-weight: 600;
+      margin-bottom: 12px;
+      color: var(--text-primary);
+    }
+
+    .handout-export-btns {
+      display: flex;
+      gap: 8px;
+    }
+
+    .handout-export-btn {
+      flex: 1;
+      padding: 10px 16px;
+      border-radius: 8px;
+      font-size: 13px;
+      font-weight: 500;
+      cursor: pointer;
+      border: 1px solid var(--border);
+      background: var(--bg-white);
+      color: var(--text-primary);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+    }
+
+    .handout-export-btn:hover {
+      background: var(--bg-gray);
+    }
+
+    .handout-export-btn.primary {
+      background: var(--primary);
+      color: white;
+      border-color: var(--primary);
+    }
+
+    /* AI Context Section */
+    .ai-context-section {
+      background: var(--bg-gray);
+      border-radius: 8px;
+      padding: 12px;
+      margin-bottom: 16px;
+      border: 1px dashed var(--border);
+    }
+
+    .ai-context-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      cursor: pointer;
+    }
+
+    .ai-context-header h5 {
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .ai-context-toggle {
+      font-size: 11px;
+      color: var(--primary);
+      cursor: pointer;
+    }
+
+    .ai-context-preview {
+      margin-top: 8px;
+      font-size: 11px;
+      color: var(--text-secondary);
+      max-height: 60px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .ai-context-full {
+      display: none;
+      margin-top: 8px;
+      font-size: 11px;
+      color: var(--text-secondary);
+      max-height: 200px;
+      overflow-y: auto;
+      white-space: pre-wrap;
+    }
+
+    .ai-context-section.expanded .ai-context-preview {
+      display: none;
+    }
+
+    .ai-context-section.expanded .ai-context-full {
+      display: block;
+    }
+
+    /* Loading spinner for AI */
+    .ai-loading {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 40px;
+    }
+
+    .ai-loading-spinner {
+      width: 32px;
+      height: 32px;
+      border: 3px solid var(--border);
+      border-top-color: var(--primary);
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
   </style>
 </head>
 <body>
@@ -1788,6 +2403,79 @@
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z"/>
           </svg>
+        </div>
+        <!-- Global AI Launcher -->
+        <div class="ai-launcher-container">
+          <button class="ai-launcher-btn" onclick="toggleAiLauncherMenu()" title="AI Tools">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
+            </svg>
+          </button>
+          <div class="ai-launcher-menu" id="ai-launcher-menu">
+            <div class="ai-launcher-menu-header">
+              <h4>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
+                </svg>
+                AI Tools
+              </h4>
+            </div>
+            <div class="ai-launcher-menu-item" onclick="openAiDrawer('chart-prep')">
+              <div class="ai-launcher-menu-icon">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><path d="M14 2v6h6"/><path d="M16 13H8"/><path d="M16 17H8"/><path d="M10 9H8"/>
+                </svg>
+              </div>
+              <div class="ai-launcher-menu-text">
+                <h5>Chart Prep</h5>
+                <p>AI-generated visit summary</p>
+              </div>
+            </div>
+            <div class="ai-launcher-menu-item" onclick="openAiDrawer('document')">
+              <div class="ai-launcher-menu-icon">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/>
+                </svg>
+              </div>
+              <div class="ai-launcher-menu-text">
+                <h5>Document Interaction</h5>
+                <p>Transcribe and document visit</p>
+              </div>
+            </div>
+            <div class="ai-launcher-menu-item" onclick="openAiDrawer('ask-ai')">
+              <div class="ai-launcher-menu-icon">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/>
+                </svg>
+              </div>
+              <div class="ai-launcher-menu-text">
+                <h5>Ask AI / Search VERA</h5>
+                <p>Query clinical guidelines</p>
+              </div>
+            </div>
+            <div class="ai-launcher-menu-item" onclick="openAiDrawer('summarize')">
+              <div class="ai-launcher-menu-icon">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/>
+                </svg>
+              </div>
+              <div class="ai-launcher-menu-text">
+                <h5>Summarize for Patient</h5>
+                <p>Plain-language explanation</p>
+              </div>
+            </div>
+            <div class="ai-launcher-menu-item" onclick="openAiDrawer('handout')">
+              <div class="ai-launcher-menu-icon">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4z"/><path d="M3 6h18"/><path d="M16 10a4 4 0 01-8 0"/>
+                </svg>
+              </div>
+              <div class="ai-launcher-menu-text">
+                <h5>Create Patient Handout</h5>
+                <p>Generate take-home materials</p>
+              </div>
+            </div>
+          </div>
         </div>
         <div class="user-avatar">SA</div>
       </div>
@@ -3483,6 +4171,297 @@ Electronically signed by: Dr. Steve Arbogast
     </div>
   </div>
 
+  <!-- AI Drawer Overlay and Panel -->
+  <div class="ai-drawer-overlay" id="ai-drawer-overlay" onclick="closeAiDrawer()"></div>
+  <div class="ai-drawer" id="ai-drawer">
+    <div class="ai-drawer-header">
+      <div class="ai-drawer-header-left">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
+        </svg>
+        <h3 id="ai-drawer-title">AI Tools</h3>
+      </div>
+      <button class="ai-drawer-close" onclick="closeAiDrawer()">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+        </svg>
+      </button>
+    </div>
+    <div class="ai-drawer-tabs">
+      <button class="ai-drawer-tab active" onclick="switchAiDrawerTab('chart-prep')">Chart Prep</button>
+      <button class="ai-drawer-tab" onclick="switchAiDrawerTab('document')">Document</button>
+      <button class="ai-drawer-tab" onclick="switchAiDrawerTab('ask-ai')">Ask AI</button>
+      <button class="ai-drawer-tab" onclick="switchAiDrawerTab('summarize')">Summarize</button>
+      <button class="ai-drawer-tab" onclick="switchAiDrawerTab('handout')">Handout</button>
+    </div>
+    <div class="ai-drawer-content">
+      <!-- Chart Prep Pane -->
+      <div class="ai-drawer-pane active" id="pane-chart-prep">
+        <div class="ai-context-section" onclick="toggleAiContext(this)">
+          <div class="ai-context-header">
+            <h5>AI Context (from chart)</h5>
+            <span class="ai-context-toggle">Show more</span>
+          </div>
+          <div class="ai-context-preview" id="chart-prep-context-preview">Loading patient data...</div>
+          <div class="ai-context-full" id="chart-prep-context-full"></div>
+        </div>
+
+        <div class="chart-prep-section">
+          <h4>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/>
+            </svg>
+            Patient Overview
+          </h4>
+          <div class="chart-prep-content" id="chart-prep-overview">
+            <strong>Test Test</strong> - 50 y/o male presenting for follow-up of chronic migraines. Patient has history of episodic migraines evolving to chronic pattern over 2 years.
+          </div>
+        </div>
+
+        <div class="chart-prep-section">
+          <h4>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M22 12h-4l-3 9L9 3l-3 9H2"/>
+            </svg>
+            Recent Results Summary
+          </h4>
+          <div class="chart-prep-content">
+            <ul>
+              <li><strong>MRI Brain (Dec 2025):</strong> <span class="chart-prep-badge normal">Normal</span> - No acute intracranial abnormality</li>
+              <li><strong>CT Head (Nov 2025):</strong> <span class="chart-prep-badge normal">Normal</span> - No hemorrhage or mass effect</li>
+              <li><strong>EEG (Oct 2025):</strong> <span class="chart-prep-badge abnormal">Abnormal</span> - Mild diffuse slowing</li>
+            </ul>
+          </div>
+        </div>
+
+        <div class="chart-prep-section">
+          <h4>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M12 20V10"/><path d="M18 20V4"/><path d="M6 20v-4"/>
+            </svg>
+            Scale Trends
+          </h4>
+          <div class="chart-prep-content">
+            <ul>
+              <li><strong>MIDAS:</strong> 56 → 42 → 24 → 18 (improving, -68% from baseline)</li>
+              <li><strong>HIT-6:</strong> 68 → 62 → 58 (improving trend)</li>
+              <li><strong>PHQ-9:</strong> 12 → 8 → 6 (mild depression, improving)</li>
+            </ul>
+          </div>
+        </div>
+
+        <div class="chart-prep-section">
+          <h4>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/>
+            </svg>
+            Suggested Discussion Points
+          </h4>
+          <div class="chart-prep-content">
+            <ul>
+              <li>Review current preventive medication efficacy (topiramate 100mg)</li>
+              <li>Discuss MIDAS score improvement and treatment response</li>
+              <li>Consider CGRP inhibitor if further optimization needed</li>
+              <li>Address sleep hygiene and trigger avoidance</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+
+      <!-- Document Interaction Pane -->
+      <div class="ai-drawer-pane" id="pane-document">
+        <div class="ai-context-section" onclick="toggleAiContext(this)">
+          <div class="ai-context-header">
+            <h5>AI Context (from chart)</h5>
+            <span class="ai-context-toggle">Show more</span>
+          </div>
+          <div class="ai-context-preview" id="doc-context-preview">Loading patient data...</div>
+          <div class="ai-context-full" id="doc-context-full"></div>
+        </div>
+
+        <div class="doc-interaction-section">
+          <div class="doc-interaction-label">HPI (History of Present Illness)</div>
+          <textarea class="doc-interaction-textarea" id="doc-hpi" placeholder="AI-generated HPI will appear here...">Patient is a 50-year-old male presenting for follow-up of chronic migraines. Reports headache frequency has decreased from daily to approximately 3-4 times per week since starting current preventive regimen. Headaches are described as bilateral, throbbing, moderate intensity (6/10), lasting 4-6 hours. Associated with photophobia and occasional nausea. Denies visual aura. Current abortive therapy (sumatriptan) provides relief within 2 hours.</textarea>
+        </div>
+
+        <div class="doc-interaction-section">
+          <div class="doc-interaction-label">Assessment</div>
+          <textarea class="doc-interaction-textarea" id="doc-assessment" placeholder="AI-generated assessment will appear here...">1. Chronic migraine without aura (G43.709) - improving on current regimen
+2. Medication overuse headache - resolved with current management
+3. Mild depression (F32.0) - stable on current treatment</textarea>
+        </div>
+
+        <div class="doc-interaction-section">
+          <div class="doc-interaction-label">Plan</div>
+          <textarea class="doc-interaction-textarea" id="doc-plan" placeholder="AI-generated plan will appear here...">1. Continue topiramate 100mg BID - good tolerance and efficacy
+2. Continue sumatriptan 100mg PRN for acute attacks (limit to 2x/week)
+3. Maintain headache diary
+4. Return in 3 months or sooner if worsening
+5. Consider CGRP inhibitor if frequency does not continue to improve</textarea>
+        </div>
+
+        <div class="doc-interaction-actions">
+          <button class="doc-interaction-btn secondary" onclick="regenerateDocumentation()">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M23 4v6h-6"/><path d="M1 20v-6h6"/><path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"/>
+            </svg>
+            Regenerate
+          </button>
+          <button class="doc-interaction-btn primary" onclick="saveToFields()">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2z"/><path d="M17 21v-8H7v8"/><path d="M7 3v5h8"/>
+            </svg>
+            Save to Note Fields
+          </button>
+        </div>
+      </div>
+
+      <!-- Ask AI / Search VERA Pane -->
+      <div class="ai-drawer-pane" id="pane-ask-ai">
+        <div class="ask-ai-tabs">
+          <button class="ask-ai-tab active" onclick="switchAskAiTab('ask')">Ask AI</button>
+          <button class="ask-ai-tab" onclick="switchAskAiTab('vera')">Search VERA Health</button>
+        </div>
+
+        <div class="ai-context-section" onclick="toggleAiContext(this)">
+          <div class="ai-context-header">
+            <h5>AI Context (from chart)</h5>
+            <span class="ai-context-toggle">Show more</span>
+          </div>
+          <div class="ai-context-preview" id="ask-context-preview">Loading patient data...</div>
+          <div class="ai-context-full" id="ask-context-full"></div>
+        </div>
+
+        <div class="ask-ai-input-container">
+          <input type="text" class="ask-ai-input" id="ask-ai-input" placeholder="Ask a clinical question..." onkeypress="if(event.key==='Enter')submitAskAi()">
+          <button class="ask-ai-send" onclick="submitAskAi()">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/>
+            </svg>
+          </button>
+        </div>
+
+        <div class="ask-ai-response" id="ask-ai-response">
+          <p style="color: var(--text-muted); font-style: italic;">Ask a question about this patient's case, treatment options, or clinical guidelines. The AI will provide context-aware responses based on the current chart data.</p>
+          <p style="margin-top: 12px; color: var(--text-muted); font-size: 12px;">Example questions:</p>
+          <ul style="color: var(--text-muted); font-size: 12px; margin-top: 4px;">
+            <li>"What are the CGRP inhibitor options for this patient?"</li>
+            <li>"Is this patient a candidate for Botox?"</li>
+            <li>"What are the contraindications for triptans?"</li>
+          </ul>
+        </div>
+      </div>
+
+      <!-- Summarize for Patient Pane -->
+      <div class="ai-drawer-pane" id="pane-summarize">
+        <div class="reading-level-selector">
+          <label>Reading Level:</label>
+          <select id="reading-level" onchange="updatePatientSummary()">
+            <option value="simple">Simple (5th grade)</option>
+            <option value="standard" selected>Standard (8th grade)</option>
+            <option value="detailed">Detailed (12th grade)</option>
+          </select>
+        </div>
+
+        <div class="patient-summary-box">
+          <div class="patient-summary-header">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
+            </svg>
+            <h4>Summary for Patient</h4>
+          </div>
+          <div class="patient-summary-content" id="patient-summary-content">
+            <p><strong>What we found:</strong> Your headaches are getting better with your current treatment. Your MIDAS score went from 56 to 18, which means your headaches are affecting your daily life much less than before.</p>
+            <p style="margin-top: 12px;"><strong>Your brain scans:</strong> The MRI and CT scans of your brain look normal. There are no concerning findings.</p>
+            <p style="margin-top: 12px;"><strong>Your treatment plan:</strong> Continue taking your current medications as prescribed. Keep track of your headaches in your diary. If your headaches get worse or you have any concerns, call the office right away.</p>
+            <p style="margin-top: 12px;"><strong>Next steps:</strong> We'll see you again in 3 months to check on your progress.</p>
+          </div>
+        </div>
+
+        <div class="doc-interaction-actions">
+          <button class="doc-interaction-btn secondary" onclick="copyPatientSummary()">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/>
+            </svg>
+            Copy to Clipboard
+          </button>
+          <button class="doc-interaction-btn primary" onclick="printPatientSummary()">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M6 9V2h12v7"/><path d="M6 18H4a2 2 0 01-2-2v-5a2 2 0 012-2h16a2 2 0 012 2v5a2 2 0 01-2 2h-2"/><rect x="6" y="14" width="12" height="8"/>
+            </svg>
+            Print
+          </button>
+        </div>
+      </div>
+
+      <!-- Create Patient Handout Pane -->
+      <div class="ai-drawer-pane" id="pane-handout">
+        <div class="handout-options">
+          <h4 style="font-size: 13px; font-weight: 600; margin-bottom: 12px;">Include in Handout:</h4>
+          <div class="handout-option">
+            <input type="checkbox" id="handout-diagnosis" checked>
+            <label for="handout-diagnosis">Diagnosis Summary</label>
+          </div>
+          <div class="handout-option">
+            <input type="checkbox" id="handout-medications" checked>
+            <label for="handout-medications">Medication Instructions</label>
+          </div>
+          <div class="handout-option">
+            <input type="checkbox" id="handout-lifestyle" checked>
+            <label for="handout-lifestyle">Lifestyle Recommendations</label>
+          </div>
+          <div class="handout-option">
+            <input type="checkbox" id="handout-warning">
+            <label for="handout-warning">Warning Signs to Watch For</label>
+          </div>
+          <div class="handout-option">
+            <input type="checkbox" id="handout-followup" checked>
+            <label for="handout-followup">Follow-up Instructions</label>
+          </div>
+        </div>
+
+        <div class="handout-preview" id="handout-preview">
+          <h5>Patient Handout Preview</h5>
+          <p><strong>Your Diagnosis:</strong> Chronic Migraine</p>
+          <p style="margin-top: 8px;"><strong>Your Medications:</strong></p>
+          <ul style="margin: 4px 0 8px 16px;">
+            <li>Topiramate 100mg - Take twice daily for prevention</li>
+            <li>Sumatriptan 100mg - Take as needed for acute headache (max 2x/week)</li>
+          </ul>
+          <p><strong>Lifestyle Tips:</strong></p>
+          <ul style="margin: 4px 0 8px 16px;">
+            <li>Keep a regular sleep schedule</li>
+            <li>Stay hydrated</li>
+            <li>Avoid known triggers (bright lights, certain foods)</li>
+            <li>Manage stress with relaxation techniques</li>
+          </ul>
+          <p><strong>Next Appointment:</strong> 3 months</p>
+        </div>
+
+        <div class="handout-export-btns">
+          <button class="handout-export-btn" onclick="exportHandout('pdf')">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><path d="M14 2v6h6"/><path d="M12 18v-6"/><path d="M9 15l3 3 3-3"/>
+            </svg>
+            PDF
+          </button>
+          <button class="handout-export-btn" onclick="exportHandout('print')">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M6 9V2h12v7"/><path d="M6 18H4a2 2 0 01-2-2v-5a2 2 0 012-2h16a2 2 0 012 2v5a2 2 0 01-2 2h-2"/><rect x="6" y="14" width="12" height="8"/>
+            </svg>
+            Print
+          </button>
+          <button class="handout-export-btn primary" onclick="exportHandout('email')">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/>
+            </svg>
+            Email
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <script>
     // Tab switching
     function switchTab(tabName) {
@@ -3876,6 +4855,428 @@ Electronically signed by: Dr. Steve Arbogast
       if (e.target === this) {
         closeScoreDetailModal();
       }
+    });
+
+    // =====================================================
+    // GLOBAL AI LAUNCHER & DRAWER FUNCTIONS
+    // =====================================================
+
+    // Toggle AI Launcher Menu
+    function toggleAiLauncherMenu() {
+      const menu = document.getElementById('ai-launcher-menu');
+      menu.classList.toggle('show');
+    }
+
+    // Close AI Launcher Menu when clicking outside
+    document.addEventListener('click', function(e) {
+      const container = document.querySelector('.ai-launcher-container');
+      const menu = document.getElementById('ai-launcher-menu');
+      if (container && !container.contains(e.target)) {
+        menu.classList.remove('show');
+      }
+    });
+
+    // Open AI Drawer with specific tab
+    function openAiDrawer(tabId) {
+      const menu = document.getElementById('ai-launcher-menu');
+      const overlay = document.getElementById('ai-drawer-overlay');
+      const drawer = document.getElementById('ai-drawer');
+
+      menu.classList.remove('show');
+      overlay.classList.add('show');
+      drawer.classList.add('show');
+
+      switchAiDrawerTab(tabId);
+      updateAiContext();
+    }
+
+    // Close AI Drawer
+    function closeAiDrawer() {
+      const overlay = document.getElementById('ai-drawer-overlay');
+      const drawer = document.getElementById('ai-drawer');
+
+      overlay.classList.remove('show');
+      drawer.classList.remove('show');
+    }
+
+    // Close drawer on ESC key
+    document.addEventListener('keydown', function(e) {
+      if (e.key === 'Escape') {
+        closeAiDrawer();
+        document.getElementById('ai-launcher-menu').classList.remove('show');
+      }
+    });
+
+    // Switch AI Drawer Tab
+    function switchAiDrawerTab(tabId) {
+      // Update tab buttons
+      document.querySelectorAll('.ai-drawer-tab').forEach(tab => tab.classList.remove('active'));
+      const tabs = document.querySelectorAll('.ai-drawer-tab');
+      const tabNames = ['chart-prep', 'document', 'ask-ai', 'summarize', 'handout'];
+      const tabIndex = tabNames.indexOf(tabId);
+      if (tabIndex >= 0 && tabs[tabIndex]) {
+        tabs[tabIndex].classList.add('active');
+      }
+
+      // Update panes
+      document.querySelectorAll('.ai-drawer-pane').forEach(pane => pane.classList.remove('active'));
+      const pane = document.getElementById('pane-' + tabId);
+      if (pane) {
+        pane.classList.add('active');
+      }
+
+      // Update drawer title
+      const titles = {
+        'chart-prep': 'Chart Prep',
+        'document': 'Document Interaction',
+        'ask-ai': 'Ask AI / Search VERA',
+        'summarize': 'Summarize for Patient',
+        'handout': 'Create Patient Handout'
+      };
+      document.getElementById('ai-drawer-title').textContent = titles[tabId] || 'AI Tools';
+    }
+
+    // Toggle AI Context expansion
+    function toggleAiContext(section) {
+      section.classList.toggle('expanded');
+      const toggle = section.querySelector('.ai-context-toggle');
+      toggle.textContent = section.classList.contains('expanded') ? 'Show less' : 'Show more';
+    }
+
+    // Get AI Context from page fields
+    function getAiContext() {
+      const context = {
+        patient: {
+          name: 'Test Test',
+          age: 50,
+          sex: 'Male',
+          mrn: '123123'
+        },
+        chiefComplaint: 'Chronic migraines - follow-up',
+        visitType: document.querySelector('.chip.selected')?.textContent || 'Follow-up',
+        hpi: '',
+        assessment: '',
+        recommendations: '',
+        generalNotes: '',
+        imaging: {
+          mriBrain: '',
+          ctHead: '',
+          ctaHeadNeck: '',
+          eeg: '',
+          emgNcs: ''
+        },
+        scales: {
+          midas: { current: 18, history: [56, 42, 24, 18] },
+          hit6: { current: 58, history: [68, 62, 58] },
+          phq9: { current: 6, history: [12, 8, 6] }
+        }
+      };
+
+      // Read from HPI textarea
+      const hpiTextarea = document.querySelector('#hpi-tab .form-textarea, #hpi-tab textarea');
+      if (hpiTextarea) context.hpi = hpiTextarea.value;
+
+      // Read from Assessment textarea
+      const assessmentTextarea = document.querySelector('#recommendation-tab .form-section:nth-child(2) textarea');
+      if (assessmentTextarea) context.assessment = assessmentTextarea.value;
+
+      // Read from Recommendations textarea
+      const recsTextarea = document.querySelector('#recommendation-tab .form-section:nth-child(3) textarea');
+      if (recsTextarea) context.recommendations = recsTextarea.value;
+
+      // Read imaging results
+      const imagingTextareas = document.querySelectorAll('#imaging-tab textarea');
+      const imagingFields = ['mriBrain', 'ctHead', 'ctaHeadNeck', 'eeg', 'emgNcs'];
+      imagingTextareas.forEach((ta, i) => {
+        if (imagingFields[i]) context.imaging[imagingFields[i]] = ta.value;
+      });
+
+      return context;
+    }
+
+    // Format context for display
+    function formatContextPreview(context) {
+      return `Patient: ${context.patient.name}, ${context.patient.age}y/o ${context.patient.sex} | Chief Complaint: ${context.chiefComplaint} | MIDAS: ${context.scales.midas.current}`;
+    }
+
+    function formatContextFull(context) {
+      let text = `PATIENT INFORMATION\n`;
+      text += `Name: ${context.patient.name}\n`;
+      text += `Age: ${context.patient.age} | Sex: ${context.patient.sex} | MRN: ${context.patient.mrn}\n\n`;
+      text += `CHIEF COMPLAINT\n${context.chiefComplaint}\n\n`;
+      text += `VISIT TYPE\n${context.visitType}\n\n`;
+
+      if (context.hpi) {
+        text += `HPI\n${context.hpi}\n\n`;
+      }
+
+      text += `SCALE SCORES\n`;
+      text += `MIDAS: ${context.scales.midas.current} (history: ${context.scales.midas.history.join(' → ')})\n`;
+      text += `HIT-6: ${context.scales.hit6.current} (history: ${context.scales.hit6.history.join(' → ')})\n`;
+      text += `PHQ-9: ${context.scales.phq9.current} (history: ${context.scales.phq9.history.join(' → ')})\n\n`;
+
+      if (context.imaging.mriBrain) {
+        text += `IMAGING - MRI Brain\n${context.imaging.mriBrain}\n\n`;
+      }
+      if (context.imaging.ctHead) {
+        text += `IMAGING - CT Head\n${context.imaging.ctHead}\n\n`;
+      }
+
+      return text;
+    }
+
+    // Update AI Context displays
+    function updateAiContext() {
+      const context = getAiContext();
+      const preview = formatContextPreview(context);
+      const full = formatContextFull(context);
+
+      // Update all context sections
+      const previewIds = ['chart-prep-context-preview', 'doc-context-preview', 'ask-context-preview'];
+      const fullIds = ['chart-prep-context-full', 'doc-context-full', 'ask-context-full'];
+
+      previewIds.forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.textContent = preview;
+      });
+
+      fullIds.forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.textContent = full;
+      });
+    }
+
+    // =====================================================
+    // DOCUMENT INTERACTION FUNCTIONS
+    // =====================================================
+
+    function regenerateDocumentation() {
+      const hpi = document.getElementById('doc-hpi');
+      const assessment = document.getElementById('doc-assessment');
+      const plan = document.getElementById('doc-plan');
+
+      // Simulate regeneration with slight variation
+      hpi.value = "Patient is a 50-year-old male with chronic migraines presenting for routine follow-up. He reports significant improvement in headache frequency, now experiencing 3-4 headaches per week compared to daily headaches at baseline. Headaches remain bilateral with throbbing quality, rated 6/10 in intensity, duration 4-6 hours. Associated symptoms include photophobia and mild nausea. No aura reported. Sumatriptan continues to provide effective acute relief.";
+
+      assessment.value = "1. Chronic migraine without aura (G43.709) - responding well to current therapy\n2. History of medication overuse headache - resolved\n3. Comorbid mild depression (F32.0) - stable";
+
+      plan.value = "1. Continue topiramate 100mg twice daily for migraine prevention\n2. Sumatriptan 100mg as needed for breakthrough headaches, limit to twice weekly\n3. Continue headache diary to track patterns\n4. Follow up in 3 months\n5. If headaches remain frequent, consider adding CGRP inhibitor therapy";
+
+      showToast('Documentation regenerated');
+    }
+
+    function saveToFields() {
+      const hpi = document.getElementById('doc-hpi').value;
+      const assessment = document.getElementById('doc-assessment').value;
+      const plan = document.getElementById('doc-plan').value;
+
+      // Find and update the main form textareas
+      const hpiTextarea = document.querySelector('#hpi-tab .ai-textarea-wrapper textarea');
+      if (hpiTextarea) hpiTextarea.value = hpi;
+
+      const assessmentTextarea = document.querySelector('#recommendation-tab .form-section:nth-child(2) .ai-textarea-wrapper textarea');
+      if (assessmentTextarea) assessmentTextarea.value = assessment;
+
+      const recsTextarea = document.querySelector('#recommendation-tab .form-section:nth-child(3) .ai-textarea-wrapper textarea');
+      if (recsTextarea) recsTextarea.value = plan;
+
+      showToast('Saved to note fields');
+      closeAiDrawer();
+    }
+
+    // =====================================================
+    // ASK AI FUNCTIONS
+    // =====================================================
+
+    function switchAskAiTab(mode) {
+      document.querySelectorAll('.ask-ai-tab').forEach(tab => tab.classList.remove('active'));
+      event.target.classList.add('active');
+
+      const input = document.getElementById('ask-ai-input');
+      if (mode === 'ask') {
+        input.placeholder = 'Ask a clinical question...';
+      } else {
+        input.placeholder = 'Search VERA Health guidelines...';
+      }
+    }
+
+    function submitAskAi() {
+      const input = document.getElementById('ask-ai-input');
+      const response = document.getElementById('ask-ai-response');
+      const question = input.value.trim();
+
+      if (!question) return;
+
+      // Show loading
+      response.innerHTML = '<div class="ai-loading"><div class="ai-loading-spinner"></div></div>';
+
+      // Simulate AI response
+      setTimeout(() => {
+        let answer = '';
+
+        if (question.toLowerCase().includes('cgrp')) {
+          answer = `<p><strong>CGRP Inhibitors for Migraine Prevention</strong></p>
+          <p style="margin-top: 8px;">Based on this patient's profile (chronic migraine with partial response to topiramate), CGRP inhibitors could be considered. Options include:</p>
+          <ul style="margin: 8px 0 8px 16px;">
+            <li><strong>Erenumab (Aimovig)</strong> - 70mg or 140mg monthly SC injection</li>
+            <li><strong>Fremanezumab (Ajovy)</strong> - 225mg monthly or 675mg quarterly SC</li>
+            <li><strong>Galcanezumab (Emgality)</strong> - 240mg loading, then 120mg monthly SC</li>
+            <li><strong>Eptinezumab (Vyepti)</strong> - 100mg or 300mg IV quarterly</li>
+          </ul>
+          <p style="margin-top: 8px;">Given the patient's MIDAS improvement (56→18), you might consider continuing current therapy before adding CGRP inhibitor, or adding it for further optimization.</p>`;
+        } else if (question.toLowerCase().includes('botox')) {
+          answer = `<p><strong>Botox Candidacy Assessment</strong></p>
+          <p style="margin-top: 8px;">This patient meets criteria for OnabotulinumtoxinA (Botox) based on:</p>
+          <ul style="margin: 8px 0 8px 16px;">
+            <li>Diagnosis of chronic migraine (≥15 headache days/month)</li>
+            <li>Age ≥18 years</li>
+            <li>Trial of preventive medication (topiramate)</li>
+          </ul>
+          <p style="margin-top: 8px;">However, given the significant improvement on current therapy (MIDAS decreased 68%), you may want to continue monitoring before adding Botox. Typical dosing is 155-195 units across 31-39 injection sites every 12 weeks.</p>`;
+        } else {
+          answer = `<p>Based on the current patient context and your question about "${question}", here is a clinical summary:</p>
+          <p style="margin-top: 8px;">The patient is responding well to current therapy with significant improvement in disability scores. Consider maintaining the current regimen while monitoring for continued improvement. If symptoms plateau, additional therapies such as CGRP inhibitors or Botox could be considered.</p>
+          <p style="margin-top: 12px; font-size: 12px; color: var(--text-muted);">Note: This is a simulated AI response for demonstration purposes.</p>`;
+        }
+
+        response.innerHTML = answer;
+      }, 1500);
+
+      input.value = '';
+    }
+
+    // =====================================================
+    // PATIENT SUMMARY FUNCTIONS
+    // =====================================================
+
+    function updatePatientSummary() {
+      const level = document.getElementById('reading-level').value;
+      const content = document.getElementById('patient-summary-content');
+
+      if (level === 'simple') {
+        content.innerHTML = `
+          <p><strong>Your headaches:</strong> Your headaches are much better! The medicine is working well.</p>
+          <p style="margin-top: 12px;"><strong>Your tests:</strong> Your brain pictures look good. Nothing to worry about.</p>
+          <p style="margin-top: 12px;"><strong>What to do:</strong> Keep taking your pills every day. Write down when you get headaches. Call us if they get worse.</p>
+          <p style="margin-top: 12px;"><strong>Next visit:</strong> Come back in 3 months.</p>
+        `;
+      } else if (level === 'detailed') {
+        content.innerHTML = `
+          <p><strong>Clinical Assessment:</strong> Your chronic migraine condition has shown significant improvement with the current preventive regimen. Your MIDAS (Migraine Disability Assessment) score has decreased from 56 to 18, representing a 68% reduction in migraine-related disability. This indicates a transition from severe to moderate disability category.</p>
+          <p style="margin-top: 12px;"><strong>Diagnostic Imaging:</strong> Your MRI and CT imaging studies demonstrate no acute intracranial abnormalities, mass lesions, or vascular malformations. These findings are reassuring and rule out secondary causes of headache.</p>
+          <p style="margin-top: 12px;"><strong>Treatment Plan:</strong> Continue topiramate 100mg twice daily for migraine prophylaxis. Use sumatriptan 100mg for acute attacks, limiting use to twice weekly to prevent medication overuse headache. Maintain your headache diary for pattern analysis.</p>
+          <p style="margin-top: 12px;"><strong>Follow-up:</strong> Return in 3 months for reassessment. If improvement plateaus, we may consider adding CGRP inhibitor therapy.</p>
+        `;
+      } else {
+        content.innerHTML = `
+          <p><strong>What we found:</strong> Your headaches are getting better with your current treatment. Your MIDAS score went from 56 to 18, which means your headaches are affecting your daily life much less than before.</p>
+          <p style="margin-top: 12px;"><strong>Your brain scans:</strong> The MRI and CT scans of your brain look normal. There are no concerning findings.</p>
+          <p style="margin-top: 12px;"><strong>Your treatment plan:</strong> Continue taking your current medications as prescribed. Keep track of your headaches in your diary. If your headaches get worse or you have any concerns, call the office right away.</p>
+          <p style="margin-top: 12px;"><strong>Next steps:</strong> We'll see you again in 3 months to check on your progress.</p>
+        `;
+      }
+    }
+
+    function copyPatientSummary() {
+      const content = document.getElementById('patient-summary-content').innerText;
+      navigator.clipboard.writeText(content).then(() => {
+        showToast('Summary copied to clipboard');
+      });
+    }
+
+    function printPatientSummary() {
+      const content = document.getElementById('patient-summary-content').innerHTML;
+      const printWindow = window.open('', '_blank');
+      printWindow.document.write(`
+        <html>
+          <head>
+            <title>Patient Summary</title>
+            <style>
+              body { font-family: Arial, sans-serif; padding: 40px; max-width: 600px; margin: 0 auto; }
+              h1 { color: #0D9488; font-size: 24px; margin-bottom: 24px; }
+              p { line-height: 1.6; margin-bottom: 12px; }
+            </style>
+          </head>
+          <body>
+            <h1>Your Visit Summary</h1>
+            ${content}
+          </body>
+        </html>
+      `);
+      printWindow.document.close();
+      printWindow.print();
+    }
+
+    // =====================================================
+    // HANDOUT FUNCTIONS
+    // =====================================================
+
+    function exportHandout(format) {
+      if (format === 'print') {
+        const content = document.getElementById('handout-preview').innerHTML;
+        const printWindow = window.open('', '_blank');
+        printWindow.document.write(`
+          <html>
+            <head>
+              <title>Patient Handout</title>
+              <style>
+                body { font-family: Arial, sans-serif; padding: 40px; max-width: 600px; margin: 0 auto; }
+                h5 { color: #0D9488; font-size: 20px; margin-bottom: 20px; }
+                p { line-height: 1.6; margin-bottom: 8px; }
+                ul { margin: 8px 0 16px 20px; }
+                li { margin-bottom: 4px; }
+              </style>
+            </head>
+            <body>${content}</body>
+          </html>
+        `);
+        printWindow.document.close();
+        printWindow.print();
+      } else if (format === 'pdf') {
+        showToast('PDF export would generate downloadable file');
+      } else if (format === 'email') {
+        showToast('Email dialog would open here');
+      }
+    }
+
+    // =====================================================
+    // UTILITY FUNCTIONS
+    // =====================================================
+
+    function showToast(message) {
+      // Create toast element
+      let toast = document.getElementById('ai-toast');
+      if (!toast) {
+        toast = document.createElement('div');
+        toast.id = 'ai-toast';
+        toast.style.cssText = `
+          position: fixed;
+          bottom: 24px;
+          left: 50%;
+          transform: translateX(-50%);
+          background: #1F2937;
+          color: white;
+          padding: 12px 24px;
+          border-radius: 8px;
+          font-size: 14px;
+          z-index: 9999;
+          opacity: 0;
+          transition: opacity 0.3s;
+        `;
+        document.body.appendChild(toast);
+      }
+
+      toast.textContent = message;
+      toast.style.opacity = '1';
+
+      setTimeout(() => {
+        toast.style.opacity = '0';
+      }, 2500);
+    }
+
+    // Initialize context on page load
+    document.addEventListener('DOMContentLoaded', function() {
+      // Pre-populate context when drawer opens
     });
   </script>
 </body>
