@@ -1281,6 +1281,466 @@
     .toggle-switch.active::after {
       transform: translateX(18px);
     }
+
+    /* AI Text Input Features */
+    .ai-textarea-wrapper {
+      position: relative;
+    }
+
+    .ai-textarea-icons {
+      position: absolute;
+      top: 8px;
+      right: 8px;
+      display: flex;
+      gap: 4px;
+      z-index: 10;
+    }
+
+    .ai-icon-btn {
+      width: 28px;
+      height: 28px;
+      border-radius: 6px;
+      border: 1px solid var(--border);
+      background: var(--bg-white);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      color: var(--text-muted);
+      transition: all 0.2s;
+    }
+
+    .ai-icon-btn:hover {
+      border-color: var(--primary);
+      color: var(--primary);
+      background: #F0FDFA;
+    }
+
+    .ai-icon-btn.recording {
+      border-color: var(--error);
+      color: var(--error);
+      background: #FEE2E2;
+      animation: pulse-recording 1.5s infinite;
+    }
+
+    @keyframes pulse-recording {
+      0%, 100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.4); }
+      50% { box-shadow: 0 0 0 6px rgba(239, 68, 68, 0); }
+    }
+
+    .ai-icon-btn.sparkle {
+      background: linear-gradient(135deg, #F0FDFA 0%, #ECFDF5 100%);
+      border-color: #A7F3D0;
+      color: var(--primary);
+    }
+
+    .ai-icon-btn.sparkle:hover {
+      background: linear-gradient(135deg, #CCFBF1 0%, #D1FAE5 100%);
+    }
+
+    /* AI Actions Dropdown */
+    .ai-actions-dropdown {
+      position: absolute;
+      top: 100%;
+      right: 0;
+      margin-top: 4px;
+      background: var(--bg-white);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+      min-width: 200px;
+      z-index: 100;
+      display: none;
+    }
+
+    .ai-actions-dropdown.show {
+      display: block;
+    }
+
+    .ai-action-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 14px;
+      cursor: pointer;
+      font-size: 13px;
+      color: var(--text-primary);
+      transition: background 0.2s;
+    }
+
+    .ai-action-item:first-child {
+      border-radius: 8px 8px 0 0;
+    }
+
+    .ai-action-item:last-child {
+      border-radius: 0 0 8px 8px;
+    }
+
+    .ai-action-item:hover {
+      background: var(--bg-gray);
+    }
+
+    .ai-action-item svg {
+      color: var(--primary);
+    }
+
+    .ai-action-item span {
+      flex: 1;
+    }
+
+    /* AI Response Modal */
+    .ai-response-modal {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0,0,0,0.5);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 2000;
+    }
+
+    .ai-response-modal.show {
+      display: flex;
+    }
+
+    .ai-response-content {
+      background: var(--bg-white);
+      border-radius: 16px;
+      width: 500px;
+      max-width: 90vw;
+      max-height: 80vh;
+      overflow: hidden;
+      box-shadow: 0 20px 40px rgba(0,0,0,0.2);
+      animation: modalSlideIn 0.3s ease;
+    }
+
+    @keyframes modalSlideIn {
+      from { opacity: 0; transform: translateY(-20px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .ai-response-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 16px 20px;
+      border-bottom: 1px solid var(--border);
+      background: linear-gradient(135deg, #F0FDFA 0%, #ECFDF5 100%);
+    }
+
+    .ai-response-header h3 {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 15px;
+      color: var(--primary-dark);
+    }
+
+    .ai-response-close {
+      width: 28px;
+      height: 28px;
+      border-radius: 6px;
+      border: none;
+      background: transparent;
+      cursor: pointer;
+      color: var(--text-muted);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .ai-response-close:hover {
+      background: var(--bg-dark);
+    }
+
+    .ai-response-body {
+      padding: 20px;
+      max-height: 400px;
+      overflow-y: auto;
+    }
+
+    .ai-response-text {
+      font-size: 14px;
+      line-height: 1.6;
+      color: var(--text-primary);
+    }
+
+    .ai-response-footer {
+      display: flex;
+      gap: 12px;
+      padding: 16px 20px;
+      border-top: 1px solid var(--border);
+      background: var(--bg-gray);
+    }
+
+    .ai-response-footer button {
+      flex: 1;
+      padding: 10px 16px;
+      border-radius: 8px;
+      font-weight: 500;
+      font-size: 13px;
+      cursor: pointer;
+    }
+
+    .ai-btn-secondary {
+      background: var(--bg-white);
+      border: 1px solid var(--border);
+      color: var(--text-secondary);
+    }
+
+    .ai-btn-primary {
+      background: var(--primary);
+      border: none;
+      color: white;
+    }
+
+    .ai-btn-primary:hover {
+      background: var(--primary-dark);
+    }
+
+    .ai-thinking {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      color: var(--text-muted);
+      font-size: 13px;
+    }
+
+    .ai-thinking-dots {
+      display: flex;
+      gap: 4px;
+    }
+
+    .ai-thinking-dots span {
+      width: 6px;
+      height: 6px;
+      background: var(--primary);
+      border-radius: 50%;
+      animation: thinking 1.4s infinite;
+    }
+
+    .ai-thinking-dots span:nth-child(2) { animation-delay: 0.2s; }
+    .ai-thinking-dots span:nth-child(3) { animation-delay: 0.4s; }
+
+    @keyframes thinking {
+      0%, 80%, 100% { transform: scale(0.6); opacity: 0.5; }
+      40% { transform: scale(1); opacity: 1; }
+    }
+
+    /* Score History Section */
+    .score-history-section {
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .score-history-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      cursor: pointer;
+      padding: 4px 0;
+    }
+
+    .score-history-header h4 {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text-primary);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .score-history-toggle {
+      color: var(--text-muted);
+      transition: transform 0.2s;
+    }
+
+    .score-history-header.collapsed .score-history-toggle {
+      transform: rotate(-90deg);
+    }
+
+    .score-history-content {
+      margin-top: 12px;
+    }
+
+    .score-history-content.hidden {
+      display: none;
+    }
+
+    .score-card {
+      background: var(--bg-gray);
+      border-radius: 8px;
+      padding: 10px 12px;
+      margin-bottom: 8px;
+    }
+
+    .score-card-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 6px;
+    }
+
+    .score-card-title {
+      font-weight: 600;
+      font-size: 12px;
+      color: var(--text-primary);
+    }
+
+    .score-card-trend {
+      font-size: 11px;
+      display: flex;
+      align-items: center;
+      gap: 2px;
+    }
+
+    .score-card-trend.improving { color: var(--success); }
+    .score-card-trend.worsening { color: var(--error); }
+    .score-card-trend.stable { color: var(--text-muted); }
+
+    .score-history-list {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .score-history-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 6px 8px;
+      border-radius: 4px;
+      font-size: 11px;
+      transition: background 0.2s;
+    }
+
+    .score-history-item.clickable {
+      cursor: pointer;
+    }
+
+    .score-history-item.clickable:hover {
+      background: var(--bg-dark);
+    }
+
+    .score-history-item .date {
+      color: var(--text-muted);
+    }
+
+    .score-history-item .value {
+      font-weight: 600;
+      color: var(--text-primary);
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .score-history-item .interpretation {
+      font-size: 10px;
+      color: var(--text-secondary);
+      padding: 2px 6px;
+      background: var(--bg-dark);
+      border-radius: 4px;
+    }
+
+    .score-detail-modal {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0,0,0,0.5);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 2000;
+    }
+
+    .score-detail-modal.show {
+      display: flex;
+    }
+
+    .score-detail-content {
+      background: var(--bg-white);
+      border-radius: 12px;
+      width: 400px;
+      max-width: 90vw;
+      overflow: hidden;
+      box-shadow: 0 20px 40px rgba(0,0,0,0.2);
+    }
+
+    .score-detail-header {
+      padding: 16px 20px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .score-detail-header h3 {
+      font-size: 15px;
+      color: var(--text-primary);
+    }
+
+    .score-detail-body {
+      padding: 20px;
+    }
+
+    .score-detail-summary {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 12px 16px;
+      background: var(--bg-gray);
+      border-radius: 8px;
+      margin-bottom: 16px;
+    }
+
+    .score-detail-value {
+      font-size: 28px;
+      font-weight: 700;
+      color: var(--primary);
+    }
+
+    .score-detail-interpretation {
+      font-size: 13px;
+      color: var(--text-secondary);
+    }
+
+    .score-detail-questions {
+      font-size: 12px;
+    }
+
+    .score-detail-questions h4 {
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--text-secondary);
+      margin-bottom: 8px;
+    }
+
+    .score-question-item {
+      display: flex;
+      justify-content: space-between;
+      padding: 8px 0;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .score-question-item:last-child {
+      border-bottom: none;
+    }
+
+    .score-question-text {
+      color: var(--text-primary);
+      flex: 1;
+      padding-right: 12px;
+    }
+
+    .score-question-value {
+      font-weight: 600;
+      color: var(--primary);
+    }
   </style>
 </head>
 <body>
@@ -1444,6 +1904,105 @@
           </div>
         </div>
 
+        <!-- Score History Section -->
+        <div class="score-history-section">
+          <div class="score-history-header" onclick="toggleScoreHistory(this)">
+            <h4>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M3 3v18h18"/><path d="M18 17V9"/><path d="M13 17V5"/><path d="M8 17v-3"/>
+              </svg>
+              Score History
+            </h4>
+            <svg class="score-history-toggle" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <polyline points="6 9 12 15 18 9"/>
+            </svg>
+          </div>
+          <div class="score-history-content">
+            <!-- MIDAS - Clickable -->
+            <div class="score-card">
+              <div class="score-card-header">
+                <span class="score-card-title">MIDAS</span>
+                <span class="score-card-trend improving">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/>
+                    <polyline points="17 6 23 6 23 12"/>
+                  </svg>
+                  Improving
+                </span>
+              </div>
+              <div class="score-history-list">
+                <div class="score-history-item clickable" onclick="showScoreDetail('midas', 'Jan 16, 2026', 18, 'Moderate')">
+                  <span class="date">Jan 16, 2026</span>
+                  <span class="value">18 <span class="interpretation">Moderate</span></span>
+                </div>
+                <div class="score-history-item clickable" onclick="showScoreDetail('midas', 'Jan 10, 2026', 24, 'Moderate')">
+                  <span class="date">Jan 10, 2026</span>
+                  <span class="value">24 <span class="interpretation">Moderate</span></span>
+                </div>
+                <div class="score-history-item clickable" onclick="showScoreDetail('midas', 'Dec 15, 2025', 42, 'Severe')">
+                  <span class="date">Dec 15, 2025</span>
+                  <span class="value">42 <span class="interpretation">Severe</span></span>
+                </div>
+                <div class="score-history-item clickable" onclick="showScoreDetail('midas', 'Nov 1, 2025', 56, 'Severe')">
+                  <span class="date">Nov 1, 2025</span>
+                  <span class="value">56 <span class="interpretation">Severe</span></span>
+                </div>
+              </div>
+            </div>
+
+            <!-- HIT-6 - Non-clickable -->
+            <div class="score-card">
+              <div class="score-card-header">
+                <span class="score-card-title">HIT-6</span>
+                <span class="score-card-trend stable">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <line x1="5" y1="12" x2="19" y2="12"/>
+                  </svg>
+                  Stable
+                </span>
+              </div>
+              <div class="score-history-list">
+                <div class="score-history-item">
+                  <span class="date">Jan 16, 2026</span>
+                  <span class="value">58 <span class="interpretation">Substantial</span></span>
+                </div>
+                <div class="score-history-item">
+                  <span class="date">Jan 10, 2026</span>
+                  <span class="value">60 <span class="interpretation">Severe</span></span>
+                </div>
+                <div class="score-history-item">
+                  <span class="date">Dec 15, 2025</span>
+                  <span class="value">62 <span class="interpretation">Severe</span></span>
+                </div>
+              </div>
+            </div>
+
+            <!-- PHQ-9 - Non-clickable -->
+            <div class="score-card">
+              <div class="score-card-header">
+                <span class="score-card-title">PHQ-9</span>
+                <span class="score-card-trend improving">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/>
+                    <polyline points="17 6 23 6 23 12"/>
+                  </svg>
+                  Improving
+                </span>
+              </div>
+              <div class="score-history-list">
+                <div class="score-history-item">
+                  <span class="date">Jan 16, 2026</span>
+                  <span class="value">6 <span class="interpretation">Mild</span></span>
+                </div>
+                <div class="score-history-item">
+                  <span class="date">Dec 15, 2025</span>
+                  <span class="value">11 <span class="interpretation">Moderate</span></span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
       </aside>
 
       <!-- Center Panel -->
@@ -1492,7 +2051,43 @@
                 <span class="section-title">History of presenting illness</span>
                 <span class="required-badge">Required</span>
               </div>
-              <textarea class="form-textarea" placeholder="Min. 25 words">50-year-old male presents for follow-up of chronic daily headaches. Patient reports headaches have improved from daily to approximately 3-4 per week since starting topiramate. Current dose is 50mg twice daily. Denies aura, nausea, or photophobia with recent episodes.</textarea>
+              <div class="ai-textarea-wrapper">
+                <div class="ai-textarea-icons">
+                  <button class="ai-icon-btn" onclick="toggleRecording(this)" title="Dictate with AI">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <path d="M12 1a3 3 0 00-3 3v8a3 3 0 006 0V4a3 3 0 00-3-3z"/><path d="M19 10v2a7 7 0 01-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/>
+                    </svg>
+                  </button>
+                  <div style="position: relative;">
+                    <button class="ai-icon-btn sparkle" onclick="toggleAiDropdown(this)" title="AI Actions">
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
+                      </svg>
+                    </button>
+                    <div class="ai-actions-dropdown">
+                      <div class="ai-action-item" onclick="triggerAiAction('question', this)">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                          <circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 015.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/>
+                        </svg>
+                        <span>Ask a question about this</span>
+                      </div>
+                      <div class="ai-action-item" onclick="triggerAiAction('improve', this)">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                          <path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/>
+                        </svg>
+                        <span>Improve this text</span>
+                      </div>
+                      <div class="ai-action-item" onclick="triggerAiAction('summarize', this)">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                          <line x1="21" y1="10" x2="3" y2="10"/><line x1="21" y1="6" x2="3" y2="6"/><line x1="21" y1="14" x2="3" y2="14"/><line x1="21" y1="18" x2="3" y2="18"/>
+                        </svg>
+                        <span>Summarize</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                <textarea class="form-textarea" placeholder="Min. 25 words" style="padding-right: 80px;">50-year-old male presents for follow-up of chronic daily headaches. Patient reports headaches have improved from daily to approximately 3-4 per week since starting topiramate. Current dose is 50mg twice daily. Denies aura, nausea, or photophobia with recent episodes.</textarea>
+              </div>
             </div>
 
             <div class="form-section">
@@ -2135,7 +2730,43 @@
                 <span class="section-title">General Notes</span>
                 <span class="optional-badge">Optional</span>
               </div>
-              <textarea class="form-textarea" placeholder="Additional examination notes..."></textarea>
+              <div class="ai-textarea-wrapper">
+                <div class="ai-textarea-icons">
+                  <button class="ai-icon-btn" onclick="toggleRecording(this)" title="Dictate with AI">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <path d="M12 1a3 3 0 00-3 3v8a3 3 0 006 0V4a3 3 0 00-3-3z"/><path d="M19 10v2a7 7 0 01-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/>
+                    </svg>
+                  </button>
+                  <div style="position: relative;">
+                    <button class="ai-icon-btn sparkle" onclick="toggleAiDropdown(this)" title="AI Actions">
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
+                      </svg>
+                    </button>
+                    <div class="ai-actions-dropdown">
+                      <div class="ai-action-item" onclick="triggerAiAction('question', this)">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                          <circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 015.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/>
+                        </svg>
+                        <span>Ask a question about this</span>
+                      </div>
+                      <div class="ai-action-item" onclick="triggerAiAction('improve', this)">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                          <path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/>
+                        </svg>
+                        <span>Improve this text</span>
+                      </div>
+                      <div class="ai-action-item" onclick="triggerAiAction('summarize', this)">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                          <line x1="21" y1="10" x2="3" y2="10"/><line x1="21" y1="6" x2="3" y2="6"/><line x1="21" y1="14" x2="3" y2="14"/><line x1="21" y1="18" x2="3" y2="18"/>
+                        </svg>
+                        <span>Summarize</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                <textarea class="form-textarea" placeholder="Additional examination notes..." style="padding-right: 80px;"></textarea>
+              </div>
             </div>
           </div>
 
@@ -2217,7 +2848,43 @@
                 Generate assessment
               </button>
 
-              <textarea class="form-textarea" id="assessment-text" placeholder="Enter a detailed assessment...">50-year-old male with chronic daily headache, likely chronic migraine without aura based on clinical presentation. Patient reports improvement with current prophylactic therapy (topiramate 50mg BID). Headache frequency reduced from daily to 3-4 per week. No red flags present. MRI brain unremarkable. MIDAS score indicates moderate disability (18), HIT-6 indicates substantial impact (58). Plan to continue current regimen and reassess at next visit.</textarea>
+              <div class="ai-textarea-wrapper">
+                <div class="ai-textarea-icons">
+                  <button class="ai-icon-btn" onclick="toggleRecording(this)" title="Dictate with AI">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <path d="M12 1a3 3 0 00-3 3v8a3 3 0 006 0V4a3 3 0 00-3-3z"/><path d="M19 10v2a7 7 0 01-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/>
+                    </svg>
+                  </button>
+                  <div style="position: relative;">
+                    <button class="ai-icon-btn sparkle" onclick="toggleAiDropdown(this)" title="AI Actions">
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
+                      </svg>
+                    </button>
+                    <div class="ai-actions-dropdown">
+                      <div class="ai-action-item" onclick="triggerAiAction('question', this)">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                          <circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 015.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/>
+                        </svg>
+                        <span>Ask a question about this</span>
+                      </div>
+                      <div class="ai-action-item" onclick="triggerAiAction('improve', this)">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                          <path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/>
+                        </svg>
+                        <span>Improve this text</span>
+                      </div>
+                      <div class="ai-action-item" onclick="triggerAiAction('summarize', this)">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                          <line x1="21" y1="10" x2="3" y2="10"/><line x1="21" y1="6" x2="3" y2="6"/><line x1="21" y1="14" x2="3" y2="14"/><line x1="21" y1="18" x2="3" y2="18"/>
+                        </svg>
+                        <span>Summarize</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                <textarea class="form-textarea" id="assessment-text" placeholder="Enter a detailed assessment..." style="padding-right: 80px;">50-year-old male with chronic daily headache, likely chronic migraine without aura based on clinical presentation. Patient reports improvement with current prophylactic therapy (topiramate 50mg BID). Headache frequency reduced from daily to 3-4 per week. No red flags present. MRI brain unremarkable. MIDAS score indicates moderate disability (18), HIT-6 indicates substantial impact (58). Plan to continue current regimen and reassess at next visit.</textarea>
+              </div>
             </div>
 
             <div class="form-section">
@@ -2231,13 +2898,49 @@
                 <span class="chip" onclick="toggleChip(this)">Free-text recommendations</span>
               </div>
 
-              <textarea class="form-textarea" id="recommendations-text">1. Continue topiramate 50mg twice daily
+              <div class="ai-textarea-wrapper">
+                <div class="ai-textarea-icons">
+                  <button class="ai-icon-btn" onclick="toggleRecording(this)" title="Dictate with AI">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <path d="M12 1a3 3 0 00-3 3v8a3 3 0 006 0V4a3 3 0 00-3-3z"/><path d="M19 10v2a7 7 0 01-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/>
+                    </svg>
+                  </button>
+                  <div style="position: relative;">
+                    <button class="ai-icon-btn sparkle" onclick="toggleAiDropdown(this)" title="AI Actions">
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
+                      </svg>
+                    </button>
+                    <div class="ai-actions-dropdown">
+                      <div class="ai-action-item" onclick="triggerAiAction('question', this)">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                          <circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 015.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/>
+                        </svg>
+                        <span>Ask a question about this</span>
+                      </div>
+                      <div class="ai-action-item" onclick="triggerAiAction('improve', this)">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                          <path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/>
+                        </svg>
+                        <span>Improve this text</span>
+                      </div>
+                      <div class="ai-action-item" onclick="triggerAiAction('summarize', this)">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                          <line x1="21" y1="10" x2="3" y2="10"/><line x1="21" y1="6" x2="3" y2="6"/><line x1="21" y1="14" x2="3" y2="14"/><line x1="21" y1="18" x2="3" y2="18"/>
+                        </svg>
+                        <span>Summarize</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                <textarea class="form-textarea" id="recommendations-text" style="padding-right: 80px;">1. Continue topiramate 50mg twice daily
 2. May increase to 75mg BID if headaches persist at current frequency
 3. Headache diary - continue tracking frequency, severity, triggers
 4. Avoid known triggers (stress, irregular sleep, skipped meals)
 5. Follow up in 3 months or sooner if worsening
 6. Call clinic if experiencing new neurological symptoms
 7. Consider CGRP antagonist if inadequate response to topiramate optimization</textarea>
+              </div>
             </div>
 
             <div class="form-section">
@@ -2537,6 +3240,69 @@ Electronically signed by: Dr. Steve Arbogast
     <span id="toast-message">Copied to clipboard!</span>
   </div>
 
+  <!-- AI Response Modal -->
+  <div class="ai-response-modal" id="ai-response-modal">
+    <div class="ai-response-content">
+      <div class="ai-response-header">
+        <h3>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
+          </svg>
+          <span id="ai-modal-title">AI Assistant</span>
+        </h3>
+        <button class="ai-response-close" onclick="closeAiModal()">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+          </svg>
+        </button>
+      </div>
+      <div class="ai-response-body">
+        <div class="ai-thinking" id="ai-thinking">
+          <div class="ai-thinking-dots">
+            <span></span><span></span><span></span>
+          </div>
+          <span>AI is thinking...</span>
+        </div>
+        <div class="ai-response-text" id="ai-response-text" style="display: none;"></div>
+      </div>
+      <div class="ai-response-footer" id="ai-response-footer" style="display: none;">
+        <button class="ai-btn-secondary" onclick="closeAiModal()">Cancel</button>
+        <button class="ai-btn-primary" onclick="applyAiResponse()">Apply</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MIDAS Score Detail Modal -->
+  <div class="score-detail-modal" id="score-detail-modal">
+    <div class="score-detail-content">
+      <div class="score-detail-header">
+        <h3 id="score-detail-title">MIDAS Score Details</h3>
+        <button class="ai-response-close" onclick="closeScoreDetailModal()">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+          </svg>
+        </button>
+      </div>
+      <div class="score-detail-body">
+        <div class="score-detail-summary">
+          <div>
+            <div class="score-detail-value" id="score-detail-value">18</div>
+            <div class="score-detail-interpretation" id="score-detail-interp">Moderate Disability</div>
+          </div>
+          <div style="text-align: right;">
+            <div style="font-size: 12px; color: var(--text-muted);" id="score-detail-date">Jan 16, 2026</div>
+          </div>
+        </div>
+        <div class="score-detail-questions">
+          <h4>Question Responses</h4>
+          <div id="score-questions-list">
+            <!-- Filled dynamically -->
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <script>
     // Tab switching
     function switchTab(tabName) {
@@ -2692,6 +3458,245 @@ Electronically signed by: Dr. Steve Arbogast
     const style = document.createElement('style');
     style.textContent = '@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }';
     document.head.appendChild(style);
+
+    // ==========================================
+    // AI Text Input Features
+    // ==========================================
+
+    // Toggle recording state
+    function toggleRecording(btn) {
+      btn.classList.toggle('recording');
+      if (btn.classList.contains('recording')) {
+        showToast('Recording started... Speak now', 'success');
+        // Simulate stopping after 3 seconds
+        setTimeout(() => {
+          if (btn.classList.contains('recording')) {
+            btn.classList.remove('recording');
+            // Find the textarea in the wrapper and add simulated dictation
+            const wrapper = btn.closest('.ai-textarea-wrapper');
+            const textarea = wrapper.querySelector('textarea');
+            if (textarea) {
+              const currentText = textarea.value;
+              const dictatedText = " The patient also reports occasional aura with visual disturbances approximately 30 minutes before headache onset.";
+              textarea.value = currentText + dictatedText;
+            }
+            showToast('Dictation complete', 'success');
+          }
+        }, 3000);
+      } else {
+        showToast('Recording stopped', 'success');
+      }
+    }
+
+    // Toggle AI actions dropdown
+    function toggleAiDropdown(btn) {
+      // Close all other dropdowns first
+      document.querySelectorAll('.ai-actions-dropdown').forEach(d => d.classList.remove('show'));
+      const dropdown = btn.nextElementSibling;
+      dropdown.classList.toggle('show');
+      event.stopPropagation();
+    }
+
+    // Close dropdowns when clicking outside
+    document.addEventListener('click', function(e) {
+      if (!e.target.closest('.ai-textarea-icons')) {
+        document.querySelectorAll('.ai-actions-dropdown').forEach(d => d.classList.remove('show'));
+      }
+    });
+
+    // Current textarea being worked on
+    let currentAiTextarea = null;
+
+    // Trigger AI action
+    function triggerAiAction(action, element) {
+      // Find the textarea
+      const wrapper = element.closest('.ai-textarea-wrapper');
+      currentAiTextarea = wrapper.querySelector('textarea');
+      const text = currentAiTextarea.value;
+
+      // Close dropdown
+      document.querySelectorAll('.ai-actions-dropdown').forEach(d => d.classList.remove('show'));
+
+      // Open modal
+      const modal = document.getElementById('ai-response-modal');
+      const title = document.getElementById('ai-modal-title');
+      const thinking = document.getElementById('ai-thinking');
+      const responseText = document.getElementById('ai-response-text');
+      const footer = document.getElementById('ai-response-footer');
+
+      // Set title based on action
+      if (action === 'question') {
+        title.textContent = 'Ask AI About This Text';
+      } else if (action === 'improve') {
+        title.textContent = 'Improve Text';
+      } else if (action === 'summarize') {
+        title.textContent = 'Summarize Text';
+      }
+
+      // Show modal with thinking state
+      modal.classList.add('show');
+      thinking.style.display = 'flex';
+      responseText.style.display = 'none';
+      footer.style.display = 'none';
+
+      // Simulate AI response after delay
+      setTimeout(() => {
+        thinking.style.display = 'none';
+        responseText.style.display = 'block';
+        footer.style.display = 'flex';
+
+        if (action === 'question') {
+          responseText.innerHTML = `
+            <p style="margin-bottom: 12px;"><strong>Based on the clinical information provided:</strong></p>
+            <ul style="margin-left: 20px; margin-bottom: 12px;">
+              <li style="margin-bottom: 8px;">The patient appears to have <strong>chronic migraine without aura</strong> based on the frequency (3-4 headaches/week) and response to topiramate.</li>
+              <li style="margin-bottom: 8px;">Current MIDAS score of 18 indicates <strong>moderate disability</strong>, which is an improvement from the initial severe disability.</li>
+              <li style="margin-bottom: 8px;">No red flag symptoms mentioned. Consider asking about: sudden onset, positional component, associated fever, or neurological deficits.</li>
+            </ul>
+            <p style="color: var(--text-muted); font-size: 12px; font-style: italic;">Would you like me to elaborate on any of these points?</p>
+          `;
+        } else if (action === 'improve') {
+          responseText.innerHTML = `
+            <p style="margin-bottom: 12px;"><strong>Suggested improvements:</strong></p>
+            <div style="background: var(--bg-gray); padding: 12px; border-radius: 8px; font-size: 13px; line-height: 1.6;">
+              50-year-old male presents for routine follow-up of chronic migraine without aura. <span style="background: #D1FAE5; padding: 2px 4px; border-radius: 2px;">He reports significant improvement in headache frequency, decreasing from daily episodes to 3-4 per week</span> since initiating topiramate prophylaxis. Current dosage is 50mg twice daily, which he tolerates well without significant side effects. <span style="background: #D1FAE5; padding: 2px 4px; border-radius: 2px;">Notably, he denies typical migraine accompaniments including visual aura, nausea, vomiting, photophobia, and phonophobia</span> with recent episodes.
+            </div>
+            <p style="color: var(--text-muted); font-size: 12px; margin-top: 12px; font-style: italic;">Changes highlighted in green. Click Apply to replace the original text.</p>
+          `;
+        } else if (action === 'summarize') {
+          responseText.innerHTML = `
+            <p style="margin-bottom: 12px;"><strong>Summary:</strong></p>
+            <div style="background: var(--bg-gray); padding: 12px; border-radius: 8px; font-size: 13px; line-height: 1.6;">
+              <strong>Key Points:</strong>
+              <ul style="margin: 8px 0 0 20px;">
+                <li>50 y/o M with chronic daily headache</li>
+                <li>Improved on topiramate 50mg BID (daily → 3-4/week)</li>
+                <li>No aura, nausea, or photophobia</li>
+              </ul>
+            </div>
+          `;
+        }
+      }, 1500);
+    }
+
+    // Close AI modal
+    function closeAiModal() {
+      document.getElementById('ai-response-modal').classList.remove('show');
+      currentAiTextarea = null;
+    }
+
+    // Apply AI response to textarea
+    function applyAiResponse() {
+      if (currentAiTextarea) {
+        // For demo, just show a toast - in real app would update the textarea
+        showToast('AI suggestion applied', 'success');
+      }
+      closeAiModal();
+    }
+
+    // Close modal when clicking overlay
+    document.getElementById('ai-response-modal').addEventListener('click', function(e) {
+      if (e.target === this) {
+        closeAiModal();
+      }
+    });
+
+    // ==========================================
+    // Score History Features
+    // ==========================================
+
+    // Toggle score history section
+    function toggleScoreHistory(header) {
+      header.classList.toggle('collapsed');
+      const content = header.nextElementSibling;
+      content.classList.toggle('hidden');
+    }
+
+    // MIDAS sample data for different dates
+    const midasData = {
+      'Jan 16, 2026': {
+        score: 18,
+        interpretation: 'Moderate Disability',
+        questions: [
+          { q: 'Days missed work/school due to headache', a: '2 days' },
+          { q: 'Days productivity reduced by half at work/school', a: '4 days' },
+          { q: 'Days missed household work due to headache', a: '3 days' },
+          { q: 'Days productivity reduced by half for household work', a: '5 days' },
+          { q: 'Days missed family/social activities', a: '4 days' }
+        ]
+      },
+      'Jan 10, 2026': {
+        score: 24,
+        interpretation: 'Moderate Disability',
+        questions: [
+          { q: 'Days missed work/school due to headache', a: '3 days' },
+          { q: 'Days productivity reduced by half at work/school', a: '5 days' },
+          { q: 'Days missed household work due to headache', a: '4 days' },
+          { q: 'Days productivity reduced by half for household work', a: '6 days' },
+          { q: 'Days missed family/social activities', a: '6 days' }
+        ]
+      },
+      'Dec 15, 2025': {
+        score: 42,
+        interpretation: 'Severe Disability',
+        questions: [
+          { q: 'Days missed work/school due to headache', a: '6 days' },
+          { q: 'Days productivity reduced by half at work/school', a: '10 days' },
+          { q: 'Days missed household work due to headache', a: '8 days' },
+          { q: 'Days productivity reduced by half for household work', a: '10 days' },
+          { q: 'Days missed family/social activities', a: '8 days' }
+        ]
+      },
+      'Nov 1, 2025': {
+        score: 56,
+        interpretation: 'Severe Disability',
+        questions: [
+          { q: 'Days missed work/school due to headache', a: '8 days' },
+          { q: 'Days productivity reduced by half at work/school', a: '12 days' },
+          { q: 'Days missed household work due to headache', a: '10 days' },
+          { q: 'Days productivity reduced by half for household work', a: '14 days' },
+          { q: 'Days missed family/social activities', a: '12 days' }
+        ]
+      }
+    };
+
+    // Show score detail modal
+    function showScoreDetail(scale, date, score, interpretation) {
+      if (scale !== 'midas') return; // Only MIDAS is clickable
+
+      const modal = document.getElementById('score-detail-modal');
+      const data = midasData[date];
+
+      if (!data) return;
+
+      document.getElementById('score-detail-title').textContent = 'MIDAS Score Details';
+      document.getElementById('score-detail-value').textContent = data.score;
+      document.getElementById('score-detail-interp').textContent = data.interpretation;
+      document.getElementById('score-detail-date').textContent = date;
+
+      // Build questions list
+      const questionsList = document.getElementById('score-questions-list');
+      questionsList.innerHTML = data.questions.map(item => `
+        <div class="score-question-item">
+          <span class="score-question-text">${item.q}</span>
+          <span class="score-question-value">${item.a}</span>
+        </div>
+      `).join('');
+
+      modal.classList.add('show');
+    }
+
+    // Close score detail modal
+    function closeScoreDetailModal() {
+      document.getElementById('score-detail-modal').classList.remove('show');
+    }
+
+    // Close modal when clicking overlay
+    document.getElementById('score-detail-modal').addEventListener('click', function(e) {
+      if (e.target === this) {
+        closeScoreDetailModal();
+      }
+    });
   </script>
 </body>
 </html>
