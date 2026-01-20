@@ -509,6 +509,123 @@ When AI Scribe generates recommendations AND the provider uses Smart Recommendat
 | **Drug Interaction Alerts** | Check extracted medications against alert system |
 | **ICD-10 Suggestions** | Feed Scribe diagnoses to diagnosis dropdown |
 
+### Vera Health Integration
+
+Vera Health provides AI-powered Clinical Decision Support with evidence-based answers from 60M+ peer-reviewed papers and guidelines. Sevaro integrates with Vera Health via their API.
+
+#### Vera Health Capabilities
+
+| Capability | Description |
+|------------|-------------|
+| **Evidence-based answers** | Real-time search of medical literature with citations |
+| **Guideline summaries** | AAN, AHA, specialty guidelines summarized on demand |
+| **Plan builder** | Diagnosis-specific treatment recommendations |
+| **Source citations** | Every recommendation linked to peer-reviewed source |
+| **HIPAA compliant** | Safe for clinical use with PHI context |
+| **CME credits** | +0.5 CME credits per clinical query |
+
+#### Integration Architecture
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                    SEVARO ←→ VERA HEALTH                         │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                 │
+│  SEVARO SENDS TO VERA:                                          │
+│  ┌─────────────────────────────────────────────────────────┐   │
+│  │ • Patient context (demographics, diagnoses, meds)        │   │
+│  │ • Clinical question or query                             │   │
+│  │ • Diagnosis for plan builder                             │   │
+│  │ • Guideline request (e.g., "AAN migraine prophylaxis")   │   │
+│  └─────────────────────────────────────────────────────────┘   │
+│                              │                                  │
+│                              ▼                                  │
+│                    ┌─────────────────┐                          │
+│                    │  VERA HEALTH    │                          │
+│                    │  API            │                          │
+│                    │  (ZeroEntropy)  │                          │
+│                    └─────────────────┘                          │
+│                              │                                  │
+│                              ▼                                  │
+│  VERA RETURNS TO SEVARO:                                        │
+│  ┌─────────────────────────────────────────────────────────┐   │
+│  │ • Evidence-based recommendations                         │   │
+│  │ • Source citations (journal, year, DOI)                  │   │
+│  │ • Confidence/evidence grade                              │   │
+│  │ • Structured plan items                                  │   │
+│  │ • CME credit tracking data                               │   │
+│  └─────────────────────────────────────────────────────────┘   │
+│                                                                 │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+#### API Integration Specifications
+
+| Endpoint | Purpose | Data Sent | Data Received |
+|----------|---------|-----------|---------------|
+| `/query` | Clinical questions | Question + patient context | Answer + citations |
+| `/plan` | Treatment plans | Diagnosis codes, patient factors | Structured recommendations |
+| `/guidelines` | Guideline lookup | Condition, topic | Summary + source links |
+| `/search` | Literature search | Search terms | Relevant papers ranked |
+
+#### Data Sent to Vera Health
+
+```json
+{
+  "query_type": "plan_builder",
+  "patient_context": {
+    "age": 50,
+    "sex": "male",
+    "diagnoses": ["G43.909"],
+    "current_medications": ["topiramate 50mg BID"],
+    "allergies": ["sulfa"],
+    "relevant_history": "chronic migraine, failed 2 preventives"
+  },
+  "clinical_question": "What are recommended next steps for migraine prophylaxis?",
+  "specialty": "neurology"
+}
+```
+
+#### Data Received from Vera Health
+
+```json
+{
+  "recommendations": [
+    {
+      "id": "rec_001",
+      "text": "Consider CGRP inhibitor (erenumab, fremanezumab, galcanezumab)",
+      "evidence_grade": "A",
+      "citations": [
+        {
+          "source": "Neurology 2021;96(3):e364-e390",
+          "title": "AAN Guideline: Acute and Preventive Treatment of Migraine",
+          "doi": "10.1212/WNL.0000000000011050"
+        }
+      ],
+      "rationale": "Patient has failed 2+ oral preventives; CGRP inhibitors recommended as next line per AAN guidelines"
+    },
+    {
+      "id": "rec_002",
+      "text": "Continue topiramate if tolerated; may increase to 100mg BID",
+      "evidence_grade": "B",
+      "citations": [...]
+    }
+  ],
+  "cme_credit": 0.5,
+  "query_id": "vera_123456"
+}
+```
+
+#### Use Cases
+
+| Use Case | Trigger | Vera API Call |
+|----------|---------|---------------|
+| **AI Researcher** | Provider clicks "Ask AI" | `/query` with clinical question |
+| **Plan Builder** | Provider opens plan builder for diagnosis | `/plan` with diagnosis + context |
+| **Guideline Check** | "What do guidelines say about X?" | `/guidelines` with topic |
+| **Evidence Lookup** | Provider wants source for recommendation | `/search` with recommendation text |
+| **Smart Recommendations** | Auto-triggered after diagnosis entered | `/plan` with diagnosis |
+
 ---
 
 ## User Interface Requirements
