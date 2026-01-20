@@ -1,6 +1,6 @@
 # AI Scribe - Product Requirements Document
 
-**Document Version:** 1.1
+**Document Version:** 1.2
 **Last Updated:** January 20, 2026
 **Status:** Draft
 **Author:** Product Team
@@ -213,9 +213,10 @@ The AI Scribe listens to the clinical encounter (with appropriate consent), tran
 │    │  • Clinical entity extraction                               │     │
 │    │  • Note section classification                              │     │
 │    │  • Medical terminology normalization                        │     │
-│    │  • ICD-10 / CPT code suggestion                            │     │
+│    │  • ICD-10 diagnosis suggestion (for note context)           │     │
 │    │  • Content summarization & organization                     │     │
 │    │  • Confidence scoring                                       │     │
+│    │  Note: CPT/billing codes handled by Earnest RCM integration │     │
 │    └─────────────────────────────────────────────────────────────┘     │
 │                                    │                                    │
 │                                    ▼                                    │
@@ -1428,14 +1429,79 @@ Each specialty has its own AI configuration:
 | **Referral generation** | Create referral from visit discussion |
 | **Fax/letter generation** | Generate correspondence from note |
 
-### Phase 2: Coding & Billing Assistant
+### Earnest RCM Integration (Coding & Billing)
 
-| Feature | Description |
-|---------|-------------|
-| **ICD-10 suggestions** | Auto-suggest diagnosis codes from note |
-| **E&M level suggestion** | Recommend appropriate E&M based on documentation |
-| **HCC capture** | Identify risk adjustment opportunities |
-| **Code justification** | Show documentation supporting each code |
+**Sevaro does NOT perform internal coding or billing suggestions.** All coding and billing recommendations are handled by **[Earnest RCM](https://www.earnestrcm.com/)**, our revenue cycle management partner.
+
+#### Earnest RCM Overview
+
+Earnest RCM is an AI-powered revenue cycle management platform that provides:
+
+| Capability | Description |
+|------------|-------------|
+| **Claims Coding** | AI-powered ICD-10 and CPT code suggestions from clinical notes |
+| **Code Auditing** | Maximizes first-pass rates by learning payer rules |
+| **Eligibility Verification** | AI-automated payer calls and portal integrations |
+| **Prior Authorization** | AI references payer criteria and cites clinical notes |
+| **AR Follow-up** | Auto-schedule and power-dial follow-ups to payers |
+
+#### Integration Architecture
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                    SEVARO → EARNEST RCM                         │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                 │
+│  SEVARO SUBMITS:                                                │
+│  ┌─────────────────────────────────────────────────────────┐   │
+│  │ • Finalized clinical note (after provider approval)      │   │
+│  │ • Patient demographics                                   │   │
+│  │ • Visit type and date of service                         │   │
+│  │ • Provider information                                   │   │
+│  └─────────────────────────────────────────────────────────┘   │
+│                              │                                  │
+│                              ▼                                  │
+│                    ┌─────────────────┐                          │
+│                    │   EARNEST RCM   │                          │
+│                    │   AI Engine     │                          │
+│                    └─────────────────┘                          │
+│                              │                                  │
+│                              ▼                                  │
+│  EARNEST RCM RETURNS:                                           │
+│  ┌─────────────────────────────────────────────────────────┐   │
+│  │ • Suggested ICD-10 codes with supporting documentation   │   │
+│  │ • Suggested CPT/E&M codes                                │   │
+│  │ • HCC capture opportunities                              │   │
+│  │ • Coding confidence scores                               │   │
+│  │ • Payer-specific guidance                                │   │
+│  └─────────────────────────────────────────────────────────┘   │
+│                                                                 │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+#### Workflow
+
+1. **Provider completes and approves note** in Sevaro
+2. **Note submitted to Earnest RCM** automatically or on demand
+3. **Earnest RCM reviews** and returns code suggestions
+4. **Coder/provider reviews** suggestions in billing workflow
+5. **Claim submitted** to payer
+
+#### Security & Compliance
+
+- HIPAA compliant with BAA
+- SOC 2 certified
+- No data retention by Earnest RCM beyond processing
+- Full encryption of data in transit and at rest
+
+#### Key Benefits
+
+| Benefit | Impact |
+|---------|--------|
+| **First-pass rate optimization** | Reduces claim denials |
+| **Payer rule learning** | Adapts to changing payer requirements |
+| **No internal coding burden** | Offloads coding to specialists |
+| **Faster reimbursement** | Accelerates revenue cycle |
 
 ### Phase 3: Guideline Integration
 
@@ -1508,7 +1574,7 @@ Each specialty has its own AI configuration:
 | Consent flagging | Settings at EHR layer (TBD) |
 | External EHR integration | Synapse only (no external) |
 | Login requirements | No separate login (embedded in Synapse) |
-| Coding support | Separate system handles |
+| Coding support | Earnest RCM handles (external integration) |
 | Template management | Tied to specialty instances (Synapse AI for X) |
 
 ---
@@ -1528,10 +1594,17 @@ Each specialty has its own AI configuration:
 ### Related Documents
 
 - PRD: Neurology Clinical Scales
-- PRD: AI Researcher (planned)
-- PRD: AI Summarizer (planned)
-- PRD: Dot Phrases / Auto Text (planned)
+- PRD: AI Researcher
+- PRD: AI Summarizer
+- PRD: Dot Phrases / Auto Text
 - Sevaro MVP PRD v1.3
+
+### External Partners
+
+| Partner | Function | Reference |
+|---------|----------|-----------|
+| **Vera Health** | Clinical decision support, evidence-based recommendations | [verahealth.ai](https://www.verahealth.ai/) |
+| **Earnest RCM** | Coding, billing, revenue cycle management | [earnestrcm.com](https://www.earnestrcm.com/) |
 
 ### References
 
@@ -1544,6 +1617,11 @@ Each specialty has its own AI configuration:
 
 ## Changelog
 
+**v1.2 (January 20, 2026)**
+- Added Earnest RCM integration for coding & billing
+- Clarified that Sevaro does NOT do internal coding/billing
+- Updated architecture to reflect external coding workflow
+
 **v1.1 (January 20, 2026)**
 - Expanded based on Ambient AI Feature Scope document
 - Added Customization & Templates section
@@ -1555,7 +1633,7 @@ Each specialty has its own AI configuration:
 - Added Performance Expectations
 - Added Analytics & Continuous Improvement dashboard
 - Added Scalability & Specialties section
-- Expanded Phase 2+ Features (coding, workflow automation)
+- Expanded Phase 2+ Features (workflow automation)
 - Added comprehensive Success Metrics
 - Added Implementation Notes and technical approach
 
