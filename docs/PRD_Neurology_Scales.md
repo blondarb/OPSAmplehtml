@@ -1,6 +1,6 @@
 # Neurology Clinical Scales - Combined Reference & Implementation PRD
 
-**Document Version:** 1.0
+**Document Version:** 1.1
 **Last Updated:** January 20, 2026
 **Status:** Draft
 **Author:** Product Team
@@ -44,13 +44,19 @@ Clinical scales in neurology serve to:
 |----------|----------|----------|
 | **Headache/Migraine** | Disability assessment, treatment response | MIDAS, HIT-6 |
 | **Mood/Psychiatric** | Comorbidity screening, symptom tracking | PHQ-9, GAD-7 |
-| **Cognitive** | Dementia screening, baseline assessment | MoCA, MMSE |
+| **Cognitive** | Dementia screening, baseline assessment | MoCA, MMSE, CDR |
 | **Movement Disorders** | Parkinson's staging, symptom tracking | UPDRS, H&Y |
-| **Multiple Sclerosis** | Disability quantification | EDSS |
-| **Sleep** | Sleep disorder assessment | Epworth, PSQI |
-| **Pain/Function** | Disability documentation | ODI, NDI |
+| **Multiple Sclerosis** | Disability quantification | EDSS, FSS |
+| **Sleep** | Sleep disorder assessment | Epworth, PSQI, STOP-BANG, ISI |
+| **Pain/Neuropathy** | Pain assessment, neuropathic screening | DN4, painDETECT, ODI, NDI |
+| **TIA/Stroke Risk** | Risk stratification, anticoagulation decisions | ABCD2, CHA₂DS₂-VASc, HAS-BLED |
 | **Stroke (Inpatient)** | Acute assessment, prognosis | NIHSS, GCS, mRS |
-| **ICU/Critical Care** | Consciousness, sedation | GCS, FOUR, RASS |
+| **ICU/Critical Care** | Consciousness, sedation | GCS, FOUR, RASS, CAM |
+| **Neuromuscular** | Disease severity, functional status | QMG, MG-ADL, ALSFRS-R, MRC |
+| **Vestibular/Dizziness** | Disability from vertigo | DHI |
+| **Spasticity** | Tone assessment | Modified Ashworth, Tardieu |
+| **Falls/Mobility** | Fall risk, balance assessment | TUG, Berg Balance, Tinetti |
+| **Fatigue** | Symptom quantification | FSS |
 
 ---
 
@@ -495,6 +501,491 @@ Each section scored 0-5
 | **Purpose** | Quantifies seizure severity |
 | **Use** | Treatment response monitoring |
 | **Priority** | P3 |
+
+### TIA & Stroke Risk Assessment
+
+#### ABCD2 Score (TIA Risk Stratification)
+
+| Attribute | Details |
+|-----------|---------|
+| **Full Name** | ABCD2 Score for TIA |
+| **Purpose** | Predicts short-term stroke risk after TIA |
+| **Target Population** | Patients with transient ischemic attack |
+| **Administration** | Clinician assessment |
+| **Time to Complete** | 2 minutes |
+| **Validated** | Yes - international guidelines recommend |
+
+**Score Components (0-7 points):**
+
+| Factor | Criteria | Points |
+|--------|----------|--------|
+| **A**ge | ≥60 years | 1 |
+| **B**lood Pressure | SBP ≥140 or DBP ≥90 mmHg | 1 |
+| **C**linical Features | Unilateral weakness | 2 |
+| | Speech impairment without weakness | 1 |
+| **D**uration | ≥60 minutes | 2 |
+| | 10-59 minutes | 1 |
+| **D**iabetes | Present | 1 |
+
+**Risk Stratification:**
+
+| Score | 2-Day Stroke Risk | 7-Day Risk | Action |
+|-------|-------------------|------------|--------|
+| 0-3 | ~1% | ~1.2% | Outpatient workup may be appropriate |
+| 4-5 | ~4% | ~5.9% | Hospitalization recommended |
+| 6-7 | ~8% | ~12% | Urgent hospitalization, expedited workup |
+
+**Clinical Notes:**
+- Should be combined with imaging (DWI-MRI) for better accuracy
+- Does not replace need for carotid imaging and cardiac evaluation
+- Patients with low ABCD2 may still have high-risk features (LAA, AF)
+
+**Priority:** P1
+
+#### CHA₂DS₂-VASc Score (Stroke Risk in AFib)
+
+| Attribute | Details |
+|-----------|---------|
+| **Full Name** | Congestive heart failure, Hypertension, Age, Diabetes, Stroke, Vascular disease, Sex |
+| **Purpose** | Annual stroke risk in non-valvular atrial fibrillation |
+| **Target Population** | Patients with atrial fibrillation |
+| **Use** | Anticoagulation decision-making |
+
+**Score Components (0-9 points):**
+
+| Factor | Criteria | Points |
+|--------|----------|--------|
+| **C**ongestive Heart Failure | History of HF or LVEF ≤40% | 1 |
+| **H**ypertension | History or on treatment | 1 |
+| **A**ge ≥75 | | 2 |
+| **D**iabetes | | 1 |
+| **S**troke/TIA/Thromboembolism | History | 2 |
+| **V**ascular Disease | Prior MI, PAD, aortic plaque | 1 |
+| **A**ge 65-74 | | 1 |
+| **S**ex Category | Female | 1 |
+
+**Annual Stroke Risk:**
+
+| Score | Risk/Year | Recommendation |
+|-------|-----------|----------------|
+| 0 (male) / 1 (female) | ~0% | No anticoagulation |
+| 1 (male) / 2 (female) | ~1.3% | Consider anticoagulation |
+| ≥2 (male) / ≥3 (female) | 2-15% | Anticoagulation recommended |
+
+**Priority:** P2
+
+#### HAS-BLED Score (Bleeding Risk)
+
+| Attribute | Details |
+|-----------|---------|
+| **Purpose** | Estimates bleeding risk on anticoagulation |
+| **Use** | Paired with CHA₂DS₂-VASc for risk-benefit |
+
+**Score Components (0-9 points):**
+
+| Factor | Points |
+|--------|--------|
+| **H**ypertension (uncontrolled, SBP >160) | 1 |
+| **A**bnormal renal/liver function (1 each) | 1-2 |
+| **S**troke history | 1 |
+| **B**leeding history/predisposition | 1 |
+| **L**abile INRs (if on warfarin) | 1 |
+| **E**lderly (>65) | 1 |
+| **D**rugs/alcohol (1 each) | 1-2 |
+
+**Interpretation:** Score ≥3 = High bleeding risk (caution with anticoagulation, address modifiable factors)
+
+**Priority:** P2
+
+### Neuromuscular Disorders
+
+#### QMG (Quantitative Myasthenia Gravis Score)
+
+| Attribute | Details |
+|-----------|---------|
+| **Full Name** | Quantitative Myasthenia Gravis Score |
+| **Purpose** | Objective measure of MG disease severity |
+| **Target Population** | Myasthenia gravis patients |
+| **Administration** | Clinician-administered |
+| **Time to Complete** | 15-20 minutes |
+
+**13 Test Items:**
+1. Double vision (lateral gaze, seconds)
+2. Ptosis (upward gaze, seconds)
+3. Facial muscles
+4. Swallowing
+5. Speech (dysarthria after counting)
+6. Right arm outstretched (seconds)
+7. Left arm outstretched (seconds)
+8. Vital capacity (% predicted)
+9. Right hand grip (kg)
+10. Left hand grip (kg)
+11. Head lift (45°, seconds)
+12. Right leg outstretched (seconds)
+13. Left leg outstretched (seconds)
+
+**Scoring:** 0-39 points (higher = more severe)
+- 0-10: Mild
+- 11-20: Moderate
+- >20: Severe
+
+**Priority:** P2
+
+#### MG-ADL (Myasthenia Gravis Activities of Daily Living)
+
+| Attribute | Details |
+|-----------|---------|
+| **Purpose** | Patient-reported functional status in MG |
+| **Administration** | Patient self-report |
+| **Items** | 8 questions |
+| **Scoring** | 0-24 (0-3 per item) |
+
+**Domains:** Talking, chewing, swallowing, breathing, brushing teeth/combing hair, arising from chair, double vision, eyelid droop
+
+**Priority:** P2
+
+#### ALSFRS-R (ALS Functional Rating Scale - Revised)
+
+| Attribute | Details |
+|-----------|---------|
+| **Full Name** | Amyotrophic Lateral Sclerosis Functional Rating Scale - Revised |
+| **Purpose** | Track disease progression in ALS |
+| **Target Population** | ALS patients |
+| **Administration** | Clinician or trained assessor |
+| **Items** | 12 questions |
+| **Scoring** | 0-48 (higher = better function) |
+
+**Domains:**
+- Bulbar: Speech, salivation, swallowing
+- Fine Motor: Handwriting, cutting food, dressing
+- Gross Motor: Turning in bed, walking, climbing stairs
+- Respiratory: Dyspnea, orthopnea, respiratory insufficiency
+
+**Clinical Notes:**
+- Rate of decline predicts survival
+- Loss of ~1 point/month typical
+- Required for clinical trials and riluzole monitoring
+
+**Priority:** P2
+
+#### MRC Muscle Strength Scale
+
+| Grade | Description |
+|-------|-------------|
+| 0 | No contraction |
+| 1 | Flicker or trace contraction |
+| 2 | Active movement with gravity eliminated |
+| 3 | Active movement against gravity |
+| 4 | Active movement against gravity and resistance |
+| 4- | Slight resistance |
+| 4 | Moderate resistance |
+| 4+ | Strong resistance |
+| 5 | Normal strength |
+
+**Priority:** P1 (fundamental exam documentation)
+
+### Dizziness & Vestibular
+
+#### Dizziness Handicap Inventory (DHI)
+
+| Attribute | Details |
+|-----------|---------|
+| **Full Name** | Dizziness Handicap Inventory |
+| **Purpose** | Measures disability from dizziness/vertigo |
+| **Target Population** | Vestibular disorders, BPPV, Meniere's |
+| **Administration** | Patient self-report |
+| **Time to Complete** | 5-10 minutes |
+| **Validated** | Yes - test-retest reliability 0.97 |
+
+**Structure:** 25 items in 3 subscales:
+- Physical (7 items) - movement-provoked symptoms
+- Emotional (9 items) - psychological impact
+- Functional (9 items) - daily activity limitations
+
+**Scoring:**
+- Each item: Yes (4), Sometimes (2), No (0)
+- Total: 0-100 points
+
+| Score | Interpretation |
+|-------|----------------|
+| 0-30 | Mild handicap |
+| 31-60 | Moderate handicap |
+| 61-100 | Severe handicap |
+
+**Clinical Notes:**
+- Change of ≥18 points = clinically significant
+- 2-item BPPV subscale (getting out of bed, rolling over) highly predictive
+- High correlation with psychological status
+
+**Priority:** P2
+
+### Neuropathic Pain
+
+#### DN4 (Douleur Neuropathique 4 Questions)
+
+| Attribute | Details |
+|-----------|---------|
+| **Full Name** | Douleur Neuropathique 4 Questions |
+| **Purpose** | Screen for neuropathic pain component |
+| **Target Population** | Patients with chronic pain, neuropathy |
+| **Administration** | Clinician (interview + exam) |
+| **Time to Complete** | 3-5 minutes |
+| **Validated** | Sensitivity 83%, Specificity 90% |
+
+**10 Items (7 interview + 3 exam):**
+
+*Patient Interview:*
+1. Burning
+2. Painful cold
+3. Electric shocks
+4. Tingling
+5. Pins and needles
+6. Numbness
+7. Itching
+
+*Clinical Examination:*
+8. Hypoesthesia to touch
+9. Hypoesthesia to pinprick
+10. Brush-induced allodynia
+
+**Scoring:** ≥4/10 = Neuropathic pain likely
+
+**Clinical Notes:**
+- Recommended by IASP and European guidelines
+- 7-item self-report version also validated
+- Helps differentiate nociceptive vs neuropathic pain
+
+**Priority:** P2
+
+#### painDETECT Questionnaire
+
+| Attribute | Details |
+|-----------|---------|
+| **Purpose** | Screen for neuropathic pain component |
+| **Administration** | Patient self-report |
+| **Scoring** | 0-38 points |
+
+**Interpretation:**
+- ≤12: Neuropathic component unlikely (<15%)
+- 13-18: Unclear (uncertain)
+- ≥19: Neuropathic component likely (>90%)
+
+**Priority:** P3
+
+### Spasticity Assessment
+
+#### Modified Ashworth Scale (MAS)
+
+| Attribute | Details |
+|-----------|---------|
+| **Purpose** | Grades muscle tone/spasticity |
+| **Target Population** | Stroke, MS, TBI, spinal cord injury |
+| **Administration** | Clinician assessment |
+| **Time to Complete** | 2-5 minutes per limb |
+
+**Grading:**
+
+| Grade | Description |
+|-------|-------------|
+| 0 | No increase in tone |
+| 1 | Slight increase, catch and release at end ROM |
+| 1+ | Slight increase, catch followed by minimal resistance through <½ ROM |
+| 2 | More marked increase through most ROM, limb easily moved |
+| 3 | Considerable increase, passive movement difficult |
+| 4 | Rigid in flexion or extension |
+
+**Clinical Notes:**
+- Most widely used clinical spasticity measure
+- Limited by lack of standardized velocity
+- Document position and velocity used
+
+**Priority:** P1
+
+#### Tardieu Scale / Modified Tardieu Scale
+
+| Attribute | Details |
+|-----------|---------|
+| **Purpose** | Differentiates spasticity from contracture |
+| **Advantage** | Tests at multiple velocities |
+| **Administration** | Clinician assessment |
+
+**Key Measurements:**
+- R1: Angle of catch at fast velocity
+- R2: Passive ROM at slow velocity
+- Spasticity angle = R2 - R1
+
+**Clinical Notes:**
+- Better differentiates neural (spasticity) from non-neural (contracture) components
+- Preferred in pediatric spasticity
+- 2025 Movement Disorders review recommends over Ashworth
+
+**Priority:** P2
+
+### Sleep Disorders (Additional)
+
+#### STOP-BANG Questionnaire (Sleep Apnea Risk)
+
+| Attribute | Details |
+|-----------|---------|
+| **Purpose** | Screen for obstructive sleep apnea risk |
+| **Administration** | Patient self-report or clinician |
+| **Time to Complete** | 1-2 minutes |
+
+**8 Items (Yes/No):**
+
+| Item | Criteria |
+|------|----------|
+| **S**noring | Loud snoring |
+| **T**iredness | Daytime fatigue/sleepiness |
+| **O**bserved apnea | Witnessed breathing stops |
+| **P**ressure | Treated for hypertension |
+| **B**MI | >35 kg/m² |
+| **A**ge | >50 years |
+| **N**eck | Circumference >40 cm |
+| **G**ender | Male |
+
+**Interpretation:**
+- 0-2: Low risk
+- 3-4: Intermediate risk
+- ≥5: High risk for moderate-severe OSA
+
+**Priority:** P2
+
+#### Insomnia Severity Index (ISI)
+
+| Attribute | Details |
+|-----------|---------|
+| **Purpose** | Assess insomnia severity |
+| **Items** | 7 questions |
+| **Scoring** | 0-28 |
+
+**Interpretation:**
+- 0-7: No clinically significant insomnia
+- 8-14: Subthreshold insomnia
+- 15-21: Moderate insomnia
+- 22-28: Severe insomnia
+
+**Priority:** P2
+
+### Fatigue
+
+#### Fatigue Severity Scale (FSS)
+
+| Attribute | Details |
+|-----------|---------|
+| **Purpose** | Quantify impact of fatigue |
+| **Target Population** | MS, Parkinson's, chronic illness |
+| **Administration** | Patient self-report |
+| **Items** | 9 statements |
+| **Scoring** | 1-7 Likert scale per item |
+
+**Interpretation:** Mean score ≥4 indicates significant fatigue
+
+**Clinical Notes:**
+- Fatigue is most common symptom in MS
+- Important for Parkinson's, post-stroke
+- Track response to treatment interventions
+
+**Priority:** P2
+
+### Cognitive (Additional)
+
+#### MMSE (Mini-Mental State Examination)
+
+| Attribute | Details |
+|-----------|---------|
+| **Full Name** | Mini-Mental State Examination |
+| **Purpose** | Cognitive screening |
+| **Administration** | Clinician-administered |
+| **Time to Complete** | 5-10 minutes |
+| **Scoring** | 0-30 points |
+| **Licensing** | Requires license from PAR |
+
+**Domains:** Orientation (10), Registration (3), Attention/Calculation (5), Recall (3), Language (8), Visual Construction (1)
+
+**Interpretation:**
+- 24-30: Normal
+- 18-23: Mild cognitive impairment
+- 0-17: Severe cognitive impairment
+
+**Clinical Notes:**
+- Less sensitive than MoCA for mild impairment
+- Ceiling effects in educated patients
+- Still widely used due to familiarity
+
+**Priority:** P2
+
+#### Clinical Dementia Rating (CDR)
+
+| Attribute | Details |
+|-----------|---------|
+| **Purpose** | Stage dementia severity |
+| **Administration** | Semi-structured interview (patient + informant) |
+| **Time** | 30-45 minutes |
+
+**Domains Assessed:** Memory, Orientation, Judgment & Problem Solving, Community Affairs, Home & Hobbies, Personal Care
+
+**Global CDR Score:**
+
+| Score | Stage |
+|-------|-------|
+| 0 | Normal |
+| 0.5 | Questionable/Very Mild |
+| 1 | Mild |
+| 2 | Moderate |
+| 3 | Severe |
+
+**Priority:** P2
+
+### Falls & Mobility
+
+#### Timed Up and Go (TUG)
+
+| Attribute | Details |
+|-----------|---------|
+| **Purpose** | Assess mobility and fall risk |
+| **Administration** | Clinician-timed performance |
+| **Equipment** | Chair, 3-meter walkway, stopwatch |
+
+**Procedure:** Time to rise from chair, walk 3 meters, turn, walk back, sit down
+
+**Interpretation:**
+- <10 seconds: Normal
+- 10-20 seconds: Good mobility, low fall risk
+- 20-30 seconds: May need assistive device
+- >30 seconds: High fall risk, impaired mobility
+
+**Priority:** P2
+
+#### Berg Balance Scale
+
+| Attribute | Details |
+|-----------|---------|
+| **Purpose** | Assess balance and fall risk |
+| **Items** | 14 tasks |
+| **Scoring** | 0-56 points |
+
+**Interpretation:**
+- 0-20: High fall risk (wheelchair bound)
+- 21-40: Medium fall risk (walking with assistance)
+- 41-56: Low fall risk (independent)
+
+**Priority:** P2
+
+#### Tinetti Gait and Balance Assessment
+
+| Attribute | Details |
+|-----------|---------|
+| **Purpose** | Assess gait and balance |
+| **Components** | Balance (16 points) + Gait (12 points) |
+| **Total Score** | 0-28 |
+
+**Interpretation:**
+- <19: High fall risk
+- 19-24: Moderate fall risk
+- 25-28: Low fall risk
+
+**Priority:** P2
 
 ---
 
@@ -1056,14 +1547,24 @@ ScaleDefinition {
 |-----------|-------------------|
 | **Migraine** | MIDAS, HIT-6, PHQ-9, GAD-7 |
 | **Tension Headache** | HIT-6, PHQ-9, NDI |
+| **Cervicogenic Headache** | NDI, HIT-6, MIDAS |
+| **TIA** | ABCD2, CHA₂DS₂-VASc (if AFib), mRS |
+| **Atrial Fibrillation** | CHA₂DS₂-VASc, HAS-BLED |
 | **Epilepsy** | QOLIE-31, PHQ-9, ESS, Liverpool |
-| **Parkinson's Disease** | UPDRS, H&Y, MoCA, PHQ-9 |
-| **Multiple Sclerosis** | EDSS, PHQ-9, MoCA, Fatigue Scale |
-| **Dementia** | MoCA, MMSE, PHQ-9, ADL scales |
-| **Stroke (Acute)** | NIHSS, GCS, mRS |
-| **Stroke (Recovery)** | mRS, MoCA, PHQ-9 |
-| **Sleep Disorders** | ESS, PSQI, PHQ-9 |
-| **Spine/Radiculopathy** | ODI, NDI, Pain scales |
+| **Parkinson's Disease** | UPDRS, H&Y, MoCA, PHQ-9, FSS |
+| **Multiple Sclerosis** | EDSS, FSS, PHQ-9, MoCA, Modified Ashworth |
+| **Dementia** | MoCA, MMSE, CDR, PHQ-9 |
+| **Myasthenia Gravis** | QMG, MG-ADL, PHQ-9 |
+| **ALS** | ALSFRS-R, FSS, PHQ-9 |
+| **Peripheral Neuropathy** | DN4, MRC, PHQ-9 |
+| **Stroke (Acute)** | NIHSS, GCS, mRS, Hunt & Hess (SAH), ICH Score |
+| **Stroke (Recovery)** | mRS, MoCA, PHQ-9, Modified Ashworth, Berg Balance |
+| **Vertigo/Vestibular** | DHI, PHQ-9, GAD-7 |
+| **Sleep Disorders** | ESS, PSQI, STOP-BANG, ISI, PHQ-9 |
+| **Spine/Radiculopathy** | ODI, NDI, DN4, MRC |
+| **Spasticity** | Modified Ashworth, Tardieu |
+| **Falls/Gait Disorders** | TUG, Berg Balance, Tinetti, MoCA |
+| **ICU/Altered Mental Status** | GCS, FOUR, CAM, RASS |
 
 ### Frequency Recommendations
 
@@ -1072,9 +1573,16 @@ ScaleDefinition {
 | MIDAS | Every 3 months (aligns with timeframe) |
 | HIT-6 | Monthly during active treatment |
 | PHQ-9 | Baseline + every 3-6 months |
+| GAD-7 | Baseline + every 3-6 months |
 | MoCA | Baseline + annually (or if concerns) |
 | NIHSS | Admission, Q4-6h acute, daily thereafter |
 | GCS | Q1h (critical), Q4h (stable) |
+| ALSFRS-R | Monthly (tracks disease progression) |
+| QMG | Every 3-6 months, pre/post treatment |
+| DHI | Baseline + post-vestibular therapy |
+| FSS | Every 3-6 months |
+| Modified Ashworth | Pre/post botulinum toxin, every 3 months |
+| TUG/Berg Balance | Baseline + after falls, every 6 months |
 
 ### References
 
@@ -1088,6 +1596,20 @@ ScaleDefinition {
 ---
 
 ## Changelog
+
+**v1.1 (January 20, 2026)**
+- Expanded scale coverage based on comprehensive review
+- Added TIA/Stroke Risk scales: ABCD2, CHA₂DS₂-VASc, HAS-BLED
+- Added Neuromuscular scales: QMG, MG-ADL, ALSFRS-R, MRC
+- Added Dizziness/Vestibular: DHI
+- Added Neuropathic Pain scales: DN4, painDETECT
+- Added Spasticity scales: Modified Ashworth, Tardieu
+- Added Sleep scales: STOP-BANG, ISI
+- Added Fatigue: FSS
+- Added Cognitive scales: MMSE, CDR
+- Added Falls/Mobility scales: TUG, Berg Balance, Tinetti
+- Updated condition-to-scale mapping table
+- Expanded frequency recommendations
 
 **v1.0 (January 20, 2026)**
 - Initial document creation
