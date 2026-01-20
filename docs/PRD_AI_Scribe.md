@@ -1,15 +1,23 @@
 # AI Scribe - Product Requirements Document
 
-**Document Version:** 1.0
+**Document Version:** 1.1
 **Last Updated:** January 20, 2026
 **Status:** Draft
 **Author:** Product Team
+**Owner:** Product Engineering / Clinical Informatics / Design
 
 ---
 
 ## Executive Summary
 
-The AI Scribe is a real-time clinical documentation assistant that captures physician-patient conversations, transcribes speech to text, and intelligently organizes the content into structured clinical note sections. It combines voice transcription (e.g., Whisper) with medical AI processing (e.g., ChatGPT Medical, Claude, or similar) to reduce documentation burden while maintaining clinical accuracy.
+The AI Scribe is an integrated AI-driven system for ambient transcription and clinical note generation from provider-patient conversations. The system must be:
+
+- **Embedded** in the EHR workflow (internal Synapse platform)
+- **Secure, compliant, and auditable** across all specialties
+- **Modular and customizable** (note styles, structure, preferences per provider)
+- **Controlled by the provider** with in-workflow editing and AI prompting
+- **Capable of surfacing** clinical insights, coding, orders, and smart recommendations
+- **Extensible** for in-clinic, remote, and telemedicine across video/audio interfaces (browser, phone, desktop)
 
 ---
 
@@ -19,14 +27,23 @@ The AI Scribe is a real-time clinical documentation assistant that captures phys
 2. [Solution Overview](#solution-overview)
 3. [User Stories](#user-stories)
 4. [System Architecture](#system-architecture)
-5. [Functional Requirements](#functional-requirements)
-6. [AI Processing Requirements](#ai-processing-requirements)
-7. [Integration with Other Features](#integration-with-other-features)
-8. [User Interface Requirements](#user-interface-requirements)
-9. [Data Flow & Processing](#data-flow--processing)
-10. [Privacy & Compliance](#privacy-and-compliance)
-11. [Quality & Accuracy](#quality-and-accuracy)
-12. [Future Enhancements](#future-enhancements)
+5. [Core Feature Requirements](#core-feature-requirements)
+6. [Customization & Templates](#customization--templates)
+7. [Settings Dashboard](#settings-dashboard)
+8. [In-Workflow AI Editing](#in-workflow-ai-editing)
+9. [Transcript Viewer & Traceability](#transcript-viewer--traceability)
+10. [Error Flagging & Gap Detection](#error-flagging--gap-detection)
+11. [AI Processing Requirements](#ai-processing-requirements)
+12. [Integration with Other Features](#integration-with-other-features)
+13. [User Interface Requirements](#user-interface-requirements)
+14. [Data Flow & Processing](#data-flow--processing)
+15. [Privacy & Compliance](#privacy-and-compliance)
+16. [Provider Oversight & Approval](#provider-oversight--approval)
+17. [Performance Expectations](#performance-expectations)
+18. [Analytics & Continuous Improvement](#analytics--continuous-improvement)
+19. [Scalability & Specialties](#scalability--specialties)
+20. [Phase 2+ Features](#phase-2-features)
+21. [Success Metrics](#success-metrics)
 
 ---
 
@@ -766,25 +783,616 @@ Full transcript (complete)
 
 ---
 
-## Future Enhancements
+## Customization & Templates
 
-### Phase 2 Enhancements
+### Customizable Note Output
 
-| Enhancement | Description | Priority |
-|-------------|-------------|----------|
-| **Multi-language** | Spanish, Mandarin transcription | P1 |
-| **Specialty templates** | Auto-select template by visit type | P2 |
-| **Learning from edits** | Improve prompts based on corrections | P2 |
-| **Dictation mode** | Direct-to-field dictation option | P2 |
+Providers can customize how AI-generated notes are formatted and structured.
 
-### Phase 3 Enhancements
+#### Note Style Options
 
-| Enhancement | Description |
-|-------------|-------------|
-| **Ambient coding** | Suggest E&M level from conversation |
-| **Quality measure capture** | Detect quality measure completion |
-| **Patient instructions** | Generate patient-friendly summary |
-| **Interpreter support** | Handle interpreted visits |
+| Style | Description | Use Case |
+|-------|-------------|----------|
+| **Brief** | Concise, essential information only | High-volume clinics |
+| **Detailed** | Comprehensive documentation | Complex cases, litigation risk |
+| **Bullet** | Bulleted format throughout | Quick scanning |
+| **Narrative** | Traditional paragraph style | Standard documentation |
+| **SOAP** | Structured SOAP format | Problem-oriented documentation |
+
+#### Template Configuration
+
+```
+Template Definition {
+  id: "neuro-headache-fu"
+  name: "Neurology Headache Follow-up"
+  specialty: "neurology"
+  visit_type: "follow_up"
+
+  sections: {
+    hpi: {
+      style: "narrative"
+      include: ["symptom_update", "medication_response", "side_effects"]
+      required_elements: ["headache_frequency", "severity_change"]
+    }
+    assessment: {
+      style: "numbered"
+      include_icd10: true
+    }
+    plan: {
+      style: "bullet"
+      include_follow_up: true
+    }
+  }
+
+  language_preferences: {
+    use_abbreviations: true  // "HTN" vs "Hypertension"
+    terminology_level: "standard"  // standard | patient-friendly | academic
+  }
+}
+```
+
+#### Per-Provider Customization
+
+| Setting | Options | Default |
+|---------|---------|---------|
+| **Default note style** | Brief, Detailed, Bullet, Narrative, SOAP | Narrative |
+| **Abbreviation preference** | Use standard abbreviations / Spell out | Abbreviations |
+| **Pronoun style** | He/She, They, Patient | He/She |
+| **Section ordering** | Customizable order | Standard |
+| **Auto-include negatives** | Yes / No | Yes |
+
+---
+
+## Settings Dashboard
+
+### Modular Settings System
+
+A centralized settings dashboard allowing providers to configure their AI Scribe preferences.
+
+#### Settings Hierarchy
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                    SETTINGS HIERARCHY                        │
+├─────────────────────────────────────────────────────────────┤
+│                                                             │
+│  ┌─────────────────────────────────────────────────────┐   │
+│  │              SYSTEM DEFAULTS                         │   │
+│  │         (Organization-wide settings)                 │   │
+│  │  • Compliance requirements                           │   │
+│  │  • Required disclaimers                              │   │
+│  │  • Audit settings                                    │   │
+│  └─────────────────────────────────────────────────────┘   │
+│                          ▼                                  │
+│  ┌─────────────────────────────────────────────────────┐   │
+│  │              SPECIALTY DEFAULTS                      │   │
+│  │         (Neurology, Psychiatry, etc.)                │   │
+│  │  • Default templates                                 │   │
+│  │  • Common phrases                                    │   │
+│  │  • Terminology preferences                           │   │
+│  └─────────────────────────────────────────────────────┘   │
+│                          ▼                                  │
+│  ┌─────────────────────────────────────────────────────┐   │
+│  │              PROVIDER PREFERENCES                    │   │
+│  │         (Individual clinician settings)              │   │
+│  │  • Personal templates                                │   │
+│  │  • Note style preferences                            │   │
+│  │  • Quick phrases                                     │   │
+│  │  • UI preferences                                    │   │
+│  └─────────────────────────────────────────────────────┘   │
+│                                                             │
+└─────────────────────────────────────────────────────────────┘
+```
+
+#### Settings Categories
+
+| Category | Settings |
+|----------|----------|
+| **General** | Default note style, language, timezone |
+| **Templates** | Manage custom templates, import/export |
+| **Privacy** | Consent workflows, recording indicators |
+| **Audio** | Microphone selection, noise cancellation |
+| **AI Behavior** | Confidence thresholds, auto-population rules |
+| **Notifications** | Alerts, reminders, error notifications |
+
+### Settings UI Mockup
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│  Settings                                           ✕ Close │
+├────────────────┬────────────────────────────────────────────┤
+│                │                                            │
+│  ▸ General     │  General Template Settings                 │
+│  ▾ Templates   │  ────────────────────────────────────────  │
+│    └─ Neuro    │                                            │
+│  ▸ Privacy     │  Default Note Style    [Narrative     ▼]   │
+│  ▸ Audio       │                                            │
+│  ▸ AI Behavior │  Section Settings                          │
+│  ▸ Notifications│  ────────────────────────────────────────  │
+│                │                                            │
+│                │  HPI Section                               │
+│                │  ├─ Style:        [Narrative  ▼]           │
+│                │  ├─ Auto-include negatives: [✓]            │
+│                │  └─ Required elements: [Configure]         │
+│                │                                            │
+│                │  Assessment Section                        │
+│                │  ├─ Style:        [Numbered   ▼]           │
+│                │  └─ Include ICD-10: [✓]                    │
+│                │                                            │
+│                │  Plan Section                              │
+│                │  ├─ Style:        [Bullet     ▼]           │
+│                │  └─ Auto-follow-up: [✓]                    │
+│                │                                            │
+│                │            [Reset to Defaults] [Save]      │
+└────────────────┴────────────────────────────────────────────┘
+```
+
+---
+
+## In-Workflow AI Editing
+
+### AI-Powered Text Actions
+
+When text is selected or cursor is in a field, a toolbar appears with AI editing options.
+
+#### Available Actions
+
+| Action | Description | Example |
+|--------|-------------|---------|
+| **Ask AI** | Get information or suggestions | "What's the typical dose for topiramate?" |
+| **Improve** | Enhance clarity and completeness | Makes text more concise or detailed |
+| **Summarize** | Condense selected text | Long HPI → key bullet points |
+| **Expand** | Add more detail | Brief note → comprehensive narrative |
+| **Dictate** | Voice-to-text for selected field | Free-form dictation |
+| **Complete** | AI completes partial text | "Patient reports..." → full sentence |
+| **Rewrite** | Transform text style | "Make this more concise" |
+
+#### Structured Edits
+
+| Edit Type | Command | Result |
+|-----------|---------|--------|
+| **Gender change** | "Change gender to female" | Updates all pronouns |
+| **Terminology** | "Use abbreviations" | HTN, DM, etc. |
+| **Format** | "Convert to bullets" | Restructures as list |
+| **Tone** | "Make patient-friendly" | Simplifies language |
+
+#### Editing Toolbar UI
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│  ▌Selected text: "Patient reports headaches have improved"  │
+├─────────────────────────────────────────────────────────────┤
+│  [🔮 Ask AI] [✨ Improve] [📝 Summarize] [➕ Expand] [🎤 Dictate] │
+│                                                             │
+│  Quick actions: [More concise] [Add details] [Patient-friendly] │
+└─────────────────────────────────────────────────────────────┘
+```
+
+### Provider Control
+
+- Provider must be able to set tone/voice/detail level
+- Control summary style preferences
+- All AI edits require explicit acceptance
+- Undo available for all AI modifications
+
+---
+
+## Transcript Viewer & Traceability
+
+### Full Transcript Viewer
+
+View the complete transcript alongside the generated note for verification.
+
+#### Features
+
+| Feature | Description |
+|---------|-------------|
+| **Side-by-side view** | Transcript and note visible together |
+| **Section highlighting** | Click note section → highlights source transcript |
+| **Timestamp sync** | Navigate by time markers |
+| **Speaker labels** | Clear Dr. / Patient identification |
+| **Search** | Find specific terms in transcript |
+
+#### Traceability Linkage
+
+```
+┌───────────────────────────────────────────────────────────────────────────┐
+│                                                                           │
+│  ┌────────────────────────┐    ┌────────────────────────────────────────┐ │
+│  │     TRANSCRIPT         │    │            GENERATED NOTE              │ │
+│  ├────────────────────────┤    ├────────────────────────────────────────┤ │
+│  │                        │    │                                        │ │
+│  │ [0:05] Patient: "The   │◄──►│ HPI:                                   │ │
+│  │ headaches are better,  │    │ Patient reports improvement in         │ │
+│  │ maybe 3-4 a week now   │    │ headache frequency from daily to       │ │
+│  │ instead of daily."     │    │ 3-4 episodes per week. [📎 0:05]       │ │
+│  │                        │    │                                        │ │
+│  │ [0:18] Patient: "Some  │◄──►│ Side effects: Mild paresthesias        │ │
+│  │ tingling in my fingers │    │ in fingers, well-tolerated.            │ │
+│  │ but it's not too bad." │    │ [📎 0:18]                              │ │
+│  │                        │    │                                        │ │
+│  └────────────────────────┘    └────────────────────────────────────────┘ │
+│                                                                           │
+│  [▶ Play from 0:05]  [Sync to transcript]  [Show all sources]             │
+└───────────────────────────────────────────────────────────────────────────┘
+```
+
+#### Sync Options
+
+- **Live sync:** Transcript scrolls as audio plays
+- **Note-to-transcript:** Click note section to jump to source
+- **Transcript-to-note:** Click transcript to see where it was used
+- **Missing content:** Highlight transcript portions not included
+
+---
+
+## Error Flagging & Gap Detection
+
+### AI-Driven Documentation Alerts
+
+The system proactively identifies missing or incomplete documentation.
+
+#### Alert Types
+
+| Alert Type | Example | Severity |
+|------------|---------|----------|
+| **Missing required element** | "Headache duration not documented" | High |
+| **Incomplete section** | "ROS incomplete - only 3 systems reviewed" | Medium |
+| **Conflicting information** | "Duration stated as both 2 weeks and 1 month" | High |
+| **Missing follow-up** | "No follow-up plan documented" | Medium |
+| **Coding gap** | "Diagnosis mentioned but no ICD-10 selected" | Low |
+
+#### Gap Detection Rules
+
+```
+Gap Detection {
+  hpi_requirements: {
+    headache: ["onset", "location", "duration", "severity", "frequency"]
+    seizure: ["semiology", "duration", "frequency", "last_occurrence", "triggers"]
+  }
+
+  alerts: [
+    {
+      condition: "headache mentioned AND duration missing"
+      message: "Headache duration not recorded"
+      severity: "high"
+      suggestion: "Ask: 'How long do your headaches typically last?'"
+    }
+  ]
+}
+```
+
+#### Alert UI
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│  ⚠️ Documentation Alerts (3)                        [Dismiss All] │
+├─────────────────────────────────────────────────────────────┤
+│                                                             │
+│  🔴 HIGH: Headache duration not documented                  │
+│     Suggestion: Add duration to HPI                         │
+│     [Add Now] [Dismiss] [Not Applicable]                    │
+│                                                             │
+│  🟡 MEDIUM: Follow-up interval not specified                │
+│     Suggestion: Specify return visit timing                 │
+│     [Add Now] [Dismiss]                                     │
+│                                                             │
+│  🟢 LOW: Consider adding MIDAS score                        │
+│     Suggestion: Headache patient without disability score   │
+│     [Add Scale] [Dismiss]                                   │
+│                                                             │
+└─────────────────────────────────────────────────────────────┘
+```
+
+#### Differentiation
+
+The system clearly differentiates:
+- **Required elements** (must address before signing)
+- **Suggested improvements** (optional but recommended)
+- **Informational** (FYI only)
+
+---
+
+## Provider Oversight & Approval
+
+### Draft-Only Model
+
+**All AI-generated content is ALWAYS a draft** until explicitly approved by the provider.
+
+#### Approval Workflow
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                    APPROVAL WORKFLOW                         │
+├─────────────────────────────────────────────────────────────┤
+│                                                             │
+│  1. AI GENERATES DRAFT                                      │
+│     ├─ All content marked as "AI-Generated"                 │
+│     ├─ Confidence scores displayed                          │
+│     └─ Source transcript linked                             │
+│                        ▼                                    │
+│  2. PROVIDER REVIEWS                                        │
+│     ├─ Section-by-section review                            │
+│     ├─ Inline editing enabled                               │
+│     └─ Accept/Reject per section                            │
+│                        ▼                                    │
+│  3. PROVIDER EDITS (optional)                               │
+│     ├─ All edits logged                                     │
+│     ├─ Before/after captured                                │
+│     └─ Edit reason optionally recorded                      │
+│                        ▼                                    │
+│  4. PROVIDER APPROVES                                       │
+│     ├─ Explicit approval action required                    │
+│     ├─ Timestamp and user recorded                          │
+│     └─ Note status changes to "Approved"                    │
+│                        ▼                                    │
+│  5. NOTE FINALIZED                                          │
+│     └─ Locked for editing (standard amendment process)      │
+│                                                             │
+└─────────────────────────────────────────────────────────────┘
+```
+
+#### Audit Trail
+
+| Event | Captured Data |
+|-------|---------------|
+| Draft generated | Timestamp, AI model, confidence scores |
+| Section reviewed | Timestamp, section, reviewer |
+| Edit made | Before text, after text, editor, timestamp |
+| Approval | Timestamp, approver, final content hash |
+
+#### Change Tracking
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│  Edit History - HPI Section                         [Close] │
+├─────────────────────────────────────────────────────────────┤
+│                                                             │
+│  Version 1 (AI Generated) - 2:34 PM                         │
+│  ─────────────────────────────────────────────────────────  │
+│  Patient reports headaches have improved from daily to      │
+│  approximately 3-4 per week.                                │
+│                                                             │
+│  Version 2 (Dr. Smith edited) - 2:36 PM                     │
+│  ─────────────────────────────────────────────────────────  │
+│  Patient reports significant improvement in headache        │
+│  frequency, now occurring 3-4 times weekly compared to      │
+│  daily episodes previously. [+added detail]                 │
+│                                                             │
+│  ✓ Approved by Dr. Smith - 2:38 PM                          │
+│                                                             │
+└─────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## Performance Expectations
+
+### Latency Requirements
+
+| Operation | Target | Maximum |
+|-----------|--------|---------|
+| **Transcription display** | <2 seconds | 5 seconds |
+| **Full note generation** | <2 minutes | 3 minutes |
+| **AI edit response** | <3 seconds | 5 seconds |
+| **Section classification** | Real-time | 2 seconds |
+
+### Accuracy Requirements
+
+| Metric | Target | Minimum Acceptable |
+|--------|--------|-------------------|
+| **Transcription WER** | <5% | <8% |
+| **Medical term accuracy** | >97% | >95% |
+| **Speaker diarization** | >95% | >90% |
+| **Section classification** | >92% | >88% |
+
+### Availability
+
+| Metric | Target |
+|--------|--------|
+| **Uptime** | 99.9% |
+| **Scheduled maintenance** | <4 hours/month, off-peak |
+| **Degraded mode** | Manual transcription fallback available |
+
+---
+
+## Analytics & Continuous Improvement
+
+### Tracked Metrics
+
+#### Usage Metrics
+
+| Metric | Description |
+|--------|-------------|
+| **Sessions per provider** | Daily/weekly AI Scribe usage |
+| **Time saved per visit** | Comparison to baseline documentation time |
+| **Acceptance rate** | % of AI content accepted without edit |
+| **Edit frequency** | How often providers modify AI output |
+| **Section usage** | Which sections use AI most/least |
+
+#### Quality Metrics
+
+| Metric | Description |
+|--------|-------------|
+| **Revision score** | Before/after comparison of AI vs final |
+| **Common corrections** | Most frequently edited content types |
+| **Gap detection hits** | How often alerts are addressed |
+| **Provider feedback** | Explicit ratings and comments |
+
+### Admin Dashboard
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│  AI Scribe Analytics Dashboard                    [Export]  │
+├─────────────────────────────────────────────────────────────┤
+│                                                             │
+│  Overview (Last 30 Days)                                    │
+│  ───────────────────────────────────────────────────────    │
+│  Total Sessions: 1,247    Avg Time Saved: 8.3 min/visit     │
+│  Acceptance Rate: 78%     Provider Satisfaction: 4.2/5      │
+│                                                             │
+│  ┌─────────────────────────────────────────────────────┐   │
+│  │  [Chart: Time Saved Trend]                          │   │
+│  │   12 ┤                    ╭───╮                      │   │
+│  │   10 ┤              ╭─────╯   ╰──╮                   │   │
+│  │    8 ┤         ╭────╯            ╰──────             │   │
+│  │    6 ┤    ╭────╯                                     │   │
+│  │      └────────────────────────────────────────────   │   │
+│  │        Week 1   Week 2   Week 3   Week 4             │   │
+│  └─────────────────────────────────────────────────────┘   │
+│                                                             │
+│  Adoption by Service Line                                   │
+│  ───────────────────────────────────────────────────────    │
+│  Neurology:  ████████████████████░░░░  82%                  │
+│  Psychiatry: ██████████████░░░░░░░░░░  58%                  │
+│  Internal:   ████████░░░░░░░░░░░░░░░░  34%                  │
+│                                                             │
+│  Common Edit Patterns                                       │
+│  ───────────────────────────────────────────────────────    │
+│  1. Adding medication details (23%)                         │
+│  2. Clarifying timeline (18%)                               │
+│  3. Adding negatives (15%)                                  │
+│                                                             │
+└─────────────────────────────────────────────────────────────┘
+```
+
+### Continuous Improvement Loop
+
+1. **Collect** - Gather edit patterns and feedback
+2. **Analyze** - Identify common corrections
+3. **Improve** - Update prompts and models
+4. **Deploy** - Release improvements
+5. **Measure** - Track impact on metrics
+6. **Repeat**
+
+---
+
+## Scalability & Specialties
+
+### Specialty-Specific Instances
+
+Each specialty has its own AI configuration:
+
+| Specialty | Template Set | Terminology | Scales |
+|-----------|--------------|-------------|--------|
+| **Neurology** | Neuro templates | Neuro abbreviations | MIDAS, NIHSS, etc. |
+| **Psychiatry** | Psych templates | DSM terminology | PHQ-9, GAD-7, etc. |
+| **Internal Medicine** | General templates | Standard medical | Various |
+| **Pain Management** | Pain templates | Pain terminology | Pain scales |
+
+### Supported Visit Types
+
+| Visit Type | Support Level |
+|------------|---------------|
+| **In-clinic** | Full support |
+| **Telehealth (video)** | Full support |
+| **Phone visits** | Full support |
+| **Intake/screening** | Full support |
+| **90-minute evaluations** | Full support |
+
+### Multi-Language Support (Phase 3)
+
+| Language | Phase | Notes |
+|----------|-------|-------|
+| English | Phase 1 | Primary |
+| Spanish | Phase 3 | High priority |
+| Mandarin | Phase 3 | Based on demand |
+
+---
+
+## Phase 2+ Features
+
+### Phase 2: Workflow Automation
+
+| Feature | Description |
+|---------|-------------|
+| **Task creation** | "Check labs in 2 weeks" → auto-creates task |
+| **After-visit summary** | Auto-generate patient-facing summary |
+| **Referral generation** | Create referral from visit discussion |
+| **Fax/letter generation** | Generate correspondence from note |
+
+### Phase 2: Coding & Billing Assistant
+
+| Feature | Description |
+|---------|-------------|
+| **ICD-10 suggestions** | Auto-suggest diagnosis codes from note |
+| **E&M level suggestion** | Recommend appropriate E&M based on documentation |
+| **HCC capture** | Identify risk adjustment opportunities |
+| **Code justification** | Show documentation supporting each code |
+
+### Phase 3: Guideline Integration
+
+| Feature | Description |
+|---------|-------------|
+| **Guideline summaries** | "Summarize AAN migraine guidelines" |
+| **Evidence citations** | Insert relevant citations |
+| **Clinical decision support** | Alert when guidelines suggest different approach |
+
+---
+
+## Success Metrics
+
+### Primary Success Metrics
+
+| Metric | Baseline | 6-Month Target |
+|--------|----------|----------------|
+| **Burnout score** | Current | -30% improvement |
+| **Chart closure same-day** | ~60% | >90% |
+| **Documentation time per visit** | 15-20 min | <8 min |
+| **After-hours charting** | 2+ hours/day | <30 min/day |
+
+### Secondary Success Metrics
+
+| Metric | Target |
+|--------|--------|
+| **Provider NPS** | >8 |
+| **Patient satisfaction** | No negative impact |
+| **Coding completeness** | P1 capture of all documented diagnoses |
+| **Note draft completion** | 100% within 48 hours |
+
+### Measurement Approach
+
+1. **Baseline measurement** - 30 days before launch
+2. **Weekly tracking** - During rollout
+3. **Monthly reporting** - Ongoing
+4. **Quarterly review** - Deep-dive analysis
+
+---
+
+## Implementation Notes
+
+### Technical Approach
+
+| Component | Approach |
+|-----------|----------|
+| **Input method** | Chrome plugin preferred; desktop/mobile fallback |
+| **Browser support** | Chrome primary; Safari, Firefox secondary |
+| **Platform integration** | Zoom, video, internal triage platforms |
+| **AI Models** | Off-the-shelf (GPT-4); fine-tuning vs custom TBD |
+| **Frameworks** | Open frameworks only (Whisper, AWS/Azure) |
+| **No proprietary SDK** | Avoid vendor lock-in |
+
+### Deployment Phases
+
+| Phase | Scope | Timeline |
+|-------|-------|----------|
+| **Phase 1** | Neurology only, core features | Initial release |
+| **Phase 2** | Add specialties, workflow automation | +3-6 months |
+| **Phase 3** | Multi-language, guideline integration | +6-12 months |
+
+---
+
+## Open Questions (Resolved)
+
+| Question | Resolution |
+|----------|------------|
+| Priority 1 focus | Documentation quality |
+| Priority 2 focus | Clinical guidance |
+| Consent flagging | Settings at EHR layer (TBD) |
+| External EHR integration | Synapse only (no external) |
+| Login requirements | No separate login (embedded in Synapse) |
+| Coding support | Separate system handles |
+| Template management | Tied to specialty instances (Synapse AI for X) |
 
 ---
 
@@ -818,6 +1426,21 @@ Full transcript (complete)
 ---
 
 ## Changelog
+
+**v1.1 (January 20, 2026)**
+- Expanded based on Ambient AI Feature Scope document
+- Added Customization & Templates section
+- Added Settings Dashboard specifications
+- Added In-Workflow AI Editing with toolbar actions
+- Added Transcript Viewer & Traceability features
+- Added Error Flagging & Gap Detection
+- Added Provider Oversight & Approval workflow
+- Added Performance Expectations
+- Added Analytics & Continuous Improvement dashboard
+- Added Scalability & Specialties section
+- Expanded Phase 2+ Features (coding, workflow automation)
+- Added comprehensive Success Metrics
+- Added Implementation Notes and technical approach
 
 **v1.0 (January 20, 2026)**
 - Initial document creation
