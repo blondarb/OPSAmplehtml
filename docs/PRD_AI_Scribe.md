@@ -1449,7 +1449,7 @@ Earnest RCM is an AI-powered revenue cycle management platform that provides:
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│                    SEVARO → EARNEST RCM                         │
+│                    SEVARO → EARNEST RCM → LOCAL EHR             │
 ├─────────────────────────────────────────────────────────────────┤
 │                                                                 │
 │  SEVARO SUBMITS:                                                │
@@ -1473,7 +1473,14 @@ Earnest RCM is an AI-powered revenue cycle management platform that provides:
 │  │ • Suggested CPT/E&M codes                                │   │
 │  │ • HCC capture opportunities                              │   │
 │  │ • Coding confidence scores                               │   │
-│  │ • Payer-specific guidance                                │   │
+│  └─────────────────────────────────────────────────────────┘   │
+│                              │                                  │
+│                              ▼                                  │
+│  CODES POPULATED TO LOCAL EHR:                                  │
+│  ┌─────────────────────────────────────────────────────────┐   │
+│  │ • Diagnosis codes added to encounter                     │   │
+│  │ • Billing codes added for health system billing          │   │
+│  │ • Sevaro does NOT submit claims                          │   │
 │  └─────────────────────────────────────────────────────────┘   │
 │                                                                 │
 └─────────────────────────────────────────────────────────────────┘
@@ -1484,8 +1491,8 @@ Earnest RCM is an AI-powered revenue cycle management platform that provides:
 1. **Provider completes and approves note** in Sevaro
 2. **Note submitted to Earnest RCM** automatically or on demand
 3. **Earnest RCM reviews** and returns code suggestions
-4. **Coder/provider reviews** suggestions in billing workflow
-5. **Claim submitted** to payer
+4. **Codes added to local EHR** - ICD-10 and CPT codes populated
+5. **Health system handles billing** - Sevaro does not submit claims
 
 #### Security & Compliance
 
