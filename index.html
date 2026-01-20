@@ -2661,6 +2661,252 @@
       height: 14px;
     }
 
+    /* PRD Documentation Button */
+    .docs-btn {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 12px;
+      background: linear-gradient(135deg, #6366F1 0%, #8B5CF6 100%);
+      color: white;
+      border: none;
+      border-radius: 6px;
+      font-size: 12px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .docs-btn:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3);
+    }
+
+    .docs-btn svg {
+      width: 14px;
+      height: 14px;
+    }
+
+    /* PRD Modal Styles */
+    .prd-modal-overlay {
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0, 0, 0, 0.5);
+      z-index: 10000;
+      justify-content: center;
+      align-items: center;
+      backdrop-filter: blur(4px);
+    }
+
+    .prd-modal-overlay.active {
+      display: flex;
+    }
+
+    .prd-modal {
+      background: var(--bg-white);
+      border-radius: 16px;
+      width: 90%;
+      max-width: 700px;
+      max-height: 85vh;
+      overflow: hidden;
+      box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+      animation: modalSlideIn 0.3s ease;
+    }
+
+    @keyframes modalSlideIn {
+      from {
+        opacity: 0;
+        transform: translateY(-20px) scale(0.95);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+      }
+    }
+
+    .prd-modal-header {
+      padding: 24px;
+      background: linear-gradient(135deg, #6366F1 0%, #8B5CF6 100%);
+      color: white;
+    }
+
+    .prd-modal-header h2 {
+      font-size: 20px;
+      font-weight: 600;
+      margin-bottom: 4px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .prd-modal-header p {
+      font-size: 14px;
+      opacity: 0.9;
+    }
+
+    .prd-modal-close {
+      position: absolute;
+      top: 20px;
+      right: 20px;
+      background: rgba(255,255,255,0.2);
+      border: none;
+      color: white;
+      width: 32px;
+      height: 32px;
+      border-radius: 8px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: background 0.2s;
+    }
+
+    .prd-modal-close:hover {
+      background: rgba(255,255,255,0.3);
+    }
+
+    .prd-modal-content {
+      padding: 24px;
+      overflow-y: auto;
+      max-height: calc(85vh - 120px);
+    }
+
+    .prd-category {
+      margin-bottom: 24px;
+    }
+
+    .prd-category:last-child {
+      margin-bottom: 0;
+    }
+
+    .prd-category-title {
+      font-size: 12px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: var(--text-muted);
+      margin-bottom: 12px;
+      padding-bottom: 8px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .prd-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 16px;
+      padding: 16px;
+      background: var(--bg-gray);
+      border-radius: 12px;
+      margin-bottom: 12px;
+      transition: all 0.2s;
+      cursor: pointer;
+      text-decoration: none;
+      color: inherit;
+    }
+
+    .prd-item:hover {
+      background: var(--bg-dark);
+      transform: translateX(4px);
+    }
+
+    .prd-item:last-child {
+      margin-bottom: 0;
+    }
+
+    .prd-item-icon {
+      width: 44px;
+      height: 44px;
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+
+    .prd-item-icon.ai { background: linear-gradient(135deg, #10B981 0%, #059669 100%); }
+    .prd-item-icon.scales { background: linear-gradient(135deg, #F59E0B 0%, #D97706 100%); }
+    .prd-item-icon.docs { background: linear-gradient(135deg, #3B82F6 0%, #2563EB 100%); }
+    .prd-item-icon.edu { background: linear-gradient(135deg, #EC4899 0%, #DB2777 100%); }
+
+    .prd-item-icon svg {
+      width: 22px;
+      height: 22px;
+      color: white;
+    }
+
+    .prd-item-content {
+      flex: 1;
+    }
+
+    .prd-item-title {
+      font-size: 15px;
+      font-weight: 600;
+      color: var(--text-primary);
+      margin-bottom: 4px;
+    }
+
+    .prd-item-desc {
+      font-size: 13px;
+      color: var(--text-secondary);
+      line-height: 1.4;
+    }
+
+    .prd-item-version {
+      font-size: 11px;
+      color: var(--text-muted);
+      margin-top: 6px;
+    }
+
+    .prd-item-arrow {
+      color: var(--text-muted);
+      transition: transform 0.2s;
+    }
+
+    .prd-item:hover .prd-item-arrow {
+      transform: translateX(4px);
+      color: var(--primary);
+    }
+
+    .prd-partners {
+      margin-top: 24px;
+      padding-top: 24px;
+      border-top: 1px solid var(--border);
+    }
+
+    .prd-partners-title {
+      font-size: 12px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: var(--text-muted);
+      margin-bottom: 12px;
+    }
+
+    .prd-partner-badges {
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+
+    .prd-partner-badge {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 14px;
+      background: var(--bg-gray);
+      border-radius: 8px;
+      font-size: 13px;
+      color: var(--text-secondary);
+    }
+
+    .prd-partner-badge strong {
+      color: var(--text-primary);
+    }
+
     /* Document Interaction Styles */
     .doc-interaction-section {
       margin-bottom: 16px;
@@ -3162,6 +3408,13 @@
             <path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z"/>
           </svg>
         </div>
+        <!-- PRD Documentation Button -->
+        <button class="docs-btn" onclick="openPrdModal()" title="View Product Documentation">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><path d="M14 2v6h6"/><path d="M16 13H8"/><path d="M16 17H8"/><path d="M10 9H8"/>
+          </svg>
+          PRDs
+        </button>
         <!-- Guided Tour Button -->
         <button class="tour-start-btn" onclick="startTour()" title="Take a Tour">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -5153,6 +5406,159 @@ Electronically signed by: Dr. Steve Arbogast
     </div>
   </div>
 
+  <!-- PRD Documentation Modal -->
+  <div class="prd-modal-overlay" id="prd-modal-overlay" onclick="closePrdModal(event)">
+    <div class="prd-modal" onclick="event.stopPropagation()">
+      <div class="prd-modal-header" style="position: relative;">
+        <h2>
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><path d="M14 2v6h6"/><path d="M16 13H8"/><path d="M16 17H8"/><path d="M10 9H8"/>
+          </svg>
+          Product Documentation
+        </h2>
+        <p>Detailed PRDs for Sevaro Outpatient features</p>
+        <button class="prd-modal-close" onclick="closePrdModal()">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+          </svg>
+        </button>
+      </div>
+      <div class="prd-modal-content">
+        <div class="prd-category">
+          <div class="prd-category-title">AI-Powered Features</div>
+
+          <a href="https://github.com/blondarb/OPSAmplehtml/blob/claude/review-ehr-features-prd-NOT9z/docs/PRD_AI_Scribe.md" target="_blank" class="prd-item">
+            <div class="prd-item-icon ai">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M12 1a3 3 0 00-3 3v8a3 3 0 006 0V4a3 3 0 00-3-3z"/><path d="M19 10v2a7 7 0 01-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/>
+              </svg>
+            </div>
+            <div class="prd-item-content">
+              <div class="prd-item-title">AI Scribe</div>
+              <div class="prd-item-desc">Ambient transcription and clinical note generation from provider-patient conversations</div>
+              <div class="prd-item-version">v1.2 • Includes Vera Health & Earnest RCM integrations</div>
+            </div>
+            <div class="prd-item-arrow">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M5 12h14M12 5l7 7-7 7"/>
+              </svg>
+            </div>
+          </a>
+
+          <a href="https://github.com/blondarb/OPSAmplehtml/blob/claude/review-ehr-features-prd-NOT9z/docs/PRD_AI_Researcher.md" target="_blank" class="prd-item">
+            <div class="prd-item-icon ai">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/>
+              </svg>
+            </div>
+            <div class="prd-item-content">
+              <div class="prd-item-title">AI Researcher</div>
+              <div class="prd-item-desc">Evidence-based clinical decision support powered by Vera Health (60M+ papers)</div>
+              <div class="prd-item-version">v1.0 • CME credit tracking included</div>
+            </div>
+            <div class="prd-item-arrow">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M5 12h14M12 5l7 7-7 7"/>
+              </svg>
+            </div>
+          </a>
+
+          <a href="https://github.com/blondarb/OPSAmplehtml/blob/claude/review-ehr-features-prd-NOT9z/docs/PRD_AI_Summarizer.md" target="_blank" class="prd-item">
+            <div class="prd-item-icon ai">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><path d="M14 2v6h6"/><path d="M16 13H8"/><path d="M16 17H8"/>
+              </svg>
+            </div>
+            <div class="prd-item-content">
+              <div class="prd-item-title">AI Summarizer</div>
+              <div class="prd-item-desc">Chart prep, note summaries, lab trends, medication history, and timeline synthesis</div>
+              <div class="prd-item-version">v1.0 • 6 summary types</div>
+            </div>
+            <div class="prd-item-arrow">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M5 12h14M12 5l7 7-7 7"/>
+              </svg>
+            </div>
+          </a>
+        </div>
+
+        <div class="prd-category">
+          <div class="prd-category-title">Clinical Tools</div>
+
+          <a href="https://github.com/blondarb/OPSAmplehtml/blob/claude/review-ehr-features-prd-NOT9z/docs/PRD_Neurology_Scales.md" target="_blank" class="prd-item">
+            <div class="prd-item-icon scales">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M3 3v18h18"/><path d="M18 17l-5-5-4 4-3-3"/>
+              </svg>
+            </div>
+            <div class="prd-item-content">
+              <div class="prd-item-title">Neurology Clinical Scales</div>
+              <div class="prd-item-desc">40+ scales with scoring, interpretation, and trending (MIDAS, NIHSS, MoCA, PHQ-9, etc.)</div>
+              <div class="prd-item-version">v1.1 • Outpatient + Inpatient scales</div>
+            </div>
+            <div class="prd-item-arrow">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M5 12h14M12 5l7 7-7 7"/>
+              </svg>
+            </div>
+          </a>
+
+          <a href="https://github.com/blondarb/OPSAmplehtml/blob/claude/review-ehr-features-prd-NOT9z/docs/PRD_Dot_Phrases.md" target="_blank" class="prd-item">
+            <div class="prd-item-icon docs">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/>
+              </svg>
+            </div>
+            <div class="prd-item-content">
+              <div class="prd-item-title">Dot Phrases / Auto Text</div>
+              <div class="prd-item-desc">Text expansion with 50+ neurology templates (.neuroexam, .migraine, .hpi, etc.)</div>
+              <div class="prd-item-version">v1.0 • Provider-customizable library</div>
+            </div>
+            <div class="prd-item-arrow">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M5 12h14M12 5l7 7-7 7"/>
+              </svg>
+            </div>
+          </a>
+        </div>
+
+        <div class="prd-category">
+          <div class="prd-category-title">Patient Engagement</div>
+
+          <a href="https://github.com/blondarb/OPSAmplehtml/blob/claude/review-ehr-features-prd-NOT9z/docs/PRD_Patient_Education.md" target="_blank" class="prd-item">
+            <div class="prd-item-icon edu">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M2 3h6a4 4 0 014 4v14a3 3 0 00-3-3H2z"/><path d="M22 3h-6a4 4 0 00-4 4v14a3 3 0 013-3h7z"/>
+              </svg>
+            </div>
+            <div class="prd-item-content">
+              <div class="prd-item-title">Patient Education & Handouts</div>
+              <div class="prd-item-desc">AI-generated personalized patient materials with reading level adjustment</div>
+              <div class="prd-item-version">v1.0 • Multilingual support</div>
+            </div>
+            <div class="prd-item-arrow">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M5 12h14M12 5l7 7-7 7"/>
+              </svg>
+            </div>
+          </a>
+        </div>
+
+        <div class="prd-partners">
+          <div class="prd-partners-title">External Integration Partners</div>
+          <div class="prd-partner-badges">
+            <div class="prd-partner-badge">
+              <strong>Vera Health</strong> Clinical Decision Support
+            </div>
+            <div class="prd-partner-badge">
+              <strong>Earnest RCM</strong> Coding & Billing
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- Guided Tour Overlay and Tooltip -->
   <div class="tour-overlay" id="tour-overlay"></div>
   <div class="tour-tooltip" id="tour-tooltip">
@@ -6665,6 +7071,28 @@ Electronically signed by: Dr. Steve Arbogast
         position: 'center'
       }
     ];
+
+    // PRD Documentation Modal Functions
+    function openPrdModal() {
+      document.getElementById('prd-modal-overlay').classList.add('active');
+      document.body.style.overflow = 'hidden';
+    }
+
+    function closePrdModal(event) {
+      if (event && event.target !== event.currentTarget) return;
+      document.getElementById('prd-modal-overlay').classList.remove('active');
+      document.body.style.overflow = '';
+    }
+
+    // Close PRD modal on Escape key
+    document.addEventListener('keydown', function(e) {
+      if (e.key === 'Escape') {
+        const modal = document.getElementById('prd-modal-overlay');
+        if (modal.classList.contains('active')) {
+          closePrdModal();
+        }
+      }
+    });
 
     let currentTourStep = 0;
     let previousHighlight = null;
