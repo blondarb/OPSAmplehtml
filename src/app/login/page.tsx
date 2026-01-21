@@ -16,12 +16,13 @@ function LoginForm() {
   const searchParams = useSearchParams()
   const redirectTo = searchParams.get('redirectTo') || '/dashboard'
 
-  const supabase = createClient()
-
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
     setLoading(true)
     setError(null)
+
+    // Create client only when needed (not during static generation)
+    const supabase = createClient()
 
     const { error } = await supabase.auth.signInWithPassword({
       email,
@@ -45,6 +46,9 @@ function LoginForm() {
 
     setLoading(true)
     setError(null)
+
+    // Create client only when needed
+    const supabase = createClient()
 
     const { error } = await supabase.auth.signInWithOtp({
       email,
