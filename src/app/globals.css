@@ -1,4 +1,6 @@
-@import "tailwindcss";
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
 
 :root {
   /* Sevaro Color System */
@@ -18,14 +20,6 @@
 
   --background: var(--bg-gray);
   --foreground: var(--text-primary);
-}
-
-@theme inline {
-  --color-primary: var(--primary);
-  --color-primary-light: var(--primary-light);
-  --color-primary-dark: var(--primary-dark);
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
 }
 
 /* Dark mode support */
