@@ -1,7 +1,6 @@
 'use client'
 
 import { useState } from 'react'
-import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 
@@ -32,58 +31,47 @@ export default function SignupPage() {
       return
     }
 
-    // Create client only when needed (not during static generation)
-    const supabase = createClient()
-
-    const { data, error } = await supabase.auth.signUp({
-      email,
-      password,
-      options: {
-        emailRedirectTo: `${window.location.origin}/auth/callback`,
-      },
-    })
-
-    if (error) {
-      setError(error.message)
-      setLoading(false)
-    } else if (data.user && !data.session) {
-      // Email confirmation required
-      setMessage('Check your email to confirm your account!')
-      setLoading(false)
-    } else {
-      // Auto-confirmed (if email confirmation is disabled)
-      // Seed demo data for new user
-      if (data.user) {
-        await seedDemoData(supabase, data.user.id)
-      }
-      router.push('/dashboard')
-      router.refresh()
-    }
-  }
-
-  const seedDemoData = async (supabase: ReturnType<typeof createClient>, userId: string) => {
     try {
-      const { error } = await supabase.rpc('seed_demo_data', { user_uuid: userId })
+      // Dynamically import to avoid build-time issues
+      const { createClient } = await import('@/lib/supabase/client')
+      const supabase = createClient()
+
+      const { data, error } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          emailRedirectTo: `${window.location.origin}/auth/callback`,
+        },
+      })
+
       if (error) {
-        console.error('Error seeding demo data:', error)
+        setError(error.message)
+        setLoading(false)
+      } else if (data.user && !data.session) {
+        setMessage('Check your email to confirm your account!')
+        setLoading(false)
+      } else {
+        router.push('/dashboard')
+        router.refresh()
       }
     } catch (err) {
-      console.error('Error seeding demo data:', err)
+      setError('An error occurred. Please try again.')
+      setLoading(false)
     }
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center" style={{ background: 'var(--bg-gray)' }}>
-      <div className="w-full max-w-md p-8 rounded-xl shadow-lg" style={{ background: 'var(--bg-white)' }}>
+    <div className="min-h-screen flex items-center justify-center" style={{ background: '#F9FAFB' }}>
+      <div className="w-full max-w-md p-8 rounded-xl shadow-lg" style={{ background: '#FFFFFF' }}>
         {/* Logo */}
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-12 h-12 rounded-lg mb-4" style={{ background: 'var(--primary)' }}>
+          <div className="inline-flex items-center justify-center w-12 h-12 rounded-lg mb-4" style={{ background: '#0D9488' }}>
             <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2">
               <path d="M22 12h-4l-3 9L9 3l-3 9H2"/>
             </svg>
           </div>
-          <h1 className="text-2xl font-bold" style={{ color: 'var(--text-primary)' }}>Create Account</h1>
-          <p className="mt-2" style={{ color: 'var(--text-secondary)' }}>Start your free trial of Sevaro Clinical</p>
+          <h1 className="text-2xl font-bold" style={{ color: '#111827' }}>Create Account</h1>
+          <p className="mt-2" style={{ color: '#6B7280' }}>Start your free trial of Sevaro Clinical</p>
         </div>
 
         {/* Error/Message display */}
@@ -101,7 +89,7 @@ export default function SignupPage() {
         {/* Signup Form */}
         <form onSubmit={handleSignup}>
           <div className="mb-4">
-            <label className="block text-sm font-medium mb-2" style={{ color: 'var(--text-secondary)' }}>
+            <label className="block text-sm font-medium mb-2" style={{ color: '#6B7280' }}>
               Email
             </label>
             <input
@@ -110,9 +98,9 @@ export default function SignupPage() {
               onChange={(e) => setEmail(e.target.value)}
               className="w-full px-4 py-3 rounded-lg border transition-colors"
               style={{
-                borderColor: 'var(--border)',
-                background: 'var(--bg-white)',
-                color: 'var(--text-primary)',
+                borderColor: '#E5E7EB',
+                background: '#FFFFFF',
+                color: '#111827',
               }}
               placeholder="you@example.com"
               required
@@ -120,7 +108,7 @@ export default function SignupPage() {
           </div>
 
           <div className="mb-4">
-            <label className="block text-sm font-medium mb-2" style={{ color: 'var(--text-secondary)' }}>
+            <label className="block text-sm font-medium mb-2" style={{ color: '#6B7280' }}>
               Password
             </label>
             <input
@@ -129,9 +117,9 @@ export default function SignupPage() {
               onChange={(e) => setPassword(e.target.value)}
               className="w-full px-4 py-3 rounded-lg border transition-colors"
               style={{
-                borderColor: 'var(--border)',
-                background: 'var(--bg-white)',
-                color: 'var(--text-primary)',
+                borderColor: '#E5E7EB',
+                background: '#FFFFFF',
+                color: '#111827',
               }}
               placeholder="••••••••"
               required
@@ -139,7 +127,7 @@ export default function SignupPage() {
           </div>
 
           <div className="mb-6">
-            <label className="block text-sm font-medium mb-2" style={{ color: 'var(--text-secondary)' }}>
+            <label className="block text-sm font-medium mb-2" style={{ color: '#6B7280' }}>
               Confirm Password
             </label>
             <input
@@ -148,9 +136,9 @@ export default function SignupPage() {
               onChange={(e) => setConfirmPassword(e.target.value)}
               className="w-full px-4 py-3 rounded-lg border transition-colors"
               style={{
-                borderColor: 'var(--border)',
-                background: 'var(--bg-white)',
-                color: 'var(--text-primary)',
+                borderColor: '#E5E7EB',
+                background: '#FFFFFF',
+                color: '#111827',
               }}
               placeholder="••••••••"
               required
@@ -161,27 +149,16 @@ export default function SignupPage() {
             type="submit"
             disabled={loading}
             className="w-full py-3 rounded-lg font-medium text-white transition-colors disabled:opacity-50"
-            style={{ background: 'var(--primary)' }}
+            style={{ background: '#0D9488' }}
           >
             {loading ? 'Creating account...' : 'Create Account'}
           </button>
         </form>
 
-        {/* Features */}
-        <div className="mt-6 p-4 rounded-lg" style={{ background: 'var(--bg-gray)' }}>
-          <p className="text-sm font-medium mb-2" style={{ color: 'var(--text-primary)' }}>Demo includes:</p>
-          <ul className="text-sm space-y-1" style={{ color: 'var(--text-secondary)' }}>
-            <li>- AI-powered clinical documentation</li>
-            <li>- Voice dictation</li>
-            <li>- Clinical scales (MIDAS, HIT-6, PHQ-9)</li>
-            <li>- Sample patient data</li>
-          </ul>
-        </div>
-
         {/* Sign in link */}
-        <p className="mt-6 text-center text-sm" style={{ color: 'var(--text-secondary)' }}>
+        <p className="mt-6 text-center text-sm" style={{ color: '#6B7280' }}>
           Already have an account?{' '}
-          <Link href="/login" className="font-medium" style={{ color: 'var(--primary)' }}>
+          <Link href="/login" className="font-medium" style={{ color: '#0D9488' }}>
             Sign in
           </Link>
         </p>
