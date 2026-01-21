@@ -1,36 +1,90 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Sevaro Clinical
+
+AI-powered clinical documentation platform for neurology outpatient practices.
+
+## Features
+
+- **Clinical Notes**: SOAP-format documentation with AI assistance
+- **AI Features**: Ask AI, Chart Prep, voice dictation
+- **Clinical Scales**: MIDAS, HIT-6, PHQ-9, GAD-7, and more
+- **Patient Management**: Demographics, visits, imaging studies
+- **Secure Authentication**: Email/password and magic link login
+
+## Tech Stack
+
+- [Next.js 15](https://nextjs.org/) - React framework
+- [Supabase](https://supabase.com/) - Database & authentication
+- [OpenAI](https://openai.com/) - AI capabilities
+- [Tailwind CSS](https://tailwindcss.com/) - Styling
+- [Vercel](https://vercel.com/) - Deployment
 
 ## Getting Started
 
-First, run the development server:
+### Prerequisites
 
+- Node.js 18+
+- Supabase account
+- OpenAI API key
+
+### Setup
+
+1. Clone the repository:
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+git clone https://github.com/blondarb/OPSAmplehtml.git
+cd OPSAmplehtml
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+2. Install dependencies:
+```bash
+npm install
+```
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+3. Create `.env.local` with your Supabase credentials:
+```
+NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
+```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+4. Set up the database:
+   - Go to Supabase SQL Editor
+   - Run `supabase/migrations/001_initial_schema.sql`
+   - Run `supabase/migrations/002_seed_demo_data.sql`
 
-## Learn More
+5. Add your OpenAI API key:
+   - In Supabase Table Editor, go to `app_settings`
+   - Insert row with `key: 'openai_api_key'`, `value: 'sk-your-key'`
 
-To learn more about Next.js, take a look at the following resources:
+6. Start the development server:
+```bash
+npm run dev
+```
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+Open [http://localhost:3000](http://localhost:3000) to view the app.
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## Project Structure
 
-## Deploy on Vercel
+```
+src/
+├── app/                # Next.js pages and API routes
+├── components/         # React components
+├── lib/               # Utilities and Supabase clients
+└── middleware.ts      # Auth middleware
+```
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+## Documentation
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+- [CLAUDE.md](./CLAUDE.md) - Development guide for AI assistants
+- [docs/](./docs/) - Product requirements documents
+- [FIGMA_MAKE_PROMPTS.md](./FIGMA_MAKE_PROMPTS.md) - UI design specifications
+
+## Deployment
+
+Deploy to Vercel:
+
+1. Connect your GitHub repository to Vercel
+2. Add environment variables in Vercel project settings
+3. Deploy
+
+## License
+
+Proprietary - All rights reserved.
