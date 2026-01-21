@@ -1,0 +1,108 @@
+@import "tailwindcss";
+
+:root {
+  /* Sevaro Color System */
+  --primary: #0D9488;
+  --primary-light: #14B8A6;
+  --primary-dark: #0F766E;
+  --bg-white: #FFFFFF;
+  --bg-gray: #F9FAFB;
+  --bg-dark: #F3F4F6;
+  --text-primary: #111827;
+  --text-secondary: #6B7280;
+  --text-muted: #9CA3AF;
+  --border: #E5E7EB;
+  --error: #EF4444;
+  --success: #10B981;
+  --warning: #F59E0B;
+
+  --background: var(--bg-gray);
+  --foreground: var(--text-primary);
+}
+
+@theme inline {
+  --color-primary: var(--primary);
+  --color-primary-light: var(--primary-light);
+  --color-primary-dark: var(--primary-dark);
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+}
+
+/* Dark mode support */
+[data-theme="dark"] {
+  --primary: #14B8A6;
+  --primary-light: #2DD4BF;
+  --primary-dark: #0D9488;
+  --bg-white: #1F2937;
+  --bg-gray: #111827;
+  --bg-dark: #0F172A;
+  --text-primary: #F9FAFB;
+  --text-secondary: #D1D5DB;
+  --text-muted: #9CA3AF;
+  --border: #374151;
+  --error: #F87171;
+  --success: #34D399;
+  --warning: #FBBF24;
+
+  --background: var(--bg-gray);
+  --foreground: var(--text-primary);
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--bg-gray);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--text-muted);
+}
+
+/* Focus styles */
+*:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+
+/* Form elements */
+input, textarea, select {
+  font-family: inherit;
+  font-size: inherit;
+}
+
+button {
+  font-family: inherit;
+  cursor: pointer;
+}
+
+a {
+  color: var(--primary);
+  text-decoration: none;
+}
+
+a:hover {
+  text-decoration: underline;
+}
