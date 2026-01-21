@@ -55,7 +55,9 @@ export default function SignupPage() {
         router.refresh()
       }
     } catch (err) {
-      setError('An error occurred. Please try again.')
+      console.error('Signup error:', err)
+      const errorMessage = err instanceof Error ? err.message : 'An error occurred. Please try again.'
+      setError(errorMessage)
       setLoading(false)
     }
   }
