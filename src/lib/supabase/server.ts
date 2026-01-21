@@ -10,8 +10,8 @@ export async function createClient() {
   // Handle missing env vars during build
   if (!supabaseUrl || !supabaseAnonKey) {
     return createServerClient(
-      'https://placeholder.supabase.co',
-      'placeholder-key',
+      'https://xxxxxxxxxxxxxxxxxxxx.supabase.co',
+      'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBsYWNlaG9sZGVyIiwicm9sZSI6ImFub24iLCJpYXQiOjE2NDAwMDAwMDAsImV4cCI6MTk1NjAwMDAwMH0.placeholder',
       {
         cookies: {
           getAll() {
