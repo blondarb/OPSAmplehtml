@@ -14,7 +14,6 @@ export default function SignupPage() {
   const [message, setMessage] = useState<string | null>(null)
 
   const router = useRouter()
-  const supabase = createClient()
 
   const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -32,6 +31,9 @@ export default function SignupPage() {
       setLoading(false)
       return
     }
+
+    // Create client only when needed (not during static generation)
+    const supabase = createClient()
 
     const { data, error } = await supabase.auth.signUp({
       email,
@@ -52,14 +54,14 @@ export default function SignupPage() {
       // Auto-confirmed (if email confirmation is disabled)
       // Seed demo data for new user
       if (data.user) {
-        await seedDemoData(data.user.id)
+        await seedDemoData(supabase, data.user.id)
       }
       router.push('/dashboard')
       router.refresh()
     }
   }
 
-  const seedDemoData = async (userId: string) => {
+  const seedDemoData = async (supabase: ReturnType<typeof createClient>, userId: string) => {
     try {
       const { error } = await supabase.rpc('seed_demo_data', { user_uuid: userId })
       if (error) {
