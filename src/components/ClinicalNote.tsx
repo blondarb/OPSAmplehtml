@@ -150,6 +150,7 @@ export default function ClinicalNote({
           patient={patient}
           noteData={noteData}
           updateNote={updateNote}
+          activeTextField={activeTextField}
         />
       )}
 

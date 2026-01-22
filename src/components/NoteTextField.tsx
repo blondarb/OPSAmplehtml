@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect, useCallback } from 'react'
 import InlinePhrasePicker from './InlinePhrasePicker'
+import { useVoiceRecorder } from '@/hooks/useVoiceRecorder'
 
 interface Phrase {
   id: string
@@ -40,6 +41,50 @@ export default function NoteTextField({
   const containerRef = useRef<HTMLDivElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const lastExpandedRef = useRef<string>('')
+
+  // Voice recording hook
+  const {
+    isRecording,
+    isTranscribing,
+    error: recordingError,
+    transcribedText,
+    startRecording,
+    stopRecording,
+    clearTranscription,
+  } = useVoiceRecorder()
+
+  // Insert transcribed text when available
+  useEffect(() => {
+    if (transcribedText) {
+      const textarea = textareaRef.current
+      if (textarea) {
+        const start = textarea.selectionStart
+        const end = textarea.selectionEnd
+        const newValue = value.substring(0, start) + transcribedText + value.substring(end)
+        onChange(newValue)
+
+        // Set cursor position after inserted text
+        setTimeout(() => {
+          textarea.focus()
+          const newPos = start + transcribedText.length
+          textarea.setSelectionRange(newPos, newPos)
+        }, 0)
+      } else {
+        // Fallback: append to end
+        onChange(value + transcribedText)
+      }
+      clearTranscription()
+    }
+  }, [transcribedText, value, onChange, clearTranscription])
+
+  // Handle dictation button click
+  const handleDictateClick = () => {
+    if (isRecording) {
+      stopRecording()
+    } else {
+      startRecording()
+    }
+  }
 
   // Fetch phrases for auto-expansion
   useEffect(() => {
@@ -200,24 +245,33 @@ export default function NoteTextField({
         }}>
           {showDictate && (
             <button
-              onClick={onOpenAiDrawer}
+              onClick={handleDictateClick}
+              disabled={isTranscribing}
               style={{
                 width: '28px',
                 height: '28px',
                 borderRadius: '6px',
-                border: '1px solid var(--border)',
-                background: 'var(--bg-white)',
-                cursor: 'pointer',
+                border: isRecording ? 'none' : '1px solid var(--border)',
+                background: isRecording ? 'var(--error)' : isTranscribing ? 'var(--bg-gray)' : 'var(--bg-white)',
+                cursor: isTranscribing ? 'wait' : 'pointer',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                color: 'var(--text-muted)',
+                color: isRecording ? 'white' : 'var(--text-muted)',
+                animation: isRecording ? 'pulse 1s infinite' : 'none',
+                position: 'relative',
               }}
-              title="Dictate"
+              title={isRecording ? 'Stop Recording' : isTranscribing ? 'Transcribing...' : recordingError || 'Dictate'}
             >
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <path d="M12 1a3 3 0 00-3 3v8a3 3 0 006 0V4a3 3 0 00-3-3z"/><path d="M19 10v2a7 7 0 01-14 0v-2"/>
-              </svg>
+              {isTranscribing ? (
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ animation: 'spin 1s linear infinite' }}>
+                  <circle cx="12" cy="12" r="10" strokeDasharray="32" strokeDashoffset="12" />
+                </svg>
+              ) : (
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M12 1a3 3 0 00-3 3v8a3 3 0 006 0V4a3 3 0 00-3-3z"/><path d="M19 10v2a7 7 0 01-14 0v-2"/>
+                </svg>
+              )}
             </button>
           )}
           <button
@@ -274,6 +328,16 @@ export default function NoteTextField({
           />
         )}
       </div>
+      <style jsx>{`
+        @keyframes pulse {
+          0%, 100% { opacity: 1; transform: scale(1); }
+          50% { opacity: 0.8; transform: scale(1.05); }
+        }
+        @keyframes spin {
+          from { transform: rotate(0deg); }
+          to { transform: rotate(360deg); }
+        }
+      `}</style>
     </div>
   )
 }

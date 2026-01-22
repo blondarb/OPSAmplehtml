@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { useVoiceRecorder } from '@/hooks/useVoiceRecorder'
 
 interface AiDrawerProps {
   isOpen: boolean
@@ -10,6 +11,7 @@ interface AiDrawerProps {
   patient: any
   noteData: any
   updateNote: (field: string, value: any) => void
+  activeTextField?: string | null
 }
 
 export default function AiDrawer({
@@ -20,10 +22,41 @@ export default function AiDrawer({
   patient,
   noteData,
   updateNote,
+  activeTextField,
 }: AiDrawerProps) {
   const [question, setQuestion] = useState('')
   const [aiResponse, setAiResponse] = useState('')
   const [loading, setLoading] = useState(false)
+  const [selectedInsertField, setSelectedInsertField] = useState<string>('hpi')
+
+  // Voice recording for Document tab
+  const {
+    isRecording,
+    isTranscribing,
+    error: recordingError,
+    transcribedText,
+    recordingDuration,
+    startRecording,
+    stopRecording,
+    clearTranscription,
+  } = useVoiceRecorder()
+
+  // Format duration as MM:SS
+  const formatDuration = (seconds: number) => {
+    const mins = Math.floor(seconds / 60)
+    const secs = seconds % 60
+    return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`
+  }
+
+  // Insert transcribed text into selected field
+  const insertTranscription = (field: string) => {
+    if (transcribedText) {
+      const currentValue = noteData[field] || ''
+      const newValue = currentValue ? `${currentValue} ${transcribedText}` : transcribedText
+      updateNote(field, newValue)
+      clearTranscription()
+    }
+  }
 
   const tabs = [
     { id: 'chart-prep', label: 'Chart Prep' },
@@ -240,37 +273,199 @@ export default function AiDrawer({
           {/* Document Tab */}
           {activeTab === 'document' && (
             <div>
+              <p style={{ marginBottom: '16px', color: 'var(--text-secondary)', fontSize: '13px' }}>
+                Record your voice and AI will transcribe it using Whisper.
+              </p>
+
+              {/* Recording UI */}
+              <div style={{
+                background: isRecording ? 'linear-gradient(135deg, #FEE2E2 0%, #FECACA 100%)' : 'var(--bg-gray)',
+                borderRadius: '8px',
+                padding: '24px',
+                textAlign: 'center',
+                marginBottom: '16px',
+                border: isRecording ? '2px solid var(--error)' : '1px solid var(--border)',
+              }}>
+                <button
+                  onClick={isRecording ? stopRecording : startRecording}
+                  disabled={isTranscribing}
+                  style={{
+                    width: '80px',
+                    height: '80px',
+                    borderRadius: '50%',
+                    background: isRecording ? 'var(--error)' : isTranscribing ? 'var(--bg-gray)' : 'var(--primary)',
+                    border: 'none',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    margin: '0 auto 16px',
+                    cursor: isTranscribing ? 'wait' : 'pointer',
+                    animation: isRecording ? 'pulse 1.5s infinite' : 'none',
+                    boxShadow: isRecording ? '0 0 0 8px rgba(239, 68, 68, 0.2)' : 'none',
+                  }}
+                >
+                  {isTranscribing ? (
+                    <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" style={{ animation: 'spin 1s linear infinite' }}>
+                      <circle cx="12" cy="12" r="10" strokeDasharray="32" strokeDashoffset="12" />
+                    </svg>
+                  ) : isRecording ? (
+                    <svg width="32" height="32" viewBox="0 0 24 24" fill="white">
+                      <rect x="6" y="6" width="12" height="12" rx="2" />
+                    </svg>
+                  ) : (
+                    <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2">
+                      <path d="M12 1a3 3 0 00-3 3v8a3 3 0 006 0V4a3 3 0 00-3-3z"/><path d="M19 10v2a7 7 0 01-14 0v-2"/>
+                    </svg>
+                  )}
+                </button>
+
+                {isRecording && (
+                  <div style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '8px',
+                    marginBottom: '8px',
+                  }}>
+                    <span style={{
+                      width: '8px',
+                      height: '8px',
+                      borderRadius: '50%',
+                      background: 'var(--error)',
+                      animation: 'pulse 1s infinite',
+                    }} />
+                    <span style={{ fontWeight: 600, color: 'var(--error)', fontSize: '18px' }}>
+                      {formatDuration(recordingDuration)}
+                    </span>
+                  </div>
+                )}
+
+                <p style={{ fontWeight: 500, color: 'var(--text-primary)', marginBottom: '4px' }}>
+                  {isTranscribing ? 'Transcribing...' : isRecording ? 'Recording... Click to Stop' : 'Click to Start Recording'}
+                </p>
+                <p style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
+                  {isRecording ? 'Speak clearly into your microphone' : 'AI will transcribe your speech using Whisper'}
+                </p>
+              </div>
+
+              {/* Error message */}
+              {recordingError && (
+                <div style={{
+                  background: '#FEF2F2',
+                  border: '1px solid #FECACA',
+                  borderRadius: '8px',
+                  padding: '12px',
+                  marginBottom: '16px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                }}>
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#DC2626" strokeWidth="2">
+                    <circle cx="12" cy="12" r="10"/><path d="M12 8v4M12 16h.01"/>
+                  </svg>
+                  <span style={{ fontSize: '13px', color: '#DC2626' }}>{recordingError}</span>
+                </div>
+              )}
+
+              {/* Transcribed text */}
+              {transcribedText && (
+                <div style={{
+                  background: 'linear-gradient(135deg, #F0FDFA 0%, #ECFDF5 100%)',
+                  border: '1px solid #A7F3D0',
+                  borderRadius: '8px',
+                  padding: '16px',
+                  marginBottom: '16px',
+                }}>
+                  <div style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                    marginBottom: '12px',
+                  }}>
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#059669" strokeWidth="2">
+                      <path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><path d="M22 4L12 14.01l-3-3"/>
+                    </svg>
+                    <span style={{ fontWeight: 500, color: '#059669', fontSize: '13px' }}>Transcription Complete</span>
+                  </div>
+                  <p style={{ fontSize: '14px', color: 'var(--text-primary)', marginBottom: '16px', lineHeight: 1.5 }}>
+                    {transcribedText}
+                  </p>
+
+                  {/* Insert options */}
+                  <div style={{ marginBottom: '12px' }}>
+                    <label style={{ fontSize: '12px', color: 'var(--text-muted)', marginBottom: '6px', display: 'block' }}>
+                      Insert into:
+                    </label>
+                    <select
+                      value={selectedInsertField}
+                      onChange={(e) => setSelectedInsertField(e.target.value)}
+                      style={{
+                        width: '100%',
+                        padding: '8px 12px',
+                        border: '1px solid var(--border)',
+                        borderRadius: '6px',
+                        fontSize: '13px',
+                        marginBottom: '8px',
+                      }}
+                    >
+                      <option value="hpi">HPI (History of Present Illness)</option>
+                      <option value="assessment">Assessment</option>
+                      <option value="plan">Plan</option>
+                      <option value="ros">Review of Systems</option>
+                    </select>
+                  </div>
+
+                  <div style={{ display: 'flex', gap: '8px' }}>
+                    <button
+                      onClick={() => insertTranscription(selectedInsertField)}
+                      style={{
+                        flex: 1,
+                        padding: '10px 16px',
+                        background: 'var(--primary)',
+                        color: 'white',
+                        border: 'none',
+                        borderRadius: '6px',
+                        fontWeight: 500,
+                        cursor: 'pointer',
+                        fontSize: '13px',
+                      }}
+                    >
+                      Insert Text
+                    </button>
+                    <button
+                      onClick={clearTranscription}
+                      style={{
+                        padding: '10px 16px',
+                        background: 'var(--bg-white)',
+                        color: 'var(--text-secondary)',
+                        border: '1px solid var(--border)',
+                        borderRadius: '6px',
+                        fontWeight: 500,
+                        cursor: 'pointer',
+                        fontSize: '13px',
+                      }}
+                    >
+                      Discard
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* Tips */}
               <div style={{
                 background: 'var(--bg-gray)',
                 borderRadius: '8px',
-                padding: '20px',
-                textAlign: 'center',
-                marginBottom: '16px',
+                padding: '12px',
               }}>
-                <div style={{
-                  width: '60px',
-                  height: '60px',
-                  borderRadius: '50%',
-                  background: 'var(--error)',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  margin: '0 auto 12px',
-                }}>
-                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2">
-                    <path d="M12 1a3 3 0 00-3 3v8a3 3 0 006 0V4a3 3 0 00-3-3z"/><path d="M19 10v2a7 7 0 01-14 0v-2"/>
-                  </svg>
-                </div>
-                <p style={{ fontWeight: 500, color: 'var(--text-primary)', marginBottom: '4px' }}>
-                  Click to Start Recording
+                <p style={{ fontSize: '12px', fontWeight: 500, color: 'var(--text-secondary)', marginBottom: '8px' }}>
+                  Tips for best results:
                 </p>
-                <p style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
-                  AI will transcribe and document your visit in real-time
-                </p>
+                <ul style={{ fontSize: '12px', color: 'var(--text-muted)', margin: 0, paddingLeft: '16px' }}>
+                  <li>Speak clearly at a moderate pace</li>
+                  <li>Minimize background noise</li>
+                  <li>Use medical terminology as needed</li>
+                </ul>
               </div>
-              <p style={{ fontSize: '12px', color: 'var(--text-muted)', textAlign: 'center' }}>
-                Voice transcription requires Whisper API integration
-              </p>
             </div>
           )}
 
@@ -479,8 +674,12 @@ export default function AiDrawer({
           to { transform: translateX(0); }
         }
         @keyframes pulse {
-          0%, 100% { opacity: 0.4; }
-          50% { opacity: 1; }
+          0%, 100% { opacity: 1; transform: scale(1); }
+          50% { opacity: 0.8; transform: scale(1.05); }
+        }
+        @keyframes spin {
+          from { transform: rotate(0deg); }
+          to { transform: rotate(360deg); }
         }
       `}</style>
     </>
