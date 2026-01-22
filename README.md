@@ -4,19 +4,29 @@ AI-powered clinical documentation platform for neurology outpatient practices.
 
 ## Features
 
-- **Clinical Notes**: SOAP-format documentation with AI assistance
-- **AI Features**: Ask AI, Chart Prep, voice dictation
+- **Clinical Notes**: Tabbed interface (History, Imaging/results, Physical exams, Recommendation)
+- **AI Features**:
+  - Ask AI: Clinical questions with context
+  - Chart Prep: Pre-visit summaries
+  - Voice Dictation: Record and transcribe with OpenAI Whisper
+  - Patient Summary: Generate visit summaries
+  - Patient Handouts: Educational materials
+- **Dot Phrases**: Text expansion shortcuts with field scoping
 - **Clinical Scales**: MIDAS, HIT-6, PHQ-9, GAD-7, and more
-- **Patient Management**: Demographics, visits, imaging studies
-- **Secure Authentication**: Email/password and magic link login
+- **Patient Management**: Demographics, visits, imaging, timeline
+- **Secure Authentication**: Email/password via Supabase Auth
 
 ## Tech Stack
 
-- [Next.js 15](https://nextjs.org/) - React framework
+- [Next.js 15](https://nextjs.org/) - React framework with App Router
 - [Supabase](https://supabase.com/) - Database & authentication
-- [OpenAI](https://openai.com/) - AI capabilities
+- [OpenAI](https://openai.com/) - GPT-4 + Whisper for AI capabilities
 - [Tailwind CSS](https://tailwindcss.com/) - Styling
 - [Vercel](https://vercel.com/) - Deployment
+
+## Live Demo
+
+https://ops-amplehtml.vercel.app/
 
 ## Getting Started
 
@@ -47,12 +57,15 @@ NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
 
 4. Set up the database:
    - Go to Supabase SQL Editor
-   - Run `supabase/migrations/001_initial_schema.sql`
-   - Run `supabase/migrations/002_seed_demo_data.sql`
+   - Run migrations in order:
+     - `supabase/migrations/001_initial_schema.sql`
+     - `supabase/migrations/002_seed_demo_data.sql`
+     - `supabase/migrations/003_dot_phrases.sql`
+     - `supabase/migrations/004_dot_phrases_scope.sql`
 
-5. Add your OpenAI API key:
-   - In Supabase Table Editor, go to `app_settings`
-   - Insert row with `key: 'openai_api_key'`, `value: 'sk-your-key'`
+5. Add your OpenAI API key (one of):
+   - In Supabase Table Editor, go to `app_settings`, insert row with `key: 'openai_api_key'`, `value: 'sk-your-key'`
+   - Or add `OPENAI_API_KEY=sk-your-key` to `.env.local`
 
 6. Start the development server:
 ```bash
@@ -65,10 +78,25 @@ Open [http://localhost:3000](http://localhost:3000) to view the app.
 
 ```
 src/
-├── app/                # Next.js pages and API routes
-├── components/         # React components
-├── lib/               # Utilities and Supabase clients
-└── middleware.ts      # Auth middleware
+├── app/                    # Next.js pages and API routes
+│   ├── api/
+│   │   ├── ai/            # AI endpoints (ask, chart-prep, transcribe)
+│   │   └── phrases/       # Dot phrases CRUD
+│   ├── dashboard/         # Main clinical interface
+│   ├── login/             # Login page
+│   └── signup/            # Signup page
+├── components/            # React components
+│   ├── AiDrawer.tsx       # AI assistant panel
+│   ├── CenterPanel.tsx    # Main content with tabs
+│   ├── ClinicalNote.tsx   # Note container
+│   ├── DotPhrasesDrawer.tsx # Dot phrases panel
+│   ├── LeftSidebar.tsx    # Patient info sidebar
+│   └── TopNav.tsx         # Navigation header
+├── hooks/
+│   └── useVoiceRecorder.ts # Voice recording
+├── lib/
+│   └── supabase/          # Supabase clients
+└── middleware.ts          # Auth middleware
 ```
 
 ## Documentation
@@ -76,14 +104,19 @@ src/
 - [CLAUDE.md](./CLAUDE.md) - Development guide for AI assistants
 - [docs/](./docs/) - Product requirements documents
 - [FIGMA_MAKE_PROMPTS.md](./FIGMA_MAKE_PROMPTS.md) - UI design specifications
+- [prototype/](./prototype/) - Original HTML prototype
 
 ## Deployment
 
 Deploy to Vercel:
 
 1. Connect your GitHub repository to Vercel
-2. Add environment variables in Vercel project settings
+2. Add environment variables in Vercel project settings:
+   - `NEXT_PUBLIC_SUPABASE_URL`
+   - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
 3. Deploy
+
+When redeploying, use "Redeploy without cache" for fresh builds.
 
 ## License
 
