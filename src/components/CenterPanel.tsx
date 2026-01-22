@@ -11,6 +11,8 @@ interface CenterPanelProps {
   openAiDrawer: (tab: string) => void
   openPhrasesDrawer: (field?: string) => void
   setActiveTextField: (field: string | null) => void
+  rawDictation: Record<string, string>
+  updateRawDictation: (field: string, rawText: string) => void
 }
 
 const CHIEF_COMPLAINTS = [
@@ -21,7 +23,7 @@ const CHIEF_COMPLAINTS = [
   'Vision loss', 'Weakness', 'Other'
 ]
 
-export default function CenterPanel({ noteData, updateNote, currentVisit, imagingStudies, openAiDrawer, openPhrasesDrawer, setActiveTextField }: CenterPanelProps) {
+export default function CenterPanel({ noteData, updateNote, currentVisit, imagingStudies, openAiDrawer, openPhrasesDrawer, setActiveTextField, rawDictation, updateRawDictation }: CenterPanelProps) {
   const [activeTab, setActiveTab] = useState('history')
   const [openAccordions, setOpenAccordions] = useState<string[]>(['headache-scales'])
 
@@ -159,6 +161,8 @@ export default function CenterPanel({ noteData, updateNote, currentVisit, imagin
                 onOpenAiDrawer={() => openAiDrawer('ask-ai')}
                 onOpenFullPhrasesDrawer={() => openPhrasesDrawer('hpi')}
                 setActiveTextField={setActiveTextField}
+                rawDictation={rawDictation.hpi}
+                onRawDictationChange={(rawText) => updateRawDictation('hpi', rawText)}
               />
             </div>
 
@@ -582,11 +586,13 @@ export default function CenterPanel({ noteData, updateNote, currentVisit, imagin
                 fieldName="assessment"
                 placeholder="Assessment will appear here..."
                 minHeight="150px"
-                showDictate={false}
+                showDictate={true}
                 showAiAction={true}
                 onOpenAiDrawer={() => openAiDrawer('ask-ai')}
                 onOpenFullPhrasesDrawer={() => openPhrasesDrawer('assessment')}
                 setActiveTextField={setActiveTextField}
+                rawDictation={rawDictation.assessment}
+                onRawDictationChange={(rawText) => updateRawDictation('assessment', rawText)}
               />
             </div>
           </>

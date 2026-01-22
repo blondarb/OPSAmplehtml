@@ -7,6 +7,7 @@ interface UseVoiceRecorderResult {
   isTranscribing: boolean
   error: string | null
   transcribedText: string | null
+  rawText: string | null
   recordingDuration: number
   startRecording: () => Promise<void>
   stopRecording: () => void
@@ -18,6 +19,7 @@ export function useVoiceRecorder(): UseVoiceRecorderResult {
   const [isTranscribing, setIsTranscribing] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [transcribedText, setTranscribedText] = useState<string | null>(null)
+  const [rawText, setRawText] = useState<string | null>(null)
   const [recordingDuration, setRecordingDuration] = useState(0)
 
   const mediaRecorderRef = useRef<MediaRecorder | null>(null)
@@ -27,6 +29,7 @@ export function useVoiceRecorder(): UseVoiceRecorderResult {
 
   const clearTranscription = useCallback(() => {
     setTranscribedText(null)
+    setRawText(null)
     setError(null)
   }, [])
 
@@ -34,6 +37,7 @@ export function useVoiceRecorder(): UseVoiceRecorderResult {
     try {
       setError(null)
       setTranscribedText(null)
+      setRawText(null)
       audioChunksRef.current = []
 
       // Request microphone permission
@@ -95,6 +99,7 @@ export function useVoiceRecorder(): UseVoiceRecorderResult {
             setError(data.error)
           } else {
             setTranscribedText(data.text)
+            setRawText(data.rawText || data.text)
           }
         } catch (err) {
           setError('Failed to transcribe audio. Please try again.')
@@ -141,6 +146,7 @@ export function useVoiceRecorder(): UseVoiceRecorderResult {
     isTranscribing,
     error,
     transcribedText,
+    rawText,
     recordingDuration,
     startRecording,
     stopRecording,

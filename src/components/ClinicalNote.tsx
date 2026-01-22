@@ -42,6 +42,11 @@ export default function ClinicalNote({
     plan: currentVisit?.clinical_notes?.plan || '',
   })
 
+  // Raw dictation storage - keyed by field name
+  const [rawDictation, setRawDictation] = useState<Record<string, string>>(
+    (currentVisit?.clinical_notes?.raw_dictation as Record<string, string>) || {}
+  )
+
   const router = useRouter()
   const supabase = createClient()
 
@@ -88,6 +93,10 @@ export default function ClinicalNote({
     setNoteData(prev => ({ ...prev, [field]: value }))
   }
 
+  const updateRawDictation = (field: string, rawText: string) => {
+    setRawDictation(prev => ({ ...prev, [field]: rawText }))
+  }
+
   const saveNote = async () => {
     if (!currentVisit?.clinical_notes?.id) return
 
@@ -99,6 +108,7 @@ export default function ClinicalNote({
         allergies: noteData.allergies,
         assessment: noteData.assessment,
         plan: noteData.plan,
+        raw_dictation: rawDictation,
       })
       .eq('id', currentVisit.clinical_notes.id)
 
@@ -133,6 +143,8 @@ export default function ClinicalNote({
           openAiDrawer={openAiDrawer}
           openPhrasesDrawer={openPhrasesDrawer}
           setActiveTextField={setActiveTextField}
+          rawDictation={rawDictation}
+          updateRawDictation={updateRawDictation}
         />
 
         <RightActionBar
@@ -151,6 +163,7 @@ export default function ClinicalNote({
           noteData={noteData}
           updateNote={updateNote}
           activeTextField={activeTextField}
+          updateRawDictation={updateRawDictation}
         />
       )}
 

@@ -12,6 +12,7 @@ interface AiDrawerProps {
   noteData: any
   updateNote: (field: string, value: any) => void
   activeTextField?: string | null
+  updateRawDictation?: (field: string, rawText: string) => void
 }
 
 export default function AiDrawer({
@@ -23,6 +24,7 @@ export default function AiDrawer({
   noteData,
   updateNote,
   activeTextField,
+  updateRawDictation,
 }: AiDrawerProps) {
   const [question, setQuestion] = useState('')
   const [aiResponse, setAiResponse] = useState('')
@@ -35,6 +37,7 @@ export default function AiDrawer({
     isTranscribing,
     error: recordingError,
     transcribedText,
+    rawText,
     recordingDuration,
     startRecording,
     stopRecording,
@@ -54,6 +57,10 @@ export default function AiDrawer({
       const currentValue = noteData[field] || ''
       const newValue = currentValue ? `${currentValue} ${transcribedText}` : transcribedText
       updateNote(field, newValue)
+      // Also save raw dictation if available
+      if (rawText && updateRawDictation) {
+        updateRawDictation(field, rawText)
+      }
       clearTranscription()
     }
   }

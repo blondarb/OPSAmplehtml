@@ -106,6 +106,7 @@ export interface Database {
           ai_summary: string | null
           is_signed: boolean
           signed_at: string | null
+          raw_dictation: Json | null
         }
         Insert: {
           id?: string
@@ -121,6 +122,7 @@ export interface Database {
           ai_summary?: string | null
           is_signed?: boolean
           signed_at?: string | null
+          raw_dictation?: Json | null
         }
         Update: {
           id?: string
@@ -136,6 +138,7 @@ export interface Database {
           ai_summary?: string | null
           is_signed?: boolean
           signed_at?: string | null
+          raw_dictation?: Json | null
         }
       }
       clinical_scales: {

@@ -22,6 +22,8 @@ interface NoteTextFieldProps {
   onOpenAiDrawer?: () => void
   onOpenFullPhrasesDrawer: () => void
   setActiveTextField: (field: string | null) => void
+  rawDictation?: string | null
+  onRawDictationChange?: (rawText: string) => void
 }
 
 export default function NoteTextField({
@@ -35,6 +37,8 @@ export default function NoteTextField({
   onOpenAiDrawer,
   onOpenFullPhrasesDrawer,
   setActiveTextField,
+  rawDictation,
+  onRawDictationChange,
 }: NoteTextFieldProps) {
   const [showPicker, setShowPicker] = useState(false)
   const [phrases, setPhrases] = useState<Phrase[]>([])
@@ -42,12 +46,15 @@ export default function NoteTextField({
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const lastExpandedRef = useRef<string>('')
 
+  const [showRawDictation, setShowRawDictation] = useState(false)
+
   // Voice recording hook
   const {
     isRecording,
     isTranscribing,
     error: recordingError,
     transcribedText,
+    rawText,
     startRecording,
     stopRecording,
     clearTranscription,
@@ -63,6 +70,12 @@ export default function NoteTextField({
         const newValue = value.substring(0, start) + transcribedText + value.substring(end)
         onChange(newValue)
 
+        // Save raw dictation if callback provided
+        console.log('Dictation complete - rawText:', rawText, 'has callback:', !!onRawDictationChange)
+        if (rawText && onRawDictationChange) {
+          onRawDictationChange(rawText)
+        }
+
         // Set cursor position after inserted text
         setTimeout(() => {
           textarea.focus()
@@ -72,10 +85,14 @@ export default function NoteTextField({
       } else {
         // Fallback: append to end
         onChange(value + transcribedText)
+        // Save raw dictation if callback provided
+        if (rawText && onRawDictationChange) {
+          onRawDictationChange(rawText)
+        }
       }
       clearTranscription()
     }
-  }, [transcribedText, value, onChange, clearTranscription])
+  }, [transcribedText, rawText, value, onChange, onRawDictationChange, clearTranscription])
 
   // Handle dictation button click
   const handleDictateClick = () => {
@@ -317,6 +334,33 @@ export default function NoteTextField({
               </svg>
             </button>
           )}
+          {showDictate && (
+            <button
+              onClick={() => rawDictation && setShowRawDictation(!showRawDictation)}
+              disabled={!rawDictation}
+              style={{
+                width: '28px',
+                height: '28px',
+                borderRadius: '6px',
+                border: '1px solid var(--border)',
+                background: showRawDictation ? 'var(--info)' : 'var(--bg-white)',
+                cursor: rawDictation ? 'pointer' : 'not-allowed',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                color: showRawDictation ? 'white' : rawDictation ? 'var(--info)' : 'var(--text-muted)',
+                transition: 'all 0.15s',
+                opacity: rawDictation ? 1 : 0.5,
+              }}
+              title={rawDictation ? "View original dictation" : "No dictation recorded yet"}
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <circle cx="12" cy="12" r="10"/>
+                <path d="M12 16v-4"/>
+                <path d="M12 8h.01"/>
+              </svg>
+            </button>
+          )}
         </div>
 
         {/* Inline Phrase Picker - positioned above buttons */}
@@ -326,6 +370,49 @@ export default function NoteTextField({
             onInsertPhrase={handleInsertPhrase}
             onOpenFullDrawer={handleOpenFullDrawer}
           />
+        )}
+
+        {/* Raw Dictation Tooltip */}
+        {showRawDictation && rawDictation && (
+          <div
+            style={{
+              position: 'absolute',
+              top: '40px',
+              right: '0',
+              width: '300px',
+              maxHeight: '200px',
+              overflowY: 'auto',
+              background: 'var(--bg-white)',
+              border: '1px solid var(--border)',
+              borderRadius: '8px',
+              padding: '12px',
+              boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+              zIndex: 100,
+            }}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+              <span style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-muted)' }}>
+                Original Dictation
+              </span>
+              <button
+                onClick={() => setShowRawDictation(false)}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  cursor: 'pointer',
+                  color: 'var(--text-muted)',
+                  padding: '2px',
+                }}
+              >
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M18 6L6 18M6 6l12 12"/>
+                </svg>
+              </button>
+            </div>
+            <p style={{ fontSize: '13px', color: 'var(--text-secondary)', margin: 0, lineHeight: 1.5, whiteSpace: 'pre-wrap' }}>
+              {rawDictation}
+            </p>
+          </div>
         )}
       </div>
       <style jsx>{`
