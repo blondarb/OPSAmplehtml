@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import NoteTextField from './NoteTextField'
 
 interface CenterPanelProps {
   noteData: any
@@ -147,96 +148,18 @@ export default function CenterPanel({ noteData, updateNote, currentVisit, imagin
                   borderRadius: '4px',
                 }}>Required</span>
               </div>
-              <div style={{ position: 'relative' }}>
-                <textarea
-                  value={noteData.hpi}
-                  onChange={(e) => updateNote('hpi', e.target.value)}
-                  onFocus={() => setActiveTextField('hpi')}
-                  placeholder="Min. 25 words"
-                  style={{
-                    width: '100%',
-                    minHeight: '120px',
-                    padding: '12px',
-                    paddingRight: '110px',
-                    border: '1px solid var(--border)',
-                    borderRadius: '8px',
-                    fontSize: '14px',
-                    resize: 'vertical',
-                    outline: 'none',
-                    fontFamily: 'inherit',
-                    color: 'var(--text-primary)',
-                    background: 'var(--bg-white)',
-                  }}
-                />
-                <div style={{
-                  position: 'absolute',
-                  top: '8px',
-                  right: '8px',
-                  display: 'flex',
-                  gap: '4px',
-                }}>
-                  <button
-                    onClick={() => openAiDrawer('document')}
-                    style={{
-                      width: '28px',
-                      height: '28px',
-                      borderRadius: '6px',
-                      border: '1px solid var(--border)',
-                      background: 'var(--bg-white)',
-                      cursor: 'pointer',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      color: 'var(--text-muted)',
-                    }}
-                    title="Dictate"
-                  >
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                      <path d="M12 1a3 3 0 00-3 3v8a3 3 0 006 0V4a3 3 0 00-3-3z"/><path d="M19 10v2a7 7 0 01-14 0v-2"/>
-                    </svg>
-                  </button>
-                  <button
-                    onClick={() => openPhrasesDrawer('hpi')}
-                    style={{
-                      width: '28px',
-                      height: '28px',
-                      borderRadius: '6px',
-                      border: '1px solid var(--border)',
-                      background: 'var(--bg-white)',
-                      cursor: 'pointer',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      color: 'var(--warning)',
-                    }}
-                    title="Dot Phrases"
-                  >
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                      <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/>
-                    </svg>
-                  </button>
-                  <button
-                    onClick={() => openAiDrawer('ask-ai')}
-                    style={{
-                      width: '28px',
-                      height: '28px',
-                      borderRadius: '6px',
-                      border: 'none',
-                      background: 'linear-gradient(135deg, var(--primary) 0%, var(--primary-light) 100%)',
-                      cursor: 'pointer',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      color: 'white',
-                    }}
-                    title="AI Actions"
-                  >
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                      <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
-                    </svg>
-                  </button>
-                </div>
-              </div>
+              <NoteTextField
+                value={noteData.hpi}
+                onChange={(value) => updateNote('hpi', value)}
+                fieldName="hpi"
+                placeholder="Min. 25 words"
+                minHeight="120px"
+                showDictate={true}
+                showAiAction={true}
+                onOpenAiDrawer={() => openAiDrawer('ask-ai')}
+                onOpenFullPhrasesDrawer={() => openPhrasesDrawer('hpi')}
+                setActiveTextField={setActiveTextField}
+              />
             </div>
 
             {/* Clinical Scales */}
@@ -653,76 +576,18 @@ export default function CenterPanel({ noteData, updateNote, currentVisit, imagin
                 </svg>
                 Generate Assessment
               </button>
-              <div style={{ position: 'relative' }}>
-                <textarea
-                  value={noteData.assessment}
-                  onChange={(e) => updateNote('assessment', e.target.value)}
-                  onFocus={() => setActiveTextField('assessment')}
-                  placeholder="Assessment will appear here..."
-                  style={{
-                    width: '100%',
-                    minHeight: '150px',
-                    padding: '12px',
-                    paddingRight: '80px',
-                    border: '1px solid var(--border)',
-                    borderRadius: '8px',
-                    fontSize: '14px',
-                    resize: 'vertical',
-                    outline: 'none',
-                    fontFamily: 'inherit',
-                    color: 'var(--text-primary)',
-                    background: 'var(--bg-white)',
-                  }}
-                />
-                <div style={{
-                  position: 'absolute',
-                  top: '8px',
-                  right: '8px',
-                  display: 'flex',
-                  gap: '4px',
-                }}>
-                  <button
-                    onClick={() => openPhrasesDrawer('assessment')}
-                    style={{
-                      width: '28px',
-                      height: '28px',
-                      borderRadius: '6px',
-                      border: '1px solid var(--border)',
-                      background: 'var(--bg-white)',
-                      cursor: 'pointer',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      color: 'var(--warning)',
-                    }}
-                    title="Dot Phrases"
-                  >
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                      <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/>
-                    </svg>
-                  </button>
-                  <button
-                    onClick={() => openAiDrawer('ask-ai')}
-                    style={{
-                      width: '28px',
-                      height: '28px',
-                      borderRadius: '6px',
-                      border: 'none',
-                      background: 'linear-gradient(135deg, var(--primary) 0%, var(--primary-light) 100%)',
-                      cursor: 'pointer',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      color: 'white',
-                    }}
-                    title="AI Actions"
-                  >
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                      <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
-                    </svg>
-                  </button>
-                </div>
-              </div>
+              <NoteTextField
+                value={noteData.assessment}
+                onChange={(value) => updateNote('assessment', value)}
+                fieldName="assessment"
+                placeholder="Assessment will appear here..."
+                minHeight="150px"
+                showDictate={false}
+                showAiAction={true}
+                onOpenAiDrawer={() => openAiDrawer('ask-ai')}
+                onOpenFullPhrasesDrawer={() => openPhrasesDrawer('assessment')}
+                setActiveTextField={setActiveTextField}
+              />
             </div>
           </>
         )}
