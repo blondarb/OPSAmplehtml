@@ -45,7 +45,37 @@ export async function POST(request: Request) {
       response_format: 'text',
     })
 
-    return NextResponse.json({ text: transcription })
+    // Clean up the transcription with GPT to fix errors and improve readability
+    const cleanupResponse = await openai.chat.completions.create({
+      model: 'gpt-4',
+      messages: [
+        {
+          role: 'system',
+          content: `You are a medical transcription editor. Your job is to clean up dictated clinical notes while staying true to the original content.
+
+Rules:
+- Fix grammar, punctuation, and spelling errors
+- Correct obvious transcription mistakes (e.g., "patient" misheard as "patients")
+- Expand common medical abbreviations only if they were likely misheard
+- Maintain the original medical terminology and clinical meaning
+- Keep the same level of detail and information
+- Do NOT add information that wasn't dictated
+- Do NOT remove any clinical information
+- Do NOT change medical terms unless they're clearly wrong
+- Output ONLY the cleaned text, no explanations or comments`
+        },
+        {
+          role: 'user',
+          content: `Clean up this dictated clinical note:\n\n${transcription}`
+        }
+      ],
+      max_tokens: 2000,
+      temperature: 0.3, // Low temperature for more consistent output
+    })
+
+    const cleanedText = cleanupResponse.choices[0]?.message?.content || transcription
+
+    return NextResponse.json({ text: cleanedText, rawText: transcription })
 
   } catch (error: any) {
     console.error('Transcription API Error:', error)
