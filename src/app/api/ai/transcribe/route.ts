@@ -63,37 +63,61 @@ export async function POST(request: Request) {
       response_format: 'text',
     })
 
+    console.log('Whisper transcription result:', transcription)
+
+    // If transcription is empty or very short, return it directly without cleanup
+    const rawTranscription = String(transcription).trim()
+    if (!rawTranscription || rawTranscription.length < 5) {
+      return NextResponse.json({
+        text: rawTranscription || '(No speech detected)',
+        rawText: rawTranscription
+      })
+    }
+
     // Clean up the transcription with GPT to fix errors and improve readability
-    const cleanupResponse = await openai.chat.completions.create({
-      model: 'gpt-4',
-      messages: [
-        {
-          role: 'system',
-          content: `You are a medical transcription editor. Your job is to clean up dictated clinical notes while staying true to the original content.
+    try {
+      const cleanupResponse = await openai.chat.completions.create({
+        model: 'gpt-4',
+        messages: [
+          {
+            role: 'system',
+            content: `You are a medical transcription editor. Clean up the dictated text while preserving ALL original content.
 
-Rules:
+CRITICAL RULES:
+- Output ONLY the cleaned text - no explanations, no comments, no meta-text
+- If the input is short or seems incomplete, still output it cleaned up
 - Fix grammar, punctuation, and spelling errors
-- Correct obvious transcription mistakes (e.g., "patient" misheard as "patients")
-- Expand common medical abbreviations only if they were likely misheard
-- Maintain the original medical terminology and clinical meaning
-- Keep the same level of detail and information
-- Do NOT add information that wasn't dictated
-- Do NOT remove any clinical information
-- Do NOT change medical terms unless they're clearly wrong
-- Output ONLY the cleaned text, no explanations or comments`
-        },
-        {
-          role: 'user',
-          content: `Clean up this dictated clinical note:\n\n${transcription}`
-        }
-      ],
-      max_tokens: 2000,
-      temperature: 0.3, // Low temperature for more consistent output
-    })
+- Correct obvious transcription mistakes
+- NEVER say things like "not enough information" or "please provide more"
+- NEVER refuse to process the text - just clean it and return it
+- If unsure, return the original text with minimal changes`
+          },
+          {
+            role: 'user',
+            content: rawTranscription
+          }
+        ],
+        max_tokens: 2000,
+        temperature: 0.2,
+      })
 
-    const cleanedText = cleanupResponse.choices[0]?.message?.content || transcription
+      const cleanedText = cleanupResponse.choices[0]?.message?.content?.trim()
 
-    return NextResponse.json({ text: cleanedText, rawText: transcription })
+      // If cleanup result looks like an error message or refusal, use raw transcription
+      if (!cleanedText ||
+          cleanedText.toLowerCase().includes('not enough') ||
+          cleanedText.toLowerCase().includes('please provide') ||
+          cleanedText.toLowerCase().includes('cannot') ||
+          cleanedText.toLowerCase().includes('i\'m sorry')) {
+        return NextResponse.json({ text: rawTranscription, rawText: rawTranscription })
+      }
+
+      return NextResponse.json({ text: cleanedText, rawText: rawTranscription })
+    } catch (cleanupError) {
+      // If cleanup fails, return raw transcription
+      console.error('Cleanup error:', cleanupError)
+      return NextResponse.json({ text: rawTranscription, rawText: rawTranscription })
+    }
 
   } catch (error: any) {
     console.error('Transcription API Error:', error)
