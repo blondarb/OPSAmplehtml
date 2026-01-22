@@ -114,6 +114,37 @@ export default function ClinicalNote({
     plan: currentVisit?.clinical_notes?.plan || '',
   })
 
+  // Raw dictation storage - keyed by field name, stores array of dictations with timestamps
+  const migrateRawDictation = (data: any): Record<string, Array<{ text: string; timestamp: string }>> => {
+    if (!data) return {}
+    const result: Record<string, Array<{ text: string; timestamp: string }>> = {}
+    for (const [field, value] of Object.entries(data)) {
+      if (typeof value === 'string') {
+        // Old format: convert string to array with single entry
+        result[field] = [{ text: value, timestamp: new Date().toISOString() }]
+      } else if (Array.isArray(value)) {
+        // New format: use as-is
+        result[field] = value as Array<{ text: string; timestamp: string }>
+      }
+    }
+    return result
+  }
+
+  const [rawDictation, setRawDictation] = useState<Record<string, Array<{ text: string; timestamp: string }>>>(
+    migrateRawDictation(currentVisit?.clinical_notes?.raw_dictation)
+  )
+
+  const updateRawDictation = (field: string, rawText: string) => {
+    setRawDictation(prev => {
+      const existingList = prev[field] || []
+      const newEntry = {
+        text: rawText,
+        timestamp: new Date().toISOString(),
+      }
+      return { ...prev, [field]: [...existingList, newEntry] }
+    })
+  }
+
   const router = useRouter()
   const supabase = createClient()
 
@@ -171,6 +202,7 @@ export default function ClinicalNote({
         allergies: noteData.allergies,
         assessment: noteData.assessment,
         plan: noteData.plan,
+        raw_dictation: rawDictation,
       })
       .eq('id', currentVisit.clinical_notes.id)
 
@@ -207,6 +239,9 @@ export default function ClinicalNote({
           imagingStudies={imagingStudies}
           openAiDrawer={openAiDrawer}
           openDotPhrases={openDotPhrases}
+          setActiveTextField={setActiveTextField}
+          rawDictation={rawDictation}
+          updateRawDictation={updateRawDictation}
         />
       </div>
 

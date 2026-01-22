@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import NoteTextField from './NoteTextField'
 
 interface CenterPanelProps {
   noteData: any
@@ -9,122 +10,9 @@ interface CenterPanelProps {
   imagingStudies: any[]
   openAiDrawer: (tab: string) => void
   openDotPhrases?: (field: string) => void
-}
-
-// Inline action buttons for text fields
-function FieldActionButtons({
-  field,
-  openAiDrawer,
-  openDotPhrases
-}: {
-  field: string
-  openAiDrawer: (tab: string) => void
-  openDotPhrases?: (field: string) => void
-}) {
-  return (
-    <div style={{
-      display: 'flex',
-      alignItems: 'center',
-      gap: '4px',
-      position: 'absolute',
-      top: '8px',
-      right: '8px',
-      background: 'var(--bg-white)',
-      padding: '4px',
-      borderRadius: '8px',
-      boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
-    }}>
-      {/* Microphone - Voice */}
-      <button
-        onClick={() => openAiDrawer('document')}
-        style={{
-          width: '28px',
-          height: '28px',
-          borderRadius: '6px',
-          border: '1px solid var(--border)',
-          background: 'var(--bg-white)',
-          cursor: 'pointer',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          color: 'var(--text-muted)',
-        }}
-        title="Voice dictation"
-      >
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-          <path d="M12 1a3 3 0 00-3 3v8a3 3 0 006 0V4a3 3 0 00-3-3z"/><path d="M19 10v2a7 7 0 01-14 0v-2"/>
-        </svg>
-      </button>
-
-      {/* Lightning - Chart Prep */}
-      <button
-        onClick={() => openAiDrawer('chart-prep')}
-        style={{
-          width: '28px',
-          height: '28px',
-          borderRadius: '6px',
-          border: '1px solid var(--border)',
-          background: 'var(--bg-white)',
-          cursor: 'pointer',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          color: '#F59E0B',
-        }}
-        title="Quick actions"
-      >
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
-          <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>
-        </svg>
-      </button>
-
-      {/* Star - AI */}
-      <button
-        onClick={() => openAiDrawer('ask-ai')}
-        style={{
-          width: '28px',
-          height: '28px',
-          borderRadius: '6px',
-          border: 'none',
-          background: 'var(--primary)',
-          cursor: 'pointer',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          color: 'white',
-        }}
-        title="AI assistant"
-      >
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-          <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
-        </svg>
-      </button>
-
-      {/* Dot Phrases */}
-      {openDotPhrases && (
-        <button
-          onClick={() => openDotPhrases(field)}
-          style={{
-            width: '28px',
-            height: '28px',
-            borderRadius: '6px',
-            border: '1px solid var(--border)',
-            background: 'var(--bg-white)',
-            cursor: 'pointer',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            color: '#8B5CF6',
-          }}
-          title="Dot phrases"
-        >
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
-            <circle cx="12" cy="12" r="2"/><circle cx="12" cy="5" r="2"/><circle cx="12" cy="19" r="2"/>
-          </svg>
-        </button>
-      )}
-    </div>
-  )
+  setActiveTextField?: (field: string | null) => void
+  rawDictation?: Record<string, Array<{ text: string; timestamp: string }>>
+  updateRawDictation?: (field: string, rawText: string) => void
 }
 
 const CHIEF_COMPLAINTS = [
@@ -141,8 +29,24 @@ const ALLERGY_OPTIONS = ['NKDA', 'Reviewed in EMR', 'Unknown', 'Other']
 const ROS_OPTIONS = ['Reviewed', 'Unable to obtain due to:', 'Other']
 const HISTORY_OPTIONS = ['Yes', 'No, due to patient mentation', 'NA due to phone consult']
 
-export default function CenterPanel({ noteData, updateNote, currentVisit, imagingStudies, openAiDrawer, openDotPhrases }: CenterPanelProps) {
+export default function CenterPanel({
+  noteData,
+  updateNote,
+  currentVisit,
+  imagingStudies,
+  openAiDrawer,
+  openDotPhrases,
+  setActiveTextField,
+  rawDictation,
+  updateRawDictation
+}: CenterPanelProps) {
   const [activeTab, setActiveTab] = useState('history')
+  const [localActiveField, setLocalActiveField] = useState<string | null>(null)
+
+  const handleSetActiveField = (field: string | null) => {
+    setLocalActiveField(field)
+    if (setActiveTextField) setActiveTextField(field)
+  }
 
   const toggleChip = (complaint: string) => {
     const current = noteData.chiefComplaint || []
@@ -403,39 +307,20 @@ export default function CenterPanel({ noteData, updateNote, currentVisit, imagin
                   <span style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text-primary)' }}>History of presenting illness</span>
                   <span style={{ color: '#3B82F6', marginLeft: '8px', fontSize: '13px' }}>(Min. 25 words)*</span>
                 </div>
-                <div style={{ position: 'relative' }}>
-                  <FieldActionButtons field="hpi" openAiDrawer={openAiDrawer} openDotPhrases={openDotPhrases} />
-                  <div style={{
-                    position: 'absolute',
-                    top: '-8px',
-                    left: '12px',
-                    background: 'var(--bg-white)',
-                    padding: '0 4px',
-                    fontSize: '12px',
-                    color: 'var(--text-muted)',
-                  }}>
-                    Describe symptoms and history *
-                  </div>
-                  <textarea
-                    value={noteData.hpi}
-                    onChange={(e) => updateNote('hpi', e.target.value)}
-                    placeholder=""
-                    style={{
-                      width: '100%',
-                      minHeight: '120px',
-                      padding: '16px',
-                      paddingTop: '40px',
-                      border: '1px solid var(--border)',
-                      borderRadius: '8px',
-                      fontSize: '14px',
-                      resize: 'vertical',
-                      outline: 'none',
-                      fontFamily: 'inherit',
-                      color: 'var(--text-primary)',
-                      background: 'var(--bg-white)',
-                    }}
-                  />
-                </div>
+                <NoteTextField
+                  value={noteData.hpi}
+                  onChange={(value) => updateNote('hpi', value)}
+                  fieldName="hpi"
+                  placeholder="Describe symptoms and history..."
+                  minHeight="120px"
+                  showDictate={true}
+                  showAiAction={true}
+                  onOpenAiDrawer={() => openAiDrawer('ask-ai')}
+                  onOpenFullPhrasesDrawer={() => openDotPhrases && openDotPhrases('hpi')}
+                  setActiveTextField={handleSetActiveField}
+                  rawDictation={rawDictation?.hpi}
+                  onRawDictationChange={updateRawDictation ? (rawText) => updateRawDictation('hpi', rawText) : undefined}
+                />
               </div>
             </div>
 
@@ -1017,39 +902,20 @@ export default function CenterPanel({ noteData, updateNote, currentVisit, imagin
                   <span style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text-primary)' }}>Assessment</span>
                   <span style={{ color: '#3B82F6', marginLeft: '8px', fontSize: '13px' }}>(Min. 5 words)*</span>
                 </div>
-                <div style={{ position: 'relative' }}>
-                  <FieldActionButtons field="assessment" openAiDrawer={openAiDrawer} openDotPhrases={openDotPhrases} />
-                  <div style={{
-                    position: 'absolute',
-                    top: '-8px',
-                    left: '12px',
-                    background: 'var(--bg-white)',
-                    padding: '0 4px',
-                    fontSize: '12px',
-                    color: 'var(--text-muted)',
-                  }}>
-                    Enter a detailed assessment *
-                  </div>
-                  <textarea
-                    value={noteData.assessment}
-                    onChange={(e) => updateNote('assessment', e.target.value)}
-                    placeholder=""
-                    style={{
-                      width: '100%',
-                      minHeight: '120px',
-                      padding: '16px',
-                      paddingTop: '40px',
-                      border: '1px solid var(--border)',
-                      borderRadius: '8px',
-                      fontSize: '14px',
-                      resize: 'vertical',
-                      outline: 'none',
-                      fontFamily: 'inherit',
-                      color: 'var(--text-primary)',
-                      background: 'var(--bg-white)',
-                    }}
-                  />
-                </div>
+                <NoteTextField
+                  value={noteData.assessment}
+                  onChange={(value) => updateNote('assessment', value)}
+                  fieldName="assessment"
+                  placeholder="Enter a detailed assessment..."
+                  minHeight="120px"
+                  showDictate={true}
+                  showAiAction={true}
+                  onOpenAiDrawer={() => openAiDrawer('ask-ai')}
+                  onOpenFullPhrasesDrawer={() => openDotPhrases && openDotPhrases('assessment')}
+                  setActiveTextField={handleSetActiveField}
+                  rawDictation={rawDictation?.assessment}
+                  onRawDictationChange={updateRawDictation ? (rawText) => updateRawDictation('assessment', rawText) : undefined}
+                />
               </div>
             </div>
 
