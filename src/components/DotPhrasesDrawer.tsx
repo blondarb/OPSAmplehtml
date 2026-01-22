@@ -62,6 +62,7 @@ export default function DotPhrasesDrawer({
   const [formScope, setFormScope] = useState<PhraseScope>('global')
   const [formError, setFormError] = useState('')
   const [saving, setSaving] = useState(false)
+  const [loadError, setLoadError] = useState<string | null>(null)
 
   // Load phrases on mount
   useEffect(() => {
@@ -79,9 +80,23 @@ export default function DotPhrasesDrawer({
 
   const loadPhrases = async () => {
     setLoading(true)
+    setLoadError(null)
     try {
       const response = await fetch('/api/phrases')
       const data = await response.json()
+
+      if (!response.ok) {
+        // Check for specific errors
+        if (response.status === 401) {
+          setLoadError('Please log in to use dot phrases.')
+        } else if (data.error?.includes('does not exist')) {
+          setLoadError('Database not set up. Please run migrations: 003_dot_phrases.sql and 004_dot_phrases_scope.sql in Supabase SQL Editor.')
+        } else {
+          setLoadError(data.error || 'Failed to load phrases')
+        }
+        return
+      }
+
       if (data.phrases) {
         setPhrases(data.phrases)
         // If no phrases, seed defaults
@@ -91,6 +106,7 @@ export default function DotPhrasesDrawer({
       }
     } catch (error) {
       console.error('Failed to load phrases:', error)
+      setLoadError('Network error. Please check your connection.')
     } finally {
       setLoading(false)
     }
@@ -564,6 +580,33 @@ export default function DotPhrasesDrawer({
           ) : loading ? (
             <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text-secondary)' }}>
               Loading phrases...
+            </div>
+          ) : loadError ? (
+            <div style={{
+              padding: '20px',
+              margin: '20px 0',
+              backgroundColor: '#fef2f2',
+              border: '1px solid #fecaca',
+              borderRadius: '8px',
+              color: '#dc2626'
+            }}>
+              <div style={{ fontWeight: 600, marginBottom: '8px' }}>Error Loading Phrases</div>
+              <div style={{ fontSize: '13px', lineHeight: 1.5 }}>{loadError}</div>
+              <button
+                onClick={loadPhrases}
+                style={{
+                  marginTop: '12px',
+                  padding: '8px 16px',
+                  backgroundColor: '#dc2626',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '6px',
+                  fontSize: '13px',
+                  cursor: 'pointer'
+                }}
+              >
+                Retry
+              </button>
             </div>
           ) : filteredPhrases.length === 0 ? (
             <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text-secondary)' }}>
