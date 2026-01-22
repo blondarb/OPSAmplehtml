@@ -9,9 +9,10 @@ interface TopNavProps {
   toggleDarkMode: () => void
   onSignOut: () => void
   openAiDrawer: (tab: string) => void
+  openPhrasesDrawer: () => void
 }
 
-export default function TopNav({ user, darkMode, toggleDarkMode, onSignOut, openAiDrawer }: TopNavProps) {
+export default function TopNav({ user, darkMode, toggleDarkMode, onSignOut, openAiDrawer, openPhrasesDrawer }: TopNavProps) {
   const [aiMenuOpen, setAiMenuOpen] = useState(false)
   const [timer] = useState('00:00')
 
@@ -236,11 +237,16 @@ export default function TopNav({ user, darkMode, toggleDarkMode, onSignOut, open
                 { id: 'ask-ai', name: 'Ask AI / Search VERA', desc: 'Query clinical guidelines', icon: 'M11 11m-8 0a8 8 0 1016 0a8 8 0 10-16 0 M21 21l-4.35-4.35' },
                 { id: 'summarize', name: 'Summarize for Patient', desc: 'Plain-language explanation', icon: 'M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2 M12 7m-4 0a4 4 0 108 0a4 4 0 10-8 0' },
                 { id: 'handout', name: 'Create Patient Handout', desc: 'Generate take-home materials', icon: 'M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4z M3 6h18 M16 10a4 4 0 01-8 0' },
+                { id: 'dot-phrases', name: 'Dot Phrases', desc: 'Quick text expansion shortcuts', icon: 'M13 2L3 14h9l-1 8 10-12h-9l1-8z' },
               ].map((item) => (
                 <div
                   key={item.id}
                   onClick={() => {
-                    openAiDrawer(item.id)
+                    if (item.id === 'dot-phrases') {
+                      openPhrasesDrawer()
+                    } else {
+                      openAiDrawer(item.id)
+                    }
                     setAiMenuOpen(false)
                   }}
                   style={{

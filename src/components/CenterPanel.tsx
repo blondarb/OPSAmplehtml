@@ -8,6 +8,8 @@ interface CenterPanelProps {
   currentVisit: any
   imagingStudies: any[]
   openAiDrawer: (tab: string) => void
+  openPhrasesDrawer: (field?: string) => void
+  setActiveTextField: (field: string | null) => void
 }
 
 const CHIEF_COMPLAINTS = [
@@ -18,7 +20,7 @@ const CHIEF_COMPLAINTS = [
   'Vision loss', 'Weakness', 'Other'
 ]
 
-export default function CenterPanel({ noteData, updateNote, currentVisit, imagingStudies, openAiDrawer }: CenterPanelProps) {
+export default function CenterPanel({ noteData, updateNote, currentVisit, imagingStudies, openAiDrawer, openPhrasesDrawer, setActiveTextField }: CenterPanelProps) {
   const [activeTab, setActiveTab] = useState('history')
   const [openAccordions, setOpenAccordions] = useState<string[]>(['headache-scales'])
 
@@ -149,12 +151,13 @@ export default function CenterPanel({ noteData, updateNote, currentVisit, imagin
                 <textarea
                   value={noteData.hpi}
                   onChange={(e) => updateNote('hpi', e.target.value)}
+                  onFocus={() => setActiveTextField('hpi')}
                   placeholder="Min. 25 words"
                   style={{
                     width: '100%',
                     minHeight: '120px',
                     padding: '12px',
-                    paddingRight: '80px',
+                    paddingRight: '110px',
                     border: '1px solid var(--border)',
                     borderRadius: '8px',
                     fontSize: '14px',
@@ -190,6 +193,26 @@ export default function CenterPanel({ noteData, updateNote, currentVisit, imagin
                   >
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                       <path d="M12 1a3 3 0 00-3 3v8a3 3 0 006 0V4a3 3 0 00-3-3z"/><path d="M19 10v2a7 7 0 01-14 0v-2"/>
+                    </svg>
+                  </button>
+                  <button
+                    onClick={() => openPhrasesDrawer('hpi')}
+                    style={{
+                      width: '28px',
+                      height: '28px',
+                      borderRadius: '6px',
+                      border: '1px solid var(--border)',
+                      background: 'var(--bg-white)',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      color: 'var(--warning)',
+                    }}
+                    title="Dot Phrases"
+                  >
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/>
                     </svg>
                   </button>
                   <button
@@ -630,22 +653,76 @@ export default function CenterPanel({ noteData, updateNote, currentVisit, imagin
                 </svg>
                 Generate Assessment
               </button>
-              <textarea
-                value={noteData.assessment}
-                onChange={(e) => updateNote('assessment', e.target.value)}
-                placeholder="Assessment will appear here..."
-                style={{
-                  width: '100%',
-                  minHeight: '150px',
-                  padding: '12px',
-                  border: '1px solid var(--border)',
-                  borderRadius: '8px',
-                  fontSize: '14px',
-                  resize: 'vertical',
-                  outline: 'none',
-                  fontFamily: 'inherit',
-                }}
-              />
+              <div style={{ position: 'relative' }}>
+                <textarea
+                  value={noteData.assessment}
+                  onChange={(e) => updateNote('assessment', e.target.value)}
+                  onFocus={() => setActiveTextField('assessment')}
+                  placeholder="Assessment will appear here..."
+                  style={{
+                    width: '100%',
+                    minHeight: '150px',
+                    padding: '12px',
+                    paddingRight: '80px',
+                    border: '1px solid var(--border)',
+                    borderRadius: '8px',
+                    fontSize: '14px',
+                    resize: 'vertical',
+                    outline: 'none',
+                    fontFamily: 'inherit',
+                    color: 'var(--text-primary)',
+                    background: 'var(--bg-white)',
+                  }}
+                />
+                <div style={{
+                  position: 'absolute',
+                  top: '8px',
+                  right: '8px',
+                  display: 'flex',
+                  gap: '4px',
+                }}>
+                  <button
+                    onClick={() => openPhrasesDrawer('assessment')}
+                    style={{
+                      width: '28px',
+                      height: '28px',
+                      borderRadius: '6px',
+                      border: '1px solid var(--border)',
+                      background: 'var(--bg-white)',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      color: 'var(--warning)',
+                    }}
+                    title="Dot Phrases"
+                  >
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/>
+                    </svg>
+                  </button>
+                  <button
+                    onClick={() => openAiDrawer('ask-ai')}
+                    style={{
+                      width: '28px',
+                      height: '28px',
+                      borderRadius: '6px',
+                      border: 'none',
+                      background: 'linear-gradient(135deg, var(--primary) 0%, var(--primary-light) 100%)',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      color: 'white',
+                    }}
+                    title="AI Actions"
+                  >
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
+                    </svg>
+                  </button>
+                </div>
+              </div>
             </div>
           </>
         )}

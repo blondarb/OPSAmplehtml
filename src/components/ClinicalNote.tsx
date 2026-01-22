@@ -8,6 +8,7 @@ import LeftSidebar from './LeftSidebar'
 import CenterPanel from './CenterPanel'
 import RightActionBar from './RightActionBar'
 import AiDrawer from './AiDrawer'
+import DotPhrasesDrawer from './DotPhrasesDrawer'
 import type { User } from '@supabase/supabase-js'
 
 interface ClinicalNoteProps {
@@ -30,6 +31,8 @@ export default function ClinicalNote({
   const [darkMode, setDarkMode] = useState(false)
   const [aiDrawerOpen, setAiDrawerOpen] = useState(false)
   const [aiDrawerTab, setAiDrawerTab] = useState('chart-prep')
+  const [phrasesDrawerOpen, setPhrasesDrawerOpen] = useState(false)
+  const [activeTextField, setActiveTextField] = useState<string | null>(null)
   const [noteData, setNoteData] = useState({
     chiefComplaint: currentVisit?.chief_complaint || ['Headache'],
     hpi: currentVisit?.clinical_notes?.hpi || '',
@@ -69,6 +72,18 @@ export default function ClinicalNote({
     setAiDrawerOpen(true)
   }
 
+  const openPhrasesDrawer = (field?: string) => {
+    if (field) setActiveTextField(field)
+    setPhrasesDrawerOpen(true)
+  }
+
+  const handleInsertPhrase = (text: string) => {
+    if (activeTextField) {
+      const currentValue = noteData[activeTextField as keyof typeof noteData] || ''
+      updateNote(activeTextField, currentValue + text)
+    }
+  }
+
   const updateNote = (field: string, value: any) => {
     setNoteData(prev => ({ ...prev, [field]: value }))
   }
@@ -100,6 +115,7 @@ export default function ClinicalNote({
         toggleDarkMode={toggleDarkMode}
         onSignOut={handleSignOut}
         openAiDrawer={openAiDrawer}
+        openPhrasesDrawer={openPhrasesDrawer}
       />
 
       <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
@@ -115,6 +131,8 @@ export default function ClinicalNote({
           currentVisit={currentVisit}
           imagingStudies={imagingStudies}
           openAiDrawer={openAiDrawer}
+          openPhrasesDrawer={openPhrasesDrawer}
+          setActiveTextField={setActiveTextField}
         />
 
         <RightActionBar
@@ -134,6 +152,12 @@ export default function ClinicalNote({
           updateNote={updateNote}
         />
       )}
+
+      <DotPhrasesDrawer
+        isOpen={phrasesDrawerOpen}
+        onClose={() => setPhrasesDrawerOpen(false)}
+        onInsertPhrase={handleInsertPhrase}
+      />
     </div>
   )
 }

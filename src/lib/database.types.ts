@@ -254,6 +254,47 @@ export interface Database {
           updated_at?: string
         }
       }
+      dot_phrases: {
+        Row: {
+          id: string
+          created_at: string
+          updated_at: string
+          user_id: string
+          trigger_text: string
+          expansion_text: string
+          category: string | null
+          description: string | null
+          is_active: boolean
+          use_count: number
+          last_used: string | null
+        }
+        Insert: {
+          id?: string
+          created_at?: string
+          updated_at?: string
+          user_id: string
+          trigger_text: string
+          expansion_text: string
+          category?: string | null
+          description?: string | null
+          is_active?: boolean
+          use_count?: number
+          last_used?: string | null
+        }
+        Update: {
+          id?: string
+          created_at?: string
+          updated_at?: string
+          user_id?: string
+          trigger_text?: string
+          expansion_text?: string
+          category?: string | null
+          description?: string | null
+          is_active?: boolean
+          use_count?: number
+          last_used?: string | null
+        }
+      }
     }
     Views: {
       [_ in never]: never
