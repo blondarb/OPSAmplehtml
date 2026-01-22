@@ -17,6 +17,7 @@
   --error: #EF4444;
   --success: #10B981;
   --warning: #F59E0B;
+  --info: #3B82F6;
 
   --background: var(--bg-gray);
   --foreground: var(--text-primary);
@@ -37,6 +38,7 @@
   --error: #F87171;
   --success: #34D399;
   --warning: #FBBF24;
+  --info: #60A5FA;
 
   --background: var(--bg-gray);
   --foreground: var(--text-primary);

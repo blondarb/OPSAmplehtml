@@ -106,6 +106,7 @@ export interface Database {
           ai_summary: string | null
           is_signed: boolean
           signed_at: string | null
+          raw_dictation: Json | null
         }
         Insert: {
           id?: string
@@ -121,6 +122,7 @@ export interface Database {
           ai_summary?: string | null
           is_signed?: boolean
           signed_at?: string | null
+          raw_dictation?: Json | null
         }
         Update: {
           id?: string
@@ -136,6 +138,7 @@ export interface Database {
           ai_summary?: string | null
           is_signed?: boolean
           signed_at?: string | null
+          raw_dictation?: Json | null
         }
       }
       clinical_scales: {
@@ -252,6 +255,50 @@ export interface Database {
           value?: string
           created_at?: string
           updated_at?: string
+        }
+      }
+      dot_phrases: {
+        Row: {
+          id: string
+          created_at: string
+          updated_at: string
+          user_id: string
+          trigger_text: string
+          expansion_text: string
+          category: string | null
+          description: string | null
+          is_active: boolean
+          use_count: number
+          last_used: string | null
+          scope: 'global' | 'hpi' | 'assessment' | 'plan' | 'ros' | 'allergies'
+        }
+        Insert: {
+          id?: string
+          created_at?: string
+          updated_at?: string
+          user_id: string
+          trigger_text: string
+          expansion_text: string
+          category?: string | null
+          description?: string | null
+          is_active?: boolean
+          use_count?: number
+          last_used?: string | null
+          scope?: 'global' | 'hpi' | 'assessment' | 'plan' | 'ros' | 'allergies'
+        }
+        Update: {
+          id?: string
+          created_at?: string
+          updated_at?: string
+          user_id?: string
+          trigger_text?: string
+          expansion_text?: string
+          category?: string | null
+          description?: string | null
+          is_active?: boolean
+          use_count?: number
+          last_used?: string | null
+          scope?: 'global' | 'hpi' | 'assessment' | 'plan' | 'ros' | 'allergies'
         }
       }
     }
