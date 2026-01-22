@@ -85,9 +85,8 @@ export default function InlinePhrasePicker({
       ref={containerRef}
       style={{
         position: 'absolute',
-        top: '100%',
+        top: '36px',
         right: '0',
-        marginTop: '4px',
         width: '320px',
         background: 'var(--bg-white)',
         borderRadius: '12px',
