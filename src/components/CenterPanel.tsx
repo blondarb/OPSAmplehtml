@@ -12,15 +12,20 @@ interface CenterPanelProps {
 
 const CHIEF_COMPLAINTS = [
   'Altered mental status', 'Amnesia', 'Blurry vision', 'Chronic pain',
-  'Dizziness/Vertigo', 'Double vision', 'Headache', 'Memory problem',
-  'Movement problem', 'Neuropathy', 'Numbness', 'Parkinson Disease',
-  'Seizure', 'Stroke like symptoms', 'Syncope', 'TIA', 'Tremor',
-  'Vision loss', 'Weakness', 'Other'
+  'Confirmed stroke on neuroimaging', 'Difficulty swallowing', 'Dizziness/Vertigo',
+  'Double vision', 'Headache', 'Hemorrhagic Stroke', 'Hypoxic/Anoxic brain injury',
+  'Memory problem', 'Movement problem', 'Multiple Sclerosis Exacerbation',
+  'Myasthenia Gravis Exacerbation', 'Neuropathy', 'Numbness', 'Parkinson Disease',
+  'Prognosis after cardiac arrest', 'Seizure', 'Stroke like symptoms', 'Syncope',
+  'TIA', 'Tremor', 'Vision loss', 'Weakness', 'Other'
 ]
+
+const ALLERGY_OPTIONS = ['NKDA', 'Reviewed in EMR', 'Unknown', 'Other']
+const ROS_OPTIONS = ['Reviewed', 'Unable to obtain due to:', 'Other']
+const HISTORY_OPTIONS = ['Yes', 'No, due to patient mentation', 'NA due to phone consult']
 
 export default function CenterPanel({ noteData, updateNote, currentVisit, imagingStudies, openAiDrawer }: CenterPanelProps) {
   const [activeTab, setActiveTab] = useState('history')
-  const [openAccordions, setOpenAccordions] = useState<string[]>(['headache-scales'])
 
   const toggleChip = (complaint: string) => {
     const current = noteData.chiefComplaint || []
@@ -29,12 +34,6 @@ export default function CenterPanel({ noteData, updateNote, currentVisit, imagin
     } else {
       updateNote('chiefComplaint', [...current, complaint])
     }
-  }
-
-  const toggleAccordion = (id: string) => {
-    setOpenAccordions(prev =>
-      prev.includes(id) ? prev.filter(a => a !== id) : [...prev, id]
-    )
   }
 
   const tabs = [
@@ -46,16 +45,17 @@ export default function CenterPanel({ noteData, updateNote, currentVisit, imagin
 
   return (
     <main style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-      {/* Tab Navigation */}
+      {/* Tab Navigation with Action Bar */}
       <div style={{
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'space-between',
         background: 'var(--bg-white)',
         borderBottom: '1px solid var(--border)',
-        paddingRight: '16px',
+        padding: '0 16px',
       }}>
-        <div style={{ display: 'flex', gap: '4px', padding: '0 24px' }}>
+        {/* Tabs */}
+        <div style={{ display: 'flex', gap: '4px' }}>
           {tabs.map(tab => (
             <button
               key={tab.id}
@@ -64,12 +64,12 @@ export default function CenterPanel({ noteData, updateNote, currentVisit, imagin
                 padding: '16px 20px',
                 fontSize: '14px',
                 fontWeight: 500,
-                color: activeTab === tab.id ? 'var(--primary)' : 'var(--text-secondary)',
+                color: activeTab === tab.id ? 'var(--text-primary)' : 'var(--text-secondary)',
                 background: 'none',
                 border: 'none',
                 cursor: 'pointer',
                 position: 'relative',
-                borderBottom: activeTab === tab.id ? '2px solid var(--primary)' : '2px solid transparent',
+                borderBottom: activeTab === tab.id ? '2px solid var(--text-primary)' : '2px solid transparent',
                 marginBottom: '-1px',
               }}
             >
@@ -77,411 +77,387 @@ export default function CenterPanel({ noteData, updateNote, currentVisit, imagin
             </button>
           ))}
         </div>
+
+        {/* Action Buttons */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          {/* More Options */}
+          <button style={{
+            width: '32px',
+            height: '32px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            borderRadius: '6px',
+            border: 'none',
+            background: 'transparent',
+            cursor: 'pointer',
+            color: 'var(--text-secondary)',
+          }}>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+              <circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/><circle cx="5" cy="12" r="2"/>
+            </svg>
+          </button>
+
+          {/* Thumbs Up */}
+          <button style={{
+            width: '32px',
+            height: '32px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            borderRadius: '6px',
+            border: 'none',
+            background: 'transparent',
+            cursor: 'pointer',
+            color: 'var(--text-secondary)',
+          }}>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M14 9V5a3 3 0 00-3-3l-4 9v11h11.28a2 2 0 002-1.7l1.38-9a2 2 0 00-2-2.3zM7 22H4a2 2 0 01-2-2v-7a2 2 0 012-2h3"/>
+            </svg>
+          </button>
+
+          {/* Microphone */}
+          <button
+            onClick={() => openAiDrawer('document')}
+            style={{
+              width: '32px',
+              height: '32px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              borderRadius: '6px',
+              border: 'none',
+              background: 'transparent',
+              cursor: 'pointer',
+              color: 'var(--text-secondary)',
+            }}
+          >
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M12 1a3 3 0 00-3 3v8a3 3 0 006 0V4a3 3 0 00-3-3z"/><path d="M19 10v2a7 7 0 01-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/>
+            </svg>
+          </button>
+
+          {/* AI Star */}
+          <button
+            onClick={() => openAiDrawer('ask-ai')}
+            style={{
+              width: '32px',
+              height: '32px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              borderRadius: '6px',
+              border: 'none',
+              background: 'var(--primary)',
+              cursor: 'pointer',
+              color: 'white',
+            }}
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
+            </svg>
+          </button>
+
+          {/* Copy */}
+          <button style={{
+            width: '32px',
+            height: '32px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            borderRadius: '6px',
+            border: 'none',
+            background: 'transparent',
+            cursor: 'pointer',
+            color: 'var(--text-secondary)',
+          }}>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/>
+            </svg>
+          </button>
+
+          {/* Divider */}
+          <div style={{ width: '1px', height: '24px', background: 'var(--border)', margin: '0 4px' }}/>
+
+          {/* Pend Button */}
+          <button style={{
+            padding: '8px 16px',
+            borderRadius: '8px',
+            border: '1px solid var(--border)',
+            background: 'var(--bg-white)',
+            cursor: 'pointer',
+            fontSize: '13px',
+            fontWeight: 500,
+            color: 'var(--text-primary)',
+          }}>
+            Pend
+          </button>
+
+          {/* Sign & Complete Button */}
+          <button style={{
+            padding: '8px 16px',
+            borderRadius: '8px',
+            border: 'none',
+            background: 'var(--primary)',
+            cursor: 'pointer',
+            fontSize: '13px',
+            fontWeight: 500,
+            color: 'white',
+          }}>
+            Sign & complete
+          </button>
+        </div>
       </div>
 
       {/* Tab Content */}
-      <div style={{ flex: 1, overflowY: 'auto', padding: '24px', background: 'var(--bg-gray)' }}>
+      <div style={{ flex: 1, overflowY: 'auto', padding: '24px', background: 'var(--bg-gray)', position: 'relative' }}>
         {/* History Tab */}
         {activeTab === 'history' && (
           <>
-            {/* Chief Complaint */}
-            <div style={{
-              background: 'var(--bg-white)',
-              borderRadius: '12px',
-              padding: '20px',
-              marginBottom: '16px',
-              boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
-            }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-                <span style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text-primary)' }}>Reason for visit</span>
-                <span style={{
-                  background: 'var(--error)',
-                  color: 'white',
-                  fontSize: '11px',
-                  fontWeight: 500,
-                  padding: '3px 8px',
-                  borderRadius: '4px',
-                }}>Required</span>
-              </div>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
-                {CHIEF_COMPLAINTS.map(complaint => (
-                  <button
-                    key={complaint}
-                    onClick={() => toggleChip(complaint)}
-                    style={{
-                      padding: '8px 14px',
-                      borderRadius: '20px',
-                      fontSize: '13px',
-                      cursor: 'pointer',
-                      border: '1px solid',
-                      borderColor: noteData.chiefComplaint?.includes(complaint) ? 'var(--primary)' : 'var(--border)',
-                      background: noteData.chiefComplaint?.includes(complaint) ? 'var(--primary)' : 'var(--bg-white)',
-                      color: noteData.chiefComplaint?.includes(complaint) ? 'white' : 'var(--text-secondary)',
-                      transition: 'all 0.2s',
-                    }}
-                  >
-                    {complaint}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* HPI */}
-            <div style={{
-              background: 'var(--bg-white)',
-              borderRadius: '12px',
-              padding: '20px',
-              marginBottom: '16px',
-              boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
-            }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-                <span style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text-primary)' }}>History of presenting illness</span>
-                <span style={{
-                  background: 'var(--error)',
-                  color: 'white',
-                  fontSize: '11px',
-                  fontWeight: 500,
-                  padding: '3px 8px',
-                  borderRadius: '4px',
-                }}>Required</span>
-              </div>
-              <div style={{ position: 'relative' }}>
-                <textarea
-                  value={noteData.hpi}
-                  onChange={(e) => updateNote('hpi', e.target.value)}
-                  placeholder="Min. 25 words"
-                  style={{
-                    width: '100%',
-                    minHeight: '120px',
-                    padding: '12px',
-                    paddingRight: '80px',
-                    border: '1px solid var(--border)',
-                    borderRadius: '8px',
-                    fontSize: '14px',
-                    resize: 'vertical',
-                    outline: 'none',
-                    fontFamily: 'inherit',
-                    color: 'var(--text-primary)',
-                    background: 'var(--bg-white)',
-                  }}
-                />
-                <div style={{
-                  position: 'absolute',
-                  top: '8px',
-                  right: '8px',
-                  display: 'flex',
-                  gap: '4px',
-                }}>
-                  <button
-                    onClick={() => openAiDrawer('document')}
-                    style={{
-                      width: '28px',
-                      height: '28px',
-                      borderRadius: '6px',
-                      border: '1px solid var(--border)',
-                      background: 'var(--bg-white)',
-                      cursor: 'pointer',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      color: 'var(--text-muted)',
-                    }}
-                    title="Dictate"
-                  >
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                      <path d="M12 1a3 3 0 00-3 3v8a3 3 0 006 0V4a3 3 0 00-3-3z"/><path d="M19 10v2a7 7 0 01-14 0v-2"/>
-                    </svg>
-                  </button>
-                  <button
-                    onClick={() => openAiDrawer('ask-ai')}
-                    style={{
-                      width: '28px',
-                      height: '28px',
-                      borderRadius: '6px',
-                      border: 'none',
-                      background: 'linear-gradient(135deg, var(--primary) 0%, var(--primary-light) 100%)',
-                      cursor: 'pointer',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      color: 'white',
-                    }}
-                    title="AI Actions"
-                  >
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                      <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
-                    </svg>
-                  </button>
-                </div>
-              </div>
-            </div>
-
-            {/* Clinical Scales */}
-            <div style={{
-              background: 'var(--bg-white)',
-              borderRadius: '12px',
-              padding: '20px',
-              marginBottom: '16px',
-              boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
-            }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-                <span style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text-primary)' }}>Clinical Scales</span>
-                <span style={{
-                  background: 'var(--bg-dark)',
-                  color: 'var(--text-secondary)',
-                  fontSize: '11px',
-                  fontWeight: 500,
-                  padding: '3px 8px',
-                  borderRadius: '4px',
-                }}>Optional</span>
-              </div>
-
-              {/* Headache Scales Accordion */}
+            {/* Reason for Consult */}
+            <div style={{ position: 'relative', marginBottom: '16px' }}>
+              <span style={{
+                position: 'absolute',
+                right: '-12px',
+                top: '0',
+                background: '#EF4444',
+                color: 'white',
+                fontSize: '11px',
+                fontWeight: 500,
+                padding: '4px 8px',
+                borderRadius: '0 4px 4px 0',
+                zIndex: 1,
+              }}>Required</span>
               <div style={{
-                border: '1px solid var(--border)',
-                borderRadius: '8px',
-                marginBottom: '8px',
-                overflow: 'hidden',
+                background: 'var(--bg-white)',
+                borderRadius: '12px',
+                padding: '20px',
+                boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
               }}>
-                <div
-                  onClick={() => toggleAccordion('headache-scales')}
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    padding: '14px 16px',
-                    background: 'var(--bg-white)',
-                    cursor: 'pointer',
-                  }}
-                >
-                  <span style={{ display: 'flex', alignItems: 'center', gap: '12px', fontWeight: 500 }}>
-                    <span style={{
-                      width: '8px',
-                      height: '8px',
-                      borderRadius: '50%',
-                      background: 'var(--success)',
-                    }}/>
-                    Headache Scales
-                  </span>
-                  <svg
-                    width="16"
-                    height="16"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="var(--text-muted)"
-                    strokeWidth="2"
-                    style={{
-                      transform: openAccordions.includes('headache-scales') ? 'rotate(180deg)' : 'rotate(0)',
-                      transition: 'transform 0.2s',
-                    }}
-                  >
-                    <polyline points="6 9 12 15 18 9"/>
-                  </svg>
+                <div style={{ marginBottom: '16px' }}>
+                  <span style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text-primary)' }}>Reason for consult</span>
+                  <span style={{ color: '#EF4444', marginLeft: '2px' }}>*</span>
                 </div>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+                  {CHIEF_COMPLAINTS.map(complaint => (
+                    <button
+                      key={complaint}
+                      onClick={() => toggleChip(complaint)}
+                      style={{
+                        padding: '8px 14px',
+                        borderRadius: '20px',
+                        fontSize: '13px',
+                        cursor: 'pointer',
+                        border: '1px solid',
+                        borderColor: noteData.chiefComplaint?.includes(complaint) ? 'var(--primary)' : 'var(--border)',
+                        background: noteData.chiefComplaint?.includes(complaint) ? 'var(--primary)' : 'var(--bg-white)',
+                        color: noteData.chiefComplaint?.includes(complaint) ? 'white' : 'var(--text-secondary)',
+                        transition: 'all 0.2s',
+                      }}
+                    >
+                      {complaint}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
 
-                {openAccordions.includes('headache-scales') && (
+            {/* History of Presenting Illness */}
+            <div style={{ position: 'relative', marginBottom: '16px' }}>
+              <span style={{
+                position: 'absolute',
+                right: '-12px',
+                top: '0',
+                background: '#EF4444',
+                color: 'white',
+                fontSize: '11px',
+                fontWeight: 500,
+                padding: '4px 8px',
+                borderRadius: '0 4px 4px 0',
+                zIndex: 1,
+              }}>Required</span>
+              <div style={{
+                background: 'var(--bg-white)',
+                borderRadius: '12px',
+                padding: '20px',
+                boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
+              }}>
+                <div style={{ marginBottom: '16px' }}>
+                  <span style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text-primary)' }}>History of presenting illness</span>
+                  <span style={{ color: '#3B82F6', marginLeft: '8px', fontSize: '13px' }}>(Min. 25 words)*</span>
+                </div>
+                <div style={{ position: 'relative' }}>
                   <div style={{
-                    padding: '16px',
-                    borderTop: '1px solid var(--border)',
-                    background: 'var(--bg-gray)',
+                    position: 'absolute',
+                    top: '-8px',
+                    left: '12px',
+                    background: 'var(--bg-white)',
+                    padding: '0 4px',
+                    fontSize: '12px',
+                    color: 'var(--text-muted)',
                   }}>
-                    {/* MIDAS */}
-                    <div style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '16px',
-                      padding: '12px 0',
-                      borderBottom: '1px solid var(--border)',
-                    }}>
-                      <span style={{ flex: 1, fontWeight: 500 }}>MIDAS Score</span>
-                      <input
-                        type="number"
-                        defaultValue={18}
-                        style={{
-                          width: '80px',
-                          padding: '8px',
-                          border: '1px solid var(--border)',
-                          borderRadius: '6px',
-                          textAlign: 'center',
-                        }}
-                      />
-                      <select style={{
-                        width: '150px',
-                        padding: '8px',
-                        border: '1px solid var(--border)',
-                        borderRadius: '6px',
-                        background: 'var(--bg-white)',
-                      }}>
-                        <option>Moderate disability</option>
-                        <option>Little/No disability</option>
-                        <option>Mild disability</option>
-                        <option>Severe disability</option>
-                      </select>
-                    </div>
-                    {/* HIT-6 */}
-                    <div style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '16px',
-                      padding: '12px 0',
-                    }}>
-                      <span style={{ flex: 1, fontWeight: 500 }}>HIT-6 Score</span>
-                      <input
-                        type="number"
-                        defaultValue={58}
-                        style={{
-                          width: '80px',
-                          padding: '8px',
-                          border: '1px solid var(--border)',
-                          borderRadius: '6px',
-                          textAlign: 'center',
-                        }}
-                      />
-                      <select style={{
-                        width: '150px',
-                        padding: '8px',
-                        border: '1px solid var(--border)',
-                        borderRadius: '6px',
-                        background: 'var(--bg-white)',
-                      }}>
-                        <option>Substantial impact</option>
-                        <option>Little/No impact</option>
-                        <option>Some impact</option>
-                        <option>Severe impact</option>
-                      </select>
-                    </div>
+                    Describe symptoms and history *
                   </div>
-                )}
-              </div>
-
-              {/* Cognitive Scales */}
-              <div style={{
-                border: '1px solid var(--border)',
-                borderRadius: '8px',
-                marginBottom: '8px',
-              }}>
-                <div
-                  onClick={() => toggleAccordion('cognitive-scales')}
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    padding: '14px 16px',
-                    cursor: 'pointer',
-                  }}
-                >
-                  <span style={{ display: 'flex', alignItems: 'center', gap: '12px', fontWeight: 500 }}>
-                    <span style={{
-                      width: '8px',
-                      height: '8px',
-                      borderRadius: '50%',
-                      background: 'var(--border)',
-                    }}/>
-                    Cognitive Scales
-                  </span>
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--text-muted)" strokeWidth="2">
-                    <polyline points="6 9 12 15 18 9"/>
-                  </svg>
-                </div>
-              </div>
-
-              {/* Mental Health */}
-              <div style={{
-                border: '1px solid var(--border)',
-                borderRadius: '8px',
-              }}>
-                <div
-                  onClick={() => toggleAccordion('mental-health')}
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    padding: '14px 16px',
-                    cursor: 'pointer',
-                  }}
-                >
-                  <span style={{ display: 'flex', alignItems: 'center', gap: '12px', fontWeight: 500 }}>
-                    <span style={{
-                      width: '8px',
-                      height: '8px',
-                      borderRadius: '50%',
-                      background: 'var(--border)',
-                    }}/>
-                    Mental Health Screens
-                  </span>
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--text-muted)" strokeWidth="2">
-                    <polyline points="6 9 12 15 18 9"/>
-                  </svg>
+                  <textarea
+                    value={noteData.hpi}
+                    onChange={(e) => updateNote('hpi', e.target.value)}
+                    placeholder=""
+                    style={{
+                      width: '100%',
+                      minHeight: '120px',
+                      padding: '16px',
+                      border: '1px solid var(--border)',
+                      borderRadius: '8px',
+                      fontSize: '14px',
+                      resize: 'vertical',
+                      outline: 'none',
+                      fontFamily: 'inherit',
+                      color: 'var(--text-primary)',
+                      background: 'var(--bg-white)',
+                    }}
+                  />
                 </div>
               </div>
             </div>
 
-            {/* ROS */}
-            <div style={{
-              background: 'var(--bg-white)',
-              borderRadius: '12px',
-              padding: '20px',
-              marginBottom: '16px',
-              boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
-            }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-                <span style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text-primary)' }}>Review of systems</span>
-                <span style={{
-                  background: 'var(--error)',
-                  color: 'white',
-                  fontSize: '11px',
-                  fontWeight: 500,
-                  padding: '3px 8px',
-                  borderRadius: '4px',
-                }}>Required</span>
-              </div>
-              <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap' }}>
-                {['Reviewed', 'Unable to obtain due to:', 'Other'].map(option => (
-                  <label key={option} style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
-                    <input
-                      type="radio"
-                      name="ros"
-                      checked={noteData.ros === option}
-                      onChange={() => updateNote('ros', option)}
-                      style={{ accentColor: 'var(--primary)' }}
-                    />
-                    {option}
-                  </label>
-                ))}
+            {/* Review of System */}
+            <div style={{ position: 'relative', marginBottom: '16px' }}>
+              <span style={{
+                position: 'absolute',
+                right: '-12px',
+                top: '0',
+                background: '#EF4444',
+                color: 'white',
+                fontSize: '11px',
+                fontWeight: 500,
+                padding: '4px 8px',
+                borderRadius: '0 4px 4px 0',
+                zIndex: 1,
+              }}>Required</span>
+              <div style={{
+                background: 'var(--bg-white)',
+                borderRadius: '12px',
+                padding: '20px',
+                boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
+              }}>
+                <div style={{ marginBottom: '16px' }}>
+                  <span style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text-primary)' }}>Review of system</span>
+                  <span style={{ color: '#EF4444', marginLeft: '2px' }}>*</span>
+                </div>
+                <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                  {ROS_OPTIONS.map(option => (
+                    <button
+                      key={option}
+                      onClick={() => updateNote('ros', option)}
+                      style={{
+                        padding: '8px 16px',
+                        borderRadius: '20px',
+                        fontSize: '13px',
+                        cursor: 'pointer',
+                        border: '1px solid',
+                        borderColor: noteData.ros === option ? 'var(--primary)' : 'var(--border)',
+                        background: noteData.ros === option ? 'var(--primary)' : 'var(--bg-white)',
+                        color: noteData.ros === option ? 'white' : 'var(--text-secondary)',
+                      }}
+                    >
+                      {option}
+                    </button>
+                  ))}
+                </div>
               </div>
             </div>
 
             {/* Allergies */}
-            <div style={{
-              background: 'var(--bg-white)',
-              borderRadius: '12px',
-              padding: '20px',
-              boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
-            }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-                <span style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text-primary)' }}>Allergies</span>
-                <span style={{
-                  background: 'var(--error)',
-                  color: 'white',
-                  fontSize: '11px',
-                  fontWeight: 500,
-                  padding: '3px 8px',
-                  borderRadius: '4px',
-                }}>Required</span>
+            <div style={{ position: 'relative', marginBottom: '16px' }}>
+              <span style={{
+                position: 'absolute',
+                right: '-12px',
+                top: '0',
+                background: '#EF4444',
+                color: 'white',
+                fontSize: '11px',
+                fontWeight: 500,
+                padding: '4px 8px',
+                borderRadius: '0 4px 4px 0',
+                zIndex: 1,
+              }}>Required</span>
+              <div style={{
+                background: 'var(--bg-white)',
+                borderRadius: '12px',
+                padding: '20px',
+                boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
+              }}>
+                <div style={{ marginBottom: '16px' }}>
+                  <span style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text-primary)' }}>Allergies</span>
+                  <span style={{ color: '#EF4444', marginLeft: '2px' }}>*</span>
+                </div>
+                <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                  {ALLERGY_OPTIONS.map(option => (
+                    <button
+                      key={option}
+                      onClick={() => updateNote('allergies', option)}
+                      style={{
+                        padding: '8px 16px',
+                        borderRadius: '20px',
+                        fontSize: '13px',
+                        cursor: 'pointer',
+                        border: '1px solid',
+                        borderColor: noteData.allergies === option ? 'var(--primary)' : 'var(--border)',
+                        background: noteData.allergies === option ? 'var(--primary)' : 'var(--bg-white)',
+                        color: noteData.allergies === option ? 'white' : 'var(--text-secondary)',
+                      }}
+                    >
+                      {option}
+                    </button>
+                  ))}
+                </div>
               </div>
-              <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap' }}>
-                {['NKDA', 'Reviewed in EHR', 'Unknown', 'Other'].map(option => (
-                  <label key={option} style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
-                    <input
-                      type="radio"
-                      name="allergies"
-                      checked={noteData.allergies === option}
-                      onChange={() => updateNote('allergies', option)}
-                      style={{ accentColor: 'var(--primary)' }}
-                    />
-                    {option}
-                  </label>
-                ))}
+            </div>
+
+            {/* Medical History Available */}
+            <div style={{ position: 'relative', marginBottom: '16px' }}>
+              <span style={{
+                position: 'absolute',
+                right: '-12px',
+                top: '0',
+                background: '#EF4444',
+                color: 'white',
+                fontSize: '11px',
+                fontWeight: 500,
+                padding: '4px 8px',
+                borderRadius: '0 4px 4px 0',
+                zIndex: 1,
+              }}>Required</span>
+              <div style={{
+                background: 'var(--bg-white)',
+                borderRadius: '12px',
+                padding: '20px',
+                boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
+              }}>
+                <div style={{ marginBottom: '16px' }}>
+                  <span style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text-primary)' }}>Is medical, surgical, family and social history available?</span>
+                  <span style={{ color: '#EF4444', marginLeft: '2px' }}>*</span>
+                </div>
+                <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                  {HISTORY_OPTIONS.map(option => (
+                    <button
+                      key={option}
+                      onClick={() => updateNote('historyAvailable', option)}
+                      style={{
+                        padding: '8px 16px',
+                        borderRadius: '20px',
+                        fontSize: '13px',
+                        cursor: 'pointer',
+                        border: '1px solid',
+                        borderColor: noteData.historyAvailable === option ? 'var(--primary)' : 'var(--border)',
+                        background: noteData.historyAvailable === option ? 'var(--primary)' : 'var(--bg-white)',
+                        color: noteData.historyAvailable === option ? 'white' : 'var(--text-secondary)',
+                      }}
+                    >
+                      {option}
+                    </button>
+                  ))}
+                </div>
               </div>
             </div>
           </>
@@ -490,91 +466,143 @@ export default function CenterPanel({ noteData, updateNote, currentVisit, imagin
         {/* Imaging Tab */}
         {activeTab === 'imaging' && (
           <div>
-            {imagingStudies.length === 0 ? (
-              <div style={{
-                background: 'var(--bg-white)',
-                borderRadius: '12px',
-                padding: '40px',
-                textAlign: 'center',
-                color: 'var(--text-muted)',
-              }}>
-                No imaging studies found
-              </div>
-            ) : (
-              imagingStudies.map(study => (
-                <div key={study.id} style={{
-                  background: 'var(--bg-white)',
-                  border: '1px solid var(--border)',
-                  borderRadius: '8px',
-                  marginBottom: '8px',
-                  overflow: 'hidden',
-                }}>
-                  <div style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    padding: '14px 16px',
-                  }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                      <span style={{ fontWeight: 500 }}>{study.study_type} - {study.description}</span>
-                    </div>
-                    <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
-                      {new Date(study.study_date).toLocaleDateString()}
-                    </span>
-                  </div>
-                  {study.impression && (
-                    <div style={{
-                      padding: '16px',
-                      borderTop: '1px solid var(--border)',
-                      background: 'var(--bg-gray)',
-                      fontSize: '13px',
-                      color: 'var(--text-secondary)',
-                    }}>
-                      <strong>Impression:</strong> {study.impression}
-                    </div>
-                  )}
+            {/* CTH Done */}
+            <div style={{
+              background: 'var(--bg-white)',
+              borderRadius: '12px',
+              padding: '20px',
+              marginBottom: '16px',
+              boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+                <span style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text-primary)' }}>Was CTH done?</span>
+                <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>(Optional)</span>
+                <div style={{ display: 'flex', gap: '8px', marginLeft: 'auto' }}>
+                  <button style={{
+                    padding: '8px 24px',
+                    borderRadius: '20px',
+                    fontSize: '13px',
+                    cursor: 'pointer',
+                    border: '1px solid var(--border)',
+                    background: 'var(--bg-white)',
+                    color: 'var(--text-secondary)',
+                  }}>Yes</button>
+                  <button style={{
+                    padding: '8px 24px',
+                    borderRadius: '20px',
+                    fontSize: '13px',
+                    cursor: 'pointer',
+                    border: '1px solid var(--border)',
+                    background: 'var(--bg-white)',
+                    color: 'var(--text-secondary)',
+                  }}>No</button>
                 </div>
-              ))
-            )}
-          </div>
-        )}
-
-        {/* Exam Tab */}
-        {activeTab === 'exam' && (
-          <div style={{
-            background: 'var(--bg-white)',
-            borderRadius: '12px',
-            padding: '20px',
-            boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
-          }}>
-            <div style={{ marginBottom: '16px' }}>
-              <button style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '6px',
-                padding: '10px 16px',
-                background: 'linear-gradient(135deg, var(--primary) 0%, var(--primary-light) 100%)',
-                color: 'white',
-                border: 'none',
-                borderRadius: '8px',
-                fontWeight: 500,
-                cursor: 'pointer',
-              }}>
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <polyline points="20 6 9 17 4 12"/>
-                </svg>
-                Quick Normal Exam
-              </button>
+              </div>
             </div>
-            <p style={{ color: 'var(--text-muted)', fontSize: '13px' }}>
-              Physical examination documentation will appear here. Click &quot;Quick Normal Exam&quot; to populate with normal findings.
-            </p>
-          </div>
-        )}
 
-        {/* Recommendation Tab */}
-        {activeTab === 'recommendation' && (
-          <>
+            {/* CTA head & neck */}
+            <div style={{
+              background: 'var(--bg-white)',
+              borderRadius: '12px',
+              padding: '20px',
+              marginBottom: '16px',
+              boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+                <span style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text-primary)' }}>Was CTA head & neck done?</span>
+                <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>(Optional)</span>
+                <div style={{ display: 'flex', gap: '8px', marginLeft: 'auto' }}>
+                  <button style={{
+                    padding: '8px 24px',
+                    borderRadius: '20px',
+                    fontSize: '13px',
+                    cursor: 'pointer',
+                    border: '1px solid var(--border)',
+                    background: 'var(--bg-white)',
+                    color: 'var(--text-secondary)',
+                  }}>Yes</button>
+                  <button style={{
+                    padding: '8px 24px',
+                    borderRadius: '20px',
+                    fontSize: '13px',
+                    cursor: 'pointer',
+                    border: '1px solid var(--border)',
+                    background: 'var(--bg-white)',
+                    color: 'var(--text-secondary)',
+                  }}>No</button>
+                </div>
+              </div>
+            </div>
+
+            {/* MRI brain */}
+            <div style={{
+              background: 'var(--bg-white)',
+              borderRadius: '12px',
+              padding: '20px',
+              marginBottom: '16px',
+              boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+                <span style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text-primary)' }}>MRI brain</span>
+                <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>(Optional)</span>
+                <div style={{ display: 'flex', gap: '8px', marginLeft: 'auto' }}>
+                  <button style={{
+                    padding: '8px 24px',
+                    borderRadius: '20px',
+                    fontSize: '13px',
+                    cursor: 'pointer',
+                    border: '1px solid var(--border)',
+                    background: 'var(--bg-white)',
+                    color: 'var(--text-secondary)',
+                  }}>Yes</button>
+                  <button style={{
+                    padding: '8px 24px',
+                    borderRadius: '20px',
+                    fontSize: '13px',
+                    cursor: 'pointer',
+                    border: '1px solid var(--primary)',
+                    background: 'var(--primary)',
+                    color: 'white',
+                  }}>No</button>
+                </div>
+              </div>
+            </div>
+
+            {/* TTE */}
+            <div style={{
+              background: 'var(--bg-white)',
+              borderRadius: '12px',
+              padding: '20px',
+              marginBottom: '16px',
+              boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+                <span style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text-primary)' }}>TTE</span>
+                <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>(Optional)</span>
+                <div style={{ display: 'flex', gap: '8px', marginLeft: 'auto' }}>
+                  <button style={{
+                    padding: '8px 24px',
+                    borderRadius: '20px',
+                    fontSize: '13px',
+                    cursor: 'pointer',
+                    border: '1px solid var(--border)',
+                    background: 'var(--bg-white)',
+                    color: 'var(--text-secondary)',
+                  }}>Yes</button>
+                  <button style={{
+                    padding: '8px 24px',
+                    borderRadius: '20px',
+                    fontSize: '13px',
+                    cursor: 'pointer',
+                    border: '1px solid var(--border)',
+                    background: 'var(--bg-white)',
+                    color: 'var(--text-secondary)',
+                  }}>No</button>
+                </div>
+              </div>
+            </div>
+
+            {/* Lab results */}
             <div style={{
               background: 'var(--bg-white)',
               borderRadius: '12px',
@@ -583,72 +611,453 @@ export default function CenterPanel({ noteData, updateNote, currentVisit, imagin
               boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
             }}>
               <div style={{ marginBottom: '16px' }}>
-                <span style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text-primary)' }}>Diagnosis</span>
+                <span style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text-primary)' }}>Lab results</span>
+                <span style={{ fontSize: '12px', color: 'var(--text-muted)', marginLeft: '8px' }}>(Optional)</span>
               </div>
-              <input
-                type="text"
-                placeholder="Search diagnoses by name or ICD-10 code..."
-                style={{
-                  width: '100%',
-                  padding: '12px 16px',
-                  paddingLeft: '40px',
-                  border: '1px solid var(--border)',
-                  borderRadius: '8px',
-                  fontSize: '14px',
-                  outline: 'none',
-                }}
-              />
+              <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                {['Lipid profile panel', 'HbA1c', 'Other lab results'].map(option => (
+                  <button
+                    key={option}
+                    style={{
+                      padding: '8px 16px',
+                      borderRadius: '20px',
+                      fontSize: '13px',
+                      cursor: 'pointer',
+                      border: '1px solid var(--border)',
+                      background: 'var(--bg-white)',
+                      color: 'var(--text-secondary)',
+                    }}
+                  >
+                    {option}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Exam Tab */}
+        {activeTab === 'exam' && (
+          <div>
+            {/* Initial Assessment */}
+            <div style={{
+              background: 'var(--bg-white)',
+              borderRadius: '12px',
+              padding: '20px',
+              marginBottom: '16px',
+              boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px' }}>
+                <span style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text-primary)' }}>Initial assessment</span>
+                <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>(Optional)</span>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--text-muted)" strokeWidth="2">
+                  <circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 015.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/>
+                </svg>
+              </div>
+              <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap' }}>
+                <div style={{ flex: '1 1 200px' }}>
+                  <label style={{ display: 'block', fontSize: '12px', color: 'var(--text-muted)', marginBottom: '4px' }}>Select date</label>
+                  <div style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                    padding: '8px 12px',
+                    border: '1px solid var(--border)',
+                    borderRadius: '8px',
+                  }}>
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" strokeWidth="2">
+                      <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>
+                    </svg>
+                    <span style={{ fontSize: '14px', color: 'var(--text-primary)' }}>01/16/2026</span>
+                  </div>
+                </div>
+                <div style={{ flex: '1 1 200px' }}>
+                  <label style={{ display: 'block', fontSize: '12px', color: 'var(--text-muted)', marginBottom: '4px' }}>Military Time (PST)</label>
+                  <div style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                    padding: '8px 12px',
+                    border: '1px solid var(--border)',
+                    borderRadius: '8px',
+                  }}>
+                    <span style={{ fontSize: '14px', color: 'var(--text-primary)' }}>HH : MM</span>
+                    <button style={{
+                      marginLeft: 'auto',
+                      padding: '4px 12px',
+                      borderRadius: '16px',
+                      border: '1px solid var(--border)',
+                      background: 'var(--bg-white)',
+                      fontSize: '12px',
+                      cursor: 'pointer',
+                    }}>Now</button>
+                  </div>
+                </div>
+              </div>
             </div>
 
+            {/* Neuro exam */}
+            <div style={{
+              background: 'var(--bg-white)',
+              borderRadius: '12px',
+              padding: '20px',
+              marginBottom: '16px',
+              boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
+            }}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: '12px', cursor: 'pointer' }}>
+                <input type="checkbox" style={{ width: '18px', height: '18px', accentColor: 'var(--primary)' }}/>
+                <span style={{ fontSize: '14px', fontWeight: 500, color: 'var(--text-primary)' }}>Neuro exam</span>
+              </label>
+            </div>
+
+            {/* Vital signs */}
+            <div style={{
+              background: 'var(--bg-white)',
+              borderRadius: '12px',
+              padding: '20px',
+              marginBottom: '16px',
+              boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
+            }}>
+              <div style={{ marginBottom: '16px' }}>
+                <span style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text-primary)' }}>Vital signs</span>
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '16px' }}>
+                <div>
+                  <label style={{ display: 'block', fontSize: '12px', color: 'var(--text-muted)', marginBottom: '4px' }}>Glucose (mg/dL) (Optional)</label>
+                  <input type="text" style={{
+                    width: '100%',
+                    padding: '10px 12px',
+                    border: '1px solid var(--border)',
+                    borderRadius: '8px',
+                    fontSize: '14px',
+                    outline: 'none',
+                  }}/>
+                </div>
+                <div>
+                  <label style={{ display: 'block', fontSize: '12px', color: 'var(--text-muted)', marginBottom: '4px' }}>BP (mm/Hg) (Optional)</label>
+                  <input type="text" style={{
+                    width: '100%',
+                    padding: '10px 12px',
+                    border: '1px solid var(--border)',
+                    borderRadius: '8px',
+                    fontSize: '14px',
+                    outline: 'none',
+                  }}/>
+                </div>
+                <div>
+                  <label style={{ display: 'block', fontSize: '12px', color: 'var(--text-muted)', marginBottom: '4px' }}>Oxygen saturation (%) (Optional)</label>
+                  <input type="text" style={{
+                    width: '100%',
+                    padding: '10px 12px',
+                    border: '1px solid var(--border)',
+                    borderRadius: '8px',
+                    fontSize: '14px',
+                    outline: 'none',
+                  }}/>
+                </div>
+                <div>
+                  <label style={{ display: 'block', fontSize: '12px', color: 'var(--text-muted)', marginBottom: '4px' }}>Pulse (bpm) (Optional)</label>
+                  <input type="text" style={{
+                    width: '100%',
+                    padding: '10px 12px',
+                    border: '1px solid var(--border)',
+                    borderRadius: '8px',
+                    fontSize: '14px',
+                    outline: 'none',
+                  }}/>
+                </div>
+              </div>
+              <div style={{ marginTop: '16px' }}>
+                <span style={{ fontSize: '14px', fontWeight: 500, color: 'var(--text-primary)' }}>Fever symptoms</span>
+                <span style={{ fontSize: '12px', color: 'var(--text-muted)', marginLeft: '8px' }}>(Optional)</span>
+                <div style={{ display: 'flex', gap: '8px', marginTop: '8px' }}>
+                  {['Febrile', 'Afebrile'].map(option => (
+                    <button
+                      key={option}
+                      style={{
+                        padding: '8px 16px',
+                        borderRadius: '20px',
+                        fontSize: '13px',
+                        cursor: 'pointer',
+                        border: '1px solid var(--border)',
+                        background: 'var(--bg-white)',
+                        color: 'var(--text-secondary)',
+                      }}
+                    >
+                      {option}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Recommendation Tab */}
+        {activeTab === 'recommendation' && (
+          <>
+            {/* Differential Diagnosis */}
+            <div style={{ position: 'relative', marginBottom: '16px' }}>
+              <span style={{
+                position: 'absolute',
+                right: '-12px',
+                top: '0',
+                background: '#EF4444',
+                color: 'white',
+                fontSize: '11px',
+                fontWeight: 500,
+                padding: '4px 8px',
+                borderRadius: '0 4px 4px 0',
+                zIndex: 1,
+              }}>Required</span>
+              <div style={{
+                background: 'var(--bg-white)',
+                borderRadius: '12px',
+                padding: '20px',
+                boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
+              }}>
+                <div style={{ marginBottom: '16px' }}>
+                  <span style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text-primary)' }}>Differential diagnosis</span>
+                  <span style={{ color: '#EF4444', marginLeft: '2px' }}>*</span>
+                </div>
+                <div style={{ position: 'relative' }}>
+                  <select style={{
+                    width: '100%',
+                    padding: '12px 16px',
+                    border: '1px solid var(--border)',
+                    borderRadius: '8px',
+                    fontSize: '14px',
+                    outline: 'none',
+                    appearance: 'none',
+                    background: 'var(--bg-white)',
+                    cursor: 'pointer',
+                  }}>
+                    <option value="">Select diagnosis...</option>
+                    <option value="migraine">Headache/migraine</option>
+                    <option value="stroke">Stroke</option>
+                    <option value="seizure">Seizure disorder</option>
+                  </select>
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--text-muted)" strokeWidth="2" style={{
+                    position: 'absolute',
+                    right: '16px',
+                    top: '50%',
+                    transform: 'translateY(-50%)',
+                    pointerEvents: 'none',
+                  }}>
+                    <polyline points="6 9 12 15 18 9"/>
+                  </svg>
+                </div>
+              </div>
+            </div>
+
+            {/* Generate Assessment Button */}
+            <button
+              onClick={() => openAiDrawer('ask-ai')}
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '8px',
+                padding: '12px 20px',
+                background: 'var(--primary)',
+                color: 'white',
+                border: 'none',
+                borderRadius: '8px',
+                fontWeight: 500,
+                cursor: 'pointer',
+                marginBottom: '16px',
+                fontSize: '14px',
+              }}
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
+              </svg>
+              Generate assessment
+            </button>
+
+            {/* Assessment */}
+            <div style={{ position: 'relative', marginBottom: '16px' }}>
+              <span style={{
+                position: 'absolute',
+                right: '-12px',
+                top: '0',
+                background: '#EF4444',
+                color: 'white',
+                fontSize: '11px',
+                fontWeight: 500,
+                padding: '4px 8px',
+                borderRadius: '0 4px 4px 0',
+                zIndex: 1,
+              }}>Required</span>
+              <div style={{
+                background: 'var(--bg-white)',
+                borderRadius: '12px',
+                padding: '20px',
+                boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
+              }}>
+                <div style={{ marginBottom: '16px' }}>
+                  <span style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text-primary)' }}>Assessment</span>
+                  <span style={{ color: '#3B82F6', marginLeft: '8px', fontSize: '13px' }}>(Min. 5 words)*</span>
+                </div>
+                <div style={{ position: 'relative' }}>
+                  <div style={{
+                    position: 'absolute',
+                    top: '-8px',
+                    left: '12px',
+                    background: 'var(--bg-white)',
+                    padding: '0 4px',
+                    fontSize: '12px',
+                    color: 'var(--text-muted)',
+                  }}>
+                    Enter a detailed assessment *
+                  </div>
+                  <textarea
+                    value={noteData.assessment}
+                    onChange={(e) => updateNote('assessment', e.target.value)}
+                    placeholder=""
+                    style={{
+                      width: '100%',
+                      minHeight: '120px',
+                      padding: '16px',
+                      border: '1px solid var(--border)',
+                      borderRadius: '8px',
+                      fontSize: '14px',
+                      resize: 'vertical',
+                      outline: 'none',
+                      fontFamily: 'inherit',
+                      color: 'var(--text-primary)',
+                      background: 'var(--bg-white)',
+                    }}
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Recommendations */}
+            <div style={{ position: 'relative', marginBottom: '16px' }}>
+              <span style={{
+                position: 'absolute',
+                right: '-12px',
+                top: '0',
+                background: '#EF4444',
+                color: 'white',
+                fontSize: '11px',
+                fontWeight: 500,
+                padding: '4px 8px',
+                borderRadius: '0 4px 4px 0',
+                zIndex: 1,
+              }}>Required</span>
+              <div style={{
+                background: 'var(--bg-white)',
+                borderRadius: '12px',
+                padding: '20px',
+                boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
+              }}>
+                <div style={{ marginBottom: '16px' }}>
+                  <span style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text-primary)' }}>Recommendations</span>
+                  <span style={{ color: '#EF4444', marginLeft: '2px' }}>*</span>
+                </div>
+                <div style={{ display: 'flex', gap: '8px', marginBottom: '16px' }}>
+                  <button style={{
+                    padding: '8px 16px',
+                    borderRadius: '8px',
+                    fontSize: '13px',
+                    cursor: 'pointer',
+                    border: 'none',
+                    background: 'var(--primary)',
+                    color: 'white',
+                    fontWeight: 500,
+                  }}>
+                    Pre-made template
+                  </button>
+                  <button style={{
+                    padding: '8px 16px',
+                    borderRadius: '8px',
+                    fontSize: '13px',
+                    cursor: 'pointer',
+                    border: '1px solid var(--border)',
+                    background: 'var(--bg-white)',
+                    color: 'var(--text-secondary)',
+                  }}>
+                    Free-text recommendations
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* Final Recommendation Time */}
             <div style={{
               background: 'var(--bg-white)',
               borderRadius: '12px',
               padding: '20px',
               boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
             }}>
-              <div style={{ marginBottom: '16px' }}>
-                <span style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text-primary)' }}>Assessment & Plan</span>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px' }}>
+                <span style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text-primary)' }}>Final recommendation time</span>
+                <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>(Optional)</span>
               </div>
-              <button
-                onClick={() => openAiDrawer('ask-ai')}
-                style={{
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: '8px',
-                  padding: '12px 20px',
-                  background: 'var(--primary)',
-                  color: 'white',
-                  border: 'none',
-                  borderRadius: '8px',
-                  fontWeight: 500,
-                  cursor: 'pointer',
-                  marginBottom: '16px',
-                }}
-              >
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
-                </svg>
-                Generate Assessment
-              </button>
-              <textarea
-                value={noteData.assessment}
-                onChange={(e) => updateNote('assessment', e.target.value)}
-                placeholder="Assessment will appear here..."
-                style={{
-                  width: '100%',
-                  minHeight: '150px',
-                  padding: '12px',
-                  border: '1px solid var(--border)',
-                  borderRadius: '8px',
-                  fontSize: '14px',
-                  resize: 'vertical',
-                  outline: 'none',
-                  fontFamily: 'inherit',
-                }}
-              />
+              <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap' }}>
+                <div style={{ flex: '1 1 200px' }}>
+                  <label style={{ display: 'block', fontSize: '12px', color: 'var(--text-muted)', marginBottom: '4px' }}>Select date</label>
+                  <div style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                    padding: '8px 12px',
+                    border: '1px solid var(--border)',
+                    borderRadius: '8px',
+                  }}>
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" strokeWidth="2">
+                      <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>
+                    </svg>
+                    <span style={{ fontSize: '14px', color: 'var(--text-primary)' }}>01/16/2026</span>
+                  </div>
+                </div>
+                <div style={{ flex: '1 1 200px' }}>
+                  <label style={{ display: 'block', fontSize: '12px', color: 'var(--text-muted)', marginBottom: '4px' }}>Military Time (PST)</label>
+                  <div style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                    padding: '8px 12px',
+                    border: '1px solid var(--border)',
+                    borderRadius: '8px',
+                  }}>
+                    <span style={{ fontSize: '14px', color: 'var(--text-primary)' }}>HH : MM</span>
+                    <button style={{
+                      marginLeft: 'auto',
+                      padding: '4px 12px',
+                      borderRadius: '16px',
+                      border: '1px solid var(--border)',
+                      background: 'var(--bg-white)',
+                      fontSize: '12px',
+                      cursor: 'pointer',
+                    }}>Now</button>
+                  </div>
+                </div>
+              </div>
             </div>
           </>
         )}
+      </div>
+
+      {/* Slide-out panel indicator */}
+      <div style={{
+        position: 'absolute',
+        right: 0,
+        top: '50%',
+        transform: 'translateY(-50%)',
+        width: '12px',
+        height: '48px',
+        background: 'var(--bg-dark)',
+        borderRadius: '8px 0 0 8px',
+        cursor: 'pointer',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+      }}>
+        <svg width="8" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--text-muted)" strokeWidth="2">
+          <polyline points="15 18 9 12 15 6"/>
+        </svg>
       </div>
     </main>
   )
