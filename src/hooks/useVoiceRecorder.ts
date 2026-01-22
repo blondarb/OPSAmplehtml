@@ -73,10 +73,17 @@ export function useVoiceRecorder(): UseVoiceRecorderResult {
         // Create audio blob
         const audioBlob = new Blob(audioChunksRef.current, { type: mimeType })
 
+        console.log('Recording stopped. Audio chunks:', audioChunksRef.current.length, 'Total size:', audioBlob.size, 'bytes')
+
         if (audioBlob.size === 0) {
           setError('No audio recorded')
           setIsRecording(false)
           return
+        }
+
+        // Warn if recording is very short (less than 5KB usually means < 1 second of audio)
+        if (audioBlob.size < 5000) {
+          console.warn('Warning: Audio file is very small, may not contain enough speech')
         }
 
         // Send to transcription API
@@ -112,8 +119,8 @@ export function useVoiceRecorder(): UseVoiceRecorderResult {
         setIsRecording(false)
       }
 
-      // Start recording
-      mediaRecorder.start(1000) // Collect data every second
+      // Start recording - collect data every 250ms for better capture of short recordings
+      mediaRecorder.start(250)
       setIsRecording(true)
       setRecordingDuration(0)
 
@@ -136,8 +143,15 @@ export function useVoiceRecorder(): UseVoiceRecorderResult {
 
   const stopRecording = useCallback(() => {
     if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
-      mediaRecorderRef.current.stop()
-      setIsRecording(false)
+      // Request any remaining data before stopping
+      mediaRecorderRef.current.requestData()
+      // Small delay to ensure data is collected
+      setTimeout(() => {
+        if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+          mediaRecorderRef.current.stop()
+        }
+        setIsRecording(false)
+      }, 100)
     }
   }, [])
 
