@@ -84,16 +84,20 @@ export default function InlinePhrasePicker({
     <div
       ref={containerRef}
       style={{
-        position: 'absolute',
-        top: '36px',
-        right: '0',
+        position: 'fixed',
+        top: 'auto',
+        bottom: '80px',
+        right: '100px',
         width: '320px',
+        maxHeight: 'calc(100vh - 160px)',
         background: 'var(--bg-white)',
         borderRadius: '12px',
         boxShadow: '0 4px 20px rgba(0,0,0,0.15)',
         border: '1px solid var(--border)',
-        zIndex: 100,
+        zIndex: 1000,
         overflow: 'hidden',
+        display: 'flex',
+        flexDirection: 'column',
       }}
     >
       {/* Header */}
