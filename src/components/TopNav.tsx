@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import type { User } from '@supabase/supabase-js'
 
 interface TopNavProps {
@@ -9,12 +9,43 @@ interface TopNavProps {
   toggleDarkMode: () => void
   onSignOut: () => void
   openAiDrawer: (tab: string) => void
-  openPhrasesDrawer: () => void
 }
 
-export default function TopNav({ user, darkMode, toggleDarkMode, onSignOut, openAiDrawer, openPhrasesDrawer }: TopNavProps) {
+export default function TopNav({ user, darkMode, toggleDarkMode, onSignOut, openAiDrawer }: TopNavProps) {
   const [aiMenuOpen, setAiMenuOpen] = useState(false)
-  const [timer] = useState('00:00')
+  const [activeQueue, setActiveQueue] = useState('rounding')
+  const [timer, setTimer] = useState({ hours: 0, minutes: 0, seconds: 0 })
+
+  // Timer effect
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setTimer(prev => {
+        let { hours, minutes, seconds } = prev
+        seconds++
+        if (seconds >= 60) {
+          seconds = 0
+          minutes++
+        }
+        if (minutes >= 60) {
+          minutes = 0
+          hours++
+        }
+        return { hours, minutes, seconds }
+      })
+    }, 1000)
+    return () => clearInterval(interval)
+  }, [])
+
+  const formatTime = () => {
+    const pad = (n: number) => n.toString().padStart(2, '0')
+    return `${pad(timer.hours)}:${pad(timer.minutes)}:${pad(timer.seconds)}`
+  }
+
+  const queues = [
+    { id: 'acute', label: 'Acute Care', count: 0 },
+    { id: 'rounding', label: 'Rounding', count: 0 },
+    { id: 'eeg', label: 'EEG', count: 0 },
+  ]
 
   return (
     <nav style={{
@@ -30,20 +61,14 @@ export default function TopNav({ user, darkMode, toggleDarkMode, onSignOut, open
       <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
         {/* Logo */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <div style={{
-            width: '32px',
-            height: '32px',
-            borderRadius: '8px',
-            background: 'var(--primary)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-          }}>
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2">
-              <path d="M22 12h-4l-3 9L9 3l-3 9H2"/>
-            </svg>
-          </div>
-          <span style={{ fontWeight: 600, fontSize: '15px', color: 'var(--text-primary)' }}>Sevaro</span>
+          <svg width="36" height="36" viewBox="0 0 40 40" fill="none">
+            <circle cx="20" cy="20" r="20" fill="#0D9488"/>
+            <path d="M20 8c-2.5 0-4.5 1-5.5 2.5C13.5 12 13 14 13 16c0 2.5 1 4.5 2.5 6 1 1 1.5 2.5 1.5 4v2h6v-2c0-1.5.5-3 1.5-4 1.5-1.5 2.5-3.5 2.5-6 0-2-.5-4-1.5-5.5C24.5 9 22.5 8 20 8z" fill="white"/>
+            <path d="M17 30h6v2h-6v-2z" fill="white"/>
+            <circle cx="20" cy="16" r="2" fill="#0D9488"/>
+            <path d="M16 14c0-1 .5-2 1.5-2.5" stroke="white" strokeWidth="1.5" strokeLinecap="round"/>
+            <path d="M24 14c0-1-.5-2-1.5-2.5" stroke="white" strokeWidth="1.5" strokeLinecap="round"/>
+          </svg>
         </div>
 
         {/* Search */}
@@ -54,73 +79,133 @@ export default function TopNav({ user, darkMode, toggleDarkMode, onSignOut, open
           border: '1px solid var(--border)',
           borderRadius: '8px',
           padding: '8px 12px',
-          width: '280px',
+          width: '260px',
         }}>
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--text-muted)" strokeWidth="2" style={{ marginRight: '8px' }}>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--text-muted)" strokeWidth="2" style={{ marginRight: '8px', flexShrink: 0 }}>
             <circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/>
           </svg>
           <input
             type="text"
-            placeholder="Search patients..."
+            placeholder="Search for patient name or MRN"
             style={{
               border: 'none',
               background: 'transparent',
               outline: 'none',
               width: '100%',
-              fontSize: '14px',
+              fontSize: '13px',
               color: 'var(--text-primary)',
             }}
           />
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--text-muted)" strokeWidth="2" style={{ marginLeft: '8px', flexShrink: 0 }}>
+            <circle cx="12" cy="12" r="10"/>
+            <path d="M9.09 9a3 3 0 015.83 1c0 2-3 3-3 3"/>
+            <line x1="12" y1="17" x2="12.01" y2="17"/>
+          </svg>
         </div>
 
         {/* Queue Pills */}
         <div style={{ display: 'flex', gap: '8px' }}>
-          <button style={{
-            padding: '6px 12px',
-            borderRadius: '20px',
-            fontSize: '13px',
-            fontWeight: 500,
-            cursor: 'pointer',
-            border: 'none',
-            background: 'var(--text-primary)',
-            color: 'white',
-          }}>
-            In-Queue
-          </button>
-          <button style={{
-            padding: '6px 12px',
-            borderRadius: '20px',
-            fontSize: '13px',
-            fontWeight: 500,
-            cursor: 'pointer',
-            border: '1px solid var(--border)',
-            background: 'var(--bg-white)',
-            color: 'var(--text-secondary)',
-          }}>
-            Completed
-          </button>
+          {queues.map(queue => (
+            <button
+              key={queue.id}
+              onClick={() => setActiveQueue(queue.id)}
+              style={{
+                padding: '6px 14px',
+                borderRadius: '20px',
+                fontSize: '13px',
+                fontWeight: 500,
+                cursor: 'pointer',
+                border: activeQueue === queue.id ? 'none' : '1px solid var(--border)',
+                background: activeQueue === queue.id ? 'var(--text-primary)' : 'var(--bg-white)',
+                color: activeQueue === queue.id ? 'white' : 'var(--text-secondary)',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+              }}
+            >
+              {queue.label}
+              <span style={{
+                fontSize: '12px',
+                color: activeQueue === queue.id ? 'rgba(255,255,255,0.7)' : 'var(--text-muted)',
+              }}>{queue.count}</span>
+            </button>
+          ))}
         </div>
       </div>
 
       {/* Right Section */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-        {/* Timer */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+        {/* Timer with MD2 badge */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <span style={{
+            background: 'var(--primary)',
+            color: 'white',
+            padding: '4px 8px',
+            borderRadius: '4px',
+            fontSize: '12px',
+            fontWeight: 600,
+          }}>MD2</span>
+          <span style={{
+            fontFamily: 'monospace',
+            fontSize: '14px',
+            color: 'var(--text-primary)',
+            fontWeight: 500,
+          }}>{formatTime()}</span>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--text-muted)" strokeWidth="2">
+            <polyline points="6 9 12 15 18 9"/>
+          </svg>
+        </div>
+
+        {/* What's New */}
+        <button style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: '6px',
+          padding: '6px 12px',
+          borderRadius: '6px',
+          border: 'none',
+          background: 'transparent',
+          cursor: 'pointer',
+          color: 'var(--text-secondary)',
+          fontSize: '13px',
+        }}>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="#F59E0B" stroke="#F59E0B" strokeWidth="2">
+            <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
+          </svg>
+          What&apos;s New
+        </button>
+
+        {/* PHI Toggle */}
         <div style={{
           display: 'flex',
           alignItems: 'center',
           gap: '6px',
-          background: 'var(--primary)',
-          color: 'white',
-          padding: '6px 12px',
-          borderRadius: '6px',
-          fontWeight: 500,
-          fontSize: '13px',
+          padding: '4px 10px',
+          borderRadius: '16px',
+          background: 'var(--bg-gray)',
+          border: '1px solid var(--border)',
         }}>
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
-          </svg>
-          {timer}
+          <span style={{ fontSize: '12px', fontWeight: 500, color: 'var(--text-secondary)' }}>PHI</span>
         </div>
+
+        {/* Lock Icon */}
+        <button style={{
+          width: '36px',
+          height: '36px',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          borderRadius: '8px',
+          cursor: 'pointer',
+          color: 'var(--text-secondary)',
+          background: 'transparent',
+          border: 'none',
+        }}>
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
+            <path d="M7 11V7a5 5 0 0110 0v4"/>
+          </svg>
+        </button>
 
         {/* Notification */}
         <button style={{
@@ -141,19 +226,13 @@ export default function TopNav({ user, darkMode, toggleDarkMode, onSignOut, open
           </svg>
           <span style={{
             position: 'absolute',
-            top: '2px',
-            right: '2px',
-            width: '16px',
-            height: '16px',
+            top: '4px',
+            right: '4px',
+            width: '8px',
+            height: '8px',
             background: 'var(--error)',
-            color: 'white',
-            fontSize: '10px',
-            fontWeight: 600,
             borderRadius: '50%',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-          }}>2</span>
+          }}/>
         </button>
 
         {/* Dark Mode */}
@@ -183,106 +262,7 @@ export default function TopNav({ user, darkMode, toggleDarkMode, onSignOut, open
           )}
         </button>
 
-        {/* AI Tools */}
-        <div style={{ position: 'relative' }}>
-          <button
-            onClick={() => setAiMenuOpen(!aiMenuOpen)}
-            style={{
-              width: '36px',
-              height: '36px',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              borderRadius: '8px',
-              cursor: 'pointer',
-              color: 'white',
-              background: 'var(--primary)',
-              border: 'none',
-            }}
-          >
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
-            </svg>
-          </button>
-
-          {aiMenuOpen && (
-            <div style={{
-              position: 'absolute',
-              top: '100%',
-              right: 0,
-              marginTop: '8px',
-              width: '280px',
-              background: 'var(--bg-white)',
-              borderRadius: '12px',
-              boxShadow: '0 10px 40px rgba(0,0,0,0.15)',
-              zIndex: 1000,
-              overflow: 'hidden',
-            }}>
-              <div style={{
-                padding: '12px 16px',
-                background: 'linear-gradient(135deg, #0D9488 0%, #14B8A6 100%)',
-                color: 'white',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '8px',
-              }}>
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
-                </svg>
-                <span style={{ fontWeight: 600 }}>AI Tools</span>
-              </div>
-              {[
-                { id: 'chart-prep', name: 'Chart Prep', desc: 'AI-generated visit summary', icon: 'M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z M14 2v6h6 M16 13H8 M16 17H8 M10 9H8' },
-                { id: 'document', name: 'Document Interaction', desc: 'Transcribe and document visit', icon: 'M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7 M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z' },
-                { id: 'ask-ai', name: 'Ask AI / Search VERA', desc: 'Query clinical guidelines', icon: 'M11 11m-8 0a8 8 0 1016 0a8 8 0 10-16 0 M21 21l-4.35-4.35' },
-                { id: 'summarize', name: 'Summarize for Patient', desc: 'Plain-language explanation', icon: 'M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2 M12 7m-4 0a4 4 0 108 0a4 4 0 10-8 0' },
-                { id: 'handout', name: 'Create Patient Handout', desc: 'Generate take-home materials', icon: 'M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4z M3 6h18 M16 10a4 4 0 01-8 0' },
-                { id: 'dot-phrases', name: 'Dot Phrases', desc: 'Quick text expansion shortcuts', icon: 'M13 2L3 14h9l-1 8 10-12h-9l1-8z' },
-              ].map((item) => (
-                <div
-                  key={item.id}
-                  onClick={() => {
-                    if (item.id === 'dot-phrases') {
-                      openPhrasesDrawer()
-                    } else {
-                      openAiDrawer(item.id)
-                    }
-                    setAiMenuOpen(false)
-                  }}
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '12px',
-                    padding: '12px 16px',
-                    cursor: 'pointer',
-                    borderBottom: '1px solid var(--border)',
-                  }}
-                >
-                  <div style={{
-                    width: '36px',
-                    height: '36px',
-                    borderRadius: '8px',
-                    background: 'var(--bg-gray)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    color: 'var(--primary)',
-                  }}>
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                      <path d={item.icon}/>
-                    </svg>
-                  </div>
-                  <div>
-                    <div style={{ fontWeight: 500, fontSize: '14px', color: 'var(--text-primary)' }}>{item.name}</div>
-                    <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>{item.desc}</div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-
-        {/* User Avatar */}
+        {/* User Avatar with dropdown */}
         <div style={{ position: 'relative' }}>
           <button
             onClick={onSignOut}
@@ -290,7 +270,7 @@ export default function TopNav({ user, darkMode, toggleDarkMode, onSignOut, open
               width: '36px',
               height: '36px',
               borderRadius: '50%',
-              background: 'var(--primary)',
+              background: 'linear-gradient(135deg, #F59E0B 0%, #FBBF24 100%)',
               color: 'white',
               display: 'flex',
               alignItems: 'center',
@@ -304,6 +284,9 @@ export default function TopNav({ user, darkMode, toggleDarkMode, onSignOut, open
           >
             {user.email?.charAt(0).toUpperCase() || 'U'}
           </button>
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--text-muted)" strokeWidth="2" style={{ position: 'absolute', bottom: '-2px', right: '-4px' }}>
+            <polyline points="6 9 12 15 18 9"/>
+          </svg>
         </div>
       </div>
     </nav>
