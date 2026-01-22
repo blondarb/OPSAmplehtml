@@ -66,20 +66,20 @@ export default function NoteTextField({
     }
   }, [])
 
-  // Check for dot phrase triggers and auto-expand
-  const checkForTrigger = useCallback((newValue: string, cursorPos: number) => {
-    // Find the word being typed (look backwards from cursor for a dot phrase)
+  // Handle text change with auto-expansion
+  const handleChange = useCallback((e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    const newValue = e.target.value
+    const cursorPos = e.target.selectionStart
+
+    // Check for dot phrase trigger pattern: .trigger followed by space
     const textBeforeCursor = newValue.substring(0, cursorPos)
+    const triggerMatch = textBeforeCursor.match(/(\.[a-z0-9]+)\s$/i)
 
-    // Match a dot phrase pattern: starts with '.', followed by alphanumeric, ends with space or is at cursor
-    const triggerMatch = textBeforeCursor.match(/(\.[a-z0-9]+)(\s?)$/i)
-
-    if (triggerMatch) {
+    if (triggerMatch && phrases.length > 0) {
       const trigger = triggerMatch[1].toLowerCase()
-      const hasTrailingSpace = triggerMatch[2] === ' '
 
-      // Only expand if there's a trailing space (user finished typing the trigger)
-      if (hasTrailingSpace && trigger !== lastExpandedRef.current) {
+      // Don't re-expand the same trigger
+      if (trigger !== lastExpandedRef.current) {
         // Find matching phrase (must match scope: global or field-specific)
         const matchingPhrase = phrases.find(p =>
           p.trigger_text.toLowerCase() === trigger &&
@@ -87,19 +87,20 @@ export default function NoteTextField({
         )
 
         if (matchingPhrase) {
-          // Replace the trigger with expansion text
-          const triggerStart = cursorPos - trigger.length - 1 // -1 for the space
+          // Calculate positions
+          const triggerWithSpace = trigger + ' '
+          const triggerStart = cursorPos - triggerWithSpace.length
           const beforeTrigger = newValue.substring(0, triggerStart)
           const afterCursor = newValue.substring(cursorPos)
           const expandedValue = beforeTrigger + matchingPhrase.expansion_text + ' ' + afterCursor
 
-          // Track that we expanded this trigger to prevent re-expansion
+          // Track that we expanded this trigger
           lastExpandedRef.current = trigger
 
           // Track usage
           trackUsage(matchingPhrase.id)
 
-          // Update value and set cursor position after expansion
+          // Update with expanded value
           onChange(expandedValue)
 
           // Set cursor position after the expanded text
@@ -108,35 +109,23 @@ export default function NoteTextField({
             if (textarea) {
               const newCursorPos = beforeTrigger.length + matchingPhrase.expansion_text.length + 1
               textarea.setSelectionRange(newCursorPos, newCursorPos)
+              textarea.focus()
             }
           }, 0)
 
-          return true // Expanded
+          return // Don't update with original value
         }
       }
     }
 
-    // Reset the last expanded ref if the user types something else
-    if (!textBeforeCursor.includes(lastExpandedRef.current)) {
+    // Reset last expanded if user is typing something new
+    if (lastExpandedRef.current && !textBeforeCursor.endsWith(lastExpandedRef.current)) {
       lastExpandedRef.current = ''
     }
 
-    return false // Not expanded
+    // Normal update
+    onChange(newValue)
   }, [phrases, fieldName, onChange, trackUsage])
-
-  // Handle text change with auto-expansion
-  const handleChange = useCallback((e: React.ChangeEvent<HTMLTextAreaElement>) => {
-    const newValue = e.target.value
-    const cursorPos = e.target.selectionStart
-
-    // Check for trigger expansion
-    const expanded = checkForTrigger(newValue, cursorPos)
-
-    // If not expanded, just update the value normally
-    if (!expanded) {
-      onChange(newValue)
-    }
-  }, [checkForTrigger, onChange])
 
   // Close picker when clicking outside
   useEffect(() => {
