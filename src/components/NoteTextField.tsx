@@ -93,88 +93,92 @@ export default function NoteTextField({
           background: 'var(--bg-white)',
         }}
       />
+      {/* Button group with inline picker */}
       <div style={{
         position: 'absolute',
         top: '8px',
         right: '8px',
-        display: 'flex',
-        gap: '4px',
       }}>
-        {showDictate && (
+        <div style={{
+          display: 'flex',
+          gap: '4px',
+        }}>
+          {showDictate && (
+            <button
+              onClick={onOpenAiDrawer}
+              style={{
+                width: '28px',
+                height: '28px',
+                borderRadius: '6px',
+                border: '1px solid var(--border)',
+                background: 'var(--bg-white)',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                color: 'var(--text-muted)',
+              }}
+              title="Dictate"
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M12 1a3 3 0 00-3 3v8a3 3 0 006 0V4a3 3 0 00-3-3z"/><path d="M19 10v2a7 7 0 01-14 0v-2"/>
+              </svg>
+            </button>
+          )}
           <button
-            onClick={onOpenAiDrawer}
+            onClick={() => setShowPicker(!showPicker)}
             style={{
               width: '28px',
               height: '28px',
               borderRadius: '6px',
               border: '1px solid var(--border)',
-              background: 'var(--bg-white)',
+              background: showPicker ? 'var(--warning)' : 'var(--bg-white)',
               cursor: 'pointer',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              color: 'var(--text-muted)',
+              color: showPicker ? 'white' : 'var(--warning)',
+              transition: 'all 0.15s',
             }}
-            title="Dictate"
+            title="Dot Phrases"
           >
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <path d="M12 1a3 3 0 00-3 3v8a3 3 0 006 0V4a3 3 0 00-3-3z"/><path d="M19 10v2a7 7 0 01-14 0v-2"/>
+              <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/>
             </svg>
           </button>
-        )}
-        <button
-          onClick={() => setShowPicker(!showPicker)}
-          style={{
-            width: '28px',
-            height: '28px',
-            borderRadius: '6px',
-            border: '1px solid var(--border)',
-            background: showPicker ? 'var(--warning)' : 'var(--bg-white)',
-            cursor: 'pointer',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            color: showPicker ? 'white' : 'var(--warning)',
-            transition: 'all 0.15s',
-          }}
-          title="Dot Phrases"
-        >
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/>
-          </svg>
-        </button>
-        {showAiAction && (
-          <button
-            onClick={onOpenAiDrawer}
-            style={{
-              width: '28px',
-              height: '28px',
-              borderRadius: '6px',
-              border: 'none',
-              background: 'linear-gradient(135deg, var(--primary) 0%, var(--primary-light) 100%)',
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              color: 'white',
-            }}
-            title="AI Actions"
-          >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
-            </svg>
-          </button>
+          {showAiAction && (
+            <button
+              onClick={onOpenAiDrawer}
+              style={{
+                width: '28px',
+                height: '28px',
+                borderRadius: '6px',
+                border: 'none',
+                background: 'linear-gradient(135deg, var(--primary) 0%, var(--primary-light) 100%)',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                color: 'white',
+              }}
+              title="AI Actions"
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
+              </svg>
+            </button>
+          )}
+        </div>
+
+        {/* Inline Phrase Picker - positioned above buttons */}
+        {showPicker && (
+          <InlinePhrasePicker
+            fieldName={fieldName}
+            onInsertPhrase={handleInsertPhrase}
+            onOpenFullDrawer={handleOpenFullDrawer}
+          />
         )}
       </div>
-
-      {/* Inline Phrase Picker */}
-      {showPicker && (
-        <InlinePhrasePicker
-          fieldName={fieldName}
-          onInsertPhrase={handleInsertPhrase}
-          onOpenFullDrawer={handleOpenFullDrawer}
-        />
-      )}
     </div>
   )
 }
