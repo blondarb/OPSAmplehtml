@@ -194,6 +194,112 @@ export default function ClinicalNote({
         />
       </div>
 
+      {/* Floating Action Buttons */}
+      <div style={{
+        position: 'fixed',
+        bottom: '24px',
+        right: '24px',
+        display: 'flex',
+        alignItems: 'center',
+        gap: '8px',
+        background: 'var(--bg-white)',
+        padding: '8px',
+        borderRadius: '16px',
+        boxShadow: '0 4px 20px rgba(0,0,0,0.15)',
+        zIndex: 100,
+      }}>
+        {/* Microphone - Voice Recording */}
+        <button
+          onClick={() => openAiDrawer('document')}
+          style={{
+            width: '48px',
+            height: '48px',
+            borderRadius: '12px',
+            border: '1px solid var(--border)',
+            background: 'var(--bg-white)',
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            color: 'var(--text-secondary)',
+            transition: 'all 0.2s',
+          }}
+          title="Voice Recording"
+        >
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <path d="M12 1a3 3 0 00-3 3v8a3 3 0 006 0V4a3 3 0 00-3-3z"/><path d="M19 10v2a7 7 0 01-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/>
+          </svg>
+        </button>
+
+        {/* Lightning - Quick Actions */}
+        <button
+          onClick={() => openAiDrawer('chart-prep')}
+          style={{
+            width: '48px',
+            height: '48px',
+            borderRadius: '12px',
+            border: '1px solid var(--border)',
+            background: 'var(--bg-white)',
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            color: '#F59E0B',
+            transition: 'all 0.2s',
+          }}
+          title="Quick Actions"
+        >
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" strokeWidth="1">
+            <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>
+          </svg>
+        </button>
+
+        {/* Star - AI Assistant */}
+        <button
+          onClick={() => openAiDrawer('ask-ai')}
+          style={{
+            width: '48px',
+            height: '48px',
+            borderRadius: '12px',
+            border: 'none',
+            background: 'var(--primary)',
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            color: 'white',
+            transition: 'all 0.2s',
+          }}
+          title="AI Assistant"
+        >
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
+          </svg>
+        </button>
+
+        {/* More Options */}
+        <button
+          style={{
+            width: '48px',
+            height: '48px',
+            borderRadius: '12px',
+            border: '1px solid var(--border)',
+            background: 'var(--bg-white)',
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            color: 'var(--text-muted)',
+            transition: 'all 0.2s',
+          }}
+          title="More Options"
+        >
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor">
+            <circle cx="12" cy="12" r="2"/><circle cx="12" cy="5" r="2"/><circle cx="12" cy="19" r="2"/>
+          </svg>
+        </button>
+      </div>
+
       {aiDrawerOpen && (
         <AiDrawer
           isOpen={aiDrawerOpen}
