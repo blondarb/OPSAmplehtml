@@ -3,51 +3,58 @@ import { NextResponse } from 'next/server'
 
 // Default neurology phrases to seed for new users
 const DEFAULT_PHRASES = [
-  // Physical Exam
+  // Physical Exam - scope: hpi (exam findings often in HPI)
   {
     trigger_text: '.neuroexam',
     expansion_text: 'Mental status: Alert and oriented x3, appropriate affect, normal attention and concentration. Speech fluent without dysarthria. Cranial nerves II-XII intact. Motor: 5/5 strength in all extremities, normal bulk and tone. Sensory: Intact to light touch, pinprick, vibration, and proprioception. Reflexes: 2+ and symmetric throughout. Coordination: Normal finger-to-nose and heel-to-shin. Gait: Normal, tandem intact.',
     category: 'Physical Exam',
-    description: 'Complete normal neurological examination'
+    description: 'Complete normal neurological examination',
+    scope: 'hpi'
   },
   {
     trigger_text: '.wnl',
     expansion_text: 'Within normal limits',
     category: 'General',
-    description: 'Quick normal finding'
+    description: 'Quick normal finding',
+    scope: 'global'
   },
   {
     trigger_text: '.nfnd',
     expansion_text: 'No focal neurological deficits',
     category: 'Physical Exam',
-    description: 'No focal deficits'
+    description: 'No focal deficits',
+    scope: 'hpi'
   },
-  // Review of Systems
+  // Review of Systems - scope: ros
   {
     trigger_text: '.rosneg',
     expansion_text: 'Constitutional: Denies fever, chills, weight loss, fatigue. HEENT: Denies vision changes, hearing loss, tinnitus. Cardiovascular: Denies chest pain, palpitations. Respiratory: Denies shortness of breath, cough. GI: Denies nausea, vomiting, abdominal pain. Neurological: See HPI.',
     category: 'ROS',
-    description: 'Negative review of systems'
+    description: 'Negative review of systems',
+    scope: 'ros'
   },
   {
     trigger_text: '.deny',
     expansion_text: 'Patient denies any recent changes in symptoms, new symptoms, or concerning features.',
     category: 'General',
-    description: 'General denial statement'
+    description: 'General denial statement',
+    scope: 'global'
   },
-  // Allergies
+  // Allergies - scope: allergies
   {
     trigger_text: '.nkda',
     expansion_text: 'No known drug allergies',
     category: 'Allergies',
-    description: 'No known allergies'
+    description: 'No known allergies',
+    scope: 'allergies'
   },
-  // Headache/Migraine
+  // Headache/Migraine - Assessment scope
   {
     trigger_text: '.migraine',
     expansion_text: 'Chronic migraine without aura. Patient reports [X] headache days per month. Current preventive therapy: [medication]. Acute therapy: [medication]. MIDAS score: [X]. HIT-6 score: [X].',
     category: 'Assessment',
-    description: 'Migraine assessment template'
+    description: 'Migraine assessment template',
+    scope: 'assessment'
   },
   {
     trigger_text: '.haplan',
@@ -58,46 +65,53 @@ const DEFAULT_PHRASES = [
 4. Headache diary to track frequency and triggers
 5. Follow up in [X] weeks/months`,
     category: 'Plan',
-    description: 'Headache management plan'
+    description: 'Headache management plan',
+    scope: 'plan'
   },
-  // Seizure
+  // Seizure - Assessment scope
   {
     trigger_text: '.seizure',
     expansion_text: 'Epilepsy, [type]. Last seizure: [date]. Current AED: [medication] [dose]. Seizure frequency: [X] per [timeframe]. Adherence: [status]. Last AED level: [value] on [date].',
     category: 'Assessment',
-    description: 'Seizure assessment template'
+    description: 'Seizure assessment template',
+    scope: 'assessment'
   },
-  // General Plans
+  // General Plans - scope: plan
   {
     trigger_text: '.fu1mo',
     expansion_text: 'Follow up in 1 month or sooner if symptoms worsen.',
     category: 'Plan',
-    description: 'One month follow-up'
+    description: 'One month follow-up',
+    scope: 'plan'
   },
   {
     trigger_text: '.fu3mo',
     expansion_text: 'Follow up in 3 months or sooner if symptoms worsen.',
     category: 'Plan',
-    description: 'Three month follow-up'
+    description: 'Three month follow-up',
+    scope: 'plan'
   },
   {
     trigger_text: '.labs',
     expansion_text: 'Labs ordered: CBC, CMP, [additional tests]. Results to be reviewed at next visit.',
     category: 'Plan',
-    description: 'Lab order template'
+    description: 'Lab order template',
+    scope: 'plan'
   },
   {
     trigger_text: '.mri',
     expansion_text: 'MRI brain [with/without contrast] ordered to evaluate [indication]. Results to be reviewed and discussed.',
     category: 'Plan',
-    description: 'MRI order template'
+    description: 'MRI order template',
+    scope: 'plan'
   },
-  // Patient Education
+  // Patient Education - global
   {
     trigger_text: '.educated',
     expansion_text: 'Patient educated on diagnosis, treatment options, and expected outcomes. Questions answered. Patient verbalized understanding and agrees with plan.',
     category: 'General',
-    description: 'Patient education statement'
+    description: 'Patient education statement',
+    scope: 'global'
   }
 ]
 

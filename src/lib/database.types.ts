@@ -267,6 +267,7 @@ export interface Database {
           is_active: boolean
           use_count: number
           last_used: string | null
+          scope: 'global' | 'hpi' | 'assessment' | 'plan' | 'ros' | 'allergies'
         }
         Insert: {
           id?: string
@@ -280,6 +281,7 @@ export interface Database {
           is_active?: boolean
           use_count?: number
           last_used?: string | null
+          scope?: 'global' | 'hpi' | 'assessment' | 'plan' | 'ros' | 'allergies'
         }
         Update: {
           id?: string
@@ -293,6 +295,7 @@ export interface Database {
           is_active?: boolean
           use_count?: number
           last_used?: string | null
+          scope?: 'global' | 'hpi' | 'assessment' | 'plan' | 'ros' | 'allergies'
         }
       }
     }

@@ -157,6 +157,7 @@ export default function ClinicalNote({
         isOpen={phrasesDrawerOpen}
         onClose={() => setPhrasesDrawerOpen(false)}
         onInsertPhrase={handleInsertPhrase}
+        activeField={activeTextField}
       />
     </div>
   )

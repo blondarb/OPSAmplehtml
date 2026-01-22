@@ -2,6 +2,8 @@
 
 import { useState, useEffect } from 'react'
 
+type PhraseScope = 'global' | 'hpi' | 'assessment' | 'plan' | 'ros' | 'allergies'
+
 interface DotPhrase {
   id: string
   trigger_text: string
@@ -10,23 +12,45 @@ interface DotPhrase {
   description: string | null
   use_count: number
   last_used: string | null
+  scope: PhraseScope
 }
 
 interface DotPhrasesDrawerProps {
   isOpen: boolean
   onClose: () => void
   onInsertPhrase: (text: string) => void
+  activeField?: string | null
+}
+
+const SCOPE_LABELS: Record<PhraseScope, string> = {
+  global: 'All Fields',
+  hpi: 'HPI Only',
+  assessment: 'Assessment Only',
+  plan: 'Plan Only',
+  ros: 'ROS Only',
+  allergies: 'Allergies Only'
+}
+
+const SCOPE_COLORS: Record<PhraseScope, string> = {
+  global: '#6366f1',
+  hpi: '#0d9488',
+  assessment: '#f59e0b',
+  plan: '#3b82f6',
+  ros: '#8b5cf6',
+  allergies: '#ef4444'
 }
 
 export default function DotPhrasesDrawer({
   isOpen,
   onClose,
-  onInsertPhrase
+  onInsertPhrase,
+  activeField
 }: DotPhrasesDrawerProps) {
   const [phrases, setPhrases] = useState<DotPhrase[]>([])
   const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState('')
   const [selectedCategory, setSelectedCategory] = useState<string>('All')
+  const [scopeFilter, setScopeFilter] = useState<'all' | 'relevant'>('relevant')
   const [showAddForm, setShowAddForm] = useState(false)
   const [editingPhrase, setEditingPhrase] = useState<DotPhrase | null>(null)
 
@@ -35,6 +59,7 @@ export default function DotPhrasesDrawer({
   const [formExpansion, setFormExpansion] = useState('')
   const [formCategory, setFormCategory] = useState('General')
   const [formDescription, setFormDescription] = useState('')
+  const [formScope, setFormScope] = useState<PhraseScope>('global')
   const [formError, setFormError] = useState('')
   const [saving, setSaving] = useState(false)
 
@@ -42,8 +67,15 @@ export default function DotPhrasesDrawer({
   useEffect(() => {
     if (isOpen) {
       loadPhrases()
+      // Set default scope based on active field
+      if (activeField) {
+        const fieldScope = activeField as PhraseScope
+        if (['hpi', 'assessment', 'plan', 'ros', 'allergies'].includes(fieldScope)) {
+          setFormScope(fieldScope)
+        }
+      }
     }
-  }, [isOpen])
+  }, [isOpen, activeField])
 
   const loadPhrases = async () => {
     setLoading(true)
@@ -88,7 +120,12 @@ export default function DotPhrasesDrawer({
     const matchesCategory =
       selectedCategory === 'All' || phrase.category === selectedCategory
 
-    return matchesSearch && matchesCategory
+    // Scope filtering - show global phrases + phrases matching the active field
+    const matchesScope = scopeFilter === 'all' ||
+      phrase.scope === 'global' ||
+      (activeField && phrase.scope === activeField)
+
+    return matchesSearch && matchesCategory && matchesScope
   })
 
   const handleInsert = async (phrase: DotPhrase) => {
@@ -123,7 +160,8 @@ export default function DotPhrasesDrawer({
           trigger_text: formTrigger,
           expansion_text: formExpansion,
           category: formCategory,
-          description: formDescription
+          description: formDescription,
+          scope: formScope
         })
       })
 
@@ -159,6 +197,7 @@ export default function DotPhrasesDrawer({
     setFormExpansion(phrase.expansion_text)
     setFormCategory(phrase.category || 'General')
     setFormDescription(phrase.description || '')
+    setFormScope(phrase.scope || 'global')
     setShowAddForm(true)
   }
 
@@ -169,6 +208,7 @@ export default function DotPhrasesDrawer({
     setFormExpansion('')
     setFormCategory('General')
     setFormDescription('')
+    setFormScope(activeField as PhraseScope || 'global')
     setFormError('')
   }
 
@@ -219,9 +259,16 @@ export default function DotPhrasesDrawer({
         >
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
             <span style={{ fontSize: '20px' }}>⚡</span>
-            <h2 style={{ margin: 0, fontSize: '18px', fontWeight: 600, color: 'var(--text-primary)' }}>
-              Dot Phrases
-            </h2>
+            <div>
+              <h2 style={{ margin: 0, fontSize: '18px', fontWeight: 600, color: 'var(--text-primary)' }}>
+                Dot Phrases
+              </h2>
+              {activeField && (
+                <span style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>
+                  Field: {activeField.toUpperCase()}
+                </span>
+              )}
+            </div>
           </div>
           <button
             onClick={onClose}
@@ -256,6 +303,43 @@ export default function DotPhrasesDrawer({
               color: 'var(--text-primary)'
             }}
           />
+
+          {/* Scope Toggle */}
+          <div style={{ display: 'flex', gap: '8px', marginBottom: '12px' }}>
+            <button
+              onClick={() => setScopeFilter('relevant')}
+              style={{
+                flex: 1,
+                padding: '8px 12px',
+                border: '1px solid var(--border)',
+                borderRadius: '6px',
+                fontSize: '13px',
+                cursor: 'pointer',
+                backgroundColor: scopeFilter === 'relevant' ? 'var(--primary)' : 'var(--bg-white)',
+                color: scopeFilter === 'relevant' ? 'white' : 'var(--text-secondary)',
+                transition: 'all 0.15s ease'
+              }}
+            >
+              Relevant to Field
+            </button>
+            <button
+              onClick={() => setScopeFilter('all')}
+              style={{
+                flex: 1,
+                padding: '8px 12px',
+                border: '1px solid var(--border)',
+                borderRadius: '6px',
+                fontSize: '13px',
+                cursor: 'pointer',
+                backgroundColor: scopeFilter === 'all' ? 'var(--primary)' : 'var(--bg-white)',
+                color: scopeFilter === 'all' ? 'white' : 'var(--text-secondary)',
+                transition: 'all 0.15s ease'
+              }}
+            >
+              Show All
+            </button>
+          </div>
+
           <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
             {categories.map(category => (
               <button
@@ -381,6 +465,31 @@ export default function DotPhrasesDrawer({
                     <option value="HPI">HPI</option>
                   </select>
                 </div>
+                <div style={{ flex: 1 }}>
+                  <label style={{ display: 'block', marginBottom: '6px', fontSize: '13px', fontWeight: 500, color: 'var(--text-primary)' }}>
+                    Scope
+                  </label>
+                  <select
+                    value={formScope}
+                    onChange={(e) => setFormScope(e.target.value as PhraseScope)}
+                    style={{
+                      width: '100%',
+                      padding: '10px 12px',
+                      border: '1px solid var(--border)',
+                      borderRadius: '6px',
+                      fontSize: '14px',
+                      backgroundColor: 'var(--bg-white)',
+                      color: 'var(--text-primary)'
+                    }}
+                  >
+                    <option value="global">All Fields (Global)</option>
+                    <option value="hpi">HPI Only</option>
+                    <option value="assessment">Assessment Only</option>
+                    <option value="plan">Plan Only</option>
+                    <option value="ros">ROS Only</option>
+                    <option value="allergies">Allergies Only</option>
+                  </select>
+                </div>
               </div>
 
               <div>
@@ -458,7 +567,7 @@ export default function DotPhrasesDrawer({
             </div>
           ) : filteredPhrases.length === 0 ? (
             <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text-secondary)' }}>
-              {searchTerm ? 'No phrases match your search' : 'No phrases yet. Add your first one!'}
+              {searchTerm ? 'No phrases match your search' : scopeFilter === 'relevant' ? 'No phrases for this field. Try "Show All" or add a new one!' : 'No phrases yet. Add your first one!'}
             </div>
           ) : (
             /* Phrases List */
@@ -485,16 +594,29 @@ export default function DotPhrasesDrawer({
                   }}
                 >
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '6px' }}>
-                    <code style={{
-                      fontSize: '14px',
-                      fontWeight: 600,
-                      color: 'var(--primary)',
-                      backgroundColor: 'rgba(13, 148, 136, 0.1)',
-                      padding: '2px 8px',
-                      borderRadius: '4px'
-                    }}>
-                      {phrase.trigger_text}
-                    </code>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <code style={{
+                        fontSize: '14px',
+                        fontWeight: 600,
+                        color: 'var(--primary)',
+                        backgroundColor: 'rgba(13, 148, 136, 0.1)',
+                        padding: '2px 8px',
+                        borderRadius: '4px'
+                      }}>
+                        {phrase.trigger_text}
+                      </code>
+                      {/* Scope badge */}
+                      <span style={{
+                        fontSize: '10px',
+                        padding: '2px 6px',
+                        borderRadius: '4px',
+                        backgroundColor: `${SCOPE_COLORS[phrase.scope || 'global']}20`,
+                        color: SCOPE_COLORS[phrase.scope || 'global'],
+                        fontWeight: 500
+                      }}>
+                        {phrase.scope === 'global' ? '🌐' : '📍'} {SCOPE_LABELS[phrase.scope || 'global']}
+                      </span>
+                    </div>
                     <div style={{ display: 'flex', gap: '4px' }} onClick={(e) => e.stopPropagation()}>
                       <button
                         onClick={() => handleEditPhrase(phrase)}
@@ -574,7 +696,7 @@ export default function DotPhrasesDrawer({
           fontSize: '12px',
           color: 'var(--text-secondary)'
         }}>
-          <strong>Tip:</strong> Type a trigger (e.g., <code style={{ backgroundColor: 'var(--bg-white)', padding: '2px 4px', borderRadius: '3px' }}>.neuroexam</code>) in any text field, then press <kbd style={{ backgroundColor: 'var(--bg-white)', padding: '2px 6px', borderRadius: '3px', border: '1px solid var(--border)' }}>Tab</kbd> to expand.
+          <strong>Tip:</strong> Use <span style={{ color: SCOPE_COLORS.global }}>🌐 Global</span> phrases in any field, or create <span style={{ color: 'var(--primary)' }}>📍 Field-specific</span> phrases that only appear where you need them.
         </div>
       </div>
 

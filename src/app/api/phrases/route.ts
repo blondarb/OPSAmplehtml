@@ -34,7 +34,7 @@ export async function POST(request: Request) {
   }
 
   const body = await request.json()
-  const { trigger_text, expansion_text, category, description } = body
+  const { trigger_text, expansion_text, category, description, scope } = body
 
   if (!trigger_text || !expansion_text) {
     return NextResponse.json(
@@ -55,7 +55,8 @@ export async function POST(request: Request) {
       trigger_text: normalizedTrigger,
       expansion_text,
       category: category || 'General',
-      description
+      description,
+      scope: scope || 'global'
     })
     .select()
     .single()

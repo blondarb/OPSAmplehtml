@@ -42,7 +42,7 @@ export async function PUT(
   }
 
   const body = await request.json()
-  const { trigger_text, expansion_text, category, description, is_active } = body
+  const { trigger_text, expansion_text, category, description, is_active, scope } = body
 
   const updateData: Record<string, unknown> = {}
   if (trigger_text !== undefined) {
@@ -54,6 +54,7 @@ export async function PUT(
   if (category !== undefined) updateData.category = category
   if (description !== undefined) updateData.description = description
   if (is_active !== undefined) updateData.is_active = is_active
+  if (scope !== undefined) updateData.scope = scope
 
   const { data: phrase, error } = await supabase
     .from('dot_phrases')
