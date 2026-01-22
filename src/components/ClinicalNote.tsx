@@ -7,6 +7,7 @@ import TopNav from './TopNav'
 import LeftSidebar from './LeftSidebar'
 import CenterPanel from './CenterPanel'
 import AiDrawer from './AiDrawer'
+import DotPhrasesDrawer from './DotPhrasesDrawer'
 import type { User } from '@supabase/supabase-js'
 
 interface ClinicalNoteProps {
@@ -101,6 +102,8 @@ export default function ClinicalNote({
   const [activeIcon, setActiveIcon] = useState('queue')
   const [aiDrawerOpen, setAiDrawerOpen] = useState(false)
   const [aiDrawerTab, setAiDrawerTab] = useState('chart-prep')
+  const [dotPhrasesOpen, setDotPhrasesOpen] = useState(false)
+  const [activeTextField, setActiveTextField] = useState<string | null>(null)
   const [noteData, setNoteData] = useState({
     chiefComplaint: currentVisit?.chief_complaint || ['Headache'],
     hpi: currentVisit?.clinical_notes?.hpi || '',
@@ -143,6 +146,18 @@ export default function ClinicalNote({
 
   const updateNote = (field: string, value: any) => {
     setNoteData(prev => ({ ...prev, [field]: value }))
+  }
+
+  const handleInsertPhrase = (text: string) => {
+    if (activeTextField) {
+      const currentValue = noteData[activeTextField as keyof typeof noteData] || ''
+      updateNote(activeTextField, currentValue + text)
+    }
+  }
+
+  const openDotPhrases = (field?: string) => {
+    if (field) setActiveTextField(field)
+    setDotPhrasesOpen(true)
   }
 
   const saveNote = async () => {
@@ -277,8 +292,9 @@ export default function ClinicalNote({
           </svg>
         </button>
 
-        {/* More Options */}
+        {/* Dot Phrases */}
         <button
+          onClick={() => openDotPhrases('hpi')}
           style={{
             width: '48px',
             height: '48px',
@@ -289,13 +305,13 @@ export default function ClinicalNote({
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            color: 'var(--text-muted)',
+            color: '#8B5CF6',
             transition: 'all 0.2s',
           }}
-          title="More Options"
+          title="Dot Phrases"
         >
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor">
-            <circle cx="12" cy="12" r="2"/><circle cx="12" cy="5" r="2"/><circle cx="12" cy="19" r="2"/>
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>
           </svg>
         </button>
       </div>
@@ -309,6 +325,15 @@ export default function ClinicalNote({
           patient={patient}
           noteData={noteData}
           updateNote={updateNote}
+        />
+      )}
+
+      {dotPhrasesOpen && (
+        <DotPhrasesDrawer
+          isOpen={dotPhrasesOpen}
+          onClose={() => setDotPhrasesOpen(false)}
+          onInsertPhrase={handleInsertPhrase}
+          activeField={activeTextField}
         />
       )}
     </div>
