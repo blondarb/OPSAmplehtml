@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import OpenAI from 'openai'
+import OpenAI, { toFile } from 'openai'
 import { createClient } from '@/lib/supabase/server'
 
 export async function POST(request: Request) {
@@ -20,6 +20,17 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'No audio file provided' }, { status: 400 })
     }
 
+    // Log file details for debugging
+    console.log('Received audio file:', {
+      name: audioFile.name,
+      type: audioFile.type,
+      size: audioFile.size,
+    })
+
+    if (audioFile.size === 0) {
+      return NextResponse.json({ error: 'Audio file is empty' }, { status: 400 })
+    }
+
     // Get OpenAI API key - first try environment variable, then try Supabase
     let apiKey = process.env.OPENAI_API_KEY
 
@@ -37,9 +48,16 @@ export async function POST(request: Request) {
 
     const openai = new OpenAI({ apiKey })
 
+    // Convert the File to a format OpenAI can handle
+    const arrayBuffer = await audioFile.arrayBuffer()
+    const buffer = Buffer.from(arrayBuffer)
+
+    // Use OpenAI's toFile helper to create a proper file object
+    const openaiFile = await toFile(buffer, audioFile.name, { type: audioFile.type })
+
     // Call Whisper API for transcription
     const transcription = await openai.audio.transcriptions.create({
-      file: audioFile,
+      file: openaiFile,
       model: 'whisper-1',
       language: 'en',
       response_format: 'text',
