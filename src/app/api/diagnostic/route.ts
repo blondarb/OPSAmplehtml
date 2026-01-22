@@ -68,7 +68,7 @@ export async function GET() {
     }
 
     // Overall status
-    const checks = diagnostics.checks as Record<string, { error?: string | null }>
+    const checks = diagnostics.checks as Record<string, { error?: string | null; configured?: boolean }>
     diagnostics.overall = {
       dot_phrases_ready: checks.dot_phrases_table && !checks.dot_phrases_table.error &&
                          checks.scope_column && !checks.scope_column.error,
