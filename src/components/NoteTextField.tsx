@@ -22,7 +22,7 @@ interface NoteTextFieldProps {
   onOpenAiDrawer?: () => void
   onOpenFullPhrasesDrawer: () => void
   setActiveTextField: (field: string | null) => void
-  rawDictation?: string | null
+  rawDictation?: Array<{ text: string; timestamp: string }> | null
   onRawDictationChange?: (rawText: string) => void
 }
 
@@ -336,23 +336,23 @@ export default function NoteTextField({
           )}
           {showDictate && (
             <button
-              onClick={() => rawDictation && setShowRawDictation(!showRawDictation)}
-              disabled={!rawDictation}
+              onClick={() => rawDictation && rawDictation.length > 0 && setShowRawDictation(!showRawDictation)}
+              disabled={!rawDictation || rawDictation.length === 0}
               style={{
                 width: '28px',
                 height: '28px',
                 borderRadius: '6px',
                 border: '1px solid var(--border)',
                 background: showRawDictation ? 'var(--info)' : 'var(--bg-white)',
-                cursor: rawDictation ? 'pointer' : 'not-allowed',
+                cursor: rawDictation && rawDictation.length > 0 ? 'pointer' : 'not-allowed',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                color: showRawDictation ? 'white' : rawDictation ? 'var(--info)' : 'var(--text-muted)',
+                color: showRawDictation ? 'white' : rawDictation && rawDictation.length > 0 ? 'var(--info)' : 'var(--text-muted)',
                 transition: 'all 0.15s',
-                opacity: rawDictation ? 1 : 0.5,
+                opacity: rawDictation && rawDictation.length > 0 ? 1 : 0.5,
               }}
-              title={rawDictation ? "View original dictation" : "No dictation recorded yet"}
+              title={rawDictation && rawDictation.length > 0 ? `View ${rawDictation.length} dictation${rawDictation.length > 1 ? 's' : ''}` : "No dictation recorded yet"}
             >
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                 <circle cx="12" cy="12" r="10"/>
@@ -373,14 +373,14 @@ export default function NoteTextField({
         )}
 
         {/* Raw Dictation Tooltip */}
-        {showRawDictation && rawDictation && (
+        {showRawDictation && rawDictation && rawDictation.length > 0 && (
           <div
             style={{
               position: 'absolute',
               top: '40px',
               right: '0',
-              width: '300px',
-              maxHeight: '200px',
+              width: '340px',
+              maxHeight: '300px',
               overflowY: 'auto',
               background: 'var(--bg-white)',
               border: '1px solid var(--border)',
@@ -390,9 +390,9 @@ export default function NoteTextField({
               zIndex: 100,
             }}
           >
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
               <span style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-muted)' }}>
-                Original Dictation
+                Dictation History ({rawDictation.length})
               </span>
               <button
                 onClick={() => setShowRawDictation(false)}
@@ -409,9 +409,26 @@ export default function NoteTextField({
                 </svg>
               </button>
             </div>
-            <p style={{ fontSize: '13px', color: 'var(--text-secondary)', margin: 0, lineHeight: 1.5, whiteSpace: 'pre-wrap' }}>
-              {rawDictation}
-            </p>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+              {[...rawDictation].reverse().map((entry, index) => (
+                <div
+                  key={index}
+                  style={{
+                    padding: '10px',
+                    background: 'var(--bg-gray)',
+                    borderRadius: '6px',
+                    borderLeft: '3px solid var(--info)',
+                  }}
+                >
+                  <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '6px' }}>
+                    {new Date(entry.timestamp).toLocaleString()}
+                  </div>
+                  <p style={{ fontSize: '13px', color: 'var(--text-secondary)', margin: 0, lineHeight: 1.5, whiteSpace: 'pre-wrap' }}>
+                    {entry.text}
+                  </p>
+                </div>
+              ))}
+            </div>
           </div>
         )}
       </div>

@@ -42,9 +42,9 @@ export default function ClinicalNote({
     plan: currentVisit?.clinical_notes?.plan || '',
   })
 
-  // Raw dictation storage - keyed by field name
-  const [rawDictation, setRawDictation] = useState<Record<string, string>>(
-    (currentVisit?.clinical_notes?.raw_dictation as Record<string, string>) || {}
+  // Raw dictation storage - keyed by field name, stores array of dictations with timestamps
+  const [rawDictation, setRawDictation] = useState<Record<string, Array<{ text: string; timestamp: string }>>>(
+    (currentVisit?.clinical_notes?.raw_dictation as Record<string, Array<{ text: string; timestamp: string }>>) || {}
   )
 
   const router = useRouter()
@@ -94,7 +94,14 @@ export default function ClinicalNote({
   }
 
   const updateRawDictation = (field: string, rawText: string) => {
-    setRawDictation(prev => ({ ...prev, [field]: rawText }))
+    setRawDictation(prev => {
+      const existingList = prev[field] || []
+      const newEntry = {
+        text: rawText,
+        timestamp: new Date().toISOString(),
+      }
+      return { ...prev, [field]: [...existingList, newEntry] }
+    })
   }
 
   const saveNote = async () => {

@@ -11,7 +11,7 @@ interface CenterPanelProps {
   openAiDrawer: (tab: string) => void
   openPhrasesDrawer: (field?: string) => void
   setActiveTextField: (field: string | null) => void
-  rawDictation: Record<string, string>
+  rawDictation: Record<string, Array<{ text: string; timestamp: string }>>
   updateRawDictation: (field: string, rawText: string) => void
 }
 
