@@ -232,14 +232,24 @@ export default function AiDrawer({
 
   // Add prep note when transcription completes - auto-categorize
   const addPrepNote = () => {
-    if (prepTranscribedText) {
+    console.log('addPrepNote called, prepTranscribedText:', prepTranscribedText)
+    if (prepTranscribedText && prepTranscribedText.trim()) {
       const autoCategory = detectCategory(prepTranscribedText)
-      setPrepNotes(prev => [...prev, {
-        text: prepTranscribedText,
+      console.log('Auto-detected category:', autoCategory)
+      const newNote = {
+        text: prepTranscribedText.trim(),
         timestamp: new Date().toISOString(),
         category: autoCategory,
-      }])
+      }
+      console.log('Adding new note:', newNote)
+      setPrepNotes(prev => {
+        const updated = [...prev, newNote]
+        console.log('Updated prepNotes:', updated)
+        return updated
+      })
       clearPrepTranscription()
+    } else {
+      console.log('prepTranscribedText is empty or falsy, not adding note')
     }
   }
 
