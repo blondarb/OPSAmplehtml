@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import NoteTextField from './NoteTextField'
+import SmartScalesSection from './SmartScalesSection'
 
 interface CenterPanelProps {
   noteData: any
@@ -59,13 +60,6 @@ export default function CenterPanel({
   const [activeTab, setActiveTab] = useState('history')
   const [localActiveField, setLocalActiveField] = useState<string | null>(null)
 
-  // Clinical Scales accordion state
-  const [openScaleAccordions, setOpenScaleAccordions] = useState<Record<string, boolean>>({
-    headache: true,
-    cognitive: false,
-    mentalHealth: false,
-  })
-
   // Physical Exam accordion state
   const [openExamAccordions, setOpenExamAccordions] = useState<Record<string, boolean>>({
     generalAppearance: true,
@@ -119,10 +113,6 @@ export default function CenterPanel({
     tandemGait: false,
     rombergNegative: false,
   })
-
-  const toggleScaleAccordion = (key: string) => {
-    setOpenScaleAccordions(prev => ({ ...prev, [key]: !prev[key] }))
-  }
 
   const toggleExamAccordion = (key: string) => {
     setOpenExamAccordions(prev => ({ ...prev, [key]: !prev[key] }))
@@ -540,223 +530,14 @@ export default function CenterPanel({
               </div>
             </div>
 
-            {/* Clinical Scales Section */}
-            <div style={{
-              background: 'var(--bg-white)',
-              borderRadius: '12px',
-              padding: '20px',
-              boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
-              marginBottom: '16px',
-            }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-                <span style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text-primary)' }}>Clinical Scales</span>
-                <span style={{ fontSize: '11px', color: 'var(--text-muted)', background: 'var(--bg-dark)', padding: '4px 8px', borderRadius: '4px' }}>Optional</span>
-              </div>
-
-              {/* Headache Scales Accordion */}
-              <div
-                onClick={() => toggleScaleAccordion('headache')}
-                style={{
-                  border: '1px solid var(--border)',
-                  borderRadius: '8px',
-                  marginBottom: '8px',
-                  overflow: 'hidden',
-                  cursor: 'pointer',
-                }}
-              >
-                <div style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  padding: '12px 16px',
-                  background: openScaleAccordions.headache ? 'var(--bg-dark)' : 'transparent',
-                }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <span style={{
-                      width: '8px',
-                      height: '8px',
-                      borderRadius: '50%',
-                      background: 'var(--primary)',
-                    }} />
-                    <span style={{ fontSize: '14px', fontWeight: 500 }}>Headache Scales</span>
-                  </div>
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"
-                    style={{ transform: openScaleAccordions.headache ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.2s' }}>
-                    <polyline points="6 9 12 15 18 9"/>
-                  </svg>
-                </div>
-                {openScaleAccordions.headache && (
-                  <div onClick={(e) => e.stopPropagation()} style={{ padding: '16px', borderTop: '1px solid var(--border)' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginBottom: '12px' }}>
-                      <span style={{ flex: 1, fontSize: '14px', fontWeight: 500 }}>MIDAS Score</span>
-                      <input
-                        type="number"
-                        placeholder="0-270"
-                        defaultValue={18}
-                        style={{ width: '80px', padding: '8px', border: '1px solid var(--border)', borderRadius: '6px', textAlign: 'center' }}
-                      />
-                      <select style={{ width: '160px', padding: '8px', border: '1px solid var(--border)', borderRadius: '6px' }}>
-                        <option>Moderate disability</option>
-                        <option>Little/No disability</option>
-                        <option>Mild disability</option>
-                        <option>Severe disability</option>
-                      </select>
-                    </div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-                      <span style={{ flex: 1, fontSize: '14px', fontWeight: 500 }}>HIT-6 Score</span>
-                      <input
-                        type="number"
-                        placeholder="36-78"
-                        defaultValue={58}
-                        style={{ width: '80px', padding: '8px', border: '1px solid var(--border)', borderRadius: '6px', textAlign: 'center' }}
-                      />
-                      <select style={{ width: '160px', padding: '8px', border: '1px solid var(--border)', borderRadius: '6px' }}>
-                        <option>Substantial impact</option>
-                        <option>Little/No impact</option>
-                        <option>Some impact</option>
-                        <option>Severe impact</option>
-                      </select>
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              {/* Cognitive Scales Accordion */}
-              <div
-                onClick={() => toggleScaleAccordion('cognitive')}
-                style={{
-                  border: '1px solid var(--border)',
-                  borderRadius: '8px',
-                  marginBottom: '8px',
-                  overflow: 'hidden',
-                  cursor: 'pointer',
-                }}
-              >
-                <div style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  padding: '12px 16px',
-                  background: openScaleAccordions.cognitive ? 'var(--bg-dark)' : 'transparent',
-                }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <span style={{
-                      width: '8px',
-                      height: '8px',
-                      borderRadius: '50%',
-                      border: '1px solid var(--border)',
-                      background: 'transparent',
-                    }} />
-                    <span style={{ fontSize: '14px', fontWeight: 500 }}>Cognitive Scales</span>
-                  </div>
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"
-                    style={{ transform: openScaleAccordions.cognitive ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.2s' }}>
-                    <polyline points="6 9 12 15 18 9"/>
-                  </svg>
-                </div>
-                {openScaleAccordions.cognitive && (
-                  <div onClick={(e) => e.stopPropagation()} style={{ padding: '16px', borderTop: '1px solid var(--border)' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginBottom: '12px' }}>
-                      <span style={{ flex: 1, fontSize: '14px', fontWeight: 500 }}>MoCA Score</span>
-                      <input
-                        type="number"
-                        placeholder="0-30"
-                        style={{ width: '80px', padding: '8px', border: '1px solid var(--border)', borderRadius: '6px', textAlign: 'center' }}
-                      />
-                      <select style={{ width: '160px', padding: '8px', border: '1px solid var(--border)', borderRadius: '6px' }}>
-                        <option value="">Select...</option>
-                        <option>Normal (26+)</option>
-                        <option>Mild impairment (18-25)</option>
-                        <option>Moderate impairment (10-17)</option>
-                        <option>Severe impairment (&lt;10)</option>
-                      </select>
-                    </div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-                      <span style={{ flex: 1, fontSize: '14px', fontWeight: 500 }}>Mini-Cog</span>
-                      <input
-                        type="number"
-                        placeholder="0-5"
-                        style={{ width: '80px', padding: '8px', border: '1px solid var(--border)', borderRadius: '6px', textAlign: 'center' }}
-                      />
-                      <select style={{ width: '160px', padding: '8px', border: '1px solid var(--border)', borderRadius: '6px' }}>
-                        <option value="">Select...</option>
-                        <option>Normal (3-5)</option>
-                        <option>Abnormal (0-2)</option>
-                      </select>
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              {/* Mental Health Screens Accordion */}
-              <div
-                onClick={() => toggleScaleAccordion('mentalHealth')}
-                style={{
-                  border: '1px solid var(--border)',
-                  borderRadius: '8px',
-                  overflow: 'hidden',
-                  cursor: 'pointer',
-                }}
-              >
-                <div style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  padding: '12px 16px',
-                  background: openScaleAccordions.mentalHealth ? 'var(--bg-dark)' : 'transparent',
-                }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <span style={{
-                      width: '8px',
-                      height: '8px',
-                      borderRadius: '50%',
-                      border: '1px solid var(--border)',
-                      background: 'transparent',
-                    }} />
-                    <span style={{ fontSize: '14px', fontWeight: 500 }}>Mental Health Screens</span>
-                  </div>
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"
-                    style={{ transform: openScaleAccordions.mentalHealth ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.2s' }}>
-                    <polyline points="6 9 12 15 18 9"/>
-                  </svg>
-                </div>
-                {openScaleAccordions.mentalHealth && (
-                  <div onClick={(e) => e.stopPropagation()} style={{ padding: '16px', borderTop: '1px solid var(--border)' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginBottom: '12px' }}>
-                      <span style={{ flex: 1, fontSize: '14px', fontWeight: 500 }}>PHQ-9</span>
-                      <input
-                        type="number"
-                        placeholder="0-27"
-                        style={{ width: '80px', padding: '8px', border: '1px solid var(--border)', borderRadius: '6px', textAlign: 'center' }}
-                      />
-                      <select style={{ width: '160px', padding: '8px', border: '1px solid var(--border)', borderRadius: '6px' }}>
-                        <option value="">Select...</option>
-                        <option>Minimal (0-4)</option>
-                        <option>Mild (5-9)</option>
-                        <option>Moderate (10-14)</option>
-                        <option>Mod-Severe (15-19)</option>
-                        <option>Severe (20-27)</option>
-                      </select>
-                    </div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-                      <span style={{ flex: 1, fontSize: '14px', fontWeight: 500 }}>GAD-7</span>
-                      <input
-                        type="number"
-                        placeholder="0-21"
-                        style={{ width: '80px', padding: '8px', border: '1px solid var(--border)', borderRadius: '6px', textAlign: 'center' }}
-                      />
-                      <select style={{ width: '160px', padding: '8px', border: '1px solid var(--border)', borderRadius: '6px' }}>
-                        <option value="">Select...</option>
-                        <option>Minimal (0-4)</option>
-                        <option>Mild (5-9)</option>
-                        <option>Moderate (10-14)</option>
-                        <option>Severe (15-21)</option>
-                      </select>
-                    </div>
-                  </div>
-                )}
-              </div>
-            </div>
+            {/* Smart Clinical Scales Section - shows scales based on selected diagnosis */}
+            <SmartScalesSection
+              selectedConditions={noteData.chiefComplaint || []}
+              onAddToNote={(field, text) => {
+                const currentValue = noteData[field] || ''
+                updateNote(field, currentValue ? `${currentValue}\n${text}` : text)
+              }}
+            />
           </>
         )}
 
