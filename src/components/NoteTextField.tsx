@@ -228,140 +228,101 @@ export default function NoteTextField({
   }
 
   return (
-    <div ref={containerRef} style={{ position: 'relative' }}>
+    <div ref={containerRef} className="ai-textarea-wrapper">
       <textarea
         ref={textareaRef}
         value={value}
         onChange={handleChange}
         onFocus={() => setActiveTextField(fieldName)}
         placeholder={placeholder}
+        className="form-textarea"
         style={{
-          width: '100%',
           minHeight,
-          padding: '12px',
-          paddingRight: showDictate ? '110px' : '80px',
-          border: '1px solid var(--border)',
-          borderRadius: '8px',
-          fontSize: '14px',
-          resize: 'vertical',
-          outline: 'none',
-          fontFamily: 'inherit',
-          color: 'var(--text-primary)',
-          background: 'var(--bg-white)',
+          paddingRight: showDictate ? '140px' : '110px',
         }}
       />
+
+      {/* Recording Waveform Overlay */}
+      {isRecording && (
+        <div className="recording-waveform active">
+          {[...Array(10)].map((_, i) => (
+            <div key={i} className="wave-bar" />
+          ))}
+          <div className="recording-text">
+            <span className="rec-dot" />
+            Recording...
+          </div>
+        </div>
+      )}
+
       {/* Button group with inline picker */}
-      <div style={{
-        position: 'absolute',
-        top: '8px',
-        right: '8px',
-      }}>
-        <div style={{
-          display: 'flex',
-          gap: '4px',
-        }}>
-          {showDictate && (
-            <button
-              onClick={handleDictateClick}
-              disabled={isTranscribing}
-              style={{
-                width: '28px',
-                height: '28px',
-                borderRadius: '6px',
-                border: isRecording ? 'none' : '1px solid var(--border)',
-                background: isRecording ? 'var(--error)' : isTranscribing ? 'var(--bg-gray)' : 'var(--bg-white)',
-                cursor: isTranscribing ? 'wait' : 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                color: isRecording ? 'white' : 'var(--text-muted)',
-                animation: isRecording ? 'pulse 1s infinite' : 'none',
-                position: 'relative',
-              }}
-              title={isRecording ? 'Stop Recording' : isTranscribing ? 'Transcribing...' : recordingError || 'Dictate'}
-            >
-              {isTranscribing ? (
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ animation: 'spin 1s linear infinite' }}>
-                  <circle cx="12" cy="12" r="10" strokeDasharray="32" strokeDashoffset="12" />
-                </svg>
-              ) : (
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <path d="M12 1a3 3 0 00-3 3v8a3 3 0 006 0V4a3 3 0 00-3-3z"/><path d="M19 10v2a7 7 0 01-14 0v-2"/>
-                </svg>
-              )}
-            </button>
-          )}
+      <div className="ai-textarea-icons">
+        {showDictate && (
           <button
-            onClick={() => setShowPicker(!showPicker)}
+            onClick={handleDictateClick}
+            disabled={isTranscribing}
+            className={`ai-icon-btn ${isRecording ? 'recording' : ''}`}
+            title={isRecording ? 'Stop Recording' : isTranscribing ? 'Transcribing...' : recordingError || 'Dictate'}
+          >
+            {isTranscribing ? (
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="ai-loading-spinner" style={{ width: '14px', height: '14px', border: '2px solid var(--border)', borderTopColor: 'var(--primary)' }}>
+                <circle cx="12" cy="12" r="10" />
+              </svg>
+            ) : (
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M12 1a3 3 0 00-3 3v8a3 3 0 006 0V4a3 3 0 00-3-3z"/><path d="M19 10v2a7 7 0 01-14 0v-2"/>
+              </svg>
+            )}
+          </button>
+        )}
+        <button
+          onClick={() => setShowPicker(!showPicker)}
+          className={`quick-phrases-btn ${showPicker ? 'active' : ''}`}
+          style={{
+            background: showPicker ? '#8B5CF6' : undefined,
+            color: showPicker ? 'white' : undefined,
+          }}
+          title="Dot Phrases"
+        >
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/>
+          </svg>
+        </button>
+        {showAiAction && (
+          <button
+            onClick={onOpenAiDrawer}
+            className="ai-icon-btn sparkle"
             style={{
-              width: '28px',
-              height: '28px',
-              borderRadius: '6px',
-              border: '1px solid var(--border)',
-              background: showPicker ? 'var(--warning)' : 'var(--bg-white)',
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              color: showPicker ? 'white' : 'var(--warning)',
-              transition: 'all 0.15s',
+              background: 'linear-gradient(135deg, var(--primary) 0%, var(--primary-light) 100%)',
+              color: 'white',
             }}
-            title="Dot Phrases"
+            title="AI Actions"
           >
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/>
+              <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
             </svg>
           </button>
-          {showAiAction && (
-            <button
-              onClick={onOpenAiDrawer}
-              style={{
-                width: '28px',
-                height: '28px',
-                borderRadius: '6px',
-                border: 'none',
-                background: 'linear-gradient(135deg, var(--primary) 0%, var(--primary-light) 100%)',
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                color: 'white',
-              }}
-              title="AI Actions"
-            >
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
-              </svg>
-            </button>
-          )}
-          {showDictate && (
-            <button
-              onClick={() => rawDictation && rawDictation.length > 0 && setShowRawDictation(!showRawDictation)}
-              disabled={!rawDictation || rawDictation.length === 0}
-              style={{
-                width: '28px',
-                height: '28px',
-                borderRadius: '6px',
-                border: '1px solid var(--border)',
-                background: showRawDictation ? 'var(--info)' : 'var(--bg-white)',
-                cursor: rawDictation && rawDictation.length > 0 ? 'pointer' : 'not-allowed',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                color: showRawDictation ? 'white' : rawDictation && rawDictation.length > 0 ? 'var(--info)' : 'var(--text-muted)',
-                transition: 'all 0.15s',
-                opacity: rawDictation && rawDictation.length > 0 ? 1 : 0.5,
-              }}
-              title={rawDictation && rawDictation.length > 0 ? `View ${rawDictation.length} dictation${rawDictation.length > 1 ? 's' : ''}` : "No dictation recorded yet"}
-            >
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <circle cx="12" cy="12" r="10"/>
-                <path d="M12 16v-4"/>
-                <path d="M12 8h.01"/>
-              </svg>
-            </button>
-          )}
-        </div>
+        )}
+        {showDictate && (
+          <button
+            onClick={() => rawDictation && rawDictation.length > 0 && setShowRawDictation(!showRawDictation)}
+            disabled={!rawDictation || rawDictation.length === 0}
+            className="ai-icon-btn"
+            style={{
+              background: showRawDictation ? 'var(--info)' : undefined,
+              color: showRawDictation ? 'white' : rawDictation && rawDictation.length > 0 ? 'var(--info)' : undefined,
+              opacity: rawDictation && rawDictation.length > 0 ? 1 : 0.5,
+              cursor: rawDictation && rawDictation.length > 0 ? 'pointer' : 'not-allowed',
+            }}
+            title={rawDictation && rawDictation.length > 0 ? `View ${rawDictation.length} dictation${rawDictation.length > 1 ? 's' : ''}` : "No dictation recorded yet"}
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <circle cx="12" cy="12" r="10"/>
+              <path d="M12 16v-4"/>
+              <path d="M12 8h.01"/>
+            </svg>
+          </button>
+        )}
 
         {/* Inline Phrase Picker - positioned above buttons */}
         {showPicker && (
@@ -374,42 +335,19 @@ export default function NoteTextField({
 
         {/* Raw Dictation Tooltip */}
         {showRawDictation && rawDictation && rawDictation.length > 0 && (
-          <div
-            style={{
-              position: 'absolute',
-              top: '40px',
-              right: '0',
-              width: '340px',
-              maxHeight: '300px',
-              overflowY: 'auto',
-              background: 'var(--bg-white)',
-              border: '1px solid var(--border)',
-              borderRadius: '8px',
-              padding: '12px',
-              boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
-              zIndex: 100,
-            }}
-          >
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-              <span style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-muted)' }}>
-                Dictation History ({rawDictation.length})
-              </span>
+          <div className="quick-phrases-dropdown show" style={{ width: '340px', maxHeight: '300px', overflowY: 'auto' }}>
+            <div className="quick-phrases-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span>Dictation History ({rawDictation.length})</span>
               <button
                 onClick={() => setShowRawDictation(false)}
-                style={{
-                  background: 'none',
-                  border: 'none',
-                  cursor: 'pointer',
-                  color: 'var(--text-muted)',
-                  padding: '2px',
-                }}
+                style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', padding: '2px' }}
               >
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                   <path d="M18 6L6 18M6 6l12 12"/>
                 </svg>
               </button>
             </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', padding: '12px' }}>
               {[...rawDictation].reverse().map((entry, index) => (
                 <div
                   key={index}
@@ -432,16 +370,6 @@ export default function NoteTextField({
           </div>
         )}
       </div>
-      <style jsx>{`
-        @keyframes pulse {
-          0%, 100% { opacity: 1; transform: scale(1); }
-          50% { opacity: 0.8; transform: scale(1.05); }
-        }
-        @keyframes spin {
-          from { transform: rotate(0deg); }
-          to { transform: rotate(360deg); }
-        }
-      `}</style>
     </div>
   )
 }

@@ -12,6 +12,8 @@ export default function LeftSidebar({ patient, priorVisits, scoreHistory }: Left
   const [expandedVisit, setExpandedVisit] = useState<string | null>(priorVisits[0]?.id || null)
   const [timelineOpen, setTimelineOpen] = useState(true)
   const [recentConsultsOpen, setRecentConsultsOpen] = useState(false)
+  const [aiSummaryEnabled, setAiSummaryEnabled] = useState(true)
+  const [scoreHistoryOpen, setScoreHistoryOpen] = useState(true)
 
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('en-US', {
@@ -352,68 +354,166 @@ export default function LeftSidebar({ patient, priorVisits, scoreHistory }: Left
         )}
       </div>
 
-      {/* Recent Consults Section */}
-      <div style={{ padding: '16px' }}>
-        <div
-          onClick={() => setRecentConsultsOpen(!recentConsultsOpen)}
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            cursor: 'pointer',
-          }}
-        >
-          <h4 style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text-primary)' }}>
-            Recent consults
+      {/* Prior Visits Section */}
+      <div className="sidebar-section">
+        <div className="sidebar-section-header">
+          <h4>Prior Visits</h4>
+          <div className="ai-toggle">
+            <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>AI Summary</span>
+            <div
+              className={`toggle-switch ${aiSummaryEnabled ? 'active' : ''}`}
+              onClick={() => setAiSummaryEnabled(!aiSummaryEnabled)}
+            />
+          </div>
+        </div>
+        <div className="sidebar-section-content">
+          {priorVisits.slice(0, 3).map((visit) => (
+            <div
+              key={visit.id}
+              className={`prior-visit-card ${expandedVisit === visit.id ? 'expanded' : ''}`}
+              onClick={() => setExpandedVisit(expandedVisit === visit.id ? null : visit.id)}
+            >
+              <div className="visit-header">
+                <span className="visit-date">{formatDate(visit.visit_date)}</span>
+                <span className={`visit-type badge ${visit.visit_type === 'new_patient' ? 'badge-green' : 'badge-blue'}`}>
+                  {visit.visit_type === 'new_patient' ? 'New Patient' : 'Follow-up'}
+                </span>
+              </div>
+              <div className="visit-chief">{visit.chief_complaint?.join(', ') || 'General consultation'}</div>
+              <div className="visit-provider">Dr. Smith</div>
+              {expandedVisit === visit.id && aiSummaryEnabled && (
+                <div className="visit-expanded-content" style={{ display: 'block' }}>
+                  <div className="ai-summary-box">
+                    <div className="ai-summary-header">
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
+                      </svg>
+                      AI Summary
+                    </div>
+                    <div className="ai-summary-content">
+                      {visit.clinical_notes?.ai_summary || 'Patient reports improved symptoms with current treatment. Continue current regimen and reassess at next visit.'}
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Score History Section */}
+      <div className={`score-history-section ${scoreHistoryOpen ? '' : 'collapsed'}`}>
+        <div className="score-history-header" onClick={() => setScoreHistoryOpen(!scoreHistoryOpen)}>
+          <h4>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M3 3v18h18"/><path d="M18 17V9"/><path d="M13 17V5"/><path d="M8 17v-3"/>
+            </svg>
+            Score History
           </h4>
-          <svg
-            width="16"
-            height="16"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="var(--text-muted)"
-            strokeWidth="2"
-          >
-            <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+          <svg className="score-history-toggle" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <polyline points="6 9 12 15 18 9"/>
           </svg>
         </div>
+        <div className="score-history-content">
+          {/* Group scores by type */}
+          {['MIDAS', 'HIT-6', 'PHQ-9'].map((scaleType) => {
+            const scaleScores = scoreHistory.filter(s => s.scale_type === scaleType)
+            if (scaleScores.length === 0) return null
 
-        {recentConsultsOpen && priorVisits.length > 0 && (
-          <div style={{ marginTop: '12px' }}>
-            {priorVisits.slice(0, 3).map((visit) => (
-              <div
-                key={visit.id}
-                onClick={() => setExpandedVisit(expandedVisit === visit.id ? null : visit.id)}
-                style={{
-                  background: expandedVisit === visit.id ? 'var(--bg-white)' : 'var(--bg-gray)',
-                  borderRadius: '8px',
-                  padding: '12px',
-                  marginBottom: '8px',
-                  cursor: 'pointer',
-                  border: expandedVisit === visit.id ? '1px solid var(--primary)' : '1px solid transparent',
-                }}
-              >
-                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
-                  <span style={{ fontWeight: 600, fontSize: '13px', color: 'var(--text-primary)' }}>
-                    {formatDate(visit.visit_date)}
-                  </span>
-                  <span style={{
-                    fontSize: '11px',
-                    padding: '2px 8px',
-                    borderRadius: '10px',
-                    background: visit.visit_type === 'new_patient' ? '#D1FAE5' : '#DBEAFE',
-                    color: visit.visit_type === 'new_patient' ? '#059669' : '#1D4ED8',
-                  }}>
-                    {visit.visit_type === 'new_patient' ? 'New' : 'Follow-up'}
+            const trend = scaleScores.length > 1
+              ? (scaleScores[0].score < scaleScores[1].score ? 'improving' : scaleScores[0].score > scaleScores[1].score ? 'worsening' : 'stable')
+              : 'stable'
+
+            return (
+              <div key={scaleType} className="score-card">
+                <div className="score-card-header">
+                  <span className="score-card-title">{scaleType}</span>
+                  <span className={`score-card-trend ${trend}`}>
+                    {trend === 'improving' && (
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/>
+                        <polyline points="17 6 23 6 23 12"/>
+                      </svg>
+                    )}
+                    {trend === 'stable' && (
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <line x1="5" y1="12" x2="19" y2="12"/>
+                      </svg>
+                    )}
+                    {trend === 'worsening' && (
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <polyline points="23 18 13.5 8.5 8.5 13.5 1 6"/>
+                        <polyline points="17 18 23 18 23 12"/>
+                      </svg>
+                    )}
+                    {trend.charAt(0).toUpperCase() + trend.slice(1)}
                   </span>
                 </div>
-                <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>
-                  {visit.chief_complaint?.join(', ') || 'General consultation'}
+                <div className="score-history-list">
+                  {scaleScores.slice(0, 4).map((score) => (
+                    <div key={score.id} className="score-history-item clickable">
+                      <span className="date">{formatDate(score.created_at)}</span>
+                      <span className="value">{score.score} <span className="interpretation">{score.interpretation}</span></span>
+                    </div>
+                  ))}
                 </div>
               </div>
-            ))}
-          </div>
-        )}
+            )
+          })}
+
+          {/* Default scores if none exist */}
+          {scoreHistory.length === 0 && (
+            <>
+              <div className="score-card">
+                <div className="score-card-header">
+                  <span className="score-card-title">MIDAS</span>
+                  <span className="score-card-trend improving">
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/>
+                      <polyline points="17 6 23 6 23 12"/>
+                    </svg>
+                    Improving
+                  </span>
+                </div>
+                <div className="score-history-list">
+                  <div className="score-history-item clickable">
+                    <span className="date">Jan 16, 2026</span>
+                    <span className="value">18 <span className="interpretation">Moderate</span></span>
+                  </div>
+                  <div className="score-history-item clickable">
+                    <span className="date">Jan 10, 2026</span>
+                    <span className="value">24 <span className="interpretation">Moderate</span></span>
+                  </div>
+                  <div className="score-history-item clickable">
+                    <span className="date">Dec 15, 2025</span>
+                    <span className="value">42 <span className="interpretation">Severe</span></span>
+                  </div>
+                </div>
+              </div>
+              <div className="score-card">
+                <div className="score-card-header">
+                  <span className="score-card-title">HIT-6</span>
+                  <span className="score-card-trend stable">
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <line x1="5" y1="12" x2="19" y2="12"/>
+                    </svg>
+                    Stable
+                  </span>
+                </div>
+                <div className="score-history-list">
+                  <div className="score-history-item">
+                    <span className="date">Jan 16, 2026</span>
+                    <span className="value">58 <span className="interpretation">Substantial</span></span>
+                  </div>
+                  <div className="score-history-item">
+                    <span className="date">Jan 10, 2026</span>
+                    <span className="value">60 <span className="interpretation">Severe</span></span>
+                  </div>
+                </div>
+              </div>
+            </>
+          )}
+        </div>
       </div>
     </aside>
   )

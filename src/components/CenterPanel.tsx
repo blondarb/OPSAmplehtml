@@ -43,6 +43,83 @@ export default function CenterPanel({
   const [activeTab, setActiveTab] = useState('history')
   const [localActiveField, setLocalActiveField] = useState<string | null>(null)
 
+  // Clinical Scales accordion state
+  const [openScaleAccordions, setOpenScaleAccordions] = useState<Record<string, boolean>>({
+    headache: true,
+    cognitive: false,
+    mentalHealth: false,
+  })
+
+  // Physical Exam accordion state
+  const [openExamAccordions, setOpenExamAccordions] = useState<Record<string, boolean>>({
+    generalAppearance: true,
+    mentalStatus: true,
+    cranialNerves: true,
+    motor: true,
+    sensation: true,
+    coordination: true,
+    gait: false,
+  })
+
+  // Exam checkbox state
+  const [examFindings, setExamFindings] = useState<Record<string, boolean>>({
+    // Mental Status
+    locAwake: true,
+    locDrowsy: false,
+    locObtunded: false,
+    locComatose: false,
+    orientName: true,
+    orientDate: true,
+    orientLocation: true,
+    orientSituation: true,
+    followingCommands: true,
+    // Cranial Nerves
+    visualFields: true,
+    pupilsReactive: true,
+    eomsFulll: true,
+    facialSensation: true,
+    faceSymmetric: true,
+    hearingIntact: true,
+    palateElevates: true,
+    tongueMidline: true,
+    // Motor
+    normalBulk: true,
+    normalTone: true,
+    strength5: true,
+    noPronatorDrift: true,
+    // Sensation
+    lightTouch: true,
+    pinprick: true,
+    vibration: true,
+    proprioception: true,
+    // Coordination
+    fingerToNose: true,
+    heelToShin: true,
+    rapidAlternating: true,
+    // Gait
+    gaitEvaluated: true,
+    stationNormal: false,
+    casualGait: false,
+    tandemGait: false,
+    rombergNegative: false,
+  })
+
+  const toggleScaleAccordion = (key: string) => {
+    setOpenScaleAccordions(prev => ({ ...prev, [key]: !prev[key] }))
+  }
+
+  const toggleExamAccordion = (key: string) => {
+    setOpenExamAccordions(prev => ({ ...prev, [key]: !prev[key] }))
+  }
+
+  const toggleExamFinding = (key: string) => {
+    setExamFindings(prev => ({ ...prev, [key]: !prev[key] }))
+  }
+
+  const setExamFinding = (key: string, value: boolean) => {
+    setExamFindings(prev => ({ ...prev, [key]: value }))
+  }
+
   const handleSetActiveField = (field: string | null) => {
     setLocalActiveField(field)
     if (setActiveTextField) setActiveTextField(field)
@@ -65,34 +142,16 @@ export default function CenterPanel({
   ]
 
   return (
-    <main style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+    <main className="center-panel">
       {/* Tab Navigation with Action Bar */}
-      <div style={{
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        background: 'var(--bg-white)',
-        borderBottom: '1px solid var(--border)',
-        padding: '0 16px',
-      }}>
+      <div className="tab-nav-wrapper">
         {/* Tabs */}
-        <div style={{ display: 'flex', gap: '4px' }}>
+        <div className="tab-nav">
           {tabs.map(tab => (
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
-              style={{
-                padding: '16px 20px',
-                fontSize: '14px',
-                fontWeight: 500,
-                color: activeTab === tab.id ? 'var(--text-primary)' : 'var(--text-secondary)',
-                background: 'none',
-                border: 'none',
-                cursor: 'pointer',
-                position: 'relative',
-                borderBottom: activeTab === tab.id ? '2px solid var(--text-primary)' : '2px solid transparent',
-                marginBottom: '-1px',
-              }}
+              className={`tab-btn ${activeTab === tab.id ? 'active' : ''}`}
             >
               {tab.label}
             </button>
@@ -231,7 +290,7 @@ export default function CenterPanel({
       </div>
 
       {/* Tab Content */}
-      <div style={{ flex: 1, overflowY: 'auto', padding: '24px', background: 'var(--bg-gray)', position: 'relative' }}>
+      <div className="tab-content" style={{ position: 'relative' }}>
         {/* History Tab */}
         {activeTab === 'history' && (
           <>
@@ -464,6 +523,224 @@ export default function CenterPanel({
                 </div>
               </div>
             </div>
+
+            {/* Clinical Scales Section */}
+            <div style={{
+              background: 'var(--bg-white)',
+              borderRadius: '12px',
+              padding: '20px',
+              boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
+              marginBottom: '16px',
+            }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+                <span style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text-primary)' }}>Clinical Scales</span>
+                <span style={{ fontSize: '11px', color: 'var(--text-muted)', background: 'var(--bg-dark)', padding: '4px 8px', borderRadius: '4px' }}>Optional</span>
+              </div>
+
+              {/* Headache Scales Accordion */}
+              <div
+                onClick={() => toggleScaleAccordion('headache')}
+                style={{
+                  border: '1px solid var(--border)',
+                  borderRadius: '8px',
+                  marginBottom: '8px',
+                  overflow: 'hidden',
+                  cursor: 'pointer',
+                }}
+              >
+                <div style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  padding: '12px 16px',
+                  background: openScaleAccordions.headache ? 'var(--bg-dark)' : 'transparent',
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <span style={{
+                      width: '8px',
+                      height: '8px',
+                      borderRadius: '50%',
+                      background: 'var(--primary)',
+                    }} />
+                    <span style={{ fontSize: '14px', fontWeight: 500 }}>Headache Scales</span>
+                  </div>
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"
+                    style={{ transform: openScaleAccordions.headache ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.2s' }}>
+                    <polyline points="6 9 12 15 18 9"/>
+                  </svg>
+                </div>
+                {openScaleAccordions.headache && (
+                  <div onClick={(e) => e.stopPropagation()} style={{ padding: '16px', borderTop: '1px solid var(--border)' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginBottom: '12px' }}>
+                      <span style={{ flex: 1, fontSize: '14px', fontWeight: 500 }}>MIDAS Score</span>
+                      <input
+                        type="number"
+                        placeholder="0-270"
+                        defaultValue={18}
+                        style={{ width: '80px', padding: '8px', border: '1px solid var(--border)', borderRadius: '6px', textAlign: 'center' }}
+                      />
+                      <select style={{ width: '160px', padding: '8px', border: '1px solid var(--border)', borderRadius: '6px' }}>
+                        <option>Moderate disability</option>
+                        <option>Little/No disability</option>
+                        <option>Mild disability</option>
+                        <option>Severe disability</option>
+                      </select>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+                      <span style={{ flex: 1, fontSize: '14px', fontWeight: 500 }}>HIT-6 Score</span>
+                      <input
+                        type="number"
+                        placeholder="36-78"
+                        defaultValue={58}
+                        style={{ width: '80px', padding: '8px', border: '1px solid var(--border)', borderRadius: '6px', textAlign: 'center' }}
+                      />
+                      <select style={{ width: '160px', padding: '8px', border: '1px solid var(--border)', borderRadius: '6px' }}>
+                        <option>Substantial impact</option>
+                        <option>Little/No impact</option>
+                        <option>Some impact</option>
+                        <option>Severe impact</option>
+                      </select>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Cognitive Scales Accordion */}
+              <div
+                onClick={() => toggleScaleAccordion('cognitive')}
+                style={{
+                  border: '1px solid var(--border)',
+                  borderRadius: '8px',
+                  marginBottom: '8px',
+                  overflow: 'hidden',
+                  cursor: 'pointer',
+                }}
+              >
+                <div style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  padding: '12px 16px',
+                  background: openScaleAccordions.cognitive ? 'var(--bg-dark)' : 'transparent',
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <span style={{
+                      width: '8px',
+                      height: '8px',
+                      borderRadius: '50%',
+                      border: '1px solid var(--border)',
+                      background: 'transparent',
+                    }} />
+                    <span style={{ fontSize: '14px', fontWeight: 500 }}>Cognitive Scales</span>
+                  </div>
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"
+                    style={{ transform: openScaleAccordions.cognitive ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.2s' }}>
+                    <polyline points="6 9 12 15 18 9"/>
+                  </svg>
+                </div>
+                {openScaleAccordions.cognitive && (
+                  <div onClick={(e) => e.stopPropagation()} style={{ padding: '16px', borderTop: '1px solid var(--border)' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginBottom: '12px' }}>
+                      <span style={{ flex: 1, fontSize: '14px', fontWeight: 500 }}>MoCA Score</span>
+                      <input
+                        type="number"
+                        placeholder="0-30"
+                        style={{ width: '80px', padding: '8px', border: '1px solid var(--border)', borderRadius: '6px', textAlign: 'center' }}
+                      />
+                      <select style={{ width: '160px', padding: '8px', border: '1px solid var(--border)', borderRadius: '6px' }}>
+                        <option value="">Select...</option>
+                        <option>Normal (26+)</option>
+                        <option>Mild impairment (18-25)</option>
+                        <option>Moderate impairment (10-17)</option>
+                        <option>Severe impairment (&lt;10)</option>
+                      </select>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+                      <span style={{ flex: 1, fontSize: '14px', fontWeight: 500 }}>Mini-Cog</span>
+                      <input
+                        type="number"
+                        placeholder="0-5"
+                        style={{ width: '80px', padding: '8px', border: '1px solid var(--border)', borderRadius: '6px', textAlign: 'center' }}
+                      />
+                      <select style={{ width: '160px', padding: '8px', border: '1px solid var(--border)', borderRadius: '6px' }}>
+                        <option value="">Select...</option>
+                        <option>Normal (3-5)</option>
+                        <option>Abnormal (0-2)</option>
+                      </select>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Mental Health Screens Accordion */}
+              <div
+                onClick={() => toggleScaleAccordion('mentalHealth')}
+                style={{
+                  border: '1px solid var(--border)',
+                  borderRadius: '8px',
+                  overflow: 'hidden',
+                  cursor: 'pointer',
+                }}
+              >
+                <div style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  padding: '12px 16px',
+                  background: openScaleAccordions.mentalHealth ? 'var(--bg-dark)' : 'transparent',
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <span style={{
+                      width: '8px',
+                      height: '8px',
+                      borderRadius: '50%',
+                      border: '1px solid var(--border)',
+                      background: 'transparent',
+                    }} />
+                    <span style={{ fontSize: '14px', fontWeight: 500 }}>Mental Health Screens</span>
+                  </div>
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"
+                    style={{ transform: openScaleAccordions.mentalHealth ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.2s' }}>
+                    <polyline points="6 9 12 15 18 9"/>
+                  </svg>
+                </div>
+                {openScaleAccordions.mentalHealth && (
+                  <div onClick={(e) => e.stopPropagation()} style={{ padding: '16px', borderTop: '1px solid var(--border)' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginBottom: '12px' }}>
+                      <span style={{ flex: 1, fontSize: '14px', fontWeight: 500 }}>PHQ-9</span>
+                      <input
+                        type="number"
+                        placeholder="0-27"
+                        style={{ width: '80px', padding: '8px', border: '1px solid var(--border)', borderRadius: '6px', textAlign: 'center' }}
+                      />
+                      <select style={{ width: '160px', padding: '8px', border: '1px solid var(--border)', borderRadius: '6px' }}>
+                        <option value="">Select...</option>
+                        <option>Minimal (0-4)</option>
+                        <option>Mild (5-9)</option>
+                        <option>Moderate (10-14)</option>
+                        <option>Mod-Severe (15-19)</option>
+                        <option>Severe (20-27)</option>
+                      </select>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+                      <span style={{ flex: 1, fontSize: '14px', fontWeight: 500 }}>GAD-7</span>
+                      <input
+                        type="number"
+                        placeholder="0-21"
+                        style={{ width: '80px', padding: '8px', border: '1px solid var(--border)', borderRadius: '6px', textAlign: 'center' }}
+                      />
+                      <select style={{ width: '160px', padding: '8px', border: '1px solid var(--border)', borderRadius: '6px' }}>
+                        <option value="">Select...</option>
+                        <option>Minimal (0-4)</option>
+                        <option>Mild (5-9)</option>
+                        <option>Moderate (10-14)</option>
+                        <option>Severe (15-21)</option>
+                      </select>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
           </>
         )}
 
@@ -654,9 +931,6 @@ export default function CenterPanel({
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px' }}>
                 <span style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text-primary)' }}>Initial assessment</span>
                 <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>(Optional)</span>
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--text-muted)" strokeWidth="2">
-                  <circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 015.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/>
-                </svg>
               </div>
               <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap' }}>
                 <div style={{ flex: '1 1 200px' }}>
@@ -700,7 +974,7 @@ export default function CenterPanel({
               </div>
             </div>
 
-            {/* Neuro exam */}
+            {/* Neurological Examination Section */}
             <div style={{
               background: 'var(--bg-white)',
               borderRadius: '12px',
@@ -708,10 +982,454 @@ export default function CenterPanel({
               marginBottom: '16px',
               boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
             }}>
-              <label style={{ display: 'flex', alignItems: 'center', gap: '12px', cursor: 'pointer' }}>
-                <input type="checkbox" style={{ width: '18px', height: '18px', accentColor: 'var(--primary)' }}/>
-                <span style={{ fontSize: '14px', fontWeight: 500, color: 'var(--text-primary)' }}>Neuro exam</span>
-              </label>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+                <span style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text-primary)' }}>Neurological Examination</span>
+                <span style={{ fontSize: '11px', color: 'var(--text-muted)', background: 'var(--bg-dark)', padding: '4px 8px', borderRadius: '4px' }}>Optional</span>
+              </div>
+
+              {/* General Appearance Accordion */}
+              <div
+                onClick={() => toggleExamAccordion('generalAppearance')}
+                style={{
+                  border: '1px solid var(--border)',
+                  borderRadius: '8px',
+                  marginBottom: '8px',
+                  overflow: 'hidden',
+                  cursor: 'pointer',
+                }}
+              >
+                <div style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  padding: '12px 16px',
+                  background: openExamAccordions.generalAppearance ? 'var(--bg-dark)' : 'transparent',
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <span style={{
+                      width: '8px',
+                      height: '8px',
+                      borderRadius: '50%',
+                      background: 'var(--primary)',
+                    }} />
+                    <span style={{ fontSize: '14px', fontWeight: 500 }}>General Appearance</span>
+                  </div>
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"
+                    style={{ transform: openExamAccordions.generalAppearance ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.2s' }}>
+                    <polyline points="6 9 12 15 18 9"/>
+                  </svg>
+                </div>
+                {openExamAccordions.generalAppearance && (
+                  <div onClick={(e) => e.stopPropagation()} style={{ padding: '16px', borderTop: '1px solid var(--border)' }}>
+                    <select style={{ width: '100%', padding: '10px', border: '1px solid var(--border)', borderRadius: '6px' }}>
+                      <option>In no apparent distress</option>
+                      <option>Appears uncomfortable</option>
+                      <option>Appears ill</option>
+                      <option>Appears anxious</option>
+                    </select>
+                  </div>
+                )}
+              </div>
+
+              {/* Mental Status Accordion */}
+              <div
+                onClick={() => toggleExamAccordion('mentalStatus')}
+                style={{
+                  border: '1px solid var(--border)',
+                  borderRadius: '8px',
+                  marginBottom: '8px',
+                  overflow: 'hidden',
+                  cursor: 'pointer',
+                }}
+              >
+                <div style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  padding: '12px 16px',
+                  background: openExamAccordions.mentalStatus ? 'var(--bg-dark)' : 'transparent',
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <span style={{
+                      width: '8px',
+                      height: '8px',
+                      borderRadius: '50%',
+                      background: 'var(--primary)',
+                    }} />
+                    <span style={{ fontSize: '14px', fontWeight: 500 }}>Mental Status</span>
+                  </div>
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"
+                    style={{ transform: openExamAccordions.mentalStatus ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.2s' }}>
+                    <polyline points="6 9 12 15 18 9"/>
+                  </svg>
+                </div>
+                {openExamAccordions.mentalStatus && (
+                  <div onClick={(e) => e.stopPropagation()} style={{ padding: '16px', borderTop: '1px solid var(--border)' }}>
+                    <div style={{ marginBottom: '16px' }}>
+                      <h5 style={{ fontSize: '13px', fontWeight: 600, marginBottom: '8px' }}>Level of Consciousness</h5>
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '8px' }}>
+                        {[
+                          { key: 'locAwake', label: 'Awake, Alert' },
+                          { key: 'locDrowsy', label: 'Drowsy' },
+                          { key: 'locObtunded', label: 'Obtunded' },
+                          { key: 'locComatose', label: 'Comatose' },
+                        ].map(item => (
+                          <label key={item.key} style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
+                            <input
+                              type="radio"
+                              name="loc"
+                              checked={examFindings[item.key]}
+                              onChange={() => {
+                                setExamFinding('locAwake', item.key === 'locAwake')
+                                setExamFinding('locDrowsy', item.key === 'locDrowsy')
+                                setExamFinding('locObtunded', item.key === 'locObtunded')
+                                setExamFinding('locComatose', item.key === 'locComatose')
+                              }}
+                              style={{ accentColor: 'var(--primary)' }}
+                            />
+                            <span style={{ fontSize: '13px' }}>{item.label}</span>
+                          </label>
+                        ))}
+                      </div>
+                    </div>
+                    <div style={{ marginBottom: '16px' }}>
+                      <h5 style={{ fontSize: '13px', fontWeight: 600, marginBottom: '8px' }}>Orientation</h5>
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '8px' }}>
+                        {[
+                          { key: 'orientName', label: 'Name' },
+                          { key: 'orientDate', label: 'Date' },
+                          { key: 'orientLocation', label: 'Location' },
+                          { key: 'orientSituation', label: 'Situation' },
+                        ].map(item => (
+                          <label key={item.key} style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
+                            <input
+                              type="checkbox"
+                              checked={examFindings[item.key]}
+                              onChange={() => toggleExamFinding(item.key)}
+                              style={{ accentColor: 'var(--primary)' }}
+                            />
+                            <span style={{ fontSize: '13px' }}>{item.label}</span>
+                          </label>
+                        ))}
+                      </div>
+                    </div>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
+                      <input
+                        type="checkbox"
+                        checked={examFindings.followingCommands}
+                        onChange={() => toggleExamFinding('followingCommands')}
+                        style={{ accentColor: 'var(--primary)' }}
+                      />
+                      <span style={{ fontSize: '13px' }}>Following commands</span>
+                    </label>
+                  </div>
+                )}
+              </div>
+
+              {/* Cranial Nerves Accordion */}
+              <div
+                onClick={() => toggleExamAccordion('cranialNerves')}
+                style={{
+                  border: '1px solid var(--border)',
+                  borderRadius: '8px',
+                  marginBottom: '8px',
+                  overflow: 'hidden',
+                  cursor: 'pointer',
+                }}
+              >
+                <div style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  padding: '12px 16px',
+                  background: openExamAccordions.cranialNerves ? 'var(--bg-dark)' : 'transparent',
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <span style={{
+                      width: '8px',
+                      height: '8px',
+                      borderRadius: '50%',
+                      background: 'var(--primary)',
+                    }} />
+                    <span style={{ fontSize: '14px', fontWeight: 500 }}>Cranial Nerves</span>
+                  </div>
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"
+                    style={{ transform: openExamAccordions.cranialNerves ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.2s' }}>
+                    <polyline points="6 9 12 15 18 9"/>
+                  </svg>
+                </div>
+                {openExamAccordions.cranialNerves && (
+                  <div onClick={(e) => e.stopPropagation()} style={{ padding: '16px', borderTop: '1px solid var(--border)' }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '8px' }}>
+                      {[
+                        { key: 'visualFields', label: 'Visual fields full to confrontation' },
+                        { key: 'pupilsReactive', label: 'Pupils equal and reactive' },
+                        { key: 'eomsFulll', label: 'EOMs full, no nystagmus' },
+                        { key: 'facialSensation', label: 'Facial sensation intact' },
+                        { key: 'faceSymmetric', label: 'Face symmetric' },
+                        { key: 'hearingIntact', label: 'Hearing grossly intact' },
+                        { key: 'palateElevates', label: 'Palate elevates symmetrically' },
+                        { key: 'tongueMidline', label: 'Tongue midline' },
+                      ].map(item => (
+                        <label key={item.key} style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
+                          <input
+                            type="checkbox"
+                            checked={examFindings[item.key]}
+                            onChange={() => toggleExamFinding(item.key)}
+                            style={{ accentColor: 'var(--primary)' }}
+                          />
+                          <span style={{ fontSize: '13px' }}>{item.label}</span>
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Motor Accordion */}
+              <div
+                onClick={() => toggleExamAccordion('motor')}
+                style={{
+                  border: '1px solid var(--border)',
+                  borderRadius: '8px',
+                  marginBottom: '8px',
+                  overflow: 'hidden',
+                  cursor: 'pointer',
+                }}
+              >
+                <div style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  padding: '12px 16px',
+                  background: openExamAccordions.motor ? 'var(--bg-dark)' : 'transparent',
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <span style={{
+                      width: '8px',
+                      height: '8px',
+                      borderRadius: '50%',
+                      background: 'var(--primary)',
+                    }} />
+                    <span style={{ fontSize: '14px', fontWeight: 500 }}>Motor</span>
+                  </div>
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"
+                    style={{ transform: openExamAccordions.motor ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.2s' }}>
+                    <polyline points="6 9 12 15 18 9"/>
+                  </svg>
+                </div>
+                {openExamAccordions.motor && (
+                  <div onClick={(e) => e.stopPropagation()} style={{ padding: '16px', borderTop: '1px solid var(--border)' }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '8px' }}>
+                      {[
+                        { key: 'normalBulk', label: 'Normal bulk' },
+                        { key: 'normalTone', label: 'Normal tone' },
+                        { key: 'strength5', label: 'Strength 5/5 all extremities' },
+                        { key: 'noPronatorDrift', label: 'No pronator drift' },
+                      ].map(item => (
+                        <label key={item.key} style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
+                          <input
+                            type="checkbox"
+                            checked={examFindings[item.key]}
+                            onChange={() => toggleExamFinding(item.key)}
+                            style={{ accentColor: 'var(--primary)' }}
+                          />
+                          <span style={{ fontSize: '13px' }}>{item.label}</span>
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Sensation Accordion */}
+              <div
+                onClick={() => toggleExamAccordion('sensation')}
+                style={{
+                  border: '1px solid var(--border)',
+                  borderRadius: '8px',
+                  marginBottom: '8px',
+                  overflow: 'hidden',
+                  cursor: 'pointer',
+                }}
+              >
+                <div style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  padding: '12px 16px',
+                  background: openExamAccordions.sensation ? 'var(--bg-dark)' : 'transparent',
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <span style={{
+                      width: '8px',
+                      height: '8px',
+                      borderRadius: '50%',
+                      background: 'var(--primary)',
+                    }} />
+                    <span style={{ fontSize: '14px', fontWeight: 500 }}>Sensation</span>
+                  </div>
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"
+                    style={{ transform: openExamAccordions.sensation ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.2s' }}>
+                    <polyline points="6 9 12 15 18 9"/>
+                  </svg>
+                </div>
+                {openExamAccordions.sensation && (
+                  <div onClick={(e) => e.stopPropagation()} style={{ padding: '16px', borderTop: '1px solid var(--border)' }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '8px' }}>
+                      {[
+                        { key: 'lightTouch', label: 'Light touch intact' },
+                        { key: 'pinprick', label: 'Pinprick intact' },
+                        { key: 'vibration', label: 'Vibration intact' },
+                        { key: 'proprioception', label: 'Proprioception intact' },
+                      ].map(item => (
+                        <label key={item.key} style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
+                          <input
+                            type="checkbox"
+                            checked={examFindings[item.key]}
+                            onChange={() => toggleExamFinding(item.key)}
+                            style={{ accentColor: 'var(--primary)' }}
+                          />
+                          <span style={{ fontSize: '13px' }}>{item.label}</span>
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Coordination Accordion */}
+              <div
+                onClick={() => toggleExamAccordion('coordination')}
+                style={{
+                  border: '1px solid var(--border)',
+                  borderRadius: '8px',
+                  marginBottom: '8px',
+                  overflow: 'hidden',
+                  cursor: 'pointer',
+                }}
+              >
+                <div style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  padding: '12px 16px',
+                  background: openExamAccordions.coordination ? 'var(--bg-dark)' : 'transparent',
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <span style={{
+                      width: '8px',
+                      height: '8px',
+                      borderRadius: '50%',
+                      background: 'var(--primary)',
+                    }} />
+                    <span style={{ fontSize: '14px', fontWeight: 500 }}>Coordination</span>
+                  </div>
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"
+                    style={{ transform: openExamAccordions.coordination ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.2s' }}>
+                    <polyline points="6 9 12 15 18 9"/>
+                  </svg>
+                </div>
+                {openExamAccordions.coordination && (
+                  <div onClick={(e) => e.stopPropagation()} style={{ padding: '16px', borderTop: '1px solid var(--border)' }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '8px' }}>
+                      {[
+                        { key: 'fingerToNose', label: 'Finger-to-nose intact' },
+                        { key: 'heelToShin', label: 'Heel-to-shin intact' },
+                        { key: 'rapidAlternating', label: 'Rapid alternating movements intact' },
+                      ].map(item => (
+                        <label key={item.key} style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
+                          <input
+                            type="checkbox"
+                            checked={examFindings[item.key]}
+                            onChange={() => toggleExamFinding(item.key)}
+                            style={{ accentColor: 'var(--primary)' }}
+                          />
+                          <span style={{ fontSize: '13px' }}>{item.label}</span>
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Gait Accordion */}
+              <div
+                onClick={() => toggleExamAccordion('gait')}
+                style={{
+                  border: '1px solid var(--border)',
+                  borderRadius: '8px',
+                  overflow: 'hidden',
+                  cursor: 'pointer',
+                }}
+              >
+                <div style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  padding: '12px 16px',
+                  background: openExamAccordions.gait ? 'var(--bg-dark)' : 'transparent',
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <span style={{
+                      width: '8px',
+                      height: '8px',
+                      borderRadius: '50%',
+                      border: '1px solid var(--border)',
+                      background: 'transparent',
+                    }} />
+                    <span style={{ fontSize: '14px', fontWeight: 500 }}>Gait</span>
+                  </div>
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"
+                    style={{ transform: openExamAccordions.gait ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.2s' }}>
+                    <polyline points="6 9 12 15 18 9"/>
+                  </svg>
+                </div>
+                {openExamAccordions.gait && (
+                  <div onClick={(e) => e.stopPropagation()} style={{ padding: '16px', borderTop: '1px solid var(--border)' }}>
+                    <div style={{ display: 'flex', gap: '16px', marginBottom: '12px' }}>
+                      <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
+                        <input
+                          type="radio"
+                          name="gait"
+                          checked={examFindings.gaitEvaluated}
+                          onChange={() => setExamFinding('gaitEvaluated', true)}
+                          style={{ accentColor: 'var(--primary)' }}
+                        />
+                        <span style={{ fontSize: '13px' }}>Evaluated</span>
+                      </label>
+                      <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
+                        <input
+                          type="radio"
+                          name="gait"
+                          checked={!examFindings.gaitEvaluated}
+                          onChange={() => setExamFinding('gaitEvaluated', false)}
+                          style={{ accentColor: 'var(--primary)' }}
+                        />
+                        <span style={{ fontSize: '13px' }}>Not evaluated</span>
+                      </label>
+                    </div>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '8px' }}>
+                      {[
+                        { key: 'stationNormal', label: 'Station normal' },
+                        { key: 'casualGait', label: 'Casual gait normal' },
+                        { key: 'tandemGait', label: 'Tandem gait normal' },
+                        { key: 'rombergNegative', label: 'Romberg negative' },
+                      ].map(item => (
+                        <label key={item.key} style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
+                          <input
+                            type="checkbox"
+                            checked={examFindings[item.key]}
+                            onChange={() => toggleExamFinding(item.key)}
+                            style={{ accentColor: 'var(--primary)' }}
+                          />
+                          <span style={{ fontSize: '13px' }}>{item.label}</span>
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
             </div>
 
             {/* Vital signs */}

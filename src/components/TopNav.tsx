@@ -262,6 +262,86 @@ export default function TopNav({ user, darkMode, toggleDarkMode, onSignOut, open
           )}
         </button>
 
+        {/* AI Launcher */}
+        <div className="ai-launcher-container">
+          <button
+            onClick={() => setAiMenuOpen(!aiMenuOpen)}
+            className="ai-launcher-btn"
+            title="AI Tools"
+          >
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
+            </svg>
+          </button>
+          {aiMenuOpen && (
+            <div className="ai-launcher-menu show">
+              <div className="ai-launcher-menu-header">
+                <h4>
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
+                  </svg>
+                  AI Tools
+                </h4>
+              </div>
+              <div className="ai-launcher-menu-item" onClick={() => { openAiDrawer('chart-prep'); setAiMenuOpen(false); }}>
+                <div className="ai-launcher-menu-icon">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><path d="M14 2v6h6"/><path d="M16 13H8"/><path d="M16 17H8"/><path d="M10 9H8"/>
+                  </svg>
+                </div>
+                <div className="ai-launcher-menu-text">
+                  <h5>Chart Prep</h5>
+                  <p>AI-generated visit summary</p>
+                </div>
+              </div>
+              <div className="ai-launcher-menu-item" onClick={() => { openAiDrawer('document'); setAiMenuOpen(false); }}>
+                <div className="ai-launcher-menu-icon">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/>
+                  </svg>
+                </div>
+                <div className="ai-launcher-menu-text">
+                  <h5>Document</h5>
+                  <p>Transcribe and document visit</p>
+                </div>
+              </div>
+              <div className="ai-launcher-menu-item" onClick={() => { openAiDrawer('ask'); setAiMenuOpen(false); }}>
+                <div className="ai-launcher-menu-icon">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/>
+                  </svg>
+                </div>
+                <div className="ai-launcher-menu-text">
+                  <h5>Ask AI</h5>
+                  <p>Query clinical guidelines</p>
+                </div>
+              </div>
+              <div className="ai-launcher-menu-item" onClick={() => { openAiDrawer('summary'); setAiMenuOpen(false); }}>
+                <div className="ai-launcher-menu-icon">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/>
+                  </svg>
+                </div>
+                <div className="ai-launcher-menu-text">
+                  <h5>Patient Summary</h5>
+                  <p>Plain-language explanation</p>
+                </div>
+              </div>
+              <div className="ai-launcher-menu-item" onClick={() => { openAiDrawer('handout'); setAiMenuOpen(false); }}>
+                <div className="ai-launcher-menu-icon">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4z"/><path d="M3 6h18"/><path d="M16 10a4 4 0 01-8 0"/>
+                  </svg>
+                </div>
+                <div className="ai-launcher-menu-text">
+                  <h5>Patient Handout</h5>
+                  <p>Generate take-home materials</p>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+
         {/* User Avatar with dropdown */}
         <div style={{ position: 'relative' }}>
           <button
