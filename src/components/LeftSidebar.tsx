@@ -415,51 +415,62 @@ export default function LeftSidebar({ patient, priorVisits, scoreHistory }: Left
           </svg>
         </div>
         <div className="score-history-content">
-          {/* Group scores by type */}
-          {['MIDAS', 'HIT-6', 'PHQ-9'].map((scaleType) => {
-            const scaleScores = scoreHistory.filter(s => s.scale_type === scaleType)
-            if (scaleScores.length === 0) return null
+          {/* Group scores by type - dynamically get unique scale types */}
+          {(() => {
+            // Get unique scale types from the data
+            const scaleTypes = [...new Set(scoreHistory.map(s => s.scale_type))].filter(Boolean)
+            // If no data, show default scales
+            const displayTypes = scaleTypes.length > 0 ? scaleTypes : []
 
-            const trend = scaleScores.length > 1
-              ? (scaleScores[0].score < scaleScores[1].score ? 'improving' : scaleScores[0].score > scaleScores[1].score ? 'worsening' : 'stable')
-              : 'stable'
+            return displayTypes.map((scaleType) => {
+              const scaleScores = scoreHistory.filter(s => s.scale_type === scaleType)
+              if (scaleScores.length === 0) return null
 
-            return (
-              <div key={scaleType} className="score-card">
-                <div className="score-card-header">
-                  <span className="score-card-title">{scaleType}</span>
-                  <span className={`score-card-trend ${trend}`}>
-                    {trend === 'improving' && (
-                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                        <polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/>
-                        <polyline points="17 6 23 6 23 12"/>
-                      </svg>
-                    )}
-                    {trend === 'stable' && (
-                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                        <line x1="5" y1="12" x2="19" y2="12"/>
-                      </svg>
-                    )}
-                    {trend === 'worsening' && (
-                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                        <polyline points="23 18 13.5 8.5 8.5 13.5 1 6"/>
-                        <polyline points="17 18 23 18 23 12"/>
-                      </svg>
-                    )}
-                    {trend.charAt(0).toUpperCase() + trend.slice(1)}
-                  </span>
+              // For MOCA, higher is better. For others, lower is better
+              const lowerIsBetter = !scaleType.includes('MOCA')
+              const trend = scaleScores.length > 1
+                ? (lowerIsBetter
+                  ? (scaleScores[0].score < scaleScores[1].score ? 'improving' : scaleScores[0].score > scaleScores[1].score ? 'worsening' : 'stable')
+                  : (scaleScores[0].score > scaleScores[1].score ? 'improving' : scaleScores[0].score < scaleScores[1].score ? 'worsening' : 'stable'))
+                : 'stable'
+
+              return (
+                <div key={scaleType} className="score-card">
+                  <div className="score-card-header">
+                    <span className="score-card-title">{scaleType}</span>
+                    <span className={`score-card-trend ${trend}`}>
+                      {trend === 'improving' && (
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                          <polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/>
+                          <polyline points="17 6 23 6 23 12"/>
+                        </svg>
+                      )}
+                      {trend === 'stable' && (
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                          <line x1="5" y1="12" x2="19" y2="12"/>
+                        </svg>
+                      )}
+                      {trend === 'worsening' && (
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                          <polyline points="23 18 13.5 8.5 8.5 13.5 1 6"/>
+                          <polyline points="17 18 23 18 23 12"/>
+                        </svg>
+                      )}
+                      {trend.charAt(0).toUpperCase() + trend.slice(1)}
+                    </span>
+                  </div>
+                  <div className="score-history-list">
+                    {scaleScores.slice(0, 4).map((score) => (
+                      <div key={score.id} className="score-history-item clickable">
+                        <span className="date">{formatDate(score.created_at)}</span>
+                        <span className="value">{score.score} <span className="interpretation">{score.interpretation}</span></span>
+                      </div>
+                    ))}
+                  </div>
                 </div>
-                <div className="score-history-list">
-                  {scaleScores.slice(0, 4).map((score) => (
-                    <div key={score.id} className="score-history-item clickable">
-                      <span className="date">{formatDate(score.created_at)}</span>
-                      <span className="value">{score.score} <span className="interpretation">{score.interpretation}</span></span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )
-          })}
+              )
+            })
+          })()}
 
           {/* Default scores if none exist */}
           {scoreHistory.length === 0 && (

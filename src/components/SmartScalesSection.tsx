@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect, useCallback } from 'react'
 import ScaleForm from './ScaleForm'
 import {
   ScaleDefinition,
@@ -9,23 +9,43 @@ import {
 } from '@/lib/scales/types'
 import { getScalesForCondition } from '@/lib/scales/scale-definitions'
 
+interface ScaleResult {
+  id: string
+  scale_id: string
+  raw_score: number
+  interpretation: string
+  severity_level: string
+  completed_at: string
+  responses: ScaleResponses
+}
+
 interface SmartScalesSectionProps {
   selectedConditions: string[]
+  patientId?: string
+  visitId?: string
   onAddToNote?: (field: string, text: string) => void
+  onScaleComplete?: (scaleId: string, result: ScoreCalculation) => void
 }
 
 interface ScaleState {
   responses: ScaleResponses
   calculation: ScoreCalculation | null
   isExpanded: boolean
+  isSaved: boolean
+  previousResult?: ScaleResult
 }
 
 export default function SmartScalesSection({
   selectedConditions,
+  patientId,
+  visitId,
   onAddToNote,
+  onScaleComplete,
 }: SmartScalesSectionProps) {
   // Track expanded state and responses for each scale
   const [scaleStates, setScaleStates] = useState<Record<string, ScaleState>>({})
+  const [scaleHistory, setScaleHistory] = useState<ScaleResult[]>([])
+  const [isSaving, setIsSaving] = useState<string | null>(null)
 
   // Get relevant scales based on selected conditions
   const relevantScales = useMemo(() => {
@@ -51,6 +71,48 @@ export default function SmartScalesSection({
     return Array.from(scaleMap.values()).sort((a, b) => a.priority - b.priority)
   }, [selectedConditions])
 
+  // Fetch scale history for the patient
+  useEffect(() => {
+    if (!patientId) return
+
+    const fetchHistory = async () => {
+      try {
+        const response = await fetch(`/api/scales?patientId=${patientId}&limit=20`)
+        if (response.ok) {
+          const data = await response.json()
+          setScaleHistory(data.results || [])
+
+          // Update scale states with previous results
+          const historyByScale: Record<string, ScaleResult> = {}
+          for (const result of data.results || []) {
+            if (!historyByScale[result.scale_id]) {
+              historyByScale[result.scale_id] = result
+            }
+          }
+
+          setScaleStates(prev => {
+            const updated = { ...prev }
+            for (const [scaleId, result] of Object.entries(historyByScale)) {
+              updated[scaleId] = {
+                ...updated[scaleId],
+                responses: updated[scaleId]?.responses || {},
+                calculation: updated[scaleId]?.calculation || null,
+                isExpanded: updated[scaleId]?.isExpanded ?? false,
+                isSaved: updated[scaleId]?.isSaved ?? false,
+                previousResult: result,
+              }
+            }
+            return updated
+          })
+        }
+      } catch (error) {
+        console.error('Failed to fetch scale history:', error)
+      }
+    }
+
+    fetchHistory()
+  }, [patientId])
+
   const toggleScaleExpanded = (scaleId: string) => {
     setScaleStates(prev => ({
       ...prev,
@@ -59,6 +121,7 @@ export default function SmartScalesSection({
         responses: prev[scaleId]?.responses || {},
         calculation: prev[scaleId]?.calculation || null,
         isExpanded: !prev[scaleId]?.isExpanded,
+        isSaved: prev[scaleId]?.isSaved ?? false,
       },
     }))
   }
@@ -75,13 +138,94 @@ export default function SmartScalesSection({
         responses,
         calculation,
         isExpanded: prev[scaleId]?.isExpanded ?? true,
+        isSaved: false, // Mark as unsaved when responses change
       },
     }))
   }
 
+  // Save scale result to database
+  const saveScaleResult = useCallback(async (scaleId: string, state: ScaleState) => {
+    if (!patientId || !state.calculation?.isComplete) return
+
+    setIsSaving(scaleId)
+    try {
+      const response = await fetch('/api/scales', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          patientId,
+          visitId,
+          scaleId,
+          responses: state.responses,
+          rawScore: state.calculation.rawScore,
+          interpretation: state.calculation.interpretation,
+          severityLevel: state.calculation.severity,
+          grade: state.calculation.grade,
+          triggeredAlerts: state.calculation.triggeredAlerts,
+        }),
+      })
+
+      if (response.ok) {
+        const data = await response.json()
+        setScaleStates(prev => ({
+          ...prev,
+          [scaleId]: {
+            ...prev[scaleId],
+            isSaved: true,
+            previousResult: data.result,
+          },
+        }))
+
+        // Notify parent
+        if (onScaleComplete) {
+          onScaleComplete(scaleId, state.calculation)
+        }
+      }
+    } catch (error) {
+      console.error('Failed to save scale result:', error)
+    } finally {
+      setIsSaving(null)
+    }
+  }, [patientId, visitId, onScaleComplete])
+
+  // Auto-save when a scale is completed
+  useEffect(() => {
+    for (const [scaleId, state] of Object.entries(scaleStates)) {
+      if (state.calculation?.isComplete && !state.isSaved && patientId) {
+        saveScaleResult(scaleId, state)
+      }
+    }
+  }, [scaleStates, patientId, saveScaleResult])
+
   const handleAddToNote = (text: string) => {
     if (onAddToNote) {
       onAddToNote('assessment', text)
+    }
+  }
+
+  // Get trend indicator for a scale
+  const getTrendIndicator = (scaleId: string): { trend: 'improving' | 'stable' | 'worsening' | null; previousScore: number | null } => {
+    const currentState = scaleStates[scaleId]
+    const previousResult = currentState?.previousResult
+
+    if (!currentState?.calculation?.isComplete || !previousResult) {
+      return { trend: null, previousScore: previousResult?.raw_score || null }
+    }
+
+    const currentScore = currentState.calculation.rawScore
+    const prevScore = previousResult.raw_score
+    const diff = currentScore - prevScore
+
+    // For most scales, lower is better (PHQ-9, GAD-7, MIDAS, HIT-6, ESS)
+    // For MoCA, higher is better
+    const lowerIsBetter = scaleId !== 'moca'
+
+    if (Math.abs(diff) < 2) {
+      return { trend: 'stable', previousScore: prevScore }
+    } else if ((lowerIsBetter && diff < 0) || (!lowerIsBetter && diff > 0)) {
+      return { trend: 'improving', previousScore: prevScore }
+    } else {
+      return { trend: 'worsening', previousScore: prevScore }
     }
   }
 
@@ -187,20 +331,64 @@ export default function SmartScalesSection({
       </div>
 
       {/* Scale Forms */}
-      {relevantScales.map(scale => (
-        <ScaleForm
-          key={scale.id}
-          scale={scale}
-          initialResponses={scaleStates[scale.id]?.responses || {}}
-          isExpanded={scaleStates[scale.id]?.isExpanded ?? false}
-          onToggleExpand={() => toggleScaleExpanded(scale.id)}
-          onResponsesChange={(responses, calculation) =>
-            handleResponsesChange(scale.id, responses, calculation)
-          }
-          onAddToNote={handleAddToNote}
-          showAddToNote={true}
-        />
-      ))}
+      {relevantScales.map(scale => {
+        const trendInfo = getTrendIndicator(scale.id)
+        const state = scaleStates[scale.id]
+
+        return (
+          <div key={scale.id} style={{ position: 'relative' }}>
+            {/* Trend indicator badge */}
+            {trendInfo.previousScore !== null && state?.calculation?.isComplete && (
+              <div style={{
+                position: 'absolute',
+                top: '8px',
+                right: '40px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '4px',
+                fontSize: '10px',
+                padding: '2px 6px',
+                borderRadius: '4px',
+                background: trendInfo.trend === 'improving' ? '#D1FAE5' :
+                           trendInfo.trend === 'worsening' ? '#FEE2E2' : '#F3F4F6',
+                color: trendInfo.trend === 'improving' ? '#059669' :
+                       trendInfo.trend === 'worsening' ? '#DC2626' : '#6B7280',
+                zIndex: 1,
+              }}>
+                {trendInfo.trend === 'improving' && '↓'}
+                {trendInfo.trend === 'worsening' && '↑'}
+                {trendInfo.trend === 'stable' && '→'}
+                <span>prev: {trendInfo.previousScore}</span>
+              </div>
+            )}
+
+            {/* Saving indicator */}
+            {isSaving === scale.id && (
+              <div style={{
+                position: 'absolute',
+                top: '8px',
+                right: '40px',
+                fontSize: '10px',
+                color: 'var(--text-muted)',
+              }}>
+                Saving...
+              </div>
+            )}
+
+            <ScaleForm
+              scale={scale}
+              initialResponses={state?.responses || {}}
+              isExpanded={state?.isExpanded ?? false}
+              onToggleExpand={() => toggleScaleExpanded(scale.id)}
+              onResponsesChange={(responses, calculation) =>
+                handleResponsesChange(scale.id, responses, calculation)
+              }
+              onAddToNote={handleAddToNote}
+              showAddToNote={true}
+            />
+          </div>
+        )
+      })}
 
       {/* Required scales notice */}
       {relevantScales.some(s => s.isRequired) && (

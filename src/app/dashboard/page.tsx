@@ -52,11 +52,23 @@ export default async function DashboardPage() {
     .order('study_date', { ascending: false })
     .limit(10)
 
-  // Fetch score history
-  const { data: scoreHistory } = await supabase
-    .from('clinical_scales')
+  // Fetch score history from scale_results (new Smart Scales)
+  // Map to format expected by LeftSidebar: { scale_type, score, interpretation, created_at }
+  const { data: scaleResults } = await supabase
+    .from('scale_results')
     .select('*')
-    .order('created_at', { ascending: false })
+    .eq('patient_id', patients?.id)
+    .order('completed_at', { ascending: false })
+    .limit(20)
+
+  // Transform scale_results to scoreHistory format
+  const scoreHistory = (scaleResults || []).map(result => ({
+    id: result.id,
+    scale_type: result.scale_id.toUpperCase().replace('PHQ9', 'PHQ-9').replace('GAD7', 'GAD-7').replace('HIT6', 'HIT-6'),
+    score: result.raw_score,
+    interpretation: result.interpretation,
+    created_at: result.completed_at,
+  }))
 
   return (
     <ClinicalNote

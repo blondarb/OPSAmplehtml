@@ -8,6 +8,7 @@ interface CenterPanelProps {
   noteData: any
   updateNote: (field: string, value: any) => void
   currentVisit: any
+  patient?: any
   imagingStudies: any[]
   openAiDrawer: (tab: string) => void
   openDotPhrases?: (field: string) => void
@@ -50,6 +51,7 @@ export default function CenterPanel({
   noteData,
   updateNote,
   currentVisit,
+  patient,
   imagingStudies,
   openAiDrawer,
   openDotPhrases,
@@ -533,6 +535,8 @@ export default function CenterPanel({
             {/* Smart Clinical Scales Section - shows scales based on selected diagnosis */}
             <SmartScalesSection
               selectedConditions={noteData.chiefComplaint || []}
+              patientId={patient?.id}
+              visitId={currentVisit?.id}
               onAddToNote={(field, text) => {
                 const currentValue = noteData[field] || ''
                 updateNote(field, currentValue ? `${currentValue}\n${text}` : text)

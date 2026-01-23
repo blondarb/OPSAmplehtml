@@ -236,6 +236,7 @@ export default function ClinicalNote({
           noteData={noteData}
           updateNote={updateNote}
           currentVisit={currentVisit}
+          patient={patient}
           imagingStudies={imagingStudies}
           openAiDrawer={openAiDrawer}
           openDotPhrases={openDotPhrases}
