@@ -16,13 +16,29 @@ interface CenterPanelProps {
 }
 
 const CHIEF_COMPLAINTS = [
-  'Altered mental status', 'Amnesia', 'Blurry vision', 'Chronic pain',
-  'Confirmed stroke on neuroimaging', 'Difficulty swallowing', 'Dizziness/Vertigo',
-  'Double vision', 'Headache', 'Hemorrhagic Stroke', 'Hypoxic/Anoxic brain injury',
-  'Memory problem', 'Movement problem', 'Multiple Sclerosis Exacerbation',
-  'Myasthenia Gravis Exacerbation', 'Neuropathy', 'Numbness', 'Parkinson Disease',
-  'Prognosis after cardiac arrest', 'Seizure', 'Stroke like symptoms', 'Syncope',
-  'TIA', 'Tremor', 'Vision loss', 'Weakness', 'Other'
+  // Headache & Pain
+  'Migraine', 'Chronic migraine', 'Tension headache', 'Cluster headache', 'New daily persistent headache',
+  'Medication overuse headache', 'Post-traumatic headache', 'Facial pain/Trigeminal neuralgia',
+  // Movement Disorders
+  'Parkinson disease', 'Essential tremor', 'Dystonia', 'Restless legs syndrome', 'Tics/Tourette syndrome',
+  'Huntington disease', 'Ataxia', 'Chorea',
+  // Epilepsy & Seizures
+  'Epilepsy', 'New onset seizure', 'Breakthrough seizures', 'Seizure medication adjustment',
+  // Dementia & Cognitive
+  'Memory loss', 'Mild cognitive impairment', 'Alzheimer disease', 'Dementia evaluation',
+  'Frontotemporal dementia', 'Lewy body dementia',
+  // Neuromuscular
+  'Peripheral neuropathy', 'Carpal tunnel syndrome', 'Myasthenia gravis', 'ALS/Motor neuron disease',
+  'Myopathy', 'Radiculopathy', 'Plexopathy',
+  // Multiple Sclerosis & Neuroimmunology
+  'Multiple sclerosis', 'MS follow-up', 'Optic neuritis', 'Transverse myelitis', 'NMOSD',
+  // Cerebrovascular
+  'Stroke follow-up', 'TIA evaluation', 'Carotid stenosis', 'Stroke prevention',
+  // Sleep
+  'Narcolepsy', 'Insomnia', 'Sleep apnea evaluation',
+  // Other Common
+  'Dizziness/Vertigo', 'Numbness/Tingling', 'Weakness', 'Gait disorder', 'Back pain with neuro symptoms',
+  'Concussion/Post-concussion syndrome', 'Bell palsy', 'Second opinion', 'Other'
 ]
 
 const ALLERGY_OPTIONS = ['NKDA', 'Reviewed in EMR', 'Unknown', 'Other']
