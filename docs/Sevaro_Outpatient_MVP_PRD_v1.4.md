@@ -1,7 +1,7 @@
 # Sevaro Outpatient Clinical Note - MVP PRD v1.3
 
-**Document Version:** 1.3
-**Last Updated:** January 18, 2026
+**Document Version:** 1.4
+**Last Updated:** January 22, 2026
 **Status:** Implementation Complete - Demo Ready
 **Repository:** [blondarb/OPSAmplehtml](https://github.com/blondarb/OPSAmplehtml)
 
@@ -313,8 +313,13 @@ The interactive prototype is hosted at: `https://blondarb.github.io/OPSAmplehtml
 |---------|--------|----------|
 | Multi-tab documentation | Complete | P0 |
 | Patient context sidebar | Complete | P0 |
-| Clinical scales (MIDAS, HIT-6, PHQ-9) | Complete | P0 |
+| Clinical scales (MIDAS, HIT-6, MoCA, Mini-Cog, PHQ-9, GAD-7) | Complete | P0 |
 | Global AI Tools launcher | Complete | P0 |
+| AI launcher dropdown menu | Complete | P0 |
+| Prior Visits with AI Summary toggle | Complete | P1 |
+| Score History with trend indicators | Complete | P1 |
+| Clickable Neurological Examination | Complete | P0 |
+| Outpatient Neurology diagnoses (Reason for Consult) | Complete | P0 |
 | AI listening indicator | Complete | P1 |
 | AI confidence indicators | Complete | P1 |
 | AI text actions (ask/improve/summarize) | Complete | P1 |
@@ -390,6 +395,31 @@ Border radius: 8px (cards), 6px (buttons)
 ```
 
 ### Changelog
+
+**v1.4 (January 22, 2026)**
+- Updated UI to match prototype design (comprehensive CSS overhaul)
+- Added AI launcher dropdown menu in top navigation
+- Added Prior Visits section with AI Summary toggle in sidebar
+- Added Score History section with trend indicators (improving/stable/worsening)
+- Added Clinical Scales section in History tab:
+  - Headache Scales: MIDAS (0-270), HIT-6 (36-78)
+  - Cognitive Scales: MoCA (0-30), Mini-Cog (0-5)
+  - Mental Health Screens: PHQ-9 (0-27), GAD-7 (0-21)
+- Added Clickable Neurological Examination in Physical exams tab:
+  - General Appearance, Mental Status, Cranial Nerves
+  - Motor, Sensation, Coordination, Gait
+  - Interactive checkboxes and radio buttons for quick documentation
+- Updated Reason for Consult with outpatient neurology diagnoses:
+  - Headache & Pain (8 options including migraine types)
+  - Movement Disorders (8 options including Parkinson, tremor, dystonia)
+  - Epilepsy & Seizures (4 options)
+  - Dementia & Cognitive (6 options)
+  - Neuromuscular (7 options)
+  - MS & Neuroimmunology (5 options)
+  - Cerebrovascular (4 options)
+  - Sleep (3 options)
+  - Other common presentations (9 options)
+- Enhanced recording waveform animation with 10 animated bars
 
 **v1.3 (January 18, 2026)**
 - Added dark mode toggle with localStorage persistence

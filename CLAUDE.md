@@ -109,7 +109,8 @@ The OpenAI API key can be stored securely in Supabase `app_settings` table or as
 - Patient card with edit button, Non-Emergent badge
 - Video/Phone action buttons
 - Quick links (PACS viewer, VizAI, Epic, GlobalProtect)
-- Hospitalist section with Add Hospitalist
+- Prior Visits section with AI Summary toggle
+- Score History section with trend indicators (improving/stable/worsening)
 - Timeline (Initial call, Time on video, Assessment time, Final recommendation)
 - Recent consults
 
@@ -118,11 +119,41 @@ The OpenAI API key can be stored securely in Supabase `app_settings` table or as
 - Action bar (three dots, thumbs up, mic, AI star, copy, Pend, Sign & complete)
 - Form sections with Required badges
 - Inline action buttons on text fields (mic, lightning, star, dots)
+- **Clinical Scales Section** (in History tab):
+  - Headache Scales: MIDAS (0-270), HIT-6 (36-78) with disability interpretations
+  - Cognitive Scales: MoCA (0-30), Mini-Cog (0-5) with impairment levels
+  - Mental Health Screens: PHQ-9 (0-27), GAD-7 (0-21) with severity levels
+- **Neurological Examination** (in Physical exams tab):
+  - General Appearance dropdown
+  - Mental Status: Level of consciousness (radio), Orientation (checkboxes), Following commands
+  - Cranial Nerves: Visual fields, Pupils, EOMs, Facial sensation, Face symmetry, Hearing, Palate, Tongue
+  - Motor: Bulk, Tone, Strength, Pronator drift
+  - Sensation: Light touch, Pinprick, Vibration, Proprioception
+  - Coordination: Finger-to-nose, Heel-to-shin, Rapid alternating movements
+  - Gait: Evaluated/Not evaluated, Station, Casual gait, Tandem gait, Romberg
+- **Reason for Consult chips** organized by outpatient neurology categories:
+  - Headache & Pain (Migraine types, facial pain)
+  - Movement Disorders (Parkinson, tremor, dystonia, RLS)
+  - Epilepsy & Seizures
+  - Dementia & Cognitive (MCI, Alzheimer, evaluation)
+  - Neuromuscular (neuropathy, myasthenia, ALS)
+  - MS & Neuroimmunology
+  - Cerebrovascular (stroke follow-up, TIA)
+  - Sleep disorders
 
 ### AiDrawer
 - Tabs: Chart Prep, Document, Ask AI, Summary, Handout
 - Voice recording UI with Whisper transcription
+- Recording waveform animation with pulsing bars
 - AI response display with insert functionality
+
+### TopNav
+- Sevaro brain logo
+- Patient search bar
+- AI launcher dropdown menu (quick access to all 5 AI tools)
+- Queue tabs with counts
+- Timer display
+- PHI toggle, notifications, dark mode
 
 ### DotPhrasesDrawer
 - Search and filter by category
@@ -172,7 +203,7 @@ The middleware (`src/middleware.ts`) handles session refresh. Uses a simplified 
 
 ## Documentation
 
-- `docs/Sevaro_Outpatient_MVP_PRD_v1.3.md` - Main product requirements
+- `docs/Sevaro_Outpatient_MVP_PRD_v1.4.md` - Main product requirements
 - `docs/PRD_*.md` - Feature-specific PRDs
 - `FIGMA_MAKE_PROMPTS.md` - UI design prompts
 - `prototype/index.html` - Original HTML prototype

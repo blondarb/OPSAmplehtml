@@ -1,13 +1,52 @@
 # Implementation Status - AI Features
 
 **Last Updated:** January 22, 2026
-**Based on:** PRD_AI_Scribe.md v1.2
+**Based on:** PRD_AI_Scribe.md v1.2, Sevaro_Outpatient_MVP_PRD_v1.4
 
 ---
 
 ## Overview
 
 This document tracks implementation progress against the AI Scribe PRD and notes current work, issues, and next steps.
+
+---
+
+## Recent Updates (January 22, 2026)
+
+### UI Updates to Match Prototype
+- Updated comprehensive CSS styling from prototype (~1600+ lines)
+- Added AI launcher dropdown menu in TopNav for quick access to all 5 AI tools
+- Added Prior Visits section with AI Summary toggle in LeftSidebar
+- Added Score History section with trend indicators (improving/stable/worsening)
+- Enhanced recording waveform animation with 10 animated pulsing bars
+
+### Clinical Scales Section (History Tab)
+Added expandable accordions for clinical scales:
+- **Headache Scales**: MIDAS Score (0-270), HIT-6 Score (36-78) with disability/impact interpretations
+- **Cognitive Scales**: MoCA Score (0-30), Mini-Cog (0-5) with impairment levels
+- **Mental Health Screens**: PHQ-9 (0-27), GAD-7 (0-21) with severity levels
+
+### Clickable Neurological Examination (Physical Exams Tab)
+Added interactive neuro exam accordions:
+- **General Appearance**: Dropdown for distress level
+- **Mental Status**: Level of consciousness (radio), Orientation (checkboxes), Following commands
+- **Cranial Nerves**: 8 checkbox items (visual fields, pupils, EOMs, facial sensation, face symmetry, hearing, palate, tongue)
+- **Motor**: 4 checkbox items (bulk, tone, strength, pronator drift)
+- **Sensation**: 4 checkbox items (light touch, pinprick, vibration, proprioception)
+- **Coordination**: 3 checkbox items (finger-to-nose, heel-to-shin, rapid alternating)
+- **Gait**: Evaluated/Not evaluated radio + 4 checkboxes (station, casual, tandem, Romberg)
+
+### Reason for Consult Updated
+Replaced inpatient-focused chief complaints with outpatient neurology diagnoses organized by category:
+- Headache & Pain (8 options)
+- Movement Disorders (8 options)
+- Epilepsy & Seizures (4 options)
+- Dementia & Cognitive (6 options)
+- Neuromuscular (7 options)
+- MS & Neuroimmunology (5 options)
+- Cerebrovascular (4 options)
+- Sleep (3 options)
+- Other Common (9 options)
 
 ---
 
