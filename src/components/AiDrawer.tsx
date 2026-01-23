@@ -33,6 +33,11 @@ export default function AiDrawer({
   const [selectedInsertField, setSelectedInsertField] = useState<string>('hpi')
   const [insertedSections, setInsertedSections] = useState<Set<string>>(new Set())
 
+  // Chart Prep specific state
+  const [prepNotes, setPrepNotes] = useState<Array<{ text: string; timestamp: string; category: string }>>([])
+  const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set(['patientSummary', 'keyConsiderations']))
+  const [prepCategory, setPrepCategory] = useState<string>('general')
+
   // Voice recording for Document tab
   const {
     isRecording,
@@ -44,6 +49,18 @@ export default function AiDrawer({
     startRecording,
     stopRecording,
     clearTranscription,
+  } = useVoiceRecorder()
+
+  // Separate voice recorder for Chart Prep dictation
+  const {
+    isRecording: isPrepRecording,
+    isTranscribing: isPrepTranscribing,
+    error: prepRecordingError,
+    transcribedText: prepTranscribedText,
+    recordingDuration: prepRecordingDuration,
+    startRecording: startPrepRecording,
+    stopRecording: stopPrepRecording,
+    clearTranscription: clearPrepTranscription,
   } = useVoiceRecorder()
 
   // Format duration as MM:SS
@@ -164,6 +181,82 @@ export default function AiDrawer({
     { key: 'suggestedPlan', label: 'Suggested Plan', targetField: 'plan', icon: '📌' },
   ]
 
+  // Prep note categories
+  const prepCategories = [
+    { id: 'general', label: 'General Notes' },
+    { id: 'referral', label: 'Referral Notes' },
+    { id: 'imaging', label: 'Imaging Review' },
+    { id: 'labs', label: 'Lab Review' },
+    { id: 'assessment', label: 'Preliminary Assessment' },
+  ]
+
+  // Add prep note when transcription completes
+  const addPrepNote = () => {
+    if (prepTranscribedText) {
+      setPrepNotes(prev => [...prev, {
+        text: prepTranscribedText,
+        timestamp: new Date().toISOString(),
+        category: prepCategory,
+      }])
+      clearPrepTranscription()
+    }
+  }
+
+  // Toggle section expansion
+  const toggleSection = (key: string) => {
+    setExpandedSections(prev => {
+      const next = new Set(prev)
+      if (next.has(key)) {
+        next.delete(key)
+      } else {
+        next.add(key)
+      }
+      return next
+    })
+  }
+
+  // Add all insertable sections to note at once
+  const insertAllSections = () => {
+    if (!chartPrepSections) return
+
+    const fieldUpdates: Record<string, string[]> = {
+      hpi: [],
+      assessment: [],
+      plan: [],
+    }
+
+    chartPrepConfig.forEach(section => {
+      if (section.targetField && chartPrepSections[section.key]) {
+        fieldUpdates[section.targetField].push(chartPrepSections[section.key])
+      }
+    })
+
+    // Also add any prep notes to HPI
+    if (prepNotes.length > 0) {
+      const prepNotesText = prepNotes.map(n => `[${n.category}] ${n.text}`).join('\n\n')
+      fieldUpdates.hpi.unshift(`--- Pre-Visit Notes ---\n${prepNotesText}\n--- End Pre-Visit Notes ---\n`)
+    }
+
+    // Update each field
+    Object.entries(fieldUpdates).forEach(([field, contents]) => {
+      if (contents.length > 0) {
+        const currentValue = noteData[field] || ''
+        const newValue = currentValue
+          ? `${currentValue}\n\n${contents.join('\n\n')}`
+          : contents.join('\n\n')
+        updateNote(field, newValue)
+      }
+    })
+
+    // Mark all as inserted
+    setInsertedSections(new Set(chartPrepConfig.filter(s => s.targetField).map(s => s.key)))
+  }
+
+  // Delete a prep note
+  const deletePrepNote = (index: number) => {
+    setPrepNotes(prev => prev.filter((_, i) => i !== index))
+  }
+
   if (!isOpen) return null
 
   return (
@@ -261,9 +354,145 @@ export default function AiDrawer({
           {/* Chart Prep Tab */}
           {activeTab === 'chart-prep' && (
             <div>
-              <p style={{ marginBottom: '16px', color: 'var(--text-secondary)', fontSize: '13px' }}>
-                AI-generated pre-visit summary with insertable sections.
+              {/* Workflow description */}
+              <p style={{ marginBottom: '12px', color: 'var(--text-secondary)', fontSize: '12px' }}>
+                Review records and dictate notes. AI will summarize key points to guide your visit.
               </p>
+
+              {/* Dictation Section */}
+              <div style={{
+                background: isPrepRecording ? 'linear-gradient(135deg, #FEE2E2 0%, #FECACA 100%)' : 'var(--bg-gray)',
+                borderRadius: '8px',
+                padding: '12px',
+                marginBottom: '12px',
+                border: isPrepRecording ? '2px solid var(--error)' : '1px solid var(--border)',
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--text-secondary)" strokeWidth="2">
+                    <path d="M12 1a3 3 0 00-3 3v8a3 3 0 006 0V4a3 3 0 00-3-3z"/><path d="M19 10v2a7 7 0 01-14 0v-2"/>
+                  </svg>
+                  <span style={{ fontSize: '13px', fontWeight: 500, color: 'var(--text-primary)' }}>
+                    Dictate While Reviewing
+                  </span>
+                </div>
+
+                {/* Category selector */}
+                <div style={{ display: 'flex', gap: '4px', marginBottom: '8px', flexWrap: 'wrap' }}>
+                  {prepCategories.map(cat => (
+                    <button
+                      key={cat.id}
+                      onClick={() => setPrepCategory(cat.id)}
+                      style={{
+                        padding: '4px 8px',
+                        borderRadius: '4px',
+                        fontSize: '11px',
+                        border: 'none',
+                        background: prepCategory === cat.id ? 'var(--primary)' : 'var(--bg-white)',
+                        color: prepCategory === cat.id ? 'white' : 'var(--text-muted)',
+                        cursor: 'pointer',
+                      }}
+                    >
+                      {cat.label}
+                    </button>
+                  ))}
+                </div>
+
+                {/* Record button */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <button
+                    onClick={isPrepRecording ? stopPrepRecording : startPrepRecording}
+                    disabled={isPrepTranscribing}
+                    style={{
+                      flex: 1,
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '8px',
+                      padding: '10px',
+                      borderRadius: '6px',
+                      border: 'none',
+                      background: isPrepRecording ? 'var(--error)' : 'var(--primary)',
+                      color: 'white',
+                      cursor: isPrepTranscribing ? 'wait' : 'pointer',
+                      fontSize: '13px',
+                      fontWeight: 500,
+                    }}
+                  >
+                    {isPrepTranscribing ? (
+                      <>
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ animation: 'spin 1s linear infinite' }}>
+                          <circle cx="12" cy="12" r="10" strokeDasharray="32" strokeDashoffset="12" />
+                        </svg>
+                        Transcribing...
+                      </>
+                    ) : isPrepRecording ? (
+                      <>
+                        <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: 'white', animation: 'pulse 1s infinite' }} />
+                        {formatDuration(prepRecordingDuration)} - Stop
+                      </>
+                    ) : (
+                      <>
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                          <path d="M12 1a3 3 0 00-3 3v8a3 3 0 006 0V4a3 3 0 00-3-3z"/>
+                        </svg>
+                        Record Note
+                      </>
+                    )}
+                  </button>
+                </div>
+
+                {/* Transcription result */}
+                {prepTranscribedText && (
+                  <div style={{ marginTop: '8px', padding: '8px', background: 'var(--bg-white)', borderRadius: '6px', border: '1px solid #A7F3D0' }}>
+                    <p style={{ fontSize: '12px', color: 'var(--text-primary)', marginBottom: '8px' }}>{prepTranscribedText}</p>
+                    <div style={{ display: 'flex', gap: '6px' }}>
+                      <button onClick={addPrepNote} style={{ flex: 1, padding: '6px', background: 'var(--primary)', color: 'white', border: 'none', borderRadius: '4px', fontSize: '11px', cursor: 'pointer' }}>
+                        Add to Notes
+                      </button>
+                      <button onClick={clearPrepTranscription} style={{ padding: '6px 10px', background: 'var(--bg-gray)', color: 'var(--text-muted)', border: 'none', borderRadius: '4px', fontSize: '11px', cursor: 'pointer' }}>
+                        Discard
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {prepRecordingError && (
+                  <p style={{ marginTop: '8px', fontSize: '11px', color: 'var(--error)' }}>{prepRecordingError}</p>
+                )}
+              </div>
+
+              {/* Your Prep Notes */}
+              {prepNotes.length > 0 && (
+                <div style={{ marginBottom: '12px' }}>
+                  <div style={{ fontSize: '12px', fontWeight: 500, color: 'var(--text-muted)', marginBottom: '6px' }}>
+                    Your Notes ({prepNotes.length})
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                    {prepNotes.map((note, idx) => (
+                      <div key={idx} style={{
+                        padding: '8px',
+                        background: 'var(--bg-gray)',
+                        borderRadius: '6px',
+                        borderLeft: '3px solid var(--info)',
+                      }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                          <span style={{ fontSize: '10px', color: 'var(--text-muted)', textTransform: 'uppercase' }}>
+                            {prepCategories.find(c => c.id === note.category)?.label || note.category}
+                          </span>
+                          <button onClick={() => deletePrepNote(idx)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', padding: '0' }}>
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                              <path d="M18 6L6 18M6 6l12 12"/>
+                            </svg>
+                          </button>
+                        </div>
+                        <p style={{ fontSize: '12px', color: 'var(--text-secondary)', margin: '4px 0 0 0' }}>{note.text}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Generate AI Summary Button */}
               <button
                 onClick={generateChartPrep}
                 disabled={loading}
@@ -271,43 +500,101 @@ export default function AiDrawer({
                   display: 'flex',
                   alignItems: 'center',
                   gap: '8px',
-                  padding: '12px 20px',
-                  background: 'var(--primary)',
-                  color: 'white',
+                  padding: '10px 16px',
+                  background: loading ? 'var(--bg-gray)' : 'linear-gradient(135deg, #0D9488 0%, #14B8A6 100%)',
+                  color: loading ? 'var(--text-muted)' : 'white',
                   border: 'none',
                   borderRadius: '8px',
                   fontWeight: 500,
-                  cursor: 'pointer',
-                  marginBottom: '16px',
-                  opacity: loading ? 0.7 : 1,
+                  cursor: loading ? 'wait' : 'pointer',
+                  marginBottom: '12px',
                   width: '100%',
                   justifyContent: 'center',
                 }}
               >
                 {loading ? (
                   <>
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ animation: 'spin 1s linear infinite' }}>
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ animation: 'spin 1s linear infinite' }}>
                       <circle cx="12" cy="12" r="10" strokeDasharray="32" strokeDashoffset="12" />
                     </svg>
-                    Generating Chart Prep...
+                    Analyzing Records...
                   </>
                 ) : (
                   <>
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                       <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
                     </svg>
-                    Generate Chart Prep
+                    Generate AI Summary
                   </>
                 )}
               </button>
 
-              {/* Structured Sections */}
+              {/* Key Points Summary - shown when sections exist */}
+              {chartPrepSections && chartPrepSections.keyConsiderations && (
+                <div style={{
+                  background: 'linear-gradient(135deg, #FEF3C7 0%, #FDE68A 100%)',
+                  borderRadius: '8px',
+                  padding: '12px',
+                  marginBottom: '12px',
+                  border: '1px solid #F59E0B',
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '8px' }}>
+                    <span style={{ fontSize: '16px' }}>⚠️</span>
+                    <span style={{ fontWeight: 600, fontSize: '13px', color: '#92400E' }}>Key Points for This Visit</span>
+                  </div>
+                  <div style={{ fontSize: '12px', color: '#78350F', whiteSpace: 'pre-wrap', lineHeight: 1.5 }}>
+                    {chartPrepSections.keyConsiderations}
+                  </div>
+                </div>
+              )}
+
+              {/* Add All Button */}
               {chartPrepSections && (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                <button
+                  onClick={insertAllSections}
+                  disabled={insertedSections.size === chartPrepConfig.filter(s => s.targetField).length}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                    padding: '10px 16px',
+                    background: insertedSections.size === chartPrepConfig.filter(s => s.targetField).length ? '#D1FAE5' : 'var(--warning)',
+                    color: insertedSections.size === chartPrepConfig.filter(s => s.targetField).length ? '#059669' : 'white',
+                    border: 'none',
+                    borderRadius: '8px',
+                    fontWeight: 500,
+                    cursor: insertedSections.size === chartPrepConfig.filter(s => s.targetField).length ? 'default' : 'pointer',
+                    marginBottom: '12px',
+                    width: '100%',
+                    justifyContent: 'center',
+                  }}
+                >
+                  {insertedSections.size === chartPrepConfig.filter(s => s.targetField).length ? (
+                    <>
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><path d="M22 4L12 14.01l-3-3"/>
+                      </svg>
+                      All Sections Added to Note
+                    </>
+                  ) : (
+                    <>
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <path d="M12 5v14M5 12h14"/>
+                      </svg>
+                      Add All to Note
+                    </>
+                  )}
+                </button>
+              )}
+
+              {/* Collapsible Detailed Sections */}
+              {chartPrepSections && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                   {chartPrepConfig.map(section => {
                     const content = chartPrepSections[section.key]
-                    if (!content) return null
+                    if (!content || section.key === 'keyConsiderations') return null // Skip key considerations, shown above
 
+                    const isExpanded = expandedSections.has(section.key)
                     const isInserted = insertedSections.has(section.key)
                     const canInsert = section.targetField !== null
 
@@ -315,73 +602,82 @@ export default function AiDrawer({
                       <div
                         key={section.key}
                         style={{
-                          background: isInserted ? '#F0FDF4' : 'var(--bg-gray)',
+                          background: isInserted ? '#F0FDF4' : 'var(--bg-white)',
                           border: isInserted ? '1px solid #86EFAC' : '1px solid var(--border)',
-                          borderRadius: '8px',
+                          borderRadius: '6px',
                           overflow: 'hidden',
                         }}
                       >
-                        {/* Section Header */}
-                        <div style={{
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'space-between',
-                          padding: '10px 12px',
-                          background: isInserted ? '#DCFCE7' : 'var(--bg-white)',
-                          borderBottom: '1px solid var(--border)',
-                        }}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                            <span style={{ fontSize: '14px' }}>{section.icon}</span>
-                            <span style={{ fontWeight: 500, fontSize: '13px', color: 'var(--text-primary)' }}>
+                        {/* Collapsible Header */}
+                        <button
+                          onClick={() => toggleSection(section.key)}
+                          style={{
+                            width: '100%',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                            padding: '8px 10px',
+                            background: 'transparent',
+                            border: 'none',
+                            cursor: 'pointer',
+                          }}
+                        >
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                            <span style={{ fontSize: '12px' }}>{section.icon}</span>
+                            <span style={{ fontWeight: 500, fontSize: '12px', color: 'var(--text-primary)' }}>
                               {section.label}
                             </span>
                             {isInserted && (
-                              <span style={{
-                                fontSize: '10px',
-                                padding: '2px 6px',
-                                borderRadius: '4px',
-                                background: '#22C55E',
-                                color: 'white',
-                              }}>
-                                Inserted
+                              <span style={{ fontSize: '9px', padding: '1px 4px', borderRadius: '3px', background: '#22C55E', color: 'white' }}>
+                                ✓
                               </span>
                             )}
                           </div>
-                          {canInsert && !isInserted && (
-                            <button
-                              onClick={() => insertSection(section.key, section.targetField!)}
-                              style={{
-                                display: 'flex',
-                                alignItems: 'center',
-                                gap: '4px',
-                                padding: '4px 10px',
-                                background: 'var(--primary)',
-                                color: 'white',
-                                border: 'none',
-                                borderRadius: '4px',
-                                fontSize: '11px',
-                                fontWeight: 500,
-                                cursor: 'pointer',
-                              }}
-                            >
-                              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                                <path d="M12 5v14M5 12h14"/>
-                              </svg>
-                              Insert to {section.targetField?.toUpperCase()}
-                            </button>
-                          )}
-                        </div>
+                          <svg
+                            width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--text-muted)" strokeWidth="2"
+                            style={{ transform: isExpanded ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.2s' }}
+                          >
+                            <path d="M6 9l6 6 6-6"/>
+                          </svg>
+                        </button>
 
-                        {/* Section Content */}
-                        <div style={{
-                          padding: '12px',
-                          fontSize: '13px',
-                          color: 'var(--text-secondary)',
-                          lineHeight: 1.5,
-                          whiteSpace: 'pre-wrap',
-                        }}>
-                          {content}
-                        </div>
+                        {/* Expandable Content */}
+                        {isExpanded && (
+                          <div style={{ padding: '0 10px 10px 10px' }}>
+                            <div style={{
+                              fontSize: '12px',
+                              color: 'var(--text-secondary)',
+                              lineHeight: 1.5,
+                              whiteSpace: 'pre-wrap',
+                              marginBottom: canInsert ? '8px' : '0',
+                            }}>
+                              {content}
+                            </div>
+                            {canInsert && !isInserted && (
+                              <button
+                                onClick={() => insertSection(section.key, section.targetField!)}
+                                style={{
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  gap: '4px',
+                                  padding: '4px 8px',
+                                  background: 'var(--primary)',
+                                  color: 'white',
+                                  border: 'none',
+                                  borderRadius: '4px',
+                                  fontSize: '10px',
+                                  fontWeight: 500,
+                                  cursor: 'pointer',
+                                }}
+                              >
+                                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                  <path d="M12 5v14M5 12h14"/>
+                                </svg>
+                                Insert to {section.targetField?.toUpperCase()}
+                              </button>
+                            )}
+                          </div>
+                        )}
                       </div>
                     )
                   })}
@@ -391,16 +687,16 @@ export default function AiDrawer({
                     display: 'flex',
                     alignItems: 'center',
                     gap: '6px',
-                    padding: '8px 12px',
+                    padding: '6px 10px',
                     background: '#FEF3C7',
-                    borderRadius: '6px',
-                    fontSize: '11px',
+                    borderRadius: '4px',
+                    fontSize: '10px',
                     color: '#92400E',
                   }}>
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                       <circle cx="12" cy="12" r="10"/><path d="M12 8v4M12 16h.01"/>
                     </svg>
-                    AI-generated content. Review and edit before finalizing.
+                    AI-generated. Review before finalizing.
                   </div>
                 </div>
               )}
@@ -411,9 +707,9 @@ export default function AiDrawer({
                   background: 'linear-gradient(135deg, #F0FDFA 0%, #ECFDF5 100%)',
                   border: '1px solid #A7F3D0',
                   borderRadius: '8px',
-                  padding: '16px',
+                  padding: '12px',
                 }}>
-                  <div style={{ fontSize: '13px', color: 'var(--text-primary)', whiteSpace: 'pre-wrap' }}>
+                  <div style={{ fontSize: '12px', color: 'var(--text-primary)', whiteSpace: 'pre-wrap' }}>
                     {aiResponse}
                   </div>
                 </div>
