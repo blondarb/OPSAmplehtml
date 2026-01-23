@@ -28,8 +28,10 @@ export default function AiDrawer({
 }: AiDrawerProps) {
   const [question, setQuestion] = useState('')
   const [aiResponse, setAiResponse] = useState('')
+  const [chartPrepSections, setChartPrepSections] = useState<any>(null)
   const [loading, setLoading] = useState(false)
   const [selectedInsertField, setSelectedInsertField] = useState<string>('hpi')
+  const [insertedSections, setInsertedSections] = useState<Set<string>>(new Set())
 
   // Voice recording for Document tab
   const {
@@ -109,6 +111,8 @@ export default function AiDrawer({
 
   const generateChartPrep = async () => {
     setLoading(true)
+    setChartPrepSections(null)
+    setInsertedSections(new Set())
 
     try {
       const response = await fetch('/api/ai/chart-prep', {
@@ -121,13 +125,44 @@ export default function AiDrawer({
       })
 
       const data = await response.json()
-      setAiResponse(data.response || data.error || 'No response')
+      if (data.sections) {
+        setChartPrepSections(data.sections)
+        setAiResponse('') // Clear old text response
+      } else {
+        setAiResponse(data.response || data.error || 'No response')
+        setChartPrepSections(null)
+      }
     } catch (error) {
       setAiResponse('Error generating chart prep')
+      setChartPrepSections(null)
     }
 
     setLoading(false)
   }
+
+  // Insert a chart prep section into a note field
+  const insertSection = (sectionKey: string, targetField: string) => {
+    if (!chartPrepSections || !chartPrepSections[sectionKey]) return
+
+    const content = chartPrepSections[sectionKey]
+    const currentValue = noteData[targetField] || ''
+    const newValue = currentValue ? `${currentValue}\n\n${content}` : content
+    updateNote(targetField, newValue)
+    setInsertedSections(prev => new Set([...prev, sectionKey]))
+  }
+
+  // Chart prep section configuration
+  const chartPrepConfig = [
+    { key: 'patientSummary', label: 'Patient Summary', targetField: null, icon: '👤' },
+    { key: 'suggestedHPI', label: 'Suggested HPI', targetField: 'hpi', icon: '📝' },
+    { key: 'relevantHistory', label: 'Relevant History', targetField: null, icon: '📋' },
+    { key: 'currentMedications', label: 'Current Medications', targetField: null, icon: '💊' },
+    { key: 'imagingFindings', label: 'Imaging Findings', targetField: null, icon: '🔬' },
+    { key: 'scaleTrends', label: 'Clinical Scale Trends', targetField: null, icon: '📊' },
+    { key: 'keyConsiderations', label: 'Key Considerations', targetField: null, icon: '⚠️' },
+    { key: 'suggestedAssessment', label: 'Suggested Assessment', targetField: 'assessment', icon: '🎯' },
+    { key: 'suggestedPlan', label: 'Suggested Plan', targetField: 'plan', icon: '📌' },
+  ]
 
   if (!isOpen) return null
 
@@ -227,7 +262,7 @@ export default function AiDrawer({
           {activeTab === 'chart-prep' && (
             <div>
               <p style={{ marginBottom: '16px', color: 'var(--text-secondary)', fontSize: '13px' }}>
-                AI-generated pre-visit summary based on patient history.
+                AI-generated pre-visit summary with insertable sections.
               </p>
               <button
                 onClick={generateChartPrep}
@@ -245,12 +280,16 @@ export default function AiDrawer({
                   cursor: 'pointer',
                   marginBottom: '16px',
                   opacity: loading ? 0.7 : 1,
+                  width: '100%',
+                  justifyContent: 'center',
                 }}
               >
                 {loading ? (
                   <>
-                    <span className="animate-spin">...</span>
-                    Generating...
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ animation: 'spin 1s linear infinite' }}>
+                      <circle cx="12" cy="12" r="10" strokeDasharray="32" strokeDashoffset="12" />
+                    </svg>
+                    Generating Chart Prep...
                   </>
                 ) : (
                   <>
@@ -262,7 +301,112 @@ export default function AiDrawer({
                 )}
               </button>
 
-              {aiResponse && (
+              {/* Structured Sections */}
+              {chartPrepSections && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                  {chartPrepConfig.map(section => {
+                    const content = chartPrepSections[section.key]
+                    if (!content) return null
+
+                    const isInserted = insertedSections.has(section.key)
+                    const canInsert = section.targetField !== null
+
+                    return (
+                      <div
+                        key={section.key}
+                        style={{
+                          background: isInserted ? '#F0FDF4' : 'var(--bg-gray)',
+                          border: isInserted ? '1px solid #86EFAC' : '1px solid var(--border)',
+                          borderRadius: '8px',
+                          overflow: 'hidden',
+                        }}
+                      >
+                        {/* Section Header */}
+                        <div style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          padding: '10px 12px',
+                          background: isInserted ? '#DCFCE7' : 'var(--bg-white)',
+                          borderBottom: '1px solid var(--border)',
+                        }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <span style={{ fontSize: '14px' }}>{section.icon}</span>
+                            <span style={{ fontWeight: 500, fontSize: '13px', color: 'var(--text-primary)' }}>
+                              {section.label}
+                            </span>
+                            {isInserted && (
+                              <span style={{
+                                fontSize: '10px',
+                                padding: '2px 6px',
+                                borderRadius: '4px',
+                                background: '#22C55E',
+                                color: 'white',
+                              }}>
+                                Inserted
+                              </span>
+                            )}
+                          </div>
+                          {canInsert && !isInserted && (
+                            <button
+                              onClick={() => insertSection(section.key, section.targetField!)}
+                              style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '4px',
+                                padding: '4px 10px',
+                                background: 'var(--primary)',
+                                color: 'white',
+                                border: 'none',
+                                borderRadius: '4px',
+                                fontSize: '11px',
+                                fontWeight: 500,
+                                cursor: 'pointer',
+                              }}
+                            >
+                              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                <path d="M12 5v14M5 12h14"/>
+                              </svg>
+                              Insert to {section.targetField?.toUpperCase()}
+                            </button>
+                          )}
+                        </div>
+
+                        {/* Section Content */}
+                        <div style={{
+                          padding: '12px',
+                          fontSize: '13px',
+                          color: 'var(--text-secondary)',
+                          lineHeight: 1.5,
+                          whiteSpace: 'pre-wrap',
+                        }}>
+                          {content}
+                        </div>
+                      </div>
+                    )
+                  })}
+
+                  {/* AI disclaimer */}
+                  <div style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    padding: '8px 12px',
+                    background: '#FEF3C7',
+                    borderRadius: '6px',
+                    fontSize: '11px',
+                    color: '#92400E',
+                  }}>
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <circle cx="12" cy="12" r="10"/><path d="M12 8v4M12 16h.01"/>
+                    </svg>
+                    AI-generated content. Review and edit before finalizing.
+                  </div>
+                </div>
+              )}
+
+              {/* Fallback for non-structured response */}
+              {aiResponse && !chartPrepSections && (
                 <div style={{
                   background: 'linear-gradient(135deg, #F0FDFA 0%, #ECFDF5 100%)',
                   border: '1px solid #A7F3D0',
