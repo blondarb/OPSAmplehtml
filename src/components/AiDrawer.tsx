@@ -36,7 +36,6 @@ export default function AiDrawer({
   // Chart Prep specific state
   const [prepNotes, setPrepNotes] = useState<Array<{ text: string; timestamp: string; category: string }>>([])
   const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set(['patientSummary', 'keyConsiderations']))
-  const [prepCategory, setPrepCategory] = useState<string>('general')
 
   // Voice recording for Document tab
   const {
@@ -183,20 +182,62 @@ export default function AiDrawer({
 
   // Prep note categories
   const prepCategories = [
-    { id: 'general', label: 'General Notes' },
-    { id: 'referral', label: 'Referral Notes' },
-    { id: 'imaging', label: 'Imaging Review' },
-    { id: 'labs', label: 'Lab Review' },
-    { id: 'assessment', label: 'Preliminary Assessment' },
+    { id: 'general', label: 'General' },
+    { id: 'referral', label: 'Referral' },
+    { id: 'imaging', label: 'Imaging' },
+    { id: 'labs', label: 'Labs' },
+    { id: 'history', label: 'History' },
+    { id: 'assessment', label: 'Assessment' },
   ]
 
-  // Add prep note when transcription completes
+  // Auto-detect category from transcribed text
+  const detectCategory = (text: string): string => {
+    const lower = text.toLowerCase()
+
+    // Check for imaging-related keywords
+    if (lower.includes('mri') || lower.includes('ct') || lower.includes('scan') ||
+        lower.includes('imaging') || lower.includes('x-ray') || lower.includes('ultrasound') ||
+        lower.includes('eeg') || lower.includes('emg')) {
+      return 'imaging'
+    }
+
+    // Check for lab-related keywords
+    if (lower.includes('lab') || lower.includes('blood') || lower.includes('level') ||
+        lower.includes('test result') || lower.includes('hemoglobin') || lower.includes('glucose') ||
+        lower.includes('creatinine') || lower.includes('liver') || lower.includes('thyroid')) {
+      return 'labs'
+    }
+
+    // Check for referral-related keywords
+    if (lower.includes('referral') || lower.includes('referred') || lower.includes('consult') ||
+        lower.includes('primary care') || lower.includes('specialist') || lower.includes('sent by')) {
+      return 'referral'
+    }
+
+    // Check for history-related keywords
+    if (lower.includes('history') || lower.includes('past medical') || lower.includes('pmh') ||
+        lower.includes('surgical') || lower.includes('family history') || lower.includes('social')) {
+      return 'history'
+    }
+
+    // Check for assessment-related keywords
+    if (lower.includes('assessment') || lower.includes('impression') || lower.includes('diagnosis') ||
+        lower.includes('likely') || lower.includes('suspect') || lower.includes('differential') ||
+        lower.includes('think') || lower.includes('plan') || lower.includes('recommend')) {
+      return 'assessment'
+    }
+
+    return 'general'
+  }
+
+  // Add prep note when transcription completes - auto-categorize
   const addPrepNote = () => {
     if (prepTranscribedText) {
+      const autoCategory = detectCategory(prepTranscribedText)
       setPrepNotes(prev => [...prev, {
         text: prepTranscribedText,
         timestamp: new Date().toISOString(),
-        category: prepCategory,
+        category: autoCategory,
       }])
       clearPrepTranscription()
     }
@@ -374,27 +415,6 @@ export default function AiDrawer({
                   <span style={{ fontSize: '13px', fontWeight: 500, color: 'var(--text-primary)' }}>
                     Dictate While Reviewing
                   </span>
-                </div>
-
-                {/* Category selector */}
-                <div style={{ display: 'flex', gap: '4px', marginBottom: '8px', flexWrap: 'wrap' }}>
-                  {prepCategories.map(cat => (
-                    <button
-                      key={cat.id}
-                      onClick={() => setPrepCategory(cat.id)}
-                      style={{
-                        padding: '4px 8px',
-                        borderRadius: '4px',
-                        fontSize: '11px',
-                        border: 'none',
-                        background: prepCategory === cat.id ? 'var(--primary)' : 'var(--bg-white)',
-                        color: prepCategory === cat.id ? 'white' : 'var(--text-muted)',
-                        cursor: 'pointer',
-                      }}
-                    >
-                      {cat.label}
-                    </button>
-                  ))}
                 </div>
 
                 {/* Record button */}
