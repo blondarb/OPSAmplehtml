@@ -1,7 +1,7 @@
 # AI Scribe - Product Requirements Document
 
-**Document Version:** 1.2
-**Last Updated:** January 20, 2026
+**Document Version:** 1.3
+**Last Updated:** January 22, 2026
 **Status:** Draft
 **Author:** Product Team
 **Owner:** Product Engineering / Clinical Informatics / Design
@@ -1566,9 +1566,170 @@ Earnest RCM is an AI-powered revenue cycle management platform that provides:
 
 | Phase | Scope | Timeline |
 |-------|-------|----------|
-| **Phase 1** | Neurology only, core features | Initial release |
+| **Phase 1a** | Chart Prep with dictation | Initial release |
+| **Phase 1b** | Visit AI (ambient recording) | +1-2 months |
 | **Phase 2** | Add specialties, workflow automation | +3-6 months |
 | **Phase 3** | Multi-language, guideline integration | +6-12 months |
+
+---
+
+## Detailed Implementation Phases
+
+### Phase 1a: Chart Prep (Pre-Visit) - CURRENT
+
+**Purpose:** Enable providers to prepare for visits by reviewing records and dictating observations before seeing the patient.
+
+#### Workflow
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                    CHART PREP WORKFLOW                           │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                 │
+│  1. PROVIDER OPENS CHART PREP                                   │
+│     └─ AI Drawer → Chart Prep tab                               │
+│                        ▼                                        │
+│  2. REVIEW RECORDS                                              │
+│     ├─ Referral notes                                           │
+│     ├─ Imaging studies                                          │
+│     ├─ Lab results                                              │
+│     └─ Prior visit summaries                                    │
+│                        ▼                                        │
+│  3. DICTATE OBSERVATIONS                                        │
+│     ├─ Click "Record Note" button                               │
+│     ├─ Speak observations (any length)                          │
+│     ├─ Click "Stop" when done                                   │
+│     ├─ Audio sent to Whisper for transcription                  │
+│     └─ AI auto-categorizes by content:                          │
+│        • Imaging (MRI, CT, EEG, etc.)                           │
+│        • Labs (blood, glucose, etc.)                            │
+│        • Referral (consult, specialist, etc.)                   │
+│        • History (PMH, surgical, family, etc.)                  │
+│        • Assessment (impression, diagnosis, etc.)               │
+│        • General (fallback)                                     │
+│                        ▼                                        │
+│  4. GENERATE AI SUMMARY                                         │
+│     ├─ Click "Generate AI Summary"                              │
+│     ├─ AI analyzes patient context + prep notes                 │
+│     └─ Returns structured sections:                             │
+│        • Key Considerations (highlighted)                       │
+│        • Patient Summary                                        │
+│        • Suggested HPI                                          │
+│        • Relevant History                                       │
+│        • Current Medications                                    │
+│        • Imaging Findings                                       │
+│        • Clinical Scale Trends                                  │
+│        • Suggested Assessment                                   │
+│        • Suggested Plan                                         │
+│                        ▼                                        │
+│  5. INSERT INTO NOTE                                            │
+│     ├─ "Add All to Note" → Populates HPI, Assessment, Plan      │
+│     └─ Or insert individual sections                            │
+│                                                                 │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+#### Technical Components
+
+| Component | Implementation | Status |
+|-----------|----------------|--------|
+| **Voice Recording** | Browser MediaRecorder API, 250ms chunks | Complete |
+| **Transcription** | OpenAI Whisper via `/api/ai/transcribe` | Complete |
+| **Auto-categorization** | Keyword detection in transcribed text | Complete |
+| **AI Summary** | GPT-4 via `/api/ai/chart-prep` | Complete |
+| **Note Population** | `updateNote()` function in ClinicalNote | Complete |
+| **Prep Notes Storage** | React state (session only) | Complete |
+| **Prep Notes Persistence** | Database storage | Not started |
+
+#### UI Elements
+
+- **Chart Prep Tab** in AI Drawer
+- **Dictation Section** with Record/Stop button, timer, transcription preview
+- **Your Notes** section showing categorized prep notes
+- **Generate AI Summary** button
+- **Key Points** yellow highlight box
+- **Collapsible Sections** for detailed AI content
+- **Add All to Note** button
+
+#### Files
+
+- `/src/components/AiDrawer.tsx` - Chart Prep UI
+- `/src/app/api/ai/chart-prep/route.ts` - AI summary generation
+- `/src/hooks/useVoiceRecorder.ts` - Voice recording hook
+- `/src/app/api/ai/transcribe/route.ts` - Whisper transcription
+
+---
+
+### Phase 1b: Visit AI (During Visit) - PLANNED
+
+**Purpose:** Record provider-patient conversation during the visit and combine with Chart Prep notes to generate comprehensive documentation.
+
+#### Workflow
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                    VISIT AI WORKFLOW                             │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                 │
+│  1. START VISIT RECORDING                                       │
+│     ├─ Provider clicks "Start Visit Recording"                  │
+│     ├─ Consent indicator shown                                  │
+│     └─ Ambient capture begins                                   │
+│                        ▼                                        │
+│  2. CONDUCT VISIT                                               │
+│     ├─ Normal provider-patient conversation                     │
+│     ├─ Real-time transcription (optional display)               │
+│     └─ Recording continues (5-30+ minutes)                      │
+│                        ▼                                        │
+│  3. END RECORDING                                               │
+│     ├─ Provider clicks "End Recording"                          │
+│     └─ Full audio sent for processing                           │
+│                        ▼                                        │
+│  4. AI PROCESSING                                               │
+│     ├─ Whisper transcribes full conversation                    │
+│     ├─ GPT-4 extracts clinical content                          │
+│     ├─ Combines with Chart Prep notes                           │
+│     └─ Generates draft note sections                            │
+│                        ▼                                        │
+│  5. REVIEW & APPROVE                                            │
+│     ├─ Provider reviews AI-generated draft                      │
+│     ├─ Edit/accept each section                                 │
+│     └─ Finalize documentation                                   │
+│                                                                 │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+#### Technical Requirements
+
+| Requirement | Description | Priority |
+|-------------|-------------|----------|
+| **Long Recording** | Support 30+ minute recordings | P0 |
+| **Speaker Diarization** | Distinguish provider from patient | P1 |
+| **Real-time Display** | Show transcript as conversation happens | P1 |
+| **Section Classification** | Auto-map content to HPI/ROS/Exam/Plan | P0 |
+| **Prep Note Integration** | Merge Chart Prep with visit content | P0 |
+| **Audio Storage** | Store audio for playback/verification | P2 |
+
+#### Planned UI
+
+- **Visit Recording Tab** in AI Drawer (or separate modal)
+- **Start/Stop Recording** controls
+- **Live Transcript** panel (optional)
+- **Recording Duration** display
+- **Draft Review** interface with Accept/Edit/Reject per section
+
+---
+
+### Phase 1 Feature Comparison
+
+| Feature | Phase 1a (Chart Prep) | Phase 1b (Visit AI) |
+|---------|----------------------|---------------------|
+| **Recording Duration** | Short (10-60 seconds) | Long (5-30+ minutes) |
+| **Content Source** | Provider observations only | Provider + Patient conversation |
+| **Transcription** | Post-recording only | Real-time + post-processing |
+| **Speaker ID** | Single speaker | Multi-speaker diarization |
+| **Auto-categorization** | Keyword-based | AI section classification |
+| **Note Population** | Manual insert | Auto-populate with review |
 
 ---
 
@@ -1623,6 +1784,14 @@ Earnest RCM is an AI-powered revenue cycle management platform that provides:
 ---
 
 ## Changelog
+
+**v1.3 (January 22, 2026)**
+- Added Detailed Implementation Phases section
+- Documented Phase 1a: Chart Prep workflow (current implementation)
+- Documented Phase 1b: Visit AI workflow (planned)
+- Added technical components, UI elements, and file references
+- Added Phase 1 feature comparison table
+- Updated deployment phases to reflect Chart Prep first approach
 
 **v1.2 (January 20, 2026)**
 - Added Earnest RCM integration for coding & billing
