@@ -1,7 +1,7 @@
 # Implementation Status - Sevaro Clinical
 
-**Last Updated:** January 23, 2026
-**Based on:** PRD_AI_Scribe.md v1.4, Sevaro_Outpatient_MVP_PRD_v1.4
+**Last Updated:** January 24, 2026
+**Based on:** PRD_AI_Scribe.md v1.4, Sevaro_Outpatient_MVP_PRD_v1.4, PRD_Roadmap_Phase3.md
 
 ---
 
@@ -182,15 +182,138 @@ src/
 
 ---
 
-## Pending Work
+## Roadmap
+
+See full PRD: [PRD_Roadmap_Phase3.md](./PRD_Roadmap_Phase3.md)
 
 ### Phase 2: Smart Recommendations
-- Link diagnoses to treatment recommendations
-- Import templates from neuro-plans demo (134 diagnoses)
-- Checkbox-based recommendation selection per diagnosis
-- Reference: https://blondarb.github.io/neuro-plans/clinical/
+
+| Task | Status | Priority |
+|------|--------|----------|
+| Link diagnoses to treatment recommendations | PENDING | High |
+| Import templates from neuro-plans demo (134 diagnoses) | PENDING | High |
+| Checkbox-based recommendation selection per diagnosis | PENDING | High |
+
+Reference: https://blondarb.github.io/neuro-plans/clinical/
+
+---
+
+### Phase 3A: Critical UX Fixes (High Priority)
+
+#### 1. Clickable Area Audit
+Eliminate all dead UI affordances.
+
+| Element | Location | Current | Required Action |
+|---------|----------|---------|-----------------|
+| Sevaro Logo | TopNav | No action | Navigate to dashboard |
+| Timer | TopNav | Display only | Pause/reset on click |
+| Lock Icon | TopNav | No action | Session lock |
+| Notifications | TopNav | No action | Open notifications panel |
+| What's New | TopNav | No action | Open changelog modal |
+| Three Dots Menu | CenterPanel | No action | Actions menu (copy, print) |
+| Thumbs Up | CenterPanel | No action | Mark as reviewed |
+| Copy Button | CenterPanel | No action | Copy to clipboard |
+| Pend Button | CenterPanel | No action | Save as pending |
+| Sign & Complete | CenterPanel | No action | Signature workflow |
+
+#### 2. AI Actions Must Function
+All AI buttons must trigger real prompts - no placeholders.
+
+| Button | Location | Status | Required |
+|--------|----------|--------|----------|
+| Ask AI | AI Drawer | WORKING | - |
+| Generate Summary | AI Drawer | PLACEHOLDER | Implement prompt |
+| Generate Handout | AI Drawer | PLACEHOLDER | Implement prompt |
+| Improve Writing | Fields | NOT BUILT | Add action |
+| Expand Details | Fields | NOT BUILT | Add action |
+| Summarize | Fields | NOT BUILT | Add action |
+
+#### 3. Dictation Everywhere
+Any text input should have dictation.
+
+| Location | Current | Status |
+|----------|---------|--------|
+| Clinical text fields | Has mic | COMPLETE |
+| Feedback form | No mic | NEEDED |
+| Search fields | No mic | NEEDED |
+| Settings inputs | No mic | NEEDED |
+
+#### 4. User Settings Enhancement
+
+| Feature | Status |
+|---------|--------|
+| Settings Drawer | NOT BUILT |
+| Call volume/ringtone | NOT BUILT |
+| Dark mode (on/off/system) | PARTIAL |
+| Automation toggles | NOT BUILT |
+| **AI Custom Instructions (global)** | NOT BUILT |
+| **AI Custom Instructions (per-section)** | NOT BUILT |
+
+---
+
+### Phase 3B: Feature Enhancements (Medium Priority)
+
+#### 5. Note Generation Pipeline
+
+| Feature | Status |
+|---------|--------|
+| Note assembly from all sources | PARTIAL (merge engine exists) |
+| Preview/Edit modal | NOT BUILT |
+| Recommendations verification checklist | NOT BUILT |
+| Suggested improvements section | NOT BUILT |
+| "Ask AI about this note" button | NOT BUILT |
+| Sign & Complete flow | NOT BUILT |
+
+#### 6. Physical Exam Enhancements
+
+| Feature | Status |
+|---------|--------|
+| Free-text exam option | NOT BUILT |
+| **NIH Stroke Scale (NIHSS)** | NOT BUILT - Priority |
+| Modified Rankin Scale | NOT BUILT |
+| Other exam types dropdown | NOT BUILT |
+
+#### 7. Patient History Section (Above Reason for Consult)
+
+| Feature | Status |
+|---------|--------|
+| Longitudinal AI summary paragraph | NOT BUILT |
+| Length control (brief/standard/detailed) | NOT BUILT |
+| Customization settings | NOT BUILT |
+| Manual editing | NOT BUILT |
+
+---
+
+### Phase 3C: Onboarding & Workflows (Lower Priority)
+
+#### 8. Help Drawer (Top-Left Lightbulb)
+
+| Tab | Status | Description |
+|-----|--------|-------------|
+| Inspiration | NOT BUILT | Curated clinical content |
+| Tour | NOT BUILT | Guided feature walkthrough |
+| Features | NOT BUILT | Feature list with docs |
+| Feedback | NOT BUILT | Dictation + typing, persistent storage |
+
+#### 9. Suggested Workflows (CRITICAL)
+
+| Workflow | Description | Status |
+|----------|-------------|--------|
+| **Fully AI-Driven** | Dictate → AI generates all → Review | NOT DOCUMENTED |
+| **Fully Manual** | Click through → Type manually | SUPPORTED (implicit) |
+| **Hybrid Lightweight** | AI pre-fills → Manual completion | PARTIAL |
+| **Hybrid Advanced** | Selective AI per section | PARTIAL |
+
+**Workflow Precedence Rules (to define):**
+- Manual edits always override AI content
+- User-typed content protected from AI overwrite
+- Chart Prep = suggested until explicitly added
+- Workflow mode controls which AI buttons are visible
+
+---
 
 ### Other Enhancements
+
 - Real-time transcription (currently post-recording only)
 - Speaker diarization in UI
 - Audio playback for review
@@ -262,4 +385,4 @@ AI DRAWER (Teal theme, star icon):
 ---
 
 *Document maintained by Development Team*
-*Last updated: January 23, 2026*
+*Last updated: January 24, 2026*
