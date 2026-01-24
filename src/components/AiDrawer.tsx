@@ -171,17 +171,20 @@ export default function AiDrawer({
     setInsertedSections(prev => new Set([...prev, sectionKey]))
   }
 
-  // Chart prep section configuration
+  // Chart prep section configuration - bullet-style high-yield format
   const chartPrepConfig = [
-    { key: 'patientSummary', label: 'Patient Summary', targetField: null, icon: '👤' },
-    { key: 'suggestedHPI', label: 'Suggested HPI', targetField: 'hpi', icon: '📝' },
-    { key: 'relevantHistory', label: 'Relevant History', targetField: null, icon: '📋' },
-    { key: 'currentMedications', label: 'Current Medications', targetField: null, icon: '💊' },
-    { key: 'imagingFindings', label: 'Imaging Findings', targetField: null, icon: '🔬' },
-    { key: 'scaleTrends', label: 'Clinical Scale Trends', targetField: null, icon: '📊' },
-    { key: 'keyConsiderations', label: 'Key Considerations', targetField: null, icon: '⚠️' },
-    { key: 'suggestedAssessment', label: 'Suggested Assessment', targetField: 'assessment', icon: '🎯' },
-    { key: 'suggestedPlan', label: 'Suggested Plan', targetField: 'plan', icon: '📌' },
+    { key: 'visitPurpose', label: 'Visit Purpose', targetField: null, icon: '🎯', highlight: false },
+    { key: 'alerts', label: 'Alerts', targetField: null, icon: '⚠️', highlight: true },
+    { key: 'keyMetrics', label: 'Key Metrics', targetField: null, icon: '📊', highlight: false },
+    { key: 'currentTreatment', label: 'Current Treatment', targetField: null, icon: '💊', highlight: false },
+    { key: 'lastVisitSummary', label: 'Last Visit', targetField: null, icon: '📋', highlight: false },
+    { key: 'suggestedFocus', label: 'Suggested Focus', targetField: null, icon: '🔮', highlight: true },
+    { key: 'suggestedHPI', label: 'Suggested HPI', targetField: 'hpi', icon: '📝', highlight: false },
+    { key: 'suggestedAssessment', label: 'Suggested Assessment', targetField: 'assessment', icon: '💡', highlight: false },
+    { key: 'suggestedPlan', label: 'Suggested Plan', targetField: 'plan', icon: '📌', highlight: false },
+    // Legacy fields for backwards compatibility
+    { key: 'patientSummary', label: 'Patient Summary', targetField: null, icon: '👤', highlight: false, legacy: true },
+    { key: 'keyConsiderations', label: 'Key Considerations', targetField: null, icon: '⚠️', highlight: true, legacy: true },
   ]
 
   // Prep note categories
@@ -665,8 +668,46 @@ export default function AiDrawer({
                 )}
               </button>
 
-              {/* Key Points Summary - shown when sections exist */}
-              {chartPrepSections && chartPrepSections.keyConsiderations && (
+              {/* Alerts Section - shown prominently if present */}
+              {chartPrepSections && chartPrepSections.alerts && chartPrepSections.alerts.trim() && (
+                <div style={{
+                  background: 'linear-gradient(135deg, #FEE2E2 0%, #FECACA 100%)',
+                  borderRadius: '8px',
+                  padding: '12px',
+                  marginBottom: '12px',
+                  border: '1px solid #EF4444',
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '8px' }}>
+                    <span style={{ fontSize: '16px' }}>⚠️</span>
+                    <span style={{ fontWeight: 600, fontSize: '13px', color: '#991B1B' }}>Alerts</span>
+                  </div>
+                  <div style={{ fontSize: '12px', color: '#7F1D1D', whiteSpace: 'pre-wrap', lineHeight: 1.6 }}>
+                    {chartPrepSections.alerts}
+                  </div>
+                </div>
+              )}
+
+              {/* Suggested Focus - shown prominently */}
+              {chartPrepSections && chartPrepSections.suggestedFocus && (
+                <div style={{
+                  background: 'linear-gradient(135deg, #FEF3C7 0%, #FDE68A 100%)',
+                  borderRadius: '8px',
+                  padding: '12px',
+                  marginBottom: '12px',
+                  border: '1px solid #F59E0B',
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '8px' }}>
+                    <span style={{ fontSize: '16px' }}>🔮</span>
+                    <span style={{ fontWeight: 600, fontSize: '13px', color: '#92400E' }}>Suggested Focus for This Visit</span>
+                  </div>
+                  <div style={{ fontSize: '12px', color: '#78350F', whiteSpace: 'pre-wrap', lineHeight: 1.6 }}>
+                    {chartPrepSections.suggestedFocus}
+                  </div>
+                </div>
+              )}
+
+              {/* Legacy: Key Points Summary - for backwards compatibility */}
+              {chartPrepSections && chartPrepSections.keyConsiderations && !chartPrepSections.suggestedFocus && (
                 <div style={{
                   background: 'linear-gradient(135deg, #FEF3C7 0%, #FDE68A 100%)',
                   borderRadius: '8px',
@@ -728,7 +769,12 @@ export default function AiDrawer({
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                   {chartPrepConfig.map(section => {
                     const content = chartPrepSections[section.key]
-                    if (!content || section.key === 'keyConsiderations') return null // Skip key considerations, shown above
+                    // Skip sections shown prominently above, and legacy fields if new fields exist
+                    if (!content) return null
+                    if (section.key === 'alerts' || section.key === 'suggestedFocus') return null
+                    if (section.key === 'keyConsiderations' && chartPrepSections.suggestedFocus) return null
+                    if (section.key === 'patientSummary' && chartPrepSections.visitPurpose) return null
+                    if ((section as any).legacy) return null // Skip legacy fields
 
                     const isExpanded = expandedSections.has(section.key)
                     const isInserted = insertedSections.has(section.key)

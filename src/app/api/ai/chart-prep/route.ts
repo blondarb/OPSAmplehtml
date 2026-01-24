@@ -94,25 +94,25 @@ ${imagingSummary.length > 0 ? imagingSummary.map(i => `
   Impression: ${i.impression || 'N/A'}
 `).join('\n') : 'No imaging studies on record'}`
 
-    const systemPrompt = `You are a clinical AI assistant preparing a structured chart prep for a neurology visit.
+    const systemPrompt = `You are a clinical AI assistant preparing a concise, scannable chart prep for a neurology visit.
 
 ${patientContext}
 
-Generate a JSON response with the following sections. Each section should be clinically relevant and actionable.
-For sections where you have insufficient data, provide a reasonable clinical template or indicate what information is needed.
+Generate a JSON response with HIGH-YIELD, BULLET-STYLE summaries. Keep each section concise and actionable.
+Use "•" for bullet points. Each bullet should be 1 line max.
 
 IMPORTANT: Return ONLY valid JSON, no markdown formatting.
 
 {
-  "patientSummary": "2-3 sentence overview of this patient including key demographics and primary diagnoses",
-  "suggestedHPI": "A draft HPI paragraph based on the chief complaint and history. Should be 3-5 sentences suitable for documentation. Include relevant history context.",
-  "relevantHistory": "Bulleted summary of pertinent medical history, prior treatments, and outcomes",
-  "currentMedications": "List of current/recent medications mentioned in prior notes, or 'Review with patient' if unknown",
-  "imagingFindings": "Summary of relevant imaging findings and their clinical significance",
-  "scaleTrends": "Summary of clinical scale scores over time (e.g., MIDAS, HIT-6, PHQ-9) and trends",
-  "keyConsiderations": "3-5 bullet points of important things to address this visit",
-  "suggestedAssessment": "Draft assessment statement based on chief complaint and history",
-  "suggestedPlan": "Draft plan with 3-5 specific recommendations based on the clinical picture"
+  "visitPurpose": "One sentence: reason for visit + time since last seen",
+  "alerts": "2-4 bullets of URGENT items only: drug interactions, overdue screenings, critical labs, safety concerns. Use ⚠️ prefix. Return empty string if none.",
+  "keyMetrics": "2-4 bullets showing trends with arrows: • MIDAS: 42 → 28 (improving) or • PHQ-9: 12 (stable). Include actual numbers when available.",
+  "currentTreatment": "2-4 bullets of active medications with duration and response: • Topiramate 100mg BID (6mo, good response)",
+  "lastVisitSummary": "2-3 sentences summarizing the most recent visit: what was discussed, decisions made, patient status",
+  "suggestedFocus": "2-4 bullets of specific items to address THIS visit. Start each with action verb.",
+  "suggestedHPI": "A draft HPI paragraph (3-5 sentences) incorporating chief complaint and relevant history context.",
+  "suggestedAssessment": "1-2 sentence clinical impression based on available data",
+  "suggestedPlan": "3-5 bullet points with specific, actionable recommendations"
 }`
 
     const completion = await openai.chat.completions.create({
@@ -169,32 +169,40 @@ IMPORTANT: Return ONLY valid JSON, no markdown formatting.
 function formatSectionsAsText(sections: any): string {
   const parts = []
 
-  if (sections.patientSummary) {
-    parts.push(`**Patient Summary**\n${sections.patientSummary}`)
+  if (sections.visitPurpose) {
+    parts.push(`**Visit Purpose**\n${sections.visitPurpose}`)
+  }
+  if (sections.alerts) {
+    parts.push(`**Alerts**\n${sections.alerts}`)
+  }
+  if (sections.keyMetrics) {
+    parts.push(`**Key Metrics**\n${sections.keyMetrics}`)
+  }
+  if (sections.currentTreatment) {
+    parts.push(`**Current Treatment**\n${sections.currentTreatment}`)
+  }
+  if (sections.lastVisitSummary) {
+    parts.push(`**Last Visit Summary**\n${sections.lastVisitSummary}`)
+  }
+  if (sections.suggestedFocus) {
+    parts.push(`**Suggested Focus**\n${sections.suggestedFocus}`)
   }
   if (sections.suggestedHPI) {
     parts.push(`**Suggested HPI**\n${sections.suggestedHPI}`)
-  }
-  if (sections.relevantHistory) {
-    parts.push(`**Relevant History**\n${sections.relevantHistory}`)
-  }
-  if (sections.currentMedications) {
-    parts.push(`**Current Medications**\n${sections.currentMedications}`)
-  }
-  if (sections.imagingFindings) {
-    parts.push(`**Imaging Findings**\n${sections.imagingFindings}`)
-  }
-  if (sections.scaleTrends) {
-    parts.push(`**Clinical Scale Trends**\n${sections.scaleTrends}`)
-  }
-  if (sections.keyConsiderations) {
-    parts.push(`**Key Considerations**\n${sections.keyConsiderations}`)
   }
   if (sections.suggestedAssessment) {
     parts.push(`**Suggested Assessment**\n${sections.suggestedAssessment}`)
   }
   if (sections.suggestedPlan) {
     parts.push(`**Suggested Plan**\n${sections.suggestedPlan}`)
+  }
+
+  // Support legacy field names for backwards compatibility
+  if (sections.patientSummary && !sections.visitPurpose) {
+    parts.unshift(`**Patient Summary**\n${sections.patientSummary}`)
+  }
+  if (sections.keyConsiderations && !sections.suggestedFocus) {
+    parts.push(`**Key Considerations**\n${sections.keyConsiderations}`)
   }
 
   return parts.join('\n\n')
