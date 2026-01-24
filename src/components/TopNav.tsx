@@ -9,6 +9,8 @@ interface TopNavProps {
   openAiDrawer: (tab: string) => void
   onOpenSettings: () => void
   onOpenIdeas: () => void
+  onToggleSidebar?: () => void
+  isSidebarOpen?: boolean
 }
 
 // Sample notifications data
@@ -29,7 +31,7 @@ const BILLING_CODES = [
   { code: '99215', label: '99215 - Office Visit (45+ min)', color: '#EF4444' },
 ]
 
-export default function TopNav({ user, onSignOut, openAiDrawer, onOpenSettings, onOpenIdeas }: TopNavProps) {
+export default function TopNav({ user, onSignOut, openAiDrawer, onOpenSettings, onOpenIdeas, onToggleSidebar, isSidebarOpen }: TopNavProps) {
   const [aiMenuOpen, setAiMenuOpen] = useState(false)
   const [userMenuOpen, setUserMenuOpen] = useState(false)
   const [activeQueue, setActiveQueue] = useState('outpatient')
@@ -105,7 +107,7 @@ export default function TopNav({ user, onSignOut, openAiDrawer, onOpenSettings, 
 
   return (
     <>
-      <nav style={{
+      <nav className="top-nav" style={{
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'space-between',
@@ -115,7 +117,36 @@ export default function TopNav({ user, onSignOut, openAiDrawer, onOpenSettings, 
         gap: '16px',
       }}>
         {/* Left Section */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
+        <div className="nav-left" style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
+          {/* Mobile Hamburger Menu */}
+          <button
+            onClick={onToggleSidebar}
+            className="sidebar-toggle mobile-only"
+            title={isSidebarOpen ? 'Close sidebar' : 'Open sidebar'}
+            style={{
+              display: 'none', // Will be shown via CSS on mobile
+              alignItems: 'center',
+              justifyContent: 'center',
+              width: '40px',
+              height: '40px',
+              borderRadius: '8px',
+              border: 'none',
+              background: isSidebarOpen ? 'var(--primary)' : 'var(--bg-gray)',
+              cursor: 'pointer',
+              color: isSidebarOpen ? 'white' : 'var(--text-secondary)',
+            }}
+          >
+            {isSidebarOpen ? (
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+              </svg>
+            ) : (
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="18" x2="21" y2="18"/>
+              </svg>
+            )}
+          </button>
+
           {/* Logo - Opens Ideas/Getting Started drawer */}
           <button
             onClick={onOpenIdeas}
@@ -164,8 +195,8 @@ export default function TopNav({ user, onSignOut, openAiDrawer, onOpenSettings, 
             </svg>
           </div>
 
-          {/* Queue Pills */}
-          <div style={{ display: 'flex', gap: '8px' }}>
+          {/* Queue Pills - hidden on mobile */}
+          <div className="queue-filters desktop-only" style={{ display: 'flex', gap: '8px' }}>
             {queues.map(queue => (
               <button
                 key={queue.id}
@@ -195,7 +226,7 @@ export default function TopNav({ user, onSignOut, openAiDrawer, onOpenSettings, 
         </div>
 
         {/* Right Section */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+        <div className="nav-right" style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
           {/* Timer with MD2 badge - NOW WITH DROPDOWN */}
           <div style={{ position: 'relative' }}>
             <button
@@ -369,8 +400,8 @@ export default function TopNav({ user, onSignOut, openAiDrawer, onOpenSettings, 
             )}
           </div>
 
-          {/* PHI Toggle */}
-          <div style={{
+          {/* PHI Toggle - hidden on mobile */}
+          <div className="phi-toggle desktop-only" style={{
             display: 'flex',
             alignItems: 'center',
             gap: '6px',

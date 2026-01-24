@@ -259,11 +259,12 @@ Use patient-friendly language. Avoid medical jargon. Keep it informative but not
       />
 
       {/* Drawer */}
-      <div style={{
+      <div className="ai-drawer show" style={{
         position: 'fixed',
         top: 0,
         right: 0,
         width: '420px',
+        maxWidth: '100vw', // Responsive: never exceed viewport
         height: '100%',
         background: 'var(--bg-white)',
         boxShadow: '-4px 0 20px rgba(0,0,0,0.1)',

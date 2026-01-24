@@ -6,6 +6,8 @@ interface LeftSidebarProps {
   patient: any
   priorVisits: any[]
   scoreHistory: any[]
+  isOpen?: boolean
+  onClose?: () => void
 }
 
 // Default summary options
@@ -100,7 +102,7 @@ Neuro:
   }
 }
 
-export default function LeftSidebar({ patient, priorVisits, scoreHistory }: LeftSidebarProps) {
+export default function LeftSidebar({ patient, priorVisits, scoreHistory, isOpen = true, onClose }: LeftSidebarProps) {
   const [expandedVisit, setExpandedVisit] = useState<string | null>(priorVisits[0]?.id || null)
   const [aiSummaryEnabled, setAiSummaryEnabled] = useState(true)
   const [scoreHistoryOpen, setScoreHistoryOpen] = useState(true)
@@ -198,7 +200,12 @@ export default function LeftSidebar({ patient, priorVisits, scoreHistory }: Left
         to { transform: rotate(360deg); }
       }
     `}</style>
-    <aside style={{
+    {/* Mobile overlay backdrop */}
+    <div
+      className={`sidebar-overlay ${isOpen ? 'show' : ''}`}
+      onClick={onClose}
+    />
+    <aside className={`left-sidebar ${isOpen ? 'open' : ''}`} style={{
       width: '260px',
       background: 'var(--bg-white)',
       borderRight: '1px solid var(--border)',

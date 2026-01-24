@@ -392,11 +392,13 @@ export default function IdeasDrawer({ isOpen, onClose, initialTab, onStartTour }
 
       {/* Drawer */}
       <div
+        className="ai-drawer show"
         style={{
           position: 'fixed',
           top: 0,
           left: 0,
           width: '520px',
+          maxWidth: '100vw', // Responsive: never exceed viewport
           height: '100vh',
           background: 'var(--bg-white)',
           boxShadow: '4px 0 20px rgba(0, 0, 0, 0.15)',

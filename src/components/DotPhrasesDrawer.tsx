@@ -248,11 +248,13 @@ export default function DotPhrasesDrawer({
 
       {/* Drawer */}
       <div
+        className="ai-drawer show"
         style={{
           position: 'fixed',
           top: 0,
           right: 0,
           width: '450px',
+          maxWidth: '100vw', // Responsive: never exceed viewport
           height: '100vh',
           backgroundColor: 'var(--bg-white)',
           boxShadow: '-4px 0 20px rgba(0, 0, 0, 0.15)',

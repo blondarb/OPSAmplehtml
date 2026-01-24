@@ -133,6 +133,28 @@ body {
   50% { opacity: 0.3; }
 }
 
+@keyframes slideIn {
+  from {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+@keyframes slideInLeft {
+  from {
+    transform: translateX(-100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
 /* Form elements */
 input, textarea, select {
   font-family: inherit;
@@ -1838,4 +1860,432 @@ a:hover {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
   gap: 8px;
+}
+
+/* ============================================
+   RESPONSIVE DESIGN SYSTEM
+   Breakpoints:
+   - Mobile: < 640px
+   - Tablet: 640px - 1024px
+   - Desktop: > 1024px
+   ============================================ */
+
+/* Mobile-specific utilities */
+.mobile-only {
+  display: none;
+}
+
+.desktop-only {
+  display: block;
+}
+
+/* Hide sidebar button on desktop */
+.sidebar-toggle {
+  display: none;
+}
+
+/* Mobile overlay for sidebar */
+.sidebar-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  z-index: 999;
+}
+
+.sidebar-overlay.show {
+  display: block;
+}
+
+/* ============================================
+   TABLET BREAKPOINT (max-width: 1024px)
+   ============================================ */
+@media (max-width: 1024px) {
+  /* Reduce sidebar width */
+  .left-sidebar {
+    width: 240px;
+  }
+
+  /* Reduce padding */
+  .tab-content {
+    padding: 16px;
+  }
+
+  .form-section {
+    padding: 16px;
+  }
+
+  /* Search bar narrower */
+  .search-bar {
+    width: 200px;
+  }
+
+  /* Queue pills - smaller text */
+  .queue-pill {
+    padding: 5px 10px;
+    font-size: 11px;
+  }
+
+  /* Timer more compact */
+  .timer {
+    padding: 5px 10px;
+  }
+}
+
+/* ============================================
+   MOBILE BREAKPOINT (max-width: 640px)
+   ============================================ */
+@media (max-width: 640px) {
+  /* Show mobile elements, hide desktop */
+  .mobile-only {
+    display: flex;
+  }
+
+  .desktop-only {
+    display: none !important;
+  }
+
+  /* Show sidebar toggle */
+  .sidebar-toggle {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 40px;
+    height: 40px;
+    border-radius: 8px;
+    border: none;
+    background: var(--bg-gray);
+    cursor: pointer;
+    color: var(--text-secondary);
+  }
+
+  /* Top nav mobile layout */
+  .top-nav {
+    padding: 8px 12px;
+    flex-wrap: wrap;
+    height: auto;
+    min-height: 56px;
+  }
+
+  .nav-left {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .nav-right {
+    width: 100%;
+    justify-content: space-between;
+    padding-top: 8px;
+    border-top: 1px solid var(--border);
+    margin-top: 8px;
+  }
+
+  /* Search bar - full width on mobile */
+  .search-bar {
+    width: 100%;
+    order: 3;
+    margin-top: 8px;
+  }
+
+  /* Hide queue filters on mobile - too cramped */
+  .queue-filters {
+    display: none;
+  }
+
+  /* Timer - simplified on mobile */
+  .timer {
+    padding: 4px 8px;
+    font-size: 11px;
+  }
+
+  /* Left sidebar - slide-in overlay */
+  .left-sidebar {
+    position: fixed;
+    top: 0;
+    left: -100%;
+    width: 85%;
+    max-width: 320px;
+    height: 100vh;
+    z-index: 1000;
+    transition: left 0.3s ease;
+    box-shadow: 4px 0 20px rgba(0, 0, 0, 0.2);
+  }
+
+  .left-sidebar.open {
+    left: 0;
+  }
+
+  /* Center panel - full width */
+  .center-panel {
+    width: 100%;
+    margin-left: 0;
+  }
+
+  /* Tab navigation - scrollable */
+  .tab-nav-wrapper {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    padding: 0 8px;
+  }
+
+  .tab-nav {
+    min-width: max-content;
+  }
+
+  .tab-btn {
+    padding: 12px 14px;
+    font-size: 12px;
+    white-space: nowrap;
+  }
+
+  /* Tab content - reduced padding */
+  .tab-content {
+    padding: 12px;
+  }
+
+  /* Form sections - reduced padding */
+  .form-section {
+    padding: 14px;
+    border-radius: 8px;
+    margin-bottom: 12px;
+  }
+
+  /* Section header - stack on mobile */
+  .section-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+  }
+
+  /* Form row - stack on mobile */
+  .form-row {
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  /* Chips - smaller on mobile */
+  .chip {
+    padding: 6px 12px;
+    font-size: 12px;
+  }
+
+  /* Exam grid - single column on mobile */
+  .exam-grid {
+    grid-template-columns: 1fr;
+  }
+
+  /* AI drawer - full screen on mobile */
+  .ai-drawer {
+    width: 100%;
+    right: -100%;
+  }
+
+  .ai-drawer.show {
+    right: 0;
+  }
+
+  /* Notification panel - full width */
+  .notification-panel {
+    width: 100%;
+    max-width: none;
+    left: 0;
+    right: 0;
+    border-radius: 0 0 12px 12px;
+  }
+
+  /* User menu - full width */
+  .user-menu {
+    width: calc(100% - 24px);
+    left: 12px;
+    right: 12px;
+  }
+
+  /* Modals - more compact on mobile */
+  .modal {
+    width: 95%;
+    max-width: none;
+    max-height: 90vh;
+    margin: 5vh auto;
+  }
+
+  /* Text fields - taller touch targets */
+  .form-input, .form-select {
+    padding: 12px;
+    font-size: 16px; /* Prevents iOS zoom */
+  }
+
+  .form-textarea {
+    padding: 12px;
+    font-size: 16px;
+    min-height: 120px;
+  }
+
+  /* Buttons - larger touch targets */
+  button {
+    min-height: 44px;
+  }
+
+  .nav-icon {
+    width: 44px;
+    height: 44px;
+  }
+
+  /* Hide some nav icons on mobile to save space */
+  .phi-toggle {
+    display: none;
+  }
+
+  /* Prior visit cards - more compact */
+  .prior-visit-card {
+    padding: 10px;
+  }
+
+  /* Score cards - more compact */
+  .score-card {
+    padding: 10px;
+  }
+
+  /* Quick links - hide on mobile */
+  .sidebar-links {
+    display: none;
+  }
+
+  /* Action buttons row - stack */
+  .action-buttons {
+    flex-direction: column;
+  }
+
+  .action-buttons button {
+    width: 100%;
+  }
+
+  /* Study cards - more compact */
+  .study-card-header {
+    padding: 10px 12px;
+  }
+
+  .study-card-content {
+    padding: 0 12px 12px;
+  }
+
+  /* Diagnosis pills - wrap better */
+  .selected-diagnoses {
+    gap: 6px;
+  }
+
+  .diagnosis-pill {
+    padding: 6px 10px;
+    font-size: 12px;
+  }
+}
+
+/* ============================================
+   SMALL MOBILE (max-width: 375px)
+   ============================================ */
+@media (max-width: 375px) {
+  /* Even more compact for small phones */
+  .tab-btn {
+    padding: 10px 12px;
+    font-size: 11px;
+  }
+
+  .section-title {
+    font-size: 13px;
+  }
+
+  .form-label {
+    font-size: 11px;
+  }
+
+  /* Patient card - more compact */
+  .patient-card {
+    padding: 12px;
+  }
+
+  .patient-info h3 {
+    font-size: 14px;
+  }
+}
+
+/* ============================================
+   LANDSCAPE MOBILE
+   ============================================ */
+@media (max-width: 896px) and (orientation: landscape) {
+  /* Reduce header height in landscape */
+  .top-nav {
+    padding: 6px 12px;
+    min-height: 48px;
+  }
+
+  /* Sidebar narrower in landscape */
+  .left-sidebar.open {
+    max-width: 280px;
+  }
+
+  /* Modals shorter */
+  .modal {
+    max-height: 80vh;
+  }
+}
+
+/* ============================================
+   TOUCH DEVICE ENHANCEMENTS
+   ============================================ */
+@media (hover: none) and (pointer: coarse) {
+  /* Larger tap targets for touch */
+  .nav-icon,
+  .ai-icon-btn,
+  .quick-phrases-btn {
+    min-width: 44px;
+    min-height: 44px;
+  }
+
+  /* Remove hover effects that don't work on touch */
+  .chip:hover,
+  .accordion-header:hover,
+  .study-card-header:hover {
+    background: inherit;
+  }
+
+  /* Add active states instead */
+  .chip:active,
+  .accordion-header:active,
+  .study-card-header:active {
+    background: var(--bg-dark);
+  }
+
+  /* Ensure dropdowns are touch-friendly */
+  .diagnosis-option,
+  .ai-action-item,
+  .quick-phrase-item {
+    padding: 14px 16px;
+  }
+}
+
+/* ============================================
+   PRINT STYLES
+   ============================================ */
+@media print {
+  .top-nav,
+  .left-sidebar,
+  .sidebar-toggle,
+  .ai-drawer,
+  .nav-right {
+    display: none !important;
+  }
+
+  .center-panel {
+    width: 100% !important;
+    margin: 0 !important;
+  }
+
+  .tab-nav-wrapper {
+    display: none !important;
+  }
+
+  .form-section {
+    break-inside: avoid;
+    box-shadow: none;
+    border: 1px solid #ddd;
+  }
 }

@@ -69,7 +69,7 @@ function IconSidebar({ activeIcon, setActiveIcon }: { activeIcon: string, setAct
   ]
 
   return (
-    <div style={{
+    <div className="desktop-only" style={{
       width: '56px',
       background: 'var(--bg-white)',
       borderRight: '1px solid var(--border)',
@@ -114,6 +114,7 @@ export default function ClinicalNote({
 }: ClinicalNoteProps) {
   const [darkMode, setDarkMode] = useState(false)
   const [activeIcon, setActiveIcon] = useState('queue')
+  const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false)
   const [aiDrawerOpen, setAiDrawerOpen] = useState(false)
   const [aiDrawerTab, setAiDrawerTab] = useState('ask-ai')
   const [voiceDrawerOpen, setVoiceDrawerOpen] = useState(false)
@@ -481,6 +482,8 @@ export default function ClinicalNote({
         openAiDrawer={openAiDrawer}
         onOpenSettings={() => setSettingsOpen(true)}
         onOpenIdeas={() => setIdeasDrawerOpen(true)}
+        onToggleSidebar={() => setMobileSidebarOpen(!mobileSidebarOpen)}
+        isSidebarOpen={mobileSidebarOpen}
       />
 
       <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
@@ -492,6 +495,8 @@ export default function ClinicalNote({
           patient={patient}
           priorVisits={priorVisits}
           scoreHistory={scoreHistory}
+          isOpen={mobileSidebarOpen}
+          onClose={() => setMobileSidebarOpen(false)}
         />
 
         <CenterPanel

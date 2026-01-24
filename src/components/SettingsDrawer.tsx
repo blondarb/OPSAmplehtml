@@ -208,11 +208,13 @@ export default function SettingsDrawer({
 
       {/* Drawer */}
       <div
+        className="ai-drawer show"
         style={{
           position: 'fixed',
           top: 0,
           right: 0,
           width: '480px',
+          maxWidth: '100vw', // Responsive: never exceed viewport
           height: '100vh',
           background: 'var(--bg-white)',
           boxShadow: '-4px 0 20px rgba(0, 0, 0, 0.15)',
