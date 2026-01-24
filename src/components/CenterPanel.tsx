@@ -1496,7 +1496,7 @@ ${noteData.plan || 'Not documented'}
                 </div>
                 {openExamAccordions.generalAppearance && (
                   <div onClick={(e) => e.stopPropagation()} style={{ padding: '16px', borderTop: '1px solid var(--border)' }}>
-                    <select style={{ width: '100%', padding: '10px', border: '1px solid var(--border)', borderRadius: '6px', marginBottom: '12px' }}>
+                    <select style={{ width: '100%', padding: '10px', border: '1px solid var(--border)', borderRadius: '6px', marginBottom: '12px', background: 'var(--bg-white)', color: 'var(--text-primary)' }}>
                       <option>In no apparent distress</option>
                       <option>Appears uncomfortable</option>
                       <option>Appears ill</option>
@@ -1519,6 +1519,8 @@ ${noteData.plan || 'Not documented'}
                           fontSize: '13px',
                           resize: 'vertical',
                           fontFamily: 'inherit',
+                          background: 'var(--bg-white)',
+                          color: 'var(--text-primary)',
                         }}
                       />
                       <div style={{ position: 'absolute', bottom: '8px', right: '8px', display: 'flex', gap: '4px' }}>
@@ -1643,6 +1645,8 @@ ${noteData.plan || 'Not documented'}
                           fontSize: '13px',
                           resize: 'vertical',
                           fontFamily: 'inherit',
+                          background: 'var(--bg-white)',
+                          color: 'var(--text-primary)',
                         }}
                       />
                       <div style={{ position: 'absolute', bottom: '8px', right: '8px', display: 'flex', gap: '4px' }}>
@@ -1732,6 +1736,8 @@ ${noteData.plan || 'Not documented'}
                           fontSize: '13px',
                           resize: 'vertical',
                           fontFamily: 'inherit',
+                          background: 'var(--bg-white)',
+                          color: 'var(--text-primary)',
                         }}
                       />
                       <div style={{ position: 'absolute', bottom: '8px', right: '8px', display: 'flex', gap: '4px' }}>

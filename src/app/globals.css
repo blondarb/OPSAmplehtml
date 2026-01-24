@@ -83,6 +83,25 @@
   --source-imaging-text: #A5B4FC;
 }
 
+/* Dark mode form element overrides */
+[data-theme="dark"] input,
+[data-theme="dark"] textarea,
+[data-theme="dark"] select {
+  background-color: var(--bg-white);
+  color: var(--text-primary);
+  border-color: var(--border);
+}
+
+[data-theme="dark"] input::placeholder,
+[data-theme="dark"] textarea::placeholder {
+  color: var(--text-muted);
+}
+
+[data-theme="dark"] option {
+  background-color: var(--bg-white);
+  color: var(--text-primary);
+}
+
 * {
   box-sizing: border-box;
   margin: 0;
