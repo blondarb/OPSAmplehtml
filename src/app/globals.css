@@ -63,6 +63,24 @@
   /* Note modal include toggles - dark mode */
   --note-include-active-bg: #065F46;
   --note-include-active-text: #34D399;
+
+  /* Source badges - dark mode */
+  --source-manual-bg: #374151;
+  --source-manual-text: #D1D5DB;
+  --source-chartprep-bg: #78350F;
+  --source-chartprep-text: #FCD34D;
+  --source-visitai-bg: #1E3A8A;
+  --source-visitai-text: #93C5FD;
+  --source-merged-bg: #065F46;
+  --source-merged-text: #34D399;
+  --source-ai-bg: #134E4A;
+  --source-ai-text: #5EEAD4;
+  --source-recs-bg: #4C1D95;
+  --source-recs-text: #C4B5FD;
+  --source-scales-bg: #7F1D1D;
+  --source-scales-text: #FCA5A5;
+  --source-imaging-bg: #312E81;
+  --source-imaging-text: #A5B4FC;
 }
 
 * {

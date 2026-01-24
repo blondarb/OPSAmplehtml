@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useCallback } from 'react'
 import {
   generateFormattedNote,
   updateFormattedNoteSection,
@@ -17,6 +17,17 @@ import type {
   ContentSource,
 } from '@/lib/note-merge/types'
 
+// Get user settings from localStorage
+function getUserSettings() {
+  if (typeof window === 'undefined') return null
+  try {
+    const saved = localStorage.getItem('sevaro-user-settings')
+    return saved ? JSON.parse(saved) : null
+  } catch {
+    return null
+  }
+}
+
 interface EnhancedNotePreviewModalProps {
   isOpen: boolean
   onClose: () => void
@@ -27,13 +38,14 @@ interface EnhancedNotePreviewModalProps {
 
 // Source badge colors
 const SOURCE_COLORS: Record<string, { bg: string; text: string; label: string }> = {
-  'manual': { bg: '#F3F4F6', text: '#374151', label: 'Manual' },
-  'chart-prep': { bg: '#FEF3C7', text: '#D97706', label: 'Chart Prep' },
-  'visit-ai': { bg: '#DBEAFE', text: '#2563EB', label: 'Visit AI' },
-  'merged': { bg: '#D1FAE5', text: '#059669', label: 'Merged' },
-  'recommendations': { bg: '#EDE9FE', text: '#7C3AED', label: 'Smart Recs' },
-  'scales': { bg: '#FEE2E2', text: '#DC2626', label: 'Scales' },
-  'imaging': { bg: '#E0E7FF', text: '#4F46E5', label: 'Imaging' },
+  'manual': { bg: 'var(--source-manual-bg, #F3F4F6)', text: 'var(--source-manual-text, #374151)', label: 'Manual' },
+  'chart-prep': { bg: 'var(--source-chartprep-bg, #FEF3C7)', text: 'var(--source-chartprep-text, #D97706)', label: 'Chart Prep' },
+  'visit-ai': { bg: 'var(--source-visitai-bg, #DBEAFE)', text: 'var(--source-visitai-text, #2563EB)', label: 'Visit AI' },
+  'merged': { bg: 'var(--source-merged-bg, #D1FAE5)', text: 'var(--source-merged-text, #059669)', label: 'Merged' },
+  'ai-synthesized': { bg: 'var(--source-ai-bg, #F0FDFA)', text: 'var(--source-ai-text, #0D9488)', label: 'AI Synthesized' },
+  'recommendations': { bg: 'var(--source-recs-bg, #EDE9FE)', text: 'var(--source-recs-text, #7C3AED)', label: 'Smart Recs' },
+  'scales': { bg: 'var(--source-scales-bg, #FEE2E2)', text: 'var(--source-scales-text, #DC2626)', label: 'Scales' },
+  'imaging': { bg: 'var(--source-imaging-bg, #E0E7FF)', text: 'var(--source-imaging-text, #4F46E5)', label: 'Imaging' },
 }
 
 type ViewMode = 'review' | 'final'
@@ -60,6 +72,10 @@ export default function EnhancedNotePreviewModal({
   const [formattedNote, setFormattedNote] = useState<FormattedNote | null>(null)
   const [generationError, setGenerationError] = useState<string | null>(null)
 
+  // AI synthesis state
+  const [isSynthesizing, setIsSynthesizing] = useState(false)
+  const [hasSynthesized, setHasSynthesized] = useState(false)
+
   // Editing state
   const [editingSection, setEditingSection] = useState<string | null>(null)
   const [editValue, setEditValue] = useState('')
@@ -78,11 +94,89 @@ export default function EnhancedNotePreviewModal({
     showSources: false,
   }), [noteType, noteLength, includeScales, includeImaging, includeLabs, includeRecommendations])
 
+  // AI Synthesis function - calls API to intelligently merge all content
+  const synthesizeWithAI = useCallback(async () => {
+    if (!noteData || isSynthesizing) return
+
+    setIsSynthesizing(true)
+    setGenerationError(null)
+
+    try {
+      const userSettings = getUserSettings()
+
+      const response = await fetch('/api/ai/synthesize-note', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          noteType,
+          noteLength,
+          manualData: noteData.manualData,
+          chartPrepData: noteData.chartPrepData,
+          visitAIData: noteData.visitAIData,
+          scales: noteData.scales,
+          diagnoses: noteData.diagnoses,
+          imagingStudies: includeImaging ? noteData.imagingStudies : undefined,
+          recommendations: includeRecommendations ? noteData.recommendations : undefined,
+          patient: noteData.patient,
+          userSettings,
+        }),
+      })
+
+      const data = await response.json()
+
+      if (data.error) {
+        setGenerationError(data.error)
+        return
+      }
+
+      if (data.synthesizedNote) {
+        // Update the formatted note with AI-synthesized content
+        setFormattedNote(prev => {
+          if (!prev) return prev
+
+          const updatedSections = prev.sections.map(section => {
+            const synthesizedContent = data.synthesizedNote[section.id]
+            if (synthesizedContent && synthesizedContent.trim()) {
+              return {
+                ...section,
+                content: synthesizedContent,
+                source: 'ai-synthesized' as ContentSource,
+              }
+            }
+            return section
+          })
+
+          // Regenerate full text
+          const fullText = updatedSections
+            .sort((a, b) => a.order - b.order)
+            .filter(s => s.content)
+            .map(s => `${s.title.toUpperCase()}:\n${s.content}`)
+            .join('\n\n')
+
+          return {
+            ...prev,
+            sections: updatedSections,
+            fullText: `${prev.header}\n${fullText}\n${prev.footer}`,
+            wordCount: fullText.split(/\s+/).length,
+          }
+        })
+
+        setHasSynthesized(true)
+      }
+    } catch (error) {
+      console.error('Error synthesizing note:', error)
+      setGenerationError('Failed to synthesize note with AI')
+    } finally {
+      setIsSynthesizing(false)
+    }
+  }, [noteData, noteType, noteLength, includeImaging, includeRecommendations, isSynthesizing])
+
   // Generate note when modal opens or preferences change
   useEffect(() => {
     if (isOpen && noteData) {
       try {
         setGenerationError(null)
+        setHasSynthesized(false)
         // Ensure manualData exists with required structure
         const safeNoteData: ComprehensiveNoteData = {
           ...noteData,
@@ -586,39 +680,108 @@ export default function EnhancedNotePreviewModal({
             </div>
           </div>
 
-          {/* View Mode Toggle */}
-          <div style={{ display: 'flex', gap: '8px', marginTop: '16px' }}>
+          {/* View Mode Toggle and AI Synthesize */}
+          <div style={{ display: 'flex', gap: '8px', marginTop: '16px', alignItems: 'center', justifyContent: 'space-between' }}>
+            <div style={{ display: 'flex', gap: '8px' }}>
+              <button
+                onClick={() => setViewMode('review')}
+                style={{
+                  padding: '8px 16px',
+                  borderRadius: '8px',
+                  border: viewMode === 'review' ? 'none' : '1px solid var(--border)',
+                  background: viewMode === 'review' ? 'var(--bg-dark)' : 'transparent',
+                  color: viewMode === 'review' ? 'var(--text-primary)' : 'var(--text-secondary)',
+                  fontSize: '13px',
+                  fontWeight: 500,
+                  cursor: 'pointer',
+                }}
+              >
+                Review Sections
+              </button>
+              <button
+                onClick={() => setViewMode('final')}
+                style={{
+                  padding: '8px 16px',
+                  borderRadius: '8px',
+                  border: viewMode === 'final' ? 'none' : '1px solid var(--border)',
+                  background: viewMode === 'final' ? 'var(--bg-dark)' : 'transparent',
+                  color: viewMode === 'final' ? 'var(--text-primary)' : 'var(--text-secondary)',
+                  fontSize: '13px',
+                  fontWeight: 500,
+                  cursor: 'pointer',
+                }}
+              >
+                Final Note Preview
+              </button>
+            </div>
+
+            {/* AI Synthesize Button */}
             <button
-              onClick={() => setViewMode('review')}
+              onClick={synthesizeWithAI}
+              disabled={isSynthesizing}
               style={{
                 padding: '8px 16px',
                 borderRadius: '8px',
-                border: viewMode === 'review' ? 'none' : '1px solid var(--border)',
-                background: viewMode === 'review' ? 'var(--bg-dark)' : 'transparent',
-                color: viewMode === 'review' ? 'var(--text-primary)' : 'var(--text-secondary)',
+                border: 'none',
+                background: hasSynthesized
+                  ? 'linear-gradient(135deg, #10B981 0%, #059669 100%)'
+                  : 'linear-gradient(135deg, #0D9488 0%, #0F766E 100%)',
+                color: 'white',
                 fontSize: '13px',
-                fontWeight: 500,
-                cursor: 'pointer',
+                fontWeight: 600,
+                cursor: isSynthesizing ? 'wait' : 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                opacity: isSynthesizing ? 0.7 : 1,
+                boxShadow: '0 2px 8px rgba(13, 148, 136, 0.3)',
               }}
             >
-              Review Sections
-            </button>
-            <button
-              onClick={() => setViewMode('final')}
-              style={{
-                padding: '8px 16px',
-                borderRadius: '8px',
-                border: viewMode === 'final' ? 'none' : '1px solid var(--border)',
-                background: viewMode === 'final' ? 'var(--bg-dark)' : 'transparent',
-                color: viewMode === 'final' ? 'var(--text-primary)' : 'var(--text-secondary)',
-                fontSize: '13px',
-                fontWeight: 500,
-                cursor: 'pointer',
-              }}
-            >
-              Final Note Preview
+              {isSynthesizing ? (
+                <>
+                  <svg
+                    width="16"
+                    height="16"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    style={{ animation: 'spin 1s linear infinite' }}
+                  >
+                    <path d="M21 12a9 9 0 11-6.219-8.56" />
+                  </svg>
+                  Synthesizing...
+                </>
+              ) : hasSynthesized ? (
+                <>
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <polyline points="20 6 9 17 4 12" />
+                  </svg>
+                  AI Synthesized
+                </>
+              ) : (
+                <>
+                  {/* AI Sparkle Icon */}
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M12 0L14.59 9.41L24 12L14.59 14.59L12 24L9.41 14.59L0 12L9.41 9.41L12 0Z" />
+                  </svg>
+                  AI Synthesize All
+                </>
+              )}
             </button>
           </div>
+
+          {/* Info text about AI synthesis */}
+          {!hasSynthesized && (
+            <p style={{
+              marginTop: '8px',
+              fontSize: '12px',
+              color: 'var(--text-muted)',
+              fontStyle: 'italic',
+            }}>
+              Click "AI Synthesize All" to intelligently combine Chart Prep, Visit AI, and manual entries into a cohesive note.
+            </p>
+          )}
         </div>
 
         {/* Content */}
