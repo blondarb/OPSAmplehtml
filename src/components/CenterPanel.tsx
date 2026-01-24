@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import NoteTextField from './NoteTextField'
 import SmartScalesSection from './SmartScalesSection'
+import ExamScalesSection from './ExamScalesSection'
 import ReasonForConsultSection from './ReasonForConsultSection'
 import DifferentialDiagnosisSection from './DifferentialDiagnosisSection'
 import ImagingResultsTab from './ImagingResultsTab'
@@ -74,6 +75,21 @@ export default function CenterPanel({
     coordination: true,
     gait: false,
   })
+
+  // Free text notes for each exam section
+  const [examSectionNotes, setExamSectionNotes] = useState<Record<string, string>>({
+    generalAppearance: '',
+    mentalStatus: '',
+    cranialNerves: '',
+    motor: '',
+    sensation: '',
+    coordination: '',
+    gait: '',
+  })
+
+  const updateExamSectionNote = (section: string, value: string) => {
+    setExamSectionNotes(prev => ({ ...prev, [section]: value }))
+  }
 
   // Exam checkbox state
   const [examFindings, setExamFindings] = useState<Record<string, boolean>>({
@@ -955,6 +971,69 @@ ${noteData.plan || 'Not documented'}
         {/* Exam Tab */}
         {activeTab === 'exam' && (
           <div>
+            {/* Telemedicine Notice */}
+            <div style={{
+              padding: '12px 16px',
+              background: '#F0FDF4',
+              border: '1px solid #BBF7D0',
+              borderRadius: '8px',
+              marginBottom: '16px',
+              display: 'flex',
+              alignItems: 'flex-start',
+              gap: '12px',
+            }}>
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#16A34A" strokeWidth="2">
+                <path d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"/>
+              </svg>
+              <div>
+                <div style={{ fontSize: '13px', fontWeight: 600, color: '#166534', marginBottom: '4px' }}>Telemedicine-Optimized Exam</div>
+                <div style={{ fontSize: '12px', color: '#15803D' }}>
+                  This exam template is designed for video visits. MA assistance is available for exam-driven scales (NIHSS, Modified Ashworth).
+                  Use the free text fields under each section to document observations or dictate findings.
+                </div>
+              </div>
+            </div>
+
+            {/* Exam Summary - Dictation/AI */}
+            <div style={{
+              background: 'var(--bg-white)',
+              borderRadius: '12px',
+              padding: '20px',
+              marginBottom: '16px',
+              boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
+            }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+                <div>
+                  <span style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text-primary)' }}>Exam Summary</span>
+                  <span style={{ fontSize: '12px', color: 'var(--text-muted)', marginLeft: '8px' }}>Dictate or use AI to summarize findings</span>
+                </div>
+              </div>
+              <NoteTextField
+                value={noteData.examSummary || ''}
+                onChange={(value) => updateNote('examSummary', value)}
+                fieldName="examSummary"
+                placeholder="Dictate your exam findings here, or click the checkboxes below and use AI to generate a summary..."
+                minHeight="100px"
+                showDictate={true}
+                showAiAction={true}
+                onOpenAiDrawer={() => openAiDrawer('ask-ai')}
+                onOpenFullPhrasesDrawer={() => openDotPhrases && openDotPhrases('examSummary')}
+                setActiveTextField={handleSetActiveField}
+                patientContext={patientContext}
+              />
+            </div>
+
+            {/* Exam Scales Section (NIHSS, Modified Ashworth, etc.) */}
+            <ExamScalesSection
+              selectedConditions={noteData.chiefComplaint || []}
+              patientId={patient?.id}
+              visitId={currentVisit?.id}
+              onAddToNote={(field, text) => {
+                const currentValue = noteData.examSummary || ''
+                updateNote('examSummary', currentValue ? `${currentValue}\n${text}` : text)
+              }}
+            />
+
             {/* Initial Assessment */}
             <div style={{
               background: 'var(--bg-white)',
@@ -1024,22 +1103,23 @@ ${noteData.plan || 'Not documented'}
 
               {/* General Appearance Accordion */}
               <div
-                onClick={() => toggleExamAccordion('generalAppearance')}
                 style={{
                   border: '1px solid var(--border)',
                   borderRadius: '8px',
                   marginBottom: '8px',
                   overflow: 'hidden',
-                  cursor: 'pointer',
                 }}
               >
-                <div style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  padding: '12px 16px',
-                  background: openExamAccordions.generalAppearance ? 'var(--bg-dark)' : 'transparent',
-                }}>
+                <div
+                  onClick={() => toggleExamAccordion('generalAppearance')}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    padding: '12px 16px',
+                    background: openExamAccordions.generalAppearance ? 'var(--bg-dark)' : 'transparent',
+                    cursor: 'pointer',
+                  }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                     <span style={{
                       width: '8px',
@@ -1056,34 +1136,63 @@ ${noteData.plan || 'Not documented'}
                 </div>
                 {openExamAccordions.generalAppearance && (
                   <div onClick={(e) => e.stopPropagation()} style={{ padding: '16px', borderTop: '1px solid var(--border)' }}>
-                    <select style={{ width: '100%', padding: '10px', border: '1px solid var(--border)', borderRadius: '6px' }}>
+                    <select style={{ width: '100%', padding: '10px', border: '1px solid var(--border)', borderRadius: '6px', marginBottom: '12px' }}>
                       <option>In no apparent distress</option>
                       <option>Appears uncomfortable</option>
                       <option>Appears ill</option>
                       <option>Appears anxious</option>
                     </select>
+                    {/* Free text notes */}
+                    <div style={{ position: 'relative' }}>
+                      <label style={{ display: 'block', fontSize: '12px', color: 'var(--text-muted)', marginBottom: '4px' }}>Additional notes</label>
+                      <textarea
+                        value={examSectionNotes.generalAppearance}
+                        onChange={(e) => updateExamSectionNote('generalAppearance', e.target.value)}
+                        placeholder="Add observations..."
+                        style={{
+                          width: '100%',
+                          minHeight: '60px',
+                          padding: '10px 12px',
+                          paddingRight: '90px',
+                          border: '1px solid var(--border)',
+                          borderRadius: '8px',
+                          fontSize: '13px',
+                          resize: 'vertical',
+                          fontFamily: 'inherit',
+                        }}
+                      />
+                      <div style={{ position: 'absolute', bottom: '8px', right: '8px', display: 'flex', gap: '4px' }}>
+                        <button onClick={() => openVoiceDrawer?.('document')} title="Dictate" style={{ width: '24px', height: '24px', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '4px', border: 'none', background: '#FEE2E2', color: '#EF4444', cursor: 'pointer' }}>
+                          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 1a3 3 0 00-3 3v8a3 3 0 006 0V4a3 3 0 00-3-3z"/><path d="M19 10v2a7 7 0 01-14 0v-2"/></svg>
+                        </button>
+                        <button onClick={() => openAiDrawer('ask-ai')} title="AI Assist" style={{ width: '24px', height: '24px', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '4px', border: 'none', background: '#CCFBF1', color: '#0D9488', cursor: 'pointer' }}>
+                          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+                        </button>
+                      </div>
+                    </div>
                   </div>
                 )}
               </div>
 
               {/* Mental Status Accordion */}
               <div
-                onClick={() => toggleExamAccordion('mentalStatus')}
                 style={{
                   border: '1px solid var(--border)',
                   borderRadius: '8px',
                   marginBottom: '8px',
                   overflow: 'hidden',
-                  cursor: 'pointer',
                 }}
               >
-                <div style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  padding: '12px 16px',
-                  background: openExamAccordions.mentalStatus ? 'var(--bg-dark)' : 'transparent',
-                }}>
+                <div
+                  onClick={() => toggleExamAccordion('mentalStatus')}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    padding: '12px 16px',
+                    background: openExamAccordions.mentalStatus ? 'var(--bg-dark)' : 'transparent',
+                    cursor: 'pointer',
+                  }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                     <span style={{
                       width: '8px',
@@ -1148,7 +1257,7 @@ ${noteData.plan || 'Not documented'}
                         ))}
                       </div>
                     </div>
-                    <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', marginBottom: '16px' }}>
                       <input
                         type="checkbox"
                         checked={examFindings.followingCommands}
@@ -1157,28 +1266,57 @@ ${noteData.plan || 'Not documented'}
                       />
                       <span style={{ fontSize: '13px' }}>Following commands</span>
                     </label>
+                    {/* Free text notes */}
+                    <div style={{ position: 'relative' }}>
+                      <label style={{ display: 'block', fontSize: '12px', color: 'var(--text-muted)', marginBottom: '4px' }}>Additional notes</label>
+                      <textarea
+                        value={examSectionNotes.mentalStatus}
+                        onChange={(e) => updateExamSectionNote('mentalStatus', e.target.value)}
+                        placeholder="Add observations..."
+                        style={{
+                          width: '100%',
+                          minHeight: '60px',
+                          padding: '10px 12px',
+                          paddingRight: '90px',
+                          border: '1px solid var(--border)',
+                          borderRadius: '8px',
+                          fontSize: '13px',
+                          resize: 'vertical',
+                          fontFamily: 'inherit',
+                        }}
+                      />
+                      <div style={{ position: 'absolute', bottom: '8px', right: '8px', display: 'flex', gap: '4px' }}>
+                        <button onClick={() => openVoiceDrawer?.('document')} title="Dictate" style={{ width: '24px', height: '24px', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '4px', border: 'none', background: '#FEE2E2', color: '#EF4444', cursor: 'pointer' }}>
+                          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 1a3 3 0 00-3 3v8a3 3 0 006 0V4a3 3 0 00-3-3z"/><path d="M19 10v2a7 7 0 01-14 0v-2"/></svg>
+                        </button>
+                        <button onClick={() => openAiDrawer('ask-ai')} title="AI Assist" style={{ width: '24px', height: '24px', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '4px', border: 'none', background: '#CCFBF1', color: '#0D9488', cursor: 'pointer' }}>
+                          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+                        </button>
+                      </div>
+                    </div>
                   </div>
                 )}
               </div>
 
               {/* Cranial Nerves Accordion */}
               <div
-                onClick={() => toggleExamAccordion('cranialNerves')}
                 style={{
                   border: '1px solid var(--border)',
                   borderRadius: '8px',
                   marginBottom: '8px',
                   overflow: 'hidden',
-                  cursor: 'pointer',
                 }}
               >
-                <div style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  padding: '12px 16px',
-                  background: openExamAccordions.cranialNerves ? 'var(--bg-dark)' : 'transparent',
-                }}>
+                <div
+                  onClick={() => toggleExamAccordion('cranialNerves')}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    padding: '12px 16px',
+                    background: openExamAccordions.cranialNerves ? 'var(--bg-dark)' : 'transparent',
+                    cursor: 'pointer',
+                  }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                     <span style={{
                       width: '8px',
@@ -1195,7 +1333,7 @@ ${noteData.plan || 'Not documented'}
                 </div>
                 {openExamAccordions.cranialNerves && (
                   <div onClick={(e) => e.stopPropagation()} style={{ padding: '16px', borderTop: '1px solid var(--border)' }}>
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '8px' }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '8px', marginBottom: '16px' }}>
                       {[
                         { key: 'visualFields', label: 'Visual fields full to confrontation' },
                         { key: 'pupilsReactive', label: 'Pupils equal and reactive' },
@@ -1217,28 +1355,57 @@ ${noteData.plan || 'Not documented'}
                         </label>
                       ))}
                     </div>
+                    {/* Free text notes */}
+                    <div style={{ position: 'relative' }}>
+                      <label style={{ display: 'block', fontSize: '12px', color: 'var(--text-muted)', marginBottom: '4px' }}>Additional notes</label>
+                      <textarea
+                        value={examSectionNotes.cranialNerves}
+                        onChange={(e) => updateExamSectionNote('cranialNerves', e.target.value)}
+                        placeholder="Add observations..."
+                        style={{
+                          width: '100%',
+                          minHeight: '60px',
+                          padding: '10px 12px',
+                          paddingRight: '90px',
+                          border: '1px solid var(--border)',
+                          borderRadius: '8px',
+                          fontSize: '13px',
+                          resize: 'vertical',
+                          fontFamily: 'inherit',
+                        }}
+                      />
+                      <div style={{ position: 'absolute', bottom: '8px', right: '8px', display: 'flex', gap: '4px' }}>
+                        <button onClick={() => openVoiceDrawer?.('document')} title="Dictate" style={{ width: '24px', height: '24px', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '4px', border: 'none', background: '#FEE2E2', color: '#EF4444', cursor: 'pointer' }}>
+                          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 1a3 3 0 00-3 3v8a3 3 0 006 0V4a3 3 0 00-3-3z"/><path d="M19 10v2a7 7 0 01-14 0v-2"/></svg>
+                        </button>
+                        <button onClick={() => openAiDrawer('ask-ai')} title="AI Assist" style={{ width: '24px', height: '24px', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '4px', border: 'none', background: '#CCFBF1', color: '#0D9488', cursor: 'pointer' }}>
+                          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+                        </button>
+                      </div>
+                    </div>
                   </div>
                 )}
               </div>
 
               {/* Motor Accordion */}
               <div
-                onClick={() => toggleExamAccordion('motor')}
                 style={{
                   border: '1px solid var(--border)',
                   borderRadius: '8px',
                   marginBottom: '8px',
                   overflow: 'hidden',
-                  cursor: 'pointer',
                 }}
               >
-                <div style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  padding: '12px 16px',
-                  background: openExamAccordions.motor ? 'var(--bg-dark)' : 'transparent',
-                }}>
+                <div
+                  onClick={() => toggleExamAccordion('motor')}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    padding: '12px 16px',
+                    background: openExamAccordions.motor ? 'var(--bg-dark)' : 'transparent',
+                    cursor: 'pointer',
+                  }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                     <span style={{
                       width: '8px',
@@ -1255,7 +1422,7 @@ ${noteData.plan || 'Not documented'}
                 </div>
                 {openExamAccordions.motor && (
                   <div onClick={(e) => e.stopPropagation()} style={{ padding: '16px', borderTop: '1px solid var(--border)' }}>
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '8px' }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '8px', marginBottom: '16px' }}>
                       {[
                         { key: 'normalBulk', label: 'Normal bulk' },
                         { key: 'normalTone', label: 'Normal tone' },
@@ -1273,28 +1440,57 @@ ${noteData.plan || 'Not documented'}
                         </label>
                       ))}
                     </div>
+                    {/* Free text notes */}
+                    <div style={{ position: 'relative' }}>
+                      <label style={{ display: 'block', fontSize: '12px', color: 'var(--text-muted)', marginBottom: '4px' }}>Additional notes</label>
+                      <textarea
+                        value={examSectionNotes.motor}
+                        onChange={(e) => updateExamSectionNote('motor', e.target.value)}
+                        placeholder="Add observations (e.g., specific weakness patterns, tone abnormalities)..."
+                        style={{
+                          width: '100%',
+                          minHeight: '60px',
+                          padding: '10px 12px',
+                          paddingRight: '90px',
+                          border: '1px solid var(--border)',
+                          borderRadius: '8px',
+                          fontSize: '13px',
+                          resize: 'vertical',
+                          fontFamily: 'inherit',
+                        }}
+                      />
+                      <div style={{ position: 'absolute', bottom: '8px', right: '8px', display: 'flex', gap: '4px' }}>
+                        <button onClick={() => openVoiceDrawer?.('document')} title="Dictate" style={{ width: '24px', height: '24px', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '4px', border: 'none', background: '#FEE2E2', color: '#EF4444', cursor: 'pointer' }}>
+                          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 1a3 3 0 00-3 3v8a3 3 0 006 0V4a3 3 0 00-3-3z"/><path d="M19 10v2a7 7 0 01-14 0v-2"/></svg>
+                        </button>
+                        <button onClick={() => openAiDrawer('ask-ai')} title="AI Assist" style={{ width: '24px', height: '24px', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '4px', border: 'none', background: '#CCFBF1', color: '#0D9488', cursor: 'pointer' }}>
+                          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+                        </button>
+                      </div>
+                    </div>
                   </div>
                 )}
               </div>
 
               {/* Sensation Accordion */}
               <div
-                onClick={() => toggleExamAccordion('sensation')}
                 style={{
                   border: '1px solid var(--border)',
                   borderRadius: '8px',
                   marginBottom: '8px',
                   overflow: 'hidden',
-                  cursor: 'pointer',
                 }}
               >
-                <div style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  padding: '12px 16px',
-                  background: openExamAccordions.sensation ? 'var(--bg-dark)' : 'transparent',
-                }}>
+                <div
+                  onClick={() => toggleExamAccordion('sensation')}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    padding: '12px 16px',
+                    background: openExamAccordions.sensation ? 'var(--bg-dark)' : 'transparent',
+                    cursor: 'pointer',
+                  }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                     <span style={{
                       width: '8px',
@@ -1311,7 +1507,7 @@ ${noteData.plan || 'Not documented'}
                 </div>
                 {openExamAccordions.sensation && (
                   <div onClick={(e) => e.stopPropagation()} style={{ padding: '16px', borderTop: '1px solid var(--border)' }}>
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '8px' }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '8px', marginBottom: '16px' }}>
                       {[
                         { key: 'lightTouch', label: 'Light touch intact' },
                         { key: 'pinprick', label: 'Pinprick intact' },
@@ -1329,28 +1525,57 @@ ${noteData.plan || 'Not documented'}
                         </label>
                       ))}
                     </div>
+                    {/* Free text notes */}
+                    <div style={{ position: 'relative' }}>
+                      <label style={{ display: 'block', fontSize: '12px', color: 'var(--text-muted)', marginBottom: '4px' }}>Additional notes</label>
+                      <textarea
+                        value={examSectionNotes.sensation}
+                        onChange={(e) => updateExamSectionNote('sensation', e.target.value)}
+                        placeholder="Add observations (e.g., sensory level, distribution of deficits)..."
+                        style={{
+                          width: '100%',
+                          minHeight: '60px',
+                          padding: '10px 12px',
+                          paddingRight: '90px',
+                          border: '1px solid var(--border)',
+                          borderRadius: '8px',
+                          fontSize: '13px',
+                          resize: 'vertical',
+                          fontFamily: 'inherit',
+                        }}
+                      />
+                      <div style={{ position: 'absolute', bottom: '8px', right: '8px', display: 'flex', gap: '4px' }}>
+                        <button onClick={() => openVoiceDrawer?.('document')} title="Dictate" style={{ width: '24px', height: '24px', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '4px', border: 'none', background: '#FEE2E2', color: '#EF4444', cursor: 'pointer' }}>
+                          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 1a3 3 0 00-3 3v8a3 3 0 006 0V4a3 3 0 00-3-3z"/><path d="M19 10v2a7 7 0 01-14 0v-2"/></svg>
+                        </button>
+                        <button onClick={() => openAiDrawer('ask-ai')} title="AI Assist" style={{ width: '24px', height: '24px', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '4px', border: 'none', background: '#CCFBF1', color: '#0D9488', cursor: 'pointer' }}>
+                          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+                        </button>
+                      </div>
+                    </div>
                   </div>
                 )}
               </div>
 
               {/* Coordination Accordion */}
               <div
-                onClick={() => toggleExamAccordion('coordination')}
                 style={{
                   border: '1px solid var(--border)',
                   borderRadius: '8px',
                   marginBottom: '8px',
                   overflow: 'hidden',
-                  cursor: 'pointer',
                 }}
               >
-                <div style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  padding: '12px 16px',
-                  background: openExamAccordions.coordination ? 'var(--bg-dark)' : 'transparent',
-                }}>
+                <div
+                  onClick={() => toggleExamAccordion('coordination')}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    padding: '12px 16px',
+                    background: openExamAccordions.coordination ? 'var(--bg-dark)' : 'transparent',
+                    cursor: 'pointer',
+                  }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                     <span style={{
                       width: '8px',
@@ -1367,7 +1592,7 @@ ${noteData.plan || 'Not documented'}
                 </div>
                 {openExamAccordions.coordination && (
                   <div onClick={(e) => e.stopPropagation()} style={{ padding: '16px', borderTop: '1px solid var(--border)' }}>
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '8px' }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '8px', marginBottom: '16px' }}>
                       {[
                         { key: 'fingerToNose', label: 'Finger-to-nose intact' },
                         { key: 'heelToShin', label: 'Heel-to-shin intact' },
@@ -1384,27 +1609,56 @@ ${noteData.plan || 'Not documented'}
                         </label>
                       ))}
                     </div>
+                    {/* Free text notes */}
+                    <div style={{ position: 'relative' }}>
+                      <label style={{ display: 'block', fontSize: '12px', color: 'var(--text-muted)', marginBottom: '4px' }}>Additional notes</label>
+                      <textarea
+                        value={examSectionNotes.coordination}
+                        onChange={(e) => updateExamSectionNote('coordination', e.target.value)}
+                        placeholder="Add observations (e.g., dysmetria, intention tremor)..."
+                        style={{
+                          width: '100%',
+                          minHeight: '60px',
+                          padding: '10px 12px',
+                          paddingRight: '90px',
+                          border: '1px solid var(--border)',
+                          borderRadius: '8px',
+                          fontSize: '13px',
+                          resize: 'vertical',
+                          fontFamily: 'inherit',
+                        }}
+                      />
+                      <div style={{ position: 'absolute', bottom: '8px', right: '8px', display: 'flex', gap: '4px' }}>
+                        <button onClick={() => openVoiceDrawer?.('document')} title="Dictate" style={{ width: '24px', height: '24px', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '4px', border: 'none', background: '#FEE2E2', color: '#EF4444', cursor: 'pointer' }}>
+                          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 1a3 3 0 00-3 3v8a3 3 0 006 0V4a3 3 0 00-3-3z"/><path d="M19 10v2a7 7 0 01-14 0v-2"/></svg>
+                        </button>
+                        <button onClick={() => openAiDrawer('ask-ai')} title="AI Assist" style={{ width: '24px', height: '24px', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '4px', border: 'none', background: '#CCFBF1', color: '#0D9488', cursor: 'pointer' }}>
+                          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+                        </button>
+                      </div>
+                    </div>
                   </div>
                 )}
               </div>
 
               {/* Gait Accordion */}
               <div
-                onClick={() => toggleExamAccordion('gait')}
                 style={{
                   border: '1px solid var(--border)',
                   borderRadius: '8px',
                   overflow: 'hidden',
-                  cursor: 'pointer',
                 }}
               >
-                <div style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  padding: '12px 16px',
-                  background: openExamAccordions.gait ? 'var(--bg-dark)' : 'transparent',
-                }}>
+                <div
+                  onClick={() => toggleExamAccordion('gait')}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    padding: '12px 16px',
+                    background: openExamAccordions.gait ? 'var(--bg-dark)' : 'transparent',
+                    cursor: 'pointer',
+                  }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                     <span style={{
                       width: '8px',
@@ -1414,6 +1668,7 @@ ${noteData.plan || 'Not documented'}
                       background: 'transparent',
                     }} />
                     <span style={{ fontSize: '14px', fontWeight: 500 }}>Gait</span>
+                    <span style={{ fontSize: '11px', color: 'var(--text-muted)', background: '#FEF3C7', padding: '2px 6px', borderRadius: '4px' }}>Limited in telemedicine</span>
                   </div>
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"
                     style={{ transform: openExamAccordions.gait ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.2s' }}>
@@ -1431,7 +1686,7 @@ ${noteData.plan || 'Not documented'}
                           onChange={() => setExamFinding('gaitEvaluated', true)}
                           style={{ accentColor: 'var(--primary)' }}
                         />
-                        <span style={{ fontSize: '13px' }}>Evaluated</span>
+                        <span style={{ fontSize: '13px' }}>Evaluated (MA assisted)</span>
                       </label>
                       <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
                         <input
@@ -1441,10 +1696,10 @@ ${noteData.plan || 'Not documented'}
                           onChange={() => setExamFinding('gaitEvaluated', false)}
                           style={{ accentColor: 'var(--primary)' }}
                         />
-                        <span style={{ fontSize: '13px' }}>Not evaluated</span>
+                        <span style={{ fontSize: '13px' }}>Not evaluated (telemedicine limitation)</span>
                       </label>
                     </div>
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '8px' }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '8px', marginBottom: '16px' }}>
                       {[
                         { key: 'stationNormal', label: 'Station normal' },
                         { key: 'casualGait', label: 'Casual gait normal' },
@@ -1461,6 +1716,34 @@ ${noteData.plan || 'Not documented'}
                           <span style={{ fontSize: '13px' }}>{item.label}</span>
                         </label>
                       ))}
+                    </div>
+                    {/* Free text notes */}
+                    <div style={{ position: 'relative' }}>
+                      <label style={{ display: 'block', fontSize: '12px', color: 'var(--text-muted)', marginBottom: '4px' }}>Additional notes</label>
+                      <textarea
+                        value={examSectionNotes.gait}
+                        onChange={(e) => updateExamSectionNote('gait', e.target.value)}
+                        placeholder="Add observations (e.g., gait abnormalities observed via video, patient-reported balance issues)..."
+                        style={{
+                          width: '100%',
+                          minHeight: '60px',
+                          padding: '10px 12px',
+                          paddingRight: '90px',
+                          border: '1px solid var(--border)',
+                          borderRadius: '8px',
+                          fontSize: '13px',
+                          resize: 'vertical',
+                          fontFamily: 'inherit',
+                        }}
+                      />
+                      <div style={{ position: 'absolute', bottom: '8px', right: '8px', display: 'flex', gap: '4px' }}>
+                        <button onClick={() => openVoiceDrawer?.('document')} title="Dictate" style={{ width: '24px', height: '24px', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '4px', border: 'none', background: '#FEE2E2', color: '#EF4444', cursor: 'pointer' }}>
+                          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 1a3 3 0 00-3 3v8a3 3 0 006 0V4a3 3 0 00-3-3z"/><path d="M19 10v2a7 7 0 01-14 0v-2"/></svg>
+                        </button>
+                        <button onClick={() => openAiDrawer('ask-ai')} title="AI Assist" style={{ width: '24px', height: '24px', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '4px', border: 'none', background: '#CCFBF1', color: '#0D9488', cursor: 'pointer' }}>
+                          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+                        </button>
+                      </div>
                     </div>
                   </div>
                 )}

@@ -674,6 +674,682 @@ export const ESS: ScaleDefinition = {
 }
 
 // ===========================================
+// NIHSS - NIH Stroke Scale (Complete 15-item version)
+// ===========================================
+export const NIHSS: ScaleDefinition = {
+  id: 'nihss',
+  name: 'NIH Stroke Scale',
+  abbreviation: 'NIHSS',
+  description: 'Standardized stroke severity scale used to quantify neurologic deficit. Can be performed with MA assistance.',
+  category: 'other',
+  timeToComplete: 10,
+  source: 'National Institute of Neurological Disorders and Stroke (NINDS). NIH Stroke Scale.',
+  scoringMethod: 'sum',
+  questions: [
+    {
+      id: '1a_loc',
+      text: '1a. Level of Consciousness',
+      type: 'select',
+      required: true,
+      helpText: 'The investigator must choose a response even if full evaluation is precluded by obstacles',
+      options: [
+        { value: 0, label: '0 = Alert; keenly responsive' },
+        { value: 1, label: '1 = Not alert; arousable by minor stimulation' },
+        { value: 2, label: '2 = Not alert; requires repeated stimulation to attend' },
+        { value: 3, label: '3 = Responds only with reflex motor or autonomic effects, or unresponsive' },
+      ],
+    },
+    {
+      id: '1b_loc_questions',
+      text: '1b. LOC Questions (Month and Age)',
+      type: 'select',
+      required: true,
+      helpText: 'Ask patient the month and their age. Score first answer only.',
+      options: [
+        { value: 0, label: '0 = Answers both questions correctly' },
+        { value: 1, label: '1 = Answers one question correctly' },
+        { value: 2, label: '2 = Answers neither question correctly' },
+      ],
+    },
+    {
+      id: '1c_loc_commands',
+      text: '1c. LOC Commands (Open/Close Eyes, Grip/Release)',
+      type: 'select',
+      required: true,
+      helpText: 'Ask patient to open and close eyes, then grip and release non-paretic hand.',
+      options: [
+        { value: 0, label: '0 = Performs both tasks correctly' },
+        { value: 1, label: '1 = Performs one task correctly' },
+        { value: 2, label: '2 = Performs neither task correctly' },
+      ],
+    },
+    {
+      id: '2_gaze',
+      text: '2. Best Gaze (Horizontal Eye Movement)',
+      type: 'select',
+      required: true,
+      helpText: 'Test horizontal eye movements only. Score gaze deviation that can be overcome.',
+      options: [
+        { value: 0, label: '0 = Normal' },
+        { value: 1, label: '1 = Partial gaze palsy (abnormal gaze in one or both eyes but no forced deviation)' },
+        { value: 2, label: '2 = Forced deviation or total gaze paresis not overcome by oculocephalic maneuver' },
+      ],
+    },
+    {
+      id: '3_visual',
+      text: '3. Visual Fields',
+      type: 'select',
+      required: true,
+      helpText: 'Test visual fields by confrontation. Score only if clear-cut asymmetry.',
+      options: [
+        { value: 0, label: '0 = No visual loss' },
+        { value: 1, label: '1 = Partial hemianopia' },
+        { value: 2, label: '2 = Complete hemianopia' },
+        { value: 3, label: '3 = Bilateral hemianopia (blind including cortical blindness)' },
+      ],
+    },
+    {
+      id: '4_facial',
+      text: '4. Facial Palsy',
+      type: 'select',
+      required: true,
+      helpText: 'Ask patient to show teeth, raise eyebrows, and squeeze eyes shut.',
+      options: [
+        { value: 0, label: '0 = Normal symmetrical movements' },
+        { value: 1, label: '1 = Minor paralysis (flattened nasolabial fold, asymmetry on smiling)' },
+        { value: 2, label: '2 = Partial paralysis (total or near-total paralysis of lower face)' },
+        { value: 3, label: '3 = Complete paralysis (absence of facial movement in upper and lower face)' },
+      ],
+    },
+    {
+      id: '5a_motor_left_arm',
+      text: '5a. Motor Arm - Left',
+      type: 'select',
+      required: true,
+      helpText: 'Arm is placed at 90° (sitting) or 45° (supine). Drift is scored if arm falls within 10 seconds.',
+      options: [
+        { value: 0, label: '0 = No drift; limb holds 90° (or 45°) for full 10 seconds' },
+        { value: 1, label: '1 = Drift; limb holds but drifts down before full 10 seconds' },
+        { value: 2, label: '2 = Some effort against gravity; limb cannot get to or maintain position' },
+        { value: 3, label: '3 = No effort against gravity; limb falls' },
+        { value: 4, label: '4 = No movement' },
+      ],
+    },
+    {
+      id: '5b_motor_right_arm',
+      text: '5b. Motor Arm - Right',
+      type: 'select',
+      required: true,
+      helpText: 'Arm is placed at 90° (sitting) or 45° (supine). Drift is scored if arm falls within 10 seconds.',
+      options: [
+        { value: 0, label: '0 = No drift; limb holds 90° (or 45°) for full 10 seconds' },
+        { value: 1, label: '1 = Drift; limb holds but drifts down before full 10 seconds' },
+        { value: 2, label: '2 = Some effort against gravity; limb cannot get to or maintain position' },
+        { value: 3, label: '3 = No effort against gravity; limb falls' },
+        { value: 4, label: '4 = No movement' },
+      ],
+    },
+    {
+      id: '6a_motor_left_leg',
+      text: '6a. Motor Leg - Left',
+      type: 'select',
+      required: true,
+      helpText: 'Leg is placed at 30° (supine). Drift is scored if leg falls within 5 seconds.',
+      options: [
+        { value: 0, label: '0 = No drift; leg holds 30° position for full 5 seconds' },
+        { value: 1, label: '1 = Drift; leg falls by end of 5-second period but does not hit bed' },
+        { value: 2, label: '2 = Some effort against gravity; leg falls to bed by 5 seconds' },
+        { value: 3, label: '3 = No effort against gravity; leg falls to bed immediately' },
+        { value: 4, label: '4 = No movement' },
+      ],
+    },
+    {
+      id: '6b_motor_right_leg',
+      text: '6b. Motor Leg - Right',
+      type: 'select',
+      required: true,
+      helpText: 'Leg is placed at 30° (supine). Drift is scored if leg falls within 5 seconds.',
+      options: [
+        { value: 0, label: '0 = No drift; leg holds 30° position for full 5 seconds' },
+        { value: 1, label: '1 = Drift; leg falls by end of 5-second period but does not hit bed' },
+        { value: 2, label: '2 = Some effort against gravity; leg falls to bed by 5 seconds' },
+        { value: 3, label: '3 = No effort against gravity; leg falls to bed immediately' },
+        { value: 4, label: '4 = No movement' },
+      ],
+    },
+    {
+      id: '7_ataxia',
+      text: '7. Limb Ataxia',
+      type: 'select',
+      required: true,
+      helpText: 'Finger-nose-finger and heel-shin tests on both sides. Score only if clearly out of proportion to weakness.',
+      options: [
+        { value: 0, label: '0 = Absent' },
+        { value: 1, label: '1 = Present in one limb' },
+        { value: 2, label: '2 = Present in two limbs' },
+      ],
+    },
+    {
+      id: '8_sensory',
+      text: '8. Sensory',
+      type: 'select',
+      required: true,
+      helpText: 'Test with pinprick or withdrawal from noxious stimulus in obtunded patients.',
+      options: [
+        { value: 0, label: '0 = Normal; no sensory loss' },
+        { value: 1, label: '1 = Mild-to-moderate sensory loss (less sharp or dull on affected side)' },
+        { value: 2, label: '2 = Severe or total sensory loss (not aware of being touched in face, arm, and leg)' },
+      ],
+    },
+    {
+      id: '9_language',
+      text: '9. Best Language',
+      type: 'select',
+      required: true,
+      helpText: 'Ask patient to describe picture, name items, read sentences. Intubated patients can write.',
+      options: [
+        { value: 0, label: '0 = No aphasia; normal' },
+        { value: 1, label: '1 = Mild-to-moderate aphasia (loss of fluency, word-finding errors, naming errors)' },
+        { value: 2, label: '2 = Severe aphasia (fragmentary expression, great need for inference)' },
+        { value: 3, label: '3 = Mute, global aphasia; no usable speech or comprehension' },
+      ],
+    },
+    {
+      id: '10_dysarthria',
+      text: '10. Dysarthria',
+      type: 'select',
+      required: true,
+      helpText: 'Ask patient to read or repeat words. Rate clarity of articulation.',
+      options: [
+        { value: 0, label: '0 = Normal' },
+        { value: 1, label: '1 = Mild-to-moderate dysarthria (slurs some words, can still be understood)' },
+        { value: 2, label: '2 = Severe dysarthria (speech unintelligible or anarthric)' },
+      ],
+    },
+    {
+      id: '11_extinction',
+      text: '11. Extinction and Inattention (Neglect)',
+      type: 'select',
+      required: true,
+      helpText: 'Test for visual-spatial neglect and sensory extinction with double simultaneous stimulation.',
+      options: [
+        { value: 0, label: '0 = No abnormality' },
+        { value: 1, label: '1 = Visual, tactile, auditory, or personal inattention or extinction to bilateral stimulation in one modality' },
+        { value: 2, label: '2 = Profound hemi-inattention or extinction to more than one modality' },
+      ],
+    },
+  ],
+  scoringRanges: [
+    { min: 0, max: 0, interpretation: 'No stroke symptoms', severity: 'minimal', color: '#10B981' },
+    { min: 1, max: 4, interpretation: 'Minor stroke', severity: 'mild', color: '#84CC16', recommendations: ['Consider tPA if within window', 'Close monitoring'] },
+    { min: 5, max: 15, interpretation: 'Moderate stroke', severity: 'moderate', color: '#F59E0B', recommendations: ['Strong tPA candidate if eligible', 'Consider thrombectomy evaluation', 'Stroke unit admission'] },
+    { min: 16, max: 20, interpretation: 'Moderate to severe stroke', severity: 'moderately_severe', color: '#F97316', recommendations: ['ICU level care', 'Thrombectomy evaluation if LVO', 'Close neurological monitoring'] },
+    { min: 21, max: 42, interpretation: 'Severe stroke', severity: 'severe', color: '#EF4444', recommendations: ['ICU admission', 'Goals of care discussion', 'Thrombectomy if LVO and appropriate'] },
+  ],
+  alerts: [
+    {
+      id: 'nihss-severe',
+      condition: 'score >= 16',
+      type: 'critical',
+      message: 'Severe stroke - consider ICU level care and thrombectomy evaluation if LVO.',
+      action: 'Urgent stroke team notification',
+    },
+    {
+      id: 'nihss-moderate',
+      condition: 'score >= 5',
+      type: 'warning',
+      message: 'Moderate stroke - evaluate for acute interventions if within treatment window.',
+    },
+  ],
+}
+
+// ===========================================
+// Modified Ashworth Scale (Spasticity)
+// ===========================================
+export const MODIFIED_ASHWORTH: ScaleDefinition = {
+  id: 'modified_ashworth',
+  name: 'Modified Ashworth Scale',
+  abbreviation: 'MAS',
+  description: 'Measures muscle spasticity/tone. Exam-driven scale for telemedicine with MA assistance.',
+  category: 'movement',
+  timeToComplete: 5,
+  source: 'Bohannon RW, Smith MB. Interrater reliability of a modified Ashworth scale of muscle spasticity. Phys Ther. 1987.',
+  scoringMethod: 'custom',
+  questions: [
+    {
+      id: 'muscle_group',
+      text: 'Muscle Group Being Tested',
+      type: 'select',
+      required: true,
+      options: [
+        { value: 0, label: 'Upper Extremity - Elbow Flexors' },
+        { value: 1, label: 'Upper Extremity - Elbow Extensors' },
+        { value: 2, label: 'Upper Extremity - Wrist Flexors' },
+        { value: 3, label: 'Lower Extremity - Hip Adductors' },
+        { value: 4, label: 'Lower Extremity - Knee Flexors' },
+        { value: 5, label: 'Lower Extremity - Ankle Plantar Flexors' },
+      ],
+    },
+    {
+      id: 'left_side',
+      text: 'Left Side Score',
+      type: 'select',
+      required: true,
+      helpText: 'Score the resistance felt during passive movement',
+      options: [
+        { value: 0, label: '0 = No increase in muscle tone' },
+        { value: 1, label: '1 = Slight increase; catch and release at end of ROM' },
+        { value: 2, label: '1+ = Slight increase; catch followed by minimal resistance through <50% ROM' },
+        { value: 3, label: '2 = Marked increase through most of ROM, but affected part easily moved' },
+        { value: 4, label: '3 = Considerable increase; passive movement difficult' },
+        { value: 5, label: '4 = Affected part rigid in flexion or extension' },
+      ],
+    },
+    {
+      id: 'right_side',
+      text: 'Right Side Score',
+      type: 'select',
+      required: true,
+      helpText: 'Score the resistance felt during passive movement',
+      options: [
+        { value: 0, label: '0 = No increase in muscle tone' },
+        { value: 1, label: '1 = Slight increase; catch and release at end of ROM' },
+        { value: 2, label: '1+ = Slight increase; catch followed by minimal resistance through <50% ROM' },
+        { value: 3, label: '2 = Marked increase through most of ROM, but affected part easily moved' },
+        { value: 4, label: '3 = Considerable increase; passive movement difficult' },
+        { value: 5, label: '4 = Affected part rigid in flexion or extension' },
+      ],
+    },
+  ],
+  scoringRanges: [
+    { min: 0, max: 0, interpretation: 'No spasticity', severity: 'minimal', color: '#10B981' },
+    { min: 1, max: 2, interpretation: 'Mild spasticity', severity: 'mild', color: '#84CC16' },
+    { min: 3, max: 3, interpretation: 'Moderate spasticity', severity: 'moderate', color: '#F59E0B', recommendations: ['Consider baclofen or tizanidine', 'Physical therapy referral'] },
+    { min: 4, max: 5, interpretation: 'Severe spasticity', severity: 'severe', color: '#EF4444', recommendations: ['Consider botulinum toxin injection', 'Physiatry referral', 'Intrathecal baclofen evaluation'] },
+  ],
+}
+
+// ===========================================
+// ABCD2 Score (TIA Risk)
+// ===========================================
+export const ABCD2: ScaleDefinition = {
+  id: 'abcd2',
+  name: 'ABCD2 Score',
+  abbreviation: 'ABCD2',
+  description: 'Risk stratification for stroke after TIA. History-based scale.',
+  category: 'other',
+  timeToComplete: 2,
+  source: 'Johnston SC, et al. Validation and refinement of scores to predict very early stroke risk after TIA. Lancet. 2007.',
+  scoringMethod: 'sum',
+  questions: [
+    {
+      id: 'age',
+      text: 'A - Age ≥60 years?',
+      type: 'select',
+      required: true,
+      options: [
+        { value: 0, label: 'No (0 points)' },
+        { value: 1, label: 'Yes (1 point)' },
+      ],
+    },
+    {
+      id: 'blood_pressure',
+      text: 'B - Blood Pressure ≥140/90 at initial evaluation?',
+      type: 'select',
+      required: true,
+      options: [
+        { value: 0, label: 'No (0 points)' },
+        { value: 1, label: 'Yes (1 point)' },
+      ],
+    },
+    {
+      id: 'clinical_features',
+      text: 'C - Clinical Features',
+      type: 'select',
+      required: true,
+      options: [
+        { value: 0, label: 'Other symptoms (0 points)' },
+        { value: 1, label: 'Speech disturbance without weakness (1 point)' },
+        { value: 2, label: 'Unilateral weakness (2 points)' },
+      ],
+    },
+    {
+      id: 'duration',
+      text: 'D - Duration of Symptoms',
+      type: 'select',
+      required: true,
+      options: [
+        { value: 0, label: '<10 minutes (0 points)' },
+        { value: 1, label: '10-59 minutes (1 point)' },
+        { value: 2, label: '≥60 minutes (2 points)' },
+      ],
+    },
+    {
+      id: 'diabetes',
+      text: 'D - Diabetes?',
+      type: 'select',
+      required: true,
+      options: [
+        { value: 0, label: 'No (0 points)' },
+        { value: 1, label: 'Yes (1 point)' },
+      ],
+    },
+  ],
+  scoringRanges: [
+    { min: 0, max: 3, interpretation: 'Low risk (1% 2-day stroke risk)', severity: 'mild', color: '#84CC16', recommendations: ['Outpatient workup may be appropriate', 'Rapid TIA clinic follow-up'] },
+    { min: 4, max: 5, interpretation: 'Moderate risk (4.1% 2-day stroke risk)', severity: 'moderate', color: '#F59E0B', recommendations: ['Hospital admission recommended', 'Expedited workup'] },
+    { min: 6, max: 7, interpretation: 'High risk (8.1% 2-day stroke risk)', severity: 'severe', color: '#EF4444', recommendations: ['Hospital admission strongly recommended', 'Urgent neurology consultation', 'Consider stroke unit'] },
+  ],
+  alerts: [
+    {
+      id: 'abcd2-high',
+      condition: 'score >= 6',
+      type: 'critical',
+      message: 'High risk for stroke within 48 hours. Hospital admission strongly recommended.',
+      action: 'Admit for expedited workup',
+    },
+  ],
+}
+
+// ===========================================
+// DHI - Dizziness Handicap Inventory (Short Form)
+// ===========================================
+export const DHI: ScaleDefinition = {
+  id: 'dhi',
+  name: 'Dizziness Handicap Inventory',
+  abbreviation: 'DHI',
+  description: 'Assesses self-perceived handicap due to dizziness. History-based scale.',
+  category: 'other',
+  timeToComplete: 5,
+  source: 'Jacobson GP, Newman CW. The development of the Dizziness Handicap Inventory. Arch Otolaryngol Head Neck Surg. 1990.',
+  scoringMethod: 'sum',
+  questions: [
+    {
+      id: 'p1',
+      text: 'Does looking up increase your problem?',
+      type: 'select',
+      required: true,
+      options: [
+        { value: 0, label: 'No' },
+        { value: 2, label: 'Sometimes' },
+        { value: 4, label: 'Yes' },
+      ],
+    },
+    {
+      id: 'e1',
+      text: 'Because of your problem, do you feel frustrated?',
+      type: 'select',
+      required: true,
+      options: [
+        { value: 0, label: 'No' },
+        { value: 2, label: 'Sometimes' },
+        { value: 4, label: 'Yes' },
+      ],
+    },
+    {
+      id: 'f1',
+      text: 'Because of your problem, do you restrict your travel for business or recreation?',
+      type: 'select',
+      required: true,
+      options: [
+        { value: 0, label: 'No' },
+        { value: 2, label: 'Sometimes' },
+        { value: 4, label: 'Yes' },
+      ],
+    },
+    {
+      id: 'p2',
+      text: 'Does walking down a supermarket aisle increase your problem?',
+      type: 'select',
+      required: true,
+      options: [
+        { value: 0, label: 'No' },
+        { value: 2, label: 'Sometimes' },
+        { value: 4, label: 'Yes' },
+      ],
+    },
+    {
+      id: 'f2',
+      text: 'Because of your problem, do you have difficulty getting into or out of bed?',
+      type: 'select',
+      required: true,
+      options: [
+        { value: 0, label: 'No' },
+        { value: 2, label: 'Sometimes' },
+        { value: 4, label: 'Yes' },
+      ],
+    },
+    {
+      id: 'f3',
+      text: 'Does your problem significantly restrict your participation in social activities?',
+      type: 'select',
+      required: true,
+      options: [
+        { value: 0, label: 'No' },
+        { value: 2, label: 'Sometimes' },
+        { value: 4, label: 'Yes' },
+      ],
+    },
+    {
+      id: 'f4',
+      text: 'Because of your problem, do you have difficulty reading?',
+      type: 'select',
+      required: true,
+      options: [
+        { value: 0, label: 'No' },
+        { value: 2, label: 'Sometimes' },
+        { value: 4, label: 'Yes' },
+      ],
+    },
+    {
+      id: 'p3',
+      text: 'Does performing more ambitious activities (sports, dancing, household chores) increase your problem?',
+      type: 'select',
+      required: true,
+      options: [
+        { value: 0, label: 'No' },
+        { value: 2, label: 'Sometimes' },
+        { value: 4, label: 'Yes' },
+      ],
+    },
+    {
+      id: 'e2',
+      text: 'Because of your problem, are you afraid to leave your home without having someone accompany you?',
+      type: 'select',
+      required: true,
+      options: [
+        { value: 0, label: 'No' },
+        { value: 2, label: 'Sometimes' },
+        { value: 4, label: 'Yes' },
+      ],
+    },
+    {
+      id: 'e3',
+      text: 'Because of your problem, have you been embarrassed in front of others?',
+      type: 'select',
+      required: true,
+      options: [
+        { value: 0, label: 'No' },
+        { value: 2, label: 'Sometimes' },
+        { value: 4, label: 'Yes' },
+      ],
+    },
+  ],
+  scoringRanges: [
+    { min: 0, max: 14, interpretation: 'No handicap', severity: 'minimal', color: '#10B981' },
+    { min: 15, max: 24, interpretation: 'Mild handicap', severity: 'mild', color: '#84CC16' },
+    { min: 25, max: 34, interpretation: 'Moderate handicap', severity: 'moderate', color: '#F59E0B', recommendations: ['Vestibular rehabilitation referral', 'Consider medication optimization'] },
+    { min: 35, max: 40, interpretation: 'Severe handicap', severity: 'severe', color: '#EF4444', recommendations: ['Urgent vestibular evaluation', 'Consider fall precautions', 'Vestibular PT mandatory'] },
+  ],
+}
+
+// ===========================================
+// Mini-Cog (Brief Cognitive Screen)
+// ===========================================
+export const MINI_COG: ScaleDefinition = {
+  id: 'mini_cog',
+  name: 'Mini-Cog',
+  abbreviation: 'Mini-Cog',
+  description: 'Brief 3-minute cognitive screening test. Can be performed via telemedicine.',
+  category: 'cognitive',
+  timeToComplete: 3,
+  source: 'Borson S, et al. The Mini-Cog as a screen for dementia: validation in a population-based sample. J Am Geriatr Soc. 2003.',
+  scoringMethod: 'custom',
+  questions: [
+    {
+      id: 'word_recall',
+      text: 'Word Recall (3 words)',
+      type: 'select',
+      required: true,
+      helpText: 'Register 3 unrelated words, then recall after clock draw. Score words recalled.',
+      options: [
+        { value: 0, label: '0 words recalled' },
+        { value: 1, label: '1 word recalled' },
+        { value: 2, label: '2 words recalled' },
+        { value: 3, label: '3 words recalled' },
+      ],
+    },
+    {
+      id: 'clock_draw',
+      text: 'Clock Drawing Test',
+      type: 'select',
+      required: true,
+      helpText: 'Draw clock face showing 10 minutes past 11. Score 0 for abnormal, 2 for normal.',
+      options: [
+        { value: 0, label: 'Abnormal (0 points)' },
+        { value: 2, label: 'Normal (2 points)' },
+      ],
+    },
+  ],
+  scoringRanges: [
+    { min: 0, max: 2, interpretation: 'Positive screen - possible cognitive impairment', severity: 'moderate', color: '#F59E0B', recommendations: ['Further cognitive evaluation recommended', 'Consider full MoCA', 'Assess for reversible causes'] },
+    { min: 3, max: 5, interpretation: 'Negative screen - normal cognition', severity: 'minimal', color: '#10B981' },
+  ],
+  alerts: [
+    {
+      id: 'minicog-positive',
+      condition: 'score <= 2',
+      type: 'warning',
+      message: 'Positive screen for cognitive impairment. Further evaluation recommended.',
+      action: 'Consider comprehensive cognitive assessment (MoCA, neuropsychological testing)',
+    },
+  ],
+}
+
+// ===========================================
+// ISI - Insomnia Severity Index
+// ===========================================
+export const ISI: ScaleDefinition = {
+  id: 'isi',
+  name: 'Insomnia Severity Index',
+  abbreviation: 'ISI',
+  description: 'Self-report measure of insomnia severity. History-based scale.',
+  category: 'sleep',
+  timeToComplete: 3,
+  source: 'Morin CM. Insomnia: Psychological assessment and management. New York: Guilford Press. 1993.',
+  scoringMethod: 'sum',
+  questions: [
+    {
+      id: 'difficulty_falling',
+      text: 'Difficulty falling asleep',
+      type: 'select',
+      required: true,
+      options: [
+        { value: 0, label: 'None (0)' },
+        { value: 1, label: 'Mild (1)' },
+        { value: 2, label: 'Moderate (2)' },
+        { value: 3, label: 'Severe (3)' },
+        { value: 4, label: 'Very Severe (4)' },
+      ],
+    },
+    {
+      id: 'difficulty_staying',
+      text: 'Difficulty staying asleep',
+      type: 'select',
+      required: true,
+      options: [
+        { value: 0, label: 'None (0)' },
+        { value: 1, label: 'Mild (1)' },
+        { value: 2, label: 'Moderate (2)' },
+        { value: 3, label: 'Severe (3)' },
+        { value: 4, label: 'Very Severe (4)' },
+      ],
+    },
+    {
+      id: 'early_waking',
+      text: 'Problems waking up too early',
+      type: 'select',
+      required: true,
+      options: [
+        { value: 0, label: 'None (0)' },
+        { value: 1, label: 'Mild (1)' },
+        { value: 2, label: 'Moderate (2)' },
+        { value: 3, label: 'Severe (3)' },
+        { value: 4, label: 'Very Severe (4)' },
+      ],
+    },
+    {
+      id: 'satisfaction',
+      text: 'How satisfied/dissatisfied are you with your current sleep pattern?',
+      type: 'select',
+      required: true,
+      options: [
+        { value: 0, label: 'Very Satisfied (0)' },
+        { value: 1, label: 'Satisfied (1)' },
+        { value: 2, label: 'Moderately Satisfied (2)' },
+        { value: 3, label: 'Dissatisfied (3)' },
+        { value: 4, label: 'Very Dissatisfied (4)' },
+      ],
+    },
+    {
+      id: 'noticeable',
+      text: 'How noticeable to others is your sleep problem in terms of impairing your daily functioning?',
+      type: 'select',
+      required: true,
+      options: [
+        { value: 0, label: 'Not at all Noticeable (0)' },
+        { value: 1, label: 'A Little (1)' },
+        { value: 2, label: 'Somewhat (2)' },
+        { value: 3, label: 'Much (3)' },
+        { value: 4, label: 'Very Much Noticeable (4)' },
+      ],
+    },
+    {
+      id: 'worried',
+      text: 'How worried/distressed are you about your current sleep problem?',
+      type: 'select',
+      required: true,
+      options: [
+        { value: 0, label: 'Not at all Worried (0)' },
+        { value: 1, label: 'A Little (1)' },
+        { value: 2, label: 'Somewhat (2)' },
+        { value: 3, label: 'Much (3)' },
+        { value: 4, label: 'Very Much Worried (4)' },
+      ],
+    },
+    {
+      id: 'interfering',
+      text: 'To what extent is your sleep problem interfering with daily functioning?',
+      type: 'select',
+      required: true,
+      options: [
+        { value: 0, label: 'Not at all Interfering (0)' },
+        { value: 1, label: 'A Little (1)' },
+        { value: 2, label: 'Somewhat (2)' },
+        { value: 3, label: 'Much (3)' },
+        { value: 4, label: 'Very Much Interfering (4)' },
+      ],
+    },
+  ],
+  scoringRanges: [
+    { min: 0, max: 7, interpretation: 'No clinically significant insomnia', severity: 'minimal', color: '#10B981' },
+    { min: 8, max: 14, interpretation: 'Subthreshold insomnia', severity: 'mild', color: '#84CC16', recommendations: ['Sleep hygiene education', 'Consider follow-up assessment'] },
+    { min: 15, max: 21, interpretation: 'Clinical insomnia (moderate)', severity: 'moderate', color: '#F59E0B', recommendations: ['CBT-I referral recommended', 'Consider short-term sleep aid'] },
+    { min: 22, max: 28, interpretation: 'Clinical insomnia (severe)', severity: 'severe', color: '#EF4444', recommendations: ['Urgent sleep medicine referral', 'CBT-I first-line treatment', 'Assess for comorbid conditions'] },
+  ],
+}
+
+// ===========================================
 // All Scale Definitions
 // ===========================================
 export const ALL_SCALES: Record<string, ScaleDefinition> = {
@@ -683,6 +1359,51 @@ export const ALL_SCALES: Record<string, ScaleDefinition> = {
   hit6: HIT6,
   moca: MOCA,
   ess: ESS,
+  nihss: NIHSS,
+  modified_ashworth: MODIFIED_ASHWORTH,
+  abcd2: ABCD2,
+  dhi: DHI,
+  mini_cog: MINI_COG,
+  isi: ISI,
+}
+
+// Helper to categorize scales by type (exam-driven vs history-based)
+export type ScaleLocationType = 'exam' | 'history'
+
+export const SCALE_LOCATION_MAP: Record<string, ScaleLocationType> = {
+  // Exam-driven scales (require physical assessment, MA can assist)
+  nihss: 'exam',
+  modified_ashworth: 'exam',
+  moca: 'exam', // Requires patient interaction but can be done via telemedicine
+  mini_cog: 'exam',
+
+  // History-based scales (self-report, can be completed by patient)
+  phq9: 'history',
+  gad7: 'history',
+  midas: 'history',
+  hit6: 'history',
+  ess: 'history',
+  abcd2: 'history',
+  dhi: 'history',
+  isi: 'history',
+}
+
+export function getScaleLocation(scaleId: string): ScaleLocationType {
+  return SCALE_LOCATION_MAP[scaleId] || 'history'
+}
+
+export function getExamScales(): ScaleDefinition[] {
+  return Object.entries(SCALE_LOCATION_MAP)
+    .filter(([, location]) => location === 'exam')
+    .map(([id]) => ALL_SCALES[id])
+    .filter(Boolean)
+}
+
+export function getHistoryScales(): ScaleDefinition[] {
+  return Object.entries(SCALE_LOCATION_MAP)
+    .filter(([, location]) => location === 'history')
+    .map(([id]) => ALL_SCALES[id])
+    .filter(Boolean)
 }
 
 // ===========================================
@@ -798,11 +1519,35 @@ export const CONDITION_SCALE_MAPPINGS: ConditionScaleMapping[] = [
   { condition: 'Concussion/Post-concussion syndrome', scaleId: 'moca', priority: 2, isRequired: false },
   { condition: 'Concussion/Post-concussion syndrome', scaleId: 'hit6', priority: 3, isRequired: false },
 
-  { condition: 'Stroke follow-up', scaleId: 'moca', priority: 1, isRequired: false },
-  { condition: 'Stroke follow-up', scaleId: 'phq9', priority: 2, isRequired: false },
+  { condition: 'Stroke follow-up', scaleId: 'nihss', priority: 1, isRequired: false },
+  { condition: 'Stroke follow-up', scaleId: 'moca', priority: 2, isRequired: false },
+  { condition: 'Stroke follow-up', scaleId: 'phq9', priority: 3, isRequired: false },
+  { condition: 'Stroke follow-up', scaleId: 'modified_ashworth', priority: 4, isRequired: false },
 
-  { condition: 'TIA evaluation', scaleId: 'moca', priority: 1, isRequired: false },
-  { condition: 'TIA evaluation', scaleId: 'phq9', priority: 2, isRequired: false },
+  { condition: 'TIA evaluation', scaleId: 'abcd2', priority: 1, isRequired: true },
+  { condition: 'TIA evaluation', scaleId: 'nihss', priority: 2, isRequired: false },
+  { condition: 'TIA evaluation', scaleId: 'moca', priority: 3, isRequired: false },
+  { condition: 'TIA evaluation', scaleId: 'phq9', priority: 4, isRequired: false },
+
+  // Acute Stroke
+  { condition: 'Acute stroke', scaleId: 'nihss', priority: 1, isRequired: true },
+  { condition: 'Acute stroke', scaleId: 'moca', priority: 2, isRequired: false },
+
+  { condition: 'Stroke - ischemic', scaleId: 'nihss', priority: 1, isRequired: true },
+  { condition: 'Stroke - ischemic', scaleId: 'moca', priority: 2, isRequired: false },
+  { condition: 'Stroke - ischemic', scaleId: 'modified_ashworth', priority: 3, isRequired: false },
+
+  { condition: 'Stroke - hemorrhagic', scaleId: 'nihss', priority: 1, isRequired: true },
+  { condition: 'Stroke - hemorrhagic', scaleId: 'moca', priority: 2, isRequired: false },
+
+  // Dizziness/Vertigo - Add DHI
+  { condition: 'Dizziness/Vertigo', scaleId: 'dhi', priority: 1, isRequired: false },
+
+  // Spasticity conditions
+  { condition: 'Spasticity', scaleId: 'modified_ashworth', priority: 1, isRequired: true },
+
+  // Update Insomnia to include ISI
+  { condition: 'Insomnia', scaleId: 'isi', priority: 1, isRequired: false },
 ]
 
 // ===========================================
