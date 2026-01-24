@@ -1,6 +1,7 @@
 'use client'
 
-import { useState, useEffect, useMemo, useCallback } from 'react'
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
+import { useVoiceRecorder } from '@/hooks/useVoiceRecorder'
 import {
   generateFormattedNote,
   updateFormattedNoteSection,
@@ -79,6 +80,32 @@ export default function EnhancedNotePreviewModal({
   // Editing state
   const [editingSection, setEditingSection] = useState<string | null>(null)
   const [editValue, setEditValue] = useState('')
+  const editTextareaRef = useRef<HTMLTextAreaElement>(null)
+
+  // Voice recorder for dictation in edit mode
+  const {
+    isRecording: isDictating,
+    isTranscribing: isDictationTranscribing,
+    transcribedText: dictationText,
+    error: dictationError,
+    startRecording: startDictation,
+    stopRecording: stopDictation,
+    clearTranscription: clearDictation,
+  } = useVoiceRecorder()
+
+  // Append transcribed text to edit value when dictation completes
+  useEffect(() => {
+    if (dictationText && editingSection) {
+      setEditValue(prev => {
+        // If there's existing text, add a space before appending
+        if (prev.trim()) {
+          return prev + ' ' + dictationText
+        }
+        return dictationText
+      })
+      clearDictation()
+    }
+  }, [dictationText, editingSection, clearDictation])
 
   // Copy state
   const [copySuccess, setCopySuccess] = useState(false)
@@ -307,6 +334,11 @@ export default function EnhancedNotePreviewModal({
 
   const handleSaveEdit = () => {
     if (editingSection && formattedNote) {
+      // Stop any ongoing dictation
+      if (isDictating) {
+        stopDictation()
+      }
+      clearDictation()
       setFormattedNote(updateFormattedNoteSection(formattedNote, editingSection, editValue))
       setEditingSection(null)
       setEditValue('')
@@ -314,6 +346,11 @@ export default function EnhancedNotePreviewModal({
   }
 
   const handleCancelEdit = () => {
+    // Stop any ongoing dictation
+    if (isDictating) {
+      stopDictation()
+    }
+    clearDictation()
     setEditingSection(null)
     setEditValue('')
   }
@@ -431,26 +468,146 @@ export default function EnhancedNotePreviewModal({
         {/* Content */}
         {isEditing ? (
           <div>
-            <textarea
-              value={editValue}
-              onChange={(e) => setEditValue(e.target.value)}
-              style={{
-                width: '100%',
-                minHeight: '120px',
-                padding: '12px',
+            {/* Textarea with dictation button */}
+            <div style={{ position: 'relative' }}>
+              <textarea
+                ref={editTextareaRef}
+                value={editValue}
+                onChange={(e) => setEditValue(e.target.value)}
+                disabled={isDictating || isDictationTranscribing}
+                style={{
+                  width: '100%',
+                  minHeight: '120px',
+                  padding: '12px',
+                  paddingRight: '48px',
+                  borderRadius: '6px',
+                  border: `1px solid ${isDictating ? '#EF4444' : '#0D9488'}`,
+                  fontSize: '13px',
+                  lineHeight: 1.5,
+                  resize: 'vertical',
+                  fontFamily: 'inherit',
+                  background: 'var(--bg-white)',
+                  color: 'var(--text-primary)',
+                  opacity: isDictating || isDictationTranscribing ? 0.7 : 1,
+                }}
+              />
+              {/* Dictation button */}
+              <button
+                onClick={() => {
+                  if (isDictating) {
+                    stopDictation()
+                  } else {
+                    startDictation()
+                  }
+                }}
+                disabled={isDictationTranscribing}
+                title={isDictating ? 'Stop dictation' : isDictationTranscribing ? 'Transcribing...' : 'Start dictation'}
+                style={{
+                  position: 'absolute',
+                  right: '8px',
+                  top: '8px',
+                  width: '32px',
+                  height: '32px',
+                  borderRadius: '6px',
+                  border: 'none',
+                  background: isDictating ? '#EF4444' : isDictationTranscribing ? '#F3F4F6' : '#FEE2E2',
+                  cursor: isDictationTranscribing ? 'wait' : 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  transition: 'all 0.2s ease',
+                }}
+              >
+                {isDictationTranscribing ? (
+                  <svg
+                    width="16"
+                    height="16"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="#6B7280"
+                    strokeWidth="2"
+                    style={{ animation: 'spin 1s linear infinite' }}
+                  >
+                    <path d="M21 12a9 9 0 11-6.219-8.56" />
+                  </svg>
+                ) : isDictating ? (
+                  // Stop icon (square)
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="#FFFFFF">
+                    <rect x="4" y="4" width="16" height="16" rx="2" />
+                  </svg>
+                ) : (
+                  // Mic icon
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#EF4444" strokeWidth="2">
+                    <path d="M12 1a3 3 0 00-3 3v8a3 3 0 006 0V4a3 3 0 00-3-3z" />
+                    <path d="M19 10v2a7 7 0 01-14 0v-2" />
+                    <line x1="12" y1="19" x2="12" y2="23" />
+                    <line x1="8" y1="23" x2="16" y2="23" />
+                  </svg>
+                )}
+              </button>
+            </div>
+
+            {/* Recording/transcribing status */}
+            {(isDictating || isDictationTranscribing) && (
+              <div style={{
+                marginTop: '8px',
+                padding: '8px 12px',
                 borderRadius: '6px',
-                border: '1px solid #0D9488',
-                fontSize: '13px',
-                lineHeight: 1.5,
-                resize: 'vertical',
-                fontFamily: 'inherit',
-                background: 'var(--bg-white)',
-                color: 'var(--text-primary)',
-              }}
-            />
+                background: isDictating ? '#FEE2E2' : '#F3F4F6',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                fontSize: '12px',
+                color: isDictating ? '#DC2626' : '#6B7280',
+              }}>
+                {isDictating ? (
+                  <>
+                    <span style={{
+                      width: '8px',
+                      height: '8px',
+                      borderRadius: '50%',
+                      background: '#EF4444',
+                      animation: 'pulse 1s ease-in-out infinite',
+                    }} />
+                    Recording... Click the mic button to stop.
+                  </>
+                ) : (
+                  <>
+                    <svg
+                      width="14"
+                      height="14"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      style={{ animation: 'spin 1s linear infinite' }}
+                    >
+                      <path d="M21 12a9 9 0 11-6.219-8.56" />
+                    </svg>
+                    Transcribing audio...
+                  </>
+                )}
+              </div>
+            )}
+
+            {/* Dictation error */}
+            {dictationError && (
+              <div style={{
+                marginTop: '8px',
+                padding: '8px 12px',
+                borderRadius: '6px',
+                background: '#FEE2E2',
+                color: '#DC2626',
+                fontSize: '12px',
+              }}>
+                {dictationError}
+              </div>
+            )}
+
             <div style={{ display: 'flex', gap: '8px', marginTop: '8px' }}>
               <button
                 onClick={handleSaveEdit}
+                disabled={isDictating || isDictationTranscribing}
                 style={{
                   padding: '6px 16px',
                   borderRadius: '6px',
@@ -459,7 +616,8 @@ export default function EnhancedNotePreviewModal({
                   color: 'white',
                   fontSize: '13px',
                   fontWeight: 500,
-                  cursor: 'pointer',
+                  cursor: isDictating || isDictationTranscribing ? 'not-allowed' : 'pointer',
+                  opacity: isDictating || isDictationTranscribing ? 0.6 : 1,
                 }}
               >
                 Save Changes
