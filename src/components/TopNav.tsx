@@ -59,8 +59,14 @@ export default function TopNav({ user, darkMode, toggleDarkMode, onSignOut, open
     }}>
       {/* Left Section */}
       <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
-        {/* Logo */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+        {/* Logo - Links to original prototype wireframe */}
+        <a
+          href="/prototype.html"
+          target="_blank"
+          rel="noopener noreferrer"
+          title="View original prototype wireframe"
+          style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}
+        >
           <svg width="36" height="36" viewBox="0 0 40 40" fill="none">
             <circle cx="20" cy="20" r="20" fill="#0D9488"/>
             <path d="M20 8c-2.5 0-4.5 1-5.5 2.5C13.5 12 13 14 13 16c0 2.5 1 4.5 2.5 6 1 1 1.5 2.5 1.5 4v2h6v-2c0-1.5.5-3 1.5-4 1.5-1.5 2.5-3.5 2.5-6 0-2-.5-4-1.5-5.5C24.5 9 22.5 8 20 8z" fill="white"/>
@@ -69,7 +75,7 @@ export default function TopNav({ user, darkMode, toggleDarkMode, onSignOut, open
             <path d="M16 14c0-1 .5-2 1.5-2.5" stroke="white" strokeWidth="1.5" strokeLinecap="round"/>
             <path d="M24 14c0-1-.5-2-1.5-2.5" stroke="white" strokeWidth="1.5" strokeLinecap="round"/>
           </svg>
-        </div>
+        </a>
 
         {/* Search */}
         <div style={{
