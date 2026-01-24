@@ -11,6 +11,7 @@ import VoiceDrawer from './VoiceDrawer'
 import DotPhrasesDrawer from './DotPhrasesDrawer'
 import EnhancedNotePreviewModal from './EnhancedNotePreviewModal'
 import SettingsDrawer from './SettingsDrawer'
+import IdeasDrawer from './IdeasDrawer'
 import {
   type ChartPrepOutput,
   type VisitAIOutput,
@@ -119,6 +120,7 @@ export default function ClinicalNote({
   const [dotPhrasesOpen, setDotPhrasesOpen] = useState(false)
   const [notePreviewOpen, setNotePreviewOpen] = useState(false)
   const [settingsOpen, setSettingsOpen] = useState(false)
+  const [ideasDrawerOpen, setIdeasDrawerOpen] = useState(false)
   const [activeTextField, setActiveTextField] = useState<string | null>(null)
   const [selectedRecommendations, setSelectedRecommendations] = useState<RecommendationItem[]>([])
 
@@ -354,6 +356,7 @@ export default function ClinicalNote({
         onSignOut={handleSignOut}
         openAiDrawer={openAiDrawer}
         onOpenSettings={() => setSettingsOpen(true)}
+        onOpenIdeas={() => setIdeasDrawerOpen(true)}
       />
 
       <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
@@ -477,6 +480,11 @@ export default function ClinicalNote({
         onClose={() => setSettingsOpen(false)}
         darkMode={darkMode}
         toggleDarkMode={toggleDarkMode}
+      />
+
+      <IdeasDrawer
+        isOpen={ideasDrawerOpen}
+        onClose={() => setIdeasDrawerOpen(false)}
       />
     </div>
   )

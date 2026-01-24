@@ -10,6 +10,7 @@ interface TopNavProps {
   onSignOut: () => void
   openAiDrawer: (tab: string) => void
   onOpenSettings: () => void
+  onOpenIdeas: () => void
 }
 
 // Sample notifications data
@@ -37,10 +38,10 @@ const BILLING_CODES = [
   { code: '99215', label: '99215 - Office Visit (45+ min)', color: '#EF4444' },
 ]
 
-export default function TopNav({ user, darkMode, toggleDarkMode, onSignOut, openAiDrawer, onOpenSettings }: TopNavProps) {
+export default function TopNav({ user, darkMode, toggleDarkMode, onSignOut, openAiDrawer, onOpenSettings, onOpenIdeas }: TopNavProps) {
   const [aiMenuOpen, setAiMenuOpen] = useState(false)
   const [userMenuOpen, setUserMenuOpen] = useState(false)
-  const [activeQueue, setActiveQueue] = useState('rounding')
+  const [activeQueue, setActiveQueue] = useState('outpatient')
   const [timer, setTimer] = useState({ hours: 0, minutes: 0, seconds: 0 })
 
   // New state for TopNav elements
@@ -101,6 +102,7 @@ export default function TopNav({ user, darkMode, toggleDarkMode, onSignOut, open
     { id: 'acute', label: 'Acute Care', count: 0 },
     { id: 'rounding', label: 'Rounding', count: 0 },
     { id: 'eeg', label: 'EEG', count: 0 },
+    { id: 'outpatient', label: 'Outpatient', count: 1 },
   ]
 
   // Close all dropdowns when clicking outside
@@ -125,13 +127,11 @@ export default function TopNav({ user, darkMode, toggleDarkMode, onSignOut, open
       }}>
         {/* Left Section */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
-          {/* Logo - Links to original prototype wireframe */}
-          <a
-            href="/prototype.html"
-            target="_blank"
-            rel="noopener noreferrer"
-            title="View original prototype wireframe"
-            style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}
+          {/* Logo - Opens Ideas/Getting Started drawer */}
+          <button
+            onClick={onOpenIdeas}
+            title="Getting Started - Workflows, Tour, Features"
+            style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', background: 'none', border: 'none', padding: 0 }}
           >
             <svg width="36" height="36" viewBox="0 0 40 40" fill="none">
               <circle cx="20" cy="20" r="20" fill="#0D9488"/>
@@ -141,7 +141,7 @@ export default function TopNav({ user, darkMode, toggleDarkMode, onSignOut, open
               <path d="M16 14c0-1 .5-2 1.5-2.5" stroke="white" strokeWidth="1.5" strokeLinecap="round"/>
               <path d="M24 14c0-1-.5-2-1.5-2.5" stroke="white" strokeWidth="1.5" strokeLinecap="round"/>
             </svg>
-          </a>
+          </button>
 
           {/* Search */}
           <div style={{
@@ -714,17 +714,32 @@ export default function TopNav({ user, darkMode, toggleDarkMode, onSignOut, open
               onClick={() => setAiMenuOpen(!aiMenuOpen)}
               className="ai-launcher-btn"
               title="AI Tools"
+              style={{
+                background: 'linear-gradient(135deg, #06B6D4 0%, #8B5CF6 50%, #EC4899 100%)',
+                border: 'none',
+                borderRadius: '50%',
+                width: '36px',
+                height: '36px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                cursor: 'pointer',
+                boxShadow: '0 2px 8px rgba(139, 92, 246, 0.3)',
+              }}
             >
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
+              {/* 4-pointed sparkle icon */}
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="white">
+                <path d="M12 1L13.5 9.5L22 12L13.5 14.5L12 23L10.5 14.5L2 12L10.5 9.5L12 1Z"/>
+                <circle cx="19" cy="5" r="1.5" fill="white" opacity="0.8"/>
+                <circle cx="5" cy="19" r="1" fill="white" opacity="0.6"/>
               </svg>
             </button>
             {aiMenuOpen && (
               <div className="ai-launcher-menu show">
                 <div className="ai-launcher-menu-header">
                   <h4>
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                      <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                      <path d="M12 1L13.5 9.5L22 12L13.5 14.5L12 23L10.5 14.5L2 12L10.5 9.5L12 1Z"/>
                     </svg>
                     AI Tools
                   </h4>
