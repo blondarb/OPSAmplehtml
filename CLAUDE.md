@@ -370,6 +370,36 @@ When redeploying after changes, use "Redeploy without cache" to ensure fresh bui
 - **Exam Templates**: 5 predefined templates + custom template saving
 - **Scale Location System**: Exam vs history-based categorization
 
+### Onboarding & UX Improvements (January 24, 2026)
+- **Onboarding Tour**: Interactive 9-step tour for new users highlighting key UI features
+  - SVG spotlight mask for element highlighting
+  - Auto-triggers on first visit, completion saved to localStorage
+  - Can be replayed from Settings or Ideas Drawer
+- **Ideas/Getting Started Drawer**: Accessed via lightbulb icon in TopNav
+  - Workflows tab (informational workflow styles)
+  - Tour tab with "Launch Interactive Tour" button
+  - Features tab, Feedback tab
+- **Clean Chart for Testing**: New users start with empty chart (no default values)
+- **Workflows Section**: Made informational-only (no saving/persistence)
+
+### Responsive/Mobile Design (January 24, 2026)
+- **Viewport Meta Tag**: Added to layout.tsx for proper mobile rendering
+- **CSS Breakpoints**:
+  - Mobile: < 640px (slide-in sidebar, full-screen drawers)
+  - Tablet: 640px - 1024px (reduced padding/widths)
+  - Desktop: > 1024px (standard layout)
+- **TopNav**: Hamburger menu on mobile, queue pills hidden
+- **LeftSidebar**: Slide-in overlay on mobile with backdrop
+- **All Drawers**: Full-screen on mobile (maxWidth: 100vw)
+- **IconSidebar**: Hidden on mobile to save space
+- **Touch Enhancements**: Larger tap targets (44px), active states
+- **Print Styles**: Hide navigation, full-width content
+
+### Dark Mode Fixes (January 24, 2026)
+- **Physical Exam Section**: Fixed form elements (textarea, select) to use CSS variables
+- **Global Form Overrides**: Added dark mode styles for all input/textarea/select elements
+- **Placeholder Colors**: Proper muted color in dark mode
+
 ## Documentation Update Policy
 
 **IMPORTANT: When making significant changes, always update these files:**

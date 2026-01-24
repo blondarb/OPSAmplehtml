@@ -1,7 +1,7 @@
 # Consolidated Roadmap - Sevaro Clinical
 
-**Version:** 1.0
-**Last Updated:** January 24, 2026
+**Version:** 1.1
+**Last Updated:** January 24, 2026 (Responsive Design & Dark Mode)
 **Purpose:** Single source of truth consolidating all phases across PRDs
 
 ---
@@ -242,14 +242,19 @@ These foundational features are fully implemented.
 
 ## Phase 3C: Onboarding & Settings
 
-### 3.8 Help Drawer (Lightbulb Icon)
+### 3.8 Help Drawer (Lightbulb Icon) - COMPLETE
 
 | Tab | Status | Priority |
 |-----|--------|----------|
-| Inspiration | ⏳ PENDING | P2 |
-| Tour | ⏳ PENDING | P2 |
-| Features | ⏳ PENDING | P2 |
-| Feedback | ⏳ PENDING | P2 |
+| Workflows | ✅ COMPLETE | P2 |
+| Tour | ✅ COMPLETE | P2 |
+| Features | ✅ COMPLETE | P2 |
+| Feedback | ✅ COMPLETE | P2 |
+
+**Additional Onboarding Features:**
+- Interactive 9-step onboarding tour (OnboardingTour.tsx)
+- SVG spotlight highlighting for tour elements
+- Tour replay from Settings or Ideas Drawer
 
 ### 3.9 User Settings
 
@@ -357,6 +362,32 @@ These foundational features are fully implemented.
 
 ---
 
+## Phase 7: Responsive Design & Accessibility (Complete)
+
+### 7.1 Mobile/Tablet/Desktop Support
+
+| Feature | Status | Notes |
+|---------|--------|-------|
+| Viewport meta tag | ✅ COMPLETE | layout.tsx |
+| Mobile breakpoint (<640px) | ✅ COMPLETE | Slide-in sidebar, full-screen drawers |
+| Tablet breakpoint (640-1024px) | ✅ COMPLETE | Reduced padding, narrower elements |
+| Desktop breakpoint (>1024px) | ✅ COMPLETE | Standard layout |
+| Hamburger menu | ✅ COMPLETE | TopNav mobile toggle |
+| Sidebar overlay | ✅ COMPLETE | LeftSidebar with backdrop |
+| Touch enhancements | ✅ COMPLETE | 44px tap targets, active states |
+| Print styles | ✅ COMPLETE | Clean document output |
+
+### 7.2 Dark Mode Support
+
+| Feature | Status | Notes |
+|---------|--------|-------|
+| Theme toggle | ✅ COMPLETE | Settings Drawer |
+| CSS variables | ✅ COMPLETE | Full color system |
+| Form element styling | ✅ COMPLETE | Global overrides for dark mode |
+| Physical exam forms | ✅ COMPLETE | Textarea/select themed |
+
+---
+
 ## Technical Debt & Known Issues
 
 | Issue | Priority | Notes |
@@ -422,16 +453,20 @@ Based on the analysis, here's the recommended implementation order to minimize r
 
 | Metric | Target | Status |
 |--------|--------|--------|
-| Dead UI elements | 0 | 🔧 TopNav items remain |
+| Dead UI elements | 0 | ✅ TopNav items complete |
 | AI buttons with real actions | 100% | ✅ COMPLETE |
 | Dictation coverage | All text inputs | ✅ Clinical fields done |
 | Phase 2 completion | 100% | ✅ COMPLETE |
 | Core scales implemented | NIHSS added | ✅ COMPLETE (7 new scales) |
 | Field AI Actions | Working | ✅ COMPLETE |
 | User Settings | Working | ✅ COMPLETE |
+| Responsive design | Mobile/Tablet/Desktop | ✅ COMPLETE |
+| Dark mode | All form elements | ✅ COMPLETE |
+| Onboarding | Interactive tour | ✅ COMPLETE |
+| Help Drawer | All tabs | ✅ COMPLETE |
 
 ---
 
 *Document created: January 24, 2026*
-*Last updated: January 24, 2026*
+*Last updated: January 24, 2026 (Responsive Design & Dark Mode)*
 *Consolidates: All PRD documents*

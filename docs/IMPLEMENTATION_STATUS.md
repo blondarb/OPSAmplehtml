@@ -1,6 +1,6 @@
 # Implementation Status - Sevaro Clinical
 
-**Last Updated:** January 24, 2026 (Comprehensive Note Generation)
+**Last Updated:** January 24, 2026 (Responsive Design & Dark Mode)
 **Based on:** PRD_AI_Scribe.md v1.4, Sevaro_Outpatient_MVP_PRD_v1.4, PRD_Roadmap_Phase3.md
 
 ---
@@ -19,6 +19,10 @@ This document tracks implementation progress against the product requirements an
 ### Current Priority Focus
 
 **Recently Completed:**
+- ✅ **Responsive/Mobile Design** - Full mobile, tablet, desktop support with slide-in sidebar
+- ✅ **Dark Mode Form Fixes** - Physical exam and all form elements properly themed
+- ✅ **Onboarding Tour** - Interactive 9-step tour for new users with replay option
+- ✅ **Ideas/Getting Started Drawer** - Workflows, Tour, Features, Feedback tabs
 - ✅ **TopNav Enhancements** - Timer controls, Lock screen, Notifications panel, What's New
 - ✅ **Comprehensive Note Generation** - New Consult vs Follow-up layouts, note length preferences
 - ✅ **Enhanced Note Preview** - Section-by-section approval, formatted EHR-ready output
@@ -36,7 +40,40 @@ This document tracks implementation progress against the product requirements an
 
 ## Recent Updates (January 24, 2026)
 
-### TopNav Enhancements - NEW
+### Responsive/Mobile Design - NEW
+- **Viewport Meta Tag** - Added to layout.tsx for proper mobile scaling
+- **CSS Breakpoints** - Three-tier system:
+  - Mobile (< 640px): Slide-in sidebar overlay, full-screen drawers, hamburger menu
+  - Tablet (640px - 1024px): Reduced padding/widths, narrower sidebar
+  - Desktop (> 1024px): Standard layout with all elements visible
+- **TopNav Mobile** - Hamburger menu toggle, queue pills hidden, compact timer
+- **LeftSidebar Mobile** - Slide-in overlay with backdrop, closes on backdrop click
+- **All Drawers** - Full-screen on mobile (maxWidth: 100vw)
+- **IconSidebar** - Hidden on mobile to maximize space
+- **Touch Enhancements** - 44px minimum tap targets, active states instead of hover
+- **Print Styles** - Hide navigation, full-width content for clean printing
+
+### Dark Mode Form Fixes - NEW
+- **Physical Exam Section** - All textarea and select elements now use CSS variables
+- **Global Form Overrides** - Added `[data-theme="dark"]` rules for input/textarea/select
+- **Placeholder Colors** - Properly uses `--text-muted` in dark mode
+
+### Onboarding Tour - NEW
+- **OnboardingTour Component** - Interactive 9-step tour highlighting key features
+- **SVG Spotlight Mask** - Visual highlight effect for tour elements
+- **data-tour Attributes** - Added to key elements for tour targeting
+- **Persistence** - Completion saved to localStorage (`sevaro-onboarding-complete`)
+- **Replay Options** - Can be triggered from Settings Drawer or Ideas Drawer Tour tab
+
+### Ideas/Getting Started Drawer - NEW
+- **IdeasDrawer Component** - Accessed via lightbulb icon in TopNav
+- **Tabs**: Workflows, Tour, Features, Feedback
+- **Workflows Tab** - Informational workflow styles (no persistence)
+- **Tour Tab** - "Launch Interactive Tour" button
+- **Features Tab** - Feature list and descriptions
+- **Feedback Tab** - User feedback form
+
+### TopNav Enhancements
 - **Timer Dropdown** - Pause/Resume controls, Reset button, Billing code selector (MD2, MD3, 99213-99215)
 - **Lock Screen** - Full-screen PHI protection overlay with unlock button
 - **Notifications Panel** - Sample notifications with alert/message/task/system types, read/unread states, Mark all read
@@ -191,6 +228,28 @@ This document tracks implementation progress against the product requirements an
 | Score History | COMPLETE | - | With trend indicators |
 | Quick links | COMPLETE | - | PACS, VizAI, Epic, etc. |
 | Local time display | COMPLETE | - | Live clock |
+| Mobile slide-in overlay | COMPLETE | - | With backdrop click to close |
+
+### Responsive Design
+
+| Feature | Status | Component | Notes |
+|---------|--------|-----------|-------|
+| Viewport meta tag | COMPLETE | layout.tsx | Mobile scaling |
+| Mobile breakpoint (<640px) | COMPLETE | globals.css | Slide-in sidebar, full drawers |
+| Tablet breakpoint (640-1024px) | COMPLETE | globals.css | Reduced padding |
+| Desktop breakpoint (>1024px) | COMPLETE | globals.css | Standard layout |
+| Hamburger menu | COMPLETE | TopNav.tsx | Mobile sidebar toggle |
+| Touch enhancements | COMPLETE | globals.css | 44px tap targets |
+| Print styles | COMPLETE | globals.css | Clean document output |
+
+### Onboarding & Help
+
+| Feature | Status | Component | Notes |
+|---------|--------|-----------|-------|
+| Onboarding Tour | COMPLETE | OnboardingTour.tsx | 9-step interactive tour |
+| Ideas Drawer | COMPLETE | IdeasDrawer.tsx | Workflows, Tour, Features, Feedback |
+| Tour replay | COMPLETE | Settings/IdeasDrawer | Can replay from either location |
+| Dark mode support | COMPLETE | globals.css | Form elements properly themed |
 
 ### Dot Phrases
 
@@ -208,11 +267,15 @@ This document tracks implementation progress against the product requirements an
 
 ```
 src/
-├── app/api/ai/
-│   ├── ask/route.ts           # Ask AI endpoint
-│   ├── chart-prep/route.ts    # Chart Prep AI endpoint
-│   ├── transcribe/route.ts    # Whisper transcription
-│   └── visit-ai/route.ts      # Visit AI processing
+├── app/
+│   ├── globals.css            # Global styles + responsive breakpoints
+│   ├── layout.tsx             # Root layout with viewport meta
+│   └── api/ai/
+│       ├── ask/route.ts       # Ask AI endpoint
+│       ├── chart-prep/route.ts # Chart Prep AI endpoint
+│       ├── field-action/route.ts # Improve/Expand/Summarize
+│       ├── transcribe/route.ts # Whisper transcription
+│       └── visit-ai/route.ts  # Visit AI processing
 ├── components/
 │   ├── AiDrawer.tsx           # AI Assistant (Ask AI, Summary, Handout)
 │   ├── AiSuggestionPanel.tsx  # AI suggestion component
@@ -220,13 +283,19 @@ src/
 │   ├── ClinicalNote.tsx       # State management + generateNote
 │   ├── DifferentialDiagnosisSection.tsx # Diagnosis with ICD-10
 │   ├── DotPhrasesDrawer.tsx   # Dot phrases panel
-│   ├── ImagingResultsTab.tsx  # Imaging tab (NEW)
-│   ├── LeftSidebar.tsx        # Patient info, visits, scores
+│   ├── EnhancedNotePreviewModal.tsx # Comprehensive note generation
+│   ├── ExamScalesSection.tsx  # Exam-driven scales (NIHSS, etc.)
+│   ├── IdeasDrawer.tsx        # Getting Started/Help drawer
+│   ├── ImagingResultsTab.tsx  # Imaging tab
+│   ├── LeftSidebar.tsx        # Patient info, visits, scores (responsive)
 │   ├── NoteTextField.tsx      # Text field with buttons
+│   ├── OnboardingTour.tsx     # Interactive 9-step tour
 │   ├── ReasonForConsultSection.tsx # Two-tier consult
+│   ├── SettingsDrawer.tsx     # User settings with AI instructions
+│   ├── SmartRecommendationsSection.tsx # Treatment recommendations
 │   ├── SmartScalesSection.tsx # Clinical scales
-│   ├── TopNav.tsx             # Navigation header
-│   └── VoiceDrawer.tsx        # Voice & Dictation (NEW)
+│   ├── TopNav.tsx             # Navigation header (responsive)
+│   └── VoiceDrawer.tsx        # Voice & Dictation
 ├── hooks/
 │   └── useVoiceRecorder.ts    # Pause/resume recording
 └── lib/
@@ -364,14 +433,20 @@ Any text input should have dictation.
 
 ### Phase 3C: Onboarding & Workflows (Lower Priority)
 
-#### 8. Help Drawer (Top-Left Lightbulb)
+#### 8. Help Drawer (Top-Left Lightbulb) - COMPLETE
 
 | Tab | Status | Description |
 |-----|--------|-------------|
-| Inspiration | NOT BUILT | Curated clinical content |
-| Tour | NOT BUILT | Guided feature walkthrough |
-| Features | NOT BUILT | Feature list with docs |
-| Feedback | NOT BUILT | Dictation + typing, persistent storage |
+| Workflows | **COMPLETE** | Informational workflow styles |
+| Tour | **COMPLETE** | "Launch Interactive Tour" button |
+| Features | **COMPLETE** | Feature list with descriptions |
+| Feedback | **COMPLETE** | User feedback form |
+
+**Additional Features:**
+- OnboardingTour component with 9-step interactive walkthrough
+- SVG spotlight mask for visual highlighting
+- Completion persistence via localStorage
+- Replay option from Settings Drawer
 
 #### 9. Suggested Workflows (CRITICAL)
 
@@ -463,4 +538,4 @@ AI DRAWER (Teal theme, star icon):
 ---
 
 *Document maintained by Development Team*
-*Last updated: January 24, 2026*
+*Last updated: January 24, 2026 (Responsive Design & Dark Mode)*
