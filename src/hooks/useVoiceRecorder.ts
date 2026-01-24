@@ -2,6 +2,11 @@
 
 import { useState, useRef, useCallback } from 'react'
 
+interface UseVoiceRecorderOptions {
+  // If provided, this callback receives the audio blob instead of auto-transcribing
+  onRecordingComplete?: (audioBlob: Blob) => void
+}
+
 interface UseVoiceRecorderResult {
   isRecording: boolean
   isPaused: boolean
@@ -18,7 +23,7 @@ interface UseVoiceRecorderResult {
   clearTranscription: () => void
 }
 
-export function useVoiceRecorder(): UseVoiceRecorderResult {
+export function useVoiceRecorder(options?: UseVoiceRecorderOptions): UseVoiceRecorderResult {
   const [isRecording, setIsRecording] = useState(false)
   const [isPaused, setIsPaused] = useState(false)
   const [isTranscribing, setIsTranscribing] = useState(false)
@@ -93,7 +98,13 @@ export function useVoiceRecorder(): UseVoiceRecorderResult {
           console.warn('Warning: Audio file is very small, may not contain enough speech')
         }
 
-        // Send to transcription API
+        // If a callback is provided, use it instead of auto-transcribing
+        if (options?.onRecordingComplete) {
+          options.onRecordingComplete(audioBlob)
+          return
+        }
+
+        // Default behavior: Send to transcription API
         setIsTranscribing(true)
         try {
           const formData = new FormData()

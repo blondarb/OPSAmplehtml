@@ -82,6 +82,7 @@ export default function VoiceDrawer({
   } = useVoiceRecorder()
 
   // Voice recorder for Visit AI (Document tab)
+  // Uses callback to process audio through Visit AI endpoint instead of simple transcription
   const {
     isRecording: isVisitRecording,
     isPaused: isVisitPaused,
@@ -91,9 +92,13 @@ export default function VoiceDrawer({
     startRecording: startVisitRecording,
     pauseRecording: pauseVisitRecording,
     resumeRecording: resumeVisitRecording,
-    stopRecording: stopVisitRecordingRaw,
+    stopRecording: stopVisitRecording,
     restartRecording: restartVisitRecording,
-  } = useVoiceRecorder()
+  } = useVoiceRecorder({
+    onRecordingComplete: (audioBlob) => {
+      processVisitAI(audioBlob)
+    }
+  })
 
   // Format duration as MM:SS
   const formatDuration = (seconds: number) => {
@@ -208,11 +213,6 @@ export default function VoiceDrawer({
     }
 
     setVisitAIProcessing(false)
-  }
-
-  // Stop visit recording and process
-  const stopVisitRecording = async () => {
-    stopVisitRecordingRaw()
   }
 
   // Clear Visit AI results
