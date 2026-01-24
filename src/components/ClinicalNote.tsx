@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
 import TopNav from './TopNav'
@@ -132,19 +132,96 @@ export default function ClinicalNote({
   const [examFindings, setExamFindings] = useState<Record<string, boolean>>({})
   const [examSectionNotes, setExamSectionNotes] = useState<Record<string, string>>({})
 
+  // Generate a unique key for this visit's autosave data
+  const autosaveKey = `sevaro-autosave-${currentVisit?.id || 'draft'}`
+
+  // Load autosaved data on mount, falling back to visit data
+  const getInitialNoteData = () => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem(autosaveKey)
+      if (saved) {
+        try {
+          const parsed = JSON.parse(saved)
+          // Check if autosave is recent (within last 24 hours)
+          if (parsed.timestamp && Date.now() - parsed.timestamp < 24 * 60 * 60 * 1000) {
+            return parsed.data
+          }
+        } catch (e) {
+          // Invalid data, use defaults
+        }
+      }
+    }
+    return null
+  }
+
+  const savedData = getInitialNoteData()
+
   const [noteData, setNoteData] = useState({
-    chiefComplaint: currentVisit?.chief_complaint || ['Headache'],
-    hpi: currentVisit?.clinical_notes?.hpi || '',
-    ros: currentVisit?.clinical_notes?.ros || 'Reviewed',
-    rosDetails: currentVisit?.clinical_notes?.ros_details || '',
-    allergies: currentVisit?.clinical_notes?.allergies || 'NKDA',
-    allergyDetails: currentVisit?.clinical_notes?.allergy_details || '',
-    historyAvailable: currentVisit?.clinical_notes?.history_available || 'Yes',
-    historyDetails: currentVisit?.clinical_notes?.history_details || '',
-    physicalExam: currentVisit?.clinical_notes?.physical_exam || '',
-    assessment: currentVisit?.clinical_notes?.assessment || '',
-    plan: currentVisit?.clinical_notes?.plan || '',
+    chiefComplaint: savedData?.chiefComplaint || currentVisit?.chief_complaint || ['Headache'],
+    hpi: savedData?.hpi || currentVisit?.clinical_notes?.hpi || '',
+    ros: savedData?.ros || currentVisit?.clinical_notes?.ros || 'Reviewed',
+    rosDetails: savedData?.rosDetails || currentVisit?.clinical_notes?.ros_details || '',
+    allergies: savedData?.allergies || currentVisit?.clinical_notes?.allergies || 'NKDA',
+    allergyDetails: savedData?.allergyDetails || currentVisit?.clinical_notes?.allergy_details || '',
+    historyAvailable: savedData?.historyAvailable || currentVisit?.clinical_notes?.history_available || 'Yes',
+    historyDetails: savedData?.historyDetails || currentVisit?.clinical_notes?.history_details || '',
+    physicalExam: savedData?.physicalExam || currentVisit?.clinical_notes?.physical_exam || '',
+    assessment: savedData?.assessment || currentVisit?.clinical_notes?.assessment || '',
+    plan: savedData?.plan || currentVisit?.clinical_notes?.plan || '',
   })
+
+  // Autosave status
+  const [autosaveStatus, setAutosaveStatus] = useState<'saved' | 'saving' | 'unsaved'>('saved')
+  const autosaveTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+
+  // Autosave effect - debounced save to localStorage
+  useEffect(() => {
+    // Mark as unsaved when data changes
+    setAutosaveStatus('unsaved')
+
+    // Clear existing timeout
+    if (autosaveTimeoutRef.current) {
+      clearTimeout(autosaveTimeoutRef.current)
+    }
+
+    // Set new timeout to save after 2 seconds of no changes
+    autosaveTimeoutRef.current = setTimeout(() => {
+      setAutosaveStatus('saving')
+      try {
+        localStorage.setItem(autosaveKey, JSON.stringify({
+          data: noteData,
+          timestamp: Date.now(),
+        }))
+        setAutosaveStatus('saved')
+      } catch (e) {
+        console.error('Autosave failed:', e)
+        setAutosaveStatus('unsaved')
+      }
+    }, 2000)
+
+    return () => {
+      if (autosaveTimeoutRef.current) {
+        clearTimeout(autosaveTimeoutRef.current)
+      }
+    }
+  }, [noteData, autosaveKey])
+
+  // Save immediately on beforeunload
+  useEffect(() => {
+    const handleBeforeUnload = () => {
+      try {
+        localStorage.setItem(autosaveKey, JSON.stringify({
+          data: noteData,
+          timestamp: Date.now(),
+        }))
+      } catch (e) {
+        // Silent fail on unload
+      }
+    }
+
+    window.addEventListener('beforeunload', handleBeforeUnload)
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload)
+  }, [noteData, autosaveKey])
 
   // Raw dictation storage - keyed by field name, stores array of dictations with timestamps
   const migrateRawDictation = (data: any): Record<string, Array<{ text: string; timestamp: string }>> => {
@@ -525,6 +602,69 @@ export default function ClinicalNote({
         onClose={() => setIdeasDrawerOpen(false)}
         initialTab={ideasDrawerTab}
       />
+
+      {/* Autosave Status Indicator */}
+      <div
+        style={{
+          position: 'fixed',
+          bottom: '20px',
+          right: '20px',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '8px',
+          padding: '8px 14px',
+          borderRadius: '20px',
+          background: autosaveStatus === 'saved'
+            ? 'var(--bg-white)'
+            : autosaveStatus === 'saving'
+              ? 'var(--bg-white)'
+              : '#FEF3C7',
+          border: `1px solid ${autosaveStatus === 'saved' ? 'var(--border)' : autosaveStatus === 'saving' ? 'var(--border)' : '#FCD34D'}`,
+          boxShadow: '0 2px 8px rgba(0, 0, 0, 0.1)',
+          fontSize: '12px',
+          color: autosaveStatus === 'saved'
+            ? 'var(--text-muted)'
+            : autosaveStatus === 'saving'
+              ? 'var(--text-secondary)'
+              : '#B45309',
+          zIndex: 100,
+          transition: 'all 0.3s ease',
+        }}
+      >
+        {autosaveStatus === 'saved' && (
+          <>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <polyline points="20 6 9 17 4 12"/>
+            </svg>
+            <span>Saved</span>
+          </>
+        )}
+        {autosaveStatus === 'saving' && (
+          <>
+            <svg
+              width="14"
+              height="14"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              style={{ animation: 'spin 1s linear infinite' }}
+            >
+              <path d="M21 12a9 9 0 11-6.219-8.56"/>
+            </svg>
+            <span>Saving...</span>
+          </>
+        )}
+        {autosaveStatus === 'unsaved' && (
+          <>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <circle cx="12" cy="12" r="10"/>
+              <polyline points="12 6 12 12 16 14"/>
+            </svg>
+            <span>Unsaved changes</span>
+          </>
+        )}
+      </div>
     </div>
   )
 }
