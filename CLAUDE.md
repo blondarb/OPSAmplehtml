@@ -25,27 +25,36 @@ src/
 │   │   │   ├── chart-prep/# Pre-visit chart preparation
 │   │   │   ├── transcribe/# Voice transcription (Whisper)
 │   │   │   └── visit-ai/  # Visit AI - full visit transcription & clinical extraction
-│   │   └── phrases/       # Dot phrases CRUD
+│   │   ├── phrases/       # Dot phrases CRUD
+│   │   └── scales/        # Clinical scales API
 │   ├── auth/              # Auth callback handler
 │   ├── dashboard/         # Main clinical interface
 │   ├── login/             # Login page
 │   ├── signup/            # Signup page
 │   └── page.tsx           # Root redirect
 ├── components/            # React components
-│   ├── AiDrawer.tsx       # AI assistant drawer (Chart Prep, Document, Ask AI, Summary, Handout)
+│   ├── AiDrawer.tsx       # AI assistant drawer (Ask AI, Summary, Handout)
 │   ├── AiSuggestionPanel.tsx # Inline AI suggestion panel for note fields
-│   ├── CenterPanel.tsx    # Main content area with tabs (History, Imaging, Exam, Recommendation)
-│   ├── ClinicalNote.tsx   # Clinical note container with icon sidebar
+│   ├── CenterPanel.tsx    # Main content area with tabs
+│   ├── ClinicalNote.tsx   # Clinical note container orchestrating all panels
+│   ├── DifferentialDiagnosisSection.tsx # Differential diagnosis with ICD-10 codes
 │   ├── DotPhrasesDrawer.tsx # Dot phrases management drawer
-│   ├── LeftSidebar.tsx    # Patient info, Timeline, Hospitalist, Recent consults
-│   └── TopNav.tsx         # Navigation with queue tabs, timer, PHI toggle
+│   ├── ImagingResultsTab.tsx # Imaging/Results tab with collapsible study cards
+│   ├── LeftSidebar.tsx    # Patient info, Prior Visits, Score History
+│   ├── NoteTextField.tsx  # Reusable text field with dictation/AI buttons
+│   ├── ReasonForConsultSection.tsx # Two-tier reason for consult selection
+│   ├── SmartScalesSection.tsx # Clinical scales based on selected conditions
+│   ├── TopNav.tsx         # Navigation with queue tabs, timer, PHI toggle
+│   └── VoiceDrawer.tsx    # Voice & Dictation drawer (Chart Prep, Document)
 ├── hooks/
-│   └── useVoiceRecorder.ts # Voice recording hook for dictation
+│   └── useVoiceRecorder.ts # Voice recording hook with pause/resume
 ├── lib/
+│   ├── diagnosisData.ts   # 134 neurology diagnoses with ICD-10 codes
 │   ├── note-merge/        # Note merge engine for combining AI outputs
 │   │   ├── index.ts       # Re-exports merge functions
 │   │   ├── merge-engine.ts # Core merge logic
 │   │   └── types.ts       # TypeScript interfaces for merge system
+│   ├── reasonForConsultData.ts # Consult categories and sub-options
 │   ├── supabase/
 │   │   ├── client.ts      # Browser Supabase client
 │   │   └── server.ts      # Server Supabase client
@@ -61,6 +70,7 @@ Located in `supabase/migrations/`:
 - **visits**: Patient visit records
 - **clinical_notes**: Clinical documentation
 - **clinical_scales**: Assessment scales (MIDAS, HIT-6, PHQ-9, etc.)
+- **clinical_scale_history**: Historical scale scores with trends
 - **diagnoses**: Patient diagnoses
 - **imaging_studies**: Imaging records
 - **app_settings**: Application settings (stores OpenAI API key)
@@ -85,89 +95,125 @@ The OpenAI API key can be stored securely in Supabase `app_settings` table or as
 ## Key Features
 
 1. **Authentication**: Email/password and magic link via Supabase Auth
-2. **Clinical Notes**: Tabbed interface (History, Imaging/results, Physical exams, Recommendation)
-3. **AI Features**:
-   - **Ask AI**: General clinical questions with context
-   - **Chart Prep**: AI-generated pre-visit summaries with pause/resume dictation
-   - **Visit AI (Document tab)**: Record full patient visits, extract HPI/ROS/Exam/Assessment/Plan
-   - **Voice Dictation**: Record and transcribe using OpenAI Whisper + GPT-4 cleanup
+
+2. **Clinical Notes**: Tabbed interface with four main tabs:
+   - **History**: Reason for consult, HPI, ROS, allergies, medical history, clinical scales
+   - **Imaging/Results**: Collapsible study cards for MRI, CT, EEG, EMG, labs
+   - **Physical Exams**: Neurological examination with checkboxes
+   - **Recommendation**: Assessment, differential diagnosis, plan
+
+3. **Two-Tier Reason for Consult**:
+   - 9 primary categories with icons (Headache, Movement, Seizure, Cognitive, Neuromuscular, MS/Neuroimmunology, Cerebrovascular, Sleep, Other)
+   - Contextual sub-options per category (common always visible, expanded on request)
+   - Custom option entry per category
+
+4. **Differential Diagnosis Section**:
+   - Auto-populates from Reason for Consult selections
+   - 134 neurology diagnoses with ICD-10 codes
+   - Searchable diagnosis picker with category filtering
+   - Supports custom diagnosis entry
+
+5. **AI Features** (Two Separate Drawers):
+
+   **Voice Drawer** (Microphone icon - red accent):
+   - **Chart Prep**: Pre-visit dictation with auto-categorization, AI summary generation
+   - **Document**: Record full patient visits, AI extracts HPI/ROS/Exam/Assessment/Plan
+
+   **AI Drawer** (Star icon - teal accent):
+   - **Ask AI**: General clinical questions with patient context
    - **Patient Summary**: Generate patient-friendly visit summaries
    - **Patient Handouts**: Create educational materials
-   - **Note Merge Engine**: Combines Chart Prep + Visit AI + manual content into unified note
-4. **Dot Phrases**:
+
+6. **Note Merge Engine**: Combines Chart Prep + Visit AI + manual content into unified note
+
+7. **Dot Phrases**:
    - Text expansion shortcuts (e.g., `.exam` → full exam template)
    - Field-scoped phrases (global, HPI, Assessment, Plan, etc.)
    - Category organization
    - Usage tracking
-5. **Clinical Scales**: Standardized assessment tools
-6. **Patient Management**: Demographics, visits, imaging, timeline
+
+8. **Clinical Scales**: Smart scale suggestions based on selected conditions
+   - Headache: MIDAS, HIT-6
+   - Cognitive: MoCA, Mini-Cog
+   - Mental Health: PHQ-9, GAD-7
+
+9. **Imaging/Results Tab**:
+   - Collapsible study cards for each imaging type
+   - Fields: Date, Impression (dropdown), Findings (with dictation/AI buttons), PACS link
+   - Imaging studies: MRI Brain, CT Head, CTA Head & Neck, MRA Head, MRI Spine
+   - Neurodiagnostic: EEG, EMG/NCS, VEP, Sleep Study
+   - Lab results section with quick-add shortcuts
+
+10. **Patient Management**: Demographics, visits, imaging, timeline
 
 ## UI Components
 
 ### TopNav
-- Sevaro brain logo
+- Sevaro brain logo (links to prototype wireframe at `/prototype.html`)
 - Patient search bar
 - Queue tabs (Acute Care, Rounding, EEG) with counts
 - MD2 timer with live countdown
 - What's New, PHI toggle, Lock, Notifications, Dark mode, User avatar
 
 ### LeftSidebar
-- Hospital logo (Marshall / TNK | PST)
-- Medical history link
-- Patient card with edit button, Non-Emergent badge
+- Patient card with edit button, badges (Non-Emergent, Follow-up, etc.)
 - Video/Phone action buttons
 - Quick links (PACS viewer, VizAI, Epic, GlobalProtect)
-- Prior Visits section with AI Summary toggle
-- Score History section with trend indicators (improving/stable/worsening)
-- Timeline (Initial call, Time on video, Assessment time, Final recommendation)
-- Recent consults
+- **Prior Visits section**:
+  - AI Summary toggle
+  - Expandable visit cards with AI-generated summaries
+  - Sample data showing treatment progression
+- **Score History section**:
+  - Trend indicators (improving/stable/worsening)
+  - Historical scores with interpretations
+- Local time display
 
 ### CenterPanel
 - Tab navigation (History, Imaging/results, Physical exams, Recommendation)
-- Action bar (three dots, thumbs up, mic, AI star, copy, Pend, Sign & complete)
-- Form sections with Required badges
-- Inline action buttons on text fields (mic, lightning, star, dots)
-- **Clinical Scales Section** (in History tab):
-  - Headache Scales: MIDAS (0-270), HIT-6 (36-78) with disability interpretations
-  - Cognitive Scales: MoCA (0-30), Mini-Cog (0-5) with impairment levels
-  - Mental Health Screens: PHQ-9 (0-27), GAD-7 (0-21) with severity levels
-- **Neurological Examination** (in Physical exams tab):
-  - General Appearance dropdown
-  - Mental Status: Level of consciousness (radio), Orientation (checkboxes), Following commands
-  - Cranial Nerves: Visual fields, Pupils, EOMs, Facial sensation, Face symmetry, Hearing, Palate, Tongue
-  - Motor: Bulk, Tone, Strength, Pronator drift
-  - Sensation: Light touch, Pinprick, Vibration, Proprioception
-  - Coordination: Finger-to-nose, Heel-to-shin, Rapid alternating movements
-  - Gait: Evaluated/Not evaluated, Station, Casual gait, Tandem gait, Romberg
-- **Reason for Consult chips** organized by outpatient neurology categories:
-  - Headache & Pain (Migraine types, facial pain)
-  - Movement Disorders (Parkinson, tremor, dystonia, RLS)
-  - Epilepsy & Seizures
-  - Dementia & Cognitive (MCI, Alzheimer, evaluation)
-  - Neuromuscular (neuropathy, myasthenia, ALS)
-  - MS & Neuroimmunology
-  - Cerebrovascular (stroke follow-up, TIA)
-  - Sleep disorders
+- Action bar with:
+  - More options (three dots)
+  - Thumbs up
+  - Microphone (opens Voice Drawer - red accent)
+  - AI star (opens AI Drawer - teal accent)
+  - Copy
+  - Generate Note (purple, shows green dot when AI content available)
+  - Pend, Sign & complete
 
-### AiDrawer
-- Tabs: Chart Prep, Document, Ask AI, Summary, Handout
-- **Chart Prep Tab**: Pre-visit preparation with pause/resume dictation, structured output sections
-- **Document Tab (Visit AI)**: Full visit recording with clinical content extraction
-  - Inactive → Recording → Paused → Processing → Results states
-  - Extracts HPI, ROS, Exam, Assessment, Plan from conversation
-  - Confidence scores for each extracted section
-  - Insert individual sections or generate full note
-- Voice recording UI with Whisper transcription
-- Recording waveform animation with pulsing bars
-- AI response display with insert functionality
+### Text Fields with Action Buttons
+All major text fields include inline action buttons:
+- **Red mic button**: Open Voice Drawer for dictation
+- **Purple lightning button**: Open Dot Phrases drawer
+- **Teal star button**: Open AI Drawer for assistance
 
-### TopNav
-- Sevaro brain logo
-- Patient search bar
-- AI launcher dropdown menu (quick access to all 5 AI tools)
-- Queue tabs with counts
-- Timer display
-- PHI toggle, notifications, dark mode
+### ImagingResultsTab
+- Collapsible study cards matching wireframe design
+- Each study card contains:
+  - Header with name, status badge, date summary
+  - Expanded: Date picker, Impression dropdown, Findings textarea, PACS link
+  - Action buttons on findings field (mic, dot phrase, AI)
+- "Add Study" button for custom studies
+- Lab results section with quick-add chips
+
+### VoiceDrawer (Red theme)
+- Header: "Voice & Dictation" with mic icon
+- Tabs: Chart Prep, Document
+- **Chart Prep tab**:
+  - Dictate while reviewing with auto-categorization
+  - Recording controls (pause/resume/restart)
+  - AI summary generation with structured sections
+  - Alerts (red highlight), Suggested Focus (yellow highlight)
+  - "Add All to Note" button
+- **Document tab**:
+  - Full visit recording with waveform animation
+  - Processing state with spinner
+  - Results display with confidence scores
+
+### AiDrawer (Teal theme)
+- Header: "AI Assistant" with star icon
+- Tabs: Ask AI, Summary, Handout
+- Ask AI: Input field, suggested questions, AI response display
+- Summary: Simple/Standard/Detailed level selection
+- Handout: Condition dropdown, generate button
 
 ### DotPhrasesDrawer
 - Search and filter by category
@@ -205,16 +251,35 @@ The middleware (`src/middleware.ts`) handles session refresh. Uses a simplified 
 - `/api/phrases` - List and create dot phrases
 - `/api/phrases/[id]` - Get, update, delete individual phrases
 - `/api/phrases/seed` - Seed default medical phrases
+- `/api/scales` - Clinical scales API
 
 ## Design System
 
 - **Primary Color**: Teal (#0D9488)
 - **Secondary Colors**:
   - Orange (#F59E0B) - Quick actions
-  - Purple (#8B5CF6) - Dot phrases
-  - Red (#EF4444) - Required badges, errors
+  - Purple (#8B5CF6) - Dot phrases, Generate Note
+  - Red (#EF4444) - Required badges, errors, Voice Drawer
 - **Font**: Inter (system fallback)
-- **Layout**: Icon sidebar + Left sidebar + Center panel
+- **Layout**: Left sidebar (260px) + Center panel (flex)
+
+### Icon Button Colors
+- **Microphone**: Red background (#FEE2E2), red icon (#EF4444)
+- **Dot Phrase**: Purple background (#EDE9FE), purple icon (#8B5CF6)
+- **AI Assist**: Teal background (#CCFBF1), teal icon (#0D9488)
+
+## Data Files
+
+### diagnosisData.ts
+- 134 neurology diagnoses organized into 15 categories
+- Each diagnosis has: id, name, icd10, category, optional alternateIcd10
+- CONSULT_TO_DIAGNOSIS_MAP links chief complaints to relevant diagnoses
+- Helper functions: getDiagnosisByCategory, searchDiagnoses, getDiagnosisById
+
+### reasonForConsultData.ts
+- 9 primary consult categories with icons and sub-options
+- Each category has: id, label, icon, subOptions (common + expanded)
+- Helper functions: getCategoryById, getAllSubOptions, findCategoryForSubOption, derivePrimaryCategoriesFromSubOptions
 
 ## Documentation
 
@@ -224,7 +289,7 @@ The middleware (`src/middleware.ts`) handles session refresh. Uses a simplified 
 - `docs/PRD_*.md` - Feature-specific PRDs
 - `docs/IMPLEMENTATION_STATUS.md` - Current implementation status and gap analysis
 - `FIGMA_MAKE_PROMPTS.md` - UI design prompts
-- `prototype/index.html` - Original HTML prototype
+- `public/prototype.html` - Original HTML prototype (accessible via logo click)
 
 ## Common Commands
 
@@ -250,3 +315,43 @@ When redeploying after changes, use "Redeploy without cache" to ensure fresh bui
 - Main branch: `main` (production)
 - Feature branches: `claude/review-repo-design-*`
 - Push to feature branch, create PR, merge to main for deployment
+
+## Recent Changes (January 2026)
+
+### Voice/AI Drawer Separation
+- Split single AI drawer into two separate drawers
+- **VoiceDrawer**: Chart Prep + Document (mic-based functions, red theme)
+- **AiDrawer**: Ask AI + Summary + Handout (AI query functions, teal theme)
+- Microphone icon opens VoiceDrawer, AI star opens AiDrawer
+
+### Imaging/Results Tab Redesign
+- Completely rebuilt to match wireframe design
+- Collapsible study cards for all imaging and neurodiagnostic studies
+- Each card has date, impression dropdown, findings textarea, PACS link
+- All text fields have dictation/AI/dot phrase buttons
+- Lab results section with quick-add shortcuts
+
+### History Tab Improvements
+- Added expandable detail fields to ROS, Allergies, Medical History sections
+- Fields appear when relevant option selected (e.g., "Other" for allergies)
+- All new fields have dictation/AI/dot phrase buttons
+
+### Two-Tier Reason for Consult
+- 9 primary categories with contextual sub-options
+- Progressive disclosure (common options first, expandable for more)
+- Custom option entry per category
+
+### Differential Diagnosis with ICD-10
+- 134 neurology diagnoses with ICD-10 codes
+- Auto-populates from chief complaint selections
+- Searchable picker with category filtering
+
+### Prior Visits with AI Summaries
+- Expandable visit cards in left sidebar
+- AI-generated visit summaries
+- Sample data showing treatment progression over time
+
+### Score History with Trends
+- Historical clinical scale scores
+- Trend indicators (improving/stable/worsening)
+- Visual progress tracking

@@ -1,4 +1,4 @@
-# Implementation Status - AI Features
+# Implementation Status - Sevaro Clinical
 
 **Last Updated:** January 23, 2026
 **Based on:** PRD_AI_Scribe.md v1.4, Sevaro_Outpatient_MVP_PRD_v1.4
@@ -7,219 +7,210 @@
 
 ## Overview
 
-This document tracks implementation progress against the AI Scribe PRD and notes current work, issues, and next steps.
+This document tracks implementation progress against the product requirements and notes current work, issues, and next steps.
 
 ---
 
 ## Recent Updates (January 23, 2026)
 
-### Visit AI / Document Tab - NEW
-- **Complete UI overhaul** of Document tab for Visit AI recording
-- Implemented pause/resume/restart controls (matching Chart Prep)
-- Added animated waveform visualization during recording
-- Added timer display with MM:SS format
-- Created processing state with spinner
-- Built results display showing extracted sections with confidence scores
-- Added "Generate Note" workflow instruction
+### Voice/AI Drawer Separation - NEW
+- Split single AiDrawer into two separate drawers for clearer UX
+- **VoiceDrawer** (red theme, mic icon):
+  - Chart Prep tab: Pre-visit dictation with auto-categorization
+  - Document tab: Full visit recording with clinical extraction
+- **AiDrawer** (teal theme, star icon):
+  - Ask AI tab: Clinical Q&A
+  - Summary tab: Patient-friendly summaries
+  - Handout tab: Educational materials
+- Updated toolbar icons with distinct colors (mic=red, AI=teal)
 
-### Visit AI API Route - NEW
-- Created `/api/ai/visit-ai/route.ts` endpoint
-- Processes long audio recordings (up to 30+ minutes)
-- Uses Whisper for transcription with timestamps
-- Uses GPT-4 to extract clinical content by section:
-  - HPI, ROS, Physical Exam, Assessment, Plan
-- Returns confidence scores per section
-- Accepts patient and chart prep context for better extraction
+### Imaging/Results Tab Redesign - NEW
+- Completely rebuilt to match wireframe design
+- Created new `ImagingResultsTab.tsx` component
+- **Imaging Studies section**:
+  - MRI Brain, CT Head, CTA Head & Neck, MRA Head, MRI Spine
+  - Collapsible cards with date, impression dropdown, findings textarea
+  - PACS link field for each study
+- **Neurodiagnostic Studies section**:
+  - EEG, EMG/NCS, VEP, Sleep Study
+  - Same collapsible card pattern
+- **Lab Results section**:
+  - Free-text findings field
+  - Quick-add buttons: CBC, CMP, Lipid Panel, HbA1c, TSH, Vitamin B12, Vitamin D
+- All text fields have mic/dot phrase/AI action buttons
+- Status badges on collapsed cards (Normal/Abnormal/Documented)
 
-### Note Merge Infrastructure - NEW
-- Created `/src/lib/note-merge/` module with:
-  - `types.ts`: NoteFieldContent, MergedClinicalNote, ChartPrepOutput, VisitAIOutput interfaces
-  - `merge-engine.ts`: Core merge functions
-  - `index.ts`: Module exports
-- Merge strategy: Manual content preserved, AI shown as suggestions
-- Functions: mergeNoteContent, acceptAiSuggestion, rejectAiSuggestion, updateFieldContent, flattenMergedNote
+### History Tab Improvements - NEW
+- Added expandable detail fields to multiple sections:
+  - **ROS**: Shows textarea when "Unable to obtain due to:" or "Other" selected
+  - **Allergies**: Shows textarea when "Other" selected
+  - **Medical History**: Shows textarea when "Yes" selected
+- All new textareas include dictation/dot phrase/AI buttons
 
-### AI Suggestion Panel Component - NEW
-- Created `AiSuggestionPanel.tsx` component
-- Collapsible panel showing AI alternative text
-- "Use this" / "Dismiss" actions
-- Source indicator (Chart Prep vs Visit AI)
-
-### Generate Note Button
-- Updated in CenterPanel action bar
-- Shows green indicator dot when AI content available
-- Calls generateNote() to merge and populate fields
-- Opens Document tab if no AI content yet
-
-### Chart Prep Improvements
-- Added pause/resume/restart controls
-- Bullet-style high-yield output format
-- New sections: visitPurpose, alerts, keyMetrics, currentTreatment, lastVisitSummary, suggestedFocus
-- Fixed: prepNotes now included in API request
-- Added priority instruction for provider's dictated notes
-
-### Reason for Consult Categories (January 22)
-- Refactored to collapsible category structure
-- Each category shows primary items + expandable "+X more" button
-- Categories: Headache, Movement Disorders, Epilepsy, Dementia, Neuromuscular, MS, Cerebrovascular, Sleep, Other
+### Prior Visits Sample Data - UPDATED
+- Added 3 realistic prior visits with clinical progression
+- Each visit has provider name, chief complaints, AI summary
+- Shows treatment timeline (propranolol → topiramate transition)
+- Demonstrates MIDAS score improvement tracking
 
 ---
 
-## Current Implementation Status
+## Feature Implementation Status
 
-### Phase 1a: Chart Prep (Pre-Visit) - COMPLETE
+### Core Clinical Documentation
 
-**What we built:**
-- Chart Prep tab in AI Drawer with:
-  - Voice dictation with pause/resume/restart
-  - Auto-categorization of notes (imaging, labs, referral, history, assessment, general)
-  - Timer display during recording
-  - AI summary generation with bullet-style output
-  - Structured JSON sections with collapsible display
-  - Alerts section (red highlight) for urgent items
-  - Suggested Focus section (yellow highlight) for visit priorities
-  - "Add All to Note" button to populate HPI, Assessment, Plan fields
-  - Individual section insert buttons
+| Feature | Status | Component | Notes |
+|---------|--------|-----------|-------|
+| History Tab | COMPLETE | CenterPanel.tsx | ROS, Allergies, History with expandable details |
+| Imaging/Results Tab | COMPLETE | ImagingResultsTab.tsx | Collapsible study cards, labs |
+| Physical Exam Tab | COMPLETE | CenterPanel.tsx | Neurological exam checkboxes |
+| Recommendation Tab | COMPLETE | CenterPanel.tsx | Assessment, differential, plan |
+| HPI Text Field | COMPLETE | NoteTextField.tsx | With dictation/AI buttons |
 
-**Files involved:**
-- `/src/components/AiDrawer.tsx` - Chart Prep UI and logic
-- `/src/app/api/ai/chart-prep/route.ts` - Backend for AI summary generation
-- `/src/hooks/useVoiceRecorder.ts` - Voice recording hook with pause/resume
+### Reason for Consult
 
----
+| Feature | Status | Component | Notes |
+|---------|--------|-----------|-------|
+| Two-tier selection | COMPLETE | ReasonForConsultSection.tsx | 9 categories |
+| Primary category icons | COMPLETE | - | Visual selection grid |
+| Sub-options | COMPLETE | - | Common + expanded per category |
+| Custom entries | COMPLETE | - | Add custom per category |
+| Category data | COMPLETE | reasonForConsultData.ts | Full data structure |
 
-### Phase 1b: Visit AI (During Visit) - COMPLETE (UI & API)
+### Differential Diagnosis
 
-**What we built:**
-- Document tab completely redesigned for Visit AI:
-  - Start button with hover effects
-  - Recording state with animated waveform
-  - Pause/Resume/Restart/Stop controls
-  - Timer display
-  - Processing state with spinner
-  - Results display showing extracted sections
-  - Confidence indicators per section
-  - Instruction to use "Generate Note" button
+| Feature | Status | Component | Notes |
+|---------|--------|-----------|-------|
+| Auto-populate from consult | COMPLETE | DifferentialDiagnosisSection.tsx | Maps chief complaints to diagnoses |
+| ICD-10 codes | COMPLETE | diagnosisData.ts | 134 diagnoses with codes |
+| Search picker | COMPLETE | - | Category filtering |
+| Custom diagnosis entry | COMPLETE | - | Free text option |
+| Smart Recommendations | PENDING | - | Phase 2 |
 
-- Visit AI API endpoint:
-  - Long recording support (30+ minutes)
-  - Whisper transcription with timestamps
-  - GPT-4 extraction of clinical content
-  - Sections: HPI, ROS, Exam, Assessment, Plan
-  - Confidence scores per section
-  - Patient and chart prep context integration
+### AI Features
 
-**Files involved:**
-- `/src/components/AiDrawer.tsx` - Document tab UI
-- `/src/app/api/ai/visit-ai/route.ts` - Visit AI processing endpoint
-- `/src/hooks/useVoiceRecorder.ts` - Shared recording hook
+| Feature | Status | Component | Notes |
+|---------|--------|-----------|-------|
+| Voice Drawer | COMPLETE | VoiceDrawer.tsx | Chart Prep + Document |
+| AI Drawer | COMPLETE | AiDrawer.tsx | Ask AI + Summary + Handout |
+| Chart Prep | COMPLETE | VoiceDrawer.tsx | Dictation + AI summary |
+| Visit AI (Document) | COMPLETE | VoiceDrawer.tsx | Full visit recording |
+| Ask AI | COMPLETE | AiDrawer.tsx | GPT-4 Q&A |
+| Note Merge Engine | COMPLETE | lib/note-merge/ | Combine AI outputs |
+| Generate Note Button | COMPLETE | CenterPanel.tsx | Purple button with indicator |
 
-**Integration needed:**
-- The useVoiceRecorder hook currently sends to /api/ai/transcribe automatically
-- Need to modify to send to /api/ai/visit-ai for Document tab
-- Currently the audio blob needs to be captured and sent manually
+### Clinical Scales
 
----
+| Feature | Status | Component | Notes |
+|---------|--------|-----------|-------|
+| Smart scale suggestions | COMPLETE | SmartScalesSection.tsx | Based on conditions |
+| MIDAS, HIT-6 | COMPLETE | - | Headache scales |
+| MoCA, Mini-Cog | COMPLETE | - | Cognitive scales |
+| PHQ-9, GAD-7 | COMPLETE | - | Mental health |
+| Score History | COMPLETE | LeftSidebar.tsx | With trends |
+| Database integration | COMPLETE | /api/scales | History persistence |
 
-### Note Merge System - COMPLETE
+### Imaging/Results Tab
 
-**What we built:**
-- Merge engine that combines:
-  - Manual content (highest priority)
-  - Visit AI output
-  - Chart Prep output
-- Merge strategy: Preserve manual, show AI as collapsible suggestion
-- Type definitions for all data structures
-- Helper functions for accept/reject suggestions
+| Feature | Status | Component | Notes |
+|---------|--------|-----------|-------|
+| Collapsible study cards | COMPLETE | ImagingResultsTab.tsx | Matches wireframe |
+| Imaging studies | COMPLETE | - | 5 types |
+| Neurodiagnostic studies | COMPLETE | - | 4 types |
+| Lab results | COMPLETE | - | With quick-add |
+| Date picker | COMPLETE | - | Per study |
+| Impression dropdown | COMPLETE | - | Normal/Abnormal/etc |
+| Findings textarea | COMPLETE | - | With action buttons |
+| PACS link | COMPLETE | - | URL field |
+| Add Study button | COMPLETE | - | For custom studies |
 
-**Files involved:**
-- `/src/lib/note-merge/types.ts` - TypeScript interfaces
-- `/src/lib/note-merge/merge-engine.ts` - Merge logic
-- `/src/lib/note-merge/index.ts` - Module exports
+### Left Sidebar
 
----
+| Feature | Status | Component | Notes |
+|---------|--------|-----------|-------|
+| Patient card | COMPLETE | LeftSidebar.tsx | With badges |
+| Prior Visits | COMPLETE | - | Expandable with AI summaries |
+| Score History | COMPLETE | - | With trend indicators |
+| Quick links | COMPLETE | - | PACS, VizAI, Epic, etc. |
+| Local time display | COMPLETE | - | Live clock |
 
-### Generate Note Workflow - COMPLETE
+### Dot Phrases
 
-**What we built:**
-- Generate Note button in CenterPanel action bar
-- Visual indicator (green dot) when AI content available
-- Calls generateNote() in ClinicalNote component
-- Uses merge engine to combine sources
-- Populates empty fields with AI content
-- Preserves manual content
-
-**Files involved:**
-- `/src/components/CenterPanel.tsx` - Button UI
-- `/src/components/ClinicalNote.tsx` - generateNote function and state management
-
----
-
-### Other AI Features - Status
-
-| Feature | PRD Section | Status | Notes |
-|---------|-------------|--------|-------|
-| Chart Prep | Phase 1a | COMPLETE | Full implementation with dictation |
-| Visit AI | Phase 1b | COMPLETE (UI/API) | Needs audio routing fix |
-| Note Merge | - | COMPLETE | Types and engine ready |
-| Generate Note | - | COMPLETE | Button and logic working |
-| Ask AI | Ask AI Tab | COMPLETE | GPT-4 Q&A with patient context |
-| AI Suggestion Panel | - | COMPLETE | Collapsible suggestion component |
-| Patient Summary | Summary Tab | PLACEHOLDER | UI exists, backend not implemented |
-| Patient Handout | Handout Tab | PLACEHOLDER | UI exists, backend not implemented |
+| Feature | Status | Component | Notes |
+|---------|--------|-----------|-------|
+| Drawer UI | COMPLETE | DotPhrasesDrawer.tsx | Search, filter |
+| Field scoping | COMPLETE | - | Field-specific phrases |
+| CRUD operations | COMPLETE | /api/phrases | Full API |
+| Usage tracking | COMPLETE | - | Count updates |
+| Inline trigger | COMPLETE | NoteTextField.tsx | Lightning button |
 
 ---
 
-## PRD vs Implementation Comparison
+## Files Structure
 
-### What PRD v1.4 Describes
-
-The updated PRD now documents:
-1. **Phase 1a (Chart Prep)**: Pre-visit dictation and AI summary - IMPLEMENTED
-2. **Phase 1b (Visit AI)**: During-visit recording with clinical extraction - IMPLEMENTED
-3. **Note Merge System**: Combining multiple AI sources with manual content - IMPLEMENTED
-4. **Generate Note Workflow**: Provider-initiated merge and populate - IMPLEMENTED
-5. **Recording Controls**: Pause/resume/restart for both phases - IMPLEMENTED
-6. **UI Specifications**: Detailed mockups for all states - IMPLEMENTED
-
-### Gap Analysis (Remaining Work)
-
-| PRD Feature | Implementation | Gap |
-|-------------|----------------|-----|
-| Real-time transcription | Post-recording only | No streaming yet |
-| Speaker diarization | In prompt, not visual | No speaker labels in UI |
-| AI Suggestion Panel integration | Component built | Not yet wired to text fields |
-| Confidence indicators | API returns them | Not displayed in Generate Note result |
-| Audio playback | Not implemented | No stored audio for review |
-| Live transcript display | Not implemented | Future enhancement |
+```
+src/
+├── app/api/ai/
+│   ├── ask/route.ts           # Ask AI endpoint
+│   ├── chart-prep/route.ts    # Chart Prep AI endpoint
+│   ├── transcribe/route.ts    # Whisper transcription
+│   └── visit-ai/route.ts      # Visit AI processing
+├── components/
+│   ├── AiDrawer.tsx           # AI Assistant (Ask AI, Summary, Handout)
+│   ├── AiSuggestionPanel.tsx  # AI suggestion component
+│   ├── CenterPanel.tsx        # Main content with tabs
+│   ├── ClinicalNote.tsx       # State management + generateNote
+│   ├── DifferentialDiagnosisSection.tsx # Diagnosis with ICD-10
+│   ├── DotPhrasesDrawer.tsx   # Dot phrases panel
+│   ├── ImagingResultsTab.tsx  # Imaging tab (NEW)
+│   ├── LeftSidebar.tsx        # Patient info, visits, scores
+│   ├── NoteTextField.tsx      # Text field with buttons
+│   ├── ReasonForConsultSection.tsx # Two-tier consult
+│   ├── SmartScalesSection.tsx # Clinical scales
+│   ├── TopNav.tsx             # Navigation header
+│   └── VoiceDrawer.tsx        # Voice & Dictation (NEW)
+├── hooks/
+│   └── useVoiceRecorder.ts    # Pause/resume recording
+└── lib/
+    ├── diagnosisData.ts       # 134 diagnoses with ICD-10
+    ├── note-merge/            # Merge infrastructure
+    │   ├── types.ts
+    │   ├── merge-engine.ts
+    │   └── index.ts
+    └── reasonForConsultData.ts # Consult categories
+```
 
 ---
 
-## Immediate Next Steps
+## Pending Work
 
-### 1. Fix Audio Routing for Visit AI
-The useVoiceRecorder hook automatically sends to /api/ai/transcribe on stop.
-For Visit AI, we need to:
-- Either modify hook to accept custom endpoint
-- Or capture blob before automatic transcription
-- Or use separate recording mechanism
+### Phase 2: Smart Recommendations
+- Link diagnoses to treatment recommendations
+- Import templates from neuro-plans demo (134 diagnoses)
+- Checkbox-based recommendation selection per diagnosis
+- Reference: https://blondarb.github.io/neuro-plans/clinical/
 
-### 2. Wire AI Suggestion Panels to Text Fields
-The AiSuggestionPanel component is built but not integrated.
-When manual content exists and AI has different content:
-- Show collapsible suggestion below text field
-- Allow accept/dismiss actions
+### Other Enhancements
+- Real-time transcription (currently post-recording only)
+- Speaker diarization in UI
+- Audio playback for review
+- Confidence indicators in generated note
+- AI Suggestion Panel integration with text fields
 
-### 3. Test End-to-End Workflow
-- Chart Prep → dictate → generate summary
-- Visit AI → record visit → process
-- Generate Note → merge → populate fields
+---
+
+## Technical Debt / Known Issues
+
+1. **Audio routing** - Visit AI recording may need endpoint routing fix
+2. **Three voice recorder instances** - AiDrawer/VoiceDrawer could optimize
+3. **No audio storage** - Audio processed and discarded
+4. **AI suggestions not wired** - Component built but not integrated
 
 ---
 
 ## Architecture Notes
 
-### Current Data Flow
+### Data Flow
 
 ```
 CHART PREP FLOW:
@@ -240,47 +231,35 @@ GENERATE NOTE FLOW:
         - source tracking
         - AI suggestions where applicable
     → Populate empty fields with AI content
-    → (Future: Show AI suggestions for fields with manual content)
 ```
 
-### Files Structure
+### Drawer Separation
 
 ```
-src/
-├── app/api/ai/
-│   ├── ask/route.ts           # Ask AI endpoint
-│   ├── chart-prep/route.ts    # Chart Prep AI endpoint
-│   ├── transcribe/route.ts    # Whisper transcription
-│   └── visit-ai/route.ts      # Visit AI processing (NEW)
-├── components/
-│   ├── AiDrawer.tsx           # Chart Prep + Document tabs
-│   ├── AiSuggestionPanel.tsx  # AI suggestion component (NEW)
-│   ├── CenterPanel.tsx        # Generate Note button
-│   └── ClinicalNote.tsx       # State management + generateNote
-├── hooks/
-│   └── useVoiceRecorder.ts    # Pause/resume recording
-└── lib/
-    └── note-merge/            # Merge infrastructure (NEW)
-        ├── types.ts
-        ├── merge-engine.ts
-        └── index.ts
+VOICE DRAWER (Red theme, mic icon):
+├── Chart Prep tab
+│   ├── Dictation with auto-categorization
+│   ├── AI summary generation
+│   ├── Structured output sections
+│   └── "Add All to Note" functionality
+└── Document tab
+    ├── Full visit recording
+    ├── Pause/Resume/Restart controls
+    ├── Processing spinner
+    └── Extracted sections with confidence
+
+AI DRAWER (Teal theme, star icon):
+├── Ask AI tab
+│   ├── Clinical Q&A
+│   ├── Suggested questions
+│   └── AI response display
+├── Summary tab
+│   └── Patient-friendly summary generation
+└── Handout tab
+    └── Educational material generation
 ```
-
----
-
-## Technical Debt / Known Issues
-
-1. **Audio routing** - Visit AI recording goes to wrong endpoint (transcribe instead of visit-ai)
-
-2. **Three voice recorder instances** - AiDrawer uses three useVoiceRecorder hooks. Could optimize.
-
-3. **No audio storage** - Audio is processed and discarded. PRD suggests storing for playback.
-
-4. **AI suggestions not wired** - Component built but not integrated with text fields.
-
-5. **No confidence display** - API returns confidence scores but not shown after Generate Note.
 
 ---
 
 *Document maintained by Development Team*
-*Last updated after Visit AI implementation*
+*Last updated: January 23, 2026*

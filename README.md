@@ -4,16 +4,31 @@ AI-powered clinical documentation platform for neurology outpatient practices.
 
 ## Features
 
-- **Clinical Notes**: Tabbed interface (History, Imaging/results, Physical exams, Recommendation)
-- **AI Features**:
-  - Ask AI: Clinical questions with context
-  - Chart Prep: Pre-visit summaries
-  - Voice Dictation: Record and transcribe with OpenAI Whisper
-  - Patient Summary: Generate visit summaries
-  - Patient Handouts: Educational materials
-- **Dot Phrases**: Text expansion shortcuts with field scoping
-- **Clinical Scales**: MIDAS, HIT-6, PHQ-9, GAD-7, and more
-- **Patient Management**: Demographics, visits, imaging, timeline
+### Clinical Documentation
+- **Tabbed Interface**: History, Imaging/Results, Physical Exams, Recommendation
+- **Reason for Consult**: Two-tier selection with 9 categories and 100+ sub-options
+- **Differential Diagnosis**: Auto-population from chief complaint with ICD-10 codes (134 diagnoses)
+- **Neurological Exam**: Comprehensive checkbox-based exam with all cranial nerves, motor, sensory, coordination, gait
+
+### Voice & Dictation (Red Theme)
+- **Chart Prep**: Pre-visit dictation with auto-categorization into clinical sections
+- **Document**: Full visit recording with pause/resume and clinical extraction
+
+### AI Assistant (Teal Theme)
+- **Ask AI**: Clinical Q&A with patient context
+- **Patient Summary**: Generate patient-friendly visit summaries
+- **Patient Handouts**: Educational materials by condition
+
+### Clinical Scales
+- **Headache**: MIDAS (0-270), HIT-6 (36-78)
+- **Cognitive**: MoCA (0-30), Mini-Cog (0-5)
+- **Mental Health**: PHQ-9 (0-27), GAD-7 (0-21)
+- **History Tracking**: Score trends with visual indicators
+
+### Other Features
+- **Dot Phrases**: Text expansion with field scoping and categories
+- **Imaging/Results Tab**: Collapsible study cards for MRI, CT, EEG, labs
+- **Prior Visits**: Expandable visit cards with AI summaries
 - **Secure Authentication**: Email/password via Supabase Auth
 
 ## Tech Stack
@@ -78,33 +93,81 @@ Open [http://localhost:3000](http://localhost:3000) to view the app.
 
 ```
 src/
-├── app/                    # Next.js pages and API routes
+├── app/                           # Next.js App Router
 │   ├── api/
-│   │   ├── ai/            # AI endpoints (ask, chart-prep, transcribe)
-│   │   └── phrases/       # Dot phrases CRUD
-│   ├── dashboard/         # Main clinical interface
-│   ├── login/             # Login page
-│   └── signup/            # Signup page
-├── components/            # React components
-│   ├── AiDrawer.tsx       # AI assistant panel
-│   ├── CenterPanel.tsx    # Main content with tabs
-│   ├── ClinicalNote.tsx   # Note container
-│   ├── DotPhrasesDrawer.tsx # Dot phrases panel
-│   ├── LeftSidebar.tsx    # Patient info sidebar
-│   └── TopNav.tsx         # Navigation header
+│   │   ├── ai/
+│   │   │   ├── ask/               # Ask AI clinical Q&A
+│   │   │   ├── chart-prep/        # Pre-visit AI processing
+│   │   │   ├── transcribe/        # Whisper transcription
+│   │   │   └── visit-ai/          # Full visit recording AI
+│   │   ├── phrases/               # Dot phrases CRUD
+│   │   └── scales/                # Clinical scales history
+│   ├── dashboard/                 # Main clinical interface
+│   ├── login/                     # Login page
+│   └── signup/                    # Signup page
+├── components/
+│   ├── AiDrawer.tsx               # AI Assistant (Ask AI, Summary, Handout) - teal theme
+│   ├── AiSuggestionPanel.tsx      # Inline AI suggestions for text fields
+│   ├── CenterPanel.tsx            # Main content with 4 tabs
+│   ├── ClinicalNote.tsx           # State management + Generate Note
+│   ├── DifferentialDiagnosisSection.tsx  # Diagnosis picker with ICD-10
+│   ├── DotPhrasesDrawer.tsx       # Dot phrases management
+│   ├── ImagingResultsTab.tsx      # Collapsible imaging/lab cards
+│   ├── LeftSidebar.tsx            # Patient info, prior visits, scores
+│   ├── NoteTextField.tsx          # Text field with action buttons
+│   ├── ReasonForConsultSection.tsx # Two-tier consult selection
+│   ├── SmartScalesSection.tsx     # Clinical scales with scoring
+│   ├── TopNav.tsx                 # Navigation header
+│   └── VoiceDrawer.tsx            # Voice (Chart Prep, Document) - red theme
 ├── hooks/
-│   └── useVoiceRecorder.ts # Voice recording
+│   └── useVoiceRecorder.ts        # Pause/resume recording hook
 ├── lib/
-│   └── supabase/          # Supabase clients
-└── middleware.ts          # Auth middleware
+│   ├── diagnosisData.ts           # 134 diagnoses with ICD-10 codes
+│   ├── note-merge/                # Merge AI outputs with manual content
+│   │   ├── types.ts
+│   │   ├── merge-engine.ts
+│   │   └── index.ts
+│   ├── reasonForConsultData.ts    # 9 categories with sub-options
+│   └── supabase/                  # Supabase clients
+└── middleware.ts                  # Auth middleware
 ```
+
+## Architecture
+
+### Two-Drawer System
+The application uses two separate slide-out drawers for different functionality:
+
+1. **VoiceDrawer** (Red theme, microphone icon)
+   - Chart Prep: Pre-visit dictation with AI categorization
+   - Document: Full visit recording with pause/resume
+
+2. **AiDrawer** (Teal theme, star icon)
+   - Ask AI: Clinical Q&A with patient context
+   - Summary: Patient-friendly visit summaries
+   - Handout: Educational materials by condition
+
+### Generate Note Flow
+```
+[Manual Entry] ──┐
+                 ├──> mergeNoteContent() ──> Populate empty fields
+[Chart Prep] ────┤
+                 │
+[Visit AI] ──────┘
+```
+
+### Design System
+- **Primary**: Teal (#0D9488) - AI, main actions
+- **Voice**: Red (#EF4444) - Recording, microphone
+- **Dot Phrases**: Purple (#8B5CF6) - Text expansion
+- **Quick Actions**: Orange (#F59E0B) - Secondary buttons
 
 ## Documentation
 
-- [CLAUDE.md](./CLAUDE.md) - Development guide for AI assistants
-- [docs/](./docs/) - Product requirements documents
-- [FIGMA_MAKE_PROMPTS.md](./FIGMA_MAKE_PROMPTS.md) - UI design specifications
-- [prototype/](./prototype/) - Original HTML prototype
+- [CLAUDE.md](./CLAUDE.md) - Comprehensive development guide
+- [docs/IMPLEMENTATION_STATUS.md](./docs/IMPLEMENTATION_STATUS.md) - Feature tracking
+- [docs/Sevaro_Outpatient_MVP_PRD_v1.4.md](./docs/Sevaro_Outpatient_MVP_PRD_v1.4.md) - Product requirements
+- [docs/PRD_AI_Scribe.md](./docs/PRD_AI_Scribe.md) - AI feature specifications
+- [prototype/](./prototype/) - Original HTML wireframe
 
 ## Deployment
 
