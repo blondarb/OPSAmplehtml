@@ -5,8 +5,6 @@ import type { User } from '@supabase/supabase-js'
 
 interface TopNavProps {
   user: User
-  darkMode: boolean
-  toggleDarkMode: () => void
   onSignOut: () => void
   openAiDrawer: (tab: string) => void
   onOpenSettings: () => void
@@ -21,13 +19,6 @@ const SAMPLE_NOTIFICATIONS = [
   { id: '4', type: 'system', title: 'System Update', message: 'New NIHSS scale scoring available', time: '2 hours ago', read: true },
 ]
 
-// Sample what's new items
-const WHATS_NEW_ITEMS = [
-  { version: '1.4.0', date: 'Jan 24, 2026', title: 'Comprehensive Note Generation', description: 'New Consult vs Follow-up layouts, note length preferences, and one-click copy to EHR.' },
-  { version: '1.3.0', date: 'Jan 23, 2026', title: 'Smart Recommendations', description: 'AI-powered treatment recommendations based on diagnosis selection.' },
-  { version: '1.2.0', date: 'Jan 22, 2026', title: 'Extended Clinical Scales', description: 'Added NIHSS, Modified Ashworth, ABCD2, DHI, and more scales.' },
-  { version: '1.1.0', date: 'Jan 20, 2026', title: 'Voice & AI Drawer Split', description: 'Separate drawers for voice dictation and AI assistance features.' },
-]
 
 // Billing codes for timer
 const BILLING_CODES = [
@@ -38,7 +29,7 @@ const BILLING_CODES = [
   { code: '99215', label: '99215 - Office Visit (45+ min)', color: '#EF4444' },
 ]
 
-export default function TopNav({ user, darkMode, toggleDarkMode, onSignOut, openAiDrawer, onOpenSettings, onOpenIdeas }: TopNavProps) {
+export default function TopNav({ user, onSignOut, openAiDrawer, onOpenSettings, onOpenIdeas }: TopNavProps) {
   const [aiMenuOpen, setAiMenuOpen] = useState(false)
   const [userMenuOpen, setUserMenuOpen] = useState(false)
   const [activeQueue, setActiveQueue] = useState('outpatient')
@@ -51,7 +42,6 @@ export default function TopNav({ user, darkMode, toggleDarkMode, onSignOut, open
   const [lockScreenOpen, setLockScreenOpen] = useState(false)
   const [notificationsOpen, setNotificationsOpen] = useState(false)
   const [notifications, setNotifications] = useState(SAMPLE_NOTIFICATIONS)
-  const [whatsNewOpen, setWhatsNewOpen] = useState(false)
 
   // Timer effect
   useEffect(() => {
@@ -109,7 +99,6 @@ export default function TopNav({ user, darkMode, toggleDarkMode, onSignOut, open
   const closeAllDropdowns = () => {
     setTimerMenuOpen(false)
     setNotificationsOpen(false)
-    setWhatsNewOpen(false)
     setAiMenuOpen(false)
     setUserMenuOpen(false)
   }
@@ -380,92 +369,6 @@ export default function TopNav({ user, darkMode, toggleDarkMode, onSignOut, open
             )}
           </div>
 
-          {/* What's New - NOW WITH PANEL */}
-          <div style={{ position: 'relative' }}>
-            <button
-              onClick={() => { closeAllDropdowns(); setWhatsNewOpen(!whatsNewOpen); }}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '6px',
-                padding: '6px 12px',
-                borderRadius: '6px',
-                border: 'none',
-                background: whatsNewOpen ? 'var(--bg-gray)' : 'transparent',
-                cursor: 'pointer',
-                color: 'var(--text-secondary)',
-                fontSize: '13px',
-              }}
-            >
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="#F59E0B">
-                <path d="M12 1L13.5 9.5L22 12L13.5 14.5L12 23L10.5 14.5L2 12L10.5 9.5L12 1Z"/>
-              </svg>
-              What&apos;s New
-            </button>
-
-            {/* What's New Panel */}
-            {whatsNewOpen && (
-              <>
-                <div onClick={() => setWhatsNewOpen(false)} style={{ position: 'fixed', inset: 0, zIndex: 998 }} />
-                <div style={{
-                  position: 'absolute',
-                  top: '100%',
-                  right: 0,
-                  marginTop: '8px',
-                  width: '360px',
-                  background: 'var(--bg-white)',
-                  border: '1px solid var(--border)',
-                  borderRadius: '12px',
-                  boxShadow: '0 4px 20px rgba(0, 0, 0, 0.15)',
-                  zIndex: 999,
-                  overflow: 'hidden',
-                }}>
-                  <div style={{
-                    padding: '16px',
-                    borderBottom: '1px solid var(--border)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '10px',
-                  }}>
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="#F59E0B">
-                      <path d="M12 1L13.5 9.5L22 12L13.5 14.5L12 23L10.5 14.5L2 12L10.5 9.5L12 1Z"/>
-                    </svg>
-                    <span style={{ fontWeight: 600, fontSize: '15px', color: 'var(--text-primary)' }}>What&apos;s New</span>
-                  </div>
-                  <div style={{ maxHeight: '400px', overflowY: 'auto' }}>
-                    {WHATS_NEW_ITEMS.map((item, index) => (
-                      <div
-                        key={index}
-                        style={{
-                          padding: '16px',
-                          borderBottom: index < WHATS_NEW_ITEMS.length - 1 ? '1px solid var(--border)' : 'none',
-                        }}
-                      >
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
-                          <span style={{
-                            padding: '2px 8px',
-                            borderRadius: '4px',
-                            background: '#D1FAE5',
-                            color: '#059669',
-                            fontSize: '11px',
-                            fontWeight: 600,
-                          }}>v{item.version}</span>
-                          <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>{item.date}</span>
-                        </div>
-                        <div style={{ fontWeight: 600, fontSize: '14px', color: 'var(--text-primary)', marginBottom: '4px' }}>
-                          {item.title}
-                        </div>
-                        <div style={{ fontSize: '13px', color: 'var(--text-secondary)', lineHeight: 1.5 }}>
-                          {item.description}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </>
-            )}
-          </div>
-
           {/* PHI Toggle */}
           <div style={{
             display: 'flex',
@@ -680,33 +583,6 @@ export default function TopNav({ user, darkMode, toggleDarkMode, onSignOut, open
               </>
             )}
           </div>
-
-          {/* Dark Mode */}
-          <button
-            onClick={toggleDarkMode}
-            style={{
-              width: '36px',
-              height: '36px',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              borderRadius: '8px',
-              cursor: 'pointer',
-              color: 'var(--text-secondary)',
-              background: 'transparent',
-              border: 'none',
-            }}
-          >
-            {darkMode ? (
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <circle cx="12" cy="12" r="5"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/>
-              </svg>
-            ) : (
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z"/>
-              </svg>
-            )}
-          </button>
 
           {/* AI Launcher */}
           <div className="ai-launcher-container">

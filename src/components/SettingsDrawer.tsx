@@ -14,6 +14,7 @@ interface UserSettings {
   }
   // Appearance
   fontSize: 'small' | 'medium' | 'large'
+  darkModePreference: 'light' | 'dark' | 'system'
   // Tab Order
   tabOrder: string[]
   // Documentation Style
@@ -43,6 +44,7 @@ const DEFAULT_SETTINGS: UserSettings = {
     physicalExam: '',
   },
   fontSize: 'medium',
+  darkModePreference: 'system',
   tabOrder: DEFAULT_TAB_ORDER,
   documentationStyle: 'detailed',
   preferredTerminology: 'standard',
@@ -54,14 +56,14 @@ interface SettingsDrawerProps {
   isOpen: boolean
   onClose: () => void
   darkMode: boolean
-  toggleDarkMode: () => void
+  setDarkMode: (value: boolean) => void
 }
 
 export default function SettingsDrawer({
   isOpen,
   onClose,
   darkMode,
-  toggleDarkMode,
+  setDarkMode,
 }: SettingsDrawerProps) {
   const [activeTab, setActiveTab] = useState<'ai' | 'appearance' | 'notifications'>('ai')
   const [settings, setSettings] = useState<UserSettings>(DEFAULT_SETTINGS)
@@ -114,11 +116,30 @@ export default function SettingsDrawer({
       settings.fontSize === 'small' ? '13px' : settings.fontSize === 'large' ? '16px' : '14px'
     )
 
+    // Apply dark mode preference
+    applyDarkModePreference(settings.darkModePreference)
+
     setTimeout(() => {
       setSaveStatus('saved')
       setHasUnsavedChanges(false)
       setTimeout(() => setSaveStatus('idle'), 2000)
     }, 500)
+  }
+
+  // Helper to apply dark mode based on preference
+  const applyDarkModePreference = (preference: 'light' | 'dark' | 'system') => {
+    if (preference === 'system') {
+      const systemPrefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches
+      setDarkMode(systemPrefersDark)
+    } else {
+      setDarkMode(preference === 'dark')
+    }
+  }
+
+  // Handle dark mode preference change
+  const handleDarkModePreferenceChange = (preference: 'light' | 'dark' | 'system') => {
+    updateSettings('darkModePreference', preference)
+    applyDarkModePreference(preference)
   }
 
   const resetToDefaults = () => {
@@ -507,51 +528,70 @@ export default function SettingsDrawer({
           {/* Appearance Tab */}
           {activeTab === 'appearance' && (
             <div>
-              {/* Dark Mode */}
-              <div style={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                padding: '16px',
-                background: 'var(--bg-gray)',
-                borderRadius: '8px',
-                marginBottom: '16px',
-              }}>
-                <div>
-                  <h3 style={{ fontSize: '14px', fontWeight: 600, margin: '0 0 4px 0', color: 'var(--text-primary)' }}>
-                    Dark Mode
-                  </h3>
-                  <p style={{ fontSize: '12px', color: 'var(--text-muted)', margin: 0 }}>
-                    {darkMode ? 'Currently using dark theme' : 'Currently using light theme'}
-                  </p>
+              {/* Dark Mode Preference */}
+              <div style={{ marginBottom: '24px' }}>
+                <h3 style={{ fontSize: '14px', fontWeight: 600, margin: '0 0 8px 0', color: 'var(--text-primary)' }}>
+                  Theme
+                </h3>
+                <p style={{ fontSize: '12px', color: 'var(--text-muted)', margin: '0 0 12px 0' }}>
+                  Choose how Sevaro appears. Currently: {darkMode ? 'Dark' : 'Light'}
+                </p>
+                <div style={{ display: 'flex', gap: '10px' }}>
+                  {[
+                    { id: 'light' as const, label: 'Light', description: 'Always use light theme', icon: (
+                      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <circle cx="12" cy="12" r="5"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/>
+                      </svg>
+                    )},
+                    { id: 'dark' as const, label: 'Dark', description: 'Always use dark theme', icon: (
+                      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z"/>
+                      </svg>
+                    )},
+                    { id: 'system' as const, label: 'System', description: 'Match system settings', icon: (
+                      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/>
+                      </svg>
+                    )},
+                  ].map((option) => (
+                    <button
+                      key={option.id}
+                      onClick={() => handleDarkModePreferenceChange(option.id)}
+                      style={{
+                        flex: 1,
+                        padding: '14px 12px',
+                        borderRadius: '8px',
+                        border: settings.darkModePreference === option.id
+                          ? '2px solid var(--primary)'
+                          : '1px solid var(--border)',
+                        background: settings.darkModePreference === option.id
+                          ? 'rgba(13, 148, 136, 0.05)'
+                          : 'var(--bg-white)',
+                        cursor: 'pointer',
+                        textAlign: 'center',
+                      }}
+                    >
+                      <div style={{
+                        display: 'flex',
+                        justifyContent: 'center',
+                        marginBottom: '8px',
+                        color: settings.darkModePreference === option.id ? 'var(--primary)' : 'var(--text-secondary)',
+                      }}>
+                        {option.icon}
+                      </div>
+                      <div style={{
+                        fontSize: '13px',
+                        fontWeight: 500,
+                        color: settings.darkModePreference === option.id ? 'var(--primary)' : 'var(--text-primary)',
+                      }}>
+                        {option.label}
+                      </div>
+                      <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '4px' }}>
+                        {option.description}
+                      </div>
+                    </button>
+                  ))}
                 </div>
-                <button
-                  onClick={toggleDarkMode}
-                  style={{
-                    width: '52px',
-                    height: '28px',
-                    borderRadius: '14px',
-                    border: 'none',
-                    background: darkMode ? 'var(--primary)' : 'var(--border)',
-                    cursor: 'pointer',
-                    position: 'relative',
-                    transition: 'background 0.2s',
-                  }}
-                >
-                  <div
-                    style={{
-                      width: '22px',
-                      height: '22px',
-                      borderRadius: '50%',
-                      background: 'white',
-                      position: 'absolute',
-                      top: '3px',
-                      left: darkMode ? '27px' : '3px',
-                      transition: 'left 0.2s',
-                      boxShadow: '0 1px 3px rgba(0,0,0,0.2)',
-                    }}
-                  />
-                </button>
               </div>
 
               {/* Font Size */}

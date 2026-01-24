@@ -274,19 +274,54 @@ export default function ClinicalNote({
   const supabase = createClient()
 
   useEffect(() => {
-    // Check for saved dark mode preference
-    const savedDarkMode = localStorage.getItem('sevaro-dark-mode')
-    if (savedDarkMode === 'true') {
-      setDarkMode(true)
-      document.documentElement.setAttribute('data-theme', 'dark')
+    // Check for saved dark mode preference from user settings
+    const savedSettings = localStorage.getItem('sevaro-user-settings')
+    if (savedSettings) {
+      try {
+        const settings = JSON.parse(savedSettings)
+        const preference = settings.darkModePreference || 'system'
+
+        if (preference === 'system') {
+          // Use system preference
+          const systemPrefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches
+          setDarkMode(systemPrefersDark)
+          document.documentElement.setAttribute('data-theme', systemPrefersDark ? 'dark' : '')
+
+          // Listen for system preference changes
+          const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)')
+          const handleChange = (e: MediaQueryListEvent) => {
+            // Only respond if still on 'system' preference
+            const currentSettings = localStorage.getItem('sevaro-user-settings')
+            if (currentSettings) {
+              const parsed = JSON.parse(currentSettings)
+              if (parsed.darkModePreference === 'system') {
+                setDarkMode(e.matches)
+                document.documentElement.setAttribute('data-theme', e.matches ? 'dark' : '')
+              }
+            }
+          }
+          mediaQuery.addEventListener('change', handleChange)
+          return () => mediaQuery.removeEventListener('change', handleChange)
+        } else {
+          // Use explicit preference
+          const isDark = preference === 'dark'
+          setDarkMode(isDark)
+          document.documentElement.setAttribute('data-theme', isDark ? 'dark' : '')
+        }
+      } catch (e) {
+        console.error('Failed to parse settings:', e)
+      }
+    } else {
+      // Default to system preference if no settings saved
+      const systemPrefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches
+      setDarkMode(systemPrefersDark)
+      document.documentElement.setAttribute('data-theme', systemPrefersDark ? 'dark' : '')
     }
   }, [])
 
-  const toggleDarkMode = () => {
-    const newDarkMode = !darkMode
-    setDarkMode(newDarkMode)
-    localStorage.setItem('sevaro-dark-mode', String(newDarkMode))
-    document.documentElement.setAttribute('data-theme', newDarkMode ? 'dark' : '')
+  const handleSetDarkMode = (value: boolean) => {
+    setDarkMode(value)
+    document.documentElement.setAttribute('data-theme', value ? 'dark' : '')
   }
 
   const handleSignOut = async () => {
@@ -351,8 +386,6 @@ export default function ClinicalNote({
     <div className="app-container" style={{ display: 'flex', flexDirection: 'column', height: '100vh' }}>
       <TopNav
         user={user}
-        darkMode={darkMode}
-        toggleDarkMode={toggleDarkMode}
         onSignOut={handleSignOut}
         openAiDrawer={openAiDrawer}
         onOpenSettings={() => setSettingsOpen(true)}
@@ -479,7 +512,7 @@ export default function ClinicalNote({
         isOpen={settingsOpen}
         onClose={() => setSettingsOpen(false)}
         darkMode={darkMode}
-        toggleDarkMode={toggleDarkMode}
+        setDarkMode={handleSetDarkMode}
       />
 
       <IdeasDrawer
