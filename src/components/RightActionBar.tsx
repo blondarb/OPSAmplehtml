@@ -57,7 +57,7 @@ export default function RightActionBar({ openAiDrawer, onSave }: RightActionBarP
           height: '40px',
           borderRadius: '8px',
           border: 'none',
-          background: 'var(--primary)',
+          background: '#F59E0B',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',

@@ -286,8 +286,8 @@ export default function LeftSidebar({ patient, priorVisits, scoreHistory }: Left
                     borderTop: '1px solid var(--border)',
                   }}>
                     <div style={{
-                      background: 'linear-gradient(135deg, #F0FDFA 0%, #ECFDF5 100%)',
-                      border: '1px solid #A7F3D0',
+                      background: 'linear-gradient(135deg, #FFFBEB 0%, #FEF3C7 100%)',
+                      border: '1px solid #FCD34D',
                       borderRadius: '8px',
                       padding: '12px',
                     }}>
@@ -298,9 +298,9 @@ export default function LeftSidebar({ patient, priorVisits, scoreHistory }: Left
                         marginBottom: '8px',
                         fontWeight: 600,
                         fontSize: '12px',
-                        color: 'var(--primary-dark)',
+                        color: '#B45309',
                       }}>
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="#F59E0B">
                           <path d="M12 1L13.5 9.5L22 12L13.5 14.5L12 23L10.5 14.5L2 12L10.5 9.5L12 1Z"/>
                         </svg>
                         AI Summary

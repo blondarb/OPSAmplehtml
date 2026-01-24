@@ -366,7 +366,7 @@ export default function NoteTextField({
             disabled={aiLoading}
             className={`ai-icon-btn sparkle ${showAiMenu ? 'active' : ''}`}
             style={{
-              background: showAiMenu ? 'var(--primary)' : 'linear-gradient(135deg, var(--primary) 0%, var(--primary-light) 100%)',
+              background: showAiMenu ? '#D97706' : 'linear-gradient(135deg, #F59E0B 0%, #FBBF24 100%)',
               color: 'white',
             }}
             title="AI Actions"
@@ -394,7 +394,7 @@ export default function NoteTextField({
         {showAiMenu && (
           <div className="quick-phrases-dropdown show" style={{ width: '200px', right: '0', left: 'auto' }}>
             <div className="quick-phrases-header" style={{ borderBottom: '1px solid var(--border)', paddingBottom: '8px', marginBottom: '4px' }}>
-              <span style={{ fontSize: '12px', fontWeight: '600', color: 'var(--primary)' }}>AI Actions</span>
+              <span style={{ fontSize: '12px', fontWeight: '600', color: '#F59E0B' }}>AI Actions</span>
             </div>
             <button
               onClick={() => handleAiAction('improve')}
@@ -415,7 +415,7 @@ export default function NoteTextField({
               onMouseEnter={(e) => e.currentTarget.style.background = 'var(--bg-gray)'}
               onMouseLeave={(e) => e.currentTarget.style.background = 'none'}
             >
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" strokeWidth="2">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#F59E0B" strokeWidth="2">
                 <path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/>
               </svg>
               <div>
@@ -442,7 +442,7 @@ export default function NoteTextField({
               onMouseEnter={(e) => e.currentTarget.style.background = 'var(--bg-gray)'}
               onMouseLeave={(e) => e.currentTarget.style.background = 'none'}
             >
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" strokeWidth="2">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#F59E0B" strokeWidth="2">
                 <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/>
               </svg>
               <div>
@@ -469,7 +469,7 @@ export default function NoteTextField({
               onMouseEnter={(e) => e.currentTarget.style.background = 'var(--bg-gray)'}
               onMouseLeave={(e) => e.currentTarget.style.background = 'none'}
             >
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" strokeWidth="2">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#F59E0B" strokeWidth="2">
                 <line x1="21" y1="10" x2="3" y2="10"/><line x1="21" y1="6" x2="3" y2="6"/><line x1="21" y1="14" x2="3" y2="14"/><line x1="21" y1="18" x2="3" y2="18"/>
               </svg>
               <div>

@@ -715,7 +715,7 @@ export default function TopNav({ user, darkMode, toggleDarkMode, onSignOut, open
               className="ai-launcher-btn"
               title="AI Tools"
               style={{
-                background: 'linear-gradient(135deg, #06B6D4 0%, #8B5CF6 50%, #EC4899 100%)',
+                background: 'linear-gradient(135deg, #F59E0B 0%, #FBBF24 100%)',
                 border: 'none',
                 borderRadius: '50%',
                 width: '36px',
@@ -724,7 +724,7 @@ export default function TopNav({ user, darkMode, toggleDarkMode, onSignOut, open
                 alignItems: 'center',
                 justifyContent: 'center',
                 cursor: 'pointer',
-                boxShadow: '0 2px 8px rgba(139, 92, 246, 0.3)',
+                boxShadow: '0 2px 8px rgba(245, 158, 11, 0.3)',
               }}
             >
               {/* 4-pointed sparkle icon */}
@@ -738,7 +738,7 @@ export default function TopNav({ user, darkMode, toggleDarkMode, onSignOut, open
               <div className="ai-launcher-menu show">
                 <div className="ai-launcher-menu-header">
                   <h4>
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="#F59E0B">
                       <path d="M12 1L13.5 9.5L22 12L13.5 14.5L12 23L10.5 14.5L2 12L10.5 9.5L12 1Z"/>
                     </svg>
                     AI Tools

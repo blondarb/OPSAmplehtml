@@ -316,8 +316,8 @@ export default function ImagingResultsTab({
                       justifyContent: 'center',
                       borderRadius: '4px',
                       border: 'none',
-                      background: '#CCFBF1',
-                      color: '#0D9488',
+                      background: '#FEF3C7',
+                      color: '#F59E0B',
                       cursor: 'pointer',
                     }}
                   >
@@ -510,8 +510,8 @@ export default function ImagingResultsTab({
                 justifyContent: 'center',
                 borderRadius: '4px',
                 border: 'none',
-                background: '#CCFBF1',
-                color: '#0D9488',
+                background: '#FEF3C7',
+                color: '#F59E0B',
                 cursor: 'pointer',
               }}
             >

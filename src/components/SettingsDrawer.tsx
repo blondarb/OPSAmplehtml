@@ -146,7 +146,7 @@ export default function SettingsDrawer({
 
   const tabs = [
     { id: 'ai' as const, label: 'AI & Documentation', icon: (
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="#F59E0B">
         <path d="M12 1L13.5 9.5L22 12L13.5 14.5L12 23L10.5 14.5L2 12L10.5 9.5L12 1Z"/>
       </svg>
     )},

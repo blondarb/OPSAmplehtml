@@ -231,7 +231,7 @@ Use patient-friendly language. Avoid medical jargon. Keep it informative but not
         {/* Header */}
         <div style={{
           padding: '16px',
-          background: 'linear-gradient(135deg, #0D9488 0%, #14B8A6 100%)',
+          background: 'linear-gradient(135deg, #F59E0B 0%, #FBBF24 100%)',
           color: 'white',
           display: 'flex',
           alignItems: 'center',

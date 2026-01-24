@@ -28,7 +28,7 @@ export default function AiSuggestionPanel({
   if (status === 'rejected') return null
 
   const sourceLabel = source === 'chart-prep' ? 'Chart Prep' : 'Visit AI'
-  const sourceColor = source === 'chart-prep' ? '#0D9488' : '#8B5CF6'
+  const sourceColor = '#F59E0B'
 
   return (
     <div style={{

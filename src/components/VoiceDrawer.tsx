@@ -824,7 +824,7 @@ export default function VoiceDrawer({
                   alignItems: 'center',
                   gap: '8px',
                   padding: '10px 16px',
-                  background: loading ? 'var(--bg-gray)' : 'linear-gradient(135deg, #0D9488 0%, #14B8A6 100%)',
+                  background: loading ? 'var(--bg-gray)' : 'linear-gradient(135deg, #F59E0B 0%, #FBBF24 100%)',
                   color: loading ? 'var(--text-muted)' : 'white',
                   border: 'none',
                   borderRadius: '8px',
