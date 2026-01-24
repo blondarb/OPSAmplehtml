@@ -60,11 +60,9 @@ export default function AiSuggestionPanel({
             width="14"
             height="14"
             viewBox="0 0 24 24"
-            fill="none"
-            stroke={sourceColor}
-            strokeWidth="2"
+            fill={sourceColor}
           >
-            <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
+            <path d="M12 1L13.5 9.5L22 12L13.5 14.5L12 23L10.5 14.5L2 12L10.5 9.5L12 1Z"/>
           </svg>
           <span style={{
             fontSize: '12px',
