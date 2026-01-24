@@ -221,10 +221,9 @@ export default function IdeasDrawer({ isOpen, onClose, initialTab }: IdeasDrawer
     }
   }, [initialTab, isOpen])
   const [tourStep, setTourStep] = useState(0)
-  const [selectedWorkflow, setSelectedWorkflow] = useState<string | null>(null)
+  const [expandedWorkflow, setExpandedWorkflow] = useState<string | null>(null)
   const [feedbackText, setFeedbackText] = useState('')
   const [feedbackSubmitted, setFeedbackSubmitted] = useState(false)
-  const [savedWorkflow, setSavedWorkflow] = useState<string | null>(null)
   const [feedbackView, setFeedbackView] = useState<'submit' | 'browse'>('browse')
   const [allFeedback, setAllFeedback] = useState<FeedbackItem[]>([])
   const [currentUserId] = useState(() => {
@@ -263,14 +262,6 @@ export default function IdeasDrawer({ isOpen, onClose, initialTab }: IdeasDrawer
     }
   }, [transcribedText, clearTranscription])
 
-  // Load saved workflow preference
-  useEffect(() => {
-    const saved = localStorage.getItem('sevaro-preferred-workflow')
-    if (saved) {
-      setSavedWorkflow(saved)
-      setSelectedWorkflow(saved)
-    }
-  }, [])
 
   // Load all feedback when feedback tab is active
   useEffect(() => {
@@ -349,11 +340,6 @@ export default function IdeasDrawer({ isOpen, onClose, initialTab }: IdeasDrawer
     }
   }
 
-  const saveWorkflowPreference = (workflowId: string) => {
-    localStorage.setItem('sevaro-preferred-workflow', workflowId)
-    setSavedWorkflow(workflowId)
-    setSelectedWorkflow(workflowId)
-  }
 
   const submitFeedback = () => {
     if (!feedbackText.trim()) return
@@ -508,24 +494,24 @@ export default function IdeasDrawer({ isOpen, onClose, initialTab }: IdeasDrawer
             <div>
               <div style={{ marginBottom: '20px' }}>
                 <h3 style={{ fontSize: '16px', fontWeight: 600, margin: '0 0 8px 0', color: 'var(--text-primary)' }}>
-                  Choose Your Documentation Style
+                  Documentation Styles
                 </h3>
                 <p style={{ fontSize: '13px', color: 'var(--text-secondary)', margin: 0 }}>
-                  Select a workflow that matches how you prefer to document. You can change this anytime.
+                  Explore different approaches to clinical documentation. Use whichever style fits your current situation.
                 </p>
               </div>
 
               {WORKFLOWS.map((workflow) => (
                 <div
                   key={workflow.id}
-                  onClick={() => setSelectedWorkflow(selectedWorkflow === workflow.id ? null : workflow.id)}
+                  onClick={() => setExpandedWorkflow(expandedWorkflow === workflow.id ? null : workflow.id)}
                   style={{
                     marginBottom: '12px',
-                    border: savedWorkflow === workflow.id ? `2px solid ${workflow.color}` : '1px solid var(--border)',
+                    border: '1px solid var(--border)',
                     borderRadius: '12px',
                     overflow: 'hidden',
                     cursor: 'pointer',
-                    background: selectedWorkflow === workflow.id ? 'var(--bg-gray)' : 'var(--bg-white)',
+                    background: expandedWorkflow === workflow.id ? 'var(--bg-gray)' : 'var(--bg-white)',
                   }}
                 >
                   {/* Workflow Header */}
@@ -541,18 +527,6 @@ export default function IdeasDrawer({ isOpen, onClose, initialTab }: IdeasDrawer
                         <h4 style={{ fontSize: '14px', fontWeight: 600, margin: 0, color: 'var(--text-primary)' }}>
                           {workflow.name}
                         </h4>
-                        {savedWorkflow === workflow.id && (
-                          <span style={{
-                            fontSize: '10px',
-                            padding: '2px 8px',
-                            borderRadius: '10px',
-                            background: workflow.color,
-                            color: 'white',
-                            fontWeight: 600,
-                          }}>
-                            SELECTED
-                          </span>
-                        )}
                       </div>
                       <p style={{ fontSize: '13px', color: 'var(--text-secondary)', margin: '0 0 8px 0' }}>
                         {workflow.description}
@@ -571,7 +545,7 @@ export default function IdeasDrawer({ isOpen, onClose, initialTab }: IdeasDrawer
                       stroke="var(--text-muted)"
                       strokeWidth="2"
                       style={{
-                        transform: selectedWorkflow === workflow.id ? 'rotate(180deg)' : 'rotate(0deg)',
+                        transform: expandedWorkflow === workflow.id ? 'rotate(180deg)' : 'rotate(0deg)',
                         transition: 'transform 0.2s',
                       }}
                     >
@@ -580,7 +554,7 @@ export default function IdeasDrawer({ isOpen, onClose, initialTab }: IdeasDrawer
                   </div>
 
                   {/* Expanded Content */}
-                  {selectedWorkflow === workflow.id && (
+                  {expandedWorkflow === workflow.id && (
                     <div style={{
                       padding: '0 16px 16px 16px',
                       borderTop: '1px solid var(--border)',
@@ -595,7 +569,7 @@ export default function IdeasDrawer({ isOpen, onClose, initialTab }: IdeasDrawer
                           {workflow.bestFor}
                         </p>
                       </div>
-                      <div style={{ marginBottom: '16px' }}>
+                      <div>
                         <h5 style={{ fontSize: '12px', fontWeight: 600, margin: '0 0 8px 0', color: 'var(--text-muted)', textTransform: 'uppercase' }}>
                           How It Works
                         </h5>
@@ -605,25 +579,6 @@ export default function IdeasDrawer({ isOpen, onClose, initialTab }: IdeasDrawer
                           ))}
                         </ol>
                       </div>
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          saveWorkflowPreference(workflow.id)
-                        }}
-                        style={{
-                          width: '100%',
-                          padding: '10px',
-                          borderRadius: '8px',
-                          border: 'none',
-                          background: savedWorkflow === workflow.id ? 'var(--bg-gray)' : workflow.color,
-                          color: savedWorkflow === workflow.id ? 'var(--text-secondary)' : 'white',
-                          fontSize: '13px',
-                          fontWeight: 600,
-                          cursor: 'pointer',
-                        }}
-                      >
-                        {savedWorkflow === workflow.id ? '✓ Selected as Default' : 'Set as My Default Workflow'}
-                      </button>
                     </div>
                   )}
                 </div>
