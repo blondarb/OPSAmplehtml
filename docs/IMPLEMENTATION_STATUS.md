@@ -1,6 +1,6 @@
 # Implementation Status - Sevaro Clinical
 
-**Last Updated:** January 24, 2026
+**Last Updated:** January 24, 2026 (Phase 3A Quick Wins Implemented)
 **Based on:** PRD_AI_Scribe.md v1.4, Sevaro_Outpatient_MVP_PRD_v1.4, PRD_Roadmap_Phase3.md
 
 ---
@@ -210,20 +210,20 @@ Eliminate all dead UI affordances.
 | Lock Icon | TopNav | No action | Session lock |
 | Notifications | TopNav | No action | Open notifications panel |
 | What's New | TopNav | No action | Open changelog modal |
-| Three Dots Menu | CenterPanel | No action | Actions menu (copy, print) |
-| Thumbs Up | CenterPanel | No action | Mark as reviewed |
-| Copy Button | CenterPanel | No action | Copy to clipboard |
-| Pend Button | CenterPanel | No action | Save as pending |
-| Sign & Complete | CenterPanel | No action | Signature workflow |
+| Three Dots Menu | CenterPanel | **COMPLETE** | Actions menu (copy, print, dot phrases) |
+| Thumbs Up | CenterPanel | **COMPLETE** | Toggle reviewed status with visual feedback |
+| Copy Button | CenterPanel | **COMPLETE** | Copies formatted note with success indicator |
+| Pend Button | CenterPanel | **COMPLETE** | Shows saving/saved states |
+| Sign & Complete | CenterPanel | **COMPLETE** | Verification modal with checklist |
 
 #### 2. AI Actions Must Function
 All AI buttons must trigger real prompts - no placeholders.
 
 | Button | Location | Status | Required |
 |--------|----------|--------|----------|
-| Ask AI | AI Drawer | WORKING | - |
-| Generate Summary | AI Drawer | PLACEHOLDER | Implement prompt |
-| Generate Handout | AI Drawer | PLACEHOLDER | Implement prompt |
+| Ask AI | AI Drawer | **COMPLETE** | - |
+| Generate Summary | AI Drawer | **COMPLETE** | Patient-friendly summary with detail levels |
+| Generate Handout | AI Drawer | **COMPLETE** | Educational materials by condition |
 | Improve Writing | Fields | NOT BUILT | Add action |
 | Expand Details | Fields | NOT BUILT | Add action |
 | Summarize | Fields | NOT BUILT | Add action |
