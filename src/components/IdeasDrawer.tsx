@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { useVoiceRecorder } from '@/hooks/useVoiceRecorder'
 
 interface IdeasDrawerProps {
   isOpen: boolean
@@ -206,6 +207,32 @@ export default function IdeasDrawer({ isOpen, onClose }: IdeasDrawerProps) {
   const [feedbackText, setFeedbackText] = useState('')
   const [feedbackSubmitted, setFeedbackSubmitted] = useState(false)
   const [savedWorkflow, setSavedWorkflow] = useState<string | null>(null)
+
+  // Voice recording for feedback
+  const {
+    isRecording,
+    isPaused,
+    isTranscribing,
+    error: voiceError,
+    transcribedText,
+    recordingDuration,
+    startRecording,
+    pauseRecording,
+    resumeRecording,
+    stopRecording,
+    clearTranscription,
+  } = useVoiceRecorder()
+
+  // When transcription completes, append to feedback text
+  useEffect(() => {
+    if (transcribedText) {
+      setFeedbackText(prev => {
+        const separator = prev.trim() ? '\n\n' : ''
+        return prev + separator + transcribedText
+      })
+      clearTranscription()
+    }
+  }, [transcribedText, clearTranscription])
 
   // Load saved workflow preference
   useEffect(() => {
@@ -760,18 +787,115 @@ export default function IdeasDrawer({ isOpen, onClose }: IdeasDrawerProps) {
                     }}
                   />
 
+                  {/* Voice Recording Status */}
+                  {(isRecording || isTranscribing) && (
+                    <div style={{
+                      padding: '12px 16px',
+                      marginBottom: '16px',
+                      borderRadius: '8px',
+                      background: isRecording ? '#FEE2E2' : '#E0E7FF',
+                      border: isRecording ? '1px solid #EF4444' : '1px solid #6366F1',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                    }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                        {isRecording && (
+                          <>
+                            <div style={{
+                              width: '12px',
+                              height: '12px',
+                              borderRadius: '50%',
+                              background: isPaused ? '#F59E0B' : '#EF4444',
+                              animation: isPaused ? 'none' : 'pulse 1.5s infinite',
+                            }} />
+                            <span style={{ fontSize: '13px', fontWeight: 500, color: '#991B1B' }}>
+                              {isPaused ? 'Paused' : 'Recording...'} {Math.floor(recordingDuration / 60)}:{(recordingDuration % 60).toString().padStart(2, '0')}
+                            </span>
+                          </>
+                        )}
+                        {isTranscribing && (
+                          <>
+                            <div style={{
+                              width: '16px',
+                              height: '16px',
+                              border: '2px solid #6366F1',
+                              borderTopColor: 'transparent',
+                              borderRadius: '50%',
+                              animation: 'spin 1s linear infinite',
+                            }} />
+                            <span style={{ fontSize: '13px', fontWeight: 500, color: '#4338CA' }}>
+                              Transcribing...
+                            </span>
+                          </>
+                        )}
+                      </div>
+                      {isRecording && (
+                        <div style={{ display: 'flex', gap: '8px' }}>
+                          <button
+                            onClick={isPaused ? resumeRecording : pauseRecording}
+                            style={{
+                              padding: '6px 12px',
+                              borderRadius: '6px',
+                              border: 'none',
+                              background: '#FEF3C7',
+                              color: '#D97706',
+                              fontSize: '12px',
+                              fontWeight: 600,
+                              cursor: 'pointer',
+                            }}
+                          >
+                            {isPaused ? 'Resume' : 'Pause'}
+                          </button>
+                          <button
+                            onClick={stopRecording}
+                            style={{
+                              padding: '6px 12px',
+                              borderRadius: '6px',
+                              border: 'none',
+                              background: '#DC2626',
+                              color: 'white',
+                              fontSize: '12px',
+                              fontWeight: 600,
+                              cursor: 'pointer',
+                            }}
+                          >
+                            Stop
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Voice Error */}
+                  {voiceError && (
+                    <div style={{
+                      padding: '12px 16px',
+                      marginBottom: '16px',
+                      borderRadius: '8px',
+                      background: '#FEF2F2',
+                      border: '1px solid #EF4444',
+                      color: '#991B1B',
+                      fontSize: '13px',
+                    }}>
+                      {voiceError}
+                    </div>
+                  )}
+
                   <div style={{ display: 'flex', gap: '12px' }}>
                     <button
+                      onClick={isRecording ? stopRecording : startRecording}
+                      disabled={isTranscribing}
                       style={{
                         flex: 1,
                         padding: '12px',
                         borderRadius: '8px',
-                        border: '1px solid var(--border)',
-                        background: 'var(--bg-white)',
+                        border: isRecording ? 'none' : '1px solid var(--border)',
+                        background: isRecording ? '#DC2626' : isTranscribing ? 'var(--bg-gray)' : 'var(--bg-white)',
                         fontSize: '13px',
                         fontWeight: 500,
-                        cursor: 'pointer',
-                        color: 'var(--text-secondary)',
+                        cursor: isTranscribing ? 'not-allowed' : 'pointer',
+                        color: isRecording ? 'white' : isTranscribing ? 'var(--text-muted)' : 'var(--text-secondary)',
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
@@ -781,21 +905,21 @@ export default function IdeasDrawer({ isOpen, onClose }: IdeasDrawerProps) {
                       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                         <path d="M12 1a3 3 0 00-3 3v8a3 3 0 006 0V4a3 3 0 00-3-3z"/><path d="M19 10v2a7 7 0 01-14 0v-2"/>
                       </svg>
-                      Record Voice
+                      {isRecording ? 'Stop Recording' : isTranscribing ? 'Transcribing...' : 'Record Voice'}
                     </button>
                     <button
                       onClick={submitFeedback}
-                      disabled={!feedbackText.trim()}
+                      disabled={!feedbackText.trim() || isRecording || isTranscribing}
                       style={{
                         flex: 1,
                         padding: '12px',
                         borderRadius: '8px',
                         border: 'none',
-                        background: feedbackText.trim() ? 'var(--primary)' : 'var(--bg-gray)',
+                        background: feedbackText.trim() && !isRecording && !isTranscribing ? 'var(--primary)' : 'var(--bg-gray)',
                         fontSize: '13px',
                         fontWeight: 600,
-                        cursor: feedbackText.trim() ? 'pointer' : 'not-allowed',
-                        color: feedbackText.trim() ? 'white' : 'var(--text-muted)',
+                        cursor: feedbackText.trim() && !isRecording && !isTranscribing ? 'pointer' : 'not-allowed',
+                        color: feedbackText.trim() && !isRecording && !isTranscribing ? 'white' : 'var(--text-muted)',
                       }}
                     >
                       Submit Feedback
