@@ -42,6 +42,18 @@
 
   --background: var(--bg-gray);
   --foreground: var(--text-primary);
+
+  /* AI Summary section - dark mode colors */
+  --ai-summary-bg: linear-gradient(135deg, #422006 0%, #451a03 100%);
+  --ai-summary-border: #92400E;
+  --ai-summary-header: #FBBF24;
+  --ai-summary-section-header: #FCD34D;
+  --ai-summary-btn-bg: rgba(251, 191, 36, 0.2);
+  --ai-summary-btn-color: #FBBF24;
+
+  /* Queue pill active state - dark mode */
+  --queue-active-bg: var(--primary);
+  --queue-active-text: white;
 }
 
 * {

@@ -417,8 +417,8 @@ export default function LeftSidebar({ patient, priorVisits, scoreHistory }: Left
             {/* Generated Summary */}
             {generatedSummary && (
               <div style={{
-                background: 'linear-gradient(135deg, #FFFBEB 0%, #FEF3C7 100%)',
-                border: '1px solid #FCD34D',
+                background: 'var(--ai-summary-bg, linear-gradient(135deg, #FFFBEB 0%, #FEF3C7 100%))',
+                border: '1px solid var(--ai-summary-border, #FCD34D)',
                 borderRadius: '8px',
                 padding: '14px',
               }}>
@@ -434,7 +434,7 @@ export default function LeftSidebar({ patient, priorVisits, scoreHistory }: Left
                     gap: '6px',
                     fontWeight: 600,
                     fontSize: '12px',
-                    color: '#B45309',
+                    color: 'var(--ai-summary-header, #B45309)',
                   }}>
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="#F59E0B">
                       <path d="M12 1L13.5 9.5L22 12L13.5 14.5L12 23L10.5 14.5L2 12L10.5 9.5L12 1Z"/>
@@ -453,9 +453,9 @@ export default function LeftSidebar({ patient, priorVisits, scoreHistory }: Left
                         justifyContent: 'center',
                         borderRadius: '4px',
                         border: 'none',
-                        background: 'rgba(180, 83, 9, 0.1)',
+                        background: 'var(--ai-summary-btn-bg, rgba(180, 83, 9, 0.1))',
                         cursor: 'pointer',
-                        color: '#B45309',
+                        color: 'var(--ai-summary-btn-color, #B45309)',
                       }}
                     >
                       <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -473,9 +473,9 @@ export default function LeftSidebar({ patient, priorVisits, scoreHistory }: Left
                         justifyContent: 'center',
                         borderRadius: '4px',
                         border: 'none',
-                        background: 'rgba(180, 83, 9, 0.1)',
+                        background: 'var(--ai-summary-btn-bg, rgba(180, 83, 9, 0.1))',
                         cursor: 'pointer',
-                        color: '#B45309',
+                        color: 'var(--ai-summary-btn-color, #B45309)',
                       }}
                     >
                       <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -494,7 +494,7 @@ export default function LeftSidebar({ patient, priorVisits, scoreHistory }: Left
                     // Handle bold text marked with **
                     if (line.startsWith('**') && line.endsWith('**')) {
                       return (
-                        <div key={i} style={{ fontWeight: 600, color: '#92400E', marginTop: i > 0 ? '12px' : 0, marginBottom: '4px' }}>
+                        <div key={i} style={{ fontWeight: 600, color: 'var(--ai-summary-section-header, #92400E)', marginTop: i > 0 ? '12px' : 0, marginBottom: '4px' }}>
                           {line.replace(/\*\*/g, '')}
                         </div>
                       )
