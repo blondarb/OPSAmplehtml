@@ -196,9 +196,12 @@ These foundational features are fully implemented.
 
 | Feature | Status | Priority |
 |---------|--------|----------|
-| Note assembly from all sources | 🔧 PARTIAL | Merge engine exists |
-| Preview/Edit modal | ⏳ PENDING | P1 |
-| Recommendations verification checklist | ⏳ PENDING | P1 |
+| Note assembly from all sources | ✅ COMPLETE | Merge engine + modal |
+| Preview/Edit modal | ✅ COMPLETE | P1 |
+| Recommendations verification checklist | ✅ COMPLETE | P1 |
+| Source tracking (Manual/AI/Recs) | ✅ COMPLETE | P1 |
+| Section verification progress | ✅ COMPLETE | P1 |
+| AI suggestion accept/reject | ✅ COMPLETE | P1 |
 | Suggested improvements section | ⏳ PENDING | P2 |
 | "Ask AI about this note" button | ⏳ PENDING | P2 |
 

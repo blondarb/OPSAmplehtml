@@ -9,6 +9,7 @@ import CenterPanel from './CenterPanel'
 import AiDrawer from './AiDrawer'
 import VoiceDrawer from './VoiceDrawer'
 import DotPhrasesDrawer from './DotPhrasesDrawer'
+import NotePreviewModal from './NotePreviewModal'
 import { mergeNoteContent, type ChartPrepOutput, type VisitAIOutput, type ManualNoteData } from '@/lib/note-merge'
 import type { User } from '@supabase/supabase-js'
 
@@ -107,7 +108,10 @@ export default function ClinicalNote({
   const [voiceDrawerOpen, setVoiceDrawerOpen] = useState(false)
   const [voiceDrawerTab, setVoiceDrawerTab] = useState('chart-prep')
   const [dotPhrasesOpen, setDotPhrasesOpen] = useState(false)
+  const [notePreviewOpen, setNotePreviewOpen] = useState(false)
   const [activeTextField, setActiveTextField] = useState<string | null>(null)
+  const [selectedRecommendations, setSelectedRecommendations] = useState<Array<{ category: string; items: string[] }>>([])
+
   const [noteData, setNoteData] = useState({
     chiefComplaint: currentVisit?.chief_complaint || ['Headache'],
     hpi: currentVisit?.clinical_notes?.hpi || '',
@@ -165,43 +169,45 @@ export default function ClinicalNote({
     setVisitTranscript(transcript)
   }, [])
 
-  // Generate Note function - merges AI outputs with manual content
+  // Generate Note function - opens preview modal for review
   const generateNote = useCallback(() => {
-    // Prepare manual data
-    const manualData: ManualNoteData = {
-      chiefComplaint: noteData.chiefComplaint,
-      hpi: noteData.hpi,
-      ros: noteData.ros,
-      physicalExam: '', // Not currently tracked separately
-      assessment: noteData.assessment,
-      plan: noteData.plan,
-    }
+    setNotePreviewOpen(true)
+  }, [])
 
-    // Merge content from all sources
-    const mergedNote = mergeNoteContent(
-      manualData,
-      chartPrepOutput,
-      visitAIOutput,
-      { conflictResolution: 'keep-manual', showAiSuggestions: true }
-    )
+  // Handle saving note from preview modal
+  const handleSaveFromPreview = useCallback((finalNote: Record<string, string>) => {
+    // Update all note fields with the final content
+    Object.entries(finalNote).forEach(([field, value]) => {
+      if (field in noteData) {
+        updateNote(field, value)
+      }
+    })
+    setNotePreviewOpen(false)
+  }, [noteData])
 
-    // Update note fields with merged content
-    // Only update empty fields with AI content
-    if (!noteData.hpi && mergedNote.hpi.content) {
-      updateNote('hpi', mergedNote.hpi.content)
-    }
-    if (!noteData.assessment && mergedNote.assessment.content) {
-      updateNote('assessment', mergedNote.assessment.content)
-    }
-    if (!noteData.plan && mergedNote.plan.content) {
-      updateNote('plan', mergedNote.plan.content)
-    }
+  // Handle signing note from preview modal
+  const handleSignFromPreview = useCallback((finalNote: Record<string, string>) => {
+    // Update all note fields with the final content
+    Object.entries(finalNote).forEach(([field, value]) => {
+      if (field in noteData) {
+        updateNote(field, value)
+      }
+    })
+    // Mark as signed
+    // TODO: Update visit status to signed in database
+    setNotePreviewOpen(false)
+    // Could show a success toast here
+  }, [noteData])
 
-    // TODO: In future, store the full mergedNote for showing AI suggestions
-    // This would enable the AiSuggestionPanel component to show alternatives
-
-    return mergedNote
-  }, [noteData, chartPrepOutput, visitAIOutput])
+  // Track recommendations selected in SmartRecommendationsSection
+  const handleRecommendationsSelected = useCallback((items: string[]) => {
+    // Group by category (we'll improve this later)
+    if (items.length > 0) {
+      setSelectedRecommendations([{ category: 'Selected Recommendations', items }])
+    } else {
+      setSelectedRecommendations([])
+    }
+  }, [])
 
   const router = useRouter()
   const supabase = createClient()
@@ -315,6 +321,7 @@ export default function ClinicalNote({
           updateRawDictation={updateRawDictation}
           onGenerateNote={generateNote}
           hasAIContent={!!(chartPrepOutput || visitAIOutput)}
+          onRecommendationsSelected={handleRecommendationsSelected}
         />
       </div>
 
@@ -353,6 +360,26 @@ export default function ClinicalNote({
           activeField={activeTextField}
         />
       )}
+
+      <NotePreviewModal
+        isOpen={notePreviewOpen}
+        onClose={() => setNotePreviewOpen(false)}
+        noteData={{
+          chiefComplaint: noteData.chiefComplaint,
+          hpi: noteData.hpi,
+          ros: noteData.ros,
+          physicalExam: '',
+          assessment: noteData.assessment,
+          plan: noteData.plan,
+        }}
+        chartPrepData={chartPrepOutput}
+        visitAIData={visitAIOutput}
+        selectedRecommendations={selectedRecommendations}
+        onSave={handleSaveFromPreview}
+        onSign={handleSignFromPreview}
+        patientName={patient?.name || 'Patient'}
+        visitDate={currentVisit?.visit_date ? new Date(currentVisit.visit_date).toLocaleDateString() : undefined}
+      />
     </div>
   )
 }

@@ -23,6 +23,7 @@ interface CenterPanelProps {
   updateRawDictation?: (field: string, rawText: string) => void
   onGenerateNote?: () => void
   hasAIContent?: boolean
+  onRecommendationsSelected?: (items: string[]) => void
 }
 
 const ALLERGY_OPTIONS = ['NKDA', 'Reviewed in EMR', 'Unknown', 'Other']
@@ -43,6 +44,7 @@ export default function CenterPanel({
   updateRawDictation,
   onGenerateNote,
   hasAIContent,
+  onRecommendationsSelected,
 }: CenterPanelProps) {
   const [activeTab, setActiveTab] = useState('history')
   const [localActiveField, setLocalActiveField] = useState<string | null>(null)
@@ -1620,6 +1622,8 @@ ${noteData.plan || 'Not documented'}
                 const currentPlan = noteData.plan || ''
                 const newItems = items.join('\n')
                 updateNote('plan', currentPlan ? `${currentPlan}\n${newItems}` : newItems)
+                // Track for note preview
+                onRecommendationsSelected?.(items)
               }}
             />
 
