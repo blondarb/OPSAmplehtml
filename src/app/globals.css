@@ -59,6 +59,10 @@
   --ai-response-bg: linear-gradient(135deg, #134E4A 0%, #115E59 100%);
   --ai-badge-bg: #065F46;
   --ai-badge-text: #34D399;
+
+  /* Note modal include toggles - dark mode */
+  --note-include-active-bg: #065F46;
+  --note-include-active-text: #34D399;
 }
 
 * {

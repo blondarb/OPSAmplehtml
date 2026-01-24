@@ -292,8 +292,8 @@ export default function EnhancedNotePreviewModal({
                 width: '20px',
                 height: '20px',
                 borderRadius: '4px',
-                border: `2px solid ${section.isVerified ? '#10B981' : '#D1D5DB'}`,
-                background: section.isVerified ? '#10B981' : 'white',
+                border: `2px solid ${section.isVerified ? '#10B981' : 'var(--border)'}`,
+                background: section.isVerified ? '#10B981' : 'var(--bg-white)',
                 cursor: 'pointer',
                 display: 'flex',
                 alignItems: 'center',
@@ -323,7 +323,7 @@ export default function EnhancedNotePreviewModal({
                 padding: '4px 8px',
                 borderRadius: '4px',
                 border: '1px solid var(--border)',
-                background: 'white',
+                background: 'var(--bg-white)',
                 cursor: 'pointer',
                 fontSize: '12px',
                 color: 'var(--text-secondary)',
@@ -350,6 +350,8 @@ export default function EnhancedNotePreviewModal({
                 lineHeight: 1.5,
                 resize: 'vertical',
                 fontFamily: 'inherit',
+                background: 'var(--bg-white)',
+                color: 'var(--text-primary)',
               }}
             />
             <div style={{ display: 'flex', gap: '8px', marginTop: '8px' }}>
@@ -374,7 +376,7 @@ export default function EnhancedNotePreviewModal({
                   padding: '6px 16px',
                   borderRadius: '6px',
                   border: '1px solid var(--border)',
-                  background: 'white',
+                  background: 'var(--bg-white)',
                   color: 'var(--text-secondary)',
                   fontSize: '13px',
                   cursor: 'pointer',
@@ -387,7 +389,7 @@ export default function EnhancedNotePreviewModal({
         ) : (
           <div style={{
             padding: '12px',
-            background: 'white',
+            background: 'var(--bg-white)',
             borderRadius: '6px',
             fontSize: '13px',
             lineHeight: 1.6,
@@ -404,7 +406,7 @@ export default function EnhancedNotePreviewModal({
 
   const renderFinalNoteView = () => (
     <div style={{
-      background: 'white',
+      background: 'var(--bg-white)',
       border: '1px solid var(--border)',
       borderRadius: '8px',
       padding: '24px',
@@ -414,6 +416,7 @@ export default function EnhancedNotePreviewModal({
       whiteSpace: 'pre-wrap',
       maxHeight: '100%',
       overflowY: 'auto',
+      color: 'var(--text-primary)',
     }}>
       {formattedNote?.fullText || ''}
     </div>
@@ -465,7 +468,7 @@ export default function EnhancedNotePreviewModal({
                 height: '32px',
                 borderRadius: '8px',
                 border: '1px solid var(--border)',
-                background: 'white',
+                background: 'var(--bg-white)',
                 cursor: 'pointer',
                 display: 'flex',
                 alignItems: 'center',
@@ -501,7 +504,7 @@ export default function EnhancedNotePreviewModal({
                       padding: '6px 12px',
                       borderRadius: '6px',
                       border: noteType === type ? 'none' : '1px solid var(--border)',
-                      background: noteType === type ? '#0D9488' : 'white',
+                      background: noteType === type ? '#0D9488' : 'var(--bg-white)',
                       color: noteType === type ? 'white' : 'var(--text-secondary)',
                       fontSize: '12px',
                       fontWeight: 500,
@@ -528,7 +531,7 @@ export default function EnhancedNotePreviewModal({
                       padding: '6px 12px',
                       borderRadius: '6px',
                       border: noteLength === length ? 'none' : '1px solid var(--border)',
-                      background: noteLength === length ? '#8B5CF6' : 'white',
+                      background: noteLength === length ? '#8B5CF6' : 'var(--bg-white)',
                       color: noteLength === length ? 'white' : 'var(--text-secondary)',
                       fontSize: '12px',
                       fontWeight: 500,
@@ -561,8 +564,8 @@ export default function EnhancedNotePreviewModal({
                       padding: '4px 10px',
                       borderRadius: '16px',
                       border: '1px solid var(--border)',
-                      background: opt.value ? '#D1FAE5' : 'white',
-                      color: opt.value ? '#059669' : 'var(--text-muted)',
+                      background: opt.value ? 'var(--note-include-active-bg, #D1FAE5)' : 'var(--bg-white)',
+                      color: opt.value ? 'var(--note-include-active-text, #059669)' : 'var(--text-muted)',
                       fontSize: '11px',
                       fontWeight: 500,
                       cursor: 'pointer',
@@ -652,7 +655,7 @@ export default function EnhancedNotePreviewModal({
                 width: '120px',
                 height: '6px',
                 borderRadius: '3px',
-                background: '#E5E7EB',
+                background: 'var(--border)',
                 overflow: 'hidden',
               }}>
                 <div style={{
@@ -681,7 +684,7 @@ export default function EnhancedNotePreviewModal({
                 padding: '10px 20px',
                 borderRadius: '8px',
                 border: '1px solid var(--border)',
-                background: 'white',
+                background: 'var(--bg-white)',
                 color: 'var(--text-secondary)',
                 fontSize: '14px',
                 cursor: 'pointer',
@@ -697,8 +700,8 @@ export default function EnhancedNotePreviewModal({
                 padding: '10px 20px',
                 borderRadius: '8px',
                 border: '1px solid var(--border)',
-                background: copySuccess ? '#D1FAE5' : 'white',
-                color: copySuccess ? '#059669' : 'var(--text-primary)',
+                background: copySuccess ? 'var(--note-include-active-bg, #D1FAE5)' : 'var(--bg-white)',
+                color: copySuccess ? 'var(--note-include-active-text, #059669)' : 'var(--text-primary)',
                 fontSize: '14px',
                 fontWeight: 500,
                 cursor: 'pointer',
