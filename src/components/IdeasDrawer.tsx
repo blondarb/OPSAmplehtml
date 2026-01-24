@@ -10,6 +10,17 @@ interface IdeasDrawerProps {
   onStartTour?: () => void
 }
 
+// Workflow quick selection guide
+const WORKFLOW_GUIDE = {
+  title: 'Which Style Should I Use?',
+  scenarios: [
+    { situation: 'New to the app', recommendation: 'hybrid-light', reason: 'Learn the interface while getting AI assistance' },
+    { situation: 'Busy clinic day', recommendation: 'ai-driven', reason: 'Minimize clicks, let AI do the heavy lifting' },
+    { situation: 'Complex patient', recommendation: 'manual', reason: 'Full control over every detail' },
+    { situation: 'Routine follow-up', recommendation: 'ai-driven', reason: 'Quick documentation for simple visits' },
+  ],
+}
+
 // Workflow definitions
 const WORKFLOWS = [
   {
@@ -25,6 +36,8 @@ const WORKFLOWS = [
       'Make minor edits as needed',
       'Click Generate Note → review and copy to EHR',
     ],
+    keyButtons: ['🎤 Mic (red)', '✨ Generate Note (purple)'],
+    timeToComplete: '2-5 min review',
     aiUsage: 'Maximum',
     userClicks: 'Minimal',
     color: '#8B5CF6',
@@ -42,6 +55,8 @@ const WORKFLOWS = [
       'Select diagnoses from the differential section',
       'Click Generate Note to compile your entries',
     ],
+    keyButtons: ['Tabs', '⚡ Dot Phrases (purple)', '✨ Generate Note'],
+    timeToComplete: '10-15 min',
     aiUsage: 'None',
     userClicks: 'Maximum',
     color: '#6B7280',
@@ -59,6 +74,8 @@ const WORKFLOWS = [
       'Accept or modify AI suggestions where helpful',
       'Generate final note with your content prioritized',
     ],
+    keyButtons: ['🎤 Chart Prep', 'Tabs', '✨ Generate Note'],
+    timeToComplete: '5-10 min',
     aiUsage: 'Light (Chart Prep only)',
     userClicks: 'Moderate',
     color: '#06B6D4',
@@ -76,6 +93,8 @@ const WORKFLOWS = [
       'Accept AI for some sections, override for others',
       'Smart Recommendations for treatment planning',
     ],
+    keyButtons: ['🎤 Mic', '⭐ AI Actions', '💡 Smart Recs', '✨ Generate Note'],
+    timeToComplete: '5-8 min',
     aiUsage: 'Selective',
     userClicks: 'Moderate',
     color: '#10B981',
@@ -495,6 +514,37 @@ export default function IdeasDrawer({ isOpen, onClose, initialTab, onStartTour }
           {/* Workflows Tab */}
           {activeTab === 'workflows' && (
             <div>
+              {/* Quick Selection Guide */}
+              <div style={{
+                marginBottom: '20px',
+                padding: '16px',
+                background: 'linear-gradient(135deg, #EFF6FF 0%, #DBEAFE 100%)',
+                borderRadius: '12px',
+                border: '1px solid #3B82F6',
+              }}>
+                <h4 style={{ fontSize: '14px', fontWeight: 600, margin: '0 0 12px 0', color: '#1D4ED8', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <span>🎯</span> {WORKFLOW_GUIDE.title}
+                </h4>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  {WORKFLOW_GUIDE.scenarios.map((scenario, idx) => (
+                    <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12px' }}>
+                      <span style={{ fontWeight: 600, color: '#1E40AF', minWidth: '110px' }}>{scenario.situation}:</span>
+                      <span style={{
+                        padding: '2px 8px',
+                        borderRadius: '4px',
+                        background: WORKFLOWS.find(w => w.id === scenario.recommendation)?.color || '#6B7280',
+                        color: 'white',
+                        fontSize: '11px',
+                        fontWeight: 600,
+                      }}>
+                        {WORKFLOWS.find(w => w.id === scenario.recommendation)?.name}
+                      </span>
+                      <span style={{ color: '#64748B' }}>– {scenario.reason}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
               <div style={{ marginBottom: '20px' }}>
                 <h3 style={{ fontSize: '16px', fontWeight: 600, margin: '0 0 8px 0', color: 'var(--text-primary)' }}>
                   Documentation Styles
@@ -564,8 +614,51 @@ export default function IdeasDrawer({ isOpen, onClose, initialTab, onStartTour }
                       marginTop: '-8px',
                       paddingTop: '16px',
                     }}>
+                      {/* Key Buttons & Time Row */}
+                      <div style={{ display: 'flex', gap: '16px', marginBottom: '12px', flexWrap: 'wrap' }}>
+                        {workflow.keyButtons && (
+                          <div style={{ flex: 1, minWidth: '150px' }}>
+                            <h5 style={{ fontSize: '11px', fontWeight: 600, margin: '0 0 6px 0', color: 'var(--text-muted)', textTransform: 'uppercase' }}>
+                              Key Buttons
+                            </h5>
+                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
+                              {workflow.keyButtons.map((btn, idx) => (
+                                <span key={idx} style={{
+                                  padding: '3px 8px',
+                                  borderRadius: '4px',
+                                  background: 'var(--bg-gray)',
+                                  border: '1px solid var(--border)',
+                                  fontSize: '11px',
+                                  color: 'var(--text-secondary)',
+                                }}>
+                                  {btn}
+                                </span>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                        {workflow.timeToComplete && (
+                          <div style={{ minWidth: '80px' }}>
+                            <h5 style={{ fontSize: '11px', fontWeight: 600, margin: '0 0 6px 0', color: 'var(--text-muted)', textTransform: 'uppercase' }}>
+                              Typical Time
+                            </h5>
+                            <span style={{
+                              padding: '3px 8px',
+                              borderRadius: '4px',
+                              background: '#ECFDF5',
+                              border: '1px solid #10B981',
+                              fontSize: '11px',
+                              color: '#047857',
+                              fontWeight: 600,
+                            }}>
+                              {workflow.timeToComplete}
+                            </span>
+                          </div>
+                        )}
+                      </div>
+
                       <div style={{ marginBottom: '12px' }}>
-                        <h5 style={{ fontSize: '12px', fontWeight: 600, margin: '0 0 4px 0', color: 'var(--text-muted)', textTransform: 'uppercase' }}>
+                        <h5 style={{ fontSize: '11px', fontWeight: 600, margin: '0 0 4px 0', color: 'var(--text-muted)', textTransform: 'uppercase' }}>
                           Best For
                         </h5>
                         <p style={{ fontSize: '13px', color: 'var(--text-secondary)', margin: 0 }}>
@@ -573,8 +666,8 @@ export default function IdeasDrawer({ isOpen, onClose, initialTab, onStartTour }
                         </p>
                       </div>
                       <div>
-                        <h5 style={{ fontSize: '12px', fontWeight: 600, margin: '0 0 8px 0', color: 'var(--text-muted)', textTransform: 'uppercase' }}>
-                          How It Works
+                        <h5 style={{ fontSize: '11px', fontWeight: 600, margin: '0 0 8px 0', color: 'var(--text-muted)', textTransform: 'uppercase' }}>
+                          Step by Step
                         </h5>
                         <ol style={{ margin: 0, paddingLeft: '20px', fontSize: '13px', color: 'var(--text-primary)' }}>
                           {workflow.steps.map((step, idx) => (

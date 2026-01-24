@@ -32,9 +32,14 @@ This document tracks implementation progress against the product requirements an
 - ✅ **Extended Scales** - NIHSS, Modified Ashworth, ABCD2, DHI, Mini-Cog, ISI, ESS
 - ✅ **Exam Templates** - Predefined + custom template feature
 
-**Remaining High Priority:**
-1. **Pre-built Dot Phrases** - Seed the neurology phrase library
-2. **Workflow Documentation** - Help users understand AI-driven vs manual workflows
+**Newly Completed:**
+- ✅ **Pre-built Dot Phrases** - 70+ neurology phrases seeded (exams, assessments, plans per condition)
+- ✅ **Workflow Documentation** - Quick selection guide, scenario recommendations, step-by-step guides
+
+**Remaining (Lower Priority):**
+- Additional clinical scales (UPDRS, Hoehn & Yahr, EDSS, CHA₂DS₂-VASc)
+- Patient education enhancements (reading level, language selection)
+- Audio routing improvements for Visit AI
 
 ---
 
@@ -260,6 +265,24 @@ This document tracks implementation progress against the product requirements an
 | CRUD operations | COMPLETE | /api/phrases | Full API |
 | Usage tracking | COMPLETE | - | Count updates |
 | Inline trigger | COMPLETE | NoteTextField.tsx | Lightning button |
+| **Pre-built Library** | COMPLETE | /api/phrases/seed | 70+ neurology phrases |
+
+**Pre-built Phrase Categories (70+ phrases):**
+- General: .wnl, .nfnd, .deny, .educated, .stable, .improved
+- Allergies: .nkda, .nka, .pcnallergy, .sulfa
+- Physical Exam: .neuroexam, .neurobrief, .mentalstatus, .cranialnerves, .motorexam, .sensoryexam, .reflexes, .coordination, .gait
+- ROS: .rosneg, .rosneuro, .rosbrief
+- Headache: .migraine, .migraineha, .haplan, .haflags, .moh, .tensionha
+- Seizure: .seizure, .szplan, .szdescribe, .firstsz, .szfree
+- Movement: .parkinson, .pdplan, .tremor, .dystonia
+- Stroke: .stroke, .strokeplan, .tia
+- MS: .ms, .msplan, .msrelapse
+- Cognitive: .dementia, .dementiaplan, .mci
+- Neuromuscular: .neuropathy, .neuroplan, .myasthenia, .mgplan
+- Sleep: .sleepapnea, .insomnia, .sleephygiene, .rls
+- Follow-up: .fu1wk, .fu2wk, .fu1mo, .fu3mo, .fu6mo, .fuprn
+- Orders: .labs, .mri, .mrispine, .eeg, .emg, .ptref, .otref, .stref
+- Return Precautions: .returnha, .returnstroke, .returnsz
 
 ---
 
@@ -448,20 +471,27 @@ Any text input should have dictation.
 - Completion persistence via localStorage
 - Replay option from Settings Drawer
 
-#### 9. Suggested Workflows (CRITICAL)
+#### 9. Suggested Workflows - COMPLETE
 
 | Workflow | Description | Status |
 |----------|-------------|--------|
-| **Fully AI-Driven** | Dictate → AI generates all → Review | NOT DOCUMENTED |
-| **Fully Manual** | Click through → Type manually | SUPPORTED (implicit) |
-| **Hybrid Lightweight** | AI pre-fills → Manual completion | PARTIAL |
-| **Hybrid Advanced** | Selective AI per section | PARTIAL |
+| **Fully AI-Driven** | Dictate → AI generates all → Review | **COMPLETE** |
+| **Fully Manual** | Click through → Type manually | **COMPLETE** |
+| **Hybrid Lightweight** | AI pre-fills → Manual completion | **COMPLETE** |
+| **Hybrid Advanced** | Selective AI per section | **COMPLETE** |
 
-**Workflow Precedence Rules (to define):**
+**Workflow Documentation Features:**
+- Quick selection guide ("Which Style Should I Use?")
+- Scenario-based recommendations (new users, busy clinic, complex cases)
+- Key buttons listed per workflow
+- Typical time estimates
+- Step-by-step instructions
+- Edit priority explanation (manual edits always take precedence)
+
+**Workflow Precedence Rules (documented):**
 - Manual edits always override AI content
 - User-typed content protected from AI overwrite
 - Chart Prep = suggested until explicitly added
-- Workflow mode controls which AI buttons are visible
 
 ---
 

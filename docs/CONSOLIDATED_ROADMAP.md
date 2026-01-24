@@ -443,9 +443,15 @@ Based on the analysis, here's the recommended implementation order to minimize r
 
 ### Ongoing (Polish & Expansion)
 
-7. **TopNav Dead Elements** - Logo, Timer, Lock, Notifications
-8. **Pre-built Dot Phrases** - Seed neurology library
-9. **Workflow Documentation** - Help users understand options
+7. ~~**TopNav Dead Elements** - Logo, Timer, Lock, Notifications~~ ✅ COMPLETE
+8. ~~**Pre-built Dot Phrases** - Seed neurology library~~ ✅ COMPLETE
+   - 70+ phrases across 15 categories
+   - Covers all major neurology conditions
+   - Includes exams, assessments, plans, orders, and return precautions
+9. ~~**Workflow Documentation** - Help users understand options~~ ✅ COMPLETE
+   - Quick selection guide with scenario-based recommendations
+   - Step-by-step guides for each workflow style
+   - Key buttons and typical time estimates per workflow
 
 ---
 
@@ -462,6 +468,8 @@ Based on the analysis, here's the recommended implementation order to minimize r
 | User Settings | Working | ✅ COMPLETE |
 | Responsive design | Mobile/Tablet/Desktop | ✅ COMPLETE |
 | Dark mode | All form elements | ✅ COMPLETE |
+| Pre-built Dot Phrases | Neurology library | ✅ COMPLETE (70+ phrases) |
+| Workflow Documentation | User guidance | ✅ COMPLETE |
 | Onboarding | Interactive tour | ✅ COMPLETE |
 | Help Drawer | All tabs | ✅ COMPLETE |
 
