@@ -815,29 +815,19 @@ export default function LeftSidebar({ patient, priorVisits, scoreHistory }: Left
 
       {/* Score History Section */}
       <div style={{ padding: '12px 16px' }}>
-        <div
+        <button
           onClick={() => setScoreHistoryOpen(!scoreHistoryOpen)}
           style={{
             display: 'flex',
             alignItems: 'center',
-            justifyContent: 'space-between',
+            gap: '8px',
+            background: 'none',
+            border: 'none',
+            padding: 0,
             cursor: 'pointer',
             marginBottom: scoreHistoryOpen ? '12px' : 0,
           }}
         >
-          <h4 style={{
-            fontSize: '13px',
-            fontWeight: 600,
-            color: 'var(--text-primary)',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '6px',
-          }}>
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <path d="M3 3v18h18"/><path d="M18 17V9"/><path d="M13 17V5"/><path d="M8 17v-3"/>
-            </svg>
-            Score History
-          </h4>
           <svg
             width="14"
             height="14"
@@ -852,7 +842,21 @@ export default function LeftSidebar({ patient, priorVisits, scoreHistory }: Left
           >
             <polyline points="6 9 12 15 18 9"/>
           </svg>
-        </div>
+          <h4 style={{
+            fontSize: '13px',
+            fontWeight: 600,
+            color: 'var(--text-primary)',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '6px',
+            margin: 0,
+          }}>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M3 3v18h18"/><path d="M18 17V9"/><path d="M13 17V5"/><path d="M8 17v-3"/>
+            </svg>
+            Score History
+          </h4>
+        </button>
 
         {scoreHistoryOpen && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
