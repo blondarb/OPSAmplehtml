@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 
 interface LeftSidebarProps {
   patient: any
@@ -10,10 +10,26 @@ interface LeftSidebarProps {
 
 export default function LeftSidebar({ patient, priorVisits, scoreHistory }: LeftSidebarProps) {
   const [expandedVisit, setExpandedVisit] = useState<string | null>(priorVisits[0]?.id || null)
-  const [timelineOpen, setTimelineOpen] = useState(true)
-  const [recentConsultsOpen, setRecentConsultsOpen] = useState(false)
   const [aiSummaryEnabled, setAiSummaryEnabled] = useState(true)
   const [scoreHistoryOpen, setScoreHistoryOpen] = useState(true)
+  const [localTime, setLocalTime] = useState<string>('--:--')
+
+  // Update local time every second
+  useEffect(() => {
+    const updateTime = () => {
+      const now = new Date()
+      const timeString = now.toLocaleTimeString('en-US', {
+        hour: 'numeric',
+        minute: '2-digit',
+        hour12: true,
+        timeZoneName: 'short',
+      })
+      setLocalTime(timeString)
+    }
+    updateTime()
+    const interval = setInterval(updateTime, 1000)
+    return () => clearInterval(interval)
+  }, [])
 
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('en-US', {
@@ -23,83 +39,50 @@ export default function LeftSidebar({ patient, priorVisits, scoreHistory }: Left
     })
   }
 
-  const timeline = [
-    { id: 'initial', label: 'Initial call', value: 'N/A', icon: 'clipboard' },
-    { id: 'video', label: 'Time on video', value: 'N/A', icon: 'video' },
-    { id: 'assessment', label: 'Assessment time', value: 'N/A', icon: 'clock' },
-    { id: 'final', label: 'Final recommendation time', value: 'N/A', icon: 'check' },
-  ]
-
   return (
     <aside style={{
-      width: '280px',
+      width: '260px',
       background: 'var(--bg-white)',
       borderRight: '1px solid var(--border)',
       display: 'flex',
       flexDirection: 'column',
       overflowY: 'auto',
     }}>
-      {/* Hospital Logo Section */}
+      {/* Hospital/Location Section with Local Time */}
       <div style={{ padding: '16px', borderBottom: '1px solid var(--border)' }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-            <div style={{
-              width: '40px',
-              height: '40px',
-              borderRadius: '8px',
-              background: 'linear-gradient(135deg, #3B82F6 0%, #1D4ED8 100%)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              color: 'white',
-              fontWeight: 700,
-              fontSize: '14px',
-            }}>
-              M
-            </div>
-            <div>
-              <div style={{ fontWeight: 600, fontSize: '14px', color: 'var(--text-primary)' }}>Marshall</div>
-              <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>TNK | PST</div>
-            </div>
-          </div>
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--text-muted)" strokeWidth="2">
-            <path d="M7 17l9.2-9.2M17 17V7H7"/>
-          </svg>
-        </div>
-      </div>
-
-      {/* Medical History Link */}
-      <div style={{
-        padding: '12px 16px',
-        borderBottom: '1px solid var(--border)',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        cursor: 'pointer',
-      }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
           <div style={{
-            width: '32px',
-            height: '32px',
-            borderRadius: '8px',
-            background: '#FEE2E2',
+            width: '40px',
+            height: '40px',
+            borderRadius: '50%',
+            background: 'var(--bg-dark)',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
           }}>
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#DC2626" strokeWidth="2">
-              <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/>
-              <polyline points="14 2 14 8 20 8"/>
-              <line x1="16" y1="13" x2="8" y2="13"/>
-              <line x1="16" y1="17" x2="8" y2="17"/>
-              <polyline points="10 9 9 9 8 9"/>
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--text-muted)" strokeWidth="2">
+              <path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/>
             </svg>
           </div>
-          <span style={{ fontSize: '14px', color: 'var(--text-primary)' }}>Medical history</span>
+          <div style={{ flex: 1 }}>
+            <h3 style={{ fontSize: '15px', fontWeight: 600, color: 'var(--text-primary)' }}>Marshall</h3>
+            <p style={{
+              fontSize: '13px',
+              color: 'var(--text-secondary)',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '4px',
+            }}>
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/>
+              </svg>
+              {localTime}
+            </p>
+          </div>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--text-muted)" strokeWidth="2" style={{ cursor: 'pointer' }}>
+            <path d="M7 17l9.2-9.2M17 17V7H7"/>
+          </svg>
         </div>
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--text-muted)" strokeWidth="2">
-          <path d="M7 17l9.2-9.2M17 17V7H7"/>
-        </svg>
       </div>
 
       {/* Patient Card */}
@@ -138,33 +121,9 @@ export default function LeftSidebar({ patient, priorVisits, scoreHistory }: Left
               </button>
             </div>
             <p style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>
-              {patient ? `${new Date().getFullYear() - new Date(patient.date_of_birth).getFullYear()}, ${patient.gender === 'M' ? 'M' : 'F'}` : '50, M'} # {patient?.mrn || '123123'}
+              {patient ? `${new Date().getFullYear() - new Date(patient.date_of_birth).getFullYear()}, ${patient.gender === 'M' ? 'M' : 'F'}` : '50, M'} #{patient?.mrn || '123123'}
             </p>
           </div>
-        </div>
-
-        {/* Non-Emergent Badge */}
-        <div style={{
-          display: 'inline-flex',
-          alignItems: 'center',
-          gap: '6px',
-          padding: '4px 10px',
-          borderRadius: '6px',
-          border: '1px solid var(--primary)',
-          background: 'rgba(13, 148, 136, 0.1)',
-          marginBottom: '12px',
-          cursor: 'pointer',
-        }}>
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" strokeWidth="2">
-            <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/>
-            <line x1="16" y1="2" x2="16" y2="6"/>
-            <line x1="8" y1="2" x2="8" y2="6"/>
-            <line x1="3" y1="10" x2="21" y2="10"/>
-          </svg>
-          <span style={{ fontSize: '12px', color: 'var(--primary)', fontWeight: 500 }}>Non-Emergent</span>
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" strokeWidth="2">
-            <polyline points="6 9 12 15 18 9"/>
-          </svg>
         </div>
 
         {/* Action Buttons */}
@@ -207,325 +166,329 @@ export default function LeftSidebar({ patient, priorVisits, scoreHistory }: Left
 
       {/* Quick Links */}
       <div style={{ padding: '12px 16px', borderBottom: '1px solid var(--border)', fontSize: '13px' }}>
-        <div style={{ marginBottom: '4px' }}>
-          <a href="#" style={{ color: 'var(--primary)', textDecoration: 'none' }}>Pacs viewer</a>
-          <span style={{ color: 'var(--text-muted)' }}> | </span>
-          <a href="#" style={{ color: 'var(--primary)', textDecoration: 'none' }}>VizAI</a>
-          <span style={{ color: 'var(--text-muted)' }}> | </span>
-          <a href="#" style={{ color: 'var(--primary)', textDecoration: 'none' }}>Epic</a>
-          <span style={{ color: 'var(--text-muted)' }}> | </span>
-        </div>
-        <a href="#" style={{ color: 'var(--primary)', textDecoration: 'none' }}>GlobalProtect</a>
+        <a href="#" style={{ color: 'var(--primary)', textDecoration: 'none' }}>PACS viewer</a>
+        <span style={{ color: 'var(--text-muted)' }}> | </span>
+        <a href="#" style={{ color: 'var(--primary)', textDecoration: 'none' }}>VizAI</a>
+        <span style={{ color: 'var(--text-muted)' }}> | </span>
+        <a href="#" style={{ color: 'var(--primary)', textDecoration: 'none' }}>Epic</a>
       </div>
 
-      {/* Hospitalist Section */}
-      <div style={{ padding: '16px', borderBottom: '1px solid var(--border)' }}>
-        <h4 style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '12px' }}>
-          Hospitalist
-        </h4>
-        <button style={{
+      {/* Prior Visits Section */}
+      <div style={{ padding: '12px 16px', borderBottom: '1px solid var(--border)' }}>
+        <div style={{
           display: 'flex',
           alignItems: 'center',
-          gap: '8px',
-          background: 'transparent',
-          border: 'none',
-          cursor: 'pointer',
-          padding: 0,
-          color: 'var(--text-secondary)',
-          fontSize: '13px',
+          justifyContent: 'space-between',
+          marginBottom: '12px',
         }}>
-          <div style={{
-            width: '32px',
-            height: '32px',
-            borderRadius: '50%',
-            border: '2px dashed var(--border)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-          }}>
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--text-muted)" strokeWidth="2">
-              <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
-            </svg>
+          <h4 style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)' }}>Prior Visits</h4>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>AI Summary</span>
+            <button
+              onClick={() => setAiSummaryEnabled(!aiSummaryEnabled)}
+              style={{
+                width: '36px',
+                height: '20px',
+                borderRadius: '10px',
+                border: 'none',
+                background: aiSummaryEnabled ? 'var(--primary)' : 'var(--border)',
+                cursor: 'pointer',
+                position: 'relative',
+                transition: 'background 0.2s',
+              }}
+            >
+              <div style={{
+                width: '16px',
+                height: '16px',
+                borderRadius: '50%',
+                background: 'white',
+                position: 'absolute',
+                top: '2px',
+                left: aiSummaryEnabled ? '18px' : '2px',
+                transition: 'left 0.2s',
+                boxShadow: '0 1px 3px rgba(0,0,0,0.2)',
+              }} />
+            </button>
           </div>
-          Add Hospitalist
-        </button>
+        </div>
+
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+          {(priorVisits.length > 0 ? priorVisits.slice(0, 3) : [
+            { id: '1', visit_date: '2026-01-10', visit_type: 'follow_up', chief_complaint: ['Headache', 'memory concerns'], clinical_notes: { ai_summary: 'Patient reports improved headache frequency with current prophylaxis. MoCA stable at 26/30. Continue current regimen.' } },
+            { id: '2', visit_date: '2025-12-15', visit_type: 'new_patient', chief_complaint: ['New onset headaches, 3 months'], clinical_notes: { ai_summary: 'Initial evaluation for chronic daily headache. Started on topiramate 25mg. MRI brain ordered.' } },
+          ]).map((visit) => {
+            const isExpanded = expandedVisit === visit.id
+            return (
+              <div
+                key={visit.id}
+                onClick={() => setExpandedVisit(isExpanded ? null : visit.id)}
+                style={{
+                  background: isExpanded ? 'var(--bg-white)' : 'var(--bg-gray)',
+                  border: isExpanded ? '1px solid var(--primary)' : '1px solid transparent',
+                  borderRadius: '8px',
+                  padding: '12px',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s',
+                }}
+              >
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '4px' }}>
+                  <span style={{ fontWeight: 600, fontSize: '13px', color: 'var(--text-primary)' }}>
+                    {formatDate(visit.visit_date)}
+                  </span>
+                  <span style={{
+                    fontSize: '11px',
+                    padding: '2px 8px',
+                    borderRadius: '10px',
+                    background: visit.visit_type === 'new_patient' ? '#D1FAE5' : '#DBEAFE',
+                    color: visit.visit_type === 'new_patient' ? '#059669' : '#1D4ED8',
+                  }}>
+                    {visit.visit_type === 'new_patient' ? 'New Patient' : 'Follow-up'}
+                  </span>
+                </div>
+                <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '4px' }}>
+                  {Array.isArray(visit.chief_complaint) ? visit.chief_complaint.join(', ') : visit.chief_complaint || 'General consultation'}
+                </div>
+                <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Dr. Smith</div>
+
+                {/* AI Summary - Expanded */}
+                {isExpanded && aiSummaryEnabled && (
+                  <div style={{
+                    marginTop: '12px',
+                    paddingTop: '12px',
+                    borderTop: '1px solid var(--border)',
+                  }}>
+                    <div style={{
+                      background: 'linear-gradient(135deg, #F0FDFA 0%, #ECFDF5 100%)',
+                      border: '1px solid #A7F3D0',
+                      borderRadius: '8px',
+                      padding: '12px',
+                    }}>
+                      <div style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '6px',
+                        marginBottom: '8px',
+                        fontWeight: 600,
+                        fontSize: '12px',
+                        color: 'var(--primary-dark)',
+                      }}>
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                          <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
+                        </svg>
+                        AI Summary
+                      </div>
+                      <div style={{ fontSize: '12px', color: 'var(--text-secondary)', lineHeight: 1.5 }}>
+                        {visit.clinical_notes?.ai_summary || 'Patient reports improved symptoms with current treatment. Continue current regimen and reassess at next visit.'}
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )
+          })}
+        </div>
       </div>
 
-      {/* Timeline Section */}
-      <div style={{ padding: '16px', borderBottom: '1px solid var(--border)' }}>
+      {/* Score History Section */}
+      <div style={{ padding: '12px 16px' }}>
         <div
-          onClick={() => setTimelineOpen(!timelineOpen)}
+          onClick={() => setScoreHistoryOpen(!scoreHistoryOpen)}
           style={{
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
             cursor: 'pointer',
-            marginBottom: timelineOpen ? '16px' : 0,
+            marginBottom: scoreHistoryOpen ? '12px' : 0,
           }}
         >
-          <h4 style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text-primary)' }}>
-            Timeline
-          </h4>
-          <svg
-            width="16"
-            height="16"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="var(--text-muted)"
-            strokeWidth="2"
-            style={{ transform: timelineOpen ? 'rotate(0)' : 'rotate(-90deg)', transition: 'transform 0.2s' }}
-          >
-            <line x1="5" y1="12" x2="19" y2="12"/>
-          </svg>
-        </div>
-
-        {timelineOpen && (
-          <div style={{ position: 'relative', paddingLeft: '20px' }}>
-            {/* Vertical line */}
-            <div style={{
-              position: 'absolute',
-              left: '15px',
-              top: '16px',
-              bottom: '16px',
-              width: '2px',
-              background: 'var(--border)',
-            }}/>
-
-            {timeline.map((item, index) => (
-              <div key={item.id} style={{
-                display: 'flex',
-                alignItems: 'flex-start',
-                gap: '12px',
-                marginBottom: index < timeline.length - 1 ? '16px' : 0,
-                position: 'relative',
-              }}>
-                <div style={{
-                  width: '32px',
-                  height: '32px',
-                  borderRadius: '50%',
-                  background: 'var(--bg-gray)',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  color: 'var(--text-muted)',
-                  flexShrink: 0,
-                  position: 'relative',
-                  zIndex: 1,
-                }}>
-                  {item.icon === 'clipboard' && (
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                      <path d="M16 4h2a2 2 0 012 2v14a2 2 0 01-2 2H6a2 2 0 01-2-2V6a2 2 0 012-2h2"/>
-                      <rect x="8" y="2" width="8" height="4" rx="1" ry="1"/>
-                    </svg>
-                  )}
-                  {item.icon === 'video' && (
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                      <polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/>
-                    </svg>
-                  )}
-                  {item.icon === 'clock' && (
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                      <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
-                    </svg>
-                  )}
-                  {item.icon === 'check' && (
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                      <polyline points="20 6 9 17 4 12"/>
-                    </svg>
-                  )}
-                </div>
-                <div>
-                  <div style={{ fontSize: '13px', color: 'var(--primary)' }}>{item.label}</div>
-                  <div style={{ fontSize: '12px', color: 'var(--text-muted)', fontWeight: 500 }}>{item.value}</div>
-                </div>
-                {index === 0 && (
-                  <span style={{
-                    position: 'absolute',
-                    left: '-4px',
-                    top: '10px',
-                    fontSize: '10px',
-                    color: '#DC2626',
-                    fontWeight: 600,
-                  }}>FLOOR</span>
-                )}
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
-
-      {/* Prior Visits Section */}
-      <div className="sidebar-section">
-        <div className="sidebar-section-header">
-          <h4>Prior Visits</h4>
-          <div className="ai-toggle">
-            <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>AI Summary</span>
-            <div
-              className={`toggle-switch ${aiSummaryEnabled ? 'active' : ''}`}
-              onClick={() => setAiSummaryEnabled(!aiSummaryEnabled)}
-            />
-          </div>
-        </div>
-        <div className="sidebar-section-content">
-          {priorVisits.slice(0, 3).map((visit) => (
-            <div
-              key={visit.id}
-              className={`prior-visit-card ${expandedVisit === visit.id ? 'expanded' : ''}`}
-              onClick={() => setExpandedVisit(expandedVisit === visit.id ? null : visit.id)}
-            >
-              <div className="visit-header">
-                <span className="visit-date">{formatDate(visit.visit_date)}</span>
-                <span className={`visit-type badge ${visit.visit_type === 'new_patient' ? 'badge-green' : 'badge-blue'}`}>
-                  {visit.visit_type === 'new_patient' ? 'New Patient' : 'Follow-up'}
-                </span>
-              </div>
-              <div className="visit-chief">{visit.chief_complaint?.join(', ') || 'General consultation'}</div>
-              <div className="visit-provider">Dr. Smith</div>
-              {expandedVisit === visit.id && aiSummaryEnabled && (
-                <div className="visit-expanded-content" style={{ display: 'block' }}>
-                  <div className="ai-summary-box">
-                    <div className="ai-summary-header">
-                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                        <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
-                      </svg>
-                      AI Summary
-                    </div>
-                    <div className="ai-summary-content">
-                      {visit.clinical_notes?.ai_summary || 'Patient reports improved symptoms with current treatment. Continue current regimen and reassess at next visit.'}
-                    </div>
-                  </div>
-                </div>
-              )}
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {/* Score History Section */}
-      <div className={`score-history-section ${scoreHistoryOpen ? '' : 'collapsed'}`}>
-        <div className="score-history-header" onClick={() => setScoreHistoryOpen(!scoreHistoryOpen)}>
-          <h4>
+          <h4 style={{
+            fontSize: '13px',
+            fontWeight: 600,
+            color: 'var(--text-primary)',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '6px',
+          }}>
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <path d="M3 3v18h18"/><path d="M18 17V9"/><path d="M13 17V5"/><path d="M8 17v-3"/>
             </svg>
             Score History
           </h4>
-          <svg className="score-history-toggle" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+          <svg
+            width="14"
+            height="14"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="var(--text-muted)"
+            strokeWidth="2"
+            style={{
+              transform: scoreHistoryOpen ? 'rotate(0deg)' : 'rotate(-90deg)',
+              transition: 'transform 0.2s',
+            }}
+          >
             <polyline points="6 9 12 15 18 9"/>
           </svg>
         </div>
-        <div className="score-history-content">
-          {/* Group scores by type - dynamically get unique scale types */}
-          {(() => {
-            // Get unique scale types from the data
-            const scaleTypes = [...new Set(scoreHistory.map(s => s.scale_type))].filter(Boolean)
-            // If no data, show default scales
-            const displayTypes = scaleTypes.length > 0 ? scaleTypes : []
 
-            return displayTypes.map((scaleType) => {
-              const scaleScores = scoreHistory.filter(s => s.scale_type === scaleType)
-              if (scaleScores.length === 0) return null
+        {scoreHistoryOpen && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+            {/* Render actual score history or defaults */}
+            {(() => {
+              const scaleTypes = [...new Set(scoreHistory.map(s => s.scale_type))].filter(Boolean)
+              const hasData = scaleTypes.length > 0
 
-              // For MOCA, higher is better. For others, lower is better
-              const lowerIsBetter = !scaleType.includes('MOCA')
-              const trend = scaleScores.length > 1
-                ? (lowerIsBetter
-                  ? (scaleScores[0].score < scaleScores[1].score ? 'improving' : scaleScores[0].score > scaleScores[1].score ? 'worsening' : 'stable')
-                  : (scaleScores[0].score > scaleScores[1].score ? 'improving' : scaleScores[0].score < scaleScores[1].score ? 'worsening' : 'stable'))
-                : 'stable'
+              const defaultScores = [
+                {
+                  type: 'MIDAS',
+                  trend: 'improving' as const,
+                  scores: [
+                    { date: 'Jan 16, 2026', value: 18, interpretation: 'Moderate' },
+                    { date: 'Jan 10, 2026', value: 24, interpretation: 'Moderate' },
+                    { date: 'Dec 15, 2025', value: 42, interpretation: 'Severe' },
+                    { date: 'Nov 1, 2025', value: 56, interpretation: 'Severe' },
+                  ],
+                },
+                {
+                  type: 'HIT-6',
+                  trend: 'stable' as const,
+                  scores: [
+                    { date: 'Jan 16, 2026', value: 58, interpretation: 'Substantial' },
+                    { date: 'Jan 10, 2026', value: 60, interpretation: 'Severe' },
+                    { date: 'Dec 15, 2025', value: 62, interpretation: 'Severe' },
+                  ],
+                },
+                {
+                  type: 'PHQ-9',
+                  trend: 'improving' as const,
+                  scores: [
+                    { date: 'Jan 16, 2026', value: 6, interpretation: 'Mild' },
+                    { date: 'Dec 15, 2025', value: 11, interpretation: 'Moderate' },
+                  ],
+                },
+              ]
 
-              return (
-                <div key={scaleType} className="score-card">
-                  <div className="score-card-header">
-                    <span className="score-card-title">{scaleType}</span>
-                    <span className={`score-card-trend ${trend}`}>
-                      {trend === 'improving' && (
-                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                          <polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/>
-                          <polyline points="17 6 23 6 23 12"/>
-                        </svg>
-                      )}
-                      {trend === 'stable' && (
-                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                          <line x1="5" y1="12" x2="19" y2="12"/>
-                        </svg>
-                      )}
-                      {trend === 'worsening' && (
-                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                          <polyline points="23 18 13.5 8.5 8.5 13.5 1 6"/>
-                          <polyline points="17 18 23 18 23 12"/>
-                        </svg>
-                      )}
-                      {trend.charAt(0).toUpperCase() + trend.slice(1)}
-                    </span>
-                  </div>
-                  <div className="score-history-list">
-                    {scaleScores.slice(0, 4).map((score) => (
-                      <div key={score.id} className="score-history-item clickable">
-                        <span className="date">{formatDate(score.created_at)}</span>
-                        <span className="value">{score.score} <span className="interpretation">{score.interpretation}</span></span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )
-            })
-          })()}
+              const dataToRender = hasData
+                ? scaleTypes.map(scaleType => {
+                    const scaleScores = scoreHistory.filter(s => s.scale_type === scaleType)
+                    const lowerIsBetter = !scaleType.includes('MOCA')
+                    const trend = scaleScores.length > 1
+                      ? (lowerIsBetter
+                        ? (scaleScores[0].score < scaleScores[1].score ? 'improving' : scaleScores[0].score > scaleScores[1].score ? 'worsening' : 'stable')
+                        : (scaleScores[0].score > scaleScores[1].score ? 'improving' : scaleScores[0].score < scaleScores[1].score ? 'worsening' : 'stable'))
+                      : 'stable'
+                    return {
+                      type: scaleType,
+                      trend: trend as 'improving' | 'stable' | 'worsening',
+                      scores: scaleScores.slice(0, 4).map(s => ({
+                        date: formatDate(s.created_at),
+                        value: s.score,
+                        interpretation: s.interpretation,
+                      })),
+                    }
+                  })
+                : defaultScores
 
-          {/* Default scores if none exist */}
-          {scoreHistory.length === 0 && (
-            <>
-              <div className="score-card">
-                <div className="score-card-header">
-                  <span className="score-card-title">MIDAS</span>
-                  <span className="score-card-trend improving">
-                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                      <polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/>
-                      <polyline points="17 6 23 6 23 12"/>
-                    </svg>
-                    Improving
-                  </span>
-                </div>
-                <div className="score-history-list">
-                  <div className="score-history-item clickable">
-                    <span className="date">Jan 16, 2026</span>
-                    <span className="value">18 <span className="interpretation">Moderate</span></span>
-                  </div>
-                  <div className="score-history-item clickable">
-                    <span className="date">Jan 10, 2026</span>
-                    <span className="value">24 <span className="interpretation">Moderate</span></span>
-                  </div>
-                  <div className="score-history-item clickable">
-                    <span className="date">Dec 15, 2025</span>
-                    <span className="value">42 <span className="interpretation">Severe</span></span>
-                  </div>
-                </div>
-              </div>
-              <div className="score-card">
-                <div className="score-card-header">
-                  <span className="score-card-title">HIT-6</span>
-                  <span className="score-card-trend stable">
-                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                      <line x1="5" y1="12" x2="19" y2="12"/>
-                    </svg>
-                    Stable
-                  </span>
-                </div>
-                <div className="score-history-list">
-                  <div className="score-history-item">
-                    <span className="date">Jan 16, 2026</span>
-                    <span className="value">58 <span className="interpretation">Substantial</span></span>
-                  </div>
-                  <div className="score-history-item">
-                    <span className="date">Jan 10, 2026</span>
-                    <span className="value">60 <span className="interpretation">Severe</span></span>
-                  </div>
-                </div>
-              </div>
-            </>
-          )}
-        </div>
+              return dataToRender.map(scale => (
+                <ScoreCard key={scale.type} scale={scale} />
+              ))
+            })()}
+          </div>
+        )}
       </div>
     </aside>
+  )
+}
+
+// Score Card Component
+interface ScoreCardProps {
+  scale: {
+    type: string
+    trend: 'improving' | 'stable' | 'worsening'
+    scores: { date: string; value: number; interpretation: string }[]
+  }
+}
+
+function ScoreCard({ scale }: ScoreCardProps) {
+  const trendColors = {
+    improving: '#10B981',
+    stable: '#6B7280',
+    worsening: '#EF4444',
+  }
+
+  return (
+    <div style={{
+      background: 'var(--bg-gray)',
+      borderRadius: '8px',
+      padding: '12px',
+    }}>
+      {/* Header with title and trend */}
+      <div style={{
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: '10px',
+      }}>
+        <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)' }}>
+          {scale.type}
+        </span>
+        <span style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: '4px',
+          fontSize: '11px',
+          fontWeight: 500,
+          color: trendColors[scale.trend],
+        }}>
+          {scale.trend === 'improving' && (
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/>
+              <polyline points="17 6 23 6 23 12"/>
+            </svg>
+          )}
+          {scale.trend === 'stable' && (
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <line x1="5" y1="12" x2="19" y2="12"/>
+            </svg>
+          )}
+          {scale.trend === 'worsening' && (
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <polyline points="23 18 13.5 8.5 8.5 13.5 1 6"/>
+              <polyline points="17 18 23 18 23 12"/>
+            </svg>
+          )}
+          {scale.trend.charAt(0).toUpperCase() + scale.trend.slice(1)}
+        </span>
+      </div>
+
+      {/* Score list */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+        {scale.scores.map((score, idx) => (
+          <div
+            key={idx}
+            style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              padding: '6px 8px',
+              borderRadius: '4px',
+              background: 'var(--bg-white)',
+              cursor: 'pointer',
+            }}
+          >
+            <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>{score.date}</span>
+            <span style={{ fontSize: '12px', fontWeight: 500, color: 'var(--text-primary)' }}>
+              {score.value}{' '}
+              <span style={{
+                fontWeight: 400,
+                color: 'var(--text-secondary)',
+                fontSize: '11px',
+              }}>
+                {score.interpretation}
+              </span>
+            </span>
+          </div>
+        ))}
+      </div>
+    </div>
   )
 }
