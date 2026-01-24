@@ -49,6 +49,14 @@ export default function CenterPanel({
   const [activeTab, setActiveTab] = useState('history')
   const [localActiveField, setLocalActiveField] = useState<string | null>(null)
 
+  // Patient context for AI actions
+  const patientContext = {
+    patient: patient?.name || 'Unknown Patient',
+    chiefComplaint: Array.isArray(noteData.chiefComplaint)
+      ? noteData.chiefComplaint.join(', ')
+      : noteData.chiefComplaint || '',
+  }
+
   // Toolbar action states
   const [showMoreMenu, setShowMoreMenu] = useState(false)
   const [isReviewed, setIsReviewed] = useState(false)
@@ -674,6 +682,7 @@ ${noteData.plan || 'Not documented'}
                   setActiveTextField={handleSetActiveField}
                   rawDictation={rawDictation?.hpi}
                   onRawDictationChange={updateRawDictation ? (rawText) => updateRawDictation('hpi', rawText) : undefined}
+                  patientContext={patientContext}
                 />
               </div>
             </div>
@@ -1612,6 +1621,7 @@ ${noteData.plan || 'Not documented'}
                   setActiveTextField={handleSetActiveField}
                   rawDictation={rawDictation?.assessment}
                   onRawDictationChange={updateRawDictation ? (rawText) => updateRawDictation('assessment', rawText) : undefined}
+                  patientContext={patientContext}
                 />
               </div>
             </div>
@@ -1676,6 +1686,7 @@ ${noteData.plan || 'Not documented'}
                   setActiveTextField={handleSetActiveField}
                   rawDictation={rawDictation?.plan}
                   onRawDictationChange={updateRawDictation ? (rawText) => updateRawDictation('plan', rawText) : undefined}
+                  patientContext={patientContext}
                 />
               </div>
             </div>

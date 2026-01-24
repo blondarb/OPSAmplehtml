@@ -174,10 +174,11 @@ These foundational features are fully implemented.
 
 | Feature | Status | Priority |
 |---------|--------|----------|
-| Field AI (star button) | ✅ COMPLETE | Opens drawer |
-| Improve Writing | ⏳ PENDING | 🎯 Add action |
-| Expand Details | ⏳ PENDING | 🎯 Add action |
-| Summarize | ⏳ PENDING | 🎯 Add action |
+| Field AI (star button) | ✅ COMPLETE | Opens dropdown menu |
+| Improve Writing | ✅ COMPLETE | Polishes grammar & clarity |
+| Expand Details | ✅ COMPLETE | Adds clinical context |
+| Summarize | ✅ COMPLETE | Condenses to key points |
+| Ask AI link | ✅ COMPLETE | Opens AI drawer from menu |
 
 ### 3.4 Dictation Coverage
 
@@ -350,23 +351,25 @@ Based on the analysis, here's the recommended implementation order to minimize r
 
 ### Short-term (Phase 3A Completion)
 
-2. **Field-level AI Actions** - Improve/Expand/Summarize
-   - Existing buttons with no actions = bad UX
-   - Users expect these to work
+2. ~~**Field-level AI Actions** - Improve/Expand/Summarize~~ ✅ COMPLETE
+   - Dropdown menu with Improve Writing, Expand Details, Summarize
+   - API endpoint `/api/ai/field-action` with GPT-4 integration
+   - Patient context awareness for better results
 
-3. **User Settings with AI Instructions**
+3. ~~**Note Review Modal** - Final review workflow~~ ✅ COMPLETE
+   - Source tracking (Manual/ChartPrep/VisitAI/Recs)
+   - Section verification with progress
+   - AI suggestion accept/reject
+
+4. **User Settings with AI Instructions**
    - Personalization is key to adoption
    - AI custom instructions enable provider preferences
 
 ### Medium-term (Phase 3B)
 
-4. **NIHSS Scale** - Critical for stroke
+5. **NIHSS Scale** - Critical for stroke
    - High clinical value
    - Bridges outpatient/inpatient needs
-
-5. **Note Review Modal** - Final review workflow
-   - Important for note quality
-   - Confidence in AI outputs
 
 ### Ongoing (Polish & Expansion)
 

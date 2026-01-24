@@ -4,6 +4,8 @@ import { useState, useRef, useEffect, useCallback } from 'react'
 import InlinePhrasePicker from './InlinePhrasePicker'
 import { useVoiceRecorder } from '@/hooks/useVoiceRecorder'
 
+type FieldActionType = 'improve' | 'expand' | 'summarize'
+
 interface Phrase {
   id: string
   trigger_text: string
@@ -24,6 +26,10 @@ interface NoteTextFieldProps {
   setActiveTextField: (field: string | null) => void
   rawDictation?: Array<{ text: string; timestamp: string }> | null
   onRawDictationChange?: (rawText: string) => void
+  patientContext?: {
+    patient?: string
+    chiefComplaint?: string
+  }
 }
 
 export default function NoteTextField({
@@ -39,6 +45,7 @@ export default function NoteTextField({
   setActiveTextField,
   rawDictation,
   onRawDictationChange,
+  patientContext,
 }: NoteTextFieldProps) {
   const [showPicker, setShowPicker] = useState(false)
   const [phrases, setPhrases] = useState<Phrase[]>([])
@@ -47,6 +54,11 @@ export default function NoteTextField({
   const lastExpandedRef = useRef<string>('')
 
   const [showRawDictation, setShowRawDictation] = useState(false)
+
+  // AI Action states
+  const [showAiMenu, setShowAiMenu] = useState(false)
+  const [aiLoading, setAiLoading] = useState(false)
+  const [aiError, setAiError] = useState<string | null>(null)
 
   // Voice recording hook
   const {
@@ -194,6 +206,7 @@ export default function NoteTextField({
     const handleClickOutside = (event: MouseEvent) => {
       if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
         setShowPicker(false)
+        setShowAiMenu(false)
       }
     }
 
@@ -225,6 +238,47 @@ export default function NoteTextField({
   const handleOpenFullDrawer = () => {
     setShowPicker(false)
     onOpenFullPhrasesDrawer()
+  }
+
+  // Handle AI field actions
+  const handleAiAction = async (action: FieldActionType) => {
+    if (!value.trim()) {
+      setAiError('Please enter some text first')
+      setTimeout(() => setAiError(null), 3000)
+      return
+    }
+
+    setShowAiMenu(false)
+    setAiLoading(true)
+    setAiError(null)
+
+    try {
+      const response = await fetch('/api/ai/field-action', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action,
+          text: value,
+          fieldName,
+          context: patientContext,
+        }),
+      })
+
+      const data = await response.json()
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to process text')
+      }
+
+      // Replace the text with the AI result
+      onChange(data.result)
+    } catch (error: any) {
+      console.error('AI action error:', error)
+      setAiError(error.message || 'Failed to process text')
+      setTimeout(() => setAiError(null), 5000)
+    } finally {
+      setAiLoading(false)
+    }
   }
 
   return (
@@ -290,18 +344,178 @@ export default function NoteTextField({
         </button>
         {showAiAction && (
           <button
-            onClick={onOpenAiDrawer}
-            className="ai-icon-btn sparkle"
+            onClick={() => setShowAiMenu(!showAiMenu)}
+            disabled={aiLoading}
+            className={`ai-icon-btn sparkle ${showAiMenu ? 'active' : ''}`}
             style={{
-              background: 'linear-gradient(135deg, var(--primary) 0%, var(--primary-light) 100%)',
+              background: showAiMenu ? 'var(--primary)' : 'linear-gradient(135deg, var(--primary) 0%, var(--primary-light) 100%)',
               color: 'white',
             }}
             title="AI Actions"
           >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
-            </svg>
+            {aiLoading ? (
+              <div
+                style={{
+                  width: '14px',
+                  height: '14px',
+                  border: '2px solid rgba(255,255,255,0.3)',
+                  borderTopColor: 'white',
+                  borderRadius: '50%',
+                  animation: 'spin 1s linear infinite',
+                }}
+              />
+            ) : (
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
+              </svg>
+            )}
           </button>
+        )}
+
+        {/* AI Action Menu */}
+        {showAiMenu && (
+          <div className="quick-phrases-dropdown show" style={{ width: '200px', right: '0', left: 'auto' }}>
+            <div className="quick-phrases-header" style={{ borderBottom: '1px solid var(--border)', paddingBottom: '8px', marginBottom: '4px' }}>
+              <span style={{ fontSize: '12px', fontWeight: '600', color: 'var(--primary)' }}>AI Actions</span>
+            </div>
+            <button
+              onClick={() => handleAiAction('improve')}
+              className="quick-phrase-item"
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '10px',
+                width: '100%',
+                padding: '10px 12px',
+                background: 'none',
+                border: 'none',
+                cursor: 'pointer',
+                textAlign: 'left',
+                borderRadius: '6px',
+                transition: 'background 0.15s',
+              }}
+              onMouseEnter={(e) => e.currentTarget.style.background = 'var(--bg-gray)'}
+              onMouseLeave={(e) => e.currentTarget.style.background = 'none'}
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" strokeWidth="2">
+                <path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/>
+              </svg>
+              <div>
+                <div style={{ fontSize: '13px', fontWeight: '500', color: 'var(--text-primary)' }}>Improve Writing</div>
+                <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Polish grammar & clarity</div>
+              </div>
+            </button>
+            <button
+              onClick={() => handleAiAction('expand')}
+              className="quick-phrase-item"
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '10px',
+                width: '100%',
+                padding: '10px 12px',
+                background: 'none',
+                border: 'none',
+                cursor: 'pointer',
+                textAlign: 'left',
+                borderRadius: '6px',
+                transition: 'background 0.15s',
+              }}
+              onMouseEnter={(e) => e.currentTarget.style.background = 'var(--bg-gray)'}
+              onMouseLeave={(e) => e.currentTarget.style.background = 'none'}
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" strokeWidth="2">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/>
+              </svg>
+              <div>
+                <div style={{ fontSize: '13px', fontWeight: '500', color: 'var(--text-primary)' }}>Expand Details</div>
+                <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Add clinical context</div>
+              </div>
+            </button>
+            <button
+              onClick={() => handleAiAction('summarize')}
+              className="quick-phrase-item"
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '10px',
+                width: '100%',
+                padding: '10px 12px',
+                background: 'none',
+                border: 'none',
+                cursor: 'pointer',
+                textAlign: 'left',
+                borderRadius: '6px',
+                transition: 'background 0.15s',
+              }}
+              onMouseEnter={(e) => e.currentTarget.style.background = 'var(--bg-gray)'}
+              onMouseLeave={(e) => e.currentTarget.style.background = 'none'}
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" strokeWidth="2">
+                <line x1="21" y1="10" x2="3" y2="10"/><line x1="21" y1="6" x2="3" y2="6"/><line x1="21" y1="14" x2="3" y2="14"/><line x1="21" y1="18" x2="3" y2="18"/>
+              </svg>
+              <div>
+                <div style={{ fontSize: '13px', fontWeight: '500', color: 'var(--text-primary)' }}>Summarize</div>
+                <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Condense to key points</div>
+              </div>
+            </button>
+            {onOpenAiDrawer && (
+              <>
+                <div style={{ height: '1px', background: 'var(--border)', margin: '8px 0' }} />
+                <button
+                  onClick={() => {
+                    setShowAiMenu(false)
+                    onOpenAiDrawer()
+                  }}
+                  className="quick-phrase-item"
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '10px',
+                    width: '100%',
+                    padding: '10px 12px',
+                    background: 'none',
+                    border: 'none',
+                    cursor: 'pointer',
+                    textAlign: 'left',
+                    borderRadius: '6px',
+                    transition: 'background 0.15s',
+                  }}
+                  onMouseEnter={(e) => e.currentTarget.style.background = 'var(--bg-gray)'}
+                  onMouseLeave={(e) => e.currentTarget.style.background = 'none'}
+                >
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--text-muted)" strokeWidth="2">
+                    <circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/>
+                  </svg>
+                  <div>
+                    <div style={{ fontSize: '13px', fontWeight: '500', color: 'var(--text-secondary)' }}>Ask AI...</div>
+                    <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Open AI assistant</div>
+                  </div>
+                </button>
+              </>
+            )}
+          </div>
+        )}
+
+        {/* AI Error Toast */}
+        {aiError && (
+          <div
+            style={{
+              position: 'absolute',
+              bottom: '100%',
+              right: '0',
+              marginBottom: '8px',
+              padding: '8px 12px',
+              background: 'var(--danger)',
+              color: 'white',
+              borderRadius: '6px',
+              fontSize: '12px',
+              whiteSpace: 'nowrap',
+              zIndex: 100,
+            }}
+          >
+            {aiError}
+          </div>
         )}
         {showDictate && (
           <button
