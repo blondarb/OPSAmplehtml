@@ -614,6 +614,7 @@ export default function ClinicalNote({
         isOpen={ideasDrawerOpen}
         onClose={() => setIdeasDrawerOpen(false)}
         initialTab={ideasDrawerTab}
+        onStartTour={() => setShowTour(true)}
       />
 
       {/* Onboarding Tour for new users or when manually triggered */}

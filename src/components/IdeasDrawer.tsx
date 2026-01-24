@@ -7,6 +7,7 @@ interface IdeasDrawerProps {
   isOpen: boolean
   onClose: () => void
   initialTab?: 'inspiration' | 'tour' | 'features' | 'workflows' | 'feedback'
+  onStartTour?: () => void
 }
 
 // Workflow definitions
@@ -211,7 +212,7 @@ interface FeedbackItem {
   downvotes: string[] // Array of user IDs who downvoted
 }
 
-export default function IdeasDrawer({ isOpen, onClose, initialTab }: IdeasDrawerProps) {
+export default function IdeasDrawer({ isOpen, onClose, initialTab, onStartTour }: IdeasDrawerProps) {
   const [activeTab, setActiveTab] = useState<'inspiration' | 'tour' | 'features' | 'workflows' | 'feedback'>(initialTab || 'workflows')
 
   // Update active tab when initialTab changes (e.g., when opening from feedback button)
@@ -605,6 +606,66 @@ export default function IdeasDrawer({ isOpen, onClose, initialTab }: IdeasDrawer
           {/* Tour Tab */}
           {activeTab === 'tour' && (
             <div>
+              {/* Launch Interactive Tour Button */}
+              {onStartTour && (
+                <div style={{
+                  marginBottom: '24px',
+                  padding: '16px',
+                  background: 'linear-gradient(135deg, #0D9488 0%, #06B6D4 100%)',
+                  borderRadius: '12px',
+                  color: 'white',
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '12px' }}>
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <circle cx="12" cy="12" r="10"/>
+                      <polygon points="10 8 16 12 10 16 10 8" fill="currentColor"/>
+                    </svg>
+                    <div>
+                      <h4 style={{ fontSize: '14px', fontWeight: 600, margin: 0 }}>Interactive Guided Tour</h4>
+                      <p style={{ fontSize: '12px', opacity: 0.9, margin: '2px 0 0 0' }}>
+                        See each feature highlighted on the actual interface
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => {
+                      onClose()
+                      onStartTour()
+                    }}
+                    style={{
+                      width: '100%',
+                      padding: '10px',
+                      borderRadius: '8px',
+                      border: '2px solid rgba(255,255,255,0.3)',
+                      background: 'rgba(255,255,255,0.15)',
+                      color: 'white',
+                      fontSize: '13px',
+                      fontWeight: 600,
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '8px',
+                    }}
+                  >
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <path d="M5 3l14 9-14 9V3z"/>
+                    </svg>
+                    Launch Interactive Tour
+                  </button>
+                </div>
+              )}
+
+              {/* In-Drawer Tour - Text-based walkthrough */}
+              <div style={{ marginBottom: '16px' }}>
+                <h4 style={{ fontSize: '13px', fontWeight: 600, margin: '0 0 4px 0', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                  Quick Walkthrough
+                </h4>
+                <p style={{ fontSize: '12px', color: 'var(--text-secondary)', margin: 0 }}>
+                  Read through the key features step by step
+                </p>
+              </div>
+
               {/* Progress */}
               <div style={{ marginBottom: '20px' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
