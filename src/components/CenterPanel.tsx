@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import NoteTextField from './NoteTextField'
 import SmartScalesSection from './SmartScalesSection'
+import ReasonForConsultSection from './ReasonForConsultSection'
 
 interface CenterPanelProps {
   noteData: any
@@ -16,49 +17,6 @@ interface CenterPanelProps {
   rawDictation?: Record<string, Array<{ text: string; timestamp: string }>>
   updateRawDictation?: (field: string, rawText: string) => void
 }
-
-// Categorized diagnoses with primary (always shown) and expanded (shown on expand) items
-const DIAGNOSIS_CATEGORIES: Record<string, { primary: string[]; expanded: string[] }> = {
-  'Headache': {
-    primary: ['Migraine', 'Chronic migraine', 'Tension headache'],
-    expanded: ['Cluster headache', 'New daily persistent headache', 'Medication overuse headache', 'Post-traumatic headache', 'Facial pain/Trigeminal neuralgia'],
-  },
-  'Movement': {
-    primary: ['Parkinson disease', 'Essential tremor', 'Restless legs syndrome'],
-    expanded: ['Dystonia', 'Tics/Tourette syndrome', 'Huntington disease', 'Ataxia', 'Chorea'],
-  },
-  'Epilepsy': {
-    primary: ['Epilepsy', 'New onset seizure'],
-    expanded: ['Breakthrough seizures', 'Seizure medication adjustment'],
-  },
-  'Cognitive': {
-    primary: ['Memory loss', 'Dementia evaluation', 'Mild cognitive impairment'],
-    expanded: ['Alzheimer disease', 'Frontotemporal dementia', 'Lewy body dementia'],
-  },
-  'Neuromuscular': {
-    primary: ['Peripheral neuropathy', 'Carpal tunnel syndrome'],
-    expanded: ['Myasthenia gravis', 'ALS/Motor neuron disease', 'Myopathy', 'Radiculopathy', 'Plexopathy'],
-  },
-  'MS & Neuroimmunology': {
-    primary: ['Multiple sclerosis', 'MS follow-up'],
-    expanded: ['Optic neuritis', 'Transverse myelitis', 'NMOSD'],
-  },
-  'Cerebrovascular': {
-    primary: ['Stroke follow-up', 'TIA evaluation'],
-    expanded: ['Carotid stenosis', 'Stroke prevention'],
-  },
-  'Sleep': {
-    primary: ['Insomnia'],
-    expanded: ['Narcolepsy', 'Sleep apnea evaluation'],
-  },
-  'Other': {
-    primary: ['Dizziness/Vertigo', 'Numbness/Tingling', 'Weakness', 'Second opinion'],
-    expanded: ['Gait disorder', 'Back pain with neuro symptoms', 'Concussion/Post-concussion syndrome', 'Bell palsy', 'Other'],
-  },
-}
-
-// Flat list for compatibility with existing code
-const CHIEF_COMPLAINTS = Object.values(DIAGNOSIS_CATEGORIES).flatMap(cat => [...cat.primary, ...cat.expanded])
 
 const ALLERGY_OPTIONS = ['NKDA', 'Reviewed in EMR', 'Unknown', 'Other']
 const ROS_OPTIONS = ['Reviewed', 'Unable to obtain due to:', 'Other']
@@ -133,15 +91,8 @@ export default function CenterPanel({
     rombergNegative: false,
   })
 
-  // Diagnosis category expansion state
-  const [expandedCategories, setExpandedCategories] = useState<Record<string, boolean>>({})
-
   const toggleExamAccordion = (key: string) => {
     setOpenExamAccordions(prev => ({ ...prev, [key]: !prev[key] }))
-  }
-
-  const toggleCategoryExpansion = (category: string) => {
-    setExpandedCategories(prev => ({ ...prev, [category]: !prev[category] }))
   }
 
   const toggleExamFinding = (key: string) => {
@@ -155,15 +106,6 @@ export default function CenterPanel({
   const handleSetActiveField = (field: string | null) => {
     setLocalActiveField(field)
     if (setActiveTextField) setActiveTextField(field)
-  }
-
-  const toggleChip = (complaint: string) => {
-    const current = noteData.chiefComplaint || []
-    if (current.includes(complaint)) {
-      updateNote('chiefComplaint', current.filter((c: string) => c !== complaint))
-    } else {
-      updateNote('chiefComplaint', [...current, complaint])
-    }
   }
 
   const tabs = [
@@ -349,115 +291,13 @@ export default function CenterPanel({
         {/* History Tab */}
         {activeTab === 'history' && (
           <>
-            {/* Reason for Consult */}
-            <div style={{ position: 'relative', marginBottom: '16px' }}>
-              <span style={{
-                position: 'absolute',
-                right: '-12px',
-                top: '0',
-                background: '#EF4444',
-                color: 'white',
-                fontSize: '11px',
-                fontWeight: 500,
-                padding: '4px 8px',
-                borderRadius: '0 4px 4px 0',
-                zIndex: 1,
-              }}>Required</span>
-              <div style={{
-                background: 'var(--bg-white)',
-                borderRadius: '12px',
-                padding: '20px',
-                boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
-              }}>
-                <div style={{ marginBottom: '16px' }}>
-                  <span style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text-primary)' }}>Reason for consult</span>
-                  <span style={{ color: '#EF4444', marginLeft: '2px' }}>*</span>
-                </div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                  {Object.entries(DIAGNOSIS_CATEGORIES).map(([category, items]) => {
-                    const isExpanded = expandedCategories[category]
-                    const hasExpanded = items.expanded.length > 0
-                    const visibleItems = isExpanded ? [...items.primary, ...items.expanded] : items.primary
-
-                    return (
-                      <div key={category}>
-                        <div style={{
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '8px',
-                          marginBottom: '8px',
-                        }}>
-                          <span style={{
-                            fontSize: '12px',
-                            fontWeight: 600,
-                            color: 'var(--text-secondary)',
-                            textTransform: 'uppercase',
-                            letterSpacing: '0.5px',
-                          }}>
-                            {category}
-                          </span>
-                          {hasExpanded && (
-                            <button
-                              onClick={() => toggleCategoryExpansion(category)}
-                              style={{
-                                display: 'flex',
-                                alignItems: 'center',
-                                gap: '4px',
-                                padding: '2px 8px',
-                                borderRadius: '12px',
-                                fontSize: '11px',
-                                cursor: 'pointer',
-                                border: '1px solid var(--border)',
-                                background: isExpanded ? 'var(--bg-secondary)' : 'transparent',
-                                color: 'var(--text-secondary)',
-                                transition: 'all 0.2s',
-                              }}
-                            >
-                              {isExpanded ? 'Less' : `+${items.expanded.length} more`}
-                              <svg
-                                width="12"
-                                height="12"
-                                viewBox="0 0 24 24"
-                                fill="none"
-                                stroke="currentColor"
-                                strokeWidth="2"
-                                style={{
-                                  transform: isExpanded ? 'rotate(180deg)' : 'rotate(0deg)',
-                                  transition: 'transform 0.2s',
-                                }}
-                              >
-                                <polyline points="6 9 12 15 18 9"/>
-                              </svg>
-                            </button>
-                          )}
-                        </div>
-                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
-                          {visibleItems.map(complaint => (
-                            <button
-                              key={complaint}
-                              onClick={() => toggleChip(complaint)}
-                              style={{
-                                padding: '8px 14px',
-                                borderRadius: '20px',
-                                fontSize: '13px',
-                                cursor: 'pointer',
-                                border: '1px solid',
-                                borderColor: noteData.chiefComplaint?.includes(complaint) ? 'var(--primary)' : 'var(--border)',
-                                background: noteData.chiefComplaint?.includes(complaint) ? 'var(--primary)' : 'var(--bg-white)',
-                                color: noteData.chiefComplaint?.includes(complaint) ? 'white' : 'var(--text-secondary)',
-                                transition: 'all 0.2s',
-                              }}
-                            >
-                              {complaint}
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-                    )
-                  })}
-                </div>
-              </div>
-            </div>
+            {/* Reason for Consult - Two-tier selection */}
+            <ReasonForConsultSection
+              selectedSubOptions={noteData.chiefComplaint || []}
+              onSubOptionsChange={(subOptions) => updateNote('chiefComplaint', subOptions)}
+              otherDetails={noteData.consultOtherDetails || ''}
+              onOtherDetailsChange={(details) => updateNote('consultOtherDetails', details)}
+            />
 
             {/* History of Presenting Illness */}
             <div style={{ position: 'relative', marginBottom: '16px' }}>
