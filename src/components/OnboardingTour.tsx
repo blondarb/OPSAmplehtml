@@ -100,6 +100,8 @@ export default function OnboardingTour({ forceShow = false, onComplete }: Onboar
   // Check if user needs the tour
   useEffect(() => {
     if (forceShow) {
+      // Reset to first step when manually triggered
+      setCurrentStep(0)
       setIsActive(true)
       setIsReady(true)
       return
@@ -111,6 +113,7 @@ export default function OnboardingTour({ forceShow = false, onComplete }: Onboar
       if (!tourComplete) {
         // Small delay to let the page render first
         const timer = setTimeout(() => {
+          setCurrentStep(0)
           setIsActive(true)
           setIsReady(true)
         }, 1000)

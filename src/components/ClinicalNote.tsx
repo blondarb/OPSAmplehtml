@@ -123,6 +123,7 @@ export default function ClinicalNote({
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [ideasDrawerOpen, setIdeasDrawerOpen] = useState(false)
   const [ideasDrawerTab, setIdeasDrawerTab] = useState<'inspiration' | 'tour' | 'features' | 'workflows' | 'feedback'>('workflows')
+  const [showTour, setShowTour] = useState(false)
   const [activeTextField, setActiveTextField] = useState<string | null>(null)
   const [selectedRecommendations, setSelectedRecommendations] = useState<RecommendationItem[]>([])
 
@@ -606,6 +607,7 @@ export default function ClinicalNote({
         onClose={() => setSettingsOpen(false)}
         darkMode={darkMode}
         setDarkMode={handleSetDarkMode}
+        onStartTour={() => setShowTour(true)}
       />
 
       <IdeasDrawer
@@ -614,8 +616,11 @@ export default function ClinicalNote({
         initialTab={ideasDrawerTab}
       />
 
-      {/* Onboarding Tour for new users */}
-      <OnboardingTour />
+      {/* Onboarding Tour for new users or when manually triggered */}
+      <OnboardingTour
+        forceShow={showTour}
+        onComplete={() => setShowTour(false)}
+      />
 
       {/* Autosave Status Indicator */}
       <div
