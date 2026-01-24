@@ -122,16 +122,29 @@ These foundational features are fully implemented.
 | Source tracking | ✅ COMPLETE | Manual/ChartPrep/VisitAI |
 | Generate Note button | ✅ COMPLETE | CenterPanel.tsx |
 
-### 2.4 Smart Recommendations (Vera Health)
+### 2.4 Smart Recommendations
 
 | Feature | Status | Priority |
 |---------|--------|----------|
-| Link diagnoses to treatment recommendations | ⏳ PENDING | 🎯 HIGH |
-| Import templates from neuro-plans (134 diagnoses) | ⏳ PENDING | 🎯 HIGH |
-| Checkbox-based recommendation selection | ⏳ PENDING | 🎯 HIGH |
-| Recommendation reconciliation engine | ⏳ PENDING | P1 |
+| Link diagnoses to treatment recommendations | ✅ COMPLETE | P0 |
+| Import templates from neuro-plans (5 demo diagnoses) | ✅ COMPLETE | P0 |
+| Checkbox-based recommendation selection | ✅ COMPLETE | P0 |
+| Expandable sections with subsections | ✅ COMPLETE | P0 |
+| Priority badges (STAT/URGENT/ROUTINE/EXT) | ✅ COMPLETE | P1 |
+| Item details (dosing, rationale, monitoring, contraindications) | ✅ COMPLETE | P1 |
+| Patient instructions section | ✅ COMPLETE | P1 |
+| Add selected items to Plan textarea | ✅ COMPLETE | P0 |
+| Recommendation reconciliation engine | ⏳ PENDING | P2 |
+| Expand to all 134 diagnoses | ⏳ PENDING | P2 |
 
 **Reference:** https://blondarb.github.io/neuro-plans/clinical/
+
+**Demo Diagnoses Available:**
+- New Onset Seizure
+- Status Epilepticus (outpatient follow-up)
+- Multiple Sclerosis - New Diagnosis
+- Peripheral Neuropathy - New Diagnosis/Evaluation
+- Acute Ischemic Stroke (outpatient follow-up)
 
 ---
 
@@ -327,10 +340,10 @@ Based on the analysis, here's the recommended implementation order to minimize r
 
 ### Immediate (Complete Phase 2 Foundation)
 
-1. **Smart Recommendations** - Link diagnoses to treatment plans
-   - This is the major Phase 2 gap
-   - All other Phase 2 items are complete
-   - Foundation for clinical decision support
+1. ~~**Smart Recommendations** - Link diagnoses to treatment plans~~ ✅ COMPLETE
+   - 5 demo diagnoses with full outpatient recommendations
+   - Expandable sections with checkbox-based selection
+   - Integrated into Recommendation tab with Plan textarea
 
 ### Short-term (Phase 3A Completion)
 

@@ -6,6 +6,7 @@ import SmartScalesSection from './SmartScalesSection'
 import ReasonForConsultSection from './ReasonForConsultSection'
 import DifferentialDiagnosisSection from './DifferentialDiagnosisSection'
 import ImagingResultsTab from './ImagingResultsTab'
+import SmartRecommendationsSection from './SmartRecommendationsSection'
 import type { Diagnosis } from '@/lib/diagnosisData'
 
 interface CenterPanelProps {
@@ -1613,7 +1614,16 @@ ${noteData.plan || 'Not documented'}
               </div>
             </div>
 
-            {/* Recommendations */}
+            {/* Smart Recommendations - Evidence-Based Plans */}
+            <SmartRecommendationsSection
+              onAddToPlan={(items) => {
+                const currentPlan = noteData.plan || ''
+                const newItems = items.join('\n')
+                updateNote('plan', currentPlan ? `${currentPlan}\n${newItems}` : newItems)
+              }}
+            />
+
+            {/* Recommendations / Plan */}
             <div style={{ position: 'relative', marginBottom: '16px' }}>
               <span style={{
                 position: 'absolute',
@@ -1634,34 +1644,35 @@ ${noteData.plan || 'Not documented'}
                 boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
               }}>
                 <div style={{ marginBottom: '16px' }}>
-                  <span style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text-primary)' }}>Recommendations</span>
+                  <span style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text-primary)' }}>Plan</span>
                   <span style={{ color: '#EF4444', marginLeft: '2px' }}>*</span>
+                  {noteData.plan && (
+                    <span style={{
+                      marginLeft: '12px',
+                      fontSize: '12px',
+                      color: 'var(--text-muted)',
+                      background: 'var(--bg-gray)',
+                      padding: '2px 8px',
+                      borderRadius: '4px'
+                    }}>
+                      {noteData.plan.split('\n').filter((l: string) => l.trim()).length} items
+                    </span>
+                  )}
                 </div>
-                <div style={{ display: 'flex', gap: '8px', marginBottom: '16px' }}>
-                  <button style={{
-                    padding: '8px 16px',
-                    borderRadius: '8px',
-                    fontSize: '13px',
-                    cursor: 'pointer',
-                    border: 'none',
-                    background: 'var(--primary)',
-                    color: 'white',
-                    fontWeight: 500,
-                  }}>
-                    Pre-made template
-                  </button>
-                  <button style={{
-                    padding: '8px 16px',
-                    borderRadius: '8px',
-                    fontSize: '13px',
-                    cursor: 'pointer',
-                    border: '1px solid var(--border)',
-                    background: 'var(--bg-white)',
-                    color: 'var(--text-secondary)',
-                  }}>
-                    Free-text recommendations
-                  </button>
-                </div>
+                <NoteTextField
+                  value={noteData.plan}
+                  onChange={(value) => updateNote('plan', value)}
+                  fieldName="plan"
+                  placeholder="Add recommendations from Smart Recommendations above, or enter free-text plan..."
+                  minHeight="150px"
+                  showDictate={true}
+                  showAiAction={true}
+                  onOpenAiDrawer={() => openAiDrawer('ask-ai')}
+                  onOpenFullPhrasesDrawer={() => openDotPhrases && openDotPhrases('plan')}
+                  setActiveTextField={handleSetActiveField}
+                  rawDictation={rawDictation?.plan}
+                  onRawDictationChange={updateRawDictation ? (rawText) => updateRawDictation('plan', rawText) : undefined}
+                />
               </div>
             </div>
 
