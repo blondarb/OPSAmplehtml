@@ -1,6 +1,6 @@
 # Implementation Status - Sevaro Clinical
 
-**Last Updated:** January 24, 2026 (Consolidated Roadmap Created)
+**Last Updated:** January 24, 2026 (Comprehensive Note Generation)
 **Based on:** PRD_AI_Scribe.md v1.4, Sevaro_Outpatient_MVP_PRD_v1.4, PRD_Roadmap_Phase3.md
 
 ---
@@ -18,11 +18,54 @@ This document tracks implementation progress against the product requirements an
 
 ### Current Priority Focus
 
-Based on the consolidated roadmap analysis:
+**Recently Completed:**
+- ✅ **TopNav Enhancements** - Timer controls, Lock screen, Notifications panel, What's New
+- ✅ **Comprehensive Note Generation** - New Consult vs Follow-up layouts, note length preferences
+- ✅ **Enhanced Note Preview** - Section-by-section approval, formatted EHR-ready output
+- ✅ **Smart Recommendations (Phase 2)** - 5 diagnoses with treatment plans from neuro-plans
+- ✅ **Field AI Actions** - Improve/Expand/Summarize with anti-hallucination safeguards
+- ✅ **User Settings** - Full settings drawer with AI custom instructions (global + per-section)
+- ✅ **Extended Scales** - NIHSS, Modified Ashworth, ABCD2, DHI, Mini-Cog, ISI, ESS
+- ✅ **Exam Templates** - Predefined + custom template feature
 
-1. **Phase 2 Gap: Smart Recommendations** - Link diagnoses to treatment plans (import neuro-plans)
-2. **Phase 3A Remaining: Field AI Actions** - Improve/Expand/Summarize buttons need real actions
-3. **Phase 3A Remaining: User Settings** - Settings drawer with AI custom instructions
+**Remaining High Priority:**
+1. **Pre-built Dot Phrases** - Seed the neurology phrase library
+2. **Workflow Documentation** - Help users understand AI-driven vs manual workflows
+
+---
+
+## Recent Updates (January 24, 2026)
+
+### TopNav Enhancements - NEW
+- **Timer Dropdown** - Pause/Resume controls, Reset button, Billing code selector (MD2, MD3, 99213-99215)
+- **Lock Screen** - Full-screen PHI protection overlay with unlock button
+- **Notifications Panel** - Sample notifications with alert/message/task/system types, read/unread states, Mark all read
+- **What's New Panel** - Version history with release notes for recent features
+
+### Comprehensive Note Generation - NEW
+- **EnhancedNotePreviewModal** - Complete replacement for basic note preview
+- **Note Type Selection** - New Consult vs Follow-up with different layouts
+- **Note Length Preferences** - Concise, Standard, Detailed formatting options
+- **All Data Sources Collated**:
+  - AI Chart Prep output
+  - Visit AI transcription
+  - Manual clinical entries
+  - Clinical scales (with scores and interpretations)
+  - Differential diagnoses (with ICD-10 codes)
+  - Imaging results (with findings)
+  - Physical exam findings (checkbox-generated text)
+  - Smart Recommendations
+- **Section-by-Section Approval** - Verify each section before signing
+- **Final Note Preview** - Formatted EHR-ready text with one-click copy
+- **Word Count Display** - Track note length in real-time
+
+### Phase 2 & 3A Completion
+- Smart Recommendations with 5 demo diagnoses implemented
+- Field AI Actions (/api/ai/field-action) with GPT-4 integration
+- Settings Drawer with AI custom instructions
+- 7 new clinical scales added (NIHSS, MAS, ABCD2, DHI, Mini-Cog, ISI, ESS)
+- Exam template feature with predefined and custom templates
+- Compact chip-based exam scale selection
 
 ---
 
@@ -205,9 +248,12 @@ See full PRD: [PRD_Roadmap_Phase3.md](./PRD_Roadmap_Phase3.md)
 
 | Task | Status | Priority |
 |------|--------|----------|
-| Link diagnoses to treatment recommendations | PENDING | High |
-| Import templates from neuro-plans demo (134 diagnoses) | PENDING | High |
-| Checkbox-based recommendation selection per diagnosis | PENDING | High |
+| Link diagnoses to treatment recommendations | **COMPLETE** | High |
+| Import templates from neuro-plans demo (5 diagnoses) | **COMPLETE** | High |
+| Checkbox-based recommendation selection per diagnosis | **COMPLETE** | High |
+| SmartRecommendationsSection component | **COMPLETE** | High |
+| Priority badges (STAT/URGENT/ROUTINE/EXT) | **COMPLETE** | Medium |
+| Add selected items to Plan textarea | **COMPLETE** | High |
 
 Reference: https://blondarb.github.io/neuro-plans/clinical/
 
@@ -239,9 +285,9 @@ All AI buttons must trigger real prompts - no placeholders.
 | Ask AI | AI Drawer | **COMPLETE** | - |
 | Generate Summary | AI Drawer | **COMPLETE** | Patient-friendly summary with detail levels |
 | Generate Handout | AI Drawer | **COMPLETE** | Educational materials by condition |
-| Improve Writing | Fields | NOT BUILT | Add action |
-| Expand Details | Fields | NOT BUILT | Add action |
-| Summarize | Fields | NOT BUILT | Add action |
+| Improve Writing | Fields | **COMPLETE** | /api/ai/field-action with anti-hallucination |
+| Expand Details | Fields | **COMPLETE** | /api/ai/field-action with safety prompts |
+| Summarize | Fields | **COMPLETE** | /api/ai/field-action |
 
 #### 3. Dictation Everywhere
 Any text input should have dictation.
@@ -257,12 +303,15 @@ Any text input should have dictation.
 
 | Feature | Status |
 |---------|--------|
-| Settings Drawer | NOT BUILT |
+| Settings Drawer | **COMPLETE** (SettingsDrawer.tsx) |
 | Call volume/ringtone | NOT BUILT |
-| Dark mode (on/off/system) | PARTIAL |
-| Automation toggles | NOT BUILT |
-| **AI Custom Instructions (global)** | NOT BUILT |
-| **AI Custom Instructions (per-section)** | NOT BUILT |
+| Dark mode (on/off/system) | **COMPLETE** |
+| Font size settings | **COMPLETE** |
+| Documentation style preference | **COMPLETE** (concise/detailed/narrative) |
+| Terminology preference | **COMPLETE** (formal/standard/simplified) |
+| **AI Custom Instructions (global)** | **COMPLETE** |
+| **AI Custom Instructions (per-section)** | **COMPLETE** (HPI, ROS, Assessment, Plan, Physical Exam) |
+| Settings persistence | **COMPLETE** (localStorage) |
 
 ---
 
@@ -272,21 +321,35 @@ Any text input should have dictation.
 
 | Feature | Status |
 |---------|--------|
-| Note assembly from all sources | PARTIAL (merge engine exists) |
-| Preview/Edit modal | NOT BUILT |
-| Recommendations verification checklist | NOT BUILT |
+| **Comprehensive data collation** | **COMPLETE** (EnhancedNotePreviewModal) |
+| Note type selection (New Consult/Follow-up) | **COMPLETE** |
+| Note length preference (Concise/Standard/Detailed) | **COMPLETE** |
+| Note assembly from all sources | **COMPLETE** (merge engine + modal) |
+| Scales integration | **COMPLETE** |
+| Diagnoses with ICD-10 | **COMPLETE** |
+| Imaging/Labs integration | **COMPLETE** |
+| Physical exam text generation | **COMPLETE** |
+| Preview/Edit modal | **COMPLETE** |
+| Section-by-section verification | **COMPLETE** |
+| Recommendations verification checklist | **COMPLETE** |
+| Source tracking (Manual/AI/Recs/Scales/Imaging) | **COMPLETE** |
+| Final note preview (EHR-ready) | **COMPLETE** |
+| Copy to clipboard | **COMPLETE** |
+| Word count display | **COMPLETE** |
 | Suggested improvements section | NOT BUILT |
 | "Ask AI about this note" button | NOT BUILT |
-| Sign & Complete flow | NOT BUILT |
+| Sign & Complete flow | **COMPLETE** |
 
 #### 6. Physical Exam Enhancements
 
 | Feature | Status |
 |---------|--------|
 | Free-text exam option | NOT BUILT |
-| **NIH Stroke Scale (NIHSS)** | NOT BUILT - Priority |
+| **NIH Stroke Scale (NIHSS)** | **COMPLETE** (full 15-item version) |
+| Modified Ashworth Scale | **COMPLETE** (spasticity) |
 | Modified Rankin Scale | NOT BUILT |
-| Other exam types dropdown | NOT BUILT |
+| Exam Templates | **COMPLETE** (5 predefined + custom) |
+| Exam Scales Section (compact chips) | **COMPLETE** |
 
 #### 7. Patient History Section (Above Reason for Consult)
 

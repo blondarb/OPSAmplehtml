@@ -675,6 +675,31 @@ a:hover {
   background: var(--primary);
 }
 
+/* Draggable tab states */
+.tab-btn.dragging {
+  opacity: 0.5;
+  background: var(--primary-light);
+  color: white;
+}
+
+.tab-btn.drag-over {
+  border-left: 3px solid var(--primary);
+}
+
+/* Vertical scroll view styles */
+.tab-content.vertical-view {
+  max-height: none;
+}
+
+.vertical-section-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 20px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--border);
+}
+
 .view-toggle-btn {
   display: flex;
   align-items: center;

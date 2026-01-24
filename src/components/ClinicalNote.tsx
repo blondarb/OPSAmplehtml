@@ -9,9 +9,17 @@ import CenterPanel from './CenterPanel'
 import AiDrawer from './AiDrawer'
 import VoiceDrawer from './VoiceDrawer'
 import DotPhrasesDrawer from './DotPhrasesDrawer'
-import NotePreviewModal from './NotePreviewModal'
+import EnhancedNotePreviewModal from './EnhancedNotePreviewModal'
 import SettingsDrawer from './SettingsDrawer'
-import { mergeNoteContent, type ChartPrepOutput, type VisitAIOutput, type ManualNoteData } from '@/lib/note-merge'
+import {
+  type ChartPrepOutput,
+  type VisitAIOutput,
+  type ComprehensiveNoteData,
+  type ScaleResult,
+  type DiagnosisEntry,
+  type ImagingStudyEntry,
+  type RecommendationItem,
+} from '@/lib/note-merge'
 import type { User } from '@supabase/supabase-js'
 
 interface ClinicalNoteProps {
@@ -112,14 +120,25 @@ export default function ClinicalNote({
   const [notePreviewOpen, setNotePreviewOpen] = useState(false)
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [activeTextField, setActiveTextField] = useState<string | null>(null)
-  const [selectedRecommendations, setSelectedRecommendations] = useState<Array<{ category: string; items: string[] }>>([])
+  const [selectedRecommendations, setSelectedRecommendations] = useState<RecommendationItem[]>([])
+
+  // Additional data for comprehensive note generation
+  const [completedScales, setCompletedScales] = useState<ScaleResult[]>([])
+  const [selectedDiagnoses, setSelectedDiagnoses] = useState<DiagnosisEntry[]>([])
+  const [imagingData, setImagingData] = useState<ImagingStudyEntry[]>([])
+  const [examFindings, setExamFindings] = useState<Record<string, boolean>>({})
+  const [examSectionNotes, setExamSectionNotes] = useState<Record<string, string>>({})
 
   const [noteData, setNoteData] = useState({
     chiefComplaint: currentVisit?.chief_complaint || ['Headache'],
     hpi: currentVisit?.clinical_notes?.hpi || '',
     ros: currentVisit?.clinical_notes?.ros || 'Reviewed',
+    rosDetails: currentVisit?.clinical_notes?.ros_details || '',
     allergies: currentVisit?.clinical_notes?.allergies || 'NKDA',
-    historyAvailable: 'Yes',
+    allergyDetails: currentVisit?.clinical_notes?.allergy_details || '',
+    historyAvailable: currentVisit?.clinical_notes?.history_available || 'Yes',
+    historyDetails: currentVisit?.clinical_notes?.history_details || '',
+    physicalExam: currentVisit?.clinical_notes?.physical_exam || '',
     assessment: currentVisit?.clinical_notes?.assessment || '',
     plan: currentVisit?.clinical_notes?.plan || '',
   })
@@ -202,13 +221,51 @@ export default function ClinicalNote({
   }, [noteData])
 
   // Track recommendations selected in SmartRecommendationsSection
-  const handleRecommendationsSelected = useCallback((items: string[]) => {
-    // Group by category (we'll improve this later)
+  const handleRecommendationsSelected = useCallback((items: string[], category?: string) => {
     if (items.length > 0) {
-      setSelectedRecommendations([{ category: 'Selected Recommendations', items }])
+      setSelectedRecommendations([{ category: category || 'Selected Recommendations', items }])
     } else {
       setSelectedRecommendations([])
     }
+  }, [])
+
+  // Handler for scale completion (called from SmartScalesSection/ExamScalesSection)
+  const handleScaleComplete = useCallback((scaleId: string, result: any) => {
+    setCompletedScales(prev => {
+      const existing = prev.findIndex(s => s.scaleId === scaleId)
+      const newResult: ScaleResult = {
+        scaleId,
+        scaleName: result.scaleName || scaleId,
+        abbreviation: result.abbreviation || scaleId,
+        rawScore: result.rawScore,
+        maxScore: result.maxScore,
+        interpretation: result.interpretation,
+        severity: result.severity,
+        completedAt: new Date().toISOString(),
+      }
+      if (existing >= 0) {
+        const updated = [...prev]
+        updated[existing] = newResult
+        return updated
+      }
+      return [...prev, newResult]
+    })
+  }, [])
+
+  // Handler for diagnosis selection (called from DifferentialDiagnosisSection)
+  const handleDiagnosesChange = useCallback((diagnoses: DiagnosisEntry[]) => {
+    setSelectedDiagnoses(diagnoses)
+  }, [])
+
+  // Handler for imaging data updates (called from ImagingResultsTab)
+  const handleImagingChange = useCallback((studies: ImagingStudyEntry[]) => {
+    setImagingData(studies)
+  }, [])
+
+  // Handler for exam findings updates (called from CenterPanel)
+  const handleExamFindingsChange = useCallback((findings: Record<string, boolean>, notes: Record<string, string>) => {
+    setExamFindings(findings)
+    setExamSectionNotes(notes)
   }, [])
 
   const router = useRouter()
@@ -325,6 +382,10 @@ export default function ClinicalNote({
           onGenerateNote={generateNote}
           hasAIContent={!!(chartPrepOutput || visitAIOutput)}
           onRecommendationsSelected={handleRecommendationsSelected}
+          onScaleComplete={handleScaleComplete}
+          onDiagnosesChange={handleDiagnosesChange}
+          onImagingChange={handleImagingChange}
+          onExamFindingsChange={handleExamFindingsChange}
         />
       </div>
 
@@ -364,24 +425,51 @@ export default function ClinicalNote({
         />
       )}
 
-      <NotePreviewModal
+      <EnhancedNotePreviewModal
         isOpen={notePreviewOpen}
         onClose={() => setNotePreviewOpen(false)}
         noteData={{
-          chiefComplaint: noteData.chiefComplaint,
-          hpi: noteData.hpi,
-          ros: noteData.ros,
-          physicalExam: '',
-          assessment: noteData.assessment,
-          plan: noteData.plan,
+          manualData: {
+            chiefComplaint: noteData.chiefComplaint,
+            hpi: noteData.hpi,
+            ros: noteData.ros,
+            rosDetails: noteData.rosDetails,
+            allergies: noteData.allergies,
+            allergyDetails: noteData.allergyDetails,
+            historyAvailable: noteData.historyAvailable,
+            historyDetails: noteData.historyDetails,
+            physicalExam: noteData.physicalExam,
+            assessment: noteData.assessment,
+            plan: noteData.plan,
+          },
+          chartPrepData: chartPrepOutput,
+          visitAIData: visitAIOutput,
+          scales: completedScales,
+          diagnoses: selectedDiagnoses,
+          imagingStudies: imagingData,
+          recommendations: selectedRecommendations,
+          examFindings: examFindings,
+          examSectionNotes: examSectionNotes,
+          patient: patient ? {
+            name: `${patient.first_name || ''} ${patient.last_name || ''}`.trim() || patient.name || 'Unknown',
+            dob: patient.date_of_birth,
+            mrn: patient.mrn,
+            age: patient.age,
+            gender: patient.gender,
+          } : undefined,
+          visit: currentVisit ? {
+            date: currentVisit.visit_date ? new Date(currentVisit.visit_date).toLocaleDateString() : new Date().toLocaleDateString(),
+            type: currentVisit.visit_type,
+            provider: currentVisit.provider_name,
+          } : undefined,
+          priorVisits: priorVisits?.map(v => ({
+            date: v.visit_date ? new Date(v.visit_date).toLocaleDateString() : '',
+            summary: v.ai_summary,
+            diagnoses: v.chief_complaints,
+          })),
         }}
-        chartPrepData={chartPrepOutput}
-        visitAIData={visitAIOutput}
-        selectedRecommendations={selectedRecommendations}
         onSave={handleSaveFromPreview}
         onSign={handleSignFromPreview}
-        patientName={patient?.name || 'Patient'}
-        visitDate={currentVisit?.visit_date ? new Date(currentVisit.visit_date).toLocaleDateString() : undefined}
       />
 
       <SettingsDrawer

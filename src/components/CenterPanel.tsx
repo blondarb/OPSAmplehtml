@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import NoteTextField from './NoteTextField'
 import SmartScalesSection from './SmartScalesSection'
 import ExamScalesSection from './ExamScalesSection'
@@ -9,6 +9,14 @@ import DifferentialDiagnosisSection from './DifferentialDiagnosisSection'
 import ImagingResultsTab from './ImagingResultsTab'
 import SmartRecommendationsSection from './SmartRecommendationsSection'
 import type { Diagnosis } from '@/lib/diagnosisData'
+
+// Default tab configuration
+const DEFAULT_TABS = [
+  { id: 'history', label: 'History' },
+  { id: 'imaging', label: 'Imaging/results' },
+  { id: 'exam', label: 'Physical exams' },
+  { id: 'recommendation', label: 'Recommendation' },
+]
 
 interface CenterPanelProps {
   noteData: any
@@ -24,7 +32,11 @@ interface CenterPanelProps {
   updateRawDictation?: (field: string, rawText: string) => void
   onGenerateNote?: () => void
   hasAIContent?: boolean
-  onRecommendationsSelected?: (items: string[]) => void
+  onRecommendationsSelected?: (items: string[], category?: string) => void
+  onScaleComplete?: (scaleId: string, result: any) => void
+  onDiagnosesChange?: (diagnoses: Diagnosis[]) => void
+  onImagingChange?: (studies: any[]) => void
+  onExamFindingsChange?: (findings: Record<string, boolean>, notes: Record<string, string>) => void
 }
 
 const ALLERGY_OPTIONS = ['NKDA', 'Reviewed in EMR', 'Unknown', 'Other']
@@ -46,9 +58,66 @@ export default function CenterPanel({
   onGenerateNote,
   hasAIContent,
   onRecommendationsSelected,
+  onScaleComplete,
+  onDiagnosesChange,
+  onImagingChange,
+  onExamFindingsChange,
 }: CenterPanelProps) {
   const [activeTab, setActiveTab] = useState('history')
   const [localActiveField, setLocalActiveField] = useState<string | null>(null)
+
+  // Tab customization state
+  const [tabs, setTabs] = useState(DEFAULT_TABS)
+  const [isVerticalView, setIsVerticalView] = useState(false)
+
+  // Load saved tab order and view preference from localStorage
+  useEffect(() => {
+    const loadTabOrder = () => {
+      const savedOrder = localStorage.getItem('sevaro-tab-order')
+      if (savedOrder) {
+        try {
+          const order = JSON.parse(savedOrder)
+          const reorderedTabs = order
+            .map((id: string) => DEFAULT_TABS.find(t => t.id === id))
+            .filter(Boolean)
+          // Add any missing tabs at the end
+          DEFAULT_TABS.forEach(tab => {
+            if (!reorderedTabs.find((t: typeof tab) => t.id === tab.id)) {
+              reorderedTabs.push(tab)
+            }
+          })
+          setTabs(reorderedTabs)
+        } catch (e) {
+          console.log('Could not load tab order')
+        }
+      }
+    }
+
+    loadTabOrder()
+
+    const savedVerticalView = localStorage.getItem('sevaro-vertical-view')
+    if (savedVerticalView === 'true') {
+      setIsVerticalView(true)
+    }
+
+    // Listen for storage changes (when settings are saved)
+    const handleStorageChange = (e: StorageEvent) => {
+      if (e.key === 'sevaro-tab-order') {
+        loadTabOrder()
+      }
+    }
+    window.addEventListener('storage', handleStorageChange)
+    return () => window.removeEventListener('storage', handleStorageChange)
+  }, [])
+
+  // Toggle vertical view
+  const toggleVerticalView = useCallback(() => {
+    setIsVerticalView(prev => {
+      const newValue = !prev
+      localStorage.setItem('sevaro-vertical-view', String(newValue))
+      return newValue
+    })
+  }, [])
 
   // Patient context for AI actions
   const patientContext = {
@@ -250,6 +319,13 @@ export default function CenterPanel({
     setExamFindings(prev => ({ ...prev, [key]: value }))
   }
 
+  // Notify parent of exam findings changes for note generation
+  useEffect(() => {
+    if (onExamFindingsChange) {
+      onExamFindingsChange(examFindings, examSectionNotes)
+    }
+  }, [examFindings, examSectionNotes, onExamFindingsChange])
+
   const handleSetActiveField = (field: string | null) => {
     setLocalActiveField(field)
     if (setActiveTextField) setActiveTextField(field)
@@ -300,13 +376,6 @@ ${noteData.plan || 'Not documented'}
     setIsReviewed(!isReviewed)
   }
 
-  const tabs = [
-    { id: 'history', label: 'History' },
-    { id: 'imaging', label: 'Imaging/results' },
-    { id: 'exam', label: 'Physical exams' },
-    { id: 'recommendation', label: 'Recommendation' },
-  ]
-
   return (
     <main className="center-panel">
       {/* Tab Navigation with Action Bar */}
@@ -316,13 +385,55 @@ ${noteData.plan || 'Not documented'}
           {tabs.map(tab => (
             <button
               key={tab.id}
-              onClick={() => setActiveTab(tab.id)}
-              className={`tab-btn ${activeTab === tab.id ? 'active' : ''}`}
+              onClick={() => !isVerticalView && setActiveTab(tab.id)}
+              className={`tab-btn ${activeTab === tab.id && !isVerticalView ? 'active' : ''}`}
+              style={{
+                cursor: isVerticalView ? 'default' : 'pointer',
+              }}
             >
               {tab.label}
             </button>
           ))}
         </div>
+
+        {/* View Toggle Button */}
+        <button
+          onClick={toggleVerticalView}
+          title={isVerticalView ? 'Switch to tab view' : 'Switch to scroll view'}
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '6px',
+            padding: '6px 12px',
+            background: isVerticalView ? 'var(--primary)' : 'var(--bg-gray)',
+            border: `1px solid ${isVerticalView ? 'var(--primary)' : 'var(--border)'}`,
+            borderRadius: '6px',
+            fontSize: '12px',
+            fontWeight: 500,
+            color: isVerticalView ? 'white' : 'var(--text-secondary)',
+            cursor: 'pointer',
+            transition: 'all 0.2s',
+            marginRight: '8px',
+          }}
+        >
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            {isVerticalView ? (
+              // Tab view icon
+              <>
+                <rect x="3" y="3" width="18" height="18" rx="2"/>
+                <line x1="3" y1="9" x2="21" y2="9"/>
+              </>
+            ) : (
+              // Scroll view icon
+              <>
+                <line x1="3" y1="6" x2="21" y2="6"/>
+                <line x1="3" y1="12" x2="21" y2="12"/>
+                <line x1="3" y1="18" x2="21" y2="18"/>
+              </>
+            )}
+          </svg>
+          {isVerticalView ? 'Tab View' : 'Scroll View'}
+        </button>
 
         {/* Action Buttons */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', position: 'relative' }}>
@@ -525,11 +636,8 @@ ${noteData.plan || 'Not documented'}
           {/* Generate Note Button */}
           <button
             onClick={() => {
-              if (onGenerateNote && hasAIContent) {
+              if (onGenerateNote) {
                 onGenerateNote()
-              } else {
-                // Open Voice drawer to Document tab if no AI content yet
-                openVoiceDrawer?.('document')
               }
             }}
             style={{
@@ -539,16 +647,14 @@ ${noteData.plan || 'Not documented'}
               padding: '8px 14px',
               borderRadius: '8px',
               border: 'none',
-              background: hasAIContent
-                ? 'linear-gradient(135deg, #8B5CF6 0%, #A78BFA 100%)'
-                : 'linear-gradient(135deg, #6B7280 0%, #9CA3AF 100%)',
+              background: 'linear-gradient(135deg, #8B5CF6 0%, #A78BFA 100%)',
               cursor: 'pointer',
               fontSize: '13px',
               fontWeight: 500,
               color: 'white',
               position: 'relative',
             }}
-            title={hasAIContent ? 'Apply AI content to note' : 'Record visit to generate AI content'}
+            title="Generate clinical note from entered data"
           >
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
@@ -753,10 +859,38 @@ ${noteData.plan || 'Not documented'}
       )}
 
       {/* Tab Content */}
-      <div className="tab-content" style={{ position: 'relative' }}>
+      <div className={`tab-content ${isVerticalView ? 'vertical-view' : ''}`} style={{ position: 'relative' }}>
         {/* History Tab */}
-        {activeTab === 'history' && (
+        {(activeTab === 'history' || isVerticalView) && (
           <>
+            {isVerticalView && (
+              <div className="vertical-section-header" style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '12px',
+                marginBottom: '20px',
+                paddingBottom: '12px',
+                borderBottom: '1px solid var(--border)',
+              }}>
+                <div style={{
+                  width: '32px',
+                  height: '32px',
+                  borderRadius: '8px',
+                  background: 'var(--primary)',
+                  color: 'white',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontWeight: 600,
+                  fontSize: '14px',
+                }}>
+                  {tabs.findIndex(t => t.id === 'history') + 1}
+                </div>
+                <h2 style={{ margin: 0, fontSize: '18px', fontWeight: 600, color: 'var(--text-primary)' }}>
+                  History
+                </h2>
+              </div>
+            )}
             {/* Reason for Consult - Two-tier selection */}
             <ReasonForConsultSection
               selectedSubOptions={noteData.chiefComplaint || []}
@@ -1056,12 +1190,51 @@ ${noteData.plan || 'Not documented'}
                 const currentValue = noteData[field] || ''
                 updateNote(field, currentValue ? `${currentValue}\n${text}` : text)
               }}
+              onScaleComplete={onScaleComplete}
             />
+            {isVerticalView && (
+              <div style={{ marginTop: '32px', marginBottom: '32px', borderTop: '2px solid var(--border)', paddingTop: '32px' }}>
+                <div className="vertical-section-header" style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '12px',
+                  marginBottom: '20px',
+                  paddingBottom: '12px',
+                  borderBottom: '1px solid var(--border)',
+                }}>
+                  <div style={{
+                    width: '32px',
+                    height: '32px',
+                    borderRadius: '8px',
+                    background: 'var(--primary)',
+                    color: 'white',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    fontWeight: 600,
+                    fontSize: '14px',
+                  }}>
+                    {tabs.findIndex(t => t.id === 'imaging') + 1}
+                  </div>
+                  <h2 style={{ margin: 0, fontSize: '18px', fontWeight: 600, color: 'var(--text-primary)' }}>
+                    Imaging/results
+                  </h2>
+                </div>
+                <ImagingResultsTab
+                  noteData={noteData}
+                  updateNote={updateNote}
+                  openVoiceDrawer={openVoiceDrawer}
+                  openAiDrawer={openAiDrawer}
+                  openDotPhrases={openDotPhrases}
+                  setActiveTextField={handleSetActiveField}
+                />
+              </div>
+            )}
           </>
         )}
 
-        {/* Imaging Tab */}
-        {activeTab === 'imaging' && (
+        {/* Imaging Tab - only when not in vertical view */}
+        {activeTab === 'imaging' && !isVerticalView && (
           <ImagingResultsTab
             noteData={noteData}
             updateNote={updateNote}
@@ -1073,7 +1246,38 @@ ${noteData.plan || 'Not documented'}
         )}
 
         {/* Exam Tab */}
-        {activeTab === 'exam' && (
+        {(activeTab === 'exam' || isVerticalView) && (
+          <>
+            {isVerticalView && (
+              <div style={{ marginTop: '32px', marginBottom: '20px', borderTop: '2px solid var(--border)', paddingTop: '32px' }}>
+                <div className="vertical-section-header" style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '12px',
+                  marginBottom: '20px',
+                  paddingBottom: '12px',
+                  borderBottom: '1px solid var(--border)',
+                }}>
+                  <div style={{
+                    width: '32px',
+                    height: '32px',
+                    borderRadius: '8px',
+                    background: 'var(--primary)',
+                    color: 'white',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    fontWeight: 600,
+                    fontSize: '14px',
+                  }}>
+                    {tabs.findIndex(t => t.id === 'exam') + 1}
+                  </div>
+                  <h2 style={{ margin: 0, fontSize: '18px', fontWeight: 600, color: 'var(--text-primary)' }}>
+                    Physical exams
+                  </h2>
+                </div>
+              </div>
+            )}
           <div>
             {/* Exam Summary - Dictation/AI */}
             <div style={{
@@ -1113,6 +1317,7 @@ ${noteData.plan || 'Not documented'}
                 const currentValue = noteData.examSummary || ''
                 updateNote('examSummary', currentValue ? `${currentValue}\n${text}` : text)
               }}
+              onScaleComplete={onScaleComplete}
             />
 
             {/* Neurological Examination Section */}
@@ -1989,16 +2194,58 @@ ${noteData.plan || 'Not documented'}
               </div>
             </div>
           </div>
+          </>
         )}
 
         {/* Recommendation Tab */}
-        {activeTab === 'recommendation' && (
+        {(activeTab === 'recommendation' || isVerticalView) && (
           <>
+            {isVerticalView && (
+              <div style={{ marginTop: '32px', marginBottom: '20px', borderTop: '2px solid var(--border)', paddingTop: '32px' }}>
+                <div className="vertical-section-header" style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '12px',
+                  marginBottom: '20px',
+                  paddingBottom: '12px',
+                  borderBottom: '1px solid var(--border)',
+                }}>
+                  <div style={{
+                    width: '32px',
+                    height: '32px',
+                    borderRadius: '8px',
+                    background: 'var(--primary)',
+                    color: 'white',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    fontWeight: 600,
+                    fontSize: '14px',
+                  }}>
+                    {tabs.findIndex(t => t.id === 'recommendation') + 1}
+                  </div>
+                  <h2 style={{ margin: 0, fontSize: '18px', fontWeight: 600, color: 'var(--text-primary)' }}>
+                    Recommendation
+                  </h2>
+                </div>
+              </div>
+            )}
             {/* Differential Diagnosis - Auto-populated from Reason for Consult */}
             <DifferentialDiagnosisSection
               chiefComplaints={noteData.chiefComplaint || []}
               selectedDiagnoses={noteData.differentialDiagnoses || []}
-              onDiagnosesChange={(diagnoses: Diagnosis[]) => updateNote('differentialDiagnoses', diagnoses)}
+              onDiagnosesChange={(diagnoses: Diagnosis[]) => {
+                updateNote('differentialDiagnoses', diagnoses)
+                // Also notify parent for note generation
+                if (onDiagnosesChange) {
+                  onDiagnosesChange(diagnoses.map(d => ({
+                    id: d.id,
+                    name: d.name,
+                    icd10: d.icd10,
+                    category: d.category,
+                  })))
+                }
+              }}
             />
 
             {/* Generate Assessment Button */}

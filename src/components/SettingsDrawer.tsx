@@ -14,12 +14,23 @@ interface UserSettings {
   }
   // Appearance
   fontSize: 'small' | 'medium' | 'large'
+  // Tab Order
+  tabOrder: string[]
   // Documentation Style
   documentationStyle: 'concise' | 'detailed' | 'narrative'
   preferredTerminology: 'formal' | 'standard' | 'simplified'
   // Notifications
   soundEnabled: boolean
   notificationsEnabled: boolean
+}
+
+// Default tab configuration
+const DEFAULT_TAB_ORDER = ['history', 'imaging', 'exam', 'recommendation']
+const TAB_LABELS: Record<string, string> = {
+  history: 'History',
+  imaging: 'Imaging/results',
+  exam: 'Physical exams',
+  recommendation: 'Recommendation',
 }
 
 const DEFAULT_SETTINGS: UserSettings = {
@@ -32,6 +43,7 @@ const DEFAULT_SETTINGS: UserSettings = {
     physicalExam: '',
   },
   fontSize: 'medium',
+  tabOrder: DEFAULT_TAB_ORDER,
   documentationStyle: 'detailed',
   preferredTerminology: 'standard',
   soundEnabled: true,
@@ -93,6 +105,9 @@ export default function SettingsDrawer({
     setSaveStatus('saving')
     localStorage.setItem('sevaro-user-settings', JSON.stringify(settings))
 
+    // Also save tab order separately for CenterPanel to use
+    localStorage.setItem('sevaro-tab-order', JSON.stringify(settings.tabOrder || DEFAULT_TAB_ORDER))
+
     // Apply font size to document
     document.documentElement.style.setProperty(
       '--base-font-size',
@@ -111,6 +126,20 @@ export default function SettingsDrawer({
       setSettings(DEFAULT_SETTINGS)
       setHasUnsavedChanges(true)
     }
+  }
+
+  // Tab order management
+  const moveTab = (tabId: string, direction: 'up' | 'down') => {
+    const currentOrder = settings.tabOrder || DEFAULT_TAB_ORDER
+    const currentIndex = currentOrder.indexOf(tabId)
+    if (currentIndex === -1) return
+
+    const newIndex = direction === 'up' ? currentIndex - 1 : currentIndex + 1
+    if (newIndex < 0 || newIndex >= currentOrder.length) return
+
+    const newOrder = [...currentOrder]
+    ;[newOrder[currentIndex], newOrder[newIndex]] = [newOrder[newIndex], newOrder[currentIndex]]
+    updateSettings('tabOrder', newOrder)
   }
 
   if (!isOpen) return null
@@ -561,6 +590,99 @@ export default function SettingsDrawer({
                         {size}
                       </div>
                     </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Tab Order */}
+              <div style={{ marginBottom: '24px' }}>
+                <h3 style={{ fontSize: '14px', fontWeight: 600, margin: '0 0 8px 0', color: 'var(--text-primary)' }}>
+                  Tab Order
+                </h3>
+                <p style={{ fontSize: '12px', color: 'var(--text-muted)', margin: '0 0 12px 0' }}>
+                  Customize the order of tabs in the clinical note editor. Use the arrows to reorder.
+                </p>
+                <div style={{
+                  border: '1px solid var(--border)',
+                  borderRadius: '8px',
+                  overflow: 'hidden',
+                }}>
+                  {(settings.tabOrder || DEFAULT_TAB_ORDER).map((tabId, index) => (
+                    <div
+                      key={tabId}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        padding: '12px 14px',
+                        background: index % 2 === 0 ? 'var(--bg-white)' : 'var(--bg-gray)',
+                        borderBottom: index < (settings.tabOrder || DEFAULT_TAB_ORDER).length - 1 ? '1px solid var(--border)' : 'none',
+                      }}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                        <span style={{
+                          width: '24px',
+                          height: '24px',
+                          borderRadius: '6px',
+                          background: 'var(--primary)',
+                          color: 'white',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          fontSize: '12px',
+                          fontWeight: 600,
+                        }}>
+                          {index + 1}
+                        </span>
+                        <span style={{ fontSize: '13px', fontWeight: 500, color: 'var(--text-primary)' }}>
+                          {TAB_LABELS[tabId] || tabId}
+                        </span>
+                      </div>
+                      <div style={{ display: 'flex', gap: '4px' }}>
+                        <button
+                          onClick={() => moveTab(tabId, 'up')}
+                          disabled={index === 0}
+                          style={{
+                            width: '28px',
+                            height: '28px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            borderRadius: '6px',
+                            border: '1px solid var(--border)',
+                            background: index === 0 ? 'var(--bg-gray)' : 'var(--bg-white)',
+                            cursor: index === 0 ? 'not-allowed' : 'pointer',
+                            color: index === 0 ? 'var(--text-muted)' : 'var(--text-secondary)',
+                          }}
+                          title="Move up"
+                        >
+                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                            <polyline points="18 15 12 9 6 15"/>
+                          </svg>
+                        </button>
+                        <button
+                          onClick={() => moveTab(tabId, 'down')}
+                          disabled={index === (settings.tabOrder || DEFAULT_TAB_ORDER).length - 1}
+                          style={{
+                            width: '28px',
+                            height: '28px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            borderRadius: '6px',
+                            border: '1px solid var(--border)',
+                            background: index === (settings.tabOrder || DEFAULT_TAB_ORDER).length - 1 ? 'var(--bg-gray)' : 'var(--bg-white)',
+                            cursor: index === (settings.tabOrder || DEFAULT_TAB_ORDER).length - 1 ? 'not-allowed' : 'pointer',
+                            color: index === (settings.tabOrder || DEFAULT_TAB_ORDER).length - 1 ? 'var(--text-muted)' : 'var(--text-secondary)',
+                          }}
+                          title="Move down"
+                        >
+                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                            <polyline points="6 9 12 15 18 9"/>
+                          </svg>
+                        </button>
+                      </div>
+                    </div>
                   ))}
                 </div>
               </div>

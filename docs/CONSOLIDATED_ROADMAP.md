@@ -162,13 +162,13 @@ These foundational features are fully implemented.
 
 ### 3.2 TopNav Elements
 
-| Element | Status | Priority |
-|---------|--------|----------|
-| Sevaro Logo click | ⏳ PENDING | Navigate to dashboard |
-| Timer click | ⏳ PENDING | Pause/reset |
-| Lock Icon | ⏳ PENDING | Session lock |
-| Notifications | ⏳ PENDING | Panel with items |
-| What's New | ⏳ PENDING | Changelog modal |
+| Element | Status | Notes |
+|---------|--------|-------|
+| Sevaro Logo click | ✅ COMPLETE | Links to prototype.html |
+| Timer click | ✅ COMPLETE | Dropdown with pause/resume, reset, billing code selector |
+| Lock Icon | ✅ COMPLETE | Full-screen PHI protection overlay |
+| Notifications | ✅ COMPLETE | Panel with alert/message/task/system types, read/unread states |
+| What's New | ✅ COMPLETE | Version history changelog panel |
 
 ### 3.3 AI Actions on Fields
 
@@ -197,11 +197,22 @@ These foundational features are fully implemented.
 
 | Feature | Status | Priority |
 |---------|--------|----------|
+| **Comprehensive Note Generation** | ✅ COMPLETE | EnhancedNotePreviewModal |
+| Note type selection (New Consult/Follow-up) | ✅ COMPLETE | Different layouts |
+| Note length preference (Concise/Standard/Detailed) | ✅ COMPLETE | Formatting options |
 | Note assembly from all sources | ✅ COMPLETE | Merge engine + modal |
+| Scales integration (with scores) | ✅ COMPLETE | formatScales() |
+| Diagnoses integration (with ICD-10) | ✅ COMPLETE | formatDiagnoses() |
+| Imaging/Labs integration | ✅ COMPLETE | formatImagingStudies() |
+| Physical exam text generation | ✅ COMPLETE | formatExamFindings() |
+| Recommendations integration | ✅ COMPLETE | formatRecommendations() |
 | Preview/Edit modal | ✅ COMPLETE | P1 |
+| Section-by-section verification | ✅ COMPLETE | P1 |
 | Recommendations verification checklist | ✅ COMPLETE | P1 |
-| Source tracking (Manual/AI/Recs) | ✅ COMPLETE | P1 |
-| Section verification progress | ✅ COMPLETE | P1 |
+| Source tracking (Manual/AI/Recs/Scales/Imaging) | ✅ COMPLETE | P1 |
+| Final note preview (EHR-ready) | ✅ COMPLETE | Full text view |
+| Copy to clipboard (one-click) | ✅ COMPLETE | For EHR paste |
+| Word count display | ✅ COMPLETE | Real-time |
 | AI suggestion accept/reject | ✅ COMPLETE | P1 |
 | Suggested improvements section | ⏳ PENDING | P2 |
 | "Ask AI about this note" button | ⏳ PENDING | P2 |
@@ -212,7 +223,9 @@ These foundational features are fully implemented.
 |---------|--------|----------|
 | Checkbox-based neurological exam | ✅ COMPLETE | - |
 | Free-text exam option | ⏳ PENDING | P1 |
-| NIH Stroke Scale (NIHSS) | ⏳ PENDING | 🎯 HIGH |
+| NIH Stroke Scale (NIHSS) | ✅ COMPLETE | Full 15-item scale |
+| Modified Ashworth Scale | ✅ COMPLETE | Spasticity grading |
+| Exam Templates (5 predefined + custom) | ✅ COMPLETE | Quick apply |
 | Modified Rankin Scale | ⏳ PENDING | P2 |
 | Other exam types dropdown | ⏳ PENDING | P2 |
 
@@ -282,30 +295,46 @@ These foundational features are fully implemented.
 
 ## Phase 5: Extended Clinical Scales
 
+### Recently Implemented (January 2026)
+
+| Scale | Status | Notes |
+|-------|--------|-------|
+| NIHSS (NIH Stroke Scale) | ✅ COMPLETE | Full 15-item version, exam-driven |
+| Modified Ashworth Scale | ✅ COMPLETE | Spasticity assessment |
+| ABCD2 (TIA risk) | ✅ COMPLETE | Stroke risk stratification |
+| DHI (Dizziness Handicap) | ✅ COMPLETE | 10-item short form |
+| Mini-Cog | ✅ COMPLETE | Brief cognitive screen |
+| ISI (Insomnia Severity) | ✅ COMPLETE | 7-item sleep assessment |
+| ESS (Epworth Sleepiness) | ✅ COMPLETE | Daytime sleepiness |
+
+### Scale Location System
+
+| Feature | Status | Notes |
+|---------|--------|-------|
+| Exam vs History categorization | ✅ COMPLETE | SCALE_LOCATION_MAP |
+| getExamScales() helper | ✅ COMPLETE | For Physical Exam tab |
+| getHistoryScales() helper | ✅ COMPLETE | For History tab |
+| Condition-to-scale mappings | ✅ COMPLETE | Stroke, TIA, Dizziness, etc. |
+
 ### Outpatient (Future)
 
 | Scale | Status | Priority |
 |-------|--------|----------|
-| Epworth Sleepiness Scale | ⏳ PENDING | P1 |
 | UPDRS (Parkinson's) | ⏳ PENDING | P2 |
 | Hoehn & Yahr | ⏳ PENDING | P2 |
 | EDSS (MS) | ⏳ PENDING | P2 |
-| ABCD2 (TIA risk) | ⏳ PENDING | P1 |
 | CHA₂DS₂-VASc | ⏳ PENDING | P2 |
 | HAS-BLED | ⏳ PENDING | P2 |
 | DN4 (neuropathic pain) | ⏳ PENDING | P2 |
 | ODI (spine) | ⏳ PENDING | P2 |
 | NDI (neck) | ⏳ PENDING | P2 |
-| DHI (dizziness) | ⏳ PENDING | P2 |
-| Modified Ashworth | ⏳ PENDING | P1 |
 
 ### Inpatient Module (Future)
 
 | Scale | Status | Priority |
 |-------|--------|----------|
-| NIHSS | ⏳ PENDING | 🎯 P0 for inpatient |
 | GCS | ⏳ PENDING | P0 for inpatient |
-| mRS | ⏳ PENDING | P0 for inpatient |
+| mRS (Modified Rankin) | ⏳ PENDING | P0 for inpatient |
 | FOUR Score | ⏳ PENDING | P1 |
 | Hunt & Hess | ⏳ PENDING | P1 |
 | ICH Score | ⏳ PENDING | P1 |
@@ -371,30 +400,38 @@ Based on the analysis, here's the recommended implementation order to minimize r
 
 ### Medium-term (Phase 3B)
 
-5. **NIHSS Scale** - Critical for stroke
-   - High clinical value
-   - Bridges outpatient/inpatient needs
+5. ~~**NIHSS Scale** - Critical for stroke~~ ✅ COMPLETE
+   - Full 15-item version implemented
+   - Integrated with exam scales section
+   - Also added: Modified Ashworth, ABCD2, DHI, Mini-Cog, ISI, ESS
+
+6. ~~**Exam Template Feature**~~ ✅ COMPLETE
+   - Predefined templates (General Neuro, Headache, Stroke, Cognitive, Movement)
+   - Custom template saving with user naming
+   - Compact chip-based scale selection
 
 ### Ongoing (Polish & Expansion)
 
-6. **TopNav Dead Elements** - Logo, Timer, Lock, Notifications
-7. **Pre-built Dot Phrases** - Seed neurology library
-8. **Additional Scales** - Epworth, ABCD2, etc.
+7. **TopNav Dead Elements** - Logo, Timer, Lock, Notifications
+8. **Pre-built Dot Phrases** - Seed neurology library
 9. **Workflow Documentation** - Help users understand options
 
 ---
 
 ## Success Metrics
 
-| Metric | Target |
-|--------|--------|
-| Dead UI elements | 0 |
-| AI buttons with real actions | 100% |
-| Dictation coverage | All text inputs |
-| Phase 2 completion | 100% |
-| Core scales implemented | NIHSS added |
+| Metric | Target | Status |
+|--------|--------|--------|
+| Dead UI elements | 0 | 🔧 TopNav items remain |
+| AI buttons with real actions | 100% | ✅ COMPLETE |
+| Dictation coverage | All text inputs | ✅ Clinical fields done |
+| Phase 2 completion | 100% | ✅ COMPLETE |
+| Core scales implemented | NIHSS added | ✅ COMPLETE (7 new scales) |
+| Field AI Actions | Working | ✅ COMPLETE |
+| User Settings | Working | ✅ COMPLETE |
 
 ---
 
 *Document created: January 24, 2026*
+*Last updated: January 24, 2026*
 *Consolidates: All PRD documents*

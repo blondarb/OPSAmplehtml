@@ -39,10 +39,15 @@ src/
 │   ├── ClinicalNote.tsx   # Clinical note container orchestrating all panels
 │   ├── DifferentialDiagnosisSection.tsx # Differential diagnosis with ICD-10 codes
 │   ├── DotPhrasesDrawer.tsx # Dot phrases management drawer
+│   ├── EnhancedNotePreviewModal.tsx # Comprehensive note generation with type/length selection
+│   ├── ExamScalesSection.tsx # Exam-driven scales (NIHSS, MAS, etc.)
 │   ├── ImagingResultsTab.tsx # Imaging/Results tab with collapsible study cards
 │   ├── LeftSidebar.tsx    # Patient info, Prior Visits, Score History
-│   ├── NoteTextField.tsx  # Reusable text field with dictation/AI buttons
+│   ├── NoteTextField.tsx  # Reusable text field with dictation/AI/field actions
 │   ├── ReasonForConsultSection.tsx # Two-tier reason for consult selection
+│   ├── ScaleForm.tsx      # Generic scale form component
+│   ├── SettingsDrawer.tsx # User settings (AI instructions, appearance)
+│   ├── SmartRecommendationsSection.tsx # Treatment recommendations per diagnosis
 │   ├── SmartScalesSection.tsx # Clinical scales based on selected conditions
 │   ├── TopNav.tsx         # Navigation with queue tabs, timer, PHI toggle
 │   └── VoiceDrawer.tsx    # Voice & Dictation drawer (Chart Prep, Document)
@@ -52,8 +57,8 @@ src/
 │   ├── diagnosisData.ts   # 134 neurology diagnoses with ICD-10 codes
 │   ├── note-merge/        # Note merge engine for combining AI outputs
 │   │   ├── index.ts       # Re-exports merge functions
-│   │   ├── merge-engine.ts # Core merge logic
-│   │   └── types.ts       # TypeScript interfaces for merge system
+│   │   ├── merge-engine.ts # Core merge logic + formatting functions
+│   │   └── types.ts       # TypeScript interfaces (ComprehensiveNoteData, FormattedNote)
 │   ├── reasonForConsultData.ts # Consult categories and sub-options
 │   ├── supabase/
 │   │   ├── client.ts      # Browser Supabase client
@@ -244,8 +249,9 @@ The middleware (`src/middleware.ts`) handles session refresh. Uses a simplified 
 
 ### API Routes
 
-- `/api/ai/ask` - Ask clinical questions to GPT-4
+- `/api/ai/ask` - Ask clinical questions to GPT-4 (with user settings integration)
 - `/api/ai/chart-prep` - Generate pre-visit summaries with structured JSON output
+- `/api/ai/field-action` - Field-level AI actions (Improve/Expand/Summarize) with anti-hallucination
 - `/api/ai/transcribe` - Voice transcription (Whisper + GPT-4 cleanup)
 - `/api/ai/visit-ai` - Visit AI: transcribe full visits and extract clinical content
 - `/api/phrases` - List and create dot phrases
@@ -355,3 +361,29 @@ When redeploying after changes, use "Redeploy without cache" to ensure fresh bui
 - Historical clinical scale scores
 - Trend indicators (improving/stable/worsening)
 - Visual progress tracking
+
+### Phase 2 & 3A Completion (January 24, 2026)
+- **Smart Recommendations**: 5 diagnoses with neuro-plans treatment recommendations
+- **Field AI Actions**: Improve/Expand/Summarize with anti-hallucination safeguards (/api/ai/field-action)
+- **User Settings Drawer**: Global + per-section AI instructions, documentation style preferences
+- **Extended Scales**: NIHSS, Modified Ashworth, ABCD2, DHI, Mini-Cog, ISI, ESS
+- **Exam Templates**: 5 predefined templates + custom template saving
+- **Scale Location System**: Exam vs history-based categorization
+
+## Documentation Update Policy
+
+**IMPORTANT: When making significant changes, always update these files:**
+
+1. **docs/IMPLEMENTATION_STATUS.md** - Mark features as COMPLETE/PENDING
+2. **docs/CONSOLIDATED_ROADMAP.md** - Update status and completion dates
+3. **CLAUDE.md** (this file) - Add to "Recent Changes" section if notable
+
+**What counts as a significant change:**
+- New features or components
+- Completing roadmap items
+- New API endpoints
+- New clinical scales
+- Major UI changes
+- Bug fixes that change expected behavior
+
+This ensures documentation stays in sync with the codebase.
