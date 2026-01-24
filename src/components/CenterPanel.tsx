@@ -4,6 +4,8 @@ import { useState } from 'react'
 import NoteTextField from './NoteTextField'
 import SmartScalesSection from './SmartScalesSection'
 import ReasonForConsultSection from './ReasonForConsultSection'
+import DifferentialDiagnosisSection from './DifferentialDiagnosisSection'
+import type { Diagnosis } from '@/lib/diagnosisData'
 
 interface CenterPanelProps {
   noteData: any
@@ -16,6 +18,8 @@ interface CenterPanelProps {
   setActiveTextField?: (field: string | null) => void
   rawDictation?: Record<string, Array<{ text: string; timestamp: string }>>
   updateRawDictation?: (field: string, rawText: string) => void
+  onGenerateNote?: () => void
+  hasAIContent?: boolean
 }
 
 const ALLERGY_OPTIONS = ['NKDA', 'Reviewed in EMR', 'Unknown', 'Other']
@@ -32,7 +36,9 @@ export default function CenterPanel({
   openDotPhrases,
   setActiveTextField,
   rawDictation,
-  updateRawDictation
+  updateRawDictation,
+  onGenerateNote,
+  hasAIContent,
 }: CenterPanelProps) {
   const [activeTab, setActiveTab] = useState('history')
   const [localActiveField, setLocalActiveField] = useState<string | null>(null)
@@ -235,7 +241,14 @@ export default function CenterPanel({
 
           {/* Generate Note Button */}
           <button
-            onClick={() => openAiDrawer('chart-prep')}
+            onClick={() => {
+              if (onGenerateNote && hasAIContent) {
+                onGenerateNote()
+              } else {
+                // Open AI drawer to Document tab if no AI content yet
+                openAiDrawer('document')
+              }
+            }}
             style={{
               display: 'flex',
               alignItems: 'center',
@@ -243,17 +256,33 @@ export default function CenterPanel({
               padding: '8px 14px',
               borderRadius: '8px',
               border: 'none',
-              background: 'linear-gradient(135deg, #8B5CF6 0%, #A78BFA 100%)',
+              background: hasAIContent
+                ? 'linear-gradient(135deg, #8B5CF6 0%, #A78BFA 100%)'
+                : 'linear-gradient(135deg, #6B7280 0%, #9CA3AF 100%)',
               cursor: 'pointer',
               fontSize: '13px',
               fontWeight: 500,
               color: 'white',
+              position: 'relative',
             }}
+            title={hasAIContent ? 'Apply AI content to note' : 'Record visit to generate AI content'}
           >
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
             </svg>
             Generate Note
+            {hasAIContent && (
+              <span style={{
+                position: 'absolute',
+                top: '-4px',
+                right: '-4px',
+                width: '10px',
+                height: '10px',
+                borderRadius: '50%',
+                background: '#22C55E',
+                border: '2px solid white',
+              }} />
+            )}
           </button>
 
           {/* Pend Button */}
@@ -1268,59 +1297,12 @@ export default function CenterPanel({
         {/* Recommendation Tab */}
         {activeTab === 'recommendation' && (
           <>
-            {/* Differential Diagnosis */}
-            <div style={{ position: 'relative', marginBottom: '16px' }}>
-              <span style={{
-                position: 'absolute',
-                right: '-12px',
-                top: '0',
-                background: '#EF4444',
-                color: 'white',
-                fontSize: '11px',
-                fontWeight: 500,
-                padding: '4px 8px',
-                borderRadius: '0 4px 4px 0',
-                zIndex: 1,
-              }}>Required</span>
-              <div style={{
-                background: 'var(--bg-white)',
-                borderRadius: '12px',
-                padding: '20px',
-                boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
-              }}>
-                <div style={{ marginBottom: '16px' }}>
-                  <span style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text-primary)' }}>Differential diagnosis</span>
-                  <span style={{ color: '#EF4444', marginLeft: '2px' }}>*</span>
-                </div>
-                <div style={{ position: 'relative' }}>
-                  <select style={{
-                    width: '100%',
-                    padding: '12px 16px',
-                    border: '1px solid var(--border)',
-                    borderRadius: '8px',
-                    fontSize: '14px',
-                    outline: 'none',
-                    appearance: 'none',
-                    background: 'var(--bg-white)',
-                    cursor: 'pointer',
-                  }}>
-                    <option value="">Select diagnosis...</option>
-                    <option value="migraine">Headache/migraine</option>
-                    <option value="stroke">Stroke</option>
-                    <option value="seizure">Seizure disorder</option>
-                  </select>
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--text-muted)" strokeWidth="2" style={{
-                    position: 'absolute',
-                    right: '16px',
-                    top: '50%',
-                    transform: 'translateY(-50%)',
-                    pointerEvents: 'none',
-                  }}>
-                    <polyline points="6 9 12 15 18 9"/>
-                  </svg>
-                </div>
-              </div>
-            </div>
+            {/* Differential Diagnosis - Auto-populated from Reason for Consult */}
+            <DifferentialDiagnosisSection
+              chiefComplaints={noteData.chiefComplaint || []}
+              selectedDiagnoses={noteData.differentialDiagnoses || []}
+              onDiagnosesChange={(diagnoses: Diagnosis[]) => updateNote('differentialDiagnoses', diagnoses)}
+            />
 
             {/* Generate Assessment Button */}
             <button
