@@ -134,6 +134,110 @@ export default function CenterPanel({
     rombergNegative: false,
   })
 
+  // Predefined exam templates
+  const EXAM_TEMPLATES: Record<string, { name: string; findings: Partial<Record<string, boolean>>; accordions: Partial<Record<string, boolean>> }> = {
+    general: {
+      name: 'General Neuro',
+      findings: {
+        locAwake: true, orientName: true, orientDate: true, orientLocation: true, orientSituation: true,
+        followingCommands: true, visualFields: true, pupilsReactive: true, eomsFulll: true,
+        facialSensation: true, faceSymmetric: true, hearingIntact: true, palateElevates: true, tongueMidline: true,
+        normalBulk: true, normalTone: true, strength5: true, noPronatorDrift: true,
+        lightTouch: true, pinprick: true, vibration: true, proprioception: true,
+        fingerToNose: true, heelToShin: true, rapidAlternating: true,
+      },
+      accordions: { generalAppearance: true, mentalStatus: true, cranialNerves: true, motor: true, sensation: true, coordination: true, gait: false },
+    },
+    headache: {
+      name: 'Headache Exam',
+      findings: {
+        locAwake: true, orientName: true, orientDate: true, orientLocation: true, orientSituation: true,
+        followingCommands: true, visualFields: true, pupilsReactive: true, eomsFulll: true,
+        facialSensation: true, faceSymmetric: true, tongueMidline: true,
+        normalTone: true, strength5: true, noPronatorDrift: true,
+        fingerToNose: true,
+      },
+      accordions: { generalAppearance: true, mentalStatus: true, cranialNerves: true, motor: true, sensation: false, coordination: true, gait: false },
+    },
+    stroke: {
+      name: 'Stroke Exam',
+      findings: {
+        locAwake: true, orientName: true, orientDate: true, orientLocation: true, orientSituation: true,
+        followingCommands: true, visualFields: true, pupilsReactive: true, eomsFulll: true,
+        facialSensation: true, faceSymmetric: true, hearingIntact: true, palateElevates: true, tongueMidline: true,
+        normalBulk: true, normalTone: true, strength5: true, noPronatorDrift: true,
+        lightTouch: true, pinprick: true, vibration: true, proprioception: true,
+        fingerToNose: true, heelToShin: true, rapidAlternating: true,
+        gaitEvaluated: true, stationNormal: true, casualGait: true,
+      },
+      accordions: { generalAppearance: true, mentalStatus: true, cranialNerves: true, motor: true, sensation: true, coordination: true, gait: true },
+    },
+    cognitive: {
+      name: 'Cognitive Exam',
+      findings: {
+        locAwake: true, orientName: true, orientDate: true, orientLocation: true, orientSituation: true,
+        followingCommands: true, visualFields: true, pupilsReactive: true,
+        faceSymmetric: true, normalTone: true, strength5: true,
+      },
+      accordions: { generalAppearance: true, mentalStatus: true, cranialNerves: true, motor: true, sensation: false, coordination: false, gait: false },
+    },
+    movement: {
+      name: 'Movement Disorder',
+      findings: {
+        locAwake: true, orientName: true, orientDate: true, orientLocation: true, orientSituation: true,
+        followingCommands: true, faceSymmetric: true,
+        normalBulk: true, normalTone: true, strength5: true, noPronatorDrift: true,
+        fingerToNose: true, heelToShin: true, rapidAlternating: true,
+        gaitEvaluated: true, stationNormal: true, casualGait: true,
+      },
+      accordions: { generalAppearance: true, mentalStatus: true, cranialNerves: false, motor: true, sensation: false, coordination: true, gait: true },
+    },
+  }
+
+  const [selectedTemplate, setSelectedTemplate] = useState<string>('general')
+  const [showTemplateMenu, setShowTemplateMenu] = useState(false)
+  const [customTemplates, setCustomTemplates] = useState<Record<string, { name: string; findings: Record<string, boolean>; accordions: Record<string, boolean> }>>({})
+
+  const applyTemplate = (templateId: string) => {
+    const template = EXAM_TEMPLATES[templateId] || customTemplates[templateId]
+    if (template) {
+      setExamFindings(prev => {
+        const newFindings = { ...prev }
+        // Reset all to false first
+        Object.keys(newFindings).forEach(key => newFindings[key] = false)
+        // Apply template findings
+        Object.entries(template.findings).forEach(([key, value]) => {
+          if (key in newFindings) newFindings[key] = value as boolean
+        })
+        return newFindings
+      })
+      setOpenExamAccordions(prev => {
+        const newAccordions = { ...prev }
+        Object.entries(template.accordions).forEach(([key, value]) => {
+          if (key in newAccordions) newAccordions[key] = value as boolean
+        })
+        return newAccordions
+      })
+      setSelectedTemplate(templateId)
+      setShowTemplateMenu(false)
+    }
+  }
+
+  const saveCurrentAsTemplate = () => {
+    const name = prompt('Enter a name for this template:')
+    if (name) {
+      const templateId = `custom_${Date.now()}`
+      setCustomTemplates(prev => ({
+        ...prev,
+        [templateId]: {
+          name,
+          findings: { ...examFindings },
+          accordions: { ...openExamAccordions },
+        },
+      }))
+    }
+  }
+
   const toggleExamAccordion = (key: string) => {
     setOpenExamAccordions(prev => ({ ...prev, [key]: !prev[key] }))
   }
@@ -1034,60 +1138,6 @@ ${noteData.plan || 'Not documented'}
               }}
             />
 
-            {/* Initial Assessment */}
-            <div style={{
-              background: 'var(--bg-white)',
-              borderRadius: '12px',
-              padding: '20px',
-              marginBottom: '16px',
-              boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
-            }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px' }}>
-                <span style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text-primary)' }}>Initial assessment</span>
-                <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>(Optional)</span>
-              </div>
-              <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap' }}>
-                <div style={{ flex: '1 1 200px' }}>
-                  <label style={{ display: 'block', fontSize: '12px', color: 'var(--text-muted)', marginBottom: '4px' }}>Select date</label>
-                  <div style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '8px',
-                    padding: '8px 12px',
-                    border: '1px solid var(--border)',
-                    borderRadius: '8px',
-                  }}>
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" strokeWidth="2">
-                      <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>
-                    </svg>
-                    <span style={{ fontSize: '14px', color: 'var(--text-primary)' }}>01/16/2026</span>
-                  </div>
-                </div>
-                <div style={{ flex: '1 1 200px' }}>
-                  <label style={{ display: 'block', fontSize: '12px', color: 'var(--text-muted)', marginBottom: '4px' }}>Military Time (PST)</label>
-                  <div style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '8px',
-                    padding: '8px 12px',
-                    border: '1px solid var(--border)',
-                    borderRadius: '8px',
-                  }}>
-                    <span style={{ fontSize: '14px', color: 'var(--text-primary)' }}>HH : MM</span>
-                    <button style={{
-                      marginLeft: 'auto',
-                      padding: '4px 12px',
-                      borderRadius: '16px',
-                      border: '1px solid var(--border)',
-                      background: 'var(--bg-white)',
-                      fontSize: '12px',
-                      cursor: 'pointer',
-                    }}>Now</button>
-                  </div>
-                </div>
-              </div>
-            </div>
-
             {/* Neurological Examination Section */}
             <div style={{
               background: 'var(--bg-white)',
@@ -1098,7 +1148,136 @@ ${noteData.plan || 'Not documented'}
             }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
                 <span style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text-primary)' }}>Neurological Examination</span>
-                <span style={{ fontSize: '11px', color: 'var(--text-muted)', background: 'var(--bg-dark)', padding: '4px 8px', borderRadius: '4px' }}>Optional</span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  {/* Template selector */}
+                  <div style={{ position: 'relative' }}>
+                    <button
+                      onClick={() => setShowTemplateMenu(!showTemplateMenu)}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '6px',
+                        padding: '4px 10px',
+                        fontSize: '11px',
+                        fontWeight: 500,
+                        color: 'var(--primary)',
+                        background: 'transparent',
+                        border: '1px solid var(--primary)',
+                        borderRadius: '4px',
+                        cursor: 'pointer',
+                      }}
+                    >
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
+                      </svg>
+                      {EXAM_TEMPLATES[selectedTemplate]?.name || customTemplates[selectedTemplate]?.name || 'Template'}
+                      <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <polyline points="6 9 12 15 18 9"/>
+                      </svg>
+                    </button>
+                    {showTemplateMenu && (
+                      <div style={{
+                        position: 'absolute',
+                        top: '100%',
+                        right: 0,
+                        marginTop: '4px',
+                        background: 'var(--bg-white)',
+                        border: '1px solid var(--border)',
+                        borderRadius: '8px',
+                        boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+                        zIndex: 100,
+                        minWidth: '180px',
+                        overflow: 'hidden',
+                      }}>
+                        <div style={{ padding: '8px 12px', fontSize: '10px', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', borderBottom: '1px solid var(--border)' }}>
+                          Exam Templates
+                        </div>
+                        {Object.entries(EXAM_TEMPLATES).map(([id, template]) => (
+                          <button
+                            key={id}
+                            onClick={() => applyTemplate(id)}
+                            style={{
+                              width: '100%',
+                              padding: '10px 12px',
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '8px',
+                              border: 'none',
+                              background: selectedTemplate === id ? 'var(--bg-dark)' : 'transparent',
+                              cursor: 'pointer',
+                              fontSize: '12px',
+                              color: 'var(--text-primary)',
+                              textAlign: 'left',
+                            }}
+                          >
+                            {selectedTemplate === id && (
+                              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" strokeWidth="2">
+                                <polyline points="20 6 9 17 4 12"/>
+                              </svg>
+                            )}
+                            <span style={{ marginLeft: selectedTemplate === id ? 0 : '20px' }}>{template.name}</span>
+                          </button>
+                        ))}
+                        {Object.keys(customTemplates).length > 0 && (
+                          <>
+                            <div style={{ padding: '8px 12px', fontSize: '10px', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', borderTop: '1px solid var(--border)', borderBottom: '1px solid var(--border)' }}>
+                              Custom
+                            </div>
+                            {Object.entries(customTemplates).map(([id, template]) => (
+                              <button
+                                key={id}
+                                onClick={() => applyTemplate(id)}
+                                style={{
+                                  width: '100%',
+                                  padding: '10px 12px',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  gap: '8px',
+                                  border: 'none',
+                                  background: selectedTemplate === id ? 'var(--bg-dark)' : 'transparent',
+                                  cursor: 'pointer',
+                                  fontSize: '12px',
+                                  color: 'var(--text-primary)',
+                                  textAlign: 'left',
+                                }}
+                              >
+                                {selectedTemplate === id && (
+                                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" strokeWidth="2">
+                                    <polyline points="20 6 9 17 4 12"/>
+                                  </svg>
+                                )}
+                                <span style={{ marginLeft: selectedTemplate === id ? 0 : '20px' }}>{template.name}</span>
+                              </button>
+                            ))}
+                          </>
+                        )}
+                        <div style={{ borderTop: '1px solid var(--border)' }}>
+                          <button
+                            onClick={() => { saveCurrentAsTemplate(); setShowTemplateMenu(false); }}
+                            style={{
+                              width: '100%',
+                              padding: '10px 12px',
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '8px',
+                              border: 'none',
+                              background: 'transparent',
+                              cursor: 'pointer',
+                              fontSize: '12px',
+                              color: 'var(--primary)',
+                              textAlign: 'left',
+                            }}
+                          >
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                              <path d="M12 5v14M5 12h14"/>
+                            </svg>
+                            Save Current as Template
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
               </div>
 
               {/* General Appearance Accordion */}
@@ -1668,7 +1847,9 @@ ${noteData.plan || 'Not documented'}
                       background: 'transparent',
                     }} />
                     <span style={{ fontSize: '14px', fontWeight: 500 }}>Gait</span>
-                    <span style={{ fontSize: '11px', color: 'var(--text-muted)', background: '#FEF3C7', padding: '2px 6px', borderRadius: '4px' }}>Limited in telemedicine</span>
+                    <span title="May be limited in telemedicine; MA assistance recommended" style={{ color: '#D97706', cursor: 'help' }}>
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg>
+                    </span>
                   </div>
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"
                     style={{ transform: openExamAccordions.gait ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.2s' }}>
@@ -1696,7 +1877,7 @@ ${noteData.plan || 'Not documented'}
                           onChange={() => setExamFinding('gaitEvaluated', false)}
                           style={{ accentColor: 'var(--primary)' }}
                         />
-                        <span style={{ fontSize: '13px' }}>Not evaluated (telemedicine limitation)</span>
+                        <span style={{ fontSize: '13px' }}>Not evaluated</span>
                       </label>
                     </div>
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '8px', marginBottom: '16px' }}>

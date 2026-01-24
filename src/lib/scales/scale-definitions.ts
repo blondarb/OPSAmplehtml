@@ -1466,22 +1466,22 @@ export const CONDITION_SCALE_MAPPINGS: ConditionScaleMapping[] = [
   { condition: 'Breakthrough seizures', scaleId: 'ess', priority: 2, isRequired: false },
 
   // Dementia & Cognitive
-  { condition: 'Memory loss', scaleId: 'moca', priority: 1, isRequired: true },
+  { condition: 'Memory loss', scaleId: 'moca', priority: 1, isRequired: false },
   { condition: 'Memory loss', scaleId: 'phq9', priority: 2, isRequired: false },
 
-  { condition: 'Mild cognitive impairment', scaleId: 'moca', priority: 1, isRequired: true },
+  { condition: 'Mild cognitive impairment', scaleId: 'moca', priority: 1, isRequired: false },
   { condition: 'Mild cognitive impairment', scaleId: 'phq9', priority: 2, isRequired: false },
 
-  { condition: 'Alzheimer disease', scaleId: 'moca', priority: 1, isRequired: true },
+  { condition: 'Alzheimer disease', scaleId: 'moca', priority: 1, isRequired: false },
   { condition: 'Alzheimer disease', scaleId: 'phq9', priority: 2, isRequired: false },
 
-  { condition: 'Dementia evaluation', scaleId: 'moca', priority: 1, isRequired: true },
+  { condition: 'Dementia evaluation', scaleId: 'moca', priority: 1, isRequired: false },
   { condition: 'Dementia evaluation', scaleId: 'phq9', priority: 2, isRequired: false },
 
-  { condition: 'Frontotemporal dementia', scaleId: 'moca', priority: 1, isRequired: true },
+  { condition: 'Frontotemporal dementia', scaleId: 'moca', priority: 1, isRequired: false },
   { condition: 'Frontotemporal dementia', scaleId: 'phq9', priority: 2, isRequired: false },
 
-  { condition: 'Lewy body dementia', scaleId: 'moca', priority: 1, isRequired: true },
+  { condition: 'Lewy body dementia', scaleId: 'moca', priority: 1, isRequired: false },
   { condition: 'Lewy body dementia', scaleId: 'phq9', priority: 2, isRequired: false },
   { condition: 'Lewy body dementia', scaleId: 'ess', priority: 3, isRequired: false },
 
@@ -1501,14 +1501,14 @@ export const CONDITION_SCALE_MAPPINGS: ConditionScaleMapping[] = [
   { condition: 'MS follow-up', scaleId: 'moca', priority: 2, isRequired: false },
 
   // Sleep
-  { condition: 'Narcolepsy', scaleId: 'ess', priority: 1, isRequired: true },
+  { condition: 'Narcolepsy', scaleId: 'ess', priority: 1, isRequired: false },
   { condition: 'Narcolepsy', scaleId: 'phq9', priority: 2, isRequired: false },
 
   { condition: 'Insomnia', scaleId: 'ess', priority: 1, isRequired: false },
   { condition: 'Insomnia', scaleId: 'phq9', priority: 2, isRequired: false },
   { condition: 'Insomnia', scaleId: 'gad7', priority: 3, isRequired: false },
 
-  { condition: 'Sleep apnea evaluation', scaleId: 'ess', priority: 1, isRequired: true },
+  { condition: 'Sleep apnea evaluation', scaleId: 'ess', priority: 1, isRequired: false },
   { condition: 'Sleep apnea evaluation', scaleId: 'phq9', priority: 2, isRequired: false },
 
   // Other Common
@@ -1524,27 +1524,27 @@ export const CONDITION_SCALE_MAPPINGS: ConditionScaleMapping[] = [
   { condition: 'Stroke follow-up', scaleId: 'phq9', priority: 3, isRequired: false },
   { condition: 'Stroke follow-up', scaleId: 'modified_ashworth', priority: 4, isRequired: false },
 
-  { condition: 'TIA evaluation', scaleId: 'abcd2', priority: 1, isRequired: true },
+  { condition: 'TIA evaluation', scaleId: 'abcd2', priority: 1, isRequired: false },
   { condition: 'TIA evaluation', scaleId: 'nihss', priority: 2, isRequired: false },
   { condition: 'TIA evaluation', scaleId: 'moca', priority: 3, isRequired: false },
   { condition: 'TIA evaluation', scaleId: 'phq9', priority: 4, isRequired: false },
 
   // Acute Stroke
-  { condition: 'Acute stroke', scaleId: 'nihss', priority: 1, isRequired: true },
+  { condition: 'Acute stroke', scaleId: 'nihss', priority: 1, isRequired: false },
   { condition: 'Acute stroke', scaleId: 'moca', priority: 2, isRequired: false },
 
-  { condition: 'Stroke - ischemic', scaleId: 'nihss', priority: 1, isRequired: true },
+  { condition: 'Stroke - ischemic', scaleId: 'nihss', priority: 1, isRequired: false },
   { condition: 'Stroke - ischemic', scaleId: 'moca', priority: 2, isRequired: false },
   { condition: 'Stroke - ischemic', scaleId: 'modified_ashworth', priority: 3, isRequired: false },
 
-  { condition: 'Stroke - hemorrhagic', scaleId: 'nihss', priority: 1, isRequired: true },
+  { condition: 'Stroke - hemorrhagic', scaleId: 'nihss', priority: 1, isRequired: false },
   { condition: 'Stroke - hemorrhagic', scaleId: 'moca', priority: 2, isRequired: false },
 
   // Dizziness/Vertigo - Add DHI
   { condition: 'Dizziness/Vertigo', scaleId: 'dhi', priority: 1, isRequired: false },
 
   // Spasticity conditions
-  { condition: 'Spasticity', scaleId: 'modified_ashworth', priority: 1, isRequired: true },
+  { condition: 'Spasticity', scaleId: 'modified_ashworth', priority: 1, isRequired: false },
 
   // Update Insomnia to include ISI
   { condition: 'Insomnia', scaleId: 'isi', priority: 1, isRequired: false },

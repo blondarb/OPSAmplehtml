@@ -7,7 +7,8 @@ import {
   ScaleResponses,
   ScoreCalculation,
 } from '@/lib/scales/types'
-import { ALL_SCALES, getExamScales, getScalesForCondition, getScaleLocation } from '@/lib/scales/scale-definitions'
+import { getExamScales, getScalesForCondition, getScaleLocation } from '@/lib/scales/scale-definitions'
+import { getSeverityColor } from '@/lib/scales/scoring-engine'
 
 interface ScaleResult {
   id: string
@@ -46,6 +47,8 @@ export default function ExamScalesSection({
   const [scaleHistory, setScaleHistory] = useState<ScaleResult[]>([])
   const [isSaving, setIsSaving] = useState<string | null>(null)
   const [showAllScales, setShowAllScales] = useState(false)
+  const [showInfoTooltip, setShowInfoTooltip] = useState(false)
+  const [selectedScaleId, setSelectedScaleId] = useState<string | null>(null)
 
   // Get exam-driven scales based on selected conditions
   const relevantScales = useMemo(() => {
@@ -119,14 +122,15 @@ export default function ExamScalesSection({
     fetchHistory()
   }, [patientId])
 
-  const toggleScaleExpanded = (scaleId: string) => {
+  const handleScaleSelect = (scaleId: string) => {
+    setSelectedScaleId(selectedScaleId === scaleId ? null : scaleId)
     setScaleStates(prev => ({
       ...prev,
       [scaleId]: {
         ...prev[scaleId],
         responses: prev[scaleId]?.responses || {},
         calculation: prev[scaleId]?.calculation || null,
-        isExpanded: !prev[scaleId]?.isExpanded,
+        isExpanded: selectedScaleId !== scaleId,
         isSaved: prev[scaleId]?.isSaved ?? false,
       },
     }))
@@ -143,7 +147,7 @@ export default function ExamScalesSection({
         ...prev[scaleId],
         responses,
         calculation,
-        isExpanded: prev[scaleId]?.isExpanded ?? true,
+        isExpanded: true,
         isSaved: false,
       },
     }))
@@ -211,31 +215,88 @@ export default function ExamScalesSection({
     return displayedScales.filter(scale => scaleStates[scale.id]?.calculation?.isComplete).length
   }, [displayedScales, scaleStates])
 
+  // Get scale status for chip display
+  const getScaleStatus = (scale: ScaleDefinition) => {
+    const state = scaleStates[scale.id]
+    if (state?.calculation?.isComplete) {
+      return {
+        status: 'completed' as const,
+        score: state.calculation.rawScore,
+        severity: state.calculation.severity,
+      }
+    }
+    if (state?.calculation && state.calculation.answeredQuestions > 0) {
+      return { status: 'in_progress' as const }
+    }
+    return { status: 'not_started' as const }
+  }
+
   return (
     <div style={{
       background: 'var(--bg-white)',
       borderRadius: '12px',
-      padding: '20px',
+      padding: '16px',
       boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
       marginBottom: '16px',
     }}>
       {/* Header */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-          <span style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text-primary)' }}>Exam Scales</span>
-          {relevantScales.length > 0 && (
-            <span style={{
-              fontSize: '11px',
-              padding: '2px 8px',
-              borderRadius: '10px',
-              background: '#8B5CF6',
-              color: 'white',
-            }}>
-              {relevantScales.length} recommended
-            </span>
-          )}
-        </div>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <span style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text-primary)' }}>Exam Scales</span>
+
+          {/* Info icon with tooltip */}
+          <div style={{ position: 'relative' }}>
+            <button
+              onMouseEnter={() => setShowInfoTooltip(true)}
+              onMouseLeave={() => setShowInfoTooltip(false)}
+              style={{
+                background: 'transparent',
+                border: 'none',
+                padding: '2px',
+                cursor: 'pointer',
+                color: '#8B5CF6',
+                display: 'flex',
+                alignItems: 'center',
+              }}
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <circle cx="12" cy="12" r="10"/>
+                <path d="M12 16v-4"/>
+                <path d="M12 8h.01"/>
+              </svg>
+            </button>
+            {showInfoTooltip && (
+              <div style={{
+                position: 'absolute',
+                top: '100%',
+                left: '50%',
+                transform: 'translateX(-50%)',
+                marginTop: '4px',
+                padding: '8px 12px',
+                background: '#1F2937',
+                color: 'white',
+                fontSize: '11px',
+                borderRadius: '6px',
+                whiteSpace: 'nowrap',
+                zIndex: 100,
+                boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+              }}>
+                Exam-driven scales can be performed with MA assistance for telemedicine
+                <div style={{
+                  position: 'absolute',
+                  top: '-4px',
+                  left: '50%',
+                  transform: 'translateX(-50%)',
+                  width: 0,
+                  height: 0,
+                  borderLeft: '4px solid transparent',
+                  borderRight: '4px solid transparent',
+                  borderBottom: '4px solid #1F2937',
+                }} />
+              </div>
+            )}
+          </div>
+
           {completedCount > 0 && (
             <span style={{
               fontSize: '11px',
@@ -247,109 +308,152 @@ export default function ExamScalesSection({
               <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                 <polyline points="20 6 9 17 4 12" />
               </svg>
-              {completedCount} completed
+              {completedCount}/{displayedScales.length}
             </span>
           )}
-          <button
-            onClick={() => setShowAllScales(!showAllScales)}
-            style={{
-              fontSize: '11px',
-              color: 'var(--primary)',
-              background: showAllScales ? 'var(--primary)' : 'transparent',
-              border: '1px solid var(--primary)',
-              padding: '4px 8px',
-              borderRadius: '4px',
-              cursor: 'pointer',
-              ...(showAllScales ? { color: 'white' } : {}),
-            }}
-          >
-            {showAllScales ? 'Show Recommended' : 'Show All'}
-          </button>
         </div>
-      </div>
 
-      {/* Info about MA assistance */}
-      <div style={{
-        padding: '10px 12px',
-        background: '#EDE9FE',
-        borderRadius: '6px',
-        marginBottom: '12px',
-        fontSize: '12px',
-        color: '#6D28D9',
-        display: 'flex',
-        alignItems: 'center',
-        gap: '8px',
-      }}>
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-          <circle cx="12" cy="12" r="10"/>
-          <path d="M12 16v-4"/>
-          <path d="M12 8h.01"/>
-        </svg>
-        <span>These exam-driven scales can be performed with MA assistance for telemedicine visits.</span>
+        <button
+          onClick={() => setShowAllScales(!showAllScales)}
+          style={{
+            fontSize: '11px',
+            color: showAllScales ? 'white' : 'var(--primary)',
+            background: showAllScales ? 'var(--primary)' : 'transparent',
+            border: '1px solid var(--primary)',
+            padding: '4px 8px',
+            borderRadius: '4px',
+            cursor: 'pointer',
+          }}
+        >
+          {showAllScales ? 'Recommended' : 'All Scales'}
+        </button>
       </div>
 
       {displayedScales.length === 0 ? (
         <div style={{
-          padding: '24px',
+          padding: '16px',
           textAlign: 'center',
           color: 'var(--text-muted)',
-          fontSize: '13px',
+          fontSize: '12px',
           background: 'var(--bg-dark)',
           borderRadius: '8px',
         }}>
-          <svg
-            width="32"
-            height="32"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="1.5"
-            style={{ margin: '0 auto 8px', opacity: 0.5 }}
-          >
-            <path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2" />
-            <rect x="9" y="3" width="6" height="4" rx="2" />
-            <path d="M9 14l2 2 4-4" />
-          </svg>
-          <p style={{ margin: 0 }}>
-            {showAllScales
-              ? 'No exam scales available'
-              : 'Select a diagnosis to see relevant exam scales, or click "Show All"'}
-          </p>
+          {showAllScales
+            ? 'No exam scales available'
+            : 'Select a diagnosis to see relevant exam scales'}
         </div>
       ) : (
         <>
-          {/* Scale Forms */}
-          {displayedScales.map(scale => {
-            const state = scaleStates[scale.id]
+          {/* Compact scale chips row */}
+          <div style={{
+            display: 'flex',
+            flexWrap: 'wrap',
+            gap: '8px',
+            marginBottom: selectedScaleId ? '12px' : 0,
+          }}>
+            {displayedScales.map(scale => {
+              const scaleStatus = getScaleStatus(scale)
+              const isSelected = selectedScaleId === scale.id
+              const severityColor = scaleStatus.status === 'completed' && scaleStatus.severity
+                ? getSeverityColor(scaleStatus.severity)
+                : null
 
-            return (
-              <div key={scale.id} style={{ position: 'relative' }}>
-                {isSaving === scale.id && (
-                  <div style={{
-                    position: 'absolute',
-                    top: '8px',
-                    right: '40px',
-                    fontSize: '10px',
-                    color: 'var(--text-muted)',
-                  }}>
-                    Saving...
-                  </div>
-                )}
+              return (
+                <button
+                  key={scale.id}
+                  onClick={() => handleScaleSelect(scale.id)}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    padding: '6px 10px',
+                    border: isSelected
+                      ? '2px solid var(--primary)'
+                      : scaleStatus.status === 'completed'
+                        ? `1px solid ${severityColor}`
+                        : '1px solid var(--border)',
+                    borderRadius: '20px',
+                    background: isSelected
+                      ? 'var(--bg-dark)'
+                      : scaleStatus.status === 'completed'
+                        ? `${severityColor}10`
+                        : 'var(--bg-white)',
+                    cursor: 'pointer',
+                    fontSize: '12px',
+                    fontWeight: 500,
+                    color: scaleStatus.status === 'completed' && severityColor ? severityColor : 'var(--text-primary)',
+                    transition: 'all 0.15s ease',
+                  }}
+                >
+                  {/* Status indicator */}
+                  <span style={{
+                    width: '8px',
+                    height: '8px',
+                    borderRadius: '50%',
+                    background: scaleStatus.status === 'completed' && severityColor
+                      ? severityColor
+                      : scaleStatus.status === 'in_progress'
+                        ? '#F59E0B'
+                        : 'transparent',
+                    border: scaleStatus.status === 'not_started'
+                      ? '1px solid var(--border)'
+                      : 'none',
+                    flexShrink: 0,
+                  }} />
 
-                <ScaleForm
-                  scale={scale}
-                  initialResponses={state?.responses || {}}
-                  isExpanded={state?.isExpanded ?? false}
-                  onToggleExpand={() => toggleScaleExpanded(scale.id)}
-                  onResponsesChange={(responses, calculation) =>
-                    handleResponsesChange(scale.id, responses, calculation)
-                  }
-                  onAddToNote={handleAddToNote}
-                  showAddToNote={true}
-                />
-              </div>
-            )
-          })}
+                  <span>{scale.abbreviation}</span>
+
+                  {/* Score badge for completed */}
+                  {scaleStatus.status === 'completed' && scaleStatus.score !== undefined && severityColor && (
+                    <span style={{
+                      fontSize: '10px',
+                      fontWeight: 600,
+                      padding: '1px 5px',
+                      background: severityColor,
+                      color: 'white',
+                      borderRadius: '8px',
+                    }}>
+                      {scaleStatus.score}
+                    </span>
+                  )}
+
+                  {/* Saving indicator */}
+                  {isSaving === scale.id && (
+                    <span style={{ fontSize: '10px', color: 'var(--text-muted)' }}>...</span>
+                  )}
+                </button>
+              )
+            })}
+          </div>
+
+          {/* Expanded scale form */}
+          {selectedScaleId && (
+            <div style={{
+              border: '1px solid var(--border)',
+              borderRadius: '8px',
+              overflow: 'hidden',
+            }}>
+              {displayedScales
+                .filter(scale => scale.id === selectedScaleId)
+                .map(scale => {
+                  const state = scaleStates[scale.id]
+                  return (
+                    <ScaleForm
+                      key={scale.id}
+                      scale={scale}
+                      initialResponses={state?.responses || {}}
+                      isExpanded={true}
+                      onToggleExpand={() => setSelectedScaleId(null)}
+                      onResponsesChange={(responses, calculation) =>
+                        handleResponsesChange(scale.id, responses, calculation)
+                      }
+                      onAddToNote={handleAddToNote}
+                      showAddToNote={true}
+                    />
+                  )
+                })}
+            </div>
+          )}
         </>
       )}
     </div>
