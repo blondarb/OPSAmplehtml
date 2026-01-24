@@ -5,6 +5,7 @@ import NoteTextField from './NoteTextField'
 import SmartScalesSection from './SmartScalesSection'
 import ReasonForConsultSection from './ReasonForConsultSection'
 import DifferentialDiagnosisSection from './DifferentialDiagnosisSection'
+import ImagingResultsTab from './ImagingResultsTab'
 import type { Diagnosis } from '@/lib/diagnosisData'
 
 interface CenterPanelProps {
@@ -395,7 +396,7 @@ export default function CenterPanel({
                   <span style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text-primary)' }}>Review of system</span>
                   <span style={{ color: '#EF4444', marginLeft: '2px' }}>*</span>
                 </div>
-                <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginBottom: noteData.ros === 'Unable to obtain due to:' || noteData.ros === 'Other' ? '12px' : '0' }}>
                   {ROS_OPTIONS.map(option => (
                     <button
                       key={option}
@@ -415,6 +416,39 @@ export default function CenterPanel({
                     </button>
                   ))}
                 </div>
+                {/* Show details field when "Unable to obtain" or "Other" is selected */}
+                {(noteData.ros === 'Unable to obtain due to:' || noteData.ros === 'Other') && (
+                  <div style={{ position: 'relative' }}>
+                    <textarea
+                      value={noteData.rosDetails || ''}
+                      onChange={(e) => updateNote('rosDetails', e.target.value)}
+                      onFocus={() => handleSetActiveField('rosDetails')}
+                      placeholder={noteData.ros === 'Unable to obtain due to:' ? 'Specify reason...' : 'Enter ROS details...'}
+                      style={{
+                        width: '100%',
+                        minHeight: '60px',
+                        padding: '10px 12px',
+                        paddingRight: '90px',
+                        border: '1px solid var(--border)',
+                        borderRadius: '8px',
+                        fontSize: '14px',
+                        resize: 'vertical',
+                        fontFamily: 'inherit',
+                      }}
+                    />
+                    <div style={{ position: 'absolute', top: '8px', right: '8px', display: 'flex', gap: '4px' }}>
+                      <button onClick={() => openVoiceDrawer?.('document')} title="Dictate" style={{ width: '24px', height: '24px', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '4px', border: 'none', background: '#FEE2E2', color: '#EF4444', cursor: 'pointer' }}>
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 1a3 3 0 00-3 3v8a3 3 0 006 0V4a3 3 0 00-3-3z"/><path d="M19 10v2a7 7 0 01-14 0v-2"/></svg>
+                      </button>
+                      <button onClick={() => openDotPhrases?.('rosDetails')} title="Dot Phrases" style={{ width: '24px', height: '24px', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '4px', border: 'none', background: '#EDE9FE', color: '#8B5CF6', cursor: 'pointer' }}>
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
+                      </button>
+                      <button onClick={() => openAiDrawer('ask-ai')} title="AI Assist" style={{ width: '24px', height: '24px', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '4px', border: 'none', background: '#CCFBF1', color: '#0D9488', cursor: 'pointer' }}>
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
 
@@ -442,7 +476,7 @@ export default function CenterPanel({
                   <span style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text-primary)' }}>Allergies</span>
                   <span style={{ color: '#EF4444', marginLeft: '2px' }}>*</span>
                 </div>
-                <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginBottom: noteData.allergies === 'Other' ? '12px' : '0' }}>
                   {ALLERGY_OPTIONS.map(option => (
                     <button
                       key={option}
@@ -462,6 +496,39 @@ export default function CenterPanel({
                     </button>
                   ))}
                 </div>
+                {/* Show details field when "Other" is selected */}
+                {noteData.allergies === 'Other' && (
+                  <div style={{ position: 'relative' }}>
+                    <textarea
+                      value={noteData.allergyDetails || ''}
+                      onChange={(e) => updateNote('allergyDetails', e.target.value)}
+                      onFocus={() => handleSetActiveField('allergyDetails')}
+                      placeholder="List allergies and reactions..."
+                      style={{
+                        width: '100%',
+                        minHeight: '60px',
+                        padding: '10px 12px',
+                        paddingRight: '90px',
+                        border: '1px solid var(--border)',
+                        borderRadius: '8px',
+                        fontSize: '14px',
+                        resize: 'vertical',
+                        fontFamily: 'inherit',
+                      }}
+                    />
+                    <div style={{ position: 'absolute', top: '8px', right: '8px', display: 'flex', gap: '4px' }}>
+                      <button onClick={() => openVoiceDrawer?.('document')} title="Dictate" style={{ width: '24px', height: '24px', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '4px', border: 'none', background: '#FEE2E2', color: '#EF4444', cursor: 'pointer' }}>
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 1a3 3 0 00-3 3v8a3 3 0 006 0V4a3 3 0 00-3-3z"/><path d="M19 10v2a7 7 0 01-14 0v-2"/></svg>
+                      </button>
+                      <button onClick={() => openDotPhrases?.('allergyDetails')} title="Dot Phrases" style={{ width: '24px', height: '24px', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '4px', border: 'none', background: '#EDE9FE', color: '#8B5CF6', cursor: 'pointer' }}>
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
+                      </button>
+                      <button onClick={() => openAiDrawer('ask-ai')} title="AI Assist" style={{ width: '24px', height: '24px', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '4px', border: 'none', background: '#CCFBF1', color: '#0D9488', cursor: 'pointer' }}>
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
 
@@ -489,7 +556,7 @@ export default function CenterPanel({
                   <span style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text-primary)' }}>Is medical, surgical, family and social history available?</span>
                   <span style={{ color: '#EF4444', marginLeft: '2px' }}>*</span>
                 </div>
-                <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginBottom: noteData.historyAvailable === 'Yes' ? '12px' : '0' }}>
                   {HISTORY_OPTIONS.map(option => (
                     <button
                       key={option}
@@ -509,6 +576,39 @@ export default function CenterPanel({
                     </button>
                   ))}
                 </div>
+                {/* Show history details field when "Yes" is selected */}
+                {noteData.historyAvailable === 'Yes' && (
+                  <div style={{ position: 'relative' }}>
+                    <textarea
+                      value={noteData.historyDetails || ''}
+                      onChange={(e) => updateNote('historyDetails', e.target.value)}
+                      onFocus={() => handleSetActiveField('historyDetails')}
+                      placeholder="Pertinent medical, surgical, family, and social history..."
+                      style={{
+                        width: '100%',
+                        minHeight: '80px',
+                        padding: '10px 12px',
+                        paddingRight: '90px',
+                        border: '1px solid var(--border)',
+                        borderRadius: '8px',
+                        fontSize: '14px',
+                        resize: 'vertical',
+                        fontFamily: 'inherit',
+                      }}
+                    />
+                    <div style={{ position: 'absolute', top: '8px', right: '8px', display: 'flex', gap: '4px' }}>
+                      <button onClick={() => openVoiceDrawer?.('document')} title="Dictate" style={{ width: '24px', height: '24px', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '4px', border: 'none', background: '#FEE2E2', color: '#EF4444', cursor: 'pointer' }}>
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 1a3 3 0 00-3 3v8a3 3 0 006 0V4a3 3 0 00-3-3z"/><path d="M19 10v2a7 7 0 01-14 0v-2"/></svg>
+                      </button>
+                      <button onClick={() => openDotPhrases?.('historyDetails')} title="Dot Phrases" style={{ width: '24px', height: '24px', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '4px', border: 'none', background: '#EDE9FE', color: '#8B5CF6', cursor: 'pointer' }}>
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
+                      </button>
+                      <button onClick={() => openAiDrawer('ask-ai')} title="AI Assist" style={{ width: '24px', height: '24px', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '4px', border: 'none', background: '#CCFBF1', color: '#0D9488', cursor: 'pointer' }}>
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
 
@@ -527,175 +627,14 @@ export default function CenterPanel({
 
         {/* Imaging Tab */}
         {activeTab === 'imaging' && (
-          <div>
-            {/* CTH Done */}
-            <div style={{
-              background: 'var(--bg-white)',
-              borderRadius: '12px',
-              padding: '20px',
-              marginBottom: '16px',
-              boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
-            }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-                <span style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text-primary)' }}>Was CTH done?</span>
-                <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>(Optional)</span>
-                <div style={{ display: 'flex', gap: '8px', marginLeft: 'auto' }}>
-                  <button style={{
-                    padding: '8px 24px',
-                    borderRadius: '20px',
-                    fontSize: '13px',
-                    cursor: 'pointer',
-                    border: '1px solid var(--border)',
-                    background: 'var(--bg-white)',
-                    color: 'var(--text-secondary)',
-                  }}>Yes</button>
-                  <button style={{
-                    padding: '8px 24px',
-                    borderRadius: '20px',
-                    fontSize: '13px',
-                    cursor: 'pointer',
-                    border: '1px solid var(--border)',
-                    background: 'var(--bg-white)',
-                    color: 'var(--text-secondary)',
-                  }}>No</button>
-                </div>
-              </div>
-            </div>
-
-            {/* CTA head & neck */}
-            <div style={{
-              background: 'var(--bg-white)',
-              borderRadius: '12px',
-              padding: '20px',
-              marginBottom: '16px',
-              boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
-            }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-                <span style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text-primary)' }}>Was CTA head & neck done?</span>
-                <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>(Optional)</span>
-                <div style={{ display: 'flex', gap: '8px', marginLeft: 'auto' }}>
-                  <button style={{
-                    padding: '8px 24px',
-                    borderRadius: '20px',
-                    fontSize: '13px',
-                    cursor: 'pointer',
-                    border: '1px solid var(--border)',
-                    background: 'var(--bg-white)',
-                    color: 'var(--text-secondary)',
-                  }}>Yes</button>
-                  <button style={{
-                    padding: '8px 24px',
-                    borderRadius: '20px',
-                    fontSize: '13px',
-                    cursor: 'pointer',
-                    border: '1px solid var(--border)',
-                    background: 'var(--bg-white)',
-                    color: 'var(--text-secondary)',
-                  }}>No</button>
-                </div>
-              </div>
-            </div>
-
-            {/* MRI brain */}
-            <div style={{
-              background: 'var(--bg-white)',
-              borderRadius: '12px',
-              padding: '20px',
-              marginBottom: '16px',
-              boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
-            }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-                <span style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text-primary)' }}>MRI brain</span>
-                <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>(Optional)</span>
-                <div style={{ display: 'flex', gap: '8px', marginLeft: 'auto' }}>
-                  <button style={{
-                    padding: '8px 24px',
-                    borderRadius: '20px',
-                    fontSize: '13px',
-                    cursor: 'pointer',
-                    border: '1px solid var(--border)',
-                    background: 'var(--bg-white)',
-                    color: 'var(--text-secondary)',
-                  }}>Yes</button>
-                  <button style={{
-                    padding: '8px 24px',
-                    borderRadius: '20px',
-                    fontSize: '13px',
-                    cursor: 'pointer',
-                    border: '1px solid var(--primary)',
-                    background: 'var(--primary)',
-                    color: 'white',
-                  }}>No</button>
-                </div>
-              </div>
-            </div>
-
-            {/* TTE */}
-            <div style={{
-              background: 'var(--bg-white)',
-              borderRadius: '12px',
-              padding: '20px',
-              marginBottom: '16px',
-              boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
-            }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-                <span style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text-primary)' }}>TTE</span>
-                <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>(Optional)</span>
-                <div style={{ display: 'flex', gap: '8px', marginLeft: 'auto' }}>
-                  <button style={{
-                    padding: '8px 24px',
-                    borderRadius: '20px',
-                    fontSize: '13px',
-                    cursor: 'pointer',
-                    border: '1px solid var(--border)',
-                    background: 'var(--bg-white)',
-                    color: 'var(--text-secondary)',
-                  }}>Yes</button>
-                  <button style={{
-                    padding: '8px 24px',
-                    borderRadius: '20px',
-                    fontSize: '13px',
-                    cursor: 'pointer',
-                    border: '1px solid var(--border)',
-                    background: 'var(--bg-white)',
-                    color: 'var(--text-secondary)',
-                  }}>No</button>
-                </div>
-              </div>
-            </div>
-
-            {/* Lab results */}
-            <div style={{
-              background: 'var(--bg-white)',
-              borderRadius: '12px',
-              padding: '20px',
-              marginBottom: '16px',
-              boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
-            }}>
-              <div style={{ marginBottom: '16px' }}>
-                <span style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text-primary)' }}>Lab results</span>
-                <span style={{ fontSize: '12px', color: 'var(--text-muted)', marginLeft: '8px' }}>(Optional)</span>
-              </div>
-              <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-                {['Lipid profile panel', 'HbA1c', 'Other lab results'].map(option => (
-                  <button
-                    key={option}
-                    style={{
-                      padding: '8px 16px',
-                      borderRadius: '20px',
-                      fontSize: '13px',
-                      cursor: 'pointer',
-                      border: '1px solid var(--border)',
-                      background: 'var(--bg-white)',
-                      color: 'var(--text-secondary)',
-                    }}
-                  >
-                    {option}
-                  </button>
-                ))}
-              </div>
-            </div>
-          </div>
+          <ImagingResultsTab
+            noteData={noteData}
+            updateNote={updateNote}
+            openVoiceDrawer={openVoiceDrawer}
+            openAiDrawer={openAiDrawer}
+            openDotPhrases={openDotPhrases}
+            setActiveTextField={handleSetActiveField}
+          />
         )}
 
         {/* Exam Tab */}
