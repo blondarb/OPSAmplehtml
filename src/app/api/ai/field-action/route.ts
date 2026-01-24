@@ -12,6 +12,12 @@ interface FieldActionRequest {
     patient?: string
     chiefComplaint?: string
   }
+  userSettings?: {
+    globalAiInstructions?: string
+    sectionAiInstructions?: Record<string, string>
+    documentationStyle?: 'concise' | 'detailed' | 'narrative'
+    preferredTerminology?: 'formal' | 'standard' | 'simplified'
+  }
 }
 
 const ACTION_PROMPTS: Record<FieldActionType, string> = {
@@ -75,7 +81,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const { action, text, fieldName, context }: FieldActionRequest = await request.json()
+    const { action, text, fieldName, context, userSettings }: FieldActionRequest = await request.json()
 
     if (!action || !['improve', 'expand', 'summarize'].includes(action)) {
       return NextResponse.json({ error: 'Valid action (improve, expand, summarize) is required' }, { status: 400 })
@@ -111,13 +117,53 @@ export async function POST(request: Request) {
       ? `\n\nREMINDER: Patient safety is paramount. Hallucinating or fabricating clinical information could lead to medical errors. Only elaborate on information explicitly present in the input text.`
       : ''
 
+    // Build user preferences section
+    let userPreferences = ''
+    if (userSettings) {
+      const prefs: string[] = []
+
+      // Global AI instructions
+      if (userSettings.globalAiInstructions) {
+        prefs.push(`User preferences: ${userSettings.globalAiInstructions}`)
+      }
+
+      // Section-specific instructions
+      if (userSettings.sectionAiInstructions?.[fieldName]) {
+        prefs.push(`Section-specific instructions: ${userSettings.sectionAiInstructions[fieldName]}`)
+      }
+
+      // Documentation style
+      if (userSettings.documentationStyle) {
+        const styleGuide = {
+          concise: 'Keep the output brief and focused on essential information only.',
+          detailed: 'Provide comprehensive coverage with thorough documentation.',
+          narrative: 'Write in a flowing, story-like prose format.',
+        }
+        prefs.push(styleGuide[userSettings.documentationStyle])
+      }
+
+      // Terminology preference
+      if (userSettings.preferredTerminology) {
+        const termGuide = {
+          formal: 'Use formal, academic medical terminology.',
+          standard: 'Use standard clinical terminology.',
+          simplified: 'Use simplified, accessible medical language.',
+        }
+        prefs.push(termGuide[userSettings.preferredTerminology])
+      }
+
+      if (prefs.length > 0) {
+        userPreferences = `\n\n${prefs.join('\n')}`
+      }
+    }
+
     const systemPrompt = `${ACTION_PROMPTS[action]}
 
 ${fieldContext}
 ${patientContext}
 ${complaintContext}
 
-Important: This is for a neurology practice. Ensure the output is appropriate for neurological documentation.${safetyReminder}`
+Important: This is for a neurology practice. Ensure the output is appropriate for neurological documentation.${safetyReminder}${userPreferences}`
 
     // Use lower temperature for expand to reduce hallucination risk
     const temperature = action === 'expand' ? 0.3 : 0.5

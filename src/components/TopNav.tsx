@@ -9,10 +9,12 @@ interface TopNavProps {
   toggleDarkMode: () => void
   onSignOut: () => void
   openAiDrawer: (tab: string) => void
+  onOpenSettings: () => void
 }
 
-export default function TopNav({ user, darkMode, toggleDarkMode, onSignOut, openAiDrawer }: TopNavProps) {
+export default function TopNav({ user, darkMode, toggleDarkMode, onSignOut, openAiDrawer, onOpenSettings }: TopNavProps) {
   const [aiMenuOpen, setAiMenuOpen] = useState(false)
+  const [userMenuOpen, setUserMenuOpen] = useState(false)
   const [activeQueue, setActiveQueue] = useState('rounding')
   const [timer, setTimer] = useState({ hours: 0, minutes: 0, seconds: 0 })
 
@@ -351,7 +353,7 @@ export default function TopNav({ user, darkMode, toggleDarkMode, onSignOut, open
         {/* User Avatar with dropdown */}
         <div style={{ position: 'relative' }}>
           <button
-            onClick={onSignOut}
+            onClick={() => setUserMenuOpen(!userMenuOpen)}
             style={{
               width: '36px',
               height: '36px',
@@ -366,13 +368,113 @@ export default function TopNav({ user, darkMode, toggleDarkMode, onSignOut, open
               border: 'none',
               cursor: 'pointer',
             }}
-            title="Sign out"
+            title="User menu"
           >
             {user.email?.charAt(0).toUpperCase() || 'U'}
           </button>
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--text-muted)" strokeWidth="2" style={{ position: 'absolute', bottom: '-2px', right: '-4px' }}>
             <polyline points="6 9 12 15 18 9"/>
           </svg>
+
+          {/* User Menu Dropdown */}
+          {userMenuOpen && (
+            <>
+              <div
+                onClick={() => setUserMenuOpen(false)}
+                style={{
+                  position: 'fixed',
+                  inset: 0,
+                  zIndex: 998,
+                }}
+              />
+              <div
+                style={{
+                  position: 'absolute',
+                  top: '100%',
+                  right: 0,
+                  marginTop: '8px',
+                  width: '220px',
+                  background: 'var(--bg-white)',
+                  border: '1px solid var(--border)',
+                  borderRadius: '8px',
+                  boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
+                  zIndex: 999,
+                  overflow: 'hidden',
+                }}
+              >
+                {/* User Info */}
+                <div style={{ padding: '12px 14px', borderBottom: '1px solid var(--border)' }}>
+                  <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)' }}>
+                    {user.email?.split('@')[0] || 'User'}
+                  </div>
+                  <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
+                    {user.email}
+                  </div>
+                </div>
+
+                {/* Menu Items */}
+                <div style={{ padding: '6px' }}>
+                  <button
+                    onClick={() => {
+                      setUserMenuOpen(false)
+                      onOpenSettings()
+                    }}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '10px',
+                      width: '100%',
+                      padding: '10px 12px',
+                      background: 'none',
+                      border: 'none',
+                      borderRadius: '6px',
+                      cursor: 'pointer',
+                      textAlign: 'left',
+                      color: 'var(--text-primary)',
+                      fontSize: '13px',
+                    }}
+                    onMouseEnter={(e) => e.currentTarget.style.background = 'var(--bg-gray)'}
+                    onMouseLeave={(e) => e.currentTarget.style.background = 'none'}
+                  >
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-2 2 2 2 0 01-2-2v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83 0 2 2 0 010-2.83l.06-.06a1.65 1.65 0 00.33-1.82 1.65 1.65 0 00-1.51-1H3a2 2 0 01-2-2 2 2 0 012-2h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 010-2.83 2 2 0 012.83 0l.06.06a1.65 1.65 0 001.82.33H9a1.65 1.65 0 001-1.51V3a2 2 0 012-2 2 2 0 012 2v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 0 2 2 0 010 2.83l-.06.06a1.65 1.65 0 00-.33 1.82V9a1.65 1.65 0 001.51 1H21a2 2 0 012 2 2 2 0 01-2 2h-.09a1.65 1.65 0 00-1.51 1z"/>
+                    </svg>
+                    Settings
+                  </button>
+
+                  <div style={{ height: '1px', background: 'var(--border)', margin: '6px 0' }} />
+
+                  <button
+                    onClick={() => {
+                      setUserMenuOpen(false)
+                      onSignOut()
+                    }}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '10px',
+                      width: '100%',
+                      padding: '10px 12px',
+                      background: 'none',
+                      border: 'none',
+                      borderRadius: '6px',
+                      cursor: 'pointer',
+                      textAlign: 'left',
+                      color: 'var(--error)',
+                      fontSize: '13px',
+                    }}
+                    onMouseEnter={(e) => e.currentTarget.style.background = 'var(--bg-gray)'}
+                    onMouseLeave={(e) => e.currentTarget.style.background = 'none'}
+                  >
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/>
+                    </svg>
+                    Sign Out
+                  </button>
+                </div>
+              </div>
+            </>
+          )}
         </div>
       </div>
     </nav>

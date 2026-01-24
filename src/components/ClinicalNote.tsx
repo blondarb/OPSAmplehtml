@@ -10,6 +10,7 @@ import AiDrawer from './AiDrawer'
 import VoiceDrawer from './VoiceDrawer'
 import DotPhrasesDrawer from './DotPhrasesDrawer'
 import NotePreviewModal from './NotePreviewModal'
+import SettingsDrawer from './SettingsDrawer'
 import { mergeNoteContent, type ChartPrepOutput, type VisitAIOutput, type ManualNoteData } from '@/lib/note-merge'
 import type { User } from '@supabase/supabase-js'
 
@@ -109,6 +110,7 @@ export default function ClinicalNote({
   const [voiceDrawerTab, setVoiceDrawerTab] = useState('chart-prep')
   const [dotPhrasesOpen, setDotPhrasesOpen] = useState(false)
   const [notePreviewOpen, setNotePreviewOpen] = useState(false)
+  const [settingsOpen, setSettingsOpen] = useState(false)
   const [activeTextField, setActiveTextField] = useState<string | null>(null)
   const [selectedRecommendations, setSelectedRecommendations] = useState<Array<{ category: string; items: string[] }>>([])
 
@@ -294,6 +296,7 @@ export default function ClinicalNote({
         toggleDarkMode={toggleDarkMode}
         onSignOut={handleSignOut}
         openAiDrawer={openAiDrawer}
+        onOpenSettings={() => setSettingsOpen(true)}
       />
 
       <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
@@ -379,6 +382,13 @@ export default function ClinicalNote({
         onSign={handleSignFromPreview}
         patientName={patient?.name || 'Patient'}
         visitDate={currentVisit?.visit_date ? new Date(currentVisit.visit_date).toLocaleDateString() : undefined}
+      />
+
+      <SettingsDrawer
+        isOpen={settingsOpen}
+        onClose={() => setSettingsOpen(false)}
+        darkMode={darkMode}
+        toggleDarkMode={toggleDarkMode}
       />
     </div>
   )

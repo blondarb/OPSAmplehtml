@@ -253,6 +253,23 @@ export default function NoteTextField({
     setAiError(null)
 
     try {
+      // Get user settings from localStorage
+      let userSettings = null
+      const savedSettings = localStorage.getItem('sevaro-user-settings')
+      if (savedSettings) {
+        try {
+          const parsed = JSON.parse(savedSettings)
+          userSettings = {
+            globalAiInstructions: parsed.globalAiInstructions || '',
+            sectionAiInstructions: parsed.sectionAiInstructions || {},
+            documentationStyle: parsed.documentationStyle || 'detailed',
+            preferredTerminology: parsed.preferredTerminology || 'standard',
+          }
+        } catch (e) {
+          console.error('Failed to parse user settings:', e)
+        }
+      }
+
       const response = await fetch('/api/ai/field-action', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -261,6 +278,7 @@ export default function NoteTextField({
           text: value,
           fieldName,
           context: patientContext,
+          userSettings,
         }),
       })
 
