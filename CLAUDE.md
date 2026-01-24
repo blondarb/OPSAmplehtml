@@ -23,7 +23,8 @@ src/
 │   │   ├── ai/            # AI endpoints
 │   │   │   ├── ask/       # Ask AI questions
 │   │   │   ├── chart-prep/# Pre-visit chart preparation
-│   │   │   └── transcribe/# Voice transcription (Whisper)
+│   │   │   ├── transcribe/# Voice transcription (Whisper)
+│   │   │   └── visit-ai/  # Visit AI - full visit transcription & clinical extraction
 │   │   └── phrases/       # Dot phrases CRUD
 │   ├── auth/              # Auth callback handler
 │   ├── dashboard/         # Main clinical interface
@@ -32,6 +33,7 @@ src/
 │   └── page.tsx           # Root redirect
 ├── components/            # React components
 │   ├── AiDrawer.tsx       # AI assistant drawer (Chart Prep, Document, Ask AI, Summary, Handout)
+│   ├── AiSuggestionPanel.tsx # Inline AI suggestion panel for note fields
 │   ├── CenterPanel.tsx    # Main content area with tabs (History, Imaging, Exam, Recommendation)
 │   ├── ClinicalNote.tsx   # Clinical note container with icon sidebar
 │   ├── DotPhrasesDrawer.tsx # Dot phrases management drawer
@@ -40,6 +42,10 @@ src/
 ├── hooks/
 │   └── useVoiceRecorder.ts # Voice recording hook for dictation
 ├── lib/
+│   ├── note-merge/        # Note merge engine for combining AI outputs
+│   │   ├── index.ts       # Re-exports merge functions
+│   │   ├── merge-engine.ts # Core merge logic
+│   │   └── types.ts       # TypeScript interfaces for merge system
 │   ├── supabase/
 │   │   ├── client.ts      # Browser Supabase client
 │   │   └── server.ts      # Server Supabase client
@@ -82,10 +88,12 @@ The OpenAI API key can be stored securely in Supabase `app_settings` table or as
 2. **Clinical Notes**: Tabbed interface (History, Imaging/results, Physical exams, Recommendation)
 3. **AI Features**:
    - **Ask AI**: General clinical questions with context
-   - **Chart Prep**: AI-generated pre-visit summaries
+   - **Chart Prep**: AI-generated pre-visit summaries with pause/resume dictation
+   - **Visit AI (Document tab)**: Record full patient visits, extract HPI/ROS/Exam/Assessment/Plan
    - **Voice Dictation**: Record and transcribe using OpenAI Whisper + GPT-4 cleanup
    - **Patient Summary**: Generate patient-friendly visit summaries
    - **Patient Handouts**: Create educational materials
+   - **Note Merge Engine**: Combines Chart Prep + Visit AI + manual content into unified note
 4. **Dot Phrases**:
    - Text expansion shortcuts (e.g., `.exam` → full exam template)
    - Field-scoped phrases (global, HPI, Assessment, Plan, etc.)
@@ -143,6 +151,12 @@ The OpenAI API key can be stored securely in Supabase `app_settings` table or as
 
 ### AiDrawer
 - Tabs: Chart Prep, Document, Ask AI, Summary, Handout
+- **Chart Prep Tab**: Pre-visit preparation with pause/resume dictation, structured output sections
+- **Document Tab (Visit AI)**: Full visit recording with clinical content extraction
+  - Inactive → Recording → Paused → Processing → Results states
+  - Extracts HPI, ROS, Exam, Assessment, Plan from conversation
+  - Confidence scores for each extracted section
+  - Insert individual sections or generate full note
 - Voice recording UI with Whisper transcription
 - Recording waveform animation with pulsing bars
 - AI response display with insert functionality
@@ -185,8 +199,9 @@ The middleware (`src/middleware.ts`) handles session refresh. Uses a simplified 
 ### API Routes
 
 - `/api/ai/ask` - Ask clinical questions to GPT-4
-- `/api/ai/chart-prep` - Generate pre-visit summaries
+- `/api/ai/chart-prep` - Generate pre-visit summaries with structured JSON output
 - `/api/ai/transcribe` - Voice transcription (Whisper + GPT-4 cleanup)
+- `/api/ai/visit-ai` - Visit AI: transcribe full visits and extract clinical content
 - `/api/phrases` - List and create dot phrases
 - `/api/phrases/[id]` - Get, update, delete individual phrases
 - `/api/phrases/seed` - Seed default medical phrases
@@ -204,7 +219,10 @@ The middleware (`src/middleware.ts`) handles session refresh. Uses a simplified 
 ## Documentation
 
 - `docs/Sevaro_Outpatient_MVP_PRD_v1.4.md` - Main product requirements
+- `docs/PRD_AI_Scribe.md` - AI Scribe system (Chart Prep + Visit AI + Note Merge)
+- `docs/PRD_AI_Summarizer.md` - Patient summary generation
 - `docs/PRD_*.md` - Feature-specific PRDs
+- `docs/IMPLEMENTATION_STATUS.md` - Current implementation status and gap analysis
 - `FIGMA_MAKE_PROMPTS.md` - UI design prompts
 - `prototype/index.html` - Original HTML prototype
 

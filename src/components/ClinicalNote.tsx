@@ -1,13 +1,15 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
 import TopNav from './TopNav'
 import LeftSidebar from './LeftSidebar'
 import CenterPanel from './CenterPanel'
 import AiDrawer from './AiDrawer'
+import VoiceDrawer from './VoiceDrawer'
 import DotPhrasesDrawer from './DotPhrasesDrawer'
+import { mergeNoteContent, type ChartPrepOutput, type VisitAIOutput, type ManualNoteData } from '@/lib/note-merge'
 import type { User } from '@supabase/supabase-js'
 
 interface ClinicalNoteProps {
@@ -101,7 +103,9 @@ export default function ClinicalNote({
   const [darkMode, setDarkMode] = useState(false)
   const [activeIcon, setActiveIcon] = useState('queue')
   const [aiDrawerOpen, setAiDrawerOpen] = useState(false)
-  const [aiDrawerTab, setAiDrawerTab] = useState('chart-prep')
+  const [aiDrawerTab, setAiDrawerTab] = useState('ask-ai')
+  const [voiceDrawerOpen, setVoiceDrawerOpen] = useState(false)
+  const [voiceDrawerTab, setVoiceDrawerTab] = useState('chart-prep')
   const [dotPhrasesOpen, setDotPhrasesOpen] = useState(false)
   const [activeTextField, setActiveTextField] = useState<string | null>(null)
   const [noteData, setNoteData] = useState({
@@ -134,6 +138,11 @@ export default function ClinicalNote({
     migrateRawDictation(currentVisit?.clinical_notes?.raw_dictation)
   )
 
+  // AI output storage for Generate Note
+  const [chartPrepOutput, setChartPrepOutput] = useState<ChartPrepOutput | null>(null)
+  const [visitAIOutput, setVisitAIOutput] = useState<VisitAIOutput | null>(null)
+  const [visitTranscript, setVisitTranscript] = useState<string>('')
+
   const updateRawDictation = (field: string, rawText: string) => {
     setRawDictation(prev => {
       const existingList = prev[field] || []
@@ -144,6 +153,55 @@ export default function ClinicalNote({
       return { ...prev, [field]: [...existingList, newEntry] }
     })
   }
+
+  // Callback when Chart Prep completes
+  const handleChartPrepComplete = useCallback((output: ChartPrepOutput) => {
+    setChartPrepOutput(output)
+  }, [])
+
+  // Callback when Visit AI completes
+  const handleVisitAIComplete = useCallback((output: VisitAIOutput, transcript: string) => {
+    setVisitAIOutput(output)
+    setVisitTranscript(transcript)
+  }, [])
+
+  // Generate Note function - merges AI outputs with manual content
+  const generateNote = useCallback(() => {
+    // Prepare manual data
+    const manualData: ManualNoteData = {
+      chiefComplaint: noteData.chiefComplaint,
+      hpi: noteData.hpi,
+      ros: noteData.ros,
+      physicalExam: '', // Not currently tracked separately
+      assessment: noteData.assessment,
+      plan: noteData.plan,
+    }
+
+    // Merge content from all sources
+    const mergedNote = mergeNoteContent(
+      manualData,
+      chartPrepOutput,
+      visitAIOutput,
+      { conflictResolution: 'keep-manual', showAiSuggestions: true }
+    )
+
+    // Update note fields with merged content
+    // Only update empty fields with AI content
+    if (!noteData.hpi && mergedNote.hpi.content) {
+      updateNote('hpi', mergedNote.hpi.content)
+    }
+    if (!noteData.assessment && mergedNote.assessment.content) {
+      updateNote('assessment', mergedNote.assessment.content)
+    }
+    if (!noteData.plan && mergedNote.plan.content) {
+      updateNote('plan', mergedNote.plan.content)
+    }
+
+    // TODO: In future, store the full mergedNote for showing AI suggestions
+    // This would enable the AiSuggestionPanel component to show alternatives
+
+    return mergedNote
+  }, [noteData, chartPrepOutput, visitAIOutput])
 
   const router = useRouter()
   const supabase = createClient()
@@ -171,8 +229,19 @@ export default function ClinicalNote({
   }
 
   const openAiDrawer = (tab: string) => {
-    setAiDrawerTab(tab)
-    setAiDrawerOpen(true)
+    // Route to appropriate drawer based on tab type
+    if (tab === 'chart-prep' || tab === 'document') {
+      setVoiceDrawerTab(tab)
+      setVoiceDrawerOpen(true)
+    } else {
+      setAiDrawerTab(tab)
+      setAiDrawerOpen(true)
+    }
+  }
+
+  const openVoiceDrawer = (tab: string) => {
+    setVoiceDrawerTab(tab)
+    setVoiceDrawerOpen(true)
   }
 
   const updateNote = (field: string, value: any) => {
@@ -239,10 +308,13 @@ export default function ClinicalNote({
           patient={patient}
           imagingStudies={imagingStudies}
           openAiDrawer={openAiDrawer}
+          openVoiceDrawer={openVoiceDrawer}
           openDotPhrases={openDotPhrases}
           setActiveTextField={setActiveTextField}
           rawDictation={rawDictation}
           updateRawDictation={updateRawDictation}
+          onGenerateNote={generateNote}
+          hasAIContent={!!(chartPrepOutput || visitAIOutput)}
         />
       </div>
 
@@ -255,6 +327,21 @@ export default function ClinicalNote({
           patient={patient}
           noteData={noteData}
           updateNote={updateNote}
+        />
+      )}
+
+      {voiceDrawerOpen && (
+        <VoiceDrawer
+          isOpen={voiceDrawerOpen}
+          onClose={() => setVoiceDrawerOpen(false)}
+          activeTab={voiceDrawerTab}
+          setActiveTab={setVoiceDrawerTab}
+          patient={patient}
+          noteData={noteData}
+          updateNote={updateNote}
+          chartPrepOutput={chartPrepOutput}
+          onChartPrepComplete={handleChartPrepComplete}
+          onVisitAIComplete={handleVisitAIComplete}
         />
       )}
 

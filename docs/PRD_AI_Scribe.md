@@ -1,8 +1,8 @@
 # AI Scribe - Product Requirements Document
 
-**Document Version:** 1.3
-**Last Updated:** January 22, 2026
-**Status:** Draft
+**Document Version:** 1.4
+**Last Updated:** January 23, 2026
+**Status:** In Development
 **Author:** Product Team
 **Owner:** Product Engineering / Clinical Informatics / Design
 
@@ -1660,11 +1660,11 @@ Earnest RCM is an AI-powered revenue cycle management platform that provides:
 
 ---
 
-### Phase 1b: Visit AI (During Visit) - PLANNED
+### Phase 1b: Visit AI (During Visit) - IN DEVELOPMENT
 
 **Purpose:** Record provider-patient conversation during the visit and combine with Chart Prep notes to generate comprehensive documentation.
 
-#### Workflow
+#### Detailed Workflow
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
@@ -1672,31 +1672,90 @@ Earnest RCM is an AI-powered revenue cycle management platform that provides:
 ├─────────────────────────────────────────────────────────────────┤
 │                                                                 │
 │  1. START VISIT RECORDING                                       │
-│     ├─ Provider clicks "Start Visit Recording"                  │
-│     ├─ Consent indicator shown                                  │
-│     └─ Ambient capture begins                                   │
+│     ├─ Provider goes to Document tab in AI Drawer               │
+│     ├─ Clicks "Start Recording" button                          │
+│     ├─ Timer starts (MM:SS format)                              │
+│     └─ Audio waveform animation shows active recording          │
 │                        ▼                                        │
-│  2. CONDUCT VISIT                                               │
-│     ├─ Normal provider-patient conversation                     │
-│     ├─ Real-time transcription (optional display)               │
-│     └─ Recording continues (5-30+ minutes)                      │
+│  2. PAUSE/RESUME AS NEEDED                                      │
+│     ├─ Provider clicks "Pause" to temporarily stop              │
+│     ├─ Timer pauses, waveform stops                             │
+│     ├─ Click "Resume" to continue recording                     │
+│     └─ Click "Restart" to discard and start fresh               │
 │                        ▼                                        │
-│  3. END RECORDING                                               │
-│     ├─ Provider clicks "End Recording"                          │
-│     └─ Full audio sent for processing                           │
+│  3. STOP RECORDING                                              │
+│     ├─ Provider clicks "Stop" when visit complete               │
+│     └─ Audio buffer finalized                                   │
 │                        ▼                                        │
-│  4. AI PROCESSING                                               │
+│  4. AI PROCESSING (VISIT AI)                                    │
 │     ├─ Whisper transcribes full conversation                    │
-│     ├─ GPT-4 extracts clinical content                          │
-│     ├─ Combines with Chart Prep notes                           │
-│     └─ Generates draft note sections                            │
+│     ├─ Speaker diarization (provider vs patient)                │
+│     ├─ GPT-4 extracts clinical content by section:              │
+│     │   • HPI (from patient-reported symptoms)                  │
+│     │   • ROS (systematic inquiry responses)                    │
+│     │   • Physical Exam (provider observations)                 │
+│     │   • Assessment (clinical impressions)                     │
+│     │   • Plan (discussed treatment/follow-up)                  │
+│     └─ Returns VisitAIOutput JSON                               │
 │                        ▼                                        │
-│  5. REVIEW & APPROVE                                            │
-│     ├─ Provider reviews AI-generated draft                      │
-│     ├─ Edit/accept each section                                 │
-│     └─ Finalize documentation                                   │
+│  5. MERGE WITH OTHER SOURCES                                    │
+│     ├─ Visit AI output (from conversation)                      │
+│     ├─ Chart Prep suggestions (from pre-visit)                  │
+│     ├─ Manual content (already entered by provider)             │
+│     └─ Returns MergedClinicalNote with suggestions              │
+│                        ▼                                        │
+│  6. GENERATE NOTE (USER ACTION)                                 │
+│     ├─ Provider clicks "Generate Note" in action bar            │
+│     ├─ AI content populates empty fields                        │
+│     ├─ Manual content preserved (AI shown as suggestion)        │
+│     └─ Provider reviews with Accept/Dismiss per section         │
 │                                                                 │
 └─────────────────────────────────────────────────────────────────┘
+```
+
+#### Recording Controls Specification
+
+| Control | State | Action |
+|---------|-------|--------|
+| **Start** | Initial/Stopped | Begin recording, show timer |
+| **Pause** | Recording | Pause recording, freeze timer |
+| **Resume** | Paused | Continue recording, resume timer |
+| **Restart** | Paused/Recording | Discard audio, reset timer to 0:00 |
+| **Stop** | Recording/Paused | Finalize recording, trigger processing |
+
+#### Recording UI States
+
+```
+INACTIVE:
+┌────────────────────────────────────────────┐
+│  Visit Recording                           │
+│  ┌──────────────────────────────────────┐  │
+│  │  🎤  Click to start recording        │  │
+│  │      your patient visit              │  │
+│  │                                      │  │
+│  │  [ Start Recording ]                 │  │
+│  └──────────────────────────────────────┘  │
+└────────────────────────────────────────────┘
+
+RECORDING:
+┌────────────────────────────────────────────┐
+│  Visit Recording                  3:45     │
+│  ┌──────────────────────────────────────┐  │
+│  │  ▁▃▅▇▅▃▁▃▅▇▅▃▁  Recording...        │  │
+│  │                                      │  │
+│  │  [⏸ Pause]  [↺ Restart]  [⏹ Stop]   │  │
+│  └──────────────────────────────────────┘  │
+└────────────────────────────────────────────┘
+
+PAUSED:
+┌────────────────────────────────────────────┐
+│  Visit Recording                  3:45     │
+│  ┌──────────────────────────────────────┐  │
+│  │  ⏸  Paused                           │  │
+│  │                                      │  │
+│  │  [▶ Resume]  [↺ Restart]  [⏹ Stop]   │  │
+│  └──────────────────────────────────────┘  │
+└────────────────────────────────────────────┘
 ```
 
 #### Technical Requirements
@@ -1704,19 +1763,335 @@ Earnest RCM is an AI-powered revenue cycle management platform that provides:
 | Requirement | Description | Priority |
 |-------------|-------------|----------|
 | **Long Recording** | Support 30+ minute recordings | P0 |
+| **Pause/Resume** | MediaRecorder pause/resume support | P0 |
+| **Recording Timer** | Real-time MM:SS display | P0 |
 | **Speaker Diarization** | Distinguish provider from patient | P1 |
-| **Real-time Display** | Show transcript as conversation happens | P1 |
+| **Real-time Display** | Show transcript as conversation happens | P2 |
 | **Section Classification** | Auto-map content to HPI/ROS/Exam/Plan | P0 |
 | **Prep Note Integration** | Merge Chart Prep with visit content | P0 |
 | **Audio Storage** | Store audio for playback/verification | P2 |
 
-#### Planned UI
+#### Visit AI Output Format
 
-- **Visit Recording Tab** in AI Drawer (or separate modal)
-- **Start/Stop Recording** controls
-- **Live Transcript** panel (optional)
-- **Recording Duration** display
-- **Draft Review** interface with Accept/Edit/Reject per section
+The Visit AI API returns structured JSON:
+
+```typescript
+interface VisitAIOutput {
+  /** HPI generated from patient-reported symptoms */
+  hpiFromVisit?: string
+
+  /** ROS from systematic inquiry responses */
+  rosFromVisit?: string
+
+  /** Physical exam from provider observations */
+  examFromVisit?: string
+
+  /** Assessment/clinical impression from discussion */
+  assessmentFromVisit?: string
+
+  /** Plan from treatment discussion */
+  planFromVisit?: string
+
+  /** Optional: Speaker-tagged transcript segments */
+  transcriptSegments?: Array<{
+    speaker: 'provider' | 'patient' | 'unknown'
+    text: string
+    timestamp: string
+  }>
+}
+```
+
+---
+
+### Note Merge System
+
+**Purpose:** Combine content from multiple AI sources with manual content, preserving user input while offering AI suggestions.
+
+#### Merge Strategy
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                    NOTE MERGE STRATEGY                           │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                 │
+│  PRIORITY ORDER (for each field):                               │
+│                                                                 │
+│  1. MANUAL CONTENT (highest priority)                           │
+│     └─ Always preserved as primary content                      │
+│                                                                 │
+│  2. VISIT AI (if manual empty)                                  │
+│     └─ From actual visit conversation                           │
+│                                                                 │
+│  3. CHART PREP (if manual & visit AI empty)                     │
+│     └─ From pre-visit chart review                              │
+│                                                                 │
+│  AI SUGGESTIONS:                                                │
+│  • If manual content exists AND AI has different content:       │
+│    → Show AI as collapsible suggestion panel                    │
+│  • User can Accept (replaces) or Dismiss (hides)                │
+│                                                                 │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+#### Merged Note Structure
+
+```typescript
+type ContentSource = 'manual' | 'chart-prep' | 'visit-ai' | 'merged'
+
+interface NoteFieldContent {
+  /** The current content to display/use */
+  content: string
+
+  /** Where the content originated from */
+  source: ContentSource
+
+  /** AI-generated alternative (if manual content exists) */
+  aiSuggestion?: string
+
+  /** Source of the AI suggestion */
+  aiSuggestionSource?: 'chart-prep' | 'visit-ai'
+
+  /** User's response to the suggestion */
+  aiSuggestionStatus?: 'pending' | 'accepted' | 'rejected'
+
+  /** Timestamp of last modification */
+  lastModified: string
+}
+
+interface MergedClinicalNote {
+  chiefComplaint: NoteFieldContent
+  hpi: NoteFieldContent
+  ros: NoteFieldContent
+  physicalExam: NoteFieldContent
+  assessment: NoteFieldContent
+  plan: NoteFieldContent
+}
+```
+
+#### Merge Function
+
+```typescript
+function mergeNoteContent(
+  manualData: ManualNoteData,
+  chartPrepData: ChartPrepOutput | null,
+  visitAIData: VisitAIOutput | null,
+  options: MergeOptions
+): MergedClinicalNote
+
+// Options
+interface MergeOptions {
+  conflictResolution: 'keep-manual' | 'prefer-ai' | 'merge-append'
+  showAiSuggestions: boolean
+}
+```
+
+#### AI Suggestion Panel Component
+
+When a field has manual content but AI suggests different content:
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│  HPI                                                            │
+│  ┌───────────────────────────────────────────────────────────┐  │
+│  │ [User's manually entered HPI text...]                     │  │
+│  └───────────────────────────────────────────────────────────┘  │
+│                                                                 │
+│  ┌───────────────────────────────────────────────────────────┐  │
+│  │ ✨ View AI suggestion                    [Visit AI] ▼     │  │
+│  └───────────────────────────────────────────────────────────┘  │
+│                                                                 │
+│  (Expanded):                                                    │
+│  ┌───────────────────────────────────────────────────────────┐  │
+│  │ ✨ AI Suggestion                         [Visit AI]        │  │
+│  ├───────────────────────────────────────────────────────────┤  │
+│  │ 50-year-old male presents for follow-up of chronic        │  │
+│  │ migraines. Reports improvement in frequency from daily    │  │
+│  │ to 3-4 per week since starting topiramate...              │  │
+│  │                                                           │  │
+│  │            [ ✓ Use this ]  [ Dismiss ]                    │  │
+│  └───────────────────────────────────────────────────────────┘  │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+### Generate Note Workflow
+
+**Purpose:** Provider-initiated action to populate clinical note with merged AI content.
+
+#### Trigger
+
+- **Button Location:** CenterPanel action bar (alongside mic, copy, etc.)
+- **Button Label:** "Generate Note" with sparkle icon
+- **Availability:** Always visible when patient selected
+
+#### Workflow
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                  GENERATE NOTE WORKFLOW                          │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                 │
+│  1. PROVIDER CLICKS "GENERATE NOTE"                             │
+│                        ▼                                        │
+│  2. GATHER SOURCES                                              │
+│     ├─ manualData: Current note field values                    │
+│     ├─ chartPrepData: Latest Chart Prep AI output               │
+│     └─ visitAIData: Latest Visit AI output (if recorded)        │
+│                        ▼                                        │
+│  3. MERGE CONTENT                                               │
+│     ├─ Call mergeNoteContent() with all sources                 │
+│     └─ Returns MergedClinicalNote with suggestions              │
+│                        ▼                                        │
+│  4. POPULATE NOTE FIELDS                                        │
+│     For each field (HPI, Assessment, Plan, etc.):               │
+│     ├─ If field empty: populate with AI content                 │
+│     ├─ If field has content: keep content, show suggestion      │
+│     └─ Mark source for each field                               │
+│                        ▼                                        │
+│  5. SHOW CONFIRMATION                                           │
+│     └─ Toast: "Note generated with AI suggestions"              │
+│                                                                 │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+#### Visual Feedback
+
+- Fields populated from AI get subtle indicator (teal border or badge)
+- Fields with suggestions show collapsible suggestion panel
+- Source tracked for audit purposes
+
+---
+
+### Document Tab UI (AI Drawer)
+
+The Document tab handles Visit AI recording during patient visits.
+
+#### Tab Structure
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│  [ Chart Prep ] [ Document ] [ Ask AI ] [ Summary ] [ Handout ] │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                 │
+│  Document Your Visit                                            │
+│  ─────────────────────────────────────────────────────          │
+│                                                                 │
+│  ┌───────────────────────────────────────────────────────────┐  │
+│  │                                                           │  │
+│  │  🎤  Record your patient visit                            │  │
+│  │                                                           │  │
+│  │  The AI will transcribe the conversation and generate     │  │
+│  │  clinical note sections from the discussion.              │  │
+│  │                                                           │  │
+│  │            [ ● Start Recording ]                          │  │
+│  │                                                           │  │
+│  └───────────────────────────────────────────────────────────┘  │
+│                                                                 │
+│  Tips:                                                          │
+│  • Speak clearly near the microphone                            │
+│  • Use Pause to temporarily stop recording                      │
+│  • Recording works with visits up to 30+ minutes                │
+│                                                                 │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+#### Recording Active State
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│  [ Chart Prep ] [ Document ] [ Ask AI ] [ Summary ] [ Handout ] │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                 │
+│  Recording Visit                                       12:34    │
+│  ─────────────────────────────────────────────────────          │
+│                                                                 │
+│  ┌───────────────────────────────────────────────────────────┐  │
+│  │                                                           │  │
+│  │  ▁▂▃▅▆▇▆▅▃▂▁▂▃▅▆▇▆▅▃▂▁                                   │  │
+│  │                                                           │  │
+│  │  Recording in progress...                                 │  │
+│  │                                                           │  │
+│  └───────────────────────────────────────────────────────────┘  │
+│                                                                 │
+│  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐              │
+│  │  ⏸ Pause    │  │  ↺ Restart  │  │  ⏹ Stop     │              │
+│  └─────────────┘  └─────────────┘  └─────────────┘              │
+│                                                                 │
+│  ─────────────────────────────────────────────────────          │
+│  Live Transcript (optional):                                    │
+│  ┌───────────────────────────────────────────────────────────┐  │
+│  │ [Dr]: How are your headaches doing?                       │  │
+│  │ [Pt]: They're better, maybe 3-4 a week now...             │  │
+│  │ [Dr]: That's good improvement. Any side effects?          │  │
+│  │ ▌                                                         │  │
+│  └───────────────────────────────────────────────────────────┘  │
+│                                                                 │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+#### Processing State
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│  [ Chart Prep ] [ Document ] [ Ask AI ] [ Summary ] [ Handout ] │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                 │
+│  Processing Visit Recording                                     │
+│  ─────────────────────────────────────────────────────          │
+│                                                                 │
+│  ┌───────────────────────────────────────────────────────────┐  │
+│  │                                                           │  │
+│  │  ⏳ Transcribing audio...                                 │  │
+│  │  ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░ 35%                    │  │
+│  │                                                           │  │
+│  └───────────────────────────────────────────────────────────┘  │
+│                                                                 │
+│  This may take a minute for longer recordings.                  │
+│                                                                 │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+#### Completion State
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│  [ Chart Prep ] [ Document ] [ Ask AI ] [ Summary ] [ Handout ] │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                 │
+│  Visit Recorded                                        ✓        │
+│  ─────────────────────────────────────────────────────          │
+│                                                                 │
+│  ┌───────────────────────────────────────────────────────────┐  │
+│  │  ✓ 12:34 visit recorded and processed                     │  │
+│  │                                                           │  │
+│  │  AI has generated suggestions for:                        │  │
+│  │  • HPI                                                    │  │
+│  │  • Assessment                                             │  │
+│  │  • Plan                                                   │  │
+│  │                                                           │  │
+│  │  Click "Generate Note" in the note toolbar to apply.      │  │
+│  └───────────────────────────────────────────────────────────┘  │
+│                                                                 │
+│  [ ● Record Another ]                                           │
+│                                                                 │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+### Files & Implementation
+
+| Component | File | Status |
+|-----------|------|--------|
+| **Voice Recording Hook** | `/src/hooks/useVoiceRecorder.ts` | ✅ Complete (pause/resume added) |
+| **Document Tab UI** | `/src/components/AiDrawer.tsx` | 🔄 Needs update |
+| **Visit AI API** | `/src/app/api/ai/visit-ai/route.ts` | ❌ Not started |
+| **Note Merge Types** | `/src/lib/note-merge/types.ts` | ✅ Complete |
+| **Note Merge Engine** | `/src/lib/note-merge/merge-engine.ts` | ✅ Complete |
+| **AI Suggestion Panel** | `/src/components/AiSuggestionPanel.tsx` | ✅ Complete |
+| **Generate Note Button** | `/src/components/CenterPanel.tsx` | ✅ Added to toolbar |
+| **Generate Note Logic** | `/src/components/ClinicalNote.tsx` | 🔄 Needs update |
 
 ---
 
@@ -1724,12 +2099,55 @@ Earnest RCM is an AI-powered revenue cycle management platform that provides:
 
 | Feature | Phase 1a (Chart Prep) | Phase 1b (Visit AI) |
 |---------|----------------------|---------------------|
-| **Recording Duration** | Short (10-60 seconds) | Long (5-30+ minutes) |
+| **Purpose** | Pre-visit chart review & observations | During-visit conversation capture |
+| **Recording Duration** | Short (10-60 seconds per note) | Long (5-30+ minutes) |
 | **Content Source** | Provider observations only | Provider + Patient conversation |
-| **Transcription** | Post-recording only | Real-time + post-processing |
-| **Speaker ID** | Single speaker | Multi-speaker diarization |
-| **Auto-categorization** | Keyword-based | AI section classification |
-| **Note Population** | Manual insert | Auto-populate with review |
+| **Transcription** | Post-recording | Post-recording (real-time P2) |
+| **Speaker ID** | Single speaker (provider) | Multi-speaker diarization |
+| **Auto-categorization** | Keyword-based (6 categories) | AI section classification (5 sections) |
+| **Recording Controls** | Start/Stop/Pause/Resume/Restart | Start/Stop/Pause/Resume/Restart |
+| **Output Format** | ChartPrepOutput JSON | VisitAIOutput JSON |
+| **Note Population** | Via "Generate Note" button | Via "Generate Note" button |
+| **Merge Behavior** | AI fills empty fields | AI fills empty, suggests for filled |
+| **UI Location** | AI Drawer → Chart Prep tab | AI Drawer → Document tab |
+
+### Combined Workflow (Chart Prep + Visit AI)
+
+The ideal workflow uses both features together:
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                COMBINED WORKFLOW EXAMPLE                         │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                 │
+│  BEFORE VISIT (Chart Prep - Phase 1a)                           │
+│  ─────────────────────────────────────                          │
+│  1. Provider opens patient chart                                │
+│  2. Reviews imaging, labs, prior notes                          │
+│  3. Dictates observations in Chart Prep tab                     │
+│  4. Generates AI summary → ChartPrepOutput stored               │
+│                                                                 │
+│  DURING VISIT (Visit AI - Phase 1b)                             │
+│  ─────────────────────────────────────                          │
+│  5. Provider starts visit recording in Document tab             │
+│  6. Conducts normal patient encounter                           │
+│  7. Stops recording when complete                               │
+│  8. AI processes → VisitAIOutput stored                         │
+│                                                                 │
+│  AFTER VISIT (Generate Note)                                    │
+│  ─────────────────────────────────────                          │
+│  9. Provider clicks "Generate Note" in toolbar                  │
+│  10. System merges:                                             │
+│      • Manual content (preserved)                               │
+│      • Visit AI output (from conversation)                      │
+│      • Chart Prep output (from pre-visit)                       │
+│  11. AI populates empty fields                                  │
+│  12. Manual fields get AI suggestion panels                     │
+│  13. Provider reviews, accepts/edits/dismisses                  │
+│  14. Signs and completes note                                   │
+│                                                                 │
+└─────────────────────────────────────────────────────────────────┘
+```
 
 ---
 
@@ -1784,6 +2202,18 @@ Earnest RCM is an AI-powered revenue cycle management platform that provides:
 ---
 
 ## Changelog
+
+**v1.4 (January 23, 2026)**
+- Expanded Phase 1b: Visit AI with detailed implementation specs
+- Added recording controls specification (pause/resume/restart)
+- Added Note Merge System section with merge strategy
+- Added MergedClinicalNote and NoteFieldContent type definitions
+- Added AI Suggestion Panel component specification
+- Added Generate Note workflow documentation
+- Added Document Tab UI mockups for all states
+- Added Combined Workflow example (Chart Prep + Visit AI)
+- Updated Phase 1 Feature Comparison table with new details
+- Added Files & Implementation status tracking table
 
 **v1.3 (January 22, 2026)**
 - Added Detailed Implementation Phases section

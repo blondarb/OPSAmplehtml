@@ -14,6 +14,7 @@ interface CenterPanelProps {
   patient?: any
   imagingStudies: any[]
   openAiDrawer: (tab: string) => void
+  openVoiceDrawer?: (tab: string) => void
   openDotPhrases?: (field: string) => void
   setActiveTextField?: (field: string | null) => void
   rawDictation?: Record<string, Array<{ text: string; timestamp: string }>>
@@ -33,6 +34,7 @@ export default function CenterPanel({
   patient,
   imagingStudies,
   openAiDrawer,
+  openVoiceDrawer,
   openDotPhrases,
   setActiveTextField,
   rawDictation,
@@ -176,9 +178,9 @@ export default function CenterPanel({
             </svg>
           </button>
 
-          {/* Microphone */}
+          {/* Microphone - opens Voice Drawer */}
           <button
-            onClick={() => openAiDrawer('document')}
+            onClick={() => openVoiceDrawer?.('document')}
             style={{
               width: '32px',
               height: '32px',
@@ -187,9 +189,9 @@ export default function CenterPanel({
               justifyContent: 'center',
               borderRadius: '6px',
               border: 'none',
-              background: 'transparent',
+              background: '#FEE2E2',
               cursor: 'pointer',
-              color: 'var(--text-secondary)',
+              color: '#EF4444',
             }}
           >
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -245,8 +247,8 @@ export default function CenterPanel({
               if (onGenerateNote && hasAIContent) {
                 onGenerateNote()
               } else {
-                // Open AI drawer to Document tab if no AI content yet
-                openAiDrawer('document')
+                // Open Voice drawer to Document tab if no AI content yet
+                openVoiceDrawer?.('document')
               }
             }}
             style={{
