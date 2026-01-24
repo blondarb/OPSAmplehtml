@@ -6,6 +6,9 @@ import {
   getAllPlanTitles,
   type ClinicalPlan,
   type RecommendationItem,
+  type DifferentialDiagnosis,
+  type EvidenceEntry,
+  type MonitoringEntry,
 } from '@/lib/recommendationPlans'
 
 interface SmartRecommendationsSectionProps {
@@ -30,6 +33,7 @@ export default function SmartRecommendationsSection({
   const [expandedSubsections, setExpandedSubsections] = useState<Record<string, boolean>>({})
   const [selectedItems, setSelectedItems] = useState<Map<string, Set<string>>>(new Map())
   const [showPlanBuilder, setShowPlanBuilder] = useState(false)
+  const [activeReferenceTab, setActiveReferenceTab] = useState<'differential' | 'evidence' | 'monitoring' | null>(null)
 
   const planTitles = getAllPlanTitles()
   const currentPlan = selectedDiagnosis ? OUTPATIENT_PLANS[selectedDiagnosis] : null
@@ -39,6 +43,7 @@ export default function SmartRecommendationsSection({
     setExpandedSections({})
     setExpandedSubsections({})
     setSelectedItems(new Map())
+    setActiveReferenceTab(null)
   }, [selectedDiagnosis])
 
   const toggleSection = (sectionName: string) => {
@@ -384,6 +389,229 @@ export default function SmartRecommendationsSection({
                   </ul>
                 </div>
               </div>
+            </div>
+          )}
+
+          {/* Reference Icons Row */}
+          {(currentPlan.differential || currentPlan.evidence || currentPlan.monitoring) && (
+            <div style={{
+              padding: '8px 16px',
+              background: 'var(--bg-gray)',
+              borderBottom: '1px solid var(--border)',
+              display: 'flex',
+              gap: '8px',
+              alignItems: 'center',
+            }}>
+              <span style={{ fontSize: '11px', color: 'var(--text-muted)', marginRight: '4px' }}>References:</span>
+
+              {/* Differential Diagnosis */}
+              {currentPlan.differential && currentPlan.differential.length > 0 && (
+                <button
+                  onClick={() => setActiveReferenceTab(activeReferenceTab === 'differential' ? null : 'differential')}
+                  title="Differential Diagnosis"
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '4px',
+                    padding: '4px 10px',
+                    borderRadius: '16px',
+                    fontSize: '11px',
+                    fontWeight: 500,
+                    cursor: 'pointer',
+                    border: 'none',
+                    background: activeReferenceTab === 'differential' ? '#DBEAFE' : 'var(--bg-white)',
+                    color: activeReferenceTab === 'differential' ? '#2563EB' : 'var(--text-secondary)',
+                    transition: 'all 0.15s ease',
+                  }}
+                >
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <path d="M16 4h2a2 2 0 012 2v14a2 2 0 01-2 2H6a2 2 0 01-2-2V6a2 2 0 012-2h2" />
+                    <rect x="8" y="2" width="8" height="4" rx="1" />
+                    <path d="M9 14l2 2 4-4" />
+                  </svg>
+                  DDx ({currentPlan.differential.length})
+                </button>
+              )}
+
+              {/* Evidence */}
+              {currentPlan.evidence && currentPlan.evidence.length > 0 && (
+                <button
+                  onClick={() => setActiveReferenceTab(activeReferenceTab === 'evidence' ? null : 'evidence')}
+                  title="Evidence & Guidelines"
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '4px',
+                    padding: '4px 10px',
+                    borderRadius: '16px',
+                    fontSize: '11px',
+                    fontWeight: 500,
+                    cursor: 'pointer',
+                    border: 'none',
+                    background: activeReferenceTab === 'evidence' ? '#D1FAE5' : 'var(--bg-white)',
+                    color: activeReferenceTab === 'evidence' ? '#059669' : 'var(--text-secondary)',
+                    transition: 'all 0.15s ease',
+                  }}
+                >
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <path d="M4 19.5A2.5 2.5 0 016.5 17H20" />
+                    <path d="M6.5 2H20v20H6.5A2.5 2.5 0 014 19.5v-15A2.5 2.5 0 016.5 2z" />
+                    <path d="M8 7h8M8 11h8M8 15h4" />
+                  </svg>
+                  Evidence ({currentPlan.evidence.length})
+                </button>
+              )}
+
+              {/* Monitoring */}
+              {currentPlan.monitoring && currentPlan.monitoring.length > 0 && (
+                <button
+                  onClick={() => setActiveReferenceTab(activeReferenceTab === 'monitoring' ? null : 'monitoring')}
+                  title="Monitoring Parameters"
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '4px',
+                    padding: '4px 10px',
+                    borderRadius: '16px',
+                    fontSize: '11px',
+                    fontWeight: 500,
+                    cursor: 'pointer',
+                    border: 'none',
+                    background: activeReferenceTab === 'monitoring' ? '#FEE2E2' : 'var(--bg-white)',
+                    color: activeReferenceTab === 'monitoring' ? '#DC2626' : 'var(--text-secondary)',
+                    transition: 'all 0.15s ease',
+                  }}
+                >
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <path d="M22 12h-4l-3 9L9 3l-3 9H2" />
+                  </svg>
+                  Monitor ({currentPlan.monitoring.length})
+                </button>
+              )}
+            </div>
+          )}
+
+          {/* Reference Content Panels */}
+          {activeReferenceTab && (
+            <div style={{
+              padding: '12px 16px',
+              background: 'var(--bg-white)',
+              borderBottom: '1px solid var(--border)',
+              maxHeight: '250px',
+              overflowY: 'auto',
+            }}>
+              {/* Differential Diagnosis Panel */}
+              {activeReferenceTab === 'differential' && currentPlan.differential && (
+                <div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px' }}>
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#2563EB" strokeWidth="2">
+                      <path d="M16 4h2a2 2 0 012 2v14a2 2 0 01-2 2H6a2 2 0 01-2-2V6a2 2 0 012-2h2" />
+                      <rect x="8" y="2" width="8" height="4" rx="1" />
+                      <path d="M9 14l2 2 4-4" />
+                    </svg>
+                    <span style={{ fontSize: '13px', fontWeight: 600, color: '#2563EB' }}>Differential Diagnosis</span>
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                    {currentPlan.differential.map((ddx, index) => (
+                      <div key={index} style={{
+                        padding: '10px 12px',
+                        borderRadius: '6px',
+                        border: '1px solid var(--border)',
+                        background: 'var(--bg-gray)',
+                      }}>
+                        <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '4px' }}>
+                          {ddx.diagnosis}
+                        </div>
+                        <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '4px' }}>
+                          <span style={{ fontWeight: 500 }}>Features: </span>{ddx.features}
+                        </div>
+                        <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
+                          <span style={{ fontWeight: 500 }}>Tests: </span>{ddx.tests}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Evidence Panel */}
+              {activeReferenceTab === 'evidence' && currentPlan.evidence && (
+                <div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px' }}>
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#059669" strokeWidth="2">
+                      <path d="M4 19.5A2.5 2.5 0 016.5 17H20" />
+                      <path d="M6.5 2H20v20H6.5A2.5 2.5 0 014 19.5v-15A2.5 2.5 0 016.5 2z" />
+                      <path d="M8 7h8M8 11h8M8 15h4" />
+                    </svg>
+                    <span style={{ fontSize: '13px', fontWeight: 600, color: '#059669' }}>Evidence & Guidelines</span>
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                    {currentPlan.evidence.map((ev, index) => (
+                      <div key={index} style={{
+                        padding: '10px 12px',
+                        borderRadius: '6px',
+                        border: '1px solid var(--border)',
+                        background: 'var(--bg-gray)',
+                      }}>
+                        <div style={{ fontSize: '12px', color: 'var(--text-primary)', marginBottom: '6px' }}>
+                          {ev.recommendation}
+                        </div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                          <span style={{
+                            padding: '2px 8px',
+                            borderRadius: '4px',
+                            fontSize: '10px',
+                            fontWeight: 600,
+                            background: '#D1FAE5',
+                            color: '#059669',
+                          }}>
+                            {ev.evidenceLevel}
+                          </span>
+                          <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
+                            {ev.source}
+                          </span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Monitoring Panel */}
+              {activeReferenceTab === 'monitoring' && currentPlan.monitoring && (
+                <div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px' }}>
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#DC2626" strokeWidth="2">
+                      <path d="M22 12h-4l-3 9L9 3l-3 9H2" />
+                    </svg>
+                    <span style={{ fontSize: '13px', fontWeight: 600, color: '#DC2626' }}>Monitoring Parameters</span>
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                    {currentPlan.monitoring.map((mon, index) => (
+                      <div key={index} style={{
+                        padding: '10px 12px',
+                        borderRadius: '6px',
+                        border: '1px solid var(--border)',
+                        background: 'var(--bg-gray)',
+                      }}>
+                        <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '4px' }}>
+                          {mon.item}
+                        </div>
+                        <div style={{ display: 'flex', gap: '16px', fontSize: '12px' }}>
+                          <div>
+                            <span style={{ fontWeight: 500, color: 'var(--text-secondary)' }}>Frequency: </span>
+                            <span style={{ color: 'var(--text-muted)' }}>{mon.frequency}</span>
+                          </div>
+                          <div>
+                            <span style={{ fontWeight: 500, color: 'var(--text-secondary)' }}>Action: </span>
+                            <span style={{ color: 'var(--text-muted)' }}>{mon.action}</span>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           )}
 

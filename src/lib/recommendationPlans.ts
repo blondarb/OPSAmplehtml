@@ -21,6 +21,29 @@ export interface RecommendationSection {
   [key: string]: RecommendationSubsection
 }
 
+export interface DifferentialDiagnosis {
+  diagnosis: string
+  features: string
+  tests: string
+}
+
+export interface EvidenceEntry {
+  recommendation: string
+  evidenceLevel: string
+  source: string
+}
+
+export interface MonitoringEntry {
+  item: string
+  frequency: string
+  action: string
+}
+
+export interface DispositionEntry {
+  disposition: string
+  criteria: string
+}
+
 export interface ClinicalPlan {
   id: string
   title: string
@@ -30,6 +53,10 @@ export interface ClinicalPlan {
   sections: RecommendationSection
   patientInstructions: string[]
   referrals: string[]
+  differential?: DifferentialDiagnosis[]
+  evidence?: EvidenceEntry[]
+  monitoring?: MonitoringEntry[]
+  disposition?: DispositionEntry[]
 }
 
 export interface PlansData {
@@ -166,6 +193,65 @@ export const OUTPATIENT_PLANS: PlansData = {
       'Report any new or worsening symptoms promptly',
     ],
     referrals: ['Neurology', 'Epilepsy specialist', 'Neuropsychology'],
+    differential: [
+      {
+        diagnosis: 'Syncope (Convulsive Syncope)',
+        features: 'Brief episodes (<15 sec), triggered by positional changes or straining, quick recovery without prolonged confusion, warning signs like lightheadedness',
+        tests: 'ECG, orthostatic vitals, tilt-table testing, echocardiogram',
+      },
+      {
+        diagnosis: 'Psychogenic Non-Epileptic Spells (PNES)',
+        features: 'Variable presentation, prolonged duration, preserved awareness despite bilateral movements, eye closure, pelvic thrusting, no post-ictal confusion',
+        tests: 'Video EEG during event (normal EEG), prolactin level (not elevated)',
+      },
+      {
+        diagnosis: 'Transient Ischemic Attack (TIA)',
+        features: 'Negative symptoms (weakness, numbness) rather than positive symptoms, no loss of consciousness, no convulsive movements',
+        tests: 'MRI brain with DWI, CTA/MRA head and neck',
+      },
+      {
+        diagnosis: 'Migraine with Aura',
+        features: 'Gradual symptom spread over minutes, visual/sensory symptoms precede headache, positive visual phenomena',
+        tests: 'Clinical diagnosis, MRI brain if atypical features',
+      },
+      {
+        diagnosis: 'Hypoglycemia',
+        features: 'Associated with diabetes/insulin use, confusion, diaphoresis, tremor, rapid improvement with glucose',
+        tests: 'Point-of-care glucose, HbA1c',
+      },
+      {
+        diagnosis: 'Cardiac Arrhythmia',
+        features: 'Palpitations, sudden onset/offset, associated with exertion or position change',
+        tests: 'ECG, Holter monitor, event monitor, echocardiogram',
+      },
+    ],
+    evidence: [
+      {
+        recommendation: 'MRI is superior to CT for detecting epileptogenic lesions',
+        evidenceLevel: 'Class I, Level A',
+        source: 'AAN Practice Guidelines 2007',
+      },
+      {
+        recommendation: 'EEG should be performed in all patients with first unprovoked seizure',
+        evidenceLevel: 'Class I, Level A',
+        source: 'AAN Practice Guidelines 2015',
+      },
+      {
+        recommendation: 'Immediate ASM therapy reduces seizure recurrence risk but does not affect long-term prognosis',
+        evidenceLevel: 'Class I, Level A',
+        source: 'FIRST and MESS Trials',
+      },
+      {
+        recommendation: 'Levetiracetam, lamotrigine, and zonisamide have similar efficacy as initial monotherapy',
+        evidenceLevel: 'Class I, Level A',
+        source: 'SANAD II Trial, Lancet 2021',
+      },
+      {
+        recommendation: 'Risk of recurrence after first unprovoked seizure is 21-45% at 2 years',
+        evidenceLevel: 'Class I, Level A',
+        source: 'Multiple meta-analyses',
+      },
+    ],
   },
 
   'Status Epilepticus': {
@@ -274,6 +360,77 @@ export const OUTPATIENT_PLANS: PlansData = {
       'Wear medical alert identification',
     ],
     referrals: ['Epilepsy specialist', 'Comprehensive epilepsy center', 'Neuropsychology'],
+    differential: [
+      {
+        diagnosis: 'Psychogenic Non-Epileptic Status',
+        features: 'Preserved awareness, asynchronous movements, eye closure, pelvic thrusting, prolonged duration with minimal post-ictal period',
+        tests: 'Video EEG (normal cEEG during event)',
+      },
+      {
+        diagnosis: 'Movement Disorders',
+        features: 'Dystonia, chorea, tremor - typically without impaired consciousness',
+        tests: 'Clinical observation, video documentation',
+      },
+      {
+        diagnosis: 'Toxic-Metabolic Encephalopathy',
+        features: 'Gradual onset, fluctuating level of consciousness, no discrete ictal events',
+        tests: 'CMP, ammonia, drug levels, toxicology screen',
+      },
+    ],
+    evidence: [
+      {
+        recommendation: 'Benzodiazepines are first-line treatment for status epilepticus',
+        evidenceLevel: 'Class I, Level A',
+        source: 'NCS Guidelines 2012, AES Guidelines 2016',
+      },
+      {
+        recommendation: 'Lorazepam is the preferred IV benzodiazepine',
+        evidenceLevel: 'Class I, Level A',
+        source: 'Alldredge et al. NEJM 2001',
+      },
+      {
+        recommendation: 'IM midazolam is non-inferior to IV lorazepam',
+        evidenceLevel: 'Class I, Level A',
+        source: 'RAMPART Trial (Silbergleit et al. NEJM 2012)',
+      },
+      {
+        recommendation: 'Second-line agents (LEV, VPA, fPHT) have equivalent efficacy',
+        evidenceLevel: 'Class I, Level A',
+        source: 'ESETT Trial (Kapur et al. NEJM 2019)',
+      },
+      {
+        recommendation: 'Levetiracetam 60 mg/kg dosing in SE',
+        evidenceLevel: 'Class I, Level A',
+        source: 'ESETT Trial',
+      },
+      {
+        recommendation: 'Continuous EEG monitoring in refractory SE',
+        evidenceLevel: 'Class I, Level B',
+        source: 'NCS Guidelines 2012',
+      },
+      {
+        recommendation: 'Ketamine in refractory/super-refractory SE',
+        evidenceLevel: 'Class IIb, Level B',
+        source: 'Multiple case series, 2024 systematic reviews',
+      },
+    ],
+    monitoring: [
+      {
+        item: 'Continuous EEG',
+        frequency: 'Continuous during acute SE',
+        action: 'Adjust ASMs/anesthetics based on seizure activity',
+      },
+      {
+        item: 'ASM drug levels',
+        frequency: 'Daily during hospitalization, then at follow-up',
+        action: 'Dose adjustment for therapeutic range',
+      },
+      {
+        item: 'Vital signs and neurological checks',
+        frequency: 'Q1-4 hours based on acuity',
+        action: 'Escalate care if deterioration',
+      },
+    ],
   },
 
   'Multiple Sclerosis - New Diagnosis': {
