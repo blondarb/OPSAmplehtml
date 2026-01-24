@@ -138,14 +138,15 @@ export default function ClinicalNote({
   const autosaveKey = `sevaro-autosave-${currentVisit?.id || 'draft'}`
 
   // Initialize with visit data first (SSR-safe)
+  // For testing: start with a clean/empty chart
   const [noteData, setNoteData] = useState({
-    chiefComplaint: currentVisit?.chief_complaint || ['Headache'],
+    chiefComplaint: currentVisit?.chief_complaint || [],
     hpi: currentVisit?.clinical_notes?.hpi || '',
-    ros: currentVisit?.clinical_notes?.ros || 'Reviewed',
+    ros: currentVisit?.clinical_notes?.ros || '',
     rosDetails: currentVisit?.clinical_notes?.ros_details || '',
-    allergies: currentVisit?.clinical_notes?.allergies || 'NKDA',
+    allergies: currentVisit?.clinical_notes?.allergies || '',
     allergyDetails: currentVisit?.clinical_notes?.allergy_details || '',
-    historyAvailable: currentVisit?.clinical_notes?.history_available || 'Yes',
+    historyAvailable: currentVisit?.clinical_notes?.history_available || '',
     historyDetails: currentVisit?.clinical_notes?.history_details || '',
     physicalExam: currentVisit?.clinical_notes?.physical_exam || '',
     assessment: currentVisit?.clinical_notes?.assessment || '',
