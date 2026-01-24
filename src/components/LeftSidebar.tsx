@@ -17,11 +17,96 @@ const DEFAULT_SUMMARY_OPTIONS = {
   includeDiagnoses: true,
 }
 
+// Sample full clinical notes for demo
+const SAMPLE_FULL_NOTES: Record<string, { hpi: string; ros: string; exam: string; assessment: string; plan: string }> = {
+  '1': {
+    hpi: `42-year-old female presents for follow-up of chronic migraine. Patient reports significant improvement since starting topiramate 100mg daily. Headache frequency has decreased from 15 days/month to 8 days/month. Headaches are now moderate in intensity (5-6/10) compared to severe (8-9/10) previously. Patient no longer requires rescue medication more than twice weekly. No aura symptoms. Denies photophobia or phonophobia during current headaches. Sleep has improved, now getting 7-8 hours nightly. Stress levels at work have decreased. No recent ER visits for headache.`,
+    ros: `Constitutional: Denies fatigue, fever, weight changes
+Neurological: (+) intermittent headaches as above, (-) vision changes, (-) weakness, (-) numbness
+Psychiatric: Improved mood, less anxiety, sleeping well
+GI: Mild decreased appetite noted since starting topiramate (expected), no nausea/vomiting
+All other systems reviewed and negative`,
+    exam: `Vitals: BP 118/72, HR 68, BMI 24.2
+General: Well-appearing, no acute distress
+HEENT: PERRL, EOMI, no papilledema on fundoscopic exam
+Neck: Supple, no meningismus, no carotid bruits
+Neuro: CN II-XII intact. Motor 5/5 throughout. Sensory intact to light touch. DTRs 2+ symmetric. Gait normal. Romberg negative.
+Mental Status: Alert, oriented x4, appropriate affect`,
+    assessment: `1. Chronic migraine without aura (G43.709) - improving on topiramate
+2. History of medication overuse headache - resolved`,
+    plan: `1. Continue topiramate 100mg daily - patient tolerating well
+2. Continue headache diary - bring to next visit
+3. Maintain sleep hygiene and stress management
+4. PRN sumatriptan 50mg for breakthrough (limit to 2x/week)
+5. Return in 3 months for follow-up
+6. MIDAS score today: 24 (improved from 42)`
+  },
+  '2': {
+    hpi: `42-year-old female presents for medication adjustment. Patient has been on propranolol 40mg BID for 6 weeks with suboptimal response. Headache frequency remains at 12-15 days/month with moderate-severe intensity. Patient reports fatigue and some dizziness on propranolol. MRI brain completed last week was unremarkable. Labs including TSH, CBC, CMP all within normal limits. Patient interested in trying alternative preventive medication. Denies any new neurological symptoms. Headaches continue to be bilateral, pressure-like, worse with stress and poor sleep.`,
+    ros: `Constitutional: (+) fatigue (likely medication related), (-) fever, (-) weight changes
+Neurological: (+) frequent headaches as above, (-) vision changes, (-) weakness
+Cardiovascular: (+) mild dizziness with standing (orthostatic from propranolol)
+Psychiatric: Mild anxiety, mood stable
+All other systems reviewed and negative`,
+    exam: `Vitals: BP 108/68 (lower than baseline), HR 58, BMI 24.0
+General: Mildly fatigued appearing, no acute distress
+HEENT: PERRL, EOMI, fundi normal
+Neck: Supple, no tenderness
+Neuro: Cranial nerves intact. Motor strength 5/5. Sensation intact. Reflexes 2+ symmetric. Coordination normal.
+Mental Status: Alert, oriented, appropriate`,
+    assessment: `1. Chronic migraine without aura (G43.709) - inadequate response to propranolol
+2. Propranolol side effects - fatigue, orthostatic symptoms`,
+    plan: `1. Discontinue propranolol - taper over 1 week
+2. Start topiramate 25mg at bedtime
+3. Titrate topiramate: 25mg x 2 weeks, then 50mg x 2 weeks, target 100mg daily
+4. Counsel on topiramate side effects: paresthesias, cognitive slowing, weight loss, kidney stones
+5. Maintain adequate hydration (topiramate kidney stone prevention)
+6. Continue acute treatment with sumatriptan PRN
+7. Follow up in 6 weeks to assess response
+8. Discussed lifestyle modifications: regular sleep schedule, stress management, avoiding triggers`
+  },
+  '3': {
+    hpi: `42-year-old female new patient referral from PCP for evaluation of headaches and memory concerns. Headaches began approximately 3 months ago, occurring daily, bilateral frontal/temporal location, pressure-like quality, moderate intensity (6-7/10). Associated with light sensitivity during severe episodes. No nausea or vomiting. Headaches worse with stress and at end of workday. Has been taking ibuprofen 400mg daily for the past 2 months with minimal relief. Patient also reports subjective memory difficulties - forgetting names, misplacing items, word-finding difficulties. No confusion episodes. Work performance unchanged. Sleep disrupted due to headaches, averaging 5-6 hours nightly. High stress job as project manager. Family history positive for migraines (mother). No prior neurological history.`,
+    ros: `Constitutional: (+) fatigue, (-) fever, (-) weight changes
+Neurological: (+) daily headaches, (+) subjective memory concerns, (-) vision changes, (-) weakness, (-) numbness, (-) gait problems
+Psychiatric: (+) stress, (+) anxiety related to symptoms, (-) depression
+Sleep: (+) insomnia/poor sleep quality
+All other systems reviewed and negative`,
+    exam: `Vitals: BP 128/82, HR 76, BMI 24.5
+General: Anxious appearing but pleasant, no acute distress
+HEENT: PERRL, EOMI, fundi without papilledema
+Neck: Supple, mild bilateral trapezius tenderness
+Neuro:
+- Mental Status: Alert, oriented x4. MoCA 26/30 (lost points on delayed recall 3/5, abstraction 1/2). Language fluent.
+- CN II-XII intact
+- Motor 5/5 all extremities
+- Sensory intact to light touch and pinprick
+- Reflexes 2+ and symmetric
+- Coordination: FNF and HKS normal
+- Gait: Normal, tandem intact`,
+    assessment: `1. New daily persistent headache vs chronic migraine - medication overuse likely contributing
+2. Subjective cognitive complaints - likely secondary to headache, poor sleep, and stress. MoCA 26/30 normal range.
+3. Possible medication overuse headache from daily ibuprofen use`,
+    plan: `1. Order MRI brain with and without contrast - rule out structural cause
+2. Order labs: CBC, CMP, TSH, ESR, CRP
+3. Start propranolol 40mg BID for migraine prevention
+4. STOP daily ibuprofen - counsel on medication overuse headache
+5. Allow sumatriptan 50mg PRN for severe headaches (max 2x/week)
+6. Sleep hygiene counseling - target 7-8 hours
+7. Start headache diary
+8. Reassure regarding cognitive complaints - likely will improve with headache control and better sleep
+9. Return in 6 weeks with MRI results
+10. If cognitive concerns persist after headache controlled, consider formal neuropsychological testing`
+  }
+}
+
 export default function LeftSidebar({ patient, priorVisits, scoreHistory }: LeftSidebarProps) {
   const [expandedVisit, setExpandedVisit] = useState<string | null>(priorVisits[0]?.id || null)
   const [aiSummaryEnabled, setAiSummaryEnabled] = useState(true)
   const [scoreHistoryOpen, setScoreHistoryOpen] = useState(true)
+  const [priorVisitsOpen, setPriorVisitsOpen] = useState(true)
   const [localTime, setLocalTime] = useState<string>('--:--')
+  const [viewingNoteId, setViewingNoteId] = useState<string | null>(null)
 
   // Prior History Summary state
   const [showHistorySummary, setShowHistorySummary] = useState(false)
@@ -514,40 +599,70 @@ export default function LeftSidebar({ patient, priorVisits, scoreHistory }: Left
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
-          marginBottom: '12px',
+          marginBottom: priorVisitsOpen ? '12px' : 0,
         }}>
-          <h4 style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)' }}>Prior Visits</h4>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>AI Summary</span>
-            <button
-              onClick={() => setAiSummaryEnabled(!aiSummaryEnabled)}
+          <button
+            onClick={() => setPriorVisitsOpen(!priorVisitsOpen)}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              background: 'none',
+              border: 'none',
+              padding: 0,
+              cursor: 'pointer',
+            }}
+          >
+            <svg
+              width="14"
+              height="14"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="var(--text-muted)"
+              strokeWidth="2"
               style={{
-                width: '36px',
-                height: '20px',
-                borderRadius: '10px',
-                border: 'none',
-                background: aiSummaryEnabled ? 'var(--primary)' : 'var(--border)',
-                cursor: 'pointer',
-                position: 'relative',
-                transition: 'background 0.2s',
+                transform: priorVisitsOpen ? 'rotate(0deg)' : 'rotate(-90deg)',
+                transition: 'transform 0.2s',
               }}
             >
-              <div style={{
-                width: '16px',
-                height: '16px',
-                borderRadius: '50%',
-                background: 'white',
-                position: 'absolute',
-                top: '2px',
-                left: aiSummaryEnabled ? '18px' : '2px',
-                transition: 'left 0.2s',
-                boxShadow: '0 1px 3px rgba(0,0,0,0.2)',
-              }} />
-            </button>
-          </div>
+              <polyline points="6 9 12 15 18 9"/>
+            </svg>
+            <h4 style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)', margin: 0 }}>Prior Visits</h4>
+          </button>
+          {priorVisitsOpen && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>AI Summary</span>
+              <button
+                onClick={() => setAiSummaryEnabled(!aiSummaryEnabled)}
+                style={{
+                  width: '36px',
+                  height: '20px',
+                  borderRadius: '10px',
+                  border: 'none',
+                  background: aiSummaryEnabled ? 'var(--primary)' : 'var(--border)',
+                  cursor: 'pointer',
+                  position: 'relative',
+                  transition: 'background 0.2s',
+                }}
+              >
+                <div style={{
+                  width: '16px',
+                  height: '16px',
+                  borderRadius: '50%',
+                  background: 'white',
+                  position: 'absolute',
+                  top: '2px',
+                  left: aiSummaryEnabled ? '18px' : '2px',
+                  transition: 'left 0.2s',
+                  boxShadow: '0 1px 3px rgba(0,0,0,0.2)',
+                }} />
+              </button>
+            </div>
+          )}
         </div>
 
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+        {priorVisitsOpen && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
           {(priorVisits.length > 0 ? priorVisits.slice(0, 4) : [
             {
               id: '1',
@@ -613,43 +728,89 @@ export default function LeftSidebar({ patient, priorVisits, scoreHistory }: Left
                 </div>
                 <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>{visit.provider || 'Dr. Smith'}</div>
 
-                {/* AI Summary - Expanded */}
-                {isExpanded && aiSummaryEnabled && (
+                {/* Expanded Content */}
+                {isExpanded && (
                   <div style={{
                     marginTop: '12px',
                     paddingTop: '12px',
                     borderTop: '1px solid var(--border)',
                   }}>
-                    <div style={{
-                      background: 'linear-gradient(135deg, #FFFBEB 0%, #FEF3C7 100%)',
-                      border: '1px solid #FCD34D',
-                      borderRadius: '8px',
-                      padding: '12px',
-                    }}>
+                    {/* AI Summary */}
+                    {aiSummaryEnabled && (
                       <div style={{
+                        background: 'var(--ai-summary-bg, linear-gradient(135deg, #FFFBEB 0%, #FEF3C7 100%))',
+                        border: '1px solid var(--ai-summary-border, #FCD34D)',
+                        borderRadius: '8px',
+                        padding: '12px',
+                        marginBottom: '10px',
+                      }}>
+                        <div style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '6px',
+                          marginBottom: '8px',
+                          fontWeight: 600,
+                          fontSize: '12px',
+                          color: 'var(--ai-summary-header, #B45309)',
+                        }}>
+                          <svg width="14" height="14" viewBox="0 0 24 24" fill="#F59E0B">
+                            <path d="M12 1L13.5 9.5L22 12L13.5 14.5L12 23L10.5 14.5L2 12L10.5 9.5L12 1Z"/>
+                          </svg>
+                          AI Summary
+                        </div>
+                        <div style={{ fontSize: '12px', color: 'var(--text-secondary)', lineHeight: 1.5 }}>
+                          {visit.clinical_notes?.ai_summary || 'Patient reports improved symptoms with current treatment. Continue current regimen and reassess at next visit.'}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* View Full Note Button */}
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        setViewingNoteId(visit.id)
+                      }}
+                      style={{
+                        width: '100%',
                         display: 'flex',
                         alignItems: 'center',
-                        gap: '6px',
-                        marginBottom: '8px',
-                        fontWeight: 600,
+                        justifyContent: 'center',
+                        gap: '8px',
+                        padding: '10px',
+                        borderRadius: '6px',
+                        border: '1px solid var(--border)',
+                        background: 'var(--bg-white)',
                         fontSize: '12px',
-                        color: '#B45309',
-                      }}>
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="#F59E0B">
-                          <path d="M12 1L13.5 9.5L22 12L13.5 14.5L12 23L10.5 14.5L2 12L10.5 9.5L12 1Z"/>
-                        </svg>
-                        AI Summary
-                      </div>
-                      <div style={{ fontSize: '12px', color: 'var(--text-secondary)', lineHeight: 1.5 }}>
-                        {visit.clinical_notes?.ai_summary || 'Patient reports improved symptoms with current treatment. Continue current regimen and reassess at next visit.'}
-                      </div>
-                    </div>
+                        fontWeight: 500,
+                        color: 'var(--text-secondary)',
+                        cursor: 'pointer',
+                        transition: 'all 0.15s',
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.borderColor = 'var(--primary)'
+                        e.currentTarget.style.color = 'var(--primary)'
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.borderColor = 'var(--border)'
+                        e.currentTarget.style.color = 'var(--text-secondary)'
+                      }}
+                    >
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/>
+                        <polyline points="14 2 14 8 20 8"/>
+                        <line x1="16" y1="13" x2="8" y2="13"/>
+                        <line x1="16" y1="17" x2="8" y2="17"/>
+                        <polyline points="10 9 9 9 8 9"/>
+                      </svg>
+                      View Full Note
+                    </button>
                   </div>
                 )}
               </div>
             )
           })}
-        </div>
+          </div>
+        )}
       </div>
 
       {/* Score History Section */}
@@ -759,6 +920,174 @@ export default function LeftSidebar({ patient, priorVisits, scoreHistory }: Left
         )}
       </div>
     </aside>
+
+    {/* Full Note Modal */}
+    {viewingNoteId && SAMPLE_FULL_NOTES[viewingNoteId] && (
+      <>
+        <div
+          onClick={() => setViewingNoteId(null)}
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(0, 0, 0, 0.5)',
+            zIndex: 2000,
+          }}
+        />
+        <div style={{
+          position: 'fixed',
+          top: '50%',
+          left: '50%',
+          transform: 'translate(-50%, -50%)',
+          width: '90%',
+          maxWidth: '800px',
+          maxHeight: '85vh',
+          background: 'var(--bg-white)',
+          borderRadius: '16px',
+          boxShadow: '0 20px 60px rgba(0, 0, 0, 0.3)',
+          zIndex: 2001,
+          display: 'flex',
+          flexDirection: 'column',
+          overflow: 'hidden',
+        }}>
+          {/* Modal Header */}
+          <div style={{
+            padding: '20px 24px',
+            borderBottom: '1px solid var(--border)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            background: 'var(--bg-gray)',
+          }}>
+            <div>
+              <h2 style={{ fontSize: '18px', fontWeight: 600, color: 'var(--text-primary)', margin: 0 }}>
+                Clinical Note
+              </h2>
+              <p style={{ fontSize: '13px', color: 'var(--text-muted)', margin: '4px 0 0 0' }}>
+                {(() => {
+                  const visit = [
+                    { id: '1', visit_date: '2026-01-10', provider: 'Dr. Martinez' },
+                    { id: '2', visit_date: '2025-12-15', provider: 'Dr. Martinez' },
+                    { id: '3', visit_date: '2025-11-01', provider: 'Dr. Smith' },
+                  ].find(v => v.id === viewingNoteId)
+                  return visit ? `${formatDate(visit.visit_date)} - ${visit.provider}` : ''
+                })()}
+              </p>
+            </div>
+            <button
+              onClick={() => setViewingNoteId(null)}
+              style={{
+                width: '36px',
+                height: '36px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                borderRadius: '8px',
+                border: 'none',
+                background: 'var(--bg-white)',
+                cursor: 'pointer',
+                color: 'var(--text-secondary)',
+              }}
+            >
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+              </svg>
+            </button>
+          </div>
+
+          {/* Modal Content */}
+          <div style={{
+            flex: 1,
+            overflowY: 'auto',
+            padding: '24px',
+          }}>
+            {(() => {
+              const note = SAMPLE_FULL_NOTES[viewingNoteId]
+              const sections = [
+                { title: 'History of Present Illness', content: note.hpi },
+                { title: 'Review of Systems', content: note.ros },
+                { title: 'Physical Examination', content: note.exam },
+                { title: 'Assessment', content: note.assessment },
+                { title: 'Plan', content: note.plan },
+              ]
+
+              return sections.map((section, index) => (
+                <div key={section.title} style={{ marginBottom: index < sections.length - 1 ? '24px' : 0 }}>
+                  <h3 style={{
+                    fontSize: '14px',
+                    fontWeight: 600,
+                    color: 'var(--primary)',
+                    marginBottom: '10px',
+                    paddingBottom: '8px',
+                    borderBottom: '1px solid var(--border)',
+                  }}>
+                    {section.title}
+                  </h3>
+                  <div style={{
+                    fontSize: '13px',
+                    color: 'var(--text-primary)',
+                    lineHeight: 1.7,
+                    whiteSpace: 'pre-wrap',
+                  }}>
+                    {section.content}
+                  </div>
+                </div>
+              ))
+            })()}
+          </div>
+
+          {/* Modal Footer */}
+          <div style={{
+            padding: '16px 24px',
+            borderTop: '1px solid var(--border)',
+            display: 'flex',
+            justifyContent: 'flex-end',
+            gap: '12px',
+            background: 'var(--bg-gray)',
+          }}>
+            <button
+              onClick={() => {
+                const note = SAMPLE_FULL_NOTES[viewingNoteId]
+                const fullText = `HISTORY OF PRESENT ILLNESS:\n${note.hpi}\n\nREVIEW OF SYSTEMS:\n${note.ros}\n\nPHYSICAL EXAMINATION:\n${note.exam}\n\nASSESSMENT:\n${note.assessment}\n\nPLAN:\n${note.plan}`
+                navigator.clipboard.writeText(fullText)
+              }}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                padding: '10px 20px',
+                borderRadius: '8px',
+                border: '1px solid var(--border)',
+                background: 'var(--bg-white)',
+                fontSize: '13px',
+                fontWeight: 500,
+                cursor: 'pointer',
+                color: 'var(--text-secondary)',
+              }}
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/>
+              </svg>
+              Copy Note
+            </button>
+            <button
+              onClick={() => setViewingNoteId(null)}
+              style={{
+                padding: '10px 20px',
+                borderRadius: '8px',
+                border: 'none',
+                background: 'var(--primary)',
+                color: 'white',
+                fontSize: '13px',
+                fontWeight: 500,
+                cursor: 'pointer',
+              }}
+            >
+              Close
+            </button>
+          </div>
+        </div>
+      </>
+    )}
     </>
   )
 }
