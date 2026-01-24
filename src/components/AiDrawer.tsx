@@ -141,6 +141,7 @@ export default function AiDrawer({
         body: JSON.stringify({
           patient,
           noteData,
+          prepNotes, // Include dictated prep notes for AI context
         }),
       })
 

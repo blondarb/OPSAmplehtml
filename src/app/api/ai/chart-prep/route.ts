@@ -12,7 +12,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const { patient, noteData } = await request.json()
+    const { patient, noteData, prepNotes } = await request.json()
 
     // Get OpenAI API key
     let apiKey = process.env.OPENAI_API_KEY
@@ -92,11 +92,19 @@ Imaging Studies:
 ${imagingSummary.length > 0 ? imagingSummary.map(i => `
 - ${i.date}: ${i.type} - ${i.description}
   Impression: ${i.impression || 'N/A'}
-`).join('\n') : 'No imaging studies on record'}`
+`).join('\n') : 'No imaging studies on record'}
+
+Provider's Pre-Visit Notes (IMPORTANT - use these to guide the summary):
+${prepNotes && prepNotes.length > 0
+  ? prepNotes.map((n: { category: string; text: string }) => `[${n.category?.toUpperCase() || 'NOTE'}] ${n.text}`).join('\n\n')
+  : 'No pre-visit notes recorded'}`
 
     const systemPrompt = `You are a clinical AI assistant preparing a concise, scannable chart prep for a neurology visit.
 
 ${patientContext}
+
+CRITICAL: If "Provider's Pre-Visit Notes" are present above, use them as the PRIMARY source of information.
+The provider has already reviewed the chart and dictated key observations. Base your summary on their notes.
 
 Generate a JSON response with HIGH-YIELD, BULLET-STYLE summaries. Keep each section concise and actionable.
 Use "•" for bullet points. Each bullet should be 1 line max.
