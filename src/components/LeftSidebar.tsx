@@ -213,9 +213,37 @@ export default function LeftSidebar({ patient, priorVisits, scoreHistory }: Left
         </div>
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-          {(priorVisits.length > 0 ? priorVisits.slice(0, 3) : [
-            { id: '1', visit_date: '2026-01-10', visit_type: 'follow_up', chief_complaint: ['Headache', 'memory concerns'], clinical_notes: { ai_summary: 'Patient reports improved headache frequency with current prophylaxis. MoCA stable at 26/30. Continue current regimen.' } },
-            { id: '2', visit_date: '2025-12-15', visit_type: 'new_patient', chief_complaint: ['New onset headaches, 3 months'], clinical_notes: { ai_summary: 'Initial evaluation for chronic daily headache. Started on topiramate 25mg. MRI brain ordered.' } },
+          {(priorVisits.length > 0 ? priorVisits.slice(0, 4) : [
+            {
+              id: '1',
+              visit_date: '2026-01-10',
+              visit_type: 'follow_up',
+              chief_complaint: ['Migraine follow-up'],
+              provider: 'Dr. Martinez',
+              clinical_notes: {
+                ai_summary: 'Headache frequency reduced from 15 to 8 days/month on topiramate 100mg. MIDAS improved 42→24. No significant side effects. Continue current regimen, recheck in 3 months.'
+              }
+            },
+            {
+              id: '2',
+              visit_date: '2025-12-15',
+              visit_type: 'follow_up',
+              chief_complaint: ['Chronic migraine', 'Medication adjustment'],
+              provider: 'Dr. Martinez',
+              clinical_notes: {
+                ai_summary: 'Suboptimal response to propranolol. Transitioned to topiramate 25mg with 2-week titration to 100mg. MRI brain unremarkable. Discussed lifestyle modifications.'
+              }
+            },
+            {
+              id: '3',
+              visit_date: '2025-11-01',
+              visit_type: 'new_patient',
+              chief_complaint: ['New onset headaches', 'Memory concerns'],
+              provider: 'Dr. Smith',
+              clinical_notes: {
+                ai_summary: 'Initial eval for 3-month history of daily headaches with mild cognitive complaints. MoCA 26/30 (normal). Started propranolol 40mg BID. Ordered MRI brain, labs.'
+              }
+            },
           ]).map((visit) => {
             const isExpanded = expandedVisit === visit.id
             return (
@@ -248,7 +276,7 @@ export default function LeftSidebar({ patient, priorVisits, scoreHistory }: Left
                 <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '4px' }}>
                   {Array.isArray(visit.chief_complaint) ? visit.chief_complaint.join(', ') : visit.chief_complaint || 'General consultation'}
                 </div>
-                <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Dr. Smith</div>
+                <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>{visit.provider || 'Dr. Smith'}</div>
 
                 {/* AI Summary - Expanded */}
                 {isExpanded && aiSummaryEnabled && (
