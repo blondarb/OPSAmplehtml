@@ -107,12 +107,31 @@ export default function VoiceDrawer({
     { id: 'document', label: 'Document' },
   ]
 
+  // Helper to get user settings from localStorage
+  const getUserSettings = () => {
+    try {
+      const savedSettings = localStorage.getItem('sevaro-user-settings')
+      if (savedSettings) {
+        const parsed = JSON.parse(savedSettings)
+        return {
+          globalAiInstructions: parsed.globalAiInstructions || '',
+          documentationStyle: parsed.documentationStyle || 'detailed',
+          preferredTerminology: parsed.preferredTerminology || 'standard',
+        }
+      }
+    } catch (e) {
+      // Ignore parse errors
+    }
+    return null
+  }
+
   const generateChartPrep = async () => {
     setLoading(true)
     setChartPrepSections(null)
     setInsertedSections(new Set())
 
     try {
+      const userSettings = getUserSettings()
       const response = await fetch('/api/ai/chart-prep', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -120,6 +139,7 @@ export default function VoiceDrawer({
           patient,
           noteData,
           prepNotes,
+          userSettings,
         }),
       })
 
@@ -160,6 +180,10 @@ export default function VoiceDrawer({
       }
       if (chartPrepSections || chartPrepOutput) {
         formData.append('chartPrep', JSON.stringify(chartPrepSections || chartPrepOutput))
+      }
+      const userSettings = getUserSettings()
+      if (userSettings) {
+        formData.append('userSettings', JSON.stringify(userSettings))
       }
 
       const response = await fetch('/api/ai/visit-ai', {
@@ -324,6 +348,7 @@ export default function VoiceDrawer({
             setChartPrepSections(null)
             setInsertedSections(new Set())
 
+            const userSettings = getUserSettings()
             const response = await fetch('/api/ai/chart-prep', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
@@ -331,6 +356,7 @@ export default function VoiceDrawer({
                 patient,
                 noteData,
                 prepNotes: updatedNotes,
+                userSettings,
               }),
             })
 

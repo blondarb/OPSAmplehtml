@@ -2,6 +2,12 @@ import { NextResponse } from 'next/server'
 import OpenAI from 'openai'
 import { createClient } from '@/lib/supabase/server'
 
+interface UserSettings {
+  globalAiInstructions?: string
+  documentationStyle?: 'concise' | 'detailed' | 'narrative'
+  preferredTerminology?: 'formal' | 'standard' | 'simplified'
+}
+
 export async function POST(request: Request) {
   try {
     // Check authentication
@@ -16,6 +22,7 @@ export async function POST(request: Request) {
     const audioFile = formData.get('audio') as File
     const patientData = formData.get('patient') as string
     const chartPrepData = formData.get('chartPrep') as string
+    const userSettingsData = formData.get('userSettings') as string
 
     if (!audioFile) {
       return NextResponse.json({ error: 'No audio file provided' }, { status: 400 })
@@ -55,12 +62,14 @@ export async function POST(request: Request) {
       }, { status: 400 })
     }
 
-    // Parse patient and chart prep data if provided
+    // Parse patient, chart prep, and user settings data if provided
     let patient = null
     let chartPrep = null
+    let userSettings: UserSettings | null = null
     try {
       if (patientData) patient = JSON.parse(patientData)
       if (chartPrepData) chartPrep = JSON.parse(chartPrepData)
+      if (userSettingsData) userSettings = JSON.parse(userSettingsData)
     } catch (e) {
       // Ignore parse errors
     }
@@ -79,6 +88,41 @@ Pre-Visit Chart Prep Notes:
 - Suggested Focus: ${chartPrep.suggestedFocus || 'N/A'}
 - Current Treatment: ${chartPrep.currentTreatment || 'N/A'}
 ` : ''
+
+    // Build user preferences section
+    let userPreferences = ''
+    if (userSettings) {
+      const prefs: string[] = []
+
+      // Global AI instructions
+      if (userSettings.globalAiInstructions) {
+        prefs.push(`User preferences: ${userSettings.globalAiInstructions}`)
+      }
+
+      // Documentation style
+      if (userSettings.documentationStyle) {
+        const styleGuide: Record<string, string> = {
+          concise: 'Keep all sections brief and focused on essential information only.',
+          detailed: 'Provide comprehensive coverage with thorough documentation in each section.',
+          narrative: 'Write in a flowing, story-like prose format where appropriate.',
+        }
+        prefs.push(styleGuide[userSettings.documentationStyle])
+      }
+
+      // Terminology preference
+      if (userSettings.preferredTerminology) {
+        const termGuide: Record<string, string> = {
+          formal: 'Use formal, academic medical terminology.',
+          standard: 'Use standard clinical terminology.',
+          simplified: 'Use simplified, accessible medical language.',
+        }
+        prefs.push(termGuide[userSettings.preferredTerminology])
+      }
+
+      if (prefs.length > 0) {
+        userPreferences = `\n\nUser Style Preferences:\n${prefs.join('\n')}`
+      }
+    }
 
     // Step 2: Process transcript with GPT-4 to extract clinical content
     const systemPrompt = `You are a clinical documentation assistant for a neurology practice.
@@ -118,7 +162,7 @@ IMPORTANT: Return ONLY valid JSON, no markdown formatting.
     "assessment": 0.75,
     "plan": 0.80
   }
-}`
+}${userPreferences}`
 
     const completion = await openai.chat.completions.create({
       model: 'gpt-4',

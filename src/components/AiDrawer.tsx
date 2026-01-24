@@ -37,6 +37,24 @@ export default function AiDrawer({
     { id: 'handout', label: 'Handout' },
   ]
 
+  // Helper to get user settings from localStorage
+  const getUserSettings = () => {
+    try {
+      const savedSettings = localStorage.getItem('sevaro-user-settings')
+      if (savedSettings) {
+        const parsed = JSON.parse(savedSettings)
+        return {
+          globalAiInstructions: parsed.globalAiInstructions || '',
+          documentationStyle: parsed.documentationStyle || 'detailed',
+          preferredTerminology: parsed.preferredTerminology || 'standard',
+        }
+      }
+    } catch (e) {
+      // Ignore parse errors
+    }
+    return null
+  }
+
   const askAI = async () => {
     if (!question.trim()) return
 
@@ -44,6 +62,7 @@ export default function AiDrawer({
     setAiResponse('')
 
     try {
+      const userSettings = getUserSettings()
       const response = await fetch('/api/ai/ask', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -54,6 +73,7 @@ export default function AiDrawer({
             chiefComplaint: noteData.chiefComplaint?.join(', ') || '',
             hpi: noteData.hpi || '',
           },
+          userSettings,
         }),
       })
 
@@ -82,6 +102,7 @@ export default function AiDrawer({
         'Detailed': 'Provide a comprehensive summary with all relevant details, but still in patient-friendly language.',
       }
 
+      const userSettings = getUserSettings()
       const response = await fetch('/api/ai/ask', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -101,6 +122,7 @@ Do NOT use medical jargon. Write as if explaining to the patient directly.`,
             assessment: noteData.assessment || '',
             plan: noteData.plan || '',
           },
+          userSettings,
         }),
       })
 
@@ -134,6 +156,7 @@ Do NOT use medical jargon. Write as if explaining to the patient directly.`,
     }
 
     try {
+      const userSettings = getUserSettings()
       const response = await fetch('/api/ai/ask', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -152,6 +175,7 @@ Use patient-friendly language. Avoid medical jargon. Keep it informative but not
             patient: patient ? `${patient.first_name} ${patient.last_name}` : 'Patient',
             condition: selectedCondition,
           },
+          userSettings,
         }),
       })
 
