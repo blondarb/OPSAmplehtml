@@ -33,7 +33,7 @@ export default function SmartRecommendationsSection({
   const [expandedSubsections, setExpandedSubsections] = useState<Record<string, boolean>>({})
   const [selectedItems, setSelectedItems] = useState<Map<string, Set<string>>>(new Map())
   const [showPlanBuilder, setShowPlanBuilder] = useState(false)
-  const [activeReferenceTab, setActiveReferenceTab] = useState<'differential' | 'evidence' | 'monitoring' | null>(null)
+  const [activeReferenceTab, setActiveReferenceTab] = useState<'icd' | 'scope' | 'pearls' | 'differential' | 'evidence' | 'monitoring' | null>(null)
 
   const planTitles = getAllPlanTitles()
   const currentPlan = selectedDiagnosis ? OUTPATIENT_PLANS[selectedDiagnosis] : null
@@ -331,175 +331,292 @@ export default function SmartRecommendationsSection({
           borderRadius: '8px',
           overflow: 'hidden',
         }}>
-          {/* Plan Header */}
+          {/* Plan Header - Compact with Icon Buttons */}
           <div style={{
-            padding: '16px',
+            padding: '12px 16px',
             background: 'linear-gradient(135deg, #0D9488 0%, #14B8A6 100%)',
             color: 'white',
           }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-              <div>
-                <h3 style={{ fontSize: '16px', fontWeight: 600, margin: 0 }}>{currentPlan.title}</h3>
-                <div style={{ fontSize: '12px', opacity: 0.9, marginTop: '4px' }}>
-                  ICD-10: {currentPlan.icd10.join(', ')}
-                </div>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px' }}>
+              {/* Title */}
+              <h3 style={{ fontSize: '16px', fontWeight: 600, margin: 0, flex: 1 }}>{currentPlan.title}</h3>
+
+              {/* Icon Buttons Row */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                {/* ICD-10 Codes */}
+                <button
+                  onClick={() => setActiveReferenceTab(activeReferenceTab === 'icd' ? null : 'icd')}
+                  title={`ICD-10: ${currentPlan.icd10.join(', ')}`}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '4px',
+                    padding: '4px 8px',
+                    borderRadius: '4px',
+                    fontSize: '10px',
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                    border: 'none',
+                    background: activeReferenceTab === 'icd' ? 'white' : 'rgba(255,255,255,0.2)',
+                    color: activeReferenceTab === 'icd' ? '#0D9488' : 'white',
+                    transition: 'all 0.15s ease',
+                  }}
+                >
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" />
+                    <polyline points="14 2 14 8 20 8" />
+                    <line x1="16" y1="13" x2="8" y2="13" />
+                    <line x1="16" y1="17" x2="8" y2="17" />
+                  </svg>
+                  ICD
+                </button>
+
+                {/* Scope/Definition */}
+                <button
+                  onClick={() => setActiveReferenceTab(activeReferenceTab === 'scope' ? null : 'scope')}
+                  title="Definition & Scope"
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '4px',
+                    padding: '4px 8px',
+                    borderRadius: '4px',
+                    fontSize: '10px',
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                    border: 'none',
+                    background: activeReferenceTab === 'scope' ? 'white' : 'rgba(255,255,255,0.2)',
+                    color: activeReferenceTab === 'scope' ? '#0D9488' : 'white',
+                    transition: 'all 0.15s ease',
+                  }}
+                >
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <circle cx="12" cy="12" r="10" />
+                    <path d="M12 16v-4M12 8h.01" />
+                  </svg>
+                  Scope
+                </button>
+
+                {/* Clinical Pearls */}
+                {currentPlan.notes.length > 0 && (
+                  <button
+                    onClick={() => setActiveReferenceTab(activeReferenceTab === 'pearls' ? null : 'pearls')}
+                    title="Clinical Pearls"
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '4px',
+                      padding: '4px 8px',
+                      borderRadius: '4px',
+                      fontSize: '10px',
+                      fontWeight: 600,
+                      cursor: 'pointer',
+                      border: 'none',
+                      background: activeReferenceTab === 'pearls' ? '#FEF3C7' : 'rgba(255,255,255,0.2)',
+                      color: activeReferenceTab === 'pearls' ? '#D97706' : 'white',
+                      transition: 'all 0.15s ease',
+                    }}
+                  >
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <path d="M12 2L2 7l10 5 10-5-10-5z" />
+                      <path d="M2 17l10 5 10-5" />
+                      <path d="M2 12l10 5 10-5" />
+                    </svg>
+                    Pearls
+                  </button>
+                )}
+
+                {/* Differential Diagnosis */}
+                {currentPlan.differential && currentPlan.differential.length > 0 && (
+                  <button
+                    onClick={() => setActiveReferenceTab(activeReferenceTab === 'differential' ? null : 'differential')}
+                    title="Differential Diagnosis"
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '4px',
+                      padding: '4px 8px',
+                      borderRadius: '4px',
+                      fontSize: '10px',
+                      fontWeight: 600,
+                      cursor: 'pointer',
+                      border: 'none',
+                      background: activeReferenceTab === 'differential' ? '#DBEAFE' : 'rgba(255,255,255,0.2)',
+                      color: activeReferenceTab === 'differential' ? '#2563EB' : 'white',
+                      transition: 'all 0.15s ease',
+                    }}
+                  >
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <path d="M16 4h2a2 2 0 012 2v14a2 2 0 01-2 2H6a2 2 0 01-2-2V6a2 2 0 012-2h2" />
+                      <rect x="8" y="2" width="8" height="4" rx="1" />
+                      <path d="M9 14l2 2 4-4" />
+                    </svg>
+                    DDx
+                  </button>
+                )}
+
+                {/* Evidence */}
+                {currentPlan.evidence && currentPlan.evidence.length > 0 && (
+                  <button
+                    onClick={() => setActiveReferenceTab(activeReferenceTab === 'evidence' ? null : 'evidence')}
+                    title="Evidence & Guidelines"
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '4px',
+                      padding: '4px 8px',
+                      borderRadius: '4px',
+                      fontSize: '10px',
+                      fontWeight: 600,
+                      cursor: 'pointer',
+                      border: 'none',
+                      background: activeReferenceTab === 'evidence' ? '#D1FAE5' : 'rgba(255,255,255,0.2)',
+                      color: activeReferenceTab === 'evidence' ? '#059669' : 'white',
+                      transition: 'all 0.15s ease',
+                    }}
+                  >
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <path d="M4 19.5A2.5 2.5 0 016.5 17H20" />
+                      <path d="M6.5 2H20v20H6.5A2.5 2.5 0 014 19.5v-15A2.5 2.5 0 016.5 2z" />
+                    </svg>
+                    Evidence
+                  </button>
+                )}
+
+                {/* Monitoring */}
+                {currentPlan.monitoring && currentPlan.monitoring.length > 0 && (
+                  <button
+                    onClick={() => setActiveReferenceTab(activeReferenceTab === 'monitoring' ? null : 'monitoring')}
+                    title="Monitoring Parameters"
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '4px',
+                      padding: '4px 8px',
+                      borderRadius: '4px',
+                      fontSize: '10px',
+                      fontWeight: 600,
+                      cursor: 'pointer',
+                      border: 'none',
+                      background: activeReferenceTab === 'monitoring' ? '#FEE2E2' : 'rgba(255,255,255,0.2)',
+                      color: activeReferenceTab === 'monitoring' ? '#DC2626' : 'white',
+                      transition: 'all 0.15s ease',
+                    }}
+                  >
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <path d="M22 12h-4l-3 9L9 3l-3 9H2" />
+                    </svg>
+                    Monitor
+                  </button>
+                )}
+
+                {/* Close Button */}
+                <button
+                  onClick={() => {
+                    setSelectedDiagnosis(null)
+                    setShowPlanBuilder(false)
+                  }}
+                  style={{
+                    background: 'rgba(255,255,255,0.2)',
+                    border: 'none',
+                    borderRadius: '4px',
+                    padding: '4px',
+                    cursor: 'pointer',
+                    color: 'white',
+                    marginLeft: '4px',
+                  }}
+                >
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <path d="M18 6L6 18M6 6l12 12" />
+                  </svg>
+                </button>
               </div>
-              <button
-                onClick={() => {
-                  setSelectedDiagnosis(null)
-                  setShowPlanBuilder(false)
-                }}
-                style={{
-                  background: 'rgba(255,255,255,0.2)',
-                  border: 'none',
-                  borderRadius: '6px',
-                  padding: '6px',
-                  cursor: 'pointer',
-                  color: 'white',
-                }}
-              >
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <path d="M18 6L6 18M6 6l12 12" />
-                </svg>
-              </button>
-            </div>
-            <div style={{ fontSize: '13px', marginTop: '8px', opacity: 0.9 }}>
-              {currentPlan.scope}
             </div>
           </div>
-
-          {/* Clinical Notes */}
-          {currentPlan.notes.length > 0 && (
-            <div style={{
-              padding: '12px 16px',
-              background: '#FEF3C7',
-              borderBottom: '1px solid var(--border)',
-            }}>
-              <div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px' }}>
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#D97706" strokeWidth="2" style={{ flexShrink: 0, marginTop: '2px' }}>
-                  <circle cx="12" cy="12" r="10" />
-                  <path d="M12 16v-4M12 8h.01" />
-                </svg>
-                <div style={{ fontSize: '12px', color: '#92400E' }}>
-                  <strong>Clinical Pearls:</strong>
-                  <ul style={{ margin: '4px 0 0 0', paddingLeft: '16px' }}>
-                    {currentPlan.notes.map((note, i) => (
-                      <li key={i} style={{ marginBottom: '2px' }}>{note}</li>
-                    ))}
-                  </ul>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* Reference Icons Row */}
-          {(currentPlan.differential || currentPlan.evidence || currentPlan.monitoring) && (
-            <div style={{
-              padding: '8px 16px',
-              background: 'var(--bg-gray)',
-              borderBottom: '1px solid var(--border)',
-              display: 'flex',
-              gap: '8px',
-              alignItems: 'center',
-            }}>
-              <span style={{ fontSize: '11px', color: 'var(--text-muted)', marginRight: '4px' }}>References:</span>
-
-              {/* Differential Diagnosis */}
-              {currentPlan.differential && currentPlan.differential.length > 0 && (
-                <button
-                  onClick={() => setActiveReferenceTab(activeReferenceTab === 'differential' ? null : 'differential')}
-                  title="Differential Diagnosis"
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '4px',
-                    padding: '4px 10px',
-                    borderRadius: '16px',
-                    fontSize: '11px',
-                    fontWeight: 500,
-                    cursor: 'pointer',
-                    border: 'none',
-                    background: activeReferenceTab === 'differential' ? '#DBEAFE' : 'var(--bg-white)',
-                    color: activeReferenceTab === 'differential' ? '#2563EB' : 'var(--text-secondary)',
-                    transition: 'all 0.15s ease',
-                  }}
-                >
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                    <path d="M16 4h2a2 2 0 012 2v14a2 2 0 01-2 2H6a2 2 0 01-2-2V6a2 2 0 012-2h2" />
-                    <rect x="8" y="2" width="8" height="4" rx="1" />
-                    <path d="M9 14l2 2 4-4" />
-                  </svg>
-                  DDx ({currentPlan.differential.length})
-                </button>
-              )}
-
-              {/* Evidence */}
-              {currentPlan.evidence && currentPlan.evidence.length > 0 && (
-                <button
-                  onClick={() => setActiveReferenceTab(activeReferenceTab === 'evidence' ? null : 'evidence')}
-                  title="Evidence & Guidelines"
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '4px',
-                    padding: '4px 10px',
-                    borderRadius: '16px',
-                    fontSize: '11px',
-                    fontWeight: 500,
-                    cursor: 'pointer',
-                    border: 'none',
-                    background: activeReferenceTab === 'evidence' ? '#D1FAE5' : 'var(--bg-white)',
-                    color: activeReferenceTab === 'evidence' ? '#059669' : 'var(--text-secondary)',
-                    transition: 'all 0.15s ease',
-                  }}
-                >
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                    <path d="M4 19.5A2.5 2.5 0 016.5 17H20" />
-                    <path d="M6.5 2H20v20H6.5A2.5 2.5 0 014 19.5v-15A2.5 2.5 0 016.5 2z" />
-                    <path d="M8 7h8M8 11h8M8 15h4" />
-                  </svg>
-                  Evidence ({currentPlan.evidence.length})
-                </button>
-              )}
-
-              {/* Monitoring */}
-              {currentPlan.monitoring && currentPlan.monitoring.length > 0 && (
-                <button
-                  onClick={() => setActiveReferenceTab(activeReferenceTab === 'monitoring' ? null : 'monitoring')}
-                  title="Monitoring Parameters"
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '4px',
-                    padding: '4px 10px',
-                    borderRadius: '16px',
-                    fontSize: '11px',
-                    fontWeight: 500,
-                    cursor: 'pointer',
-                    border: 'none',
-                    background: activeReferenceTab === 'monitoring' ? '#FEE2E2' : 'var(--bg-white)',
-                    color: activeReferenceTab === 'monitoring' ? '#DC2626' : 'var(--text-secondary)',
-                    transition: 'all 0.15s ease',
-                  }}
-                >
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                    <path d="M22 12h-4l-3 9L9 3l-3 9H2" />
-                  </svg>
-                  Monitor ({currentPlan.monitoring.length})
-                </button>
-              )}
-            </div>
-          )}
 
           {/* Reference Content Panels */}
           {activeReferenceTab && (
             <div style={{
               padding: '12px 16px',
-              background: 'var(--bg-white)',
+              background: activeReferenceTab === 'pearls' ? '#FEF3C7' : 'var(--bg-white)',
               borderBottom: '1px solid var(--border)',
               maxHeight: '250px',
               overflowY: 'auto',
             }}>
+              {/* ICD-10 Codes Panel */}
+              {activeReferenceTab === 'icd' && (
+                <div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px' }}>
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#0D9488" strokeWidth="2">
+                      <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" />
+                      <polyline points="14 2 14 8 20 8" />
+                      <line x1="16" y1="13" x2="8" y2="13" />
+                      <line x1="16" y1="17" x2="8" y2="17" />
+                    </svg>
+                    <span style={{ fontSize: '13px', fontWeight: 600, color: '#0D9488' }}>ICD-10 Codes</span>
+                  </div>
+                  <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                    {currentPlan.icd10.map((code, index) => (
+                      <span key={index} style={{
+                        padding: '6px 12px',
+                        borderRadius: '6px',
+                        background: 'var(--bg-gray)',
+                        border: '1px solid var(--border)',
+                        fontSize: '13px',
+                        fontWeight: 600,
+                        color: 'var(--text-primary)',
+                        fontFamily: 'monospace',
+                      }}>
+                        {code}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Scope/Definition Panel */}
+              {activeReferenceTab === 'scope' && (
+                <div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px' }}>
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#0D9488" strokeWidth="2">
+                      <circle cx="12" cy="12" r="10" />
+                      <path d="M12 16v-4M12 8h.01" />
+                    </svg>
+                    <span style={{ fontSize: '13px', fontWeight: 600, color: '#0D9488' }}>Scope & Definition</span>
+                  </div>
+                  <div style={{
+                    padding: '12px',
+                    borderRadius: '6px',
+                    background: 'var(--bg-gray)',
+                    border: '1px solid var(--border)',
+                    fontSize: '13px',
+                    color: 'var(--text-primary)',
+                    lineHeight: 1.5,
+                  }}>
+                    {currentPlan.scope}
+                  </div>
+                </div>
+              )}
+
+              {/* Clinical Pearls Panel */}
+              {activeReferenceTab === 'pearls' && currentPlan.notes.length > 0 && (
+                <div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px' }}>
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#D97706" strokeWidth="2">
+                      <path d="M12 2L2 7l10 5 10-5-10-5z" />
+                      <path d="M2 17l10 5 10-5" />
+                      <path d="M2 12l10 5 10-5" />
+                    </svg>
+                    <span style={{ fontSize: '13px', fontWeight: 600, color: '#D97706' }}>Clinical Pearls</span>
+                  </div>
+                  <ul style={{ margin: 0, paddingLeft: '20px', fontSize: '13px', color: '#92400E' }}>
+                    {currentPlan.notes.map((note, i) => (
+                      <li key={i} style={{ marginBottom: '6px', lineHeight: 1.4 }}>{note}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
               {/* Differential Diagnosis Panel */}
               {activeReferenceTab === 'differential' && currentPlan.differential && (
                 <div>
