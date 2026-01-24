@@ -1,13 +1,28 @@
 # Implementation Status - Sevaro Clinical
 
-**Last Updated:** January 24, 2026 (Phase 3A Quick Wins Implemented)
+**Last Updated:** January 24, 2026 (Consolidated Roadmap Created)
 **Based on:** PRD_AI_Scribe.md v1.4, Sevaro_Outpatient_MVP_PRD_v1.4, PRD_Roadmap_Phase3.md
+
+---
+
+## Quick Links
+
+- **[CONSOLIDATED_ROADMAP.md](./CONSOLIDATED_ROADMAP.md)** - Master roadmap combining all phases from all PRDs
+- **[PRD_Roadmap_Phase3.md](./PRD_Roadmap_Phase3.md)** - UX enhancements and workflow support
 
 ---
 
 ## Overview
 
 This document tracks implementation progress against the product requirements and notes current work, issues, and next steps.
+
+### Current Priority Focus
+
+Based on the consolidated roadmap analysis:
+
+1. **Phase 2 Gap: Smart Recommendations** - Link diagnoses to treatment plans (import neuro-plans)
+2. **Phase 3A Remaining: Field AI Actions** - Improve/Expand/Summarize buttons need real actions
+3. **Phase 3A Remaining: User Settings** - Settings drawer with AI custom instructions
 
 ---
 
