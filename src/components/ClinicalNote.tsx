@@ -135,47 +135,57 @@ export default function ClinicalNote({
   // Generate a unique key for this visit's autosave data
   const autosaveKey = `sevaro-autosave-${currentVisit?.id || 'draft'}`
 
-  // Load autosaved data on mount, falling back to visit data
-  const getInitialNoteData = () => {
-    if (typeof window !== 'undefined') {
+  // Initialize with visit data first (SSR-safe)
+  const [noteData, setNoteData] = useState({
+    chiefComplaint: currentVisit?.chief_complaint || ['Headache'],
+    hpi: currentVisit?.clinical_notes?.hpi || '',
+    ros: currentVisit?.clinical_notes?.ros || 'Reviewed',
+    rosDetails: currentVisit?.clinical_notes?.ros_details || '',
+    allergies: currentVisit?.clinical_notes?.allergies || 'NKDA',
+    allergyDetails: currentVisit?.clinical_notes?.allergy_details || '',
+    historyAvailable: currentVisit?.clinical_notes?.history_available || 'Yes',
+    historyDetails: currentVisit?.clinical_notes?.history_details || '',
+    physicalExam: currentVisit?.clinical_notes?.physical_exam || '',
+    assessment: currentVisit?.clinical_notes?.assessment || '',
+    plan: currentVisit?.clinical_notes?.plan || '',
+  })
+
+  // Track whether autosave has been loaded (to prevent overwriting user changes)
+  const [autosaveLoaded, setAutosaveLoaded] = useState(false)
+
+  // Load autosaved data on mount (client-side only to avoid hydration mismatch)
+  useEffect(() => {
+    if (autosaveLoaded) return
+
+    try {
       const saved = localStorage.getItem(autosaveKey)
       if (saved) {
-        try {
-          const parsed = JSON.parse(saved)
-          // Check if autosave is recent (within last 24 hours)
-          if (parsed.timestamp && Date.now() - parsed.timestamp < 24 * 60 * 60 * 1000) {
-            return parsed.data
-          }
-        } catch (e) {
-          // Invalid data, use defaults
+        const parsed = JSON.parse(saved)
+        // Check if autosave is recent (within last 24 hours)
+        if (parsed.timestamp && Date.now() - parsed.timestamp < 24 * 60 * 60 * 1000 && parsed.data) {
+          setNoteData(prev => ({
+            ...prev,
+            ...parsed.data,
+          }))
         }
       }
+    } catch (e) {
+      // Invalid data, use defaults
+      console.error('Failed to load autosave:', e)
     }
-    return null
-  }
-
-  const savedData = getInitialNoteData()
-
-  const [noteData, setNoteData] = useState({
-    chiefComplaint: savedData?.chiefComplaint || currentVisit?.chief_complaint || ['Headache'],
-    hpi: savedData?.hpi || currentVisit?.clinical_notes?.hpi || '',
-    ros: savedData?.ros || currentVisit?.clinical_notes?.ros || 'Reviewed',
-    rosDetails: savedData?.rosDetails || currentVisit?.clinical_notes?.ros_details || '',
-    allergies: savedData?.allergies || currentVisit?.clinical_notes?.allergies || 'NKDA',
-    allergyDetails: savedData?.allergyDetails || currentVisit?.clinical_notes?.allergy_details || '',
-    historyAvailable: savedData?.historyAvailable || currentVisit?.clinical_notes?.history_available || 'Yes',
-    historyDetails: savedData?.historyDetails || currentVisit?.clinical_notes?.history_details || '',
-    physicalExam: savedData?.physicalExam || currentVisit?.clinical_notes?.physical_exam || '',
-    assessment: savedData?.assessment || currentVisit?.clinical_notes?.assessment || '',
-    plan: savedData?.plan || currentVisit?.clinical_notes?.plan || '',
-  })
+    setAutosaveLoaded(true)
+  }, [autosaveKey, autosaveLoaded])
 
   // Autosave status
   const [autosaveStatus, setAutosaveStatus] = useState<'saved' | 'saving' | 'unsaved'>('saved')
   const autosaveTimeoutRef = useRef<NodeJS.Timeout | null>(null)
 
   // Autosave effect - debounced save to localStorage
+  // Only start autosaving after initial load to avoid overwriting saved data
   useEffect(() => {
+    // Don't start autosave until autosave data has been loaded
+    if (!autosaveLoaded) return
+
     // Mark as unsaved when data changes
     setAutosaveStatus('unsaved')
 
@@ -204,7 +214,7 @@ export default function ClinicalNote({
         clearTimeout(autosaveTimeoutRef.current)
       }
     }
-  }, [noteData, autosaveKey])
+  }, [noteData, autosaveKey, autosaveLoaded])
 
   // Save immediately on beforeunload
   useEffect(() => {

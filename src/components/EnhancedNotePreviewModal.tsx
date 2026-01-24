@@ -58,6 +58,7 @@ export default function EnhancedNotePreviewModal({
 
   // Generated note state
   const [formattedNote, setFormattedNote] = useState<FormattedNote | null>(null)
+  const [generationError, setGenerationError] = useState<string | null>(null)
 
   // Editing state
   const [editingSection, setEditingSection] = useState<string | null>(null)
@@ -79,16 +80,125 @@ export default function EnhancedNotePreviewModal({
 
   // Generate note when modal opens or preferences change
   useEffect(() => {
-    if (isOpen) {
-      const note = generateFormattedNote(noteData, preferences)
-      setFormattedNote(note)
-      setViewMode('review')
-      setEditingSection(null)
-      setCopySuccess(false)
+    if (isOpen && noteData) {
+      try {
+        setGenerationError(null)
+        // Ensure manualData exists with required structure
+        const safeNoteData: ComprehensiveNoteData = {
+          ...noteData,
+          manualData: noteData.manualData || {
+            chiefComplaint: '',
+            hpi: '',
+            ros: '',
+            physicalExam: '',
+            assessment: '',
+            plan: '',
+          },
+        }
+        const note = generateFormattedNote(safeNoteData, preferences)
+        setFormattedNote(note)
+        setViewMode('review')
+        setEditingSection(null)
+        setCopySuccess(false)
+      } catch (error) {
+        console.error('Error generating note:', error)
+        setGenerationError(error instanceof Error ? error.message : 'Failed to generate note')
+        setFormattedNote(null)
+      }
     }
   }, [isOpen, noteData, preferences])
 
-  if (!isOpen || !formattedNote) return null
+  if (!isOpen) return null
+
+  // Show error state if generation failed
+  if (generationError) {
+    return (
+      <div style={{
+        position: 'fixed',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        background: 'rgba(0, 0, 0, 0.5)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        zIndex: 1000,
+        padding: '20px',
+      }}>
+        <div style={{
+          background: 'var(--bg-white)',
+          borderRadius: '16px',
+          padding: '32px',
+          maxWidth: '400px',
+          textAlign: 'center',
+        }}>
+          <div style={{ color: '#EF4444', marginBottom: '16px' }}>
+            <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <circle cx="12" cy="12" r="10"/>
+              <line x1="12" y1="8" x2="12" y2="12"/>
+              <line x1="12" y1="16" x2="12.01" y2="16"/>
+            </svg>
+          </div>
+          <h3 style={{ margin: '0 0 8px', color: 'var(--text-primary)' }}>Error Generating Note</h3>
+          <p style={{ margin: '0 0 24px', color: 'var(--text-secondary)', fontSize: '14px' }}>
+            {generationError}
+          </p>
+          <button
+            onClick={onClose}
+            style={{
+              padding: '10px 24px',
+              borderRadius: '8px',
+              border: 'none',
+              background: '#0D9488',
+              color: 'white',
+              fontSize: '14px',
+              fontWeight: 500,
+              cursor: 'pointer',
+            }}
+          >
+            Close
+          </button>
+        </div>
+      </div>
+    )
+  }
+
+  // Show loading state while generating
+  if (!formattedNote) {
+    return (
+      <div style={{
+        position: 'fixed',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        background: 'rgba(0, 0, 0, 0.5)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        zIndex: 1000,
+      }}>
+        <div style={{
+          background: 'var(--bg-white)',
+          borderRadius: '16px',
+          padding: '32px',
+          textAlign: 'center',
+        }}>
+          <div style={{
+            width: '40px',
+            height: '40px',
+            border: '3px solid #E5E7EB',
+            borderTopColor: '#0D9488',
+            borderRadius: '50%',
+            animation: 'spin 1s linear infinite',
+            margin: '0 auto 16px',
+          }} />
+          <p style={{ margin: 0, color: 'var(--text-secondary)' }}>Generating note...</p>
+        </div>
+      </div>
+    )
+  }
 
   const allRequiredVerified = areRequiredSectionsVerified(formattedNote)
 
