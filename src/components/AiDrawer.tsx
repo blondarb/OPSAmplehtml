@@ -354,6 +354,8 @@ Use patient-friendly language. Avoid medical jargon. Keep it informative but not
                     borderRadius: '8px',
                     fontSize: '14px',
                     outline: 'none',
+                    background: 'var(--bg-white)',
+                    color: 'var(--text-primary)',
                   }}
                 />
                 <button
