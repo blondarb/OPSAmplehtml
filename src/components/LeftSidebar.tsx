@@ -244,7 +244,7 @@ export default function LeftSidebar({ patient, priorVisits, scoreHistory }: Left
       </div>
 
       {/* Patient Card */}
-      <div style={{ padding: '16px', borderBottom: '1px solid var(--border)' }}>
+      <div data-tour="patient-info" style={{ padding: '16px', borderBottom: '1px solid var(--border)' }}>
         <div style={{ display: 'flex', alignItems: 'flex-start', gap: '12px', marginBottom: '12px' }}>
           <div style={{
             width: '40px',
@@ -594,7 +594,7 @@ export default function LeftSidebar({ patient, priorVisits, scoreHistory }: Left
       </div>
 
       {/* Prior Visits Section */}
-      <div style={{ padding: '12px 16px', borderBottom: '1px solid var(--border)' }}>
+      <div data-tour="prior-visits" style={{ padding: '12px 16px', borderBottom: '1px solid var(--border)' }}>
         <div style={{
           display: 'flex',
           alignItems: 'center',

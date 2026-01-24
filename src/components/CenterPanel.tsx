@@ -377,7 +377,7 @@ ${noteData.plan || 'Not documented'}
       {/* Tab Navigation with Action Bar */}
       <div className="tab-nav-wrapper">
         {/* Tabs */}
-        <div className="tab-nav">
+        <div className="tab-nav" data-tour="clinical-tabs">
           {tabs.map(tab => (
             <button
               key={tab.id}
@@ -557,6 +557,7 @@ ${noteData.plan || 'Not documented'}
 
           {/* Microphone - opens Voice Drawer */}
           <button
+            data-tour="voice-button"
             onClick={() => openVoiceDrawer?.('document')}
             style={{
               width: '32px',
@@ -578,6 +579,7 @@ ${noteData.plan || 'Not documented'}
 
           {/* AI Star */}
           <button
+            data-tour="ai-button"
             onClick={() => openAiDrawer('ask-ai')}
             style={{
               width: '32px',
@@ -631,6 +633,7 @@ ${noteData.plan || 'Not documented'}
 
           {/* Generate Note Button */}
           <button
+            data-tour="generate-note"
             onClick={() => {
               if (onGenerateNote) {
                 onGenerateNote()

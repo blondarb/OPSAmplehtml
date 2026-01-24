@@ -680,7 +680,7 @@ export default function TopNav({ user, onSignOut, openAiDrawer, onOpenSettings, 
           </div>
 
           {/* User Avatar with dropdown */}
-          <div style={{ position: 'relative' }}>
+          <div style={{ position: 'relative' }} data-tour="settings">
             <button
               onClick={() => setUserMenuOpen(!userMenuOpen)}
               style={{

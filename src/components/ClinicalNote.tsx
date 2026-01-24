@@ -12,6 +12,7 @@ import DotPhrasesDrawer from './DotPhrasesDrawer'
 import EnhancedNotePreviewModal from './EnhancedNotePreviewModal'
 import SettingsDrawer from './SettingsDrawer'
 import IdeasDrawer from './IdeasDrawer'
+import OnboardingTour from './OnboardingTour'
 import {
   type ChartPrepOutput,
   type VisitAIOutput,
@@ -612,6 +613,9 @@ export default function ClinicalNote({
         onClose={() => setIdeasDrawerOpen(false)}
         initialTab={ideasDrawerTab}
       />
+
+      {/* Onboarding Tour for new users */}
+      <OnboardingTour />
 
       {/* Autosave Status Indicator */}
       <div
