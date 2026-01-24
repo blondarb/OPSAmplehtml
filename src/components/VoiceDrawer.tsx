@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useVoiceRecorder } from '@/hooks/useVoiceRecorder'
 
 interface VisitAIOutput {
@@ -56,6 +56,8 @@ export default function VoiceDrawer({
   // Chart Prep specific state
   const [prepNotes, setPrepNotes] = useState<Array<{ text: string; timestamp: string; category: string }>>([])
   const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set(['patientSummary', 'keyConsiderations']))
+  const [autoProcessing, setAutoProcessing] = useState(false)
+  const hasAutoProcessedRef = useRef(false)
 
   // Visit AI specific state
   const [visitAIOutput, setVisitAIOutput] = useState<VisitAIOutput | null>(null)
@@ -278,8 +280,127 @@ export default function VoiceDrawer({
       }
       setPrepNotes(prev => [...prev, newNote])
       clearPrepTranscription()
+      return true
     }
+    return false
   }
+
+  // Auto-process Chart Prep when transcription completes
+  // This effect runs when prepTranscribedText changes and we're not recording
+  useEffect(() => {
+    // Only auto-process if:
+    // 1. We have transcribed text
+    // 2. We're not currently recording
+    // 3. We're not currently transcribing
+    // 4. We haven't already auto-processed this transcription
+    if (
+      prepTranscribedText &&
+      prepTranscribedText.trim() &&
+      !isPrepRecording &&
+      !isPrepTranscribing &&
+      !hasAutoProcessedRef.current &&
+      !autoProcessing
+    ) {
+      hasAutoProcessedRef.current = true
+      setAutoProcessing(true)
+
+      // Add the note first
+      const autoCategory = detectCategory(prepTranscribedText)
+      const newNote = {
+        text: prepTranscribedText.trim(),
+        timestamp: new Date().toISOString(),
+        category: autoCategory,
+      }
+
+      // Use functional update to get the latest prepNotes
+      setPrepNotes(prev => {
+        const updatedNotes = [...prev, newNote]
+
+        // After adding note, trigger AI summary generation
+        // Use setTimeout to ensure state is updated
+        setTimeout(async () => {
+          try {
+            setLoading(true)
+            setChartPrepSections(null)
+            setInsertedSections(new Set())
+
+            const response = await fetch('/api/ai/chart-prep', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                patient,
+                noteData,
+                prepNotes: updatedNotes,
+              }),
+            })
+
+            const data = await response.json()
+            if (data.sections) {
+              setChartPrepSections(data.sections)
+              setAiResponse('')
+              if (onChartPrepComplete) {
+                onChartPrepComplete(data.sections)
+              }
+
+              // Auto-insert all sections to note
+              const fieldUpdates: Record<string, string[]> = {
+                hpi: [],
+                assessment: [],
+                plan: [],
+              }
+
+              const config = [
+                { key: 'suggestedHPI', targetField: 'hpi' },
+                { key: 'suggestedAssessment', targetField: 'assessment' },
+                { key: 'suggestedPlan', targetField: 'plan' },
+              ]
+
+              config.forEach(section => {
+                if (section.targetField && data.sections[section.key]) {
+                  fieldUpdates[section.targetField].push(data.sections[section.key])
+                }
+              })
+
+              // Add prep notes text
+              if (updatedNotes.length > 0) {
+                const prepNotesText = updatedNotes.map(n => `[${n.category}] ${n.text}`).join('\n\n')
+                fieldUpdates.hpi.unshift(`--- Pre-Visit Notes ---\n${prepNotesText}\n--- End Pre-Visit Notes ---\n`)
+              }
+
+              Object.entries(fieldUpdates).forEach(([field, contents]) => {
+                if (contents.length > 0) {
+                  const currentValue = noteData[field] || ''
+                  const newValue = currentValue
+                    ? `${currentValue}\n\n${contents.join('\n\n')}`
+                    : contents.join('\n\n')
+                  updateNote(field, newValue)
+                }
+              })
+
+              setInsertedSections(new Set(config.filter(s => s.targetField).map(s => s.key)))
+            } else {
+              setAiResponse(data.response || data.error || 'No response')
+              setChartPrepSections(null)
+            }
+          } catch (error) {
+            setAiResponse('Error generating chart prep')
+            setChartPrepSections(null)
+          } finally {
+            setLoading(false)
+            setAutoProcessing(false)
+            clearPrepTranscription()
+          }
+        }, 100)
+
+        return updatedNotes
+      })
+    }
+
+    // Reset the ref when we start a new recording
+    if (isPrepRecording) {
+      hasAutoProcessedRef.current = false
+    }
+  }, [prepTranscribedText, isPrepRecording, isPrepTranscribing, patient, noteData, onChartPrepComplete, updateNote, clearPrepTranscription, autoProcessing])
 
   // Toggle section expansion
   const toggleSection = (key: string) => {
@@ -433,7 +554,7 @@ export default function VoiceDrawer({
           {activeTab === 'chart-prep' && (
             <div>
               <p style={{ marginBottom: '12px', color: 'var(--text-secondary)', fontSize: '12px' }}>
-                Review records and dictate notes. AI will summarize key points to guide your visit.
+                Record your chart review notes. When done, AI will automatically summarize and add key points to your note.
               </p>
 
               {/* Dictation Section */}
@@ -591,8 +712,34 @@ export default function VoiceDrawer({
                   )}
                 </div>
 
-                {/* Transcription result */}
-                {prepTranscribedText && (
+                {/* Auto-processing indicator */}
+                {autoProcessing && (
+                  <div style={{
+                    marginTop: '8px',
+                    padding: '12px',
+                    background: 'linear-gradient(135deg, #F0FDFA 0%, #CCFBF1 100%)',
+                    borderRadius: '6px',
+                    border: '1px solid #5EEAD4',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '10px',
+                  }}>
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#0D9488" strokeWidth="2" style={{ animation: 'spin 1s linear infinite' }}>
+                      <circle cx="12" cy="12" r="10" strokeDasharray="32" strokeDashoffset="12" />
+                    </svg>
+                    <div>
+                      <p style={{ fontSize: '12px', fontWeight: 500, color: '#0D9488', margin: 0 }}>
+                        Auto-processing...
+                      </p>
+                      <p style={{ fontSize: '11px', color: '#14B8A6', margin: '2px 0 0 0' }}>
+                        Adding notes and generating AI summary
+                      </p>
+                    </div>
+                  </div>
+                )}
+
+                {/* Transcription result - only show if NOT auto-processing */}
+                {prepTranscribedText && !autoProcessing && (
                   <div style={{ marginTop: '8px', padding: '8px', background: 'var(--bg-white)', borderRadius: '6px', border: '1px solid #A7F3D0' }}>
                     <p style={{ fontSize: '12px', color: 'var(--text-primary)', marginBottom: '8px' }}>{prepTranscribedText}</p>
                     <div style={{ display: 'flex', gap: '6px' }}>
