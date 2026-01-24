@@ -7,7 +7,7 @@ import {
   ScaleResponses,
   ScoreCalculation,
 } from '@/lib/scales/types'
-import { getExamScales, getScalesForCondition, getScaleLocation } from '@/lib/scales/scale-definitions'
+import { getExamScales } from '@/lib/scales/scale-definitions'
 import { getSeverityColor } from '@/lib/scales/scoring-engine'
 
 interface ScaleResult {
@@ -46,40 +46,13 @@ export default function ExamScalesSection({
   const [scaleStates, setScaleStates] = useState<Record<string, ScaleState>>({})
   const [scaleHistory, setScaleHistory] = useState<ScaleResult[]>([])
   const [isSaving, setIsSaving] = useState<string | null>(null)
-  const [showAllScales, setShowAllScales] = useState(false)
   const [showInfoTooltip, setShowInfoTooltip] = useState(false)
   const [selectedScaleId, setSelectedScaleId] = useState<string | null>(null)
 
-  // Get exam-driven scales based on selected conditions
-  const relevantScales = useMemo(() => {
-    if (!selectedConditions || selectedConditions.length === 0) {
-      return []
-    }
-
-    const scaleMap = new Map<string, ScaleDefinition & { priority: number; isRequired: boolean }>()
-
-    for (const condition of selectedConditions) {
-      const scales = getScalesForCondition(condition)
-      for (const scale of scales) {
-        // Only include exam-driven scales
-        if (getScaleLocation(scale.id) === 'exam') {
-          const existing = scaleMap.get(scale.id)
-          if (!existing || scale.priority < existing.priority) {
-            scaleMap.set(scale.id, scale)
-          }
-        }
-      }
-    }
-
-    return Array.from(scaleMap.values()).sort((a, b) => a.priority - b.priority)
-  }, [selectedConditions])
-
-  // Get all available exam scales (for "show all" mode)
+  // Always show all exam scales
   const allExamScales = useMemo(() => {
     return getExamScales()
   }, [])
-
-  const displayedScales = showAllScales ? allExamScales : relevantScales
 
   // Fetch scale history
   useEffect(() => {
@@ -212,8 +185,8 @@ export default function ExamScalesSection({
   }
 
   const completedCount = useMemo(() => {
-    return displayedScales.filter(scale => scaleStates[scale.id]?.calculation?.isComplete).length
-  }, [displayedScales, scaleStates])
+    return allExamScales.filter(scale => scaleStates[scale.id]?.calculation?.isComplete).length
+  }, [allExamScales, scaleStates])
 
   // Get scale status for chip display
   const getScaleStatus = (scale: ScaleDefinition) => {
@@ -308,153 +281,121 @@ export default function ExamScalesSection({
               <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                 <polyline points="20 6 9 17 4 12" />
               </svg>
-              {completedCount}/{displayedScales.length}
+              {completedCount}/{allExamScales.length}
             </span>
           )}
         </div>
-
-        <button
-          onClick={() => setShowAllScales(!showAllScales)}
-          style={{
-            fontSize: '11px',
-            color: showAllScales ? 'white' : 'var(--primary)',
-            background: showAllScales ? 'var(--primary)' : 'transparent',
-            border: '1px solid var(--primary)',
-            padding: '4px 8px',
-            borderRadius: '4px',
-            cursor: 'pointer',
-          }}
-        >
-          {showAllScales ? 'Recommended' : 'All Scales'}
-        </button>
       </div>
 
-      {displayedScales.length === 0 ? (
+      {/* Scale chips - always show all */}
+      <div style={{
+        display: 'flex',
+        flexWrap: 'wrap',
+        gap: '8px',
+        marginBottom: selectedScaleId ? '12px' : 0,
+      }}>
+        {allExamScales.map(scale => {
+          const scaleStatus = getScaleStatus(scale)
+          const isSelected = selectedScaleId === scale.id
+          const severityColor = scaleStatus.status === 'completed' && scaleStatus.severity
+            ? getSeverityColor(scaleStatus.severity)
+            : null
+
+          return (
+            <button
+              key={scale.id}
+              onClick={() => handleScaleSelect(scale.id)}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                padding: '6px 10px',
+                border: isSelected
+                  ? '2px solid var(--primary)'
+                  : scaleStatus.status === 'completed' && severityColor
+                    ? `1px solid ${severityColor}`
+                    : '1px solid var(--border)',
+                borderRadius: '20px',
+                background: isSelected
+                  ? 'var(--bg-dark)'
+                  : scaleStatus.status === 'completed' && severityColor
+                    ? `${severityColor}10`
+                    : 'var(--bg-white)',
+                cursor: 'pointer',
+                fontSize: '12px',
+                fontWeight: 500,
+                color: scaleStatus.status === 'completed' && severityColor ? severityColor : 'var(--text-primary)',
+                transition: 'all 0.15s ease',
+              }}
+            >
+              {/* Status indicator */}
+              <span style={{
+                width: '8px',
+                height: '8px',
+                borderRadius: '50%',
+                background: scaleStatus.status === 'completed' && severityColor
+                  ? severityColor
+                  : scaleStatus.status === 'in_progress'
+                    ? '#F59E0B'
+                    : 'transparent',
+                border: scaleStatus.status === 'not_started'
+                  ? '1px solid var(--border)'
+                  : 'none',
+                flexShrink: 0,
+              }} />
+
+              <span>{scale.abbreviation}</span>
+
+              {/* Score badge for completed */}
+              {scaleStatus.status === 'completed' && scaleStatus.score !== undefined && severityColor && (
+                <span style={{
+                  fontSize: '10px',
+                  fontWeight: 600,
+                  padding: '1px 5px',
+                  background: severityColor,
+                  color: 'white',
+                  borderRadius: '8px',
+                }}>
+                  {scaleStatus.score}
+                </span>
+              )}
+
+              {/* Saving indicator */}
+              {isSaving === scale.id && (
+                <span style={{ fontSize: '10px', color: 'var(--text-muted)' }}>...</span>
+              )}
+            </button>
+          )
+        })}
+      </div>
+
+      {/* Expanded scale form */}
+      {selectedScaleId && (
         <div style={{
-          padding: '16px',
-          textAlign: 'center',
-          color: 'var(--text-muted)',
-          fontSize: '12px',
-          background: 'var(--bg-dark)',
+          border: '1px solid var(--border)',
           borderRadius: '8px',
+          overflow: 'hidden',
         }}>
-          {showAllScales
-            ? 'No exam scales available'
-            : 'Select a diagnosis to see relevant exam scales'}
-        </div>
-      ) : (
-        <>
-          {/* Compact scale chips row */}
-          <div style={{
-            display: 'flex',
-            flexWrap: 'wrap',
-            gap: '8px',
-            marginBottom: selectedScaleId ? '12px' : 0,
-          }}>
-            {displayedScales.map(scale => {
-              const scaleStatus = getScaleStatus(scale)
-              const isSelected = selectedScaleId === scale.id
-              const severityColor = scaleStatus.status === 'completed' && scaleStatus.severity
-                ? getSeverityColor(scaleStatus.severity)
-                : null
-
+          {allExamScales
+            .filter(scale => scale.id === selectedScaleId)
+            .map(scale => {
+              const state = scaleStates[scale.id]
               return (
-                <button
+                <ScaleForm
                   key={scale.id}
-                  onClick={() => handleScaleSelect(scale.id)}
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '6px',
-                    padding: '6px 10px',
-                    border: isSelected
-                      ? '2px solid var(--primary)'
-                      : scaleStatus.status === 'completed'
-                        ? `1px solid ${severityColor}`
-                        : '1px solid var(--border)',
-                    borderRadius: '20px',
-                    background: isSelected
-                      ? 'var(--bg-dark)'
-                      : scaleStatus.status === 'completed'
-                        ? `${severityColor}10`
-                        : 'var(--bg-white)',
-                    cursor: 'pointer',
-                    fontSize: '12px',
-                    fontWeight: 500,
-                    color: scaleStatus.status === 'completed' && severityColor ? severityColor : 'var(--text-primary)',
-                    transition: 'all 0.15s ease',
-                  }}
-                >
-                  {/* Status indicator */}
-                  <span style={{
-                    width: '8px',
-                    height: '8px',
-                    borderRadius: '50%',
-                    background: scaleStatus.status === 'completed' && severityColor
-                      ? severityColor
-                      : scaleStatus.status === 'in_progress'
-                        ? '#F59E0B'
-                        : 'transparent',
-                    border: scaleStatus.status === 'not_started'
-                      ? '1px solid var(--border)'
-                      : 'none',
-                    flexShrink: 0,
-                  }} />
-
-                  <span>{scale.abbreviation}</span>
-
-                  {/* Score badge for completed */}
-                  {scaleStatus.status === 'completed' && scaleStatus.score !== undefined && severityColor && (
-                    <span style={{
-                      fontSize: '10px',
-                      fontWeight: 600,
-                      padding: '1px 5px',
-                      background: severityColor,
-                      color: 'white',
-                      borderRadius: '8px',
-                    }}>
-                      {scaleStatus.score}
-                    </span>
-                  )}
-
-                  {/* Saving indicator */}
-                  {isSaving === scale.id && (
-                    <span style={{ fontSize: '10px', color: 'var(--text-muted)' }}>...</span>
-                  )}
-                </button>
+                  scale={scale}
+                  initialResponses={state?.responses || {}}
+                  isExpanded={true}
+                  onToggleExpand={() => setSelectedScaleId(null)}
+                  onResponsesChange={(responses, calculation) =>
+                    handleResponsesChange(scale.id, responses, calculation)
+                  }
+                  onAddToNote={handleAddToNote}
+                  showAddToNote={true}
+                />
               )
             })}
-          </div>
-
-          {/* Expanded scale form */}
-          {selectedScaleId && (
-            <div style={{
-              border: '1px solid var(--border)',
-              borderRadius: '8px',
-              overflow: 'hidden',
-            }}>
-              {displayedScales
-                .filter(scale => scale.id === selectedScaleId)
-                .map(scale => {
-                  const state = scaleStates[scale.id]
-                  return (
-                    <ScaleForm
-                      key={scale.id}
-                      scale={scale}
-                      initialResponses={state?.responses || {}}
-                      isExpanded={true}
-                      onToggleExpand={() => setSelectedScaleId(null)}
-                      onResponsesChange={(responses, calculation) =>
-                        handleResponsesChange(scale.id, responses, calculation)
-                      }
-                      onAddToNote={handleAddToNote}
-                      showAddToNote={true}
-                    />
-                  )
-                })}
-            </div>
-          )}
-        </>
+        </div>
       )}
     </div>
   )

@@ -1075,29 +1075,6 @@ ${noteData.plan || 'Not documented'}
         {/* Exam Tab */}
         {activeTab === 'exam' && (
           <div>
-            {/* Telemedicine Notice */}
-            <div style={{
-              padding: '12px 16px',
-              background: '#F0FDF4',
-              border: '1px solid #BBF7D0',
-              borderRadius: '8px',
-              marginBottom: '16px',
-              display: 'flex',
-              alignItems: 'flex-start',
-              gap: '12px',
-            }}>
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#16A34A" strokeWidth="2">
-                <path d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"/>
-              </svg>
-              <div>
-                <div style={{ fontSize: '13px', fontWeight: 600, color: '#166534', marginBottom: '4px' }}>Telemedicine-Optimized Exam</div>
-                <div style={{ fontSize: '12px', color: '#15803D' }}>
-                  This exam template is designed for video visits. MA assistance is available for exam-driven scales (NIHSS, Modified Ashworth).
-                  Use the free text fields under each section to document observations or dictate findings.
-                </div>
-              </div>
-            </div>
-
             {/* Exam Summary - Dictation/AI */}
             <div style={{
               background: 'var(--bg-white)',
