@@ -54,6 +54,11 @@
   /* Queue pill active state - dark mode */
   --queue-active-bg: var(--primary);
   --queue-active-text: white;
+
+  /* AI Response boxes - dark mode */
+  --ai-response-bg: linear-gradient(135deg, #134E4A 0%, #115E59 100%);
+  --ai-badge-bg: #065F46;
+  --ai-badge-text: #34D399;
 }
 
 * {

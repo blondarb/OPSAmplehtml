@@ -153,15 +153,50 @@ Do NOT use medical jargon. Write as if explaining to the patient directly.`,
       parkinsons: "Parkinson's Disease",
       ms: 'Multiple Sclerosis',
       neuropathy: 'Peripheral Neuropathy',
+      stroke: 'Stroke Prevention',
+      dementia: 'Memory & Dementia Care',
+      vertigo: 'Vertigo & Dizziness',
     }
 
     try {
       const userSettings = getUserSettings()
-      const response = await fetch('/api/ai/ask', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          question: `Create a patient education handout for ${conditionNames[selectedCondition] || selectedCondition}.
+      const patientName = patient ? `${patient.first_name}` : 'Patient'
+
+      // Build the prompt based on whether it's a custom/personalized handout or a standard one
+      let question: string
+      let context: Record<string, string>
+
+      if (selectedCondition === 'custom') {
+        // Personalized handout based on this visit's note
+        question = `Create a personalized patient education handout for ${patientName} based on their visit today.
+
+Use the following information from their clinical note:
+- Chief Complaint: ${noteData.chiefComplaint?.join(', ') || 'Not specified'}
+- Assessment/Diagnosis: ${noteData.assessment || 'Not yet documented'}
+- Treatment Plan: ${noteData.plan || 'Not yet documented'}
+
+Format the handout with these sections:
+1. **Your Visit Summary** - Brief, friendly recap of why they came in and what was found
+2. **Your Diagnosis Explained** - Simple explanation of their condition(s)
+3. **Your Treatment Plan** - What medications/treatments were prescribed and why
+4. **What You Can Do at Home** - Lifestyle tips and self-care specific to their condition
+5. **Warning Signs** - When to call the office or seek emergency care
+6. **Follow-Up** - Reminder about next steps
+
+Write this as if speaking directly to ${patientName}. Use "you" and "your" throughout.
+Keep the language simple and supportive. Avoid medical jargon.
+Make it feel personal and specific to their situation, not generic.`
+
+        context = {
+          patient: patientName,
+          chiefComplaint: noteData.chiefComplaint?.join(', ') || '',
+          assessment: noteData.assessment || '',
+          plan: noteData.plan || '',
+          hpi: noteData.hpi || '',
+        }
+      } else {
+        // Standard condition-based handout
+        question = `Create a patient education handout for ${conditionNames[selectedCondition] || selectedCondition}.
 
 Format the handout with these sections:
 1. **What is ${conditionNames[selectedCondition]}?** - Brief explanation in simple terms
@@ -170,11 +205,20 @@ Format the handout with these sections:
 4. **When to Seek Help** - Warning signs to watch for
 5. **Helpful Tips** - 3-5 practical tips for managing the condition
 
-Use patient-friendly language. Avoid medical jargon. Keep it informative but not overwhelming.`,
-          context: {
-            patient: patient ? `${patient.first_name} ${patient.last_name}` : 'Patient',
-            condition: selectedCondition,
-          },
+Use patient-friendly language. Avoid medical jargon. Keep it informative but not overwhelming.`
+
+        context = {
+          patient: patientName,
+          condition: selectedCondition,
+        }
+      }
+
+      const response = await fetch('/api/ai/ask', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          question,
+          context,
           userSettings,
         }),
       })
@@ -379,12 +423,12 @@ Use patient-friendly language. Avoid medical jargon. Keep it informative but not
 
               {aiResponse && !loading && (
                 <div style={{
-                  background: 'linear-gradient(135deg, #F0FDFA 0%, #ECFDF5 100%)',
+                  background: 'var(--ai-response-bg, linear-gradient(135deg, #F0FDFA 0%, #ECFDF5 100%))',
                   borderLeft: '3px solid var(--primary)',
                   borderRadius: '8px',
                   padding: '16px',
                 }}>
-                  <div style={{ fontSize: '13px', color: 'var(--text-primary)', whiteSpace: 'pre-wrap' }}>
+                  <div style={{ fontSize: '13px', color: 'var(--text-primary)', whiteSpace: 'pre-wrap', lineHeight: 1.6 }}>
                     {aiResponse}
                   </div>
                   <div style={{
@@ -397,11 +441,32 @@ Use patient-friendly language. Avoid medical jargon. Keep it informative but not
                       fontSize: '11px',
                       padding: '2px 8px',
                       borderRadius: '4px',
-                      background: '#D1FAE5',
-                      color: '#059669',
+                      background: 'var(--ai-badge-bg, #D1FAE5)',
+                      color: 'var(--ai-badge-text, #059669)',
                     }}>
                       AI Generated
                     </span>
+                    <button
+                      onClick={() => copyToClipboard(aiResponse)}
+                      style={{
+                        marginLeft: 'auto',
+                        padding: '4px 12px',
+                        fontSize: '12px',
+                        border: '1px solid var(--border)',
+                        borderRadius: '4px',
+                        background: 'var(--bg-white)',
+                        color: 'var(--text-secondary)',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '4px',
+                      }}
+                    >
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/>
+                      </svg>
+                      Copy
+                    </button>
                   </div>
                 </div>
               )}
@@ -474,12 +539,12 @@ Use patient-friendly language. Avoid medical jargon. Keep it informative but not
               {summaryResult && !summaryLoading && (
                 <div style={{
                   marginTop: '16px',
-                  background: 'linear-gradient(135deg, #F0FDFA 0%, #ECFDF5 100%)',
+                  background: 'var(--ai-response-bg, linear-gradient(135deg, #F0FDFA 0%, #ECFDF5 100%))',
                   borderLeft: '3px solid var(--primary)',
                   borderRadius: '8px',
                   padding: '16px',
                 }}>
-                  <div style={{ fontSize: '13px', color: 'var(--text-primary)', whiteSpace: 'pre-wrap' }}>
+                  <div style={{ fontSize: '13px', color: 'var(--text-primary)', whiteSpace: 'pre-wrap', lineHeight: 1.6 }}>
                     {summaryResult}
                   </div>
                   <div style={{
@@ -492,8 +557,8 @@ Use patient-friendly language. Avoid medical jargon. Keep it informative but not
                       fontSize: '11px',
                       padding: '2px 8px',
                       borderRadius: '4px',
-                      background: '#D1FAE5',
-                      color: '#059669',
+                      background: 'var(--ai-badge-bg, #D1FAE5)',
+                      color: 'var(--ai-badge-text, #059669)',
                     }}>
                       AI Generated
                     </span>
@@ -506,6 +571,7 @@ Use patient-friendly language. Avoid medical jargon. Keep it informative but not
                         border: '1px solid var(--border)',
                         borderRadius: '4px',
                         background: 'var(--bg-white)',
+                        color: 'var(--text-secondary)',
                         cursor: 'pointer',
                         display: 'flex',
                         alignItems: 'center',
@@ -527,8 +593,38 @@ Use patient-friendly language. Avoid medical jargon. Keep it informative but not
           {activeTab === 'handout' && (
             <div>
               <p style={{ marginBottom: '16px', color: 'var(--text-secondary)', fontSize: '13px' }}>
-                Create educational handouts for the patient.
+                Create personalized educational handouts based on this visit.
               </p>
+
+              {/* Current Note Context */}
+              {(noteData.chiefComplaint?.length > 0 || noteData.assessment || noteData.plan) && (
+                <div style={{
+                  marginBottom: '16px',
+                  padding: '12px',
+                  background: 'var(--bg-gray)',
+                  borderRadius: '8px',
+                  fontSize: '12px',
+                }}>
+                  <div style={{ fontWeight: 600, color: 'var(--text-primary)', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/>
+                      <polyline points="14 2 14 8 20 8"/>
+                    </svg>
+                    From Current Note
+                  </div>
+                  {noteData.chiefComplaint?.length > 0 && (
+                    <div style={{ color: 'var(--text-secondary)', marginBottom: '4px' }}>
+                      <strong>Chief Complaint:</strong> {noteData.chiefComplaint.join(', ')}
+                    </div>
+                  )}
+                  {noteData.assessment && (
+                    <div style={{ color: 'var(--text-secondary)', marginBottom: '4px' }}>
+                      <strong>Assessment:</strong> {noteData.assessment.substring(0, 100)}{noteData.assessment.length > 100 ? '...' : ''}
+                    </div>
+                  )}
+                </div>
+              )}
+
               <select
                 value={selectedCondition}
                 onChange={(e) => setSelectedCondition(e.target.value)}
@@ -537,11 +633,14 @@ Use patient-friendly language. Avoid medical jargon. Keep it informative but not
                   padding: '12px',
                   border: '1px solid var(--border)',
                   borderRadius: '8px',
-                  marginBottom: '16px',
+                  marginBottom: '12px',
                   fontSize: '14px',
+                  background: 'var(--bg-white)',
+                  color: 'var(--text-primary)',
                 }}
               >
                 <option value="">Select a condition...</option>
+                <option value="custom">Based on this visit (personalized)</option>
                 <option value="migraine">Migraine</option>
                 <option value="tension">Tension Headache</option>
                 <option value="cluster">Cluster Headache</option>
@@ -549,7 +648,17 @@ Use patient-friendly language. Avoid medical jargon. Keep it informative but not
                 <option value="parkinsons">Parkinson Disease</option>
                 <option value="ms">Multiple Sclerosis</option>
                 <option value="neuropathy">Peripheral Neuropathy</option>
+                <option value="stroke">Stroke Prevention</option>
+                <option value="dementia">Memory & Dementia</option>
+                <option value="vertigo">Vertigo & Dizziness</option>
               </select>
+
+              {selectedCondition === 'custom' && (
+                <p style={{ fontSize: '12px', color: 'var(--primary)', marginBottom: '12px', fontStyle: 'italic' }}>
+                  The handout will be personalized using your patient's diagnosis, treatment plan, and medications from this note.
+                </p>
+              )}
+
               <button
                 onClick={generateHandout}
                 disabled={handoutLoading || !selectedCondition}
@@ -565,7 +674,7 @@ Use patient-friendly language. Avoid medical jargon. Keep it informative but not
                   opacity: handoutLoading || !selectedCondition ? 0.7 : 1,
                 }}
               >
-                {handoutLoading ? 'Generating...' : 'Generate Handout'}
+                {handoutLoading ? 'Generating...' : selectedCondition === 'custom' ? 'Generate Personalized Handout' : 'Generate Handout'}
               </button>
 
               {handoutLoading && (
@@ -590,12 +699,12 @@ Use patient-friendly language. Avoid medical jargon. Keep it informative but not
               {handoutResult && !handoutLoading && (
                 <div style={{
                   marginTop: '16px',
-                  background: 'linear-gradient(135deg, #F0FDFA 0%, #ECFDF5 100%)',
+                  background: 'var(--ai-response-bg, linear-gradient(135deg, #F0FDFA 0%, #ECFDF5 100%))',
                   borderLeft: '3px solid var(--primary)',
                   borderRadius: '8px',
                   padding: '16px',
                 }}>
-                  <div style={{ fontSize: '13px', color: 'var(--text-primary)', whiteSpace: 'pre-wrap' }}>
+                  <div style={{ fontSize: '13px', color: 'var(--text-primary)', whiteSpace: 'pre-wrap', lineHeight: 1.6 }}>
                     {handoutResult}
                   </div>
                   <div style={{
@@ -603,13 +712,14 @@ Use patient-friendly language. Avoid medical jargon. Keep it informative but not
                     display: 'flex',
                     alignItems: 'center',
                     gap: '8px',
+                    flexWrap: 'wrap',
                   }}>
                     <span style={{
                       fontSize: '11px',
                       padding: '2px 8px',
                       borderRadius: '4px',
-                      background: '#D1FAE5',
-                      color: '#059669',
+                      background: 'var(--ai-badge-bg, #D1FAE5)',
+                      color: 'var(--ai-badge-text, #059669)',
                     }}>
                       AI Generated
                     </span>
@@ -622,6 +732,7 @@ Use patient-friendly language. Avoid medical jargon. Keep it informative but not
                         border: '1px solid var(--border)',
                         borderRadius: '4px',
                         background: 'var(--bg-white)',
+                        color: 'var(--text-secondary)',
                         cursor: 'pointer',
                         display: 'flex',
                         alignItems: 'center',
@@ -640,6 +751,7 @@ Use patient-friendly language. Avoid medical jargon. Keep it informative but not
                         border: '1px solid var(--border)',
                         borderRadius: '4px',
                         background: 'var(--bg-white)',
+                        color: 'var(--text-secondary)',
                         cursor: 'pointer',
                         display: 'flex',
                         alignItems: 'center',
