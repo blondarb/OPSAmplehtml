@@ -53,12 +53,16 @@ export default function AiDrawer({
   // Separate voice recorder for Chart Prep dictation
   const {
     isRecording: isPrepRecording,
+    isPaused: isPrepPaused,
     isTranscribing: isPrepTranscribing,
     error: prepRecordingError,
     transcribedText: prepTranscribedText,
     recordingDuration: prepRecordingDuration,
     startRecording: startPrepRecording,
+    pauseRecording: pausePrepRecording,
+    resumeRecording: resumePrepRecording,
     stopRecording: stopPrepRecording,
+    restartRecording: restartPrepRecording,
     clearTranscription: clearPrepTranscription,
   } = useVoiceRecorder()
 
@@ -427,48 +431,150 @@ export default function AiDrawer({
                   </span>
                 </div>
 
-                {/* Record button */}
+                {/* Recording controls */}
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <button
-                    onClick={isPrepRecording ? stopPrepRecording : startPrepRecording}
-                    disabled={isPrepTranscribing}
-                    style={{
-                      flex: 1,
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      gap: '8px',
-                      padding: '10px',
-                      borderRadius: '6px',
-                      border: 'none',
-                      background: isPrepRecording ? 'var(--error)' : 'var(--primary)',
-                      color: 'white',
-                      cursor: isPrepTranscribing ? 'wait' : 'pointer',
-                      fontSize: '13px',
-                      fontWeight: 500,
-                    }}
-                  >
-                    {isPrepTranscribing ? (
-                      <>
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ animation: 'spin 1s linear infinite' }}>
-                          <circle cx="12" cy="12" r="10" strokeDasharray="32" strokeDashoffset="12" />
+                  {!isPrepRecording ? (
+                    // Start button
+                    <button
+                      onClick={startPrepRecording}
+                      disabled={isPrepTranscribing}
+                      style={{
+                        flex: 1,
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: '8px',
+                        padding: '10px',
+                        borderRadius: '6px',
+                        border: 'none',
+                        background: isPrepTranscribing ? 'var(--bg-gray)' : 'var(--primary)',
+                        color: isPrepTranscribing ? 'var(--text-muted)' : 'white',
+                        cursor: isPrepTranscribing ? 'wait' : 'pointer',
+                        fontSize: '13px',
+                        fontWeight: 500,
+                      }}
+                    >
+                      {isPrepTranscribing ? (
+                        <>
+                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ animation: 'spin 1s linear infinite' }}>
+                            <circle cx="12" cy="12" r="10" strokeDasharray="32" strokeDashoffset="12" />
+                          </svg>
+                          Transcribing...
+                        </>
+                      ) : (
+                        <>
+                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                            <path d="M12 1a3 3 0 00-3 3v8a3 3 0 006 0V4a3 3 0 00-3-3z"/>
+                          </svg>
+                          Record Note
+                        </>
+                      )}
+                    </button>
+                  ) : (
+                    // Recording controls: timer + pause/resume + stop + restart
+                    <>
+                      {/* Timer display */}
+                      <div style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '6px',
+                        padding: '10px 12px',
+                        background: isPrepPaused ? 'var(--warning)' : 'var(--error)',
+                        borderRadius: '6px',
+                        color: 'white',
+                        fontSize: '13px',
+                        fontWeight: 600,
+                      }}>
+                        <span style={{
+                          width: '8px',
+                          height: '8px',
+                          borderRadius: '50%',
+                          background: 'white',
+                          animation: isPrepPaused ? 'none' : 'pulse 1s infinite',
+                          opacity: isPrepPaused ? 0.5 : 1,
+                        }} />
+                        {formatDuration(prepRecordingDuration)}
+                      </div>
+
+                      {/* Pause/Resume button */}
+                      <button
+                        onClick={isPrepPaused ? resumePrepRecording : pausePrepRecording}
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          width: '36px',
+                          height: '36px',
+                          borderRadius: '6px',
+                          border: 'none',
+                          background: 'var(--bg-gray)',
+                          color: 'var(--text-primary)',
+                          cursor: 'pointer',
+                        }}
+                        title={isPrepPaused ? 'Resume' : 'Pause'}
+                      >
+                        {isPrepPaused ? (
+                          // Play icon
+                          <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                            <polygon points="5 3 19 12 5 21 5 3"/>
+                          </svg>
+                        ) : (
+                          // Pause icon
+                          <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                            <rect x="6" y="4" width="4" height="16"/>
+                            <rect x="14" y="4" width="4" height="16"/>
+                          </svg>
+                        )}
+                      </button>
+
+                      {/* Restart button */}
+                      <button
+                        onClick={restartPrepRecording}
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          width: '36px',
+                          height: '36px',
+                          borderRadius: '6px',
+                          border: 'none',
+                          background: 'var(--bg-gray)',
+                          color: 'var(--text-primary)',
+                          cursor: 'pointer',
+                        }}
+                        title="Restart"
+                      >
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                          <path d="M1 4v6h6"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/>
                         </svg>
-                        Transcribing...
-                      </>
-                    ) : isPrepRecording ? (
-                      <>
-                        <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: 'white', animation: 'pulse 1s infinite' }} />
-                        {formatDuration(prepRecordingDuration)} - Stop
-                      </>
-                    ) : (
-                      <>
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                          <path d="M12 1a3 3 0 00-3 3v8a3 3 0 006 0V4a3 3 0 00-3-3z"/>
+                      </button>
+
+                      {/* Stop button */}
+                      <button
+                        onClick={stopPrepRecording}
+                        style={{
+                          flex: 1,
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          gap: '6px',
+                          padding: '10px',
+                          borderRadius: '6px',
+                          border: 'none',
+                          background: 'var(--primary)',
+                          color: 'white',
+                          cursor: 'pointer',
+                          fontSize: '13px',
+                          fontWeight: 500,
+                        }}
+                      >
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+                          <rect x="4" y="4" width="16" height="16" rx="2"/>
                         </svg>
-                        Record Note
-                      </>
-                    )}
-                  </button>
+                        Done
+                      </button>
+                    </>
+                  )}
                 </div>
 
                 {/* Transcription result */}

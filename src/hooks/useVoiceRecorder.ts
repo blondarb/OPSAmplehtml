@@ -4,18 +4,23 @@ import { useState, useRef, useCallback } from 'react'
 
 interface UseVoiceRecorderResult {
   isRecording: boolean
+  isPaused: boolean
   isTranscribing: boolean
   error: string | null
   transcribedText: string | null
   rawText: string | null
   recordingDuration: number
   startRecording: () => Promise<void>
+  pauseRecording: () => void
+  resumeRecording: () => void
   stopRecording: () => void
+  restartRecording: () => void
   clearTranscription: () => void
 }
 
 export function useVoiceRecorder(): UseVoiceRecorderResult {
   const [isRecording, setIsRecording] = useState(false)
+  const [isPaused, setIsPaused] = useState(false)
   const [isTranscribing, setIsTranscribing] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [transcribedText, setTranscribedText] = useState<string | null>(null)
@@ -26,6 +31,7 @@ export function useVoiceRecorder(): UseVoiceRecorderResult {
   const audioChunksRef = useRef<Blob[]>([])
   const streamRef = useRef<MediaStream | null>(null)
   const timerRef = useRef<NodeJS.Timeout | null>(null)
+  const mimeTypeRef = useRef<string>('')
 
   const clearTranscription = useCallback(() => {
     setTranscribedText(null)
@@ -50,6 +56,7 @@ export function useVoiceRecorder(): UseVoiceRecorderResult {
         : MediaRecorder.isTypeSupported('audio/webm')
         ? 'audio/webm'
         : 'audio/mp4'
+      mimeTypeRef.current = mimeType
 
       const mediaRecorder = new MediaRecorder(stream, { mimeType })
       mediaRecorderRef.current = mediaRecorder
@@ -71,7 +78,7 @@ export function useVoiceRecorder(): UseVoiceRecorderResult {
         }
 
         // Create audio blob
-        const audioBlob = new Blob(audioChunksRef.current, { type: mimeType })
+        const audioBlob = new Blob(audioChunksRef.current, { type: mimeTypeRef.current })
 
         console.log('Recording stopped. Audio chunks:', audioChunksRef.current.length, 'Total size:', audioBlob.size, 'bytes')
 
@@ -91,8 +98,8 @@ export function useVoiceRecorder(): UseVoiceRecorderResult {
         try {
           const formData = new FormData()
           // Convert to a file with proper extension for OpenAI
-          const extension = mimeType.includes('webm') ? 'webm' : 'm4a'
-          const audioFile = new File([audioBlob], `recording.${extension}`, { type: mimeType })
+          const extension = mimeTypeRef.current.includes('webm') ? 'webm' : 'm4a'
+          const audioFile = new File([audioBlob], `recording.${extension}`, { type: mimeTypeRef.current })
           formData.append('audio', audioFile)
 
           const response = await fetch('/api/ai/transcribe', {
@@ -122,6 +129,7 @@ export function useVoiceRecorder(): UseVoiceRecorderResult {
       // Start recording - collect data every 250ms for better capture of short recordings
       mediaRecorder.start(250)
       setIsRecording(true)
+      setIsPaused(false)
       setRecordingDuration(0)
 
       // Start duration timer
@@ -141,6 +149,29 @@ export function useVoiceRecorder(): UseVoiceRecorderResult {
     }
   }, [])
 
+  const pauseRecording = useCallback(() => {
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
+      mediaRecorderRef.current.pause()
+      setIsPaused(true)
+      // Pause the timer
+      if (timerRef.current) {
+        clearInterval(timerRef.current)
+        timerRef.current = null
+      }
+    }
+  }, [])
+
+  const resumeRecording = useCallback(() => {
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'paused') {
+      mediaRecorderRef.current.resume()
+      setIsPaused(false)
+      // Resume the timer
+      timerRef.current = setInterval(() => {
+        setRecordingDuration(prev => prev + 1)
+      }, 1000)
+    }
+  }, [])
+
   const stopRecording = useCallback(() => {
     if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
       // Request any remaining data before stopping
@@ -151,19 +182,48 @@ export function useVoiceRecorder(): UseVoiceRecorderResult {
           mediaRecorderRef.current.stop()
         }
         setIsRecording(false)
+        setIsPaused(false)
       }, 100)
     }
   }, [])
 
+  const restartRecording = useCallback(() => {
+    // Stop current recording without transcribing
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+      // Clear the onstop handler temporarily to prevent transcription
+      const originalOnStop = mediaRecorderRef.current.onstop
+      mediaRecorderRef.current.onstop = () => {
+        streamRef.current?.getTracks().forEach(track => track.stop())
+        if (timerRef.current) {
+          clearInterval(timerRef.current)
+          timerRef.current = null
+        }
+        setIsRecording(false)
+        setIsPaused(false)
+        // Restore and start new recording
+        startRecording()
+      }
+      mediaRecorderRef.current.stop()
+    } else {
+      // Just start fresh
+      audioChunksRef.current = []
+      startRecording()
+    }
+  }, [startRecording])
+
   return {
     isRecording,
+    isPaused,
     isTranscribing,
     error,
     transcribedText,
     rawText,
     recordingDuration,
     startRecording,
+    pauseRecording,
+    resumeRecording,
     stopRecording,
+    restartRecording,
     clearTranscription,
   }
 }
