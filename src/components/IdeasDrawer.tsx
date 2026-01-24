@@ -6,6 +6,7 @@ import { useVoiceRecorder } from '@/hooks/useVoiceRecorder'
 interface IdeasDrawerProps {
   isOpen: boolean
   onClose: () => void
+  initialTab?: 'inspiration' | 'tour' | 'features' | 'workflows' | 'feedback'
 }
 
 // Workflow definitions
@@ -210,8 +211,15 @@ interface FeedbackItem {
   downvotes: string[] // Array of user IDs who downvoted
 }
 
-export default function IdeasDrawer({ isOpen, onClose }: IdeasDrawerProps) {
-  const [activeTab, setActiveTab] = useState<'inspiration' | 'tour' | 'features' | 'workflows' | 'feedback'>('workflows')
+export default function IdeasDrawer({ isOpen, onClose, initialTab }: IdeasDrawerProps) {
+  const [activeTab, setActiveTab] = useState<'inspiration' | 'tour' | 'features' | 'workflows' | 'feedback'>(initialTab || 'workflows')
+
+  // Update active tab when initialTab changes (e.g., when opening from feedback button)
+  useEffect(() => {
+    if (initialTab && isOpen) {
+      setActiveTab(initialTab)
+    }
+  }, [initialTab, isOpen])
   const [tourStep, setTourStep] = useState(0)
   const [selectedWorkflow, setSelectedWorkflow] = useState<string | null>(null)
   const [feedbackText, setFeedbackText] = useState('')

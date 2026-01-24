@@ -121,6 +121,7 @@ export default function ClinicalNote({
   const [notePreviewOpen, setNotePreviewOpen] = useState(false)
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [ideasDrawerOpen, setIdeasDrawerOpen] = useState(false)
+  const [ideasDrawerTab, setIdeasDrawerTab] = useState<'inspiration' | 'tour' | 'features' | 'workflows' | 'feedback'>('workflows')
   const [activeTextField, setActiveTextField] = useState<string | null>(null)
   const [selectedRecommendations, setSelectedRecommendations] = useState<RecommendationItem[]>([])
 
@@ -412,6 +413,10 @@ export default function ClinicalNote({
           openAiDrawer={openAiDrawer}
           openVoiceDrawer={openVoiceDrawer}
           openDotPhrases={openDotPhrases}
+          openFeedback={() => {
+            setIdeasDrawerTab('feedback')
+            setIdeasDrawerOpen(true)
+          }}
           setActiveTextField={setActiveTextField}
           rawDictation={rawDictation}
           updateRawDictation={updateRawDictation}
@@ -518,6 +523,7 @@ export default function ClinicalNote({
       <IdeasDrawer
         isOpen={ideasDrawerOpen}
         onClose={() => setIdeasDrawerOpen(false)}
+        initialTab={ideasDrawerTab}
       />
     </div>
   )

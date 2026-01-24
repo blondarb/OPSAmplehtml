@@ -27,6 +27,7 @@ interface CenterPanelProps {
   openAiDrawer: (tab: string) => void
   openVoiceDrawer?: (tab: string) => void
   openDotPhrases?: (field: string) => void
+  openFeedback?: () => void
   setActiveTextField?: (field: string | null) => void
   rawDictation?: Record<string, Array<{ text: string; timestamp: string }>>
   updateRawDictation?: (field: string, rawText: string) => void
@@ -52,6 +53,7 @@ export default function CenterPanel({
   openAiDrawer,
   openVoiceDrawer,
   openDotPhrases,
+  openFeedback,
   setActiveTextField,
   rawDictation,
   updateRawDictation,
@@ -129,7 +131,6 @@ export default function CenterPanel({
 
   // Toolbar action states
   const [showMoreMenu, setShowMoreMenu] = useState(false)
-  const [isReviewed, setIsReviewed] = useState(false)
   const [copySuccess, setCopySuccess] = useState(false)
   const [pendStatus, setPendStatus] = useState<'idle' | 'pending' | 'saved'>('idle')
   const [showSignModal, setShowSignModal] = useState(false)
@@ -371,11 +372,6 @@ ${noteData.plan || 'Not documented'}
     }, 1000)
   }
 
-  // Toggle reviewed status
-  const handleToggleReviewed = () => {
-    setIsReviewed(!isReviewed)
-  }
-
   return (
     <main className="center-panel">
       {/* Tab Navigation with Action Bar */}
@@ -536,10 +532,10 @@ ${noteData.plan || 'Not documented'}
             )}
           </div>
 
-          {/* Thumbs Up - Review Status */}
+          {/* Thumbs Up - Feedback */}
           <button
-            onClick={handleToggleReviewed}
-            title={isReviewed ? 'Marked as reviewed' : 'Mark as reviewed'}
+            onClick={() => openFeedback?.()}
+            title="Send feedback"
             style={{
               width: '32px',
               height: '32px',
@@ -548,13 +544,13 @@ ${noteData.plan || 'Not documented'}
               justifyContent: 'center',
               borderRadius: '6px',
               border: 'none',
-              background: isReviewed ? '#D1FAE5' : 'transparent',
+              background: 'transparent',
               cursor: 'pointer',
-              color: isReviewed ? '#059669' : 'var(--text-secondary)',
+              color: 'var(--text-secondary)',
               transition: 'all 0.2s',
             }}
           >
-            <svg width="18" height="18" viewBox="0 0 24 24" fill={isReviewed ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="2">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <path d="M14 9V5a3 3 0 00-3-3l-4 9v11h11.28a2 2 0 002-1.7l1.38-9a2 2 0 00-2-2.3zM7 22H4a2 2 0 01-2-2v-7a2 2 0 012-2h3"/>
             </svg>
           </button>
