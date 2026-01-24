@@ -242,12 +242,14 @@ These foundational features are fully implemented.
 
 | Feature | Status | Priority |
 |---------|--------|----------|
-| Settings Drawer | ⏳ PENDING | P1 |
+| Settings Drawer | ✅ COMPLETE | P1 |
 | Call volume/ringtone | ⏳ PENDING | P2 |
-| Dark mode (system preference) | 🔧 PARTIAL | Basic toggle exists |
-| Font size settings | ⏳ PENDING | P2 |
-| AI Custom Instructions (global) | ⏳ PENDING | 🎯 HIGH |
-| AI Custom Instructions (per-section) | ⏳ PENDING | P1 |
+| Dark mode (system preference) | ✅ COMPLETE | Toggle in Settings |
+| Font size settings | ✅ COMPLETE | Small/Medium/Large |
+| AI Custom Instructions (global) | ✅ COMPLETE | P0 |
+| AI Custom Instructions (per-section) | ✅ COMPLETE | P1 |
+| Documentation style preference | ✅ COMPLETE | Concise/Detailed/Narrative |
+| Terminology preference | ✅ COMPLETE | Formal/Standard/Simplified |
 
 ### 3.10 Workflow Documentation
 
@@ -361,9 +363,11 @@ Based on the analysis, here's the recommended implementation order to minimize r
    - Section verification with progress
    - AI suggestion accept/reject
 
-4. **User Settings with AI Instructions**
-   - Personalization is key to adoption
-   - AI custom instructions enable provider preferences
+4. ~~**User Settings with AI Instructions**~~ ✅ COMPLETE
+   - Settings Drawer with AI & Documentation, Appearance, Notifications tabs
+   - Global and per-section AI instructions
+   - Documentation style and terminology preferences
+   - Font size settings
 
 ### Medium-term (Phase 3B)
 
