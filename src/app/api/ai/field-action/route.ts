@@ -22,14 +22,25 @@ const ACTION_PROMPTS: Record<FieldActionType, string> = {
 - Maintaining the original meaning and clinical accuracy
 - Keeping it concise
 
+CRITICAL: Do NOT add any new clinical information, symptoms, findings, or details that are not present in the original text. Only improve the writing quality of what is already stated.
+
 Return ONLY the improved text without any explanations or preamble.`,
 
   expand: `You are a clinical documentation expert. Expand the following clinical text by:
-- Adding relevant clinical details and context
-- Including appropriate medical terminology
-- Elaborating on key findings or symptoms
-- Maintaining clinical accuracy
-- Keeping a professional tone
+- Elaborating on findings or symptoms ALREADY MENTIONED in the text
+- Adding appropriate medical terminology for concepts already present
+- Providing more complete descriptions of what is already stated
+- Structuring the information more thoroughly
+
+CRITICAL SAFETY RULES - YOU MUST FOLLOW THESE:
+1. NEVER invent, fabricate, or hallucinate any new clinical information
+2. NEVER add symptoms, findings, test results, or diagnoses not explicitly mentioned
+3. NEVER assume or infer clinical details that are not stated
+4. ONLY expand on what is ACTUALLY WRITTEN in the original text
+5. If the text mentions "headache", you may describe it more fully, but do NOT add nausea, photophobia, or other symptoms unless they are mentioned
+6. If unsure whether something is implied, DO NOT ADD IT
+
+The expansion should make the existing content more detailed and professional, NOT add new clinical facts.
 
 Return ONLY the expanded text without any explanations or preamble.`,
 
@@ -39,6 +50,8 @@ Return ONLY the expanded text without any explanations or preamble.`,
 - Using concise medical terminology
 - Removing redundancy while preserving meaning
 - Keeping it clear and scannable
+
+CRITICAL: Include ONLY information that is explicitly stated in the original text. Do NOT add any new findings, symptoms, or clinical details during summarization.
 
 Return ONLY the summarized text without any explanations or preamble.`,
 }
@@ -93,13 +106,21 @@ export async function POST(request: Request) {
     const patientContext = context?.patient ? `Patient: ${context.patient}` : ''
     const complaintContext = context?.chiefComplaint ? `Chief Complaint: ${context.chiefComplaint}` : ''
 
+    // Build safety reminder for clinical accuracy
+    const safetyReminder = action === 'expand'
+      ? `\n\nREMINDER: Patient safety is paramount. Hallucinating or fabricating clinical information could lead to medical errors. Only elaborate on information explicitly present in the input text.`
+      : ''
+
     const systemPrompt = `${ACTION_PROMPTS[action]}
 
 ${fieldContext}
 ${patientContext}
 ${complaintContext}
 
-Important: This is for a neurology practice. Ensure the output is appropriate for neurological documentation.`
+Important: This is for a neurology practice. Ensure the output is appropriate for neurological documentation.${safetyReminder}`
+
+    // Use lower temperature for expand to reduce hallucination risk
+    const temperature = action === 'expand' ? 0.3 : 0.5
 
     const completion = await openai.chat.completions.create({
       model: 'gpt-4',
@@ -108,7 +129,7 @@ Important: This is for a neurology practice. Ensure the output is appropriate fo
         { role: 'user', content: text }
       ],
       max_tokens: 1500,
-      temperature: 0.5,
+      temperature,
     })
 
     const result = completion.choices[0]?.message?.content || text
