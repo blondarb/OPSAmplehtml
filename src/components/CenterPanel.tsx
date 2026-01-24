@@ -46,6 +46,13 @@ export default function CenterPanel({
   const [activeTab, setActiveTab] = useState('history')
   const [localActiveField, setLocalActiveField] = useState<string | null>(null)
 
+  // Toolbar action states
+  const [showMoreMenu, setShowMoreMenu] = useState(false)
+  const [isReviewed, setIsReviewed] = useState(false)
+  const [copySuccess, setCopySuccess] = useState(false)
+  const [pendStatus, setPendStatus] = useState<'idle' | 'pending' | 'saved'>('idle')
+  const [showSignModal, setShowSignModal] = useState(false)
+
   // Physical Exam accordion state
   const [openExamAccordions, setOpenExamAccordions] = useState<Record<string, boolean>>({
     generalAppearance: true,
@@ -117,6 +124,51 @@ export default function CenterPanel({
     if (setActiveTextField) setActiveTextField(field)
   }
 
+  // Copy note to clipboard
+  const handleCopyNote = () => {
+    const noteText = `
+PATIENT: ${patient?.first_name || ''} ${patient?.last_name || ''}
+DATE: ${new Date().toLocaleDateString()}
+
+CHIEF COMPLAINT: ${noteData.chiefComplaint?.join(', ') || 'Not specified'}
+
+HISTORY OF PRESENTING ILLNESS:
+${noteData.hpi || 'Not documented'}
+
+REVIEW OF SYSTEMS: ${noteData.ros || 'Not documented'}
+${noteData.rosDetails ? `Details: ${noteData.rosDetails}` : ''}
+
+ALLERGIES: ${noteData.allergies || 'Not documented'}
+${noteData.allergyDetails ? `Details: ${noteData.allergyDetails}` : ''}
+
+ASSESSMENT:
+${noteData.assessment || 'Not documented'}
+
+PLAN:
+${noteData.plan || 'Not documented'}
+`.trim()
+
+    navigator.clipboard.writeText(noteText).then(() => {
+      setCopySuccess(true)
+      setTimeout(() => setCopySuccess(false), 2000)
+    })
+  }
+
+  // Pend (save as draft)
+  const handlePend = () => {
+    setPendStatus('pending')
+    // Simulate saving
+    setTimeout(() => {
+      setPendStatus('saved')
+      setTimeout(() => setPendStatus('idle'), 2000)
+    }, 1000)
+  }
+
+  // Toggle reviewed status
+  const handleToggleReviewed = () => {
+    setIsReviewed(!isReviewed)
+  }
+
   const tabs = [
     { id: 'history', label: 'History' },
     { id: 'imaging', label: 'Imaging/results' },
@@ -142,39 +194,125 @@ export default function CenterPanel({
         </div>
 
         {/* Action Buttons */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', position: 'relative' }}>
           {/* More Options */}
-          <button style={{
-            width: '32px',
-            height: '32px',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            borderRadius: '6px',
-            border: 'none',
-            background: 'transparent',
-            cursor: 'pointer',
-            color: 'var(--text-secondary)',
-          }}>
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-              <circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/><circle cx="5" cy="12" r="2"/>
-            </svg>
-          </button>
+          <div style={{ position: 'relative' }}>
+            <button
+              onClick={() => setShowMoreMenu(!showMoreMenu)}
+              style={{
+                width: '32px',
+                height: '32px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                borderRadius: '6px',
+                border: 'none',
+                background: showMoreMenu ? 'var(--bg-gray)' : 'transparent',
+                cursor: 'pointer',
+                color: 'var(--text-secondary)',
+              }}
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                <circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/><circle cx="5" cy="12" r="2"/>
+              </svg>
+            </button>
+            {showMoreMenu && (
+              <div style={{
+                position: 'absolute',
+                top: '100%',
+                right: 0,
+                marginTop: '4px',
+                background: 'var(--bg-white)',
+                border: '1px solid var(--border)',
+                borderRadius: '8px',
+                boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+                zIndex: 100,
+                minWidth: '160px',
+                overflow: 'hidden',
+              }}>
+                <button
+                  onClick={() => { handleCopyNote(); setShowMoreMenu(false); }}
+                  style={{
+                    width: '100%',
+                    padding: '10px 16px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                    border: 'none',
+                    background: 'transparent',
+                    cursor: 'pointer',
+                    fontSize: '13px',
+                    textAlign: 'left',
+                  }}
+                >
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/>
+                  </svg>
+                  Copy Note
+                </button>
+                <button
+                  onClick={() => { window.print(); setShowMoreMenu(false); }}
+                  style={{
+                    width: '100%',
+                    padding: '10px 16px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                    border: 'none',
+                    background: 'transparent',
+                    cursor: 'pointer',
+                    fontSize: '13px',
+                    textAlign: 'left',
+                  }}
+                >
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 01-2-2v-5a2 2 0 012-2h16a2 2 0 012 2v5a2 2 0 01-2 2h-2"/><rect x="6" y="14" width="12" height="8"/>
+                  </svg>
+                  Print Note
+                </button>
+                <button
+                  onClick={() => { openDotPhrases?.('hpi'); setShowMoreMenu(false); }}
+                  style={{
+                    width: '100%',
+                    padding: '10px 16px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                    border: 'none',
+                    background: 'transparent',
+                    cursor: 'pointer',
+                    fontSize: '13px',
+                    textAlign: 'left',
+                  }}
+                >
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/>
+                  </svg>
+                  Dot Phrases
+                </button>
+              </div>
+            )}
+          </div>
 
-          {/* Thumbs Up */}
-          <button style={{
-            width: '32px',
-            height: '32px',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            borderRadius: '6px',
-            border: 'none',
-            background: 'transparent',
-            cursor: 'pointer',
-            color: 'var(--text-secondary)',
-          }}>
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+          {/* Thumbs Up - Review Status */}
+          <button
+            onClick={handleToggleReviewed}
+            title={isReviewed ? 'Marked as reviewed' : 'Mark as reviewed'}
+            style={{
+              width: '32px',
+              height: '32px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              borderRadius: '6px',
+              border: 'none',
+              background: isReviewed ? '#D1FAE5' : 'transparent',
+              cursor: 'pointer',
+              color: isReviewed ? '#059669' : 'var(--text-secondary)',
+              transition: 'all 0.2s',
+            }}
+          >
+            <svg width="18" height="18" viewBox="0 0 24 24" fill={isReviewed ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="2">
               <path d="M14 9V5a3 3 0 00-3-3l-4 9v11h11.28a2 2 0 002-1.7l1.38-9a2 2 0 00-2-2.3zM7 22H4a2 2 0 01-2-2v-7a2 2 0 012-2h3"/>
             </svg>
           </button>
@@ -222,21 +360,32 @@ export default function CenterPanel({
           </button>
 
           {/* Copy */}
-          <button style={{
-            width: '32px',
-            height: '32px',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            borderRadius: '6px',
-            border: 'none',
-            background: 'transparent',
-            cursor: 'pointer',
-            color: 'var(--text-secondary)',
-          }}>
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/>
-            </svg>
+          <button
+            onClick={handleCopyNote}
+            title={copySuccess ? 'Copied!' : 'Copy note to clipboard'}
+            style={{
+              width: '32px',
+              height: '32px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              borderRadius: '6px',
+              border: 'none',
+              background: copySuccess ? '#D1FAE5' : 'transparent',
+              cursor: 'pointer',
+              color: copySuccess ? '#059669' : 'var(--text-secondary)',
+              transition: 'all 0.2s',
+            }}
+          >
+            {copySuccess ? (
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <polyline points="20 6 9 17 4 12"/>
+              </svg>
+            ) : (
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/>
+              </svg>
+            )}
           </button>
 
           {/* Divider */}
@@ -289,34 +438,188 @@ export default function CenterPanel({
           </button>
 
           {/* Pend Button */}
-          <button style={{
-            padding: '8px 16px',
-            borderRadius: '8px',
-            border: '1px solid var(--border)',
-            background: 'var(--bg-white)',
-            cursor: 'pointer',
-            fontSize: '13px',
-            fontWeight: 500,
-            color: 'var(--text-primary)',
-          }}>
-            Pend
+          <button
+            onClick={handlePend}
+            disabled={pendStatus === 'pending'}
+            style={{
+              padding: '8px 16px',
+              borderRadius: '8px',
+              border: '1px solid var(--border)',
+              background: pendStatus === 'saved' ? '#D1FAE5' : 'var(--bg-white)',
+              cursor: pendStatus === 'pending' ? 'wait' : 'pointer',
+              fontSize: '13px',
+              fontWeight: 500,
+              color: pendStatus === 'saved' ? '#059669' : 'var(--text-primary)',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              transition: 'all 0.2s',
+            }}
+          >
+            {pendStatus === 'pending' && (
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ animation: 'spin 1s linear infinite' }}>
+                <circle cx="12" cy="12" r="10" strokeDasharray="32" strokeDashoffset="32"/>
+              </svg>
+            )}
+            {pendStatus === 'saved' && (
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <polyline points="20 6 9 17 4 12"/>
+              </svg>
+            )}
+            {pendStatus === 'idle' ? 'Pend' : pendStatus === 'pending' ? 'Saving...' : 'Saved'}
           </button>
 
           {/* Sign & Complete Button */}
-          <button style={{
-            padding: '8px 16px',
-            borderRadius: '8px',
-            border: 'none',
-            background: 'var(--primary)',
-            cursor: 'pointer',
-            fontSize: '13px',
-            fontWeight: 500,
-            color: 'white',
-          }}>
+          <button
+            onClick={() => setShowSignModal(true)}
+            style={{
+              padding: '8px 16px',
+              borderRadius: '8px',
+              border: 'none',
+              background: 'var(--primary)',
+              cursor: 'pointer',
+              fontSize: '13px',
+              fontWeight: 500,
+              color: 'white',
+            }}
+          >
             Sign & complete
           </button>
         </div>
       </div>
+
+      {/* Sign & Complete Modal */}
+      {showSignModal && (
+        <>
+          <div
+            onClick={() => setShowSignModal(false)}
+            style={{
+              position: 'fixed',
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              background: 'rgba(0,0,0,0.5)',
+              zIndex: 1000,
+            }}
+          />
+          <div style={{
+            position: 'fixed',
+            top: '50%',
+            left: '50%',
+            transform: 'translate(-50%, -50%)',
+            background: 'var(--bg-white)',
+            borderRadius: '16px',
+            padding: '24px',
+            width: '480px',
+            maxWidth: '90vw',
+            zIndex: 1001,
+            boxShadow: '0 20px 40px rgba(0,0,0,0.2)',
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px' }}>
+              <h3 style={{ fontSize: '18px', fontWeight: 600, margin: 0 }}>Sign & Complete Note</h3>
+              <button
+                onClick={() => setShowSignModal(false)}
+                style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '4px' }}
+              >
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M18 6L6 18M6 6l12 12"/>
+                </svg>
+              </button>
+            </div>
+
+            <div style={{ marginBottom: '20px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '12px', background: 'var(--bg-gray)', borderRadius: '8px', marginBottom: '12px' }}>
+                <div style={{ width: '40px', height: '40px', borderRadius: '50%', background: 'var(--primary)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontWeight: 600 }}>
+                  {patient?.first_name?.[0] || 'P'}{patient?.last_name?.[0] || ''}
+                </div>
+                <div>
+                  <div style={{ fontWeight: 500 }}>{patient?.first_name || 'Patient'} {patient?.last_name || ''}</div>
+                  <div style={{ fontSize: '13px', color: 'var(--text-muted)' }}>DOB: {patient?.date_of_birth || 'N/A'}</div>
+                </div>
+              </div>
+
+              <div style={{ padding: '16px', border: '1px solid var(--border)', borderRadius: '8px' }}>
+                <h4 style={{ fontSize: '14px', fontWeight: 600, marginBottom: '12px' }}>Verification Checklist</h4>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  {[
+                    { label: 'Chief complaint documented', check: !!noteData.chiefComplaint?.length },
+                    { label: 'HPI completed (min. 25 words)', check: (noteData.hpi?.split(' ').length || 0) >= 25 },
+                    { label: 'Review of systems documented', check: !!noteData.ros },
+                    { label: 'Allergies documented', check: !!noteData.allergies },
+                    { label: 'Assessment completed', check: !!noteData.assessment },
+                  ].map((item, i) => (
+                    <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <div style={{
+                        width: '20px',
+                        height: '20px',
+                        borderRadius: '50%',
+                        background: item.check ? '#D1FAE5' : '#FEE2E2',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                      }}>
+                        {item.check ? (
+                          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#059669" strokeWidth="3">
+                            <polyline points="20 6 9 17 4 12"/>
+                          </svg>
+                        ) : (
+                          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#EF4444" strokeWidth="3">
+                            <path d="M18 6L6 18M6 6l12 12"/>
+                          </svg>
+                        )}
+                      </div>
+                      <span style={{ fontSize: '13px', color: item.check ? 'var(--text-primary)' : 'var(--text-muted)' }}>{item.label}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end' }}>
+              <button
+                onClick={() => setShowSignModal(false)}
+                style={{
+                  padding: '10px 20px',
+                  borderRadius: '8px',
+                  border: '1px solid var(--border)',
+                  background: 'var(--bg-white)',
+                  cursor: 'pointer',
+                  fontSize: '14px',
+                  fontWeight: 500,
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => {
+                  // In a real app, this would submit to the backend
+                  alert('Note signed and completed!')
+                  setShowSignModal(false)
+                }}
+                style={{
+                  padding: '10px 20px',
+                  borderRadius: '8px',
+                  border: 'none',
+                  background: 'var(--primary)',
+                  color: 'white',
+                  cursor: 'pointer',
+                  fontSize: '14px',
+                  fontWeight: 500,
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                }}
+              >
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M20 6L9 17l-5-5"/>
+                </svg>
+                Sign & Complete
+              </button>
+            </div>
+          </div>
+        </>
+      )}
 
       {/* Tab Content */}
       <div className="tab-content" style={{ position: 'relative' }}>

@@ -26,6 +26,10 @@ export default function AiDrawer({
   const [loading, setLoading] = useState(false)
   const [summaryLevel, setSummaryLevel] = useState('Standard')
   const [selectedCondition, setSelectedCondition] = useState('')
+  const [summaryResult, setSummaryResult] = useState('')
+  const [handoutResult, setHandoutResult] = useState('')
+  const [summaryLoading, setSummaryLoading] = useState(false)
+  const [handoutLoading, setHandoutLoading] = useState(false)
 
   const tabs = [
     { id: 'ask-ai', label: 'Ask AI' },
@@ -65,6 +69,107 @@ export default function AiDrawer({
     }
 
     setLoading(false)
+  }
+
+  const generateSummary = async () => {
+    setSummaryLoading(true)
+    setSummaryResult('')
+
+    try {
+      const levelInstructions = {
+        'Simple': 'Use simple language a 5th grader could understand. Keep it to 2-3 sentences.',
+        'Standard': 'Use patient-friendly language. Keep it to a short paragraph.',
+        'Detailed': 'Provide a comprehensive summary with all relevant details, but still in patient-friendly language.',
+      }
+
+      const response = await fetch('/api/ai/ask', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          question: `Generate a ${summaryLevel.toLowerCase()} patient-friendly summary of this visit. ${levelInstructions[summaryLevel as keyof typeof levelInstructions]}
+
+Include:
+- Why they came in (chief complaint)
+- What was found
+- What the plan is
+
+Do NOT use medical jargon. Write as if explaining to the patient directly.`,
+          context: {
+            patient: patient ? `${patient.first_name} ${patient.last_name}` : 'The patient',
+            chiefComplaint: noteData.chiefComplaint?.join(', ') || 'General consultation',
+            hpi: noteData.hpi || '',
+            assessment: noteData.assessment || '',
+            plan: noteData.plan || '',
+          },
+        }),
+      })
+
+      const data = await response.json()
+      if (data.error) {
+        setSummaryResult(`Error: ${data.error}`)
+      } else {
+        setSummaryResult(data.response)
+      }
+    } catch (error) {
+      setSummaryResult('Error connecting to AI service. Please check your API key configuration.')
+    }
+
+    setSummaryLoading(false)
+  }
+
+  const generateHandout = async () => {
+    if (!selectedCondition) return
+
+    setHandoutLoading(true)
+    setHandoutResult('')
+
+    const conditionNames: Record<string, string> = {
+      migraine: 'Migraine',
+      tension: 'Tension-Type Headache',
+      cluster: 'Cluster Headache',
+      epilepsy: 'Epilepsy',
+      parkinsons: "Parkinson's Disease",
+      ms: 'Multiple Sclerosis',
+      neuropathy: 'Peripheral Neuropathy',
+    }
+
+    try {
+      const response = await fetch('/api/ai/ask', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          question: `Create a patient education handout for ${conditionNames[selectedCondition] || selectedCondition}.
+
+Format the handout with these sections:
+1. **What is ${conditionNames[selectedCondition]}?** - Brief explanation in simple terms
+2. **Common Symptoms** - Bullet list of key symptoms
+3. **Treatment Options** - Overview of medications and lifestyle changes
+4. **When to Seek Help** - Warning signs to watch for
+5. **Helpful Tips** - 3-5 practical tips for managing the condition
+
+Use patient-friendly language. Avoid medical jargon. Keep it informative but not overwhelming.`,
+          context: {
+            patient: patient ? `${patient.first_name} ${patient.last_name}` : 'Patient',
+            condition: selectedCondition,
+          },
+        }),
+      })
+
+      const data = await response.json()
+      if (data.error) {
+        setHandoutResult(`Error: ${data.error}`)
+      } else {
+        setHandoutResult(data.response)
+      }
+    } catch (error) {
+      setHandoutResult('Error connecting to AI service. Please check your API key configuration.')
+    }
+
+    setHandoutLoading(false)
+  }
+
+  const copyToClipboard = (text: string) => {
+    navigator.clipboard.writeText(text)
   }
 
   if (!isOpen) return null
@@ -306,6 +411,8 @@ export default function AiDrawer({
                 ))}
               </div>
               <button
+                onClick={generateSummary}
+                disabled={summaryLoading}
                 style={{
                   width: '100%',
                   padding: '12px',
@@ -315,10 +422,80 @@ export default function AiDrawer({
                   borderRadius: '8px',
                   fontWeight: 500,
                   cursor: 'pointer',
+                  opacity: summaryLoading ? 0.7 : 1,
                 }}
               >
-                Generate Patient Summary
+                {summaryLoading ? 'Generating...' : 'Generate Patient Summary'}
               </button>
+
+              {summaryLoading && (
+                <div style={{
+                  marginTop: '16px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  padding: '16px',
+                  background: 'var(--bg-gray)',
+                  borderRadius: '8px',
+                }}>
+                  <div style={{ display: 'flex', gap: '4px' }}>
+                    <span style={{ animation: 'pulse 1s infinite' }}>.</span>
+                    <span style={{ animation: 'pulse 1s infinite 0.2s' }}>.</span>
+                    <span style={{ animation: 'pulse 1s infinite 0.4s' }}>.</span>
+                  </div>
+                  <span style={{ color: 'var(--text-muted)', fontSize: '13px' }}>Creating summary...</span>
+                </div>
+              )}
+
+              {summaryResult && !summaryLoading && (
+                <div style={{
+                  marginTop: '16px',
+                  background: 'linear-gradient(135deg, #F0FDFA 0%, #ECFDF5 100%)',
+                  borderLeft: '3px solid var(--primary)',
+                  borderRadius: '8px',
+                  padding: '16px',
+                }}>
+                  <div style={{ fontSize: '13px', color: 'var(--text-primary)', whiteSpace: 'pre-wrap' }}>
+                    {summaryResult}
+                  </div>
+                  <div style={{
+                    marginTop: '12px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                  }}>
+                    <span style={{
+                      fontSize: '11px',
+                      padding: '2px 8px',
+                      borderRadius: '4px',
+                      background: '#D1FAE5',
+                      color: '#059669',
+                    }}>
+                      AI Generated
+                    </span>
+                    <button
+                      onClick={() => copyToClipboard(summaryResult)}
+                      style={{
+                        marginLeft: 'auto',
+                        padding: '4px 12px',
+                        fontSize: '12px',
+                        border: '1px solid var(--border)',
+                        borderRadius: '4px',
+                        background: 'var(--bg-white)',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '4px',
+                      }}
+                    >
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/>
+                      </svg>
+                      Copy
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           )}
 
@@ -350,6 +527,8 @@ export default function AiDrawer({
                 <option value="neuropathy">Peripheral Neuropathy</option>
               </select>
               <button
+                onClick={generateHandout}
+                disabled={handoutLoading || !selectedCondition}
                 style={{
                   width: '100%',
                   padding: '12px',
@@ -359,10 +538,99 @@ export default function AiDrawer({
                   borderRadius: '8px',
                   fontWeight: 500,
                   cursor: 'pointer',
+                  opacity: handoutLoading || !selectedCondition ? 0.7 : 1,
                 }}
               >
-                Generate Handout
+                {handoutLoading ? 'Generating...' : 'Generate Handout'}
               </button>
+
+              {handoutLoading && (
+                <div style={{
+                  marginTop: '16px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  padding: '16px',
+                  background: 'var(--bg-gray)',
+                  borderRadius: '8px',
+                }}>
+                  <div style={{ display: 'flex', gap: '4px' }}>
+                    <span style={{ animation: 'pulse 1s infinite' }}>.</span>
+                    <span style={{ animation: 'pulse 1s infinite 0.2s' }}>.</span>
+                    <span style={{ animation: 'pulse 1s infinite 0.4s' }}>.</span>
+                  </div>
+                  <span style={{ color: 'var(--text-muted)', fontSize: '13px' }}>Creating handout...</span>
+                </div>
+              )}
+
+              {handoutResult && !handoutLoading && (
+                <div style={{
+                  marginTop: '16px',
+                  background: 'linear-gradient(135deg, #F0FDFA 0%, #ECFDF5 100%)',
+                  borderLeft: '3px solid var(--primary)',
+                  borderRadius: '8px',
+                  padding: '16px',
+                }}>
+                  <div style={{ fontSize: '13px', color: 'var(--text-primary)', whiteSpace: 'pre-wrap' }}>
+                    {handoutResult}
+                  </div>
+                  <div style={{
+                    marginTop: '12px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                  }}>
+                    <span style={{
+                      fontSize: '11px',
+                      padding: '2px 8px',
+                      borderRadius: '4px',
+                      background: '#D1FAE5',
+                      color: '#059669',
+                    }}>
+                      AI Generated
+                    </span>
+                    <button
+                      onClick={() => copyToClipboard(handoutResult)}
+                      style={{
+                        marginLeft: 'auto',
+                        padding: '4px 12px',
+                        fontSize: '12px',
+                        border: '1px solid var(--border)',
+                        borderRadius: '4px',
+                        background: 'var(--bg-white)',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '4px',
+                      }}
+                    >
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/>
+                      </svg>
+                      Copy
+                    </button>
+                    <button
+                      style={{
+                        padding: '4px 12px',
+                        fontSize: '12px',
+                        border: '1px solid var(--border)',
+                        borderRadius: '4px',
+                        background: 'var(--bg-white)',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '4px',
+                      }}
+                      onClick={() => window.print()}
+                    >
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 01-2-2v-5a2 2 0 012-2h16a2 2 0 012 2v5a2 2 0 01-2 2h-2"/><rect x="6" y="14" width="12" height="8"/>
+                      </svg>
+                      Print
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </div>
