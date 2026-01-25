@@ -25,6 +25,22 @@ interface SmartScalesSectionProps {
   visitId?: string
   onAddToNote?: (field: string, text: string) => void
   onScaleComplete?: (scaleId: string, result: ScoreCalculation) => void
+  // Clinical text for AI autofill (from HPI, notes, dictation)
+  clinicalText?: string
+  patientContext?: {
+    age?: number
+    sex?: string
+    diagnoses?: string[]
+    medications?: string[]
+    medicalHistory?: string[]
+    allergies?: string[]
+    vitalSigns?: {
+      bloodPressure?: string
+      heartRate?: number
+      weight?: number
+      height?: number
+    }
+  }
 }
 
 interface ScaleState {
@@ -41,6 +57,8 @@ export default function SmartScalesSection({
   visitId,
   onAddToNote,
   onScaleComplete,
+  clinicalText,
+  patientContext,
 }: SmartScalesSectionProps) {
   // Track expanded state and responses for each scale
   const [scaleStates, setScaleStates] = useState<Record<string, ScaleState>>({})
@@ -385,6 +403,9 @@ export default function SmartScalesSection({
               }
               onAddToNote={handleAddToNote}
               showAddToNote={true}
+              clinicalText={clinicalText}
+              patientContext={patientContext}
+              showAiAutofill={true}
             />
           </div>
         )

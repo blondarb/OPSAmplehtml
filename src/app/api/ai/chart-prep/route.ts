@@ -165,13 +165,14 @@ IMPORTANT: Return ONLY valid JSON, no markdown formatting.
 }${userPreferences}`
 
     const completion = await openai.chat.completions.create({
-      model: 'gpt-4',
+      model: 'gpt-4o-mini', // Cost-effective for summarization ($0.15/$0.60 per 1M tokens)
       messages: [
         { role: 'system', content: systemPrompt },
         { role: 'user', content: 'Generate the structured chart prep JSON for this patient visit.' }
       ],
       max_tokens: 2000,
       temperature: 0.4,
+      response_format: { type: 'json_object' },
     })
 
     const responseText = completion.choices[0]?.message?.content || ''

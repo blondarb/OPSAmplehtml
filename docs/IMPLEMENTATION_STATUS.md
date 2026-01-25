@@ -1,6 +1,6 @@
 # Implementation Status - Sevaro Clinical
 
-**Last Updated:** January 24, 2026 (Responsive Design & Dark Mode)
+**Last Updated:** January 25, 2026 (OpenAI Model Optimization)
 **Based on:** PRD_AI_Scribe.md v1.4, Sevaro_Outpatient_MVP_PRD_v1.4, PRD_Roadmap_Phase3.md
 
 ---
@@ -35,15 +35,113 @@ This document tracks implementation progress against the product requirements an
 **Newly Completed:**
 - ✅ **Pre-built Dot Phrases** - 70+ neurology phrases seeded (exams, assessments, plans per condition)
 - ✅ **Workflow Documentation** - Quick selection guide, scenario recommendations, step-by-step guides
+- ✅ **Additional Clinical Scales** - UPDRS Motor (Parkinson's), Hoehn & Yahr staging, EDSS (MS), CHA₂DS₂-VASc (stroke risk)
+- ✅ **AI Scale Autofill** - Extracts scale data from clinical notes/dictation with confidence scoring
 
 **Remaining (Lower Priority):**
-- Additional clinical scales (UPDRS, Hoehn & Yahr, EDSS, CHA₂DS₂-VASc)
 - Patient education enhancements (reading level, language selection)
 - Audio routing improvements for Visit AI
 
 ---
 
-## Recent Updates (January 24, 2026)
+## Recent Updates (January 25, 2026)
+
+### OpenAI Model Optimization - NEW
+Optimized all AI API endpoints for best cost/performance:
+
+**Simple Tasks (gpt-4o-mini - $0.15/$0.60 per 1M tokens):**
+- `/api/ai/ask` - General Q&A
+- `/api/ai/chart-prep` - Summarization
+- `/api/ai/transcribe` - Text cleanup
+- `/api/ai/field-action` - Improve/Expand/Summarize
+
+**Complex Tasks (gpt-5 - $1.25/$10 per 1M tokens):**
+- `/api/ai/visit-ai` - Clinical extraction from visit transcripts
+- `/api/ai/scale-autofill` - Scale data extraction from patient data
+- `/api/ai/synthesize-note` - Note synthesis and merging
+
+**Cost Savings:**
+- Simple tasks: ~93% cheaper than previous gpt-4
+- Complex tasks: ~50% cheaper input vs gpt-4o, better reasoning with GPT-5
+
+---
+
+## Previous Updates (January 24, 2026)
+
+### Additional Clinical Scales
+Added four new clinical assessment scales with full diagnosis linkage:
+
+**Exam-Driven Scales (Physical Exams tab):**
+- **UPDRS Motor (Part III)** - 33-item Unified Parkinson's Disease Rating Scale motor examination
+  - Comprehensive motor assessment: speech, facial expression, rigidity (5 locations), finger tapping, hand movements, leg agility, gait, postural stability, tremor
+  - Scoring ranges: Minimal (0-10), Mild (11-25), Moderate (26-50), Moderately Severe (51-80), Severe (81-132)
+  - Alerts for postural instability and severe freezing of gait
+- **Hoehn & Yahr** - Parkinson's disease staging scale (0-5)
+  - Stages from no signs to wheelchair/bedridden
+  - Captures side initially affected and predominant symptoms (tremor-dominant vs PIGD)
+- **EDSS** - Expanded Disability Status Scale for MS (0-10)
+  - Functional system scores: pyramidal, cerebellar, brainstem, sensory, bowel/bladder, visual, cerebral
+  - Ambulation scoring integrated
+  - Alerts for rapid progression and severe disability
+
+**History-Driven Scales (History tab):**
+- **CHA₂DS₂-VASc** - Stroke risk in atrial fibrillation (0-9)
+  - Calculates stroke risk for anticoagulation decisions
+  - Factors: CHF, hypertension, age, diabetes, stroke history, vascular disease, sex
+  - Annual stroke risk percentages per score
+
+**Diagnosis-Scale Linkages Added:**
+- Parkinson disease → UPDRS Motor, Hoehn & Yahr, MoCA, PHQ-9, ESS
+- Parkinsonism, PSP, MSA → Hoehn & Yahr, MoCA
+- Multiple sclerosis, MS follow-up, MS relapse → EDSS, PHQ-9, MoCA
+- Neuromyelitis optica, CIS → EDSS, PHQ-9
+- Atrial fibrillation, atrial flutter → CHA₂DS₂-VASc
+- Cardioembolic stroke, cryptogenic stroke → CHA₂DS₂-VASc, NIHSS, MoCA
+- Post-stroke spasticity → Modified Ashworth, NIHSS, MoCA
+
+### AI Scale Autofill - NEW
+Intelligent data extraction from ALL patient data sources to pre-populate scale responses:
+
+**API Endpoint:** `/api/ai/scale-autofill`
+- Uses **GPT-5** (latest model) with very low temperature (0.1) for consistent extraction
+- Analyzes ALL available patient data:
+  - **Demographics**: Age, sex (used directly for scales like CHA₂DS₂-VASc)
+  - **Vital Signs**: Blood pressure (flags hypertension automatically)
+  - **Diagnoses**: Checks for CHF, diabetes, stroke/TIA, vascular disease, AFib
+  - **Medications**: Infers conditions from med list (diabetes meds → diabetes, etc.)
+  - **Medical History**: Full history content
+  - **Clinical Text**: HPI, exam notes, dictation
+- Conservative approach: only extracts explicitly stated information
+- Never hallucinates or guesses missing data
+
+**Intelligent Condition Detection:**
+- Automatically flags age thresholds (≥65, ≥75) relevant for stroke risk
+- Parses blood pressure to detect hypertension (≥140/90)
+- Recognizes medications that imply conditions:
+  - Diabetes meds (metformin, insulin, etc.) → diabetes
+  - Antihypertensives → hypertension
+  - Anticoagulants → notes anticoagulation status
+  - Parkinson's meds → movement disorder
+
+**Features:**
+- **Confidence Scoring** - Each extracted answer marked as high/medium/low confidence
+- **Reasoning Display** - Shows AI's justification citing data source (demographics/vitals/diagnoses/meds/text)
+- **Missing Info Detection** - Lists questions that couldn't be answered from ANY source
+- **Suggested Prompts** - AI-generated questions to ask patient for missing data
+- **Visual Feedback** - AI-filled fields highlighted with teal background
+- **Validation** - Ensures extracted values match scale question types and valid options
+
+**UI Integration:**
+- "AI Auto-fill from Notes" button in ScaleForm when clinical text available
+- Disabled state when no clinical text to analyze
+- Expandable details showing confidence breakdown
+- Works in both ExamScalesSection and SmartScalesSection
+
+**Safety:**
+- Demographics used with HIGH confidence for age/sex questions
+- Diagnoses list = HIGH confidence, medication-implied = MEDIUM confidence
+- Conservative option selection when ambiguous in clinical text
+- Respects examiner documentation for physical findings
 
 ### Responsive/Mobile Design - NEW
 - **Viewport Meta Tag** - Added to layout.tsx for proper mobile scaling

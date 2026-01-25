@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useCallback } from 'react'
 import {
   ScaleDefinition,
   ScaleResponses,
@@ -9,6 +9,14 @@ import {
   QuestionOption,
 } from '@/lib/scales/types'
 import { calculateScore, getSeverityColor } from '@/lib/scales/scoring-engine'
+
+interface AutofillResult {
+  responses: Record<string, number | boolean | string>
+  confidence: Record<string, 'high' | 'medium' | 'low'>
+  reasoning: Record<string, string>
+  missingInfo: string[]
+  suggestedPrompts: string[]
+}
 
 interface ScaleFormProps {
   scale: ScaleDefinition
@@ -19,6 +27,23 @@ interface ScaleFormProps {
   onToggleExpand?: () => void
   showAddToNote?: boolean
   onAddToNote?: (text: string) => void
+  // AI Autofill props
+  clinicalText?: string  // Text from HPI, exam notes, or dictation to analyze
+  patientContext?: {
+    age?: number
+    sex?: string
+    diagnoses?: string[]
+    medications?: string[]
+    medicalHistory?: string[]
+    allergies?: string[]
+    vitalSigns?: {
+      bloodPressure?: string
+      heartRate?: number
+      weight?: number
+      height?: number
+    }
+  }
+  showAiAutofill?: boolean
 }
 
 export default function ScaleForm({
@@ -30,9 +55,16 @@ export default function ScaleForm({
   onToggleExpand,
   showAddToNote = true,
   onAddToNote,
+  clinicalText,
+  patientContext,
+  showAiAutofill = true,
 }: ScaleFormProps) {
   const [responses, setResponses] = useState<ScaleResponses>(initialResponses)
   const [hasInteracted, setHasInteracted] = useState(false)
+  const [isAutofilling, setIsAutofilling] = useState(false)
+  const [autofillResult, setAutofillResult] = useState<AutofillResult | null>(null)
+  const [autofillError, setAutofillError] = useState<string | null>(null)
+  const [showAutofillDetails, setShowAutofillDetails] = useState(false)
 
   // Calculate score whenever responses change
   const calculation = useMemo(() => {
@@ -54,6 +86,66 @@ export default function ScaleForm({
     }))
   }
 
+  // AI Autofill function
+  const handleAiAutofill = useCallback(async () => {
+    if (!clinicalText || clinicalText.trim().length === 0) {
+      setAutofillError('No clinical text available to analyze. Please enter notes or record dictation first.')
+      return
+    }
+
+    setIsAutofilling(true)
+    setAutofillError(null)
+    setAutofillResult(null)
+
+    try {
+      const response = await fetch('/api/ai/scale-autofill', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          scaleId: scale.id,
+          clinicalText,
+          patientContext,
+        }),
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.error || 'Failed to autofill scale')
+      }
+
+      const data = await response.json()
+
+      // Store the autofill result for display
+      setAutofillResult({
+        responses: data.responses,
+        confidence: data.confidence,
+        reasoning: data.reasoning,
+        missingInfo: data.missingInfo || [],
+        suggestedPrompts: data.suggestedPrompts || [],
+      })
+
+      // Apply the autofilled responses
+      if (data.responses && Object.keys(data.responses).length > 0) {
+        setHasInteracted(true)
+        setResponses(prev => ({
+          ...prev,
+          ...data.responses,
+        }))
+      }
+
+      // Show details if there's missing info
+      if (data.missingInfo?.length > 0 || data.suggestedPrompts?.length > 0) {
+        setShowAutofillDetails(true)
+      }
+
+    } catch (error: any) {
+      console.error('AI Autofill error:', error)
+      setAutofillError(error.message || 'Failed to autofill scale data')
+    } finally {
+      setIsAutofilling(false)
+    }
+  }, [scale.id, clinicalText, patientContext])
+
   const handleAddToNote = () => {
     if (onAddToNote && calculation.isComplete) {
       const date = new Date().toLocaleDateString('en-US', {
@@ -72,12 +164,35 @@ export default function ScaleForm({
 
   const renderQuestion = (question: ScaleQuestion, index: number) => {
     const value = responses[question.id]
+    const aiConfidence = autofillResult?.confidence[question.id]
+    const aiReasoning = autofillResult?.reasoning[question.id]
+    const wasAiFilled = autofillResult?.responses[question.id] !== undefined
+
+    // Confidence indicator style
+    const confidenceStyle = aiConfidence ? {
+      display: 'inline-flex',
+      alignItems: 'center',
+      gap: '4px',
+      marginLeft: '8px',
+      padding: '2px 6px',
+      borderRadius: '4px',
+      fontSize: '10px',
+      fontWeight: 500,
+      background: aiConfidence === 'high' ? '#D1FAE5' : aiConfidence === 'medium' ? '#FEF3C7' : '#FEE2E2',
+      color: aiConfidence === 'high' ? '#065F46' : aiConfidence === 'medium' ? '#92400E' : '#991B1B',
+    } : undefined
 
     switch (question.type) {
       case 'select':
       case 'radio':
         return (
-          <div key={question.id} style={{ marginBottom: '16px' }}>
+          <div key={question.id} style={{
+            marginBottom: '16px',
+            padding: wasAiFilled ? '8px' : undefined,
+            background: wasAiFilled ? 'rgba(13, 148, 136, 0.05)' : undefined,
+            borderRadius: wasAiFilled ? '8px' : undefined,
+            border: wasAiFilled ? '1px solid rgba(13, 148, 136, 0.2)' : undefined,
+          }}>
             <div style={{
               display: 'flex',
               alignItems: 'flex-start',
@@ -94,6 +209,14 @@ export default function ScaleForm({
               <span style={{ fontSize: '13px', color: 'var(--text-primary)', flex: 1 }}>
                 {question.text}
                 {question.required && <span style={{ color: 'var(--danger)', marginLeft: '4px' }}>*</span>}
+                {aiConfidence && (
+                  <span style={confidenceStyle} title={aiReasoning || 'AI extracted'}>
+                    <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <path d="M12 2L2 7l10 5 10-5-10-5z" />
+                    </svg>
+                    AI {aiConfidence}
+                  </span>
+                )}
               </span>
             </div>
             <div style={{ marginLeft: '28px' }}>
@@ -370,6 +493,163 @@ export default function ScaleForm({
                 </span>
               )}
             </p>
+          )}
+
+          {/* AI Autofill Section */}
+          {showAiAutofill && (
+            <div style={{ marginBottom: '16px' }}>
+              <button
+                onClick={handleAiAutofill}
+                disabled={isAutofilling || !clinicalText}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '8px',
+                  width: '100%',
+                  padding: '10px 16px',
+                  background: isAutofilling ? 'var(--bg-dark)' : clinicalText ? 'linear-gradient(135deg, #0D9488, #14B8A6)' : 'var(--bg-dark)',
+                  color: clinicalText ? 'white' : 'var(--text-muted)',
+                  border: '1px solid var(--border)',
+                  borderRadius: '8px',
+                  fontSize: '13px',
+                  fontWeight: 500,
+                  cursor: isAutofilling || !clinicalText ? 'not-allowed' : 'pointer',
+                  opacity: isAutofilling ? 0.7 : 1,
+                  transition: 'all 0.2s',
+                }}
+              >
+                {isAutofilling ? (
+                  <>
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ animation: 'spin 1s linear infinite' }}>
+                      <circle cx="12" cy="12" r="10" strokeDasharray="32" strokeDashoffset="12" />
+                    </svg>
+                    Analyzing clinical text...
+                  </>
+                ) : (
+                  <>
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <path d="M12 2L2 7l10 5 10-5-10-5z" />
+                      <path d="M2 17l10 5 10-5" />
+                      <path d="M2 12l10 5 10-5" />
+                    </svg>
+                    AI Auto-fill from Notes
+                  </>
+                )}
+              </button>
+
+              {!clinicalText && (
+                <p style={{
+                  fontSize: '11px',
+                  color: 'var(--text-muted)',
+                  marginTop: '6px',
+                  textAlign: 'center',
+                  fontStyle: 'italic',
+                }}>
+                  Enter notes or record dictation to enable AI auto-fill
+                </p>
+              )}
+
+              {/* Autofill Error */}
+              {autofillError && (
+                <div style={{
+                  marginTop: '8px',
+                  padding: '10px 12px',
+                  background: '#FEE2E2',
+                  border: '1px solid #FCA5A5',
+                  borderRadius: '6px',
+                  fontSize: '12px',
+                  color: '#DC2626',
+                }}>
+                  {autofillError}
+                </div>
+              )}
+
+              {/* Autofill Result Details */}
+              {autofillResult && (
+                <div style={{
+                  marginTop: '8px',
+                  padding: '12px',
+                  background: '#F0FDFA',
+                  border: '1px solid #99F6E4',
+                  borderRadius: '8px',
+                }}>
+                  <div style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    marginBottom: '8px',
+                  }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#0D9488" strokeWidth="2">
+                        <polyline points="20 6 9 17 4 12" />
+                      </svg>
+                      <span style={{ fontSize: '12px', fontWeight: 600, color: '#0D9488' }}>
+                        AI filled {Object.keys(autofillResult.responses).length} of {scale.questions.length} fields
+                      </span>
+                    </div>
+                    <button
+                      onClick={() => setShowAutofillDetails(!showAutofillDetails)}
+                      style={{
+                        background: 'transparent',
+                        border: 'none',
+                        fontSize: '11px',
+                        color: 'var(--primary)',
+                        cursor: 'pointer',
+                        textDecoration: 'underline',
+                      }}
+                    >
+                      {showAutofillDetails ? 'Hide details' : 'Show details'}
+                    </button>
+                  </div>
+
+                  {showAutofillDetails && (
+                    <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>
+                      {/* Confidence breakdown */}
+                      <div style={{ marginBottom: '8px' }}>
+                        <strong>Confidence:</strong>
+                        <div style={{ display: 'flex', gap: '8px', marginTop: '4px', flexWrap: 'wrap' }}>
+                          {Object.entries(autofillResult.confidence).map(([qId, conf]) => (
+                            <span key={qId} style={{
+                              padding: '2px 6px',
+                              borderRadius: '4px',
+                              background: conf === 'high' ? '#D1FAE5' : conf === 'medium' ? '#FEF3C7' : '#FEE2E2',
+                              color: conf === 'high' ? '#065F46' : conf === 'medium' ? '#92400E' : '#991B1B',
+                            }}>
+                              {qId}: {conf}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+
+                      {/* Missing information */}
+                      {autofillResult.missingInfo.length > 0 && (
+                        <div style={{ marginBottom: '8px' }}>
+                          <strong style={{ color: '#F59E0B' }}>Missing information:</strong>
+                          <ul style={{ margin: '4px 0 0 0', paddingLeft: '16px' }}>
+                            {autofillResult.missingInfo.map((info, i) => (
+                              <li key={i}>{info}</li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+
+                      {/* Suggested questions to ask */}
+                      {autofillResult.suggestedPrompts.length > 0 && (
+                        <div>
+                          <strong style={{ color: '#8B5CF6' }}>Ask the patient:</strong>
+                          <ul style={{ margin: '4px 0 0 0', paddingLeft: '16px' }}>
+                            {autofillResult.suggestedPrompts.map((prompt, i) => (
+                              <li key={i}>{prompt}</li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
           )}
 
           {/* Questions */}

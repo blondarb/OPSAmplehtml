@@ -1190,6 +1190,16 @@ ${noteData.plan || 'Not documented'}
                 updateNote(field, currentValue ? `${currentValue}\n${text}` : text)
               }}
               onScaleComplete={onScaleComplete}
+              clinicalText={[noteData.hpiContent, noteData.rosContent, noteData.allergiesContent, noteData.medicalHistoryContent].filter(Boolean).join('\n\n')}
+              patientContext={patient ? {
+                age: patient.age,
+                sex: patient.sex,
+                diagnoses: [...(noteData.chiefComplaint || []), ...(noteData.differentialDiagnoses?.map((d: Diagnosis) => d.name) || [])],
+                medications: noteData.medications || patient.medications || [],
+                medicalHistory: noteData.medicalHistoryContent ? [noteData.medicalHistoryContent] : [],
+                allergies: noteData.allergiesContent ? [noteData.allergiesContent] : [],
+                vitalSigns: noteData.vitalSigns || patient.vitalSigns || undefined,
+              } : undefined}
             />
             {isVerticalView && (
               <div style={{ marginTop: '32px', marginBottom: '32px', borderTop: '2px solid var(--border)', paddingTop: '32px' }}>
@@ -1317,6 +1327,16 @@ ${noteData.plan || 'Not documented'}
                 updateNote('examSummary', currentValue ? `${currentValue}\n${text}` : text)
               }}
               onScaleComplete={onScaleComplete}
+              clinicalText={[noteData.examSummary, noteData.hpiContent, noteData.neuroExamFindings].filter(Boolean).join('\n\n')}
+              patientContext={patient ? {
+                age: patient.age,
+                sex: patient.sex,
+                diagnoses: [...(noteData.chiefComplaint || []), ...(noteData.differentialDiagnoses?.map((d: Diagnosis) => d.name) || [])],
+                medications: noteData.medications || patient.medications || [],
+                medicalHistory: noteData.medicalHistoryContent ? [noteData.medicalHistoryContent] : [],
+                allergies: noteData.allergiesContent ? [noteData.allergiesContent] : [],
+                vitalSigns: noteData.vitalSigns || patient.vitalSigns || undefined,
+              } : undefined}
             />
 
             {/* Neurological Examination Section */}

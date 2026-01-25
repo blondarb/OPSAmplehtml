@@ -11,7 +11,7 @@ Sevaro Clinical is a web application for AI-powered clinical documentation, spec
 - **Styling**: Tailwind CSS v3 + Inline Styles
 - **Database**: Supabase (PostgreSQL)
 - **Authentication**: Supabase Auth
-- **AI**: OpenAI GPT-4 API + Whisper (transcription)
+- **AI**: OpenAI GPT-5/GPT-4o-mini APIs + Whisper (transcription)
 - **Deployment**: Vercel
 
 ## Project Structure
@@ -249,11 +249,16 @@ The middleware (`src/middleware.ts`) handles session refresh. Uses a simplified 
 
 ### API Routes
 
-- `/api/ai/ask` - Ask clinical questions to GPT-4 (with user settings integration)
-- `/api/ai/chart-prep` - Generate pre-visit summaries with structured JSON output
-- `/api/ai/field-action` - Field-level AI actions (Improve/Expand/Summarize) with anti-hallucination
-- `/api/ai/transcribe` - Voice transcription (Whisper + GPT-4 cleanup)
-- `/api/ai/visit-ai` - Visit AI: transcribe full visits and extract clinical content
+**AI Endpoints (Model Configuration):**
+- `/api/ai/ask` - Ask clinical questions (gpt-4o-mini - cost-effective Q&A)
+- `/api/ai/chart-prep` - Generate pre-visit summaries (gpt-4o-mini)
+- `/api/ai/field-action` - Field-level AI actions: Improve/Expand/Summarize (gpt-4o-mini)
+- `/api/ai/transcribe` - Voice transcription (Whisper + gpt-4o-mini cleanup)
+- `/api/ai/visit-ai` - Visit AI: transcribe and extract clinical content (gpt-5 - complex extraction)
+- `/api/ai/scale-autofill` - AI autofill for clinical scales from patient data (gpt-5)
+- `/api/ai/synthesize-note` - Note synthesis from multiple sources (gpt-5)
+
+**Other Endpoints:**
 - `/api/phrases` - List and create dot phrases
 - `/api/phrases/[id]` - Get, update, delete individual phrases
 - `/api/phrases/seed` - Seed default medical phrases
@@ -323,6 +328,17 @@ When redeploying after changes, use "Redeploy without cache" to ensure fresh bui
 - Push to feature branch, create PR, merge to main for deployment
 
 ## Recent Changes (January 2026)
+
+### OpenAI Model Optimization (January 25, 2026)
+- **Simple tasks use gpt-4o-mini** ($0.15/$0.60 per 1M tokens): ask, chart-prep, transcribe, field-action
+- **Complex tasks use gpt-5** ($1.25/$10 per 1M tokens): visit-ai, scale-autofill, synthesize-note
+- ~93% cost reduction for simple tasks, 50% cheaper input for complex tasks with better reasoning
+
+### Clinical Scales & AI Autofill (January 24, 2026)
+- **New Scales**: UPDRS Motor (33-item Parkinson's), Hoehn & Yahr, EDSS (MS), CHA₂DS₂-VASc (stroke risk)
+- **AI Scale Autofill**: Extracts data from demographics, vitals, diagnoses, medications, clinical text
+- **Confidence Scoring**: High/medium/low confidence with reasoning for each extraction
+- **Missing Info Detection**: AI suggests questions to ask for incomplete data
 
 ### Voice/AI Drawer Separation
 - Split single AI drawer into two separate drawers
@@ -399,6 +415,23 @@ When redeploying after changes, use "Redeploy without cache" to ensure fresh bui
 - **Physical Exam Section**: Fixed form elements (textarea, select) to use CSS variables
 - **Global Form Overrides**: Added dark mode styles for all input/textarea/select elements
 - **Placeholder Colors**: Proper muted color in dark mode
+
+### Additional Clinical Scales (January 24, 2026)
+- **UPDRS Motor (Part III)**: 33-item motor examination for Parkinson's disease
+- **Hoehn & Yahr**: Parkinson's staging scale (0-5)
+- **EDSS**: Expanded Disability Status Scale for MS (0-10)
+- **CHA₂DS₂-VASc**: Stroke risk calculator for atrial fibrillation (0-9)
+- New condition-scale linkages for movement disorders, MS, and AFib
+
+### AI Scale Autofill (January 24, 2026)
+- **New API Endpoint**: `/api/ai/scale-autofill` - Extracts scale data from clinical notes
+- **Features**:
+  - Confidence scoring (high/medium/low) for each extracted answer
+  - Reasoning display for AI's extraction logic
+  - Missing info detection with suggested prompts to ask patient
+  - Conservative extraction - never hallucinates missing data
+- **UI Integration**: "AI Auto-fill from Notes" button in ScaleForm
+- **Visual Feedback**: AI-filled fields highlighted, expandable confidence details
 
 ## Documentation Update Policy
 
