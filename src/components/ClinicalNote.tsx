@@ -12,8 +12,10 @@ import DotPhrasesDrawer from './DotPhrasesDrawer'
 import EnhancedNotePreviewModal from './EnhancedNotePreviewModal'
 import SettingsDrawer from './SettingsDrawer'
 import IdeasDrawer from './IdeasDrawer'
-import OnboardingTour from './OnboardingTour'
+import OnboardingTour, { resetOnboardingTour } from './OnboardingTour'
 import PatientAppointments, { type Appointment } from './PatientAppointments'
+import ScheduleFollowupModal from './ScheduleFollowupModal'
+import ScheduleNewPatientModal from './ScheduleNewPatientModal'
 import {
   type ChartPrepOutput,
   type VisitAIOutput,
@@ -166,17 +168,25 @@ function IconSidebar({ activeIcon, setActiveIcon, viewMode, onViewModeChange }: 
 
 export default function ClinicalNote({
   user,
-  patient,
-  currentVisit,
-  priorVisits,
-  imagingStudies,
-  scoreHistory,
+  patient: initialPatient,
+  currentVisit: initialVisit,
+  priorVisits: initialPriorVisits,
+  imagingStudies: initialImagingStudies,
+  scoreHistory: initialScoreHistory,
 }: ClinicalNoteProps) {
   const [darkMode, setDarkMode] = useState(false)
   const [activeIcon, setActiveIcon] = useState('home')
-  const [viewMode, setViewMode] = useState<'appointments' | 'chart'>('chart') // Start with chart view since we load with a patient
+  const [viewMode, setViewMode] = useState<'appointments' | 'chart'>('appointments') // Start with appointments view
   const [selectedAppointment, setSelectedAppointment] = useState<Appointment | null>(null)
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false)
+
+  // Dynamic patient/visit data - can be loaded from appointment selection
+  const [patient, setPatient] = useState(initialPatient)
+  const [currentVisit, setCurrentVisit] = useState(initialVisit)
+  const [priorVisits, setPriorVisits] = useState(initialPriorVisits || [])
+  const [imagingStudies, setImagingStudies] = useState(initialImagingStudies || [])
+  const [scoreHistory, setScoreHistory] = useState(initialScoreHistory || [])
+  const [loadingPatient, setLoadingPatient] = useState(false)
   const [aiDrawerOpen, setAiDrawerOpen] = useState(false)
   const [aiDrawerTab, setAiDrawerTab] = useState('ask-ai')
   const [voiceDrawerOpen, setVoiceDrawerOpen] = useState(false)
@@ -189,6 +199,12 @@ export default function ClinicalNote({
   const [showTour, setShowTour] = useState(false)
   const [activeTextField, setActiveTextField] = useState<string | null>(null)
   const [selectedRecommendations, setSelectedRecommendations] = useState<RecommendationItem[]>([])
+  const [followupModalOpen, setFollowupModalOpen] = useState(false)
+  const [resetModalOpen, setResetModalOpen] = useState(false)
+  const [resetting, setResetting] = useState(false)
+  const [scheduleNewPatientOpen, setScheduleNewPatientOpen] = useState(false)
+  const [demoHint, setDemoHint] = useState<string | null>(null)
+  const [appointmentsRefreshKey, setAppointmentsRefreshKey] = useState(0)
 
   // Additional data for comprehensive note generation
   const [completedScales, setCompletedScales] = useState<ScaleResult[]>([])
@@ -479,18 +495,188 @@ export default function ClinicalNote({
   }
 
   // Handle selecting a patient from appointments list
-  const handleSelectPatient = (appointment: Appointment) => {
+  const handleSelectPatient = async (appointment: Appointment) => {
+    if (!appointment.patient) return
+
     setSelectedAppointment(appointment)
-    setViewMode('chart')
-    setActiveIcon('notes')
-    // In a real app, this would load the patient's chart data
-    // For now, we just switch views to show the existing demo patient
+    setLoadingPatient(true)
+
+    try {
+      // Fetch full patient data with history
+      const patientRes = await fetch(`/api/patients/${appointment.patient.id}`)
+      if (!patientRes.ok) throw new Error('Failed to fetch patient')
+      const patientData = await patientRes.json()
+
+      // Set patient data (API returns { patient: {...}, medications: [...], ... })
+      const pt = patientData.patient
+      setPatient({
+        id: pt.id,
+        mrn: pt.mrn,
+        first_name: pt.firstName,
+        last_name: pt.lastName,
+        date_of_birth: pt.dateOfBirth,
+        gender: pt.gender,
+        phone: pt.phone,
+        email: pt.email,
+        address: pt.address,
+        referring_physician: pt.referringPhysician,
+        referral_reason: pt.referralReason,
+        primary_care_physician: pt.primaryCarePhysician,
+        insurance_provider: pt.insuranceProvider,
+        insurance_id: pt.insuranceId,
+        medications: patientData.medications || [],
+        allergies: patientData.allergies || [],
+      })
+
+      // Set prior visits (completed visits with AI summaries)
+      const completedVisits = (patientData.visits || [])
+        .filter((v: any) => v.status === 'completed')
+        .map((v: any) => ({
+          id: v.id,
+          visit_date: v.visitDate,
+          visit_type: v.visitType,
+          chief_complaint: v.chiefComplaint,
+          status: v.status,
+          provider: v.providerName,
+          clinical_notes: v.clinicalNote ? {
+            ai_summary: v.clinicalNote.aiSummary,
+            hpi: v.clinicalNote.hpi,
+            assessment: v.clinicalNote.assessment,
+            plan: v.clinicalNote.plan,
+          } : null,
+        }))
+      setPriorVisits(completedVisits)
+
+      // Set imaging studies
+      setImagingStudies(patientData.imagingStudies || [])
+
+      // Set score history
+      setScoreHistory(patientData.scoreHistory || [])
+
+      // Create or get visit for this appointment
+      let visit = null
+      if (appointment.visitId) {
+        // Visit already exists, fetch it
+        const visitRes = await fetch(`/api/visits/${appointment.visitId}`)
+        if (visitRes.ok) {
+          const visitData = await visitRes.json()
+          visit = visitData.visit
+        }
+      }
+
+      if (!visit) {
+        // Create a new visit for this appointment
+        const visitRes = await fetch('/api/visits', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            patientId: appointment.patient.id,
+            appointmentId: appointment.id,
+            visitType: appointment.appointmentType,
+            chiefComplaint: appointment.reasonForVisit ? [appointment.reasonForVisit] : [],
+          }),
+        })
+
+        if (visitRes.ok) {
+          const visitData = await visitRes.json()
+          visit = visitData.visit
+        }
+      }
+
+      if (visit) {
+        setCurrentVisit({
+          id: visit.id,
+          patient_id: visit.patientId || visit.patient_id,
+          visit_date: visit.visitDate || visit.visit_date,
+          visit_type: visit.visitType || visit.visit_type,
+          chief_complaint: visit.chiefComplaint || visit.chief_complaint || [],
+          status: visit.status,
+          clinical_notes: visit.clinicalNote || visit.clinical_notes?.[0] ? {
+            id: (visit.clinicalNote || visit.clinical_notes?.[0])?.id,
+            hpi: (visit.clinicalNote || visit.clinical_notes?.[0])?.hpi || '',
+            ros: (visit.clinicalNote || visit.clinical_notes?.[0])?.ros || '',
+            allergies: (visit.clinicalNote || visit.clinical_notes?.[0])?.allergies || '',
+            physical_exam: (visit.clinicalNote || visit.clinical_notes?.[0])?.physicalExam || (visit.clinicalNote || visit.clinical_notes?.[0])?.physical_exam || '',
+            assessment: (visit.clinicalNote || visit.clinical_notes?.[0])?.assessment || '',
+            plan: (visit.clinicalNote || visit.clinical_notes?.[0])?.plan || '',
+            status: (visit.clinicalNote || visit.clinical_notes?.[0])?.status || 'draft',
+            ai_summary: (visit.clinicalNote || visit.clinical_notes?.[0])?.aiSummary || (visit.clinicalNote || visit.clinical_notes?.[0])?.ai_summary || '',
+          } : null,
+        })
+
+        // Reset note data for new visit
+        const clinicalNote = visit.clinicalNote || visit.clinical_notes?.[0]
+        setNoteData({
+          chiefComplaint: visit.chiefComplaint || visit.chief_complaint || [],
+          hpi: clinicalNote?.hpi || '',
+          ros: clinicalNote?.ros || '',
+          rosDetails: clinicalNote?.rosDetails || clinicalNote?.ros_details || '',
+          allergies: clinicalNote?.allergies || '',
+          allergyDetails: clinicalNote?.allergyDetails || clinicalNote?.allergy_details || '',
+          historyAvailable: clinicalNote?.historyAvailable || clinicalNote?.history_available || '',
+          historyDetails: clinicalNote?.historyDetails || clinicalNote?.history_details || '',
+          physicalExam: clinicalNote?.physicalExam || clinicalNote?.physical_exam || '',
+          assessment: clinicalNote?.assessment || '',
+          plan: clinicalNote?.plan || '',
+        })
+
+        // Reset AI output states
+        setChartPrepOutput(null)
+        setVisitAIOutput(null)
+        setVisitTranscript('')
+        setRawDictation({})
+        setCompletedScales([])
+        setSelectedDiagnoses([])
+        setImagingData([])
+        setExamFindings({})
+        setExamSectionNotes({})
+        setSelectedRecommendations([])
+        setAutosaveLoaded(false) // Allow autosave to load for new visit
+      }
+
+      setViewMode('chart')
+      setActiveIcon('notes')
+    } catch (error) {
+      console.error('Error loading patient data:', error)
+      // Still switch to chart view, but show error state
+      setViewMode('chart')
+      setActiveIcon('notes')
+    } finally {
+      setLoadingPatient(false)
+    }
   }
 
   // Handle going back to appointments list
   const handleBackToAppointments = () => {
     setViewMode('appointments')
     setActiveIcon('home')
+  }
+
+  // Handle demo reset - opens confirmation modal
+  const handleResetDemo = () => {
+    setResetModalOpen(true)
+  }
+
+  const executeResetDemo = async () => {
+    setResetting(true)
+    try {
+      const response = await fetch('/api/demo/reset', { method: 'POST' })
+      if (!response.ok) {
+        const data = await response.json()
+        console.error('Reset failed:', data.error)
+        setResetting(false)
+        setResetModalOpen(false)
+        return
+      }
+      // Reset the onboarding tour so it replays
+      resetOnboardingTour()
+      // Go back to appointments view and reload the page
+      window.location.href = '/dashboard'
+    } catch (err) {
+      console.error('Error resetting demo:', err)
+      setResetting(false)
+      setResetModalOpen(false)
+    }
   }
 
   const handleSignOut = async () => {
@@ -551,6 +737,135 @@ export default function ClinicalNote({
     }
   }
 
+  // Pend (save note as draft) handler
+  const handlePend = useCallback(async () => {
+    if (!currentVisit?.id) {
+      console.error('No current visit to save')
+      return
+    }
+
+    try {
+      const clinicalNoteId = currentVisit?.clinical_notes?.id
+
+      // Save via API
+      const response = await fetch(`/api/visits/${currentVisit.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          chiefComplaint: noteData.chiefComplaint,
+          clinicalNote: {
+            id: clinicalNoteId,
+            hpi: noteData.hpi,
+            ros: noteData.ros,
+            rosDetails: noteData.rosDetails,
+            allergies: noteData.allergies,
+            allergyDetails: noteData.allergyDetails,
+            historyAvailable: noteData.historyAvailable,
+            historyDetails: noteData.historyDetails,
+            physicalExam: noteData.physicalExam,
+            assessment: noteData.assessment,
+            plan: noteData.plan,
+            rawDictation: rawDictation,
+            status: 'draft',
+          },
+        }),
+      })
+
+      if (!response.ok) {
+        throw new Error('Failed to save note')
+      }
+
+      // Clear autosave since we saved to server
+      localStorage.removeItem(autosaveKey)
+    } catch (error) {
+      console.error('Error saving note:', error)
+      throw error
+    }
+  }, [currentVisit, noteData, rawDictation, autosaveKey])
+
+  // Sign & Complete handler
+  const handleSignComplete = useCallback(async () => {
+    if (!currentVisit?.id) {
+      console.error('No current visit to sign')
+      return
+    }
+
+    try {
+      // First save the note
+      await handlePend()
+
+      // Then sign via the sign endpoint
+      const response = await fetch(`/api/visits/${currentVisit.id}/sign`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+      })
+
+      if (!response.ok) {
+        throw new Error('Failed to sign note')
+      }
+
+      const data = await response.json()
+
+      // Update local state to reflect signed status
+      setCurrentVisit((prev: any) => ({
+        ...prev,
+        status: 'completed',
+        clinical_notes: prev?.clinical_notes ? {
+          ...prev.clinical_notes,
+          status: 'signed',
+          ai_summary: data.aiSummary,
+        } : null,
+      }))
+
+      // Open the follow-up scheduling modal
+      setFollowupModalOpen(true)
+    } catch (error) {
+      console.error('Error signing note:', error)
+      throw error
+    }
+  }, [currentVisit, handlePend])
+
+  // Schedule follow-up appointment handler
+  const handleScheduleFollowup = useCallback(async (appointmentData: {
+    patientId: string
+    appointmentDate: string
+    appointmentTime: string
+    appointmentType: string
+    durationMinutes: number
+    hospitalSite: string
+    reasonForVisit?: string
+    schedulingNotes?: string
+  }) => {
+    const response = await fetch('/api/appointments', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        ...appointmentData,
+        priorVisitId: currentVisit?.id, // Link to the visit we just completed
+      }),
+    })
+
+    if (!response.ok) {
+      throw new Error('Failed to schedule follow-up')
+    }
+
+    // Close modal and go back to appointments
+    setFollowupModalOpen(false)
+    setAppointmentsRefreshKey(k => k + 1)
+
+    // Show demo hint to guide user to navigate to the next day
+    const followUpDate = new Date(appointmentData.appointmentDate + 'T00:00:00')
+    const formattedDate = followUpDate.toLocaleDateString('en-US', {
+      weekday: 'long',
+      month: 'long',
+      day: 'numeric',
+    })
+    setDemoHint(
+      `Follow-up scheduled for ${formattedDate}. Use the ">" arrow next to the date to navigate forward and see how AI summaries from today's visit appear in the Prior Visits sidebar. You can continue this flow indefinitely — each visit builds on the last.`
+    )
+    handleBackToAppointments()
+  }, [currentVisit])
+
   return (
     <div className="app-container" style={{ display: 'flex', flexDirection: 'column', height: '100vh' }}>
       <TopNav
@@ -561,6 +876,7 @@ export default function ClinicalNote({
         onOpenIdeas={() => setIdeasDrawerOpen(true)}
         onToggleSidebar={() => setMobileSidebarOpen(!mobileSidebarOpen)}
         isSidebarOpen={mobileSidebarOpen}
+        onResetDemo={handleResetDemo}
       />
 
       <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
@@ -574,7 +890,32 @@ export default function ClinicalNote({
 
         {/* Main Content Area - Switch between Appointments and Chart view */}
         {viewMode === 'appointments' ? (
-          <PatientAppointments onSelectPatient={handleSelectPatient} />
+          <PatientAppointments
+            onSelectPatient={handleSelectPatient}
+            onScheduleNew={() => setScheduleNewPatientOpen(true)}
+            demoHint={demoHint}
+            onDismissHint={() => setDemoHint(null)}
+            refreshKey={appointmentsRefreshKey}
+          />
+        ) : loadingPatient ? (
+          <div style={{
+            flex: 1,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            flexDirection: 'column',
+            gap: '16px',
+          }}>
+            <div style={{
+              width: '48px',
+              height: '48px',
+              border: '3px solid var(--border)',
+              borderTop: '3px solid var(--primary)',
+              borderRadius: '50%',
+              animation: 'spin 1s linear infinite',
+            }} />
+            <p style={{ color: 'var(--text-muted)', fontSize: '14px' }}>Loading patient chart...</p>
+          </div>
         ) : (
           <>
             {/* Back to appointments button when viewing a chart */}
@@ -638,6 +979,8 @@ export default function ClinicalNote({
               onDiagnosesChange={handleDiagnosesChange}
               onImagingChange={handleImagingChange}
               onExamFindingsChange={handleExamFindingsChange}
+              onPend={handlePend}
+              onSignComplete={handleSignComplete}
             />
           </>
         )}
@@ -745,6 +1088,132 @@ export default function ClinicalNote({
       <OnboardingTour
         forceShow={showTour}
         onComplete={() => setShowTour(false)}
+      />
+
+      {/* Reset Demo Confirmation Modal */}
+      {resetModalOpen && (
+        <>
+          <div
+            onClick={() => !resetting && setResetModalOpen(false)}
+            style={{
+              position: 'fixed',
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              background: 'rgba(0,0,0,0.5)',
+              zIndex: 10000,
+            }}
+          />
+          <div style={{
+            position: 'fixed',
+            top: '50%',
+            left: '50%',
+            transform: 'translate(-50%, -50%)',
+            background: 'var(--bg-white)',
+            borderRadius: '16px',
+            padding: '28px',
+            width: '420px',
+            maxWidth: '95vw',
+            zIndex: 10001,
+            boxShadow: '0 20px 40px rgba(0,0,0,0.25)',
+            textAlign: 'center',
+          }}>
+            <div style={{
+              width: '56px',
+              height: '56px',
+              borderRadius: '50%',
+              background: '#FEF3C7',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              margin: '0 auto 16px',
+            }}>
+              <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#F59E0B" strokeWidth="2">
+                <path d="M1 4v6h6" /><path d="M3.51 15a9 9 0 102.13-9.36L1 10" />
+              </svg>
+            </div>
+            <h3 style={{ margin: '0 0 8px', fontSize: '18px', fontWeight: 600, color: 'var(--text-primary)' }}>
+              Reset Demo?
+            </h3>
+            <p style={{ margin: '0 0 24px', fontSize: '14px', color: 'var(--text-secondary)', lineHeight: 1.5 }}>
+              This will clear all visits, notes, and return appointments to their original &quot;Scheduled&quot; state. The onboarding tour will replay for the next viewer.
+            </p>
+            <div style={{ display: 'flex', gap: '12px', justifyContent: 'center' }}>
+              <button
+                onClick={() => setResetModalOpen(false)}
+                disabled={resetting}
+                style={{
+                  padding: '10px 24px',
+                  borderRadius: '8px',
+                  border: '1px solid var(--border)',
+                  background: 'var(--bg-white)',
+                  cursor: 'pointer',
+                  fontSize: '14px',
+                  fontWeight: 500,
+                  color: 'var(--text-primary)',
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={executeResetDemo}
+                disabled={resetting}
+                style={{
+                  padding: '10px 24px',
+                  borderRadius: '8px',
+                  border: 'none',
+                  background: '#F59E0B',
+                  color: 'white',
+                  cursor: resetting ? 'wait' : 'pointer',
+                  fontSize: '14px',
+                  fontWeight: 600,
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                }}
+              >
+                {resetting ? (
+                  <>
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ animation: 'spin 1s linear infinite' }}>
+                      <circle cx="12" cy="12" r="10" strokeDasharray="32" strokeDashoffset="32"/>
+                    </svg>
+                    Resetting...
+                  </>
+                ) : (
+                  <>
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <path d="M1 4v6h6" /><path d="M3.51 15a9 9 0 102.13-9.36L1 10" />
+                    </svg>
+                    Reset Demo
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </>
+      )}
+
+      {/* Schedule Follow-up Modal - opens after signing a note */}
+      <ScheduleFollowupModal
+        isOpen={followupModalOpen}
+        onClose={() => {
+          setFollowupModalOpen(false)
+          handleBackToAppointments()
+        }}
+        patient={{
+          id: patient?.id || '',
+          firstName: patient?.first_name || '',
+          lastName: patient?.last_name || '',
+        }}
+        onSchedule={handleScheduleFollowup}
+      />
+
+      {/* Schedule New Patient Modal */}
+      <ScheduleNewPatientModal
+        isOpen={scheduleNewPatientOpen}
+        onClose={() => setScheduleNewPatientOpen(false)}
+        onSuccess={() => setAppointmentsRefreshKey(k => k + 1)}
       />
 
       {/* Autosave Status Indicator */}

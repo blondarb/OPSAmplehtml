@@ -608,7 +608,6 @@ Any text input should have dictation.
 1. **Audio routing** - Visit AI recording may need endpoint routing fix
 2. **Three voice recorder instances** - AiDrawer/VoiceDrawer could optimize
 3. **No audio storage** - Audio processed and discarded
-4. **AI suggestions not wired** - Component built but not integrated
 
 ---
 

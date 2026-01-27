@@ -38,6 +38,8 @@ interface CenterPanelProps {
   onDiagnosesChange?: (diagnoses: Diagnosis[]) => void
   onImagingChange?: (studies: any[]) => void
   onExamFindingsChange?: (findings: Record<string, boolean>, notes: Record<string, string>) => void
+  onPend?: () => Promise<void>
+  onSignComplete?: () => Promise<void>
 }
 
 const ALLERGY_OPTIONS = ['NKDA', 'Reviewed in EMR', 'Unknown', 'Other']
@@ -64,6 +66,8 @@ export default function CenterPanel({
   onDiagnosesChange,
   onImagingChange,
   onExamFindingsChange,
+  onPend,
+  onSignComplete,
 }: CenterPanelProps) {
   const [activeTab, setActiveTab] = useState('history')
   const [localActiveField, setLocalActiveField] = useState<string | null>(null)
@@ -363,13 +367,18 @@ ${noteData.plan || 'Not documented'}
   }
 
   // Pend (save as draft)
-  const handlePend = () => {
+  const handlePend = async () => {
     setPendStatus('pending')
-    // Simulate saving
-    setTimeout(() => {
+    try {
+      if (onPend) {
+        await onPend()
+      }
       setPendStatus('saved')
       setTimeout(() => setPendStatus('idle'), 2000)
-    }, 1000)
+    } catch (error) {
+      console.error('Error saving note:', error)
+      setPendStatus('idle')
+    }
   }
 
   return (
@@ -828,10 +837,19 @@ ${noteData.plan || 'Not documented'}
                 Cancel
               </button>
               <button
-                onClick={() => {
-                  // In a real app, this would submit to the backend
-                  alert('Note signed and completed!')
-                  setShowSignModal(false)
+                onClick={async () => {
+                  if (onSignComplete) {
+                    try {
+                      await onSignComplete()
+                      setShowSignModal(false)
+                    } catch (error) {
+                      console.error('Error signing note:', error)
+                      alert('Failed to sign note. Please try again.')
+                    }
+                  } else {
+                    alert('Note signed and completed!')
+                    setShowSignModal(false)
+                  }
                 }}
                 style={{
                   padding: '10px 20px',
@@ -2341,6 +2359,7 @@ ${noteData.plan || 'Not documented'}
 
             {/* Smart Recommendations - Evidence-Based Plans */}
             <SmartRecommendationsSection
+              selectedDiagnoses={(noteData.differentialDiagnoses || []).map((d: Diagnosis) => d.id)}
               onAddToPlan={(items) => {
                 const currentPlan = noteData.plan || ''
                 const newItems = items.join('\n')

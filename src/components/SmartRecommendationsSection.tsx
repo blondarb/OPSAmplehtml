@@ -1,18 +1,14 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import {
-  OUTPATIENT_PLANS,
-  getAllPlanTitles,
   type ClinicalPlan,
   type RecommendationItem,
-  type DifferentialDiagnosis,
-  type EvidenceEntry,
-  type MonitoringEntry,
 } from '@/lib/recommendationPlans'
 
 interface SmartRecommendationsSectionProps {
   onAddToPlan: (items: string[]) => void
+  selectedDiagnoses?: string[] // Array of diagnosis IDs from the Differential Diagnosis section
 }
 
 // Priority badge colors
@@ -27,16 +23,91 @@ const PRIORITY_COLORS: Record<string, { bg: string; text: string }> = {
 
 export default function SmartRecommendationsSection({
   onAddToPlan,
+  selectedDiagnoses = [],
 }: SmartRecommendationsSectionProps) {
-  const [selectedDiagnosis, setSelectedDiagnosis] = useState<string | null>(null)
+  const [selectedDiagnosisId, setSelectedDiagnosisId] = useState<string | null>(null)
   const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({})
   const [expandedSubsections, setExpandedSubsections] = useState<Record<string, boolean>>({})
   const [selectedItems, setSelectedItems] = useState<Map<string, Set<string>>>(new Map())
   const [showPlanBuilder, setShowPlanBuilder] = useState(false)
   const [activeReferenceTab, setActiveReferenceTab] = useState<'icd' | 'scope' | 'pearls' | 'differential' | 'evidence' | 'monitoring' | null>(null)
 
-  const planTitles = getAllPlanTitles()
-  const currentPlan = selectedDiagnosis ? OUTPATIENT_PLANS[selectedDiagnosis] : null
+  // State for Supabase data
+  const [availablePlans, setAvailablePlans] = useState<{ plan_id: string; title: string; icd10_codes: string[]; linked_diagnoses: string[] }[]>([])
+  const [currentPlan, setCurrentPlan] = useState<ClinicalPlan | null>(null)
+  const [isLoading, setIsLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  // Fetch all available plans on mount
+  useEffect(() => {
+    const fetchPlans = async () => {
+      try {
+        const response = await fetch('/api/plans?list=true')
+        if (response.ok) {
+          const data = await response.json()
+          setAvailablePlans(data.plans || [])
+        }
+      } catch (err) {
+        console.error('Failed to fetch plans list:', err)
+      }
+    }
+    fetchPlans()
+  }, [])
+
+  // Fetch plan for selected diagnosis
+  const fetchPlanForDiagnosis = useCallback(async (diagnosisId: string) => {
+    setIsLoading(true)
+    setError(null)
+    try {
+      const response = await fetch(`/api/plans?diagnosisId=${encodeURIComponent(diagnosisId)}`)
+      if (response.ok) {
+        const data = await response.json()
+        if (data.plan) {
+          setCurrentPlan(data.plan)
+          setShowPlanBuilder(true)
+        } else {
+          setError('No plan found for this diagnosis')
+          setCurrentPlan(null)
+        }
+      } else {
+        setError('Failed to fetch plan')
+        setCurrentPlan(null)
+      }
+    } catch (err) {
+      console.error('Failed to fetch plan:', err)
+      setError('Failed to fetch plan')
+      setCurrentPlan(null)
+    } finally {
+      setIsLoading(false)
+    }
+  }, [])
+
+  // Get plan titles that match selected diagnoses ONLY
+  // Plans are only shown when diagnoses are selected
+  const getRelevantPlanTitles = useCallback(() => {
+    // If no diagnoses selected, show nothing (require diagnosis selection first)
+    if (selectedDiagnoses.length === 0) {
+      return []
+    }
+
+    // Find plans that are linked to any of the selected diagnoses
+    const relevantPlans = availablePlans.filter(plan =>
+      plan.linked_diagnoses.some(diagId => selectedDiagnoses.includes(diagId))
+    )
+
+    // If no specific plans found for selected diagnoses, show generic fallback
+    if (relevantPlans.length === 0) {
+      const genericPlan = availablePlans.find(p => p.title === 'General Neurology Evaluation')
+      if (genericPlan) {
+        return [{ id: genericPlan.plan_id, title: genericPlan.title, diagnosisIds: [], isGeneric: true }]
+      }
+      return []
+    }
+
+    return relevantPlans.map(p => ({ id: p.plan_id, title: p.title, diagnosisIds: p.linked_diagnoses, isGeneric: false }))
+  }, [availablePlans, selectedDiagnoses])
+
+  const planOptions = getRelevantPlanTitles()
 
   // Reset selections when diagnosis changes
   useEffect(() => {
@@ -44,7 +115,7 @@ export default function SmartRecommendationsSection({
     setExpandedSubsections({})
     setSelectedItems(new Map())
     setActiveReferenceTab(null)
-  }, [selectedDiagnosis])
+  }, [selectedDiagnosisId])
 
   const toggleSection = (sectionName: string) => {
     setExpandedSections(prev => ({
@@ -292,37 +363,93 @@ export default function SmartRecommendationsSection({
         )}
       </div>
 
-      {/* Sample Diagnoses Buttons */}
-      <div style={{ marginBottom: '16px' }}>
-        <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginBottom: '8px' }}>
-          Select a diagnosis to view evidence-based recommendations:
+      {/* Diagnosis/Plan Selection Buttons - Only shown when diagnoses are selected */}
+      {selectedDiagnoses.length > 0 && (
+        <div style={{ marginBottom: '16px' }}>
+          <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginBottom: '8px' }}>
+            Available treatment plans for selected diagnoses:
+          </div>
+          <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+            {planOptions.length > 0 ? (
+              planOptions.map(plan => (
+                <button
+                  key={plan.id}
+                  onClick={() => {
+                    if (selectedDiagnosisId === plan.id) {
+                      setSelectedDiagnosisId(null)
+                      setCurrentPlan(null)
+                      setShowPlanBuilder(false)
+                    } else {
+                      setSelectedDiagnosisId(plan.id)
+                      // Use the first linked diagnosis ID or the plan ID itself
+                      const diagId = plan.diagnosisIds[0] || plan.id
+                      fetchPlanForDiagnosis(diagId)
+                    }
+                  }}
+                  disabled={isLoading}
+                  style={{
+                    padding: '8px 14px',
+                    borderRadius: '20px',
+                    fontSize: '13px',
+                    cursor: isLoading ? 'wait' : 'pointer',
+                    border: '1px solid',
+                    borderColor: selectedDiagnosisId === plan.id ? 'var(--primary)' : 'var(--border)',
+                    background: selectedDiagnosisId === plan.id ? 'var(--primary)' : 'var(--bg-white)',
+                    color: selectedDiagnosisId === plan.id ? 'white' : 'var(--text-secondary)',
+                    fontWeight: selectedDiagnosisId === plan.id ? 500 : 400,
+                    transition: 'all 0.15s ease',
+                    opacity: isLoading ? 0.7 : 1,
+                  }}
+                >
+                  {plan.title}
+                  {plan.isGeneric && (
+                    <span style={{ marginLeft: '6px', fontSize: '10px', opacity: 0.7 }}>(Generic)</span>
+                  )}
+                </button>
+              ))
+            ) : (
+              <div style={{ fontSize: '13px', color: 'var(--text-muted)', fontStyle: 'italic' }}>
+                {availablePlans.length === 0 ? 'Loading plans...' : 'No specific plans available for selected diagnoses'}
+              </div>
+            )}
+          </div>
         </div>
-        <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-          {planTitles.map(title => (
-            <button
-              key={title}
-              onClick={() => {
-                setSelectedDiagnosis(selectedDiagnosis === title ? null : title)
-                setShowPlanBuilder(true)
-              }}
-              style={{
-                padding: '8px 14px',
-                borderRadius: '20px',
-                fontSize: '13px',
-                cursor: 'pointer',
-                border: '1px solid',
-                borderColor: selectedDiagnosis === title ? 'var(--primary)' : 'var(--border)',
-                background: selectedDiagnosis === title ? 'var(--primary)' : 'var(--bg-white)',
-                color: selectedDiagnosis === title ? 'white' : 'var(--text-secondary)',
-                fontWeight: selectedDiagnosis === title ? 500 : 400,
-                transition: 'all 0.15s ease',
-              }}
-            >
-              {title}
-            </button>
-          ))}
+      )}
+
+      {/* Error message */}
+      {error && (
+        <div style={{
+          padding: '12px',
+          background: '#FEF2F2',
+          border: '1px solid #FECACA',
+          borderRadius: '8px',
+          marginBottom: '16px',
+          fontSize: '13px',
+          color: '#DC2626',
+        }}>
+          {error}
         </div>
-      </div>
+      )}
+
+      {/* Loading indicator */}
+      {isLoading && (
+        <div style={{
+          padding: '24px',
+          textAlign: 'center',
+          color: 'var(--text-muted)',
+        }}>
+          <div style={{
+            width: '24px',
+            height: '24px',
+            border: '2px solid var(--border)',
+            borderTopColor: 'var(--primary)',
+            borderRadius: '50%',
+            animation: 'spin 1s linear infinite',
+            margin: '0 auto 8px',
+          }} />
+          Loading plan...
+        </div>
+      )}
 
       {/* Plan Builder */}
       {currentPlan && showPlanBuilder && (
@@ -513,7 +640,7 @@ export default function SmartRecommendationsSection({
                 {/* Close Button */}
                 <button
                   onClick={() => {
-                    setSelectedDiagnosis(null)
+                    setSelectedDiagnosisId(null); setCurrentPlan(null)
                     setShowPlanBuilder(false)
                   }}
                   style={{
@@ -1000,8 +1127,8 @@ export default function SmartRecommendationsSection({
         </div>
       )}
 
-      {/* Empty state when no diagnosis selected */}
-      {!selectedDiagnosis && (
+      {/* Empty state - shown when no diagnoses selected from Differential Diagnosis section */}
+      {selectedDiagnoses.length === 0 && !isLoading && (
         <div style={{
           padding: '32px',
           textAlign: 'center',
@@ -1016,13 +1143,43 @@ export default function SmartRecommendationsSection({
             <path d="M9 16h6" />
           </svg>
           <div style={{ fontSize: '14px', fontWeight: 500, marginBottom: '4px' }}>
-            Select a Diagnosis
+            Add a Diagnosis First
           </div>
           <div style={{ fontSize: '13px' }}>
-            Choose a diagnosis above to view evidence-based treatment recommendations
+            Select diagnoses in the Differential Diagnosis section above to see available treatment plans
           </div>
         </div>
       )}
+
+      {/* Empty state - shown when diagnoses selected but no plan chosen yet */}
+      {selectedDiagnoses.length > 0 && !selectedDiagnosisId && !isLoading && planOptions.length > 0 && (
+        <div style={{
+          padding: '24px',
+          textAlign: 'center',
+          color: 'var(--text-muted)',
+          background: 'var(--bg-gray)',
+          borderRadius: '8px',
+        }}>
+          <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" strokeWidth="1.5" style={{ margin: '0 auto 12px', opacity: 0.7 }}>
+            <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" />
+            <polyline points="14 2 14 8 20 8" />
+            <line x1="16" y1="13" x2="8" y2="13" />
+            <line x1="16" y1="17" x2="8" y2="17" />
+            <polyline points="10 9 9 9 8 9" />
+          </svg>
+          <div style={{ fontSize: '13px' }}>
+            Select a plan above to view evidence-based recommendations
+          </div>
+        </div>
+      )}
+
+      {/* CSS for spinner animation */}
+      <style>{`
+        @keyframes spin {
+          from { transform: rotate(0deg); }
+          to { transform: rotate(360deg); }
+        }
+      `}</style>
     </div>
   )
 }

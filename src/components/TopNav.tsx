@@ -11,6 +11,7 @@ interface TopNavProps {
   onOpenIdeas: () => void
   onToggleSidebar?: () => void
   isSidebarOpen?: boolean
+  onResetDemo?: () => void
 }
 
 // Sample notifications data
@@ -31,7 +32,7 @@ const BILLING_CODES = [
   { code: '99215', label: '99215 - Office Visit (45+ min)', color: '#EF4444' },
 ]
 
-export default function TopNav({ user, onSignOut, openAiDrawer, onOpenSettings, onOpenIdeas, onToggleSidebar, isSidebarOpen }: TopNavProps) {
+export default function TopNav({ user, onSignOut, openAiDrawer, onOpenSettings, onOpenIdeas, onToggleSidebar, isSidebarOpen, onResetDemo }: TopNavProps) {
   const [aiMenuOpen, setAiMenuOpen] = useState(false)
   const [userMenuOpen, setUserMenuOpen] = useState(false)
   const [activeQueue, setActiveQueue] = useState('outpatient')
@@ -151,6 +152,7 @@ export default function TopNav({ user, onSignOut, openAiDrawer, onOpenSettings, 
           <button
             onClick={onOpenIdeas}
             title="Getting Started - Workflows, Tour, Features"
+            data-tour="ideas-button"
             style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', background: 'none', border: 'none', padding: 0 }}
           >
             <svg width="36" height="36" viewBox="0 0 40 40" fill="none">
@@ -801,6 +803,37 @@ export default function TopNav({ user, onSignOut, openAiDrawer, onOpenSettings, 
                       </svg>
                       Settings
                     </button>
+
+                    {onResetDemo && (
+                      <button
+                        onClick={() => {
+                          setUserMenuOpen(false)
+                          onResetDemo()
+                        }}
+                        data-tour="reset-demo"
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '10px',
+                          width: '100%',
+                          padding: '10px 12px',
+                          background: 'none',
+                          border: 'none',
+                          borderRadius: '6px',
+                          cursor: 'pointer',
+                          textAlign: 'left',
+                          color: '#F59E0B',
+                          fontSize: '13px',
+                        }}
+                        onMouseEnter={(e) => e.currentTarget.style.background = 'var(--bg-gray)'}
+                        onMouseLeave={(e) => e.currentTarget.style.background = 'none'}
+                      >
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                          <path d="M1 4v6h6" /><path d="M3.51 15a9 9 0 102.13-9.36L1 10" />
+                        </svg>
+                        Reset Demo
+                      </button>
+                    )}
 
                     <div style={{ height: '1px', background: 'var(--border)', margin: '6px 0' }} />
 

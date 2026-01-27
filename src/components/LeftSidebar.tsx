@@ -670,38 +670,11 @@ export default function LeftSidebar({ patient, priorVisits, scoreHistory, isOpen
 
         {priorVisitsOpen && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-          {(priorVisits.length > 0 ? priorVisits.slice(0, 4) : [
-            {
-              id: '1',
-              visit_date: '2026-01-10',
-              visit_type: 'follow_up',
-              chief_complaint: ['Migraine follow-up'],
-              provider: 'Dr. Martinez',
-              clinical_notes: {
-                ai_summary: 'Headache frequency reduced from 15 to 8 days/month on topiramate 100mg. MIDAS improved 42→24. No significant side effects. Continue current regimen, recheck in 3 months.'
-              }
-            },
-            {
-              id: '2',
-              visit_date: '2025-12-15',
-              visit_type: 'follow_up',
-              chief_complaint: ['Chronic migraine', 'Medication adjustment'],
-              provider: 'Dr. Martinez',
-              clinical_notes: {
-                ai_summary: 'Suboptimal response to propranolol. Transitioned to topiramate 25mg with 2-week titration to 100mg. MRI brain unremarkable. Discussed lifestyle modifications.'
-              }
-            },
-            {
-              id: '3',
-              visit_date: '2025-11-01',
-              visit_type: 'new_patient',
-              chief_complaint: ['New onset headaches', 'Memory concerns'],
-              provider: 'Dr. Smith',
-              clinical_notes: {
-                ai_summary: 'Initial eval for 3-month history of daily headaches with mild cognitive complaints. MoCA 26/30 (normal). Started propranolol 40mg BID. Ordered MRI brain, labs.'
-              }
-            },
-          ]).map((visit) => {
+          {priorVisits.length === 0 ? (
+            <div style={{ padding: '16px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '13px' }}>
+              No prior visits on record
+            </div>
+          ) : priorVisits.slice(0, 4).map((visit) => {
             const isExpanded = expandedVisit === visit.id
             return (
               <div
@@ -902,8 +875,15 @@ export default function LeftSidebar({ patient, priorVisits, scoreHistory, isOpen
                 },
               ]
 
-              const dataToRender = hasData
-                ? scaleTypes.map(scaleType => {
+              if (!hasData) {
+                return (
+                  <div style={{ padding: '12px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '13px' }}>
+                    No score history available
+                  </div>
+                )
+              }
+
+              return scaleTypes.map(scaleType => {
                     const scaleScores = scoreHistory.filter(s => s.scale_type === scaleType)
                     const lowerIsBetter = !scaleType.includes('MOCA')
                     const trend = scaleScores.length > 1
@@ -911,21 +891,18 @@ export default function LeftSidebar({ patient, priorVisits, scoreHistory, isOpen
                         ? (scaleScores[0].score < scaleScores[1].score ? 'improving' : scaleScores[0].score > scaleScores[1].score ? 'worsening' : 'stable')
                         : (scaleScores[0].score > scaleScores[1].score ? 'improving' : scaleScores[0].score < scaleScores[1].score ? 'worsening' : 'stable'))
                       : 'stable'
-                    return {
-                      type: scaleType,
-                      trend: trend as 'improving' | 'stable' | 'worsening',
-                      scores: scaleScores.slice(0, 4).map(s => ({
-                        date: formatDate(s.created_at),
-                        value: s.score,
-                        interpretation: s.interpretation,
-                      })),
-                    }
+                    return (
+                      <ScoreCard key={scaleType} scale={{
+                        type: scaleType,
+                        trend: trend as 'improving' | 'stable' | 'worsening',
+                        scores: scaleScores.slice(0, 4).map(s => ({
+                          date: formatDate(s.created_at),
+                          value: s.score,
+                          interpretation: s.interpretation,
+                        })),
+                      }} />
+                    )
                   })
-                : defaultScores
-
-              return dataToRender.map(scale => (
-                <ScoreCard key={scale.type} scale={scale} />
-              ))
             })()}
           </div>
         )}

@@ -248,6 +248,7 @@ export default function IdeasDrawer({ isOpen, onClose, initialTab, onStartTour }
   const [allFeedback, setAllFeedback] = useState<FeedbackItem[]>([])
   const [currentUserId] = useState(() => {
     // Get or create a persistent user ID for voting
+    if (typeof window === 'undefined') return 'server'
     let id = localStorage.getItem('sevaro-user-id')
     if (!id) {
       id = 'user-' + Date.now().toString(36) + Math.random().toString(36).substr(2)

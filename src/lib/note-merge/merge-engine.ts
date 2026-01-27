@@ -70,18 +70,20 @@ function createField(
 /**
  * Checks if a field has meaningful content
  */
-function hasContent(value: string | string[] | undefined): boolean {
+function hasContent(value: string | string[] | undefined | null): boolean {
   if (!value) return false
   if (Array.isArray(value)) return value.length > 0
+  if (typeof value !== 'string') return false
   return value.trim().length > 0
 }
 
 /**
  * Normalizes content to string (handles arrays like chiefComplaint)
  */
-function normalizeContent(value: string | string[] | undefined): string {
+function normalizeContent(value: string | string[] | undefined | null): string {
   if (!value) return ''
-  if (Array.isArray(value)) return value.join(', ')
+  if (Array.isArray(value)) return value.filter(v => typeof v === 'string').join(', ')
+  if (typeof value !== 'string') return String(value)
   return value.trim()
 }
 
@@ -90,14 +92,14 @@ function normalizeContent(value: string | string[] | undefined): string {
  * Priority: Manual content is preserved, AI content becomes suggestion
  */
 function mergeField(
-  manualContent: string | string[] | undefined,
-  chartPrepContent: string | undefined,
-  visitAIContent: string | undefined,
+  manualContent: string | string[] | undefined | null,
+  chartPrepContent: string | undefined | null,
+  visitAIContent: string | undefined | null,
   options: MergeOptions
 ): NoteFieldContent {
   const manual = normalizeContent(manualContent)
-  const chartPrep = chartPrepContent?.trim() || ''
-  const visitAI = visitAIContent?.trim() || ''
+  const chartPrep = (typeof chartPrepContent === 'string' ? chartPrepContent.trim() : '') || ''
+  const visitAI = (typeof visitAIContent === 'string' ? visitAIContent.trim() : '') || ''
 
   // Determine the best AI suggestion (prefer Visit AI as it's more recent/specific)
   const aiContent = visitAI || chartPrep

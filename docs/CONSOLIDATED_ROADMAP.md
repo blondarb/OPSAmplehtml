@@ -395,7 +395,6 @@ These foundational features are fully implemented.
 | Audio routing for Visit AI | P1 | May need endpoint routing fix |
 | Three voice recorder instances | P2 | Could optimize in AiDrawer/VoiceDrawer |
 | No audio storage | P2 | Audio processed and discarded |
-| AI suggestions not wired | P2 | Component exists but not integrated |
 | Supabase client creation pattern | Done | Fixed - lazy initialization |
 
 ---

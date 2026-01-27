@@ -163,7 +163,8 @@ export default function EnhancedNotePreviewModal({
 
           const updatedSections = prev.sections.map(section => {
             const synthesizedContent = data.synthesizedNote[section.id]
-            if (synthesizedContent && synthesizedContent.trim()) {
+            // Ensure synthesizedContent is a string before calling trim()
+            if (synthesizedContent && typeof synthesizedContent === 'string' && synthesizedContent.trim()) {
               return {
                 ...section,
                 content: synthesizedContent,
