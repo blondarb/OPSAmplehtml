@@ -69,7 +69,7 @@ export async function GET(request: NextRequest) {
 
     if (error) {
       console.error('Error fetching appointments:', error)
-      return NextResponse.json({ error: 'Failed to fetch appointments' }, { status: 500 })
+      return NextResponse.json({ error: 'Failed to fetch appointments', details: error.message, code: error.code }, { status: 500 })
     }
 
     // Transform data to match frontend expectations
