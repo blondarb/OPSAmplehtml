@@ -221,14 +221,16 @@ const TLDR = [
   { action: 'Change settings', howTo: 'User avatar → Settings gear icon' },
 ]
 
-// Feedback item interface
+// Feedback item interface (matches Supabase feedback table)
 interface FeedbackItem {
   id: string
   text: string
-  timestamp: string
-  user: string
-  upvotes: string[]  // Array of user IDs who upvoted
-  downvotes: string[] // Array of user IDs who downvoted
+  user_id: string
+  user_email: string
+  upvotes: string[]
+  downvotes: string[]
+  created_at: string
+  updated_at: string
 }
 
 export default function IdeasDrawer({ isOpen, onClose, initialTab, onStartTour }: IdeasDrawerProps) {
@@ -246,16 +248,8 @@ export default function IdeasDrawer({ isOpen, onClose, initialTab, onStartTour }
   const [feedbackSubmitted, setFeedbackSubmitted] = useState(false)
   const [feedbackView, setFeedbackView] = useState<'submit' | 'browse'>('browse')
   const [allFeedback, setAllFeedback] = useState<FeedbackItem[]>([])
-  const [currentUserId] = useState(() => {
-    // Get or create a persistent user ID for voting
-    if (typeof window === 'undefined') return 'server'
-    let id = localStorage.getItem('sevaro-user-id')
-    if (!id) {
-      id = 'user-' + Date.now().toString(36) + Math.random().toString(36).substr(2)
-      localStorage.setItem('sevaro-user-id', id)
-    }
-    return id
-  })
+  const [currentUserId, setCurrentUserId] = useState<string>('')
+  const [feedbackLoading, setFeedbackLoading] = useState(false)
 
   // Voice recording for feedback
   const {
@@ -291,100 +285,90 @@ export default function IdeasDrawer({ isOpen, onClose, initialTab, onStartTour }
     }
   }, [activeTab])
 
-  const loadAllFeedback = () => {
-    const stored = localStorage.getItem('sevaro-user-feedback')
-    if (stored) {
-      try {
-        const parsed = JSON.parse(stored)
-        // Migrate old feedback format to new format with votes
-        const migrated = parsed.map((item: any) => ({
-          ...item,
-          upvotes: item.upvotes || [],
-          downvotes: item.downvotes || [],
-        }))
-        // Sort by net votes (upvotes - downvotes), then by date
-        migrated.sort((a: FeedbackItem, b: FeedbackItem) => {
-          const aNet = a.upvotes.length - a.downvotes.length
-          const bNet = b.upvotes.length - b.downvotes.length
-          if (bNet !== aNet) return bNet - aNet
-          return new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
-        })
-        setAllFeedback(migrated)
-      } catch (e) {
-        setAllFeedback([])
+  const loadAllFeedback = async () => {
+    setFeedbackLoading(true)
+    try {
+      const res = await fetch('/api/feedback')
+      if (!res.ok) throw new Error('Failed to load feedback')
+      const data = await res.json()
+      const items: FeedbackItem[] = (data.feedback || []).map((item: any) => ({
+        ...item,
+        upvotes: item.upvotes || [],
+        downvotes: item.downvotes || [],
+      }))
+      // Sort by net votes (upvotes - downvotes), then by date
+      items.sort((a, b) => {
+        const aNet = a.upvotes.length - a.downvotes.length
+        const bNet = b.upvotes.length - b.downvotes.length
+        if (bNet !== aNet) return bNet - aNet
+        return new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+      })
+      setAllFeedback(items)
+      if (data.currentUserId) {
+        setCurrentUserId(data.currentUserId)
       }
+    } catch (e) {
+      console.error('Error loading feedback:', e)
+      setAllFeedback([])
+    } finally {
+      setFeedbackLoading(false)
     }
   }
 
-  const handleVote = (feedbackId: string, voteType: 'up' | 'down') => {
-    const stored = localStorage.getItem('sevaro-user-feedback')
-    if (!stored) return
-
+  const handleVote = async (feedbackId: string, voteType: 'up' | 'down') => {
     try {
-      const parsed = JSON.parse(stored)
-      const updated = parsed.map((item: FeedbackItem) => {
-        if (item.id !== feedbackId) return item
-
-        // Ensure arrays exist
-        const upvotes = item.upvotes || []
-        const downvotes = item.downvotes || []
-
-        if (voteType === 'up') {
-          // If already upvoted, remove upvote (toggle)
-          if (upvotes.includes(currentUserId)) {
-            return { ...item, upvotes: upvotes.filter((id: string) => id !== currentUserId) }
-          }
-          // Add upvote and remove downvote if exists
-          return {
-            ...item,
-            upvotes: [...upvotes, currentUserId],
-            downvotes: downvotes.filter((id: string) => id !== currentUserId),
-          }
-        } else {
-          // If already downvoted, remove downvote (toggle)
-          if (downvotes.includes(currentUserId)) {
-            return { ...item, downvotes: downvotes.filter((id: string) => id !== currentUserId) }
-          }
-          // Add downvote and remove upvote if exists
-          return {
-            ...item,
-            downvotes: [...downvotes, currentUserId],
-            upvotes: upvotes.filter((id: string) => id !== currentUserId),
-          }
-        }
+      const res = await fetch('/api/feedback', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ feedbackId, voteType }),
       })
-
-      localStorage.setItem('sevaro-user-feedback', JSON.stringify(updated))
-      loadAllFeedback()
+      if (!res.ok) throw new Error('Failed to vote')
+      // Optimistically update the local state
+      const data = await res.json()
+      if (data.feedback) {
+        setAllFeedback(prev => {
+          const updated = prev.map(item =>
+            item.id === feedbackId
+              ? { ...item, upvotes: data.feedback.upvotes || [], downvotes: data.feedback.downvotes || [] }
+              : item
+          )
+          // Re-sort after vote update
+          updated.sort((a, b) => {
+            const aNet = a.upvotes.length - a.downvotes.length
+            const bNet = b.upvotes.length - b.downvotes.length
+            if (bNet !== aNet) return bNet - aNet
+            return new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+          })
+          return updated
+        })
+      }
     } catch (e) {
       console.error('Error voting:', e)
     }
   }
 
 
-  const submitFeedback = () => {
+  const submitFeedback = async () => {
     if (!feedbackText.trim()) return
 
-    // Save feedback to localStorage (in production, this would go to a backend)
-    const existingFeedback = JSON.parse(localStorage.getItem('sevaro-user-feedback') || '[]')
-    const newFeedback: FeedbackItem = {
-      id: Date.now().toString(),
-      text: feedbackText,
-      timestamp: new Date().toISOString(),
-      user: currentUserId,
-      upvotes: [],
-      downvotes: [],
-    }
-    existingFeedback.push(newFeedback)
-    localStorage.setItem('sevaro-user-feedback', JSON.stringify(existingFeedback))
+    try {
+      const res = await fetch('/api/feedback', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text: feedbackText }),
+      })
+      if (!res.ok) throw new Error('Failed to submit feedback')
 
-    setFeedbackSubmitted(true)
-    setFeedbackText('')
-    setTimeout(() => {
-      setFeedbackSubmitted(false)
-      setFeedbackView('browse')
-      loadAllFeedback()
-    }, 2000)
+      setFeedbackSubmitted(true)
+      setFeedbackText('')
+      setTimeout(() => {
+        setFeedbackSubmitted(false)
+        setFeedbackView('browse')
+        loadAllFeedback()
+      }, 2000)
+    } catch (e) {
+      console.error('Error submitting feedback:', e)
+    }
   }
 
   if (!isOpen) return null
@@ -1030,10 +1014,30 @@ export default function IdeasDrawer({ isOpen, onClose, initialTab, onStartTour }
               {feedbackView === 'browse' && (
                 <div>
                   <p style={{ fontSize: '13px', color: 'var(--text-secondary)', margin: '0 0 16px 0' }}>
-                    Vote on feedback to help us prioritize improvements. Sorted by popularity.
+                    Vote on feedback to help us prioritize improvements. Visible to all users. Sorted by popularity.
                   </p>
 
-                  {allFeedback.length === 0 ? (
+                  {feedbackLoading ? (
+                    <div style={{
+                      padding: '40px 20px',
+                      textAlign: 'center',
+                      background: 'var(--bg-gray)',
+                      borderRadius: '12px',
+                    }}>
+                      <div style={{
+                        width: '24px',
+                        height: '24px',
+                        border: '3px solid var(--border)',
+                        borderTopColor: 'var(--primary)',
+                        borderRadius: '50%',
+                        animation: 'spin 1s linear infinite',
+                        margin: '0 auto 12px',
+                      }} />
+                      <p style={{ fontSize: '13px', color: 'var(--text-muted)', margin: 0 }}>
+                        Loading feedback...
+                      </p>
+                    </div>
+                  ) : allFeedback.length === 0 ? (
                     <div style={{
                       padding: '40px 20px',
                       textAlign: 'center',
@@ -1067,7 +1071,7 @@ export default function IdeasDrawer({ isOpen, onClose, initialTab, onStartTour }
                         const netVotes = item.upvotes.length - item.downvotes.length
                         const hasUpvoted = item.upvotes.includes(currentUserId)
                         const hasDownvoted = item.downvotes.includes(currentUserId)
-                        const isOwnFeedback = item.user === currentUserId
+                        const isOwnFeedback = item.user_id === currentUserId
 
                         return (
                           <div
@@ -1160,12 +1164,17 @@ export default function IdeasDrawer({ isOpen, onClose, initialTab, onStartTour }
                                   color: 'var(--text-muted)',
                                 }}>
                                   <span>
-                                    {new Date(item.timestamp).toLocaleDateString('en-US', {
+                                    {new Date(item.created_at).toLocaleDateString('en-US', {
                                       month: 'short',
                                       day: 'numeric',
                                       year: 'numeric',
                                     })}
                                   </span>
+                                  {item.user_email && (
+                                    <span style={{ color: 'var(--text-muted)', fontSize: '11px' }}>
+                                      {item.user_email.split('@')[0]}
+                                    </span>
+                                  )}
                                   {isOwnFeedback && (
                                     <span style={{
                                       padding: '2px 8px',
