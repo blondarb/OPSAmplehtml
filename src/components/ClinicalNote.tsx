@@ -549,35 +549,28 @@ export default function ClinicalNote({
     isSwitchingPatientRef.current = true
 
     // CRITICAL: Cancel any pending autosave timeout FIRST
-    // This prevents the old patient's data from being saved during the switch
     if (autosaveTimeoutRef.current) {
       clearTimeout(autosaveTimeoutRef.current)
       autosaveTimeoutRef.current = null
     }
 
-    // CRITICAL: Clear autosave for the OLD patient before switching
-    // This prevents cross-patient data contamination
-    if (patient?.id && patient.id !== appointment.patient.id) {
+    // SAVE the current patient's data before switching (if we have a patient)
+    if (patient?.id && noteData) {
       const oldAutosaveKey = `sevaro-autosave-${patient.id}-${currentVisit?.id || 'draft'}`
       try {
-        localStorage.removeItem(oldAutosaveKey)
-        console.log('Cleared autosave for previous patient:', patient.id)
+        localStorage.setItem(oldAutosaveKey, JSON.stringify({
+          data: noteData,
+          timestamp: Date.now(),
+          patientId: patient.id,
+          visitId: currentVisit?.id,
+        }))
+        console.log('Saved autosave for previous patient:', patient.id)
       } catch (e) {
-        console.error('Failed to clear old autosave:', e)
-      }
-
-      // CRITICAL: Also clear the NEW patient's autosave key to start fresh
-      // This prevents loading stale data from a previous session
-      const newAutosaveKey = `sevaro-autosave-${appointment.patient.id}-draft`
-      try {
-        localStorage.removeItem(newAutosaveKey)
-        console.log('Cleared any stale autosave for new patient:', appointment.patient.id)
-      } catch (e) {
-        console.error('Failed to clear new patient autosave:', e)
+        console.error('Failed to save old patient autosave:', e)
       }
     }
 
-    // Reset noteData immediately to prevent showing old data during load
+    // Reset noteData to empty while loading (prevents flash of old data)
     setNoteData({
       chiefComplaint: [],
       hpi: '',
@@ -592,7 +585,7 @@ export default function ClinicalNote({
       plan: '',
     })
 
-    // Prevent autosave from running until new data is loaded
+    // Allow autosave loading for the new patient
     setAutosaveLoaded(false)
 
     setSelectedAppointment(appointment)
@@ -728,8 +721,30 @@ export default function ClinicalNote({
         setExamFindings({})
         setExamSectionNotes({})
         setSelectedRecommendations([])
-        // Mark autosave as loaded since we just loaded fresh data from server
-        // This prevents the autosave useEffect from overwriting with stale localStorage data
+
+        // Now check for localStorage autosave for THIS patient and merge it
+        // This preserves any chart prep work done before seeing the patient
+        const newAutosaveKey = `sevaro-autosave-${appointment.patient.id}-${visit.id}`
+        try {
+          const saved = localStorage.getItem(newAutosaveKey)
+          if (saved) {
+            const parsed = JSON.parse(saved)
+            const isRecent = parsed.timestamp && Date.now() - parsed.timestamp < 24 * 60 * 60 * 1000
+            const patientMatches = parsed.patientId === appointment.patient.id
+
+            if (isRecent && parsed.data && patientMatches) {
+              console.log('Loading saved autosave data for patient:', appointment.patient.id)
+              setNoteData(prev => ({
+                ...prev,
+                ...parsed.data,
+              }))
+            }
+          }
+        } catch (e) {
+          console.error('Failed to load autosave for new patient:', e)
+        }
+
+        // Mark autosave as loaded - we've handled it manually
         setAutosaveLoaded(true)
       }
 
