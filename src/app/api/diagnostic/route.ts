@@ -6,6 +6,7 @@ export async function GET() {
   const supabase = await createClient()
   const diagnostics: Record<string, unknown> = {
     timestamp: new Date().toISOString(),
+    supabaseUrl: process.env.NEXT_PUBLIC_SUPABASE_URL || 'NOT SET',
     checks: {}
   }
 
@@ -64,6 +65,22 @@ export async function GET() {
       openai_key: {
         configured: !!apiKeySetting && !settingsError,
         error: settingsError?.message || null
+      }
+    }
+
+    // Check appointments table
+    const { data: aptData, error: aptError } = await supabase
+      .from('appointments')
+      .select('id')
+      .limit(1)
+
+    diagnostics.checks = {
+      ...diagnostics.checks as object,
+      appointments_table: {
+        exists: !aptError || !aptError.message.includes('does not exist'),
+        rowCount: aptData?.length ?? 0,
+        error: aptError?.message || null,
+        code: aptError?.code || null
       }
     }
 
