@@ -991,9 +991,10 @@ export default function PatientAppointments({ onSelectPatient, onScheduleNew, de
                           onClick={(e) => e.stopPropagation()}
                           style={{
                             position: 'absolute',
-                            right: '0',
-                            top: '100%',
-                            marginTop: '4px',
+                            left: '100%',
+                            top: '50%',
+                            transform: 'translateY(-50%)',
+                            marginLeft: '12px',
                             width: '420px',
                             maxHeight: '320px',
                             overflow: 'auto',
@@ -1048,9 +1049,10 @@ export default function PatientAppointments({ onSelectPatient, onScheduleNew, de
                           onClick={(e) => e.stopPropagation()}
                           style={{
                             position: 'absolute',
-                            right: '0',
-                            top: '100%',
-                            marginTop: '4px',
+                            left: '100%',
+                            top: '50%',
+                            transform: 'translateY(-50%)',
+                            marginLeft: '12px',
                             width: '460px',
                             maxHeight: '350px',
                             overflow: 'auto',
