@@ -71,6 +71,7 @@ export default function CenterPanel({
 }: CenterPanelProps) {
   const [activeTab, setActiveTab] = useState('history')
   const [localActiveField, setLocalActiveField] = useState<string | null>(null)
+  const [generatingAssessment, setGeneratingAssessment] = useState(false)
 
   // Tab customization state
   const [tabs, setTabs] = useState(DEFAULT_TABS)
@@ -334,6 +335,61 @@ export default function CenterPanel({
   const handleSetActiveField = (field: string | null) => {
     setLocalActiveField(field)
     if (setActiveTextField) setActiveTextField(field)
+  }
+
+  // Generate assessment using AI
+  const handleGenerateAssessment = async () => {
+    const diagnoses = noteData.differentialDiagnoses || []
+    if (diagnoses.length === 0) {
+      alert('Please select at least one diagnosis before generating an assessment.')
+      return
+    }
+
+    setGeneratingAssessment(true)
+    try {
+      const response = await fetch('/api/ai/generate-assessment', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          context: {
+            patientName: patient ? `${patient.first_name} ${patient.last_name}` : undefined,
+            patientAge: patient?.date_of_birth
+              ? Math.floor((Date.now() - new Date(patient.date_of_birth).getTime()) / (365.25 * 24 * 60 * 60 * 1000))
+              : undefined,
+            patientGender: patient?.gender,
+            chiefComplaints: noteData.chiefComplaint,
+            hpi: noteData.hpi,
+            ros: noteData.ros,
+            physicalExam: noteData.physicalExam,
+            selectedDiagnoses: diagnoses.map((d: Diagnosis) => ({
+              id: d.id,
+              name: d.name,
+              icd10: d.icd10,
+            })),
+          },
+        }),
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.error || 'Failed to generate assessment')
+      }
+
+      const data = await response.json()
+      if (data.assessment) {
+        // Append to existing assessment or set new one
+        const currentAssessment = noteData.assessment || ''
+        const newAssessment = currentAssessment
+          ? `${currentAssessment}\n\n--- AI Generated ---\n${data.assessment}`
+          : data.assessment
+        updateNote('assessment', newAssessment)
+      }
+    } catch (error: any) {
+      console.error('Error generating assessment:', error)
+      alert(error.message || 'Failed to generate assessment. Please try again.')
+    } finally {
+      setGeneratingAssessment(false)
+    }
   }
 
   // Copy note to clipboard
@@ -2293,27 +2349,45 @@ ${noteData.plan || 'Not documented'}
 
             {/* Generate Assessment Button */}
             <button
-              onClick={() => openAiDrawer('ask-ai')}
+              onClick={handleGenerateAssessment}
+              disabled={generatingAssessment || !(noteData.differentialDiagnoses?.length > 0)}
               style={{
                 display: 'inline-flex',
                 alignItems: 'center',
                 gap: '8px',
                 padding: '12px 20px',
-                background: '#F59E0B',
+                background: generatingAssessment ? '#9CA3AF' : (noteData.differentialDiagnoses?.length > 0 ? '#F59E0B' : '#D1D5DB'),
                 color: 'white',
                 border: 'none',
                 borderRadius: '8px',
                 fontWeight: 500,
-                cursor: 'pointer',
+                cursor: generatingAssessment || !(noteData.differentialDiagnoses?.length > 0) ? 'not-allowed' : 'pointer',
                 marginBottom: '16px',
                 fontSize: '14px',
+                opacity: generatingAssessment ? 0.7 : 1,
               }}
             >
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-                <path d="M12 1L13.5 9.5L22 12L13.5 14.5L12 23L10.5 14.5L2 12L10.5 9.5L12 1Z"/>
-              </svg>
-              Generate assessment
+              {generatingAssessment ? (
+                <>
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ animation: 'spin 1s linear infinite' }}>
+                    <path d="M21 12a9 9 0 11-6.219-8.56" />
+                  </svg>
+                  Generating...
+                </>
+              ) : (
+                <>
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M12 1L13.5 9.5L22 12L13.5 14.5L12 23L10.5 14.5L2 12L10.5 9.5L12 1Z"/>
+                  </svg>
+                  Generate assessment
+                </>
+              )}
             </button>
+            {!(noteData.differentialDiagnoses?.length > 0) && (
+              <p style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '-12px', marginBottom: '16px' }}>
+                Select a diagnosis above to enable AI assessment generation
+              </p>
+            )}
 
             {/* Assessment */}
             <div style={{ position: 'relative', marginBottom: '16px' }}>
