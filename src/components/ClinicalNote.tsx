@@ -213,6 +213,9 @@ export default function ClinicalNote({
   const [examFindings, setExamFindings] = useState<Record<string, boolean>>({})
   const [examSectionNotes, setExamSectionNotes] = useState<Record<string, string>>({})
 
+  // Track patient switching to prevent autosave race conditions
+  const isSwitchingPatientRef = useRef(false)
+
   // Generate a unique key for this visit's autosave data
   // CRITICAL: Include patient ID to prevent cross-patient data contamination
   const autosaveKey = `sevaro-autosave-${patient?.id || 'unknown'}-${currentVisit?.id || 'draft'}`
@@ -280,6 +283,12 @@ export default function ClinicalNote({
     // Don't autosave if we don't have a valid patient (prevents saving during patient switch)
     if (!patient?.id) return
 
+    // Don't autosave if we're in the middle of switching patients
+    if (isSwitchingPatientRef.current) {
+      console.log('Skipping autosave - patient switch in progress')
+      return
+    }
+
     // Mark as unsaved when data changes
     setAutosaveStatus('unsaved')
 
@@ -293,6 +302,12 @@ export default function ClinicalNote({
 
     // Set new timeout to save after 2 seconds of no changes
     autosaveTimeoutRef.current = setTimeout(() => {
+      // Double-check we're not switching patients
+      if (isSwitchingPatientRef.current) {
+        console.log('Skipping autosave - patient switch in progress (timeout)')
+        return
+      }
+
       // Double-check patient ID hasn't changed during the delay
       // This prevents saving old patient data to new patient's autosave key
       if (patient?.id !== currentPatientId) {
@@ -327,6 +342,9 @@ export default function ClinicalNote({
     const handleBeforeUnload = () => {
       // Don't save if no valid patient (prevents saving during transition)
       if (!patient?.id) return
+
+      // Don't save if switching patients
+      if (isSwitchingPatientRef.current) return
 
       try {
         localStorage.setItem(autosaveKey, JSON.stringify({
@@ -527,6 +545,16 @@ export default function ClinicalNote({
   const handleSelectPatient = async (appointment: Appointment) => {
     if (!appointment.patient) return
 
+    // Mark that we're switching patients - prevents autosave during transition
+    isSwitchingPatientRef.current = true
+
+    // CRITICAL: Cancel any pending autosave timeout FIRST
+    // This prevents the old patient's data from being saved during the switch
+    if (autosaveTimeoutRef.current) {
+      clearTimeout(autosaveTimeoutRef.current)
+      autosaveTimeoutRef.current = null
+    }
+
     // CRITICAL: Clear autosave for the OLD patient before switching
     // This prevents cross-patient data contamination
     if (patient?.id && patient.id !== appointment.patient.id) {
@@ -537,7 +565,35 @@ export default function ClinicalNote({
       } catch (e) {
         console.error('Failed to clear old autosave:', e)
       }
+
+      // CRITICAL: Also clear the NEW patient's autosave key to start fresh
+      // This prevents loading stale data from a previous session
+      const newAutosaveKey = `sevaro-autosave-${appointment.patient.id}-draft`
+      try {
+        localStorage.removeItem(newAutosaveKey)
+        console.log('Cleared any stale autosave for new patient:', appointment.patient.id)
+      } catch (e) {
+        console.error('Failed to clear new patient autosave:', e)
+      }
     }
+
+    // Reset noteData immediately to prevent showing old data during load
+    setNoteData({
+      chiefComplaint: [],
+      hpi: '',
+      ros: '',
+      rosDetails: '',
+      allergies: '',
+      allergyDetails: '',
+      historyAvailable: '',
+      historyDetails: '',
+      physicalExam: '',
+      assessment: '',
+      plan: '',
+    })
+
+    // Prevent autosave from running until new data is loaded
+    setAutosaveLoaded(false)
 
     setSelectedAppointment(appointment)
     setLoadingPatient(true)
@@ -686,6 +742,8 @@ export default function ClinicalNote({
       setActiveIcon('notes')
     } finally {
       setLoadingPatient(false)
+      // Mark patient switch as complete
+      isSwitchingPatientRef.current = false
     }
   }
 
