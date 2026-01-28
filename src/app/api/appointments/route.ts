@@ -36,7 +36,7 @@ export async function GET(request: NextRequest) {
           referring_physician,
           referral_reason
         ),
-        prior_visit:visits!appointments_prior_visit_id_fkey (
+        prior_visit:visits!prior_visit_id (
           id,
           visit_date,
           visit_type,
