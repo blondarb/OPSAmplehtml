@@ -254,9 +254,10 @@ The middleware (`src/middleware.ts`) handles session refresh. Uses a simplified 
 - `/api/ai/chart-prep` - Generate pre-visit summaries (gpt-4o-mini)
 - `/api/ai/field-action` - Field-level AI actions: Improve/Expand/Summarize (gpt-4o-mini)
 - `/api/ai/transcribe` - Voice transcription (Whisper + gpt-4o-mini cleanup)
-- `/api/ai/visit-ai` - Visit AI: transcribe and extract clinical content (gpt-5 - complex extraction)
-- `/api/ai/scale-autofill` - AI autofill for clinical scales from patient data (gpt-5)
-- `/api/ai/synthesize-note` - Note synthesis from multiple sources (gpt-5)
+- `/api/ai/visit-ai` - Visit AI: transcribe and extract clinical content (gpt-5.2 - complex extraction)
+- `/api/ai/scale-autofill` - AI autofill for clinical scales from patient data (gpt-5.2)
+- `/api/ai/synthesize-note` - Note synthesis from multiple sources (gpt-5.2)
+- `/api/ai/generate-assessment` - Generate clinical assessment from diagnoses (gpt-5.2)
 
 **Other Endpoints:**
 - `/api/phrases` - List and create dot phrases
@@ -329,10 +330,17 @@ When redeploying after changes, use "Redeploy without cache" to ensure fresh bui
 
 ## Recent Changes (January 2026)
 
+### Production Fixes & Generate Assessment (January 28, 2026)
+- **Cross-patient data contamination fix**: Autosave key now includes patient ID to prevent data leakage
+- **Generate Assessment feature**: New `/api/ai/generate-assessment` endpoint creates clinical assessments from selected diagnoses
+- **Diagnosis removal fix**: Removed diagnoses no longer re-appear from auto-population; recommendations update correctly
+- **Hover popover positioning**: Appointment row popovers now appear to the right instead of below
+- **GPT-5.2 upgrade**: All complex AI tasks now use latest GPT-5.2 model
+
 ### OpenAI Model Optimization (January 25, 2026)
 - **Simple tasks use gpt-4o-mini** ($0.15/$0.60 per 1M tokens): ask, chart-prep, transcribe, field-action
-- **Complex tasks use gpt-5** ($1.25/$10 per 1M tokens): visit-ai, scale-autofill, synthesize-note
-- ~93% cost reduction for simple tasks, 50% cheaper input for complex tasks with better reasoning
+- **Complex tasks use gpt-5.2** (latest): visit-ai, scale-autofill, synthesize-note, generate-assessment
+- ~93% cost reduction for simple tasks, best accuracy for complex clinical reasoning
 
 ### Clinical Scales & AI Autofill (January 24, 2026)
 - **New Scales**: UPDRS Motor (33-item Parkinson's), Hoehn & Yahr, EDSS (MS), CHA₂DS₂-VASc (stroke risk)
