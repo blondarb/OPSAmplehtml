@@ -134,7 +134,7 @@ ${diagnosisListFormatted}
 Generate a clinical assessment that addresses each diagnosis with relevant supporting findings. Format as a numbered list matching the diagnosis order above.`
 
     const completion = await openai.chat.completions.create({
-      model: 'gpt-4o-mini', // Cost-effective for structured generation
+      model: 'gpt-5', // Complex clinical reasoning task - use gpt-5 for better accuracy
       messages: [
         { role: 'system', content: systemPrompt },
         { role: 'user', content: userPrompt }
