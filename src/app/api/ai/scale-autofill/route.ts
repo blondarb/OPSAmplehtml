@@ -257,7 +257,7 @@ export async function POST(request: Request) {
     const prompt = buildExtractionPrompt(scale, clinicalText, patientContext)
 
     const completion = await openai.chat.completions.create({
-      model: 'gpt-5', // Best reasoning for structured extraction ($1.25/$10 per 1M tokens)
+      model: 'gpt-5.2', // Best reasoning for structured extraction ($1.25/$10 per 1M tokens)
       messages: [
         { role: 'system', content: 'You are a clinical documentation expert specializing in neurology. Extract structured data from clinical notes AND patient demographics/history accurately. Use all available patient data (age, sex, diagnoses, medications, vitals) to complete scale questions. Never hallucinate information not present in any data source.' },
         { role: 'user', content: prompt }

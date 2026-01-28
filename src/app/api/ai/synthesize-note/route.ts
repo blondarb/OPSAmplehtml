@@ -129,7 +129,7 @@ export async function POST(request: NextRequest) {
     const userPrompt = buildUserPrompt(context, noteType, noteLength)
 
     const response = await openai.chat.completions.create({
-      model: 'gpt-5', // Best reasoning for complex note synthesis ($1.25/$10 per 1M tokens)
+      model: 'gpt-5.2', // Best reasoning for complex note synthesis ($1.25/$10 per 1M tokens)
       messages: [
         { role: 'system', content: systemPrompt },
         { role: 'user', content: userPrompt },

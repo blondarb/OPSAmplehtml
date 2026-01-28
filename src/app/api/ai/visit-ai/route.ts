@@ -165,7 +165,7 @@ IMPORTANT: Return ONLY valid JSON, no markdown formatting.
 }${userPreferences}`
 
     const completion = await openai.chat.completions.create({
-      model: 'gpt-5', // Best reasoning for clinical extraction ($1.25/$10 per 1M tokens)
+      model: 'gpt-5.2', // Best reasoning for clinical extraction ($1.25/$10 per 1M tokens)
       messages: [
         { role: 'system', content: systemPrompt },
         { role: 'user', content: 'Extract and organize the clinical content from this visit transcript.' }
