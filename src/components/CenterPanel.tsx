@@ -345,6 +345,23 @@ export default function CenterPanel({
       return
     }
 
+    // Get user settings from localStorage
+    let userSettings = null
+    const savedSettings = localStorage.getItem('sevaro-user-settings')
+    if (savedSettings) {
+      try {
+        const parsed = JSON.parse(savedSettings)
+        userSettings = {
+          globalAiInstructions: parsed.globalAiInstructions || '',
+          sectionAiInstructions: parsed.sectionAiInstructions || {},
+          documentationStyle: parsed.documentationStyle || 'detailed',
+          preferredTerminology: parsed.preferredTerminology || 'standard',
+        }
+      } catch (e) {
+        console.error('Failed to parse user settings:', e)
+      }
+    }
+
     setGeneratingAssessment(true)
     try {
       const response = await fetch('/api/ai/generate-assessment', {
@@ -367,6 +384,7 @@ export default function CenterPanel({
               icd10: d.icd10,
             })),
           },
+          userSettings,
         }),
       })
 

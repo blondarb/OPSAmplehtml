@@ -19,6 +19,13 @@ interface AssessmentContext {
   selectedDiagnoses?: DiagnosisInput[]
 }
 
+interface UserSettings {
+  globalAiInstructions?: string
+  sectionAiInstructions?: Record<string, string>
+  documentationStyle?: 'concise' | 'detailed' | 'narrative'
+  preferredTerminology?: 'formal' | 'standard' | 'simplified'
+}
+
 export async function POST(request: Request) {
   try {
     // Check authentication
@@ -29,7 +36,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const { context }: { context: AssessmentContext } = await request.json()
+    const { context, userSettings }: { context: AssessmentContext; userSettings?: UserSettings } = await request.json()
 
     if (!context?.selectedDiagnoses || context.selectedDiagnoses.length === 0) {
       return NextResponse.json({
@@ -58,6 +65,46 @@ export async function POST(request: Request) {
       .map((d, i) => `${i + 1}. ${d.name} (${d.icd10})`)
       .join('\n')
 
+    // Build user preferences section
+    let userPreferences = ''
+    if (userSettings) {
+      const prefs: string[] = []
+
+      // Global AI instructions
+      if (userSettings.globalAiInstructions) {
+        prefs.push(`User preferences: ${userSettings.globalAiInstructions}`)
+      }
+
+      // Section-specific instructions for assessment
+      if (userSettings.sectionAiInstructions?.assessment) {
+        prefs.push(`Assessment section instructions: ${userSettings.sectionAiInstructions.assessment}`)
+      }
+
+      // Documentation style
+      if (userSettings.documentationStyle) {
+        const styleGuide: Record<string, string> = {
+          concise: 'Keep the output brief and focused on essential information only.',
+          detailed: 'Provide comprehensive coverage with thorough documentation.',
+          narrative: 'Write in a flowing, story-like prose format.',
+        }
+        prefs.push(styleGuide[userSettings.documentationStyle])
+      }
+
+      // Terminology preference
+      if (userSettings.preferredTerminology) {
+        const termGuide: Record<string, string> = {
+          formal: 'Use formal, academic medical terminology.',
+          standard: 'Use standard clinical terminology.',
+          simplified: 'Use simplified, accessible medical language.',
+        }
+        prefs.push(termGuide[userSettings.preferredTerminology])
+      }
+
+      if (prefs.length > 0) {
+        userPreferences = `\n\nUser Style Preferences:\n${prefs.join('\n')}`
+      }
+    }
+
     const systemPrompt = `You are a clinical documentation assistant for a neurology practice. Generate a concise, professional clinical assessment based on the provided patient information and selected diagnoses.
 
 Guidelines:
@@ -67,7 +114,7 @@ Guidelines:
 - Keep the assessment focused and concise (2-4 sentences per diagnosis)
 - Use appropriate clinical terminology
 - Do NOT make up information not provided in the context
-- If information is missing, focus on what IS available`
+- If information is missing, focus on what IS available${userPreferences}`
 
     const userPrompt = `Generate a clinical assessment for the following patient:
 
