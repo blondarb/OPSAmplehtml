@@ -684,8 +684,8 @@ export default function PatientAppointments({ onSelectPatient, onScheduleNew, de
                     </div>
                   </div>
 
-                  {/* Reason for Visit */}
-                  <div>
+                  {/* Reason for Visit - with hover popover anchor */}
+                  <div style={{ position: 'relative' }}>
                     <span style={{
                       display: 'inline-flex',
                       alignItems: 'center',
@@ -703,6 +703,130 @@ export default function PatientAppointments({ onSelectPatient, onScheduleNew, de
                       </svg>
                       {shortReason}
                     </span>
+
+                    {/* Referral Note Preview - New Consults (anchored to reason badge) */}
+                    {isHovered && isNewConsult && (
+                      <div
+                        onMouseEnter={handlePopoverEnter}
+                        onMouseLeave={handlePopoverLeave}
+                        onClick={(e) => e.stopPropagation()}
+                        style={{
+                          position: 'absolute',
+                          left: '0',
+                          top: '100%',
+                          marginTop: '8px',
+                          width: '420px',
+                          maxHeight: '320px',
+                          overflow: 'auto',
+                          background: 'var(--bg-white)',
+                          border: '1px solid var(--border)',
+                          borderRadius: '12px',
+                          boxShadow: '0 8px 24px rgba(0,0,0,0.15)',
+                          padding: '20px 24px',
+                          zIndex: 100,
+                          fontFamily: '"Courier New", Courier, monospace',
+                          cursor: 'default',
+                        }}
+                      >
+                        <div style={{ textAlign: 'center', fontWeight: 700, fontSize: '14px', letterSpacing: '1px', marginBottom: '4px' }}>
+                          REFERRAL NOTE
+                        </div>
+                        <div style={{ textAlign: 'center', fontSize: '12px', color: 'var(--text-muted)', marginBottom: '12px' }}>
+                          Neurology Consultation Request
+                        </div>
+                        <hr style={{ border: 'none', borderTop: '2px solid var(--primary)', marginBottom: '12px' }} />
+                        <div style={{ fontSize: '12px', lineHeight: '1.8' }}>
+                          <div><strong>DATE:</strong> {new Date(appointment.appointmentDate + 'T00:00:00').toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: 'numeric' })}</div>
+                          <div style={{ marginTop: '8px' }}>
+                            <strong>REFERRING PHYSICIAN:</strong><br />
+                            {appointment.patient?.referringPhysician || 'Not specified'}{appointment.patient?.referringPhysician ? ', DO' : ''}
+                            <br />
+                            <span style={{ color: 'var(--text-muted)' }}>Family Medicine</span>
+                          </div>
+                          <div style={{ marginTop: '8px' }}>
+                            <strong>CHIEF COMPLAINT:</strong><br />
+                            {appointment.patient?.referralReason || appointment.reasonForVisit || 'Not specified'}
+                          </div>
+                          <div style={{ marginTop: '8px' }}>
+                            <strong>CLINICAL HISTORY:</strong><br />
+                            {appointment.patient?.referralReason
+                              ? `Patient referred for evaluation of ${(appointment.patient.referralReason).toLowerCase()}. ${
+                                  appointment.patient.age ? `${appointment.patient.age} y/o` : 'Patient'
+                                } ${appointment.patient.gender === 'F' ? 'female' : appointment.patient.gender === 'M' ? 'male' : 'patient'} presenting with ${
+                                  appointment.reasonForVisit?.toLowerCase() || (appointment.patient.referralReason).toLowerCase()
+                                }. Please evaluate and advise on management.`
+                              : 'Clinical history not available in referral.'}
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* AI Visit Summary Preview - Follow-ups (anchored to reason badge) */}
+                    {isHovered && isFollowUp && appointment.priorVisit && (
+                      <div
+                        onMouseEnter={handlePopoverEnter}
+                        onMouseLeave={handlePopoverLeave}
+                        onClick={(e) => e.stopPropagation()}
+                        style={{
+                          position: 'absolute',
+                          left: '0',
+                          top: '100%',
+                          marginTop: '8px',
+                          width: '460px',
+                          maxHeight: '350px',
+                          overflow: 'auto',
+                          background: 'var(--bg-white)',
+                          border: '1px solid #BFDBFE',
+                          borderRadius: '12px',
+                          boxShadow: '0 8px 24px rgba(0,0,0,0.15)',
+                          padding: '20px 24px',
+                          zIndex: 100,
+                          cursor: 'default',
+                        }}
+                      >
+                        <div style={{ textAlign: 'center', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', marginBottom: '4px' }}>
+                          <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#3B82F6' }} />
+                          <span style={{ fontWeight: 700, fontSize: '13px', letterSpacing: '0.5px' }}>AI-GENERATED VISIT SUMMARY</span>
+                          <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#3B82F6' }} />
+                        </div>
+                        <div style={{ textAlign: 'center', fontSize: '11px', color: '#3B82F6', fontWeight: 600, letterSpacing: '1px', marginBottom: '12px' }}>
+                          PATIENT HISTORY OVERVIEW
+                        </div>
+                        <hr style={{ border: 'none', borderTop: '2px solid #3B82F6', marginBottom: '12px' }} />
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '12px', padding: '8px 12px', background: '#F0F9FF', borderRadius: '8px', border: '1px solid #BFDBFE' }}>
+                          <span style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>
+                            <strong>Last Visit:</strong> {new Date(appointment.priorVisit.visitDate.includes('T') ? appointment.priorVisit.visitDate : appointment.priorVisit.visitDate + 'T00:00:00').toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: 'numeric' })}
+                          </span>
+                          <span style={{
+                            padding: '2px 8px',
+                            background: '#DBEAFE',
+                            color: '#1D4ED8',
+                            borderRadius: '10px',
+                            fontSize: '11px',
+                            fontWeight: 600,
+                          }}>
+                            prior visit
+                          </span>
+                        </div>
+                        <div>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '8px' }}>
+                            <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>&#9660;</span>
+                            <span style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-primary)' }}>CLINICAL SUMMARY:</span>
+                          </div>
+                          <div style={{
+                            fontSize: '13px',
+                            lineHeight: '1.6',
+                            color: 'var(--text-secondary)',
+                            padding: '8px 12px',
+                            background: 'var(--bg-gray)',
+                            borderRadius: '8px',
+                            border: '1px solid var(--border)',
+                          }}>
+                            {appointment.priorVisit.aiSummary || 'No AI summary available for the prior visit.'}
+                          </div>
+                        </div>
+                      </div>
+                    )}
                   </div>
 
                   {/* Status */}
@@ -925,188 +1049,61 @@ export default function PatientAppointments({ onSelectPatient, onScheduleNew, de
                     )}
                   </div>
 
-                  {/* Hover Popovers */}
+                  {/* Quick Actions - Launch EPIC / PACS (shown on row hover) */}
                   {isHovered && (
-                    <>
-                      {/* Quick Actions - Launch EPIC / PACS */}
-                      <div
-                        onMouseEnter={handlePopoverEnter}
-                        onMouseLeave={handlePopoverLeave}
-                        onClick={(e) => e.stopPropagation()}
+                    <div
+                      onMouseEnter={handlePopoverEnter}
+                      onMouseLeave={handlePopoverLeave}
+                      onClick={(e) => e.stopPropagation()}
+                      style={{
+                        position: 'absolute',
+                        right: '60px',
+                        top: '50%',
+                        transform: 'translateY(-50%)',
+                        display: 'flex',
+                        gap: '6px',
+                        zIndex: 10,
+                      }}
+                    >
+                      <button
+                        onClick={(e) => { e.stopPropagation() }}
                         style={{
-                          position: 'absolute',
-                          right: '60px',
-                          top: '50%',
-                          transform: 'translateY(-50%)',
-                          display: 'flex',
-                          gap: '6px',
-                          zIndex: 10,
+                          padding: '6px 12px',
+                          borderRadius: '6px',
+                          border: '1px solid var(--border)',
+                          background: 'var(--bg-white)',
+                          color: 'var(--text-primary)',
+                          fontSize: '12px',
+                          fontWeight: 500,
+                          cursor: 'pointer',
+                          boxShadow: '0 2px 8px rgba(0,0,0,0.12)',
+                          whiteSpace: 'nowrap',
                         }}
+                        onMouseEnter={(e) => e.currentTarget.style.background = 'var(--bg-gray)'}
+                        onMouseLeave={(e) => e.currentTarget.style.background = 'var(--bg-white)'}
                       >
-                        <button
-                          onClick={(e) => { e.stopPropagation() }}
-                          style={{
-                            padding: '6px 12px',
-                            borderRadius: '6px',
-                            border: '1px solid var(--border)',
-                            background: 'var(--bg-white)',
-                            color: 'var(--text-primary)',
-                            fontSize: '12px',
-                            fontWeight: 500,
-                            cursor: 'pointer',
-                            boxShadow: '0 2px 8px rgba(0,0,0,0.12)',
-                            whiteSpace: 'nowrap',
-                          }}
-                          onMouseEnter={(e) => e.currentTarget.style.background = 'var(--bg-gray)'}
-                          onMouseLeave={(e) => e.currentTarget.style.background = 'var(--bg-white)'}
-                        >
-                          Launch EPIC
-                        </button>
-                        <button
-                          onClick={(e) => { e.stopPropagation() }}
-                          style={{
-                            padding: '6px 12px',
-                            borderRadius: '6px',
-                            border: '1px solid var(--border)',
-                            background: 'var(--bg-white)',
-                            color: 'var(--text-primary)',
-                            fontSize: '12px',
-                            fontWeight: 500,
-                            cursor: 'pointer',
-                            boxShadow: '0 2px 8px rgba(0,0,0,0.12)',
-                            whiteSpace: 'nowrap',
-                          }}
-                          onMouseEnter={(e) => e.currentTarget.style.background = 'var(--bg-gray)'}
-                          onMouseLeave={(e) => e.currentTarget.style.background = 'var(--bg-white)'}
-                        >
-                          Launch PACS
-                        </button>
-                      </div>
-
-                      {/* Referral Note Preview - New Consults */}
-                      {isNewConsult && (
-                        <div
-                          onMouseEnter={handlePopoverEnter}
-                          onMouseLeave={handlePopoverLeave}
-                          onClick={(e) => e.stopPropagation()}
-                          style={{
-                            position: 'absolute',
-                            right: '60px',
-                            top: '100%',
-                            marginTop: '8px',
-                            width: '420px',
-                            maxHeight: '320px',
-                            overflow: 'auto',
-                            background: 'var(--bg-white)',
-                            border: '1px solid var(--border)',
-                            borderRadius: '12px',
-                            boxShadow: '0 8px 24px rgba(0,0,0,0.15)',
-                            padding: '20px 24px',
-                            zIndex: 50,
-                            fontFamily: '"Courier New", Courier, monospace',
-                            cursor: 'default',
-                          }}
-                        >
-                          <div style={{ textAlign: 'center', fontWeight: 700, fontSize: '14px', letterSpacing: '1px', marginBottom: '4px' }}>
-                            REFERRAL NOTE
-                          </div>
-                          <div style={{ textAlign: 'center', fontSize: '12px', color: 'var(--text-muted)', marginBottom: '12px' }}>
-                            Neurology Consultation Request
-                          </div>
-                          <hr style={{ border: 'none', borderTop: '2px solid var(--primary)', marginBottom: '12px' }} />
-                          <div style={{ fontSize: '12px', lineHeight: '1.8' }}>
-                            <div><strong>DATE:</strong> {new Date(appointment.appointmentDate + 'T00:00:00').toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: 'numeric' })}</div>
-                            <div style={{ marginTop: '8px' }}>
-                              <strong>REFERRING PHYSICIAN:</strong><br />
-                              {appointment.patient?.referringPhysician || 'Not specified'}{appointment.patient?.referringPhysician ? ', DO' : ''}
-                              <br />
-                              <span style={{ color: 'var(--text-muted)' }}>Family Medicine</span>
-                            </div>
-                            <div style={{ marginTop: '8px' }}>
-                              <strong>CHIEF COMPLAINT:</strong><br />
-                              {appointment.patient?.referralReason || appointment.reasonForVisit || 'Not specified'}
-                            </div>
-                            <div style={{ marginTop: '8px' }}>
-                              <strong>CLINICAL HISTORY:</strong><br />
-                              {appointment.patient?.referralReason
-                                ? `Patient referred for evaluation of ${(appointment.patient.referralReason).toLowerCase()}. ${
-                                    appointment.patient.age ? `${appointment.patient.age} y/o` : 'Patient'
-                                  } ${appointment.patient.gender === 'F' ? 'female' : appointment.patient.gender === 'M' ? 'male' : 'patient'} presenting with ${
-                                    appointment.reasonForVisit?.toLowerCase() || (appointment.patient.referralReason).toLowerCase()
-                                  }. Please evaluate and advise on management.`
-                                : 'Clinical history not available in referral.'}
-                            </div>
-                          </div>
-                        </div>
-                      )}
-
-                      {/* AI Visit Summary Preview - Follow-ups */}
-                      {isFollowUp && appointment.priorVisit && (
-                        <div
-                          onMouseEnter={handlePopoverEnter}
-                          onMouseLeave={handlePopoverLeave}
-                          onClick={(e) => e.stopPropagation()}
-                          style={{
-                            position: 'absolute',
-                            right: '60px',
-                            top: '100%',
-                            marginTop: '8px',
-                            width: '460px',
-                            maxHeight: '350px',
-                            overflow: 'auto',
-                            background: 'var(--bg-white)',
-                            border: '1px solid #BFDBFE',
-                            borderRadius: '12px',
-                            boxShadow: '0 8px 24px rgba(0,0,0,0.15)',
-                            padding: '20px 24px',
-                            zIndex: 50,
-                            cursor: 'default',
-                          }}
-                        >
-                          <div style={{ textAlign: 'center', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', marginBottom: '4px' }}>
-                            <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#3B82F6' }} />
-                            <span style={{ fontWeight: 700, fontSize: '13px', letterSpacing: '0.5px' }}>AI-GENERATED VISIT SUMMARY</span>
-                            <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#3B82F6' }} />
-                          </div>
-                          <div style={{ textAlign: 'center', fontSize: '11px', color: '#3B82F6', fontWeight: 600, letterSpacing: '1px', marginBottom: '12px' }}>
-                            PATIENT HISTORY OVERVIEW
-                          </div>
-                          <hr style={{ border: 'none', borderTop: '2px solid #3B82F6', marginBottom: '12px' }} />
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '12px', padding: '8px 12px', background: '#F0F9FF', borderRadius: '8px', border: '1px solid #BFDBFE' }}>
-                            <span style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>
-                              <strong>Last Visit:</strong> {new Date(appointment.priorVisit.visitDate.includes('T') ? appointment.priorVisit.visitDate : appointment.priorVisit.visitDate + 'T00:00:00').toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: 'numeric' })}
-                            </span>
-                            <span style={{
-                              padding: '2px 8px',
-                              background: '#DBEAFE',
-                              color: '#1D4ED8',
-                              borderRadius: '10px',
-                              fontSize: '11px',
-                              fontWeight: 600,
-                            }}>
-                              prior visit
-                            </span>
-                          </div>
-                          <div>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '8px' }}>
-                              <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>&#9660;</span>
-                              <span style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-primary)' }}>CLINICAL SUMMARY:</span>
-                            </div>
-                            <div style={{
-                              fontSize: '13px',
-                              lineHeight: '1.6',
-                              color: 'var(--text-secondary)',
-                              padding: '8px 12px',
-                              background: 'var(--bg-gray)',
-                              borderRadius: '8px',
-                              border: '1px solid var(--border)',
-                            }}>
-                              {appointment.priorVisit.aiSummary || 'No AI summary available for the prior visit.'}
-                            </div>
-                          </div>
-                        </div>
-                      )}
-                    </>
+                        Launch EPIC
+                      </button>
+                      <button
+                        onClick={(e) => { e.stopPropagation() }}
+                        style={{
+                          padding: '6px 12px',
+                          borderRadius: '6px',
+                          border: '1px solid var(--border)',
+                          background: 'var(--bg-white)',
+                          color: 'var(--text-primary)',
+                          fontSize: '12px',
+                          fontWeight: 500,
+                          cursor: 'pointer',
+                          boxShadow: '0 2px 8px rgba(0,0,0,0.12)',
+                          whiteSpace: 'nowrap',
+                        }}
+                        onMouseEnter={(e) => e.currentTarget.style.background = 'var(--bg-gray)'}
+                        onMouseLeave={(e) => e.currentTarget.style.background = 'var(--bg-white)'}
+                      >
+                        Launch PACS
+                      </button>
+                    </div>
                   )}
                 </div>
               )
