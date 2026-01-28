@@ -109,13 +109,24 @@ export default function SmartRecommendationsSection({
 
   const planOptions = getRelevantPlanTitles()
 
-  // Reset selections when diagnosis changes
+  // Reset selections when the dropdown diagnosis changes
   useEffect(() => {
     setExpandedSections({})
     setExpandedSubsections({})
     setSelectedItems(new Map())
     setActiveReferenceTab(null)
   }, [selectedDiagnosisId])
+
+  // Reset plan builder when selected diagnoses change (from parent)
+  // This ensures recommendations update when diagnoses are added/removed
+  useEffect(() => {
+    // If the currently selected plan is no longer relevant, reset it
+    if (selectedDiagnosisId && !selectedDiagnoses.includes(selectedDiagnosisId)) {
+      setSelectedDiagnosisId(null)
+      setCurrentPlan(null)
+      setShowPlanBuilder(false)
+    }
+  }, [selectedDiagnoses, selectedDiagnosisId])
 
   const toggleSection = (sectionName: string) => {
     setExpandedSections(prev => ({

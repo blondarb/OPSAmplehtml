@@ -24,6 +24,8 @@ export default function DifferentialDiagnosisSection({
   const [showSearch, setShowSearch] = useState(false)
   const [expandedDiagnoses, setExpandedDiagnoses] = useState<Record<string, boolean>>({})
   const [searchCategory, setSearchCategory] = useState<string | null>(null)
+  // Track manually removed diagnoses to prevent auto-re-adding
+  const [manuallyRemoved, setManuallyRemoved] = useState<Set<string>>(new Set())
 
   // Auto-populate diagnoses from chief complaints
   const suggestedDiagnoses = useMemo(() => {
@@ -42,15 +44,18 @@ export default function DifferentialDiagnosisSection({
     return suggested
   }, [chiefComplaints])
 
-  // Auto-add suggested diagnoses that aren't already selected
+  // Auto-add suggested diagnoses that aren't already selected and haven't been manually removed
   useEffect(() => {
     const currentIds = new Set(selectedDiagnoses.map(d => d.id))
-    const newDiagnoses = suggestedDiagnoses.filter(d => !currentIds.has(d.id))
+    // Don't re-add diagnoses that were manually removed by the user
+    const newDiagnoses = suggestedDiagnoses.filter(d =>
+      !currentIds.has(d.id) && !manuallyRemoved.has(d.id)
+    )
 
     if (newDiagnoses.length > 0) {
       onDiagnosesChange([...selectedDiagnoses, ...newDiagnoses])
     }
-  }, [suggestedDiagnoses]) // Only run when suggested changes
+  }, [suggestedDiagnoses, manuallyRemoved]) // Run when suggested or removed changes
 
   // Search results
   const searchResults = useMemo(() => {
@@ -71,6 +76,8 @@ export default function DifferentialDiagnosisSection({
   }
 
   const removeDiagnosis = (diagnosisId: string) => {
+    // Track that this diagnosis was manually removed so it won't be auto-added again
+    setManuallyRemoved(prev => new Set([...prev, diagnosisId]))
     onDiagnosesChange(selectedDiagnoses.filter(d => d.id !== diagnosisId))
   }
 
