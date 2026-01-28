@@ -214,7 +214,8 @@ export default function ClinicalNote({
   const [examSectionNotes, setExamSectionNotes] = useState<Record<string, string>>({})
 
   // Generate a unique key for this visit's autosave data
-  const autosaveKey = `sevaro-autosave-${currentVisit?.id || 'draft'}`
+  // CRITICAL: Include patient ID to prevent cross-patient data contamination
+  const autosaveKey = `sevaro-autosave-${patient?.id || 'unknown'}-${currentVisit?.id || 'draft'}`
 
   // Initialize with visit data first (SSR-safe)
   // For testing: start with a clean/empty chart
@@ -244,11 +245,19 @@ export default function ClinicalNote({
       if (saved) {
         const parsed = JSON.parse(saved)
         // Check if autosave is recent (within last 24 hours)
-        if (parsed.timestamp && Date.now() - parsed.timestamp < 24 * 60 * 60 * 1000 && parsed.data) {
+        // AND validate that patient ID matches to prevent cross-patient contamination
+        const isRecent = parsed.timestamp && Date.now() - parsed.timestamp < 24 * 60 * 60 * 1000
+        const patientMatches = !parsed.patientId || parsed.patientId === patient?.id
+
+        if (isRecent && parsed.data && patientMatches) {
           setNoteData(prev => ({
             ...prev,
             ...parsed.data,
           }))
+        } else if (!patientMatches) {
+          // Clear mismatched autosave data
+          console.warn('Autosave patient mismatch - clearing stale data')
+          localStorage.removeItem(autosaveKey)
         }
       }
     } catch (e) {
@@ -256,7 +265,7 @@ export default function ClinicalNote({
       console.error('Failed to load autosave:', e)
     }
     setAutosaveLoaded(true)
-  }, [autosaveKey, autosaveLoaded])
+  }, [autosaveKey, autosaveLoaded, patient?.id])
 
   // Autosave status
   const [autosaveStatus, setAutosaveStatus] = useState<'saved' | 'saving' | 'unsaved'>('saved')
@@ -283,6 +292,8 @@ export default function ClinicalNote({
         localStorage.setItem(autosaveKey, JSON.stringify({
           data: noteData,
           timestamp: Date.now(),
+          patientId: patient?.id, // Store patient ID for validation
+          visitId: currentVisit?.id,
         }))
         setAutosaveStatus('saved')
       } catch (e) {
@@ -305,6 +316,8 @@ export default function ClinicalNote({
         localStorage.setItem(autosaveKey, JSON.stringify({
           data: noteData,
           timestamp: Date.now(),
+          patientId: patient?.id,
+          visitId: currentVisit?.id,
         }))
       } catch (e) {
         // Silent fail on unload
@@ -313,7 +326,7 @@ export default function ClinicalNote({
 
     window.addEventListener('beforeunload', handleBeforeUnload)
     return () => window.removeEventListener('beforeunload', handleBeforeUnload)
-  }, [noteData, autosaveKey])
+  }, [noteData, autosaveKey, patient?.id, currentVisit?.id])
 
   // Raw dictation storage - keyed by field name, stores array of dictations with timestamps
   const migrateRawDictation = (data: any): Record<string, Array<{ text: string; timestamp: string }>> => {
@@ -497,6 +510,18 @@ export default function ClinicalNote({
   // Handle selecting a patient from appointments list
   const handleSelectPatient = async (appointment: Appointment) => {
     if (!appointment.patient) return
+
+    // CRITICAL: Clear autosave for the OLD patient before switching
+    // This prevents cross-patient data contamination
+    if (patient?.id && patient.id !== appointment.patient.id) {
+      const oldAutosaveKey = `sevaro-autosave-${patient.id}-${currentVisit?.id || 'draft'}`
+      try {
+        localStorage.removeItem(oldAutosaveKey)
+        console.log('Cleared autosave for previous patient:', patient.id)
+      } catch (e) {
+        console.error('Failed to clear old autosave:', e)
+      }
+    }
 
     setSelectedAppointment(appointment)
     setLoadingPatient(true)
