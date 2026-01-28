@@ -277,6 +277,9 @@ export default function ClinicalNote({
     // Don't start autosave until autosave data has been loaded
     if (!autosaveLoaded) return
 
+    // Don't autosave if we don't have a valid patient (prevents saving during patient switch)
+    if (!patient?.id) return
+
     // Mark as unsaved when data changes
     setAutosaveStatus('unsaved')
 
@@ -285,8 +288,18 @@ export default function ClinicalNote({
       clearTimeout(autosaveTimeoutRef.current)
     }
 
+    // Capture current patient ID to validate in the timeout callback
+    const currentPatientId = patient.id
+
     // Set new timeout to save after 2 seconds of no changes
     autosaveTimeoutRef.current = setTimeout(() => {
+      // Double-check patient ID hasn't changed during the delay
+      // This prevents saving old patient data to new patient's autosave key
+      if (patient?.id !== currentPatientId) {
+        console.log('Patient changed during autosave delay, skipping save')
+        return
+      }
+
       setAutosaveStatus('saving')
       try {
         localStorage.setItem(autosaveKey, JSON.stringify({
@@ -307,11 +320,14 @@ export default function ClinicalNote({
         clearTimeout(autosaveTimeoutRef.current)
       }
     }
-  }, [noteData, autosaveKey, autosaveLoaded])
+  }, [noteData, autosaveKey, autosaveLoaded, patient?.id])
 
   // Save immediately on beforeunload
   useEffect(() => {
     const handleBeforeUnload = () => {
+      // Don't save if no valid patient (prevents saving during transition)
+      if (!patient?.id) return
+
       try {
         localStorage.setItem(autosaveKey, JSON.stringify({
           data: noteData,
@@ -656,7 +672,9 @@ export default function ClinicalNote({
         setExamFindings({})
         setExamSectionNotes({})
         setSelectedRecommendations([])
-        setAutosaveLoaded(false) // Allow autosave to load for new visit
+        // Mark autosave as loaded since we just loaded fresh data from server
+        // This prevents the autosave useEffect from overwriting with stale localStorage data
+        setAutosaveLoaded(true)
       }
 
       setViewMode('chart')
