@@ -5,6 +5,8 @@ import {
   type ClinicalPlan,
   type RecommendationItem,
 } from '@/lib/recommendationPlans'
+import { sortSections, sortSubsections } from '@/lib/recommendationOrdering'
+import type { SavedPlan } from '@/lib/savedPlanTypes'
 
 interface SmartRecommendationsSectionProps {
   onAddToPlan: (items: string[]) => void
@@ -21,22 +23,7 @@ const PRIORITY_COLORS: Record<string, { bg: string; text: string }> = {
   '—': { bg: '#F3F4F6', text: '#9CA3AF' },
 }
 
-// Section ordering - common/important first
-const SECTION_ORDER = [
-  'Laboratory Workup',
-  'Imaging & Studies',
-  'Treatment',
-  'Referrals & Follow-up',
-  'Patient Instructions',
-]
-
-// Subsection ordering - common first, specialized last
-const SUBSECTION_ORDER_MAP: Record<string, string[]> = {
-  'Laboratory Workup': ['Essential Labs', 'Baseline Labs (Pre-DMT)', 'Routine Monitoring', 'Toxicology', 'Infectious Disease Screening', 'Extended Workup', 'Additional Testing', 'If Specific Etiology Suspected', 'If Autoimmune Suspected', 'If Etiology Undetermined'],
-  'Imaging & Studies': ['Essential Imaging', 'Baseline MRI', 'Electrodiagnostic Studies', 'Cardiac Evaluation', 'Vascular Imaging', 'Follow-up Imaging', 'Other Studies', 'Imaging', 'Additional Studies', 'Additional Testing', 'Specialized', 'If Refractory', 'Follow-up Brain Imaging'],
-  'Treatment': ['First-Line ASMs', 'Platform/Moderate Efficacy DMTs', 'Higher Efficacy DMTs', 'Antiplatelet Therapy', 'Treat Underlying Cause', 'Neuropathic Pain Management - First Line', 'ASM Optimization', 'Risk Factor Management', 'Second-Line Options', 'Second Line Options', 'Anticoagulation (if AFib/cardioembolic)', 'Rescue Medications', 'Symptomatic Management', 'Topical Therapies', 'Neuroprotection'],
-  'Referrals & Follow-up': ['Essential', 'Rehabilitation', 'Additional', 'Supportive', 'Specialized'],
-}
+// Section and subsection ordering now imported from @/lib/recommendationOrdering
 
 // Icon tooltip types
 type TooltipType = 'rationale' | 'indication' | 'timing' | 'target' | 'contraindications' | 'monitoring'
@@ -101,6 +88,20 @@ export default function SmartRecommendationsSection({
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
+  // Saved plans state
+  const [savedPlans, setSavedPlans] = useState<SavedPlan[]>([])
+  const [showSaveDialog, setShowSaveDialog] = useState(false)
+  const [showLoadDialog, setShowLoadDialog] = useState(false)
+  const [savePlanName, setSavePlanName] = useState('')
+  const [savePlanDescription, setSavePlanDescription] = useState('')
+  const [isSaving, setIsSaving] = useState(false)
+  const [saveError, setSaveError] = useState<string | null>(null)
+
+  // Plan search state
+  const [planSearchQuery, setPlanSearchQuery] = useState('')
+  const [planSearchResults, setPlanSearchResults] = useState<{ plan_id: string; title: string; icd10_codes: string[]; linked_diagnoses: string[] }[]>([])
+  const [isSearching, setIsSearching] = useState(false)
+
   // Fetch all available plans on mount
   useEffect(() => {
     const fetchPlans = async () => {
@@ -144,6 +145,202 @@ export default function SmartRecommendationsSection({
       setIsLoading(false)
     }
   }, [])
+
+  // Fetch plan by its plan_key directly (used by search)
+  const fetchPlanByKey = useCallback(async (planKey: string) => {
+    setIsLoading(true)
+    setError(null)
+    try {
+      const response = await fetch(`/api/plans?planKey=${encodeURIComponent(planKey)}`)
+      if (response.ok) {
+        const data = await response.json()
+        if (data.plan) {
+          setCurrentPlan(data.plan)
+          setShowPlanBuilder(true)
+        } else {
+          setError('Plan not found')
+          setCurrentPlan(null)
+        }
+      } else {
+        setError('Failed to fetch plan')
+        setCurrentPlan(null)
+      }
+    } catch (err) {
+      console.error('Failed to fetch plan by key:', err)
+      setError('Failed to fetch plan')
+      setCurrentPlan(null)
+    } finally {
+      setIsLoading(false)
+    }
+  }, [])
+
+  // Fetch saved plans for current user
+  const fetchSavedPlans = useCallback(async () => {
+    try {
+      const response = await fetch('/api/saved-plans')
+      if (response.ok) {
+        const data = await response.json()
+        setSavedPlans(data.plans || [])
+      }
+    } catch (err) {
+      console.error('Failed to fetch saved plans:', err)
+    }
+  }, [])
+
+  // Load saved plans on mount
+  useEffect(() => {
+    fetchSavedPlans()
+  }, [fetchSavedPlans])
+
+  // Debounced plan search
+  useEffect(() => {
+    if (!planSearchQuery.trim()) {
+      setPlanSearchResults([])
+      return
+    }
+    const timer = setTimeout(async () => {
+      setIsSearching(true)
+      try {
+        const response = await fetch(`/api/plans?search=${encodeURIComponent(planSearchQuery.trim())}`)
+        if (response.ok) {
+          const data = await response.json()
+          setPlanSearchResults(data.plans || [])
+        }
+      } catch (err) {
+        console.error('Plan search failed:', err)
+      } finally {
+        setIsSearching(false)
+      }
+    }, 300)
+    return () => clearTimeout(timer)
+  }, [planSearchQuery])
+
+  // Save current selections as a saved plan
+  const handleSavePlan = async () => {
+    if (!savePlanName.trim()) return
+    setIsSaving(true)
+    setSaveError(null)
+
+    // Convert selectedItems Map<string, Set<string>> to Record<string, string[]>
+    const selectedRecord: Record<string, string[]> = {}
+    selectedItems.forEach((items, key) => {
+      const arr = Array.from(items)
+      if (arr.length > 0) {
+        // Separate custom items from standard items
+        const standard = arr.filter(i => !i.startsWith('[Custom] '))
+        const custom = arr.filter(i => i.startsWith('[Custom] '))
+        if (standard.length > 0) selectedRecord[key] = standard
+        if (custom.length > 0) {
+          if (!selectedRecord[`__custom__${key}`]) {
+            selectedRecord[`__custom__${key}`] = custom
+          }
+        }
+      }
+    })
+
+    // Build custom items from the custom items that are in selectedItems
+    const customRecord: Record<string, string[]> = {}
+    selectedItems.forEach((items, key) => {
+      const customArr = Array.from(items).filter(i => i.startsWith('[Custom] '))
+      if (customArr.length > 0) {
+        customRecord[key] = customArr
+      }
+    })
+
+    try {
+      const response = await fetch('/api/saved-plans', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: savePlanName.trim(),
+          description: savePlanDescription.trim() || undefined,
+          source_plan_key: currentPlan?.id || undefined,
+          selected_items: selectedRecord,
+          custom_items: customRecord,
+        }),
+      })
+
+      if (response.status === 409) {
+        setSaveError('Maximum of 10 saved plans reached. Delete one to save a new plan.')
+        setIsSaving(false)
+        return
+      }
+
+      if (!response.ok) {
+        const data = await response.json()
+        setSaveError(data.error || 'Failed to save plan')
+        setIsSaving(false)
+        return
+      }
+
+      // Success - refresh list and close dialog
+      await fetchSavedPlans()
+      setShowSaveDialog(false)
+      setSavePlanName('')
+      setSavePlanDescription('')
+    } catch (err) {
+      setSaveError('Failed to save plan')
+    } finally {
+      setIsSaving(false)
+    }
+  }
+
+  // Load a saved plan — applies selections + custom items to component state
+  const handleLoadPlan = async (plan: SavedPlan) => {
+    // If plan has a source_plan_key and we don't have that plan loaded, load it first
+    if (plan.source_plan_key && currentPlan?.id !== plan.source_plan_key) {
+      // Find the plan in availablePlans and select it
+      const matchingPlan = availablePlans.find(p => p.plan_id === plan.source_plan_key)
+      if (matchingPlan) {
+        setSelectedDiagnosisId(matchingPlan.plan_id)
+        await fetchPlanForDiagnosis(matchingPlan.linked_diagnoses[0] || matchingPlan.plan_id)
+      }
+    }
+
+    // Apply saved selections to state
+    const newSelectedItems = new Map<string, Set<string>>()
+    if (plan.selected_items) {
+      Object.entries(plan.selected_items).forEach(([key, items]) => {
+        if (Array.isArray(items) && !key.startsWith('__custom__')) {
+          newSelectedItems.set(key, new Set(items))
+        }
+      })
+    }
+
+    // Merge custom items into the selected items
+    if (plan.custom_items) {
+      Object.entries(plan.custom_items).forEach(([key, items]) => {
+        if (Array.isArray(items)) {
+          const existing = newSelectedItems.get(key) || new Set()
+          items.forEach(item => existing.add(item))
+          newSelectedItems.set(key, existing)
+        }
+      })
+    }
+
+    setSelectedItems(newSelectedItems)
+    setShowLoadDialog(false)
+
+    // Track usage
+    try {
+      await fetch(`/api/saved-plans/${plan.id}`, { method: 'PATCH' })
+      fetchSavedPlans() // refresh counts
+    } catch {
+      // non-critical
+    }
+  }
+
+  // Delete a saved plan
+  const handleDeleteSavedPlan = async (planId: string) => {
+    try {
+      const response = await fetch(`/api/saved-plans/${planId}`, { method: 'DELETE' })
+      if (response.ok) {
+        setSavedPlans(prev => prev.filter(p => p.id !== planId))
+      }
+    } catch (err) {
+      console.error('Failed to delete saved plan:', err)
+    }
+  }
 
   // Get plan titles that match selected diagnoses ONLY
   // Plans are only shown when diagnoses are selected
@@ -236,30 +433,14 @@ export default function SmartRecommendationsSection({
     }
   }
 
-  // Sort sections according to predefined order
+  // Sort sections according to canonical order (from recommendationOrdering)
   const getSortedSections = (sections: Record<string, Record<string, RecommendationItem[]>>) => {
-    const sectionNames = Object.keys(sections)
-    return sectionNames.sort((a, b) => {
-      const indexA = SECTION_ORDER.indexOf(a)
-      const indexB = SECTION_ORDER.indexOf(b)
-      // If not in order list, put at end
-      const orderA = indexA === -1 ? 999 : indexA
-      const orderB = indexB === -1 ? 999 : indexB
-      return orderA - orderB
-    })
+    return sortSections(Object.keys(sections))
   }
 
-  // Sort subsections according to predefined order for the section
+  // Sort subsections according to canonical order for the section
   const getSortedSubsections = (sectionName: string, subsections: Record<string, RecommendationItem[]>) => {
-    const subsectionNames = Object.keys(subsections)
-    const orderList = SUBSECTION_ORDER_MAP[sectionName] || []
-    return subsectionNames.sort((a, b) => {
-      const indexA = orderList.indexOf(a)
-      const indexB = orderList.indexOf(b)
-      const orderA = indexA === -1 ? 999 : indexA
-      const orderB = indexB === -1 ? 999 : indexB
-      return orderA - orderB
-    })
+    return sortSubsections(sectionName, Object.keys(subsections))
   }
 
   const toggleItem = (sectionKey: string, itemText: string) => {
@@ -575,29 +756,262 @@ export default function SmartRecommendationsSection({
             Legend
           </button>
         </div>
-        {getTotalSelectedCount() > 0 && (
-          <button
-            onClick={handleAddSelectedToPlan}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '6px',
-              padding: '8px 16px',
-              borderRadius: '8px',
-              border: 'none',
-              background: 'var(--primary)',
-              color: 'white',
-              fontSize: '13px',
-              fontWeight: 500,
-              cursor: 'pointer',
-            }}
-          >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <path d="M12 5v14M5 12h14" />
-            </svg>
-            Add {getTotalSelectedCount()} to Plan
-          </button>
-        )}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+          {/* Load saved plan button */}
+          {savedPlans.length > 0 && (
+            <div style={{ position: 'relative' }}>
+              <button
+                onClick={() => { setShowLoadDialog(!showLoadDialog); setShowSaveDialog(false) }}
+                title="Load saved plan"
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '4px',
+                  padding: '6px 10px',
+                  borderRadius: '6px',
+                  border: '1px solid var(--border)',
+                  background: showLoadDialog ? 'var(--bg-gray)' : 'var(--bg-white)',
+                  color: 'var(--text-secondary)',
+                  fontSize: '12px',
+                  cursor: 'pointer',
+                }}
+              >
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z" />
+                </svg>
+                Load
+              </button>
+
+              {/* Load dialog dropdown */}
+              {showLoadDialog && (
+                <div style={{
+                  position: 'absolute',
+                  top: '100%',
+                  right: 0,
+                  marginTop: '4px',
+                  width: '320px',
+                  maxHeight: '360px',
+                  overflowY: 'auto',
+                  background: 'var(--bg-white)',
+                  border: '1px solid var(--border)',
+                  borderRadius: '8px',
+                  boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+                  zIndex: 50,
+                  padding: '8px',
+                }}>
+                  <div style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-muted)', padding: '4px 8px 8px', borderBottom: '1px solid var(--border)', marginBottom: '4px' }}>
+                    Saved Plans ({savedPlans.length})
+                  </div>
+                  {savedPlans.map(sp => (
+                    <div
+                      key={sp.id}
+                      style={{
+                        padding: '8px',
+                        borderRadius: '6px',
+                        border: '1px solid var(--border)',
+                        marginBottom: '4px',
+                        background: 'var(--bg-gray)',
+                      }}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '4px' }}>
+                        <span style={{ fontSize: '13px', fontWeight: 500, color: 'var(--text-primary)' }}>{sp.name}</span>
+                        <span style={{ fontSize: '10px', color: 'var(--text-muted)' }}>
+                          {sp.use_count > 0 ? `Used ${sp.use_count}×` : 'Never used'}
+                        </span>
+                      </div>
+                      {sp.description && (
+                        <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '6px' }}>{sp.description}</div>
+                      )}
+                      <div style={{ display: 'flex', gap: '6px', justifyContent: 'flex-end' }}>
+                        <button
+                          onClick={() => handleDeleteSavedPlan(sp.id)}
+                          style={{
+                            padding: '4px 8px',
+                            borderRadius: '4px',
+                            border: '1px solid #FECACA',
+                            background: '#FEF2F2',
+                            color: '#DC2626',
+                            fontSize: '11px',
+                            cursor: 'pointer',
+                          }}
+                        >
+                          Delete
+                        </button>
+                        <button
+                          onClick={() => handleLoadPlan(sp)}
+                          style={{
+                            padding: '4px 10px',
+                            borderRadius: '4px',
+                            border: 'none',
+                            background: 'var(--primary)',
+                            color: 'white',
+                            fontSize: '11px',
+                            fontWeight: 500,
+                            cursor: 'pointer',
+                          }}
+                        >
+                          Apply
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Save button — only shown when items are selected */}
+          {getTotalSelectedCount() > 0 && (
+            <div style={{ position: 'relative' }}>
+              <button
+                onClick={() => { setShowSaveDialog(!showSaveDialog); setShowLoadDialog(false); setSaveError(null) }}
+                title="Save current selections as a plan"
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '4px',
+                  padding: '6px 10px',
+                  borderRadius: '6px',
+                  border: '1px solid var(--border)',
+                  background: showSaveDialog ? 'var(--bg-gray)' : 'var(--bg-white)',
+                  color: 'var(--text-secondary)',
+                  fontSize: '12px',
+                  cursor: 'pointer',
+                }}
+              >
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2z" />
+                  <polyline points="17 21 17 13 7 13 7 21" />
+                  <polyline points="7 3 7 8 15 8" />
+                </svg>
+                Save
+              </button>
+
+              {/* Save dialog */}
+              {showSaveDialog && (
+                <div style={{
+                  position: 'absolute',
+                  top: '100%',
+                  right: 0,
+                  marginTop: '4px',
+                  width: '300px',
+                  background: 'var(--bg-white)',
+                  border: '1px solid var(--border)',
+                  borderRadius: '8px',
+                  boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+                  zIndex: 50,
+                  padding: '12px',
+                }}>
+                  <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '8px' }}>
+                    Save Plan
+                  </div>
+                  <input
+                    type="text"
+                    placeholder="Plan name (required)"
+                    value={savePlanName}
+                    onChange={(e) => setSavePlanName(e.target.value)}
+                    onKeyDown={(e) => { if (e.key === 'Enter') handleSavePlan() }}
+                    style={{
+                      width: '100%',
+                      padding: '8px 10px',
+                      borderRadius: '6px',
+                      border: '1px solid var(--border)',
+                      background: 'var(--bg-white)',
+                      fontSize: '13px',
+                      color: 'var(--text-primary)',
+                      marginBottom: '6px',
+                      boxSizing: 'border-box',
+                    }}
+                    autoFocus
+                  />
+                  <input
+                    type="text"
+                    placeholder="Description (optional)"
+                    value={savePlanDescription}
+                    onChange={(e) => setSavePlanDescription(e.target.value)}
+                    style={{
+                      width: '100%',
+                      padding: '8px 10px',
+                      borderRadius: '6px',
+                      border: '1px solid var(--border)',
+                      background: 'var(--bg-white)',
+                      fontSize: '12px',
+                      color: 'var(--text-primary)',
+                      marginBottom: '8px',
+                      boxSizing: 'border-box',
+                    }}
+                  />
+                  {saveError && (
+                    <div style={{ fontSize: '11px', color: '#DC2626', marginBottom: '6px' }}>{saveError}</div>
+                  )}
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
+                      {savedPlans.length} of 10 plans
+                    </span>
+                    <div style={{ display: 'flex', gap: '6px' }}>
+                      <button
+                        onClick={() => { setShowSaveDialog(false); setSaveError(null) }}
+                        style={{
+                          padding: '6px 10px',
+                          borderRadius: '4px',
+                          border: '1px solid var(--border)',
+                          background: 'var(--bg-white)',
+                          color: 'var(--text-secondary)',
+                          fontSize: '12px',
+                          cursor: 'pointer',
+                        }}
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        onClick={handleSavePlan}
+                        disabled={!savePlanName.trim() || isSaving}
+                        style={{
+                          padding: '6px 12px',
+                          borderRadius: '4px',
+                          border: 'none',
+                          background: savePlanName.trim() ? 'var(--primary)' : 'var(--border)',
+                          color: savePlanName.trim() ? 'white' : 'var(--text-muted)',
+                          fontSize: '12px',
+                          fontWeight: 500,
+                          cursor: savePlanName.trim() && !isSaving ? 'pointer' : 'not-allowed',
+                          opacity: isSaving ? 0.7 : 1,
+                        }}
+                      >
+                        {isSaving ? 'Saving...' : 'Save'}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Add to Plan button */}
+          {getTotalSelectedCount() > 0 && (
+            <button
+              onClick={handleAddSelectedToPlan}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                padding: '8px 16px',
+                borderRadius: '8px',
+                border: 'none',
+                background: 'var(--primary)',
+                color: 'white',
+                fontSize: '13px',
+                fontWeight: 500,
+                cursor: 'pointer',
+              }}
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M12 5v14M5 12h14" />
+              </svg>
+              Add {getTotalSelectedCount()} to Plan
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Legend Panel */}
@@ -655,6 +1069,109 @@ export default function SmartRecommendationsSection({
           </div>
         </div>
       )}
+
+      {/* Plan Search Bar — always visible */}
+      <div style={{ marginBottom: '12px' }}>
+        <div style={{ position: 'relative' }}>
+          <svg
+            width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--text-muted)" strokeWidth="2"
+            style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }}
+          >
+            <circle cx="11" cy="11" r="8" />
+            <path d="M21 21l-4.35-4.35" />
+          </svg>
+          <input
+            type="text"
+            placeholder="Search plans by name, ICD-10, or keyword..."
+            value={planSearchQuery}
+            onChange={(e) => setPlanSearchQuery(e.target.value)}
+            style={{
+              width: '100%',
+              padding: '8px 10px 8px 32px',
+              borderRadius: '8px',
+              border: '1px solid var(--border)',
+              background: 'var(--bg-white)',
+              fontSize: '13px',
+              color: 'var(--text-primary)',
+              boxSizing: 'border-box',
+            }}
+          />
+          {planSearchQuery && (
+            <button
+              onClick={() => setPlanSearchQuery('')}
+              style={{
+                position: 'absolute',
+                right: '8px',
+                top: '50%',
+                transform: 'translateY(-50%)',
+                background: 'none',
+                border: 'none',
+                color: 'var(--text-muted)',
+                cursor: 'pointer',
+                fontSize: '16px',
+                lineHeight: 1,
+                padding: '2px',
+              }}
+            >
+              ×
+            </button>
+          )}
+        </div>
+
+        {/* Search results */}
+        {planSearchQuery.trim() && (
+          <div style={{
+            marginTop: '8px',
+            border: '1px solid var(--border)',
+            borderRadius: '8px',
+            background: 'var(--bg-white)',
+            maxHeight: '200px',
+            overflowY: 'auto',
+          }}>
+            {isSearching ? (
+              <div style={{ padding: '12px', textAlign: 'center', fontSize: '12px', color: 'var(--text-muted)' }}>
+                Searching...
+              </div>
+            ) : planSearchResults.length > 0 ? (
+              planSearchResults.map(plan => (
+                <button
+                  key={plan.plan_id}
+                  onClick={() => {
+                    setSelectedDiagnosisId(plan.plan_id)
+                    fetchPlanByKey(plan.plan_id)
+                    setPlanSearchQuery('')
+                    setPlanSearchResults([])
+                  }}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    width: '100%',
+                    padding: '8px 12px',
+                    border: 'none',
+                    borderBottom: '1px solid var(--border)',
+                    background: selectedDiagnosisId === plan.plan_id ? 'var(--bg-gray)' : 'transparent',
+                    cursor: 'pointer',
+                    textAlign: 'left',
+                    fontSize: '13px',
+                    color: 'var(--text-primary)',
+                  }}
+                >
+                  <span>{plan.title}</span>
+                  <span style={{ fontSize: '10px', color: 'var(--text-muted)', marginLeft: '8px', flexShrink: 0 }}>
+                    {(plan.icd10_codes || []).slice(0, 3).join(', ')}
+                    {(plan.icd10_codes || []).length > 3 && '...'}
+                  </span>
+                </button>
+              ))
+            ) : (
+              <div style={{ padding: '12px', textAlign: 'center', fontSize: '12px', color: 'var(--text-muted)' }}>
+                No plans found for &ldquo;{planSearchQuery}&rdquo;
+              </div>
+            )}
+          </div>
+        )}
+      </div>
 
       {/* Diagnosis/Plan Selection Buttons - Only shown when diagnoses are selected */}
       {selectedDiagnoses.length > 0 && (

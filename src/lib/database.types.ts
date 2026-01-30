@@ -257,6 +257,112 @@ export interface Database {
           updated_at?: string
         }
       }
+      clinical_plans: {
+        Row: {
+          id: string
+          plan_key: string
+          title: string
+          icd10_codes: string[]
+          scope: string | null
+          notes: string[]
+          sections: Json
+          patient_instructions: string[]
+          referrals: string[]
+          differential: Json | null
+          evidence: Json | null
+          monitoring: Json | null
+          disposition: Json | null
+          source: string
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          plan_key: string
+          title: string
+          icd10_codes?: string[]
+          scope?: string | null
+          notes?: string[]
+          sections?: Json
+          patient_instructions?: string[]
+          referrals?: string[]
+          differential?: Json | null
+          evidence?: Json | null
+          monitoring?: Json | null
+          disposition?: Json | null
+          source?: string
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          plan_key?: string
+          title?: string
+          icd10_codes?: string[]
+          scope?: string | null
+          notes?: string[]
+          sections?: Json
+          patient_instructions?: string[]
+          referrals?: string[]
+          differential?: Json | null
+          evidence?: Json | null
+          monitoring?: Json | null
+          disposition?: Json | null
+          source?: string
+          created_at?: string
+          updated_at?: string
+        }
+      }
+      saved_plans: {
+        Row: {
+          id: string
+          tenant_id: string
+          user_id: string
+          name: string
+          description: string | null
+          source_plan_key: string | null
+          selected_items: Json
+          custom_items: Json
+          plan_overrides: Json
+          is_default: boolean
+          use_count: number
+          last_used: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          tenant_id?: string
+          user_id: string
+          name: string
+          description?: string | null
+          source_plan_key?: string | null
+          selected_items?: Json
+          custom_items?: Json
+          plan_overrides?: Json
+          is_default?: boolean
+          use_count?: number
+          last_used?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          tenant_id?: string
+          user_id?: string
+          name?: string
+          description?: string | null
+          source_plan_key?: string | null
+          selected_items?: Json
+          custom_items?: Json
+          plan_overrides?: Json
+          is_default?: boolean
+          use_count?: number
+          last_used?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+      }
       dot_phrases: {
         Row: {
           id: string
