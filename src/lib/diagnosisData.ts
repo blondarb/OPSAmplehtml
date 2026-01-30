@@ -407,12 +407,94 @@ export function getDiagnosesForConsultReason(consultReason: string): Diagnosis[]
     .filter((d): d is Diagnosis => d !== undefined)
 }
 
-// Helper: Search diagnoses by name or ICD-10
+// Common clinical abbreviations and synonyms → diagnosis IDs
+const DIAGNOSIS_SYNONYMS: Record<string, string[]> = {
+  'tia': ['tia'],
+  'ms': ['ms-new-diagnosis', 'ms-chronic-management', 'ms-exacerbation'],
+  'gbs': ['gbs'],
+  'cidp': ['cidp'],
+  'als': ['als'],
+  'mg': ['myasthenia-new', 'myasthenia-exacerbation', 'myasthenia-chronic'],
+  'nmo': ['nmo'],
+  'nmosd': ['nmo'],
+  'mog': ['mog-antibody-disease'],
+  'mogad': ['mog-antibody-disease'],
+  'pd': ['parkinsons-new', 'parkinsons-management', 'parkinsons-fluctuations'],
+  'et': ['essential-tremor'],
+  'rls': ['restless-legs-syndrome'],
+  'mci': ['mci'],
+  'iih': ['iih'],
+  'pres': ['pres'],
+  'rcvs': ['rcvs'],
+  'cjd': ['cjd'],
+  'nph': ['nph'],
+  'fnd': ['fnd'],
+  'pnes': ['pnes'],
+  'adem': ['adem'],
+  'pml': ['pml'],
+  'lems': ['lems'],
+  'ibm': ['ibm'],
+  'cvt': ['cvt'],
+  'gca': ['gca'],
+  'cte': ['cte'],
+  'tbi': ['tbi'],
+  'sah': ['sah'],
+  'ich': ['ich'],
+  'moh': ['medication-overuse-headache'],
+  'edss': ['ms-chronic-management'],
+  'nihss': ['acute-ischemic-stroke'],
+  'midas': ['migraine-unspecified', 'chronic-migraine'],
+  'stroke': ['acute-ischemic-stroke', 'post-stroke-management'],
+  'seizure': ['new-onset-seizure', 'breakthrough-seizure', 'epilepsy-management', 'status-epilepticus'],
+  'epilepsy': ['epilepsy-management', 'drug-resistant-epilepsy'],
+  'migraine': ['migraine-unspecified', 'migraine-with-aura', 'migraine-without-aura', 'chronic-migraine'],
+  'tremor': ['essential-tremor', 'parkinsons-new'],
+  'dementia': ['dementia-evaluation', 'alzheimers-disease', 'vascular-dementia', 'lewy-body-dementia', 'frontotemporal-dementia'],
+  'neuropathy': ['peripheral-neuropathy', 'diabetic-neuropathy', 'small-fiber-neuropathy'],
+  'parkinson': ['parkinsons-new', 'parkinsons-management', 'parkinsons-fluctuations'],
+  'parkinsons': ['parkinsons-new', 'parkinsons-management', 'parkinsons-fluctuations'],
+  'alzheimer': ['alzheimers-disease'],
+  'alzheimers': ['alzheimers-disease'],
+  'huntington': ['huntingtons-disease'],
+  'huntingtons': ['huntingtons-disease'],
+  'wilson': ['wilsons-disease'],
+  'wilsons': ['wilsons-disease'],
+  'bell': ['bells-palsy'],
+  'bells': ['bells-palsy'],
+  'cts': ['carpal-tunnel'],
+  'msa': ['msa'],
+  'psp': ['psp'],
+  'cbd': ['cbd'],
+  'ncse': ['ncse'],
+}
+
+// Helper: Search diagnoses by name, ICD-10, ID, or synonym
 export function searchDiagnoses(query: string): Diagnosis[] {
-  const lowerQuery = query.toLowerCase()
-  return getAllDiagnoses().filter(d =>
+  const lowerQuery = query.toLowerCase().trim()
+  const allDiags = getAllDiagnoses()
+
+  // Check synonym map for exact match first
+  const synonymIds = DIAGNOSIS_SYNONYMS[lowerQuery]
+  if (synonymIds) {
+    // Return synonym matches first, then regular substring matches (deduplicated)
+    const synonymResults = synonymIds
+      .map(id => allDiags.find(d => d.id === id))
+      .filter((d): d is Diagnosis => d !== undefined)
+    const substringResults = allDiags.filter(d =>
+      !synonymIds.includes(d.id) && (
+        d.name.toLowerCase().includes(lowerQuery) ||
+        d.icd10.toLowerCase().includes(lowerQuery) ||
+        d.id.toLowerCase().includes(lowerQuery)
+      )
+    )
+    return [...synonymResults, ...substringResults]
+  }
+
+  // Regular substring search across name, ICD-10, and ID
+  return allDiags.filter(d =>
     d.name.toLowerCase().includes(lowerQuery) ||
-    d.icd10.toLowerCase().includes(lowerQuery)
+    d.icd10.toLowerCase().includes(lowerQuery) ||
+    d.id.toLowerCase().includes(lowerQuery)
   )
 }
 
