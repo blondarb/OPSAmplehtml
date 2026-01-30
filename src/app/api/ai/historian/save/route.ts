@@ -13,6 +13,7 @@ export async function POST(request: Request) {
       .from('historian_sessions')
       .insert({
         tenant_id: tenant,
+        patient_id: body.patient_id || null,
         session_type: body.session_type || 'new_patient',
         patient_name: body.patient_name || '',
         referral_reason: body.referral_reason || null,

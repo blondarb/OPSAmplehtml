@@ -97,7 +97,7 @@ export async function fetchDashboardData() {
   try {
     const { data: sessions } = await supabase
       .from('historian_sessions')
-      .select('*')
+      .select('*, patient:patients(id, first_name, last_name, mrn)')
       .eq('tenant_id', tenant)
       .order('created_at', { ascending: false })
       .limit(10)

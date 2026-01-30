@@ -1,8 +1,8 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { getTenantClient } from '@/lib/tenant'
-import { DEMO_SCENARIOS } from '@/lib/historianTypes'
+import { DEMO_SCENARIOS, type PortalPatient } from '@/lib/historianTypes'
 
 type Tab = 'intake' | 'messages' | 'historian'
 
@@ -44,7 +44,67 @@ export default function PatientPortal() {
   const [msgLoading, setMsgLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
+  // Historian tab state
+  const [portalPatients, setPortalPatients] = useState<PortalPatient[]>([])
+  const [patientsLoading, setPatientsLoading] = useState(false)
+  const [showAddPatient, setShowAddPatient] = useState(false)
+  const [newFirstName, setNewFirstName] = useState('')
+  const [newLastName, setNewLastName] = useState('')
+  const [newReferral, setNewReferral] = useState('')
+  const [addingPatient, setAddingPatient] = useState(false)
+  const [showDemoScenarios, setShowDemoScenarios] = useState(false)
+
   const tenant = getTenantClient()
+
+  const fetchPatients = useCallback(async () => {
+    setPatientsLoading(true)
+    try {
+      const res = await fetch(`/api/patient/patients?tenant_id=${tenant}`)
+      if (res.ok) {
+        const data = await res.json()
+        setPortalPatients(data.patients || [])
+      }
+    } catch {
+      // Silently fail - patients list is optional
+    } finally {
+      setPatientsLoading(false)
+    }
+  }, [tenant])
+
+  // Load patients when historian tab is selected
+  useEffect(() => {
+    if (tab === 'historian') {
+      fetchPatients()
+    }
+  }, [tab, fetchPatients])
+
+  const handleAddPatient = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setAddingPatient(true)
+    setError(null)
+    try {
+      const res = await fetch('/api/patient/register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          first_name: newFirstName,
+          last_name: newLastName,
+          referral_reason: newReferral || null,
+          tenant_id: tenant,
+        }),
+      })
+      if (!res.ok) throw new Error('Failed to register patient')
+      setNewFirstName('')
+      setNewLastName('')
+      setNewReferral('')
+      setShowAddPatient(false)
+      fetchPatients()
+    } catch (err: any) {
+      setError(err.message)
+    } finally {
+      setAddingPatient(false)
+    }
+  }
 
   const handleIntakeSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -436,54 +496,255 @@ export default function PatientPortal() {
           <div>
             <h2 style={{ color: '#fff', margin: '0 0 4px', fontSize: '1.25rem' }}>AI Neurologic Historian</h2>
             <p style={{ color: '#94a3b8', margin: '0 0 24px', fontSize: '0.875rem' }}>
-              Complete your intake interview by speaking with our AI historian. It will ask you about your symptoms, medical history, and more.
+              Select your name to begin your intake interview, or add yourself as a new patient.
             </p>
 
-            <div style={{ display: 'grid', gap: '12px', marginBottom: '24px' }}>
-              {DEMO_SCENARIOS.map(scenario => (
-                <a
-                  key={scenario.id}
-                  href={`/patient/historian?scenario=${scenario.id}`}
-                  style={{
-                    display: 'block',
-                    textAlign: 'left',
-                    padding: '16px 20px',
-                    borderRadius: '12px',
-                    border: '1px solid #334155',
-                    background: '#1e293b',
-                    textDecoration: 'none',
-                    transition: 'border-color 0.15s ease',
-                  }}
-                >
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
-                    <span style={{
-                      display: 'inline-block',
-                      padding: '2px 8px',
-                      borderRadius: '4px',
-                      background: scenario.session_type === 'new_patient' ? 'rgba(139,92,246,0.2)' : 'rgba(13,148,136,0.2)',
-                      color: scenario.session_type === 'new_patient' ? '#a78bfa' : '#5eead4',
-                      fontSize: '0.7rem',
-                      fontWeight: 600,
-                      textTransform: 'uppercase',
+            {/* Patient list */}
+            {patientsLoading ? (
+              <div style={{ textAlign: 'center', padding: '24px 0', color: '#94a3b8', fontSize: '0.875rem' }}>
+                Loading patients...
+              </div>
+            ) : portalPatients.length > 0 ? (
+              <div style={{ display: 'grid', gap: '10px', marginBottom: '16px' }}>
+                {portalPatients.map(pt => (
+                  <a
+                    key={pt.id}
+                    href={`/patient/historian?patient_id=${pt.id}`}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '12px',
+                      padding: '14px 16px',
+                      borderRadius: '12px',
+                      border: '1px solid #334155',
+                      background: '#1e293b',
+                      textDecoration: 'none',
+                      transition: 'border-color 0.15s ease',
+                    }}
+                  >
+                    <div style={{
+                      width: 40, height: 40, borderRadius: '50%',
+                      background: 'linear-gradient(135deg, #0d9488, #14b8a6)',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      color: '#fff', fontWeight: 700, fontSize: '1rem',
+                      flexShrink: 0,
                     }}>
-                      {scenario.session_type === 'new_patient' ? 'New' : 'Follow-up'}
-                    </span>
+                      {pt.first_name.charAt(0)}{pt.last_name.charAt(0)}
+                    </div>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ color: '#fff', fontWeight: 600, fontSize: '0.95rem' }}>
+                        {pt.first_name} {pt.last_name}
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                        {pt.referral_reason && (
+                          <span style={{ color: '#94a3b8', fontSize: '0.75rem', lineHeight: 1.3 }}>
+                            {pt.referral_reason}
+                          </span>
+                        )}
+                        {pt.mrn && (
+                          <span style={{ color: '#64748b', fontSize: '0.7rem' }}>MRN: {pt.mrn}</span>
+                        )}
+                      </div>
+                    </div>
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#64748b" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
+                      <polyline points="9 18 15 12 9 6" />
+                    </svg>
+                  </a>
+                ))}
+              </div>
+            ) : (
+              <div style={{
+                textAlign: 'center',
+                padding: '24px',
+                borderRadius: '12px',
+                border: '1px dashed #334155',
+                marginBottom: '16px',
+                color: '#94a3b8',
+                fontSize: '0.875rem',
+              }}>
+                No patients found. Add yourself below to get started.
+              </div>
+            )}
+
+            {/* Add New Patient */}
+            {showAddPatient ? (
+              <form onSubmit={handleAddPatient} style={{
+                padding: '16px 20px',
+                borderRadius: '12px',
+                border: '1px solid #334155',
+                background: '#1e293b',
+                marginBottom: '16px',
+              }}>
+                <div style={{ fontWeight: 600, color: '#fff', fontSize: '0.9rem', marginBottom: '12px' }}>
+                  Add New Patient
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '12px' }}>
+                  <div>
+                    <label style={labelStyle}>First Name *</label>
+                    <input
+                      required
+                      style={inputStyle}
+                      value={newFirstName}
+                      onChange={e => setNewFirstName(e.target.value)}
+                      placeholder="Jane"
+                    />
                   </div>
-                  <div style={{ color: '#fff', fontWeight: 600, fontSize: '0.95rem', marginBottom: '4px' }}>
-                    {scenario.label}
+                  <div>
+                    <label style={labelStyle}>Last Name *</label>
+                    <input
+                      required
+                      style={inputStyle}
+                      value={newLastName}
+                      onChange={e => setNewLastName(e.target.value)}
+                      placeholder="Doe"
+                    />
                   </div>
-                  <div style={{ color: '#94a3b8', fontSize: '0.8rem', lineHeight: 1.4 }}>
-                    {scenario.description}
-                  </div>
-                </a>
-              ))}
+                </div>
+                <div style={{ marginBottom: '16px' }}>
+                  <label style={labelStyle}>Referral Reason</label>
+                  <input
+                    style={inputStyle}
+                    value={newReferral}
+                    onChange={e => setNewReferral(e.target.value)}
+                    placeholder="e.g., Chronic headaches, referred by PCP"
+                  />
+                </div>
+                <div style={{ display: 'flex', gap: '8px' }}>
+                  <button
+                    type="submit"
+                    disabled={addingPatient}
+                    style={{
+                      padding: '10px 20px',
+                      borderRadius: '8px',
+                      background: addingPatient ? '#64748b' : '#0d9488',
+                      color: '#fff',
+                      border: 'none',
+                      fontWeight: 600,
+                      fontSize: '0.875rem',
+                      cursor: addingPatient ? 'not-allowed' : 'pointer',
+                    }}
+                  >
+                    {addingPatient ? 'Adding...' : 'Add Patient'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setShowAddPatient(false)}
+                    style={{
+                      padding: '10px 20px',
+                      borderRadius: '8px',
+                      background: 'transparent',
+                      color: '#94a3b8',
+                      border: '1px solid #334155',
+                      fontWeight: 600,
+                      fontSize: '0.875rem',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </form>
+            ) : (
+              <button
+                onClick={() => setShowAddPatient(true)}
+                style={{
+                  width: '100%',
+                  padding: '12px',
+                  borderRadius: '10px',
+                  background: 'transparent',
+                  color: '#0d9488',
+                  border: '1px dashed #0d9488',
+                  fontWeight: 600,
+                  fontSize: '0.875rem',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '6px',
+                  marginBottom: '16px',
+                }}
+              >
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <line x1="12" y1="5" x2="12" y2="19" />
+                  <line x1="5" y1="12" x2="19" y2="12" />
+                </svg>
+                Add New Patient
+              </button>
+            )}
+
+            {/* Demo Scenarios (collapsible) */}
+            <div style={{ marginTop: '8px' }}>
+              <button
+                onClick={() => setShowDemoScenarios(!showDemoScenarios)}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  color: '#64748b',
+                  fontSize: '0.8rem',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '4px',
+                  padding: '8px 0',
+                }}
+              >
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
+                  style={{ transform: showDemoScenarios ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }}>
+                  <polyline points="6 9 12 15 18 9" />
+                </svg>
+                Or try a demo scenario
+              </button>
+
+              {showDemoScenarios && (
+                <div style={{ display: 'grid', gap: '10px', marginTop: '8px' }}>
+                  {DEMO_SCENARIOS.map(scenario => (
+                    <a
+                      key={scenario.id}
+                      href={`/patient/historian?scenario=${scenario.id}`}
+                      style={{
+                        display: 'block',
+                        textAlign: 'left',
+                        padding: '14px 16px',
+                        borderRadius: '12px',
+                        border: '1px solid #334155',
+                        background: '#1e293b',
+                        textDecoration: 'none',
+                        transition: 'border-color 0.15s ease',
+                      }}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
+                        <span style={{
+                          display: 'inline-block',
+                          padding: '2px 8px',
+                          borderRadius: '4px',
+                          background: scenario.session_type === 'new_patient' ? 'rgba(139,92,246,0.2)' : 'rgba(13,148,136,0.2)',
+                          color: scenario.session_type === 'new_patient' ? '#a78bfa' : '#5eead4',
+                          fontSize: '0.7rem',
+                          fontWeight: 600,
+                          textTransform: 'uppercase',
+                        }}>
+                          {scenario.session_type === 'new_patient' ? 'New' : 'Follow-up'}
+                        </span>
+                      </div>
+                      <div style={{ color: '#fff', fontWeight: 600, fontSize: '0.9rem', marginBottom: '4px' }}>
+                        {scenario.label}
+                      </div>
+                      <div style={{ color: '#94a3b8', fontSize: '0.8rem', lineHeight: 1.4 }}>
+                        {scenario.description}
+                      </div>
+                    </a>
+                  ))}
+                </div>
+              )}
             </div>
 
+            {/* How it works info */}
             <div style={{
               padding: '16px 20px',
               borderRadius: '12px',
               background: 'rgba(13,148,136,0.1)',
               border: '1px solid rgba(13,148,136,0.2)',
+              marginTop: '16px',
             }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#0d9488" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -494,7 +755,7 @@ export default function PatientPortal() {
                 <span style={{ color: '#5eead4', fontWeight: 600, fontSize: '0.8rem' }}>How it works</span>
               </div>
               <p style={{ color: '#94a3b8', fontSize: '0.8rem', margin: 0, lineHeight: 1.5 }}>
-                Select a scenario and speak with the AI historian using your microphone. It will ask you questions one at a time and generate a structured clinical summary for your neurologist.
+                Select your name above to start a voice interview with the AI historian. It will ask you questions one at a time about your symptoms, medical history, and more, then generate a structured clinical summary for your neurologist.
               </p>
             </div>
           </div>
