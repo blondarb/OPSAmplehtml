@@ -1,0 +1,322 @@
+# Test Cases - Sevaro Clinical
+# test_cases_version: 1.0
+# Last updated: 2026-01-30
+#
+# Structure: Each case has id, title, preconditions, steps, expected.
+# Organized by suite matching TEST_RUNBOOK.md sections.
+
+---
+smoke:
+  - id: S1
+    title: App loads and redirects
+    preconditions: [deployed preview URL available]
+    steps:
+      - Navigate to root URL /
+    expected: Redirects to /login (if logged out) or /dashboard (if session exists)
+
+  - id: S2
+    title: Login flow
+    preconditions: [valid demo user credentials]
+    steps:
+      - Navigate to /login
+      - Enter email and password
+      - Click Sign In
+    expected: Redirects to /dashboard, patient card visible in left sidebar
+
+  - id: S3
+    title: Tab navigation renders
+    preconditions: [logged in, on /dashboard]
+    steps:
+      - Click History tab
+      - Click Imaging/Results tab
+      - Click Physical Exams tab
+      - Click Recommendation tab
+    expected: Each tab renders content without console errors or blank screen
+
+  - id: S4
+    title: Patient portal loads
+    preconditions: [deployed preview URL available]
+    steps:
+      - Navigate to /patient
+    expected: Three tabs visible (Intake Form, Messages, AI Historian)
+
+  - id: S5
+    title: Build passes
+    preconditions: [local repo up to date]
+    steps:
+      - Run npm run build
+    expected: Exit code 0, "Compiled successfully" in output
+
+---
+clinical_notes:
+  - id: A1
+    title: HPI text persists across tabs
+    preconditions: [logged in, on History tab]
+    steps:
+      - Type text in HPI field
+      - Switch to Imaging tab
+      - Switch back to History tab
+    expected: HPI text still present
+
+  - id: A2
+    title: Reason for consult cascades
+    preconditions: [logged in, on History tab]
+    steps:
+      - Click Headache category
+      - Select a sub-option (e.g., Migraine with aura)
+    expected: Sub-options appear, differential diagnosis section auto-populates matching ICD-10 codes
+
+  - id: A3
+    title: Differential diagnosis management
+    preconditions: [logged in, Recommendation tab]
+    steps:
+      - Click Add Diagnosis
+      - Search "migraine"
+      - Select a diagnosis
+      - Remove a previously added diagnosis
+    expected: Diagnosis added with ICD-10 badge, removed diagnosis disappears and does not reappear
+
+  - id: A4
+    title: Generate Note modal
+    preconditions: [logged in, some note content entered]
+    steps:
+      - Click Generate Note button (purple)
+    expected: Modal opens with note type/length selection, preview renders
+
+  - id: A5
+    title: Dot phrase expansion
+    preconditions: [logged in, dot phrases seeded]
+    steps:
+      - Click lightning icon on any text field
+      - Search for a phrase
+      - Select it
+    expected: Text expands into field
+
+  - id: A6
+    title: Smart scale suggestions
+    preconditions: [logged in, Headache diagnosis selected]
+    steps:
+      - Scroll to Clinical Scales section
+    expected: MIDAS and HIT-6 suggested
+
+  - id: A7
+    title: Imaging tab card interaction
+    preconditions: [logged in, Imaging tab]
+    steps:
+      - Click MRI Brain card header to expand
+      - Fill in findings textarea
+      - Click PACS link
+    expected: Card expands, text persists, PACS link navigable
+
+  - id: A8
+    title: No cross-patient data bleed
+    preconditions: [logged in, multiple patients exist]
+    steps:
+      - Enter data for Patient A
+      - Switch to Patient B
+    expected: Patient B shows own data, not Patient A's
+
+---
+ai_features:
+  - id: B1
+    title: Ask AI returns response
+    preconditions: [logged in, OpenAI key configured]
+    steps:
+      - Click AI star icon to open AI drawer
+      - Type a clinical question
+      - Submit
+    expected: AI response renders in drawer
+
+  - id: B2
+    title: Field AI actions
+    preconditions: [logged in, text in HPI field]
+    steps:
+      - Click star icon on HPI field
+      - Select Improve
+    expected: Improved text replaces or appends to field
+
+  - id: B3
+    title: Voice drawer mic prompt
+    preconditions: [logged in]
+    steps:
+      - Click red mic icon in action bar
+    expected: Voice drawer opens, browser requests mic permission
+
+  - id: B4
+    title: Chart Prep summary
+    preconditions: [logged in, Voice drawer open, Chart Prep tab]
+    steps:
+      - Record dictation (or provide mock audio)
+      - Click generate summary
+    expected: Structured summary with section headers appears
+
+  - id: B5
+    title: Generate Assessment from diagnoses
+    preconditions: [logged in, 1+ diagnosis added]
+    steps:
+      - Click Generate Assessment button
+    expected: Assessment text populates from selected diagnoses
+
+---
+historian:
+  - id: C1
+    title: Patient picker shows real patients
+    preconditions: [demo data seeded in Supabase, migration 011 applied]
+    steps:
+      - Navigate to /patient
+      - Click AI Historian tab
+    expected: Patient cards with names, referral reason, MRN displayed
+
+  - id: C2
+    title: Add new patient from portal
+    preconditions: [on Historian tab]
+    steps:
+      - Click Add New Patient
+      - Fill first name, last name, referral reason
+      - Submit
+    expected: Patient appears in list, form clears
+
+  - id: C3
+    title: Patient context loads for interview
+    preconditions: [patient with prior visit exists]
+    steps:
+      - Select patient from list
+      - Wait for /patient/historian page to load
+    expected: Context card shows patient name, session type (new/follow-up), referral reason
+
+  - id: C4
+    title: Demo scenario still works
+    preconditions: [on Historian tab]
+    steps:
+      - Expand "Or try a demo scenario"
+      - Click a scenario
+    expected: Navigates to /patient/historian?scenario=<id>, scenario loads
+
+  - id: C5
+    title: Voice interview starts
+    preconditions: [on historian page with scenario or patient selected, mic available]
+    steps:
+      - Click Start Voice Interview
+      - Grant mic permission
+    expected: Status changes to Connecting then Active, AI greeting plays
+
+  - id: C6
+    title: Session saved with patient_id
+    preconditions: [interview completed for a real patient]
+    steps:
+      - End interview
+      - Check historian_sessions table
+    expected: Row has patient_id FK set to selected patient's UUID
+
+  - id: C7
+    title: Physician sees real patient name
+    preconditions: [logged in as physician, historian session exists with patient_id]
+    steps:
+      - Check AI Historian section in left sidebar
+    expected: Session card shows joined patient name, not "Demo Patient"
+
+  - id: C8
+    title: Import to note
+    preconditions: [historian session with structured output]
+    steps:
+      - Expand session card
+      - Click Import to Note
+    expected: HPI, assessment, medications populate in clinical note
+
+  - id: C9
+    title: Safety escalation
+    preconditions: [active interview session]
+    steps:
+      - Speak a safety keyword (e.g., test phrase)
+    expected: Red escalation overlay with 911, 988, Crisis Text Line links
+
+---
+patient_portal:
+  - id: D1
+    title: Intake form submission
+    preconditions: [on /patient, Intake tab]
+    steps:
+      - Fill name, chief complaint (required)
+      - Submit
+    expected: Success message, form resets
+
+  - id: D2
+    title: Send message
+    preconditions: [on /patient, Messages tab]
+    steps:
+      - Fill name, subject, body
+      - Submit
+    expected: "Message sent successfully" toast
+
+  - id: D3
+    title: Historian tab full flow
+    preconditions: [on /patient, Historian tab]
+    steps:
+      - Verify patient list loads
+      - Verify Add New Patient form works
+      - Verify demo scenario collapsible section
+    expected: All three sections functional
+
+---
+mobile:
+  - id: E1
+    title: iPhone SE layout (375px)
+    preconditions: [browser devtools, 375px width]
+    steps:
+      - Load /dashboard
+      - Tap hamburger menu
+      - Open any drawer
+    expected: Sidebar slides in, drawers full-screen, no horizontal overflow
+
+  - id: E2
+    title: iPad layout (768px)
+    preconditions: [browser devtools, 768px width]
+    steps:
+      - Load /dashboard
+    expected: Sidebar visible, reduced padding, content readable
+
+  - id: E3
+    title: Touch targets
+    preconditions: [mobile viewport]
+    steps:
+      - Inspect action bar buttons
+    expected: All interactive elements >= 44px min dimension
+
+  - id: E4
+    title: Portal on mobile
+    preconditions: [375px viewport]
+    steps:
+      - Load /patient
+      - Navigate all three tabs
+    expected: Forms usable, no horizontal scroll
+
+---
+cross_cutting:
+  - id: F1
+    title: Dark mode rendering
+    preconditions: [logged in]
+    steps:
+      - Toggle dark mode via TopNav
+      - Check all tabs, drawers, forms
+    expected: All text readable, no white-on-white, form fields styled
+
+  - id: F2
+    title: Auth guard on dashboard
+    preconditions: [logged out]
+    steps:
+      - Navigate to /dashboard
+    expected: Redirects to /login
+
+  - id: F3
+    title: Portal accessible without auth
+    preconditions: [logged out]
+    steps:
+      - Navigate to /patient
+    expected: Portal renders, no auth redirect
+
+  - id: F4
+    title: Graceful API error handling
+    preconditions: [invalid or missing OpenAI key]
+    steps:
+      - Trigger an AI action (Ask AI, Generate Assessment)
+    expected: Error message in UI, not white screen or unhandled exception

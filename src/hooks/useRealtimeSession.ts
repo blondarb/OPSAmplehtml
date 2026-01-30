@@ -9,6 +9,7 @@ interface UseRealtimeSessionOptions {
   sessionType: HistorianSessionType
   referralReason?: string
   patientName?: string
+  patientContext?: string
   onSafetyEscalation?: () => void
   onComplete?: (data: {
     structuredOutput: HistorianStructuredOutput | null
@@ -121,6 +122,7 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
         body: JSON.stringify({
           sessionType: options.sessionType,
           referralReason: options.referralReason,
+          patientContext: options.patientContext,
         }),
       })
 
@@ -207,7 +209,7 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
       setStatus('error')
       cleanup()
     }
-  }, [options.sessionType, options.referralReason, cleanup])
+  }, [options.sessionType, options.referralReason, options.patientContext, cleanup])
 
   // Handle server events from the data channel
   const handleServerEvent = useCallback((msg: any) => {

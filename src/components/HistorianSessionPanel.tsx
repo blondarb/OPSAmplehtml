@@ -94,6 +94,10 @@ export default function HistorianSessionPanel({ sessions, onImport }: HistorianS
         {sessions.map(session => {
           const isExpanded = expandedId === session.id
           const hasRedFlags = session.red_flags && session.red_flags.length > 0
+          // Prefer joined patient name over text patient_name field
+          const displayName = session.patient
+            ? `${session.patient.first_name} ${session.patient.last_name}`
+            : (session.patient_name || 'Patient')
 
           return (
             <div
@@ -139,7 +143,7 @@ export default function HistorianSessionPanel({ sessions, onImport }: HistorianS
                       {session.session_type === 'new_patient' ? 'New' : 'F/U'}
                     </span>
                     <span style={{ fontWeight: 600, fontSize: '0.8rem', color: 'var(--text-primary, #1e293b)' }}>
-                      {session.patient_name || 'Patient'}
+                      {displayName}
                     </span>
                     {session.safety_escalated && (
                       <svg width="14" height="14" viewBox="0 0 24 24" fill="#ef4444" stroke="none">

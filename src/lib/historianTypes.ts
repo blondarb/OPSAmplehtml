@@ -48,6 +48,7 @@ export interface HistorianStructuredOutput {
 export interface HistorianSession {
   id: string
   tenant_id: string
+  patient_id: string | null
   session_type: HistorianSessionType
   patient_name: string
   referral_reason: string | null
@@ -63,6 +64,33 @@ export interface HistorianSession {
   imported_to_note: boolean
   created_at: string
   updated_at: string
+  // Joined patient data (from dashboardData query)
+  patient?: {
+    id: string
+    first_name: string
+    last_name: string
+    mrn: string
+  } | null
+}
+
+export interface PortalPatient {
+  id: string
+  first_name: string
+  last_name: string
+  date_of_birth: string | null
+  gender: string | null
+  mrn: string | null
+  referral_reason: string | null
+  referring_physician: string | null
+}
+
+export interface PatientContext {
+  patientName: string
+  referralReason: string | null
+  lastVisitDate: string | null
+  lastVisitType: string | null
+  lastNoteExcerpt: string | null
+  lastNotePlan: string | null
 }
 
 export interface DemoScenario {

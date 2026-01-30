@@ -3,11 +3,20 @@
 import { useState, useCallback, useEffect, useRef } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
 import { useRealtimeSession } from '@/hooks/useRealtimeSession'
-import { DEMO_SCENARIOS, type DemoScenario, type HistorianStructuredOutput, type HistorianRedFlag, type HistorianTranscriptEntry } from '@/lib/historianTypes'
+import { DEMO_SCENARIOS, type DemoScenario, type HistorianStructuredOutput, type HistorianRedFlag, type HistorianTranscriptEntry, type HistorianSessionType, type PatientContext } from '@/lib/historianTypes'
 import { getTenantClient } from '@/lib/tenant'
 import HistorianSessionComplete from './HistorianSessionComplete'
 
-type Phase = 'scenario_select' | 'connecting' | 'active' | 'ending' | 'complete' | 'safety_escalation'
+type Phase = 'loading_context' | 'scenario_select' | 'connecting' | 'active' | 'ending' | 'complete' | 'safety_escalation'
+
+/** Unified config for both real-patient and demo-scenario flows */
+interface SessionConfig {
+  sessionType: HistorianSessionType
+  referralReason?: string
+  patientName: string
+  patientId: string | null
+  patientContext?: string
+}
 
 function formatTime(seconds: number): string {
   const m = Math.floor(seconds / 60)
@@ -19,9 +28,11 @@ export default function NeurologicHistorian() {
   const searchParams = useSearchParams()
   const router = useRouter()
   const scenarioParam = searchParams.get('scenario')
+  const patientIdParam = searchParams.get('patient_id')
 
-  const [phase, setPhase] = useState<Phase>('scenario_select')
+  const [phase, setPhase] = useState<Phase>(patientIdParam ? 'loading_context' : 'scenario_select')
   const [selectedScenario, setSelectedScenario] = useState<DemoScenario | null>(null)
+  const [sessionConfig, setSessionConfig] = useState<SessionConfig | null>(null)
   const [showTranscript, setShowTranscript] = useState(false)
   const [completionData, setCompletionData] = useState<{
     structuredOutput: HistorianStructuredOutput | null
@@ -36,6 +47,14 @@ export default function NeurologicHistorian() {
   const transcriptEndRef = useRef<HTMLDivElement>(null)
   const tenant = getTenantClient()
 
+  // Derive active config from either real patient or demo scenario
+  const activeConfig: SessionConfig = sessionConfig || {
+    sessionType: selectedScenario?.session_type || 'new_patient',
+    referralReason: selectedScenario?.referral_reason,
+    patientName: selectedScenario?.patient_name || 'Demo Patient',
+    patientId: null,
+  }
+
   const handleComplete = useCallback(async (data: typeof completionData) => {
     if (!data) return
     setCompletionData(data)
@@ -48,9 +67,10 @@ export default function NeurologicHistorian() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           tenant_id: tenant,
-          session_type: selectedScenario?.session_type || 'new_patient',
-          patient_name: selectedScenario?.patient_name || 'Demo Patient',
-          referral_reason: selectedScenario?.referral_reason || null,
+          patient_id: activeConfig.patientId || null,
+          session_type: activeConfig.sessionType,
+          patient_name: activeConfig.patientName,
+          referral_reason: activeConfig.referralReason || null,
           structured_output: data.structuredOutput,
           narrative_summary: data.narrativeSummary,
           transcript: data.transcript,
@@ -64,7 +84,7 @@ export default function NeurologicHistorian() {
     } catch (err) {
       console.error('Failed to save historian session:', err)
     }
-  }, [tenant, selectedScenario])
+  }, [tenant, activeConfig])
 
   const handleSafetyEscalation = useCallback(() => {
     setPhase('safety_escalation')
@@ -82,12 +102,61 @@ export default function NeurologicHistorian() {
     startSession,
     endSession,
   } = useRealtimeSession({
-    sessionType: selectedScenario?.session_type || 'new_patient',
-    referralReason: selectedScenario?.referral_reason,
-    patientName: selectedScenario?.patient_name,
+    sessionType: activeConfig.sessionType,
+    referralReason: activeConfig.referralReason,
+    patientName: activeConfig.patientName,
+    patientContext: activeConfig.patientContext,
     onComplete: handleComplete,
     onSafetyEscalation: handleSafetyEscalation,
   })
+
+  // Fetch patient context when patient_id is provided
+  useEffect(() => {
+    if (!patientIdParam) return
+
+    let cancelled = false
+    async function fetchContext() {
+      try {
+        const res = await fetch(`/api/patient/context?patient_id=${patientIdParam}`)
+        if (!res.ok) throw new Error('Failed to load patient context')
+        const ctx: PatientContext = await res.json()
+
+        if (cancelled) return
+
+        // Determine session type based on whether prior visit exists
+        const sessionType: HistorianSessionType = ctx.lastVisitDate ? 'follow_up' : 'new_patient'
+
+        // Build context string for the AI prompt
+        let contextStr = `Patient: ${ctx.patientName}`
+        if (ctx.referralReason) contextStr += `\nReferral reason: ${ctx.referralReason}`
+        if (ctx.lastVisitDate) {
+          contextStr += `\nLast visit: ${new Date(ctx.lastVisitDate).toLocaleDateString()} (${ctx.lastVisitType || 'visit'})`
+        }
+        if (ctx.lastNoteExcerpt) contextStr += `\nPrior note excerpt:\n${ctx.lastNoteExcerpt}`
+        if (ctx.lastNotePlan) contextStr += `\nPrior plan: ${ctx.lastNotePlan}`
+
+        setSessionConfig({
+          sessionType,
+          referralReason: ctx.referralReason || undefined,
+          patientName: ctx.patientName,
+          patientId: patientIdParam,
+          patientContext: contextStr,
+        })
+        setPhase('scenario_select')
+      } catch (err) {
+        console.error('Failed to load patient context:', err)
+        // Fall back to scenario select without context
+        setSessionConfig({
+          sessionType: 'new_patient',
+          patientName: 'Patient',
+          patientId: patientIdParam,
+        })
+        setPhase('scenario_select')
+      }
+    }
+    fetchContext()
+    return () => { cancelled = true }
+  }, [patientIdParam])
 
   // Auto-select scenario from query param
   useEffect(() => {
@@ -117,7 +186,8 @@ export default function NeurologicHistorian() {
   }
 
   const handleStartInterview = async () => {
-    if (!selectedScenario) return
+    // Allow start if we have a real patient config OR a selected demo scenario
+    if (!selectedScenario && !sessionConfig) return
     await startSession()
   }
 
@@ -128,6 +198,7 @@ export default function NeurologicHistorian() {
   const handleStartAnother = () => {
     setPhase('scenario_select')
     setSelectedScenario(null)
+    setSessionConfig(null)
     setCompletionData(null)
     setShowTranscript(false)
   }
@@ -256,6 +327,27 @@ export default function NeurologicHistorian() {
       {/* Main content */}
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
 
+        {/* ====== LOADING CONTEXT ====== */}
+        {phase === 'loading_context' && (
+          <div style={{
+            flex: 1,
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '32px 24px',
+          }}>
+            <div style={{
+              width: 48, height: 48, borderRadius: '50%',
+              border: '3px solid #334155', borderTopColor: '#0d9488',
+              animation: 'spin 1s linear infinite',
+              marginBottom: '16px',
+            }} />
+            <p style={{ color: '#94a3b8', fontSize: '0.875rem' }}>Loading patient information...</p>
+            <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+          </div>
+        )}
+
         {/* ====== SCENARIO SELECT ====== */}
         {phase === 'scenario_select' && (
           <div style={{ maxWidth: '640px', margin: '0 auto', padding: '32px 24px', width: '100%' }}>
@@ -263,7 +355,9 @@ export default function NeurologicHistorian() {
               Start an AI Interview
             </h2>
             <p style={{ color: '#94a3b8', margin: '0 0 24px', fontSize: '0.875rem' }}>
-              Select a demo scenario to begin. The AI will conduct a structured neurological intake interview via voice.
+              {sessionConfig
+                ? 'Review your information below and begin your intake interview.'
+                : 'Select a demo scenario to begin. The AI will conduct a structured neurological intake interview via voice.'}
             </p>
 
             {error && (
@@ -280,62 +374,118 @@ export default function NeurologicHistorian() {
               </div>
             )}
 
-            <div style={{ display: 'grid', gap: '12px', marginBottom: '24px' }}>
-              {DEMO_SCENARIOS.map(scenario => (
-                <button
-                  key={scenario.id}
-                  onClick={() => handleSelectScenario(scenario)}
-                  style={{
-                    textAlign: 'left',
-                    padding: '16px 20px',
-                    borderRadius: '12px',
-                    border: selectedScenario?.id === scenario.id
-                      ? '2px solid #0d9488'
-                      : '1px solid #334155',
-                    background: selectedScenario?.id === scenario.id
-                      ? 'rgba(13, 148, 136, 0.1)'
-                      : '#1e293b',
-                    cursor: 'pointer',
-                    transition: 'all 0.15s ease',
-                  }}
-                >
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
-                    <span style={{
-                      display: 'inline-block',
-                      padding: '2px 8px',
-                      borderRadius: '4px',
-                      background: scenario.session_type === 'new_patient' ? 'rgba(139,92,246,0.2)' : 'rgba(13,148,136,0.2)',
-                      color: scenario.session_type === 'new_patient' ? '#a78bfa' : '#5eead4',
-                      fontSize: '0.7rem',
-                      fontWeight: 600,
-                      textTransform: 'uppercase',
-                    }}>
-                      {scenario.session_type === 'new_patient' ? 'New' : 'Follow-up'}
-                    </span>
+            {/* Real patient context card */}
+            {sessionConfig && (
+              <div style={{
+                padding: '20px',
+                borderRadius: '12px',
+                border: '2px solid #0d9488',
+                background: 'rgba(13, 148, 136, 0.1)',
+                marginBottom: '24px',
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px' }}>
+                  <div style={{
+                    width: 36, height: 36, borderRadius: '50%',
+                    background: 'linear-gradient(135deg, #0d9488, #14b8a6)',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    color: '#fff', fontWeight: 700, fontSize: '0.9rem',
+                  }}>
+                    {sessionConfig.patientName.charAt(0).toUpperCase()}
                   </div>
-                  <div style={{ color: '#fff', fontWeight: 600, fontSize: '0.95rem', marginBottom: '4px' }}>
-                    {scenario.label}
+                  <div>
+                    <div style={{ color: '#fff', fontWeight: 600, fontSize: '1rem' }}>
+                      {sessionConfig.patientName}
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <span style={{
+                        display: 'inline-block',
+                        padding: '1px 6px',
+                        borderRadius: '4px',
+                        background: sessionConfig.sessionType === 'new_patient' ? 'rgba(139,92,246,0.2)' : 'rgba(13,148,136,0.2)',
+                        color: sessionConfig.sessionType === 'new_patient' ? '#a78bfa' : '#5eead4',
+                        fontSize: '0.65rem',
+                        fontWeight: 600,
+                        textTransform: 'uppercase',
+                      }}>
+                        {sessionConfig.sessionType === 'new_patient' ? 'New Patient' : 'Follow-up'}
+                      </span>
+                    </div>
                   </div>
-                  <div style={{ color: '#94a3b8', fontSize: '0.8rem', lineHeight: 1.4 }}>
-                    {scenario.description}
+                </div>
+                {sessionConfig.referralReason && (
+                  <div style={{ fontSize: '0.8rem', color: '#94a3b8', marginBottom: '4px' }}>
+                    <span style={{ fontWeight: 600, color: '#cbd5e1' }}>Referral: </span>
+                    {sessionConfig.referralReason}
                   </div>
-                </button>
-              ))}
-            </div>
+                )}
+                {sessionConfig.patientContext && sessionConfig.patientContext.includes('Last visit:') && (
+                  <div style={{ fontSize: '0.8rem', color: '#94a3b8' }}>
+                    <span style={{ fontWeight: 600, color: '#cbd5e1' }}>Prior visit: </span>
+                    {sessionConfig.patientContext.split('Last visit: ')[1]?.split('\n')[0] || ''}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Demo scenario grid (show when no real patient, or as fallback) */}
+            {!sessionConfig && (
+              <div style={{ display: 'grid', gap: '12px', marginBottom: '24px' }}>
+                {DEMO_SCENARIOS.map(scenario => (
+                  <button
+                    key={scenario.id}
+                    onClick={() => handleSelectScenario(scenario)}
+                    style={{
+                      textAlign: 'left',
+                      padding: '16px 20px',
+                      borderRadius: '12px',
+                      border: selectedScenario?.id === scenario.id
+                        ? '2px solid #0d9488'
+                        : '1px solid #334155',
+                      background: selectedScenario?.id === scenario.id
+                        ? 'rgba(13, 148, 136, 0.1)'
+                        : '#1e293b',
+                      cursor: 'pointer',
+                      transition: 'all 0.15s ease',
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
+                      <span style={{
+                        display: 'inline-block',
+                        padding: '2px 8px',
+                        borderRadius: '4px',
+                        background: scenario.session_type === 'new_patient' ? 'rgba(139,92,246,0.2)' : 'rgba(13,148,136,0.2)',
+                        color: scenario.session_type === 'new_patient' ? '#a78bfa' : '#5eead4',
+                        fontSize: '0.7rem',
+                        fontWeight: 600,
+                        textTransform: 'uppercase',
+                      }}>
+                        {scenario.session_type === 'new_patient' ? 'New' : 'Follow-up'}
+                      </span>
+                    </div>
+                    <div style={{ color: '#fff', fontWeight: 600, fontSize: '0.95rem', marginBottom: '4px' }}>
+                      {scenario.label}
+                    </div>
+                    <div style={{ color: '#94a3b8', fontSize: '0.8rem', lineHeight: 1.4 }}>
+                      {scenario.description}
+                    </div>
+                  </button>
+                ))}
+              </div>
+            )}
 
             <button
               onClick={handleStartInterview}
-              disabled={!selectedScenario}
+              disabled={!selectedScenario && !sessionConfig}
               style={{
                 width: '100%',
                 padding: '14px',
                 borderRadius: '10px',
-                background: selectedScenario ? '#0d9488' : '#334155',
-                color: selectedScenario ? '#fff' : '#64748b',
+                background: (selectedScenario || sessionConfig) ? '#0d9488' : '#334155',
+                color: (selectedScenario || sessionConfig) ? '#fff' : '#64748b',
                 border: 'none',
                 fontWeight: 700,
                 fontSize: '1rem',
-                cursor: selectedScenario ? 'pointer' : 'not-allowed',
+                cursor: (selectedScenario || sessionConfig) ? 'pointer' : 'not-allowed',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
