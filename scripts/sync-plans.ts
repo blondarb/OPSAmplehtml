@@ -120,12 +120,12 @@ function flattenDosing(dosing: string | SourceDosingObject | undefined): string 
 
 function cleanIcd10Codes(codes: string[]): string[] {
   return codes
-    .map(code => code.trim())
-    .filter(code => /^[A-Z]\d{2}/.test(code))
+    .map(code => code.replace(/^\*+\s*/, '').trim())   // strip leading ** markdown
     .map(code => {
-      const match = code.match(/^([A-Z]\d{2}(\.\d+)?)/)
-      return match ? match[1] : code
+      const match = code.match(/([A-Z]\d{2}(\.\d+)?)/) // extract ICD-10 anywhere in string
+      return match ? match[1] : ''
     })
+    .filter(code => code.length > 0)
     .filter((code, index, self) => self.indexOf(code) === index)
 }
 
