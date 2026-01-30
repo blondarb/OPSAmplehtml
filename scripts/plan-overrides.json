@@ -1,0 +1,7 @@
+{
+  "_comment": "Local overrides applied after syncing plans from neuro-plans. Fixes data gaps in the source plans.json. Keys are plan_key values. Fields are merged into the transformed plan before upsert — arrays replace (not append), objects shallow-merge.",
+
+  "tia": {
+    "icd10_codes": ["G45.9", "G45.0", "G45.1", "G45.8"]
+  }
+}

@@ -14,6 +14,7 @@
 
 import * as dotenv from 'dotenv'
 import * as path from 'path'
+import * as fs from 'fs'
 
 // Load environment variables from .env.local
 dotenv.config({ path: path.resolve(process.cwd(), '.env.local') })
@@ -26,6 +27,7 @@ import { createClient } from '@supabase/supabase-js'
 
 const GITHUB_RAW_URL = 'https://raw.githubusercontent.com/blondarb/neuro-plans/main/docs/data/plans.json'
 const GITHUB_REPO_URL = 'https://github.com/blondarb/neuro-plans'
+const OVERRIDES_PATH = path.resolve(__dirname, 'plan-overrides.json')
 
 // ============================================
 // TYPES
@@ -251,6 +253,30 @@ async function syncPlans() {
   if (transformedPlans.length === 0) {
     console.log('⚠ No plans to sync. Exiting.')
     process.exit(0)
+  }
+
+  // Apply local overrides (fixes for data gaps in neuro-plans source)
+  if (fs.existsSync(OVERRIDES_PATH)) {
+    try {
+      const raw = fs.readFileSync(OVERRIDES_PATH, 'utf-8')
+      const overrides: Record<string, Record<string, unknown>> = JSON.parse(raw)
+      let overrideCount = 0
+      for (const plan of transformedPlans) {
+        const override = overrides[plan.plan_key]
+        if (override && typeof override === 'object' && !override._comment) {
+          Object.assign(plan, override)
+          overrideCount++
+          console.log(`  🔧 Override applied: ${plan.plan_key}`)
+        }
+      }
+      if (overrideCount > 0) {
+        console.log(`\n📝 ${overrideCount} override(s) applied from plan-overrides.json\n`)
+      } else {
+        console.log('📝 plan-overrides.json loaded (no matching plans to override)\n')
+      }
+    } catch (err) {
+      console.warn(`⚠ Could not load overrides: ${err}\n`)
+    }
   }
 
   console.log('💾 Upserting to Supabase...\n')
