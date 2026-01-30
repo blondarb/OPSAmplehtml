@@ -1,7 +1,7 @@
 # Consolidated Roadmap - Sevaro Clinical
 
 **Version:** 1.3
-**Last Updated:** January 30, 2026 (AI Neurologic Historian)
+**Last Updated:** January 30, 2026 (Patient-Centric Historian + QA Framework)
 **Purpose:** Single source of truth consolidating all phases across PRDs
 
 ---
@@ -418,8 +418,8 @@ These foundational features are fully implemented.
 
 | Feature | Status | Notes |
 |---------|--------|-------|
-| AI Historian tab in PatientPortal | ✅ COMPLETE | Third tab with scenario cards |
-| Full-screen voice interview page | ✅ COMPLETE | /patient/historian |
+| AI Historian tab in PatientPortal | ✅ COMPLETE | Patient picker + add patient + demo fallback |
+| Full-screen voice interview page | ✅ COMPLETE | /patient/historian (?patient_id= or ?scenario=) |
 | Animated voice orb UI | ✅ COMPLETE | Teal (AI) / purple (patient) |
 | Streaming transcript display | ✅ COMPLETE | Collapsible with timestamps |
 | Safety escalation overlay | ✅ COMPLETE | 911, 988, Crisis Text Line |
@@ -439,6 +439,33 @@ These foundational features are fully implemented.
 | Import to Note | ✅ COMPLETE | Maps structured output to note fields |
 | historian_sessions table | ✅ COMPLETE | Migration 010, JSONB columns |
 | Session save/list API | ✅ COMPLETE | /api/ai/historian/save |
+
+### 8.4 Patient-Centric Upgrade
+
+| Feature | Status | Notes |
+|---------|--------|-------|
+| Real patient list in portal | ✅ COMPLETE | get_patients_for_portal RPC |
+| Add New Patient from portal | ✅ COMPLETE | portal_register_patient RPC |
+| Patient context loading | ✅ COMPLETE | get_patient_context_for_portal RPC |
+| Prior visit context in interviews | ✅ COMPLETE | HPI, assessment, plan passed to AI |
+| Auto session type derivation | ✅ COMPLETE | follow_up if prior visit exists |
+| patient_id FK on sessions | ✅ COMPLETE | Migration 011, nullable FK |
+| Physician view patient join | ✅ COMPLETE | Real names from patients table |
+| Demo scenario fallback | ✅ COMPLETE | Collapsible section, unchanged flow |
+
+---
+
+## Phase 9: QA Framework (Complete)
+
+| Feature | Status | Notes |
+|---------|--------|-------|
+| Test runbook (v1.0) | ✅ COMPLETE | qa/TEST_RUNBOOK.md |
+| Structured test cases (v1.0) | ✅ COMPLETE | qa/TEST_CASES.yaml (35 cases) |
+| Bug report template | ✅ COMPLETE | qa/BUG_TEMPLATE.md |
+| Release checklist | ✅ COMPLETE | qa/RELEASE_CHECKLIST.md |
+| Run log template | ✅ COMPLETE | qa/runs/RUN_TEMPLATE.md |
+| First test run | ✅ COMPLETE | qa/runs/RUN-2026-01-30-001.md (GO) |
+| CLAUDE.md QA rules | ✅ COMPLETE | Rules-of-engagement section added |
 
 ---
 
@@ -525,10 +552,11 @@ Based on the analysis, here's the recommended implementation order to minimize r
 | Workflow Documentation | User guidance | ✅ COMPLETE |
 | Onboarding | Interactive tour | ✅ COMPLETE |
 | Help Drawer | All tabs | ✅ COMPLETE |
-| AI Neurologic Historian | Voice intake via WebRTC | ✅ COMPLETE |
+| AI Neurologic Historian | Voice intake via WebRTC + patient-centric | ✅ COMPLETE |
+| QA Framework | Test runbook, cases, checklists, run logs | ✅ COMPLETE |
 
 ---
 
 *Document created: January 24, 2026*
-*Last updated: January 30, 2026 (AI Neurologic Historian)*
+*Last updated: January 30, 2026 (Patient-Centric Historian + QA Framework)*
 *Consolidates: All PRD documents*

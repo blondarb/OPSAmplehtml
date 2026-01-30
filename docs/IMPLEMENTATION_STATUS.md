@@ -1,6 +1,6 @@
 # Implementation Status - Sevaro Clinical
 
-**Last Updated:** January 30, 2026 (AI Neurologic Historian)
+**Last Updated:** January 30, 2026 (Patient-Centric Historian + QA Framework)
 **Based on:** PRD_AI_Scribe.md v1.4, Sevaro_Outpatient_MVP_PRD_v1.4, PRD_Roadmap_Phase3.md
 
 ---
@@ -33,6 +33,8 @@ This document tracks implementation progress against the product requirements an
 - ✅ **Exam Templates** - Predefined + custom template feature
 
 **Newly Completed:**
+- ✅ **Patient-Centric Historian** - Real patients from Supabase, prior visit context in interviews, patient_id FK linkage
+- ✅ **QA Framework** - Test runbook, 35 structured test cases, release checklist, bug template, run log system
 - ✅ **AI Neurologic Historian** - Voice-based patient intake via OpenAI Realtime API (WebRTC)
 - ✅ **Pre-built Dot Phrases** - 70+ neurology phrases seeded (exams, assessments, plans per condition)
 - ✅ **Workflow Documentation** - Quick selection guide, scenario recommendations, step-by-step guides
@@ -47,7 +49,46 @@ This document tracks implementation progress against the product requirements an
 
 ## Recent Updates (January 30, 2026)
 
-### AI Neurologic Historian - NEW
+### Patient-Centric AI Historian - NEW
+Upgraded the AI Historian from hardcoded demo scenarios to real patient data.
+
+**Patient Portal Changes:**
+- Historian tab shows real patients fetched from Supabase via `get_patients_for_portal` RPC
+- "Add New Patient" inline form creates patients via `portal_register_patient` RPC
+- Patient selection navigates to `/patient/historian?patient_id=<uuid>`
+- Prior visit context (HPI, assessment, plan) loaded via `get_patient_context_for_portal` RPC
+- Session type auto-derived: follow-up if prior visit exists, new_patient otherwise
+- Demo scenarios moved to collapsible "Or try a demo scenario" section
+
+**Physician View Changes:**
+- `dashboardData.ts` historian query joins with `patients` table
+- `HistorianSessionPanel` displays real patient name from join data when available
+- Sessions without `patient_id` (legacy demo sessions) still display correctly
+
+**Database (Migration 011):**
+- `patient_id UUID` FK added to `historian_sessions` (nullable, ON DELETE SET NULL)
+- `referral_reason TEXT` and `referring_physician TEXT` added to `patients`
+- 3 SECURITY DEFINER RPC functions for unauthenticated portal access
+- Anon RLS policies on `historian_sessions` for portal saves
+
+**New API Routes:**
+- `GET /api/patient/patients` - List patients for portal
+- `GET /api/patient/context?patient_id=` - Patient name, referral, last visit/note data
+- `POST /api/patient/register` - Register new patient using demo physician's user_id
+
+**Modified Files (7):** historianTypes.ts, useRealtimeSession.ts, historian/save/route.ts, NeurologicHistorian.tsx, PatientPortal.tsx, dashboardData.ts, HistorianSessionPanel.tsx
+
+### QA Framework - NEW
+Added `qa/` folder with versioned test infrastructure.
+
+- `qa/TEST_RUNBOOK.md` (v1.0) - Stable baseline: smoke suite (S1-S5), regression flows (A-F), mobile-first checks, role-based matrix, tooling guidance
+- `qa/TEST_CASES.yaml` (v1.0) - 35 structured test cases with IDs, preconditions, steps, expected results
+- `qa/BUG_TEMPLATE.md` - Repro steps, expected/actual, environment, logs
+- `qa/RELEASE_CHECKLIST.md` - Pre-deploy (9 checks), deploy (3), post-deploy (7), rollback plan
+- `qa/runs/RUN_TEMPLATE.md` - Per-release mission brief + result log
+- `qa/runs/RUN-2026-01-30-001.md` - First run: Smoke 5/5 PASS, Focus 5/7 PASS, 0 bugs, verdict GO
+
+### AI Neurologic Historian - PREVIOUSLY ADDED
 Voice-based patient intake interview system using OpenAI Realtime API over WebRTC.
 
 **Architecture:**
@@ -354,7 +395,10 @@ Intelligent data extraction from ALL patient data sources to pre-populate scale 
 | Note Merge Engine | COMPLETE | lib/note-merge/ | Combine AI outputs |
 | Generate Note Button | COMPLETE | CenterPanel.tsx | Purple button with indicator |
 | AI Historian (Voice) | COMPLETE | NeurologicHistorian.tsx | WebRTC real-time voice |
-| Historian Session Panel | COMPLETE | HistorianSessionPanel.tsx | Physician review/import |
+| Historian Patient Context | COMPLETE | NeurologicHistorian.tsx | Real patients, prior visit context |
+| Historian Patient Picker | COMPLETE | PatientPortal.tsx | Patient list, add patient, demo fallback |
+| Historian Patient FK | COMPLETE | migration 011 | patient_id links sessions to patients |
+| Historian Session Panel | COMPLETE | HistorianSessionPanel.tsx | Physician review/import, real names |
 
 ### Clinical Scales
 
@@ -451,15 +495,20 @@ src/
 ├── app/
 │   ├── globals.css            # Global styles + responsive breakpoints
 │   ├── layout.tsx             # Root layout with viewport meta
-│   └── api/ai/
-│       ├── ask/route.ts       # Ask AI endpoint
-│       ├── chart-prep/route.ts # Chart Prep AI endpoint
-│       ├── field-action/route.ts # Improve/Expand/Summarize
-│       ├── historian/         # AI Neurologic Historian
-│       │   ├── session/route.ts # Ephemeral token for WebRTC
-│       │   └── save/route.ts  # Save/list sessions
-│       ├── transcribe/route.ts # Whisper transcription
-│       └── visit-ai/route.ts  # Visit AI processing
+│   └── api/
+│       ├── ai/
+│       │   ├── ask/route.ts       # Ask AI endpoint
+│       │   ├── chart-prep/route.ts # Chart Prep AI endpoint
+│       │   ├── field-action/route.ts # Improve/Expand/Summarize
+│       │   ├── historian/         # AI Neurologic Historian
+│       │   │   ├── session/route.ts # Ephemeral token for WebRTC
+│       │   │   └── save/route.ts  # Save/list sessions (+ patient_id)
+│       │   ├── transcribe/route.ts # Whisper transcription
+│       │   └── visit-ai/route.ts  # Visit AI processing
+│       └── patient/
+│           ├── patients/route.ts  # List patients for portal (RPC)
+│           ├── context/route.ts   # Patient context for historian (RPC)
+│           └── register/route.ts  # Register new patient (RPC)
 ├── components/
 │   ├── AiDrawer.tsx           # AI Assistant (Ask AI, Summary, Handout)
 │   ├── AiSuggestionPanel.tsx  # AI suggestion component
@@ -708,16 +757,27 @@ GENERATE NOTE FLOW:
 ### AI Historian Flow
 
 ```
-PATIENT INTERVIEW FLOW:
-[Select Scenario] → POST /api/ai/historian/session → Ephemeral Token
-                  → RTCPeerConnection + DataChannel → OpenAI Realtime API
+PATIENT-CENTRIC FLOW:
+[Portal] → GET /api/patient/patients → Patient list
+         → Select patient → GET /api/patient/context?patient_id=
+         → Derives session type (new_patient / follow_up)
+         → Builds patientContext string (name, referral, prior HPI/assessment/plan)
+
+INTERVIEW FLOW:
+[Start Interview] → POST /api/ai/historian/session (with patientContext)
+                  → Ephemeral Token → RTCPeerConnection + DataChannel
+                  → OpenAI Realtime API (context-aware greeting)
                   → Voice conversation (server VAD, Whisper transcription)
                   → AI calls save_interview_output tool → Structured JSON
-                  → POST /api/ai/historian/save → historian_sessions table
+                  → POST /api/ai/historian/save (with patient_id FK)
+                  → historian_sessions table
+
+DEMO SCENARIO FLOW (unchanged):
+[Select Scenario] → /patient/historian?scenario=<id> → Same interview flow without patient_id
 
 PHYSICIAN REVIEW FLOW:
-[Login] → fetchDashboardData() → historian_sessions query
-        → LeftSidebar → HistorianSessionPanel
+[Login] → fetchDashboardData() → historian_sessions JOIN patients query
+        → LeftSidebar → HistorianSessionPanel (real patient name from join)
         → Expand session → Summary / Structured / Transcript tabs
         → "Import to Note" → Maps structured_output to noteData fields
 ```
@@ -751,4 +811,4 @@ AI DRAWER (Teal theme, star icon):
 ---
 
 *Document maintained by Development Team*
-*Last updated: January 30, 2026 (AI Neurologic Historian)*
+*Last updated: January 30, 2026 (Patient-Centric Historian + QA Framework)*
