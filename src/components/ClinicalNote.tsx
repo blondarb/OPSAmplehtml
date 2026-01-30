@@ -35,6 +35,7 @@ interface ClinicalNoteProps {
   imagingStudies: any[]
   scoreHistory: any[]
   patientMessages?: any[]
+  historianSessions?: any[]
 }
 
 // Icon sidebar navigation
@@ -175,6 +176,7 @@ export default function ClinicalNote({
   imagingStudies: initialImagingStudies,
   scoreHistory: initialScoreHistory,
   patientMessages = [],
+  historianSessions = [],
 }: ClinicalNoteProps) {
   const [darkMode, setDarkMode] = useState(false)
   const [activeIcon, setActiveIcon] = useState('home')
@@ -830,6 +832,17 @@ export default function ClinicalNote({
     }
   }
 
+  const handleImportHistorian = (session: any) => {
+    if (!session?.structured_output) return
+    const so = session.structured_output
+    setNoteData(prev => ({
+      ...prev,
+      hpi: so.hpi || prev.hpi,
+      allergies: so.allergies || prev.allergies,
+      assessment: so.chief_complaint ? `${so.chief_complaint}\n${prev.assessment || ''}`.trim() : prev.assessment,
+    }))
+  }
+
   const openDotPhrases = (field?: string) => {
     if (field) setActiveTextField(field)
     setDotPhrasesOpen(true)
@@ -1071,6 +1084,8 @@ export default function ClinicalNote({
               priorVisits={priorVisits}
               scoreHistory={scoreHistory}
               patientMessages={patientMessages}
+              historianSessions={historianSessions}
+              onImportHistorian={handleImportHistorian}
               isOpen={mobileSidebarOpen}
               onClose={() => setMobileSidebarOpen(false)}
             />

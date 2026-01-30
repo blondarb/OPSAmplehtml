@@ -1,12 +1,15 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import HistorianSessionPanel from './HistorianSessionPanel'
 
 interface LeftSidebarProps {
   patient: any
   priorVisits: any[]
   scoreHistory: any[]
   patientMessages?: any[]
+  historianSessions?: any[]
+  onImportHistorian?: (session: any) => void
   isOpen?: boolean
   onClose?: () => void
 }
@@ -103,7 +106,7 @@ Neuro:
   }
 }
 
-export default function LeftSidebar({ patient, priorVisits, scoreHistory, patientMessages = [], isOpen = true, onClose }: LeftSidebarProps) {
+export default function LeftSidebar({ patient, priorVisits, scoreHistory, patientMessages = [], historianSessions = [], onImportHistorian, isOpen = true, onClose }: LeftSidebarProps) {
   const [expandedVisit, setExpandedVisit] = useState<string | null>(priorVisits[0]?.id || null)
   const [aiSummaryEnabled, setAiSummaryEnabled] = useState(true)
   const [scoreHistoryOpen, setScoreHistoryOpen] = useState(true)
@@ -972,6 +975,16 @@ export default function LeftSidebar({ patient, priorVisits, scoreHistory, patien
               </div>
             ))}
           </div>
+        </div>
+      )}
+
+      {/* AI Historian Sessions */}
+      {historianSessions.length > 0 && (
+        <div style={{ padding: '12px 16px', borderTop: '1px solid var(--border)' }}>
+          <HistorianSessionPanel
+            sessions={historianSessions}
+            onImport={onImportHistorian}
+          />
         </div>
       )}
     </aside>

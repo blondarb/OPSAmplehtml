@@ -16,6 +16,7 @@ export default async function PhysicianPage() {
       imagingStudies={data.imagingStudies}
       scoreHistory={data.scoreHistory}
       patientMessages={data.patientMessages}
+      historianSessions={data.historianSessions}
     />
   )
 }

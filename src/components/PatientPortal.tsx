@@ -2,8 +2,9 @@
 
 import { useState } from 'react'
 import { getTenantClient } from '@/lib/tenant'
+import { DEMO_SCENARIOS } from '@/lib/historianTypes'
 
-type Tab = 'intake' | 'messages'
+type Tab = 'intake' | 'messages' | 'historian'
 
 interface IntakeForm {
   patient_name: string
@@ -151,7 +152,7 @@ export default function PatientPortal() {
 
       {/* Tab Bar */}
       <div style={{ display: 'flex', gap: '0', borderBottom: '1px solid #334155', padding: '0 24px' }}>
-        {(['intake', 'messages'] as Tab[]).map(t => (
+        {(['intake', 'messages', 'historian'] as Tab[]).map(t => (
           <button
             key={t}
             onClick={() => { setTab(t); setError(null) }}
@@ -164,10 +165,17 @@ export default function PatientPortal() {
               fontWeight: 600,
               fontSize: '0.875rem',
               cursor: 'pointer',
-              textTransform: 'capitalize',
             }}
           >
-            {t === 'intake' ? 'Intake Form' : 'Messages'}
+            {t === 'intake' ? 'Intake Form' : t === 'messages' ? 'Messages' : (
+              <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M12 1a3 3 0 00-3 3v8a3 3 0 006 0V4a3 3 0 00-3-3z" />
+                  <path d="M19 10v2a7 7 0 01-14 0v-2" />
+                </svg>
+                AI Historian
+              </span>
+            )}
           </button>
         ))}
       </div>
@@ -420,6 +428,75 @@ export default function PatientPortal() {
                 {msgLoading ? 'Sending...' : 'Send Message'}
               </button>
             </form>
+          </div>
+        )}
+
+        {/* ======= AI HISTORIAN TAB ======= */}
+        {tab === 'historian' && (
+          <div>
+            <h2 style={{ color: '#fff', margin: '0 0 4px', fontSize: '1.25rem' }}>AI Neurologic Historian</h2>
+            <p style={{ color: '#94a3b8', margin: '0 0 24px', fontSize: '0.875rem' }}>
+              Complete your intake interview by speaking with our AI historian. It will ask you about your symptoms, medical history, and more.
+            </p>
+
+            <div style={{ display: 'grid', gap: '12px', marginBottom: '24px' }}>
+              {DEMO_SCENARIOS.map(scenario => (
+                <a
+                  key={scenario.id}
+                  href={`/patient/historian?scenario=${scenario.id}`}
+                  style={{
+                    display: 'block',
+                    textAlign: 'left',
+                    padding: '16px 20px',
+                    borderRadius: '12px',
+                    border: '1px solid #334155',
+                    background: '#1e293b',
+                    textDecoration: 'none',
+                    transition: 'border-color 0.15s ease',
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
+                    <span style={{
+                      display: 'inline-block',
+                      padding: '2px 8px',
+                      borderRadius: '4px',
+                      background: scenario.session_type === 'new_patient' ? 'rgba(139,92,246,0.2)' : 'rgba(13,148,136,0.2)',
+                      color: scenario.session_type === 'new_patient' ? '#a78bfa' : '#5eead4',
+                      fontSize: '0.7rem',
+                      fontWeight: 600,
+                      textTransform: 'uppercase',
+                    }}>
+                      {scenario.session_type === 'new_patient' ? 'New' : 'Follow-up'}
+                    </span>
+                  </div>
+                  <div style={{ color: '#fff', fontWeight: 600, fontSize: '0.95rem', marginBottom: '4px' }}>
+                    {scenario.label}
+                  </div>
+                  <div style={{ color: '#94a3b8', fontSize: '0.8rem', lineHeight: 1.4 }}>
+                    {scenario.description}
+                  </div>
+                </a>
+              ))}
+            </div>
+
+            <div style={{
+              padding: '16px 20px',
+              borderRadius: '12px',
+              background: 'rgba(13,148,136,0.1)',
+              border: '1px solid rgba(13,148,136,0.2)',
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#0d9488" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <circle cx="12" cy="12" r="10" />
+                  <line x1="12" y1="16" x2="12" y2="12" />
+                  <line x1="12" y1="8" x2="12.01" y2="8" />
+                </svg>
+                <span style={{ color: '#5eead4', fontWeight: 600, fontSize: '0.8rem' }}>How it works</span>
+              </div>
+              <p style={{ color: '#94a3b8', fontSize: '0.8rem', margin: 0, lineHeight: 1.5 }}>
+                Select a scenario and speak with the AI historian using your microphone. It will ask you questions one at a time and generate a structured clinical summary for your neurologist.
+              </p>
+            </div>
           </div>
         )}
       </div>

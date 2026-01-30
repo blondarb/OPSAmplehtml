@@ -92,6 +92,20 @@ export async function fetchDashboardData() {
     // Table may not exist yet — ignore
   }
 
+  // Fetch historian sessions for physician view
+  let historianSessions: any[] = []
+  try {
+    const { data: sessions } = await supabase
+      .from('historian_sessions')
+      .select('*')
+      .eq('tenant_id', tenant)
+      .order('created_at', { ascending: false })
+      .limit(10)
+    historianSessions = sessions || []
+  } catch {
+    // Table may not exist yet — ignore
+  }
+
   return {
     user,
     patient: patients,
@@ -100,5 +114,6 @@ export async function fetchDashboardData() {
     imagingStudies: imagingStudies || [],
     scoreHistory: scoreHistory || [],
     patientMessages,
+    historianSessions,
   }
 }
