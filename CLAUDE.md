@@ -11,7 +11,7 @@ Sevaro Clinical is a web application for AI-powered clinical documentation, spec
 - **Styling**: Tailwind CSS v3 + Inline Styles
 - **Database**: Supabase (PostgreSQL)
 - **Authentication**: Supabase Auth
-- **AI**: OpenAI GPT-5/GPT-4o-mini APIs + Whisper (transcription)
+- **AI**: OpenAI GPT-5/GPT-4o-mini APIs + Whisper (transcription) + Realtime API (WebRTC)
 - **Deployment**: Vercel
 
 ## Project Structure
@@ -23,6 +23,9 @@ src/
 │   │   ├── ai/            # AI endpoints
 │   │   │   ├── ask/       # Ask AI questions
 │   │   │   ├── chart-prep/# Pre-visit chart preparation
+│   │   │   ├── historian/ # AI Neurologic Historian (Realtime API)
+│   │   │   │   ├── session/ # Ephemeral token for WebRTC
+│   │   │   │   └── save/    # Save/list historian sessions
 │   │   │   ├── transcribe/# Voice transcription (Whisper)
 │   │   │   └── visit-ai/  # Visit AI - full visit transcription & clinical extraction
 │   │   ├── phrases/       # Dot phrases CRUD
@@ -30,6 +33,9 @@ src/
 │   ├── auth/              # Auth callback handler
 │   ├── dashboard/         # Main clinical interface
 │   ├── login/             # Login page
+│   ├── patient/           # Patient portal
+│   │   ├── page.tsx       # Patient portal (intake, messages, historian)
+│   │   └── historian/     # AI Historian voice interview page
 │   ├── signup/            # Signup page
 │   └── page.tsx           # Root redirect
 ├── components/            # React components
@@ -41,8 +47,11 @@ src/
 │   ├── DotPhrasesDrawer.tsx # Dot phrases management drawer
 │   ├── EnhancedNotePreviewModal.tsx # Comprehensive note generation with type/length selection
 │   ├── ExamScalesSection.tsx # Exam-driven scales (NIHSS, MAS, etc.)
+│   ├── HistorianSessionComplete.tsx # Post-interview success screen
+│   ├── HistorianSessionPanel.tsx # Physician-side historian session viewer
 │   ├── ImagingResultsTab.tsx # Imaging/Results tab with collapsible study cards
 │   ├── LeftSidebar.tsx    # Patient info, Prior Visits, Score History
+│   ├── NeurologicHistorian.tsx # Full-page patient voice interview UI
 │   ├── NoteTextField.tsx  # Reusable text field with dictation/AI/field actions
 │   ├── ReasonForConsultSection.tsx # Two-tier reason for consult selection
 │   ├── ScaleForm.tsx      # Generic scale form component
@@ -52,9 +61,12 @@ src/
 │   ├── TopNav.tsx         # Navigation with queue tabs, timer, PHI toggle
 │   └── VoiceDrawer.tsx    # Voice & Dictation drawer (Chart Prep, Document)
 ├── hooks/
+│   ├── useRealtimeSession.ts # WebRTC hook for OpenAI Realtime API
 │   └── useVoiceRecorder.ts # Voice recording hook with pause/resume
 ├── lib/
 │   ├── diagnosisData.ts   # 134 neurology diagnoses with ICD-10 codes
+│   ├── historianTypes.ts  # TypeScript types for AI Historian
+│   ├── historianPrompts.ts # System prompts for AI Historian interviews
 │   ├── note-merge/        # Note merge engine for combining AI outputs
 │   │   ├── index.ts       # Re-exports merge functions
 │   │   ├── merge-engine.ts # Core merge logic + formatting functions
@@ -80,6 +92,7 @@ Located in `supabase/migrations/`:
 - **imaging_studies**: Imaging records
 - **app_settings**: Application settings (stores OpenAI API key)
 - **dot_phrases**: User-defined text expansion phrases with scoping
+- **historian_sessions**: AI voice interview sessions (structured output, transcript, red flags)
 
 ## Environment Variables
 
@@ -151,6 +164,17 @@ The OpenAI API key can be stored securely in Supabase `app_settings` table or as
 
 10. **Patient Management**: Demographics, visits, imaging, timeline
 
+11. **AI Neurologic Historian**:
+    - Voice-based patient intake interview via OpenAI Realtime API (WebRTC)
+    - Structured neurologic history using OLDCARTS framework
+    - New patient and follow-up interview flows
+    - Safety monitoring with escalation protocol (suicide/crisis detection)
+    - Structured output: chief complaint, HPI, medications, allergies, PMH, family/social history, ROS
+    - Red flag identification with severity scoring
+    - Physician-side session panel with transcript, summary, and structured data views
+    - Import-to-note functionality for EHR integration
+    - 4 demo scenarios (headache referral, seizure eval, migraine follow-up, MS follow-up)
+
 ## UI Components
 
 ### TopNav
@@ -220,6 +244,22 @@ All major text fields include inline action buttons:
 - Summary: Simple/Standard/Detailed level selection
 - Handout: Condition dropdown, generate button
 
+### NeurologicHistorian (Patient-facing)
+- Full-page voice interview UI at `/patient/historian`
+- State machine: Scenario Select → Connecting → Active → Complete (+ Safety Escalation)
+- Voice orb with teal (AI speaking) / purple (patient speaking) animation
+- Streaming transcript display with collapsible history
+- Timer and session status indicators
+- Safety escalation overlay with emergency resources (911, 988, Crisis Text Line)
+- Post-interview success screen with duration/question stats
+
+### HistorianSessionPanel (Physician-facing)
+- LeftSidebar section showing completed historian sessions
+- Expandable cards with sub-tabs: Summary, Structured Data, Transcript
+- Red flag banners with severity indicators
+- Safety escalation alerts for flagged sessions
+- "Import to Note" button to populate clinical note fields
+
 ### DotPhrasesDrawer
 - Search and filter by category
 - Scope filtering (relevant to field vs all)
@@ -258,6 +298,8 @@ The middleware (`src/middleware.ts`) handles session refresh. Uses a simplified 
 - `/api/ai/scale-autofill` - AI autofill for clinical scales from patient data (gpt-5.2)
 - `/api/ai/synthesize-note` - Note synthesis from multiple sources (gpt-5.2)
 - `/api/ai/generate-assessment` - Generate clinical assessment from diagnoses (gpt-5.2)
+- `/api/ai/historian/session` - Create ephemeral token for WebRTC (gpt-4o-realtime-preview)
+- `/api/ai/historian/save` - Save/list historian interview sessions
 
 **Other Endpoints:**
 - `/api/phrases` - List and create dot phrases
@@ -329,6 +371,19 @@ When redeploying after changes, use "Redeploy without cache" to ensure fresh bui
 - Push to feature branch, create PR, merge to main for deployment
 
 ## Recent Changes (January 2026)
+
+### AI Neurologic Historian (January 30, 2026)
+- **Voice-based patient intake**: Real-time voice interviews via OpenAI Realtime API over WebRTC
+- **Architecture**: Client connects directly to OpenAI via WebRTC; server only issues ephemeral token (Vercel-compatible)
+- **Interview flows**: New patient (OLDCARTS framework) and follow-up (interval changes, treatment response)
+- **Safety monitoring**: Keyword detection + AI-level safety protocol with escalation overlay (911, 988, Crisis Text Line)
+- **Structured output**: AI calls `save_interview_output` tool to produce structured clinical data (chief complaint, HPI, meds, allergies, PMH, family/social hx, ROS)
+- **Red flag detection**: AI identifies clinical red flags with severity scoring
+- **Patient portal integration**: New "AI Historian" tab in PatientPortal with 4 demo scenarios
+- **Physician integration**: HistorianSessionPanel in LeftSidebar with transcript, summary, structured data views
+- **Import to note**: One-click import of structured output into clinical note fields
+- **New files**: historianTypes.ts, historianPrompts.ts, useRealtimeSession.ts, NeurologicHistorian.tsx, HistorianSessionComplete.tsx, HistorianSessionPanel.tsx, historian API routes, migration 010
+- **Database**: `historian_sessions` table with JSONB structured output, transcript, red flags
 
 ### Production Fixes & Generate Assessment (January 28, 2026)
 - **Cross-patient data contamination fix**: Autosave key now includes patient ID to prevent data leakage

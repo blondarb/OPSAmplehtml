@@ -1,6 +1,6 @@
 # Implementation Status - Sevaro Clinical
 
-**Last Updated:** January 25, 2026 (OpenAI Model Optimization)
+**Last Updated:** January 30, 2026 (AI Neurologic Historian)
 **Based on:** PRD_AI_Scribe.md v1.4, Sevaro_Outpatient_MVP_PRD_v1.4, PRD_Roadmap_Phase3.md
 
 ---
@@ -33,6 +33,7 @@ This document tracks implementation progress against the product requirements an
 - ✅ **Exam Templates** - Predefined + custom template feature
 
 **Newly Completed:**
+- ✅ **AI Neurologic Historian** - Voice-based patient intake via OpenAI Realtime API (WebRTC)
 - ✅ **Pre-built Dot Phrases** - 70+ neurology phrases seeded (exams, assessments, plans per condition)
 - ✅ **Workflow Documentation** - Quick selection guide, scenario recommendations, step-by-step guides
 - ✅ **Additional Clinical Scales** - UPDRS Motor (Parkinson's), Hoehn & Yahr staging, EDSS (MS), CHA₂DS₂-VASc (stroke risk)
@@ -44,9 +45,65 @@ This document tracks implementation progress against the product requirements an
 
 ---
 
-## Recent Updates (January 25, 2026)
+## Recent Updates (January 30, 2026)
 
-### OpenAI Model Optimization - NEW
+### AI Neurologic Historian - NEW
+Voice-based patient intake interview system using OpenAI Realtime API over WebRTC.
+
+**Architecture:**
+- Client connects directly to OpenAI via WebRTC (no WebSocket server needed)
+- Server issues ephemeral token via `/api/ai/historian/session` (one REST call)
+- Fully Vercel-compatible deployment
+
+**Patient-Facing Features:**
+- Full-screen voice interview UI at `/patient/historian`
+- 4 demo scenarios: headache referral, seizure eval, migraine follow-up, MS follow-up
+- New patient flow: OLDCARTS symptom characterization, meds, PMH, family/social hx, ROS
+- Follow-up flow: interval changes, treatment response, new symptoms, functional status
+- Animated voice orb (teal=AI speaking, purple=patient speaking)
+- Streaming transcript display with collapsible history
+- Safety escalation overlay with emergency resources (911, 988 Suicide Hotline, Crisis Text Line)
+- AI Historian tab added to PatientPortal
+
+**Physician-Facing Features:**
+- HistorianSessionPanel in LeftSidebar with expandable session cards
+- Sub-tabs: Summary, Structured Data, Transcript
+- Red flag banners with severity indicators (high/medium/low)
+- Safety escalation alerts for flagged sessions
+- "Import to Note" button maps structured output to clinical note fields
+
+**Technical:**
+- `useRealtimeSession` hook manages full WebRTC lifecycle
+- `buildHistorianSystemPrompt()` constructs interview instructions
+- `save_interview_output` tool definition for structured JSON extraction
+- `historian_sessions` table (migration 010) with JSONB columns
+- Safety keyword monitoring as secondary defense layer
+- Model: `gpt-4o-realtime-preview` with `verse` voice, server VAD
+
+**New Files (10):**
+- `src/lib/historianTypes.ts` - TypeScript interfaces and demo scenarios
+- `src/lib/historianPrompts.ts` - System prompts and tool definitions
+- `src/hooks/useRealtimeSession.ts` - WebRTC lifecycle hook
+- `src/components/NeurologicHistorian.tsx` - Patient voice interview UI
+- `src/components/HistorianSessionComplete.tsx` - Post-interview screen
+- `src/components/HistorianSessionPanel.tsx` - Physician session viewer
+- `src/app/api/ai/historian/session/route.ts` - Ephemeral token endpoint
+- `src/app/api/ai/historian/save/route.ts` - Session save/list endpoint
+- `src/app/patient/historian/page.tsx` - Historian page route
+- `supabase/migrations/010_historian_sessions.sql` - Database migration
+
+**Modified Files (5):**
+- `src/components/PatientPortal.tsx` - Added AI Historian tab
+- `src/lib/dashboardData.ts` - Fetch historian sessions
+- `src/components/ClinicalNote.tsx` - Import handler, pass to sidebar
+- `src/components/LeftSidebar.tsx` - Render HistorianSessionPanel
+- `src/app/physician/page.tsx` + `src/app/dashboard/page.tsx` - Pass sessions prop
+
+---
+
+## Previous Updates (January 25, 2026)
+
+### OpenAI Model Optimization
 Optimized all AI API endpoints for best cost/performance:
 
 **Simple Tasks (gpt-4o-mini - $0.15/$0.60 per 1M tokens):**
@@ -296,6 +353,8 @@ Intelligent data extraction from ALL patient data sources to pre-populate scale 
 | Ask AI | COMPLETE | AiDrawer.tsx | GPT-4 Q&A |
 | Note Merge Engine | COMPLETE | lib/note-merge/ | Combine AI outputs |
 | Generate Note Button | COMPLETE | CenterPanel.tsx | Purple button with indicator |
+| AI Historian (Voice) | COMPLETE | NeurologicHistorian.tsx | WebRTC real-time voice |
+| Historian Session Panel | COMPLETE | HistorianSessionPanel.tsx | Physician review/import |
 
 ### Clinical Scales
 
@@ -332,6 +391,7 @@ Intelligent data extraction from ALL patient data sources to pre-populate scale 
 | Quick links | COMPLETE | - | PACS, VizAI, Epic, etc. |
 | Local time display | COMPLETE | - | Live clock |
 | Mobile slide-in overlay | COMPLETE | - | With backdrop click to close |
+| AI Historian sessions | COMPLETE | HistorianSessionPanel.tsx | With import-to-note |
 
 ### Responsive Design
 
@@ -395,6 +455,9 @@ src/
 │       ├── ask/route.ts       # Ask AI endpoint
 │       ├── chart-prep/route.ts # Chart Prep AI endpoint
 │       ├── field-action/route.ts # Improve/Expand/Summarize
+│       ├── historian/         # AI Neurologic Historian
+│       │   ├── session/route.ts # Ephemeral token for WebRTC
+│       │   └── save/route.ts  # Save/list sessions
 │       ├── transcribe/route.ts # Whisper transcription
 │       └── visit-ai/route.ts  # Visit AI processing
 ├── components/
@@ -406,6 +469,9 @@ src/
 │   ├── DotPhrasesDrawer.tsx   # Dot phrases panel
 │   ├── EnhancedNotePreviewModal.tsx # Comprehensive note generation
 │   ├── ExamScalesSection.tsx  # Exam-driven scales (NIHSS, etc.)
+│   ├── HistorianSessionComplete.tsx # Post-interview success screen
+│   ├── HistorianSessionPanel.tsx # Physician historian session viewer
+│   ├── NeurologicHistorian.tsx # Patient voice interview UI
 │   ├── IdeasDrawer.tsx        # Getting Started/Help drawer
 │   ├── ImagingResultsTab.tsx  # Imaging tab
 │   ├── LeftSidebar.tsx        # Patient info, visits, scores (responsive)
@@ -418,9 +484,12 @@ src/
 │   ├── TopNav.tsx             # Navigation header (responsive)
 │   └── VoiceDrawer.tsx        # Voice & Dictation
 ├── hooks/
+│   ├── useRealtimeSession.ts  # WebRTC hook for OpenAI Realtime API
 │   └── useVoiceRecorder.ts    # Pause/resume recording
 └── lib/
     ├── diagnosisData.ts       # 134 diagnoses with ICD-10
+    ├── historianTypes.ts      # AI Historian TypeScript types
+    ├── historianPrompts.ts    # AI Historian system prompts
     ├── note-merge/            # Merge infrastructure
     │   ├── types.ts
     │   ├── merge-engine.ts
@@ -636,6 +705,23 @@ GENERATE NOTE FLOW:
     → Populate empty fields with AI content
 ```
 
+### AI Historian Flow
+
+```
+PATIENT INTERVIEW FLOW:
+[Select Scenario] → POST /api/ai/historian/session → Ephemeral Token
+                  → RTCPeerConnection + DataChannel → OpenAI Realtime API
+                  → Voice conversation (server VAD, Whisper transcription)
+                  → AI calls save_interview_output tool → Structured JSON
+                  → POST /api/ai/historian/save → historian_sessions table
+
+PHYSICIAN REVIEW FLOW:
+[Login] → fetchDashboardData() → historian_sessions query
+        → LeftSidebar → HistorianSessionPanel
+        → Expand session → Summary / Structured / Transcript tabs
+        → "Import to Note" → Maps structured_output to noteData fields
+```
+
 ### Drawer Separation
 
 ```
@@ -665,4 +751,4 @@ AI DRAWER (Teal theme, star icon):
 ---
 
 *Document maintained by Development Team*
-*Last updated: January 24, 2026 (Responsive Design & Dark Mode)*
+*Last updated: January 30, 2026 (AI Neurologic Historian)*

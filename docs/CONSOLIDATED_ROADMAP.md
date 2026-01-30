@@ -1,7 +1,7 @@
 # Consolidated Roadmap - Sevaro Clinical
 
-**Version:** 1.1
-**Last Updated:** January 24, 2026 (Responsive Design & Dark Mode)
+**Version:** 1.3
+**Last Updated:** January 30, 2026 (AI Neurologic Historian)
 **Purpose:** Single source of truth consolidating all phases across PRDs
 
 ---
@@ -134,17 +134,27 @@ These foundational features are fully implemented.
 | Item details (dosing, rationale, monitoring, contraindications) | ✅ COMPLETE | P1 |
 | Patient instructions section | ✅ COMPLETE | P1 |
 | Add selected items to Plan textarea | ✅ COMPLETE | P0 |
+| **GitHub → Supabase sync pipeline** | ✅ COMPLETE | P0 |
+| **Dynamic plan loading from database** | ✅ COMPLETE | P0 |
+| **OPD-only filtering in sync** | ✅ COMPLETE | P1 |
 | Recommendation reconciliation engine | ⏳ PENDING | P2 |
-| Expand to all 134 diagnoses | ⏳ PENDING | P2 |
+| Expand to all 134 diagnoses | 🔧 PARTIAL | P1 - Pipeline ready, plans being built |
 
 **Reference:** https://blondarb.github.io/neuro-plans/clinical/
 
-**Demo Diagnoses Available:**
+**Integration Pipeline (January 26, 2026):**
+- `npm run sync-plans` fetches plans.json from neuro-plans GitHub
+- Filters to OPD-only items, flattens dosing structures
+- Upserts to Supabase `clinical_plans` table
+- SmartRecommendationsSection fetches from `/api/plans` endpoint
+
+**Current Plans Available:**
 - New Onset Seizure
 - Status Epilepticus (outpatient follow-up)
 - Multiple Sclerosis - New Diagnosis
 - Peripheral Neuropathy - New Diagnosis/Evaluation
 - Acute Ischemic Stroke (outpatient follow-up)
+- *(6 more in development in neuro-plans)*
 
 ---
 
@@ -388,6 +398,50 @@ These foundational features are fully implemented.
 
 ---
 
+## Phase 8: AI Neurologic Historian (Complete)
+
+### 8.1 Voice-Based Patient Intake
+
+| Feature | Status | Notes |
+|---------|--------|-------|
+| OpenAI Realtime API integration (WebRTC) | ✅ COMPLETE | gpt-4o-realtime-preview, verse voice |
+| Ephemeral token API endpoint | ✅ COMPLETE | /api/ai/historian/session |
+| WebRTC hook (useRealtimeSession) | ✅ COMPLETE | Full lifecycle management |
+| New patient interview (OLDCARTS) | ✅ COMPLETE | Structured symptom characterization |
+| Follow-up interview flow | ✅ COMPLETE | Interval changes, treatment response |
+| Safety monitoring & escalation | ✅ COMPLETE | Keyword detection + AI protocol |
+| Structured output via tool call | ✅ COMPLETE | save_interview_output function |
+| Red flag identification | ✅ COMPLETE | High/medium/low severity |
+| 4 demo scenarios | ✅ COMPLETE | Headache, seizure, migraine f/u, MS f/u |
+
+### 8.2 Patient Portal Integration
+
+| Feature | Status | Notes |
+|---------|--------|-------|
+| AI Historian tab in PatientPortal | ✅ COMPLETE | Third tab with scenario cards |
+| Full-screen voice interview page | ✅ COMPLETE | /patient/historian |
+| Animated voice orb UI | ✅ COMPLETE | Teal (AI) / purple (patient) |
+| Streaming transcript display | ✅ COMPLETE | Collapsible with timestamps |
+| Safety escalation overlay | ✅ COMPLETE | 911, 988, Crisis Text Line |
+| Post-interview success screen | ✅ COMPLETE | Duration, question count stats |
+
+### 8.3 Physician Integration
+
+| Feature | Status | Notes |
+|---------|--------|-------|
+| HistorianSessionPanel in LeftSidebar | ✅ COMPLETE | After Patient Messages section |
+| Session cards with type/duration/time | ✅ COMPLETE | Expandable with sub-tabs |
+| Summary view | ✅ COMPLETE | Narrative AI summary |
+| Structured data view | ✅ COMPLETE | Key-value clinical fields |
+| Transcript view | ✅ COMPLETE | Scrollable with role colors |
+| Red flag banners | ✅ COMPLETE | Amber warning with severity dots |
+| Safety escalation alerts | ✅ COMPLETE | Red alert for flagged sessions |
+| Import to Note | ✅ COMPLETE | Maps structured output to note fields |
+| historian_sessions table | ✅ COMPLETE | Migration 010, JSONB columns |
+| Session save/list API | ✅ COMPLETE | /api/ai/historian/save |
+
+---
+
 ## Technical Debt & Known Issues
 
 | Issue | Priority | Notes |
@@ -471,9 +525,10 @@ Based on the analysis, here's the recommended implementation order to minimize r
 | Workflow Documentation | User guidance | ✅ COMPLETE |
 | Onboarding | Interactive tour | ✅ COMPLETE |
 | Help Drawer | All tabs | ✅ COMPLETE |
+| AI Neurologic Historian | Voice intake via WebRTC | ✅ COMPLETE |
 
 ---
 
 *Document created: January 24, 2026*
-*Last updated: January 24, 2026 (Responsive Design & Dark Mode)*
+*Last updated: January 30, 2026 (AI Neurologic Historian)*
 *Consolidates: All PRD documents*
