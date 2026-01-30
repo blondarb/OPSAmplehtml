@@ -513,3 +513,22 @@ When redeploying after changes, use "Redeploy without cache" to ensure fresh bui
 - Bug fixes that change expected behavior
 
 This ensures documentation stays in sync with the codebase.
+
+## QA Rules of Engagement
+
+All test artifacts live in `qa/`. See those files for full details — this section is the short reference.
+
+| File | Purpose |
+|------|---------|
+| `qa/TEST_RUNBOOK.md` | Stable baseline test plan (smoke + regression + mobile + role-based) |
+| `qa/TEST_CASES.yaml` | Structured test cases with IDs, preconditions, steps, expected results |
+| `qa/BUG_TEMPLATE.md` | Bug report template (repro, expected/actual, env, logs) |
+| `qa/RELEASE_CHECKLIST.md` | Pre-deploy and post-deploy checks |
+| `qa/runs/RUN_TEMPLATE.md` | Per-release run log template (copy, fill, save as `RUN-YYYY-MM-DD-NNN.md`) |
+
+**Key rules:**
+1. **Stable baseline + mission brief** — The runbook is stable. Each release gets a short mission brief in `qa/runs/` listing only the delta. Do not recreate the full plan each run.
+2. **Every deploy runs smoke suite** (S1-S5) plus the mission brief's focus cases.
+3. **VS Code (Claude Code)** = planner. **Chrome (Claude Code for Chrome)** = executor.
+4. **Mobile-first**: Every run includes at least one 375px check (E1).
+5. **Versioned**: `runbook_version` and `test_cases_version` tracked in file headers. Bump when flows/cases change.
