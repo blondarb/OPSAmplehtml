@@ -1,6 +1,6 @@
 # Implementation Status - Sevaro Clinical
 
-**Last Updated:** January 30, 2026 (Patient-Centric Historian + QA Framework)
+**Last Updated:** January 30, 2026 (Enriched Patient Context for AI Historian)
 **Based on:** PRD_AI_Scribe.md v1.4, Sevaro_Outpatient_MVP_PRD_v1.4, PRD_Roadmap_Phase3.md
 
 ---
@@ -49,6 +49,28 @@ This document tracks implementation progress against the product requirements an
 
 ## Recent Updates (January 30, 2026)
 
+### Enriched Patient Context for AI Historian - NEW
+Upgraded the SQL function and data pipeline so the AI Historian receives richer clinical context during follow-up interviews.
+
+**Database (Migration 012):**
+- `get_patient_context_for_portal` now returns 3 new columns: `last_note_allergies`, `last_note_ros`, `active_diagnoses`
+- `active_diagnoses` aggregates from `diagnoses` table via the latest completed visit (format: "description (ICD-10), ...")
+- Function was DROP + CREATE (PostgreSQL cannot change return type via CREATE OR REPLACE)
+- GRANT EXECUTE re-applied for anon + authenticated roles
+
+**API Route Changes (`/api/patient/context`):**
+- Removed aggressive truncation (HPI was capped at 500 chars, assessment at 300 chars) — full text now passed through
+- Added `allergies`, `diagnoses`, `lastNoteSummary` to JSON response
+
+**TypeScript (`PatientContext` interface):**
+- Added `allergies: string | null`, `diagnoses: string | null`, `lastNoteSummary: string | null`
+
+**Component (`NeurologicHistorian.tsx`):**
+- Context string builder now includes active diagnoses, allergies, and prior visit summary
+- Each section only included when data is non-null
+
+**Modified Files (4):** 012_enrich_patient_context.sql (new), historianTypes.ts, patient/context/route.ts, NeurologicHistorian.tsx
+
 ### Patient-Centric AI Historian - NEW
 Upgraded the AI Historian from hardcoded demo scenarios to real patient data.
 
@@ -73,7 +95,7 @@ Upgraded the AI Historian from hardcoded demo scenarios to real patient data.
 
 **New API Routes:**
 - `GET /api/patient/patients` - List patients for portal
-- `GET /api/patient/context?patient_id=` - Patient name, referral, last visit/note data
+- `GET /api/patient/context?patient_id=` - Patient name, referral, last visit/note data, allergies, diagnoses, AI summary
 - `POST /api/patient/register` - Register new patient using demo physician's user_id
 
 **Modified Files (7):** historianTypes.ts, useRealtimeSession.ts, historian/save/route.ts, NeurologicHistorian.tsx, PatientPortal.tsx, dashboardData.ts, HistorianSessionPanel.tsx
@@ -761,7 +783,7 @@ PATIENT-CENTRIC FLOW:
 [Portal] → GET /api/patient/patients → Patient list
          → Select patient → GET /api/patient/context?patient_id=
          → Derives session type (new_patient / follow_up)
-         → Builds patientContext string (name, referral, prior HPI/assessment/plan)
+         → Builds patientContext string (name, referral, diagnoses, allergies, prior HPI/assessment/plan/summary)
 
 INTERVIEW FLOW:
 [Start Interview] → POST /api/ai/historian/session (with patientContext)
@@ -811,4 +833,4 @@ AI DRAWER (Teal theme, star icon):
 ---
 
 *Document maintained by Development Team*
-*Last updated: January 30, 2026 (Patient-Centric Historian + QA Framework)*
+*Last updated: January 30, 2026 (Enriched Patient Context for AI Historian)*

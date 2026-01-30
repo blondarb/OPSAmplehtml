@@ -372,6 +372,12 @@ When redeploying after changes, use "Redeploy without cache" to ensure fresh bui
 
 ## Recent Changes (January 2026)
 
+### Enriched Patient Context for AI Historian (January 30, 2026)
+- **Migration 012**: `get_patient_context_for_portal` now returns `last_note_allergies`, `last_note_ros`, and `active_diagnoses` (aggregated from diagnoses table with ICD-10 codes)
+- **Removed truncation**: API route no longer truncates HPI (was 500 chars) or assessment (was 300 chars) — full text passed to AI
+- **New PatientContext fields**: `allergies`, `diagnoses`, `lastNoteSummary` added to TypeScript interface and API response
+- **Richer AI context string**: Historian now receives active diagnoses, allergies, and prior visit summary in addition to existing HPI/assessment/plan
+
 ### AI Neurologic Historian (January 30, 2026)
 - **Voice-based patient intake**: Real-time voice interviews via OpenAI Realtime API over WebRTC
 - **Architecture**: Client connects directly to OpenAI via WebRTC; server only issues ephemeral token (Vercel-compatible)

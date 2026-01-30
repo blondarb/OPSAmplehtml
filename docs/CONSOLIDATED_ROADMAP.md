@@ -1,7 +1,7 @@
 # Consolidated Roadmap - Sevaro Clinical
 
 **Version:** 1.3
-**Last Updated:** January 30, 2026 (Patient-Centric Historian + QA Framework)
+**Last Updated:** January 30, 2026 (Enriched Patient Context for AI Historian)
 **Purpose:** Single source of truth consolidating all phases across PRDs
 
 ---
@@ -447,11 +447,12 @@ These foundational features are fully implemented.
 | Real patient list in portal | ✅ COMPLETE | get_patients_for_portal RPC |
 | Add New Patient from portal | ✅ COMPLETE | portal_register_patient RPC |
 | Patient context loading | ✅ COMPLETE | get_patient_context_for_portal RPC |
-| Prior visit context in interviews | ✅ COMPLETE | HPI, assessment, plan passed to AI |
+| Prior visit context in interviews | ✅ COMPLETE | HPI, assessment, plan, allergies, diagnoses, ROS, AI summary passed to AI |
 | Auto session type derivation | ✅ COMPLETE | follow_up if prior visit exists |
 | patient_id FK on sessions | ✅ COMPLETE | Migration 011, nullable FK |
 | Physician view patient join | ✅ COMPLETE | Real names from patients table |
 | Demo scenario fallback | ✅ COMPLETE | Collapsible section, unchanged flow |
+| Enriched context (migration 012) | ✅ COMPLETE | Allergies, ROS, active diagnoses, AI summary; removed HPI/assessment truncation |
 
 ---
 
@@ -558,5 +559,5 @@ Based on the analysis, here's the recommended implementation order to minimize r
 ---
 
 *Document created: January 24, 2026*
-*Last updated: January 30, 2026 (Patient-Centric Historian + QA Framework)*
+*Last updated: January 30, 2026 (Enriched Patient Context for AI Historian)*
 *Consolidates: All PRD documents*
