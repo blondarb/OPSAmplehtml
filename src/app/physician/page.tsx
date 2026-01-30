@@ -4,7 +4,7 @@ import { fetchDashboardData } from '@/lib/dashboardData'
 // Force dynamic rendering - this page requires auth
 export const dynamic = 'force-dynamic'
 
-export default async function DashboardPage() {
+export default async function PhysicianPage() {
   const data = await fetchDashboardData()
 
   return (

@@ -34,6 +34,7 @@ interface ClinicalNoteProps {
   priorVisits: any[]
   imagingStudies: any[]
   scoreHistory: any[]
+  patientMessages?: any[]
 }
 
 // Icon sidebar navigation
@@ -173,6 +174,7 @@ export default function ClinicalNote({
   priorVisits: initialPriorVisits,
   imagingStudies: initialImagingStudies,
   scoreHistory: initialScoreHistory,
+  patientMessages = [],
 }: ClinicalNoteProps) {
   const [darkMode, setDarkMode] = useState(false)
   const [activeIcon, setActiveIcon] = useState('home')
@@ -1068,6 +1070,7 @@ export default function ClinicalNote({
               patient={patient}
               priorVisits={priorVisits}
               scoreHistory={scoreHistory}
+              patientMessages={patientMessages}
               isOpen={mobileSidebarOpen}
               onClose={() => setMobileSidebarOpen(false)}
             />

@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import OpenAI from 'openai'
 import { createClient } from '@/lib/supabase/server'
+import { getTenantServer } from '@/lib/tenant'
 
 interface UserSettings {
   globalAiInstructions?: string
@@ -36,6 +37,8 @@ export async function POST(request: Request) {
 
     const openai = new OpenAI({ apiKey })
 
+    const tenant = getTenantServer()
+
     // Fetch patient's visit history for context
     const { data: visits } = await supabase
       .from('visits')
@@ -47,6 +50,7 @@ export async function POST(request: Request) {
       `)
       .eq('patient_id', patient?.id)
       .eq('status', 'completed')
+      .eq('tenant_id', tenant)
       .order('visit_date', { ascending: false })
       .limit(3)
 
@@ -55,6 +59,7 @@ export async function POST(request: Request) {
       .from('imaging_studies')
       .select('*')
       .eq('patient_id', patient?.id)
+      .eq('tenant_id', tenant)
       .order('study_date', { ascending: false })
       .limit(5)
 

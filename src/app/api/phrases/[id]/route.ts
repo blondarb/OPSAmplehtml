@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
+import { getTenantServer } from '@/lib/tenant'
 
 // GET /api/phrases/[id] - Get a single phrase
 export async function GET(
@@ -14,11 +15,14 @@ export async function GET(
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
+  const tenant = getTenantServer()
+
   const { data: phrase, error } = await supabase
     .from('dot_phrases')
     .select('*')
     .eq('id', id)
     .eq('user_id', user.id)
+    .eq('tenant_id', tenant)
     .single()
 
   if (error) {
@@ -56,11 +60,14 @@ export async function PUT(
   if (is_active !== undefined) updateData.is_active = is_active
   if (scope !== undefined) updateData.scope = scope
 
+  const tenant = getTenantServer()
+
   const { data: phrase, error } = await supabase
     .from('dot_phrases')
     .update(updateData)
     .eq('id', id)
     .eq('user_id', user.id)
+    .eq('tenant_id', tenant)
     .select()
     .single()
 
@@ -84,11 +91,14 @@ export async function DELETE(
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
+  const tenant = getTenantServer()
+
   const { error } = await supabase
     .from('dot_phrases')
     .delete()
     .eq('id', id)
     .eq('user_id', user.id)
+    .eq('tenant_id', tenant)
 
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 })
@@ -110,12 +120,15 @@ export async function PATCH(
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
+  const tenant = getTenantServer()
+
   // First get the current use_count
   const { data: currentPhrase, error: fetchError } = await supabase
     .from('dot_phrases')
     .select('use_count')
     .eq('id', id)
     .eq('user_id', user.id)
+    .eq('tenant_id', tenant)
     .single()
 
   if (fetchError) {
@@ -131,6 +144,7 @@ export async function PATCH(
     })
     .eq('id', id)
     .eq('user_id', user.id)
+    .eq('tenant_id', tenant)
 
   if (updateError) {
     return NextResponse.json({ error: updateError.message }, { status: 500 })

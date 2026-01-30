@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextRequest, NextResponse } from 'next/server'
+import { getTenantServer } from '@/lib/tenant'
 
 // GET - Fetch scale results for a patient
 export async function GET(request: NextRequest) {
@@ -19,11 +20,14 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: 'patientId is required' }, { status: 400 })
   }
 
+  const tenant = getTenantServer()
+
   // Fetch scale results for the patient
   let query = supabase
     .from('scale_results')
     .select('*')
     .eq('patient_id', patientId)
+    .eq('tenant_id', tenant)
     .order('completed_at', { ascending: false })
     .limit(limit)
 
@@ -70,9 +74,12 @@ export async function POST(request: NextRequest) {
     )
   }
 
+  const tenant = getTenantServer()
+
   const { data, error } = await supabase
     .from('scale_results')
     .insert({
+      tenant_id: tenant,
       patient_id: patientId,
       visit_id: visitId || null,
       scale_id: scaleId,

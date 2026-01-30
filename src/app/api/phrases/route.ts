@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
+import { getTenantServer } from '@/lib/tenant'
 
 // GET /api/phrases - List all phrases for current user
 export async function GET() {
@@ -10,10 +11,13 @@ export async function GET() {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
+  const tenant = getTenantServer()
+
   const { data: phrases, error } = await supabase
     .from('dot_phrases')
     .select('*')
     .eq('user_id', user.id)
+    .eq('tenant_id', tenant)
     .eq('is_active', true)
     .order('use_count', { ascending: false })
 
@@ -48,9 +52,12 @@ export async function POST(request: Request) {
     ? trigger_text.toLowerCase()
     : `.${trigger_text.toLowerCase()}`
 
+  const tenant = getTenantServer()
+
   const { data: phrase, error } = await supabase
     .from('dot_phrases')
     .insert({
+      tenant_id: tenant,
       user_id: user.id,
       trigger_text: normalizedTrigger,
       expansion_text,

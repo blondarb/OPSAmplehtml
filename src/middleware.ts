@@ -7,7 +7,8 @@ export function middleware(request: NextRequest) {
 
 export const config = {
   matcher: [
-    // Only match protected routes for now
+    // Protected routes
     '/dashboard/:path*',
+    '/physician/:path*',
   ],
 }

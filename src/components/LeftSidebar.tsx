@@ -6,6 +6,7 @@ interface LeftSidebarProps {
   patient: any
   priorVisits: any[]
   scoreHistory: any[]
+  patientMessages?: any[]
   isOpen?: boolean
   onClose?: () => void
 }
@@ -102,7 +103,7 @@ Neuro:
   }
 }
 
-export default function LeftSidebar({ patient, priorVisits, scoreHistory, isOpen = true, onClose }: LeftSidebarProps) {
+export default function LeftSidebar({ patient, priorVisits, scoreHistory, patientMessages = [], isOpen = true, onClose }: LeftSidebarProps) {
   const [expandedVisit, setExpandedVisit] = useState<string | null>(priorVisits[0]?.id || null)
   const [aiSummaryEnabled, setAiSummaryEnabled] = useState(true)
   const [scoreHistoryOpen, setScoreHistoryOpen] = useState(true)
@@ -907,6 +908,72 @@ export default function LeftSidebar({ patient, priorVisits, scoreHistory, isOpen
           </div>
         )}
       </div>
+      {/* Patient Messages Section */}
+      {patientMessages.length > 0 && (
+        <div style={{ padding: '12px 16px', borderTop: '1px solid var(--border)' }}>
+          <h4 style={{
+            fontSize: '13px',
+            fontWeight: 600,
+            color: 'var(--text-primary)',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '6px',
+            margin: '0 0 12px 0',
+          }}>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#8B5CF6" strokeWidth="2">
+              <path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/>
+            </svg>
+            Patient Messages
+            <span style={{
+              background: '#8B5CF6',
+              color: '#fff',
+              borderRadius: '10px',
+              padding: '1px 7px',
+              fontSize: '11px',
+              fontWeight: 600,
+              marginLeft: '4px',
+            }}>
+              {patientMessages.filter((m: any) => !m.is_read).length || patientMessages.length}
+            </span>
+          </h4>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+            {patientMessages.slice(0, 5).map((msg: any) => (
+              <div
+                key={msg.id}
+                style={{
+                  background: msg.is_read ? 'var(--bg-gray)' : 'rgba(139,92,246,0.08)',
+                  border: msg.is_read ? '1px solid transparent' : '1px solid rgba(139,92,246,0.2)',
+                  borderRadius: '8px',
+                  padding: '10px',
+                }}
+              >
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
+                  <span style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-primary)' }}>
+                    {msg.patient_name}
+                  </span>
+                  <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
+                    {new Date(msg.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                  </span>
+                </div>
+                {msg.subject && (
+                  <div style={{ fontSize: '12px', fontWeight: 500, color: 'var(--text-secondary)', marginBottom: '2px' }}>
+                    {msg.subject}
+                  </div>
+                )}
+                <div style={{
+                  fontSize: '12px',
+                  color: 'var(--text-muted)',
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                  whiteSpace: 'nowrap',
+                }}>
+                  {msg.body}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
     </aside>
 
     {/* Full Note Modal */}

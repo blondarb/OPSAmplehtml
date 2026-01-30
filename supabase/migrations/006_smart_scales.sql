@@ -26,7 +26,7 @@ CREATE TABLE IF NOT EXISTS scale_definitions (
 -- Maps conditions/diagnoses to relevant scales
 -- ============================================
 CREATE TABLE IF NOT EXISTS condition_scale_mapping (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   condition TEXT NOT NULL,  -- Matches values in CHIEF_COMPLAINTS
   scale_id TEXT NOT NULL REFERENCES scale_definitions(id) ON DELETE CASCADE,
   priority INTEGER DEFAULT 1,  -- Lower number = higher priority/more relevant
@@ -40,7 +40,7 @@ CREATE TABLE IF NOT EXISTS condition_scale_mapping (
 -- Stores completed scale assessments with responses and scores
 -- ============================================
 CREATE TABLE IF NOT EXISTS scale_results (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW(),
   patient_id UUID NOT NULL REFERENCES patients(id) ON DELETE CASCADE,
