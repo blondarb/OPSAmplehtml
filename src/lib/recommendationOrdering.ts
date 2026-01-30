@@ -4,11 +4,14 @@
  * PRD rules:
  *  - Sections: Labs → Imaging → Treatment → Other Recommendations
  *  - Subsections: Essential/First-Line first, Rare/Specialized last
- *  - Legacy section names (e.g. "Referrals & Follow-up", "Patient Instructions")
- *    are mapped into the canonical ordering without restructuring plan data.
+ *
+ * The actual subsection names come from the neuro-plans repository.
+ * Labs/Imaging/Other have a small fixed set of names.
+ * Treatment subsections vary widely per plan, so we use keyword-based
+ * priority tiers instead of an exact name list.
  */
 
-// Top-level section order (includes both canonical and legacy names)
+// Top-level section order
 export const SECTION_ORDER = [
   'Laboratory Workup',
   'Imaging & Studies',
@@ -19,81 +22,28 @@ export const SECTION_ORDER = [
   'Patient Instructions',
 ]
 
-// Subsection ordering per section — items earlier in the array render first.
-// Legacy names are included so existing neuro-plans data sorts correctly.
+// Exact subsection ordering for sections with a fixed set of subsection names
 export const SUBSECTION_ORDER_MAP: Record<string, string[]> = {
   'Laboratory Workup': [
-    // Essential / Core
-    'Essential Labs',
-    'Baseline Labs (Pre-DMT)',
-    // Routine / Monitoring
-    'Routine Monitoring',
-    // Specialised screening groups
-    'Toxicology',
-    'Infectious Disease Screening',
-    // Extended / Expanded
+    'Essential/Core Labs',
     'Extended Workup',
-    'Additional Testing',
-    'If Specific Etiology Suspected',
-    'If Autoimmune Suspected',
-    'If Etiology Undetermined',
-    // LP / CSF always last
-    'Lumbar Puncture / CSF',
+    'Rare/Specialized',
+    'Lumbar Puncture',
   ],
 
   'Imaging & Studies': [
-    // Essential / First-Line
-    'Essential Imaging',
-    'Baseline MRI',
-    // Electrodiagnostic
-    'Electrodiagnostic Studies',
-    // Cardiac & Vascular
-    'Cardiac Evaluation',
-    'Vascular Imaging',
-    // Follow-up
-    'Follow-up Imaging',
-    'Follow-up Brain Imaging',
-    // Extended / Optional
-    'Other Studies',
-    'Imaging',
-    'Additional Studies',
-    'Additional Testing',
-    'Specialized',
-    'If Refractory',
+    'Essential/First-line',
+    'Extended',
+    'Rare/Specialized',
   ],
 
-  Treatment: [
-    // First-Line / Standard
-    'First-Line ASMs',
-    'Antiplatelet Therapy',
-    'Treat Underlying Cause',
-    'Neuropathic Pain Management - First Line',
-    // Disease-Specific Targeted
-    'Platform/Moderate Efficacy DMTs',
-    'Higher Efficacy DMTs',
-    // Second-Line / Advanced
-    'ASM Optimization',
-    'Risk Factor Management',
-    'Second-Line Options',
-    'Second Line Options',
-    'Anticoagulation (if AFib/cardioembolic)',
-    // Rescue / Emergent
-    'Rescue Medications',
-    // Symptomatic
-    'Symptomatic Management',
-    'Topical Therapies',
-    'Neuroprotection',
-  ],
-
-  // "Other Recommendations" subsection order (PRD 3.1)
   'Other Recommendations': [
     'Referrals & Consults',
     'Lifestyle & Prevention',
-    'Risk Reduction',
-    'Patient Instructions & Education',
+    'Patient Instructions',
   ],
 
-  // Legacy "Referrals & Follow-up" section keeps its own subsection ordering
+  // Legacy section
   'Referrals & Follow-up': [
     'Essential',
     'Rehabilitation',
@@ -101,6 +51,83 @@ export const SUBSECTION_ORDER_MAP: Record<string, string[]> = {
     'Supportive',
     'Specialized',
   ],
+}
+
+// Treatment subsections use keyword-based priority tiers (lower = earlier).
+// Subsections not matching any keyword get tier 50 (middle).
+const TREATMENT_TIER_KEYWORDS: [number, RegExp][] = [
+  // Tier 1: Acute / Emergent / Stabilization — always first
+  [1, /^stabiliz/i],
+  [2, /acute.*emerg|emerg.*acute/i],
+  [3, /^acute/i],
+  [4, /emergent|urgent/i],
+
+  // Tier 10: First-line / Essential / Primary treatments
+  [10, /first[- ]line/i],
+  [11, /essential|core|primary|foundation/i],
+  [12, /^empiric/i],
+  [13, /corticosteroid/i],
+  [14, /antiviral/i],
+
+  // Tier 20: Disease-modifying / Preventive / Standard therapies
+  [20, /disease[- ]modif/i],
+  [21, /preventive|prevention/i],
+  [22, /dopamin|levodopa/i],
+  [23, /cholinesterase|nmda/i],
+  [24, /immunotherapy|immunosuppress/i],
+  [25, /^maintenance/i],
+  [26, /secondary prevention/i],
+  [27, /pharmacologic/i],
+
+  // Tier 30: Second-line / Adjunctive / Targeted
+  [30, /second[- ]line/i],
+  [31, /adjunct/i],
+  [32, /targeted|specific/i],
+  [33, /biologic/i],
+  [34, /steroid[- ]spar/i],
+  [35, /combination/i],
+
+  // Tier 40: Symptomatic / Supportive / Non-motor
+  [40, /symptomatic/i],
+  [41, /supportive/i],
+  [42, /non[- ]motor/i],
+  [43, /non[- ]pharmacol/i],
+  [44, /pain management/i],
+  [45, /neuropathic pain/i],
+  [46, /behavioral|psychiatric|mood|sleep|cognit|fatigue|autonomic/i],
+  [47, /headache management|vestibular|visual/i],
+  [48, /nutritional|weight|lifestyle/i],
+  [49, /rehabilitation|physical therapy/i],
+
+  // Tier 60: Third-line / Refractory / Advanced
+  [60, /third[- ]line/i],
+  [61, /refractory/i],
+  [62, /advanced|rescue/i],
+  [63, /interventional/i],
+
+  // Tier 70: Surgical
+  [70, /surgical/i],
+
+  // Tier 80: Medications to avoid / special populations / pregnancy
+  [80, /avoid/i],
+  [81, /pregnancy/i],
+  [82, /withdrawal/i],
+  [83, /transition/i],
+
+  // Tier 90: Complications / Post-treatment
+  [90, /complication/i],
+  [91, /post-/i],
+]
+
+/**
+ * Get a numeric priority tier for a Treatment subsection name.
+ * Lower numbers appear first. Unmatched names get tier 50.
+ */
+function getTreatmentTier(name: string): number {
+  for (const [tier, pattern] of TREATMENT_TIER_KEYWORDS) {
+    if (pattern.test(name)) return tier
+  }
+  return 50 // default middle tier
 }
 
 /**
@@ -119,9 +146,17 @@ export function sortSections(names: string[]): string[] {
 
 /**
  * Sort subsection names within a given section according to canonical order.
+ * For Treatment sections, uses keyword-based tier sorting.
+ * For other sections, uses the exact name list in SUBSECTION_ORDER_MAP.
  * Names not in the map are appended at the end in their original order.
  */
 export function sortSubsections(section: string, names: string[]): string[] {
+  // Treatment uses keyword-based tiers
+  if (section === 'Treatment') {
+    return [...names].sort((a, b) => getTreatmentTier(a) - getTreatmentTier(b))
+  }
+
+  // Other sections use exact name ordering
   const orderList = SUBSECTION_ORDER_MAP[section] || []
   return [...names].sort((a, b) => {
     const idxA = orderList.indexOf(a)
