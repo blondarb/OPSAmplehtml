@@ -132,8 +132,11 @@ export default function NeurologicHistorian() {
         if (ctx.lastVisitDate) {
           contextStr += `\nLast visit: ${new Date(ctx.lastVisitDate).toLocaleDateString()} (${ctx.lastVisitType || 'visit'})`
         }
+        if (ctx.diagnoses) contextStr += `\nActive diagnoses: ${ctx.diagnoses}`
+        if (ctx.allergies) contextStr += `\nAllergies: ${ctx.allergies}`
         if (ctx.lastNoteExcerpt) contextStr += `\nPrior note excerpt:\n${ctx.lastNoteExcerpt}`
         if (ctx.lastNotePlan) contextStr += `\nPrior plan: ${ctx.lastNotePlan}`
+        if (ctx.lastNoteSummary) contextStr += `\nPrior visit summary: ${ctx.lastNoteSummary}`
 
         setSessionConfig({
           sessionType,

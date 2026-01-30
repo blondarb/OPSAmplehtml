@@ -91,6 +91,9 @@ export interface PatientContext {
   lastVisitType: string | null
   lastNoteExcerpt: string | null
   lastNotePlan: string | null
+  allergies: string | null
+  diagnoses: string | null
+  lastNoteSummary: string | null
 }
 
 export interface DemoScenario {

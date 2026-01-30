@@ -32,10 +32,13 @@ export async function GET(request: Request) {
       lastVisitDate: row.last_visit_date || null,
       lastVisitType: row.last_visit_type || null,
       lastNoteExcerpt: row.last_note_hpi
-        ? (row.last_note_hpi.length > 500 ? row.last_note_hpi.slice(0, 500) + '...' : row.last_note_hpi)
-          + (row.last_note_assessment ? '\n\nAssessment: ' + (row.last_note_assessment.length > 300 ? row.last_note_assessment.slice(0, 300) + '...' : row.last_note_assessment) : '')
+        ? row.last_note_hpi
+          + (row.last_note_assessment ? '\n\nAssessment: ' + row.last_note_assessment : '')
         : null,
       lastNotePlan: row.last_note_plan || null,
+      allergies: row.last_note_allergies || null,
+      diagnoses: row.active_diagnoses || null,
+      lastNoteSummary: row.last_note_summary || null,
     })
   } catch (error: any) {
     console.error('Patient context API error:', error)
