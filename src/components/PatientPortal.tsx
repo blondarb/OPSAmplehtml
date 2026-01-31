@@ -205,9 +205,6 @@ export default function PatientPortal() {
           </div>
           <span style={{ color: '#fff', fontWeight: 600, fontSize: '1.125rem' }}>Sevaro Patient Portal</span>
         </div>
-        <a href="/" style={{ color: '#94a3b8', fontSize: '0.875rem', textDecoration: 'none' }}>
-          Back to Home
-        </a>
       </header>
 
       {/* Tab Bar */}

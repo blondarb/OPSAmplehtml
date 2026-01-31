@@ -1189,36 +1189,6 @@ export default function ClinicalNote({
           </div>
         ) : (
           <>
-            {/* Back to appointments button when viewing a chart */}
-            <div style={{
-              position: 'absolute',
-              top: '70px',
-              left: '70px',
-              zIndex: 50,
-            }}>
-              <button
-                onClick={handleBackToAppointments}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '6px',
-                  padding: '8px 12px',
-                  background: 'var(--bg-white)',
-                  border: '1px solid var(--border)',
-                  borderRadius: '8px',
-                  cursor: 'pointer',
-                  fontSize: '13px',
-                  color: 'var(--text-secondary)',
-                  boxShadow: '0 2px 4px rgba(0,0,0,0.05)',
-                }}
-              >
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <polyline points="15 18 9 12 15 6" />
-                </svg>
-                Back
-              </button>
-            </div>
-
             <LeftSidebar
               patient={patient}
               priorVisits={priorVisits}
