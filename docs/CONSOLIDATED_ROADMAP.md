@@ -71,7 +71,24 @@ These foundational features are fully implemented.
 | Impression dropdown | ✅ COMPLETE | Normal/Abnormal |
 | PACS link field | ✅ COMPLETE | - |
 
-### 1.4 Authentication & Infrastructure
+### 1.4 Medications & Allergies
+
+| Feature | Status | Notes |
+|---------|--------|-------|
+| patient_medications table | ✅ COMPLETE | Migration 014, RLS, indexes, triggers |
+| patient_allergies table | ✅ COMPLETE | Migration 014, severity levels |
+| medication_reviews table | ✅ COMPLETE | Audit trail for reviews |
+| Medications API (CRUD) | ✅ COMPLETE | /api/medications, /api/medications/[id] |
+| Allergies API (CRUD) | ✅ COMPLETE | /api/allergies, /api/allergies/[id] |
+| TypeScript types | ✅ COMPLETE | medicationTypes.ts — 8 interfaces, 4 enums |
+| Neuro formulary data | ✅ COMPLETE | ~70 meds, 8 categories, searchFormulary() |
+| CenterPanel medication UI | ✅ COMPLETE | List, add/edit form, formulary typeahead, discontinue modal |
+| CenterPanel allergy UI | ✅ COMPLETE | Chips/pills with severity colors, add form |
+| LeftSidebar medication summary | ✅ COMPLETE | Medication list in sidebar |
+| LeftSidebar allergy banner | ✅ COMPLETE | Alert banner + allergy summary |
+| ClinicalNote state management | ✅ COMPLETE | useState, useEffect fetch, 7 useCallback handlers |
+
+### 1.5 Authentication & Infrastructure
 
 | Feature | Status | Notes |
 |---------|--------|-------|

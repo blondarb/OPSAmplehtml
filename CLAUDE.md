@@ -28,6 +28,8 @@ src/
 │   │   │   │   └── save/    # Save/list historian sessions
 │   │   │   ├── transcribe/# Voice transcription (Whisper)
 │   │   │   └── visit-ai/  # Visit AI - full visit transcription & clinical extraction
+│   │   ├── allergies/     # Allergy CRUD API
+│   │   ├── medications/   # Medication CRUD API
 │   │   ├── phrases/       # Dot phrases CRUD
 │   │   └── scales/        # Clinical scales API
 │   ├── auth/              # Auth callback handler
@@ -67,6 +69,8 @@ src/
 │   ├── diagnosisData.ts   # 134 neurology diagnoses with ICD-10 codes
 │   ├── historianTypes.ts  # TypeScript types for AI Historian
 │   ├── historianPrompts.ts # System prompts for AI Historian interviews
+│   ├── medicationTypes.ts # TypeScript types for medications & allergies
+│   ├── neuroFormulary.ts  # ~70 neurology medications with search helper
 │   ├── note-merge/        # Note merge engine for combining AI outputs
 │   │   ├── index.ts       # Re-exports merge functions
 │   │   ├── merge-engine.ts # Core merge logic + formatting functions
@@ -93,6 +97,9 @@ Located in `supabase/migrations/`:
 - **app_settings**: Application settings (stores OpenAI API key)
 - **dot_phrases**: User-defined text expansion phrases with scoping
 - **historian_sessions**: AI voice interview sessions (structured output, transcript, red flags)
+- **patient_medications**: Patient medication records with dosage, frequency, prescriber
+- **patient_allergies**: Patient allergy records with severity and reaction type
+- **medication_reviews**: Medication review audit trail
 
 ## Environment Variables
 
@@ -371,6 +378,15 @@ When redeploying after changes, use "Redeploy without cache" to ensure fresh bui
 - Push to feature branch, create PR, merge to main for deployment
 
 ## Recent Changes (January 2026)
+
+### Medications & Allergies (January 30, 2026)
+- **Migration 014**: `patient_medications`, `patient_allergies`, `medication_reviews` tables with RLS, indexes, triggers
+- **API routes**: Full CRUD (GET/POST/PATCH/DELETE) for `/api/medications` and `/api/allergies` with auth + tenant scoping
+- **TypeScript types**: 8 interfaces and 4 enums in `medicationTypes.ts`
+- **Neuro formulary**: ~70 neurology medications across 8 categories with `searchFormulary()` helper
+- **ClinicalNote state**: useState, useEffect fetch, 7 useCallback handlers for med/allergy CRUD
+- **CenterPanel UI**: Medication list with add/edit form, formulary typeahead, discontinue modal, allergy chips with severity colors
+- **LeftSidebar UI**: Allergy alert banner, medication summary list, allergy overview
 
 ### Enriched Patient Context for AI Historian (January 30, 2026)
 - **Migration 012**: `get_patient_context_for_portal` now returns `last_note_allergies`, `last_note_ros`, and `active_diagnoses` (aggregated from diagnoses table with ICD-10 codes)

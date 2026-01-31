@@ -33,6 +33,7 @@ This document tracks implementation progress against the product requirements an
 - ✅ **Exam Templates** - Predefined + custom template feature
 
 **Newly Completed:**
+- ✅ **Medications & Allergies** - Full CRUD API, ~70-med neuro formulary with typeahead, allergy severity chips, sidebar summary, migration 014
 - ✅ **Patient-Centric Historian** - Real patients from Supabase, prior visit context in interviews, patient_id FK linkage
 - ✅ **QA Framework** - Test runbook, 35 structured test cases, release checklist, bug template, run log system
 - ✅ **AI Neurologic Historian** - Voice-based patient intake via OpenAI Realtime API (WebRTC)
