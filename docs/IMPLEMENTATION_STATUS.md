@@ -1,6 +1,6 @@
 # Implementation Status - Sevaro Clinical
 
-**Last Updated:** January 30, 2026 (Enriched Patient Context for AI Historian)
+**Last Updated:** January 30, 2026 (Smart Recommendations Expansion — 67 plans, ordering, saved plans, search)
 **Based on:** PRD_AI_Scribe.md v1.4, Sevaro_Outpatient_MVP_PRD_v1.4, PRD_Roadmap_Phase3.md
 
 ---
@@ -26,7 +26,7 @@ This document tracks implementation progress against the product requirements an
 - ✅ **TopNav Enhancements** - Timer controls, Lock screen, Notifications panel, What's New
 - ✅ **Comprehensive Note Generation** - New Consult vs Follow-up layouts, note length preferences
 - ✅ **Enhanced Note Preview** - Section-by-section approval, formatted EHR-ready output
-- ✅ **Smart Recommendations (Phase 2)** - 5 diagnoses with treatment plans from neuro-plans
+- ✅ **Smart Recommendations (Phase 2)** - 67 plans synced from neuro-plans with canonical ordering, saved plans, search
 - ✅ **Field AI Actions** - Improve/Expand/Summarize with anti-hallucination safeguards
 - ✅ **User Settings** - Full settings drawer with AI custom instructions (global + per-section)
 - ✅ **Extended Scales** - NIHSS, Modified Ashworth, ABCD2, DHI, Mini-Cog, ISI, ESS
@@ -49,7 +49,65 @@ This document tracks implementation progress against the product requirements an
 
 ## Recent Updates (January 30, 2026)
 
-### Enriched Patient Context for AI Historian - NEW
+### Smart Recommendations Expansion - NEW
+Major upgrade to Smart Recommendations: 67 clinical plans synced from neuro-plans, canonical subsection ordering, saved plans, search, and ICD-10 matching fixes.
+
+**Database (Migration 013):**
+- `clinical_plans` table (reference data, shared across tenants) — already existed, RLS policies added
+- `saved_plans` table (user-owned) — stores selections + custom items relative to base plan
+- RLS policies, indexes on user_id/tenant_id/source_plan_key, updated_at triggers
+
+**Sync Pipeline Fixes (`scripts/sync-plans.ts`):**
+- Fixed `cleanIcd10Codes()` — source data has `**` markdown bold markers (e.g. `"** G45.9 (Transient cerebral ischemic attack, unspecified)"`) that caused codes to be silently dropped
+- 6 plans had completely empty ICD-10 codes (GBS, MS, MG, Autoimmune Encephalitis, Parkinson's, MS Chronic); now all 67 plans have proper codes
+- Added `scripts/plan-overrides.json` — local overrides merged after source parsing, before Supabase upsert; prevents manual DB patches from being lost on re-sync
+- TIA override: source JSON only has G45.9, but clinical documentation lists G45.0, G45.1, G45.8 as well
+
+**Canonical Subsection Ordering (`src/lib/recommendationOrdering.ts`):**
+- Labs: Essential/Core Labs → Extended Workup → Rare/Specialized → Lumbar Puncture
+- Imaging: Essential/First-line → Extended → Rare/Specialized
+- Other: Referrals & Consults → Lifestyle & Prevention → Patient Instructions
+- Treatment: Keyword-based priority tiers (200+ unique subsection names across 67 plans) — Acute/Emergent → First-line/Essential → Disease-modifying → Second-line → Symptomatic → Refractory → Surgical → Avoid → Complications
+
+**Plans API (`/api/plans/route.ts`):**
+- Fallback to hardcoded OUTPATIENT_PLANS when Supabase query fails
+- Alternate ICD-10 code matching — `diagnosisToIcd10Map` stores arrays of all codes (primary + alternates)
+- `codesMatch()` helper with prefix-aware matching
+- `?planKey=` parameter for direct plan lookup
+- `?search=` parameter for keyword search across title, ICD-10, and scope
+
+**Saved Plans API:**
+- `GET /api/saved-plans` — list saved plans for current user
+- `POST /api/saved-plans` — create with 10-plan soft limit
+- `GET/PUT/DELETE/PATCH /api/saved-plans/[id]` — CRUD + usage tracking
+
+**Diagnosis Search Enhancements (`src/lib/diagnosisData.ts`):**
+- Added `DIAGNOSIS_SYNONYMS` map with 60+ clinical abbreviations (tia, ms, gbs, als, mg, nmo, pd, rls, mci, etc.)
+- `searchDiagnoses()` now checks synonym map first, then searches name, ICD-10, AND diagnosis ID
+
+**SmartRecommendationsSection.tsx:**
+- Imports canonical ordering from recommendationOrdering.ts
+- Save/Load UI (disk/folder icons) with inline dialogs
+- Plan search bar (always visible, debounced 300ms)
+- Saved plans state and API integration
+
+**New Files (7):**
+- `supabase/migrations/013_clinical_plans_and_saved_plans.sql`
+- `src/lib/recommendationOrdering.ts`
+- `src/lib/savedPlanTypes.ts`
+- `src/app/api/plans/seed/route.ts`
+- `src/app/api/saved-plans/route.ts`
+- `src/app/api/saved-plans/[id]/route.ts`
+- `scripts/plan-overrides.json`
+
+**Modified Files (4):**
+- `src/app/api/plans/route.ts` — fallback, ICD-10 matching, search, planKey lookup
+- `src/components/SmartRecommendationsSection.tsx` — ordering, save/load, search UI
+- `src/lib/diagnosisData.ts` — synonym search
+- `src/lib/database.types.ts` — clinical_plans and saved_plans type definitions
+- `scripts/sync-plans.ts` — ICD-10 parsing fix, overrides mechanism
+
+### Enriched Patient Context for AI Historian
 Upgraded the SQL function and data pipeline so the AI Historian receives richer clinical context during follow-up interviews.
 
 **Database (Migration 012):**
@@ -320,7 +378,7 @@ Intelligent data extraction from ALL patient data sources to pre-populate scale 
 - **Word Count Display** - Track note length in real-time
 
 ### Phase 2 & 3A Completion
-- Smart Recommendations with 5 demo diagnoses implemented
+- Smart Recommendations with 67 plans synced from neuro-plans (see Smart Recommendations Expansion above)
 - Field AI Actions (/api/ai/field-action) with GPT-4 integration
 - Settings Drawer with AI custom instructions
 - 7 new clinical scales added (NIHSS, MAS, ABCD2, DHI, Mini-Cog, ISI, ESS)
@@ -403,7 +461,7 @@ Intelligent data extraction from ALL patient data sources to pre-populate scale 
 | ICD-10 codes | COMPLETE | diagnosisData.ts | 134 diagnoses with codes |
 | Search picker | COMPLETE | - | Category filtering |
 | Custom diagnosis entry | COMPLETE | - | Free text option |
-| Smart Recommendations | PENDING | - | Phase 2 |
+| Smart Recommendations | COMPLETE | SmartRecommendationsSection.tsx | 67 plans, ordering, saved plans, search |
 
 ### AI Features
 
@@ -527,6 +585,12 @@ src/
 │       │   │   └── save/route.ts  # Save/list sessions (+ patient_id)
 │       │   ├── transcribe/route.ts # Whisper transcription
 │       │   └── visit-ai/route.ts  # Visit AI processing
+│       ├── plans/
+│       │   ├── route.ts           # Clinical plans API (list, search, by diagnosis/key)
+│       │   └── seed/route.ts      # Seed plans from hardcoded data
+│       ├── saved-plans/
+│       │   ├── route.ts           # Saved plans list + create
+│       │   └── [id]/route.ts      # Saved plans CRUD + usage tracking
 │       └── patient/
 │           ├── patients/route.ts  # List patients for portal (RPC)
 │           ├── context/route.ts   # Patient context for historian (RPC)
@@ -558,9 +622,11 @@ src/
 │   ├── useRealtimeSession.ts  # WebRTC hook for OpenAI Realtime API
 │   └── useVoiceRecorder.ts    # Pause/resume recording
 └── lib/
-    ├── diagnosisData.ts       # 134 diagnoses with ICD-10
+    ├── diagnosisData.ts       # 134 diagnoses with ICD-10 + synonym search
     ├── historianTypes.ts      # AI Historian TypeScript types
     ├── historianPrompts.ts    # AI Historian system prompts
+    ├── recommendationOrdering.ts # Canonical section/subsection ordering
+    ├── savedPlanTypes.ts      # Saved plan TypeScript interfaces
     ├── note-merge/            # Merge infrastructure
     │   ├── types.ts
     │   ├── merge-engine.ts
@@ -579,11 +645,20 @@ See full PRD: [PRD_Roadmap_Phase3.md](./PRD_Roadmap_Phase3.md)
 | Task | Status | Priority |
 |------|--------|----------|
 | Link diagnoses to treatment recommendations | **COMPLETE** | High |
-| Import templates from neuro-plans demo (5 diagnoses) | **COMPLETE** | High |
+| 67 plans synced from neuro-plans GitHub repo | **COMPLETE** | High |
 | Checkbox-based recommendation selection per diagnosis | **COMPLETE** | High |
 | SmartRecommendationsSection component | **COMPLETE** | High |
 | Priority badges (STAT/URGENT/ROUTINE/EXT) | **COMPLETE** | Medium |
 | Add selected items to Plan textarea | **COMPLETE** | High |
+| Canonical subsection ordering (Essential first) | **COMPLETE** | High |
+| Keyword-based Treatment tier sorting | **COMPLETE** | High |
+| Saved plans (save/load per user, 10-plan limit) | **COMPLETE** | Medium |
+| Plan search by keyword | **COMPLETE** | Medium |
+| Diagnosis synonym/abbreviation search (60+ terms) | **COMPLETE** | Medium |
+| Alternate ICD-10 code matching | **COMPLETE** | High |
+| Plan overrides mechanism for sync | **COMPLETE** | Medium |
+| ICD-10 parsing fix (markdown source format) | **COMPLETE** | High |
+| Expand to all 134 diagnoses | **PARTIAL** | Medium — 67/134, ~90 more to build |
 
 Reference: https://blondarb.github.io/neuro-plans/clinical/
 
@@ -833,4 +908,4 @@ AI DRAWER (Teal theme, star icon):
 ---
 
 *Document maintained by Development Team*
-*Last updated: January 30, 2026 (Enriched Patient Context for AI Historian)*
+*Last updated: January 30, 2026 (Smart Recommendations Expansion — 67 plans, ordering, saved plans, search)*

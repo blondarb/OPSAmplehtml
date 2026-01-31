@@ -1,7 +1,7 @@
 # Consolidated Roadmap - Sevaro Clinical
 
-**Version:** 1.3
-**Last Updated:** January 30, 2026 (Enriched Patient Context for AI Historian)
+**Version:** 1.4
+**Last Updated:** January 30, 2026 (Smart Recommendations Expansion — 67 plans, ordering, saved plans, search)
 **Purpose:** Single source of truth consolidating all phases across PRDs
 
 ---
@@ -127,7 +127,7 @@ These foundational features are fully implemented.
 | Feature | Status | Priority |
 |---------|--------|----------|
 | Link diagnoses to treatment recommendations | ✅ COMPLETE | P0 |
-| Import templates from neuro-plans (5 demo diagnoses) | ✅ COMPLETE | P0 |
+| Import templates from neuro-plans (67 plans synced) | ✅ COMPLETE | P0 |
 | Checkbox-based recommendation selection | ✅ COMPLETE | P0 |
 | Expandable sections with subsections | ✅ COMPLETE | P0 |
 | Priority badges (STAT/URGENT/ROUTINE/EXT) | ✅ COMPLETE | P1 |
@@ -137,24 +137,46 @@ These foundational features are fully implemented.
 | **GitHub → Supabase sync pipeline** | ✅ COMPLETE | P0 |
 | **Dynamic plan loading from database** | ✅ COMPLETE | P0 |
 | **OPD-only filtering in sync** | ✅ COMPLETE | P1 |
+| **Canonical subsection ordering** | ✅ COMPLETE | P0 |
+| **Keyword-based Treatment tier sorting** | ✅ COMPLETE | P0 |
+| **Saved plans (save/load per user)** | ✅ COMPLETE | P1 |
+| **Plan search by keyword** | ✅ COMPLETE | P1 |
+| **Diagnosis synonym/abbreviation search** | ✅ COMPLETE | P1 |
+| **Alternate ICD-10 code matching** | ✅ COMPLETE | P0 |
+| **Plan overrides mechanism for sync** | ✅ COMPLETE | P1 |
+| **ICD-10 parsing fix (markdown-formatted source)** | ✅ COMPLETE | P0 |
 | Recommendation reconciliation engine | ⏳ PENDING | P2 |
-| Expand to all 134 diagnoses | 🔧 PARTIAL | P1 - Pipeline ready, plans being built |
+| Expand to all 134 diagnoses | 🔧 PARTIAL | P1 — 67/134 plans built, ~90 more to add |
 
 **Reference:** https://blondarb.github.io/neuro-plans/clinical/
 
-**Integration Pipeline (January 26, 2026):**
-- `npm run sync-plans` fetches plans.json from neuro-plans GitHub
+**Integration Pipeline (January 30, 2026):**
+- `npm run sync-plans` fetches plans.json from neuro-plans GitHub repo
+- Strips markdown formatting (`**`) from ICD-10 codes, extracts clean codes
 - Filters to OPD-only items, flattens dosing structures
-- Upserts to Supabase `clinical_plans` table
-- SmartRecommendationsSection fetches from `/api/plans` endpoint
+- Applies local overrides from `scripts/plan-overrides.json` (fixes source data gaps)
+- Upserts to Supabase `clinical_plans` table (67 plans)
+- SmartRecommendationsSection fetches from `/api/plans` endpoint with fallback to hardcoded data
 
-**Current Plans Available:**
-- New Onset Seizure
-- Status Epilepticus (outpatient follow-up)
-- Multiple Sclerosis - New Diagnosis
-- Peripheral Neuropathy - New Diagnosis/Evaluation
-- Acute Ischemic Stroke (outpatient follow-up)
-- *(6 more in development in neuro-plans)*
+**Subsection Ordering (recommendationOrdering.ts):**
+- Labs: Essential/Core Labs → Extended Workup → Rare/Specialized → Lumbar Puncture
+- Imaging: Essential/First-line → Extended → Rare/Specialized
+- Treatment: Keyword-based tiers (Acute → First-line → Disease-modifying → Second-line → Symptomatic → Refractory → Surgical → Avoid → Complications)
+- Other: Referrals & Consults → Lifestyle & Prevention → Patient Instructions
+
+**Saved Plans:**
+- `saved_plans` table (migration 013) with RLS, user-owned
+- CRUD API at `/api/saved-plans` and `/api/saved-plans/[id]`
+- Save/Load UI in SmartRecommendationsSection (10-plan soft limit per user)
+- Stores selections + custom items relative to base plan
+
+**Diagnosis Search Enhancements:**
+- 60+ clinical abbreviation synonyms (tia, ms, gbs, als, mg, nmo, pd, rls, mci, etc.)
+- Search matches against name, ICD-10 code, AND diagnosis ID
+- Plan search across title, ICD-10 codes, and scope
+
+**Current Plans Available (67):**
+Migraine, Migraine with Aura, Chronic Migraine, Cluster Headache, Tension-Type Headache, Medication Overuse Headache, Low Pressure Headache, Post-Concussion Syndrome, Trigeminal Neuralgia, New Onset Seizure, Status Epilepticus, Breakthrough Seizure, NCSE, Acute Ischemic Stroke, TIA, Intracerebral Hemorrhage, Subarachnoid Hemorrhage, CVT, Parkinson's Disease, Parkinson's Disease - New Diagnosis, Drug-Induced Parkinsonism, Essential Tremor, Dystonia, Tardive Dyskinesia, Huntington's Disease, RLS, Wilson's Disease, MS - New Diagnosis, MS - Chronic Management, NMOSD, Optic Neuritis, Dementia Evaluation, MCI, Alzheimer's Disease, Lewy Body Dementia, Vascular Dementia, Frontotemporal Dementia, Rapidly Progressive Dementia, NPH, Peripheral Neuropathy, Diabetic Neuropathy, Small Fiber Neuropathy, CIDP, Carpal Tunnel Syndrome, Radiculopathy, GBS, MG - New Diagnosis, MG - Outpatient Management, MG - Exacerbation/Crisis, ALS/MND, Neuromuscular Respiratory Failure, Autoimmune Encephalitis, Bacterial Meningitis, HSV Encephalitis, Bell's Palsy, Syncope, Vertigo/Dizziness Evaluation, Wernicke Encephalopathy, Brain Metastases, IIH, Elevated ICP Management, Spinal Epidural Abscess, Acute Myelopathy, Cauda Equina Syndrome, Spinal Cord Compression, GCA, FND
 
 ---
 
@@ -301,7 +323,7 @@ These foundational features are fully implemented.
 | CRUD operations | ✅ COMPLETE | /api/phrases |
 | Usage tracking | ✅ COMPLETE | Count updates |
 | Drawer UI | ✅ COMPLETE | DotPhrasesDrawer.tsx |
-| Pre-built neurology phrases | ⏳ PENDING | Need to seed library |
+| Pre-built neurology phrases | ✅ COMPLETE | 70+ phrases seeded via /api/phrases/seed |
 | Dot-prefix auto-expand | ⏳ PENDING | P2 |
 | Keyboard shortcuts | ⏳ PENDING | P2 |
 | Import/Export | ⏳ PENDING | P3 |
@@ -331,14 +353,19 @@ These foundational features are fully implemented.
 | getHistoryScales() helper | ✅ COMPLETE | For History tab |
 | Condition-to-scale mappings | ✅ COMPLETE | Stroke, TIA, Dizziness, etc. |
 
+### Outpatient — Recently Implemented (January 2026)
+
+| Scale | Status | Notes |
+|-------|--------|-------|
+| UPDRS Motor (Part III) | ✅ COMPLETE | 33-item Parkinson's motor exam |
+| Hoehn & Yahr | ✅ COMPLETE | Parkinson's staging (0-5) |
+| EDSS | ✅ COMPLETE | MS disability (0-10) |
+| CHA₂DS₂-VASc | ✅ COMPLETE | Stroke risk in AFib (0-9) |
+
 ### Outpatient (Future)
 
 | Scale | Status | Priority |
 |-------|--------|----------|
-| UPDRS (Parkinson's) | ⏳ PENDING | P2 |
-| Hoehn & Yahr | ⏳ PENDING | P2 |
-| EDSS (MS) | ⏳ PENDING | P2 |
-| CHA₂DS₂-VASc | ⏳ PENDING | P2 |
 | HAS-BLED | ⏳ PENDING | P2 |
 | DN4 (neuropathic pain) | ⏳ PENDING | P2 |
 | ODI (spine) | ⏳ PENDING | P2 |
@@ -488,9 +515,10 @@ Based on the analysis, here's the recommended implementation order to minimize r
 ### Immediate (Complete Phase 2 Foundation)
 
 1. ~~**Smart Recommendations** - Link diagnoses to treatment plans~~ ✅ COMPLETE
-   - 5 demo diagnoses with full outpatient recommendations
-   - Expandable sections with checkbox-based selection
-   - Integrated into Recommendation tab with Plan textarea
+   - 67 plans synced from neuro-plans repo (covering most neurology diagnoses)
+   - Canonical subsection ordering (Essential first, Rare/Specialized last)
+   - Saved plans per user, plan search, diagnosis synonym search
+   - Alternate ICD-10 matching, plan overrides mechanism for sync
 
 ### Short-term (Phase 3A Completion)
 
@@ -559,5 +587,5 @@ Based on the analysis, here's the recommended implementation order to minimize r
 ---
 
 *Document created: January 24, 2026*
-*Last updated: January 30, 2026 (Enriched Patient Context for AI Historian)*
+*Last updated: January 30, 2026 (Smart Recommendations Expansion — 67 plans, ordering, saved plans, search)*
 *Consolidates: All PRD documents*
