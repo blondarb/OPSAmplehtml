@@ -379,6 +379,12 @@ When redeploying after changes, use "Redeploy without cache" to ensure fresh bui
 
 ## Recent Changes (January 2026)
 
+### P1 Features (January 30, 2026)
+- **Free-text Exam Toggle**: Structured/Free-text pill toggle on Physical Exams tab; free-text mode shows single NoteTextField with dictation/AI/dot phrase buttons; persisted to localStorage
+- **Handout Auto-suggest by Diagnosis**: AiDrawer Handout tab now shows "From this visit" optgroup populated from selected diagnoses, plus "Common conditions" and "Personalized" groups
+- **Patient History Summary**: New `PatientHistorySummary.tsx` component above Reason for Consult in History tab; AI-generated longitudinal summary with Brief/Standard/Detailed modes; editable after generation; calls `/api/ai/chart-prep`; empty state for new patients
+- **Audio Routing Hardening**: Safari MIME type mapping fix (mp4/m4a/ogg), 25MB file size validation (client + server), retry button with stored audio blob ref, `maxDuration=120` on visit-ai route
+
 ### Medications & Allergies (January 30, 2026)
 - **Migration 014**: `patient_medications`, `patient_allergies`, `medication_reviews` tables with RLS, indexes, triggers
 - **API routes**: Full CRUD (GET/POST/PATCH/DELETE) for `/api/medications` and `/api/allergies` with auth + tenant scoping

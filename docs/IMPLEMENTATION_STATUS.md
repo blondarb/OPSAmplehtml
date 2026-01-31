@@ -1,6 +1,6 @@
 # Implementation Status - Sevaro Clinical
 
-**Last Updated:** January 30, 2026 (Smart Recommendations Expansion — 67 plans, ordering, saved plans, search)
+**Last Updated:** January 30, 2026 (P1 Features — free-text exam, handout auto-suggest, patient history summary, audio hardening)
 **Based on:** PRD_AI_Scribe.md v1.4, Sevaro_Outpatient_MVP_PRD_v1.4, PRD_Roadmap_Phase3.md
 
 ---
@@ -44,11 +44,46 @@ This document tracks implementation progress against the product requirements an
 
 **Remaining (Lower Priority):**
 - Patient education enhancements (reading level, language selection)
-- Audio routing improvements for Visit AI
+- Expand Smart Recommendations to all 134 diagnoses (67/134 done)
 
 ---
 
 ## Recent Updates (January 30, 2026)
+
+### P1 Features - NEW
+Four features shipped in a single commit:
+
+**1. Free-text Exam Toggle** (`CenterPanel.tsx`, `ClinicalNote.tsx`):
+- Structured / Free-text pill toggle in Neurological Examination header
+- Free-text mode hides all accordion checkbox sections, shows single NoteTextField (300px min-height)
+- Dictation, AI assist, and dot phrase buttons on free-text field
+- Exam Summary and ExamScalesSection visible in both modes
+- `examFreeText` added to noteData with localStorage persistence
+
+**2. Handout Auto-suggest by Diagnosis** (`AiDrawer.tsx`, `ClinicalNote.tsx`):
+- `selectedDiagnoses` prop threaded from ClinicalNote to AiDrawer
+- Handout dropdown uses `<optgroup>`: "From this visit" (selected diagnoses with ICD-10), "Common conditions" (10 hardcoded), "Personalized" (custom)
+- `generateHandout()` handles `dx:` prefixed selections using diagnosis name directly in AI prompt
+
+**3. Patient History Summary** (new `PatientHistorySummary.tsx`, `CenterPanel.tsx`, `ClinicalNote.tsx`):
+- Collapsible card above Reason for Consult in History tab
+- Brief / Standard / Detailed mode selector
+- Calls `/api/ai/chart-prep` with prior visits, medications, allergies, score history
+- Editable sections after generation (click Edit → textarea → Save/Cancel)
+- Copy button for summary text
+- Empty state for new patients: "No prior visits on file"
+- Props threaded: ClinicalNote → CenterPanel → PatientHistorySummary
+
+**4. Audio Routing Hardening** (`VoiceDrawer.tsx`, `useVoiceRecorder.ts`, `visit-ai/route.ts`):
+- Safari MIME type mapping: `audio/mp4`, `audio/x-m4a` → `.m4a`; `audio/ogg` → `.ogg`
+- 25MB file size validation client-side (before upload) and server-side (in route)
+- `lastVisitAudioBlobRef` stores last recording for retry
+- Retry button in error state re-sends stored audio blob (red, with refresh icon)
+- `export const maxDuration = 120` on visit-ai route for Vercel function timeout
+- `lastAudioBlob` exposed from useVoiceRecorder hook
+
+**New Files (1):** PatientHistorySummary.tsx
+**Modified Files (6):** CenterPanel.tsx, ClinicalNote.tsx, AiDrawer.tsx, VoiceDrawer.tsx, useVoiceRecorder.ts, visit-ai/route.ts
 
 ### Smart Recommendations Expansion - NEW
 Major upgrade to Smart Recommendations: 67 clinical plans synced from neuro-plans, canonical subsection ordering, saved plans, search, and ICD-10 matching fixes.
@@ -613,6 +648,7 @@ src/
 │   ├── LeftSidebar.tsx        # Patient info, visits, scores (responsive)
 │   ├── NoteTextField.tsx      # Text field with buttons
 │   ├── OnboardingTour.tsx     # Interactive 9-step tour
+│   ├── PatientHistorySummary.tsx # AI longitudinal patient summary
 │   ├── ReasonForConsultSection.tsx # Two-tier consult
 │   ├── SettingsDrawer.tsx     # User settings with AI instructions
 │   ├── SmartRecommendationsSection.tsx # Treatment recommendations
@@ -750,7 +786,7 @@ Any text input should have dictation.
 
 | Feature | Status |
 |---------|--------|
-| Free-text exam option | NOT BUILT |
+| Free-text exam option | **COMPLETE** | Structured/Free-text pill toggle, NoteTextField for narrative |
 | **NIH Stroke Scale (NIHSS)** | **COMPLETE** (full 15-item version) |
 | Modified Ashworth Scale | **COMPLETE** (spasticity) |
 | Modified Rankin Scale | NOT BUILT |
@@ -761,10 +797,10 @@ Any text input should have dictation.
 
 | Feature | Status |
 |---------|--------|
-| Longitudinal AI summary paragraph | NOT BUILT |
-| Length control (brief/standard/detailed) | NOT BUILT |
+| Longitudinal AI summary paragraph | **COMPLETE** (PatientHistorySummary.tsx) |
+| Length control (brief/standard/detailed) | **COMPLETE** |
+| Manual editing | **COMPLETE** (click to edit after generation) |
 | Customization settings | NOT BUILT |
-| Manual editing | NOT BUILT |
 
 ---
 
@@ -821,7 +857,7 @@ Any text input should have dictation.
 
 ## Technical Debt / Known Issues
 
-1. **Audio routing** - Visit AI recording may need endpoint routing fix
+1. ~~**Audio routing**~~ - Fixed: Safari MIME types, file size validation, retry with stored blob, maxDuration=120
 2. **Three voice recorder instances** - AiDrawer/VoiceDrawer could optimize
 3. **No audio storage** - Audio processed and discarded
 
@@ -909,4 +945,4 @@ AI DRAWER (Teal theme, star icon):
 ---
 
 *Document maintained by Development Team*
-*Last updated: January 30, 2026 (Smart Recommendations Expansion — 67 plans, ordering, saved plans, search)*
+*Last updated: January 30, 2026 (P1 Features — free-text exam, handout auto-suggest, patient history summary, audio hardening)*

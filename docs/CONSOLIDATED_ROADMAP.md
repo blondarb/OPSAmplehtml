@@ -1,7 +1,7 @@
 # Consolidated Roadmap - Sevaro Clinical
 
 **Version:** 1.4
-**Last Updated:** January 30, 2026 (Smart Recommendations Expansion — 67 plans, ordering, saved plans, search)
+**Last Updated:** January 30, 2026 (P1 Features — free-text exam, handout auto-suggest, patient history summary, audio hardening)
 **Purpose:** Single source of truth consolidating all phases across PRDs
 
 ---
@@ -271,7 +271,7 @@ Migraine, Migraine with Aura, Chronic Migraine, Cluster Headache, Tension-Type H
 | Feature | Status | Priority |
 |---------|--------|----------|
 | Checkbox-based neurological exam | ✅ COMPLETE | - |
-| Free-text exam option | ⏳ PENDING | P1 |
+| Free-text exam option | ✅ COMPLETE | Structured/Free-text pill toggle |
 | NIH Stroke Scale (NIHSS) | ✅ COMPLETE | Full 15-item scale |
 | Modified Ashworth Scale | ✅ COMPLETE | Spasticity grading |
 | Exam Templates (5 predefined + custom) | ✅ COMPLETE | Quick apply |
@@ -282,9 +282,9 @@ Migraine, Migraine with Aura, Chronic Migraine, Cluster Headache, Tension-Type H
 
 | Feature | Status | Priority |
 |---------|--------|----------|
-| Longitudinal AI summary paragraph | ⏳ PENDING | P1 |
-| Length control (brief/standard/detailed) | ⏳ PENDING | P1 |
-| Manual editing | ⏳ PENDING | P1 |
+| Longitudinal AI summary paragraph | ✅ COMPLETE | PatientHistorySummary.tsx |
+| Length control (brief/standard/detailed) | ✅ COMPLETE | Mode selector buttons |
+| Manual editing | ✅ COMPLETE | Click to edit after generation |
 | Customization settings | ⏳ PENDING | P2 |
 
 ---
@@ -411,7 +411,7 @@ Migraine, Migraine with Aura, Chronic Migraine, Cluster Headache, Tension-Type H
 | Language selection | ⏳ PENDING | P2 |
 | Print formatting | ⏳ PENDING | P2 |
 | Practice branding | ⏳ PENDING | P2 |
-| Auto-suggest based on diagnosis | ⏳ PENDING | P1 |
+| Auto-suggest based on diagnosis | ✅ COMPLETE | Grouped optgroups from visit diagnoses |
 | Template library expansion | ⏳ PENDING | Ongoing |
 
 ---
@@ -518,7 +518,7 @@ Migraine, Migraine with Aura, Chronic Migraine, Cluster Headache, Tension-Type H
 
 | Issue | Priority | Notes |
 |-------|----------|-------|
-| Audio routing for Visit AI | P1 | May need endpoint routing fix |
+| ~~Audio routing for Visit AI~~ | Done | Safari MIME fix, file size validation, retry, maxDuration |
 | Three voice recorder instances | P2 | Could optimize in AiDrawer/VoiceDrawer |
 | No audio storage | P2 | Audio processed and discarded |
 | Supabase client creation pattern | Done | Fixed - lazy initialization |
@@ -604,5 +604,5 @@ Based on the analysis, here's the recommended implementation order to minimize r
 ---
 
 *Document created: January 24, 2026*
-*Last updated: January 30, 2026 (Smart Recommendations Expansion — 67 plans, ordering, saved plans, search)*
+*Last updated: January 30, 2026 (P1 Features — free-text exam, handout auto-suggest, patient history summary, audio hardening)*
 *Consolidates: All PRD documents*
