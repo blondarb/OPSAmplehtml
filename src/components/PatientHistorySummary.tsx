@@ -157,7 +157,7 @@ Format as a concise clinical summary. Use section headers if in standard or deta
           alignItems: 'center',
           padding: '14px 20px',
           cursor: 'pointer',
-          background: summary ? 'linear-gradient(135deg, #F0FDFA 0%, #F5F3FF 100%)' : 'transparent',
+          background: summary ? 'var(--bg-dark)' : 'transparent',
         }}
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
@@ -173,9 +173,10 @@ Format as a concise clinical summary. Use section headers if in standard or deta
               fontSize: '10px',
               padding: '2px 8px',
               borderRadius: '4px',
-              background: '#D1FAE5',
-              color: '#059669',
+              background: 'var(--success)',
+              color: 'white',
               fontWeight: 500,
+              opacity: 0.9,
             }}>
               AI Generated
             </span>
