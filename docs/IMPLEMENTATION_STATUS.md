@@ -1,6 +1,6 @@
 # Implementation Status - Sevaro Clinical
 
-**Last Updated:** January 30, 2026 (P1 Features — free-text exam, handout auto-suggest, patient history summary, audio hardening)
+**Last Updated:** January 31, 2026 (4 critical UX fixes: vitals wiring, section nav, med modal, dead code removal)
 **Based on:** PRD_AI_Scribe.md v1.4, Sevaro_Outpatient_MVP_PRD_v1.4, PRD_Roadmap_Phase3.md
 
 ---
@@ -33,6 +33,12 @@ This document tracks implementation progress against the product requirements an
 - ✅ **Exam Templates** - Predefined + custom template feature
 
 **Newly Completed:**
+- ✅ **Vital Signs Wiring** - BP/HR/Temp/Weight/BMI controlled inputs at top of Physical Exams tab; values saved to noteData, included in generated notes via merge engine
+- ✅ **History Tab Section Navigation** - Sticky pill-bar (Summary/Consult/HPI/ROS/Meds/Allergies/History/Scales); IntersectionObserver tracks active section; smooth scroll on click
+- ✅ **Medication Form Modal** - Add/edit medication form moved from inline to centered modal overlay; reduces scroll displacement in History tab
+- ✅ **Dead Code Removal** - Removed ~260 lines of unused Prior History Summary from LeftSidebar (real implementation is PatientHistorySummary.tsx in CenterPanel)
+- ✅ **Note Review (Suggested Improvements)** - AI-powered note analysis for consistency, completeness, quality issues; collapsible panel in Generate Note modal; auto-runs after AI synthesis; new `/api/ai/note-review` endpoint (gpt-4o-mini)
+- ✅ **Ask AI About This Note** - Chat-like interface in Generate Note modal to ask questions about the generated note; full note context passed to AI; suggested question pills; conversation history
 - ✅ **Medications & Allergies** - Full CRUD API, ~70-med neuro formulary with typeahead, allergy severity chips, sidebar summary, migration 014
 - ✅ **Patient-Centric Historian** - Real patients from Supabase, prior visit context in interviews, patient_id FK linkage
 - ✅ **QA Framework** - Test runbook, 35 structured test cases, release checklist, bug template, run log system
@@ -43,14 +49,123 @@ This document tracks implementation progress against the product requirements an
 - ✅ **AI Scale Autofill** - Extracts scale data from clinical notes/dictation with confidence scoring
 
 **Remaining (Lower Priority):**
-- Patient education enhancements (reading level, language selection)
 - Expand Smart Recommendations to all 134 diagnoses (67/134 done)
+
+---
+
+## Recent Updates (January 31, 2026)
+
+### 4 Critical UX Fixes - NEW
+
+**1. Vital Signs Wiring** (`ClinicalNote.tsx`, `CenterPanel.tsx`, `types.ts`, `merge-engine.ts`):
+- Added `vitals` field (`bp`, `hr`, `temp`, `weight`, `bmi`) to noteData state in ClinicalNote.tsx
+- Added `vitals` to `ManualNoteData` interface in note-merge types
+- Added "Vital Signs" section to merge engine output (formatted as `BP: 120/80 | HR: 72 | ...`)
+- Replaced 4 uncontrolled inputs + dead Febrile/Afebrile buttons with 5 controlled inputs at top of Physical Exams tab
+
+**2. History Tab Section Navigation** (`CenterPanel.tsx`):
+- Added `useRef` + IntersectionObserver to track visible section
+- Sticky pill-bar with 8 section buttons: Summary, Consult, HPI, ROS, Meds, Allergies, History, Scales
+- `data-section` attributes on all History tab sections
+- Active pill highlights with teal background; click scrolls smoothly to target section
+- Pills only show in tab view (hidden in vertical/scroll view)
+
+**3. Medication Form Modal** (`CenterPanel.tsx`):
+- Extracted inline medication add/edit form into fixed-position centered modal overlay
+- Same pattern as existing discontinue confirmation modal
+- Formulary typeahead and all form fields preserved
+- Medication list stays compact; no vertical displacement on form open
+
+**4. Dead Code Removal** (`LeftSidebar.tsx`):
+- Removed `DEFAULT_SUMMARY_OPTIONS` constant
+- Removed 5 state variables, `generateHistorySummary` function, `toggleSummaryOption` function
+- Removed ~260 lines of "Prior History Summary" JSX block
+- Per-visit AI summaries and all other sidebar sections unchanged
+
+**Modified Files (5):** `LeftSidebar.tsx` (-260 lines), `ClinicalNote.tsx` (+3 lines), `types.ts` (+2 lines), `merge-engine.ts` (+18 lines), `CenterPanel.tsx` (+80/-120 lines net)
 
 ---
 
 ## Recent Updates (January 30, 2026)
 
-### P1 Features - NEW
+### 4 New Outpatient Clinical Scales + Patient Education Enhancements
+
+**1. Four New Clinical Scales** (`scale-definitions.ts`, `scoring-engine.ts`):
+- **HAS-BLED** (Bleeding Risk): 9 binary items (0-9), pairs with CHA₂DS₂-VASc for atrial fibrillation patients; history-based
+- **DN4** (Neuropathic Pain): 7 interview + 3 physical exam items (0-10), ≥4 = neuropathic pain likely; exam-based (has physical exam component)
+- **ODI** (Oswestry Disability Index): 10 sections (0-5 each), percentage scoring (0-100%); low back pain disability; history-based
+- **NDI** (Neck Disability Index): 10 sections (0-5 each), percentage scoring (0-100%); neck disability; history-based
+- Custom scoring engine updated for ODI/NDI percentage calculation: `Math.round((sum / (answeredCount * 5)) * 100)`
+- `formatScaleResultForNote` appends `%` for ODI/NDI scores
+- All 4 registered in ALL_SCALES, SCALE_LOCATION_MAP, and CONDITION_SCALE_MAPPINGS
+- Condition mappings: HAS-BLED → AFib/flutter/cardioembolic/cryptogenic stroke; DN4 → peripheral/small fiber neuropathy, numbness/tingling, radiculopathy; ODI → back pain, radiculopathy; NDI → radiculopathy
+
+**2. Practice Name Setting** (`SettingsDrawer.tsx`):
+- New `practiceName` field in UserSettings interface with text input at top of AI & Documentation tab
+- Persisted to localStorage via existing settings save mechanism
+- Displayed on patient education handout headers when set
+
+**3. Handout Language Selection** (`AiDrawer.tsx`):
+- Free-text language input between reading level selector and Generate button
+- Persisted to localStorage key `sevaro-handout-language`
+- Language instructions injected into all 3 handout prompt paths (diagnosis-based, personalized, standard)
+- Blank defaults to English
+
+**4. Handout Print Formatting** (`AiDrawer.tsx`, `globals.css`):
+- Practice name header shown above handout result when set
+- Hidden print wrapper (`#handout-print-wrapper`) populated on Print click with practice name header, handout content, date footer
+- Print CSS: full-width layout with proper margins (0.75in/1in), 12pt content, 18pt bold practice name, gray footer with date
+- Action buttons hidden in print via `[data-no-print]` attribute
+
+**5. Housekeeping**:
+- Dot-prefix auto-expand marked as COMPLETE in roadmap (already implemented in NoteTextField.tsx)
+
+**Modified Files (6):** `scoring-engine.ts` (+12 lines), `scale-definitions.ts` (+400 lines), `index.ts` (+4 lines), `SettingsDrawer.tsx` (+20 lines), `AiDrawer.tsx` (+80 lines), `globals.css` (+55 lines)
+
+### Note Review & Ask AI About This Note
+
+**1. Suggested Improvements (Note Review)** (`EnhancedNotePreviewModal.tsx`, `/api/ai/note-review`):
+- New API endpoint `/api/ai/note-review` analyzes generated notes for consistency, completeness, and quality issues
+- Uses gpt-4o-mini with temperature 0.3, JSON response format, max 6 prioritized suggestions
+- Collapsible panel in review view with "Check Note" button and count badge
+- Each suggestion has colored left border (amber=warning, teal=info), type badge pill, message text
+- "Go to [section]" links scroll to and highlight the relevant section card (2s highlight with teal glow)
+- Suggestions can be dismissed individually; zero-suggestions shows green checkmark
+- Auto-triggers after AI Synthesis completes; also available manually via "Check Note"
+
+**2. Ask AI About This Note** (`EnhancedNotePreviewModal.tsx`, `/api/ai/ask`):
+- Chat-like interface in the Generate Note modal between content area and footer
+- Full note text passed as `fullNoteText` context to existing `/api/ai/ask` endpoint
+- 4 suggested question pills shown when no conversation history (billing codes, consistency, completeness, summary)
+- Conversation displayed as right-aligned question bubbles and left-aligned answer bubbles with teal border
+- Enter key sends; auto-scrolls to latest response
+- Dark mode compatible using CSS variables throughout
+
+**Modified Files (3):** `EnhancedNotePreviewModal.tsx` (+~250 lines), `/api/ai/note-review/route.ts` (new, ~90 lines), `/api/ai/ask/route.ts` (+3 lines)
+
+### Reading Level Control & Dictation Expansion
+
+**1. Reading Level Control for Handouts** (`AiDrawer.tsx`):
+- Pill-style selector (Simple / Standard / Advanced) between condition dropdown and Generate button
+- Simple = 5th grade reading level, no jargon; Standard = 8th grade with explained terms; Advanced = college level, full medical terminology
+- Reading level instructions injected into all three handout prompt paths (diagnosis-based, personalized, standard condition)
+- Selection persisted to localStorage key `sevaro-handout-reading-level`
+
+**2. Dictation on Settings AI Instructions** (`SettingsDrawer.tsx`):
+- Imported `useVoiceRecorder` hook with shared instance and `dictationTarget` state
+- 24x24 red mic buttons at bottom-right of global AI instructions textarea and each section-specific textarea
+- Transcribed text appends to the targeted field; "Transcribing..." indicator during processing
+- Mic button turns solid red while recording, light red (#FEE2E2) when idle
+
+**3. Dictation on TopNav Search** (`TopNav.tsx`):
+- Imported `useVoiceRecorder` hook with controlled `searchValue` state
+- 14px mic icon button inside search container (right side)
+- Search bar border turns red during recording; placeholder shows "Listening..." / "Transcribing..."
+- Transcribed text populates search field automatically
+
+**Modified Files (3):** AiDrawer.tsx, SettingsDrawer.tsx, TopNav.tsx
+
+### P1 Features
 Four features shipped in a single commit:
 
 **1. Free-text Exam Toggle** (`CenterPanel.tsx`, `ClinicalNote.tsx`):
@@ -737,9 +852,9 @@ Any text input should have dictation.
 | Location | Current | Status |
 |----------|---------|--------|
 | Clinical text fields | Has mic | COMPLETE |
-| Feedback form | No mic | NEEDED |
-| Search fields | No mic | NEEDED |
-| Settings inputs | No mic | NEEDED |
+| Feedback form | Has mic | COMPLETE |
+| Search fields | Has mic | COMPLETE |
+| Settings inputs | Has mic | COMPLETE |
 
 #### 4. User Settings Enhancement
 
@@ -778,8 +893,8 @@ Any text input should have dictation.
 | Final note preview (EHR-ready) | **COMPLETE** |
 | Copy to clipboard | **COMPLETE** |
 | Word count display | **COMPLETE** |
-| Suggested improvements section | NOT BUILT |
-| "Ask AI about this note" button | NOT BUILT |
+| Suggested improvements section | **COMPLETE** (note-review API + collapsible panel) |
+| "Ask AI about this note" button | **COMPLETE** (chat interface in Generate Note modal) |
 | Sign & Complete flow | **COMPLETE** |
 
 #### 6. Physical Exam Enhancements
@@ -849,7 +964,6 @@ Any text input should have dictation.
 
 - Real-time transcription (currently post-recording only)
 - Speaker diarization in UI
-- Audio playback for review
 - Confidence indicators in generated note
 - AI Suggestion Panel integration with text fields
 
@@ -859,7 +973,7 @@ Any text input should have dictation.
 
 1. ~~**Audio routing**~~ - Fixed: Safari MIME types, file size validation, retry with stored blob, maxDuration=120
 2. **Three voice recorder instances** - AiDrawer/VoiceDrawer could optimize
-3. **No audio storage** - Audio processed and discarded
+3. ~~**No audio storage**~~ - By design: audio is processed and immediately discarded to avoid storing PHI
 
 ---
 
@@ -945,4 +1059,4 @@ AI DRAWER (Teal theme, star icon):
 ---
 
 *Document maintained by Development Team*
-*Last updated: January 30, 2026 (P1 Features — free-text exam, handout auto-suggest, patient history summary, audio hardening)*
+*Last updated: January 30, 2026 (Reading level control, dictation on settings/search, free-text exam, handout auto-suggest, patient history summary, audio hardening)*

@@ -112,8 +112,17 @@ function calculateWeightedScore(scale: ScaleDefinition, responses: ScaleResponse
  * Calculate custom score based on scale-specific logic
  */
 function calculateCustomScore(scale: ScaleDefinition, responses: ScaleResponses): number {
-  // Custom scoring is handled per-scale
-  // For now, fall back to sum scoring
+  // ODI and NDI use percentage scoring: (sum / (answeredCount * 5)) * 100
+  if (scale.id === 'odi' || scale.id === 'ndi') {
+    const sum = calculateSumScore(scale, responses)
+    const answeredCount = scale.questions.filter(
+      q => responses[q.id] !== undefined && responses[q.id] !== ''
+    ).length
+    if (answeredCount === 0) return 0
+    return Math.round((sum / (answeredCount * 5)) * 100)
+  }
+
+  // Other custom scales (EDSS, H&Y, etc.) fall back to sum scoring
   return calculateSumScore(scale, responses)
 }
 
@@ -226,7 +235,10 @@ export function formatScaleResultForNote(
     day: 'numeric',
   })
 
-  let result = `${scale.abbreviation}: ${calculation.rawScore}`
+  const scoreDisplay = (scale.id === 'odi' || scale.id === 'ndi')
+    ? `${calculation.rawScore}%`
+    : `${calculation.rawScore}`
+  let result = `${scale.abbreviation}: ${scoreDisplay}`
   if (calculation.grade) {
     result += ` (${calculation.grade})`
   }

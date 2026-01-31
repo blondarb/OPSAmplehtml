@@ -1,7 +1,7 @@
 # Consolidated Roadmap - Sevaro Clinical
 
 **Version:** 1.4
-**Last Updated:** January 30, 2026 (P1 Features — free-text exam, handout auto-suggest, patient history summary, audio hardening)
+**Last Updated:** January 31, 2026 (4 critical UX fixes: vitals wiring, section nav, med modal, dead code cleanup)
 **Purpose:** Single source of truth consolidating all phases across PRDs
 
 ---
@@ -82,7 +82,7 @@ These foundational features are fully implemented.
 | Allergies API (CRUD) | ✅ COMPLETE | /api/allergies, /api/allergies/[id] |
 | TypeScript types | ✅ COMPLETE | medicationTypes.ts — 8 interfaces, 4 enums |
 | Neuro formulary data | ✅ COMPLETE | ~70 meds, 8 categories, searchFormulary() |
-| CenterPanel medication UI | ✅ COMPLETE | List, add/edit form, formulary typeahead, discontinue modal |
+| CenterPanel medication UI | ✅ COMPLETE | List, add/edit modal, formulary typeahead, discontinue modal |
 | CenterPanel allergy UI | ✅ COMPLETE | Chips/pills with severity colors, add form |
 | LeftSidebar medication summary | ✅ COMPLETE | Medication list in sidebar |
 | LeftSidebar allergy banner | ✅ COMPLETE | Alert banner + allergy summary |
@@ -114,8 +114,6 @@ These foundational features are fully implemented.
 | Structured output sections | ✅ COMPLETE | P0 |
 | Real-time transcription display | 🔧 PARTIAL | P1 - Post-recording only |
 | Speaker diarization UI | ⏳ PENDING | P2 |
-| Audio playback for review | ⏳ PENDING | P2 |
-| Audio storage | ⏳ PENDING | P2 - Currently discarded |
 
 ### 2.2 AI Assistant (AiDrawer - Teal Theme)
 
@@ -234,9 +232,18 @@ Migraine, Migraine with Aura, Chronic Migraine, Cluster Headache, Tension-Type H
 | Location | Status |
 |----------|--------|
 | Clinical text fields | ✅ COMPLETE |
-| Feedback form | ⏳ PENDING |
-| Search fields | ⏳ PENDING |
-| Settings inputs | ⏳ PENDING |
+| Feedback form | ✅ COMPLETE |
+| Search fields | ✅ COMPLETE |
+| Settings inputs | ✅ COMPLETE |
+
+### 3.4b Clinical Workflow UX (January 31, 2026)
+
+| Feature | Status | Notes |
+|---------|--------|-------|
+| History Tab Section Navigation | ✅ COMPLETE | Sticky pill-bar with 8 sections, IntersectionObserver active tracking, smooth scroll |
+| Vital Signs Inputs | ✅ COMPLETE | BP/HR/Temp/Weight/BMI at top of Exam tab, saved to noteData, in generated notes |
+| Medication Form as Modal | ✅ COMPLETE | Moved from inline to centered modal overlay, reduces scroll displacement |
+| Dead Code Cleanup (LeftSidebar) | ✅ COMPLETE | Removed ~260 lines of unused Prior History Summary |
 
 ---
 
@@ -263,8 +270,8 @@ Migraine, Migraine with Aura, Chronic Migraine, Cluster Headache, Tension-Type H
 | Copy to clipboard (one-click) | ✅ COMPLETE | For EHR paste |
 | Word count display | ✅ COMPLETE | Real-time |
 | AI suggestion accept/reject | ✅ COMPLETE | P1 |
-| Suggested improvements section | ⏳ PENDING | P2 |
-| "Ask AI about this note" button | ⏳ PENDING | P2 |
+| Suggested improvements section | ✅ COMPLETE | P2 — AI note review with collapsible suggestions panel |
+| "Ask AI about this note" button | ✅ COMPLETE | P2 — Chat interface with full note context |
 
 ### 3.6 Physical Exam Enhancements
 
@@ -275,6 +282,7 @@ Migraine, Migraine with Aura, Chronic Migraine, Cluster Headache, Tension-Type H
 | NIH Stroke Scale (NIHSS) | ✅ COMPLETE | Full 15-item scale |
 | Modified Ashworth Scale | ✅ COMPLETE | Spasticity grading |
 | Exam Templates (5 predefined + custom) | ✅ COMPLETE | Quick apply |
+| Vital Signs (BP/HR/Temp/Weight/BMI) | ✅ COMPLETE | Controlled inputs at top of Exam tab, saved to noteData, in generated notes |
 | Modified Rankin Scale | ⏳ PENDING | P2 |
 | Other exam types dropdown | ⏳ PENDING | P2 |
 
@@ -341,7 +349,7 @@ Migraine, Migraine with Aura, Chronic Migraine, Cluster Headache, Tension-Type H
 | Usage tracking | ✅ COMPLETE | Count updates |
 | Drawer UI | ✅ COMPLETE | DotPhrasesDrawer.tsx |
 | Pre-built neurology phrases | ✅ COMPLETE | 70+ phrases seeded via /api/phrases/seed |
-| Dot-prefix auto-expand | ⏳ PENDING | P2 |
+| Dot-prefix auto-expand | ✅ COMPLETE | Already implemented in NoteTextField.tsx |
 | Keyboard shortcuts | ⏳ PENDING | P2 |
 | Import/Export | ⏳ PENDING | P3 |
 
@@ -379,14 +387,14 @@ Migraine, Migraine with Aura, Chronic Migraine, Cluster Headache, Tension-Type H
 | EDSS | ✅ COMPLETE | MS disability (0-10) |
 | CHA₂DS₂-VASc | ✅ COMPLETE | Stroke risk in AFib (0-9) |
 
-### Outpatient (Future)
+### Outpatient — Implemented (January 30, 2026)
 
-| Scale | Status | Priority |
-|-------|--------|----------|
-| HAS-BLED | ⏳ PENDING | P2 |
-| DN4 (neuropathic pain) | ⏳ PENDING | P2 |
-| ODI (spine) | ⏳ PENDING | P2 |
-| NDI (neck) | ⏳ PENDING | P2 |
+| Scale | Status | Notes |
+|-------|--------|-------|
+| HAS-BLED | ✅ COMPLETE | Bleeding risk (0-9), pairs with CHA₂DS₂-VASc for AFib |
+| DN4 (neuropathic pain) | ✅ COMPLETE | 7 interview + 3 exam items, ≥4 = neuropathic |
+| ODI (spine) | ✅ COMPLETE | 10-section low back disability, percentage scoring |
+| NDI (neck) | ✅ COMPLETE | 10-section neck disability, percentage scoring |
 
 ### Inpatient Module (Future)
 
@@ -407,10 +415,10 @@ Migraine, Migraine with Aura, Chronic Migraine, Cluster Headache, Tension-Type H
 | Feature | Status | Notes |
 |---------|--------|-------|
 | Handout tab in AiDrawer | ✅ COMPLETE | 7 conditions |
-| Reading level control | ⏳ PENDING | P1 |
-| Language selection | ⏳ PENDING | P2 |
-| Print formatting | ⏳ PENDING | P2 |
-| Practice branding | ⏳ PENDING | P2 |
+| Reading level control | ✅ COMPLETE | P1 — Simple/Standard/Advanced pill selector, localStorage persistence |
+| Language selection | ✅ COMPLETE | Free-text language input, persisted to localStorage |
+| Print formatting | ✅ COMPLETE | Practice name header, date footer, clean print styles |
+| Practice branding | ✅ COMPLETE | Practice name in Settings, displayed on handouts and print |
 | Auto-suggest based on diagnosis | ✅ COMPLETE | Grouped optgroups from visit diagnoses |
 | Template library expansion | ⏳ PENDING | Ongoing |
 
@@ -520,7 +528,6 @@ Migraine, Migraine with Aura, Chronic Migraine, Cluster Headache, Tension-Type H
 |-------|----------|-------|
 | ~~Audio routing for Visit AI~~ | Done | Safari MIME fix, file size validation, retry, maxDuration |
 | Three voice recorder instances | P2 | Could optimize in AiDrawer/VoiceDrawer |
-| No audio storage | P2 | Audio processed and discarded |
 | Supabase client creation pattern | Done | Fixed - lazy initialization |
 
 ---
@@ -587,7 +594,7 @@ Based on the analysis, here's the recommended implementation order to minimize r
 |--------|--------|--------|
 | Dead UI elements | 0 | ✅ TopNav items complete |
 | AI buttons with real actions | 100% | ✅ COMPLETE |
-| Dictation coverage | All text inputs | ✅ Clinical fields done |
+| Dictation coverage | All text inputs | ✅ COMPLETE — Clinical fields, settings, search, feedback |
 | Phase 2 completion | 100% | ✅ COMPLETE |
 | Core scales implemented | NIHSS added | ✅ COMPLETE (7 new scales) |
 | Field AI Actions | Working | ✅ COMPLETE |
@@ -604,5 +611,5 @@ Based on the analysis, here's the recommended implementation order to minimize r
 ---
 
 *Document created: January 24, 2026*
-*Last updated: January 30, 2026 (P1 Features — free-text exam, handout auto-suggest, patient history summary, audio hardening)*
+*Last updated: January 30, 2026 (Reading level control, dictation on settings/search, free-text exam, handout auto-suggest, patient history summary, audio hardening)*
 *Consolidates: All PRD documents*

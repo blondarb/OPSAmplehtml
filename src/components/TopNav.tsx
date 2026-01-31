@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import type { User } from '@supabase/supabase-js'
+import { useVoiceRecorder } from '@/hooks/useVoiceRecorder'
 
 interface TopNavProps {
   user: User
@@ -45,6 +46,17 @@ export default function TopNav({ user, onSignOut, openAiDrawer, onOpenSettings, 
   const [lockScreenOpen, setLockScreenOpen] = useState(false)
   const [notificationsOpen, setNotificationsOpen] = useState(false)
   const [notifications, setNotifications] = useState(SAMPLE_NOTIFICATIONS)
+  const [searchValue, setSearchValue] = useState('')
+
+  const searchVoice = useVoiceRecorder()
+
+  // When search transcription completes, populate the search field
+  useEffect(() => {
+    if (searchVoice.transcribedText) {
+      setSearchValue(searchVoice.transcribedText)
+      searchVoice.clearTranscription()
+    }
+  }, [searchVoice.transcribedText])
 
   // Timer effect
   useEffect(() => {
@@ -170,17 +182,20 @@ export default function TopNav({ user, onSignOut, openAiDrawer, onOpenSettings, 
             display: 'flex',
             alignItems: 'center',
             background: 'var(--bg-gray)',
-            border: '1px solid var(--border)',
+            border: searchVoice.isRecording ? '1px solid #EF4444' : '1px solid var(--border)',
             borderRadius: '8px',
             padding: '8px 12px',
             width: '260px',
+            transition: 'border-color 0.2s',
           }}>
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--text-muted)" strokeWidth="2" style={{ marginRight: '8px', flexShrink: 0 }}>
               <circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/>
             </svg>
             <input
               type="text"
-              placeholder="Search for patient name or MRN"
+              value={searchValue}
+              onChange={(e) => setSearchValue(e.target.value)}
+              placeholder={searchVoice.isRecording ? 'Listening...' : searchVoice.isTranscribing ? 'Transcribing...' : 'Search for patient name or MRN'}
               style={{
                 border: 'none',
                 background: 'transparent',
@@ -190,11 +205,37 @@ export default function TopNav({ user, onSignOut, openAiDrawer, onOpenSettings, 
                 color: 'var(--text-primary)',
               }}
             />
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--text-muted)" strokeWidth="2" style={{ marginLeft: '8px', flexShrink: 0 }}>
-              <circle cx="12" cy="12" r="10"/>
-              <path d="M9.09 9a3 3 0 015.83 1c0 2-3 3-3 3"/>
-              <line x1="12" y1="17" x2="12.01" y2="17"/>
-            </svg>
+            <button
+              onClick={() => {
+                if (searchVoice.isRecording) {
+                  searchVoice.stopRecording()
+                } else {
+                  searchVoice.startRecording()
+                }
+              }}
+              title={searchVoice.isRecording ? 'Stop dictation' : 'Voice search'}
+              style={{
+                marginLeft: '4px',
+                flexShrink: 0,
+                width: '20px',
+                height: '20px',
+                borderRadius: '4px',
+                border: 'none',
+                background: searchVoice.isRecording ? '#EF4444' : 'transparent',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                padding: 0,
+                transition: 'background 0.2s',
+              }}
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={searchVoice.isRecording ? 'white' : 'var(--text-muted)'} strokeWidth="2">
+                <path d="M12 1a3 3 0 00-3 3v8a3 3 0 006 0V4a3 3 0 00-3-3z"/>
+                <path d="M19 10v2a7 7 0 01-14 0v-2"/>
+                <line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/>
+              </svg>
+            </button>
           </div>
 
           {/* Queue Pills - hidden on mobile */}

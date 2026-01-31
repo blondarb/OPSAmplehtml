@@ -2234,6 +2234,585 @@ export const ISI: ScaleDefinition = {
 }
 
 // ===========================================
+// HAS-BLED - Bleeding Risk Score
+// ===========================================
+export const HAS_BLED: ScaleDefinition = {
+  id: 'has_bled',
+  name: 'HAS-BLED Bleeding Risk Score',
+  abbreviation: 'HAS-BLED',
+  description: 'Estimates risk of major bleeding in patients on anticoagulation for atrial fibrillation. History-based scale.',
+  category: 'other',
+  timeToComplete: 3,
+  source: 'Pisters R, et al. A novel user-friendly score (HAS-BLED) to assess 1-year risk of major bleeding in patients with atrial fibrillation. Chest. 2010.',
+  scoringMethod: 'sum',
+  questions: [
+    {
+      id: 'hypertension',
+      text: 'Hypertension (uncontrolled, systolic BP >160 mmHg)',
+      type: 'select',
+      required: true,
+      options: [
+        { value: 0, label: 'No (0)' },
+        { value: 1, label: 'Yes (1)' },
+      ],
+    },
+    {
+      id: 'renal',
+      text: 'Abnormal renal function (dialysis, transplant, Cr >2.26 mg/dL)',
+      type: 'select',
+      required: true,
+      options: [
+        { value: 0, label: 'No (0)' },
+        { value: 1, label: 'Yes (1)' },
+      ],
+    },
+    {
+      id: 'liver',
+      text: 'Abnormal liver function (cirrhosis, bilirubin >2x normal, AST/ALT/ALP >3x normal)',
+      type: 'select',
+      required: true,
+      options: [
+        { value: 0, label: 'No (0)' },
+        { value: 1, label: 'Yes (1)' },
+      ],
+    },
+    {
+      id: 'stroke_history',
+      text: 'Stroke history',
+      type: 'select',
+      required: true,
+      options: [
+        { value: 0, label: 'No (0)' },
+        { value: 1, label: 'Yes (1)' },
+      ],
+    },
+    {
+      id: 'bleeding',
+      text: 'Bleeding history or predisposition',
+      type: 'select',
+      required: true,
+      options: [
+        { value: 0, label: 'No (0)' },
+        { value: 1, label: 'Yes (1)' },
+      ],
+    },
+    {
+      id: 'labile_inr',
+      text: 'Labile INR (unstable/high INRs, TTR <60%)',
+      type: 'select',
+      required: true,
+      options: [
+        { value: 0, label: 'No (0)' },
+        { value: 1, label: 'Yes (1)' },
+      ],
+    },
+    {
+      id: 'elderly',
+      text: 'Elderly (age >65)',
+      type: 'select',
+      required: true,
+      options: [
+        { value: 0, label: 'No (0)' },
+        { value: 1, label: 'Yes (1)' },
+      ],
+    },
+    {
+      id: 'drugs',
+      text: 'Drugs predisposing to bleeding (antiplatelet agents, NSAIDs)',
+      type: 'select',
+      required: true,
+      options: [
+        { value: 0, label: 'No (0)' },
+        { value: 1, label: 'Yes (1)' },
+      ],
+    },
+    {
+      id: 'alcohol',
+      text: 'Alcohol use (>=8 drinks/week)',
+      type: 'select',
+      required: true,
+      options: [
+        { value: 0, label: 'No (0)' },
+        { value: 1, label: 'Yes (1)' },
+      ],
+    },
+  ],
+  scoringRanges: [
+    { min: 0, max: 0, interpretation: 'Low bleeding risk (1.13 bleeds per 100 patient-years)', severity: 'minimal', color: '#10B981' },
+    { min: 1, max: 1, interpretation: 'Low-moderate bleeding risk (1.02 bleeds per 100 patient-years)', severity: 'mild', color: '#84CC16', recommendations: ['Anticoagulation generally safe', 'Routine monitoring'] },
+    { min: 2, max: 2, interpretation: 'Moderate bleeding risk (1.88 bleeds per 100 patient-years)', severity: 'moderate', color: '#F59E0B', recommendations: ['Anticoagulation can be considered with caution', 'Address modifiable risk factors', 'More frequent monitoring recommended'] },
+    { min: 3, max: 9, interpretation: 'High bleeding risk (3.74+ bleeds per 100 patient-years)', severity: 'severe', color: '#EF4444', recommendations: ['High bleeding risk — does NOT contraindicate anticoagulation', 'Address all modifiable risk factors (BP control, stop NSAIDs, limit alcohol)', 'Consider NOAC over warfarin', 'Close monitoring required', 'Consider LAA closure if bleeding risk intolerable'] },
+  ],
+  alerts: [
+    {
+      id: 'has-bled-high',
+      condition: 'score >= 3',
+      type: 'warning',
+      message: 'High bleeding risk. Address modifiable risk factors and monitor closely.',
+      action: 'Review medications, control blood pressure, limit alcohol',
+    },
+  ],
+}
+
+// ===========================================
+// DN4 - Douleur Neuropathique 4 Questions
+// ===========================================
+export const DN4: ScaleDefinition = {
+  id: 'dn4',
+  name: 'Douleur Neuropathique 4 Questions',
+  abbreviation: 'DN4',
+  description: 'Screening tool for neuropathic pain. Combines interview questions and physical exam findings. Exam-based scale.',
+  category: 'other',
+  timeToComplete: 5,
+  source: 'Bouhassira D, et al. Comparison of pain syndromes associated with nervous or somatic lesions and development of a new neuropathic pain diagnostic questionnaire (DN4). Pain. 2005.',
+  scoringMethod: 'sum',
+  questions: [
+    // Interview items (7)
+    {
+      id: 'burning',
+      text: 'Does the pain have a burning quality?',
+      type: 'select',
+      required: true,
+      options: [
+        { value: 0, label: 'No (0)' },
+        { value: 1, label: 'Yes (1)' },
+      ],
+    },
+    {
+      id: 'painful_cold',
+      text: 'Does the pain have a painful cold quality?',
+      type: 'select',
+      required: true,
+      options: [
+        { value: 0, label: 'No (0)' },
+        { value: 1, label: 'Yes (1)' },
+      ],
+    },
+    {
+      id: 'electric_shocks',
+      text: 'Does the pain feel like electric shocks?',
+      type: 'select',
+      required: true,
+      options: [
+        { value: 0, label: 'No (0)' },
+        { value: 1, label: 'Yes (1)' },
+      ],
+    },
+    {
+      id: 'tingling',
+      text: 'Is the pain associated with tingling?',
+      type: 'select',
+      required: true,
+      options: [
+        { value: 0, label: 'No (0)' },
+        { value: 1, label: 'Yes (1)' },
+      ],
+    },
+    {
+      id: 'pins_needles',
+      text: 'Is the pain associated with pins and needles?',
+      type: 'select',
+      required: true,
+      options: [
+        { value: 0, label: 'No (0)' },
+        { value: 1, label: 'Yes (1)' },
+      ],
+    },
+    {
+      id: 'numbness',
+      text: 'Is the pain associated with numbness?',
+      type: 'select',
+      required: true,
+      options: [
+        { value: 0, label: 'No (0)' },
+        { value: 1, label: 'Yes (1)' },
+      ],
+    },
+    {
+      id: 'itching',
+      text: 'Is the pain associated with itching?',
+      type: 'select',
+      required: true,
+      options: [
+        { value: 0, label: 'No (0)' },
+        { value: 1, label: 'Yes (1)' },
+      ],
+    },
+    // Physical exam items (3)
+    {
+      id: 'hypoesthesia_touch',
+      text: 'Hypoesthesia to touch (exam: light touch in painful area)',
+      type: 'select',
+      required: true,
+      options: [
+        { value: 0, label: 'No (0)' },
+        { value: 1, label: 'Yes (1)' },
+      ],
+    },
+    {
+      id: 'hypoesthesia_pinprick',
+      text: 'Hypoesthesia to pinprick (exam: pinprick in painful area)',
+      type: 'select',
+      required: true,
+      options: [
+        { value: 0, label: 'No (0)' },
+        { value: 1, label: 'Yes (1)' },
+      ],
+    },
+    {
+      id: 'allodynia',
+      text: 'Pain caused or increased by brushing (exam: brush painful area)',
+      type: 'select',
+      required: true,
+      options: [
+        { value: 0, label: 'No (0)' },
+        { value: 1, label: 'Yes (1)' },
+      ],
+    },
+  ],
+  scoringRanges: [
+    { min: 0, max: 3, interpretation: 'Nociceptive pain likely (score <4)', severity: 'minimal', color: '#10B981', recommendations: ['Consider non-neuropathic pain treatment', 'Re-evaluate if treatment response is inadequate'] },
+    { min: 4, max: 10, interpretation: 'Neuropathic pain likely (score >=4, sensitivity 83%, specificity 90%)', severity: 'moderate', color: '#F59E0B', recommendations: ['Consider neuropathic pain agents (gabapentin, pregabalin, duloxetine, TCAs)', 'EMG/NCS if etiology unclear', 'Refer to pain management if refractory'] },
+  ],
+  alerts: [
+    {
+      id: 'dn4-neuropathic',
+      condition: 'score >= 4',
+      type: 'info',
+      message: 'Score >=4 suggests neuropathic pain component. Consider targeted therapy.',
+      action: 'Evaluate for neuropathic pain treatment options',
+    },
+  ],
+}
+
+// ===========================================
+// ODI - Oswestry Disability Index
+// ===========================================
+export const ODI: ScaleDefinition = {
+  id: 'odi',
+  name: 'Oswestry Disability Index',
+  abbreviation: 'ODI',
+  description: 'Self-report questionnaire measuring low back pain disability. History-based scale. Scored as a percentage (0-100%).',
+  category: 'functional',
+  timeToComplete: 5,
+  source: 'Fairbank JC, Pynsent PB. The Oswestry Disability Index. Spine. 2000.',
+  scoringMethod: 'custom',
+  questions: [
+    {
+      id: 'pain_intensity',
+      text: 'Section 1 - Pain Intensity',
+      type: 'select',
+      required: true,
+      options: [
+        { value: 0, label: 'I have no pain at the moment (0)' },
+        { value: 1, label: 'The pain is very mild at the moment (1)' },
+        { value: 2, label: 'The pain is moderate at the moment (2)' },
+        { value: 3, label: 'The pain is fairly severe at the moment (3)' },
+        { value: 4, label: 'The pain is very severe at the moment (4)' },
+        { value: 5, label: 'The pain is the worst imaginable at the moment (5)' },
+      ],
+    },
+    {
+      id: 'personal_care',
+      text: 'Section 2 - Personal Care (washing, dressing, etc.)',
+      type: 'select',
+      required: true,
+      options: [
+        { value: 0, label: 'I can look after myself normally without causing extra pain (0)' },
+        { value: 1, label: 'I can look after myself but it causes extra pain (1)' },
+        { value: 2, label: 'It is painful to look after myself and I am slow and careful (2)' },
+        { value: 3, label: 'I need some help but manage most of my personal care (3)' },
+        { value: 4, label: 'I need help every day in most aspects of self-care (4)' },
+        { value: 5, label: 'I do not get dressed, wash with difficulty, and stay in bed (5)' },
+      ],
+    },
+    {
+      id: 'lifting',
+      text: 'Section 3 - Lifting',
+      type: 'select',
+      required: true,
+      options: [
+        { value: 0, label: 'I can lift heavy weights without extra pain (0)' },
+        { value: 1, label: 'I can lift heavy weights but it gives extra pain (1)' },
+        { value: 2, label: 'Pain prevents me from lifting heavy weights off the floor, but I can if conveniently placed (2)' },
+        { value: 3, label: 'Pain prevents me from lifting heavy weights, but I can manage light to medium weights (3)' },
+        { value: 4, label: 'I can only lift very light weights (4)' },
+        { value: 5, label: 'I cannot lift or carry anything at all (5)' },
+      ],
+    },
+    {
+      id: 'walking',
+      text: 'Section 4 - Walking',
+      type: 'select',
+      required: true,
+      options: [
+        { value: 0, label: 'Pain does not prevent me from walking any distance (0)' },
+        { value: 1, label: 'Pain prevents me from walking more than 1 mile (1)' },
+        { value: 2, label: 'Pain prevents me from walking more than 1/2 mile (2)' },
+        { value: 3, label: 'Pain prevents me from walking more than 100 yards (3)' },
+        { value: 4, label: 'I can only walk using a stick or crutches (4)' },
+        { value: 5, label: 'I am in bed most of the time (5)' },
+      ],
+    },
+    {
+      id: 'sitting',
+      text: 'Section 5 - Sitting',
+      type: 'select',
+      required: true,
+      options: [
+        { value: 0, label: 'I can sit in any chair as long as I like (0)' },
+        { value: 1, label: 'I can only sit in my favorite chair as long as I like (1)' },
+        { value: 2, label: 'Pain prevents me from sitting for more than 1 hour (2)' },
+        { value: 3, label: 'Pain prevents me from sitting for more than 30 minutes (3)' },
+        { value: 4, label: 'Pain prevents me from sitting for more than 10 minutes (4)' },
+        { value: 5, label: 'Pain prevents me from sitting at all (5)' },
+      ],
+    },
+    {
+      id: 'standing',
+      text: 'Section 6 - Standing',
+      type: 'select',
+      required: true,
+      options: [
+        { value: 0, label: 'I can stand as long as I want without extra pain (0)' },
+        { value: 1, label: 'I can stand as long as I want but it gives me extra pain (1)' },
+        { value: 2, label: 'Pain prevents me from standing for more than 1 hour (2)' },
+        { value: 3, label: 'Pain prevents me from standing for more than 30 minutes (3)' },
+        { value: 4, label: 'Pain prevents me from standing for more than 10 minutes (4)' },
+        { value: 5, label: 'Pain prevents me from standing at all (5)' },
+      ],
+    },
+    {
+      id: 'sleeping',
+      text: 'Section 7 - Sleeping',
+      type: 'select',
+      required: true,
+      options: [
+        { value: 0, label: 'My sleep is never disturbed by pain (0)' },
+        { value: 1, label: 'My sleep is occasionally disturbed by pain (1)' },
+        { value: 2, label: 'Because of pain I have less than 6 hours sleep (2)' },
+        { value: 3, label: 'Because of pain I have less than 4 hours sleep (3)' },
+        { value: 4, label: 'Because of pain I have less than 2 hours sleep (4)' },
+        { value: 5, label: 'Pain prevents me from sleeping at all (5)' },
+      ],
+    },
+    {
+      id: 'social_life',
+      text: 'Section 8 - Social Life',
+      type: 'select',
+      required: true,
+      options: [
+        { value: 0, label: 'My social life is normal and gives me no extra pain (0)' },
+        { value: 1, label: 'My social life is normal but increases the degree of pain (1)' },
+        { value: 2, label: 'Pain has no significant effect on my social life apart from limiting energetic interests (2)' },
+        { value: 3, label: 'Pain has restricted my social life and I do not go out as often (3)' },
+        { value: 4, label: 'Pain has restricted social life to my home (4)' },
+        { value: 5, label: 'I have no social life because of pain (5)' },
+      ],
+    },
+    {
+      id: 'travelling',
+      text: 'Section 9 - Travelling',
+      type: 'select',
+      required: true,
+      options: [
+        { value: 0, label: 'I can travel anywhere without pain (0)' },
+        { value: 1, label: 'I can travel anywhere but it gives me extra pain (1)' },
+        { value: 2, label: 'Pain is bad but I manage journeys over 2 hours (2)' },
+        { value: 3, label: 'Pain restricts me to journeys of less than 1 hour (3)' },
+        { value: 4, label: 'Pain restricts me to short necessary journeys under 30 minutes (4)' },
+        { value: 5, label: 'Pain prevents me from travelling except to receive treatment (5)' },
+      ],
+    },
+    {
+      id: 'employment',
+      text: 'Section 10 - Employment/Homemaking',
+      type: 'select',
+      required: true,
+      options: [
+        { value: 0, label: 'My normal homemaking/job activities do not cause pain (0)' },
+        { value: 1, label: 'My normal activities cause extra pain (1)' },
+        { value: 2, label: 'I can perform most of my normal activities but pain prevents more (2)' },
+        { value: 3, label: 'Pain prevents me from doing anything but light duties (3)' },
+        { value: 4, label: 'Pain prevents me from doing even light duties (4)' },
+        { value: 5, label: 'Pain prevents me from doing any job/homemaking (5)' },
+      ],
+    },
+  ],
+  scoringRanges: [
+    { min: 0, max: 20, interpretation: 'Minimal disability', severity: 'minimal', color: '#10B981', recommendations: ['Patient can cope with most activities', 'No treatment may be needed beyond advice'] },
+    { min: 21, max: 40, interpretation: 'Moderate disability', severity: 'mild', color: '#84CC16', recommendations: ['Conservative treatment recommended', 'Physical therapy referral', 'May have difficulty with sitting, lifting, standing'] },
+    { min: 41, max: 60, interpretation: 'Severe disability', severity: 'moderate', color: '#F59E0B', recommendations: ['Pain is a significant problem', 'Detailed investigation and active management recommended', 'Consider multimodal pain management'] },
+    { min: 61, max: 80, interpretation: 'Crippled - back pain impacting all aspects of life', severity: 'moderately_severe', color: '#F97316', recommendations: ['Positive intervention required', 'Consider surgical evaluation if appropriate', 'Multidisciplinary pain program recommended'] },
+    { min: 81, max: 100, interpretation: 'Bed-bound or exaggerating symptoms', severity: 'severe', color: '#EF4444', recommendations: ['Evaluate for bed-bound status vs. symptom exaggeration', 'Urgent multidisciplinary evaluation', 'Consider psychosocial assessment'] },
+  ],
+}
+
+// ===========================================
+// NDI - Neck Disability Index
+// ===========================================
+export const NDI: ScaleDefinition = {
+  id: 'ndi',
+  name: 'Neck Disability Index',
+  abbreviation: 'NDI',
+  description: 'Self-report questionnaire measuring neck pain disability. History-based scale. Scored as a percentage (0-100%).',
+  category: 'functional',
+  timeToComplete: 5,
+  source: 'Vernon H, Mior S. The Neck Disability Index: a study of reliability and validity. J Manipulative Physiol Ther. 1991.',
+  scoringMethod: 'custom',
+  questions: [
+    {
+      id: 'pain_intensity',
+      text: 'Section 1 - Pain Intensity',
+      type: 'select',
+      required: true,
+      options: [
+        { value: 0, label: 'I have no pain at the moment (0)' },
+        { value: 1, label: 'The pain is very mild at the moment (1)' },
+        { value: 2, label: 'The pain is moderate at the moment (2)' },
+        { value: 3, label: 'The pain is fairly severe at the moment (3)' },
+        { value: 4, label: 'The pain is very severe at the moment (4)' },
+        { value: 5, label: 'The pain is the worst imaginable at the moment (5)' },
+      ],
+    },
+    {
+      id: 'personal_care',
+      text: 'Section 2 - Personal Care (washing, dressing, etc.)',
+      type: 'select',
+      required: true,
+      options: [
+        { value: 0, label: 'I can look after myself normally without causing extra pain (0)' },
+        { value: 1, label: 'I can look after myself normally but it causes extra pain (1)' },
+        { value: 2, label: 'It is painful to look after myself and I am slow and careful (2)' },
+        { value: 3, label: 'I need some help but manage most of my personal care (3)' },
+        { value: 4, label: 'I need help every day in most aspects of self-care (4)' },
+        { value: 5, label: 'I do not get dressed, wash with difficulty, and stay in bed (5)' },
+      ],
+    },
+    {
+      id: 'lifting',
+      text: 'Section 3 - Lifting',
+      type: 'select',
+      required: true,
+      options: [
+        { value: 0, label: 'I can lift heavy weights without extra pain (0)' },
+        { value: 1, label: 'I can lift heavy weights but it gives extra pain (1)' },
+        { value: 2, label: 'Pain prevents me from lifting heavy weights off the floor, but I can if conveniently placed (2)' },
+        { value: 3, label: 'Pain prevents me from lifting heavy weights, but I can manage light to medium weights (3)' },
+        { value: 4, label: 'I can only lift very light weights (4)' },
+        { value: 5, label: 'I cannot lift or carry anything at all (5)' },
+      ],
+    },
+    {
+      id: 'reading',
+      text: 'Section 4 - Reading',
+      type: 'select',
+      required: true,
+      options: [
+        { value: 0, label: 'I can read as much as I want with no pain in my neck (0)' },
+        { value: 1, label: 'I can read as much as I want with slight pain in my neck (1)' },
+        { value: 2, label: 'I can read as much as I want with moderate pain in my neck (2)' },
+        { value: 3, label: 'I cannot read as much as I want because of moderate pain in my neck (3)' },
+        { value: 4, label: 'I can hardly read at all because of severe pain in my neck (4)' },
+        { value: 5, label: 'I cannot read at all (5)' },
+      ],
+    },
+    {
+      id: 'headaches',
+      text: 'Section 5 - Headaches',
+      type: 'select',
+      required: true,
+      options: [
+        { value: 0, label: 'I have no headaches at all (0)' },
+        { value: 1, label: 'I have slight headaches which come infrequently (1)' },
+        { value: 2, label: 'I have moderate headaches which come infrequently (2)' },
+        { value: 3, label: 'I have moderate headaches which come frequently (3)' },
+        { value: 4, label: 'I have severe headaches which come frequently (4)' },
+        { value: 5, label: 'I have headaches almost all the time (5)' },
+      ],
+    },
+    {
+      id: 'concentration',
+      text: 'Section 6 - Concentration',
+      type: 'select',
+      required: true,
+      options: [
+        { value: 0, label: 'I can concentrate fully when I want to with no difficulty (0)' },
+        { value: 1, label: 'I can concentrate fully when I want to with slight difficulty (1)' },
+        { value: 2, label: 'I have a fair degree of difficulty in concentrating when I want to (2)' },
+        { value: 3, label: 'I have a lot of difficulty in concentrating when I want to (3)' },
+        { value: 4, label: 'I have a great deal of difficulty in concentrating when I want to (4)' },
+        { value: 5, label: 'I cannot concentrate at all (5)' },
+      ],
+    },
+    {
+      id: 'work',
+      text: 'Section 7 - Work',
+      type: 'select',
+      required: true,
+      options: [
+        { value: 0, label: 'I can do as much work as I want to (0)' },
+        { value: 1, label: 'I can only do my usual work but no more (1)' },
+        { value: 2, label: 'I can do most of my usual work but no more (2)' },
+        { value: 3, label: 'I cannot do my usual work (3)' },
+        { value: 4, label: 'I can hardly do any work at all (4)' },
+        { value: 5, label: 'I cannot do any work at all (5)' },
+      ],
+    },
+    {
+      id: 'driving',
+      text: 'Section 8 - Driving',
+      type: 'select',
+      required: true,
+      options: [
+        { value: 0, label: 'I can drive my car without any neck pain (0)' },
+        { value: 1, label: 'I can drive my car as long as I want with slight pain in my neck (1)' },
+        { value: 2, label: 'I can drive my car as long as I want with moderate pain in my neck (2)' },
+        { value: 3, label: 'I cannot drive my car as long as I want because of moderate pain (3)' },
+        { value: 4, label: 'I can hardly drive at all because of severe pain in my neck (4)' },
+        { value: 5, label: 'I cannot drive my car at all (5)' },
+      ],
+    },
+    {
+      id: 'sleeping',
+      text: 'Section 9 - Sleeping',
+      type: 'select',
+      required: true,
+      options: [
+        { value: 0, label: 'I have no trouble sleeping (0)' },
+        { value: 1, label: 'My sleep is slightly disturbed (less than 1 hour sleepless) (1)' },
+        { value: 2, label: 'My sleep is mildly disturbed (1-2 hours sleepless) (2)' },
+        { value: 3, label: 'My sleep is moderately disturbed (2-3 hours sleepless) (3)' },
+        { value: 4, label: 'My sleep is greatly disturbed (3-5 hours sleepless) (4)' },
+        { value: 5, label: 'My sleep is completely disturbed (5-7 hours sleepless) (5)' },
+      ],
+    },
+    {
+      id: 'recreation',
+      text: 'Section 10 - Recreation',
+      type: 'select',
+      required: true,
+      options: [
+        { value: 0, label: 'I am able to engage in all my recreation activities with no pain at all (0)' },
+        { value: 1, label: 'I am able to engage in all my activities with some pain in my neck (1)' },
+        { value: 2, label: 'I am able to engage in most of my usual activities because of pain in my neck (2)' },
+        { value: 3, label: 'I am only able to engage in a few of my usual activities because of pain (3)' },
+        { value: 4, label: 'I can hardly do any recreation activities because of pain in my neck (4)' },
+        { value: 5, label: 'I cannot do any recreation activities at all (5)' },
+      ],
+    },
+  ],
+  scoringRanges: [
+    { min: 0, max: 4, interpretation: 'No disability', severity: 'minimal', color: '#10B981' },
+    { min: 5, max: 14, interpretation: 'Mild disability', severity: 'mild', color: '#84CC16', recommendations: ['Patient may benefit from advice on posture and ergonomics', 'Consider physical therapy referral'] },
+    { min: 15, max: 24, interpretation: 'Moderate disability', severity: 'moderate', color: '#F59E0B', recommendations: ['Physical therapy recommended', 'Ergonomic assessment', 'Consider imaging if not already done'] },
+    { min: 25, max: 34, interpretation: 'Severe disability', severity: 'moderately_severe', color: '#F97316', recommendations: ['Active multimodal treatment recommended', 'Consider specialist referral', 'Assess for cervical radiculopathy or myelopathy'] },
+    { min: 35, max: 50, interpretation: 'Complete disability', severity: 'severe', color: '#EF4444', recommendations: ['Comprehensive evaluation needed', 'Rule out structural pathology (MRI)', 'Multidisciplinary management', 'Consider surgical evaluation if appropriate'] },
+    { min: 51, max: 100, interpretation: 'Complete disability (percentage scoring)', severity: 'severe', color: '#EF4444', recommendations: ['Comprehensive evaluation needed', 'Rule out structural pathology', 'Multidisciplinary management'] },
+  ],
+}
+
+// ===========================================
 // All Scale Definitions
 // ===========================================
 export const ALL_SCALES: Record<string, ScaleDefinition> = {
@@ -2253,6 +2832,10 @@ export const ALL_SCALES: Record<string, ScaleDefinition> = {
   hoehn_yahr: HOEHN_YAHR,
   edss: EDSS,
   cha2ds2_vasc: CHA2DS2_VASC,
+  has_bled: HAS_BLED,
+  dn4: DN4,
+  odi: ODI,
+  ndi: NDI,
 }
 
 // Helper to categorize scales by type (exam-driven vs history-based)
@@ -2278,6 +2861,10 @@ export const SCALE_LOCATION_MAP: Record<string, ScaleLocationType> = {
   dhi: 'history',
   isi: 'history',
   cha2ds2_vasc: 'history', // Risk calculation from medical history
+  has_bled: 'history', // Bleeding risk from medical history
+  dn4: 'exam', // Has physical exam component (hypoesthesia, allodynia)
+  odi: 'history', // Self-report low back pain disability
+  ndi: 'history', // Self-report neck disability
 }
 
 export function getScaleLocation(scaleId: string): ScaleLocationType {
@@ -2483,6 +3070,25 @@ export const CONDITION_SCALE_MAPPINGS: ConditionScaleMapping[] = [
   { condition: 'Post-stroke spasticity', scaleId: 'modified_ashworth', priority: 1, isRequired: false },
   { condition: 'Post-stroke spasticity', scaleId: 'nihss', priority: 2, isRequired: false },
   { condition: 'Post-stroke spasticity', scaleId: 'moca', priority: 3, isRequired: false },
+
+  // HAS-BLED - Bleeding risk (pairs with CHA₂DS₂-VASc)
+  { condition: 'Atrial fibrillation', scaleId: 'has_bled', priority: 2, isRequired: false },
+  { condition: 'Atrial flutter', scaleId: 'has_bled', priority: 2, isRequired: false },
+  { condition: 'Cardioembolic stroke', scaleId: 'has_bled', priority: 2, isRequired: false },
+  { condition: 'Cryptogenic stroke', scaleId: 'has_bled', priority: 2, isRequired: false },
+
+  // DN4 - Neuropathic pain screening
+  { condition: 'Peripheral neuropathy', scaleId: 'dn4', priority: 1, isRequired: false },
+  { condition: 'Small fiber neuropathy', scaleId: 'dn4', priority: 1, isRequired: false },
+  { condition: 'Numbness/Tingling', scaleId: 'dn4', priority: 1, isRequired: false },
+  { condition: 'Radiculopathy', scaleId: 'dn4', priority: 1, isRequired: false },
+
+  // ODI - Low back disability
+  { condition: 'Back pain with neuro symptoms', scaleId: 'odi', priority: 1, isRequired: false },
+  { condition: 'Radiculopathy', scaleId: 'odi', priority: 2, isRequired: false },
+
+  // NDI - Neck disability
+  { condition: 'Radiculopathy', scaleId: 'ndi', priority: 3, isRequired: false },
 ]
 
 // ===========================================

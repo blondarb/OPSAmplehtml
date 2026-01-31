@@ -84,7 +84,7 @@ Current patient context:
 - Patient: ${context?.patient || 'Not specified'}
 - Chief Complaint: ${context?.chiefComplaint || 'Not specified'}
 - HPI Summary: ${context?.hpi || 'Not provided'}
-
+${context?.fullNoteText ? `\nFull Clinical Note:\n${context.fullNoteText}\n` : ''}
 Provide concise, evidence-based responses. When discussing medications, include typical dosing. Always recommend consulting current guidelines for complex decisions.${userPreferences}`
 
     const completion = await openai.chat.completions.create({

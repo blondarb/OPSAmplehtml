@@ -244,6 +244,7 @@ export default function ClinicalNote({
     examFreeText: currentVisit?.clinical_notes?.exam_free_text || '',
     assessment: currentVisit?.clinical_notes?.assessment || '',
     plan: currentVisit?.clinical_notes?.plan || '',
+    vitals: currentVisit?.clinical_notes?.vitals || { bp: '', hr: '', temp: '', weight: '', bmi: '' },
   })
 
   // Track whether autosave has been loaded (to prevent overwriting user changes)
@@ -594,6 +595,7 @@ export default function ClinicalNote({
       examFreeText: '',
       assessment: '',
       plan: '',
+      vitals: { bp: '', hr: '', temp: '', weight: '', bmi: '' },
     })
 
     // Allow autosave loading for the new patient
@@ -720,6 +722,7 @@ export default function ClinicalNote({
           examFreeText: clinicalNote?.examFreeText || clinicalNote?.exam_free_text || '',
           assessment: clinicalNote?.assessment || '',
           plan: clinicalNote?.plan || '',
+          vitals: clinicalNote?.vitals || { bp: '', hr: '', temp: '', weight: '', bmi: '' },
         })
 
         // Reset AI output states

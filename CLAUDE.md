@@ -47,7 +47,7 @@ src/
 │   ├── ClinicalNote.tsx   # Clinical note container orchestrating all panels
 │   ├── DifferentialDiagnosisSection.tsx # Differential diagnosis with ICD-10 codes
 │   ├── DotPhrasesDrawer.tsx # Dot phrases management drawer
-│   ├── EnhancedNotePreviewModal.tsx # Comprehensive note generation with type/length selection
+│   ├── EnhancedNotePreviewModal.tsx # Comprehensive note generation with type/length selection, AI note review, ask AI
 │   ├── ExamScalesSection.tsx # Exam-driven scales (NIHSS, MAS, etc.)
 │   ├── HistorianSessionComplete.tsx # Post-interview success screen
 │   ├── HistorianSessionPanel.tsx # Physician-side historian session viewer
@@ -305,6 +305,7 @@ The middleware (`src/middleware.ts`) handles session refresh. Uses a simplified 
 - `/api/ai/scale-autofill` - AI autofill for clinical scales from patient data (gpt-5.2)
 - `/api/ai/synthesize-note` - Note synthesis from multiple sources (gpt-5.2)
 - `/api/ai/generate-assessment` - Generate clinical assessment from diagnoses (gpt-5.2)
+- `/api/ai/note-review` - AI-powered note review for suggested improvements (gpt-4o-mini)
 - `/api/ai/historian/session` - Create ephemeral token for WebRTC (gpt-4o-realtime-preview)
 - `/api/ai/historian/save` - Save/list historian interview sessions
 
@@ -378,6 +379,30 @@ When redeploying after changes, use "Redeploy without cache" to ensure fresh bui
 - Push to feature branch, create PR, merge to main for deployment
 
 ## Recent Changes (January 2026)
+
+### 4 Critical UX Fixes (January 30, 2026)
+- **Dead Code Removal**: Removed ~260 lines of unused "Prior History Summary" from LeftSidebar (state vars, generate function, entire JSX block); real implementation lives in `PatientHistorySummary.tsx` rendered in CenterPanel
+- **Vital Signs Wiring**: Added `vitals` field (`bp`, `hr`, `temp`, `weight`, `bmi`) to noteData state in ClinicalNote.tsx, `ManualNoteData` interface in types.ts, and merge engine; controlled inputs at top of Physical Exams tab; Vital Signs section appears in generated notes
+- **Medication Form Modal**: Extracted inline medication add/edit form (~130 lines) from History tab into centered modal overlay; reduces scroll displacement, keeps medication list compact; uses same modal pattern as discontinue confirmation
+- **History Tab Section Navigation**: Sticky pill-bar at top of History tab with 8 sections (Summary, Consult, HPI, ROS, Meds, Allergies, History, Scales); IntersectionObserver tracks visible section and highlights active pill; click scrolls smoothly to target section; `data-section` attributes on each section container
+
+### 4 New Clinical Scales + Patient Education Enhancements (January 30, 2026)
+- **HAS-BLED**: Bleeding risk score (0-9), 9 binary items; pairs with CHA₂DS₂-VASc for AFib patients; history-based
+- **DN4**: Neuropathic pain screening (0-10), 7 interview + 3 exam items, ≥4 = neuropathic; exam-based
+- **ODI**: Oswestry Disability Index (0-100%), 10 sections for low back pain disability; custom percentage scoring
+- **NDI**: Neck Disability Index (0-100%), 10 sections for neck disability; custom percentage scoring
+- **Practice Name Setting**: New `practiceName` field in SettingsDrawer (AI & Documentation tab), displayed on handout headers
+- **Handout Language Selection**: Free-text language input in AiDrawer Handout tab; persisted to localStorage; injects language instructions into all handout prompts
+- **Handout Print Formatting**: Practice name header + date footer in print output; hidden print wrapper; clean print CSS with proper margins/typography; `[data-no-print]` hides action buttons
+
+### Note Review & Ask AI About This Note (January 30, 2026)
+- **Suggested Improvements**: New `/api/ai/note-review` endpoint (gpt-4o-mini, JSON response, max 6 suggestions); collapsible panel in EnhancedNotePreviewModal with type badges (consistency/completeness/quality), severity borders (amber warning, teal info), "Go to section" scroll links, dismiss buttons; auto-triggers after AI synthesis
+- **Ask AI About This Note**: Chat input bar in Generate Note modal; full note text sent as `fullNoteText` context to `/api/ai/ask`; 4 suggested question pills; right-aligned question bubbles and left-aligned answer bubbles with teal border; Enter key sends
+
+### Reading Level Control & Dictation Expansion (January 30, 2026)
+- **Handout Reading Level Control**: Pill-style selector (Simple/Standard/Advanced) in AiDrawer Handout tab; injects reading-level instructions into all handout AI prompts; persisted to localStorage
+- **Settings Dictation**: `useVoiceRecorder` hook on global AI instructions textarea and all 5 per-section instruction textareas in SettingsDrawer; 24x24 red mic buttons with transcription append
+- **TopNav Search Dictation**: Mic button in patient search bar; red border during recording; transcribed text auto-populates search field
 
 ### P1 Features (January 30, 2026)
 - **Free-text Exam Toggle**: Structured/Free-text pill toggle on Physical Exams tab; free-text mode shows single NoteTextField with dictation/AI/dot phrase buttons; persisted to localStorage

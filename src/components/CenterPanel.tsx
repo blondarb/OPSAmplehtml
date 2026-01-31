@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import NoteTextField from './NoteTextField'
 import SmartScalesSection from './SmartScalesSection'
 import ExamScalesSection from './ExamScalesSection'
@@ -114,6 +114,61 @@ export default function CenterPanel({
   // Tab customization state
   const [tabs, setTabs] = useState(DEFAULT_TABS)
   const [isVerticalView, setIsVerticalView] = useState(false)
+
+  // History tab section navigation
+  const HISTORY_SECTIONS = [
+    { id: 'summary', label: 'Summary' },
+    { id: 'consult', label: 'Consult' },
+    { id: 'hpi', label: 'HPI' },
+    { id: 'ros', label: 'ROS' },
+    { id: 'meds', label: 'Meds' },
+    { id: 'allergies-section', label: 'Allergies' },
+    { id: 'history-section', label: 'History' },
+    { id: 'scales', label: 'Scales' },
+  ]
+  const [activeSection, setActiveSection] = useState('summary')
+  const historySectionsRef = useRef<Map<string, IntersectionObserverEntry>>(new Map())
+  const scrollContainerRef = useRef<HTMLDivElement | null>(null)
+
+  // IntersectionObserver to track visible section in History tab
+  useEffect(() => {
+    if (activeTab !== 'history') return
+
+    const container = scrollContainerRef.current
+    if (!container) return
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach(entry => {
+          historySectionsRef.current.set(entry.target.getAttribute('data-section') || '', entry)
+        })
+        // Find the first visible section
+        for (const sec of HISTORY_SECTIONS) {
+          const entry = historySectionsRef.current.get(sec.id)
+          if (entry?.isIntersecting) {
+            setActiveSection(sec.id)
+            break
+          }
+        }
+      },
+      { root: container, rootMargin: '-80px 0px -60% 0px', threshold: 0 }
+    )
+
+    const sectionEls = container.querySelectorAll('[data-section]')
+    sectionEls.forEach(el => observer.observe(el))
+
+    return () => observer.disconnect()
+  }, [activeTab])
+
+  const scrollToSection = (sectionId: string) => {
+    const container = scrollContainerRef.current
+    if (!container) return
+    const el = container.querySelector(`[data-section="${sectionId}"]`)
+    if (el) {
+      el.scrollIntoView({ behavior: 'smooth', block: 'start' })
+      setActiveSection(sectionId)
+    }
+  }
 
   // Load saved tab order and view preference from localStorage
   useEffect(() => {
@@ -511,7 +566,7 @@ ${noteData.plan || 'Not documented'}
   }
 
   return (
-    <main className="center-panel">
+    <main className="center-panel" ref={scrollContainerRef}>
       {/* Tab Navigation with Action Bar */}
       <div className="tab-nav-wrapper">
         {/* Tabs */}
@@ -1037,25 +1092,67 @@ ${noteData.plan || 'Not documented'}
                 </h2>
               </div>
             )}
+
+            {/* Section Navigation Pills */}
+            {!isVerticalView && (
+              <div style={{
+                position: 'sticky',
+                top: 0,
+                zIndex: 10,
+                background: 'var(--bg-gray)',
+                padding: '8px 0 10px',
+                marginBottom: '8px',
+                display: 'flex',
+                gap: '6px',
+                flexWrap: 'wrap',
+              }}>
+                {HISTORY_SECTIONS.map(sec => (
+                  <button
+                    key={sec.id}
+                    onClick={() => scrollToSection(sec.id)}
+                    style={{
+                      padding: '5px 12px',
+                      borderRadius: '14px',
+                      fontSize: '12px',
+                      fontWeight: 500,
+                      cursor: 'pointer',
+                      border: 'none',
+                      background: activeSection === sec.id ? 'var(--primary)' : 'var(--bg-white)',
+                      color: activeSection === sec.id ? 'white' : 'var(--text-secondary)',
+                      transition: 'all 0.15s',
+                      boxShadow: activeSection === sec.id ? 'none' : '0 1px 2px rgba(0,0,0,0.06)',
+                    }}
+                  >
+                    {sec.label}
+                  </button>
+                ))}
+              </div>
+            )}
+
             {/* Patient History Summary - AI longitudinal summary for returning patients */}
-            <PatientHistorySummary
-              patient={patient}
-              priorVisits={priorVisits}
-              medications={medications}
-              allergies={allergies}
-              scoreHistory={scoreHistory}
-              noteData={noteData}
-            />
+            <div data-section="summary">
+              <PatientHistorySummary
+                patient={patient}
+                priorVisits={priorVisits}
+                medications={medications}
+                allergies={allergies}
+                scoreHistory={scoreHistory}
+                noteData={noteData}
+              />
+            </div>
 
             {/* Reason for Consult - Two-tier selection */}
+            <div data-section="consult">
             <ReasonForConsultSection
               selectedSubOptions={noteData.chiefComplaint || []}
               onSubOptionsChange={(subOptions) => updateNote('chiefComplaint', subOptions)}
               otherDetails={noteData.consultOtherDetails || ''}
               onOtherDetailsChange={(details) => updateNote('consultOtherDetails', details)}
             />
+            </div>
 
             {/* History of Presenting Illness */}
+            <div data-section="hpi">
             <div style={{ position: 'relative', marginBottom: '16px' }}>
               <span style={{
                 position: 'absolute',
@@ -1096,8 +1193,10 @@ ${noteData.plan || 'Not documented'}
                 />
               </div>
             </div>
+            </div>
 
             {/* Review of System */}
+            <div data-section="ros">
             <div style={{ position: 'relative', marginBottom: '16px' }}>
               <span style={{
                 position: 'absolute',
@@ -1176,8 +1275,10 @@ ${noteData.plan || 'Not documented'}
                 )}
               </div>
             </div>
+            </div>
 
             {/* Medications */}
+            <div data-section="meds">
             <div style={{ marginBottom: '16px' }}>
               <div style={{
                 background: 'var(--bg-white)',
@@ -1185,7 +1286,7 @@ ${noteData.plan || 'Not documented'}
                 padding: '20px',
                 boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
               }}>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: medications.length > 0 || showMedForm ? '12px' : '0' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: medications.length > 0 ? '12px' : '0' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" strokeWidth="2">
                       <path d="M10.5 1.5H8.25A2.25 2.25 0 006 3.75v16.5a2.25 2.25 0 002.25 2.25h7.5A2.25 2.25 0 0018 20.25V3.75a2.25 2.25 0 00-2.25-2.25H13.5m-3 0V3h3V1.5m-3 0h3m-6 9h6m-6 4h4"/>
@@ -1212,7 +1313,7 @@ ${noteData.plan || 'Not documented'}
 
                 {/* Medication List */}
                 {medications.filter(m => m.is_active).length > 0 && (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginBottom: showMedForm ? '12px' : '0' }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginBottom: '0' }}>
                     {medications.filter(m => m.is_active).map(med => (
                       <div key={med.id} style={{
                         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
@@ -1259,7 +1360,7 @@ ${noteData.plan || 'Not documented'}
 
                 {/* Discontinued medications (collapsed) */}
                 {medications.filter(m => !m.is_active).length > 0 && (
-                  <details style={{ marginBottom: showMedForm ? '12px' : '0' }}>
+                  <details style={{ marginBottom: '0' }}>
                     <summary style={{ fontSize: '12px', color: 'var(--text-muted)', cursor: 'pointer', marginBottom: '6px' }}>
                       {medications.filter(m => !m.is_active).length} discontinued
                     </summary>
@@ -1279,142 +1380,7 @@ ${noteData.plan || 'Not documented'}
                   </details>
                 )}
 
-                {/* Add/Edit Medication Form */}
-                {showMedForm && (
-                  <div style={{ border: '1px solid var(--border)', borderRadius: '8px', padding: '16px', background: 'var(--bg-gray)' }}>
-                    <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '10px' }}>
-                      {editingMedId ? 'Edit Medication' : 'Add Medication'}
-                    </div>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                      {/* Medication name with formulary typeahead */}
-                      <div style={{ position: 'relative' }}>
-                        <input
-                          type="text"
-                          value={medFormData.medication_name}
-                          onChange={(e) => {
-                            const val = e.target.value
-                            setMedFormData(prev => ({ ...prev, medication_name: val }))
-                            if (val.length >= 2) {
-                              setMedSearchResults(searchFormulary(val))
-                              setShowMedSearch(true)
-                            } else {
-                              setShowMedSearch(false)
-                            }
-                          }}
-                          onBlur={() => setTimeout(() => setShowMedSearch(false), 200)}
-                          placeholder="Medication name..."
-                          style={{ width: '100%', padding: '10px 12px', border: '1px solid var(--border)', borderRadius: '8px', fontSize: '13px' }}
-                        />
-                        {showMedSearch && medSearchResults.length > 0 && (
-                          <div style={{
-                            position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 10,
-                            background: 'var(--bg-white)', border: '1px solid var(--border)', borderRadius: '8px',
-                            boxShadow: '0 4px 12px rgba(0,0,0,0.1)', maxHeight: '200px', overflowY: 'auto',
-                          }}>
-                            {medSearchResults.slice(0, 8).map((item, idx) => (
-                              <button
-                                key={idx}
-                                onMouseDown={(e) => {
-                                  e.preventDefault()
-                                  setMedFormData(prev => ({
-                                    ...prev,
-                                    medication_name: item.name,
-                                    route: item.routes[0] || prev.route,
-                                    dosage: item.common_dosages[0] || prev.dosage,
-                                    frequency: item.common_frequencies[0] || prev.frequency,
-                                  }))
-                                  setShowMedSearch(false)
-                                }}
-                                style={{
-                                  display: 'block', width: '100%', textAlign: 'left',
-                                  padding: '8px 12px', border: 'none', background: 'transparent',
-                                  cursor: 'pointer', fontSize: '13px', borderBottom: '1px solid var(--border)',
-                                }}
-                              >
-                                <span style={{ fontWeight: 500, color: 'var(--text-primary)' }}>{item.name}</span>
-                                {item.generic_name !== item.name && (
-                                  <span style={{ color: 'var(--text-muted)', marginLeft: '6px', fontSize: '12px' }}>({item.generic_name})</span>
-                                )}
-                                <span style={{ color: 'var(--text-muted)', fontSize: '11px', marginLeft: '8px' }}>{item.category}</span>
-                              </button>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '8px' }}>
-                        <input
-                          type="text"
-                          value={medFormData.dosage}
-                          onChange={(e) => setMedFormData(prev => ({ ...prev, dosage: e.target.value }))}
-                          placeholder="Dosage (e.g. 100mg)"
-                          style={{ padding: '10px 12px', border: '1px solid var(--border)', borderRadius: '8px', fontSize: '13px' }}
-                        />
-                        <input
-                          type="text"
-                          value={medFormData.frequency}
-                          onChange={(e) => setMedFormData(prev => ({ ...prev, frequency: e.target.value }))}
-                          placeholder="Frequency (e.g. BID)"
-                          style={{ padding: '10px 12px', border: '1px solid var(--border)', borderRadius: '8px', fontSize: '13px' }}
-                        />
-                        <select
-                          value={medFormData.route}
-                          onChange={(e) => setMedFormData(prev => ({ ...prev, route: e.target.value }))}
-                          style={{ padding: '10px 12px', border: '1px solid var(--border)', borderRadius: '8px', fontSize: '13px' }}
-                        >
-                          <option value="PO">PO (Oral)</option>
-                          <option value="IV">IV</option>
-                          <option value="IM">IM</option>
-                          <option value="SC">SC</option>
-                          <option value="topical">Topical</option>
-                          <option value="inhaled">Inhaled</option>
-                          <option value="nasal">Nasal</option>
-                          <option value="SL">SL</option>
-                        </select>
-                      </div>
-                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
-                        <input
-                          type="text"
-                          value={medFormData.indication}
-                          onChange={(e) => setMedFormData(prev => ({ ...prev, indication: e.target.value }))}
-                          placeholder="Indication"
-                          style={{ padding: '10px 12px', border: '1px solid var(--border)', borderRadius: '8px', fontSize: '13px' }}
-                        />
-                        <input
-                          type="date"
-                          value={medFormData.start_date}
-                          onChange={(e) => setMedFormData(prev => ({ ...prev, start_date: e.target.value }))}
-                          style={{ padding: '10px 12px', border: '1px solid var(--border)', borderRadius: '8px', fontSize: '13px' }}
-                        />
-                      </div>
-                    </div>
-                    <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', marginTop: '10px' }}>
-                      <button
-                        onClick={() => { setShowMedForm(false); setEditingMedId(null) }}
-                        style={{ padding: '8px 16px', borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--bg-white)', fontSize: '12px', cursor: 'pointer', color: 'var(--text-secondary)' }}
-                      >
-                        Cancel
-                      </button>
-                      <button
-                        onClick={async () => {
-                          if (!medFormData.medication_name.trim()) return
-                          if (editingMedId) {
-                            await onUpdateMedication?.(editingMedId, medFormData)
-                          } else {
-                            await onAddMedication?.(medFormData)
-                          }
-                          setShowMedForm(false)
-                          setEditingMedId(null)
-                          setMedFormData({ medication_name: '', dosage: '', frequency: '', route: 'PO', prescriber: '', indication: '', start_date: '' })
-                        }}
-                        style={{ padding: '8px 16px', borderRadius: '8px', border: 'none', background: 'var(--primary)', color: 'white', fontSize: '12px', fontWeight: 500, cursor: 'pointer' }}
-                      >
-                        {editingMedId ? 'Save Changes' : 'Add Medication'}
-                      </button>
-                    </div>
-                  </div>
-                )}
-
-                {medications.length === 0 && !showMedForm && (
+                {medications.length === 0 && (
                   <div style={{ fontSize: '13px', color: 'var(--text-muted)', textAlign: 'center', padding: '12px' }}>
                     No medications documented
                   </div>
@@ -1458,7 +1424,137 @@ ${noteData.plan || 'Not documented'}
               </>
             )}
 
+            {/* Add/Edit Medication Modal */}
+            {showMedForm && (
+              <>
+                <div onClick={() => { setShowMedForm(false); setEditingMedId(null) }} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 1000 }} />
+                <div style={{
+                  position: 'fixed', top: '50%', left: '50%', transform: 'translate(-50%, -50%)',
+                  background: 'var(--bg-white)', borderRadius: '12px', padding: '24px', width: '480px', maxWidth: '90vw',
+                  zIndex: 1001, boxShadow: '0 20px 50px rgba(0,0,0,0.15)',
+                }}>
+                  <h3 style={{ margin: '0 0 16px', fontSize: '16px', fontWeight: 600, color: 'var(--text-primary)' }}>
+                    {editingMedId ? 'Edit Medication' : 'Add Medication'}
+                  </h3>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                    {/* Medication name with formulary typeahead */}
+                    <div style={{ position: 'relative' }}>
+                      <label style={{ display: 'block', fontSize: '12px', color: 'var(--text-muted)', marginBottom: '4px' }}>Medication Name</label>
+                      <input
+                        type="text"
+                        value={medFormData.medication_name}
+                        onChange={(e) => {
+                          const val = e.target.value
+                          setMedFormData(prev => ({ ...prev, medication_name: val }))
+                          if (val.length >= 2) {
+                            setMedSearchResults(searchFormulary(val))
+                            setShowMedSearch(true)
+                          } else {
+                            setShowMedSearch(false)
+                          }
+                        }}
+                        onBlur={() => setTimeout(() => setShowMedSearch(false), 200)}
+                        placeholder="Search formulary..."
+                        autoFocus
+                        style={{ width: '100%', padding: '10px 12px', border: '1px solid var(--border)', borderRadius: '8px', fontSize: '13px' }}
+                      />
+                      {showMedSearch && medSearchResults.length > 0 && (
+                        <div style={{
+                          position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 10,
+                          background: 'var(--bg-white)', border: '1px solid var(--border)', borderRadius: '8px',
+                          boxShadow: '0 4px 12px rgba(0,0,0,0.1)', maxHeight: '200px', overflowY: 'auto',
+                        }}>
+                          {medSearchResults.slice(0, 8).map((item, idx) => (
+                            <button
+                              key={idx}
+                              onMouseDown={(e) => {
+                                e.preventDefault()
+                                setMedFormData(prev => ({
+                                  ...prev,
+                                  medication_name: item.name,
+                                  route: item.routes[0] || prev.route,
+                                  dosage: item.common_dosages[0] || prev.dosage,
+                                  frequency: item.common_frequencies[0] || prev.frequency,
+                                }))
+                                setShowMedSearch(false)
+                              }}
+                              style={{
+                                display: 'block', width: '100%', textAlign: 'left',
+                                padding: '8px 12px', border: 'none', background: 'transparent',
+                                cursor: 'pointer', fontSize: '13px', borderBottom: '1px solid var(--border)',
+                              }}
+                            >
+                              <span style={{ fontWeight: 500, color: 'var(--text-primary)' }}>{item.name}</span>
+                              {item.generic_name !== item.name && (
+                                <span style={{ color: 'var(--text-muted)', marginLeft: '6px', fontSize: '12px' }}>({item.generic_name})</span>
+                              )}
+                              <span style={{ color: 'var(--text-muted)', fontSize: '11px', marginLeft: '8px' }}>{item.category}</span>
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '8px' }}>
+                      <div>
+                        <label style={{ display: 'block', fontSize: '12px', color: 'var(--text-muted)', marginBottom: '4px' }}>Dosage</label>
+                        <input type="text" value={medFormData.dosage} onChange={(e) => setMedFormData(prev => ({ ...prev, dosage: e.target.value }))} placeholder="e.g. 100mg" style={{ width: '100%', padding: '10px 12px', border: '1px solid var(--border)', borderRadius: '8px', fontSize: '13px' }} />
+                      </div>
+                      <div>
+                        <label style={{ display: 'block', fontSize: '12px', color: 'var(--text-muted)', marginBottom: '4px' }}>Frequency</label>
+                        <input type="text" value={medFormData.frequency} onChange={(e) => setMedFormData(prev => ({ ...prev, frequency: e.target.value }))} placeholder="e.g. BID" style={{ width: '100%', padding: '10px 12px', border: '1px solid var(--border)', borderRadius: '8px', fontSize: '13px' }} />
+                      </div>
+                      <div>
+                        <label style={{ display: 'block', fontSize: '12px', color: 'var(--text-muted)', marginBottom: '4px' }}>Route</label>
+                        <select value={medFormData.route} onChange={(e) => setMedFormData(prev => ({ ...prev, route: e.target.value }))} style={{ width: '100%', padding: '10px 12px', border: '1px solid var(--border)', borderRadius: '8px', fontSize: '13px' }}>
+                          <option value="PO">PO (Oral)</option>
+                          <option value="IV">IV</option>
+                          <option value="IM">IM</option>
+                          <option value="SC">SC</option>
+                          <option value="topical">Topical</option>
+                          <option value="inhaled">Inhaled</option>
+                          <option value="nasal">Nasal</option>
+                          <option value="SL">SL</option>
+                        </select>
+                      </div>
+                    </div>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+                      <div>
+                        <label style={{ display: 'block', fontSize: '12px', color: 'var(--text-muted)', marginBottom: '4px' }}>Indication</label>
+                        <input type="text" value={medFormData.indication} onChange={(e) => setMedFormData(prev => ({ ...prev, indication: e.target.value }))} placeholder="Indication" style={{ width: '100%', padding: '10px 12px', border: '1px solid var(--border)', borderRadius: '8px', fontSize: '13px' }} />
+                      </div>
+                      <div>
+                        <label style={{ display: 'block', fontSize: '12px', color: 'var(--text-muted)', marginBottom: '4px' }}>Start Date</label>
+                        <input type="date" value={medFormData.start_date} onChange={(e) => setMedFormData(prev => ({ ...prev, start_date: e.target.value }))} style={{ width: '100%', padding: '10px 12px', border: '1px solid var(--border)', borderRadius: '8px', fontSize: '13px' }} />
+                      </div>
+                    </div>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', marginTop: '16px' }}>
+                    <button
+                      onClick={() => { setShowMedForm(false); setEditingMedId(null) }}
+                      style={{ padding: '10px 16px', borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--bg-white)', fontSize: '13px', cursor: 'pointer', color: 'var(--text-secondary)' }}
+                    >Cancel</button>
+                    <button
+                      onClick={async () => {
+                        if (!medFormData.medication_name.trim()) return
+                        if (editingMedId) {
+                          await onUpdateMedication?.(editingMedId, medFormData)
+                        } else {
+                          await onAddMedication?.(medFormData)
+                        }
+                        setShowMedForm(false)
+                        setEditingMedId(null)
+                        setMedFormData({ medication_name: '', dosage: '', frequency: '', route: 'PO', prescriber: '', indication: '', start_date: '' })
+                      }}
+                      style={{ padding: '10px 16px', borderRadius: '8px', border: 'none', background: 'var(--primary)', color: 'white', fontSize: '13px', fontWeight: 500, cursor: 'pointer' }}
+                    >{editingMedId ? 'Save Changes' : 'Add Medication'}</button>
+                  </div>
+                </div>
+              </>
+            )}
+            </div>
+
             {/* Allergies */}
+            <div data-section="allergies-section">
             <div style={{ position: 'relative', marginBottom: '16px' }}>
               <span style={{
                 position: 'absolute',
@@ -1621,8 +1717,10 @@ ${noteData.plan || 'Not documented'}
                 )}
               </div>
             </div>
+            </div>
 
             {/* Medical History Available */}
+            <div data-section="history-section">
             <div style={{ position: 'relative', marginBottom: '16px' }}>
               <span style={{
                 position: 'absolute',
@@ -1701,8 +1799,10 @@ ${noteData.plan || 'Not documented'}
                 )}
               </div>
             </div>
+            </div>
 
             {/* Smart Clinical Scales Section - shows scales based on selected diagnosis */}
+            <div data-section="scales">
             <SmartScalesSection
               selectedConditions={noteData.chiefComplaint || []}
               patientId={patient?.id}
@@ -1723,6 +1823,7 @@ ${noteData.plan || 'Not documented'}
                 vitalSigns: noteData.vitalSigns || patient.vitalSigns || undefined,
               } : undefined}
             />
+            </div>
             {isVerticalView && (
               <div style={{ marginTop: '32px', marginBottom: '32px', borderTop: '2px solid var(--border)', paddingTop: '32px' }}>
                 <div className="vertical-section-header" style={{
@@ -1810,6 +1911,71 @@ ${noteData.plan || 'Not documented'}
               </div>
             )}
           <div>
+            {/* Vital Signs - controlled inputs saved to noteData */}
+            <div style={{
+              background: 'var(--bg-white)',
+              borderRadius: '12px',
+              padding: '20px',
+              marginBottom: '16px',
+              boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
+            }}>
+              <div style={{ marginBottom: '16px' }}>
+                <span style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text-primary)' }}>Vital Signs</span>
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '12px' }}>
+                <div>
+                  <label style={{ display: 'block', fontSize: '12px', color: 'var(--text-muted)', marginBottom: '4px' }}>BP (mmHg)</label>
+                  <input
+                    type="text"
+                    value={noteData.vitals?.bp || ''}
+                    onChange={(e) => updateNote('vitals', { ...noteData.vitals, bp: e.target.value })}
+                    placeholder="120/80"
+                    style={{ width: '100%', padding: '10px 12px', border: '1px solid var(--border)', borderRadius: '8px', fontSize: '14px', outline: 'none' }}
+                  />
+                </div>
+                <div>
+                  <label style={{ display: 'block', fontSize: '12px', color: 'var(--text-muted)', marginBottom: '4px' }}>HR (bpm)</label>
+                  <input
+                    type="text"
+                    value={noteData.vitals?.hr || ''}
+                    onChange={(e) => updateNote('vitals', { ...noteData.vitals, hr: e.target.value })}
+                    placeholder="72"
+                    style={{ width: '100%', padding: '10px 12px', border: '1px solid var(--border)', borderRadius: '8px', fontSize: '14px', outline: 'none' }}
+                  />
+                </div>
+                <div>
+                  <label style={{ display: 'block', fontSize: '12px', color: 'var(--text-muted)', marginBottom: '4px' }}>Temp (&deg;F)</label>
+                  <input
+                    type="text"
+                    value={noteData.vitals?.temp || ''}
+                    onChange={(e) => updateNote('vitals', { ...noteData.vitals, temp: e.target.value })}
+                    placeholder="98.6"
+                    style={{ width: '100%', padding: '10px 12px', border: '1px solid var(--border)', borderRadius: '8px', fontSize: '14px', outline: 'none' }}
+                  />
+                </div>
+                <div>
+                  <label style={{ display: 'block', fontSize: '12px', color: 'var(--text-muted)', marginBottom: '4px' }}>Weight (lbs)</label>
+                  <input
+                    type="text"
+                    value={noteData.vitals?.weight || ''}
+                    onChange={(e) => updateNote('vitals', { ...noteData.vitals, weight: e.target.value })}
+                    placeholder="165"
+                    style={{ width: '100%', padding: '10px 12px', border: '1px solid var(--border)', borderRadius: '8px', fontSize: '14px', outline: 'none' }}
+                  />
+                </div>
+                <div>
+                  <label style={{ display: 'block', fontSize: '12px', color: 'var(--text-muted)', marginBottom: '4px' }}>BMI</label>
+                  <input
+                    type="text"
+                    value={noteData.vitals?.bmi || ''}
+                    onChange={(e) => updateNote('vitals', { ...noteData.vitals, bmi: e.target.value })}
+                    placeholder="24.5"
+                    style={{ width: '100%', padding: '10px 12px', border: '1px solid var(--border)', borderRadius: '8px', fontSize: '14px', outline: 'none' }}
+                  />
+                </div>
+              </div>
+            </div>
+
             {/* Exam Summary - Dictation/AI */}
             <div style={{
               background: 'var(--bg-white)',
@@ -2714,86 +2880,6 @@ ${noteData.plan || 'Not documented'}
               </>)}
             </div>
 
-            {/* Vital signs */}
-            <div style={{
-              background: 'var(--bg-white)',
-              borderRadius: '12px',
-              padding: '20px',
-              marginBottom: '16px',
-              boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
-            }}>
-              <div style={{ marginBottom: '16px' }}>
-                <span style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text-primary)' }}>Vital signs</span>
-              </div>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '16px' }}>
-                <div>
-                  <label style={{ display: 'block', fontSize: '12px', color: 'var(--text-muted)', marginBottom: '4px' }}>Glucose (mg/dL) (Optional)</label>
-                  <input type="text" style={{
-                    width: '100%',
-                    padding: '10px 12px',
-                    border: '1px solid var(--border)',
-                    borderRadius: '8px',
-                    fontSize: '14px',
-                    outline: 'none',
-                  }}/>
-                </div>
-                <div>
-                  <label style={{ display: 'block', fontSize: '12px', color: 'var(--text-muted)', marginBottom: '4px' }}>BP (mm/Hg) (Optional)</label>
-                  <input type="text" style={{
-                    width: '100%',
-                    padding: '10px 12px',
-                    border: '1px solid var(--border)',
-                    borderRadius: '8px',
-                    fontSize: '14px',
-                    outline: 'none',
-                  }}/>
-                </div>
-                <div>
-                  <label style={{ display: 'block', fontSize: '12px', color: 'var(--text-muted)', marginBottom: '4px' }}>Oxygen saturation (%) (Optional)</label>
-                  <input type="text" style={{
-                    width: '100%',
-                    padding: '10px 12px',
-                    border: '1px solid var(--border)',
-                    borderRadius: '8px',
-                    fontSize: '14px',
-                    outline: 'none',
-                  }}/>
-                </div>
-                <div>
-                  <label style={{ display: 'block', fontSize: '12px', color: 'var(--text-muted)', marginBottom: '4px' }}>Pulse (bpm) (Optional)</label>
-                  <input type="text" style={{
-                    width: '100%',
-                    padding: '10px 12px',
-                    border: '1px solid var(--border)',
-                    borderRadius: '8px',
-                    fontSize: '14px',
-                    outline: 'none',
-                  }}/>
-                </div>
-              </div>
-              <div style={{ marginTop: '16px' }}>
-                <span style={{ fontSize: '14px', fontWeight: 500, color: 'var(--text-primary)' }}>Fever symptoms</span>
-                <span style={{ fontSize: '12px', color: 'var(--text-muted)', marginLeft: '8px' }}>(Optional)</span>
-                <div style={{ display: 'flex', gap: '8px', marginTop: '8px' }}>
-                  {['Febrile', 'Afebrile'].map(option => (
-                    <button
-                      key={option}
-                      style={{
-                        padding: '8px 16px',
-                        borderRadius: '20px',
-                        fontSize: '13px',
-                        cursor: 'pointer',
-                        border: '1px solid var(--border)',
-                        background: 'var(--bg-white)',
-                        color: 'var(--text-secondary)',
-                      }}
-                    >
-                      {option}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            </div>
           </div>
           </>
         )}

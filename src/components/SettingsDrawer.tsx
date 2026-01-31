@@ -1,8 +1,11 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
+import { useVoiceRecorder } from '@/hooks/useVoiceRecorder'
 
 interface UserSettings {
+  // Practice Info
+  practiceName: string
   // AI Instructions
   globalAiInstructions: string
   sectionAiInstructions: {
@@ -35,6 +38,7 @@ const TAB_LABELS: Record<string, string> = {
 }
 
 const DEFAULT_SETTINGS: UserSettings = {
+  practiceName: '',
   globalAiInstructions: '',
   sectionAiInstructions: {
     hpi: '',
@@ -72,6 +76,42 @@ export default function SettingsDrawer({
   const [expandedSection, setExpandedSection] = useState<string | null>(null)
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false)
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved'>('idle')
+  const [dictationTarget, setDictationTarget] = useState<'global' | keyof UserSettings['sectionAiInstructions'] | null>(null)
+
+  const voice = useVoiceRecorder()
+
+  // When transcription completes, append to the targeted textarea
+  useEffect(() => {
+    if (voice.transcribedText && dictationTarget) {
+      if (dictationTarget === 'global') {
+        const current = settings.globalAiInstructions
+        const newValue = current ? `${current} ${voice.transcribedText}` : voice.transcribedText
+        updateSettings('globalAiInstructions', newValue)
+      } else {
+        const current = settings.sectionAiInstructions[dictationTarget]
+        const newValue = current ? `${current} ${voice.transcribedText}` : voice.transcribedText
+        updateSectionInstruction(dictationTarget, newValue)
+      }
+      voice.clearTranscription()
+      setDictationTarget(null)
+    }
+  }, [voice.transcribedText])
+
+  const toggleDictation = useCallback((target: 'global' | keyof UserSettings['sectionAiInstructions']) => {
+    if (voice.isRecording && dictationTarget === target) {
+      voice.stopRecording()
+    } else if (voice.isRecording) {
+      // Recording for a different target — stop first, then start new
+      voice.stopRecording()
+      setTimeout(() => {
+        setDictationTarget(target)
+        voice.startRecording()
+      }, 300)
+    } else {
+      setDictationTarget(target)
+      voice.startRecording()
+    }
+  }, [voice.isRecording, dictationTarget])
 
   // Load settings from localStorage on mount
   useEffect(() => {
@@ -300,6 +340,34 @@ export default function SettingsDrawer({
           {/* AI & Documentation Tab */}
           {activeTab === 'ai' && (
             <div>
+              {/* Practice Name */}
+              <div style={{ marginBottom: '24px' }}>
+                <div style={{ marginBottom: '12px' }}>
+                  <h3 style={{ fontSize: '14px', fontWeight: 600, margin: '0 0 4px 0', color: 'var(--text-primary)' }}>
+                    Practice Name
+                  </h3>
+                  <p style={{ fontSize: '12px', color: 'var(--text-muted)', margin: 0 }}>
+                    Displayed on patient education handouts and printed materials.
+                  </p>
+                </div>
+                <input
+                  type="text"
+                  value={settings.practiceName}
+                  onChange={(e) => updateSettings('practiceName', e.target.value)}
+                  placeholder="e.g., Meridian Neurology Associates"
+                  style={{
+                    width: '100%',
+                    padding: '10px 12px',
+                    borderRadius: '8px',
+                    border: '1px solid var(--border)',
+                    background: 'var(--bg-gray)',
+                    fontSize: '13px',
+                    color: 'var(--text-primary)',
+                    fontFamily: 'inherit',
+                  }}
+                />
+              </div>
+
               {/* Global AI Instructions */}
               <div style={{ marginBottom: '24px' }}>
                 <div style={{ marginBottom: '12px' }}>
@@ -310,23 +378,62 @@ export default function SettingsDrawer({
                     These instructions will be applied to all AI-generated content across your notes.
                   </p>
                 </div>
-                <textarea
-                  value={settings.globalAiInstructions}
-                  onChange={(e) => updateSettings('globalAiInstructions', e.target.value)}
-                  placeholder="E.g., Always use formal medical terminology. Prefer bullet points over paragraphs. Include pertinent negatives in ROS..."
-                  style={{
-                    width: '100%',
-                    minHeight: '100px',
-                    padding: '12px',
-                    borderRadius: '8px',
-                    border: '1px solid var(--border)',
-                    background: 'var(--bg-gray)',
-                    fontSize: '13px',
-                    color: 'var(--text-primary)',
-                    resize: 'vertical',
-                    fontFamily: 'inherit',
-                  }}
-                />
+                <div style={{ position: 'relative' }}>
+                  <textarea
+                    value={settings.globalAiInstructions}
+                    onChange={(e) => updateSettings('globalAiInstructions', e.target.value)}
+                    placeholder="E.g., Always use formal medical terminology. Prefer bullet points over paragraphs. Include pertinent negatives in ROS..."
+                    style={{
+                      width: '100%',
+                      minHeight: '100px',
+                      padding: '12px',
+                      paddingRight: '40px',
+                      borderRadius: '8px',
+                      border: '1px solid var(--border)',
+                      background: 'var(--bg-gray)',
+                      fontSize: '13px',
+                      color: 'var(--text-primary)',
+                      resize: 'vertical',
+                      fontFamily: 'inherit',
+                    }}
+                  />
+                  <button
+                    onClick={() => toggleDictation('global')}
+                    title={voice.isRecording && dictationTarget === 'global' ? 'Stop dictation' : 'Dictate'}
+                    style={{
+                      position: 'absolute',
+                      bottom: '8px',
+                      right: '8px',
+                      width: '24px',
+                      height: '24px',
+                      borderRadius: '6px',
+                      border: 'none',
+                      background: voice.isRecording && dictationTarget === 'global' ? '#EF4444' : '#FEE2E2',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      transition: 'background 0.2s',
+                    }}
+                  >
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke={voice.isRecording && dictationTarget === 'global' ? 'white' : '#EF4444'} strokeWidth="2">
+                      <path d="M12 1a3 3 0 00-3 3v8a3 3 0 006 0V4a3 3 0 00-3-3z"/>
+                      <path d="M19 10v2a7 7 0 01-14 0v-2"/>
+                      <line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/>
+                    </svg>
+                  </button>
+                  {voice.isTranscribing && dictationTarget === 'global' && (
+                    <div style={{
+                      position: 'absolute',
+                      bottom: '8px',
+                      right: '40px',
+                      fontSize: '11px',
+                      color: 'var(--text-muted)',
+                    }}>
+                      Transcribing...
+                    </div>
+                  )}
+                </div>
                 <div style={{ marginTop: '8px', display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
                   <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Suggestions:</span>
                   {[
@@ -425,23 +532,62 @@ export default function SettingsDrawer({
                     </button>
                     {expandedSection === section && (
                       <div style={{ padding: '12px 14px', borderTop: '1px solid var(--border)' }}>
-                        <textarea
-                          value={settings.sectionAiInstructions[section]}
-                          onChange={(e) => updateSectionInstruction(section, e.target.value)}
-                          placeholder={`Custom instructions for ${sectionLabels[section]}...`}
-                          style={{
-                            width: '100%',
-                            minHeight: '80px',
-                            padding: '10px',
-                            borderRadius: '6px',
-                            border: '1px solid var(--border)',
-                            background: 'var(--bg-white)',
-                            fontSize: '13px',
-                            color: 'var(--text-primary)',
-                            resize: 'vertical',
-                            fontFamily: 'inherit',
-                          }}
-                        />
+                        <div style={{ position: 'relative' }}>
+                          <textarea
+                            value={settings.sectionAiInstructions[section]}
+                            onChange={(e) => updateSectionInstruction(section, e.target.value)}
+                            placeholder={`Custom instructions for ${sectionLabels[section]}...`}
+                            style={{
+                              width: '100%',
+                              minHeight: '80px',
+                              padding: '10px',
+                              paddingRight: '40px',
+                              borderRadius: '6px',
+                              border: '1px solid var(--border)',
+                              background: 'var(--bg-white)',
+                              fontSize: '13px',
+                              color: 'var(--text-primary)',
+                              resize: 'vertical',
+                              fontFamily: 'inherit',
+                            }}
+                          />
+                          <button
+                            onClick={() => toggleDictation(section)}
+                            title={voice.isRecording && dictationTarget === section ? 'Stop dictation' : 'Dictate'}
+                            style={{
+                              position: 'absolute',
+                              bottom: '8px',
+                              right: '8px',
+                              width: '24px',
+                              height: '24px',
+                              borderRadius: '6px',
+                              border: 'none',
+                              background: voice.isRecording && dictationTarget === section ? '#EF4444' : '#FEE2E2',
+                              cursor: 'pointer',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              transition: 'background 0.2s',
+                            }}
+                          >
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke={voice.isRecording && dictationTarget === section ? 'white' : '#EF4444'} strokeWidth="2">
+                              <path d="M12 1a3 3 0 00-3 3v8a3 3 0 006 0V4a3 3 0 00-3-3z"/>
+                              <path d="M19 10v2a7 7 0 01-14 0v-2"/>
+                              <line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/>
+                            </svg>
+                          </button>
+                          {voice.isTranscribing && dictationTarget === section && (
+                            <div style={{
+                              position: 'absolute',
+                              bottom: '8px',
+                              right: '40px',
+                              fontSize: '11px',
+                              color: 'var(--text-muted)',
+                            }}>
+                              Transcribing...
+                            </div>
+                          )}
+                        </div>
                       </div>
                     )}
                   </div>

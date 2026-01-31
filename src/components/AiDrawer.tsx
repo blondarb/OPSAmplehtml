@@ -32,6 +32,19 @@ export default function AiDrawer({
   const [handoutResult, setHandoutResult] = useState('')
   const [summaryLoading, setSummaryLoading] = useState(false)
   const [handoutLoading, setHandoutLoading] = useState(false)
+  const [readingLevel, setReadingLevel] = useState<'simple' | 'standard' | 'advanced'>(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('sevaro-handout-reading-level')
+      if (saved === 'simple' || saved === 'standard' || saved === 'advanced') return saved
+    }
+    return 'standard'
+  })
+  const [handoutLanguage, setHandoutLanguage] = useState(() => {
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem('sevaro-handout-language') || ''
+    }
+    return ''
+  })
 
   const tabs = [
     { id: 'ask-ai', label: 'Ask AI' },
@@ -49,12 +62,18 @@ export default function AiDrawer({
           globalAiInstructions: parsed.globalAiInstructions || '',
           documentationStyle: parsed.documentationStyle || 'detailed',
           preferredTerminology: parsed.preferredTerminology || 'standard',
+          practiceName: parsed.practiceName || '',
         }
       }
     } catch (e) {
       // Ignore parse errors
     }
     return null
+  }
+
+  const handleLanguageChange = (value: string) => {
+    setHandoutLanguage(value)
+    localStorage.setItem('sevaro-handout-language', value)
   }
 
   const askAI = async () => {
@@ -141,6 +160,22 @@ Do NOT use medical jargon. Write as if explaining to the patient directly.`,
     setSummaryLoading(false)
   }
 
+  const getReadingLevelInstructions = (level: 'simple' | 'standard' | 'advanced') => {
+    switch (level) {
+      case 'simple':
+        return 'Write at a 5th grade reading level. Use short sentences and simple words. Avoid all medical jargon — explain everything in everyday language.'
+      case 'advanced':
+        return 'Write at a college reading level. Use full medical terminology and detailed clinical explanations. Assume the reader has health literacy.'
+      default:
+        return 'Write at an 8th grade reading level. Use some medical terms but always explain them in parentheses or plain language.'
+    }
+  }
+
+  const handleReadingLevelChange = (level: 'simple' | 'standard' | 'advanced') => {
+    setReadingLevel(level)
+    localStorage.setItem('sevaro-handout-reading-level', level)
+  }
+
   const generateHandout = async () => {
     if (!selectedCondition) return
 
@@ -174,6 +209,11 @@ Do NOT use medical jargon. Write as if explaining to the patient directly.`,
         ? selectedCondition.slice(3) // strip "dx:" prefix
         : conditionNames[selectedCondition] || selectedCondition
 
+      const readingInstructions = getReadingLevelInstructions(readingLevel)
+      const languageInstructions = handoutLanguage.trim()
+        ? `IMPORTANT: Write the entire handout in ${handoutLanguage.trim()}. All headings, content, and instructions must be in ${handoutLanguage.trim()}.`
+        : ''
+
       if (isDiagnosisBased) {
         // Diagnosis-based handout from this visit's selections
         question = `Create a patient education handout for ${resolvedConditionName}.
@@ -185,7 +225,8 @@ Format the handout with these sections:
 4. **When to Seek Help** - Warning signs to watch for
 5. **Helpful Tips** - 3-5 practical tips for managing the condition
 
-Use patient-friendly language. Avoid medical jargon. Keep it informative but not overwhelming.`
+Reading level instructions: ${readingInstructions}
+${languageInstructions}`
 
         context = {
           patient: patientName,
@@ -209,8 +250,10 @@ Format the handout with these sections:
 6. **Follow-Up** - Reminder about next steps
 
 Write this as if speaking directly to ${patientName}. Use "you" and "your" throughout.
-Keep the language simple and supportive. Avoid medical jargon.
-Make it feel personal and specific to their situation, not generic.`
+Make it feel personal and specific to their situation, not generic.
+
+Reading level instructions: ${readingInstructions}
+${languageInstructions}`
 
         context = {
           patient: patientName,
@@ -230,7 +273,8 @@ Format the handout with these sections:
 4. **When to Seek Help** - Warning signs to watch for
 5. **Helpful Tips** - 3-5 practical tips for managing the condition
 
-Use patient-friendly language. Avoid medical jargon. Keep it informative but not overwhelming.`
+Reading level instructions: ${readingInstructions}
+${languageInstructions}`
 
         context = {
           patient: patientName,
@@ -700,6 +744,79 @@ Use patient-friendly language. Avoid medical jargon. Keep it informative but not
                 </p>
               )}
 
+              {/* Reading Level Selector */}
+              <div style={{ marginBottom: '12px' }}>
+                <label style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '8px', display: 'block' }}>
+                  Reading Level
+                </label>
+                <div style={{
+                  display: 'flex',
+                  background: 'var(--bg-gray)',
+                  borderRadius: '8px',
+                  padding: '3px',
+                  gap: '2px',
+                }}>
+                  {([
+                    { value: 'simple' as const, label: 'Simple', desc: '5th grade' },
+                    { value: 'standard' as const, label: 'Standard', desc: '8th grade' },
+                    { value: 'advanced' as const, label: 'Advanced', desc: 'College' },
+                  ]).map(level => (
+                    <button
+                      key={level.value}
+                      onClick={() => handleReadingLevelChange(level.value)}
+                      style={{
+                        flex: 1,
+                        padding: '8px 4px',
+                        borderRadius: '6px',
+                        border: 'none',
+                        background: readingLevel === level.value ? 'var(--bg-white)' : 'transparent',
+                        boxShadow: readingLevel === level.value ? '0 1px 3px rgba(0,0,0,0.1)' : 'none',
+                        cursor: 'pointer',
+                        textAlign: 'center',
+                        transition: 'all 0.2s',
+                      }}
+                    >
+                      <div style={{
+                        fontSize: '13px',
+                        fontWeight: readingLevel === level.value ? 600 : 500,
+                        color: readingLevel === level.value ? 'var(--primary)' : 'var(--text-secondary)',
+                      }}>
+                        {level.label}
+                      </div>
+                      <div style={{
+                        fontSize: '10px',
+                        color: readingLevel === level.value ? 'var(--primary)' : 'var(--text-muted)',
+                        marginTop: '2px',
+                      }}>
+                        {level.desc}
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Language Selection */}
+              <div style={{ marginBottom: '12px' }}>
+                <label style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '6px', display: 'block' }}>
+                  Language
+                </label>
+                <input
+                  type="text"
+                  value={handoutLanguage}
+                  onChange={(e) => handleLanguageChange(e.target.value)}
+                  placeholder="Leave blank for English"
+                  style={{
+                    width: '100%',
+                    padding: '8px 12px',
+                    border: '1px solid var(--border)',
+                    borderRadius: '8px',
+                    fontSize: '13px',
+                    background: 'var(--bg-white)',
+                    color: 'var(--text-primary)',
+                  }}
+                />
+              </div>
+
               <button
                 onClick={generateHandout}
                 disabled={handoutLoading || !selectedCondition}
@@ -737,77 +854,115 @@ Use patient-friendly language. Avoid medical jargon. Keep it informative but not
                 </div>
               )}
 
-              {handoutResult && !handoutLoading && (
-                <div style={{
-                  marginTop: '16px',
-                  background: 'var(--ai-response-bg, linear-gradient(135deg, #F0FDFA 0%, #ECFDF5 100%))',
-                  borderLeft: '3px solid var(--primary)',
-                  borderRadius: '8px',
-                  padding: '16px',
-                }}>
-                  <div style={{ fontSize: '13px', color: 'var(--text-primary)', whiteSpace: 'pre-wrap', lineHeight: 1.6 }}>
-                    {handoutResult}
-                  </div>
-                  <div style={{
-                    marginTop: '12px',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '8px',
-                    flexWrap: 'wrap',
-                  }}>
-                    <span style={{
-                      fontSize: '11px',
-                      padding: '2px 8px',
-                      borderRadius: '4px',
-                      background: 'var(--ai-badge-bg, #D1FAE5)',
-                      color: 'var(--ai-badge-text, #059669)',
+              {handoutResult && !handoutLoading && (() => {
+                const practiceName = getUserSettings()?.practiceName || ''
+                return (
+                  <>
+                    <div style={{
+                      marginTop: '16px',
+                      background: 'var(--ai-response-bg, linear-gradient(135deg, #F0FDFA 0%, #ECFDF5 100%))',
+                      borderLeft: '3px solid var(--primary)',
+                      borderRadius: '8px',
+                      padding: '16px',
                     }}>
-                      AI Generated
-                    </span>
-                    <button
-                      onClick={() => copyToClipboard(handoutResult)}
-                      style={{
-                        marginLeft: 'auto',
-                        padding: '4px 12px',
-                        fontSize: '12px',
-                        border: '1px solid var(--border)',
-                        borderRadius: '4px',
-                        background: 'var(--bg-white)',
-                        color: 'var(--text-secondary)',
-                        cursor: 'pointer',
+                      {practiceName && (
+                        <div style={{
+                          textAlign: 'center',
+                          marginBottom: '12px',
+                          paddingBottom: '12px',
+                          borderBottom: '1px solid var(--border)',
+                        }}>
+                          <div style={{ fontSize: '15px', fontWeight: 700, color: 'var(--text-primary)' }}>
+                            {practiceName}
+                          </div>
+                          <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '2px' }}>
+                            Patient Education Handout
+                          </div>
+                        </div>
+                      )}
+                      <div style={{ fontSize: '13px', color: 'var(--text-primary)', whiteSpace: 'pre-wrap', lineHeight: 1.6 }}>
+                        {handoutResult}
+                      </div>
+                      <div style={{
+                        marginTop: '12px',
                         display: 'flex',
                         alignItems: 'center',
-                        gap: '4px',
-                      }}
-                    >
-                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                        <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/>
-                      </svg>
-                      Copy
-                    </button>
-                    <button
-                      style={{
-                        padding: '4px 12px',
-                        fontSize: '12px',
-                        border: '1px solid var(--border)',
-                        borderRadius: '4px',
-                        background: 'var(--bg-white)',
-                        color: 'var(--text-secondary)',
-                        cursor: 'pointer',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '4px',
-                      }}
-                      onClick={() => window.print()}
-                    >
-                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                        <polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 01-2-2v-5a2 2 0 012-2h16a2 2 0 012 2v5a2 2 0 01-2 2h-2"/><rect x="6" y="14" width="12" height="8"/>
-                      </svg>
-                      Print
-                    </button>
-                  </div>
-                </div>
-              )}
+                        gap: '8px',
+                        flexWrap: 'wrap',
+                      }} data-no-print>
+                        <span style={{
+                          fontSize: '11px',
+                          padding: '2px 8px',
+                          borderRadius: '4px',
+                          background: 'var(--ai-badge-bg, #D1FAE5)',
+                          color: 'var(--ai-badge-text, #059669)',
+                        }}>
+                          AI Generated
+                        </span>
+                        <button
+                          onClick={() => copyToClipboard(handoutResult)}
+                          style={{
+                            marginLeft: 'auto',
+                            padding: '4px 12px',
+                            fontSize: '12px',
+                            border: '1px solid var(--border)',
+                            borderRadius: '4px',
+                            background: 'var(--bg-white)',
+                            color: 'var(--text-secondary)',
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '4px',
+                          }}
+                        >
+                          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                            <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/>
+                          </svg>
+                          Copy
+                        </button>
+                        <button
+                          style={{
+                            padding: '4px 12px',
+                            fontSize: '12px',
+                            border: '1px solid var(--border)',
+                            borderRadius: '4px',
+                            background: 'var(--bg-white)',
+                            color: 'var(--text-secondary)',
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '4px',
+                          }}
+                          onClick={() => {
+                            const printWrapper = document.getElementById('handout-print-wrapper')
+                            if (printWrapper) {
+                              printWrapper.innerHTML = `
+                                <div class="handout-print-header">
+                                  ${practiceName ? `<div class="handout-print-practice">${practiceName}</div>` : ''}
+                                  <div class="handout-print-subtitle">Patient Education Handout</div>
+                                </div>
+                                <div class="handout-print-content">${handoutResult.replace(/\n/g, '<br/>')}</div>
+                                <div class="handout-print-footer">
+                                  <span>${new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}</span>
+                                  ${practiceName ? `<span>${practiceName}</span>` : ''}
+                                </div>
+                              `
+                            }
+                            window.print()
+                          }}
+                        >
+                          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                            <polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 01-2-2v-5a2 2 0 012-2h16a2 2 0 012 2v5a2 2 0 01-2 2h-2"/><rect x="6" y="14" width="12" height="8"/>
+                          </svg>
+                          Print
+                        </button>
+                      </div>
+                    </div>
+                    {/* Hidden print wrapper */}
+                    <div id="handout-print-wrapper" className="handout-print-wrapper" />
+                  </>
+                )
+              })()}
             </div>
           )}
         </div>

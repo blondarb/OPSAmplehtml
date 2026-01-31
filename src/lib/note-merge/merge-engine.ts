@@ -629,6 +629,28 @@ export function generateFormattedNote(
     })
   }
 
+  // Vital Signs
+  if (data.manualData.vitals) {
+    const v = data.manualData.vitals
+    const parts: string[] = []
+    if (v.bp) parts.push(`BP: ${v.bp}`)
+    if (v.hr) parts.push(`HR: ${v.hr}`)
+    if (v.temp) parts.push(`Temp: ${v.temp}`)
+    if (v.weight) parts.push(`Weight: ${v.weight}`)
+    if (v.bmi) parts.push(`BMI: ${v.bmi}`)
+    if (parts.length > 0) {
+      sections.push({
+        id: 'vitals',
+        title: 'Vital Signs',
+        content: parts.join(' | '),
+        source: 'manual',
+        isVerified: false,
+        isEditable: true,
+        order: order++,
+      })
+    }
+  }
+
   // Physical Examination
   let examContent = mergedNote.physicalExam.content || ''
   if (data.examFindings && Object.keys(data.examFindings).length > 0) {

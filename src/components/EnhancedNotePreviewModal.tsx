@@ -18,6 +18,14 @@ import type {
   ContentSource,
 } from '@/lib/note-merge/types'
 
+// Note review suggestion type
+interface NoteReviewSuggestion {
+  type: 'consistency' | 'completeness' | 'quality'
+  message: string
+  sectionId: string
+  severity: 'warning' | 'info'
+}
+
 // Get user settings from localStorage
 function getUserSettings() {
   if (typeof window === 'undefined') return null
@@ -76,6 +84,7 @@ export default function EnhancedNotePreviewModal({
   // AI synthesis state
   const [isSynthesizing, setIsSynthesizing] = useState(false)
   const [hasSynthesized, setHasSynthesized] = useState(false)
+  const [synthesisJustCompleted, setSynthesisJustCompleted] = useState(false)
 
   // Editing state
   const [editingSection, setEditingSection] = useState<string | null>(null)
@@ -109,6 +118,21 @@ export default function EnhancedNotePreviewModal({
 
   // Copy state
   const [copySuccess, setCopySuccess] = useState(false)
+
+  // Note review (Suggested Improvements) state
+  const [suggestions, setSuggestions] = useState<NoteReviewSuggestion[]>([])
+  const [isReviewing, setIsReviewing] = useState(false)
+  const [reviewError, setReviewError] = useState<string | null>(null)
+  const [suggestionsCollapsed, setSuggestionsCollapsed] = useState(false)
+  const [dismissedSuggestions, setDismissedSuggestions] = useState<Set<number>>(new Set())
+  const [highlightedSection, setHighlightedSection] = useState<string | null>(null)
+  const sectionRefs = useRef<Record<string, HTMLDivElement | null>>({})
+
+  // Ask AI About This Note state
+  const [askQuestion, setAskQuestion] = useState('')
+  const [isAskingAI, setIsAskingAI] = useState(false)
+  const [askHistory, setAskHistory] = useState<Array<{ question: string; answer: string }>>([])
+  const askEndRef = useRef<HTMLDivElement>(null)
 
   // Build preferences object
   const preferences: NotePreferences = useMemo(() => ({
@@ -190,6 +214,8 @@ export default function EnhancedNotePreviewModal({
         })
 
         setHasSynthesized(true)
+        // Auto-trigger note review after synthesis
+        setSynthesisJustCompleted(true)
       }
     } catch (error) {
       console.error('Error synthesizing note:', error)
@@ -198,6 +224,112 @@ export default function EnhancedNotePreviewModal({
       setIsSynthesizing(false)
     }
   }, [noteData, noteType, noteLength, includeImaging, includeRecommendations, isSynthesizing])
+
+  // Review note with AI for suggestions
+  const reviewNote = useCallback(async () => {
+    if (!formattedNote || isReviewing) return
+
+    setIsReviewing(true)
+    setReviewError(null)
+    setDismissedSuggestions(new Set())
+
+    try {
+      const sections = formattedNote.sections
+        .filter(s => s.content)
+        .map(s => ({ id: s.id, title: s.title, content: s.content }))
+
+      const diagnoses = noteData.diagnoses?.map((d: { name?: string }) => d.name).filter(Boolean) || []
+
+      const response = await fetch('/api/ai/note-review', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sections, noteType, diagnoses }),
+      })
+
+      const data = await response.json()
+
+      if (data.error) {
+        setReviewError(data.error)
+        return
+      }
+
+      setSuggestions(data.suggestions || [])
+      setSuggestionsCollapsed(false)
+    } catch (error) {
+      console.error('Error reviewing note:', error)
+      setReviewError('Failed to review note')
+    } finally {
+      setIsReviewing(false)
+    }
+  }, [formattedNote, noteType, noteData, isReviewing])
+
+  // Ask AI about this note
+  const askAboutNote = useCallback(async (question?: string) => {
+    const q = question || askQuestion.trim()
+    if (!q || isAskingAI || !formattedNote) return
+
+    setIsAskingAI(true)
+    setAskQuestion('')
+
+    try {
+      const fullNoteText = formattedNote.sections
+        .sort((a, b) => a.order - b.order)
+        .filter(s => s.content)
+        .map(s => `${s.title.toUpperCase()}:\n${s.content}`)
+        .join('\n\n')
+
+      const userSettings = getUserSettings()
+
+      const response = await fetch('/api/ai/ask', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          question: q,
+          context: {
+            patient: noteData.patient?.name || 'Current patient',
+            chiefComplaint: noteData.manualData?.chiefComplaint || '',
+            hpi: noteData.manualData?.hpi || '',
+            fullNoteText,
+          },
+          userSettings,
+        }),
+      })
+
+      const data = await response.json()
+
+      setAskHistory(prev => [...prev, {
+        question: q,
+        answer: data.response || data.error || 'No response',
+      }])
+
+      // Scroll to bottom of conversation
+      setTimeout(() => askEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 100)
+    } catch (error) {
+      console.error('Error asking AI:', error)
+      setAskHistory(prev => [...prev, {
+        question: q,
+        answer: 'Failed to get AI response. Please try again.',
+      }])
+    } finally {
+      setIsAskingAI(false)
+    }
+  }, [askQuestion, isAskingAI, formattedNote, noteData])
+
+  // Auto-run review after synthesis completes
+  useEffect(() => {
+    if (synthesisJustCompleted) {
+      setSynthesisJustCompleted(false)
+      reviewNote()
+    }
+  }, [synthesisJustCompleted, reviewNote])
+
+  // Clear section highlight after delay
+  useEffect(() => {
+    if (highlightedSection) {
+      const timer = setTimeout(() => setHighlightedSection(null), 2000)
+      return () => clearTimeout(timer)
+    }
+  }, [highlightedSection])
 
   // Generate note when modal opens or preferences change
   useEffect(() => {
@@ -222,6 +354,17 @@ export default function EnhancedNotePreviewModal({
         setViewMode('review')
         setEditingSection(null)
         setCopySuccess(false)
+        // Reset note review and ask AI state
+        setSuggestions([])
+        setIsReviewing(false)
+        setReviewError(null)
+        setSuggestionsCollapsed(false)
+        setDismissedSuggestions(new Set())
+        setHighlightedSection(null)
+        setAskQuestion('')
+        setIsAskingAI(false)
+        setAskHistory([])
+        setSynthesisJustCompleted(false)
       } catch (error) {
         console.error('Error generating note:', error)
         setGenerationError(error instanceof Error ? error.message : 'Failed to generate note')
@@ -386,6 +529,359 @@ export default function EnhancedNotePreviewModal({
   const verifiedCount = formattedNote.sections.filter(s => s.isVerified).length
   const totalSections = formattedNote.sections.length
 
+  const handleScrollToSection = (sectionId: string) => {
+    const el = sectionRefs.current[sectionId]
+    if (el) {
+      el.scrollIntoView({ behavior: 'smooth', block: 'center' })
+      setHighlightedSection(sectionId)
+    }
+  }
+
+  const handleDismissSuggestion = (index: number) => {
+    setDismissedSuggestions(prev => new Set(prev).add(index))
+  }
+
+  const visibleSuggestions = suggestions.filter((_, i) => !dismissedSuggestions.has(i))
+
+  const renderSuggestionsPanel = () => {
+    const hasRun = suggestions.length > 0 || reviewError || isReviewing
+    const isEmpty = !isReviewing && !reviewError && suggestions.length === 0 && hasRun
+
+    return (
+      <div style={{
+        marginTop: '16px',
+        border: '1px solid var(--border)',
+        borderRadius: '8px',
+        overflow: 'hidden',
+      }}>
+        {/* Header */}
+        <button
+          onClick={() => setSuggestionsCollapsed(!suggestionsCollapsed)}
+          style={{
+            width: '100%',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            padding: '12px 16px',
+            background: 'var(--bg-gray)',
+            border: 'none',
+            cursor: 'pointer',
+            gap: '8px',
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            {/* Sparkle icon */}
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="#0D9488">
+              <path d="M12 0L14.59 9.41L24 12L14.59 14.59L12 24L9.41 14.59L0 12L9.41 9.41L12 0Z" />
+            </svg>
+            <span style={{ fontWeight: 600, fontSize: '13px', color: 'var(--text-primary)' }}>
+              Note Review
+            </span>
+            {visibleSuggestions.length > 0 && (
+              <span style={{
+                background: '#F59E0B',
+                color: 'white',
+                borderRadius: '10px',
+                padding: '1px 8px',
+                fontSize: '11px',
+                fontWeight: 600,
+              }}>
+                {visibleSuggestions.length}
+              </span>
+            )}
+            {isEmpty && (
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#10B981" strokeWidth="2">
+                <path d="M22 11.08V12a10 10 0 11-5.93-9.14" />
+                <polyline points="22 4 12 14.01 9 11.01" />
+              </svg>
+            )}
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            {!isReviewing && (
+              <span
+                onClick={(e) => {
+                  e.stopPropagation()
+                  reviewNote()
+                }}
+                style={{
+                  padding: '4px 12px',
+                  borderRadius: '6px',
+                  background: '#0D9488',
+                  color: 'white',
+                  fontSize: '11px',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                }}
+              >
+                Check Note
+              </span>
+            )}
+            <svg
+              width="16"
+              height="16"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="var(--text-muted)"
+              strokeWidth="2"
+              style={{ transform: suggestionsCollapsed ? 'rotate(-90deg)' : 'rotate(0deg)', transition: 'transform 0.2s' }}
+            >
+              <polyline points="6 9 12 15 18 9" />
+            </svg>
+          </div>
+        </button>
+
+        {/* Body */}
+        {!suggestionsCollapsed && (
+          <div style={{ padding: '12px 16px' }}>
+            {isReviewing && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 0', color: 'var(--text-secondary)', fontSize: '13px' }}>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ animation: 'spin 1s linear infinite' }}>
+                  <path d="M21 12a9 9 0 11-6.219-8.56" />
+                </svg>
+                Analyzing note for suggestions...
+              </div>
+            )}
+
+            {reviewError && (
+              <div style={{ padding: '8px 12px', borderRadius: '6px', background: '#FEE2E2', color: '#DC2626', fontSize: '13px' }}>
+                {reviewError}
+              </div>
+            )}
+
+            {isEmpty && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 0', color: '#10B981', fontSize: '13px' }}>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M22 11.08V12a10 10 0 11-5.93-9.14" />
+                  <polyline points="22 4 12 14.01 9 11.01" />
+                </svg>
+                No issues found — note looks good.
+              </div>
+            )}
+
+            {!hasRun && !isReviewing && (
+              <div style={{ padding: '8px 0', color: 'var(--text-muted)', fontSize: '13px', fontStyle: 'italic' }}>
+                Click &quot;Check Note&quot; to get AI-powered documentation suggestions.
+              </div>
+            )}
+
+            {visibleSuggestions.map((suggestion, idx) => {
+              const originalIdx = suggestions.indexOf(suggestion)
+              const borderColor = suggestion.severity === 'warning' ? '#F59E0B' : '#0D9488'
+              const typeBg = suggestion.type === 'consistency' ? '#FEF3C7' : suggestion.type === 'completeness' ? '#DBEAFE' : '#F0FDF4'
+              const typeColor = suggestion.type === 'consistency' ? '#D97706' : suggestion.type === 'completeness' ? '#2563EB' : '#15803D'
+              const sectionName = formattedNote?.sections.find(s => s.id === suggestion.sectionId)?.title
+
+              return (
+                <div
+                  key={idx}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'flex-start',
+                    gap: '12px',
+                    padding: '10px 12px',
+                    marginBottom: '8px',
+                    borderLeft: `3px solid ${borderColor}`,
+                    borderRadius: '0 6px 6px 0',
+                    background: 'var(--bg-white)',
+                  }}
+                >
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
+                      <span style={{
+                        padding: '1px 6px',
+                        borderRadius: '4px',
+                        fontSize: '10px',
+                        fontWeight: 600,
+                        background: typeBg,
+                        color: typeColor,
+                        textTransform: 'capitalize',
+                      }}>
+                        {suggestion.type}
+                      </span>
+                      {sectionName && (
+                        <button
+                          onClick={() => handleScrollToSection(suggestion.sectionId)}
+                          style={{
+                            border: 'none',
+                            background: 'none',
+                            padding: 0,
+                            cursor: 'pointer',
+                            fontSize: '11px',
+                            color: '#0D9488',
+                            fontWeight: 500,
+                            textDecoration: 'underline',
+                          }}
+                        >
+                          Go to {sectionName}
+                        </button>
+                      )}
+                    </div>
+                    <p style={{ margin: 0, fontSize: '13px', color: 'var(--text-primary)', lineHeight: 1.4 }}>
+                      {suggestion.message}
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => handleDismissSuggestion(originalIdx)}
+                    style={{
+                      border: 'none',
+                      background: 'none',
+                      cursor: 'pointer',
+                      padding: '2px',
+                      color: 'var(--text-muted)',
+                      flexShrink: 0,
+                    }}
+                    title="Dismiss"
+                  >
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <path d="M18 6L6 18M6 6l12 12" />
+                    </svg>
+                  </button>
+                </div>
+              )
+            })}
+          </div>
+        )}
+      </div>
+    )
+  }
+
+  const SUGGESTED_QUESTIONS = [
+    'Is the assessment consistent with the HPI?',
+    'What billing codes does this note support?',
+    'Does the plan address all diagnoses?',
+    'Summarize this note in 2 sentences',
+  ]
+
+  const renderAskConversation = () => {
+    if (askHistory.length === 0) return null
+
+    return (
+      <div style={{ marginTop: '16px' }}>
+        {askHistory.map((entry, idx) => (
+          <div key={idx} style={{ marginBottom: '12px' }}>
+            {/* Question bubble - right aligned */}
+            <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '8px' }}>
+              <div style={{
+                maxWidth: '80%',
+                padding: '8px 12px',
+                borderRadius: '12px 12px 2px 12px',
+                background: '#0D9488',
+                color: 'white',
+                fontSize: '13px',
+                lineHeight: 1.4,
+              }}>
+                {entry.question}
+              </div>
+            </div>
+            {/* Answer bubble - left aligned */}
+            <div style={{ display: 'flex', justifyContent: 'flex-start' }}>
+              <div style={{
+                maxWidth: '80%',
+                padding: '8px 12px',
+                borderRadius: '12px 12px 12px 2px',
+                background: 'var(--bg-gray)',
+                borderLeft: '3px solid #0D9488',
+                fontSize: '13px',
+                lineHeight: 1.5,
+                color: 'var(--text-primary)',
+                whiteSpace: 'pre-wrap',
+              }}>
+                {entry.answer}
+              </div>
+            </div>
+          </div>
+        ))}
+        <div ref={askEndRef} />
+      </div>
+    )
+  }
+
+  const renderAskInputBar = () => (
+    <div style={{
+      padding: '12px 24px',
+      borderTop: '1px solid var(--border)',
+      background: 'var(--bg-white)',
+    }}>
+      {/* Suggested question pills (only shown when no history) */}
+      {askHistory.length === 0 && (
+        <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginBottom: '8px' }}>
+          {SUGGESTED_QUESTIONS.map((q, idx) => (
+            <button
+              key={idx}
+              onClick={() => askAboutNote(q)}
+              disabled={isAskingAI}
+              style={{
+                padding: '4px 10px',
+                borderRadius: '16px',
+                border: '1px solid var(--border)',
+                background: 'var(--bg-gray)',
+                color: 'var(--text-secondary)',
+                fontSize: '11px',
+                cursor: isAskingAI ? 'not-allowed' : 'pointer',
+                whiteSpace: 'nowrap',
+                opacity: isAskingAI ? 0.5 : 1,
+              }}
+            >
+              {q}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {/* Input row */}
+      <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="#0D9488" style={{ flexShrink: 0 }}>
+          <path d="M12 0L14.59 9.41L24 12L14.59 14.59L12 24L9.41 14.59L0 12L9.41 9.41L12 0Z" />
+        </svg>
+        <input
+          type="text"
+          value={askQuestion}
+          onChange={(e) => setAskQuestion(e.target.value)}
+          onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); askAboutNote() } }}
+          placeholder="Ask about this note..."
+          disabled={isAskingAI}
+          style={{
+            flex: 1,
+            padding: '8px 12px',
+            borderRadius: '8px',
+            border: '1px solid var(--border)',
+            fontSize: '13px',
+            background: 'var(--bg-white)',
+            color: 'var(--text-primary)',
+            outline: 'none',
+          }}
+        />
+        <button
+          onClick={() => askAboutNote()}
+          disabled={!askQuestion.trim() || isAskingAI}
+          style={{
+            width: '32px',
+            height: '32px',
+            borderRadius: '8px',
+            border: 'none',
+            background: askQuestion.trim() && !isAskingAI ? '#0D9488' : 'var(--bg-gray)',
+            cursor: askQuestion.trim() && !isAskingAI ? 'pointer' : 'not-allowed',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            flexShrink: 0,
+          }}
+        >
+          {isAskingAI ? (
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--text-muted)" strokeWidth="2" style={{ animation: 'spin 1s linear infinite' }}>
+              <path d="M21 12a9 9 0 11-6.219-8.56" />
+            </svg>
+          ) : (
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={askQuestion.trim() ? 'white' : 'var(--text-muted)'} strokeWidth="2">
+              <line x1="22" y1="2" x2="11" y2="13" />
+              <polygon points="22 2 15 22 11 13 2 9 22 2" />
+            </svg>
+          )}
+        </button>
+      </div>
+    </div>
+  )
+
   const renderSourceBadge = (source: ContentSource) => {
     const config = SOURCE_COLORS[source] || SOURCE_COLORS.manual
     return (
@@ -407,13 +903,18 @@ export default function EnhancedNotePreviewModal({
     const isRequired = ['chiefComplaint', 'hpi', 'physicalExam', 'assessment', 'plan'].includes(section.id)
 
     return (
-      <div key={section.id} style={{
-        marginBottom: '16px',
-        padding: '16px',
-        background: 'var(--bg-gray)',
-        borderRadius: '8px',
-        border: `1px solid ${section.isVerified ? '#10B981' : 'var(--border)'}`,
-      }}>
+      <div
+        key={section.id}
+        ref={(el) => { sectionRefs.current[section.id] = el }}
+        style={{
+          marginBottom: '16px',
+          padding: '16px',
+          background: 'var(--bg-gray)',
+          borderRadius: '8px',
+          border: `1px solid ${highlightedSection === section.id ? '#0D9488' : section.isVerified ? '#10B981' : 'var(--border)'}`,
+          transition: 'border-color 0.3s ease, box-shadow 0.3s ease',
+          boxShadow: highlightedSection === section.id ? '0 0 0 2px rgba(13, 148, 136, 0.3)' : 'none',
+        }}>
         {/* Header */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
@@ -954,11 +1455,20 @@ export default function EnhancedNotePreviewModal({
               {formattedNote.sections
                 .sort((a, b) => a.order - b.order)
                 .map(section => renderSection(section))}
+
+              {/* Suggestions Panel */}
+              {renderSuggestionsPanel()}
             </>
           ) : (
             renderFinalNoteView()
           )}
+
+          {/* Ask AI Conversation History */}
+          {renderAskConversation()}
         </div>
+
+        {/* Ask AI Input Bar */}
+        {renderAskInputBar()}
 
         {/* Footer */}
         <div style={{

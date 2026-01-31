@@ -78,7 +78,8 @@ export interface ManualNoteData {
   allergyDetails?: string
   historyAvailable?: string
   historyDetails?: string
-  [key: string]: string | string[] | undefined
+  vitals?: { bp?: string; hr?: string; temp?: string; weight?: string; bmi?: string }
+  [key: string]: string | string[] | { bp?: string; hr?: string; temp?: string; weight?: string; bmi?: string } | undefined
 }
 
 export interface MergeOptions {
