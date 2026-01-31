@@ -238,7 +238,7 @@ export default function LeftSidebar({ patient, priorVisits, scoreHistory, patien
             </svg>
           </div>
           <div style={{ flex: 1 }}>
-            <h3 style={{ fontSize: '15px', fontWeight: 600, color: 'var(--text-primary)' }}>Marshall</h3>
+            <h3 style={{ fontSize: '15px', fontWeight: 600, color: 'var(--text-primary)' }}>Meridian Neurology</h3>
             <p style={{
               fontSize: '13px',
               color: 'var(--text-secondary)',

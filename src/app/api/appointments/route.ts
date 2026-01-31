@@ -136,7 +136,7 @@ export async function POST(request: NextRequest) {
       appointmentTime,
       durationMinutes = 30,
       appointmentType,
-      hospitalSite = 'Main Campus',
+      hospitalSite = 'Meridian Neurology',
       reasonForVisit,
       priorVisitId,
       schedulingNotes,

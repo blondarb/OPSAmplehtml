@@ -40,7 +40,7 @@ export interface Appointment {
 }
 
 // Filter options
-const HOSPITAL_SITES = ['All', 'Main Campus', 'New Media', 'CHH', 'Outpatient Center']
+const HOSPITAL_SITES = ['All', 'Meridian Neurology', 'New Media', 'CHH', 'Outpatient Center']
 const STATUSES = ['All', 'Scheduled', 'Confirmed', 'In-Progress', 'Completed', 'Cancelled']
 const APPOINTMENT_TYPES = ['All', 'new-consult', 'next-day', 'follow-up', '3-month-follow-up', '6-month-follow-up', '12-month-follow-up']
 

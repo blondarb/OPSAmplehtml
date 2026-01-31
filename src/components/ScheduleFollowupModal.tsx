@@ -39,7 +39,7 @@ const DURATIONS = [
 ]
 
 const HOSPITAL_SITES = [
-  'Main Campus',
+  'Meridian Neurology',
   'New Media',
   'CHH',
   'Outpatient Center',
@@ -65,7 +65,7 @@ export default function ScheduleFollowupModal({
   })
   const [appointmentTime, setAppointmentTime] = useState('09:00')
   const [duration, setDuration] = useState(30)
-  const [hospitalSite, setHospitalSite] = useState('Main Campus')
+  const [hospitalSite, setHospitalSite] = useState('Meridian Neurology')
   const [notes, setNotes] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
 
