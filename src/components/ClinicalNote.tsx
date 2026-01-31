@@ -25,6 +25,7 @@ import {
   type ImagingStudyEntry,
   type RecommendationItem,
 } from '@/lib/note-merge'
+import type { PatientMedication, PatientAllergy } from '@/lib/medicationTypes'
 import type { User } from '@supabase/supabase-js'
 
 interface ClinicalNoteProps {
@@ -209,6 +210,10 @@ export default function ClinicalNote({
   const [scheduleNewPatientOpen, setScheduleNewPatientOpen] = useState(false)
   const [demoHint, setDemoHint] = useState<string | null>(null)
   const [appointmentsRefreshKey, setAppointmentsRefreshKey] = useState(0)
+
+  // Structured medication and allergy data
+  const [medications, setMedications] = useState<PatientMedication[]>([])
+  const [allergies, setAllergies] = useState<PatientAllergy[]>([])
 
   // Additional data for comprehensive note generation
   const [completedScales, setCompletedScales] = useState<ScaleResult[]>([])
@@ -726,6 +731,8 @@ export default function ClinicalNote({
         setExamSectionNotes({})
         setSelectedRecommendations([])
 
+        // Medications/allergies will be re-fetched via the useEffect on patient.id change
+
         // Now check for localStorage autosave for THIS patient and merge it
         // This preserves any chart prep work done before seeing the patient
         const newAutosaveKey = `sevaro-autosave-${appointment.patient.id}-${visit.id}`
@@ -842,6 +849,133 @@ export default function ClinicalNote({
       assessment: so.chief_complaint ? `${so.chief_complaint}\n${prev.assessment || ''}`.trim() : prev.assessment,
     }))
   }
+
+  // Fetch medications and allergies when patient changes
+  useEffect(() => {
+    if (!patient?.id) return
+    const fetchMedsAndAllergies = async () => {
+      try {
+        const [medsRes, allergiesRes] = await Promise.all([
+          fetch(`/api/medications?patient_id=${patient.id}`),
+          fetch(`/api/allergies?patient_id=${patient.id}`),
+        ])
+        if (medsRes.ok) {
+          const medsData = await medsRes.json()
+          setMedications(medsData.medications || [])
+        }
+        if (allergiesRes.ok) {
+          const allergiesData = await allergiesRes.json()
+          setAllergies(allergiesData.allergies || [])
+        }
+      } catch (e) {
+        console.error('Failed to fetch medications/allergies:', e)
+      }
+    }
+    fetchMedsAndAllergies()
+  }, [patient?.id])
+
+  // Medication handlers
+  const handleAddMedication = useCallback(async (input: any) => {
+    try {
+      const res = await fetch('/api/medications', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ...input, patient_id: patient?.id }),
+      })
+      if (res.ok) {
+        const { medication } = await res.json()
+        setMedications(prev => [medication, ...prev])
+        return medication
+      }
+    } catch (e) {
+      console.error('Failed to add medication:', e)
+    }
+    return null
+  }, [patient?.id])
+
+  const handleUpdateMedication = useCallback(async (id: string, updates: any) => {
+    try {
+      const res = await fetch(`/api/medications/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(updates),
+      })
+      if (res.ok) {
+        const { medication } = await res.json()
+        setMedications(prev => prev.map(m => m.id === id ? medication : m))
+        return medication
+      }
+    } catch (e) {
+      console.error('Failed to update medication:', e)
+    }
+    return null
+  }, [])
+
+  const handleDiscontinueMedication = useCallback(async (id: string, reason?: string) => {
+    return handleUpdateMedication(id, {
+      status: 'discontinued',
+      discontinue_reason: reason || undefined,
+    })
+  }, [handleUpdateMedication])
+
+  const handleDeleteMedication = useCallback(async (id: string) => {
+    try {
+      const res = await fetch(`/api/medications/${id}`, { method: 'DELETE' })
+      if (res.ok) {
+        setMedications(prev => prev.filter(m => m.id !== id))
+      }
+    } catch (e) {
+      console.error('Failed to delete medication:', e)
+    }
+  }, [])
+
+  // Allergy handlers
+  const handleAddAllergy = useCallback(async (input: any) => {
+    try {
+      const res = await fetch('/api/allergies', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ...input, patient_id: patient?.id }),
+      })
+      if (res.ok) {
+        const { allergy } = await res.json()
+        setAllergies(prev => [allergy, ...prev])
+        return allergy
+      }
+    } catch (e) {
+      console.error('Failed to add allergy:', e)
+    }
+    return null
+  }, [patient?.id])
+
+  const handleUpdateAllergy = useCallback(async (id: string, updates: any) => {
+    try {
+      const res = await fetch(`/api/allergies/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(updates),
+      })
+      if (res.ok) {
+        const { allergy } = await res.json()
+        setAllergies(prev => prev.map(a => a.id === id ? allergy : a))
+        return allergy
+      }
+    } catch (e) {
+      console.error('Failed to update allergy:', e)
+    }
+    return null
+  }, [])
+
+  const handleRemoveAllergy = useCallback(async (id: string) => {
+    try {
+      const res = await fetch(`/api/allergies/${id}`, { method: 'DELETE' })
+      if (res.ok) {
+        setAllergies(prev => prev.filter(a => a.id !== id))
+      }
+    } catch (e) {
+      console.error('Failed to remove allergy:', e)
+    }
+  }, [])
 
   const openDotPhrases = (field?: string) => {
     if (field) setActiveTextField(field)
@@ -1088,6 +1222,8 @@ export default function ClinicalNote({
               onImportHistorian={handleImportHistorian}
               isOpen={mobileSidebarOpen}
               onClose={() => setMobileSidebarOpen(false)}
+              medications={medications}
+              allergies={allergies}
             />
 
             <CenterPanel
@@ -1115,6 +1251,15 @@ export default function ClinicalNote({
               onExamFindingsChange={handleExamFindingsChange}
               onPend={handlePend}
               onSignComplete={handleSignComplete}
+              medications={medications}
+              allergies={allergies}
+              onAddMedication={handleAddMedication}
+              onUpdateMedication={handleUpdateMedication}
+              onDiscontinueMedication={handleDiscontinueMedication}
+              onDeleteMedication={handleDeleteMedication}
+              onAddAllergy={handleAddAllergy}
+              onUpdateAllergy={handleUpdateAllergy}
+              onRemoveAllergy={handleRemoveAllergy}
             />
           </>
         )}

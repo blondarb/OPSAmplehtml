@@ -363,6 +363,160 @@ export interface Database {
           updated_at?: string
         }
       }
+      patient_medications: {
+        Row: {
+          id: string
+          patient_id: string
+          tenant_id: string
+          medication_name: string
+          generic_name: string | null
+          dosage: string | null
+          frequency: string | null
+          route: string
+          start_date: string | null
+          end_date: string | null
+          prescriber: string | null
+          indication: string | null
+          status: 'active' | 'discontinued' | 'held' | 'completed' | 'failed'
+          discontinue_reason: string | null
+          source: 'manual' | 'ai_historian' | 'ai_scribe' | 'import'
+          ai_confidence: number | null
+          confirmed_by_user: boolean
+          notes: string | null
+          is_active: boolean
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          patient_id: string
+          tenant_id?: string
+          medication_name: string
+          generic_name?: string | null
+          dosage?: string | null
+          frequency?: string | null
+          route?: string
+          start_date?: string | null
+          end_date?: string | null
+          prescriber?: string | null
+          indication?: string | null
+          status?: 'active' | 'discontinued' | 'held' | 'completed' | 'failed'
+          discontinue_reason?: string | null
+          source?: 'manual' | 'ai_historian' | 'ai_scribe' | 'import'
+          ai_confidence?: number | null
+          confirmed_by_user?: boolean
+          notes?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          patient_id?: string
+          tenant_id?: string
+          medication_name?: string
+          generic_name?: string | null
+          dosage?: string | null
+          frequency?: string | null
+          route?: string
+          start_date?: string | null
+          end_date?: string | null
+          prescriber?: string | null
+          indication?: string | null
+          status?: 'active' | 'discontinued' | 'held' | 'completed' | 'failed'
+          discontinue_reason?: string | null
+          source?: 'manual' | 'ai_historian' | 'ai_scribe' | 'import'
+          ai_confidence?: number | null
+          confirmed_by_user?: boolean
+          notes?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+      }
+      patient_allergies: {
+        Row: {
+          id: string
+          patient_id: string
+          tenant_id: string
+          allergen: string
+          allergen_type: 'drug' | 'food' | 'environmental' | 'other'
+          reaction: string | null
+          severity: 'mild' | 'moderate' | 'severe' | 'life-threatening' | 'unknown'
+          onset_date: string | null
+          source: 'manual' | 'ai_historian' | 'ai_scribe' | 'import'
+          confirmed_by_user: boolean
+          is_active: boolean
+          notes: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          patient_id: string
+          tenant_id?: string
+          allergen: string
+          allergen_type?: 'drug' | 'food' | 'environmental' | 'other'
+          reaction?: string | null
+          severity?: 'mild' | 'moderate' | 'severe' | 'life-threatening' | 'unknown'
+          onset_date?: string | null
+          source?: 'manual' | 'ai_historian' | 'ai_scribe' | 'import'
+          confirmed_by_user?: boolean
+          is_active?: boolean
+          notes?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          patient_id?: string
+          tenant_id?: string
+          allergen?: string
+          allergen_type?: 'drug' | 'food' | 'environmental' | 'other'
+          reaction?: string | null
+          severity?: 'mild' | 'moderate' | 'severe' | 'life-threatening' | 'unknown'
+          onset_date?: string | null
+          source?: 'manual' | 'ai_historian' | 'ai_scribe' | 'import'
+          confirmed_by_user?: boolean
+          is_active?: boolean
+          notes?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+      }
+      medication_reviews: {
+        Row: {
+          id: string
+          patient_id: string
+          visit_id: string | null
+          tenant_id: string
+          reviewed_by: string | null
+          review_type: 'reconciliation' | 'renewal' | 'initial'
+          changes_made: Json
+          notes: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          patient_id: string
+          visit_id?: string | null
+          tenant_id?: string
+          reviewed_by?: string | null
+          review_type?: 'reconciliation' | 'renewal' | 'initial'
+          changes_made?: Json
+          notes?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          patient_id?: string
+          visit_id?: string | null
+          tenant_id?: string
+          reviewed_by?: string | null
+          review_type?: 'reconciliation' | 'renewal' | 'initial'
+          changes_made?: Json
+          notes?: string | null
+          created_at?: string
+        }
+      }
       dot_phrases: {
         Row: {
           id: string
