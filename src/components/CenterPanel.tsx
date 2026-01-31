@@ -9,6 +9,8 @@ import DifferentialDiagnosisSection from './DifferentialDiagnosisSection'
 import ImagingResultsTab from './ImagingResultsTab'
 import SmartRecommendationsSection from './SmartRecommendationsSection'
 import type { Diagnosis } from '@/lib/diagnosisData'
+import type { PatientMedication, PatientAllergy, AllergySeverity, AllergenType, FormularyItem } from '@/lib/medicationTypes'
+import { searchFormulary } from '@/lib/neuroFormulary'
 
 // Default tab configuration
 const DEFAULT_TABS = [
@@ -40,6 +42,15 @@ interface CenterPanelProps {
   onExamFindingsChange?: (findings: Record<string, boolean>, notes: Record<string, string>) => void
   onPend?: () => Promise<void>
   onSignComplete?: () => Promise<void>
+  medications?: PatientMedication[]
+  allergies?: PatientAllergy[]
+  onAddMedication?: (input: any) => Promise<any>
+  onUpdateMedication?: (id: string, updates: any) => Promise<any>
+  onDiscontinueMedication?: (id: string, reason?: string) => Promise<any>
+  onDeleteMedication?: (id: string) => Promise<void>
+  onAddAllergy?: (input: any) => Promise<any>
+  onUpdateAllergy?: (id: string, updates: any) => Promise<any>
+  onRemoveAllergy?: (id: string) => Promise<void>
 }
 
 const ALLERGY_OPTIONS = ['NKDA', 'Reviewed in EMR', 'Unknown', 'Other']
@@ -68,10 +79,32 @@ export default function CenterPanel({
   onExamFindingsChange,
   onPend,
   onSignComplete,
+  medications = [],
+  allergies = [],
+  onAddMedication,
+  onUpdateMedication,
+  onDiscontinueMedication,
+  onDeleteMedication,
+  onAddAllergy,
+  onUpdateAllergy,
+  onRemoveAllergy,
 }: CenterPanelProps) {
   const [activeTab, setActiveTab] = useState('history')
   const [localActiveField, setLocalActiveField] = useState<string | null>(null)
   const [generatingAssessment, setGeneratingAssessment] = useState(false)
+
+  // Medication form state
+  const [showMedForm, setShowMedForm] = useState(false)
+  const [medFormData, setMedFormData] = useState({ medication_name: '', dosage: '', frequency: '', route: 'PO', prescriber: '', indication: '', start_date: '' })
+  const [medSearchResults, setMedSearchResults] = useState<FormularyItem[]>([])
+  const [showMedSearch, setShowMedSearch] = useState(false)
+  const [editingMedId, setEditingMedId] = useState<string | null>(null)
+  const [discontinueModal, setDiscontinueModal] = useState<{ id: string; name: string } | null>(null)
+  const [discontinueReason, setDiscontinueReason] = useState('')
+
+  // Allergy form state
+  const [showAllergyForm, setShowAllergyForm] = useState(false)
+  const [allergyFormData, setAllergyFormData] = useState({ allergen: '', allergen_type: 'drug' as AllergenType, reaction: '', severity: 'unknown' as AllergySeverity })
 
   // Tab customization state
   const [tabs, setTabs] = useState(DEFAULT_TABS)
@@ -424,7 +457,10 @@ ${noteData.hpi || 'Not documented'}
 REVIEW OF SYSTEMS: ${noteData.ros || 'Not documented'}
 ${noteData.rosDetails ? `Details: ${noteData.rosDetails}` : ''}
 
-ALLERGIES: ${noteData.allergies || 'Not documented'}
+MEDICATIONS:
+${medications.filter(m => m.is_active).length > 0 ? medications.filter(m => m.is_active).map(m => `- ${m.medication_name}${m.dosage ? ` ${m.dosage}` : ''}${m.frequency ? ` ${m.frequency}` : ''}`).join('\n') : 'None documented'}
+
+ALLERGIES: ${allergies.filter(a => a.is_active).length > 0 ? allergies.filter(a => a.is_active).map(a => `${a.allergen}${a.reaction ? ` (${a.reaction})` : ''}${a.severity !== 'unknown' ? ` - ${a.severity}` : ''}`).join(', ') : noteData.allergies || 'Not documented'}
 ${noteData.allergyDetails ? `Details: ${noteData.allergyDetails}` : ''}
 
 ASSESSMENT:
@@ -865,7 +901,7 @@ ${noteData.plan || 'Not documented'}
                     { label: 'Chief complaint documented', check: !!noteData.chiefComplaint?.length },
                     { label: 'HPI completed (min. 25 words)', check: (noteData.hpi?.split(' ').length || 0) >= 25 },
                     { label: 'Review of systems documented', check: !!noteData.ros },
-                    { label: 'Allergies documented', check: !!noteData.allergies },
+                    { label: 'Allergies documented', check: !!noteData.allergies || allergies.length > 0 },
                     { label: 'Assessment completed', check: !!noteData.assessment },
                   ].map((item, i) => (
                     <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -1112,6 +1148,287 @@ ${noteData.plan || 'Not documented'}
               </div>
             </div>
 
+            {/* Medications */}
+            <div style={{ marginBottom: '16px' }}>
+              <div style={{
+                background: 'var(--bg-white)',
+                borderRadius: '12px',
+                padding: '20px',
+                boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: medications.length > 0 || showMedForm ? '12px' : '0' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" strokeWidth="2">
+                      <path d="M10.5 1.5H8.25A2.25 2.25 0 006 3.75v16.5a2.25 2.25 0 002.25 2.25h7.5A2.25 2.25 0 0018 20.25V3.75a2.25 2.25 0 00-2.25-2.25H13.5m-3 0V3h3V1.5m-3 0h3m-6 9h6m-6 4h4"/>
+                    </svg>
+                    <span style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text-primary)' }}>Medications</span>
+                    {medications.length > 0 && (
+                      <span style={{ fontSize: '11px', background: 'var(--primary)', color: 'white', borderRadius: '10px', padding: '1px 8px', fontWeight: 600 }}>
+                        {medications.filter(m => m.is_active).length}
+                      </span>
+                    )}
+                  </div>
+                  <button
+                    onClick={() => { setShowMedForm(true); setEditingMedId(null); setMedFormData({ medication_name: '', dosage: '', frequency: '', route: 'PO', prescriber: '', indication: '', start_date: '' }) }}
+                    style={{
+                      display: 'flex', alignItems: 'center', gap: '4px',
+                      padding: '8px 14px', borderRadius: '8px', border: '1px solid var(--primary)',
+                      background: 'transparent', color: 'var(--primary)', fontSize: '12px', fontWeight: 500, cursor: 'pointer',
+                    }}
+                  >
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                    Add
+                  </button>
+                </div>
+
+                {/* Medication List */}
+                {medications.filter(m => m.is_active).length > 0 && (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginBottom: showMedForm ? '12px' : '0' }}>
+                    {medications.filter(m => m.is_active).map(med => (
+                      <div key={med.id} style={{
+                        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                        padding: '8px 12px', background: 'var(--bg-gray)', borderRadius: '8px', fontSize: '13px',
+                      }}>
+                        <div style={{ flex: 1 }}>
+                          <span style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{med.medication_name}</span>
+                          {med.dosage && <span style={{ color: 'var(--text-secondary)', marginLeft: '6px' }}>{med.dosage}</span>}
+                          {med.frequency && <span style={{ color: 'var(--text-muted)', marginLeft: '4px' }}>{med.frequency}</span>}
+                          {med.route && med.route !== 'PO' && <span style={{ color: 'var(--text-muted)', marginLeft: '4px' }}>({med.route})</span>}
+                        </div>
+                        <div style={{ display: 'flex', gap: '4px' }}>
+                          <button
+                            onClick={() => {
+                              setEditingMedId(med.id)
+                              setMedFormData({
+                                medication_name: med.medication_name,
+                                dosage: med.dosage || '',
+                                frequency: med.frequency || '',
+                                route: med.route || 'PO',
+                                prescriber: med.prescriber || '',
+                                indication: med.indication || '',
+                                start_date: med.start_date || '',
+                              })
+                              setShowMedForm(true)
+                            }}
+                            title="Edit"
+                            style={{ width: '28px', height: '28px', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '4px', border: 'none', background: 'transparent', cursor: 'pointer', color: 'var(--text-muted)' }}
+                          >
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                          </button>
+                          <button
+                            onClick={() => setDiscontinueModal({ id: med.id, name: med.medication_name })}
+                            title="Discontinue"
+                            style={{ width: '28px', height: '28px', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '4px', border: 'none', background: 'transparent', cursor: 'pointer', color: 'var(--text-muted)' }}
+                          >
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/></svg>
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* Discontinued medications (collapsed) */}
+                {medications.filter(m => !m.is_active).length > 0 && (
+                  <details style={{ marginBottom: showMedForm ? '12px' : '0' }}>
+                    <summary style={{ fontSize: '12px', color: 'var(--text-muted)', cursor: 'pointer', marginBottom: '6px' }}>
+                      {medications.filter(m => !m.is_active).length} discontinued
+                    </summary>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                      {medications.filter(m => !m.is_active).map(med => (
+                        <div key={med.id} style={{
+                          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                          padding: '6px 12px', background: 'var(--bg-gray)', borderRadius: '6px', fontSize: '12px', opacity: 0.7,
+                        }}>
+                          <span style={{ textDecoration: 'line-through', color: 'var(--text-muted)' }}>
+                            {med.medication_name} {med.dosage || ''}
+                          </span>
+                          <span style={{ fontSize: '11px', color: '#EF4444' }}>{med.status}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </details>
+                )}
+
+                {/* Add/Edit Medication Form */}
+                {showMedForm && (
+                  <div style={{ border: '1px solid var(--border)', borderRadius: '8px', padding: '16px', background: 'var(--bg-gray)' }}>
+                    <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '10px' }}>
+                      {editingMedId ? 'Edit Medication' : 'Add Medication'}
+                    </div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                      {/* Medication name with formulary typeahead */}
+                      <div style={{ position: 'relative' }}>
+                        <input
+                          type="text"
+                          value={medFormData.medication_name}
+                          onChange={(e) => {
+                            const val = e.target.value
+                            setMedFormData(prev => ({ ...prev, medication_name: val }))
+                            if (val.length >= 2) {
+                              setMedSearchResults(searchFormulary(val))
+                              setShowMedSearch(true)
+                            } else {
+                              setShowMedSearch(false)
+                            }
+                          }}
+                          onBlur={() => setTimeout(() => setShowMedSearch(false), 200)}
+                          placeholder="Medication name..."
+                          style={{ width: '100%', padding: '10px 12px', border: '1px solid var(--border)', borderRadius: '8px', fontSize: '13px' }}
+                        />
+                        {showMedSearch && medSearchResults.length > 0 && (
+                          <div style={{
+                            position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 10,
+                            background: 'var(--bg-white)', border: '1px solid var(--border)', borderRadius: '8px',
+                            boxShadow: '0 4px 12px rgba(0,0,0,0.1)', maxHeight: '200px', overflowY: 'auto',
+                          }}>
+                            {medSearchResults.slice(0, 8).map((item, idx) => (
+                              <button
+                                key={idx}
+                                onMouseDown={(e) => {
+                                  e.preventDefault()
+                                  setMedFormData(prev => ({
+                                    ...prev,
+                                    medication_name: item.name,
+                                    route: item.routes[0] || prev.route,
+                                    dosage: item.common_dosages[0] || prev.dosage,
+                                    frequency: item.common_frequencies[0] || prev.frequency,
+                                  }))
+                                  setShowMedSearch(false)
+                                }}
+                                style={{
+                                  display: 'block', width: '100%', textAlign: 'left',
+                                  padding: '8px 12px', border: 'none', background: 'transparent',
+                                  cursor: 'pointer', fontSize: '13px', borderBottom: '1px solid var(--border)',
+                                }}
+                              >
+                                <span style={{ fontWeight: 500, color: 'var(--text-primary)' }}>{item.name}</span>
+                                {item.generic_name !== item.name && (
+                                  <span style={{ color: 'var(--text-muted)', marginLeft: '6px', fontSize: '12px' }}>({item.generic_name})</span>
+                                )}
+                                <span style={{ color: 'var(--text-muted)', fontSize: '11px', marginLeft: '8px' }}>{item.category}</span>
+                              </button>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '8px' }}>
+                        <input
+                          type="text"
+                          value={medFormData.dosage}
+                          onChange={(e) => setMedFormData(prev => ({ ...prev, dosage: e.target.value }))}
+                          placeholder="Dosage (e.g. 100mg)"
+                          style={{ padding: '10px 12px', border: '1px solid var(--border)', borderRadius: '8px', fontSize: '13px' }}
+                        />
+                        <input
+                          type="text"
+                          value={medFormData.frequency}
+                          onChange={(e) => setMedFormData(prev => ({ ...prev, frequency: e.target.value }))}
+                          placeholder="Frequency (e.g. BID)"
+                          style={{ padding: '10px 12px', border: '1px solid var(--border)', borderRadius: '8px', fontSize: '13px' }}
+                        />
+                        <select
+                          value={medFormData.route}
+                          onChange={(e) => setMedFormData(prev => ({ ...prev, route: e.target.value }))}
+                          style={{ padding: '10px 12px', border: '1px solid var(--border)', borderRadius: '8px', fontSize: '13px' }}
+                        >
+                          <option value="PO">PO (Oral)</option>
+                          <option value="IV">IV</option>
+                          <option value="IM">IM</option>
+                          <option value="SC">SC</option>
+                          <option value="topical">Topical</option>
+                          <option value="inhaled">Inhaled</option>
+                          <option value="nasal">Nasal</option>
+                          <option value="SL">SL</option>
+                        </select>
+                      </div>
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+                        <input
+                          type="text"
+                          value={medFormData.indication}
+                          onChange={(e) => setMedFormData(prev => ({ ...prev, indication: e.target.value }))}
+                          placeholder="Indication"
+                          style={{ padding: '10px 12px', border: '1px solid var(--border)', borderRadius: '8px', fontSize: '13px' }}
+                        />
+                        <input
+                          type="date"
+                          value={medFormData.start_date}
+                          onChange={(e) => setMedFormData(prev => ({ ...prev, start_date: e.target.value }))}
+                          style={{ padding: '10px 12px', border: '1px solid var(--border)', borderRadius: '8px', fontSize: '13px' }}
+                        />
+                      </div>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', marginTop: '10px' }}>
+                      <button
+                        onClick={() => { setShowMedForm(false); setEditingMedId(null) }}
+                        style={{ padding: '8px 16px', borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--bg-white)', fontSize: '12px', cursor: 'pointer', color: 'var(--text-secondary)' }}
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        onClick={async () => {
+                          if (!medFormData.medication_name.trim()) return
+                          if (editingMedId) {
+                            await onUpdateMedication?.(editingMedId, medFormData)
+                          } else {
+                            await onAddMedication?.(medFormData)
+                          }
+                          setShowMedForm(false)
+                          setEditingMedId(null)
+                          setMedFormData({ medication_name: '', dosage: '', frequency: '', route: 'PO', prescriber: '', indication: '', start_date: '' })
+                        }}
+                        style={{ padding: '8px 16px', borderRadius: '8px', border: 'none', background: 'var(--primary)', color: 'white', fontSize: '12px', fontWeight: 500, cursor: 'pointer' }}
+                      >
+                        {editingMedId ? 'Save Changes' : 'Add Medication'}
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {medications.length === 0 && !showMedForm && (
+                  <div style={{ fontSize: '13px', color: 'var(--text-muted)', textAlign: 'center', padding: '12px' }}>
+                    No medications documented
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Discontinue Medication Modal */}
+            {discontinueModal && (
+              <>
+                <div onClick={() => { setDiscontinueModal(null); setDiscontinueReason('') }} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 1000 }} />
+                <div style={{
+                  position: 'fixed', top: '50%', left: '50%', transform: 'translate(-50%, -50%)',
+                  background: 'var(--bg-white)', borderRadius: '12px', padding: '24px', width: '380px', maxWidth: '90vw',
+                  zIndex: 1001, boxShadow: '0 20px 50px rgba(0,0,0,0.15)',
+                }}>
+                  <h3 style={{ margin: '0 0 8px', fontSize: '16px', fontWeight: 600, color: 'var(--text-primary)' }}>
+                    Discontinue {discontinueModal.name}?
+                  </h3>
+                  <p style={{ margin: '0 0 12px', fontSize: '13px', color: 'var(--text-secondary)' }}>
+                    This will mark the medication as discontinued with today&apos;s date.
+                  </p>
+                  <textarea
+                    value={discontinueReason}
+                    onChange={(e) => setDiscontinueReason(e.target.value)}
+                    placeholder="Reason for discontinuation (optional)..."
+                    style={{ width: '100%', minHeight: '60px', padding: '10px 12px', border: '1px solid var(--border)', borderRadius: '8px', fontSize: '13px', resize: 'vertical', fontFamily: 'inherit', marginBottom: '12px' }}
+                  />
+                  <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
+                    <button onClick={() => { setDiscontinueModal(null); setDiscontinueReason('') }} style={{ padding: '10px 16px', borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--bg-white)', fontSize: '13px', cursor: 'pointer' }}>Cancel</button>
+                    <button
+                      onClick={async () => {
+                        await onDiscontinueMedication?.(discontinueModal.id, discontinueReason || undefined)
+                        setDiscontinueModal(null)
+                        setDiscontinueReason('')
+                      }}
+                      style={{ padding: '10px 16px', borderRadius: '8px', border: 'none', background: '#EF4444', color: 'white', fontSize: '13px', fontWeight: 500, cursor: 'pointer' }}
+                    >Discontinue</button>
+                  </div>
+                </div>
+              </>
+            )}
+
             {/* Allergies */}
             <div style={{ position: 'relative', marginBottom: '16px' }}>
               <span style={{
@@ -1132,19 +1449,43 @@ ${noteData.plan || 'Not documented'}
                 padding: '20px',
                 boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
               }}>
-                <div style={{ marginBottom: '16px' }}>
-                  <span style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text-primary)' }}>Allergies</span>
-                  <span style={{ color: '#EF4444', marginLeft: '2px' }}>*</span>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <span style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text-primary)' }}>Allergies</span>
+                    <span style={{ color: '#EF4444', marginLeft: '2px' }}>*</span>
+                  </div>
+                  <button
+                    onClick={() => { setShowAllergyForm(true); setAllergyFormData({ allergen: '', allergen_type: 'drug', reaction: '', severity: 'unknown' }) }}
+                    style={{
+                      display: 'flex', alignItems: 'center', gap: '4px',
+                      padding: '8px 14px', borderRadius: '8px', border: '1px solid var(--primary)',
+                      background: 'transparent', color: 'var(--primary)', fontSize: '12px', fontWeight: 500, cursor: 'pointer',
+                    }}
+                  >
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                    Add
+                  </button>
                 </div>
-                <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginBottom: noteData.allergies === 'Other' ? '12px' : '0' }}>
+
+                {/* Quick shortcuts */}
+                <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginBottom: (allergies.length > 0 || showAllergyForm) ? '12px' : '0' }}>
                   {ALLERGY_OPTIONS.map(option => (
                     <button
                       key={option}
-                      onClick={() => updateNote('allergies', option)}
+                      onClick={async () => {
+                        if (option === 'NKDA') {
+                          updateNote('allergies', 'NKDA')
+                          await onAddAllergy?.({ allergen: 'NKDA', allergen_type: 'other', severity: 'unknown' })
+                        } else if (option === 'Other') {
+                          setShowAllergyForm(true)
+                        } else {
+                          updateNote('allergies', option)
+                        }
+                      }}
                       style={{
-                        padding: '8px 16px',
+                        padding: '8px 14px',
                         borderRadius: '20px',
-                        fontSize: '13px',
+                        fontSize: '12px',
                         cursor: 'pointer',
                         border: '1px solid',
                         borderColor: noteData.allergies === option ? 'var(--primary)' : 'var(--border)',
@@ -1156,36 +1497,96 @@ ${noteData.plan || 'Not documented'}
                     </button>
                   ))}
                 </div>
-                {/* Show details field when "Other" is selected */}
-                {noteData.allergies === 'Other' && (
-                  <div style={{ position: 'relative' }}>
-                    <textarea
-                      value={noteData.allergyDetails || ''}
-                      onChange={(e) => updateNote('allergyDetails', e.target.value)}
-                      onFocus={() => handleSetActiveField('allergyDetails')}
-                      placeholder="List allergies and reactions..."
-                      style={{
-                        width: '100%',
-                        minHeight: '60px',
-                        padding: '10px 12px',
-                        paddingRight: '90px',
-                        border: '1px solid var(--border)',
-                        borderRadius: '8px',
-                        fontSize: '14px',
-                        resize: 'vertical',
-                        fontFamily: 'inherit',
-                      }}
-                    />
-                    <div style={{ position: 'absolute', top: '8px', right: '8px', display: 'flex', gap: '4px' }}>
-                      <button onClick={() => openVoiceDrawer?.('document')} title="Dictate" style={{ width: '24px', height: '24px', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '4px', border: 'none', background: '#FEE2E2', color: '#EF4444', cursor: 'pointer' }}>
-                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 1a3 3 0 00-3 3v8a3 3 0 006 0V4a3 3 0 00-3-3z"/><path d="M19 10v2a7 7 0 01-14 0v-2"/></svg>
-                      </button>
-                      <button onClick={() => openDotPhrases?.('allergyDetails')} title="Dot Phrases" style={{ width: '24px', height: '24px', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '4px', border: 'none', background: '#EDE9FE', color: '#8B5CF6', cursor: 'pointer' }}>
-                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
-                      </button>
-                      <button onClick={() => openAiDrawer('ask-ai')} title="AI Assist" style={{ width: '24px', height: '24px', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '4px', border: 'none', background: '#FEF3C7', color: '#F59E0B', cursor: 'pointer' }}>
-                        <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M12 1L13.5 9.5L22 12L13.5 14.5L12 23L10.5 14.5L2 12L10.5 9.5L12 1Z"/></svg>
-                      </button>
+
+                {/* Allergy pills */}
+                {allergies.filter(a => a.is_active && a.allergen !== 'NKDA').length > 0 && (
+                  <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginBottom: showAllergyForm ? '12px' : '0' }}>
+                    {allergies.filter(a => a.is_active && a.allergen !== 'NKDA').map(allergy => {
+                      const severityColors: Record<string, { bg: string; text: string; border: string }> = {
+                        'life-threatening': { bg: '#FEE2E2', text: '#991B1B', border: '#FCA5A5' },
+                        severe: { bg: '#FEF3C7', text: '#92400E', border: '#FCD34D' },
+                        moderate: { bg: '#FEF9C3', text: '#854D0E', border: '#FDE68A' },
+                        mild: { bg: '#F0FDF4', text: '#166534', border: '#BBF7D0' },
+                        unknown: { bg: 'var(--bg-gray)', text: 'var(--text-secondary)', border: 'var(--border)' },
+                      }
+                      const colors = severityColors[allergy.severity] || severityColors.unknown
+                      return (
+                        <div key={allergy.id} style={{
+                          display: 'flex', alignItems: 'center', gap: '6px',
+                          padding: '4px 10px', borderRadius: '12px',
+                          background: colors.bg, border: `1px solid ${colors.border}`,
+                          fontSize: '12px', color: colors.text,
+                        }}>
+                          <span style={{ fontWeight: 500 }}>{allergy.allergen}</span>
+                          {allergy.reaction && <span style={{ opacity: 0.8 }}>- {allergy.reaction}</span>}
+                          <span style={{ fontSize: '10px', fontWeight: 600, textTransform: 'uppercase', opacity: 0.7 }}>{allergy.severity !== 'unknown' ? allergy.severity : ''}</span>
+                          <button
+                            onClick={() => onRemoveAllergy?.(allergy.id)}
+                            style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '0', color: colors.text, opacity: 0.6, lineHeight: 1 }}
+                          >
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                          </button>
+                        </div>
+                      )
+                    })}
+                  </div>
+                )}
+
+                {/* Add Allergy Form */}
+                {showAllergyForm && (
+                  <div style={{ border: '1px solid var(--border)', borderRadius: '8px', padding: '16px', background: 'var(--bg-gray)' }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                      <input
+                        type="text"
+                        value={allergyFormData.allergen}
+                        onChange={(e) => setAllergyFormData(prev => ({ ...prev, allergen: e.target.value }))}
+                        placeholder="Allergen name..."
+                        style={{ width: '100%', padding: '10px 12px', border: '1px solid var(--border)', borderRadius: '8px', fontSize: '13px' }}
+                        autoFocus
+                      />
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '8px' }}>
+                        <select
+                          value={allergyFormData.allergen_type}
+                          onChange={(e) => setAllergyFormData(prev => ({ ...prev, allergen_type: e.target.value as AllergenType }))}
+                          style={{ padding: '10px 12px', border: '1px solid var(--border)', borderRadius: '8px', fontSize: '13px' }}
+                        >
+                          <option value="drug">Drug</option>
+                          <option value="food">Food</option>
+                          <option value="environmental">Environmental</option>
+                          <option value="other">Other</option>
+                        </select>
+                        <input
+                          type="text"
+                          value={allergyFormData.reaction}
+                          onChange={(e) => setAllergyFormData(prev => ({ ...prev, reaction: e.target.value }))}
+                          placeholder="Reaction (e.g. rash)"
+                          style={{ padding: '10px 12px', border: '1px solid var(--border)', borderRadius: '8px', fontSize: '13px' }}
+                        />
+                        <select
+                          value={allergyFormData.severity}
+                          onChange={(e) => setAllergyFormData(prev => ({ ...prev, severity: e.target.value as AllergySeverity }))}
+                          style={{ padding: '10px 12px', border: '1px solid var(--border)', borderRadius: '8px', fontSize: '13px' }}
+                        >
+                          <option value="unknown">Severity Unknown</option>
+                          <option value="mild">Mild</option>
+                          <option value="moderate">Moderate</option>
+                          <option value="severe">Severe</option>
+                          <option value="life-threatening">Life-threatening</option>
+                        </select>
+                      </div>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', marginTop: '10px' }}>
+                      <button onClick={() => setShowAllergyForm(false)} style={{ padding: '8px 16px', borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--bg-white)', fontSize: '12px', cursor: 'pointer', color: 'var(--text-secondary)' }}>Cancel</button>
+                      <button
+                        onClick={async () => {
+                          if (!allergyFormData.allergen.trim()) return
+                          await onAddAllergy?.(allergyFormData)
+                          updateNote('allergies', 'Other')
+                          setShowAllergyForm(false)
+                          setAllergyFormData({ allergen: '', allergen_type: 'drug', reaction: '', severity: 'unknown' })
+                        }}
+                        style={{ padding: '8px 16px', borderRadius: '8px', border: 'none', background: 'var(--primary)', color: 'white', fontSize: '12px', fontWeight: 500, cursor: 'pointer' }}
+                      >Add Allergy</button>
                     </div>
                   </div>
                 )}

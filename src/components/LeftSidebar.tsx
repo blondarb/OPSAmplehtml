@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import HistorianSessionPanel from './HistorianSessionPanel'
+import type { PatientMedication, PatientAllergy } from '@/lib/medicationTypes'
 
 interface LeftSidebarProps {
   patient: any
@@ -12,6 +13,8 @@ interface LeftSidebarProps {
   onImportHistorian?: (session: any) => void
   isOpen?: boolean
   onClose?: () => void
+  medications?: PatientMedication[]
+  allergies?: PatientAllergy[]
 }
 
 // Default summary options
@@ -106,11 +109,12 @@ Neuro:
   }
 }
 
-export default function LeftSidebar({ patient, priorVisits, scoreHistory, patientMessages = [], historianSessions = [], onImportHistorian, isOpen = true, onClose }: LeftSidebarProps) {
+export default function LeftSidebar({ patient, priorVisits, scoreHistory, patientMessages = [], historianSessions = [], onImportHistorian, isOpen = true, onClose, medications = [], allergies = [] }: LeftSidebarProps) {
   const [expandedVisit, setExpandedVisit] = useState<string | null>(priorVisits[0]?.id || null)
   const [aiSummaryEnabled, setAiSummaryEnabled] = useState(true)
   const [scoreHistoryOpen, setScoreHistoryOpen] = useState(true)
   const [priorVisitsOpen, setPriorVisitsOpen] = useState(true)
+  const [medsOpen, setMedsOpen] = useState(true)
   const [localTime, setLocalTime] = useState<string>('--:--')
   const [viewingNoteId, setViewingNoteId] = useState<string | null>(null)
 
@@ -340,6 +344,134 @@ export default function LeftSidebar({ patient, priorVisits, scoreHistory, patien
         <a href="#" style={{ color: 'var(--primary)', textDecoration: 'none' }}>VizAI</a>
         <span style={{ color: 'var(--text-muted)' }}> | </span>
         <a href="#" style={{ color: 'var(--primary)', textDecoration: 'none' }}>Epic</a>
+      </div>
+
+      {/* Medications & Allergies Summary */}
+      <div style={{ padding: '12px 16px', borderBottom: '1px solid var(--border)' }}>
+        <button
+          onClick={() => setMedsOpen(!medsOpen)}
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
+            background: 'none',
+            border: 'none',
+            padding: 0,
+            cursor: 'pointer',
+            marginBottom: medsOpen ? '10px' : 0,
+            width: '100%',
+          }}
+        >
+          <svg
+            width="14"
+            height="14"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="var(--text-muted)"
+            strokeWidth="2"
+            style={{
+              transform: medsOpen ? 'rotate(0deg)' : 'rotate(-90deg)',
+              transition: 'transform 0.2s',
+            }}
+          >
+            <polyline points="6 9 12 15 18 9"/>
+          </svg>
+          <h4 style={{
+            fontSize: '13px',
+            fontWeight: 600,
+            color: 'var(--text-primary)',
+            margin: 0,
+            display: 'flex',
+            alignItems: 'center',
+            gap: '6px',
+          }}>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" strokeWidth="2">
+              <path d="M10.5 1.5H8.25A2.25 2.25 0 006 3.75v16.5a2.25 2.25 0 002.25 2.25h7.5A2.25 2.25 0 0018 20.25V3.75a2.25 2.25 0 00-2.25-2.25H13.5m-3 0V3h3V1.5m-3 0h3m-6 9h6m-6 4h4"/>
+            </svg>
+            Medications
+            {medications.filter(m => m.is_active).length > 0 && (
+              <span style={{
+                background: 'var(--primary)',
+                color: 'white',
+                borderRadius: '10px',
+                padding: '1px 7px',
+                fontSize: '11px',
+                fontWeight: 600,
+              }}>
+                {medications.filter(m => m.is_active).length}
+              </span>
+            )}
+          </h4>
+        </button>
+
+        {medsOpen && (
+          <div>
+            {/* Severe/life-threatening allergy alerts */}
+            {allergies.filter(a => a.is_active && (a.severity === 'severe' || a.severity === 'life-threatening')).length > 0 && (
+              <div style={{
+                background: '#FEE2E2',
+                border: '1px solid #FCA5A5',
+                borderLeft: '4px solid #EF4444',
+                borderRadius: '0 8px 8px 0',
+                padding: '8px 10px',
+                marginBottom: '8px',
+                display: 'flex',
+                alignItems: 'flex-start',
+                gap: '6px',
+              }}>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#DC2626" strokeWidth="2" style={{ flexShrink: 0, marginTop: '1px' }}>
+                  <path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/>
+                  <line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>
+                </svg>
+                <div style={{ fontSize: '11px', color: '#991B1B', fontWeight: 500 }}>
+                  {allergies.filter(a => a.is_active && (a.severity === 'severe' || a.severity === 'life-threatening')).map(a =>
+                    `${a.allergen}${a.reaction ? ` (${a.reaction})` : ''}`
+                  ).join(', ')}
+                </div>
+              </div>
+            )}
+
+            {/* Medication list */}
+            {medications.filter(m => m.is_active).length > 0 ? (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                {medications.filter(m => m.is_active).map(med => (
+                  <div key={med.id} style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    padding: '4px 8px',
+                    borderRadius: '4px',
+                    fontSize: '12px',
+                  }}>
+                    <div style={{
+                      width: '6px',
+                      height: '6px',
+                      borderRadius: '50%',
+                      background: 'var(--primary)',
+                      flexShrink: 0,
+                    }} />
+                    <span style={{ color: 'var(--text-primary)', fontWeight: 500 }}>{med.medication_name}</span>
+                    {med.dosage && <span style={{ color: 'var(--text-muted)' }}>{med.dosage}</span>}
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div style={{ fontSize: '12px', color: 'var(--text-muted)', padding: '4px 0' }}>
+                No active medications
+              </div>
+            )}
+
+            {/* Active allergies summary */}
+            {allergies.filter(a => a.is_active).length > 0 && (
+              <div style={{ marginTop: '8px', paddingTop: '8px', borderTop: '1px solid var(--border)' }}>
+                <div style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text-muted)', marginBottom: '4px', textTransform: 'uppercase' }}>Allergies</div>
+                <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>
+                  {allergies.filter(a => a.is_active).map(a => a.allergen).join(', ')}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Prior History Summary Tool */}
