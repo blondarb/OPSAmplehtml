@@ -64,6 +64,7 @@ export default function VoiceDrawer({
   const [visitTranscript, setVisitTranscript] = useState<string>('')
   const [visitAIProcessing, setVisitAIProcessing] = useState(false)
   const [visitAIError, setVisitAIError] = useState<string | null>(null)
+  const lastVisitAudioBlobRef = useRef<Blob | null>(null)
 
   // Separate voice recorder for Chart Prep dictation
   const {
@@ -169,14 +170,31 @@ export default function VoiceDrawer({
 
   // Process Visit AI recording
   const processVisitAI = async (audioBlob: Blob) => {
+    // Store blob for retry
+    lastVisitAudioBlobRef.current = audioBlob
+
     setVisitAIProcessing(true)
     setVisitAIError(null)
     setVisitAIOutput(null)
     setVisitTranscript('')
 
+    // File size validation (Vercel body limit is ~4.5MB by default, Whisper limit is 25MB)
+    const MAX_SIZE_MB = 25
+    const blobSizeMB = audioBlob.size / (1024 * 1024)
+    if (blobSizeMB > MAX_SIZE_MB) {
+      setVisitAIError(`Recording is too large (${blobSizeMB.toFixed(1)}MB). Maximum is ${MAX_SIZE_MB}MB. Try a shorter recording.`)
+      setVisitAIProcessing(false)
+      return
+    }
+
     try {
       const formData = new FormData()
-      const extension = audioBlob.type.includes('webm') ? 'webm' : 'm4a'
+      // Safari uses audio/mp4 or audio/x-m4a; Chrome/Firefox use audio/webm
+      const mime = audioBlob.type.toLowerCase()
+      const extension = mime.includes('webm') ? 'webm'
+        : mime.includes('mp4') || mime.includes('m4a') ? 'm4a'
+        : mime.includes('ogg') ? 'ogg'
+        : 'webm'
       const audioFile = new File([audioBlob], `visit-recording.${extension}`, { type: audioBlob.type })
       formData.append('audio', audioFile)
 
@@ -1343,20 +1361,49 @@ export default function VoiceDrawer({
                   </svg>
                   <div style={{ flex: 1 }}>
                     <p style={{ fontSize: '13px', color: '#DC2626', marginBottom: '8px' }}>{visitAIError}</p>
-                    <button
-                      onClick={clearVisitAI}
-                      style={{
-                        padding: '6px 12px',
-                        background: 'var(--bg-white)',
-                        color: 'var(--text-secondary)',
-                        border: '1px solid var(--border)',
-                        borderRadius: '4px',
-                        fontSize: '12px',
-                        cursor: 'pointer',
-                      }}
-                    >
-                      Try Again
-                    </button>
+                    <div style={{ display: 'flex', gap: '8px' }}>
+                      {lastVisitAudioBlobRef.current && (
+                        <button
+                          onClick={() => {
+                            if (lastVisitAudioBlobRef.current) {
+                              processVisitAI(lastVisitAudioBlobRef.current)
+                            }
+                          }}
+                          style={{
+                            padding: '6px 12px',
+                            background: '#EF4444',
+                            color: 'white',
+                            border: 'none',
+                            borderRadius: '4px',
+                            fontSize: '12px',
+                            fontWeight: 500,
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '4px',
+                          }}
+                        >
+                          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                            <path d="M1 4v6h6"/><path d="M3.51 15a9 9 0 102.13-9.36L1 10"/>
+                          </svg>
+                          Retry
+                        </button>
+                      )}
+                      <button
+                        onClick={clearVisitAI}
+                        style={{
+                          padding: '6px 12px',
+                          background: 'var(--bg-white)',
+                          color: 'var(--text-secondary)',
+                          border: '1px solid var(--border)',
+                          borderRadius: '4px',
+                          fontSize: '12px',
+                          cursor: 'pointer',
+                        }}
+                      >
+                        Dismiss
+                      </button>
+                    </div>
                   </div>
                 </div>
               )}

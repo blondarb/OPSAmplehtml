@@ -8,6 +8,7 @@ import ReasonForConsultSection from './ReasonForConsultSection'
 import DifferentialDiagnosisSection from './DifferentialDiagnosisSection'
 import ImagingResultsTab from './ImagingResultsTab'
 import SmartRecommendationsSection from './SmartRecommendationsSection'
+import PatientHistorySummary from './PatientHistorySummary'
 import type { Diagnosis } from '@/lib/diagnosisData'
 import type { PatientMedication, PatientAllergy, AllergySeverity, AllergenType, FormularyItem } from '@/lib/medicationTypes'
 import { searchFormulary } from '@/lib/neuroFormulary'
@@ -51,6 +52,8 @@ interface CenterPanelProps {
   onAddAllergy?: (input: any) => Promise<any>
   onUpdateAllergy?: (id: string, updates: any) => Promise<any>
   onRemoveAllergy?: (id: string) => Promise<void>
+  priorVisits?: any[]
+  scoreHistory?: any[]
 }
 
 const ALLERGY_OPTIONS = ['NKDA', 'Reviewed in EMR', 'Unknown', 'Other']
@@ -88,6 +91,8 @@ export default function CenterPanel({
   onAddAllergy,
   onUpdateAllergy,
   onRemoveAllergy,
+  priorVisits = [],
+  scoreHistory = [],
 }: CenterPanelProps) {
   const [activeTab, setActiveTab] = useState('history')
   const [localActiveField, setLocalActiveField] = useState<string | null>(null)
@@ -305,6 +310,20 @@ export default function CenterPanel({
   const [selectedTemplate, setSelectedTemplate] = useState<string>('general')
   const [showTemplateMenu, setShowTemplateMenu] = useState(false)
   const [customTemplates, setCustomTemplates] = useState<Record<string, { name: string; findings: Record<string, boolean>; accordions: Record<string, boolean> }>>({})
+
+  // Free-text exam mode toggle
+  const [examFreeTextMode, setExamFreeTextMode] = useState(false)
+
+  // Load exam mode preference from localStorage
+  useEffect(() => {
+    const saved = localStorage.getItem('sevaro-exam-freetext-mode')
+    if (saved === 'true') setExamFreeTextMode(true)
+  }, [])
+
+  const toggleExamMode = (freeText: boolean) => {
+    setExamFreeTextMode(freeText)
+    localStorage.setItem('sevaro-exam-freetext-mode', String(freeText))
+  }
 
   const applyTemplate = (templateId: string) => {
     const template = EXAM_TEMPLATES[templateId] || customTemplates[templateId]
@@ -1018,6 +1037,16 @@ ${noteData.plan || 'Not documented'}
                 </h2>
               </div>
             )}
+            {/* Patient History Summary - AI longitudinal summary for returning patients */}
+            <PatientHistorySummary
+              patient={patient}
+              priorVisits={priorVisits}
+              medications={medications}
+              allergies={allergies}
+              scoreHistory={scoreHistory}
+              noteData={noteData}
+            />
+
             {/* Reason for Consult - Two-tier selection */}
             <ReasonForConsultSection
               selectedSubOptions={noteData.chiefComplaint || []}
@@ -1843,6 +1872,40 @@ ${noteData.plan || 'Not documented'}
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
                 <span style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text-primary)' }}>Neurological Examination</span>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  {/* Structured / Free-text toggle */}
+                  <div style={{ display: 'flex', borderRadius: '6px', overflow: 'hidden', border: '1px solid var(--border)' }}>
+                    <button
+                      onClick={() => toggleExamMode(false)}
+                      style={{
+                        padding: '4px 12px',
+                        fontSize: '11px',
+                        fontWeight: 500,
+                        border: 'none',
+                        cursor: 'pointer',
+                        background: !examFreeTextMode ? 'var(--primary)' : 'var(--bg-white)',
+                        color: !examFreeTextMode ? 'white' : 'var(--text-secondary)',
+                        transition: 'all 0.2s',
+                      }}
+                    >
+                      Structured
+                    </button>
+                    <button
+                      onClick={() => toggleExamMode(true)}
+                      style={{
+                        padding: '4px 12px',
+                        fontSize: '11px',
+                        fontWeight: 500,
+                        border: 'none',
+                        borderLeft: '1px solid var(--border)',
+                        cursor: 'pointer',
+                        background: examFreeTextMode ? 'var(--primary)' : 'var(--bg-white)',
+                        color: examFreeTextMode ? 'white' : 'var(--text-secondary)',
+                        transition: 'all 0.2s',
+                      }}
+                    >
+                      Free-text
+                    </button>
+                  </div>
                   {/* Template selector */}
                   <div style={{ position: 'relative' }}>
                     <button
@@ -1974,6 +2037,25 @@ ${noteData.plan || 'Not documented'}
                 </div>
               </div>
 
+              {/* Free-text mode: show single large text area */}
+              {examFreeTextMode && (
+                <NoteTextField
+                  value={noteData.examFreeText || ''}
+                  onChange={(value) => updateNote('examFreeText', value)}
+                  fieldName="examFreeText"
+                  placeholder="Type or dictate your narrative physical exam findings here..."
+                  minHeight="300px"
+                  showDictate={true}
+                  showAiAction={true}
+                  onOpenAiDrawer={() => openAiDrawer('ask-ai')}
+                  onOpenFullPhrasesDrawer={() => openDotPhrases && openDotPhrases('examFreeText')}
+                  setActiveTextField={handleSetActiveField}
+                  patientContext={patientContext}
+                />
+              )}
+
+              {/* Structured mode: show accordion sections */}
+              {!examFreeTextMode && (<>
               {/* General Appearance Accordion */}
               <div
                 style={{
@@ -2629,6 +2711,7 @@ ${noteData.plan || 'Not documented'}
                   </div>
                 )}
               </div>
+              </>)}
             </div>
 
             {/* Vital signs */}

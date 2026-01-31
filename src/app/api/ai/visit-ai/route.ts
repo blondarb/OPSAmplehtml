@@ -2,6 +2,9 @@ import { NextResponse } from 'next/server'
 import OpenAI from 'openai'
 import { createClient } from '@/lib/supabase/server'
 
+// Allow up to 120s for long audio transcription + GPT processing
+export const maxDuration = 120
+
 interface UserSettings {
   globalAiInstructions?: string
   documentationStyle?: 'concise' | 'detailed' | 'narrative'
@@ -26,6 +29,14 @@ export async function POST(request: Request) {
 
     if (!audioFile) {
       return NextResponse.json({ error: 'No audio file provided' }, { status: 400 })
+    }
+
+    // File size check (Whisper limit is 25MB)
+    const MAX_FILE_SIZE = 25 * 1024 * 1024
+    if (audioFile.size > MAX_FILE_SIZE) {
+      return NextResponse.json({
+        error: `Audio file too large (${(audioFile.size / (1024 * 1024)).toFixed(1)}MB). Maximum is 25MB.`
+      }, { status: 400 })
     }
 
     // Get OpenAI API key

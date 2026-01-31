@@ -10,6 +10,7 @@ interface AiDrawerProps {
   patient: any
   noteData: any
   updateNote: (field: string, value: any) => void
+  selectedDiagnoses?: Array<{ id: string; name: string; icd10?: string }>
 }
 
 export default function AiDrawer({
@@ -20,6 +21,7 @@ export default function AiDrawer({
   patient,
   noteData,
   updateNote,
+  selectedDiagnoses = [],
 }: AiDrawerProps) {
   const [question, setQuestion] = useState('')
   const [aiResponse, setAiResponse] = useState('')
@@ -166,7 +168,30 @@ Do NOT use medical jargon. Write as if explaining to the patient directly.`,
       let question: string
       let context: Record<string, string>
 
-      if (selectedCondition === 'custom') {
+      // Resolve condition name: diagnosis-based selections use "dx:" prefix
+      const isDiagnosisBased = selectedCondition.startsWith('dx:')
+      const resolvedConditionName = isDiagnosisBased
+        ? selectedCondition.slice(3) // strip "dx:" prefix
+        : conditionNames[selectedCondition] || selectedCondition
+
+      if (isDiagnosisBased) {
+        // Diagnosis-based handout from this visit's selections
+        question = `Create a patient education handout for ${resolvedConditionName}.
+
+Format the handout with these sections:
+1. **What is ${resolvedConditionName}?** - Brief explanation in simple terms
+2. **Common Symptoms** - Bullet list of key symptoms
+3. **Treatment Options** - Overview of medications and lifestyle changes
+4. **When to Seek Help** - Warning signs to watch for
+5. **Helpful Tips** - 3-5 practical tips for managing the condition
+
+Use patient-friendly language. Avoid medical jargon. Keep it informative but not overwhelming.`
+
+        context = {
+          patient: patientName,
+          condition: resolvedConditionName,
+        }
+      } else if (selectedCondition === 'custom') {
         // Personalized handout based on this visit's note
         question = `Create a personalized patient education handout for ${patientName} based on their visit today.
 
@@ -643,17 +668,30 @@ Use patient-friendly language. Avoid medical jargon. Keep it informative but not
                 }}
               >
                 <option value="">Select a condition...</option>
-                <option value="custom">Based on this visit (personalized)</option>
-                <option value="migraine">Migraine</option>
-                <option value="tension">Tension Headache</option>
-                <option value="cluster">Cluster Headache</option>
-                <option value="epilepsy">Epilepsy</option>
-                <option value="parkinsons">Parkinson Disease</option>
-                <option value="ms">Multiple Sclerosis</option>
-                <option value="neuropathy">Peripheral Neuropathy</option>
-                <option value="stroke">Stroke Prevention</option>
-                <option value="dementia">Memory & Dementia</option>
-                <option value="vertigo">Vertigo & Dizziness</option>
+                {selectedDiagnoses.length > 0 && (
+                  <optgroup label="From this visit">
+                    {selectedDiagnoses.map(d => (
+                      <option key={d.id} value={`dx:${d.name}`}>
+                        {d.name}{d.icd10 ? ` (${d.icd10})` : ''}
+                      </option>
+                    ))}
+                  </optgroup>
+                )}
+                <optgroup label="Common conditions">
+                  <option value="migraine">Migraine</option>
+                  <option value="tension">Tension Headache</option>
+                  <option value="cluster">Cluster Headache</option>
+                  <option value="epilepsy">Epilepsy</option>
+                  <option value="parkinsons">Parkinson Disease</option>
+                  <option value="ms">Multiple Sclerosis</option>
+                  <option value="neuropathy">Peripheral Neuropathy</option>
+                  <option value="stroke">Stroke Prevention</option>
+                  <option value="dementia">Memory & Dementia</option>
+                  <option value="vertigo">Vertigo & Dizziness</option>
+                </optgroup>
+                <optgroup label="Personalized">
+                  <option value="custom">Based on this visit (personalized)</option>
+                </optgroup>
               </select>
 
               {selectedCondition === 'custom' && (
@@ -677,7 +715,7 @@ Use patient-friendly language. Avoid medical jargon. Keep it informative but not
                   opacity: handoutLoading || !selectedCondition ? 0.7 : 1,
                 }}
               >
-                {handoutLoading ? 'Generating...' : selectedCondition === 'custom' ? 'Generate Personalized Handout' : 'Generate Handout'}
+                {handoutLoading ? 'Generating...' : selectedCondition === 'custom' ? 'Generate Personalized Handout' : selectedCondition.startsWith('dx:') ? 'Generate Diagnosis Handout' : 'Generate Handout'}
               </button>
 
               {handoutLoading && (

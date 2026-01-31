@@ -241,6 +241,7 @@ export default function ClinicalNote({
     historyAvailable: currentVisit?.clinical_notes?.history_available || '',
     historyDetails: currentVisit?.clinical_notes?.history_details || '',
     physicalExam: currentVisit?.clinical_notes?.physical_exam || '',
+    examFreeText: currentVisit?.clinical_notes?.exam_free_text || '',
     assessment: currentVisit?.clinical_notes?.assessment || '',
     plan: currentVisit?.clinical_notes?.plan || '',
   })
@@ -590,6 +591,7 @@ export default function ClinicalNote({
       historyAvailable: '',
       historyDetails: '',
       physicalExam: '',
+      examFreeText: '',
       assessment: '',
       plan: '',
     })
@@ -715,6 +717,7 @@ export default function ClinicalNote({
           historyAvailable: clinicalNote?.historyAvailable || clinicalNote?.history_available || '',
           historyDetails: clinicalNote?.historyDetails || clinicalNote?.history_details || '',
           physicalExam: clinicalNote?.physicalExam || clinicalNote?.physical_exam || '',
+          examFreeText: clinicalNote?.examFreeText || clinicalNote?.exam_free_text || '',
           assessment: clinicalNote?.assessment || '',
           plan: clinicalNote?.plan || '',
         })
@@ -1260,6 +1263,8 @@ export default function ClinicalNote({
               onAddAllergy={handleAddAllergy}
               onUpdateAllergy={handleUpdateAllergy}
               onRemoveAllergy={handleRemoveAllergy}
+              priorVisits={priorVisits}
+              scoreHistory={scoreHistory}
             />
           </>
         )}
@@ -1274,6 +1279,7 @@ export default function ClinicalNote({
           patient={patient}
           noteData={noteData}
           updateNote={updateNote}
+          selectedDiagnoses={selectedDiagnoses}
         />
       )}
 

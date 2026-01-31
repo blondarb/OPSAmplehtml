@@ -15,6 +15,7 @@ interface UseVoiceRecorderResult {
   transcribedText: string | null
   rawText: string | null
   recordingDuration: number
+  lastAudioBlob: Blob | null
   startRecording: () => Promise<void>
   pauseRecording: () => void
   resumeRecording: () => void
@@ -37,6 +38,7 @@ export function useVoiceRecorder(options?: UseVoiceRecorderOptions): UseVoiceRec
   const streamRef = useRef<MediaStream | null>(null)
   const timerRef = useRef<NodeJS.Timeout | null>(null)
   const mimeTypeRef = useRef<string>('')
+  const lastAudioBlobRef = useRef<Blob | null>(null)
 
   const clearTranscription = useCallback(() => {
     setTranscribedText(null)
@@ -87,6 +89,9 @@ export function useVoiceRecorder(options?: UseVoiceRecorderOptions): UseVoiceRec
 
         console.log('Recording stopped. Audio chunks:', audioChunksRef.current.length, 'Total size:', audioBlob.size, 'bytes')
 
+        // Store blob for retry capability
+        lastAudioBlobRef.current = audioBlob
+
         if (audioBlob.size === 0) {
           setError('No audio recorded')
           setIsRecording(false)
@@ -109,7 +114,12 @@ export function useVoiceRecorder(options?: UseVoiceRecorderOptions): UseVoiceRec
         try {
           const formData = new FormData()
           // Convert to a file with proper extension for OpenAI
-          const extension = mimeTypeRef.current.includes('webm') ? 'webm' : 'm4a'
+          // Safari uses audio/mp4 or audio/x-m4a; Chrome/Firefox use audio/webm
+          const mime = mimeTypeRef.current.toLowerCase()
+          const extension = mime.includes('webm') ? 'webm'
+            : mime.includes('mp4') || mime.includes('m4a') ? 'm4a'
+            : mime.includes('ogg') ? 'ogg'
+            : 'webm'
           const audioFile = new File([audioBlob], `recording.${extension}`, { type: mimeTypeRef.current })
           formData.append('audio', audioFile)
 
@@ -230,6 +240,7 @@ export function useVoiceRecorder(options?: UseVoiceRecorderOptions): UseVoiceRec
     transcribedText,
     rawText,
     recordingDuration,
+    lastAudioBlob: lastAudioBlobRef.current,
     startRecording,
     pauseRecording,
     resumeRecording,
