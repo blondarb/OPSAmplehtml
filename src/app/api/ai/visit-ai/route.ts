@@ -157,7 +157,11 @@ Speaker identification hints:
 - Provider usually asks questions, gives medical advice, discusses diagnoses
 - Patient usually describes symptoms, answers questions, reports concerns
 
-IMPORTANT: Return ONLY valid JSON, no markdown formatting.
+IMPORTANT GUARDRAILS:
+- Return ONLY valid JSON, no markdown formatting.
+- Do NOT comment on, judge, or flag missing or undocumented findings. Only include what IS documented in the transcript.
+- Do NOT say things like "no exam documented", "physical exam not performed", "ROS not discussed", or "missing data".
+- If a section has no relevant content in the transcript, return an empty string — do not call out its absence.
 
 {
   "hpiFromVisit": "Narrative paragraph of HPI based on patient-reported information. Use third-person medical style. Include onset, duration, severity, associated symptoms. 3-5 sentences.",

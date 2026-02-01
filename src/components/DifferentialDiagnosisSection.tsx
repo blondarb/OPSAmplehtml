@@ -23,7 +23,6 @@ export default function DifferentialDiagnosisSection({
   const [searchQuery, setSearchQuery] = useState('')
   const [showSearch, setShowSearch] = useState(false)
   const [expandedDiagnoses, setExpandedDiagnoses] = useState<Record<string, boolean>>({})
-  const [searchCategory, setSearchCategory] = useState<string | null>(null)
   // Track manually removed diagnoses to prevent auto-re-adding
   const [manuallyRemoved, setManuallyRemoved] = useState<Set<string>>(new Set())
 
@@ -60,14 +59,11 @@ export default function DifferentialDiagnosisSection({
   // Search results
   const searchResults = useMemo(() => {
     if (!searchQuery.trim()) return []
-    let results = searchDiagnoses(searchQuery)
-    if (searchCategory) {
-      results = results.filter(d => d.category === searchCategory)
-    }
+    const results = searchDiagnoses(searchQuery)
     // Exclude already selected
     const selectedIds = new Set(selectedDiagnoses.map(d => d.id))
     return results.filter(d => !selectedIds.has(d.id)).slice(0, 20)
-  }, [searchQuery, searchCategory, selectedDiagnoses])
+  }, [searchQuery, selectedDiagnoses])
 
   const acceptDiagnosis = (diagnosis: Diagnosis) => {
     if (!selectedDiagnoses.find(d => d.id === diagnosis.id)) {
@@ -250,7 +246,6 @@ export default function DifferentialDiagnosisSection({
                 onClick={() => {
                   setShowSearch(false)
                   setSearchQuery('')
-                  setSearchCategory(null)
                 }}
                 style={{
                   background: 'transparent',
@@ -265,43 +260,6 @@ export default function DifferentialDiagnosisSection({
                   <line x1="6" y1="6" x2="18" y2="18" />
                 </svg>
               </button>
-            </div>
-
-            {/* Category Filter */}
-            <div style={{ padding: '8px 12px', borderBottom: '1px solid var(--border)', display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
-              <button
-                onClick={() => setSearchCategory(null)}
-                style={{
-                  padding: '4px 10px',
-                  borderRadius: '12px',
-                  fontSize: '11px',
-                  border: '1px solid',
-                  borderColor: !searchCategory ? 'var(--primary)' : 'var(--border)',
-                  background: !searchCategory ? 'rgba(13, 148, 136, 0.1)' : 'transparent',
-                  color: !searchCategory ? 'var(--primary)' : 'var(--text-secondary)',
-                  cursor: 'pointer',
-                }}
-              >
-                All
-              </button>
-              {DIAGNOSIS_CATEGORIES.slice(0, 8).map(cat => (
-                <button
-                  key={cat.id}
-                  onClick={() => setSearchCategory(cat.id)}
-                  style={{
-                    padding: '4px 10px',
-                    borderRadius: '12px',
-                    fontSize: '11px',
-                    border: '1px solid',
-                    borderColor: searchCategory === cat.id ? 'var(--primary)' : 'var(--border)',
-                    background: searchCategory === cat.id ? 'rgba(13, 148, 136, 0.1)' : 'transparent',
-                    color: searchCategory === cat.id ? 'var(--primary)' : 'var(--text-secondary)',
-                    cursor: 'pointer',
-                  }}
-                >
-                  {cat.name}
-                </button>
-              ))}
             </div>
 
             {/* Search Results */}

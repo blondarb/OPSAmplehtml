@@ -2929,12 +2929,6 @@ ${noteData.plan || 'Not documented'}`.trim()
                     cursor: 'pointer',
                   }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <span style={{
-                      width: '8px',
-                      height: '8px',
-                      borderRadius: '50%',
-                      background: 'var(--primary)',
-                    }} />
                     <span style={{ fontSize: '14px', fontWeight: 500 }}>Gait</span>
                     <span title="May be limited in telemedicine; MA assistance recommended" style={{ color: '#D97706', cursor: 'help' }}>
                       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg>

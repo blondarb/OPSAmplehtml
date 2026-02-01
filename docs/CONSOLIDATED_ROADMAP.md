@@ -1,7 +1,7 @@
 # Consolidated Roadmap - Sevaro Clinical
 
-**Version:** 1.5
-**Last Updated:** February 1, 2026 (5 UX improvements + user feedback backlog from live testing)
+**Version:** 1.6
+**Last Updated:** February 1, 2026 (P0 bugfixes, hasSmartPlan sync, feedback backlog triage)
 **Purpose:** Single source of truth consolidating all phases across PRDs
 
 ---
@@ -161,7 +161,8 @@ These foundational features are fully implemented.
 | **Plan overrides mechanism for sync** | ✅ COMPLETE | P1 |
 | **ICD-10 parsing fix (markdown-formatted source)** | ✅ COMPLETE | P0 |
 | Recommendation reconciliation engine | ⏳ PENDING | P2 |
-| Expand to all 134 diagnoses | 🔧 PARTIAL | P1 — 67/134 plans built, ~90 more to add |
+| hasSmartPlan flag sync | ✅ COMPLETE | 148/166 diagnoses flagged, matches 98 DB plans |
+| Expand to all 166 diagnoses | 🔧 PARTIAL | P1 — 98 plans in DB, 148/166 covered (89%), 18 still need plans |
 
 **Reference:** https://blondarb.github.io/neuro-plans/clinical/
 
@@ -170,7 +171,7 @@ These foundational features are fully implemented.
 - Strips markdown formatting (`**`) from ICD-10 codes, extracts clean codes
 - Filters to OPD-only items, flattens dosing structures
 - Applies local overrides from `scripts/plan-overrides.json` (fixes source data gaps)
-- Upserts to Supabase `clinical_plans` table (67 plans)
+- Upserts to Supabase `clinical_plans` table (98 plans in DB total)
 - SmartRecommendationsSection fetches from `/api/plans` endpoint with fallback to hardcoded data
 
 **Subsection Ordering (recommendationOrdering.ts):**
@@ -190,7 +191,7 @@ These foundational features are fully implemented.
 - Search matches against name, ICD-10 code, AND diagnosis ID
 - Plan search across title, ICD-10 codes, and scope
 
-**Current Plans Available (67):**
+**Current Plans Available (98 in DB):**
 Migraine, Migraine with Aura, Chronic Migraine, Cluster Headache, Tension-Type Headache, Medication Overuse Headache, Low Pressure Headache, Post-Concussion Syndrome, Trigeminal Neuralgia, New Onset Seizure, Status Epilepticus, Breakthrough Seizure, NCSE, Acute Ischemic Stroke, TIA, Intracerebral Hemorrhage, Subarachnoid Hemorrhage, CVT, Parkinson's Disease, Parkinson's Disease - New Diagnosis, Drug-Induced Parkinsonism, Essential Tremor, Dystonia, Tardive Dyskinesia, Huntington's Disease, RLS, Wilson's Disease, MS - New Diagnosis, MS - Chronic Management, NMOSD, Optic Neuritis, Dementia Evaluation, MCI, Alzheimer's Disease, Lewy Body Dementia, Vascular Dementia, Frontotemporal Dementia, Rapidly Progressive Dementia, NPH, Peripheral Neuropathy, Diabetic Neuropathy, Small Fiber Neuropathy, CIDP, Carpal Tunnel Syndrome, Radiculopathy, GBS, MG - New Diagnosis, MG - Outpatient Management, MG - Exacerbation/Crisis, ALS/MND, Neuromuscular Respiratory Failure, Autoimmune Encephalitis, Bacterial Meningitis, HSV Encephalitis, Bell's Palsy, Syncope, Vertigo/Dizziness Evaluation, Wernicke Encephalopathy, Brain Metastases, IIH, Elevated ICP Management, Spinal Epidural Abscess, Acute Myelopathy, Cauda Equina Syndrome, Spinal Cord Compression, GCA, FND
 
 ---
@@ -263,37 +264,38 @@ From live testing session. Items organized by priority tier.
 
 | Item | Status | Component | Description |
 |------|--------|-----------|-------------|
-| Second Chart Prep breaks note | 🐛 OPEN | VoiceDrawer.tsx | Creating another chart prep after one corrupts note data |
-| Tab nav scrolls with content | 🐛 OPEN | CenterPanel.tsx | Navigation tabs + action bar should be sticky/fixed |
-| Sign & Complete non-functional | 🐛 OPEN | CenterPanel.tsx | Button does nothing |
+| Cross-patient data contamination | ✅ FIXED | ClinicalNote.tsx | resetAllClinicalState + async guards |
+| Second Chart Prep breaks note (F1) | ✅ FIXED | VoiceDrawer.tsx | Marker-based replace + noteDataRef |
+| Tab nav scrolls with content (F2) | ✅ FIXED | globals.css, CenterPanel.tsx | z-index 20 on tab-nav-wrapper |
+| Sign & Complete non-functional (F3) | ✅ FIXED | CenterPanel.tsx | Prior commit |
 
 #### Quick UI Fixes (P1)
 
 | Item | Status | Component | Description |
 |------|--------|-----------|-------------|
-| Remove "Final recommendation time" | ⏳ PENDING | CenterPanel.tsx | Section not needed |
-| Remove/fix DDx search filter icons | ⏳ PENDING | DifferentialDiagnosisSection.tsx | Icons make searching harder |
-| Rename "Differential diagnosis" → "Diagnoses" | ⏳ PENDING | DifferentialDiagnosisSection.tsx | Simpler label |
-| Remove mystery circle next to Gait | ⏳ PENDING | CenterPanel.tsx | Unexplained UI element |
-| Remove "AI Summary" button in Chart Prep | ⏳ PENDING | VoiceDrawer.tsx | Keep only "Done" button |
+| Remove "Final recommendation time" (F4) | ✅ FIXED | CenterPanel.tsx | Already removed |
+| Remove DDx search filter pills (F5) | ✅ FIXED | DifferentialDiagnosisSection.tsx | Filter bar + dead state removed |
+| Rename "Differential diagnosis" → "Diagnoses" (F6) | ✅ FIXED | DifferentialDiagnosisSection.tsx | Already renamed |
+| Remove mystery circle next to Gait (F7) | ✅ FIXED | CenterPanel.tsx | 8px teal dot removed |
+| Remove "AI Summary" button in Chart Prep (F8) | ✅ FIXED | VoiceDrawer.tsx | Already removed |
 
 #### Behavior Changes (P1)
 
 | Item | Status | Component | Description |
 |------|--------|-----------|-------------|
-| Chart Prep → single paragraph summary | ⏳ PENDING | VoiceDrawer.tsx, chart-prep API | Don't place items in fields or show boxes |
-| AI should not judge missing findings | ⏳ PENDING | AI prompts | AI notes things aren't documented; Chart Prep context leak |
-| Copy Note → slide-out drawer | ⏳ PENDING | CenterPanel.tsx | Show completed note in drawer, not just clipboard |
-| Exam scale hover tooltips | ⏳ PENDING | ExamScalesSection.tsx | Explain purpose and when to use each scale |
+| Chart Prep → single paragraph summary (F9) | ✅ FIXED | VoiceDrawer.tsx, chart-prep API | API refactored to narrative format |
+| AI should not judge missing findings (F10) | ✅ FIXED | visit-ai, synthesize-note | Guardrails added to all AI prompts |
+| Copy Note → slide-out drawer (F11) | ✅ FIXED | CenterPanel.tsx | showCopyDrawer added |
+| Exam scale hover tooltips (F12) | ✅ FIXED | ExamScalesSection.tsx | title attribute on scale buttons |
 
 #### Feature Additions (P2)
 
 | Item | Status | Component | Description |
 |------|--------|-----------|-------------|
-| Add symptom-based diagnoses | ⏳ PENDING | diagnosisData.ts | Paresthesias, headaches, spells, dizziness, weakness, numbness, etc. |
-| Patient History Summary context | ⏳ PENDING | PatientHistorySummary.tsx | Referral summary for new patients, longitudinal for follow-ups |
-| Sign & Complete full workflow | ⏳ PENDING | CenterPanel.tsx + API | Write to visits table, schedule follow-up, appear on schedule |
-| Imaging longitudinal tracking | ⏳ PENDING | ImagingResultsTab.tsx | Add study types, summary view for entered data, edit only for corrections |
+| Add symptom-based diagnoses (F13) | ✅ FIXED | diagnosisData.ts | 10 symptoms added |
+| Patient History Summary context (F14) | 🔧 PARTIAL | PatientHistorySummary.tsx | Referral note card for new patients; longitudinal follow-up TBD |
+| Sign & Complete full workflow (F15) | ✅ FIXED | ClinicalNote.tsx + API | Writes to visits, AI summary, ScheduleFollowupModal, appointments API; migration 016 pending DB apply |
+| Imaging longitudinal tracking (F16) | ✅ FIXED | ImagingResultsTab.tsx | Array-based study tracking, prior studies, grouped dropdown |
 
 ---
 
@@ -661,5 +663,5 @@ Based on the analysis, here's the recommended implementation order to minimize r
 ---
 
 *Document created: January 24, 2026*
-*Last updated: February 1, 2026 (5 UX improvements + user feedback backlog from live testing)*
+*Last updated: February 1, 2026 (P0 bugfixes, hasSmartPlan sync, feedback backlog triage)*
 *Consolidates: All PRD documents*

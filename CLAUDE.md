@@ -66,7 +66,7 @@ src/
 │   ├── useRealtimeSession.ts # WebRTC hook for OpenAI Realtime API
 │   └── useVoiceRecorder.ts # Voice recording hook with pause/resume
 ├── lib/
-│   ├── diagnosisData.ts   # 134 neurology diagnoses with ICD-10 codes
+│   ├── diagnosisData.ts   # 166 neurology diagnoses with ICD-10 codes
 │   ├── historianTypes.ts  # TypeScript types for AI Historian
 │   ├── historianPrompts.ts # System prompts for AI Historian interviews
 │   ├── medicationTypes.ts # TypeScript types for medications & allergies
@@ -134,7 +134,7 @@ The OpenAI API key can be stored securely in Supabase `app_settings` table or as
 
 4. **Differential Diagnosis Section**:
    - Auto-populates from Reason for Consult selections
-   - 134 neurology diagnoses with ICD-10 codes
+   - 166 neurology diagnoses with ICD-10 codes
    - Searchable diagnosis picker with category filtering
    - Supports custom diagnosis entry
 
@@ -333,7 +333,7 @@ The middleware (`src/middleware.ts`) handles session refresh. Uses a simplified 
 ## Data Files
 
 ### diagnosisData.ts
-- 134 neurology diagnoses organized into 15 categories
+- 166 neurology diagnoses organized into 16 categories
 - Each diagnosis has: id, name, icd10, category, optional alternateIcd10
 - CONSULT_TO_DIAGNOSIS_MAP links chief complaints to relevant diagnoses
 - Helper functions: getDiagnosisByCategory, searchDiagnoses, getDiagnosisById
@@ -377,6 +377,31 @@ When redeploying after changes, use "Redeploy without cache" to ensure fresh bui
 - Main branch: `main` (production)
 - Feature branches: `claude/review-repo-design-*`
 - Push to feature branch, create PR, merge to main for deployment
+
+## Recent Changes (February 2026)
+
+### P0 Bugfixes & Data Sync (February 1, 2026)
+- **Cross-Patient Data Contamination Fix**: New `resetAllClinicalState()` in ClinicalNote.tsx wipes all state on patient switch/sign; `isSwitchingPatientRef` guards async callbacks (Chart Prep, Visit AI, Historian import) from writing to wrong patient
+- **Second Chart Prep Fix (F1)**: Marker-based replace (`--- Chart Prep ---` / `--- End Chart Prep ---`) prevents content duplication; `noteDataRef` fixes stale closure in VoiceDrawer auto-process effect
+- **Tab Nav Z-Index Fix (F2)**: `.tab-nav-wrapper` raised to z-index 20; section pills to z-index 15; field action icons stay at z-index 10
+- **hasSmartPlan Sync**: Updated 148/166 diagnoses with `hasSmartPlan: true` (was only 6); matches 98 plans in Supabase `clinical_plans` table
+- **Cervical Myelopathy ICD-10 Fix**: Corrected from G99.2 to M47.12 to match DB plan
+- **Feedback Backlog Triage**: F1, F2, F9, F11, F12, F13, F14 (partial), F16 fixed; F4, F5, F6, F7, F8, F10 still pending
+
+### 5 UX Improvements (February 1, 2026)
+- **Consult Sub-Options Visibility**: Auto-scroll to sub-options, hint text, teal border highlight, chevron connector
+- **Tab Completion Indicators**: Green/amber dots on tabs with missing-field tooltips
+- **DDx Edit Affordances**: Priority badges, reorder arrows, set primary, swap search
+- **Recommendation Plan Adoption**: Select all/deselect all, "Added!" confirmation, plan textarea flash
+- **Contextual Exam Scales**: Recommended/All filter toggle, diagnosis context banner, teal dots
+
+### Earlier Fixes in This Session (February 1, 2026)
+- **Chart Prep Narrative Format (F9)**: API refactored to single paragraph summary
+- **Copy Note Drawer (F11)**: Copy button opens slide-out drawer showing formatted note
+- **Exam Scale Tooltips (F12)**: Title attribute with hover explanation on scale buttons
+- **Symptom-Based Diagnoses (F13)**: 10 symptom entries added to diagnosisData.ts
+- **Patient History Summary Context (F14)**: Referral note card for new patients
+- **Imaging Longitudinal Tracking (F16)**: Array-based study tracking, prior studies, grouped dropdown
 
 ## Recent Changes (January 2026)
 

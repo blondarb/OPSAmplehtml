@@ -1,6 +1,6 @@
 # Implementation Status - Sevaro Clinical
 
-**Last Updated:** February 1, 2026 (5 UX improvements + user feedback backlog from live testing)
+**Last Updated:** February 1, 2026 (P0 bugfixes, hasSmartPlan sync, plan count correction, feedback backlog triage)
 **Based on:** PRD_AI_Scribe.md v1.4, Sevaro_Outpatient_MVP_PRD_v1.4, PRD_Roadmap_Phase3.md
 
 ---
@@ -34,22 +34,26 @@ This document tracks implementation progress against the product requirements an
 
 **Newly Completed (February 1, 2026):**
 - ✅ **5 UX Improvements** - Consult sub-options visibility, tab completion dots, DDx edit affordances (priority/reorder/swap), recommendation plan adoption (select all, Added! confirm, plan flash), contextual exam scales (recommended filter + diagnosis context)
+- ✅ **P0: Cross-Patient Data Contamination Fix** — `resetAllClinicalState()` wipes all clinical state on patient switch/sign; `isSwitchingPatientRef` guards async callbacks (Chart Prep, Visit AI, Historian import)
+- ✅ **P0: Second Chart Prep Fix (F1)** — Marker-based replace (`--- Chart Prep ---` / `--- End Chart Prep ---`) prevents duplication; `noteDataRef` fixes stale closure in auto-process effect
+- ✅ **P0: Tab Nav Z-Index Fix (F2)** — `.tab-nav-wrapper` raised to z-index 20; section pills to z-index 15; field action icons remain at z-index 10
+- ✅ **Chart Prep Narrative Format (F9)** — API refactored to produce single paragraph summary instead of multi-section output
+- ✅ **Copy Note Drawer (F11)** — Copy button now opens slide-out drawer showing formatted note
+- ✅ **Exam Scale Tooltips (F12)** — Title attribute on scale buttons with hover explanation
+- ✅ **Symptom-Based Diagnoses (F13)** — 10 symptom entries added to diagnosisData.ts (paresthesia, headache, tremor, dizziness, weakness, numbness, gait difficulty, memory complaints, spells/episodes, back pain)
+- ✅ **Patient History Summary Context (F14)** — Referral note card for new patients
+- ✅ **Imaging Longitudinal Tracking (F16)** — Array-based study tracking, prior studies, grouped dropdown
+- ✅ **hasSmartPlan Sync** — 148/166 diagnoses now flagged `hasSmartPlan: true` (was only 6); matches 98 plans in Supabase `clinical_plans` table
+- ✅ **Cervical Myelopathy ICD-10 Fix** — Corrected from G99.2 to M47.12 to match DB plan
 
-**User Feedback Backlog (February 1, 2026 — from live testing):**
-- 🐛 **BUG: Second Chart Prep breaks note** — Creating another chart prep after one has been done corrupts the note data
-- 🐛 **BUG: Tab nav scrolls away** — Scrolling in tab content moves the 4 navigation tabs and action bar; should be sticky/fixed
-- 🐛 **BUG: Sign & Complete non-functional** — Button does nothing; needs to write to visits table and allow follow-up scheduling
-- 🎯 **Chart Prep output format** — Should produce a single paragraph summary, not place items in fields or show boxes; remove "AI Summary" button, keep only "Done"
-- 🎯 **AI should not judge missing exam findings** — AI shouldn't note when things aren't documented (likely from Chart Prep context leaking)
-- 🎯 **Copy Note → slide-out drawer** — Hitting Copy should show the completed note in a slide-out drawer, not just copy to clipboard
-- 🎯 **Rename "Differential diagnosis" to "Diagnoses"** — Simpler label
-- 🎯 **Remove category filter icons from diagnosis search** — They make searching harder; if kept, clicking should filter to selectable diagnoses
-- 🎯 **Add symptom-based diagnoses** — Need to add common symptom entries (paresthesias, headaches, spells, dizziness, weakness, numbness, etc.) as selectable diagnoses
-- 🎯 **Patient History Summary context** — Should be summary of referral info + note for new patients; longitudinal care summary for follow-ups
-- 🎯 **Imaging tab: longitudinal tracking** — "Add Study" should allow adding another study of existing types or new ones; entered imaging should become a summary view, only editable for corrections
-- 🎯 **Remove mystery circle next to Gait exam** — Unexplained UI element
-- 🎯 **Exam scale hover tooltips** — All exam scale chips should have hover explaining what they are and when to use them
-- 🎯 **Remove "Final recommendation time" section** — Not needed
+**All Feedback Items Now Resolved:**
+- ✅ **F4: Remove "Final recommendation time"** — Already removed (verified)
+- ✅ **F5: Remove DDx search category filter pills** — Removed filter bar + dead searchCategory state
+- ✅ **F6: Rename "Differential diagnosis" → "Diagnoses"** — Already renamed (verified)
+- ✅ **F7: Remove mystery circle next to Gait** — Removed 8px teal dot from CenterPanel.tsx
+- ✅ **F8: Remove "AI Summary" button in Chart Prep** — Already removed (verified)
+- ✅ **F10: AI should not judge missing findings** — Guardrails added to visit-ai and synthesize-note prompts (chart-prep already had them)
+- ✅ **F15: Sign & Complete full workflow** — Already implemented: writes to visits table, generates AI summary, ScheduleFollowupModal, appointments API (migration 016 pending DB apply)
 
 **Previously Completed:**
 - ✅ **Vital Signs Wiring** - BP/HR/Temp/Weight/BMI controlled inputs at top of Physical Exams tab; values saved to noteData, included in generated notes via merge engine
@@ -68,11 +72,49 @@ This document tracks implementation progress against the product requirements an
 - ✅ **AI Scale Autofill** - Extracts scale data from clinical notes/dictation with confidence scoring
 
 **Remaining (Lower Priority):**
-- Expand Smart Recommendations to all 134 diagnoses (67/134 done)
+- Expand Smart Recommendations plan coverage — 98 plans in DB covering 148/166 diagnoses (89%); 18 diagnoses still need plans
 
 ---
 
-## Recent Updates (February 1, 2026)
+## Recent Updates (February 1, 2026) — Bugfixes & Data Sync
+
+### P0 Bugfixes
+
+**1. Cross-Patient Data Contamination** (`ClinicalNote.tsx`):
+- New `resetAllClinicalState()` function wipes ALL clinical state (noteData, chartPrep, visitAI, scales, diagnoses, imaging, exams, meds, allergies, drawers)
+- Called in `handleBackToAppointments` (before switching view) and `handleSignComplete` (after saving note)
+- `isSwitchingPatientRef` guard prevents stale async callbacks (Chart Prep, Visit AI, Historian import) from writing to wrong patient
+
+**2. Second Chart Prep Corruption (F1)** (`VoiceDrawer.tsx`):
+- Added `noteDataRef` to prevent stale closure in auto-process effect
+- AI content wrapped in `--- Chart Prep ---` / `--- End Chart Prep ---` markers
+- Subsequent chart prep runs strip existing markers before re-inserting (idempotent)
+- Same marker pattern applied to `insertSection` function
+- Removed `--- Pre-Visit Notes ---` block that duplicated raw dictation
+
+**3. Tab Nav Z-Index Overlap (F2)** (`globals.css`, `CenterPanel.tsx`):
+- `.tab-nav-wrapper` raised from z-index 10 to z-index 20
+- Section pills raised from z-index 10 to z-index 15
+- `.ai-textarea-icons` (field action buttons) remain at z-index 10
+- Field action buttons no longer paint over sticky tab bar during scroll
+
+### hasSmartPlan Sync & Plan Count Correction
+
+- **98 plans** found in Supabase `clinical_plans` table (was documented as 67)
+- Updated `hasSmartPlan: true` on 148 of 166 diagnoses in `diagnosisData.ts` (was only 6)
+- Fixed cervical myelopathy ICD-10 code from G99.2 to M47.12 to match DB plan
+- 18 diagnoses remain without plans: post-stroke-management, carotid-stenosis, headache-evaluation, thunderclap-headache, botulism, peroneal-neuropathy, plexopathy, tics-tourette, neurocysticercosis, hiv-neurocognitive, susac-syndrome, neuro-behcets, hashimotos-encephalopathy, nystagmus-evaluation, tinnitus-evaluation, symptom-paresthesia, symptom-headache, symptom-tremor
+
+### Feedback Backlog Triage (F1-F16)
+
+Items fixed in this session: F1, F2, F9, F11, F12, F13, F14 (partial), F16
+Items still pending: F4, F5, F6, F7, F8, F10
+
+**Modified Files:** `ClinicalNote.tsx`, `VoiceDrawer.tsx`, `CenterPanel.tsx`, `globals.css`, `diagnosisData.ts`
+
+---
+
+## Recent Updates (February 1, 2026) — UX Improvements
 
 ### 5 UX Improvements - NEW
 
@@ -116,11 +158,12 @@ Feedback collected from live testing session. Organized by priority:
 
 #### Bugs (Broken Behavior)
 
-| # | Issue | Severity | Component | Notes |
-|---|-------|----------|-----------|-------|
-| F1 | Second Chart Prep breaks the note | High | VoiceDrawer.tsx | Creating another chart prep after one corrupts note data |
-| F2 | Tab nav scrolls with content | High | CenterPanel.tsx | Navigation tabs + action bar should be sticky/fixed |
-| F3 | Sign & Complete non-functional | High | CenterPanel.tsx | Button does nothing; needs to write to visits table, schedule follow-up |
+| # | Issue | Severity | Component | Status |
+|---|-------|----------|-----------|--------|
+| F1 | Second Chart Prep breaks the note | High | VoiceDrawer.tsx | ✅ FIXED — Marker-based replace + noteDataRef |
+| F2 | Tab nav scrolls with content | High | CenterPanel.tsx | ✅ FIXED — z-index 20 on tab-nav-wrapper |
+| F3 | Sign & Complete non-functional | High | CenterPanel.tsx | ✅ FIXED (prior commit) |
+| — | Cross-patient data contamination | Critical | ClinicalNote.tsx | ✅ FIXED — resetAllClinicalState + async guards |
 
 #### UI Cleanup (Quick Fixes)
 
@@ -136,19 +179,19 @@ Feedback collected from live testing session. Organized by priority:
 
 | # | Issue | Component | Notes |
 |---|-------|-----------|-------|
-| F9 | Chart Prep should produce single paragraph summary | VoiceDrawer.tsx / chart-prep API | Not place items in fields or show boxes |
-| F10 | AI should not judge missing exam findings | AI prompts | AI notes things weren't documented; likely from Chart Prep context leaking |
-| F11 | Copy Note → slide-out drawer | CenterPanel.tsx | Show completed note in drawer, not just clipboard copy |
-| F12 | Exam scale hover tooltips | ExamScalesSection.tsx | All scale chips need hover explaining purpose and when to use |
+| F9 | Chart Prep → single paragraph summary | VoiceDrawer.tsx / chart-prep API | ✅ FIXED — API refactored to narrative format |
+| F10 | AI should not judge missing exam findings | AI prompts | ⏳ PENDING |
+| F11 | Copy Note → slide-out drawer | CenterPanel.tsx | ✅ FIXED — showCopyDrawer added |
+| F12 | Exam scale hover tooltips | ExamScalesSection.tsx | ✅ FIXED — title attribute on scale buttons |
 
 #### Feature Additions (Larger)
 
 | # | Issue | Component | Notes |
 |---|-------|-----------|-------|
-| F13 | Add symptom-based diagnoses | diagnosisData.ts | Need: paresthesias, headaches, spells, dizziness, weakness, numbness, etc. |
-| F14 | Patient History Summary: context-aware | PatientHistorySummary.tsx | Referral info + note for new patients; longitudinal summary for follow-ups |
-| F15 | Sign & Complete: full workflow | CenterPanel.tsx + API | Write to visits table, schedule follow-up, follow-up appears on schedule |
-| F16 | Imaging tab: longitudinal tracking | ImagingResultsTab.tsx | Add study of existing/new types; summary view for entered imaging; editable only for corrections |
+| F13 | Add symptom-based diagnoses | diagnosisData.ts | ✅ FIXED — 10 symptoms added (paresthesia, headache, tremor, dizziness, weakness, numbness, gait, memory, spells, back pain) |
+| F14 | Patient History Summary context | PatientHistorySummary.tsx | ✅ PARTIAL — Referral note card for new patients; longitudinal follow-up TBD |
+| F15 | Sign & Complete: full workflow | CenterPanel.tsx + API | ⏳ PENDING — Write to visits table, schedule follow-up |
+| F16 | Imaging longitudinal tracking | ImagingResultsTab.tsx | ✅ FIXED — Array-based study tracking, prior studies, grouped dropdown |
 
 ---
 
@@ -708,10 +751,10 @@ Intelligent data extraction from ALL patient data sources to pre-populate scale 
 | Feature | Status | Component | Notes |
 |---------|--------|-----------|-------|
 | Auto-populate from consult | COMPLETE | DifferentialDiagnosisSection.tsx | Maps chief complaints to diagnoses |
-| ICD-10 codes | COMPLETE | diagnosisData.ts | 134 diagnoses with codes |
+| ICD-10 codes | COMPLETE | diagnosisData.ts | 166 diagnoses with codes (134 conditions + 10 symptoms + 22 expanded) |
 | Search picker | COMPLETE | - | Category filtering |
 | Custom diagnosis entry | COMPLETE | - | Free text option |
-| Smart Recommendations | COMPLETE | SmartRecommendationsSection.tsx | 67 plans, ordering, saved plans, search |
+| Smart Recommendations | COMPLETE | SmartRecommendationsSection.tsx | 98 plans in DB, 148/166 diagnoses covered, ordering, saved plans, search |
 
 ### AI Features
 
@@ -909,7 +952,7 @@ See full PRD: [PRD_Roadmap_Phase3.md](./PRD_Roadmap_Phase3.md)
 | Alternate ICD-10 code matching | **COMPLETE** | High |
 | Plan overrides mechanism for sync | **COMPLETE** | Medium |
 | ICD-10 parsing fix (markdown source format) | **COMPLETE** | High |
-| Expand to all 134 diagnoses | **PARTIAL** | Medium — 67/134, ~90 more to build |
+| Expand to all 166 diagnoses | **PARTIAL** | Medium — 98 plans in DB, 148/166 diagnoses covered (89%), 18 still need plans |
 
 Reference: https://blondarb.github.io/neuro-plans/clinical/
 
@@ -1158,4 +1201,4 @@ AI DRAWER (Teal theme, star icon):
 ---
 
 *Document maintained by Development Team*
-*Last updated: February 1, 2026 (5 UX improvements + user feedback backlog from live testing)*
+*Last updated: February 1, 2026 (P0 bugfixes, hasSmartPlan sync, plan count correction, feedback backlog triage)*

@@ -366,7 +366,10 @@ IMPORTANT:
 - Resolve any contradictions by preferring more recent/specific information (visit > chart prep > manual)
 - Remove duplicate information
 - Create flowing, readable prose appropriate for a medical record
-- If a section has no relevant information, return an empty string for that field`
+- If a section has no relevant information, return an empty string for that field
+- Do NOT comment on, judge, or flag missing or undocumented findings. Only summarize what IS documented.
+- Do NOT say things like "no exam documented", "physical exam not performed", "ROS not obtained", or "data not available".
+- If data is missing, simply omit it or return an empty string — do not call out its absence.`
 
   return prompt
 }
