@@ -59,6 +59,10 @@ export default function VoiceDrawer({
   const [autoProcessing, setAutoProcessing] = useState(false)
   const hasAutoProcessedRef = useRef(false)
 
+  // Ref to always have latest noteData in async callbacks (prevents stale closure bugs)
+  const noteDataRef = useRef(noteData)
+  useEffect(() => { noteDataRef.current = noteData }, [noteData])
+
   // Visit AI specific state
   const [visitAIOutput, setVisitAIOutput] = useState<VisitAIOutput | null>(null)
   const [visitTranscript, setVisitTranscript] = useState<string>('')
@@ -265,12 +269,22 @@ export default function VoiceDrawer({
   }
 
   // Insert a chart prep section into a note field
+  // Replaces any previous chart prep content in that field to prevent duplication
   const insertSection = (sectionKey: string, targetField: string) => {
     if (!chartPrepSections || !chartPrepSections[sectionKey]) return
 
     const content = chartPrepSections[sectionKey]
     const currentValue = noteData[targetField] || ''
-    const newValue = currentValue ? `${currentValue}\n\n${content}` : content
+
+    // Strip any previous chart prep content (between markers) before inserting
+    const stripped = currentValue
+      .replace(/--- Chart Prep ---[\s\S]*?--- End Chart Prep ---\n*/g, '')
+      .trim()
+
+    const markedContent = `--- Chart Prep ---\n${content}\n--- End Chart Prep ---`
+    const newValue = stripped
+      ? `${stripped}\n\n${markedContent}`
+      : markedContent
     updateNote(targetField, newValue)
     setInsertedSections(prev => new Set([...prev, sectionKey]))
   }
@@ -402,13 +416,9 @@ export default function VoiceDrawer({
                 onChartPrepComplete(data.sections)
               }
 
-              // Auto-insert all sections to note
-              const fieldUpdates: Record<string, string[]> = {
-                hpi: [],
-                assessment: [],
-                plan: [],
-              }
-
+              // Auto-insert sections into note fields
+              // Uses noteDataRef for current values (avoids stale closure)
+              // Replaces any previous chart prep content to prevent duplication
               const config = [
                 { key: 'suggestedHPI', targetField: 'hpi' },
                 { key: 'suggestedAssessment', targetField: 'assessment' },
@@ -417,23 +427,19 @@ export default function VoiceDrawer({
 
               config.forEach(section => {
                 if (section.targetField && data.sections[section.key]) {
-                  fieldUpdates[section.targetField].push(data.sections[section.key])
-                }
-              })
+                  const currentValue = noteDataRef.current[section.targetField] || ''
+                  const aiContent = data.sections[section.key]
 
-              // Add prep notes text
-              if (updatedNotes.length > 0) {
-                const prepNotesText = updatedNotes.map(n => `[${n.category}] ${n.text}`).join('\n\n')
-                fieldUpdates.hpi.unshift(`--- Pre-Visit Notes ---\n${prepNotesText}\n--- End Pre-Visit Notes ---\n`)
-              }
+                  // Strip any previous chart prep content (between markers) before inserting
+                  const stripped = currentValue
+                    .replace(/--- Chart Prep ---[\s\S]*?--- End Chart Prep ---\n*/g, '')
+                    .trim()
 
-              Object.entries(fieldUpdates).forEach(([field, contents]) => {
-                if (contents.length > 0) {
-                  const currentValue = noteData[field] || ''
-                  const newValue = currentValue
-                    ? `${currentValue}\n\n${contents.join('\n\n')}`
-                    : contents.join('\n\n')
-                  updateNote(field, newValue)
+                  const markedContent = `--- Chart Prep ---\n${aiContent}\n--- End Chart Prep ---`
+                  const newValue = stripped
+                    ? `${stripped}\n\n${markedContent}`
+                    : markedContent
+                  updateNote(section.targetField, newValue)
                 }
               })
 

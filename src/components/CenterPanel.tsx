@@ -1235,7 +1235,7 @@ ${noteData.plan || 'Not documented'}`.trim()
               <div style={{
                 position: 'sticky',
                 top: 0,
-                zIndex: 10,
+                zIndex: 15,
                 background: 'var(--bg-gray)',
                 padding: '8px 0 10px',
                 marginBottom: '8px',
