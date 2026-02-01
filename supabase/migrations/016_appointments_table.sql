@@ -1,6 +1,7 @@
 -- Migration 016: Appointments table
 -- Unblocks the Sign & Complete → Schedule Follow-up → Dashboard flow
 -- (API routes and ScheduleFollowupModal already exist in code)
+-- Idempotent: handles case where table already exists without tenant_id
 
 CREATE TABLE IF NOT EXISTS appointments (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -22,13 +23,17 @@ CREATE TABLE IF NOT EXISTS appointments (
   scheduling_notes TEXT
 );
 
--- Indexes
-CREATE INDEX idx_appointments_patient_id ON appointments(patient_id);
-CREATE INDEX idx_appointments_date ON appointments(appointment_date);
-CREATE INDEX idx_appointments_status ON appointments(status);
-CREATE INDEX idx_appointments_tenant_id ON appointments(tenant_id);
+-- Add tenant_id if table already existed without it
+ALTER TABLE appointments ADD COLUMN IF NOT EXISTS tenant_id TEXT NOT NULL DEFAULT 'default';
 
--- Auto-update updated_at trigger (reuse existing function)
+-- Indexes (IF NOT EXISTS)
+CREATE INDEX IF NOT EXISTS idx_appointments_patient_id ON appointments(patient_id);
+CREATE INDEX IF NOT EXISTS idx_appointments_date ON appointments(appointment_date);
+CREATE INDEX IF NOT EXISTS idx_appointments_status ON appointments(status);
+CREATE INDEX IF NOT EXISTS idx_appointments_tenant_id ON appointments(tenant_id);
+
+-- Auto-update updated_at trigger (reuse existing function, drop first to be idempotent)
+DROP TRIGGER IF EXISTS update_appointments_updated_at ON appointments;
 CREATE TRIGGER update_appointments_updated_at
   BEFORE UPDATE ON appointments
   FOR EACH ROW
@@ -37,22 +42,27 @@ CREATE TRIGGER update_appointments_updated_at
 -- RLS
 ALTER TABLE appointments ENABLE ROW LEVEL SECURITY;
 
+-- Drop and recreate policies to be idempotent
+DROP POLICY IF EXISTS "Authenticated users can read appointments" ON appointments;
 CREATE POLICY "Authenticated users can read appointments"
   ON appointments FOR SELECT
   TO authenticated
   USING (true);
 
+DROP POLICY IF EXISTS "Authenticated users can insert appointments" ON appointments;
 CREATE POLICY "Authenticated users can insert appointments"
   ON appointments FOR INSERT
   TO authenticated
   WITH CHECK (true);
 
+DROP POLICY IF EXISTS "Authenticated users can update appointments" ON appointments;
 CREATE POLICY "Authenticated users can update appointments"
   ON appointments FOR UPDATE
   TO authenticated
   USING (true)
   WITH CHECK (true);
 
+DROP POLICY IF EXISTS "Authenticated users can delete appointments" ON appointments;
 CREATE POLICY "Authenticated users can delete appointments"
   ON appointments FOR DELETE
   TO authenticated

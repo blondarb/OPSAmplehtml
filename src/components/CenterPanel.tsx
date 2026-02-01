@@ -534,9 +534,9 @@ REVIEW OF SYSTEMS: ${noteData.ros || 'Not documented'}
 ${noteData.rosDetails ? `Details: ${noteData.rosDetails}` : ''}
 
 MEDICATIONS:
-${medications.filter(m => m.is_active).length > 0 ? medications.filter(m => m.is_active).map(m => `- ${m.medication_name}${m.dosage ? ` ${m.dosage}` : ''}${m.frequency ? ` ${m.frequency}` : ''}`).join('\n') : 'None documented'}
+${(medications || []).filter(m => m.is_active).length > 0 ? (medications || []).filter(m => m.is_active).map(m => `- ${m.medication_name}${m.dosage ? ` ${m.dosage}` : ''}${m.frequency ? ` ${m.frequency}` : ''}`).join('\n') : 'None documented'}
 
-ALLERGIES: ${allergies.filter(a => a.is_active).length > 0 ? allergies.filter(a => a.is_active).map(a => `${a.allergen}${a.reaction ? ` (${a.reaction})` : ''}${a.severity !== 'unknown' ? ` - ${a.severity}` : ''}`).join(', ') : noteData.allergies || 'Not documented'}
+ALLERGIES: ${(allergies || []).filter(a => a.is_active).length > 0 ? (allergies || []).filter(a => a.is_active).map(a => `${a.allergen}${a.reaction ? ` (${a.reaction})` : ''}${a.severity !== 'unknown' ? ` - ${a.severity}` : ''}`).join(', ') : noteData.allergies || 'Not documented'}
 ${noteData.allergyDetails ? `Details: ${noteData.allergyDetails}` : ''}
 
 ASSESSMENT:

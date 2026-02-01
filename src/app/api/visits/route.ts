@@ -38,19 +38,16 @@ export async function POST(request: NextRequest) {
     }
     const mappedVisitType = visitTypeMap[visitType] || visitType
 
-    // Create the visit
+    // Create the visit (only insert columns that exist in the visits table)
     const { data: visit, error: visitError } = await supabase
       .from('visits')
       .insert({
         patient_id: patientId,
         user_id: user.id,
-        appointment_id: appointmentId,
         visit_date: new Date().toISOString().split('T')[0],
         visit_type: mappedVisitType,
         chief_complaint: chiefComplaint || [],
         status: 'in_progress',
-        provider_name: providerName,
-        prior_visit_id: priorVisitId,
       })
       .select()
       .single()
@@ -81,7 +78,7 @@ export async function POST(request: NextRequest) {
         .from('appointments')
         .update({
           visit_id: visit.id,
-          status: 'in-progress',
+          status: 'in_progress',
           updated_at: new Date().toISOString(),
         })
         .eq('id', appointmentId)
