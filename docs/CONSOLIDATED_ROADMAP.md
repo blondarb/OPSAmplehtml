@@ -1,7 +1,7 @@
 # Consolidated Roadmap - Sevaro Clinical
 
-**Version:** 1.4
-**Last Updated:** January 31, 2026 (4 critical UX fixes: vitals wiring, section nav, med modal, dead code cleanup)
+**Version:** 1.5
+**Last Updated:** February 1, 2026 (5 UX improvements + user feedback backlog from live testing)
 **Purpose:** Single source of truth consolidating all phases across PRDs
 
 ---
@@ -244,6 +244,56 @@ Migraine, Migraine with Aura, Chronic Migraine, Cluster Headache, Tension-Type H
 | Vital Signs Inputs | ✅ COMPLETE | BP/HR/Temp/Weight/BMI at top of Exam tab, saved to noteData, in generated notes |
 | Medication Form as Modal | ✅ COMPLETE | Moved from inline to centered modal overlay, reduces scroll displacement |
 | Dead Code Cleanup (LeftSidebar) | ✅ COMPLETE | Removed ~260 lines of unused Prior History Summary |
+
+### 3.4c UX Improvements (February 1, 2026)
+
+| Feature | Status | Notes |
+|---------|--------|-------|
+| Consult sub-options visibility | ✅ COMPLETE | Auto-scroll, hint text, highlight border, chevron connector |
+| Tab completion indicators | ✅ COMPLETE | Green/amber dots with missing-field tooltips |
+| DDx edit affordances | ✅ COMPLETE | Priority badges, reorder arrows, set primary, swap search |
+| Recommendation → Plan adoption | ✅ COMPLETE | Select all/deselect all, Added! confirm, plan flash |
+| Contextual exam scales | ✅ COMPLETE | Recommended/All filter, diagnosis context banner, teal dots |
+
+### 3.4d User Feedback Backlog (February 1, 2026)
+
+From live testing session. Items organized by priority tier.
+
+#### Bugs (P0 — broken behavior)
+
+| Item | Status | Component | Description |
+|------|--------|-----------|-------------|
+| Second Chart Prep breaks note | 🐛 OPEN | VoiceDrawer.tsx | Creating another chart prep after one corrupts note data |
+| Tab nav scrolls with content | 🐛 OPEN | CenterPanel.tsx | Navigation tabs + action bar should be sticky/fixed |
+| Sign & Complete non-functional | 🐛 OPEN | CenterPanel.tsx | Button does nothing |
+
+#### Quick UI Fixes (P1)
+
+| Item | Status | Component | Description |
+|------|--------|-----------|-------------|
+| Remove "Final recommendation time" | ⏳ PENDING | CenterPanel.tsx | Section not needed |
+| Remove/fix DDx search filter icons | ⏳ PENDING | DifferentialDiagnosisSection.tsx | Icons make searching harder |
+| Rename "Differential diagnosis" → "Diagnoses" | ⏳ PENDING | DifferentialDiagnosisSection.tsx | Simpler label |
+| Remove mystery circle next to Gait | ⏳ PENDING | CenterPanel.tsx | Unexplained UI element |
+| Remove "AI Summary" button in Chart Prep | ⏳ PENDING | VoiceDrawer.tsx | Keep only "Done" button |
+
+#### Behavior Changes (P1)
+
+| Item | Status | Component | Description |
+|------|--------|-----------|-------------|
+| Chart Prep → single paragraph summary | ⏳ PENDING | VoiceDrawer.tsx, chart-prep API | Don't place items in fields or show boxes |
+| AI should not judge missing findings | ⏳ PENDING | AI prompts | AI notes things aren't documented; Chart Prep context leak |
+| Copy Note → slide-out drawer | ⏳ PENDING | CenterPanel.tsx | Show completed note in drawer, not just clipboard |
+| Exam scale hover tooltips | ⏳ PENDING | ExamScalesSection.tsx | Explain purpose and when to use each scale |
+
+#### Feature Additions (P2)
+
+| Item | Status | Component | Description |
+|------|--------|-----------|-------------|
+| Add symptom-based diagnoses | ⏳ PENDING | diagnosisData.ts | Paresthesias, headaches, spells, dizziness, weakness, numbness, etc. |
+| Patient History Summary context | ⏳ PENDING | PatientHistorySummary.tsx | Referral summary for new patients, longitudinal for follow-ups |
+| Sign & Complete full workflow | ⏳ PENDING | CenterPanel.tsx + API | Write to visits table, schedule follow-up, appear on schedule |
+| Imaging longitudinal tracking | ⏳ PENDING | ImagingResultsTab.tsx | Add study types, summary view for entered data, edit only for corrections |
 
 ---
 
@@ -611,5 +661,5 @@ Based on the analysis, here's the recommended implementation order to minimize r
 ---
 
 *Document created: January 24, 2026*
-*Last updated: January 30, 2026 (Reading level control, dictation on settings/search, free-text exam, handout auto-suggest, patient history summary, audio hardening)*
+*Last updated: February 1, 2026 (5 UX improvements + user feedback backlog from live testing)*
 *Consolidates: All PRD documents*

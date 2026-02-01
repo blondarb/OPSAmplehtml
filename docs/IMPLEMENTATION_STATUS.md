@@ -1,6 +1,6 @@
 # Implementation Status - Sevaro Clinical
 
-**Last Updated:** January 31, 2026 (4 critical UX fixes: vitals wiring, section nav, med modal, dead code removal)
+**Last Updated:** February 1, 2026 (5 UX improvements + user feedback backlog from live testing)
 **Based on:** PRD_AI_Scribe.md v1.4, Sevaro_Outpatient_MVP_PRD_v1.4, PRD_Roadmap_Phase3.md
 
 ---
@@ -32,7 +32,26 @@ This document tracks implementation progress against the product requirements an
 - ✅ **Extended Scales** - NIHSS, Modified Ashworth, ABCD2, DHI, Mini-Cog, ISI, ESS
 - ✅ **Exam Templates** - Predefined + custom template feature
 
-**Newly Completed:**
+**Newly Completed (February 1, 2026):**
+- ✅ **5 UX Improvements** - Consult sub-options visibility, tab completion dots, DDx edit affordances (priority/reorder/swap), recommendation plan adoption (select all, Added! confirm, plan flash), contextual exam scales (recommended filter + diagnosis context)
+
+**User Feedback Backlog (February 1, 2026 — from live testing):**
+- 🐛 **BUG: Second Chart Prep breaks note** — Creating another chart prep after one has been done corrupts the note data
+- 🐛 **BUG: Tab nav scrolls away** — Scrolling in tab content moves the 4 navigation tabs and action bar; should be sticky/fixed
+- 🐛 **BUG: Sign & Complete non-functional** — Button does nothing; needs to write to visits table and allow follow-up scheduling
+- 🎯 **Chart Prep output format** — Should produce a single paragraph summary, not place items in fields or show boxes; remove "AI Summary" button, keep only "Done"
+- 🎯 **AI should not judge missing exam findings** — AI shouldn't note when things aren't documented (likely from Chart Prep context leaking)
+- 🎯 **Copy Note → slide-out drawer** — Hitting Copy should show the completed note in a slide-out drawer, not just copy to clipboard
+- 🎯 **Rename "Differential diagnosis" to "Diagnoses"** — Simpler label
+- 🎯 **Remove category filter icons from diagnosis search** — They make searching harder; if kept, clicking should filter to selectable diagnoses
+- 🎯 **Add symptom-based diagnoses** — Need to add common symptom entries (paresthesias, headaches, spells, dizziness, weakness, numbness, etc.) as selectable diagnoses
+- 🎯 **Patient History Summary context** — Should be summary of referral info + note for new patients; longitudinal care summary for follow-ups
+- 🎯 **Imaging tab: longitudinal tracking** — "Add Study" should allow adding another study of existing types or new ones; entered imaging should become a summary view, only editable for corrections
+- 🎯 **Remove mystery circle next to Gait exam** — Unexplained UI element
+- 🎯 **Exam scale hover tooltips** — All exam scale chips should have hover explaining what they are and when to use them
+- 🎯 **Remove "Final recommendation time" section** — Not needed
+
+**Previously Completed:**
 - ✅ **Vital Signs Wiring** - BP/HR/Temp/Weight/BMI controlled inputs at top of Physical Exams tab; values saved to noteData, included in generated notes via merge engine
 - ✅ **History Tab Section Navigation** - Sticky pill-bar (Summary/Consult/HPI/ROS/Meds/Allergies/History/Scales); IntersectionObserver tracks active section; smooth scroll on click
 - ✅ **Medication Form Modal** - Add/edit medication form moved from inline to centered modal overlay; reduces scroll displacement in History tab
@@ -53,9 +72,89 @@ This document tracks implementation progress against the product requirements an
 
 ---
 
+## Recent Updates (February 1, 2026)
+
+### 5 UX Improvements - NEW
+
+**1. Consult Sub-Options Visibility** (`ReasonForConsultSection.tsx`):
+- Auto-scrolls to sub-options when category selected (100ms delay + scrollIntoView)
+- "(select details below)" hint text on selected category buttons
+- Teal border highlight on sub-options area (1.5s CSS transition)
+- Chevron arrow visual connector between category grid and sub-options
+
+**2. Tab-Level Completion Indicators** (`CenterPanel.tsx`):
+- useMemo computing per-tab completion: History (chief + HPI 25+ words), Imaging (any study data), Exam (any data/vitals), Recommendation (DDx + assessment 5+ words + plan 5+ words)
+- 8px colored dots (green=complete, amber=partial) next to tab labels
+- Hover tooltip showing missing fields per tab
+
+**3. DDx Edit Affordances** (`DifferentialDiagnosisSection.tsx`):
+- Numbered priority badges (1, 2, 3...) with "Primary" badge on first item
+- Up/down arrow buttons for reordering diagnoses
+- "Set primary" link on non-primary items
+- "Refine" (items with alternates) or "Swap" (inline search to replace) on all items
+
+**4. Smart Recommendation → Plan Adoption** (`SmartRecommendationsSection.tsx`, `CenterPanel.tsx`, `NoteTextField.tsx`):
+- "Select all / Deselect all" toggle per subsection header
+- Improved formatting: section headers + indented bullet items when adding to plan
+- "Added!" confirmation with checkmark (2s timeout)
+- Teal border glow flash on Plan textarea when items appended
+- `data-field` attribute added to NoteTextField for DOM targeting
+
+**5. Contextual Exam Scales** (`ExamScalesSection.tsx`, `CenterPanel.tsx`):
+- `diagnosisNames` prop from differential diagnoses passed to ExamScalesSection
+- Uses `getScalesForCondition()` to identify recommended exam scales
+- "Recommended (N) / All (N)" filter toggle
+- Recommended scales sorted first when showing all
+- Teal dot indicator on recommended scale chips
+- "Recommended for: [diagnosis list]" context banner
+
+**Modified Files (6):** ReasonForConsultSection.tsx, CenterPanel.tsx, DifferentialDiagnosisSection.tsx, SmartRecommendationsSection.tsx, ExamScalesSection.tsx, NoteTextField.tsx (+560/-124 lines)
+
+### User Feedback Backlog (February 1, 2026)
+
+Feedback collected from live testing session. Organized by priority:
+
+#### Bugs (Broken Behavior)
+
+| # | Issue | Severity | Component | Notes |
+|---|-------|----------|-----------|-------|
+| F1 | Second Chart Prep breaks the note | High | VoiceDrawer.tsx | Creating another chart prep after one corrupts note data |
+| F2 | Tab nav scrolls with content | High | CenterPanel.tsx | Navigation tabs + action bar should be sticky/fixed |
+| F3 | Sign & Complete non-functional | High | CenterPanel.tsx | Button does nothing; needs to write to visits table, schedule follow-up |
+
+#### UI Cleanup (Quick Fixes)
+
+| # | Issue | Component | Notes |
+|---|-------|-----------|-------|
+| F4 | Remove "Final recommendation time" section | CenterPanel.tsx | Not needed |
+| F5 | Remove/fix category filter icons in DDx search | DifferentialDiagnosisSection.tsx | Makes searching harder; if kept, should show selectable diagnoses |
+| F6 | Rename "Differential diagnosis" → "Diagnoses" | DifferentialDiagnosisSection.tsx | Simpler label |
+| F7 | Remove mystery circle next to Gait exam | CenterPanel.tsx | Unexplained UI element |
+| F8 | Remove "AI Summary" button in Chart Prep | VoiceDrawer.tsx | Keep only "Done" button |
+
+#### Behavior Changes (Medium)
+
+| # | Issue | Component | Notes |
+|---|-------|-----------|-------|
+| F9 | Chart Prep should produce single paragraph summary | VoiceDrawer.tsx / chart-prep API | Not place items in fields or show boxes |
+| F10 | AI should not judge missing exam findings | AI prompts | AI notes things weren't documented; likely from Chart Prep context leaking |
+| F11 | Copy Note → slide-out drawer | CenterPanel.tsx | Show completed note in drawer, not just clipboard copy |
+| F12 | Exam scale hover tooltips | ExamScalesSection.tsx | All scale chips need hover explaining purpose and when to use |
+
+#### Feature Additions (Larger)
+
+| # | Issue | Component | Notes |
+|---|-------|-----------|-------|
+| F13 | Add symptom-based diagnoses | diagnosisData.ts | Need: paresthesias, headaches, spells, dizziness, weakness, numbness, etc. |
+| F14 | Patient History Summary: context-aware | PatientHistorySummary.tsx | Referral info + note for new patients; longitudinal summary for follow-ups |
+| F15 | Sign & Complete: full workflow | CenterPanel.tsx + API | Write to visits table, schedule follow-up, follow-up appears on schedule |
+| F16 | Imaging tab: longitudinal tracking | ImagingResultsTab.tsx | Add study of existing/new types; summary view for entered imaging; editable only for corrections |
+
+---
+
 ## Recent Updates (January 31, 2026)
 
-### 4 Critical UX Fixes - NEW
+### 4 Critical UX Fixes
 
 **1. Vital Signs Wiring** (`ClinicalNote.tsx`, `CenterPanel.tsx`, `types.ts`, `merge-engine.ts`):
 - Added `vitals` field (`bp`, `hr`, `temp`, `weight`, `bmi`) to noteData state in ClinicalNote.tsx
@@ -1059,4 +1158,4 @@ AI DRAWER (Teal theme, star icon):
 ---
 
 *Document maintained by Development Team*
-*Last updated: January 30, 2026 (Reading level control, dictation on settings/search, free-text exam, handout auto-suggest, patient history summary, audio hardening)*
+*Last updated: February 1, 2026 (5 UX improvements + user feedback backlog from live testing)*
