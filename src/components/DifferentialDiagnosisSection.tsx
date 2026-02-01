@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useMemo, useEffect } from 'react'
+import { useState, useMemo, useEffect, useCallback } from 'react'
 import {
   getDiagnosesForConsultReason,
   searchDiagnoses,
@@ -95,6 +95,29 @@ export default function DifferentialDiagnosisSection({
     setExpandedDiagnoses(prev => ({ ...prev, [oldDiagnosis.id]: false }))
   }
 
+  const moveDiagnosis = useCallback((index: number, direction: 'up' | 'down') => {
+    const newList = [...selectedDiagnoses]
+    const targetIndex = direction === 'up' ? index - 1 : index + 1
+    if (targetIndex < 0 || targetIndex >= newList.length) return
+    ;[newList[index], newList[targetIndex]] = [newList[targetIndex], newList[index]]
+    onDiagnosesChange(newList)
+  }, [selectedDiagnoses, onDiagnosesChange])
+
+  const setAsPrimary = useCallback((index: number) => {
+    if (index === 0) return
+    const newList = [...selectedDiagnoses]
+    const [item] = newList.splice(index, 1)
+    newList.unshift(item)
+    onDiagnosesChange(newList)
+  }, [selectedDiagnoses, onDiagnosesChange])
+
+  const swapDiagnosis = useCallback((oldDiagnosis: Diagnosis, newDiagnosis: Diagnosis) => {
+    onDiagnosesChange(
+      selectedDiagnoses.map(d => (d.id === oldDiagnosis.id ? newDiagnosis : d))
+    )
+    setExpandedDiagnoses(prev => ({ ...prev, [oldDiagnosis.id]: false }))
+  }, [selectedDiagnoses, onDiagnosesChange])
+
   return (
     <div style={{ position: 'relative', marginBottom: '16px' }}>
       <span
@@ -150,14 +173,20 @@ export default function DifferentialDiagnosisSection({
               No diagnoses selected. Select a Reason for Consult or add diagnoses below.
             </div>
           ) : (
-            selectedDiagnoses.map(diagnosis => (
+            selectedDiagnoses.map((diagnosis, index) => (
               <DiagnosisCard
                 key={diagnosis.id}
                 diagnosis={diagnosis}
+                index={index}
+                totalCount={selectedDiagnoses.length}
                 isExpanded={expandedDiagnoses[diagnosis.id] || false}
                 onToggleExpand={() => toggleExpanded(diagnosis.id)}
                 onRemove={() => removeDiagnosis(diagnosis.id)}
                 onRefine={(newDiagnosis) => refineDiagnosis(diagnosis, newDiagnosis)}
+                onMoveUp={() => moveDiagnosis(index, 'up')}
+                onMoveDown={() => moveDiagnosis(index, 'down')}
+                onSetAsPrimary={() => setAsPrimary(index)}
+                onSwap={(newDiagnosis) => swapDiagnosis(diagnosis, newDiagnosis)}
               />
             ))
           )}
@@ -332,15 +361,28 @@ export default function DifferentialDiagnosisSection({
 // Individual diagnosis card component
 interface DiagnosisCardProps {
   diagnosis: Diagnosis
+  index: number
+  totalCount: number
   isExpanded: boolean
   onToggleExpand: () => void
   onRemove: () => void
   onRefine: (newDiagnosis: Diagnosis) => void
+  onMoveUp: () => void
+  onMoveDown: () => void
+  onSetAsPrimary: () => void
+  onSwap: (newDiagnosis: Diagnosis) => void
 }
 
-function DiagnosisCard({ diagnosis, isExpanded, onToggleExpand, onRemove, onRefine }: DiagnosisCardProps) {
+function DiagnosisCard({ diagnosis, index, totalCount, isExpanded, onToggleExpand, onRemove, onRefine, onMoveUp, onMoveDown, onSetAsPrimary, onSwap }: DiagnosisCardProps) {
   const category = DIAGNOSIS_CATEGORIES.find(c => c.id === diagnosis.category)
   const hasAlternates = diagnosis.alternateIcd10 && diagnosis.alternateIcd10.length > 0
+  const [swapSearchQuery, setSwapSearchQuery] = useState('')
+  const [showSwapSearch, setShowSwapSearch] = useState(false)
+
+  const swapResults = useMemo(() => {
+    if (!swapSearchQuery.trim()) return []
+    return searchDiagnoses(swapSearchQuery).filter(d => d.id !== diagnosis.id).slice(0, 10)
+  }, [swapSearchQuery, diagnosis.id])
 
   return (
     <div
@@ -357,9 +399,54 @@ function DiagnosisCard({ diagnosis, isExpanded, onToggleExpand, onRemove, onRefi
           display: 'flex',
           alignItems: 'center',
           padding: '12px',
-          gap: '12px',
+          gap: '8px',
         }}
       >
+        {/* Priority number badge */}
+        <span style={{
+          width: '24px',
+          height: '24px',
+          borderRadius: '50%',
+          background: index === 0 ? 'var(--primary)' : 'var(--bg-dark)',
+          color: index === 0 ? 'white' : 'var(--text-secondary)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          fontSize: '11px',
+          fontWeight: 600,
+          flexShrink: 0,
+        }}>
+          {index + 1}
+        </span>
+
+        {/* Reorder arrows */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', flexShrink: 0 }}>
+          <button
+            onClick={onMoveUp}
+            disabled={index === 0}
+            title="Move up"
+            style={{
+              width: '20px', height: '16px', display: 'flex', alignItems: 'center', justifyContent: 'center',
+              border: 'none', background: 'transparent', cursor: index === 0 ? 'default' : 'pointer',
+              color: index === 0 ? 'var(--border)' : 'var(--text-muted)', padding: 0,
+            }}
+          >
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="18 15 12 9 6 15"/></svg>
+          </button>
+          <button
+            onClick={onMoveDown}
+            disabled={index === totalCount - 1}
+            title="Move down"
+            style={{
+              width: '20px', height: '16px', display: 'flex', alignItems: 'center', justifyContent: 'center',
+              border: 'none', background: 'transparent', cursor: index === totalCount - 1 ? 'default' : 'pointer',
+              color: index === totalCount - 1 ? 'var(--border)' : 'var(--text-muted)', padding: 0,
+            }}
+          >
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="6 9 12 15 18 9"/></svg>
+          </button>
+        </div>
+
         {/* Category icon */}
         <span style={{ fontSize: '20px' }}>{category?.icon || '📋'}</span>
 
@@ -369,6 +456,14 @@ function DiagnosisCard({ diagnosis, isExpanded, onToggleExpand, onRemove, onRefi
             <span style={{ fontSize: '14px', fontWeight: 500, color: 'var(--text-primary)' }}>
               {diagnosis.name}
             </span>
+            {index === 0 && (
+              <span style={{
+                padding: '2px 6px', borderRadius: '4px', fontSize: '10px', fontWeight: 600,
+                background: 'rgba(13, 148, 136, 0.1)', color: 'var(--primary)',
+              }}>
+                Primary
+              </span>
+            )}
             {diagnosis.hasSmartPlan && (
               <span
                 style={{
@@ -391,39 +486,50 @@ function DiagnosisCard({ diagnosis, isExpanded, onToggleExpand, onRemove, onRefi
 
         {/* Actions */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-          {hasAlternates && (
+          {index !== 0 && totalCount > 1 && (
             <button
-              onClick={onToggleExpand}
+              onClick={onSetAsPrimary}
               style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '4px',
-                padding: '6px 10px',
-                borderRadius: '6px',
-                border: '1px solid var(--border)',
-                background: 'var(--bg-white)',
-                color: 'var(--text-secondary)',
-                fontSize: '12px',
-                cursor: 'pointer',
+                padding: '4px 8px', borderRadius: '6px', border: 'none',
+                background: 'transparent', color: 'var(--primary)', fontSize: '11px',
+                cursor: 'pointer', whiteSpace: 'nowrap',
               }}
+              title="Set as primary diagnosis"
             >
-              Refine
-              <svg
-                width="12"
-                height="12"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                style={{
-                  transform: isExpanded ? 'rotate(180deg)' : 'rotate(0deg)',
-                  transition: 'transform 0.2s',
-                }}
-              >
-                <polyline points="6 9 12 15 18 9" />
-              </svg>
+              Set primary
             </button>
           )}
+          <button
+            onClick={onToggleExpand}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '4px',
+              padding: '6px 10px',
+              borderRadius: '6px',
+              border: '1px solid var(--border)',
+              background: 'var(--bg-white)',
+              color: 'var(--text-secondary)',
+              fontSize: '12px',
+              cursor: 'pointer',
+            }}
+          >
+            {hasAlternates ? 'Refine' : 'Swap'}
+            <svg
+              width="12"
+              height="12"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              style={{
+                transform: isExpanded ? 'rotate(180deg)' : 'rotate(0deg)',
+                transition: 'transform 0.2s',
+              }}
+            >
+              <polyline points="6 9 12 15 18 9" />
+            </svg>
+          </button>
           <button
             onClick={onRemove}
             style={{
@@ -448,8 +554,8 @@ function DiagnosisCard({ diagnosis, isExpanded, onToggleExpand, onRemove, onRefi
         </div>
       </div>
 
-      {/* Expanded refinement options */}
-      {isExpanded && hasAlternates && (
+      {/* Expanded refinement options (alternates) or swap search */}
+      {isExpanded && (
         <div
           style={{
             borderTop: '1px solid var(--border)',
@@ -457,62 +563,112 @@ function DiagnosisCard({ diagnosis, isExpanded, onToggleExpand, onRemove, onRefi
             background: 'var(--bg-white)',
           }}
         >
-          <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '8px' }}>
-            Select a more specific diagnosis:
-          </div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-            {diagnosis.alternateIcd10?.map(alt => (
-              <button
-                key={alt.code}
-                onClick={() =>
-                  onRefine({
-                    ...diagnosis,
-                    icd10: alt.code,
-                    name: alt.description,
-                  })
-                }
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '8px',
-                  padding: '8px 12px',
-                  borderRadius: '6px',
-                  border: '1px solid var(--border)',
-                  background: diagnosis.icd10 === alt.code ? 'rgba(13, 148, 136, 0.1)' : 'transparent',
-                  cursor: 'pointer',
-                  textAlign: 'left',
-                }}
-              >
-                <span
-                  style={{
-                    width: '16px',
-                    height: '16px',
-                    borderRadius: '50%',
-                    border: '2px solid',
-                    borderColor: diagnosis.icd10 === alt.code ? 'var(--primary)' : 'var(--border)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                  }}
-                >
-                  {diagnosis.icd10 === alt.code && (
+          {hasAlternates ? (
+            <>
+              <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '8px' }}>
+                Select a more specific diagnosis:
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                {diagnosis.alternateIcd10?.map(alt => (
+                  <button
+                    key={alt.code}
+                    onClick={() =>
+                      onRefine({
+                        ...diagnosis,
+                        icd10: alt.code,
+                        name: alt.description,
+                      })
+                    }
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '8px',
+                      padding: '8px 12px',
+                      borderRadius: '6px',
+                      border: '1px solid var(--border)',
+                      background: diagnosis.icd10 === alt.code ? 'rgba(13, 148, 136, 0.1)' : 'transparent',
+                      cursor: 'pointer',
+                      textAlign: 'left',
+                    }}
+                  >
                     <span
                       style={{
-                        width: '8px',
-                        height: '8px',
+                        width: '16px',
+                        height: '16px',
                         borderRadius: '50%',
-                        background: 'var(--primary)',
+                        border: '2px solid',
+                        borderColor: diagnosis.icd10 === alt.code ? 'var(--primary)' : 'var(--border)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
                       }}
-                    />
-                  )}
-                </span>
-                <div>
-                  <div style={{ fontSize: '13px', color: 'var(--text-primary)' }}>{alt.description}</div>
-                  <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>{alt.code}</div>
+                    >
+                      {diagnosis.icd10 === alt.code && (
+                        <span
+                          style={{
+                            width: '8px',
+                            height: '8px',
+                            borderRadius: '50%',
+                            background: 'var(--primary)',
+                          }}
+                        />
+                      )}
+                    </span>
+                    <div>
+                      <div style={{ fontSize: '13px', color: 'var(--text-primary)' }}>{alt.description}</div>
+                      <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>{alt.code}</div>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            </>
+          ) : (
+            <>
+              <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '8px' }}>
+                Search for a replacement diagnosis:
+              </div>
+              <input
+                type="text"
+                value={swapSearchQuery}
+                onChange={(e) => setSwapSearchQuery(e.target.value)}
+                placeholder="Search by name or ICD-10..."
+                autoFocus
+                style={{
+                  width: '100%', padding: '8px 12px', borderRadius: '6px',
+                  border: '1px solid var(--border)', fontSize: '13px', marginBottom: '8px',
+                  background: 'var(--bg-secondary)',
+                }}
+              />
+              {swapResults.length > 0 && (
+                <div style={{ maxHeight: '180px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                  {swapResults.map(d => (
+                    <button
+                      key={d.id}
+                      onClick={() => { onSwap(d); setSwapSearchQuery('') }}
+                      style={{
+                        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                        padding: '8px 12px', borderRadius: '6px', border: '1px solid var(--border)',
+                        background: 'transparent', cursor: 'pointer', textAlign: 'left', width: '100%',
+                      }}
+                    >
+                      <div>
+                        <div style={{ fontSize: '13px', color: 'var(--text-primary)', fontWeight: 500 }}>{d.name}</div>
+                        <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>{d.icd10} • {DIAGNOSIS_CATEGORIES.find(c => c.id === d.category)?.name}</div>
+                      </div>
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" strokeWidth="2">
+                        <path d="M7 16V4m0 0L3 8m4-4l4 4M17 8v12m0 0l4-4m-4 4l-4-4"/>
+                      </svg>
+                    </button>
+                  ))}
                 </div>
-              </button>
-            ))}
-          </div>
+              )}
+              {swapSearchQuery.trim() && swapResults.length === 0 && (
+                <div style={{ padding: '12px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '12px' }}>
+                  No matching diagnoses found
+                </div>
+              )}
+            </>
+          )}
         </div>
       )}
     </div>

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import NoteTextField from './NoteTextField'
 import SmartScalesSection from './SmartScalesSection'
 import ExamScalesSection from './ExamScalesSection'
@@ -565,24 +565,111 @@ ${noteData.plan || 'Not documented'}
     }
   }
 
+  // Tab completion status indicators
+  const tabCompletion = useMemo(() => {
+    const wordCount = (text: string | undefined) => (text || '').trim().split(/\s+/).filter(Boolean).length
+
+    // History: green if chiefComplaint filled + HPI >= 25 words; yellow if partial
+    const hasChief = Array.isArray(noteData.chiefComplaint) ? noteData.chiefComplaint.length > 0 : !!noteData.chiefComplaint
+    const hpiWords = wordCount(noteData.hpiContent)
+    const historyComplete = hasChief && hpiWords >= 25
+    const historyPartial = hasChief || hpiWords > 0
+
+    // Imaging: green if any study has data
+    const hasImaging = imagingStudies.some((s: any) => s.findings || s.impression || s.date)
+
+    // Exam: green if exam data exists
+    const hasExam = !!(noteData.examSummary || noteData.neuroExamFindings || (noteData.vitals && Object.values(noteData.vitals).some((v: any) => v)))
+
+    // Recommendation: green if DDx + assessment (5+ words) + plan (5+ words); yellow if partial
+    const hasDDx = (noteData.differentialDiagnoses || []).length > 0
+    const assessmentWords = wordCount(noteData.assessment)
+    const planWords = wordCount(noteData.plan)
+    const recComplete = hasDDx && assessmentWords >= 5 && planWords >= 5
+    const recPartial = hasDDx || assessmentWords > 0 || planWords > 0
+
+    return {
+      history: { status: historyComplete ? 'green' : historyPartial ? 'yellow' : 'none', missing: [!hasChief && 'Chief complaint', hpiWords < 25 && 'HPI (25+ words)'].filter(Boolean) as string[] },
+      imaging: { status: hasImaging ? 'green' : 'none' as const, missing: [] as string[] },
+      exam: { status: hasExam ? 'green' : 'none' as const, missing: [] as string[] },
+      recommendation: { status: recComplete ? 'green' : recPartial ? 'yellow' : 'none', missing: [!hasDDx && 'Differential diagnosis', assessmentWords < 5 && 'Assessment (5+ words)', planWords < 5 && 'Plan (5+ words)'].filter(Boolean) as string[] },
+    } as Record<string, { status: string; missing: string[] }>
+  }, [noteData, imagingStudies])
+
+  const [hoveredTab, setHoveredTab] = useState<string | null>(null)
+
   return (
     <main className="center-panel" ref={scrollContainerRef}>
       {/* Tab Navigation with Action Bar */}
       <div className="tab-nav-wrapper">
         {/* Tabs */}
         <div className="tab-nav" data-tour="clinical-tabs">
-          {tabs.map(tab => (
-            <button
-              key={tab.id}
-              onClick={() => !isVerticalView && setActiveTab(tab.id)}
-              className={`tab-btn ${activeTab === tab.id && !isVerticalView ? 'active' : ''}`}
-              style={{
-                cursor: isVerticalView ? 'default' : 'pointer',
-              }}
-            >
-              {tab.label}
-            </button>
-          ))}
+          {tabs.map(tab => {
+            const completion = tabCompletion[tab.id]
+            const dotColor = completion?.status === 'green' ? '#10B981' : completion?.status === 'yellow' ? '#F59E0B' : null
+            return (
+              <div key={tab.id} style={{ position: 'relative', display: 'inline-flex' }}
+                onMouseEnter={() => setHoveredTab(tab.id)}
+                onMouseLeave={() => setHoveredTab(null)}
+              >
+                <button
+                  onClick={() => !isVerticalView && setActiveTab(tab.id)}
+                  className={`tab-btn ${activeTab === tab.id && !isVerticalView ? 'active' : ''}`}
+                  style={{
+                    cursor: isVerticalView ? 'default' : 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                  }}
+                >
+                  {tab.label}
+                  {dotColor && (
+                    <span style={{
+                      width: '8px',
+                      height: '8px',
+                      borderRadius: '50%',
+                      background: dotColor,
+                      flexShrink: 0,
+                    }} />
+                  )}
+                </button>
+                {/* Tooltip showing missing fields */}
+                {hoveredTab === tab.id && completion?.missing?.length > 0 && (
+                  <div style={{
+                    position: 'absolute',
+                    top: '100%',
+                    left: '50%',
+                    transform: 'translateX(-50%)',
+                    marginTop: '4px',
+                    padding: '8px 12px',
+                    background: '#1F2937',
+                    color: 'white',
+                    fontSize: '11px',
+                    borderRadius: '6px',
+                    zIndex: 100,
+                    whiteSpace: 'nowrap',
+                    boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+                  }}>
+                    <div style={{ fontWeight: 600, marginBottom: '4px' }}>Missing:</div>
+                    {completion.missing.map((m: string, i: number) => (
+                      <div key={i}>• {m}</div>
+                    ))}
+                    <div style={{
+                      position: 'absolute',
+                      top: '-4px',
+                      left: '50%',
+                      transform: 'translateX(-50%)',
+                      width: 0,
+                      height: 0,
+                      borderLeft: '4px solid transparent',
+                      borderRight: '4px solid transparent',
+                      borderBottom: '4px solid #1F2937',
+                    }} />
+                  </div>
+                )}
+              </div>
+            )
+          })}
         </div>
 
         {/* View Toggle Button */}
@@ -2008,6 +2095,7 @@ ${noteData.plan || 'Not documented'}
             {/* Exam Scales Section (NIHSS, Modified Ashworth, etc.) */}
             <ExamScalesSection
               selectedConditions={noteData.chiefComplaint || []}
+              diagnosisNames={(noteData.differentialDiagnoses || []).map((d: Diagnosis) => d.name)}
               patientId={patient?.id}
               visitId={currentVisit?.id}
               onAddToNote={(field, text) => {
@@ -3028,6 +3116,13 @@ ${noteData.plan || 'Not documented'}
                 updateNote('plan', currentPlan ? `${currentPlan}\n${newItems}` : newItems)
                 // Track for note preview
                 onRecommendationsSelected?.(items)
+                // Flash highlight the Plan textarea
+                const planEl = document.querySelector('[data-field="plan"]') as HTMLElement
+                if (planEl) {
+                  planEl.style.boxShadow = '0 0 0 3px rgba(13, 148, 136, 0.4)'
+                  planEl.style.transition = 'box-shadow 0.3s'
+                  setTimeout(() => { planEl.style.boxShadow = '' }, 2000)
+                }
               }}
             />
 

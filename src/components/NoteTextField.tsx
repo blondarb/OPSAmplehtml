@@ -300,7 +300,7 @@ export default function NoteTextField({
   }
 
   return (
-    <div ref={containerRef} className="ai-textarea-wrapper">
+    <div ref={containerRef} className="ai-textarea-wrapper" data-field={fieldName}>
       <textarea
         ref={textareaRef}
         value={value}

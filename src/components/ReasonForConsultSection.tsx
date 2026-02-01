@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useRef } from 'react'
 import {
   CONSULT_CATEGORIES,
   derivePrimaryCategoriesFromSubOptions,
@@ -33,6 +33,11 @@ export default function ReasonForConsultSection({
   // Track which category detail sections are expanded to show all options
   const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({})
 
+  // Ref for sub-options container to auto-scroll
+  const subOptionsRef = useRef<HTMLDivElement>(null)
+  // Track highlight state for sub-options appearing
+  const [highlightSubOptions, setHighlightSubOptions] = useState(false)
+
   // Track custom entries per category
   const [customEntries, setCustomEntries] = useState<Record<string, string[]>>({})
   const [customInputValues, setCustomInputValues] = useState<Record<string, string>>({})
@@ -64,6 +69,12 @@ export default function ReasonForConsultSection({
         }
         return prev.filter(id => id !== categoryId)
       } else {
+        // Auto-scroll to sub-options and highlight
+        setTimeout(() => {
+          subOptionsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
+          setHighlightSubOptions(true)
+          setTimeout(() => setHighlightSubOptions(false), 1500)
+        }, 100)
         return [...prev, categoryId]
       }
     })
@@ -210,24 +221,46 @@ export default function ReasonForConsultSection({
                   }}
                 >
                   {category.label}
+                  {isSelected && (
+                    <span style={{ display: 'block', fontSize: '10px', fontWeight: 400, color: 'var(--text-muted)', marginTop: '1px' }}>
+                      (select details below)
+                    </span>
+                  )}
                 </span>
               </button>
             )
           })}
         </div>
 
-        {/* Divider - only show if categories are selected */}
+        {/* Visual connector + Divider - only show if categories are selected */}
         {selectedCategories.length > 0 && (
-          <div
-            style={{
-              height: '1px',
-              background: 'var(--border)',
-              margin: '0 -20px 20px -20px',
-            }}
-          />
+          <>
+            {/* Chevron arrow connector */}
+            <div style={{ display: 'flex', justifyContent: 'center', margin: '4px 0' }}>
+              <svg width="20" height="16" viewBox="0 0 20 16" fill="none" stroke="var(--primary)" strokeWidth="2" opacity={0.5}>
+                <polyline points="4 4 10 12 16 4" />
+              </svg>
+            </div>
+            <div
+              style={{
+                height: '1px',
+                background: 'var(--border)',
+                margin: '0 -20px 20px -20px',
+              }}
+            />
+          </>
         )}
 
         {/* Sub-option sections for each selected category */}
+        <div
+          ref={subOptionsRef}
+          style={{
+            borderRadius: '8px',
+            border: highlightSubOptions ? '2px solid var(--primary)' : '2px solid transparent',
+            transition: 'border-color 0.3s ease',
+            padding: highlightSubOptions ? '8px' : '0',
+          }}
+        >
         {selectedCategories.map(categoryId => {
           const category = getCategoryById(categoryId)
           if (!category) return null
@@ -256,6 +289,8 @@ export default function ReasonForConsultSection({
             />
           )
         })}
+
+        </div>
 
         {/* Other details free text */}
         {selectedCategories.length > 0 && (

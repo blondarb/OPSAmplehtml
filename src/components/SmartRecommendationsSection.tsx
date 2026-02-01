@@ -81,6 +81,7 @@ export default function SmartRecommendationsSection({
   const [expandedDosing, setExpandedDosing] = useState<Set<string>>(new Set())
   const [customItems, setCustomItems] = useState<Record<string, string>>({})
   const [showLegend, setShowLegend] = useState(false)
+  const [addedConfirmation, setAddedConfirmation] = useState(false)
 
   // State for Supabase data
   const [availablePlans, setAvailablePlans] = useState<{ plan_id: string; title: string; icd10_codes: string[]; linked_diagnoses: string[] }[]>([])
@@ -474,18 +475,50 @@ export default function SmartRecommendationsSection({
   const handleAddSelectedToPlan = () => {
     const allSelected: string[] = []
 
+    // Group items by section for better formatting
+    const grouped = new Map<string, string[]>()
     selectedItems.forEach((items, sectionKey) => {
-      items.forEach(item => {
-        // Format the item with section context
-        allSelected.push(`• ${item}`)
-      })
+      // Extract the subsection name from the key (e.g., "Diagnostics-Imaging" -> "Imaging")
+      const parts = sectionKey.split('-')
+      const subsection = parts.length > 1 ? parts.slice(1).join('-') : parts[0]
+      if (!grouped.has(subsection)) grouped.set(subsection, [])
+      items.forEach(item => grouped.get(subsection)!.push(item))
+    })
+
+    grouped.forEach((items, subsection) => {
+      allSelected.push(`${subsection}:`)
+      items.forEach(item => allSelected.push(`  • ${item}`))
     })
 
     if (allSelected.length > 0) {
       onAddToPlan(allSelected)
+      // Show confirmation
+      setAddedConfirmation(true)
+      setTimeout(() => setAddedConfirmation(false), 2000)
       // Clear selections after adding
       setSelectedItems(new Map())
     }
+  }
+
+  // Select all / deselect all for a subsection
+  const toggleSelectAllSubsection = (subsectionKey: string, items: RecommendationItem[]) => {
+    const validItems = items.filter(i => i.priority !== '—')
+    const currentSelected = selectedItems.get(subsectionKey) || new Set<string>()
+    const allSelected = validItems.every(i => currentSelected.has(i.item))
+
+    setSelectedItems(prev => {
+      const newMap = new Map(prev)
+      if (allSelected) {
+        // Deselect all
+        newMap.delete(subsectionKey)
+      } else {
+        // Select all
+        const newSet = new Set<string>()
+        validItems.forEach(i => newSet.add(i.item))
+        newMap.set(subsectionKey, newSet)
+      }
+      return newMap
+    })
   }
 
   const renderPriorityBadge = (priority: string) => {
@@ -988,9 +1021,10 @@ export default function SmartRecommendationsSection({
           )}
 
           {/* Add to Plan button */}
-          {getTotalSelectedCount() > 0 && (
+          {(getTotalSelectedCount() > 0 || addedConfirmation) && (
             <button
               onClick={handleAddSelectedToPlan}
+              disabled={addedConfirmation}
               style={{
                 display: 'flex',
                 alignItems: 'center',
@@ -998,17 +1032,29 @@ export default function SmartRecommendationsSection({
                 padding: '8px 16px',
                 borderRadius: '8px',
                 border: 'none',
-                background: 'var(--primary)',
+                background: addedConfirmation ? '#10B981' : 'var(--primary)',
                 color: 'white',
                 fontSize: '13px',
                 fontWeight: 500,
-                cursor: 'pointer',
+                cursor: addedConfirmation ? 'default' : 'pointer',
+                transition: 'background 0.3s',
               }}
             >
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <path d="M12 5v14M5 12h14" />
-              </svg>
-              Add {getTotalSelectedCount()} to Plan
+              {addedConfirmation ? (
+                <>
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <polyline points="20 6 9 17 4 12" />
+                  </svg>
+                  Added!
+                </>
+              ) : (
+                <>
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <path d="M12 5v14M5 12h14" />
+                  </svg>
+                  Add {getTotalSelectedCount()} to Plan
+                </>
+              )}
             </button>
           )}
         </div>
@@ -1751,6 +1797,17 @@ export default function SmartRecommendationsSection({
                               {subsectionName}
                             </span>
                             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                              {expandedSubsections[subsectionKey] && (
+                                <span
+                                  onClick={(e) => { e.stopPropagation(); toggleSelectAllSubsection(subsectionKey, items) }}
+                                  style={{
+                                    fontSize: '11px', color: 'var(--primary)', cursor: 'pointer',
+                                    padding: '2px 6px', borderRadius: '4px', background: 'rgba(13, 148, 136, 0.08)',
+                                  }}
+                                >
+                                  {items.filter(i => i.priority !== '—').every(i => (selectedItems.get(subsectionKey) || new Set()).has(i.item)) ? 'Deselect all' : 'Select all'}
+                                </span>
+                              )}
                               <span style={{
                                 fontSize: '11px',
                                 color: 'var(--text-muted)',

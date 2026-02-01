@@ -7,7 +7,7 @@ import {
   ScaleResponses,
   ScoreCalculation,
 } from '@/lib/scales/types'
-import { getExamScales } from '@/lib/scales/scale-definitions'
+import { getExamScales, getScalesForCondition } from '@/lib/scales/scale-definitions'
 import { getSeverityColor } from '@/lib/scales/scoring-engine'
 
 interface ScaleResult {
@@ -22,6 +22,7 @@ interface ScaleResult {
 
 interface ExamScalesSectionProps {
   selectedConditions: string[]
+  diagnosisNames?: string[]
   patientId?: string
   visitId?: string
   onAddToNote?: (field: string, text: string) => void
@@ -54,6 +55,7 @@ interface ScaleState {
 
 export default function ExamScalesSection({
   selectedConditions,
+  diagnosisNames = [],
   patientId,
   visitId,
   onAddToNote,
@@ -66,11 +68,57 @@ export default function ExamScalesSection({
   const [isSaving, setIsSaving] = useState<string | null>(null)
   const [showInfoTooltip, setShowInfoTooltip] = useState(false)
   const [selectedScaleId, setSelectedScaleId] = useState<string | null>(null)
+  const [filterMode, setFilterMode] = useState<'all' | 'recommended'>('all')
 
   // Always show all exam scales
   const allExamScales = useMemo(() => {
     return getExamScales()
   }, [])
+
+  // Compute recommended scales from diagnoses
+  const recommendedScaleIds = useMemo(() => {
+    const ids = new Set<string>()
+    for (const name of diagnosisNames) {
+      const scales = getScalesForCondition(name)
+      scales.forEach(s => {
+        if (allExamScales.some(es => es.id === s.id)) {
+          ids.add(s.id)
+        }
+      })
+    }
+    return ids
+  }, [diagnosisNames, allExamScales])
+
+  // Map diagnosis names to recommended scale ids for context banner
+  const scaleRecommendationContext = useMemo(() => {
+    const map: Record<string, string[]> = {}
+    for (const name of diagnosisNames) {
+      const scales = getScalesForCondition(name)
+      scales.forEach(s => {
+        if (allExamScales.some(es => es.id === s.id)) {
+          if (!map[s.id]) map[s.id] = []
+          if (!map[s.id].includes(name)) map[s.id].push(name)
+        }
+      })
+    }
+    return map
+  }, [diagnosisNames, allExamScales])
+
+  // Filtered and sorted scales
+  const displayedScales = useMemo(() => {
+    if (filterMode === 'recommended' && recommendedScaleIds.size > 0) {
+      return allExamScales.filter(s => recommendedScaleIds.has(s.id))
+    }
+    // Show all, but recommended first
+    if (recommendedScaleIds.size > 0) {
+      return [...allExamScales].sort((a, b) => {
+        const aRec = recommendedScaleIds.has(a.id) ? 0 : 1
+        const bRec = recommendedScaleIds.has(b.id) ? 0 : 1
+        return aRec - bRec
+      })
+    }
+    return allExamScales
+  }, [allExamScales, filterMode, recommendedScaleIds])
 
   // Fetch scale history
   useEffect(() => {
@@ -305,14 +353,57 @@ export default function ExamScalesSection({
         </div>
       </div>
 
-      {/* Scale chips - always show all */}
+      {/* Recommended / All filter toggle */}
+      {recommendedScaleIds.size > 0 && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: '4px', marginBottom: '10px' }}>
+          <div style={{
+            display: 'inline-flex', borderRadius: '6px', border: '1px solid var(--border)',
+            overflow: 'hidden', fontSize: '11px', fontWeight: 500,
+          }}>
+            <button
+              onClick={() => setFilterMode('recommended')}
+              style={{
+                padding: '4px 10px', border: 'none', cursor: 'pointer',
+                background: filterMode === 'recommended' ? 'var(--primary)' : 'transparent',
+                color: filterMode === 'recommended' ? 'white' : 'var(--text-secondary)',
+              }}
+            >
+              Recommended ({recommendedScaleIds.size})
+            </button>
+            <button
+              onClick={() => setFilterMode('all')}
+              style={{
+                padding: '4px 10px', border: 'none', cursor: 'pointer',
+                background: filterMode === 'all' ? 'var(--primary)' : 'transparent',
+                color: filterMode === 'all' ? 'white' : 'var(--text-secondary)',
+              }}
+            >
+              All ({allExamScales.length})
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Context banner for recommended scales */}
+      {recommendedScaleIds.size > 0 && filterMode === 'recommended' && (
+        <div style={{
+          padding: '8px 12px', borderRadius: '6px', marginBottom: '10px',
+          background: 'rgba(13, 148, 136, 0.06)', border: '1px solid rgba(13, 148, 136, 0.15)',
+          fontSize: '12px', color: 'var(--text-secondary)',
+        }}>
+          Recommended for: {diagnosisNames.slice(0, 3).join(', ')}{diagnosisNames.length > 3 ? ` +${diagnosisNames.length - 3} more` : ''}
+        </div>
+      )}
+
+      {/* Scale chips */}
       <div style={{
         display: 'flex',
         flexWrap: 'wrap',
         gap: '8px',
         marginBottom: selectedScaleId ? '12px' : 0,
       }}>
-        {allExamScales.map(scale => {
+        {displayedScales.map(scale => {
+          const isRecommended = recommendedScaleIds.has(scale.id)
           const scaleStatus = getScaleStatus(scale)
           const isSelected = selectedScaleId === scale.id
           const severityColor = scaleStatus.status === 'completed' && scaleStatus.severity
@@ -355,8 +446,10 @@ export default function ExamScalesSection({
                   ? severityColor
                   : scaleStatus.status === 'in_progress'
                     ? '#F59E0B'
-                    : 'transparent',
-                border: scaleStatus.status === 'not_started'
+                    : isRecommended
+                      ? 'var(--primary)'
+                      : 'transparent',
+                border: scaleStatus.status === 'not_started' && !isRecommended
                   ? '1px solid var(--border)'
                   : 'none',
                 flexShrink: 0,
@@ -394,7 +487,7 @@ export default function ExamScalesSection({
           borderRadius: '8px',
           overflow: 'hidden',
         }}>
-          {allExamScales
+          {displayedScales
             .filter(scale => scale.id === selectedScaleId)
             .map(scale => {
               const state = scaleStates[scale.id]
