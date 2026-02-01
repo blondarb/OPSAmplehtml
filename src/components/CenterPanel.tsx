@@ -1093,8 +1093,8 @@ ${noteData.plan || 'Not documented'}
               </div>
             )}
 
-            {/* Section Navigation Pills */}
-            {!isVerticalView && (
+            {/* Section Navigation Pills - only in scroll view */}
+            {isVerticalView && (
               <div style={{
                 position: 'sticky',
                 top: 0,

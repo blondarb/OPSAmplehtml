@@ -145,9 +145,9 @@ export default function ReasonForConsultSection({
         <div
           style={{
             display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))',
-            gap: '10px',
-            marginBottom: '20px',
+            gridTemplateColumns: 'repeat(auto-fill, minmax(110px, 1fr))',
+            gap: '8px',
+            marginBottom: '16px',
           }}
         >
           {CONSULT_CATEGORIES.map(category => {
@@ -158,13 +158,13 @@ export default function ReasonForConsultSection({
                 onClick={() => toggleCategory(category.id)}
                 style={{
                   display: 'flex',
-                  flexDirection: 'column',
+                  flexDirection: 'row',
                   alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: '6px',
-                  padding: '14px 12px',
-                  borderRadius: '12px',
-                  border: '2px solid',
+                  justifyContent: 'flex-start',
+                  gap: '8px',
+                  padding: '8px 10px',
+                  borderRadius: '8px',
+                  border: '1.5px solid',
                   borderColor: isSelected ? 'var(--primary)' : 'var(--border)',
                   background: isSelected ? 'rgba(13, 148, 136, 0.08)' : 'var(--bg-white)',
                   cursor: 'pointer',
@@ -176,10 +176,10 @@ export default function ReasonForConsultSection({
                   <span
                     style={{
                       position: 'absolute',
-                      top: '6px',
-                      right: '6px',
-                      width: '18px',
-                      height: '18px',
+                      top: '4px',
+                      right: '4px',
+                      width: '14px',
+                      height: '14px',
                       borderRadius: '50%',
                       background: 'var(--primary)',
                       display: 'flex',
@@ -188,8 +188,8 @@ export default function ReasonForConsultSection({
                     }}
                   >
                     <svg
-                      width="10"
-                      height="10"
+                      width="8"
+                      height="8"
                       viewBox="0 0 24 24"
                       fill="none"
                       stroke="white"
@@ -199,13 +199,13 @@ export default function ReasonForConsultSection({
                     </svg>
                   </span>
                 )}
-                <span style={{ fontSize: '24px' }}>{category.icon}</span>
+                <span style={{ fontSize: '16px', flexShrink: 0 }}>{category.icon}</span>
                 <span
                   style={{
-                    fontSize: '13px',
+                    fontSize: '12px',
                     fontWeight: 500,
                     color: isSelected ? 'var(--primary)' : 'var(--text-primary)',
-                    textAlign: 'center',
+                    textAlign: 'left',
                     lineHeight: 1.2,
                   }}
                 >
