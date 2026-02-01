@@ -108,10 +108,34 @@ export default function VoiceDrawer({
     return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`
   }
 
+  // Reset Chart Prep state when the Chart Prep tab is activated
+  // This ensures a fresh session each time
+  const prevTabRef = useRef(activeTab)
+  useEffect(() => {
+    if (activeTab === 'chart-prep' && prevTabRef.current !== 'chart-prep') {
+      setPrepNotes([])
+      setChartPrepSections(null)
+      setInsertedSections(new Set())
+      setAiResponse('')
+      hasAutoProcessedRef.current = false
+    }
+    prevTabRef.current = activeTab
+  }, [activeTab])
+
   const tabs = [
     { id: 'chart-prep', label: 'Chart Prep' },
     { id: 'document', label: 'Document' },
   ]
+
+  // Start a fresh Chart Prep recording session, clearing previous state
+  const startFreshPrepRecording = () => {
+    setPrepNotes([])
+    setChartPrepSections(null)
+    setInsertedSections(new Set())
+    setAiResponse('')
+    hasAutoProcessedRef.current = false
+    startPrepRecording()
+  }
 
   // Helper to get user settings from localStorage
   const getUserSettings = () => {
@@ -623,7 +647,7 @@ export default function VoiceDrawer({
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                   {!isPrepRecording ? (
                     <button
-                      onClick={startPrepRecording}
+                      onClick={startFreshPrepRecording}
                       disabled={isPrepTranscribing}
                       style={{
                         flex: 1,
@@ -834,42 +858,6 @@ export default function VoiceDrawer({
                 </div>
               )}
 
-              {/* Generate AI Summary Button */}
-              <button
-                onClick={generateChartPrep}
-                disabled={loading}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '8px',
-                  padding: '10px 16px',
-                  background: loading ? 'var(--bg-gray)' : 'linear-gradient(135deg, #F59E0B 0%, #FBBF24 100%)',
-                  color: loading ? 'var(--text-muted)' : 'white',
-                  border: 'none',
-                  borderRadius: '8px',
-                  fontWeight: 500,
-                  cursor: loading ? 'wait' : 'pointer',
-                  marginBottom: '12px',
-                  width: '100%',
-                  justifyContent: 'center',
-                }}
-              >
-                {loading ? (
-                  <>
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ animation: 'spin 1s linear infinite' }}>
-                      <circle cx="12" cy="12" r="10" strokeDasharray="32" strokeDashoffset="12" />
-                    </svg>
-                    Analyzing Records...
-                  </>
-                ) : (
-                  <>
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
-                      <path d="M12 1L13.5 9.5L22 12L13.5 14.5L12 23L10.5 14.5L2 12L10.5 9.5L12 1Z"/>
-                    </svg>
-                    Generate AI Summary
-                  </>
-                )}
-              </button>
 
               {/* Alerts Section */}
               {chartPrepSections && chartPrepSections.alerts && chartPrepSections.alerts.trim() && (

@@ -232,6 +232,8 @@ export default function CenterPanel({
   const [copySuccess, setCopySuccess] = useState(false)
   const [pendStatus, setPendStatus] = useState<'idle' | 'pending' | 'saved'>('idle')
   const [showSignModal, setShowSignModal] = useState(false)
+  const [signingInProgress, setSigningInProgress] = useState(false)
+  const [signError, setSignError] = useState<string | null>(null)
 
   // Physical Exam accordion state
   const [openExamAccordions, setOpenExamAccordions] = useState<Record<string, boolean>>({
@@ -1092,32 +1094,61 @@ ${noteData.plan || 'Not documented'}
               </div>
             </div>
 
+            {signError && (
+              <div style={{
+                padding: '10px 12px',
+                background: '#FEF2F2',
+                border: '1px solid #FECACA',
+                borderRadius: '8px',
+                marginBottom: '16px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+              }}>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#DC2626" strokeWidth="2" style={{ flexShrink: 0 }}>
+                  <circle cx="12" cy="12" r="10"/><path d="M12 8v4M12 16h.01"/>
+                </svg>
+                <span style={{ fontSize: '13px', color: '#DC2626' }}>{signError}</span>
+              </div>
+            )}
+
             <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end' }}>
               <button
-                onClick={() => setShowSignModal(false)}
+                onClick={() => {
+                  setShowSignModal(false)
+                  setSignError(null)
+                }}
+                disabled={signingInProgress}
                 style={{
                   padding: '10px 20px',
                   borderRadius: '8px',
                   border: '1px solid var(--border)',
                   background: 'var(--bg-white)',
-                  cursor: 'pointer',
+                  cursor: signingInProgress ? 'not-allowed' : 'pointer',
                   fontSize: '14px',
                   fontWeight: 500,
+                  opacity: signingInProgress ? 0.5 : 1,
                 }}
               >
                 Cancel
               </button>
               <button
+                disabled={signingInProgress}
                 onClick={async () => {
+                  setSignError(null)
+                  setSigningInProgress(true)
                   if (onSignComplete) {
                     try {
                       await onSignComplete()
                       setShowSignModal(false)
-                    } catch (error) {
+                    } catch (error: any) {
                       console.error('Error signing note:', error)
-                      alert('Failed to sign note. Please try again.')
+                      setSignError(error?.message || 'Failed to sign note. Please try again.')
+                    } finally {
+                      setSigningInProgress(false)
                     }
                   } else {
+                    setSigningInProgress(false)
                     alert('Note signed and completed!')
                     setShowSignModal(false)
                   }
@@ -1126,9 +1157,9 @@ ${noteData.plan || 'Not documented'}
                   padding: '10px 20px',
                   borderRadius: '8px',
                   border: 'none',
-                  background: 'var(--primary)',
+                  background: signingInProgress ? 'var(--text-muted)' : 'var(--primary)',
                   color: 'white',
-                  cursor: 'pointer',
+                  cursor: signingInProgress ? 'wait' : 'pointer',
                   fontSize: '14px',
                   fontWeight: 500,
                   display: 'flex',
@@ -1136,10 +1167,21 @@ ${noteData.plan || 'Not documented'}
                   gap: '8px',
                 }}
               >
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <path d="M20 6L9 17l-5-5"/>
-                </svg>
-                Sign & Complete
+                {signingInProgress ? (
+                  <>
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ animation: 'spin 1s linear infinite' }}>
+                      <circle cx="12" cy="12" r="10" strokeDasharray="32" strokeDashoffset="12"/>
+                    </svg>
+                    Signing...
+                  </>
+                ) : (
+                  <>
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <path d="M20 6L9 17l-5-5"/>
+                    </svg>
+                    Sign & Complete
+                  </>
+                )}
               </button>
             </div>
           </div>
@@ -2879,8 +2921,7 @@ ${noteData.plan || 'Not documented'}
                       width: '8px',
                       height: '8px',
                       borderRadius: '50%',
-                      border: '1px solid var(--border)',
-                      background: 'transparent',
+                      background: 'var(--primary)',
                     }} />
                     <span style={{ fontSize: '14px', fontWeight: 500 }}>Gait</span>
                     <span title="May be limited in telemedicine; MA assistance recommended" style={{ color: '#D97706', cursor: 'help' }}>
@@ -3180,58 +3221,6 @@ ${noteData.plan || 'Not documented'}
               </div>
             </div>
 
-            {/* Final Recommendation Time */}
-            <div style={{
-              background: 'var(--bg-white)',
-              borderRadius: '12px',
-              padding: '20px',
-              boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
-            }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px' }}>
-                <span style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text-primary)' }}>Final recommendation time</span>
-                <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>(Optional)</span>
-              </div>
-              <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap' }}>
-                <div style={{ flex: '1 1 200px' }}>
-                  <label style={{ display: 'block', fontSize: '12px', color: 'var(--text-muted)', marginBottom: '4px' }}>Select date</label>
-                  <div style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '8px',
-                    padding: '8px 12px',
-                    border: '1px solid var(--border)',
-                    borderRadius: '8px',
-                  }}>
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" strokeWidth="2">
-                      <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>
-                    </svg>
-                    <span style={{ fontSize: '14px', color: 'var(--text-primary)' }}>01/16/2026</span>
-                  </div>
-                </div>
-                <div style={{ flex: '1 1 200px' }}>
-                  <label style={{ display: 'block', fontSize: '12px', color: 'var(--text-muted)', marginBottom: '4px' }}>Military Time (PST)</label>
-                  <div style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '8px',
-                    padding: '8px 12px',
-                    border: '1px solid var(--border)',
-                    borderRadius: '8px',
-                  }}>
-                    <span style={{ fontSize: '14px', color: 'var(--text-primary)' }}>HH : MM</span>
-                    <button style={{
-                      marginLeft: 'auto',
-                      padding: '4px 12px',
-                      borderRadius: '16px',
-                      border: '1px solid var(--border)',
-                      background: 'var(--bg-white)',
-                      fontSize: '12px',
-                      cursor: 'pointer',
-                    }}>Now</button>
-                  </div>
-                </div>
-              </div>
-            </div>
           </>
         )}
       </div>

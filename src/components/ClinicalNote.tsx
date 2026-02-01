@@ -1024,16 +1024,45 @@ export default function ClinicalNote({
 
   // Pend (save note as draft) handler
   const handlePend = useCallback(async () => {
-    if (!currentVisit?.id) {
-      console.error('No current visit to save')
-      return
+    let visitId = currentVisit?.id
+
+    // Auto-create a visit if none exists (e.g., demo/dev environment)
+    if (!visitId && patient?.id) {
+      try {
+        const res = await fetch('/api/visits', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            patientId: patient.id,
+            visitType: 'follow-up',
+            chiefComplaint: noteData.chiefComplaint || [],
+          }),
+        })
+        if (res.ok) {
+          const data = await res.json()
+          visitId = data.visit?.id
+          setCurrentVisit((prev: any) => ({
+            ...prev,
+            id: visitId,
+            patient_id: patient.id,
+            status: 'in_progress',
+          }))
+        }
+      } catch (e) {
+        console.error('Failed to auto-create visit:', e)
+      }
+    }
+
+    if (!visitId) {
+      console.error('No current visit to save and could not create one')
+      throw new Error('No visit available. Please select a patient from the appointments list.')
     }
 
     try {
       const clinicalNoteId = currentVisit?.clinical_notes?.id
 
       // Save via API
-      const response = await fetch(`/api/visits/${currentVisit.id}`, {
+      const response = await fetch(`/api/visits/${visitId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -1048,8 +1077,10 @@ export default function ClinicalNote({
             historyAvailable: noteData.historyAvailable,
             historyDetails: noteData.historyDetails,
             physicalExam: noteData.physicalExam,
+            examFreeText: noteData.examFreeText,
             assessment: noteData.assessment,
             plan: noteData.plan,
+            vitals: noteData.vitals,
             rawDictation: rawDictation,
             status: 'draft',
           },
@@ -1057,7 +1088,8 @@ export default function ClinicalNote({
       })
 
       if (!response.ok) {
-        throw new Error('Failed to save note')
+        const errData = await response.json().catch(() => ({}))
+        throw new Error(errData.error || `Failed to save note (${response.status})`)
       }
 
       // Clear autosave since we saved to server
@@ -1066,27 +1098,29 @@ export default function ClinicalNote({
       console.error('Error saving note:', error)
       throw error
     }
-  }, [currentVisit, noteData, rawDictation, autosaveKey])
+  }, [currentVisit, noteData, rawDictation, autosaveKey, patient?.id])
 
   // Sign & Complete handler
   const handleSignComplete = useCallback(async () => {
-    if (!currentVisit?.id) {
-      console.error('No current visit to sign')
-      return
-    }
-
     try {
-      // First save the note
+      // First save the note (this will auto-create visit if needed)
       await handlePend()
 
+      // Get the visit ID (may have been auto-created in handlePend)
+      const visitId = currentVisit?.id
+      if (!visitId) {
+        throw new Error('No visit available to sign')
+      }
+
       // Then sign via the sign endpoint
-      const response = await fetch(`/api/visits/${currentVisit.id}/sign`, {
+      const response = await fetch(`/api/visits/${visitId}/sign`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
       })
 
       if (!response.ok) {
-        throw new Error('Failed to sign note')
+        const errData = await response.json().catch(() => ({}))
+        throw new Error(errData.error || `Failed to sign note (${response.status})`)
       }
 
       const data = await response.json()

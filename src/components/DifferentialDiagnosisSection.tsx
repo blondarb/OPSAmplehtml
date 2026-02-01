@@ -147,7 +147,7 @@ export default function DifferentialDiagnosisSection({
         {/* Header */}
         <div style={{ marginBottom: '16px' }}>
           <span style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text-primary)' }}>
-            Differential diagnosis
+            Diagnoses
           </span>
           <span style={{ color: '#EF4444', marginLeft: '2px' }}>*</span>
           {chiefComplaints.length > 0 && (
@@ -299,7 +299,7 @@ export default function DifferentialDiagnosisSection({
                     cursor: 'pointer',
                   }}
                 >
-                  {cat.icon} {cat.name}
+                  {cat.name}
                 </button>
               ))}
             </div>

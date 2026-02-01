@@ -718,6 +718,9 @@ a:hover {
   background: var(--bg-white);
   border-bottom: 1px solid var(--border);
   padding: 0 16px;
+  position: sticky;
+  top: 0;
+  z-index: 10;
 }
 
 .tab-nav {
