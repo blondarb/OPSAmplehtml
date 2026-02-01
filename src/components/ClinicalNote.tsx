@@ -411,12 +411,22 @@ export default function ClinicalNote({
   }
 
   // Callback when Chart Prep completes
+  // Guard: Only accept if we're still on the same patient (prevents stale async responses)
   const handleChartPrepComplete = useCallback((output: ChartPrepOutput) => {
+    if (isSwitchingPatientRef.current) {
+      console.warn('Ignoring chart prep result - patient switch in progress')
+      return
+    }
     setChartPrepOutput(output)
   }, [])
 
   // Callback when Visit AI completes
+  // Guard: Only accept if we're still on the same patient
   const handleVisitAIComplete = useCallback((output: VisitAIOutput, transcript: string) => {
+    if (isSwitchingPatientRef.current) {
+      console.warn('Ignoring visit AI result - patient switch in progress')
+      return
+    }
     setVisitAIOutput(output)
     setVisitTranscript(transcript)
   }, [])
@@ -793,11 +803,74 @@ export default function ClinicalNote({
     }
   }
 
+  // CRITICAL: Clear ALL clinical state to prevent cross-patient data contamination
+  const resetAllClinicalState = useCallback(() => {
+    // Cancel any pending autosave FIRST
+    if (autosaveTimeoutRef.current) {
+      clearTimeout(autosaveTimeoutRef.current)
+      autosaveTimeoutRef.current = null
+    }
+
+    // Block autosave during reset
+    isSwitchingPatientRef.current = true
+
+    // Clear note content
+    setNoteData({
+      chiefComplaint: [],
+      hpi: '',
+      ros: '',
+      rosDetails: '',
+      allergies: '',
+      allergyDetails: '',
+      historyAvailable: '',
+      historyDetails: '',
+      physicalExam: '',
+      examFreeText: '',
+      assessment: '',
+      plan: '',
+      vitals: { bp: '', hr: '', temp: '', weight: '', bmi: '' },
+    })
+
+    // Clear AI outputs
+    setChartPrepOutput(null)
+    setVisitAIOutput(null)
+    setVisitTranscript('')
+
+    // Clear clinical data
+    setRawDictation({})
+    setCompletedScales([])
+    setSelectedDiagnoses([])
+    setImagingData([])
+    setExamFindings({})
+    setExamSectionNotes({})
+    setSelectedRecommendations([])
+
+    // Clear medications/allergies (will be re-fetched for next patient)
+    setMedications([])
+    setAllergies([])
+
+    // Reset autosave state so next patient loads cleanly
+    setAutosaveLoaded(false)
+    setAutosaveStatus('saved')
+
+    // Close any open drawers
+    setAiDrawerOpen(false)
+    setVoiceDrawerOpen(false)
+    setDotPhrasesOpen(false)
+    setNotePreviewOpen(false)
+
+    // Re-enable autosave after a tick (next patient will set its own data)
+    setTimeout(() => {
+      isSwitchingPatientRef.current = false
+    }, 100)
+  }, [])
+
   // Handle going back to appointments list
-  const handleBackToAppointments = () => {
+  const handleBackToAppointments = useCallback(() => {
+    resetAllClinicalState()
     setViewMode('appointments')
     setActiveIcon('home')
-  }
+  }, [resetAllClinicalState])
 
   // Handle demo reset - opens confirmation modal
   const handleResetDemo = () => {
@@ -861,6 +934,10 @@ export default function ClinicalNote({
 
   const handleImportHistorian = (session: any) => {
     if (!session?.structured_output) return
+    if (isSwitchingPatientRef.current) {
+      console.warn('Ignoring historian import - patient switch in progress')
+      return
+    }
     const so = session.structured_output
     setNoteData(prev => ({
       ...prev,
@@ -1136,13 +1213,21 @@ export default function ClinicalNote({
         } : null,
       }))
 
+      // CRITICAL: Clear all clinical state BEFORE opening follow-up modal
+      // This prevents stale Patient A data from bleeding into Patient B
+      // Note: We keep patient/currentVisit for the follow-up modal to reference
+      resetAllClinicalState()
+
+      // Clear the autosave for this (now signed) visit
+      localStorage.removeItem(autosaveKey)
+
       // Open the follow-up scheduling modal
       setFollowupModalOpen(true)
     } catch (error) {
       console.error('Error signing note:', error)
       throw error
     }
-  }, [currentVisit, handlePend])
+  }, [currentVisit, handlePend, resetAllClinicalState, autosaveKey])
 
   // Schedule follow-up appointment handler
   const handleScheduleFollowup = useCallback(async (appointmentData: {
