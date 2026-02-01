@@ -1,5 +1,5 @@
 // Neurology Diagnosis Data Structure
-// 134 diagnoses across 15 categories with ICD-10 codes
+// 155 diagnoses across 16 categories with ICD-10 codes
 // Based on neuro-plans clinical decision support templates
 
 export interface Diagnosis {
@@ -25,7 +25,7 @@ export const CONSULT_TO_DIAGNOSIS_MAP: Record<string, string[]> = {
   'Migraine': ['migraine-unspecified', 'migraine-with-aura', 'migraine-without-aura'],
   'Chronic migraine': ['chronic-migraine'],
   'Tension headache': ['tension-headache'],
-  'New headache': ['headache-evaluation'],
+  'New headache': ['headache-evaluation', 'symptom-headache'],
   'Thunderclap headache': ['thunderclap-headache'],
   'Cluster headache': ['cluster-headache'],
   'Medication overuse headache': ['medication-overuse-headache'],
@@ -43,19 +43,19 @@ export const CONSULT_TO_DIAGNOSIS_MAP: Record<string, string[]> = {
   'Ataxia': ['ataxia-evaluation'],
   'Chorea': ['chorea-evaluation'],
   'Drug-induced movement disorder': ['drug-induced-parkinsonism', 'tardive-dyskinesia'],
-  'Gait disorder': ['gait-disorder-evaluation'],
+  'Gait disorder': ['gait-disorder-evaluation', 'symptom-gait-abnormality'],
 
   // Seizure category
   'Epilepsy': ['epilepsy-management'],
   'New onset seizure': ['new-onset-seizure'],
   'Breakthrough seizures': ['breakthrough-seizure'],
   'Seizure medication adjustment': ['epilepsy-management'],
-  'Spell vs seizure evaluation': ['pnes', 'syncope-evaluation'],
+  'Spell vs seizure evaluation': ['pnes', 'syncope-evaluation', 'symptom-spells'],
   'Syncope vs seizure': ['syncope-evaluation'],
   'Status epilepticus follow-up': ['status-epilepticus'],
 
   // Cognitive category
-  'Memory loss': ['dementia-evaluation', 'mci'],
+  'Memory loss': ['dementia-evaluation', 'mci', 'symptom-memory-loss'],
   'Dementia evaluation': ['dementia-evaluation'],
   'Mild cognitive impairment': ['mci'],
   'Alzheimer disease': ['alzheimers-disease'],
@@ -107,11 +107,11 @@ export const CONSULT_TO_DIAGNOSIS_MAP: Record<string, string[]> = {
   'Parasomnia': ['parasomnia'],
 
   // Other category
-  'Dizziness/Vertigo': ['vertigo-evaluation'],
-  'Numbness/Tingling': ['peripheral-neuropathy', 'small-fiber-neuropathy'],
-  'Weakness': ['diffuse-weakness'],
+  'Dizziness/Vertigo': ['vertigo-evaluation', 'symptom-dizziness-vertigo'],
+  'Numbness/Tingling': ['peripheral-neuropathy', 'small-fiber-neuropathy', 'symptom-paresthesia'],
+  'Weakness': ['diffuse-weakness', 'symptom-weakness'],
   'Second opinion': [],
-  'Back pain with neuro symptoms': ['radiculopathy', 'myelopathy-evaluation'],
+  'Back pain with neuro symptoms': ['radiculopathy', 'myelopathy-evaluation', 'symptom-low-back-pain'],
   'Concussion/Post-concussion syndrome': ['post-concussion-syndrome', 'tbi'],
   'Bell palsy': ['bells-palsy'],
   'Abnormal imaging finding': [],
@@ -387,6 +387,23 @@ export const DIAGNOSIS_CATEGORIES: DiagnosisCategory[] = [
       { id: 'tinnitus-evaluation', name: 'Tinnitus Evaluation', icd10: 'H93.19', category: 'other-misc' },
     ],
   },
+  {
+    id: 'symptoms',
+    name: 'Symptoms & Presentations',
+    icon: '🔍',
+    diagnoses: [
+      { id: 'symptom-paresthesia', name: 'Paresthesia / Numbness / Tingling', icd10: 'R20.2', category: 'symptoms' },
+      { id: 'symptom-headache', name: 'Headache, unspecified', icd10: 'R51.9', category: 'symptoms' },
+      { id: 'symptom-spells', name: 'Spells / Episodes, unspecified', icd10: 'R56.9', category: 'symptoms' },
+      { id: 'symptom-dizziness-vertigo', name: 'Dizziness / Vertigo', icd10: 'R42', category: 'symptoms' },
+      { id: 'symptom-weakness', name: 'Weakness, generalized', icd10: 'R53.1', category: 'symptoms' },
+      { id: 'symptom-memory-loss', name: 'Memory loss', icd10: 'R41.3', category: 'symptoms' },
+      { id: 'symptom-tremor', name: 'Tremor, unspecified', icd10: 'R25.1', category: 'symptoms' },
+      { id: 'symptom-gait-abnormality', name: 'Gait abnormality', icd10: 'R26.9', category: 'symptoms' },
+      { id: 'symptom-low-back-pain', name: 'Low back pain', icd10: 'M54.5', category: 'symptoms' },
+      { id: 'symptom-neck-pain', name: 'Neck pain / Cervicalgia', icd10: 'M54.2', category: 'symptoms' },
+    ],
+  },
 ]
 
 // Helper: Get all diagnoses as flat list
@@ -443,6 +460,15 @@ const DIAGNOSIS_SYNONYMS: Record<string, string[]> = {
   'moh': ['medication-overuse-headache'],
   'edss': ['ms-chronic-management'],
   'nihss': ['acute-ischemic-stroke'],
+  'numbness': ['symptom-paresthesia', 'peripheral-neuropathy', 'small-fiber-neuropathy'],
+  'tingling': ['symptom-paresthesia', 'peripheral-neuropathy', 'small-fiber-neuropathy'],
+  'paresthesia': ['symptom-paresthesia', 'peripheral-neuropathy'],
+  'dizzy': ['symptom-dizziness-vertigo', 'vertigo-evaluation'],
+  'vertigo': ['symptom-dizziness-vertigo', 'vertigo-evaluation'],
+  'back pain': ['symptom-low-back-pain', 'radiculopathy'],
+  'neck pain': ['symptom-neck-pain', 'radiculopathy', 'cervical-myelopathy'],
+  'cervicalgia': ['symptom-neck-pain'],
+  'spells': ['symptom-spells', 'pnes', 'new-onset-seizure'],
   'midas': ['migraine-unspecified', 'chronic-migraine'],
   'stroke': ['acute-ischemic-stroke', 'post-stroke-management'],
   'seizure': ['new-onset-seizure', 'breakthrough-seizure', 'epilepsy-management', 'status-epilepticus'],

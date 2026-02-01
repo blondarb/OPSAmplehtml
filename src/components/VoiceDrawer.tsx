@@ -275,19 +275,11 @@ export default function VoiceDrawer({
     setInsertedSections(prev => new Set([...prev, sectionKey]))
   }
 
-  // Chart prep section configuration
+  // Chart prep section configuration - insertable sections that map to note fields
   const chartPrepConfig = [
-    { key: 'visitPurpose', label: 'Visit Purpose', targetField: null, icon: '🎯', highlight: false },
-    { key: 'alerts', label: 'Alerts', targetField: null, icon: '⚠️', highlight: true },
-    { key: 'keyMetrics', label: 'Key Metrics', targetField: null, icon: '📊', highlight: false },
-    { key: 'currentTreatment', label: 'Current Treatment', targetField: null, icon: '💊', highlight: false },
-    { key: 'lastVisitSummary', label: 'Last Visit', targetField: null, icon: '📋', highlight: false },
-    { key: 'suggestedFocus', label: 'Suggested Focus', targetField: null, icon: '🔮', highlight: true },
-    { key: 'suggestedHPI', label: 'Suggested HPI', targetField: 'hpi', icon: '📝', highlight: false },
-    { key: 'suggestedAssessment', label: 'Suggested Assessment', targetField: 'assessment', icon: '💡', highlight: false },
-    { key: 'suggestedPlan', label: 'Suggested Plan', targetField: 'plan', icon: '📌', highlight: false },
-    { key: 'patientSummary', label: 'Patient Summary', targetField: null, icon: '👤', highlight: false, legacy: true },
-    { key: 'keyConsiderations', label: 'Key Considerations', targetField: null, icon: '⚠️', highlight: true, legacy: true },
+    { key: 'suggestedHPI', label: 'Suggested HPI', targetField: 'hpi' },
+    { key: 'suggestedAssessment', label: 'Suggested Assessment', targetField: 'assessment' },
+    { key: 'suggestedPlan', label: 'Suggested Plan', targetField: 'plan' },
   ]
 
   // Prep note categories
@@ -445,7 +437,7 @@ export default function VoiceDrawer({
                 }
               })
 
-              setInsertedSections(new Set(config.filter(s => s.targetField).map(s => s.key)))
+              setInsertedSections(new Set(config.map(s => s.key)))
             } else {
               setAiResponse(data.response || data.error || 'No response')
               setChartPrepSections(null)
@@ -514,7 +506,7 @@ export default function VoiceDrawer({
       }
     })
 
-    setInsertedSections(new Set(chartPrepConfig.filter(s => s.targetField).map(s => s.key)))
+    setInsertedSections(new Set(chartPrepConfig.map(s => s.key)))
   }
 
   // Delete a prep note
@@ -869,7 +861,10 @@ export default function VoiceDrawer({
                   border: '1px solid #EF4444',
                 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '8px' }}>
-                    <span style={{ fontSize: '16px' }}>⚠️</span>
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#991B1B" strokeWidth="2">
+                      <path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/>
+                      <line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>
+                    </svg>
                     <span style={{ fontWeight: 600, fontSize: '13px', color: '#991B1B' }}>Alerts</span>
                   </div>
                   <div style={{ fontSize: '12px', color: '#7F1D1D', whiteSpace: 'pre-wrap', lineHeight: 1.6 }}>
@@ -878,40 +873,32 @@ export default function VoiceDrawer({
                 </div>
               )}
 
-              {/* Suggested Focus */}
-              {chartPrepSections && chartPrepSections.suggestedFocus && (
+              {/* Summary Paragraph */}
+              {chartPrepSections && chartPrepSections.summary && (
                 <div style={{
-                  background: 'linear-gradient(135deg, #FEF3C7 0%, #FDE68A 100%)',
+                  background: 'var(--bg-gray)',
+                  borderLeft: '3px solid var(--primary)',
                   borderRadius: '8px',
-                  padding: '12px',
+                  padding: '14px',
                   marginBottom: '12px',
-                  border: '1px solid #F59E0B',
                 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '8px' }}>
-                    <span style={{ fontSize: '16px' }}>🔮</span>
-                    <span style={{ fontWeight: 600, fontSize: '13px', color: '#92400E' }}>Suggested Focus for This Visit</span>
-                  </div>
-                  <div style={{ fontSize: '12px', color: '#78350F', whiteSpace: 'pre-wrap', lineHeight: 1.6 }}>
-                    {chartPrepSections.suggestedFocus}
+                  <div style={{ fontSize: '13px', color: 'var(--text-primary)', lineHeight: 1.7, whiteSpace: 'pre-wrap' }}>
+                    {chartPrepSections.summary}
                   </div>
                 </div>
               )}
 
-              {/* Legacy Key Points */}
-              {chartPrepSections && chartPrepSections.keyConsiderations && !chartPrepSections.suggestedFocus && (
+              {/* Legacy multi-section format: visit purpose + suggested focus */}
+              {chartPrepSections && chartPrepSections.visitPurpose && !chartPrepSections.summary && (
                 <div style={{
-                  background: 'linear-gradient(135deg, #FEF3C7 0%, #FDE68A 100%)',
+                  background: 'var(--bg-gray)',
+                  borderLeft: '3px solid var(--primary)',
                   borderRadius: '8px',
-                  padding: '12px',
+                  padding: '14px',
                   marginBottom: '12px',
-                  border: '1px solid #F59E0B',
                 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '8px' }}>
-                    <span style={{ fontSize: '16px' }}>⚠️</span>
-                    <span style={{ fontWeight: 600, fontSize: '13px', color: '#92400E' }}>Key Points for This Visit</span>
-                  </div>
-                  <div style={{ fontSize: '12px', color: '#78350F', whiteSpace: 'pre-wrap', lineHeight: 1.5 }}>
-                    {chartPrepSections.keyConsiderations}
+                  <div style={{ fontSize: '13px', color: 'var(--text-primary)', lineHeight: 1.7, whiteSpace: 'pre-wrap' }}>
+                    {chartPrepSections.visitPurpose}
                   </div>
                 </div>
               )}
@@ -920,24 +907,24 @@ export default function VoiceDrawer({
               {chartPrepSections && (
                 <button
                   onClick={insertAllSections}
-                  disabled={insertedSections.size === chartPrepConfig.filter(s => s.targetField).length}
+                  disabled={insertedSections.size === chartPrepConfig.length}
                   style={{
                     display: 'flex',
                     alignItems: 'center',
                     gap: '8px',
                     padding: '10px 16px',
-                    background: insertedSections.size === chartPrepConfig.filter(s => s.targetField).length ? '#D1FAE5' : 'var(--warning)',
-                    color: insertedSections.size === chartPrepConfig.filter(s => s.targetField).length ? '#059669' : 'white',
+                    background: insertedSections.size === chartPrepConfig.length ? '#D1FAE5' : 'var(--warning)',
+                    color: insertedSections.size === chartPrepConfig.length ? '#059669' : 'white',
                     border: 'none',
                     borderRadius: '8px',
                     fontWeight: 500,
-                    cursor: insertedSections.size === chartPrepConfig.filter(s => s.targetField).length ? 'default' : 'pointer',
+                    cursor: insertedSections.size === chartPrepConfig.length ? 'default' : 'pointer',
                     marginBottom: '12px',
                     width: '100%',
                     justifyContent: 'center',
                   }}
                 >
-                  {insertedSections.size === chartPrepConfig.filter(s => s.targetField).length ? (
+                  {insertedSections.size === chartPrepConfig.length ? (
                     <>
                       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                         <path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><path d="M22 4L12 14.01l-3-3"/>
@@ -955,20 +942,15 @@ export default function VoiceDrawer({
                 </button>
               )}
 
-              {/* Collapsible Detailed Sections */}
+              {/* Insertable sections (HPI, Assessment, Plan) */}
               {chartPrepSections && (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                   {chartPrepConfig.map(section => {
                     const content = chartPrepSections[section.key]
                     if (!content) return null
-                    if (section.key === 'alerts' || section.key === 'suggestedFocus') return null
-                    if (section.key === 'keyConsiderations' && chartPrepSections.suggestedFocus) return null
-                    if (section.key === 'patientSummary' && chartPrepSections.visitPurpose) return null
-                    if ((section as any).legacy) return null
 
                     const isExpanded = expandedSections.has(section.key)
                     const isInserted = insertedSections.has(section.key)
-                    const canInsert = section.targetField !== null
 
                     return (
                       <div
@@ -994,7 +976,6 @@ export default function VoiceDrawer({
                           }}
                         >
                           <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                            <span style={{ fontSize: '12px' }}>{section.icon}</span>
                             <span style={{ fontWeight: 500, fontSize: '12px', color: 'var(--text-primary)' }}>
                               {section.label}
                             </span>
@@ -1019,13 +1000,13 @@ export default function VoiceDrawer({
                               color: 'var(--text-secondary)',
                               lineHeight: 1.5,
                               whiteSpace: 'pre-wrap',
-                              marginBottom: canInsert ? '8px' : '0',
+                              marginBottom: '8px',
                             }}>
                               {content}
                             </div>
-                            {canInsert && !isInserted && (
+                            {!isInserted && (
                               <button
-                                onClick={() => insertSection(section.key, section.targetField!)}
+                                onClick={() => insertSection(section.key, section.targetField)}
                                 style={{
                                   display: 'flex',
                                   alignItems: 'center',
@@ -1043,7 +1024,7 @@ export default function VoiceDrawer({
                                 <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                                   <path d="M12 5v14M5 12h14"/>
                                 </svg>
-                                Insert to {section.targetField?.toUpperCase()}
+                                Insert to {section.targetField.toUpperCase()}
                               </button>
                             )}
                           </div>

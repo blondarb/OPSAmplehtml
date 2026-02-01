@@ -414,6 +414,7 @@ export default function ExamScalesSection({
             <button
               key={scale.id}
               onClick={() => handleScaleSelect(scale.id)}
+              title={`${scale.name}${scale.description ? ` — ${scale.description}` : ''}`}
               style={{
                 display: 'flex',
                 alignItems: 'center',

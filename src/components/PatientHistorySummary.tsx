@@ -249,16 +249,76 @@ Format as a concise clinical summary. Use section headers if in standard or deta
             </div>
           )}
 
-          {/* Empty state */}
+          {/* New patient: show referral info */}
           {!hasPriorVisits && (
-            <p style={{
-              fontSize: '13px',
-              color: 'var(--text-muted)',
-              fontStyle: 'italic',
-              margin: '8px 0 0',
+            <div style={{
+              background: 'var(--bg-gray)',
+              borderRadius: '8px',
+              padding: '14px',
+              marginTop: '4px',
             }}>
-              No prior visits on file. Summary will be available for returning patients.
-            </p>
+              {(patient?.referring_physician || patient?.referringPhysician || patient?.referral_reason || patient?.referralReason) ? (
+                <>
+                  <div style={{ textAlign: 'center', fontWeight: 700, fontSize: '13px', letterSpacing: '0.5px', marginBottom: '4px', color: 'var(--text-primary)' }}>
+                    REFERRAL NOTE
+                  </div>
+                  <div style={{ textAlign: 'center', fontSize: '11px', color: 'var(--text-muted)', marginBottom: '12px' }}>
+                    {new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
+                  </div>
+
+                  {(patient?.referring_physician || patient?.referringPhysician) && (
+                    <div style={{ marginBottom: '10px' }}>
+                      <div style={{ fontSize: '10px', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '2px' }}>
+                        Referring Physician
+                      </div>
+                      <div style={{ fontSize: '13px', color: 'var(--text-primary)' }}>
+                        {patient?.referring_physician || patient?.referringPhysician}
+                      </div>
+                    </div>
+                  )}
+
+                  {(patient?.referral_reason || patient?.referralReason || noteData?.chiefComplaint?.length > 0) && (
+                    <div style={{ marginBottom: '10px' }}>
+                      <div style={{ fontSize: '10px', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '2px' }}>
+                        Chief Complaint
+                      </div>
+                      <div style={{ fontSize: '13px', color: 'var(--text-primary)' }}>
+                        {patient?.referral_reason || patient?.referralReason || noteData?.chiefComplaint?.join(', ')}
+                      </div>
+                    </div>
+                  )}
+
+                  {(patient?.referral_reason || patient?.referralReason) && (
+                    <div>
+                      <div style={{ fontSize: '10px', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '2px' }}>
+                        Clinical History
+                      </div>
+                      <div style={{ fontSize: '13px', color: 'var(--text-secondary)', lineHeight: 1.5 }}>
+                        Patient referred for evaluation of {(patient?.referral_reason || patient?.referralReason || '').toLowerCase()}.
+                      </div>
+                    </div>
+                  )}
+                </>
+              ) : noteData?.chiefComplaint?.length > 0 ? (
+                <>
+                  <div style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '6px' }}>
+                    New Patient Visit
+                  </div>
+                  <div style={{ fontSize: '13px', color: 'var(--text-primary)', lineHeight: 1.5 }}>
+                    Chief complaint: {noteData.chiefComplaint.join(', ')}
+                  </div>
+                </>
+              ) : (
+                <p style={{
+                  fontSize: '13px',
+                  color: 'var(--text-muted)',
+                  fontStyle: 'italic',
+                  margin: 0,
+                }}>
+                  New patient — no prior visits on file.
+                </p>
+              )}
+            </div>
           )}
 
           {/* Loading state */}

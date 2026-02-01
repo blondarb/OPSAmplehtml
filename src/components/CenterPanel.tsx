@@ -230,6 +230,7 @@ export default function CenterPanel({
   // Toolbar action states
   const [showMoreMenu, setShowMoreMenu] = useState(false)
   const [copySuccess, setCopySuccess] = useState(false)
+  const [showCopyDrawer, setShowCopyDrawer] = useState(false)
   const [pendStatus, setPendStatus] = useState<'idle' | 'pending' | 'saved'>('idle')
   const [showSignModal, setShowSignModal] = useState(false)
   const [signingInProgress, setSigningInProgress] = useState(false)
@@ -519,10 +520,9 @@ export default function CenterPanel({
     }
   }
 
-  // Copy note to clipboard
-  const handleCopyNote = () => {
-    const noteText = `
-PATIENT: ${patient?.first_name || ''} ${patient?.last_name || ''}
+  // Build formatted note text for copy/review
+  const buildNoteText = useCallback(() => {
+    return `PATIENT: ${patient?.first_name || ''} ${patient?.last_name || ''}
 DATE: ${new Date().toLocaleDateString()}
 
 CHIEF COMPLAINT: ${noteData.chiefComplaint?.join(', ') || 'Not specified'}
@@ -543,9 +543,17 @@ ASSESSMENT:
 ${noteData.assessment || 'Not documented'}
 
 PLAN:
-${noteData.plan || 'Not documented'}
-`.trim()
+${noteData.plan || 'Not documented'}`.trim()
+  }, [patient, noteData, medications, allergies])
 
+  // Copy note to clipboard (direct, used from more menu)
+  const handleCopyNote = () => {
+    setShowCopyDrawer(true)
+  }
+
+  // Copy text to clipboard with feedback
+  const handleCopyToClipboard = () => {
+    const noteText = buildNoteText()
     navigator.clipboard.writeText(noteText).then(() => {
       setCopySuccess(true)
       setTimeout(() => setCopySuccess(false), 2000)
@@ -1988,6 +1996,8 @@ ${noteData.plan || 'Not documented'}
                   openAiDrawer={openAiDrawer}
                   openDotPhrases={openDotPhrases}
                   setActiveTextField={handleSetActiveField}
+                  priorImagingStudies={imagingStudies}
+                  onImagingChange={onImagingChange}
                 />
               </div>
             )}
@@ -2003,6 +2013,8 @@ ${noteData.plan || 'Not documented'}
             openAiDrawer={openAiDrawer}
             openDotPhrases={openDotPhrases}
             setActiveTextField={handleSetActiveField}
+            priorImagingStudies={imagingStudies}
+            onImagingChange={onImagingChange}
           />
         )}
 
@@ -3244,6 +3256,122 @@ ${noteData.plan || 'Not documented'}
           <polyline points="15 18 9 12 15 6"/>
         </svg>
       </div>
+
+      {/* Copy Note Drawer */}
+      {showCopyDrawer && (
+        <>
+          <div
+            onClick={() => setShowCopyDrawer(false)}
+            style={{
+              position: 'fixed',
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              background: 'rgba(0,0,0,0.5)',
+              zIndex: 1000,
+            }}
+          />
+          <div style={{
+            position: 'fixed',
+            top: 0,
+            right: 0,
+            width: '520px',
+            maxWidth: '100vw',
+            height: '100%',
+            background: 'var(--bg-white)',
+            boxShadow: '-4px 0 20px rgba(0,0,0,0.1)',
+            zIndex: 1001,
+            display: 'flex',
+            flexDirection: 'column',
+            animation: 'slideIn 0.3s ease',
+          }}>
+            {/* Header */}
+            <div style={{
+              padding: '16px 20px',
+              borderBottom: '1px solid var(--border)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--text-primary)" strokeWidth="2">
+                  <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/>
+                </svg>
+                <span style={{ fontWeight: 600, fontSize: '16px' }}>Copy Note</span>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <button
+                  onClick={handleCopyToClipboard}
+                  style={{
+                    padding: '8px 16px',
+                    borderRadius: '6px',
+                    border: 'none',
+                    background: copySuccess ? '#D1FAE5' : 'var(--primary)',
+                    color: copySuccess ? '#059669' : 'white',
+                    cursor: 'pointer',
+                    fontSize: '13px',
+                    fontWeight: 500,
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    transition: 'all 0.2s',
+                  }}
+                >
+                  {copySuccess ? (
+                    <>
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <polyline points="20 6 9 17 4 12"/>
+                      </svg>
+                      Copied
+                    </>
+                  ) : (
+                    <>
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/>
+                      </svg>
+                      Copy to Clipboard
+                    </>
+                  )}
+                </button>
+                <button
+                  onClick={() => setShowCopyDrawer(false)}
+                  style={{
+                    background: 'transparent',
+                    border: 'none',
+                    cursor: 'pointer',
+                    padding: '4px',
+                    color: 'var(--text-muted)',
+                  }}
+                >
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <path d="M18 6L6 18M6 6l12 12"/>
+                  </svg>
+                </button>
+              </div>
+            </div>
+
+            {/* Note Content */}
+            <div style={{
+              flex: 1,
+              overflowY: 'auto',
+              padding: '20px',
+            }}>
+              <pre style={{
+                fontFamily: 'inherit',
+                fontSize: '13px',
+                lineHeight: 1.7,
+                color: 'var(--text-primary)',
+                whiteSpace: 'pre-wrap',
+                wordBreak: 'break-word',
+                margin: 0,
+              }}>
+                {buildNoteText()}
+              </pre>
+            </div>
+          </div>
+        </>
+      )}
     </main>
   )
 }

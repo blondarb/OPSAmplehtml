@@ -145,25 +145,25 @@ ${prepNotes && prepNotes.length > 0
       }
     }
 
-    const systemPrompt = `You are a clinical AI assistant preparing a concise, scannable chart prep for a neurology visit.
+    const systemPrompt = `You are a clinical AI assistant preparing a concise chart prep summary for a neurology visit.
 
 ${patientContext}
 
 CRITICAL: If "Provider's Pre-Visit Notes" are present above, use them as the PRIMARY source of information.
 The provider has already reviewed the chart and dictated key observations. Base your summary on their notes.
 
-Generate a JSON response with HIGH-YIELD, BULLET-STYLE summaries. Keep each section concise and actionable.
-Use "•" for bullet points. Each bullet should be 1 line max.
+IMPORTANT GUARDRAILS:
+- Do NOT comment on, judge, or flag missing or undocumented findings. Only summarize what IS documented.
+- Do NOT say things like "no exam documented" or "missing ROS" or "exam findings not available."
+- Stick to facts that are present in the record. If data is missing, simply omit it — do not call it out.
+
+Generate a JSON response with a single narrative paragraph summary plus optional alerts.
 
 IMPORTANT: Return ONLY valid JSON, no markdown formatting.
 
 {
-  "visitPurpose": "One sentence: reason for visit + time since last seen",
-  "alerts": "2-4 bullets of URGENT items only: drug interactions, overdue screenings, critical labs, safety concerns. Use ⚠️ prefix. Return empty string if none.",
-  "keyMetrics": "2-4 bullets showing trends with arrows: • MIDAS: 42 → 28 (improving) or • PHQ-9: 12 (stable). Include actual numbers when available.",
-  "currentTreatment": "2-4 bullets of active medications with duration and response: • Topiramate 100mg BID (6mo, good response)",
-  "lastVisitSummary": "2-3 sentences summarizing the most recent visit: what was discussed, decisions made, patient status",
-  "suggestedFocus": "2-4 bullets of specific items to address THIS visit. Start each with action verb.",
+  "summary": "A single concise paragraph (4-8 sentences) summarizing: who this patient is, why they are being seen, relevant history highlights, current treatments and responses, recent scale scores with trends, and suggested focus areas for today's visit. Write in clinical prose, not bullets.",
+  "alerts": "Urgent items only: drug interactions, overdue screenings, critical labs, safety concerns. Use ⚠️ prefix. Return empty string if none.",
   "suggestedHPI": "A draft HPI paragraph (3-5 sentences) incorporating chief complaint and relevant history context.",
   "suggestedAssessment": "1-2 sentence clinical impression based on available data",
   "suggestedPlan": "3-5 bullet points with specific, actionable recommendations"
@@ -224,11 +224,17 @@ IMPORTANT: Return ONLY valid JSON, no markdown formatting.
 function formatSectionsAsText(sections: any): string {
   const parts = []
 
-  if (sections.visitPurpose) {
-    parts.push(`**Visit Purpose**\n${sections.visitPurpose}`)
+  // New single-paragraph format
+  if (sections.summary) {
+    parts.push(sections.summary)
   }
   if (sections.alerts) {
     parts.push(`**Alerts**\n${sections.alerts}`)
+  }
+
+  // Legacy multi-section format support
+  if (sections.visitPurpose && !sections.summary) {
+    parts.push(`**Visit Purpose**\n${sections.visitPurpose}`)
   }
   if (sections.keyMetrics) {
     parts.push(`**Key Metrics**\n${sections.keyMetrics}`)
@@ -250,14 +256,6 @@ function formatSectionsAsText(sections: any): string {
   }
   if (sections.suggestedPlan) {
     parts.push(`**Suggested Plan**\n${sections.suggestedPlan}`)
-  }
-
-  // Support legacy field names for backwards compatibility
-  if (sections.patientSummary && !sections.visitPurpose) {
-    parts.unshift(`**Patient Summary**\n${sections.patientSummary}`)
-  }
-  if (sections.keyConsiderations && !sections.suggestedFocus) {
-    parts.push(`**Key Considerations**\n${sections.keyConsiderations}`)
   }
 
   return parts.join('\n\n')
