@@ -191,6 +191,7 @@ export default function ClinicalNote({
   const [priorVisits, setPriorVisits] = useState(initialPriorVisits || [])
   const [imagingStudies, setImagingStudies] = useState(initialImagingStudies || [])
   const [scoreHistory, setScoreHistory] = useState(initialScoreHistory || [])
+  const [patientHistorianSessions, setPatientHistorianSessions] = useState(historianSessions || [])
   const [loadingPatient, setLoadingPatient] = useState(false)
   const [aiDrawerOpen, setAiDrawerOpen] = useState(false)
   const [aiDrawerTab, setAiDrawerTab] = useState('ask-ai')
@@ -655,6 +656,19 @@ export default function ClinicalNote({
 
       // Set score history
       setScoreHistory(patientData.scoreHistory || [])
+
+      // Fetch historian sessions scoped to this patient
+      try {
+        const histRes = await fetch(`/api/ai/historian/save?patient_id=${appointment.patient.id}`)
+        if (histRes.ok) {
+          const histData = await histRes.json()
+          setPatientHistorianSessions(histData.sessions || [])
+        } else {
+          setPatientHistorianSessions([])
+        }
+      } catch {
+        setPatientHistorianSessions([])
+      }
 
       // Create or get visit for this appointment
       let visit = null
@@ -1194,7 +1208,7 @@ export default function ClinicalNote({
               priorVisits={priorVisits}
               scoreHistory={scoreHistory}
               patientMessages={patientMessages}
-              historianSessions={historianSessions}
+              historianSessions={patientHistorianSessions}
               onImportHistorian={handleImportHistorian}
               isOpen={mobileSidebarOpen}
               onClose={() => setMobileSidebarOpen(false)}

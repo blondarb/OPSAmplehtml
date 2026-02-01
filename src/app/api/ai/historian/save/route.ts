@@ -50,13 +50,18 @@ export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url)
     const tenant = searchParams.get('tenant_id') || getTenantServer()
+    const patientId = searchParams.get('patient_id')
 
     const supabase = await createClient()
 
-    const { data, error } = await supabase
+    let query = supabase
       .from('historian_sessions')
-      .select('*')
+      .select('*, patient:patients(id, first_name, last_name, mrn)')
       .eq('tenant_id', tenant)
+    if (patientId) {
+      query = query.eq('patient_id', patientId)
+    }
+    const { data, error } = await query
       .order('created_at', { ascending: false })
       .limit(10)
 

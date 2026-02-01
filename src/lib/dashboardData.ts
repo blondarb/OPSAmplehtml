@@ -92,13 +92,17 @@ export async function fetchDashboardData() {
     // Table may not exist yet — ignore
   }
 
-  // Fetch historian sessions for physician view
+  // Fetch historian sessions for physician view (scoped to current patient)
   let historianSessions: any[] = []
   try {
-    const { data: sessions } = await supabase
+    let query = supabase
       .from('historian_sessions')
       .select('*, patient:patients(id, first_name, last_name, mrn)')
       .eq('tenant_id', tenant)
+    if (patients?.id) {
+      query = query.eq('patient_id', patients.id)
+    }
+    const { data: sessions } = await query
       .order('created_at', { ascending: false })
       .limit(10)
     historianSessions = sessions || []
