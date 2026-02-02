@@ -175,7 +175,7 @@ IMPORTANT: Return ONLY valid JSON, no markdown formatting.
         { role: 'system', content: systemPrompt },
         { role: 'user', content: 'Generate the structured chart prep JSON for this patient visit.' }
       ],
-      max_tokens: 2000,
+      max_completion_tokens: 2000,
       temperature: 0.4,
       response_format: { type: 'json_object' },
     })

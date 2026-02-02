@@ -19,16 +19,17 @@ DIAGNOSIS_CATEGORIES.forEach(category => {
   })
 })
 
-// Helper: check if any code in a list matches any plan ICD-10 code (prefix-aware)
+// Helper: check if any code in a list matches any plan ICD-10 code
+// Uses exact 3-character category match (e.g., G43 matches G43.709)
+// to prevent false positives across different ICD-10 categories
 function codesMatch(planCodes: string[], diagCodes: string[]): boolean {
   return planCodes.some(planCode => {
-    const planBase = planCode.replace(/\.\d+$/, '')
+    // Extract the 3-character base (letter + 2 digits), e.g., G43 from G43.709
+    const planBase = planCode.substring(0, 3)
     return diagCodes.some(diagCode => {
-      const diagBase = diagCode.replace(/\.\d+$/, '')
-      return planCode === diagCode ||
-        planBase === diagBase ||
-        diagCode.startsWith(planBase) ||
-        planCode.startsWith(diagBase)
+      const diagBase = diagCode.substring(0, 3)
+      // Exact full code match, or same 3-character ICD-10 category
+      return planCode === diagCode || planBase === diagBase
     })
   })
 }

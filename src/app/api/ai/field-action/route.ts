@@ -174,7 +174,7 @@ Important: This is for a neurology practice. Ensure the output is appropriate fo
         { role: 'system', content: systemPrompt },
         { role: 'user', content: text }
       ],
-      max_tokens: 1500,
+      max_completion_tokens: 1500,
       temperature,
     })
 

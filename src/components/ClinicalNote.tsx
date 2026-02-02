@@ -1171,6 +1171,10 @@ export default function ClinicalNote({
 
       // Clear autosave since we saved to server
       localStorage.removeItem(autosaveKey)
+
+      // Return the visitId so callers (like handleSignComplete) can use it
+      // instead of reading stale closure state
+      return visitId
     } catch (error) {
       console.error('Error saving note:', error)
       throw error
@@ -1181,10 +1185,8 @@ export default function ClinicalNote({
   const handleSignComplete = useCallback(async () => {
     try {
       // First save the note (this will auto-create visit if needed)
-      await handlePend()
-
-      // Get the visit ID (may have been auto-created in handlePend)
-      const visitId = currentVisit?.id
+      // handlePend returns the visitId directly to avoid stale closure issues
+      const visitId = await handlePend()
       if (!visitId) {
         throw new Error('No visit available to sign')
       }

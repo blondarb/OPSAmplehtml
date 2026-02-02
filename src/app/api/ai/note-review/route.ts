@@ -75,7 +75,7 @@ If the note has no issues, return: { "suggestions": [] }`
         { role: 'system', content: systemPrompt },
         { role: 'user', content: noteText }
       ],
-      max_tokens: 1500,
+      max_completion_tokens: 1500,
       temperature: 0.3,
       response_format: { type: 'json_object' },
     })

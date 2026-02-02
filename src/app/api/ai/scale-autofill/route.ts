@@ -262,7 +262,7 @@ export async function POST(request: Request) {
         { role: 'system', content: 'You are a clinical documentation expert specializing in neurology. Extract structured data from clinical notes AND patient demographics/history accurately. Use all available patient data (age, sex, diagnoses, medications, vitals) to complete scale questions. Never hallucinate information not present in any data source.' },
         { role: 'user', content: prompt }
       ],
-      max_tokens: 2500,
+      max_completion_tokens: 2500,
       temperature: 0.1, // Very low temperature for maximum consistency
       response_format: { type: 'json_object' }
     })

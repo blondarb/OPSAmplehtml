@@ -185,7 +185,7 @@ IMPORTANT GUARDRAILS:
         { role: 'system', content: systemPrompt },
         { role: 'user', content: 'Extract and organize the clinical content from this visit transcript.' }
       ],
-      max_tokens: 2500,
+      max_completion_tokens: 2500,
       temperature: 0.3,
       response_format: { type: 'json_object' },
     })

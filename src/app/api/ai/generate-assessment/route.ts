@@ -139,7 +139,7 @@ Generate a clinical assessment that addresses each diagnosis with relevant suppo
         { role: 'system', content: systemPrompt },
         { role: 'user', content: userPrompt }
       ],
-      max_tokens: 1500,
+      max_completion_tokens: 1500,
       temperature: 0.3, // Lower temperature for more consistent clinical output
     })
 
