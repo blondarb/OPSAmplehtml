@@ -1237,9 +1237,8 @@ export default function SmartRecommendationsSection({
                       setShowPlanBuilder(false)
                     } else {
                       setSelectedDiagnosisId(plan.id)
-                      // Use the first linked diagnosis ID or the plan ID itself
-                      const diagId = plan.diagnosisIds[0] || plan.id
-                      fetchPlanForDiagnosis(diagId)
+                      // Fetch by plan key directly — more reliable than ICD-10 roundtrip
+                      fetchPlanByKey(plan.id)
                     }
                   }}
                   disabled={isLoading}

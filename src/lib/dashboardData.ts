@@ -40,12 +40,12 @@ export async function fetchDashboardData() {
     .limit(1)
     .single()
 
-  // Fetch prior visits
+  // Fetch prior visits with full clinical note content for history summary
   const { data: priorVisits } = await supabase
     .from('visits')
     .select(`
       *,
-      clinical_notes(ai_summary)
+      clinical_notes(hpi, ros, assessment, plan, ai_summary)
     `)
     .eq('status', 'completed')
     .eq('tenant_id', tenant)

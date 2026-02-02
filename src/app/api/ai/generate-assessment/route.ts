@@ -15,7 +15,14 @@ interface AssessmentContext {
   chiefComplaints?: string[]
   hpi?: string
   ros?: string
+  rosDetails?: string
   physicalExam?: string
+  examFreeText?: string
+  vitals?: { bp?: string; hr?: string; temp?: string; weight?: string; bmi?: string }
+  medications?: string[]
+  allergies?: string[]
+  medicalHistory?: string
+  historyDetails?: string
   selectedDiagnoses?: DiagnosisInput[]
 }
 
@@ -110,11 +117,19 @@ export async function POST(request: Request) {
 Guidelines:
 - Write in standard medical documentation style (brief, factual)
 - Include the diagnosis name and ICD-10 code for each diagnosis
-- Reference relevant findings from the HPI and exam that support each diagnosis
+- Reference relevant findings from the HPI, exam, vitals, medications, and history that support each diagnosis
 - Keep the assessment focused and concise (2-4 sentences per diagnosis)
 - Use appropriate clinical terminology
 - Do NOT make up information not provided in the context
 - If information is missing, focus on what IS available${userPreferences}`
+
+    // Build additional context sections
+    const vitalsText = context.vitals
+      ? Object.entries(context.vitals).filter(([, v]) => v).map(([k, v]) => `${k}: ${v}`).join(', ')
+      : ''
+    const medsText = context.medications?.length ? context.medications.join('; ') : ''
+    const allergiesText = context.allergies?.length ? context.allergies.join('; ') : ''
+    const examText = [context.physicalExam, context.examFreeText].filter(Boolean).join('\n')
 
     const userPrompt = `Generate a clinical assessment for the following patient:
 
@@ -125,13 +140,17 @@ Chief Complaint(s): ${context.chiefComplaints?.join(', ') || 'Not specified'}
 History of Present Illness:
 ${context.hpi || 'Not provided'}
 
-${context.ros ? `Review of Systems:\n${context.ros}\n` : ''}
-${context.physicalExam ? `Physical Examination:\n${context.physicalExam}\n` : ''}
+${context.ros ? `Review of Systems:\n${context.ros}${context.rosDetails ? `\nDetails: ${context.rosDetails}` : ''}\n` : ''}
+${vitalsText ? `Vital Signs: ${vitalsText}\n` : ''}
+${examText ? `Physical Examination:\n${examText}\n` : ''}
+${medsText ? `Current Medications: ${medsText}\n` : ''}
+${allergiesText ? `Allergies: ${allergiesText}\n` : ''}
+${context.medicalHistory ? `Medical History: ${context.medicalHistory}${context.historyDetails ? `\nDetails: ${context.historyDetails}` : ''}\n` : ''}
 
 Selected Diagnoses:
 ${diagnosisListFormatted}
 
-Generate a clinical assessment that addresses each diagnosis with relevant supporting findings. Format as a numbered list matching the diagnosis order above.`
+Generate a clinical assessment that addresses each diagnosis with relevant supporting findings from ALL the clinical data above. Format as a numbered list matching the diagnosis order above.`
 
     const completion = await openai.chat.completions.create({
       model: 'gpt-5.2', // Complex clinical reasoning task - use latest GPT-5.2 for best accuracy
