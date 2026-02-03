@@ -1,7 +1,7 @@
 // Neurology Diagnosis Data Structure
 // 166 diagnoses across 16 categories with ICD-10 codes
 // Based on neuro-plans clinical decision support templates
-// hasSmartPlan flag synced with 98 plans in Supabase clinical_plans table (Feb 2026)
+// hasSmartPlan flag synced with 127 plans in Supabase clinical_plans table (Feb 2026)
 
 export interface Diagnosis {
   id: string
@@ -152,8 +152,8 @@ export const DIAGNOSIS_CATEGORIES: DiagnosisCategory[] = [
       { id: 'rcvs', name: 'Reversible Cerebral Vasoconstriction', icd10: 'I67.841', category: 'stroke-cerebrovascular', hasSmartPlan: true },
       { id: 'cns-vasculitis', name: 'CNS Vasculitis', icd10: 'I67.7', category: 'stroke-cerebrovascular', hasSmartPlan: true },
       { id: 'moyamoya', name: 'Moyamoya Disease', icd10: 'I67.5', category: 'stroke-cerebrovascular', hasSmartPlan: true },
-      { id: 'post-stroke-management', name: 'Post-Stroke Management', icd10: 'I69.30', category: 'stroke-cerebrovascular' },
-      { id: 'carotid-stenosis', name: 'Carotid Stenosis', icd10: 'I65.29', category: 'stroke-cerebrovascular' },
+      { id: 'post-stroke-management', name: 'Post-Stroke Management', icd10: 'I69.30', category: 'stroke-cerebrovascular', hasSmartPlan: true },
+      { id: 'carotid-stenosis', name: 'Carotid Stenosis', icd10: 'I65.29', category: 'stroke-cerebrovascular', hasSmartPlan: true },
     ],
   },
   {
@@ -161,7 +161,7 @@ export const DIAGNOSIS_CATEGORIES: DiagnosisCategory[] = [
     name: 'Headache',
     icon: '🧠',
     diagnoses: [
-      { id: 'headache-evaluation', name: 'Headache Evaluation', icd10: 'R51.9', category: 'headache' },
+      { id: 'headache-evaluation', name: 'Headache Evaluation', icd10: 'R51.9', category: 'headache', hasSmartPlan: true },
       { id: 'migraine-unspecified', name: 'Migraine, unspecified', icd10: 'G43.909', category: 'headache', hasSmartPlan: true,
         alternateIcd10: [
           { code: 'G43.909', description: 'Migraine, unspecified, not intractable' },
@@ -179,7 +179,7 @@ export const DIAGNOSIS_CATEGORIES: DiagnosisCategory[] = [
       { id: 'low-pressure-headache', name: 'Low Pressure Headache/SIH', icd10: 'G96.00', category: 'headache', hasSmartPlan: true },
       { id: 'trigeminal-neuralgia', name: 'Trigeminal Neuralgia', icd10: 'G50.0', category: 'headache', hasSmartPlan: true },
       { id: 'new-daily-persistent-headache', name: 'New Daily Persistent Headache', icd10: 'G44.52', category: 'headache', hasSmartPlan: true },
-      { id: 'thunderclap-headache', name: 'Thunderclap Headache Evaluation', icd10: 'R51.9', category: 'headache' },
+      { id: 'thunderclap-headache', name: 'Thunderclap Headache Evaluation', icd10: 'R51.9', category: 'headache', hasSmartPlan: true },
       { id: 'gca', name: 'Giant Cell Arteritis', icd10: 'M31.6', category: 'headache', hasSmartPlan: true },
     ],
   },
@@ -217,7 +217,7 @@ export const DIAGNOSIS_CATEGORIES: DiagnosisCategory[] = [
       { id: 'muscular-dystrophy', name: 'Muscular Dystrophy', icd10: 'G71.0', category: 'neuromuscular', hasSmartPlan: true },
       { id: 'myotonic-dystrophy', name: 'Myotonic Dystrophy', icd10: 'G71.11', category: 'neuromuscular', hasSmartPlan: true },
       { id: 'cim-cin', name: 'Critical Illness Myopathy/Neuropathy', icd10: 'G72.81', category: 'neuromuscular', hasSmartPlan: true },
-      { id: 'botulism', name: 'Botulism', icd10: 'A05.1', category: 'neuromuscular' },
+      { id: 'botulism', name: 'Botulism', icd10: 'A05.1', category: 'neuromuscular', hasSmartPlan: true },
     ],
   },
   {
@@ -232,13 +232,13 @@ export const DIAGNOSIS_CATEGORIES: DiagnosisCategory[] = [
       { id: 'chemo-neuropathy', name: 'Chemotherapy-Induced Neuropathy', icd10: 'G62.0', category: 'neuropathy', hasSmartPlan: true },
       { id: 'carpal-tunnel', name: 'Carpal Tunnel Syndrome', icd10: 'G56.00', category: 'neuropathy', hasSmartPlan: true },
       { id: 'ulnar-neuropathy', name: 'Ulnar Neuropathy', icd10: 'G56.20', category: 'neuropathy', hasSmartPlan: true },
-      { id: 'peroneal-neuropathy', name: 'Peroneal Neuropathy', icd10: 'G57.30', category: 'neuropathy' },
+      { id: 'peroneal-neuropathy', name: 'Peroneal Neuropathy', icd10: 'G57.30', category: 'neuropathy', hasSmartPlan: true },
       { id: 'mmn', name: 'Multifocal Motor Neuropathy', icd10: 'G61.82', category: 'neuropathy', hasSmartPlan: true },
       { id: 'hereditary-neuropathy', name: 'Hereditary Neuropathy', icd10: 'G60.0', category: 'neuropathy', hasSmartPlan: true },
       { id: 'vasculitic-neuropathy', name: 'Vasculitic Neuropathy', icd10: 'G63', category: 'neuropathy', hasSmartPlan: true },
       { id: 'autonomic-neuropathy', name: 'Autonomic Neuropathy', icd10: 'G90.09', category: 'neuropathy', hasSmartPlan: true },
       { id: 'radiculopathy', name: 'Radiculopathy', icd10: 'M54.10', category: 'neuropathy', hasSmartPlan: true },
-      { id: 'plexopathy', name: 'Plexopathy', icd10: 'G54.0', category: 'neuropathy' },
+      { id: 'plexopathy', name: 'Plexopathy', icd10: 'G54.0', category: 'neuropathy', hasSmartPlan: true },
     ],
   },
   {
@@ -260,7 +260,7 @@ export const DIAGNOSIS_CATEGORIES: DiagnosisCategory[] = [
       { id: 'msa', name: 'Multiple System Atrophy', icd10: 'G90.3', category: 'movement-disorders', hasSmartPlan: true },
       { id: 'cbd', name: 'Corticobasal Degeneration', icd10: 'G31.85', category: 'movement-disorders', hasSmartPlan: true },
       { id: 'restless-legs-syndrome', name: 'Restless Legs Syndrome', icd10: 'G25.81', category: 'movement-disorders', hasSmartPlan: true },
-      { id: 'tics-tourette', name: 'Tics/Tourette Syndrome', icd10: 'F95.2', category: 'movement-disorders' },
+      { id: 'tics-tourette', name: 'Tics/Tourette Syndrome', icd10: 'F95.2', category: 'movement-disorders', hasSmartPlan: true },
       { id: 'ataxia-evaluation', name: 'Ataxia Evaluation', icd10: 'R27.0', category: 'movement-disorders', hasSmartPlan: true },
       { id: 'chorea-evaluation', name: 'Chorea Evaluation', icd10: 'G25.5', category: 'movement-disorders', hasSmartPlan: true },
       { id: 'gait-disorder-evaluation', name: 'Gait Disorder Evaluation', icd10: 'R26.9', category: 'movement-disorders', hasSmartPlan: true },
@@ -296,9 +296,9 @@ export const DIAGNOSIS_CATEGORIES: DiagnosisCategory[] = [
       { id: 'autoimmune-encephalitis', name: 'Autoimmune Encephalitis', icd10: 'G04.81', category: 'cns-infections', hasSmartPlan: true },
       { id: 'fungal-meningitis', name: 'Fungal Meningitis', icd10: 'G02', category: 'cns-infections', hasSmartPlan: true },
       { id: 'tb-meningitis', name: 'TB Meningitis', icd10: 'A17.0', category: 'cns-infections', hasSmartPlan: true },
-      { id: 'neurocysticercosis', name: 'Neurocysticercosis', icd10: 'B69.0', category: 'cns-infections' },
+      { id: 'neurocysticercosis', name: 'Neurocysticercosis', icd10: 'B69.0', category: 'cns-infections', hasSmartPlan: true },
       { id: 'brain-abscess', name: 'Brain Abscess', icd10: 'G06.0', category: 'cns-infections', hasSmartPlan: true },
-      { id: 'hiv-neurocognitive', name: 'HIV-Associated Neurocognitive Disorder', icd10: 'B20', category: 'cns-infections' },
+      { id: 'hiv-neurocognitive', name: 'HIV-Associated Neurocognitive Disorder', icd10: 'B20', category: 'cns-infections', hasSmartPlan: true },
       { id: 'neurosyphilis', name: 'Neurosyphilis', icd10: 'A52.3', category: 'cns-infections', hasSmartPlan: true },
       { id: 'lyme-neuro', name: 'Lyme Neuroborreliosis', icd10: 'A69.22', category: 'cns-infections', hasSmartPlan: true },
     ],
@@ -338,10 +338,10 @@ export const DIAGNOSIS_CATEGORIES: DiagnosisCategory[] = [
     icon: '🔥',
     diagnoses: [
       { id: 'neurosarcoidosis', name: 'Neurosarcoidosis', icd10: 'D86.82', category: 'autoimmune-inflammatory', hasSmartPlan: true },
-      { id: 'susac-syndrome', name: 'Susac Syndrome', icd10: 'H35.89', category: 'autoimmune-inflammatory' },
-      { id: 'neuro-behcets', name: "Neuro-Behcet's", icd10: 'M35.2', category: 'autoimmune-inflammatory' },
+      { id: 'susac-syndrome', name: 'Susac Syndrome', icd10: 'H35.89', category: 'autoimmune-inflammatory', hasSmartPlan: true },
+      { id: 'neuro-behcets', name: "Neuro-Behcet's", icd10: 'M35.2', category: 'autoimmune-inflammatory', hasSmartPlan: true },
       { id: 'stiff-person', name: 'Stiff Person Syndrome', icd10: 'G25.82', category: 'autoimmune-inflammatory', hasSmartPlan: true },
-      { id: 'hashimotos-encephalopathy', name: "Hashimoto's Encephalopathy", icd10: 'E06.3', category: 'autoimmune-inflammatory' },
+      { id: 'hashimotos-encephalopathy', name: "Hashimoto's Encephalopathy", icd10: 'E06.3', category: 'autoimmune-inflammatory', hasSmartPlan: true },
     ],
   },
   {
@@ -376,7 +376,7 @@ export const DIAGNOSIS_CATEGORIES: DiagnosisCategory[] = [
       { id: 'vertigo-evaluation', name: 'Vertigo/Dizziness Evaluation', icd10: 'R42', category: 'other-misc', hasSmartPlan: true },
       { id: 'bells-palsy', name: "Bell's Palsy", icd10: 'G51.0', category: 'other-misc', hasSmartPlan: true },
       { id: 'horner-syndrome', name: 'Horner Syndrome', icd10: 'G90.2', category: 'other-misc', hasSmartPlan: true },
-      { id: 'nystagmus-evaluation', name: 'Nystagmus Evaluation', icd10: 'H55.00', category: 'other-misc' },
+      { id: 'nystagmus-evaluation', name: 'Nystagmus Evaluation', icd10: 'H55.00', category: 'other-misc', hasSmartPlan: true },
       { id: 'post-concussion-syndrome', name: 'Post-Concussion Syndrome', icd10: 'F07.81', category: 'other-misc', hasSmartPlan: true },
       { id: 'tbi', name: 'Traumatic Brain Injury', icd10: 'S06.9', category: 'other-misc', hasSmartPlan: true },
       { id: 'cte', name: 'Chronic Traumatic Encephalopathy', icd10: 'G31.89', category: 'other-misc', hasSmartPlan: true },
@@ -385,7 +385,7 @@ export const DIAGNOSIS_CATEGORIES: DiagnosisCategory[] = [
       { id: 'insomnia', name: 'Insomnia', icd10: 'G47.00', category: 'other-misc', hasSmartPlan: true },
       { id: 'rem-sleep-behavior', name: 'REM Sleep Behavior Disorder', icd10: 'G47.52', category: 'other-misc', hasSmartPlan: true },
       { id: 'parasomnia', name: 'Parasomnia', icd10: 'G47.50', category: 'other-misc', hasSmartPlan: true },
-      { id: 'tinnitus-evaluation', name: 'Tinnitus Evaluation', icd10: 'H93.19', category: 'other-misc' },
+      { id: 'tinnitus-evaluation', name: 'Tinnitus Evaluation', icd10: 'H93.19', category: 'other-misc', hasSmartPlan: true },
     ],
   },
   {
@@ -393,13 +393,13 @@ export const DIAGNOSIS_CATEGORIES: DiagnosisCategory[] = [
     name: 'Symptoms & Presentations',
     icon: '🔍',
     diagnoses: [
-      { id: 'symptom-paresthesia', name: 'Paresthesia / Numbness / Tingling', icd10: 'R20.2', category: 'symptoms' },
-      { id: 'symptom-headache', name: 'Headache, unspecified', icd10: 'R51.9', category: 'symptoms' },
+      { id: 'symptom-paresthesia', name: 'Paresthesia / Numbness / Tingling', icd10: 'R20.2', category: 'symptoms', hasSmartPlan: true },
+      { id: 'symptom-headache', name: 'Headache, unspecified', icd10: 'R51.9', category: 'symptoms', hasSmartPlan: true },
       { id: 'symptom-spells', name: 'Spells / Episodes, unspecified', icd10: 'R56.9', category: 'symptoms', hasSmartPlan: true },
       { id: 'symptom-dizziness-vertigo', name: 'Dizziness / Vertigo', icd10: 'R42', category: 'symptoms', hasSmartPlan: true },
       { id: 'symptom-weakness', name: 'Weakness, generalized', icd10: 'R53.1', category: 'symptoms', hasSmartPlan: true },
       { id: 'symptom-memory-loss', name: 'Memory loss', icd10: 'R41.3', category: 'symptoms', hasSmartPlan: true },
-      { id: 'symptom-tremor', name: 'Tremor, unspecified', icd10: 'R25.1', category: 'symptoms' },
+      { id: 'symptom-tremor', name: 'Tremor, unspecified', icd10: 'R25.1', category: 'symptoms', hasSmartPlan: true },
       { id: 'symptom-gait-abnormality', name: 'Gait abnormality', icd10: 'R26.9', category: 'symptoms', hasSmartPlan: true },
       { id: 'symptom-low-back-pain', name: 'Low back pain', icd10: 'M54.5', category: 'symptoms', hasSmartPlan: true },
       { id: 'symptom-neck-pain', name: 'Neck pain / Cervicalgia', icd10: 'M54.2', category: 'symptoms', hasSmartPlan: true },
