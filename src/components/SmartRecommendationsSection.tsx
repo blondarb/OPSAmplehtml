@@ -84,7 +84,7 @@ export default function SmartRecommendationsSection({
   const [addedConfirmation, setAddedConfirmation] = useState(false)
 
   // State for Supabase data
-  const [availablePlans, setAvailablePlans] = useState<{ plan_id: string; title: string; icd10_codes: string[]; linked_diagnoses: string[] }[]>([])
+  const [availablePlans, setAvailablePlans] = useState<{ plan_id: string; title: string; icd10_codes: string[]; linked_diagnoses: string[]; diagnosis_scores?: Record<string, number> }[]>([])
   const [currentPlan, setCurrentPlan] = useState<ClinicalPlan | null>(null)
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -100,7 +100,7 @@ export default function SmartRecommendationsSection({
 
   // Plan search state
   const [planSearchQuery, setPlanSearchQuery] = useState('')
-  const [planSearchResults, setPlanSearchResults] = useState<{ plan_id: string; title: string; icd10_codes: string[]; linked_diagnoses: string[] }[]>([])
+  const [planSearchResults, setPlanSearchResults] = useState<{ plan_id: string; title: string; icd10_codes: string[]; linked_diagnoses: string[]; diagnosis_scores?: Record<string, number> }[]>([])
   const [isSearching, setIsSearching] = useState(false)
 
   // Fetch all available plans on mount
@@ -365,7 +365,20 @@ export default function SmartRecommendationsSection({
       return []
     }
 
-    return relevantPlans.map(p => ({ id: p.plan_id, title: p.title, diagnosisIds: p.linked_diagnoses, isGeneric: false }))
+    // Sort by max match score for the selected diagnoses (best-matching plan first)
+    const scored = relevantPlans.map(plan => {
+      let maxScore = 0
+      if (plan.diagnosis_scores) {
+        for (const diagId of selectedDiagnoses) {
+          const s = plan.diagnosis_scores[diagId] || 0
+          if (s > maxScore) maxScore = s
+        }
+      }
+      return { plan, maxScore }
+    })
+    scored.sort((a, b) => b.maxScore - a.maxScore)
+
+    return scored.map(({ plan }) => ({ id: plan.plan_id, title: plan.title, diagnosisIds: plan.linked_diagnoses, isGeneric: false }))
   }, [availablePlans, selectedDiagnoses])
 
   const planOptions = getRelevantPlanTitles()

@@ -34,6 +34,24 @@ function codesMatch(planCodes: string[], diagCodes: string[]): boolean {
   })
 }
 
+// Scored matching: exact full-code matches rank far above prefix-only matches
+function matchScore(planCodes: string[], diagCodes: string[]): number {
+  let exactMatches = 0
+  let prefixMatches = 0
+  for (const planCode of planCodes) {
+    const planBase = planCode.substring(0, 3)
+    for (const diagCode of diagCodes) {
+      if (planCode === diagCode) {
+        exactMatches++
+      } else if (planBase === diagCode.substring(0, 3)) {
+        prefixMatches++
+      }
+    }
+  }
+  if (exactMatches === 0 && prefixMatches === 0) return 0
+  return exactMatches * 1000 + prefixMatches
+}
+
 // Fallback: convert OUTPATIENT_PLANS to the DB row shape for consistent handling
 function getFallbackPlans() {
   return Object.values(OUTPATIENT_PLANS).map(plan => ({
@@ -92,13 +110,15 @@ export async function GET(request: NextRequest) {
           codes.some((c: string) => c.includes(searchQuery))
       })
 
-      // Build linked_diagnoses for each matching plan
+      // Build linked_diagnoses and diagnosis_scores for each matching plan
       const plans = matchingPlans.map(plan => {
         const linkedDiagnoses: string[] = []
+        const diagnosisScores: Record<string, number> = {}
         const planIcd10s = plan.icd10_codes || []
         Object.entries(diagnosisToIcd10Map).forEach(([diagId, diagCodes]) => {
           if (codesMatch(planIcd10s, diagCodes)) {
             linkedDiagnoses.push(diagId)
+            diagnosisScores[diagId] = matchScore(planIcd10s, diagCodes)
           }
         })
         return {
@@ -106,6 +126,7 @@ export async function GET(request: NextRequest) {
           title: plan.title,
           icd10_codes: planIcd10s,
           linked_diagnoses: linkedDiagnoses,
+          diagnosis_scores: diagnosisScores,
         }
       })
 
@@ -125,16 +146,16 @@ export async function GET(request: NextRequest) {
         console.warn('clinical_plans table query failed, using fallback:', error.message)
       }
 
-      // Transform to include plan_id and compute linked_diagnoses from ICD-10 codes
+      // Transform to include plan_id, linked_diagnoses, and diagnosis_scores
       const plans = plansData.map(plan => {
-        // Find all diagnosis IDs that match this plan's ICD-10 codes
         const linkedDiagnoses: string[] = []
+        const diagnosisScores: Record<string, number> = {}
         const planIcd10s = plan.icd10_codes || []
 
         Object.entries(diagnosisToIcd10Map).forEach(([diagId, diagCodes]) => {
-          // Check if any of the plan's ICD-10 codes match any of this diagnosis's codes
           if (codesMatch(planIcd10s, diagCodes)) {
             linkedDiagnoses.push(diagId)
+            diagnosisScores[diagId] = matchScore(planIcd10s, diagCodes)
           }
         })
 
@@ -142,7 +163,8 @@ export async function GET(request: NextRequest) {
           plan_id: plan.plan_key,
           title: plan.title,
           icd10_codes: planIcd10s,
-          linked_diagnoses: linkedDiagnoses
+          linked_diagnoses: linkedDiagnoses,
+          diagnosis_scores: diagnosisScores
         }
       })
 
@@ -209,11 +231,18 @@ export async function GET(request: NextRequest) {
         console.warn('clinical_plans table query failed, using fallback:', error.message)
       }
 
-      // Find the first plan that matches any of this diagnosis's ICD-10 codes
-      const matchingPlan = allPlansData.find(plan => {
+      // Score all plans and pick the best match (exact ICD-10 match >> prefix match)
+      let bestPlan: (typeof allPlansData)[number] | null = null
+      let bestScore = 0
+      for (const plan of allPlansData) {
         const planIcd10s = plan.icd10_codes || []
-        return codesMatch(planIcd10s, diagnosisCodes)
-      })
+        const score = matchScore(planIcd10s, diagnosisCodes)
+        if (score > bestScore) {
+          bestScore = score
+          bestPlan = plan
+        }
+      }
+      const matchingPlan = bestPlan
 
       if (!matchingPlan) {
         return NextResponse.json({ plan: null, message: 'No plan found for this diagnosis' })
