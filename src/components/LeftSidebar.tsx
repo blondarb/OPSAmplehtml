@@ -713,16 +713,16 @@ export default function LeftSidebar({ patient, priorVisits, scoreHistory, patien
     {/* Full Note Modal */}
     {(() => {
       const viewingVisitNote = viewingNoteId ? priorVisits.find(v => v.id === viewingNoteId) : null
-      const cn = viewingVisitNote?.clinical_notes
-      if (!viewingNoteId || !cn) return null
+      if (!viewingNoteId || !viewingVisitNote) return null
 
-      const sections = [
+      const cn = viewingVisitNote?.clinical_notes
+      const sections = cn ? [
         { title: 'History of Present Illness', content: cn.hpi },
         { title: 'Review of Systems', content: cn.ros },
         { title: 'Physical Examination', content: cn.exam },
         { title: 'Assessment', content: cn.assessment },
         { title: 'Plan', content: cn.plan },
-      ].filter(s => s.content)
+      ].filter(s => s.content) : []
 
       return (
         <>
@@ -818,8 +818,36 @@ export default function LeftSidebar({ patient, priorVisits, scoreHistory, patien
                   </div>
                 </div>
               )) : (
-                <div style={{ padding: '24px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '14px' }}>
-                  No clinical note content available for this visit.
+                <div style={{ padding: '24px' }}>
+                  {cn?.ai_summary || viewingVisitNote.clinical_notes?.ai_summary ? (
+                    <div style={{ marginBottom: '16px' }}>
+                      <div style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '6px',
+                        marginBottom: '10px',
+                        fontWeight: 600,
+                        fontSize: '13px',
+                        color: '#B45309',
+                      }}>
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="#F59E0B">
+                          <path d="M12 1L13.5 9.5L22 12L13.5 14.5L12 23L10.5 14.5L2 12L10.5 9.5L12 1Z"/>
+                        </svg>
+                        AI Summary
+                      </div>
+                      <div style={{
+                        fontSize: '13px',
+                        color: 'var(--text-primary)',
+                        lineHeight: 1.7,
+                        whiteSpace: 'pre-wrap',
+                      }}>
+                        {cn?.ai_summary || viewingVisitNote.clinical_notes?.ai_summary}
+                      </div>
+                    </div>
+                  ) : null}
+                  <div style={{ textAlign: 'center', color: 'var(--text-muted)', fontSize: '13px', fontStyle: 'italic' }}>
+                    Detailed note content is not available for this visit.
+                  </div>
                 </div>
               )}
             </div>
@@ -836,11 +864,14 @@ export default function LeftSidebar({ patient, priorVisits, scoreHistory, patien
               <button
                 onClick={() => {
                   const parts: string[] = []
-                  if (cn.hpi) parts.push(`HISTORY OF PRESENT ILLNESS:\n${cn.hpi}`)
-                  if (cn.ros) parts.push(`REVIEW OF SYSTEMS:\n${cn.ros}`)
-                  if (cn.exam) parts.push(`PHYSICAL EXAMINATION:\n${cn.exam}`)
-                  if (cn.assessment) parts.push(`ASSESSMENT:\n${cn.assessment}`)
-                  if (cn.plan) parts.push(`PLAN:\n${cn.plan}`)
+                  if (cn?.hpi) parts.push(`HISTORY OF PRESENT ILLNESS:\n${cn.hpi}`)
+                  if (cn?.ros) parts.push(`REVIEW OF SYSTEMS:\n${cn.ros}`)
+                  if (cn?.exam) parts.push(`PHYSICAL EXAMINATION:\n${cn.exam}`)
+                  if (cn?.assessment) parts.push(`ASSESSMENT:\n${cn.assessment}`)
+                  if (cn?.plan) parts.push(`PLAN:\n${cn.plan}`)
+                  if (parts.length === 0 && (cn?.ai_summary || viewingVisitNote.clinical_notes?.ai_summary)) {
+                    parts.push(`AI SUMMARY:\n${cn?.ai_summary || viewingVisitNote.clinical_notes?.ai_summary}`)
+                  }
                   navigator.clipboard.writeText(parts.join('\n\n'))
                 }}
                 style={{

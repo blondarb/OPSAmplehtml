@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { getTenantServer } from '@/lib/tenant'
 import OpenAI from 'openai'
 
 // POST /api/visits/[id]/sign - Sign and complete a visit
@@ -47,9 +48,10 @@ export async function POST(
         clinicalNote = existingNote
       } else {
         // Create a clinical note if one truly doesn't exist
+        const tenantId = await getTenantServer()
         const { data: newNote, error: createNoteError } = await supabase
           .from('clinical_notes')
-          .insert({ visit_id: id, status: 'draft' })
+          .insert({ visit_id: id, status: 'draft', tenant_id: tenantId })
           .select()
           .single()
         if (createNoteError || !newNote) {

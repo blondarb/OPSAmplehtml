@@ -38,8 +38,8 @@ export default function PatientHistorySummary({
 
     const modeInstructions: Record<SummaryMode, string> = {
       brief: 'Keep it to 2-3 sentences. Include only the visit purpose and any critical alerts (e.g., drug allergies, red flags).',
-      standard: 'Include: visit purpose, key metrics/scores with trends, current treatment regimen, and a one-line summary of the most recent visit. Keep it under 150 words.',
-      detailed: 'Include: visit purpose, all relevant metrics with trends, full treatment history, focus areas for today, and a detailed summary of recent visits. Be thorough but concise.',
+      standard: 'Include: visit purpose, key metrics/scores with trends, current treatment regimen, and a one-line summary of the most recent visit. Include all medications prescribed, current and from prior visits, along with treatment changes between visits. Keep it under 150 words.',
+      detailed: 'Include: visit purpose, all relevant metrics with trends, full treatment history, focus areas for today, and a detailed summary of recent visits. Include all medications prescribed, current and from prior visits, along with treatment changes between visits. Be thorough but concise.',
     }
 
     // Build context from prior visits
@@ -50,7 +50,7 @@ export default function PatientHistorySummary({
       const hpi = v.clinical_notes?.hpi || ''
       const assessment = v.clinical_notes?.assessment || ''
       const plan = v.clinical_notes?.plan || ''
-      return `Visit ${date} (${v.visit_type || 'visit'}): CC: ${cc}. ${aiSummary || `HPI: ${hpi.substring(0, 200)}. Assessment: ${assessment.substring(0, 200)}. Plan: ${plan.substring(0, 200)}`}`
+      return `Visit ${date} (${v.visit_type || 'visit'}): CC: ${cc}. ${aiSummary || `HPI: ${hpi}. Assessment: ${assessment}. Plan: ${plan}`}`
     }).join('\n')
 
     // Build medication list

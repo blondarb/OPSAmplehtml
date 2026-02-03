@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { getTenantServer } from '@/lib/tenant'
 
 // GET /api/visits/[id] - Get a visit with clinical note
 export async function GET(
@@ -99,6 +100,8 @@ export async function PATCH(
       if (clinicalNote.rawDictation !== undefined) noteUpdate.raw_dictation = clinicalNote.rawDictation
       if (clinicalNote.aiSummary !== undefined) noteUpdate.ai_summary = clinicalNote.aiSummary
       if (clinicalNote.status !== undefined) noteUpdate.status = clinicalNote.status
+      if (clinicalNote.vitals !== undefined) noteUpdate.vitals = clinicalNote.vitals
+      if (clinicalNote.examFreeText !== undefined) noteUpdate.exam_free_text = clinicalNote.examFreeText
 
       // Try update first
       const { data: updated } = await supabase
@@ -109,9 +112,13 @@ export async function PATCH(
 
       // If no rows updated, create the clinical note
       if (!updated || updated.length === 0) {
-        await supabase
+        const tenantId = await getTenantServer()
+        const { error: insertError } = await supabase
           .from('clinical_notes')
-          .insert({ visit_id: id, status: 'draft', ...noteUpdate })
+          .insert({ visit_id: id, status: 'draft', tenant_id: tenantId, ...noteUpdate })
+        if (insertError) {
+          console.error('Error creating clinical note:', insertError)
+        }
       }
     }
 

@@ -140,6 +140,7 @@ export async function GET(
         hpi: visit.clinical_notes[0].hpi,
         ros: visit.clinical_notes[0].ros,
         physicalExam: visit.clinical_notes[0].physical_exam,
+        examFreeText: visit.clinical_notes[0].exam_free_text,
         assessment: visit.clinical_notes[0].assessment,
         plan: visit.clinical_notes[0].plan,
         aiSummary: visit.clinical_notes[0].ai_summary,

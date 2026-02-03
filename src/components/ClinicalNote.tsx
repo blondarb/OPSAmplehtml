@@ -657,6 +657,7 @@ export default function ClinicalNote({
             hpi: v.clinicalNote.hpi,
             ros: v.clinicalNote.ros,
             exam: v.clinicalNote.physicalExam || v.clinicalNote.physical_exam,
+            examFreeText: v.clinicalNote.examFreeText || v.clinicalNote.exam_free_text,
             assessment: v.clinicalNote.assessment,
             plan: v.clinicalNote.plan,
           } : null,
