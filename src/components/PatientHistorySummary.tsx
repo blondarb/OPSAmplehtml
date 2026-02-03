@@ -88,11 +88,24 @@ export default function PatientHistorySummary({
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          dictation: `Generate a ${mode} longitudinal patient history summary for this returning patient.
+          patient: {
+            id: patient?.id,
+            first_name: patient?.first_name || patient?.firstName,
+            last_name: patient?.last_name || patient?.lastName,
+            date_of_birth: patient?.date_of_birth || patient?.dateOfBirth,
+            gender: patient?.gender,
+            mrn: patient?.mrn,
+          },
+          noteData: {
+            chiefComplaint: noteData?.chiefComplaint || [],
+          },
+          prepNotes: [
+            {
+              category: 'summary request',
+              text: `Generate a ${mode} longitudinal patient history summary for this returning patient.
 
 ${modeInstructions[mode]}
 
-Patient: ${patient?.first_name || ''} ${patient?.last_name || ''}, ${patient?.gender || ''}, DOB: ${patient?.date_of_birth || 'unknown'}
 Active Medications: ${medList}
 Allergies: ${allergyList}
 Clinical Scores: ${scores}
@@ -101,10 +114,8 @@ Prior Visit History:
 ${visitSummaries}
 
 Format as a concise clinical summary. Use section headers if in standard or detailed mode. Do NOT use markdown formatting.`,
-          context: {
-            patient: `${patient?.first_name || ''} ${patient?.last_name || ''}`,
-            chiefComplaint: noteData.chiefComplaint?.join(', ') || '',
-          },
+            },
+          ],
           userSettings,
         }),
       })
@@ -113,8 +124,8 @@ Format as a concise clinical summary. Use section headers if in standard or deta
       if (data.error) {
         setSummary(`Error: ${data.error}`)
       } else {
-        // chart-prep returns { summary, sections, alerts, suggestedFocus }
-        const result = data.summary || data.response || ''
+        // chart-prep returns { sections: { summary, alerts, ... }, response }
+        const result = data.sections?.summary || data.response || data.summary || ''
         setSummary(result)
         setEditedSummary(result)
       }

@@ -23,15 +23,15 @@ export async function POST(
       .select(`
         *,
         clinical_notes (*),
-        patient:patients (first_name, last_name, date_of_birth, gender),
-        appointment:appointments!visits_appointment_id_fkey (id)
+        patient:patients (first_name, last_name, date_of_birth, gender)
       `)
       .eq('id', id)
       .single()
 
     if (visitError || !visit) {
       console.error('Error fetching visit:', visitError)
-      return NextResponse.json({ error: 'Visit not found' }, { status: 404 })
+      const detail = visitError?.message || 'Unknown error'
+      return NextResponse.json({ error: 'Visit not found', detail }, { status: 404 })
     }
 
     let clinicalNote = visit.clinical_notes?.[0]
@@ -140,15 +140,15 @@ Generate a professional clinical summary:`
       console.error('Error completing visit:', visitUpdateError)
     }
 
-    // Update appointment status to completed
-    if (visit.appointment?.id) {
+    // Update appointment status to completed (if visit has an appointment_id)
+    if (visit.appointment_id) {
       await supabase
         .from('appointments')
         .update({
           status: 'completed',
           updated_at: new Date().toISOString(),
         })
-        .eq('id', visit.appointment.id)
+        .eq('id', visit.appointment_id)
     }
 
     // Fetch the updated visit

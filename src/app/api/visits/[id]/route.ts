@@ -64,7 +64,9 @@ export async function PATCH(
     const visitUpdate: Record<string, any> = {
       updated_at: new Date().toISOString(),
     }
-    if (chiefComplaint !== undefined) visitUpdate.chief_complaint = chiefComplaint
+    if (chiefComplaint !== undefined) {
+      visitUpdate.chief_complaint = Array.isArray(chiefComplaint) ? chiefComplaint : [chiefComplaint]
+    }
     if (status !== undefined) visitUpdate.status = status
 
     const { data: visit, error: visitError } = await supabase
@@ -76,7 +78,7 @@ export async function PATCH(
 
     if (visitError) {
       console.error('Error updating visit:', visitError)
-      return NextResponse.json({ error: 'Failed to update visit' }, { status: 500 })
+      return NextResponse.json({ error: 'Failed to update visit', detail: visitError.message, code: visitError.code }, { status: 500 })
     }
 
     // Update or create clinical note if provided

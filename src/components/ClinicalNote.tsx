@@ -655,6 +655,8 @@ export default function ClinicalNote({
           clinical_notes: v.clinicalNote ? {
             ai_summary: v.clinicalNote.aiSummary,
             hpi: v.clinicalNote.hpi,
+            ros: v.clinicalNote.ros,
+            exam: v.clinicalNote.physicalExam || v.clinicalNote.physical_exam,
             assessment: v.clinicalNote.assessment,
             plan: v.clinicalNote.plan,
           } : null,
@@ -956,16 +958,57 @@ export default function ClinicalNote({
           fetch(`/api/medications?patient_id=${patient.id}`),
           fetch(`/api/allergies?patient_id=${patient.id}`),
         ])
+        let meds: PatientMedication[] = []
         if (medsRes.ok) {
           const medsData = await medsRes.json()
-          setMedications(medsData.medications || [])
+          meds = medsData.medications || []
         }
+        // Fallback: if API returned empty but patient prop has medications, use those
+        if (meds.length === 0 && patient.medications?.length > 0) {
+          meds = patient.medications.map((m: any) => ({
+            id: m.id || m.medication_id || crypto.randomUUID(),
+            patient_id: patient.id,
+            medication_name: m.medication_name || m.medicationName || m.name || '',
+            dosage: m.dosage || '',
+            frequency: m.frequency || '',
+            route: m.route || '',
+            prescriber: m.prescriber || '',
+            start_date: m.start_date || m.startDate || null,
+            end_date: m.end_date || m.endDate || null,
+            is_active: m.is_active != null ? m.is_active : m.isActive != null ? m.isActive : m.status ? m.status === 'active' : true,
+            status: m.status || 'active',
+            notes: m.notes || '',
+            created_at: m.created_at || m.createdAt || new Date().toISOString(),
+            updated_at: m.updated_at || m.updatedAt || new Date().toISOString(),
+          }))
+        }
+        setMedications(meds)
+
         if (allergiesRes.ok) {
           const allergiesData = await allergiesRes.json()
           setAllergies(allergiesData.allergies || [])
         }
       } catch (e) {
         console.error('Failed to fetch medications/allergies:', e)
+        // On fetch failure, try patient prop fallback for medications
+        if (patient.medications?.length > 0) {
+          setMedications(patient.medications.map((m: any) => ({
+            id: m.id || m.medication_id || crypto.randomUUID(),
+            patient_id: patient.id,
+            medication_name: m.medication_name || m.medicationName || m.name || '',
+            dosage: m.dosage || '',
+            frequency: m.frequency || '',
+            route: m.route || '',
+            prescriber: m.prescriber || '',
+            start_date: m.start_date || m.startDate || null,
+            end_date: m.end_date || m.endDate || null,
+            is_active: m.is_active != null ? m.is_active : m.isActive != null ? m.isActive : m.status ? m.status === 'active' : true,
+            status: m.status || 'active',
+            notes: m.notes || '',
+            created_at: m.created_at || m.createdAt || new Date().toISOString(),
+            updated_at: m.updated_at || m.updatedAt || new Date().toISOString(),
+          })))
+        }
       }
     }
     fetchMedsAndAllergies()
@@ -1166,7 +1209,8 @@ export default function ClinicalNote({
 
       if (!response.ok) {
         const errData = await response.json().catch(() => ({}))
-        throw new Error(errData.error || `Failed to save note (${response.status})`)
+        const detail = errData.detail ? `: ${errData.detail}` : ''
+        throw new Error((errData.error || `Failed to save note (${response.status})`) + detail)
       }
 
       // Clear autosave since we saved to server
