@@ -53,6 +53,8 @@ export const CONSULT_CATEGORIES: ConsultCategory[] = [
       common: ['Epilepsy', 'New onset seizure', 'Breakthrough seizures'],
       expanded: [
         'Seizure medication adjustment',
+        'Drug-resistant epilepsy',
+        'Seizure in pregnancy',
         'Spell vs seizure evaluation',
         'Syncope vs seizure',
         'Status epilepticus follow-up',
@@ -115,6 +117,7 @@ export const CONSULT_CATEGORIES: ConsultCategory[] = [
       common: ['Stroke follow-up', 'TIA evaluation', 'Stroke prevention'],
       expanded: [
         'Carotid stenosis',
+        'Moyamoya disease',
         'Post-thrombolysis follow-up',
         'Post-thrombectomy follow-up',
         'ICH follow-up',
@@ -144,9 +147,18 @@ export const CONSULT_CATEGORIES: ConsultCategory[] = [
     subOptions: {
       common: ['Dizziness/Vertigo', 'Numbness/Tingling', 'Weakness', 'Second opinion'],
       expanded: [
+        'Tremor evaluation',
+        'Nystagmus',
         'Back pain with neuro symptoms',
+        'Neck pain with neuro symptoms',
         'Concussion/Post-concussion syndrome',
         'Bell palsy',
+        'Meningitis/Encephalitis',
+        'CNS infection',
+        'Brain tumor',
+        'Spinal cord disorder',
+        'Functional neurological disorder',
+        'Autoimmune neurologic disorder',
         'Abnormal imaging finding',
         'Syncope evaluation',
         'Tinnitus',
