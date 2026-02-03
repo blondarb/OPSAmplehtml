@@ -36,6 +36,12 @@ const RAW_BASE_URL = 'https://raw.githubusercontent.com/blondarb/neuro-plans/mai
 const OVERRIDES_PATH = path.resolve(__dirname, 'plan-overrides.json')
 const CONCURRENCY = 8 // parallel fetches
 
+// Slugs to skip — duplicates of better-maintained plans already in Supabase
+const EXCLUDED_SLUGS = new Set([
+  'syncope-evaluation',   // duplicate of "syncope" (plans/)
+  'vertigo-evaluation',   // duplicate of "vertigo-dizziness-evaluation" (plans/)
+])
+
 // ============================================
 // TYPES
 // ============================================
@@ -294,6 +300,8 @@ async function syncPlans() {
     else continue
 
     const slug = item.path.split('/').pop()!.replace('.json', '')
+    if (EXCLUDED_SLUGS.has(slug)) continue
+
     const existing = planFiles.get(slug)
 
     // Prefer plans/ over drafts/
