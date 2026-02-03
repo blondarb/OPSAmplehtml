@@ -1,6 +1,6 @@
 # Implementation Status - Sevaro Clinical
 
-**Last Updated:** February 1, 2026 (P0 bugfixes, hasSmartPlan sync, plan count correction, feedback backlog triage)
+**Last Updated:** February 3, 2026 (Follow-up visit workflow, plan sync pipeline, ICD-10 matching, Sign & Complete fixes)
 **Based on:** PRD_AI_Scribe.md v1.4, Sevaro_Outpatient_MVP_PRD_v1.4, PRD_Roadmap_Phase3.md
 
 ---
@@ -32,7 +32,16 @@ This document tracks implementation progress against the product requirements an
 - ✅ **Extended Scales** - NIHSS, Modified Ashworth, ABCD2, DHI, Mini-Cog, ISI, ESS
 - ✅ **Exam Templates** - Predefined + custom template feature
 
-**Newly Completed (February 1, 2026):**
+**Newly Completed (February 3, 2026):**
+- ✅ **Follow-Up Visit Workflow (Round 1)** — View Full Note modal, Patient History Summary medication context, medication list fallback from prior visit text, sign route resilience
+- ✅ **Follow-Up Visit Workflow (Round 2)** — View Full Note opens even when clinical_notes is null (shows AI summary fallback), tenant_id added to clinical_notes INSERT in PATCH and sign routes, vitals/examFreeText fields added to PATCH route, Patient History Summary sends full untruncated text to AI with explicit medication instructions, examFreeText propagated through patients API and ClinicalNote prior visits mapping
+- ✅ **Plan-Diagnosis Matching Fix** — Scored ICD-10 matching replaces boolean prefix match; weighted scoring (exact=10, prefix=5, category=2) prevents false matches; diagnosis synonyms and consult map added
+- ✅ **Clinical Plans Sync Pipeline** — 127 plans synced from neuro-plans repo to Supabase; ES module compatibility fix; duplicate draft plan exclusion (syncope-evaluation, vertigo-evaluation)
+- ✅ **Sign & Complete Fixes** — Stale closure fix (handlePend returns visitId directly), OpenAI `max_tokens` → `max_completion_tokens` across 8 API routes, assessment generation gets full context
+- ✅ **Plan Pill Click Fix** — SmartRecommendationsSection plan pills now respond to clicks correctly
+- ✅ **History Summary Query Fix** — dashboardData.ts query corrected for score history
+
+**Previously Completed (February 1, 2026):**
 - ✅ **5 UX Improvements** - Consult sub-options visibility, tab completion dots, DDx edit affordances (priority/reorder/swap), recommendation plan adoption (select all, Added! confirm, plan flash), contextual exam scales (recommended filter + diagnosis context)
 - ✅ **P0: Cross-Patient Data Contamination Fix** — `resetAllClinicalState()` wipes all clinical state on patient switch/sign; `isSwitchingPatientRef` guards async callbacks (Chart Prep, Visit AI, Historian import)
 - ✅ **P0: Second Chart Prep Fix (F1)** — Marker-based replace (`--- Chart Prep ---` / `--- End Chart Prep ---`) prevents duplication; `noteDataRef` fixes stale closure in auto-process effect
@@ -73,6 +82,87 @@ This document tracks implementation progress against the product requirements an
 
 **Remaining (Lower Priority):**
 - Expand Smart Recommendations plan coverage — 98 plans in DB covering 148/166 diagnoses (89%); 18 diagnoses still need plans
+
+---
+
+## Recent Updates (February 3, 2026) — Follow-Up Workflow & Plan Sync
+
+### Session Summary (9 commits)
+
+This session focused on making the end-to-end patient workflow reliable: appointment → visit → sign → follow-up → view prior visit. Also upgraded the clinical plans pipeline and fixed several API-level bugs.
+
+### Follow-Up Visit Workflow (Round 1 & 2)
+
+**Problem:** After signing a visit and navigating to the follow-up, three things were broken: the "View Full Note" modal wouldn't open, the Patient History Summary didn't mention medications from the prior visit, and ibuprofen from the prior visit wasn't showing in the medication list.
+
+**Root Cause:** The prior visit was signed using old code that had a broken appointment FK join, leaving the clinical_notes record empty/missing. The modal required `cn` (clinical_notes) to be truthy, so it never opened.
+
+**Fixes across 6 files:**
+
+1. **LeftSidebar.tsx — View Full Note resilience** (`a600bd7`):
+   - Modal gate changed from requiring `cn` to requiring `viewingVisitNote`
+   - When note sections are empty, shows AI summary (if available) + "not available" message
+   - Copy Note button handles null `cn` gracefully with AI summary fallback
+
+2. **visits/[id]/route.ts (PATCH) — Missing fields + tenant_id** (`a600bd7`):
+   - Added `vitals` and `examFreeText` field handlers (were being silently dropped)
+   - Added `tenant_id` from `getTenantServer()` to clinical_notes INSERT
+   - Added error logging on INSERT failure
+
+3. **visits/[id]/sign/route.ts — tenant_id** (`3e16316`, `a600bd7`):
+   - Direct clinical_notes lookup when join returns empty (bypasses FK issues)
+   - Auto-creates clinical_notes if truly missing
+   - Added `tenant_id` to INSERT
+
+4. **PatientHistorySummary.tsx — Full medication context** (`3e16316`, `a600bd7`):
+   - Removed `.substring(0, 200)` truncation on HPI, assessment, and plan
+   - Standard/detailed mode instructions now explicitly request "all medications prescribed, current and from prior visits, along with treatment changes between visits"
+
+5. **patients/[id]/route.ts — examFreeText** (`a600bd7`):
+   - Added `examFreeText: visit.clinical_notes[0].exam_free_text` to transform
+
+6. **ClinicalNote.tsx — Prior visits mapping** (`3e16316`, `a600bd7`):
+   - Added medication list fallback from patient prop when API returns empty
+   - Added `examFreeText` to prior visits clinical_notes mapping
+
+### Plan Sync Pipeline & ICD-10 Matching
+
+**1. Sync 127 Plans** (`d518f18`):
+- `scripts/sync-plans.ts` upgraded to handle larger plan set from neuro-plans repo
+- Updated `diagnosisData.ts` hasSmartPlan flags
+
+**2. Plan-Diagnosis Linking Fix** (`0a6d532`):
+- Added `DIAGNOSIS_SYNONYMS` and `CONSULT_TO_DIAGNOSIS_MAP` for better matching
+- Fixed incorrect ICD-10 matches, added deduplication
+
+**3. ES Module Fix** (`f3503f2`):
+- `__dirname` → `fileURLToPath(import.meta.url)` for ES module compatibility
+
+**4. Duplicate Draft Exclusion** (`8bee29e`):
+- Excluded `syncope-evaluation` and `vertigo-evaluation` draft plans from sync
+
+**5. Scored ICD-10 Matching** (`474ed74`):
+- Replaced boolean prefix match with weighted scoring (exact=10, prefix=5, category=2)
+- Prevents false positive matches across diagnosis families
+
+### API & Sign Flow Fixes
+
+**1. OpenAI max_tokens Migration** (`1beff32`):
+- Changed `max_tokens` → `max_completion_tokens` across 8 API routes (OpenAI API breaking change)
+
+**2. Sign & Complete Stale Closure** (`1beff32`):
+- `handlePend()` now returns visitId directly, preventing `handleSignComplete` from reading stale state
+
+**3. Assessment Full Context** (`481573b`):
+- `/api/ai/generate-assessment` now receives full diagnosis data including ICD-10 codes
+
+**4. Plan Pill Clicks** (`481573b`):
+- Fixed SmartRecommendationsSection plan pills that weren't responding to clicks
+
+**5. History Summary Query** (`481573b`):
+- Fixed `dashboardData.ts` query for score history retrieval
+
+**Modified Files (total across all commits):** 25 files changed, +690/-385 lines
 
 ---
 
@@ -1116,6 +1206,13 @@ Any text input should have dictation.
 1. ~~**Audio routing**~~ - Fixed: Safari MIME types, file size validation, retry with stored blob, maxDuration=120
 2. **Three voice recorder instances** - AiDrawer/VoiceDrawer could optimize
 3. ~~**No audio storage**~~ - By design: audio is processed and immediately discarded to avoid storing PHI
+4. ~~**OpenAI max_tokens deprecation**~~ - Fixed Feb 3: migrated to `max_completion_tokens` across all 8 API routes
+5. ~~**Sign & Complete stale closure**~~ - Fixed Feb 3: handlePend returns visitId directly
+6. ~~**View Full Note fails on legacy data**~~ - Fixed Feb 3: modal now opens with AI summary fallback when clinical_notes is null
+7. ~~**PATCH route missing vitals/examFreeText**~~ - Fixed Feb 3: both fields now handled in save
+8. ~~**clinical_notes INSERT missing tenant_id**~~ - Fixed Feb 3: PATCH and sign routes now include tenant_id
+9. **18 diagnoses without plans** - Lower priority: post-stroke-management, carotid-stenosis, headache-evaluation, thunderclap-headache, botulism, peroneal-neuropathy, plexopathy, tics-tourette, neurocysticercosis, hiv-neurocognitive, susac-syndrome, neuro-behcets, hashimotos-encephalopathy, nystagmus-evaluation, tinnitus-evaluation, symptom-paresthesia, symptom-headache, symptom-tremor
+10. **Medication records only show structured data** - Medications mentioned in note text (e.g., ibuprofen in HPI) don't appear in the medication list unless added via the medication form. Expected behavior but could confuse demo viewers.
 
 ---
 
@@ -1201,4 +1298,4 @@ AI DRAWER (Teal theme, star icon):
 ---
 
 *Document maintained by Development Team*
-*Last updated: February 1, 2026 (P0 bugfixes, hasSmartPlan sync, plan count correction, feedback backlog triage)*
+*Last updated: February 3, 2026 (Follow-up visit workflow, plan sync pipeline, ICD-10 matching, Sign & Complete fixes)*

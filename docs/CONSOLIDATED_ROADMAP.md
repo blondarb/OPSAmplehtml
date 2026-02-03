@@ -1,7 +1,7 @@
 # Consolidated Roadmap - Sevaro Clinical
 
-**Version:** 1.6
-**Last Updated:** February 1, 2026 (P0 bugfixes, hasSmartPlan sync, feedback backlog triage)
+**Version:** 1.7
+**Last Updated:** February 3, 2026 (Follow-up visit workflow, plan sync, ICD-10 matching, Sign & Complete fixes)
 **Purpose:** Single source of truth consolidating all phases across PRDs
 
 ---
@@ -293,8 +293,8 @@ From live testing session. Items organized by priority tier.
 | Item | Status | Component | Description |
 |------|--------|-----------|-------------|
 | Add symptom-based diagnoses (F13) | ✅ FIXED | diagnosisData.ts | 10 symptoms added |
-| Patient History Summary context (F14) | 🔧 PARTIAL | PatientHistorySummary.tsx | Referral note card for new patients; longitudinal follow-up TBD |
-| Sign & Complete full workflow (F15) | ✅ FIXED | ClinicalNote.tsx + API | Writes to visits, AI summary, ScheduleFollowupModal, appointments API; migration 016 pending DB apply |
+| Patient History Summary context (F14) | ✅ FIXED | PatientHistorySummary.tsx | Referral card for new patients; full medication context for follow-ups (Feb 3: removed truncation, explicit medication instructions) |
+| Sign & Complete full workflow (F15) | ✅ FIXED | ClinicalNote.tsx + API | Writes to visits, AI summary, ScheduleFollowupModal, appointments API; stale closure fix (Feb 3); tenant_id fix (Feb 3) |
 | Imaging longitudinal tracking (F16) | ✅ FIXED | ImagingResultsTab.tsx | Array-based study tracking, prior studies, grouped dropdown |
 
 ---
@@ -581,6 +581,13 @@ From live testing session. Items organized by priority tier.
 | ~~Audio routing for Visit AI~~ | Done | Safari MIME fix, file size validation, retry, maxDuration |
 | Three voice recorder instances | P2 | Could optimize in AiDrawer/VoiceDrawer |
 | Supabase client creation pattern | Done | Fixed - lazy initialization |
+| ~~OpenAI max_tokens deprecation~~ | Done | Feb 3: migrated to max_completion_tokens across all 8 API routes |
+| ~~Sign & Complete stale closure~~ | Done | Feb 3: handlePend returns visitId directly |
+| ~~View Full Note fails on legacy data~~ | Done | Feb 3: modal opens with AI summary fallback |
+| ~~PATCH route missing fields~~ | Done | Feb 3: vitals + examFreeText now saved |
+| ~~clinical_notes missing tenant_id~~ | Done | Feb 3: PATCH and sign routes include tenant_id |
+| 18 diagnoses without plans | P2 | Low coverage gap — 148/166 (89%) covered |
+| Medication text mentions vs structured records | P2 | Meds in note text don't appear in structured medication list |
 
 ---
 
@@ -663,5 +670,5 @@ Based on the analysis, here's the recommended implementation order to minimize r
 ---
 
 *Document created: January 24, 2026*
-*Last updated: February 1, 2026 (P0 bugfixes, hasSmartPlan sync, feedback backlog triage)*
+*Last updated: February 3, 2026 (Follow-up visit workflow, plan sync pipeline, ICD-10 matching, Sign & Complete fixes)*
 *Consolidates: All PRD documents*

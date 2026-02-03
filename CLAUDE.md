@@ -380,6 +380,21 @@ When redeploying after changes, use "Redeploy without cache" to ensure fresh bui
 
 ## Recent Changes (February 2026)
 
+### Follow-Up Visit Workflow & Plan Sync (February 3, 2026)
+- **View Full Note Resilience**: Modal now opens even when clinical_notes is null/empty; shows AI summary fallback + "not available" message; Copy Note handles null gracefully
+- **PATCH Route Missing Fields**: Added `vitals` and `examFreeText` field handling; added `tenant_id` to clinical_notes INSERT; error logging on INSERT failure
+- **Sign Route tenant_id**: Added `tenant_id` from `getTenantServer()` to clinical_notes INSERT in sign route
+- **Patient History Summary Full Context**: Removed `.substring(0, 200)` truncation on HPI/assessment/plan; standard/detailed modes now explicitly request medication details from prior visits
+- **examFreeText Propagation**: Added to patients API transform and ClinicalNote prior visits mapping
+- **Plan Sync Pipeline**: 127 plans synced from neuro-plans repo; ES module compatibility fix; duplicate draft exclusion
+- **Scored ICD-10 Matching**: Weighted scoring (exact=10, prefix=5, category=2) replaces boolean prefix match; prevents false positives
+- **Plan-Diagnosis Linking**: Added synonyms, consult map, fixed incorrect matches, deduplication
+- **OpenAI API Migration**: `max_tokens` → `max_completion_tokens` across 8 API routes
+- **Sign & Complete Stale Closure Fix**: `handlePend()` returns visitId directly to prevent stale state reads
+- **Assessment Full Context**: generate-assessment endpoint now receives full diagnosis data with ICD-10 codes
+- **Plan Pill Click Fix**: SmartRecommendationsSection plan pills now respond to clicks
+- **History Summary Query Fix**: dashboardData.ts query corrected for score history
+
 ### P0 Bugfixes & Data Sync (February 1, 2026)
 - **Cross-Patient Data Contamination Fix**: New `resetAllClinicalState()` in ClinicalNote.tsx wipes all state on patient switch/sign; `isSwitchingPatientRef` guards async callbacks (Chart Prep, Visit AI, Historian import) from writing to wrong patient
 - **Second Chart Prep Fix (F1)**: Marker-based replace (`--- Chart Prep ---` / `--- End Chart Prep ---`) prevents content duplication; `noteDataRef` fixes stale closure in VoiceDrawer auto-process effect
