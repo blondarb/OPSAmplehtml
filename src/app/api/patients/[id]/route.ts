@@ -128,25 +128,31 @@ export async function GET(
     }))
 
     // Transform visits with clinical notes
-    const transformedVisits = (visits || []).map(visit => ({
-      id: visit.id,
-      visitDate: visit.visit_date,
-      visitType: visit.visit_type,
-      chiefComplaint: visit.chief_complaint,
-      status: visit.status,
-      providerName: visit.provider_name,
-      clinicalNote: visit.clinical_notes?.[0] ? {
-        id: visit.clinical_notes[0].id,
-        hpi: visit.clinical_notes[0].hpi,
-        ros: visit.clinical_notes[0].ros,
-        physicalExam: visit.clinical_notes[0].physical_exam,
-        examFreeText: visit.clinical_notes[0].exam_free_text,
-        assessment: visit.clinical_notes[0].assessment,
-        plan: visit.clinical_notes[0].plan,
-        aiSummary: visit.clinical_notes[0].ai_summary,
-        status: visit.clinical_notes[0].status,
-      } : null,
-    }))
+    // Supabase returns clinical_notes as object (unique FK on visit_id) not array
+    const transformedVisits = (visits || []).map(visit => {
+      const note = Array.isArray(visit.clinical_notes)
+        ? visit.clinical_notes[0]
+        : visit.clinical_notes
+      return {
+        id: visit.id,
+        visitDate: visit.visit_date,
+        visitType: visit.visit_type,
+        chiefComplaint: visit.chief_complaint,
+        status: visit.status,
+        providerName: visit.provider_name,
+        clinicalNote: note ? {
+          id: note.id,
+          hpi: note.hpi,
+          ros: note.ros,
+          physicalExam: note.physical_exam,
+          examFreeText: note.exam_free_text,
+          assessment: note.assessment,
+          plan: note.plan,
+          aiSummary: note.ai_summary,
+          status: note.status,
+        } : null,
+      }
+    })
 
     // Transform scale results for score history
     const scoreHistory = (scaleResults || []).map(result => ({
