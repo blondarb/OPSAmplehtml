@@ -135,8 +135,18 @@ export async function POST() {
           await supabase.from('visits').delete().in('id', dynamicVisitIds)
         }
 
+        // Delete their medications and allergies
+        await supabase.from('patient_medications').delete().in('patient_id', dynamicIds)
+        await supabase.from('patient_allergies').delete().in('patient_id', dynamicIds)
+
         // Delete their appointments
         await supabase.from('appointments').delete().in('patient_id', dynamicIds)
+
+        // Delete their diagnoses
+        await supabase.from('diagnoses').delete().in('patient_id', dynamicIds)
+
+        // Delete their imaging studies
+        await supabase.from('imaging_studies').delete().in('patient_id', dynamicIds)
 
         // Delete the patients themselves
         const { error: patientDeleteError } = await supabase
