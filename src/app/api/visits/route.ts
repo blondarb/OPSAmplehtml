@@ -27,6 +27,22 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'patientId is required' }, { status: 400 })
     }
 
+    // Prevent duplicate visits for the same appointment
+    if (appointmentId) {
+      const { data: existing } = await supabase
+        .from('appointments')
+        .select('visit_id')
+        .eq('id', appointmentId)
+        .single()
+
+      if (existing?.visit_id) {
+        return NextResponse.json(
+          { error: 'This appointment already has an active visit', visitId: existing.visit_id },
+          { status: 409 }
+        )
+      }
+    }
+
     // Map appointment types to valid visit_type values
     const visitTypeMap: Record<string, string> = {
       'new-consult': 'new_patient',
