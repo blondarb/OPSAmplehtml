@@ -156,7 +156,7 @@ export default function ReasonForConsultSection({
         <div
           style={{
             display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fill, minmax(110px, 1fr))',
+            gridTemplateColumns: 'repeat(auto-fill, minmax(125px, 1fr))',
             gap: '8px',
             marginBottom: '16px',
           }}
@@ -218,7 +218,6 @@ export default function ReasonForConsultSection({
                     color: isSelected ? 'var(--primary)' : 'var(--text-primary)',
                     textAlign: 'left',
                     lineHeight: 1.3,
-                    whiteSpace: 'nowrap',
                   }}
                 >
                   {category.label}
