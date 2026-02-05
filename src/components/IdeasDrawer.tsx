@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useVoiceRecorder } from '@/hooks/useVoiceRecorder'
 
 interface IdeasDrawerProps {
@@ -221,6 +221,17 @@ const TLDR = [
   { action: 'Change settings', howTo: 'User avatar → Settings gear icon' },
 ]
 
+// Feedback status config
+type FeedbackStatus = 'pending' | 'approved' | 'in_progress' | 'addressed' | 'declined'
+
+const STATUS_CONFIG: Record<FeedbackStatus, { label: string; color: string; bg: string; border: string }> = {
+  pending: { label: 'Pending Review', color: '#92400E', bg: '#FEF3C7', border: '#F59E0B' },
+  approved: { label: 'Approved', color: '#1E40AF', bg: '#DBEAFE', border: '#3B82F6' },
+  in_progress: { label: 'In Progress', color: '#7C2D12', bg: '#FED7AA', border: '#F97316' },
+  addressed: { label: 'Addressed', color: '#047857', bg: '#D1FAE5', border: '#10B981' },
+  declined: { label: 'Declined', color: '#6B7280', bg: '#F3F4F6', border: '#9CA3AF' },
+}
+
 // Feedback item interface (matches Supabase feedback table)
 interface FeedbackItem {
   id: string
@@ -229,8 +240,23 @@ interface FeedbackItem {
   user_email: string
   upvotes: string[]
   downvotes: string[]
+  status: FeedbackStatus
+  admin_response: string | null
+  admin_user_email: string | null
+  status_updated_at: string | null
+  comment_count: number
   created_at: string
   updated_at: string
+}
+
+interface FeedbackComment {
+  id: string
+  feedback_id: string
+  user_id: string
+  user_email: string
+  text: string
+  is_admin_comment: boolean
+  created_at: string
 }
 
 export default function IdeasDrawer({ isOpen, onClose, initialTab, onStartTour }: IdeasDrawerProps) {
@@ -246,10 +272,34 @@ export default function IdeasDrawer({ isOpen, onClose, initialTab, onStartTour }
   const [expandedWorkflow, setExpandedWorkflow] = useState<string | null>(null)
   const [feedbackText, setFeedbackText] = useState('')
   const [feedbackSubmitted, setFeedbackSubmitted] = useState(false)
-  const [feedbackView, setFeedbackView] = useState<'submit' | 'browse'>('browse')
+  const [feedbackView, setFeedbackView] = useState<'submit' | 'browse' | 'admin'>('browse')
   const [allFeedback, setAllFeedback] = useState<FeedbackItem[]>([])
   const [currentUserId, setCurrentUserId] = useState<string>('')
   const [feedbackLoading, setFeedbackLoading] = useState(false)
+  const [isUserAdmin, setIsUserAdmin] = useState(false)
+  const [statusFilter, setStatusFilter] = useState<FeedbackStatus | 'all'>('all')
+
+  // Edit feedback state
+  const [editingFeedbackId, setEditingFeedbackId] = useState<string | null>(null)
+  const [editingFeedbackText, setEditingFeedbackText] = useState('')
+
+  // Comments state
+  const [expandedComments, setExpandedComments] = useState<string | null>(null)
+  const [comments, setComments] = useState<Record<string, FeedbackComment[]>>({})
+  const [commentsLoading, setCommentsLoading] = useState<string | null>(null)
+  const [newCommentText, setNewCommentText] = useState<Record<string, string>>({})
+
+  // Admin response state
+  const [adminResponseText, setAdminResponseText] = useState<Record<string, string>>({})
+
+  // Admin management state
+  const [seedAdmin, setSeedAdmin] = useState<string>('')
+  const [elevatedAdmins, setElevatedAdmins] = useState<string[]>([])
+  const [newAdminEmail, setNewAdminEmail] = useState('')
+  const [adminDataLoading, setAdminDataLoading] = useState(false)
+  const [systemPrompts, setSystemPrompts] = useState<Array<{ id: string; name: string; file: string; model: string; description: string }>>([])
+  const [expandedPrompt, setExpandedPrompt] = useState<string | null>(null)
+  const [backlogCopied, setBacklogCopied] = useState(false)
 
   // Voice recording for feedback
   const {
@@ -295,6 +345,11 @@ export default function IdeasDrawer({ isOpen, onClose, initialTab, onStartTour }
         ...item,
         upvotes: item.upvotes || [],
         downvotes: item.downvotes || [],
+        status: item.status || 'pending',
+        admin_response: item.admin_response || null,
+        admin_user_email: item.admin_user_email || null,
+        status_updated_at: item.status_updated_at || null,
+        comment_count: item.comment_count || 0,
       }))
       // Sort by net votes (upvotes - downvotes), then by date
       items.sort((a, b) => {
@@ -307,11 +362,78 @@ export default function IdeasDrawer({ isOpen, onClose, initialTab, onStartTour }
       if (data.currentUserId) {
         setCurrentUserId(data.currentUserId)
       }
+      if (data.isAdmin !== undefined) {
+        setIsUserAdmin(data.isAdmin)
+      }
     } catch (e) {
       console.error('Error loading feedback:', e)
       setAllFeedback([])
     } finally {
       setFeedbackLoading(false)
+    }
+  }
+
+  const loadAdminData = useCallback(async () => {
+    setAdminDataLoading(true)
+    try {
+      const res = await fetch('/api/feedback/admin')
+      if (!res.ok) return // Not an admin or error
+      const data = await res.json()
+      setSeedAdmin(data.seedAdmin || '')
+      setElevatedAdmins(data.elevatedAdmins || [])
+      setSystemPrompts(data.systemPrompts || [])
+    } catch (e) {
+      console.error('Error loading admin data:', e)
+    } finally {
+      setAdminDataLoading(false)
+    }
+  }, [])
+
+  // Load admin data when admin view is selected
+  useEffect(() => {
+    if (feedbackView === 'admin' && isUserAdmin) {
+      loadAdminData()
+    }
+  }, [feedbackView, isUserAdmin, loadAdminData])
+
+  const handleAddAdmin = async () => {
+    const email = newAdminEmail.trim()
+    if (!email || !email.includes('@')) return
+    try {
+      const res = await fetch('/api/feedback/admin', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email }),
+      })
+      if (!res.ok) {
+        const data = await res.json()
+        alert(data.error || 'Failed to add admin')
+        return
+      }
+      const data = await res.json()
+      setElevatedAdmins(data.elevatedAdmins || [])
+      setNewAdminEmail('')
+    } catch (e) {
+      console.error('Error adding admin:', e)
+    }
+  }
+
+  const handleRemoveAdmin = async (email: string) => {
+    try {
+      const res = await fetch('/api/feedback/admin', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email }),
+      })
+      if (!res.ok) {
+        const data = await res.json()
+        alert(data.error || 'Failed to remove admin')
+        return
+      }
+      const data = await res.json()
+      setElevatedAdmins(data.elevatedAdmins || [])
+    } catch (e) {
+      console.error('Error removing admin:', e)
     }
   }
 
@@ -323,7 +445,6 @@ export default function IdeasDrawer({ isOpen, onClose, initialTab, onStartTour }
         body: JSON.stringify({ feedbackId, voteType }),
       })
       if (!res.ok) throw new Error('Failed to vote')
-      // Optimistically update the local state
       const data = await res.json()
       if (data.feedback) {
         setAllFeedback(prev => {
@@ -332,7 +453,6 @@ export default function IdeasDrawer({ isOpen, onClose, initialTab, onStartTour }
               ? { ...item, upvotes: data.feedback.upvotes || [], downvotes: data.feedback.downvotes || [] }
               : item
           )
-          // Re-sort after vote update
           updated.sort((a, b) => {
             const aNet = a.upvotes.length - a.downvotes.length
             const bNet = b.upvotes.length - b.downvotes.length
@@ -347,6 +467,153 @@ export default function IdeasDrawer({ isOpen, onClose, initialTab, onStartTour }
     }
   }
 
+  const handleStatusUpdate = async (feedbackId: string, newStatus: FeedbackStatus, response?: string) => {
+    try {
+      const body: Record<string, unknown> = {
+        feedbackId,
+        action: 'updateStatus',
+        status: newStatus,
+      }
+      if (response !== undefined) {
+        body.adminResponse = response
+      }
+      const res = await fetch('/api/feedback', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      })
+      if (!res.ok) throw new Error('Failed to update status')
+      const data = await res.json()
+      if (data.feedback) {
+        setAllFeedback(prev =>
+          prev.map(item =>
+            item.id === feedbackId
+              ? {
+                  ...item,
+                  status: data.feedback.status,
+                  admin_response: data.feedback.admin_response,
+                  admin_user_email: data.feedback.admin_user_email,
+                  status_updated_at: data.feedback.status_updated_at,
+                }
+              : item
+          )
+        )
+      }
+    } catch (e) {
+      console.error('Error updating status:', e)
+    }
+  }
+
+  const handleEditFeedback = async (feedbackId: string) => {
+    const text = editingFeedbackText.trim()
+    if (!text) return
+    try {
+      const res = await fetch('/api/feedback', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ feedbackId, action: 'updateText', text }),
+      })
+      if (!res.ok) throw new Error('Failed to update feedback')
+      const data = await res.json()
+      if (data.feedback) {
+        setAllFeedback(prev =>
+          prev.map(item =>
+            item.id === feedbackId ? { ...item, text: data.feedback.text, updated_at: data.feedback.updated_at } : item
+          )
+        )
+      }
+      setEditingFeedbackId(null)
+      setEditingFeedbackText('')
+    } catch (e) {
+      console.error('Error editing feedback:', e)
+      alert('Failed to update feedback')
+    }
+  }
+
+  const loadComments = useCallback(async (feedbackId: string) => {
+    setCommentsLoading(feedbackId)
+    try {
+      const res = await fetch(`/api/feedback/comments?feedbackId=${feedbackId}`)
+      if (!res.ok) throw new Error('Failed to load comments')
+      const data = await res.json()
+      setComments(prev => ({ ...prev, [feedbackId]: data.comments || [] }))
+    } catch (e) {
+      console.error('Error loading comments:', e)
+    } finally {
+      setCommentsLoading(null)
+    }
+  }, [])
+
+  const handleAddComment = async (feedbackId: string) => {
+    const text = newCommentText[feedbackId]?.trim()
+    if (!text) return
+
+    try {
+      const res = await fetch('/api/feedback/comments', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          feedbackId,
+          text,
+          isAdminComment: isUserAdmin,
+        }),
+      })
+      if (!res.ok) throw new Error('Failed to add comment')
+      const data = await res.json()
+      if (data.comment) {
+        setComments(prev => ({
+          ...prev,
+          [feedbackId]: [...(prev[feedbackId] || []), data.comment],
+        }))
+        setNewCommentText(prev => ({ ...prev, [feedbackId]: '' }))
+        // Update comment count
+        setAllFeedback(prev =>
+          prev.map(item =>
+            item.id === feedbackId
+              ? { ...item, comment_count: item.comment_count + 1 }
+              : item
+          )
+        )
+      }
+    } catch (e) {
+      console.error('Error adding comment:', e)
+    }
+  }
+
+  const handleDeleteComment = async (feedbackId: string, commentId: string) => {
+    try {
+      const res = await fetch('/api/feedback/comments', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ commentId }),
+      })
+      if (!res.ok) throw new Error('Failed to delete comment')
+      setComments(prev => ({
+        ...prev,
+        [feedbackId]: (prev[feedbackId] || []).filter(c => c.id !== commentId),
+      }))
+      setAllFeedback(prev =>
+        prev.map(item =>
+          item.id === feedbackId
+            ? { ...item, comment_count: Math.max(0, item.comment_count - 1) }
+            : item
+        )
+      )
+    } catch (e) {
+      console.error('Error deleting comment:', e)
+    }
+  }
+
+  const toggleComments = (feedbackId: string) => {
+    if (expandedComments === feedbackId) {
+      setExpandedComments(null)
+    } else {
+      setExpandedComments(feedbackId)
+      if (!comments[feedbackId]) {
+        loadComments(feedbackId)
+      }
+    }
+  }
 
   const submitFeedback = async () => {
     if (!feedbackText.trim()) return
@@ -380,6 +647,18 @@ export default function IdeasDrawer({ isOpen, onClose, initialTab, onStartTour }
     { id: 'inspiration' as const, label: 'Tips', icon: '💡' },
     { id: 'feedback' as const, label: 'Feedback', icon: '💬' },
   ]
+
+  // Filter feedback by status
+  const filteredFeedback = statusFilter === 'all'
+    ? allFeedback
+    : allFeedback.filter(f => f.status === statusFilter)
+
+  // Count by status
+  const statusCounts = allFeedback.reduce((acc, f) => {
+    const s = f.status || 'pending'
+    acc[s] = (acc[s] || 0) + 1
+    return acc
+  }, {} as Record<string, number>)
 
   return (
     <>
@@ -954,7 +1233,7 @@ export default function IdeasDrawer({ isOpen, onClose, initialTab, onStartTour }
               <div style={{
                 display: 'flex',
                 gap: '8px',
-                marginBottom: '20px',
+                marginBottom: '16px',
                 padding: '4px',
                 background: 'var(--bg-gray)',
                 borderRadius: '8px',
@@ -1008,14 +1287,82 @@ export default function IdeasDrawer({ isOpen, onClose, initialTab, onStartTour }
                   </svg>
                   Submit New
                 </button>
+                {isUserAdmin && (
+                  <button
+                    onClick={() => setFeedbackView('admin')}
+                    style={{
+                      flex: 1,
+                      padding: '10px',
+                      borderRadius: '6px',
+                      border: 'none',
+                      background: feedbackView === 'admin' ? 'var(--bg-white)' : 'transparent',
+                      boxShadow: feedbackView === 'admin' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none',
+                      fontSize: '13px',
+                      fontWeight: 600,
+                      cursor: 'pointer',
+                      color: feedbackView === 'admin' ? '#047857' : 'var(--text-muted)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '6px',
+                    }}
+                  >
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <path d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/>
+                    </svg>
+                    Admin
+                  </button>
+                )}
               </div>
 
               {/* Browse Feedback View */}
               {feedbackView === 'browse' && (
                 <div>
-                  <p style={{ fontSize: '13px', color: 'var(--text-secondary)', margin: '0 0 16px 0' }}>
-                    Vote on feedback to help us prioritize improvements. Visible to all users. Sorted by popularity.
+                  <p style={{ fontSize: '13px', color: 'var(--text-secondary)', margin: '0 0 12px 0' }}>
+                    Vote on feedback to help us prioritize improvements. Sorted by popularity.
                   </p>
+
+                  {/* Status Filter Pills */}
+                  <div style={{
+                    display: 'flex',
+                    gap: '6px',
+                    marginBottom: '16px',
+                    flexWrap: 'wrap',
+                  }}>
+                    <button
+                      onClick={() => setStatusFilter('all')}
+                      style={{
+                        padding: '5px 12px',
+                        borderRadius: '16px',
+                        border: statusFilter === 'all' ? '2px solid var(--primary)' : '1px solid var(--border)',
+                        background: statusFilter === 'all' ? '#CCFBF1' : 'var(--bg-white)',
+                        fontSize: '12px',
+                        fontWeight: 600,
+                        cursor: 'pointer',
+                        color: statusFilter === 'all' ? 'var(--primary)' : 'var(--text-muted)',
+                      }}
+                    >
+                      All ({allFeedback.length})
+                    </button>
+                    {(Object.keys(STATUS_CONFIG) as FeedbackStatus[]).map(s => (
+                      <button
+                        key={s}
+                        onClick={() => setStatusFilter(s)}
+                        style={{
+                          padding: '5px 12px',
+                          borderRadius: '16px',
+                          border: statusFilter === s ? `2px solid ${STATUS_CONFIG[s].border}` : '1px solid var(--border)',
+                          background: statusFilter === s ? STATUS_CONFIG[s].bg : 'var(--bg-white)',
+                          fontSize: '12px',
+                          fontWeight: 500,
+                          cursor: 'pointer',
+                          color: statusFilter === s ? STATUS_CONFIG[s].color : 'var(--text-muted)',
+                        }}
+                      >
+                        {STATUS_CONFIG[s].label} ({statusCounts[s] || 0})
+                      </button>
+                    ))}
+                  </div>
 
                   {feedbackLoading ? (
                     <div style={{
@@ -1037,7 +1384,7 @@ export default function IdeasDrawer({ isOpen, onClose, initialTab, onStartTour }
                         Loading feedback...
                       </p>
                     </div>
-                  ) : allFeedback.length === 0 ? (
+                  ) : filteredFeedback.length === 0 ? (
                     <div style={{
                       padding: '40px 20px',
                       textAlign: 'center',
@@ -1046,155 +1393,507 @@ export default function IdeasDrawer({ isOpen, onClose, initialTab, onStartTour }
                     }}>
                       <div style={{ fontSize: '40px', marginBottom: '12px' }}>📭</div>
                       <p style={{ fontSize: '14px', color: 'var(--text-muted)', margin: 0 }}>
-                        No feedback yet. Be the first to share!
+                        {statusFilter === 'all'
+                          ? 'No feedback yet. Be the first to share!'
+                          : `No feedback with status "${STATUS_CONFIG[statusFilter as FeedbackStatus]?.label}".`}
                       </p>
-                      <button
-                        onClick={() => setFeedbackView('submit')}
-                        style={{
-                          marginTop: '16px',
-                          padding: '10px 20px',
-                          borderRadius: '8px',
-                          border: 'none',
-                          background: 'var(--primary)',
-                          color: 'white',
-                          fontSize: '13px',
-                          fontWeight: 600,
-                          cursor: 'pointer',
-                        }}
-                      >
-                        Submit Feedback
-                      </button>
+                      {statusFilter === 'all' && (
+                        <button
+                          onClick={() => setFeedbackView('submit')}
+                          style={{
+                            marginTop: '16px',
+                            padding: '10px 20px',
+                            borderRadius: '8px',
+                            border: 'none',
+                            background: 'var(--primary)',
+                            color: 'white',
+                            fontSize: '13px',
+                            fontWeight: 600,
+                            cursor: 'pointer',
+                          }}
+                        >
+                          Submit Feedback
+                        </button>
+                      )}
                     </div>
                   ) : (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                      {allFeedback.map((item) => {
+                      {filteredFeedback.map((item) => {
                         const netVotes = item.upvotes.length - item.downvotes.length
                         const hasUpvoted = item.upvotes.includes(currentUserId)
                         const hasDownvoted = item.downvotes.includes(currentUserId)
                         const isOwnFeedback = item.user_id === currentUserId
+                        const itemStatus = item.status || 'pending'
+                        const statusConf = STATUS_CONFIG[itemStatus]
+                        const isExpanded = expandedComments === item.id
+                        const itemComments = comments[item.id] || []
 
                         return (
                           <div
                             key={item.id}
                             style={{
-                              padding: '16px',
                               background: 'var(--bg-white)',
-                              border: '1px solid var(--border)',
+                              border: `1px solid ${itemStatus === 'addressed' ? '#10B981' : 'var(--border)'}`,
                               borderRadius: '12px',
+                              overflow: 'hidden',
+                              opacity: itemStatus === 'addressed' ? 0.85 : 1,
                             }}
                           >
-                            <div style={{ display: 'flex', gap: '12px' }}>
-                              {/* Vote Column */}
-                              <div style={{
-                                display: 'flex',
-                                flexDirection: 'column',
-                                alignItems: 'center',
-                                gap: '4px',
-                                minWidth: '48px',
-                              }}>
-                                <button
-                                  onClick={() => handleVote(item.id, 'up')}
-                                  style={{
-                                    width: '36px',
-                                    height: '36px',
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    justifyContent: 'center',
-                                    borderRadius: '8px',
-                                    border: hasUpvoted ? '2px solid #10B981' : '1px solid var(--border)',
-                                    background: hasUpvoted ? '#D1FAE5' : 'var(--bg-white)',
-                                    cursor: 'pointer',
-                                    color: hasUpvoted ? '#059669' : 'var(--text-muted)',
-                                    transition: 'all 0.15s',
-                                  }}
-                                  title="Upvote"
-                                >
-                                  <svg width="18" height="18" viewBox="0 0 24 24" fill={hasUpvoted ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="2">
-                                    <path d="M14 9V5a3 3 0 00-3-3l-4 9v11h11.28a2 2 0 002-1.7l1.38-9a2 2 0 00-2-2.3H14z"/>
-                                    <path d="M7 22H4a2 2 0 01-2-2v-7a2 2 0 012-2h3"/>
-                                  </svg>
-                                </button>
-                                <span style={{
-                                  fontSize: '16px',
-                                  fontWeight: 700,
-                                  color: netVotes > 0 ? '#059669' : netVotes < 0 ? '#DC2626' : 'var(--text-muted)',
-                                }}>
-                                  {netVotes > 0 ? '+' : ''}{netVotes}
-                                </span>
-                                <button
-                                  onClick={() => handleVote(item.id, 'down')}
-                                  style={{
-                                    width: '36px',
-                                    height: '36px',
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    justifyContent: 'center',
-                                    borderRadius: '8px',
-                                    border: hasDownvoted ? '2px solid #EF4444' : '1px solid var(--border)',
-                                    background: hasDownvoted ? '#FEE2E2' : 'var(--bg-white)',
-                                    cursor: 'pointer',
-                                    color: hasDownvoted ? '#DC2626' : 'var(--text-muted)',
-                                    transition: 'all 0.15s',
-                                  }}
-                                  title="Downvote"
-                                >
-                                  <svg width="18" height="18" viewBox="0 0 24 24" fill={hasDownvoted ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="2">
-                                    <path d="M10 15v4a3 3 0 003 3l4-9V2H5.72a2 2 0 00-2 1.7l-1.38 9a2 2 0 002 2.3H10z"/>
-                                    <path d="M17 2h3a2 2 0 012 2v7a2 2 0 01-2 2h-3"/>
-                                  </svg>
-                                </button>
-                              </div>
-
-                              {/* Content Column */}
-                              <div style={{ flex: 1, minWidth: 0 }}>
-                                <p style={{
-                                  fontSize: '14px',
-                                  color: 'var(--text-primary)',
-                                  margin: '0 0 8px 0',
-                                  lineHeight: 1.5,
-                                  whiteSpace: 'pre-wrap',
-                                }}>
-                                  {item.text}
-                                </p>
+                            <div style={{ padding: '16px' }}>
+                              <div style={{ display: 'flex', gap: '12px' }}>
+                                {/* Vote Column */}
                                 <div style={{
                                   display: 'flex',
+                                  flexDirection: 'column',
                                   alignItems: 'center',
-                                  gap: '12px',
-                                  fontSize: '12px',
-                                  color: 'var(--text-muted)',
+                                  gap: '4px',
+                                  minWidth: '48px',
                                 }}>
-                                  <span>
-                                    {new Date(item.created_at).toLocaleDateString('en-US', {
-                                      month: 'short',
-                                      day: 'numeric',
-                                      year: 'numeric',
-                                    })}
+                                  <button
+                                    onClick={() => handleVote(item.id, 'up')}
+                                    style={{
+                                      width: '36px',
+                                      height: '36px',
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      justifyContent: 'center',
+                                      borderRadius: '8px',
+                                      border: hasUpvoted ? '2px solid #10B981' : '1px solid var(--border)',
+                                      background: hasUpvoted ? '#D1FAE5' : 'var(--bg-white)',
+                                      cursor: 'pointer',
+                                      color: hasUpvoted ? '#059669' : 'var(--text-muted)',
+                                      transition: 'all 0.15s',
+                                    }}
+                                    title="Upvote"
+                                  >
+                                    <svg width="18" height="18" viewBox="0 0 24 24" fill={hasUpvoted ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="2">
+                                      <path d="M14 9V5a3 3 0 00-3-3l-4 9v11h11.28a2 2 0 002-1.7l1.38-9a2 2 0 00-2-2.3H14z"/>
+                                      <path d="M7 22H4a2 2 0 01-2-2v-7a2 2 0 012-2h3"/>
+                                    </svg>
+                                  </button>
+                                  <span style={{
+                                    fontSize: '16px',
+                                    fontWeight: 700,
+                                    color: netVotes > 0 ? '#059669' : netVotes < 0 ? '#DC2626' : 'var(--text-muted)',
+                                  }}>
+                                    {netVotes > 0 ? '+' : ''}{netVotes}
                                   </span>
-                                  {item.user_email && (
-                                    <span style={{ color: 'var(--text-muted)', fontSize: '11px' }}>
-                                      {item.user_email.split('@')[0]}
-                                    </span>
-                                  )}
-                                  {isOwnFeedback && (
+                                  <button
+                                    onClick={() => handleVote(item.id, 'down')}
+                                    style={{
+                                      width: '36px',
+                                      height: '36px',
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      justifyContent: 'center',
+                                      borderRadius: '8px',
+                                      border: hasDownvoted ? '2px solid #EF4444' : '1px solid var(--border)',
+                                      background: hasDownvoted ? '#FEE2E2' : 'var(--bg-white)',
+                                      cursor: 'pointer',
+                                      color: hasDownvoted ? '#DC2626' : 'var(--text-muted)',
+                                      transition: 'all 0.15s',
+                                    }}
+                                    title="Downvote"
+                                  >
+                                    <svg width="18" height="18" viewBox="0 0 24 24" fill={hasDownvoted ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="2">
+                                      <path d="M10 15v4a3 3 0 003 3l4-9V2H5.72a2 2 0 00-2 1.7l-1.38 9a2 2 0 002 2.3H10z"/>
+                                      <path d="M17 2h3a2 2 0 012 2v7a2 2 0 01-2 2h-3"/>
+                                    </svg>
+                                  </button>
+                                </div>
+
+                                {/* Content Column */}
+                                <div style={{ flex: 1, minWidth: 0 }}>
+                                  {/* Status Badge */}
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px', flexWrap: 'wrap' }}>
                                     <span style={{
-                                      padding: '2px 8px',
-                                      borderRadius: '4px',
-                                      background: '#E0E7FF',
-                                      color: '#4F46E5',
-                                      fontSize: '10px',
+                                      padding: '2px 10px',
+                                      borderRadius: '12px',
+                                      background: statusConf.bg,
+                                      border: `1px solid ${statusConf.border}`,
+                                      color: statusConf.color,
+                                      fontSize: '11px',
                                       fontWeight: 600,
                                     }}>
-                                      YOUR FEEDBACK
+                                      {statusConf.label}
                                     </span>
+                                    {isOwnFeedback && (
+                                      <span style={{
+                                        padding: '2px 8px',
+                                        borderRadius: '4px',
+                                        background: '#E0E7FF',
+                                        color: '#4F46E5',
+                                        fontSize: '10px',
+                                        fontWeight: 600,
+                                      }}>
+                                        YOUR FEEDBACK
+                                      </span>
+                                    )}
+                                  </div>
+
+                                  {editingFeedbackId === item.id ? (
+                                    <div style={{ margin: '0 0 8px 0' }}>
+                                      <textarea
+                                        value={editingFeedbackText}
+                                        onChange={(e) => setEditingFeedbackText(e.target.value)}
+                                        style={{
+                                          width: '100%',
+                                          minHeight: '60px',
+                                          padding: '8px 10px',
+                                          borderRadius: '6px',
+                                          border: '1px solid var(--primary)',
+                                          background: 'var(--bg-white)',
+                                          color: 'var(--text-primary)',
+                                          fontSize: '13px',
+                                          lineHeight: 1.5,
+                                          resize: 'vertical',
+                                          outline: 'none',
+                                        }}
+                                        onKeyDown={(e) => {
+                                          if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleEditFeedback(item.id) }
+                                          if (e.key === 'Escape') { setEditingFeedbackId(null); setEditingFeedbackText('') }
+                                        }}
+                                        autoFocus
+                                      />
+                                      <div style={{ display: 'flex', gap: '6px', marginTop: '6px', justifyContent: 'flex-end' }}>
+                                        <button
+                                          onClick={() => { setEditingFeedbackId(null); setEditingFeedbackText('') }}
+                                          style={{ padding: '4px 12px', borderRadius: '6px', border: '1px solid var(--border)', background: 'var(--bg-white)', color: 'var(--text-secondary)', fontSize: '12px', cursor: 'pointer' }}
+                                        >
+                                          Cancel
+                                        </button>
+                                        <button
+                                          onClick={() => handleEditFeedback(item.id)}
+                                          disabled={!editingFeedbackText.trim() || editingFeedbackText.trim() === item.text}
+                                          style={{
+                                            padding: '4px 12px', borderRadius: '6px', border: 'none', fontSize: '12px', fontWeight: 600, cursor: 'pointer',
+                                            background: editingFeedbackText.trim() && editingFeedbackText.trim() !== item.text ? 'var(--primary)' : 'var(--bg-gray)',
+                                            color: editingFeedbackText.trim() && editingFeedbackText.trim() !== item.text ? 'white' : 'var(--text-muted)',
+                                          }}
+                                        >
+                                          Save
+                                        </button>
+                                      </div>
+                                    </div>
+                                  ) : (
+                                    <div style={{ display: 'flex', alignItems: 'flex-start', gap: '6px', margin: '0 0 8px 0' }}>
+                                      <p style={{
+                                        fontSize: '14px',
+                                        color: 'var(--text-primary)',
+                                        margin: 0,
+                                        lineHeight: 1.5,
+                                        whiteSpace: 'pre-wrap',
+                                        flex: 1,
+                                        textDecoration: itemStatus === 'addressed' ? 'line-through' : 'none',
+                                      }}>
+                                        {item.text}
+                                      </p>
+                                      {isOwnFeedback && itemStatus !== 'addressed' && (
+                                        <button
+                                          onClick={() => { setEditingFeedbackId(item.id); setEditingFeedbackText(item.text) }}
+                                          title="Edit feedback"
+                                          style={{
+                                            padding: '2px', background: 'transparent', border: 'none', cursor: 'pointer',
+                                            color: 'var(--text-muted)', flexShrink: 0, marginTop: '2px',
+                                          }}
+                                        >
+                                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                            <path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/>
+                                            <path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/>
+                                          </svg>
+                                        </button>
+                                      )}
+                                    </div>
                                   )}
-                                  {item.upvotes.length > 0 && (
-                                    <span style={{ color: '#059669' }}>
-                                      {item.upvotes.length} upvote{item.upvotes.length !== 1 ? 's' : ''}
+
+                                  {/* Admin Response */}
+                                  {item.admin_response && (
+                                    <div style={{
+                                      margin: '8px 0',
+                                      padding: '10px 12px',
+                                      borderRadius: '8px',
+                                      background: '#F0FDF4',
+                                      border: '1px solid #86EFAC',
+                                      borderLeft: '3px solid #10B981',
+                                    }}>
+                                      <div style={{ fontSize: '11px', fontWeight: 600, color: '#047857', marginBottom: '4px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                          <path d="M9 12l2 2 4-4"/>
+                                          <circle cx="12" cy="12" r="10"/>
+                                        </svg>
+                                        Admin Response
+                                        {item.admin_user_email && (
+                                          <span style={{ fontWeight: 400, color: '#059669' }}>
+                                            ({item.admin_user_email.split('@')[0]})
+                                          </span>
+                                        )}
+                                      </div>
+                                      <p style={{ fontSize: '13px', color: '#065F46', margin: 0, lineHeight: 1.4 }}>
+                                        {item.admin_response}
+                                      </p>
+                                    </div>
+                                  )}
+
+                                  <div style={{
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '12px',
+                                    fontSize: '12px',
+                                    color: 'var(--text-muted)',
+                                    flexWrap: 'wrap',
+                                  }}>
+                                    <span>
+                                      {new Date(item.created_at).toLocaleDateString('en-US', {
+                                        month: 'short',
+                                        day: 'numeric',
+                                        year: 'numeric',
+                                      })}
                                     </span>
-                                  )}
+                                    {item.user_email && (
+                                      <span style={{ color: 'var(--text-muted)', fontSize: '11px' }}>
+                                        {item.user_email.split('@')[0]}
+                                      </span>
+                                    )}
+                                    {item.upvotes.length > 0 && (
+                                      <span style={{ color: '#059669' }}>
+                                        {item.upvotes.length} upvote{item.upvotes.length !== 1 ? 's' : ''}
+                                      </span>
+                                    )}
+                                    {/* Comments toggle */}
+                                    <button
+                                      onClick={() => toggleComments(item.id)}
+                                      style={{
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: '4px',
+                                        padding: '2px 8px',
+                                        borderRadius: '4px',
+                                        border: 'none',
+                                        background: isExpanded ? '#DBEAFE' : 'transparent',
+                                        color: isExpanded ? '#1D4ED8' : 'var(--text-muted)',
+                                        fontSize: '12px',
+                                        cursor: 'pointer',
+                                        fontWeight: isExpanded ? 600 : 400,
+                                      }}
+                                    >
+                                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                        <path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/>
+                                      </svg>
+                                      {item.comment_count} comment{item.comment_count !== 1 ? 's' : ''}
+                                    </button>
+                                  </div>
                                 </div>
                               </div>
+
+                              {/* Admin Controls */}
+                              {isUserAdmin && (
+                                <div style={{
+                                  marginTop: '12px',
+                                  paddingTop: '12px',
+                                  borderTop: '1px dashed var(--border)',
+                                }}>
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px', flexWrap: 'wrap' }}>
+                                    <span style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase' }}>
+                                      Admin:
+                                    </span>
+                                    {(Object.keys(STATUS_CONFIG) as FeedbackStatus[]).map(s => (
+                                      <button
+                                        key={s}
+                                        onClick={() => handleStatusUpdate(item.id, s)}
+                                        style={{
+                                          padding: '3px 10px',
+                                          borderRadius: '4px',
+                                          border: itemStatus === s ? `2px solid ${STATUS_CONFIG[s].border}` : '1px solid var(--border)',
+                                          background: itemStatus === s ? STATUS_CONFIG[s].bg : 'var(--bg-white)',
+                                          fontSize: '11px',
+                                          fontWeight: itemStatus === s ? 700 : 500,
+                                          cursor: 'pointer',
+                                          color: itemStatus === s ? STATUS_CONFIG[s].color : 'var(--text-muted)',
+                                        }}
+                                      >
+                                        {STATUS_CONFIG[s].label}
+                                      </button>
+                                    ))}
+                                  </div>
+                                  {/* Admin response input */}
+                                  <div style={{ display: 'flex', gap: '8px' }}>
+                                    <input
+                                      type="text"
+                                      value={adminResponseText[item.id] || ''}
+                                      onChange={(e) => setAdminResponseText(prev => ({ ...prev, [item.id]: e.target.value }))}
+                                      placeholder="Add admin response (visible to all users)..."
+                                      style={{
+                                        flex: 1,
+                                        padding: '8px 12px',
+                                        borderRadius: '6px',
+                                        border: '1px solid var(--border)',
+                                        background: 'var(--bg-white)',
+                                        fontSize: '12px',
+                                        color: 'var(--text-primary)',
+                                      }}
+                                      onKeyDown={(e) => {
+                                        if (e.key === 'Enter' && adminResponseText[item.id]?.trim()) {
+                                          handleStatusUpdate(item.id, itemStatus, adminResponseText[item.id].trim())
+                                          setAdminResponseText(prev => ({ ...prev, [item.id]: '' }))
+                                        }
+                                      }}
+                                    />
+                                    <button
+                                      onClick={() => {
+                                        if (adminResponseText[item.id]?.trim()) {
+                                          handleStatusUpdate(item.id, itemStatus, adminResponseText[item.id].trim())
+                                          setAdminResponseText(prev => ({ ...prev, [item.id]: '' }))
+                                        }
+                                      }}
+                                      disabled={!adminResponseText[item.id]?.trim()}
+                                      style={{
+                                        padding: '8px 14px',
+                                        borderRadius: '6px',
+                                        border: 'none',
+                                        background: adminResponseText[item.id]?.trim() ? '#10B981' : 'var(--bg-gray)',
+                                        color: adminResponseText[item.id]?.trim() ? 'white' : 'var(--text-muted)',
+                                        fontSize: '12px',
+                                        fontWeight: 600,
+                                        cursor: adminResponseText[item.id]?.trim() ? 'pointer' : 'not-allowed',
+                                      }}
+                                    >
+                                      Save
+                                    </button>
+                                  </div>
+                                </div>
+                              )}
                             </div>
+
+                            {/* Comments Section (Expanded) */}
+                            {isExpanded && (
+                              <div style={{
+                                borderTop: '1px solid var(--border)',
+                                background: 'var(--bg-gray)',
+                                padding: '12px 16px',
+                              }}>
+                                {commentsLoading === item.id ? (
+                                  <div style={{ textAlign: 'center', padding: '12px' }}>
+                                    <div style={{
+                                      width: '18px',
+                                      height: '18px',
+                                      border: '2px solid var(--border)',
+                                      borderTopColor: 'var(--primary)',
+                                      borderRadius: '50%',
+                                      animation: 'spin 1s linear infinite',
+                                      margin: '0 auto',
+                                    }} />
+                                  </div>
+                                ) : (
+                                  <>
+                                    {itemComments.length === 0 && (
+                                      <p style={{ fontSize: '12px', color: 'var(--text-muted)', margin: '0 0 12px 0', textAlign: 'center' }}>
+                                        No comments yet. Be the first to comment.
+                                      </p>
+                                    )}
+                                    {itemComments.map((comment) => (
+                                      <div
+                                        key={comment.id}
+                                        style={{
+                                          marginBottom: '10px',
+                                          padding: '10px 12px',
+                                          borderRadius: '8px',
+                                          background: comment.is_admin_comment ? '#F0FDF4' : 'var(--bg-white)',
+                                          border: comment.is_admin_comment ? '1px solid #86EFAC' : '1px solid var(--border)',
+                                        }}
+                                      >
+                                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '4px' }}>
+                                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                            <span style={{ fontSize: '11px', fontWeight: 600, color: comment.is_admin_comment ? '#047857' : 'var(--text-secondary)' }}>
+                                              {comment.user_email?.split('@')[0] || 'User'}
+                                            </span>
+                                            {comment.is_admin_comment && (
+                                              <span style={{
+                                                padding: '1px 6px',
+                                                borderRadius: '3px',
+                                                background: '#D1FAE5',
+                                                color: '#047857',
+                                                fontSize: '9px',
+                                                fontWeight: 700,
+                                                textTransform: 'uppercase',
+                                              }}>
+                                                Admin
+                                              </span>
+                                            )}
+                                            <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
+                                              {new Date(comment.created_at).toLocaleDateString('en-US', {
+                                                month: 'short',
+                                                day: 'numeric',
+                                              })}
+                                            </span>
+                                          </div>
+                                          {comment.user_id === currentUserId && (
+                                            <button
+                                              onClick={() => handleDeleteComment(item.id, comment.id)}
+                                              style={{
+                                                padding: '2px 6px',
+                                                border: 'none',
+                                                background: 'transparent',
+                                                color: 'var(--text-muted)',
+                                                fontSize: '11px',
+                                                cursor: 'pointer',
+                                              }}
+                                              title="Delete comment"
+                                            >
+                                              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                                <path d="M18 6L6 18M6 6l12 12"/>
+                                              </svg>
+                                            </button>
+                                          )}
+                                        </div>
+                                        <p style={{ fontSize: '13px', color: 'var(--text-primary)', margin: 0, lineHeight: 1.4 }}>
+                                          {comment.text}
+                                        </p>
+                                      </div>
+                                    ))}
+
+                                    {/* Add comment input */}
+                                    <div style={{ display: 'flex', gap: '8px', marginTop: '8px' }}>
+                                      <input
+                                        type="text"
+                                        value={newCommentText[item.id] || ''}
+                                        onChange={(e) => setNewCommentText(prev => ({ ...prev, [item.id]: e.target.value }))}
+                                        placeholder="Add a comment..."
+                                        style={{
+                                          flex: 1,
+                                          padding: '8px 12px',
+                                          borderRadius: '6px',
+                                          border: '1px solid var(--border)',
+                                          background: 'var(--bg-white)',
+                                          fontSize: '12px',
+                                          color: 'var(--text-primary)',
+                                        }}
+                                        onKeyDown={(e) => {
+                                          if (e.key === 'Enter' && newCommentText[item.id]?.trim()) {
+                                            handleAddComment(item.id)
+                                          }
+                                        }}
+                                      />
+                                      <button
+                                        onClick={() => handleAddComment(item.id)}
+                                        disabled={!newCommentText[item.id]?.trim()}
+                                        style={{
+                                          padding: '8px 14px',
+                                          borderRadius: '6px',
+                                          border: newCommentText[item.id]?.trim() ? 'none' : '1px solid var(--border)',
+                                          background: newCommentText[item.id]?.trim() ? 'var(--primary)' : 'var(--bg-white)',
+                                          color: newCommentText[item.id]?.trim() ? 'white' : 'var(--text-muted)',
+                                          fontSize: '12px',
+                                          fontWeight: 600,
+                                          cursor: newCommentText[item.id]?.trim() ? 'pointer' : 'not-allowed',
+                                        }}
+                                      >
+                                        Post
+                                      </button>
+                                    </div>
+                                  </>
+                                )}
+                              </div>
+                            )}
                           </div>
                         )
                       })}
@@ -1383,6 +2082,366 @@ export default function IdeasDrawer({ isOpen, onClose, initialTab, onStartTour }
                         >
                           Submit Feedback
                         </button>
+                      </div>
+                    </>
+                  )}
+                </div>
+              )}
+
+              {/* Admin Panel View */}
+              {feedbackView === 'admin' && isUserAdmin && (
+                <div>
+                  {adminDataLoading ? (
+                    <div style={{ textAlign: 'center', padding: '40px 20px' }}>
+                      <div style={{
+                        width: '24px',
+                        height: '24px',
+                        border: '3px solid var(--border)',
+                        borderTopColor: '#10B981',
+                        borderRadius: '50%',
+                        animation: 'spin 1s linear infinite',
+                        margin: '0 auto 12px',
+                      }} />
+                      <p style={{ fontSize: '13px', color: 'var(--text-muted)', margin: 0 }}>Loading admin panel...</p>
+                    </div>
+                  ) : (
+                    <>
+                      {/* Admin Management Section */}
+                      <div style={{
+                        marginBottom: '24px',
+                        padding: '16px',
+                        borderRadius: '12px',
+                        background: 'linear-gradient(135deg, #F0FDF4 0%, #DCFCE7 100%)',
+                        border: '1px solid #86EFAC',
+                      }}>
+                        <h4 style={{ fontSize: '14px', fontWeight: 600, margin: '0 0 12px 0', color: '#047857', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                            <path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/>
+                            <circle cx="9" cy="7" r="4"/>
+                            <path d="M23 21v-2a4 4 0 00-3-3.87"/>
+                            <path d="M16 3.13a4 4 0 010 7.75"/>
+                          </svg>
+                          Admin Management
+                        </h4>
+
+                        {/* Seed Admin */}
+                        <div style={{ marginBottom: '12px' }}>
+                          <span style={{ fontSize: '11px', fontWeight: 600, color: '#065F46', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                            Seed Admin (permanent)
+                          </span>
+                          <div style={{
+                            marginTop: '4px',
+                            padding: '8px 12px',
+                            borderRadius: '6px',
+                            background: 'white',
+                            border: '1px solid #86EFAC',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                          }}>
+                            <span style={{ fontSize: '13px', fontWeight: 500, color: '#047857' }}>{seedAdmin}</span>
+                            <span style={{
+                              padding: '2px 8px',
+                              borderRadius: '4px',
+                              background: '#D1FAE5',
+                              color: '#047857',
+                              fontSize: '10px',
+                              fontWeight: 700,
+                            }}>
+                              PERMANENT
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* Elevated Admins */}
+                        <div style={{ marginBottom: '12px' }}>
+                          <span style={{ fontSize: '11px', fontWeight: 600, color: '#065F46', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                            Elevated Admins
+                          </span>
+                          {elevatedAdmins.length === 0 ? (
+                            <p style={{ fontSize: '12px', color: '#059669', margin: '4px 0 0 0' }}>
+                              No additional admins. Add one below.
+                            </p>
+                          ) : (
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginTop: '4px' }}>
+                              {elevatedAdmins.map((email) => (
+                                <div
+                                  key={email}
+                                  style={{
+                                    padding: '8px 12px',
+                                    borderRadius: '6px',
+                                    background: 'white',
+                                    border: '1px solid var(--border)',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'space-between',
+                                  }}
+                                >
+                                  <span style={{ fontSize: '13px', color: 'var(--text-primary)' }}>{email}</span>
+                                  <button
+                                    onClick={() => handleRemoveAdmin(email)}
+                                    style={{
+                                      padding: '3px 8px',
+                                      borderRadius: '4px',
+                                      border: '1px solid #FCA5A5',
+                                      background: '#FEF2F2',
+                                      color: '#DC2626',
+                                      fontSize: '11px',
+                                      fontWeight: 600,
+                                      cursor: 'pointer',
+                                    }}
+                                  >
+                                    Remove
+                                  </button>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Add Admin */}
+                        <div style={{ display: 'flex', gap: '8px' }}>
+                          <input
+                            type="email"
+                            value={newAdminEmail}
+                            onChange={(e) => setNewAdminEmail(e.target.value)}
+                            placeholder="email@example.com"
+                            style={{
+                              flex: 1,
+                              padding: '8px 12px',
+                              borderRadius: '6px',
+                              border: '1px solid var(--border)',
+                              background: 'white',
+                              fontSize: '13px',
+                              color: 'var(--text-primary)',
+                            }}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') handleAddAdmin()
+                            }}
+                          />
+                          <button
+                            onClick={handleAddAdmin}
+                            disabled={!newAdminEmail.trim() || !newAdminEmail.includes('@')}
+                            style={{
+                              padding: '8px 16px',
+                              borderRadius: '6px',
+                              border: 'none',
+                              background: newAdminEmail.trim() && newAdminEmail.includes('@') ? '#10B981' : 'var(--bg-gray)',
+                              color: newAdminEmail.trim() && newAdminEmail.includes('@') ? 'white' : 'var(--text-muted)',
+                              fontSize: '13px',
+                              fontWeight: 600,
+                              cursor: newAdminEmail.trim() && newAdminEmail.includes('@') ? 'pointer' : 'not-allowed',
+                            }}
+                          >
+                            Add Admin
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Copy Approved Backlog Section */}
+                      {(() => {
+                        const approvedItems = allFeedback.filter(f => f.status === 'approved')
+                        return (
+                          <div style={{
+                            marginBottom: '24px',
+                            padding: '16px',
+                            borderRadius: '12px',
+                            background: 'linear-gradient(135deg, #EDE9FE 0%, #DDD6FE 100%)',
+                            border: '1px solid #C4B5FD',
+                          }}>
+                            <h4 style={{ fontSize: '14px', fontWeight: 600, margin: '0 0 8px 0', color: '#6D28D9', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/>
+                                <path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/>
+                              </svg>
+                              Approved Backlog
+                            </h4>
+                            <p style={{ fontSize: '12px', color: '#7C3AED', margin: '0 0 12px 0' }}>
+                              {approvedItems.length === 0
+                                ? 'No approved items yet. Approve feedback in the Browse tab to build a backlog.'
+                                : `${approvedItems.length} approved item${approvedItems.length !== 1 ? 's' : ''} ready to copy for dev planning.`
+                              }
+                            </p>
+
+                            {approvedItems.length > 0 && (
+                              <>
+                                <div style={{
+                                  maxHeight: '200px',
+                                  overflowY: 'auto',
+                                  marginBottom: '12px',
+                                  display: 'flex',
+                                  flexDirection: 'column',
+                                  gap: '6px',
+                                }}>
+                                  {approvedItems.map((item, idx) => (
+                                    <div key={item.id} style={{
+                                      padding: '8px 10px',
+                                      borderRadius: '6px',
+                                      background: 'white',
+                                      border: '1px solid #C4B5FD',
+                                      fontSize: '12px',
+                                      color: 'var(--text-primary)',
+                                      lineHeight: 1.4,
+                                    }}>
+                                      <span style={{ fontWeight: 600, color: '#7C3AED', marginRight: '6px' }}>#{idx + 1}</span>
+                                      {item.text}
+                                      <div style={{ display: 'flex', gap: '8px', marginTop: '4px', fontSize: '11px', color: 'var(--text-muted)' }}>
+                                        <span>{item.user_email}</span>
+                                        <span>·</span>
+                                        <span>{item.upvotes.length} upvote{item.upvotes.length !== 1 ? 's' : ''}</span>
+                                        <span>·</span>
+                                        <span>{item.comment_count} comment{item.comment_count !== 1 ? 's' : ''}</span>
+                                      </div>
+                                    </div>
+                                  ))}
+                                </div>
+
+                                <button
+                                  onClick={() => {
+                                    const lines = approvedItems.map((item, idx) => {
+                                      const net = item.upvotes.length - item.downvotes.length
+                                      const parts = [
+                                        `${idx + 1}. ${item.text}`,
+                                        `   By: ${item.user_email} | Votes: ${net >= 0 ? '+' : ''}${net} | Comments: ${item.comment_count}`,
+                                        `   Submitted: ${new Date(item.created_at).toLocaleDateString()}`,
+                                      ]
+                                      if (item.admin_response) {
+                                        parts.push(`   Admin note: ${item.admin_response}`)
+                                      }
+                                      return parts.join('\n')
+                                    })
+                                    const text = `=== Approved Feedback Backlog (${approvedItems.length} items) ===\nExported: ${new Date().toLocaleString()}\n\n${lines.join('\n\n')}`
+                                    navigator.clipboard.writeText(text).then(() => {
+                                      setBacklogCopied(true)
+                                      setTimeout(() => setBacklogCopied(false), 2000)
+                                    })
+                                  }}
+                                  style={{
+                                    width: '100%',
+                                    padding: '10px',
+                                    borderRadius: '8px',
+                                    border: 'none',
+                                    background: backlogCopied ? '#10B981' : '#7C3AED',
+                                    color: 'white',
+                                    fontSize: '13px',
+                                    fontWeight: 600,
+                                    cursor: 'pointer',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    gap: '8px',
+                                    transition: 'background 0.2s',
+                                  }}
+                                >
+                                  {backlogCopied ? (
+                                    <>
+                                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                                        <polyline points="20 6 9 17 4 12"/>
+                                      </svg>
+                                      Copied to Clipboard!
+                                    </>
+                                  ) : (
+                                    <>
+                                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                        <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/>
+                                        <path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/>
+                                      </svg>
+                                      Copy Approved Backlog
+                                    </>
+                                  )}
+                                </button>
+                              </>
+                            )}
+                          </div>
+                        )
+                      })()}
+
+                      {/* System Prompts Section */}
+                      <div>
+                        <h4 style={{ fontSize: '14px', fontWeight: 600, margin: '0 0 4px 0', color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                            <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/>
+                            <polyline points="14 2 14 8 20 8"/>
+                            <line x1="16" y1="13" x2="8" y2="13"/>
+                            <line x1="16" y1="17" x2="8" y2="17"/>
+                          </svg>
+                          System Prompts
+                        </h4>
+                        <p style={{ fontSize: '12px', color: 'var(--text-muted)', margin: '0 0 12px 0' }}>
+                          Read-only overview of AI system prompts. Editing via Supabase coming soon.
+                        </p>
+
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                          {systemPrompts.map((prompt) => (
+                            <div
+                              key={prompt.id}
+                              style={{
+                                border: '1px solid var(--border)',
+                                borderRadius: '8px',
+                                overflow: 'hidden',
+                                background: 'var(--bg-white)',
+                              }}
+                            >
+                              <button
+                                onClick={() => setExpandedPrompt(expandedPrompt === prompt.id ? null : prompt.id)}
+                                style={{
+                                  width: '100%',
+                                  padding: '12px 14px',
+                                  border: 'none',
+                                  background: 'transparent',
+                                  cursor: 'pointer',
+                                  textAlign: 'left',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  gap: '10px',
+                                }}
+                              >
+                                <div style={{ flex: 1 }}>
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '2px' }}>
+                                    <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)' }}>
+                                      {prompt.name}
+                                    </span>
+                                    <span style={{
+                                      padding: '1px 6px',
+                                      borderRadius: '4px',
+                                      background: prompt.model.includes('5') ? '#EDE9FE' : '#DBEAFE',
+                                      color: prompt.model.includes('5') ? '#7C3AED' : '#1D4ED8',
+                                      fontSize: '10px',
+                                      fontWeight: 600,
+                                    }}>
+                                      {prompt.model}
+                                    </span>
+                                  </div>
+                                  <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
+                                    {prompt.file}
+                                  </span>
+                                </div>
+                                <svg
+                                  width="16" height="16" viewBox="0 0 24 24"
+                                  fill="none" stroke="var(--text-muted)" strokeWidth="2"
+                                  style={{
+                                    transform: expandedPrompt === prompt.id ? 'rotate(180deg)' : 'rotate(0deg)',
+                                    transition: 'transform 0.2s',
+                                    flexShrink: 0,
+                                  }}
+                                >
+                                  <polyline points="6 9 12 15 18 9"/>
+                                </svg>
+                              </button>
+                              {expandedPrompt === prompt.id && (
+                                <div style={{
+                                  padding: '0 14px 12px',
+                                  borderTop: '1px solid var(--border)',
+                                  paddingTop: '10px',
+                                }}>
+                                  <p style={{ fontSize: '12px', color: 'var(--text-secondary)', margin: 0, lineHeight: 1.5 }}>
+                                    {prompt.description}
+                                  </p>
+                                </div>
+                              )}
+                            </div>
+                          ))}
+                        </div>
                       </div>
                     </>
                   )}

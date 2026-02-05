@@ -1,10 +1,30 @@
 // Smart Recommendations Data - Outpatient Neurology Plans
 // Based on https://blondarb.github.io/neuro-plans/clinical/
 
+/**
+ * Dose option for medications with multiple standard doses
+ * Each option has display text and a full order sentence
+ */
+export interface DoseOption {
+  text: string           // Display text, e.g., "2 mg SC"
+  orderSentence: string  // Full order sentence, e.g., "Apomorphine SC 2 mg SC"
+}
+
+/**
+ * Structured dosing information with multiple options
+ * Allows dropdown selection with manual override capability
+ */
+export interface StructuredDosing {
+  doseOptions?: DoseOption[]  // Array of standard dose choices
+  route?: string              // Administration route (PO, IV, SC, etc.)
+  instructions?: string       // Additional dosing instructions
+  orderSentence?: string      // Default order sentence if no dropdown selection
+}
+
 export interface RecommendationItem {
   item: string
   rationale?: string
-  dosing?: string
+  dosing?: string | StructuredDosing  // Can be simple string or structured with doseOptions
   timing?: string
   target?: string
   indication?: string

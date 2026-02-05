@@ -100,10 +100,22 @@ interface SupabaseRow {
   disposition: Array<{ disposition: string; criteria: string }>
 }
 
+interface TargetDoseOption {
+  text: string
+  orderSentence: string
+}
+
+interface TargetStructuredDosing {
+  doseOptions?: TargetDoseOption[]
+  route?: string
+  instructions?: string
+  orderSentence?: string
+}
+
 interface TargetRecommendationItem {
   item: string
   rationale?: string
-  dosing?: string
+  dosing?: string | TargetStructuredDosing  // Preserve full structure with doseOptions
   timing?: string
   target?: string
   indication?: string
@@ -127,12 +139,32 @@ interface PlanFileInfo {
 // TRANSFORM FUNCTIONS
 // ============================================
 
-function flattenDosing(dosing: string | SourceDosingObject | undefined): string | undefined {
+/**
+ * Transform dosing - preserve full structure with doseOptions for dropdown selection
+ * If only a string or single option, return as string for backward compatibility
+ * If multiple doseOptions exist, return structured object for dropdown UI
+ */
+function transformDosing(dosing: string | SourceDosingObject | undefined): string | TargetStructuredDosing | undefined {
   if (!dosing) return undefined
   if (typeof dosing === 'string') return dosing
+
+  // Check if there are multiple dose options - preserve full structure for dropdown
+  if (dosing.doseOptions && dosing.doseOptions.length > 1) {
+    return {
+      doseOptions: dosing.doseOptions.map(opt => ({
+        text: opt.text,
+        orderSentence: opt.orderSentence
+      })),
+      route: dosing.route,
+      instructions: dosing.instructions,
+      orderSentence: dosing.orderSentence
+    }
+  }
+
+  // Single option or no options - flatten to string for simplicity
   if (dosing.orderSentence) return dosing.orderSentence
   if (dosing.instructions) return dosing.instructions
-  if (dosing.doseOptions && dosing.doseOptions.length > 0) {
+  if (dosing.doseOptions && dosing.doseOptions.length === 1) {
     return dosing.doseOptions[0].orderSentence || dosing.doseOptions[0].text
   }
   return undefined
@@ -161,7 +193,7 @@ function transformPlan(sourcePlan: SourcePlan): SupabaseRow | null {
         .map(item => ({
           item: item.item,
           rationale: item.rationale,
-          dosing: flattenDosing(item.dosing),
+          dosing: transformDosing(item.dosing),
           timing: item.timing,
           target: item.target,
           indication: item.indication,

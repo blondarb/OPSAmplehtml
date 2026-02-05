@@ -169,7 +169,7 @@ Important: This is for a neurology practice. Ensure the output is appropriate fo
     const temperature = action === 'expand' ? 0.3 : 0.5
 
     const completion = await openai.chat.completions.create({
-      model: 'gpt-4o-mini', // Cost-effective for text transformation ($0.15/$0.60 per 1M tokens)
+      model: 'gpt-5-mini', // Cost-effective for text transformation ($0.25/$2 per 1M tokens)
       messages: [
         { role: 'system', content: systemPrompt },
         { role: 'user', content: text }

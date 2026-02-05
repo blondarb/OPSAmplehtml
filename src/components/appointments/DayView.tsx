@@ -15,12 +15,58 @@ import AppointmentPopover, { useHoverPopover } from './AppointmentPopover'
 interface DayViewProps {
   appointments: Appointment[]
   onSelectPatient: (appointment: Appointment) => void
+  onRefresh?: () => void
 }
 
-export default function DayView({ appointments, onSelectPatient }: DayViewProps) {
+export default function DayView({ appointments, onSelectPatient, onRefresh }: DayViewProps) {
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc')
   const [menuOpenId, setMenuOpenId] = useState<string | null>(null)
   const { hoveredId, anchorRect, onEnter, onLeave, onPopoverEnter, onPopoverLeave } = useHoverPopover()
+
+  // Cancel / Reschedule modals
+  const [cancelModal, setCancelModal] = useState<Appointment | null>(null)
+  const [rescheduleModal, setRescheduleModal] = useState<Appointment | null>(null)
+  const [rescheduleDate, setRescheduleDate] = useState('')
+  const [rescheduleTime, setRescheduleTime] = useState('')
+  const [actionLoading, setActionLoading] = useState(false)
+
+  const handleCancel = async () => {
+    if (!cancelModal) return
+    setActionLoading(true)
+    try {
+      const res = await fetch(`/api/appointments/${cancelModal.id}`, { method: 'DELETE' })
+      if (!res.ok) throw new Error('Failed to cancel')
+      setCancelModal(null)
+      onRefresh?.()
+    } catch (e) {
+      console.error('Cancel failed:', e)
+      alert('Failed to cancel appointment')
+    } finally {
+      setActionLoading(false)
+    }
+  }
+
+  const handleReschedule = async () => {
+    if (!rescheduleModal || !rescheduleDate || !rescheduleTime) return
+    setActionLoading(true)
+    try {
+      const res = await fetch(`/api/appointments/${rescheduleModal.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ appointmentDate: rescheduleDate, appointmentTime: rescheduleTime }),
+      })
+      if (!res.ok) throw new Error('Failed to reschedule')
+      setRescheduleModal(null)
+      setRescheduleDate('')
+      setRescheduleTime('')
+      onRefresh?.()
+    } catch (e) {
+      console.error('Reschedule failed:', e)
+      alert('Failed to reschedule appointment')
+    } finally {
+      setActionLoading(false)
+    }
+  }
 
   // Sort appointments
   const sortedAppointments = [...appointments].sort((a, b) => {
@@ -259,12 +305,17 @@ export default function DayView({ appointments, onSelectPatient }: DayViewProps)
                         <MenuButton
                           label="Reschedule"
                           icon={<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2" /><line x1="16" y1="2" x2="16" y2="6" /><line x1="8" y1="2" x2="8" y2="6" /></svg>}
-                          onClick={() => setMenuOpenId(null)}
+                          onClick={() => {
+                            setRescheduleModal(appointment)
+                            setRescheduleDate(appointment.appointmentDate)
+                            setRescheduleTime(appointment.appointmentTime)
+                            setMenuOpenId(null)
+                          }}
                         />
                         <MenuButton
                           label="Cancel"
                           icon={<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10" /><line x1="15" y1="9" x2="9" y2="15" /><line x1="9" y1="9" x2="15" y2="15" /></svg>}
-                          onClick={() => setMenuOpenId(null)}
+                          onClick={() => { setCancelModal(appointment); setMenuOpenId(null) }}
                           danger
                         />
                       </div>
@@ -306,6 +357,102 @@ export default function DayView({ appointments, onSelectPatient }: DayViewProps)
           onMouseEnter={onPopoverEnter}
           onMouseLeave={onPopoverLeave}
         />
+      )}
+
+      {/* Cancel Confirmation Modal */}
+      {cancelModal && (
+        <>
+          <div onClick={() => setCancelModal(null)} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 2000 }} />
+          <div style={{
+            position: 'fixed', top: '50%', left: '50%', transform: 'translate(-50%, -50%)',
+            background: 'var(--bg-white)', borderRadius: '12px', padding: '24px', width: '380px', maxWidth: '90vw',
+            zIndex: 2001, boxShadow: '0 20px 50px rgba(0,0,0,0.15)',
+          }}>
+            <h3 style={{ margin: '0 0 8px', fontSize: '16px', fontWeight: 600, color: 'var(--text-primary)' }}>
+              Cancel Appointment?
+            </h3>
+            <p style={{ margin: '0 0 4px', fontSize: '13px', color: 'var(--text-secondary)' }}>
+              <strong>{cancelModal.patient?.firstName} {cancelModal.patient?.lastName}</strong>
+            </p>
+            <p style={{ margin: '0 0 16px', fontSize: '13px', color: 'var(--text-muted)' }}>
+              {formatTime(cancelModal.appointmentDate, cancelModal.appointmentTime)} &middot; {formatType(cancelModal.appointmentType)}
+            </p>
+            <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
+              <button
+                onClick={() => setCancelModal(null)}
+                style={{ padding: '8px 16px', borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--bg-white)', color: 'var(--text-secondary)', fontSize: '13px', cursor: 'pointer' }}
+              >
+                Keep
+              </button>
+              <button
+                onClick={handleCancel}
+                disabled={actionLoading}
+                style={{ padding: '8px 16px', borderRadius: '8px', border: 'none', background: '#DC2626', color: 'white', fontSize: '13px', fontWeight: 600, cursor: actionLoading ? 'wait' : 'pointer', opacity: actionLoading ? 0.7 : 1 }}
+              >
+                {actionLoading ? 'Cancelling...' : 'Cancel Appointment'}
+              </button>
+            </div>
+          </div>
+        </>
+      )}
+
+      {/* Reschedule Modal */}
+      {rescheduleModal && (
+        <>
+          <div onClick={() => { setRescheduleModal(null); setRescheduleDate(''); setRescheduleTime('') }} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 2000 }} />
+          <div style={{
+            position: 'fixed', top: '50%', left: '50%', transform: 'translate(-50%, -50%)',
+            background: 'var(--bg-white)', borderRadius: '12px', padding: '24px', width: '380px', maxWidth: '90vw',
+            zIndex: 2001, boxShadow: '0 20px 50px rgba(0,0,0,0.15)',
+          }}>
+            <h3 style={{ margin: '0 0 8px', fontSize: '16px', fontWeight: 600, color: 'var(--text-primary)' }}>
+              Reschedule Appointment
+            </h3>
+            <p style={{ margin: '0 0 16px', fontSize: '13px', color: 'var(--text-secondary)' }}>
+              <strong>{rescheduleModal.patient?.firstName} {rescheduleModal.patient?.lastName}</strong> &middot; {formatType(rescheduleModal.appointmentType)}
+            </p>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginBottom: '16px' }}>
+              <div>
+                <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '4px' }}>Date</label>
+                <input
+                  type="date"
+                  value={rescheduleDate}
+                  onChange={(e) => setRescheduleDate(e.target.value)}
+                  style={{ width: '100%', padding: '8px 10px', borderRadius: '6px', border: '1px solid var(--border)', background: 'var(--bg-white)', color: 'var(--text-primary)', fontSize: '13px' }}
+                />
+              </div>
+              <div>
+                <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '4px' }}>Time</label>
+                <input
+                  type="time"
+                  value={rescheduleTime}
+                  onChange={(e) => setRescheduleTime(e.target.value)}
+                  style={{ width: '100%', padding: '8px 10px', borderRadius: '6px', border: '1px solid var(--border)', background: 'var(--bg-white)', color: 'var(--text-primary)', fontSize: '13px' }}
+                />
+              </div>
+            </div>
+            <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
+              <button
+                onClick={() => { setRescheduleModal(null); setRescheduleDate(''); setRescheduleTime('') }}
+                style={{ padding: '8px 16px', borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--bg-white)', color: 'var(--text-secondary)', fontSize: '13px', cursor: 'pointer' }}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleReschedule}
+                disabled={actionLoading || !rescheduleDate || !rescheduleTime}
+                style={{
+                  padding: '8px 16px', borderRadius: '8px', border: 'none', fontSize: '13px', fontWeight: 600,
+                  background: rescheduleDate && rescheduleTime && !actionLoading ? 'var(--primary)' : 'var(--bg-gray)',
+                  color: rescheduleDate && rescheduleTime && !actionLoading ? 'white' : 'var(--text-muted)',
+                  cursor: actionLoading ? 'wait' : 'pointer',
+                }}
+              >
+                {actionLoading ? 'Saving...' : 'Reschedule'}
+              </button>
+            </div>
+          </div>
+        </>
       )}
     </>
   )

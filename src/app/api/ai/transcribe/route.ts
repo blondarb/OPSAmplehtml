@@ -77,7 +77,7 @@ export async function POST(request: Request) {
     // Clean up the transcription with GPT to fix errors and improve readability
     try {
       const cleanupResponse = await openai.chat.completions.create({
-        model: 'gpt-4o-mini', // Cost-effective for text cleanup ($0.15/$0.60 per 1M tokens)
+        model: 'gpt-5-mini', // Cost-effective for text cleanup ($0.25/$2 per 1M tokens)
         messages: [
           {
             role: 'system',

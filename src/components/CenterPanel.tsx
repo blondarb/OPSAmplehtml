@@ -56,6 +56,7 @@ interface CenterPanelProps {
   scoreHistory?: any[]
 }
 
+const MEDICATION_OPTIONS = ['No Medications', 'Reviewed in EMR']
 const ALLERGY_OPTIONS = ['NKDA', 'Reviewed in EMR', 'Unknown', 'Other']
 const ROS_OPTIONS = ['Reviewed', 'Unable to obtain due to:', 'Other']
 const HISTORY_OPTIONS = ['Yes', 'No, due to patient mentation', 'NA due to phone consult']
@@ -106,6 +107,7 @@ export default function CenterPanel({
   const [editingMedId, setEditingMedId] = useState<string | null>(null)
   const [discontinueModal, setDiscontinueModal] = useState<{ id: string; name: string } | null>(null)
   const [discontinueReason, setDiscontinueReason] = useState('')
+  const [medQuickStatus, setMedQuickStatus] = useState<string | null>(null)
 
   // Allergy form state
   const [showAllergyForm, setShowAllergyForm] = useState(false)
@@ -1455,6 +1457,30 @@ ${noteData.plan || 'Not documented'}`.trim()
                   </button>
                 </div>
 
+                {/* Quick shortcuts for medications */}
+                {medications.filter(m => m.is_active).length === 0 && (
+                  <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginBottom: '12px' }}>
+                    {MEDICATION_OPTIONS.map(option => (
+                      <button
+                        key={option}
+                        onClick={() => setMedQuickStatus(medQuickStatus === option ? null : option)}
+                        style={{
+                          padding: '8px 14px',
+                          borderRadius: '20px',
+                          fontSize: '12px',
+                          cursor: 'pointer',
+                          border: '1px solid',
+                          borderColor: medQuickStatus === option ? 'var(--primary)' : 'var(--border)',
+                          background: medQuickStatus === option ? 'var(--primary)' : 'var(--bg-white)',
+                          color: medQuickStatus === option ? 'white' : 'var(--text-secondary)',
+                        }}
+                      >
+                        {option}
+                      </button>
+                    ))}
+                  </div>
+                )}
+
                 {/* Medication List */}
                 {medications.filter(m => m.is_active).length > 0 && (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginBottom: '0' }}>
@@ -1524,7 +1550,7 @@ ${noteData.plan || 'Not documented'}`.trim()
                   </details>
                 )}
 
-                {medications.length === 0 && (
+                {medications.length === 0 && !medQuickStatus && (
                   <div style={{ fontSize: '13px', color: 'var(--text-muted)', textAlign: 'center', padding: '12px' }}>
                     No medications documented
                   </div>
