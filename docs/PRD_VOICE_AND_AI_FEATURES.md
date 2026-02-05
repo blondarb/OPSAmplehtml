@@ -622,17 +622,36 @@ interface FormattedNote {
 
 ### Settings Structure
 ```typescript
+interface NoteLayoutPreferences {
+  includeHistorySummary: boolean    // Add patient history summary at top
+  includeAllergiesAtTop: boolean    // Display allergies prominently
+  includeProblemList: boolean       // Include active problem list
+  groupMedicationsWithAssessment: boolean  // List meds with each diagnosis
+}
+
 interface UserSettings {
-  globalAiInstructions: string
-  sectionInstructions: {
+  // Note type-specific instructions (NEW)
+  newConsultInstructions: string    // Instructions for new consultation notes
+  followUpInstructions: string      // Instructions for follow-up notes
+
+  // Section-specific instructions (apply to both note types)
+  sectionAiInstructions: {
     hpi: string
     ros: string
-    exam: string
     assessment: string
     plan: string
+    physicalExam: string
   }
-  documentationStyle: 'concise' | 'standard' | 'detailed'
-  preferredTerminology: 'standard' | 'simplified'
+
+  // Note layout preferences (NEW)
+  noteLayout: NoteLayoutPreferences
+
+  // Documentation style
+  documentationStyle: 'concise' | 'detailed' | 'narrative'
+  preferredTerminology: 'formal' | 'standard' | 'simplified'
+
+  // Legacy (for backward compatibility)
+  globalAiInstructions?: string
 }
 ```
 
@@ -641,18 +660,83 @@ interface UserSettings {
 const SETTINGS_KEY = 'sevaro-user-settings'
 ```
 
-### Injection Pattern
-All AI endpoints receive user settings and inject instructions:
+### Injection Pattern (Updated for Note Types)
+
+The synthesize-note endpoint selects instructions based on note type:
+
 ```typescript
-const userSettings = getUserSettings()
-const systemPrompt = `
-${BASE_PROMPT}
+// /api/ai/synthesize-note/route.ts
+function buildSystemPrompt(
+  noteType: 'new-consult' | 'follow-up',
+  noteLength: 'concise' | 'standard' | 'detailed',
+  userSettings?: UserSettings
+): string {
+  // Select note-type specific instructions
+  const noteTypeGuidance = noteType === 'new-consult'
+    ? (userSettings?.newConsultInstructions || DEFAULT_NEW_CONSULT)
+    : (userSettings?.followUpInstructions || DEFAULT_FOLLOW_UP)
 
-${userSettings?.globalAiInstructions || ''}
+  let prompt = `${BASE_PROMPT}\n\n${noteTypeGuidance}`
 
-Documentation style: ${userSettings?.documentationStyle || 'standard'}
-Terminology: ${userSettings?.preferredTerminology || 'standard'}
-`
+  // Add terminology preference
+  prompt += `\nTerminology: ${userSettings?.preferredTerminology || 'standard'}`
+
+  // Add documentation style
+  prompt += `\nDocumentation style: ${userSettings?.documentationStyle || 'detailed'}`
+
+  // Add section-specific instructions
+  if (userSettings?.sectionAiInstructions) {
+    const sections = userSettings.sectionAiInstructions
+    if (sections.hpi) prompt += `\nHPI Instructions: ${sections.hpi}`
+    if (sections.ros) prompt += `\nROS Instructions: ${sections.ros}`
+    if (sections.assessment) prompt += `\nAssessment Instructions: ${sections.assessment}`
+    if (sections.plan) prompt += `\nPlan Instructions: ${sections.plan}`
+    if (sections.physicalExam) prompt += `\nPhysical Exam Instructions: ${sections.physicalExam}`
+  }
+
+  // Add layout preferences
+  if (userSettings?.noteLayout) {
+    const layout = userSettings.noteLayout
+    if (layout.includeHistorySummary) prompt += `\n- Include history summary at top`
+    if (layout.includeAllergiesAtTop) prompt += `\n- List allergies prominently`
+    if (layout.includeProblemList) prompt += `\n- Include active problem list in assessment`
+    if (layout.groupMedicationsWithAssessment) prompt += `\n- Group medications with assessment`
+  }
+
+  // Legacy support
+  if (userSettings?.globalAiInstructions && !userSettings.newConsultInstructions) {
+    prompt += `\n\nAdditional instructions: ${userSettings.globalAiInstructions}`
+  }
+
+  return prompt
+}
+```
+
+### Settings Migration
+
+For backward compatibility, old settings are migrated to new format:
+```typescript
+function migrateSettings(old: Partial<UserSettings>): Partial<UserSettings> {
+  const migrated = { ...old }
+
+  // Migrate globalAiInstructions to both note types
+  if (old.globalAiInstructions && !old.newConsultInstructions) {
+    migrated.newConsultInstructions = old.globalAiInstructions
+    migrated.followUpInstructions = old.globalAiInstructions
+  }
+
+  // Ensure noteLayout exists with defaults
+  if (!migrated.noteLayout) {
+    migrated.noteLayout = {
+      includeHistorySummary: true,
+      includeAllergiesAtTop: false,
+      includeProblemList: false,
+      groupMedicationsWithAssessment: false,
+    }
+  }
+
+  return migrated
+}
 ```
 
 ## 12. Error Handling

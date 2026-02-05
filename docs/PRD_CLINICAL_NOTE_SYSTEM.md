@@ -341,6 +341,47 @@ function matchScore(planCodes: string[], diagCodes: string[]): number {
 - **Note Length**: Concise / Standard / Detailed
 - **Include toggles**: Scales, Imaging, Labs, Recommendations
 
+### User Settings Integration
+
+The note generation system respects user settings stored in `localStorage`:
+
+**Note Type Instructions:**
+When the user selects "New Consult" or "Follow-up", the corresponding custom instructions (`newConsultInstructions` or `followUpInstructions`) are injected into the AI synthesis prompt. This allows different documentation styles for different visit types.
+
+**Section-Specific Instructions:**
+Each section (HPI, ROS, Assessment, Plan, Physical Exam) can have custom instructions that get injected into the AI prompt for that section.
+
+**Layout Preferences:**
+User preferences affect note structure:
+- `includeHistorySummary` - Adds brief patient history at the beginning
+- `includeAllergiesAtTop` - Places allergies prominently in the note header
+- `includeProblemList` - Includes active problem list in assessment
+- `groupMedicationsWithAssessment` - Lists medications with each diagnosis
+
+**Documentation Style & Terminology:**
+- `documentationStyle`: 'concise' | 'detailed' | 'narrative'
+- `preferredTerminology`: 'formal' | 'standard' | 'simplified'
+
+### Settings Retrieval
+```typescript
+// EnhancedNotePreviewModal.tsx
+function getUserSettings() {
+  const saved = localStorage.getItem('sevaro-user-settings')
+  if (!saved) return null
+
+  const settings = JSON.parse(saved)
+  return {
+    newConsultInstructions: settings.newConsultInstructions,
+    followUpInstructions: settings.followUpInstructions,
+    sectionInstructions: settings.sectionAiInstructions,
+    noteLayout: settings.noteLayout,
+    documentationStyle: settings.documentationStyle,
+    preferredTerminology: settings.preferredTerminology,
+    globalInstructions: settings.globalAiInstructions, // Legacy
+  }
+}
+```
+
 ### Note Merge Engine
 ```typescript
 // src/lib/note-merge/merge-engine.ts
@@ -353,6 +394,25 @@ function mergeNoteContent(
 
 // Priority: Manual > Visit AI > Chart Prep
 // AI suggestions shown when manual content exists and differs
+```
+
+### AI Synthesis API Call
+```typescript
+// Sent to /api/ai/synthesize-note
+{
+  noteType: 'new-consult' | 'follow-up',
+  noteLength: 'concise' | 'standard' | 'detailed',
+  manualData, chartPrepData, visitAIData,
+  scales, diagnoses, imagingStudies, recommendations, patient,
+  userSettings: {
+    newConsultInstructions,    // Used when noteType === 'new-consult'
+    followUpInstructions,      // Used when noteType === 'follow-up'
+    sectionInstructions,       // Per-section customizations
+    noteLayout,                // Structure preferences
+    documentationStyle,        // Writing style
+    preferredTerminology       // Language level
+  }
+}
 ```
 
 ### Formatted Output

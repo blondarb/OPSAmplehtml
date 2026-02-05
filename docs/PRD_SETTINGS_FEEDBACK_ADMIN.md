@@ -93,28 +93,72 @@ The Settings Drawer is a right-aligned slide-out panel with three tabs:
 - **Purpose:** Displayed on patient education handouts and printed materials
 - **Placeholder:** "e.g., Meridian Neurology Associates"
 
-#### Global AI Instructions
-- **Type:** Multi-line textarea with voice dictation button
-- **Purpose:** Instructions applied to ALL AI-generated content across the application
-- **Placeholder:** "E.g., Always use formal medical terminology. Prefer bullet points..."
-- **Suggestions chips:** "Use formal terminology", "Be concise", "Include pertinent negatives", "Use bullet points"
-- **Dictation:** Red microphone button for voice input (appends to existing text)
+#### Note Layout Preferences
+Checkbox options that control the structure of generated notes:
 
-#### Section-Specific Instructions
-Expandable accordion for each clinical note section:
+| Option | Key | Description |
+|--------|-----|-------------|
+| Include history summary at top | `includeHistorySummary` | Add a brief patient history summary at the beginning of follow-up notes |
+| List allergies prominently | `includeAllergiesAtTop` | Display allergies near the top of the note for visibility |
+| Include active problem list | `includeProblemList` | Add the patient's active problem list in the assessment section |
+| Group medications with assessment | `groupMedicationsWithAssessment` | List relevant medications alongside each diagnosis in the assessment |
 
-| Section | Key |
-|---------|-----|
-| History of Present Illness (HPI) | `hpi` |
-| Review of Systems (ROS) | `ros` |
-| Assessment | `assessment` |
-| Plan | `plan` |
-| Physical Exam | `physicalExam` |
+**UI:** Stacked checkbox list with labels and brief descriptions.
+
+#### Note Type Instructions
+Separate AI instructions for different visit types. Uses progressive disclosure (collapsed by default).
+
+| Note Type | Key | Icon | Description |
+|-----------|-----|------|-------------|
+| New Consultation Notes | `newConsultInstructions` | 📋 | Instructions for comprehensive new patient documentation |
+| Follow-up Notes | `followUpInstructions` | 🔄 | Instructions for interval/follow-up visit notes |
 
 Each section has:
-- Collapsible header with "Custom" badge if instructions exist
+- Collapsible header with expand/collapse chevron
+- "Customized" purple badge if instructions differ from default preset
+- Multi-line textarea with voice dictation button
+- "Reset to Default" button (appears only when customized)
+
+**Default Presets:**
+
+*New Consultation:*
+```
+Write comprehensive new consultation notes that include:
+- Complete history including onset, progression, and context
+- All pertinent positives and negatives
+- Thorough review of systems
+- Detailed neurological examination findings
+- Clear assessment with differential diagnosis
+- Evidence-based treatment recommendations
+```
+
+*Follow-up:*
+```
+Write focused follow-up notes that emphasize:
+- Interval changes since last visit
+- Response to current treatments
+- Any new symptoms or concerns
+- Updated examination findings (changes from baseline)
+- Adjustments to treatment plan
+- Next steps and follow-up timeline
+```
+
+#### Section-Specific Instructions
+Expandable accordion for each clinical note section. These instructions apply to both note types.
+
+| Section | Key | Default Preset |
+|---------|-----|----------------|
+| History of Present Illness (HPI) | `hpi` | "Write the HPI as a narrative paragraph. Include onset, location, duration, character, aggravating/alleviating factors, radiation, timing, and severity (OLDCARTS). Include pertinent negatives." |
+| Review of Systems (ROS) | `ros` | "Document review of systems efficiently. List positive findings first, then summarize negative systems. Use standard abbreviations when appropriate." |
+| Assessment | `assessment` | "Write a clear assessment that synthesizes the clinical picture. Link diagnoses to supporting evidence. Include ICD-10 codes when available." |
+| Plan | `plan` | "Organize the plan by diagnosis/problem. Include specific medications with dosages, follow-up timeline, and patient education points." |
+| Physical Exam | `physicalExam` | "Document examination findings clearly. Note normal findings briefly and abnormal findings in detail. Include relevant scale scores." |
+
+Each section has:
+- Collapsible header with expand/collapse chevron
+- "Customized" purple badge if instructions differ from default preset
 - Textarea with voice dictation button
-- Placeholder: "Custom instructions for [Section Name]..."
+- "Reset to Default" button (appears only when customized)
 
 #### Documentation Style
 Three-option pill selector:
@@ -193,12 +237,22 @@ Shows sample text at current font size setting.
 ### 3.5 Settings Data Model
 
 ```typescript
+interface NoteLayoutPreferences {
+  includeHistorySummary: boolean
+  includeAllergiesAtTop: boolean
+  includeProblemList: boolean
+  groupMedicationsWithAssessment: boolean
+}
+
 interface UserSettings {
   // Practice Info
   practiceName: string
 
-  // AI Instructions
-  globalAiInstructions: string
+  // Note Type-Specific AI Instructions
+  newConsultInstructions: string
+  followUpInstructions: string
+
+  // Section-Specific AI Instructions (apply to both note types)
   sectionAiInstructions: {
     hpi: string
     ros: string
@@ -206,6 +260,9 @@ interface UserSettings {
     plan: string
     physicalExam: string
   }
+
+  // Note Layout Preferences
+  noteLayout: NoteLayoutPreferences
 
   // Appearance
   fontSize: 'small' | 'medium' | 'large'
@@ -221,20 +278,58 @@ interface UserSettings {
   // Notifications
   soundEnabled: boolean
   notificationsEnabled: boolean
+
+  // Legacy (for backward compatibility)
+  globalAiInstructions?: string
 }
 ```
 
 **Default Values:**
 ```typescript
+const DEFAULT_PRESETS = {
+  newConsult: `Write comprehensive new consultation notes that include:
+- Complete history including onset, progression, and context
+- All pertinent positives and negatives
+- Thorough review of systems
+- Detailed neurological examination findings
+- Clear assessment with differential diagnosis
+- Evidence-based treatment recommendations`,
+
+  followUp: `Write focused follow-up notes that emphasize:
+- Interval changes since last visit
+- Response to current treatments
+- Any new symptoms or concerns
+- Updated examination findings (changes from baseline)
+- Adjustments to treatment plan
+- Next steps and follow-up timeline`,
+
+  hpi: `Write the HPI as a narrative paragraph. Include onset, location, duration, character, aggravating/alleviating factors, radiation, timing, and severity (OLDCARTS). Include pertinent negatives.`,
+
+  ros: `Document review of systems efficiently. List positive findings first, then summarize negative systems. Use standard abbreviations when appropriate.`,
+
+  assessment: `Write a clear assessment that synthesizes the clinical picture. Link diagnoses to supporting evidence. Include ICD-10 codes when available.`,
+
+  plan: `Organize the plan by diagnosis/problem. Include specific medications with dosages, follow-up timeline, and patient education points.`,
+
+  physicalExam: `Document examination findings clearly. Note normal findings briefly and abnormal findings in detail. Include relevant scale scores.`,
+}
+
 const DEFAULT_SETTINGS: UserSettings = {
   practiceName: '',
-  globalAiInstructions: '',
+  newConsultInstructions: DEFAULT_PRESETS.newConsult,
+  followUpInstructions: DEFAULT_PRESETS.followUp,
   sectionAiInstructions: {
-    hpi: '',
-    ros: '',
-    assessment: '',
-    plan: '',
-    physicalExam: '',
+    hpi: DEFAULT_PRESETS.hpi,
+    ros: DEFAULT_PRESETS.ros,
+    assessment: DEFAULT_PRESETS.assessment,
+    plan: DEFAULT_PRESETS.plan,
+    physicalExam: DEFAULT_PRESETS.physicalExam,
+  },
+  noteLayout: {
+    includeHistorySummary: true,
+    includeAllergiesAtTop: false,
+    includeProblemList: false,
+    groupMedicationsWithAssessment: false,
   },
   fontSize: 'medium',
   darkModePreference: 'system',
