@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import NoteTextField from './NoteTextField'
 import InlineDictationButton from './InlineDictationButton'
+import InlineAiActionButton from './InlineAiActionButton'
 import SmartScalesSection from './SmartScalesSection'
 import ExamScalesSection from './ExamScalesSection'
 import ReasonForConsultSection from './ReasonForConsultSection'
@@ -1441,9 +1442,13 @@ ${noteData.plan || 'Not documented'}`.trim()
                       <button onClick={() => openDotPhrases?.('rosDetails')} title="Dot Phrases" style={{ width: '24px', height: '24px', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '4px', border: 'none', background: '#EDE9FE', color: '#8B5CF6', cursor: 'pointer' }}>
                         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
                       </button>
-                      <button onClick={() => openAiDrawer('ask-ai')} title="AI Assist" style={{ width: '24px', height: '24px', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '4px', border: 'none', background: '#FEF3C7', color: '#F59E0B', cursor: 'pointer' }}>
-                        <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M12 1L13.5 9.5L22 12L13.5 14.5L12 23L10.5 14.5L2 12L10.5 9.5L12 1Z"/></svg>
-                      </button>
+                      <InlineAiActionButton
+                        value={noteData.rosDetails || ''}
+                        onTextChange={(text) => updateNote('rosDetails', text)}
+                        fieldName="ros"
+                        patientContext={{ patient: patient?.name, chiefComplaint: noteData.chiefComplaint?.join(', ') }}
+                        onOpenAiDrawer={() => openAiDrawer('ask-ai')}
+                      />
                     </div>
                   </div>
                 )}
@@ -1994,9 +1999,13 @@ ${noteData.plan || 'Not documented'}`.trim()
                       <button onClick={() => openDotPhrases?.('historyDetails')} title="Dot Phrases" style={{ width: '24px', height: '24px', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '4px', border: 'none', background: '#EDE9FE', color: '#8B5CF6', cursor: 'pointer' }}>
                         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
                       </button>
-                      <button onClick={() => openAiDrawer('ask-ai')} title="AI Assist" style={{ width: '24px', height: '24px', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '4px', border: 'none', background: '#FEF3C7', color: '#F59E0B', cursor: 'pointer' }}>
-                        <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M12 1L13.5 9.5L22 12L13.5 14.5L12 23L10.5 14.5L2 12L10.5 9.5L12 1Z"/></svg>
-                      </button>
+                      <InlineAiActionButton
+                        value={noteData.historyDetails || ''}
+                        onTextChange={(text) => updateNote('historyDetails', text)}
+                        fieldName="hpi"
+                        patientContext={{ patient: patient?.name, chiefComplaint: noteData.chiefComplaint?.join(', ') }}
+                        onOpenAiDrawer={() => openAiDrawer('ask-ai')}
+                      />
                     </div>
                   </div>
                 )}
@@ -2522,9 +2531,13 @@ ${noteData.plan || 'Not documented'}`.trim()
                           }}
                           dictationHistory={examDictationHistory.generalAppearance}
                         />
-                        <button onClick={() => openAiDrawer('ask-ai')} title="AI Assist" style={{ width: '24px', height: '24px', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '4px', border: 'none', background: '#FEF3C7', color: '#F59E0B', cursor: 'pointer' }}>
-                          <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M12 1L13.5 9.5L22 12L13.5 14.5L12 23L10.5 14.5L2 12L10.5 9.5L12 1Z"/></svg>
-                        </button>
+                        <InlineAiActionButton
+                          value={examSectionNotes.generalAppearance || ''}
+                          onTextChange={(text) => updateExamSectionNote('generalAppearance', text)}
+                          fieldName="findings"
+                          patientContext={{ patient: patient?.name, chiefComplaint: noteData.chiefComplaint?.join(', ') }}
+                          onOpenAiDrawer={() => openAiDrawer('ask-ai')}
+                        />
                       </div>
                     </div>
                   </div>
@@ -2653,9 +2666,13 @@ ${noteData.plan || 'Not documented'}`.trim()
                           }}
                           dictationHistory={examDictationHistory.mentalStatus}
                         />
-                        <button onClick={() => openAiDrawer('ask-ai')} title="AI Assist" style={{ width: '24px', height: '24px', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '4px', border: 'none', background: '#FEF3C7', color: '#F59E0B', cursor: 'pointer' }}>
-                          <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M12 1L13.5 9.5L22 12L13.5 14.5L12 23L10.5 14.5L2 12L10.5 9.5L12 1Z"/></svg>
-                        </button>
+                        <InlineAiActionButton
+                          value={examSectionNotes.mentalStatus || ''}
+                          onTextChange={(text) => updateExamSectionNote('mentalStatus', text)}
+                          fieldName="findings"
+                          patientContext={{ patient: patient?.name, chiefComplaint: noteData.chiefComplaint?.join(', ') }}
+                          onOpenAiDrawer={() => openAiDrawer('ask-ai')}
+                        />
                       </div>
                     </div>
                   </div>
@@ -2749,9 +2766,13 @@ ${noteData.plan || 'Not documented'}`.trim()
                           }}
                           dictationHistory={examDictationHistory.cranialNerves}
                         />
-                        <button onClick={() => openAiDrawer('ask-ai')} title="AI Assist" style={{ width: '24px', height: '24px', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '4px', border: 'none', background: '#FEF3C7', color: '#F59E0B', cursor: 'pointer' }}>
-                          <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M12 1L13.5 9.5L22 12L13.5 14.5L12 23L10.5 14.5L2 12L10.5 9.5L12 1Z"/></svg>
-                        </button>
+                        <InlineAiActionButton
+                          value={examSectionNotes.cranialNerves || ''}
+                          onTextChange={(text) => updateExamSectionNote('cranialNerves', text)}
+                          fieldName="findings"
+                          patientContext={{ patient: patient?.name, chiefComplaint: noteData.chiefComplaint?.join(', ') }}
+                          onOpenAiDrawer={() => openAiDrawer('ask-ai')}
+                        />
                       </div>
                     </div>
                   </div>
@@ -2839,9 +2860,13 @@ ${noteData.plan || 'Not documented'}`.trim()
                           }}
                           dictationHistory={examDictationHistory.motor}
                         />
-                        <button onClick={() => openAiDrawer('ask-ai')} title="AI Assist" style={{ width: '24px', height: '24px', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '4px', border: 'none', background: '#FEF3C7', color: '#F59E0B', cursor: 'pointer' }}>
-                          <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M12 1L13.5 9.5L22 12L13.5 14.5L12 23L10.5 14.5L2 12L10.5 9.5L12 1Z"/></svg>
-                        </button>
+                        <InlineAiActionButton
+                          value={examSectionNotes.motor || ''}
+                          onTextChange={(text) => updateExamSectionNote('motor', text)}
+                          fieldName="findings"
+                          patientContext={{ patient: patient?.name, chiefComplaint: noteData.chiefComplaint?.join(', ') }}
+                          onOpenAiDrawer={() => openAiDrawer('ask-ai')}
+                        />
                       </div>
                     </div>
                   </div>
@@ -2929,9 +2954,13 @@ ${noteData.plan || 'Not documented'}`.trim()
                           }}
                           dictationHistory={examDictationHistory.sensation}
                         />
-                        <button onClick={() => openAiDrawer('ask-ai')} title="AI Assist" style={{ width: '24px', height: '24px', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '4px', border: 'none', background: '#FEF3C7', color: '#F59E0B', cursor: 'pointer' }}>
-                          <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M12 1L13.5 9.5L22 12L13.5 14.5L12 23L10.5 14.5L2 12L10.5 9.5L12 1Z"/></svg>
-                        </button>
+                        <InlineAiActionButton
+                          value={examSectionNotes.sensation || ''}
+                          onTextChange={(text) => updateExamSectionNote('sensation', text)}
+                          fieldName="findings"
+                          patientContext={{ patient: patient?.name, chiefComplaint: noteData.chiefComplaint?.join(', ') }}
+                          onOpenAiDrawer={() => openAiDrawer('ask-ai')}
+                        />
                       </div>
                     </div>
                   </div>
@@ -3018,9 +3047,13 @@ ${noteData.plan || 'Not documented'}`.trim()
                           }}
                           dictationHistory={examDictationHistory.coordination}
                         />
-                        <button onClick={() => openAiDrawer('ask-ai')} title="AI Assist" style={{ width: '24px', height: '24px', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '4px', border: 'none', background: '#FEF3C7', color: '#F59E0B', cursor: 'pointer' }}>
-                          <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M12 1L13.5 9.5L22 12L13.5 14.5L12 23L10.5 14.5L2 12L10.5 9.5L12 1Z"/></svg>
-                        </button>
+                        <InlineAiActionButton
+                          value={examSectionNotes.coordination || ''}
+                          onTextChange={(text) => updateExamSectionNote('coordination', text)}
+                          fieldName="findings"
+                          patientContext={{ patient: patient?.name, chiefComplaint: noteData.chiefComplaint?.join(', ') }}
+                          onOpenAiDrawer={() => openAiDrawer('ask-ai')}
+                        />
                       </div>
                     </div>
                   </div>
@@ -3126,9 +3159,13 @@ ${noteData.plan || 'Not documented'}`.trim()
                           }}
                           dictationHistory={examDictationHistory.gait}
                         />
-                        <button onClick={() => openAiDrawer('ask-ai')} title="AI Assist" style={{ width: '24px', height: '24px', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '4px', border: 'none', background: '#FEF3C7', color: '#F59E0B', cursor: 'pointer' }}>
-                          <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M12 1L13.5 9.5L22 12L13.5 14.5L12 23L10.5 14.5L2 12L10.5 9.5L12 1Z"/></svg>
-                        </button>
+                        <InlineAiActionButton
+                          value={examSectionNotes.gait || ''}
+                          onTextChange={(text) => updateExamSectionNote('gait', text)}
+                          fieldName="findings"
+                          patientContext={{ patient: patient?.name, chiefComplaint: noteData.chiefComplaint?.join(', ') }}
+                          onOpenAiDrawer={() => openAiDrawer('ask-ai')}
+                        />
                       </div>
                     </div>
                   </div>
