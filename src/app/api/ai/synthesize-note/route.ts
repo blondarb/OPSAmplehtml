@@ -63,9 +63,29 @@ interface SynthesizeNoteRequest {
     gender?: string
   }
   userSettings?: {
+    // Note-type specific instructions
+    newConsultInstructions?: string
+    followUpInstructions?: string
+    // Section-specific instructions
+    sectionInstructions?: {
+      hpi?: string
+      ros?: string
+      assessment?: string
+      plan?: string
+      physicalExam?: string
+    }
+    // Note layout preferences
+    noteLayout?: {
+      includeHistorySummary?: boolean
+      includeAllergiesAtTop?: boolean
+      includeProblemList?: boolean
+      groupMedicationsWithAssessment?: boolean
+    }
+    // Documentation style
+    documentationStyle?: 'concise' | 'detailed' | 'narrative'
+    preferredTerminology?: 'formal' | 'standard' | 'simplified'
+    // Legacy field for backward compatibility
     globalInstructions?: string
-    sectionInstructions?: Record<string, string>
-    documentationStyle?: string
   }
 }
 
@@ -305,15 +325,16 @@ function buildSystemPrompt(
     detailed: 'Be comprehensive. Include all relevant details, nuances, and clinical reasoning.',
   }
 
-  const noteTypeGuidance = noteType === 'new-consult'
-    ? `This is a NEW CONSULTATION note. Include:
+  // Get note-type specific instructions from user settings or use defaults
+  const defaultNewConsultGuidance = `This is a NEW CONSULTATION note. Include:
 - Comprehensive history and background
 - Detailed reason for referral/consultation
 - Full review of systems
 - Complete physical examination
 - Thorough differential diagnosis with reasoning
 - Comprehensive initial workup and treatment plan`
-    : `This is a FOLLOW-UP note. Focus on:
+
+  const defaultFollowUpGuidance = `This is a FOLLOW-UP note. Focus on:
 - Interval history since last visit
 - Response to previous treatments
 - Any new symptoms or concerns
@@ -321,16 +342,46 @@ function buildSystemPrompt(
 - Assessment of progress
 - Plan adjustments and next steps`
 
+  // Use custom instructions if provided, otherwise use defaults
+  const noteTypeGuidance = noteType === 'new-consult'
+    ? (userSettings?.newConsultInstructions || defaultNewConsultGuidance)
+    : (userSettings?.followUpInstructions || defaultFollowUpGuidance)
+
+  // Terminology preference affects language style
+  const terminologyGuidance = {
+    formal: 'Use formal medical terminology throughout. Prefer technical terms.',
+    standard: 'Use standard medical language appropriate for clinical documentation.',
+    simplified: 'Use clear, accessible language while maintaining clinical accuracy.',
+  }
+
+  // Documentation style preference
+  const styleGuidance = {
+    concise: 'Write in a concise, bullet-point-friendly style when appropriate.',
+    detailed: 'Write comprehensive, detailed prose with full explanations.',
+    narrative: 'Write in a flowing narrative style, telling the clinical story.',
+  }
+
   let prompt = `You are a neurology clinical documentation specialist. Your task is to synthesize multiple information sources into a cohesive, professional clinical note.
 
 NOTE TYPE: ${noteType === 'new-consult' ? 'New Consultation' : 'Follow-up Visit'}
 ${noteTypeGuidance}
 
 DOCUMENTATION LENGTH: ${noteLength.toUpperCase()}
-${lengthGuidance[noteLength]}
+${lengthGuidance[noteLength]}`
 
-DOCUMENTATION STYLE:
-- Use professional medical language appropriate for clinical documentation
+  // Add terminology preference
+  const terminology = userSettings?.preferredTerminology || 'standard'
+  prompt += `\n\nTERMINOLOGY: ${terminology.toUpperCase()}
+${terminologyGuidance[terminology]}`
+
+  // Add documentation style
+  const docStyle = userSettings?.documentationStyle || 'detailed'
+  prompt += `\n\nDOCUMENTATION STYLE: ${docStyle.toUpperCase()}
+${styleGuidance[docStyle]}`
+
+  prompt += `
+
+GENERAL GUIDELINES:
 - Write in third person (e.g., "Patient reports..." not "You report...")
 - Be factual and objective
 - Avoid redundancy - synthesize overlapping information from different sources
@@ -338,12 +389,48 @@ DOCUMENTATION STYLE:
 - Use standard medical abbreviations appropriately
 - Structure content logically within each section`
 
-  if (userSettings?.globalInstructions) {
-    prompt += `\n\nADDITIONAL PROVIDER INSTRUCTIONS:\n${userSettings.globalInstructions}`
+  // Add section-specific instructions if provided
+  if (userSettings?.sectionInstructions) {
+    const sectionInstr = userSettings.sectionInstructions
+    const customSections: string[] = []
+
+    if (sectionInstr.hpi) customSections.push(`HPI Instructions: ${sectionInstr.hpi}`)
+    if (sectionInstr.ros) customSections.push(`ROS Instructions: ${sectionInstr.ros}`)
+    if (sectionInstr.physicalExam) customSections.push(`Physical Exam Instructions: ${sectionInstr.physicalExam}`)
+    if (sectionInstr.assessment) customSections.push(`Assessment Instructions: ${sectionInstr.assessment}`)
+    if (sectionInstr.plan) customSections.push(`Plan Instructions: ${sectionInstr.plan}`)
+
+    if (customSections.length > 0) {
+      prompt += `\n\nSECTION-SPECIFIC INSTRUCTIONS FROM PROVIDER:\n${customSections.join('\n')}`
+    }
   }
 
-  if (userSettings?.documentationStyle) {
-    prompt += `\n\nPREFERRED STYLE: ${userSettings.documentationStyle}`
+  // Add layout preferences
+  if (userSettings?.noteLayout) {
+    const layout = userSettings.noteLayout
+    const layoutInstructions: string[] = []
+
+    if (layout.includeHistorySummary) {
+      layoutInstructions.push('Include a brief patient history summary at the beginning of the HPI')
+    }
+    if (layout.includeAllergiesAtTop) {
+      layoutInstructions.push('Place allergies prominently near the top of the note, before the HPI')
+    }
+    if (layout.includeProblemList) {
+      layoutInstructions.push('Include the active problem list in the assessment section')
+    }
+    if (layout.groupMedicationsWithAssessment) {
+      layoutInstructions.push('Group relevant medications with each diagnosis in the assessment')
+    }
+
+    if (layoutInstructions.length > 0) {
+      prompt += `\n\nLAYOUT PREFERENCES:\n${layoutInstructions.map(i => `- ${i}`).join('\n')}`
+    }
+  }
+
+  // Legacy support for global instructions
+  if (userSettings?.globalInstructions && !userSettings.newConsultInstructions && !userSettings.followUpInstructions) {
+    prompt += `\n\nADDITIONAL PROVIDER INSTRUCTIONS:\n${userSettings.globalInstructions}`
   }
 
   prompt += `\n\nOUTPUT FORMAT:

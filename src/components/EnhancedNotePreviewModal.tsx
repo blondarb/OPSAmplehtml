@@ -26,12 +26,36 @@ interface NoteReviewSuggestion {
   severity: 'warning' | 'info'
 }
 
-// Get user settings from localStorage
+// Get user settings from localStorage with proper field mapping for the API
 function getUserSettings() {
   if (typeof window === 'undefined') return null
   try {
     const saved = localStorage.getItem('sevaro-user-settings')
-    return saved ? JSON.parse(saved) : null
+    if (!saved) return null
+
+    const settings = JSON.parse(saved)
+
+    // Return the settings structure expected by the API
+    return {
+      // Note-type specific instructions
+      newConsultInstructions: settings.newConsultInstructions,
+      followUpInstructions: settings.followUpInstructions,
+      // Section-specific instructions - map from sectionAiInstructions to sectionInstructions
+      sectionInstructions: settings.sectionAiInstructions ? {
+        hpi: settings.sectionAiInstructions.hpi,
+        ros: settings.sectionAiInstructions.ros,
+        assessment: settings.sectionAiInstructions.assessment,
+        plan: settings.sectionAiInstructions.plan,
+        physicalExam: settings.sectionAiInstructions.physicalExam,
+      } : undefined,
+      // Note layout preferences
+      noteLayout: settings.noteLayout,
+      // Documentation style
+      documentationStyle: settings.documentationStyle,
+      preferredTerminology: settings.preferredTerminology,
+      // Legacy support
+      globalInstructions: settings.globalAiInstructions,
+    }
   } catch {
     return null
   }

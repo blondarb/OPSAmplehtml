@@ -3,11 +3,49 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useVoiceRecorder } from '@/hooks/useVoiceRecorder'
 
+// Default presets for AI instructions
+const DEFAULT_PRESETS = {
+  newConsult: `Write comprehensive new consultation notes that include:
+- Complete history including onset, progression, and context
+- All pertinent positives and negatives
+- Thorough review of systems
+- Detailed neurological examination findings
+- Clear assessment with differential diagnosis
+- Evidence-based treatment recommendations`,
+
+  followUp: `Write focused follow-up notes that emphasize:
+- Interval changes since last visit
+- Response to current treatments
+- Any new symptoms or concerns
+- Updated examination findings (changes from baseline)
+- Adjustments to treatment plan
+- Next steps and follow-up timeline`,
+
+  hpi: `Write the HPI as a narrative paragraph. Include onset, location, duration, character, aggravating/alleviating factors, radiation, timing, and severity (OLDCARTS). Include pertinent negatives.`,
+
+  ros: `Document review of systems efficiently. List positive findings first, then summarize negative systems. Use standard abbreviations when appropriate.`,
+
+  assessment: `Write a clear assessment that synthesizes the clinical picture. Link diagnoses to supporting evidence. Include ICD-10 codes when available.`,
+
+  plan: `Organize the plan by diagnosis/problem. Include specific medications with dosages, follow-up timeline, and patient education points.`,
+
+  physicalExam: `Document examination findings clearly. Note normal findings briefly and abnormal findings in detail. Include relevant scale scores.`,
+}
+
+interface NoteLayoutPreferences {
+  includeHistorySummary: boolean
+  includeAllergiesAtTop: boolean
+  includeProblemList: boolean
+  groupMedicationsWithAssessment: boolean
+}
+
 interface UserSettings {
   // Practice Info
   practiceName: string
-  // AI Instructions
-  globalAiInstructions: string
+  // AI Instructions - Note Type Specific
+  newConsultInstructions: string
+  followUpInstructions: string
+  // Section-specific instructions (apply to both note types)
   sectionAiInstructions: {
     hpi: string
     ros: string
@@ -15,6 +53,8 @@ interface UserSettings {
     plan: string
     physicalExam: string
   }
+  // Note Layout Preferences
+  noteLayout: NoteLayoutPreferences
   // Appearance
   fontSize: 'small' | 'medium' | 'large'
   darkModePreference: 'light' | 'dark' | 'system'
@@ -26,6 +66,8 @@ interface UserSettings {
   // Notifications
   soundEnabled: boolean
   notificationsEnabled: boolean
+  // Legacy field for backward compatibility
+  globalAiInstructions?: string
 }
 
 // Default tab configuration
@@ -39,13 +81,20 @@ const TAB_LABELS: Record<string, string> = {
 
 const DEFAULT_SETTINGS: UserSettings = {
   practiceName: '',
-  globalAiInstructions: '',
+  newConsultInstructions: DEFAULT_PRESETS.newConsult,
+  followUpInstructions: DEFAULT_PRESETS.followUp,
   sectionAiInstructions: {
-    hpi: '',
-    ros: '',
-    assessment: '',
-    plan: '',
-    physicalExam: '',
+    hpi: DEFAULT_PRESETS.hpi,
+    ros: DEFAULT_PRESETS.ros,
+    assessment: DEFAULT_PRESETS.assessment,
+    plan: DEFAULT_PRESETS.plan,
+    physicalExam: DEFAULT_PRESETS.physicalExam,
+  },
+  noteLayout: {
+    includeHistorySummary: true,
+    includeAllergiesAtTop: false,
+    includeProblemList: false,
+    groupMedicationsWithAssessment: false,
   },
   fontSize: 'medium',
   darkModePreference: 'system',
@@ -74,34 +123,41 @@ export default function SettingsDrawer({
   const [activeTab, setActiveTab] = useState<'ai' | 'appearance' | 'notifications'>('ai')
   const [settings, setSettings] = useState<UserSettings>(DEFAULT_SETTINGS)
   const [expandedSection, setExpandedSection] = useState<string | null>(null)
+  const [expandedNoteType, setExpandedNoteType] = useState<'newConsult' | 'followUp' | null>(null)
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false)
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved'>('idle')
-  const [dictationTarget, setDictationTarget] = useState<'global' | keyof UserSettings['sectionAiInstructions'] | null>(null)
+  const [dictationTarget, setDictationTarget] = useState<string | null>(null)
 
   const voice = useVoiceRecorder()
 
   // When transcription completes, append to the targeted textarea
   useEffect(() => {
     if (voice.transcribedText && dictationTarget) {
-      if (dictationTarget === 'global') {
-        const current = settings.globalAiInstructions
+      if (dictationTarget === 'newConsult') {
+        const newValue = settings.newConsultInstructions
+          ? `${settings.newConsultInstructions} ${voice.transcribedText}`
+          : voice.transcribedText
+        updateSettings('newConsultInstructions', newValue)
+      } else if (dictationTarget === 'followUp') {
+        const newValue = settings.followUpInstructions
+          ? `${settings.followUpInstructions} ${voice.transcribedText}`
+          : voice.transcribedText
+        updateSettings('followUpInstructions', newValue)
+      } else if (dictationTarget in settings.sectionAiInstructions) {
+        const section = dictationTarget as keyof typeof settings.sectionAiInstructions
+        const current = settings.sectionAiInstructions[section]
         const newValue = current ? `${current} ${voice.transcribedText}` : voice.transcribedText
-        updateSettings('globalAiInstructions', newValue)
-      } else {
-        const current = settings.sectionAiInstructions[dictationTarget]
-        const newValue = current ? `${current} ${voice.transcribedText}` : voice.transcribedText
-        updateSectionInstruction(dictationTarget, newValue)
+        updateSectionInstruction(section, newValue)
       }
       voice.clearTranscription()
       setDictationTarget(null)
     }
   }, [voice.transcribedText])
 
-  const toggleDictation = useCallback((target: 'global' | keyof UserSettings['sectionAiInstructions']) => {
+  const toggleDictation = useCallback((target: string) => {
     if (voice.isRecording && dictationTarget === target) {
       voice.stopRecording()
     } else if (voice.isRecording) {
-      // Recording for a different target — stop first, then start new
       voice.stopRecording()
       setTimeout(() => {
         setDictationTarget(target)
@@ -119,12 +175,32 @@ export default function SettingsDrawer({
     if (savedSettings) {
       try {
         const parsed = JSON.parse(savedSettings)
-        setSettings({ ...DEFAULT_SETTINGS, ...parsed })
+        // Migrate old settings format
+        const migrated = migrateSettings(parsed)
+        setSettings({ ...DEFAULT_SETTINGS, ...migrated })
       } catch (e) {
         console.error('Failed to parse settings:', e)
       }
     }
   }, [])
+
+  // Migrate old settings to new format
+  const migrateSettings = (old: Partial<UserSettings>): Partial<UserSettings> => {
+    const migrated = { ...old }
+
+    // If old globalAiInstructions exists and new fields don't, migrate
+    if (old.globalAiInstructions && !old.newConsultInstructions) {
+      migrated.newConsultInstructions = old.globalAiInstructions
+      migrated.followUpInstructions = old.globalAiInstructions
+    }
+
+    // Ensure noteLayout exists
+    if (!migrated.noteLayout) {
+      migrated.noteLayout = DEFAULT_SETTINGS.noteLayout
+    }
+
+    return migrated
+  }
 
   const updateSettings = <K extends keyof UserSettings>(
     key: K,
@@ -143,6 +219,27 @@ export default function SettingsDrawer({
       },
     }))
     setHasUnsavedChanges(true)
+  }
+
+  const updateLayoutPreference = (key: keyof NoteLayoutPreferences, value: boolean) => {
+    setSettings(prev => ({
+      ...prev,
+      noteLayout: {
+        ...prev.noteLayout,
+        [key]: value,
+      },
+    }))
+    setHasUnsavedChanges(true)
+  }
+
+  const resetSectionToDefault = (section: keyof typeof DEFAULT_PRESETS) => {
+    if (section === 'newConsult') {
+      updateSettings('newConsultInstructions', DEFAULT_PRESETS.newConsult)
+    } else if (section === 'followUp') {
+      updateSettings('followUpInstructions', DEFAULT_PRESETS.followUp)
+    } else {
+      updateSectionInstruction(section as keyof UserSettings['sectionAiInstructions'], DEFAULT_PRESETS[section])
+    }
   }
 
   const saveSettings = () => {
@@ -205,6 +302,17 @@ export default function SettingsDrawer({
     updateSettings('tabOrder', newOrder)
   }
 
+  // Check if a section has been customized from default
+  const isCustomized = (section: keyof typeof DEFAULT_PRESETS): boolean => {
+    if (section === 'newConsult') {
+      return settings.newConsultInstructions !== DEFAULT_PRESETS.newConsult
+    } else if (section === 'followUp') {
+      return settings.followUpInstructions !== DEFAULT_PRESETS.followUp
+    } else {
+      return settings.sectionAiInstructions[section as keyof UserSettings['sectionAiInstructions']] !== DEFAULT_PRESETS[section]
+    }
+  }
+
   if (!isOpen) return null
 
   const tabs = [
@@ -233,6 +341,80 @@ export default function SettingsDrawer({
     physicalExam: 'Physical Exam',
   }
 
+  const layoutOptions: Array<{ key: keyof NoteLayoutPreferences; label: string; description: string }> = [
+    { key: 'includeHistorySummary', label: 'Include history summary at top', description: 'Add a brief patient history summary at the beginning of follow-up notes' },
+    { key: 'includeAllergiesAtTop', label: 'List allergies prominently', description: 'Display allergies at the top of the note for visibility' },
+    { key: 'includeProblemList', label: 'Include active problem list', description: 'Add the patient\'s active problem list in the note header' },
+    { key: 'groupMedicationsWithAssessment', label: 'Group medications with assessment', description: 'List relevant medications alongside each diagnosis in the assessment' },
+  ]
+
+  // Render textarea with dictation button
+  const renderTextareaWithDictation = (
+    value: string,
+    onChange: (value: string) => void,
+    placeholder: string,
+    target: string,
+    minHeight: string = '100px'
+  ) => (
+    <div style={{ position: 'relative' }}>
+      <textarea
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder={placeholder}
+        style={{
+          width: '100%',
+          minHeight,
+          padding: '12px',
+          paddingRight: '40px',
+          borderRadius: '8px',
+          border: '1px solid var(--border)',
+          background: 'var(--bg-gray)',
+          fontSize: '13px',
+          color: 'var(--text-primary)',
+          resize: 'vertical',
+          fontFamily: 'inherit',
+          lineHeight: 1.5,
+        }}
+      />
+      <button
+        onClick={() => toggleDictation(target)}
+        title={voice.isRecording && dictationTarget === target ? 'Stop dictation' : 'Dictate'}
+        style={{
+          position: 'absolute',
+          bottom: '8px',
+          right: '8px',
+          width: '24px',
+          height: '24px',
+          borderRadius: '6px',
+          border: 'none',
+          background: voice.isRecording && dictationTarget === target ? '#EF4444' : '#FEE2E2',
+          cursor: 'pointer',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          transition: 'background 0.2s',
+        }}
+      >
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke={voice.isRecording && dictationTarget === target ? 'white' : '#EF4444'} strokeWidth="2">
+          <path d="M12 1a3 3 0 00-3 3v8a3 3 0 006 0V4a3 3 0 00-3-3z"/>
+          <path d="M19 10v2a7 7 0 01-14 0v-2"/>
+          <line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/>
+        </svg>
+      </button>
+      {voice.isTranscribing && dictationTarget === target && (
+        <div style={{
+          position: 'absolute',
+          bottom: '8px',
+          right: '40px',
+          fontSize: '11px',
+          color: 'var(--text-muted)',
+        }}>
+          Transcribing...
+        </div>
+      )}
+    </div>
+  )
+
   return (
     <>
       {/* Backdrop */}
@@ -253,8 +435,8 @@ export default function SettingsDrawer({
           position: 'fixed',
           top: 0,
           right: 0,
-          width: '480px',
-          maxWidth: '100vw', // Responsive: never exceed viewport
+          width: '520px',
+          maxWidth: '100vw',
           height: '100vh',
           background: 'var(--bg-white)',
           boxShadow: '-4px 0 20px rgba(0, 0, 0, 0.15)',
@@ -368,100 +550,236 @@ export default function SettingsDrawer({
                 />
               </div>
 
-              {/* Global AI Instructions */}
+              {/* Note Layout Preferences */}
               <div style={{ marginBottom: '24px' }}>
                 <div style={{ marginBottom: '12px' }}>
                   <h3 style={{ fontSize: '14px', fontWeight: 600, margin: '0 0 4px 0', color: 'var(--text-primary)' }}>
-                    Global AI Instructions
+                    Note Layout Preferences
                   </h3>
                   <p style={{ fontSize: '12px', color: 'var(--text-muted)', margin: 0 }}>
-                    These instructions will be applied to all AI-generated content across your notes.
+                    Customize what appears in your generated notes.
                   </p>
                 </div>
-                <div style={{ position: 'relative' }}>
-                  <textarea
-                    value={settings.globalAiInstructions}
-                    onChange={(e) => updateSettings('globalAiInstructions', e.target.value)}
-                    placeholder="E.g., Always use formal medical terminology. Prefer bullet points over paragraphs. Include pertinent negatives in ROS..."
+                <div style={{
+                  border: '1px solid var(--border)',
+                  borderRadius: '8px',
+                  overflow: 'hidden',
+                }}>
+                  {layoutOptions.map((option, index) => (
+                    <label
+                      key={option.key}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'flex-start',
+                        gap: '12px',
+                        padding: '12px 14px',
+                        background: index % 2 === 0 ? 'var(--bg-white)' : 'var(--bg-gray)',
+                        cursor: 'pointer',
+                        borderBottom: index < layoutOptions.length - 1 ? '1px solid var(--border)' : 'none',
+                      }}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={settings.noteLayout[option.key]}
+                        onChange={(e) => updateLayoutPreference(option.key, e.target.checked)}
+                        style={{
+                          marginTop: '2px',
+                          width: '16px',
+                          height: '16px',
+                          accentColor: 'var(--primary)',
+                        }}
+                      />
+                      <div>
+                        <div style={{ fontSize: '13px', fontWeight: 500, color: 'var(--text-primary)' }}>
+                          {option.label}
+                        </div>
+                        <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '2px' }}>
+                          {option.description}
+                        </div>
+                      </div>
+                    </label>
+                  ))}
+                </div>
+              </div>
+
+              {/* Note Type-Specific Instructions */}
+              <div style={{ marginBottom: '24px' }}>
+                <div style={{ marginBottom: '12px' }}>
+                  <h3 style={{ fontSize: '14px', fontWeight: 600, margin: '0 0 4px 0', color: 'var(--text-primary)' }}>
+                    Note Type Instructions
+                  </h3>
+                  <p style={{ fontSize: '12px', color: 'var(--text-muted)', margin: 0 }}>
+                    Customize AI behavior for different visit types. Click to expand and edit.
+                  </p>
+                </div>
+
+                {/* New Consultation */}
+                <div style={{
+                  marginBottom: '8px',
+                  border: '1px solid var(--border)',
+                  borderRadius: '8px',
+                  overflow: 'hidden',
+                }}>
+                  <button
+                    onClick={() => setExpandedNoteType(expandedNoteType === 'newConsult' ? null : 'newConsult')}
                     style={{
                       width: '100%',
-                      minHeight: '100px',
-                      padding: '12px',
-                      paddingRight: '40px',
-                      borderRadius: '8px',
-                      border: '1px solid var(--border)',
-                      background: 'var(--bg-gray)',
-                      fontSize: '13px',
-                      color: 'var(--text-primary)',
-                      resize: 'vertical',
-                      fontFamily: 'inherit',
-                    }}
-                  />
-                  <button
-                    onClick={() => toggleDictation('global')}
-                    title={voice.isRecording && dictationTarget === 'global' ? 'Stop dictation' : 'Dictate'}
-                    style={{
-                      position: 'absolute',
-                      bottom: '8px',
-                      right: '8px',
-                      width: '24px',
-                      height: '24px',
-                      borderRadius: '6px',
-                      border: 'none',
-                      background: voice.isRecording && dictationTarget === 'global' ? '#EF4444' : '#FEE2E2',
-                      cursor: 'pointer',
                       display: 'flex',
                       alignItems: 'center',
-                      justifyContent: 'center',
-                      transition: 'background 0.2s',
+                      justifyContent: 'space-between',
+                      padding: '12px 14px',
+                      background: expandedNoteType === 'newConsult' ? 'var(--bg-gray)' : 'var(--bg-white)',
+                      border: 'none',
+                      cursor: 'pointer',
+                      textAlign: 'left',
                     }}
                   >
-                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke={voice.isRecording && dictationTarget === 'global' ? 'white' : '#EF4444'} strokeWidth="2">
-                      <path d="M12 1a3 3 0 00-3 3v8a3 3 0 006 0V4a3 3 0 00-3-3z"/>
-                      <path d="M19 10v2a7 7 0 01-14 0v-2"/>
-                      <line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/>
-                    </svg>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                      <span style={{ fontSize: '18px' }}>📋</span>
+                      <span style={{ fontSize: '13px', fontWeight: 500, color: 'var(--text-primary)' }}>
+                        New Consultation Notes
+                      </span>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      {isCustomized('newConsult') && (
+                        <span style={{
+                          fontSize: '10px',
+                          padding: '2px 6px',
+                          borderRadius: '4px',
+                          background: '#8B5CF6',
+                          color: 'white',
+                        }}>
+                          Customized
+                        </span>
+                      )}
+                      <svg
+                        width="14" height="14" viewBox="0 0 24 24" fill="none"
+                        stroke="var(--text-muted)" strokeWidth="2"
+                        style={{ transform: expandedNoteType === 'newConsult' ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.2s' }}
+                      >
+                        <polyline points="6 9 12 15 18 9" />
+                      </svg>
+                    </div>
                   </button>
-                  {voice.isTranscribing && dictationTarget === 'global' && (
-                    <div style={{
-                      position: 'absolute',
-                      bottom: '8px',
-                      right: '40px',
-                      fontSize: '11px',
-                      color: 'var(--text-muted)',
-                    }}>
-                      Transcribing...
+                  {expandedNoteType === 'newConsult' && (
+                    <div style={{ padding: '12px 14px', borderTop: '1px solid var(--border)' }}>
+                      {renderTextareaWithDictation(
+                        settings.newConsultInstructions,
+                        (val) => updateSettings('newConsultInstructions', val),
+                        'Instructions for new consultation notes...',
+                        'newConsult',
+                        '120px'
+                      )}
+                      {isCustomized('newConsult') && (
+                        <button
+                          onClick={() => resetSectionToDefault('newConsult')}
+                          style={{
+                            marginTop: '8px',
+                            padding: '6px 12px',
+                            borderRadius: '6px',
+                            border: '1px solid var(--border)',
+                            background: 'var(--bg-white)',
+                            fontSize: '11px',
+                            color: 'var(--text-secondary)',
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '6px',
+                          }}
+                        >
+                          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                            <path d="M3 12a9 9 0 109-9 9.75 9.75 0 00-6.74 2.74L3 8"/>
+                            <path d="M3 3v5h5"/>
+                          </svg>
+                          Reset to Default
+                        </button>
+                      )}
                     </div>
                   )}
                 </div>
-                <div style={{ marginTop: '8px', display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-                  <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Suggestions:</span>
-                  {[
-                    'Use formal terminology',
-                    'Be concise',
-                    'Include pertinent negatives',
-                    'Use bullet points',
-                  ].map((suggestion) => (
-                    <button
-                      key={suggestion}
-                      onClick={() => {
-                        const current = settings.globalAiInstructions
-                        const newValue = current ? `${current}\n${suggestion}` : suggestion
-                        updateSettings('globalAiInstructions', newValue)
-                      }}
-                      style={{
-                        padding: '4px 8px',
-                        borderRadius: '4px',
-                        border: '1px solid var(--border)',
-                        background: 'var(--bg-white)',
-                        fontSize: '11px',
-                        color: 'var(--text-secondary)',
-                        cursor: 'pointer',
-                      }}
-                    >
-                      + {suggestion}
-                    </button>
-                  ))}
+
+                {/* Follow-up */}
+                <div style={{
+                  border: '1px solid var(--border)',
+                  borderRadius: '8px',
+                  overflow: 'hidden',
+                }}>
+                  <button
+                    onClick={() => setExpandedNoteType(expandedNoteType === 'followUp' ? null : 'followUp')}
+                    style={{
+                      width: '100%',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      padding: '12px 14px',
+                      background: expandedNoteType === 'followUp' ? 'var(--bg-gray)' : 'var(--bg-white)',
+                      border: 'none',
+                      cursor: 'pointer',
+                      textAlign: 'left',
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                      <span style={{ fontSize: '18px' }}>🔄</span>
+                      <span style={{ fontSize: '13px', fontWeight: 500, color: 'var(--text-primary)' }}>
+                        Follow-up Notes
+                      </span>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      {isCustomized('followUp') && (
+                        <span style={{
+                          fontSize: '10px',
+                          padding: '2px 6px',
+                          borderRadius: '4px',
+                          background: '#8B5CF6',
+                          color: 'white',
+                        }}>
+                          Customized
+                        </span>
+                      )}
+                      <svg
+                        width="14" height="14" viewBox="0 0 24 24" fill="none"
+                        stroke="var(--text-muted)" strokeWidth="2"
+                        style={{ transform: expandedNoteType === 'followUp' ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.2s' }}
+                      >
+                        <polyline points="6 9 12 15 18 9" />
+                      </svg>
+                    </div>
+                  </button>
+                  {expandedNoteType === 'followUp' && (
+                    <div style={{ padding: '12px 14px', borderTop: '1px solid var(--border)' }}>
+                      {renderTextareaWithDictation(
+                        settings.followUpInstructions,
+                        (val) => updateSettings('followUpInstructions', val),
+                        'Instructions for follow-up notes...',
+                        'followUp',
+                        '120px'
+                      )}
+                      {isCustomized('followUp') && (
+                        <button
+                          onClick={() => resetSectionToDefault('followUp')}
+                          style={{
+                            marginTop: '8px',
+                            padding: '6px 12px',
+                            borderRadius: '6px',
+                            border: '1px solid var(--border)',
+                            background: 'var(--bg-white)',
+                            fontSize: '11px',
+                            color: 'var(--text-secondary)',
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '6px',
+                          }}
+                        >
+                          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                            <path d="M3 12a9 9 0 109-9 9.75 9.75 0 00-6.74 2.74L3 8"/>
+                            <path d="M3 3v5h5"/>
+                          </svg>
+                          Reset to Default
+                        </button>
+                      )}
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -472,7 +790,7 @@ export default function SettingsDrawer({
                     Section-Specific Instructions
                   </h3>
                   <p style={{ fontSize: '12px', color: 'var(--text-muted)', margin: 0 }}>
-                    Customize AI behavior for individual note sections.
+                    Fine-tune AI behavior for individual note sections. These apply to both note types.
                   </p>
                 </div>
                 {(Object.keys(sectionLabels) as Array<keyof typeof sectionLabels>).map((section) => (
@@ -503,28 +821,21 @@ export default function SettingsDrawer({
                         {sectionLabels[section]}
                       </span>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        {settings.sectionAiInstructions[section] && (
+                        {isCustomized(section) && (
                           <span style={{
                             fontSize: '10px',
                             padding: '2px 6px',
                             borderRadius: '4px',
-                            background: 'var(--primary)',
+                            background: '#8B5CF6',
                             color: 'white',
                           }}>
-                            Custom
+                            Customized
                           </span>
                         )}
                         <svg
-                          width="14"
-                          height="14"
-                          viewBox="0 0 24 24"
-                          fill="none"
-                          stroke="var(--text-muted)"
-                          strokeWidth="2"
-                          style={{
-                            transform: expandedSection === section ? 'rotate(180deg)' : 'rotate(0deg)',
-                            transition: 'transform 0.2s',
-                          }}
+                          width="14" height="14" viewBox="0 0 24 24" fill="none"
+                          stroke="var(--text-muted)" strokeWidth="2"
+                          style={{ transform: expandedSection === section ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.2s' }}
                         >
                           <polyline points="6 9 12 15 18 9" />
                         </svg>
@@ -532,62 +843,37 @@ export default function SettingsDrawer({
                     </button>
                     {expandedSection === section && (
                       <div style={{ padding: '12px 14px', borderTop: '1px solid var(--border)' }}>
-                        <div style={{ position: 'relative' }}>
-                          <textarea
-                            value={settings.sectionAiInstructions[section]}
-                            onChange={(e) => updateSectionInstruction(section, e.target.value)}
-                            placeholder={`Custom instructions for ${sectionLabels[section]}...`}
+                        {renderTextareaWithDictation(
+                          settings.sectionAiInstructions[section],
+                          (val) => updateSectionInstruction(section, val),
+                          `Instructions for ${sectionLabels[section]}...`,
+                          section,
+                          '80px'
+                        )}
+                        {isCustomized(section) && (
+                          <button
+                            onClick={() => resetSectionToDefault(section)}
                             style={{
-                              width: '100%',
-                              minHeight: '80px',
-                              padding: '10px',
-                              paddingRight: '40px',
+                              marginTop: '8px',
+                              padding: '6px 12px',
                               borderRadius: '6px',
                               border: '1px solid var(--border)',
                               background: 'var(--bg-white)',
-                              fontSize: '13px',
-                              color: 'var(--text-primary)',
-                              resize: 'vertical',
-                              fontFamily: 'inherit',
-                            }}
-                          />
-                          <button
-                            onClick={() => toggleDictation(section)}
-                            title={voice.isRecording && dictationTarget === section ? 'Stop dictation' : 'Dictate'}
-                            style={{
-                              position: 'absolute',
-                              bottom: '8px',
-                              right: '8px',
-                              width: '24px',
-                              height: '24px',
-                              borderRadius: '6px',
-                              border: 'none',
-                              background: voice.isRecording && dictationTarget === section ? '#EF4444' : '#FEE2E2',
+                              fontSize: '11px',
+                              color: 'var(--text-secondary)',
                               cursor: 'pointer',
                               display: 'flex',
                               alignItems: 'center',
-                              justifyContent: 'center',
-                              transition: 'background 0.2s',
+                              gap: '6px',
                             }}
                           >
-                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke={voice.isRecording && dictationTarget === section ? 'white' : '#EF4444'} strokeWidth="2">
-                              <path d="M12 1a3 3 0 00-3 3v8a3 3 0 006 0V4a3 3 0 00-3-3z"/>
-                              <path d="M19 10v2a7 7 0 01-14 0v-2"/>
-                              <line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/>
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                              <path d="M3 12a9 9 0 109-9 9.75 9.75 0 00-6.74 2.74L3 8"/>
+                              <path d="M3 3v5h5"/>
                             </svg>
+                            Reset to Default
                           </button>
-                          {voice.isTranscribing && dictationTarget === section && (
-                            <div style={{
-                              position: 'absolute',
-                              bottom: '8px',
-                              right: '40px',
-                              fontSize: '11px',
-                              color: 'var(--text-muted)',
-                            }}>
-                              Transcribing...
-                            </div>
-                          )}
-                        </div>
+                        )}
                       </div>
                     )}
                   </div>
@@ -790,7 +1076,7 @@ export default function SettingsDrawer({
                   Tab Order
                 </h3>
                 <p style={{ fontSize: '12px', color: 'var(--text-muted)', margin: '0 0 12px 0' }}>
-                  Customize the order of tabs in the clinical note editor. Use the arrows to reorder.
+                  Customize the order of tabs in the clinical note editor.
                 </p>
                 <div style={{
                   border: '1px solid var(--border)',
@@ -884,7 +1170,7 @@ export default function SettingsDrawer({
                     Guided Tour
                   </h3>
                   <p style={{ fontSize: '12px', color: 'var(--text-muted)', margin: '0 0 12px 0' }}>
-                    Learn about key features and how to use Sevaro Clinical effectively.
+                    Learn about key features and how to use Sevaro Clinical.
                   </p>
                   <button
                     onClick={() => {
@@ -1073,7 +1359,7 @@ export default function SettingsDrawer({
               cursor: 'pointer',
             }}
           >
-            Reset to Defaults
+            Reset All
           </button>
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
             {saveStatus === 'saved' && (
@@ -1133,6 +1419,9 @@ export default function SettingsDrawer({
   )
 }
 
+// Export type for other components
+export type { UserSettings, NoteLayoutPreferences }
+
 // Export a helper to get settings for use in other components
 export function getUserSettings(): UserSettings {
   if (typeof window === 'undefined') return DEFAULT_SETTINGS
@@ -1140,10 +1429,14 @@ export function getUserSettings(): UserSettings {
   const savedSettings = localStorage.getItem('sevaro-user-settings')
   if (savedSettings) {
     try {
-      return { ...DEFAULT_SETTINGS, ...JSON.parse(savedSettings) }
+      const parsed = JSON.parse(savedSettings)
+      return { ...DEFAULT_SETTINGS, ...parsed }
     } catch (e) {
       return DEFAULT_SETTINGS
     }
   }
   return DEFAULT_SETTINGS
 }
+
+// Export default presets for reference
+export { DEFAULT_PRESETS }
