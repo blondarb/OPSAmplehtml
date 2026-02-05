@@ -96,7 +96,7 @@ export const CONSULT_CATEGORIES: ConsultCategory[] = [
   },
   {
     id: 'ms-neuroimmunology',
-    label: 'MS / Neuroimmunology',
+    label: 'MS / Neuroimmune',
     icon: '🧬',
     subOptions: {
       common: ['Multiple sclerosis', 'MS follow-up', 'Suspected demyelination'],
