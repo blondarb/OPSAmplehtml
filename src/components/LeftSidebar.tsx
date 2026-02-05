@@ -796,6 +796,31 @@ export default function LeftSidebar({ patient, priorVisits, scoreHistory, patien
               overflowY: 'auto',
               padding: '24px',
             }}>
+              {/* Reason for Visit banner */}
+              {viewingVisitNote.chief_complaint && (
+                <div style={{
+                  padding: '10px 14px',
+                  borderRadius: '8px',
+                  background: 'var(--ai-summary-bg, linear-gradient(135deg, #F0FDFA 0%, #CCFBF1 100%))',
+                  border: '1px solid var(--ai-summary-border, #5EEAD4)',
+                  marginBottom: '20px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                }}>
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#0D9488" strokeWidth="2">
+                    <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/>
+                    <polyline points="14 2 14 8 20 8"/>
+                  </svg>
+                  <div>
+                    <span style={{ fontSize: '11px', fontWeight: 600, color: '#0D9488', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Reason for Visit</span>
+                    <div style={{ fontSize: '13px', fontWeight: 500, color: 'var(--text-primary)', marginTop: '2px' }}>
+                      {Array.isArray(viewingVisitNote.chief_complaint) ? viewingVisitNote.chief_complaint.join(', ') : viewingVisitNote.chief_complaint}
+                    </div>
+                  </div>
+                </div>
+              )}
+
               {sections.length > 0 ? sections.map((section, index) => (
                 <div key={section.title} style={{ marginBottom: index < sections.length - 1 ? '24px' : 0 }}>
                   <h3 style={{

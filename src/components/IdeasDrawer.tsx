@@ -279,6 +279,10 @@ export default function IdeasDrawer({ isOpen, onClose, initialTab, onStartTour }
   const [isUserAdmin, setIsUserAdmin] = useState(false)
   const [statusFilter, setStatusFilter] = useState<FeedbackStatus | 'all'>('all')
 
+  // Edit feedback state
+  const [editingFeedbackId, setEditingFeedbackId] = useState<string | null>(null)
+  const [editingFeedbackText, setEditingFeedbackText] = useState('')
+
   // Comments state
   const [expandedComments, setExpandedComments] = useState<string | null>(null)
   const [comments, setComments] = useState<Record<string, FeedbackComment[]>>({})
@@ -497,6 +501,32 @@ export default function IdeasDrawer({ isOpen, onClose, initialTab, onStartTour }
       }
     } catch (e) {
       console.error('Error updating status:', e)
+    }
+  }
+
+  const handleEditFeedback = async (feedbackId: string) => {
+    const text = editingFeedbackText.trim()
+    if (!text) return
+    try {
+      const res = await fetch('/api/feedback', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ feedbackId, action: 'updateText', text }),
+      })
+      if (!res.ok) throw new Error('Failed to update feedback')
+      const data = await res.json()
+      if (data.feedback) {
+        setAllFeedback(prev =>
+          prev.map(item =>
+            item.id === feedbackId ? { ...item, text: data.feedback.text, updated_at: data.feedback.updated_at } : item
+          )
+        )
+      }
+      setEditingFeedbackId(null)
+      setEditingFeedbackText('')
+    } catch (e) {
+      console.error('Error editing feedback:', e)
+      alert('Failed to update feedback')
     }
   }
 
@@ -1501,16 +1531,80 @@ export default function IdeasDrawer({ isOpen, onClose, initialTab, onStartTour }
                                     )}
                                   </div>
 
-                                  <p style={{
-                                    fontSize: '14px',
-                                    color: 'var(--text-primary)',
-                                    margin: '0 0 8px 0',
-                                    lineHeight: 1.5,
-                                    whiteSpace: 'pre-wrap',
-                                    textDecoration: itemStatus === 'addressed' ? 'line-through' : 'none',
-                                  }}>
-                                    {item.text}
-                                  </p>
+                                  {editingFeedbackId === item.id ? (
+                                    <div style={{ margin: '0 0 8px 0' }}>
+                                      <textarea
+                                        value={editingFeedbackText}
+                                        onChange={(e) => setEditingFeedbackText(e.target.value)}
+                                        style={{
+                                          width: '100%',
+                                          minHeight: '60px',
+                                          padding: '8px 10px',
+                                          borderRadius: '6px',
+                                          border: '1px solid var(--primary)',
+                                          background: 'var(--bg-white)',
+                                          color: 'var(--text-primary)',
+                                          fontSize: '13px',
+                                          lineHeight: 1.5,
+                                          resize: 'vertical',
+                                          outline: 'none',
+                                        }}
+                                        onKeyDown={(e) => {
+                                          if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleEditFeedback(item.id) }
+                                          if (e.key === 'Escape') { setEditingFeedbackId(null); setEditingFeedbackText('') }
+                                        }}
+                                        autoFocus
+                                      />
+                                      <div style={{ display: 'flex', gap: '6px', marginTop: '6px', justifyContent: 'flex-end' }}>
+                                        <button
+                                          onClick={() => { setEditingFeedbackId(null); setEditingFeedbackText('') }}
+                                          style={{ padding: '4px 12px', borderRadius: '6px', border: '1px solid var(--border)', background: 'var(--bg-white)', color: 'var(--text-secondary)', fontSize: '12px', cursor: 'pointer' }}
+                                        >
+                                          Cancel
+                                        </button>
+                                        <button
+                                          onClick={() => handleEditFeedback(item.id)}
+                                          disabled={!editingFeedbackText.trim() || editingFeedbackText.trim() === item.text}
+                                          style={{
+                                            padding: '4px 12px', borderRadius: '6px', border: 'none', fontSize: '12px', fontWeight: 600, cursor: 'pointer',
+                                            background: editingFeedbackText.trim() && editingFeedbackText.trim() !== item.text ? 'var(--primary)' : 'var(--bg-gray)',
+                                            color: editingFeedbackText.trim() && editingFeedbackText.trim() !== item.text ? 'white' : 'var(--text-muted)',
+                                          }}
+                                        >
+                                          Save
+                                        </button>
+                                      </div>
+                                    </div>
+                                  ) : (
+                                    <div style={{ display: 'flex', alignItems: 'flex-start', gap: '6px', margin: '0 0 8px 0' }}>
+                                      <p style={{
+                                        fontSize: '14px',
+                                        color: 'var(--text-primary)',
+                                        margin: 0,
+                                        lineHeight: 1.5,
+                                        whiteSpace: 'pre-wrap',
+                                        flex: 1,
+                                        textDecoration: itemStatus === 'addressed' ? 'line-through' : 'none',
+                                      }}>
+                                        {item.text}
+                                      </p>
+                                      {isOwnFeedback && itemStatus !== 'addressed' && (
+                                        <button
+                                          onClick={() => { setEditingFeedbackId(item.id); setEditingFeedbackText(item.text) }}
+                                          title="Edit feedback"
+                                          style={{
+                                            padding: '2px', background: 'transparent', border: 'none', cursor: 'pointer',
+                                            color: 'var(--text-muted)', flexShrink: 0, marginTop: '2px',
+                                          }}
+                                        >
+                                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                            <path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/>
+                                            <path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/>
+                                          </svg>
+                                        </button>
+                                      )}
+                                    </div>
+                                  )}
 
                                   {/* Admin Response */}
                                   {item.admin_response && (

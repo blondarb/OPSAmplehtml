@@ -500,6 +500,7 @@ export default function AppointmentsDashboard({
             <DayView
               appointments={filteredAppointments}
               onSelectPatient={handleSelectPatient}
+              onRefresh={fetchAppointments}
             />
           )}
 

@@ -137,10 +137,41 @@ export async function PATCH(request: Request) {
   }
 
   const body = await request.json()
-  const { feedbackId, voteType, action, status, adminResponse } = body
+  const { feedbackId, voteType, action, status, adminResponse, text } = body
 
   if (!feedbackId) {
     return NextResponse.json({ error: 'feedbackId is required' }, { status: 400 })
+  }
+
+  // Edit feedback text (own feedback only)
+  if (action === 'updateText') {
+    if (!text || !text.trim()) {
+      return NextResponse.json({ error: 'Feedback text is required' }, { status: 400 })
+    }
+
+    // Verify ownership
+    const { data: existing } = await supabase
+      .from('feedback')
+      .select('user_id')
+      .eq('id', feedbackId)
+      .single()
+
+    if (!existing || existing.user_id !== user.id) {
+      return NextResponse.json({ error: 'You can only edit your own feedback' }, { status: 403 })
+    }
+
+    const { data: updated, error: updateError } = await supabase
+      .from('feedback')
+      .update({ text: text.trim(), updated_at: new Date().toISOString() })
+      .eq('id', feedbackId)
+      .select()
+      .single()
+
+    if (updateError) {
+      return NextResponse.json({ error: updateError.message }, { status: 500 })
+    }
+
+    return NextResponse.json({ feedback: updated })
   }
 
   // Admin status update action
