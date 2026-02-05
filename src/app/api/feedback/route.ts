@@ -1,7 +1,34 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 
-// GET /api/feedback - List all feedback (visible to all users)
+// Check if user is a feedback admin
+async function isAdmin(email: string | undefined): Promise<boolean> {
+  if (!email) return false
+  // Check environment variable first (comma-separated emails)
+  const envAdmins = process.env.FEEDBACK_ADMIN_EMAILS
+  if (envAdmins) {
+    const adminList = envAdmins.split(',').map(e => e.trim().toLowerCase())
+    if (adminList.includes(email.toLowerCase())) return true
+  }
+  // Check app_settings table as fallback
+  try {
+    const supabase = await createClient()
+    const { data } = await supabase
+      .from('app_settings')
+      .select('value')
+      .eq('key', 'feedback_admin_emails')
+      .single()
+    if (data?.value) {
+      const adminList = data.value.split(',').map((e: string) => e.trim().toLowerCase())
+      return adminList.includes(email.toLowerCase())
+    }
+  } catch {
+    // Ignore - no admin setting configured
+  }
+  return false
+}
+
+// GET /api/feedback - List all feedback with comments count
 export async function GET() {
   const supabase = await createClient()
 
@@ -19,7 +46,33 @@ export async function GET() {
     return NextResponse.json({ error: error.message }, { status: 500 })
   }
 
-  return NextResponse.json({ feedback, currentUserId: user.id })
+  // Get comment counts for all feedback items
+  const feedbackIds = (feedback || []).map(f => f.id)
+  let commentCounts: Record<string, number> = {}
+  if (feedbackIds.length > 0) {
+    const { data: comments } = await supabase
+      .from('feedback_comments')
+      .select('feedback_id')
+      .in('feedback_id', feedbackIds)
+    if (comments) {
+      for (const c of comments) {
+        commentCounts[c.feedback_id] = (commentCounts[c.feedback_id] || 0) + 1
+      }
+    }
+  }
+
+  const enriched = (feedback || []).map(f => ({
+    ...f,
+    comment_count: commentCounts[f.id] || 0,
+  }))
+
+  const userIsAdmin = await isAdmin(user.email || undefined)
+
+  return NextResponse.json({
+    feedback: enriched,
+    currentUserId: user.id,
+    isAdmin: userIsAdmin,
+  })
 }
 
 // POST /api/feedback - Submit new feedback
@@ -46,6 +99,7 @@ export async function POST(request: Request) {
       user_email: user.email || 'Anonymous',
       upvotes: [],
       downvotes: [],
+      status: 'pending',
     })
     .select()
     .single()
@@ -57,7 +111,7 @@ export async function POST(request: Request) {
   return NextResponse.json({ feedback })
 }
 
-// PATCH /api/feedback - Vote on feedback (upvote/downvote)
+// PATCH /api/feedback - Vote on feedback OR update status (admin)
 export async function PATCH(request: Request) {
   const supabase = await createClient()
 
@@ -67,10 +121,53 @@ export async function PATCH(request: Request) {
   }
 
   const body = await request.json()
-  const { feedbackId, voteType } = body
+  const { feedbackId, voteType, action, status, adminResponse } = body
 
-  if (!feedbackId || !['up', 'down'].includes(voteType)) {
-    return NextResponse.json({ error: 'feedbackId and voteType (up/down) are required' }, { status: 400 })
+  if (!feedbackId) {
+    return NextResponse.json({ error: 'feedbackId is required' }, { status: 400 })
+  }
+
+  // Admin status update action
+  if (action === 'updateStatus') {
+    const userIsAdmin = await isAdmin(user.email || undefined)
+    if (!userIsAdmin) {
+      return NextResponse.json({ error: 'Admin access required' }, { status: 403 })
+    }
+
+    const validStatuses = ['pending', 'approved', 'in_progress', 'addressed', 'declined']
+    if (!status || !validStatuses.includes(status)) {
+      return NextResponse.json({ error: 'Valid status required: ' + validStatuses.join(', ') }, { status: 400 })
+    }
+
+    const updateData: Record<string, unknown> = {
+      status,
+      admin_user_id: user.id,
+      admin_user_email: user.email,
+      status_updated_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    }
+
+    if (adminResponse !== undefined) {
+      updateData.admin_response = adminResponse
+    }
+
+    const { data: updated, error: updateError } = await supabase
+      .from('feedback')
+      .update(updateData)
+      .eq('id', feedbackId)
+      .select()
+      .single()
+
+    if (updateError) {
+      return NextResponse.json({ error: updateError.message }, { status: 500 })
+    }
+
+    return NextResponse.json({ feedback: updated })
+  }
+
+  // Vote action (existing behavior)
+  if (!voteType || !['up', 'down'].includes(voteType)) {
+    return NextResponse.json({ error: 'voteType (up/down) is required' }, { status: 400 })
   }
 
   // Get current feedback item
@@ -90,19 +187,15 @@ export async function PATCH(request: Request) {
 
   if (voteType === 'up') {
     if (upvotes.includes(userId)) {
-      // Toggle off upvote
       upvotes = upvotes.filter(id => id !== userId)
     } else {
-      // Add upvote, remove downvote if exists
       upvotes = [...upvotes, userId]
       downvotes = downvotes.filter(id => id !== userId)
     }
   } else {
     if (downvotes.includes(userId)) {
-      // Toggle off downvote
       downvotes = downvotes.filter(id => id !== userId)
     } else {
-      // Add downvote, remove upvote if exists
       downvotes = [...downvotes, userId]
       upvotes = upvotes.filter(id => id !== userId)
     }
