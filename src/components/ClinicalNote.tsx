@@ -271,9 +271,18 @@ export default function ClinicalNote({
         const patientMatches = !parsed.patientId || parsed.patientId === patient?.id
 
         if (isRecent && parsed.data && patientMatches) {
+          // Sanitize chiefComplaint to ensure it's always an array
+          const sanitizedData = {
+            ...parsed.data,
+            chiefComplaint: Array.isArray(parsed.data.chiefComplaint)
+              ? parsed.data.chiefComplaint
+              : parsed.data.chiefComplaint
+                ? [parsed.data.chiefComplaint]
+                : [],
+          }
           setNoteData(prev => ({
             ...prev,
-            ...parsed.data,
+            ...sanitizedData,
           }))
         } else if (!patientMatches) {
           // Clear mismatched autosave data
@@ -784,9 +793,18 @@ export default function ClinicalNote({
 
             if (isRecent && parsed.data && patientMatches) {
               console.log('Loading saved autosave data for patient:', appointment.patient.id)
+              // Sanitize chiefComplaint to ensure it's always an array
+              const sanitizedData = {
+                ...parsed.data,
+                chiefComplaint: Array.isArray(parsed.data.chiefComplaint)
+                  ? parsed.data.chiefComplaint
+                  : parsed.data.chiefComplaint
+                    ? [parsed.data.chiefComplaint]
+                    : [],
+              }
               setNoteData(prev => ({
                 ...prev,
-                ...parsed.data,
+                ...sanitizedData,
               }))
             }
           }
