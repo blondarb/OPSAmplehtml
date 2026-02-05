@@ -41,9 +41,9 @@ export default function AppointmentPopover({
   let left = anchorRect.right + 8
   let top = anchorRect.top
 
-  // Flip to left if overflowing right edge
+  // Clamp to right edge if overflowing (never flip to left side of screen)
   if (left + popoverWidth > viewportWidth - 20) {
-    left = anchorRect.left - popoverWidth - 8
+    left = viewportWidth - popoverWidth - 20
   }
 
   // Clamp to top of viewport
