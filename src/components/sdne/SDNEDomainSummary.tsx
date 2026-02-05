@@ -10,6 +10,8 @@ import {
 
 interface SDNEDomainSummaryProps {
   domainFlags: Record<SDNEDomain, SDNEFlag>
+  selectedDomain?: SDNEDomain | null
+  onDomainClick?: (domain: SDNEDomain) => void
 }
 
 // Domain icons as SVG paths (avoiding external icon library dependency)
@@ -90,26 +92,44 @@ const DOMAIN_ORDER: SDNEDomain[] = [
 /**
  * 8-domain heatmap summary card for SDNE exam results
  * Shows at-a-glance status for each neurologic domain
+ * Domains are clickable to show detailed task data
  */
-export function SDNEDomainSummary({ domainFlags }: SDNEDomainSummaryProps) {
+export function SDNEDomainSummary({ domainFlags, selectedDomain, onDomainClick }: SDNEDomainSummaryProps) {
+  const isClickable = !!onDomainClick
+
   return (
     <div>
       <h4 className="text-sm font-semibold text-gray-900 mb-1">Domain Summary</h4>
-      <p className="text-xs text-gray-500 mb-3">At-a-glance results across all neurologic domains</p>
+      <p className="text-xs text-gray-500 mb-3">
+        {isClickable
+          ? 'Click a domain to view detailed task data'
+          : 'At-a-glance results across all neurologic domains'}
+      </p>
 
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
         {DOMAIN_ORDER.map((domain) => {
           const flag = domainFlags[domain]
           const colors = SDNE_FLAG_THEME[SDNE_FLAG_KEY[flag]]
+          const isSelected = selectedDomain === domain
 
           return (
-            <div
+            <button
               key={domain}
+              type="button"
+              onClick={() => onDomainClick?.(domain)}
+              disabled={!isClickable}
               style={{
                 backgroundColor: colors.bg,
-                border: `1px solid ${colors.border}`,
+                border: isSelected
+                  ? `2px solid var(--primary)`
+                  : `1px solid ${colors.border}`,
+                boxShadow: isSelected ? '0 2px 8px rgba(13, 148, 136, 0.25)' : undefined,
               }}
-              className="p-3 rounded-lg transition-all duration-150 hover:shadow-md cursor-default"
+              className={`p-3 rounded-lg transition-all duration-150 text-left ${
+                isClickable
+                  ? 'cursor-pointer hover:shadow-md hover:scale-[1.02] active:scale-[0.98]'
+                  : 'cursor-default'
+              }`}
             >
               <div className="flex items-center gap-2 mb-1">
                 <span style={{ color: colors.main }}>
@@ -125,7 +145,22 @@ export function SDNEDomainSummary({ domainFlags }: SDNEDomainSummaryProps) {
               <p className="text-xs text-gray-500">
                 {SDNE_DOMAIN_LABELS[domain]}
               </p>
-            </div>
+              {isClickable && (
+                <div style={{
+                  marginTop: '6px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '4px',
+                  color: isSelected ? 'var(--primary)' : 'var(--text-muted)',
+                  fontSize: '10px',
+                }}>
+                  <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <polyline points="9 18 15 12 9 6" />
+                  </svg>
+                  <span>{isSelected ? 'Viewing' : 'View tasks'}</span>
+                </div>
+              )}
+            </button>
           )
         })}
       </div>

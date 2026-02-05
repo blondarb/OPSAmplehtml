@@ -3,5 +3,6 @@
 
 export { SDNEFlagChip } from './SDNEFlagChip'
 export { SDNEDomainSummary } from './SDNEDomainSummary'
+export { SDNEDomainDetail } from './SDNEDomainDetail'
 export { SDNEInterpretation } from './SDNEInterpretation'
 export { SDNEExamResultsPanel } from './SDNEExamResultsPanel'

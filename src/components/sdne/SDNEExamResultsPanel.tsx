@@ -5,6 +5,7 @@ import { SDNESessionResult, SDNEDomain, SDNE_FLAG_THEME, SDNE_FLAG_KEY, SDNE_FLA
 import { getLatestSDNESessionForPatient, getAllSDNESessionsForPatient } from '@/lib/sdneSampleData'
 import { SDNEFlagChip } from './SDNEFlagChip'
 import { SDNEDomainSummary } from './SDNEDomainSummary'
+import { SDNEDomainDetail } from './SDNEDomainDetail'
 import { SDNEInterpretation } from './SDNEInterpretation'
 
 interface SDNEExamResultsPanelProps {
@@ -66,6 +67,7 @@ export function SDNEExamResultsPanel({
 }: SDNEExamResultsPanelProps) {
   const [isExpanded, setIsExpanded] = useState(false)
   const [selectedSessionIndex, setSelectedSessionIndex] = useState(0)
+  const [selectedDomain, setSelectedDomain] = useState<SDNEDomain | null>(null)
 
   // Get all SDNE sessions for patient (historical data)
   const allSessions = useMemo(() => {
@@ -115,6 +117,17 @@ export function SDNEExamResultsPanel({
   const handleToggle = () => {
     setIsExpanded(prev => !prev)
   }
+
+  // Handle domain click - toggle selection
+  const handleDomainClick = (domain: SDNEDomain) => {
+    setSelectedDomain(prev => prev === domain ? null : domain)
+  }
+
+  // Get tasks for selected domain
+  const selectedDomainTasks = useMemo(() => {
+    if (!selectedDomain || !session.taskResults) return []
+    return session.taskResults.filter(task => task.domain === selectedDomain)
+  }, [selectedDomain, session.taskResults])
 
   return (
     <div
@@ -231,7 +244,10 @@ export function SDNEExamResultsPanel({
                   return (
                     <button
                       key={s.sessionId}
-                      onClick={() => setSelectedSessionIndex(idx)}
+                      onClick={() => {
+                        setSelectedSessionIndex(idx)
+                        setSelectedDomain(null) // Reset domain selection when switching sessions
+                      }}
                       style={{
                         padding: '8px 12px',
                         borderRadius: '8px',
@@ -315,7 +331,22 @@ export function SDNEExamResultsPanel({
           )}
 
           {/* Domain Summary Grid */}
-          <SDNEDomainSummary domainFlags={session.domainFlags} />
+          <SDNEDomainSummary
+            domainFlags={session.domainFlags}
+            selectedDomain={selectedDomain}
+            onDomainClick={handleDomainClick}
+          />
+
+          {/* Domain Detail Panel - shows when a domain is selected */}
+          {selectedDomain && (
+            <div style={{ marginTop: '16px' }}>
+              <SDNEDomainDetail
+                domain={selectedDomain}
+                tasks={selectedDomainTasks}
+                onClose={() => setSelectedDomain(null)}
+              />
+            </div>
+          )}
 
           {/* Detected Patterns */}
           {hasPatterns && (
