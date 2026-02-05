@@ -9,6 +9,7 @@ import DifferentialDiagnosisSection from './DifferentialDiagnosisSection'
 import ImagingResultsTab from './ImagingResultsTab'
 import SmartRecommendationsSection from './SmartRecommendationsSection'
 import PatientHistorySummary from './PatientHistorySummary'
+import { SDNEExamResultsPanel } from './sdne'
 import type { Diagnosis } from '@/lib/diagnosisData'
 import type { PatientMedication, PatientAllergy, AllergySeverity, AllergenType, FormularyItem } from '@/lib/medicationTypes'
 import { searchFormulary } from '@/lib/neuroFormulary'
@@ -2176,6 +2177,27 @@ ${noteData.plan || 'Not documented'}`.trim()
                 onOpenFullPhrasesDrawer={() => openDotPhrases && openDotPhrases('examSummary')}
                 setActiveTextField={handleSetActiveField}
                 patientContext={patientContext}
+              />
+            </div>
+
+            {/* SDNE Digital Neurologic Exam Results */}
+            <div style={{
+              background: 'var(--bg-white)',
+              borderRadius: '12px',
+              padding: '20px',
+              marginBottom: '16px',
+              boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
+            }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+                <div>
+                  <span style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text-primary)' }}>Digital Neurologic Exam</span>
+                  <span style={{ fontSize: '12px', color: 'var(--text-muted)', marginLeft: '8px' }}>SDNE Core-15 VR screening results</span>
+                </div>
+              </div>
+              <SDNEExamResultsPanel
+                patientMrn={patient?.mrn}
+                chiefComplaints={noteData.chiefComplaint || []}
+                consultCategories={noteData.consultCategories || []}
               />
             </div>
 
