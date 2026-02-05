@@ -163,8 +163,6 @@ export default function DayView({ appointments, onSelectPatient, onRefresh }: Da
               <div
                 key={appointment.id}
                 onClick={() => onSelectPatient(appointment)}
-                onMouseEnter={(e) => onEnter(appointment.id, e.currentTarget)}
-                onMouseLeave={onLeave}
                 style={{
                   position: 'relative',
                   display: 'grid',
@@ -208,8 +206,12 @@ export default function DayView({ appointments, onSelectPatient, onRefresh }: Da
                   </div>
                 </div>
 
-                {/* Reason for Visit */}
-                <div>
+                {/* Reason for Visit - hover triggers popover */}
+                <div
+                  onMouseEnter={(e) => onEnter(appointment.id, e.currentTarget)}
+                  onMouseLeave={onLeave}
+                  style={{ display: 'inline-block' }}
+                >
                   <span style={{
                     display: 'inline-flex',
                     alignItems: 'center',
