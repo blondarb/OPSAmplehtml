@@ -310,7 +310,7 @@ Format as a concise clinical summary. Use section headers if in standard or deta
                     </div>
                   )}
                 </>
-              ) : noteData?.chiefComplaint?.length > 0 ? (
+              ) : noteData && Array.isArray(noteData.chiefComplaint) && noteData.chiefComplaint.length > 0 ? (
                 <>
                   <div style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '6px' }}>
                     New Patient Visit

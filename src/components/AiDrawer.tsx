@@ -684,7 +684,7 @@ ${languageInstructions}`
                     </svg>
                     From Current Note
                   </div>
-                  {noteData.chiefComplaint?.length > 0 && (
+                  {Array.isArray(noteData.chiefComplaint) && noteData.chiefComplaint.length > 0 && (
                     <div style={{ color: 'var(--text-secondary)', marginBottom: '4px' }}>
                       <strong>Chief Complaint:</strong> {noteData.chiefComplaint.join(', ')}
                     </div>
