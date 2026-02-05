@@ -1759,18 +1759,21 @@ ${noteData.plan || 'Not documented'}`.trim()
             {/* Allergies */}
             <div data-section="allergies-section">
             <div style={{ position: 'relative', marginBottom: '16px' }}>
-              <span style={{
-                position: 'absolute',
-                right: '-12px',
-                top: '0',
-                background: '#EF4444',
-                color: 'white',
-                fontSize: '11px',
-                fontWeight: 500,
-                padding: '4px 8px',
-                borderRadius: '0 4px 4px 0',
-                zIndex: 1,
-              }}>Required</span>
+              {/* Only show Required badge if no allergies are listed and no status selected */}
+              {!(allergies.filter(a => a.is_active).length > 0 || noteData.allergies) && (
+                <span style={{
+                  position: 'absolute',
+                  right: '-12px',
+                  top: '0',
+                  background: '#EF4444',
+                  color: 'white',
+                  fontSize: '11px',
+                  fontWeight: 500,
+                  padding: '4px 8px',
+                  borderRadius: '0 4px 4px 0',
+                  zIndex: 1,
+                }}>Required</span>
+              )}
               <div style={{
                 background: 'var(--bg-white)',
                 borderRadius: '12px',
@@ -1780,7 +1783,16 @@ ${noteData.plan || 'Not documented'}`.trim()
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                     <span style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text-primary)' }}>Allergies</span>
-                    <span style={{ color: '#EF4444', marginLeft: '2px' }}>*</span>
+                    {/* Only show asterisk if no allergies listed and no status selected */}
+                    {!(allergies.filter(a => a.is_active).length > 0 || noteData.allergies) && (
+                      <span style={{ color: '#EF4444', marginLeft: '2px' }}>*</span>
+                    )}
+                    {/* Show green checkmark when allergies are reviewed */}
+                    {(allergies.filter(a => a.is_active).length > 0 || noteData.allergies) && (
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#10B981" strokeWidth="2.5">
+                        <polyline points="20 6 9 17 4 12"/>
+                      </svg>
+                    )}
                   </div>
                   <button
                     onClick={() => { setShowAllergyForm(true); setAllergyFormData({ allergen: '', allergen_type: 'drug', reaction: '', severity: 'unknown' }) }}
