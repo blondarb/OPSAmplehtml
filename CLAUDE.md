@@ -297,16 +297,16 @@ The middleware (`src/middleware.ts`) handles session refresh. Uses a simplified 
 ### API Routes
 
 **AI Endpoints (Model Configuration):**
-- `/api/ai/ask` - Ask clinical questions (gpt-4o-mini - cost-effective Q&A)
-- `/api/ai/chart-prep` - Generate pre-visit summaries (gpt-4o-mini)
-- `/api/ai/field-action` - Field-level AI actions: Improve/Expand/Summarize (gpt-4o-mini)
-- `/api/ai/transcribe` - Voice transcription (Whisper + gpt-4o-mini cleanup)
+- `/api/ai/ask` - Ask clinical questions (gpt-5-mini - cost-effective Q&A)
+- `/api/ai/chart-prep` - Generate pre-visit summaries (gpt-5-mini)
+- `/api/ai/field-action` - Field-level AI actions: Improve/Expand/Summarize (gpt-5-mini)
+- `/api/ai/transcribe` - Voice transcription (Whisper + gpt-5-mini cleanup)
 - `/api/ai/visit-ai` - Visit AI: transcribe and extract clinical content (gpt-5.2 - complex extraction)
 - `/api/ai/scale-autofill` - AI autofill for clinical scales from patient data (gpt-5.2)
 - `/api/ai/synthesize-note` - Note synthesis from multiple sources (gpt-5.2)
 - `/api/ai/generate-assessment` - Generate clinical assessment from diagnoses (gpt-5.2)
-- `/api/ai/note-review` - AI-powered note review for suggested improvements (gpt-4o-mini)
-- `/api/ai/historian/session` - Create ephemeral token for WebRTC (gpt-4o-realtime-preview)
+- `/api/ai/note-review` - AI-powered note review for suggested improvements (gpt-5-mini)
+- `/api/ai/historian/session` - Create ephemeral token for WebRTC (gpt-realtime)
 - `/api/ai/historian/save` - Save/list historian interview sessions
 
 **Other Endpoints:**
@@ -343,13 +343,35 @@ The middleware (`src/middleware.ts`) handles session refresh. Uses a simplified 
 - Each category has: id, label, icon, subOptions (common + expanded)
 - Helper functions: getCategoryById, getAllSubOptions, findCategoryForSubOption, derivePrimaryCategoriesFromSubOptions
 
+### Smart Recommendations (neuro-plans)
+- **Source**: `blondarb/neuro-plans` GitHub repo (built by Steve Arbogast)
+- **Published**: https://blondarb.github.io/neuro-plans/clinical/
+- **127 clinical plans** with evidence-based treatment recommendations
+- **Sync command**: `npm run sync-plans` fetches JSON from GitHub and upserts to Supabase `clinical_plans` table
+- **Order sentences**: Medications can have multiple `doseOptions` with dropdown selection in UI
+- **ICD-10 matching**: Scored matching (exact=1000, category=1) links diagnoses to relevant plans
+
 ## Documentation
 
+### Product Requirements
 - `docs/Sevaro_Outpatient_MVP_PRD_v1.4.md` - Main product requirements
 - `docs/PRD_AI_Scribe.md` - AI Scribe system (Chart Prep + Visit AI + Note Merge)
 - `docs/PRD_AI_Summarizer.md` - Patient summary generation
 - `docs/PRD_*.md` - Feature-specific PRDs
 - `docs/IMPLEMENTATION_STATUS.md` - Current implementation status and gap analysis
+
+### Engineering Handoff Docs (February 2026)
+- `docs/SCHEMA_REFERENCE.md` - Complete database schema for all Supabase tables
+- `docs/AI_PROMPTS_AND_MODELS.md` - All AI system prompts and model configuration
+- `docs/API_CONTRACTS.md` - API reference with full request/response schemas
+- `docs/PRD_CLINICAL_NOTE_SYSTEM.md` - Clinical note system with tabs, diagnoses, recommendations
+- `docs/PRD_VOICE_AND_AI_FEATURES.md` - Voice dictation, AI assistance, note merge engine
+- `docs/PRD_AI_HISTORIAN.md` - WebRTC voice interview system with safety protocol
+- `docs/PRD_APPOINTMENTS_PATIENT_MGMT.md` - Appointment scheduling and patient management
+- `docs/PRD_CLINICAL_SCALES_RECOMMENDATIONS.md` - 13+ clinical scales + neuro-plans integration
+- `docs/PRD_SETTINGS_FEEDBACK_ADMIN.md` - User settings, feedback system, admin panel
+
+### Other
 - `FIGMA_MAKE_PROMPTS.md` - UI design prompts
 - `public/prototype.html` - Original HTML prototype (accessible via logo click)
 
@@ -379,6 +401,24 @@ When redeploying after changes, use "Redeploy without cache" to ensure fresh bui
 - Push to feature branch, create PR, merge to main for deployment
 
 ## Recent Changes (February 2026)
+
+### OpenAI Model Migration & Order Sentences (February 5, 2026)
+- **Model Migration**: All `gpt-4o-mini` → `gpt-5-mini`, `gpt-4o-realtime-preview` → `gpt-realtime` (deprecation deadlines Feb 16 & Feb 27)
+- **Order Sentence Dropdowns**: Medications with multiple dose options now show radio button selector instead of single dose
+  - New types: `DoseOption`, `StructuredDosing` in `recommendationPlans.ts`
+  - Sync script preserves full `doseOptions` array from neuro-plans
+  - SmartRecommendationsSection shows dose picker with custom option
+  - Selected dose included in "Add to Plan" output
+- **Engineering PRDs**: 9 comprehensive docs for engineering team handoff:
+  - `docs/SCHEMA_REFERENCE.md` - Complete database schema
+  - `docs/AI_PROMPTS_AND_MODELS.md` - All AI system prompts + model config
+  - `docs/API_CONTRACTS.md` - API reference with request/response schemas
+  - `docs/PRD_CLINICAL_NOTE_SYSTEM.md` - Core clinical documentation
+  - `docs/PRD_VOICE_AND_AI_FEATURES.md` - Voice dictation + AI assistance
+  - `docs/PRD_AI_HISTORIAN.md` - WebRTC voice interview system
+  - `docs/PRD_APPOINTMENTS_PATIENT_MGMT.md` - Scheduling and patient management
+  - `docs/PRD_CLINICAL_SCALES_RECOMMENDATIONS.md` - Clinical scales + neuro-plans treatment recommendations
+  - `docs/PRD_SETTINGS_FEEDBACK_ADMIN.md` - Settings, feedback, admin panel
 
 ### Follow-Up Visit Workflow & Plan Sync (February 3, 2026)
 - **View Full Note Resilience**: Modal now opens even when clinical_notes is null/empty; shows AI summary fallback + "not available" message; Copy Note handles null gracefully
@@ -485,10 +525,11 @@ When redeploying after changes, use "Redeploy without cache" to ensure fresh bui
 - **Hover popover positioning**: Appointment row popovers now appear to the right instead of below
 - **GPT-5.2 upgrade**: All complex AI tasks now use latest GPT-5.2 model
 
-### OpenAI Model Optimization (January 25, 2026)
-- **Simple tasks use gpt-4o-mini** ($0.15/$0.60 per 1M tokens): ask, chart-prep, transcribe, field-action
-- **Complex tasks use gpt-5.2** (latest): visit-ai, scale-autofill, synthesize-note, generate-assessment
-- ~93% cost reduction for simple tasks, best accuracy for complex clinical reasoning
+### OpenAI Model Optimization (February 5, 2026)
+- **Simple tasks use gpt-5-mini**: ask, chart-prep, transcribe, field-action, note-review
+- **Complex tasks use gpt-5.2**: visit-ai, scale-autofill, synthesize-note, generate-assessment
+- **Realtime voice use gpt-realtime**: historian session (WebRTC)
+- Migration from gpt-4o-mini (deprecated Feb 16, 2026) and gpt-4o-realtime-preview (deprecated Feb 27, 2026)
 
 ### Clinical Scales & AI Autofill (January 24, 2026)
 - **New Scales**: UPDRS Motor (33-item Parkinson's), Hoehn & Yahr, EDSS (MS), CHA₂DS₂-VASc (stroke risk)
