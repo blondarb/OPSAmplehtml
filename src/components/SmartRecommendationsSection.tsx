@@ -4,6 +4,8 @@ import { useState, useEffect, useCallback } from 'react'
 import {
   type ClinicalPlan,
   type RecommendationItem,
+  type StructuredDosing,
+  type DoseOption,
 } from '@/lib/recommendationPlans'
 import { sortSections, sortSubsections } from '@/lib/recommendationOrdering'
 import type { SavedPlan } from '@/lib/savedPlanTypes'
@@ -95,6 +97,10 @@ export default function SmartRecommendationsSection({
   const [showLegend, setShowLegend] = useState(false)
   const [addedConfirmation, setAddedConfirmation] = useState(false)
   const [isDarkMode, setIsDarkMode] = useState(false)
+  // Track selected dose option per item (itemKey -> selected orderSentence or 'custom')
+  const [selectedDoseOptions, setSelectedDoseOptions] = useState<Record<string, string>>({})
+  // Track custom dose text per item when 'custom' is selected
+  const [customDoseText, setCustomDoseText] = useState<Record<string, string>>({})
 
   // Detect dark mode
   useEffect(() => {
@@ -507,6 +513,22 @@ export default function SmartRecommendationsSection({
     return count
   }
 
+  // Helper to get the formatted item text with dose if selected
+  const getItemWithDose = (sectionKey: string, itemName: string, itemIndex: number): string => {
+    const itemKey = `${sectionKey}-${itemIndex}`
+    const selectedDose = selectedDoseOptions[itemKey]
+
+    if (selectedDose && selectedDose !== 'custom') {
+      // A standard dose option was selected - use the order sentence
+      return selectedDose
+    } else if (selectedDose === 'custom' && customDoseText[itemKey]) {
+      // Custom dose was entered
+      return `${itemName}: ${customDoseText[itemKey]}`
+    }
+    // No dose selected - just return item name
+    return itemName
+  }
+
   const handleAddSelectedToPlan = () => {
     const allSelected: string[] = []
 
@@ -517,7 +539,31 @@ export default function SmartRecommendationsSection({
       const parts = sectionKey.split('-')
       const subsection = parts.length > 1 ? parts.slice(1).join('-') : parts[0]
       if (!grouped.has(subsection)) grouped.set(subsection, [])
-      items.forEach(item => grouped.get(subsection)!.push(item))
+
+      // Get items with their selected doses
+      items.forEach(itemName => {
+        // Find the item index in the current plan to look up dose selection
+        if (currentPlan?.sections) {
+          let foundIndex = -1
+          for (const section of Object.values(currentPlan.sections)) {
+            const subsectionItems = section[subsection]
+            if (subsectionItems) {
+              foundIndex = subsectionItems.findIndex(i => i.item === itemName)
+              if (foundIndex !== -1) {
+                const itemWithDose = getItemWithDose(sectionKey, itemName, foundIndex)
+                grouped.get(subsection)!.push(itemWithDose)
+                break
+              }
+            }
+          }
+          // If not found by subsection, just add the item name
+          if (foundIndex === -1) {
+            grouped.get(subsection)!.push(itemName)
+          }
+        } else {
+          grouped.get(subsection)!.push(itemName)
+        }
+      })
     })
 
     grouped.forEach((items, subsection) => {
@@ -532,6 +578,9 @@ export default function SmartRecommendationsSection({
       setTimeout(() => setAddedConfirmation(false), 2000)
       // Clear selections after adding
       setSelectedItems(new Map())
+      // Also clear dose selections
+      setSelectedDoseOptions({})
+      setCustomDoseText({})
     }
   }
 
@@ -732,11 +781,121 @@ export default function SmartRecommendationsSection({
                 border: '1px solid var(--border)',
               }}>
                 <div style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text-muted)', marginBottom: '6px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-                  Dosing
+                  Order Sentence
                 </div>
-                <div style={{ fontSize: '12px', color: 'var(--text-primary)', lineHeight: '1.5' }}>
-                  {item.dosing}
-                </div>
+
+                {/* Check if structured dosing with multiple options */}
+                {typeof item.dosing === 'object' && (item.dosing as StructuredDosing).doseOptions && (item.dosing as StructuredDosing).doseOptions!.length > 1 ? (
+                  <div>
+                    {/* Dose option selector */}
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                      {(item.dosing as StructuredDosing).doseOptions!.map((opt: DoseOption, optIndex: number) => {
+                        const isOptionSelected = selectedDoseOptions[itemKey] === opt.orderSentence
+                        return (
+                          <label
+                            key={optIndex}
+                            style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '8px',
+                              padding: '8px 10px',
+                              borderRadius: '4px',
+                              border: `1px solid ${isOptionSelected ? 'var(--primary)' : 'var(--border)'}`,
+                              background: isOptionSelected ? 'rgba(13, 148, 136, 0.1)' : 'var(--bg-white)',
+                              cursor: 'pointer',
+                              transition: 'all 0.15s ease',
+                            }}
+                          >
+                            <input
+                              type="radio"
+                              name={`dose-${itemKey}`}
+                              checked={isOptionSelected}
+                              onChange={() => setSelectedDoseOptions(prev => ({ ...prev, [itemKey]: opt.orderSentence }))}
+                              style={{ accentColor: 'var(--primary)' }}
+                            />
+                            <div style={{ flex: 1 }}>
+                              <div style={{ fontSize: '13px', fontWeight: 500, color: 'var(--text-primary)' }}>
+                                {opt.text}
+                              </div>
+                              <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '2px' }}>
+                                {opt.orderSentence}
+                              </div>
+                            </div>
+                          </label>
+                        )
+                      })}
+
+                      {/* Custom option */}
+                      <label
+                        style={{
+                          display: 'flex',
+                          alignItems: 'flex-start',
+                          gap: '8px',
+                          padding: '8px 10px',
+                          borderRadius: '4px',
+                          border: `1px solid ${selectedDoseOptions[itemKey] === 'custom' ? 'var(--primary)' : 'var(--border)'}`,
+                          background: selectedDoseOptions[itemKey] === 'custom' ? 'rgba(13, 148, 136, 0.1)' : 'var(--bg-white)',
+                          cursor: 'pointer',
+                          transition: 'all 0.15s ease',
+                        }}
+                      >
+                        <input
+                          type="radio"
+                          name={`dose-${itemKey}`}
+                          checked={selectedDoseOptions[itemKey] === 'custom'}
+                          onChange={() => setSelectedDoseOptions(prev => ({ ...prev, [itemKey]: 'custom' }))}
+                          style={{ accentColor: 'var(--primary)', marginTop: '4px' }}
+                        />
+                        <div style={{ flex: 1 }}>
+                          <div style={{ fontSize: '13px', fontWeight: 500, color: 'var(--text-primary)', marginBottom: '6px' }}>
+                            Custom order
+                          </div>
+                          {selectedDoseOptions[itemKey] === 'custom' && (
+                            <input
+                              type="text"
+                              placeholder="Enter custom order sentence..."
+                              value={customDoseText[itemKey] || ''}
+                              onChange={(e) => setCustomDoseText(prev => ({ ...prev, [itemKey]: e.target.value }))}
+                              onClick={(e) => e.stopPropagation()}
+                              style={{
+                                width: '100%',
+                                padding: '6px 10px',
+                                borderRadius: '4px',
+                                border: '1px solid var(--border)',
+                                background: 'var(--bg-white)',
+                                fontSize: '12px',
+                                color: 'var(--text-primary)',
+                              }}
+                            />
+                          )}
+                        </div>
+                      </label>
+                    </div>
+
+                    {/* Show additional instructions if available */}
+                    {(item.dosing as StructuredDosing).instructions && (
+                      <div style={{
+                        marginTop: '10px',
+                        padding: '8px 10px',
+                        background: 'rgba(139, 92, 246, 0.1)',
+                        borderRadius: '4px',
+                        border: '1px solid rgba(139, 92, 246, 0.2)',
+                      }}>
+                        <div style={{ fontSize: '10px', fontWeight: 600, color: '#7C3AED', marginBottom: '2px', textTransform: 'uppercase' }}>
+                          Instructions
+                        </div>
+                        <div style={{ fontSize: '11px', color: 'var(--text-primary)' }}>
+                          {(item.dosing as StructuredDosing).instructions}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  /* Simple string dosing - show as text */
+                  <div style={{ fontSize: '12px', color: 'var(--text-primary)', lineHeight: '1.5' }}>
+                    {typeof item.dosing === 'string' ? item.dosing : (item.dosing as StructuredDosing).orderSentence || (item.dosing as StructuredDosing).instructions || 'See prescribing information'}
+                  </div>
+                )}
               </div>
             )}
 
