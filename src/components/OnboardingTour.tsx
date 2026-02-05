@@ -11,26 +11,35 @@ interface TourStep {
   spotlightPadding?: number
 }
 
-const TOUR_STEPS: TourStep[] = [
+// Schedule/Appointments Tour Steps
+const SCHEDULE_TOUR_STEPS: TourStep[] = [
   {
-    id: 'welcome',
+    id: 'welcome-schedule',
     title: 'Welcome to Sevaro Clinical!',
-    description: 'Let\'s take a quick tour to help you get started with AI-powered clinical documentation. This will only take a minute.',
+    description: 'Let\'s start with a quick tour of the Schedule view. This is where you\'ll manage your daily appointments and access patient charts.',
     target: 'body',
     position: 'bottom',
   },
   {
     id: 'appointments-list',
     title: 'Today\'s Appointments',
-    description: 'Your daily schedule starts here. Click any patient row to open their chart and begin documenting. Appointments show patient info, visit type, status, and prior visit details.',
+    description: 'Your daily schedule appears here. Each row shows patient info, visit type, status, and prior visit details. Click any patient row to open their chart.',
     target: '[data-tour="appointments-list"]',
     position: 'top',
     spotlightPadding: 8,
   },
   {
+    id: 'view-toggle',
+    title: 'Calendar Views',
+    description: 'Switch between Day, Week, and Month views. Day view shows detailed appointment slots, Week gives you a 7-day overview, and Month shows your full monthly schedule.',
+    target: '[data-tour="view-toggle"]',
+    position: 'bottom',
+    spotlightPadding: 8,
+  },
+  {
     id: 'schedule-button',
-    title: 'Schedule Appointments',
-    description: 'Use this button to schedule new patient appointments. After completing a visit, you\'ll also be prompted to schedule a follow-up directly from the chart.',
+    title: 'Schedule New Appointments',
+    description: 'Click here to schedule a new patient appointment. You can also schedule follow-ups directly from the chart after completing a visit.',
     target: '[data-tour="schedule-button"]',
     position: 'bottom',
     spotlightPadding: 8,
@@ -38,15 +47,41 @@ const TOUR_STEPS: TourStep[] = [
   {
     id: 'ideas-button',
     title: 'Getting Started & Help',
-    description: 'Click the Sevaro logo anytime to access the Getting Started drawer. Here you\'ll find workflow guides, feature explanations, and you can replay this tour whenever you need a refresher.',
+    description: 'Click the Sevaro logo anytime to access help resources, workflow guides, feature explanations, and to replay this tour.',
     target: '[data-tour="ideas-button"]',
     position: 'bottom',
     spotlightPadding: 8,
   },
   {
+    id: 'settings',
+    title: 'Settings & Reset Demo',
+    description: 'Access your profile settings here. The Reset Demo option restores the original demo state for the next viewer.',
+    target: '[data-tour="settings"]',
+    position: 'left',
+    spotlightPadding: 12,
+  },
+  {
+    id: 'complete-schedule',
+    title: 'Ready to Start!',
+    description: 'Click any patient from the schedule to open their chart. Once you\'re in the EHR view, we\'ll give you a tour of the documentation features.',
+    target: 'body',
+    position: 'bottom',
+  },
+]
+
+// EHR/Clinical Note Tour Steps
+const EHR_TOUR_STEPS: TourStep[] = [
+  {
+    id: 'welcome-ehr',
+    title: 'Welcome to the Clinical Note!',
+    description: 'This is where you document patient visits. Let\'s walk through the key features for efficient clinical documentation.',
+    target: 'body',
+    position: 'bottom',
+  },
+  {
     id: 'patient-info',
     title: 'Patient Information',
-    description: 'View and manage patient details here. You\'ll see demographics, visit type, and quick action buttons for video calls and external systems.',
+    description: 'View patient demographics, visit type, and status here. Quick action buttons let you access video calls, PACS, and external systems.',
     target: '[data-tour="patient-info"]',
     position: 'right',
     spotlightPadding: 8,
@@ -54,7 +89,7 @@ const TOUR_STEPS: TourStep[] = [
   {
     id: 'prior-visits',
     title: 'Prior Visits & History',
-    description: 'Access previous visit summaries with AI-generated insights. Expand any visit to see detailed notes and track treatment progression over time.',
+    description: 'Access previous visit summaries with AI-generated insights. Expand any visit to see detailed notes and track treatment progression.',
     target: '[data-tour="prior-visits"]',
     position: 'right',
     spotlightPadding: 8,
@@ -78,7 +113,7 @@ const TOUR_STEPS: TourStep[] = [
   {
     id: 'ai-button',
     title: 'AI Assistant',
-    description: 'Access AI features here: Ask clinical questions, generate patient summaries, or create educational handouts. The AI uses your note context for personalized responses.',
+    description: 'Access AI features here: Ask clinical questions, generate patient summaries, or create educational handouts. AI uses your note context for personalized responses.',
     target: '[data-tour="ai-button"]',
     position: 'bottom',
     spotlightPadding: 8,
@@ -86,45 +121,48 @@ const TOUR_STEPS: TourStep[] = [
   {
     id: 'generate-note',
     title: 'Generate Note',
-    description: 'When you\'re ready, click here to generate your clinical note. AI will synthesize all your inputs—dictation, chart prep, and manual entries—into a cohesive document.',
+    description: 'When ready, click here to generate your clinical note. AI synthesizes all inputs—dictation, chart prep, and manual entries—into a cohesive document.',
     target: '[data-tour="generate-note"]',
     position: 'bottom',
     spotlightPadding: 8,
   },
   {
-    id: 'settings',
-    title: 'Settings & Reset',
-    description: 'Click your profile icon to access Settings and the Reset Demo button. Use Reset Demo to restore the original demo state so the next viewer gets a fresh experience.',
-    target: '[data-tour="settings"]',
-    position: 'left',
-    spotlightPadding: 12,
-  },
-  {
-    id: 'complete',
+    id: 'complete-ehr',
     title: 'You\'re All Set!',
-    description: 'Start by clicking a patient from the schedule to open their chart. Document with dictation, AI assistance, and dot phrases, then Sign & Complete. Use Reset Demo from your profile menu when you\'re done. Happy documenting!',
+    description: 'Document with dictation, AI assistance, and dot phrases. Click Sign & Complete when finished, then schedule a follow-up if needed. Happy documenting!',
     target: 'body',
     position: 'bottom',
   },
 ]
 
-const TOUR_STORAGE_KEY = 'sevaro-onboarding-complete'
+export type TourPhase = 'schedule' | 'ehr'
+
+const TOUR_STORAGE_KEYS = {
+  schedule: 'sevaro-tour-schedule-complete',
+  ehr: 'sevaro-tour-ehr-complete',
+}
+
+// Legacy key for migration
+const LEGACY_TOUR_KEY = 'sevaro-onboarding-complete'
 
 interface OnboardingTourProps {
-  forceShow?: boolean // For testing/demo purposes
+  phase: TourPhase
+  forceShow?: boolean
   onComplete?: () => void
 }
 
-export default function OnboardingTour({ forceShow = false, onComplete }: OnboardingTourProps) {
+export default function OnboardingTour({ phase, forceShow = false, onComplete }: OnboardingTourProps) {
   const [isActive, setIsActive] = useState(false)
   const [currentStep, setCurrentStep] = useState(0)
   const [spotlightRect, setSpotlightRect] = useState<DOMRect | null>(null)
   const [isReady, setIsReady] = useState(false)
 
+  const TOUR_STEPS = phase === 'schedule' ? SCHEDULE_TOUR_STEPS : EHR_TOUR_STEPS
+  const storageKey = TOUR_STORAGE_KEYS[phase]
+
   // Check if user needs the tour
   useEffect(() => {
     if (forceShow) {
-      // Reset to first step when manually triggered
       setCurrentStep(0)
       setIsActive(true)
       setIsReady(true)
@@ -133,8 +171,11 @@ export default function OnboardingTour({ forceShow = false, onComplete }: Onboar
 
     // Check localStorage for tour completion
     try {
-      const tourComplete = localStorage.getItem(TOUR_STORAGE_KEY)
-      if (!tourComplete) {
+      const tourComplete = localStorage.getItem(storageKey)
+      // Also check legacy key - if old tour was completed, don't auto-show either phase
+      const legacyComplete = localStorage.getItem(LEGACY_TOUR_KEY)
+
+      if (!tourComplete && !legacyComplete) {
         // Small delay to let the page render first
         const timer = setTimeout(() => {
           setCurrentStep(0)
@@ -146,7 +187,7 @@ export default function OnboardingTour({ forceShow = false, onComplete }: Onboar
     } catch {
       // localStorage not available
     }
-  }, [forceShow])
+  }, [forceShow, storageKey])
 
   // Update spotlight position when step changes
   const updateSpotlight = useCallback(() => {
@@ -169,9 +210,10 @@ export default function OnboardingTour({ forceShow = false, onComplete }: Onboar
       // Scroll element into view if needed
       element.scrollIntoView({ behavior: 'smooth', block: 'center' })
     } else {
+      // Element not found - skip to next step
       setSpotlightRect(null)
     }
-  }, [currentStep, isActive, isReady])
+  }, [currentStep, isActive, isReady, TOUR_STEPS])
 
   useEffect(() => {
     updateSpotlight()
@@ -201,7 +243,7 @@ export default function OnboardingTour({ forceShow = false, onComplete }: Onboar
 
   const completeTour = () => {
     try {
-      localStorage.setItem(TOUR_STORAGE_KEY, 'true')
+      localStorage.setItem(storageKey, 'true')
     } catch {
       // localStorage not available
     }
@@ -212,8 +254,8 @@ export default function OnboardingTour({ forceShow = false, onComplete }: Onboar
   if (!isActive || !isReady) return null
 
   const step = TOUR_STEPS[currentStep]
-  const isWelcome = step.id === 'welcome'
-  const isComplete = step.id === 'complete'
+  const isWelcome = step.id.startsWith('welcome')
+  const isComplete = step.id.startsWith('complete')
   const padding = step.spotlightPadding || 0
 
   // Calculate tooltip position
@@ -260,6 +302,9 @@ export default function OnboardingTour({ forceShow = false, onComplete }: Onboar
         }
     }
   }
+
+  const phaseLabel = phase === 'schedule' ? 'Schedule Tour' : 'EHR Tour'
+  const phaseIcon = phase === 'schedule' ? '📅' : '📋'
 
   return (
     <>
@@ -348,6 +393,8 @@ export default function OnboardingTour({ forceShow = false, onComplete }: Onboar
           style={{
             background: isComplete
               ? 'linear-gradient(135deg, #10B981 0%, #059669 100%)'
+              : phase === 'schedule'
+              ? 'linear-gradient(135deg, #6366F1 0%, #4F46E5 100%)'
               : 'linear-gradient(135deg, #0D9488 0%, #0F766E 100%)',
             padding: '20px 24px',
             color: 'white',
@@ -355,9 +402,7 @@ export default function OnboardingTour({ forceShow = false, onComplete }: Onboar
         >
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '8px' }}>
             {isWelcome && (
-              <svg width="28" height="28" viewBox="0 0 24 24" fill="currentColor">
-                <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
-              </svg>
+              <span style={{ fontSize: '24px' }}>{phaseIcon}</span>
             )}
             {isComplete && (
               <svg width="28" height="28" viewBox="0 0 24 24" fill="currentColor">
@@ -384,8 +429,23 @@ export default function OnboardingTour({ forceShow = false, onComplete }: Onboar
             <h3 style={{ margin: 0, fontSize: '18px', fontWeight: 600 }}>{step.title}</h3>
           </div>
 
+          {/* Phase indicator */}
+          <div style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '6px',
+            background: 'rgba(255, 255, 255, 0.15)',
+            padding: '4px 10px',
+            borderRadius: '12px',
+            fontSize: '12px',
+            marginBottom: '8px',
+          }}>
+            <span>{phaseIcon}</span>
+            <span>{phaseLabel}</span>
+          </div>
+
           {/* Progress dots */}
-          <div style={{ display: 'flex', gap: '6px', marginTop: '12px' }}>
+          <div style={{ display: 'flex', gap: '6px', marginTop: '8px' }}>
             {TOUR_STEPS.map((_, index) => (
               <div
                 key={index}
@@ -470,6 +530,8 @@ export default function OnboardingTour({ forceShow = false, onComplete }: Onboar
                 border: 'none',
                 background: isComplete
                   ? 'linear-gradient(135deg, #10B981 0%, #059669 100%)'
+                  : phase === 'schedule'
+                  ? 'linear-gradient(135deg, #6366F1 0%, #4F46E5 100%)'
                   : 'linear-gradient(135deg, #0D9488 0%, #0F766E 100%)',
                 color: 'white',
                 fontSize: '13px',
@@ -506,11 +568,32 @@ export default function OnboardingTour({ forceShow = false, onComplete }: Onboar
   )
 }
 
-// Helper function to reset the tour (for testing)
-export function resetOnboardingTour() {
+// Helper functions to reset tours
+export function resetScheduleTour() {
   try {
-    localStorage.removeItem(TOUR_STORAGE_KEY)
+    localStorage.removeItem(TOUR_STORAGE_KEYS.schedule)
   } catch {
     // localStorage not available
   }
 }
+
+export function resetEhrTour() {
+  try {
+    localStorage.removeItem(TOUR_STORAGE_KEYS.ehr)
+  } catch {
+    // localStorage not available
+  }
+}
+
+export function resetAllTours() {
+  try {
+    localStorage.removeItem(TOUR_STORAGE_KEYS.schedule)
+    localStorage.removeItem(TOUR_STORAGE_KEYS.ehr)
+    localStorage.removeItem(LEGACY_TOUR_KEY)
+  } catch {
+    // localStorage not available
+  }
+}
+
+// Legacy export for backward compatibility
+export const resetOnboardingTour = resetAllTours

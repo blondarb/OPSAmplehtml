@@ -214,13 +214,16 @@ export default function AppointmentsDashboard({
           </h1>
 
           {/* View Switcher */}
-          <div style={{
-            display: 'flex',
-            alignItems: 'center',
-            background: 'var(--bg-gray)',
-            borderRadius: '8px',
-            padding: '3px',
-          }}>
+          <div
+            data-tour="view-toggle"
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              background: 'var(--bg-gray)',
+              borderRadius: '8px',
+              padding: '3px',
+            }}
+          >
             {(['day', 'week', 'month'] as CalendarViewMode[]).map(mode => (
               <button
                 key={mode}

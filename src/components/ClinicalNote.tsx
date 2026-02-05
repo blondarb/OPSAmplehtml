@@ -12,7 +12,7 @@ import DotPhrasesDrawer from './DotPhrasesDrawer'
 import EnhancedNotePreviewModal from './EnhancedNotePreviewModal'
 import SettingsDrawer from './SettingsDrawer'
 import IdeasDrawer from './IdeasDrawer'
-import OnboardingTour, { resetOnboardingTour } from './OnboardingTour'
+import OnboardingTour, { resetAllTours, type TourPhase } from './OnboardingTour'
 import PatientAppointments, { type Appointment } from './PatientAppointments'
 import ScheduleFollowupModal from './ScheduleFollowupModal'
 import ScheduleNewPatientModal from './ScheduleNewPatientModal'
@@ -203,6 +203,7 @@ export default function ClinicalNote({
   const [ideasDrawerOpen, setIdeasDrawerOpen] = useState(false)
   const [ideasDrawerTab, setIdeasDrawerTab] = useState<'inspiration' | 'tour' | 'features' | 'workflows' | 'feedback'>('workflows')
   const [showTour, setShowTour] = useState(false)
+  const [tourPhase, setTourPhase] = useState<TourPhase>('schedule')
   const [activeTextField, setActiveTextField] = useState<string | null>(null)
   const [selectedRecommendations, setSelectedRecommendations] = useState<RecommendationItem[]>([])
   const [followupModalOpen, setFollowupModalOpen] = useState(false)
@@ -891,8 +892,8 @@ export default function ClinicalNote({
         setResetModalOpen(false)
         return
       }
-      // Reset the onboarding tour so it replays
-      resetOnboardingTour()
+      // Reset the onboarding tours so they replay
+      resetAllTours()
       // Go back to appointments view and reload the page
       window.location.href = '/dashboard'
     } catch (err) {
@@ -1519,11 +1520,16 @@ export default function ClinicalNote({
         isOpen={ideasDrawerOpen}
         onClose={() => setIdeasDrawerOpen(false)}
         initialTab={ideasDrawerTab}
-        onStartTour={() => setShowTour(true)}
+        onStartTour={(phase?: TourPhase) => {
+          setTourPhase(phase || (selectedAppointment ? 'ehr' : 'schedule'))
+          setShowTour(true)
+        }}
       />
 
       {/* Onboarding Tour for new users or when manually triggered */}
+      {/* Show schedule tour when on appointments view, EHR tour when patient selected */}
       <OnboardingTour
+        phase={selectedAppointment ? 'ehr' : tourPhase}
         forceShow={showTour}
         onComplete={() => setShowTour(false)}
       />

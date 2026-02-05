@@ -2,12 +2,13 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { useVoiceRecorder } from '@/hooks/useVoiceRecorder'
+import type { TourPhase } from './OnboardingTour'
 
 interface IdeasDrawerProps {
   isOpen: boolean
   onClose: () => void
   initialTab?: 'inspiration' | 'tour' | 'features' | 'workflows' | 'feedback'
-  onStartTour?: () => void
+  onStartTour?: (phase?: TourPhase) => void
 }
 
 // Workflow quick selection guide
@@ -965,53 +966,101 @@ export default function IdeasDrawer({ isOpen, onClose, initialTab, onStartTour }
           {/* Tour Tab */}
           {activeTab === 'tour' && (
             <div>
-              {/* Launch Interactive Tour Button */}
+              {/* Launch Interactive Tour Buttons - Two Phases */}
               {onStartTour && (
-                <div style={{
-                  marginBottom: '24px',
-                  padding: '16px',
-                  background: 'linear-gradient(135deg, #0D9488 0%, #06B6D4 100%)',
-                  borderRadius: '12px',
-                  color: 'white',
-                }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '12px' }}>
-                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                      <circle cx="12" cy="12" r="10"/>
-                      <polygon points="10 8 16 12 10 16 10 8" fill="currentColor"/>
-                    </svg>
-                    <div>
-                      <h4 style={{ fontSize: '14px', fontWeight: 600, margin: 0 }}>Interactive Guided Tour</h4>
-                      <p style={{ fontSize: '12px', opacity: 0.9, margin: '2px 0 0 0' }}>
-                        See each feature highlighted on the actual interface
-                      </p>
+                <div style={{ marginBottom: '24px' }}>
+                  <h4 style={{ fontSize: '13px', fontWeight: 600, margin: '0 0 12px 0', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                    Interactive Tours
+                  </h4>
+
+                  {/* Schedule Tour */}
+                  <div style={{
+                    marginBottom: '12px',
+                    padding: '16px',
+                    background: 'linear-gradient(135deg, #6366F1 0%, #4F46E5 100%)',
+                    borderRadius: '12px',
+                    color: 'white',
+                  }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '12px' }}>
+                      <span style={{ fontSize: '24px' }}>📅</span>
+                      <div>
+                        <h4 style={{ fontSize: '14px', fontWeight: 600, margin: 0 }}>Schedule Tour</h4>
+                        <p style={{ fontSize: '12px', opacity: 0.9, margin: '2px 0 0 0' }}>
+                          Learn the appointments dashboard and calendar views
+                        </p>
+                      </div>
                     </div>
+                    <button
+                      onClick={() => {
+                        onClose()
+                        onStartTour('schedule')
+                      }}
+                      style={{
+                        width: '100%',
+                        padding: '10px',
+                        borderRadius: '8px',
+                        border: '2px solid rgba(255,255,255,0.3)',
+                        background: 'rgba(255,255,255,0.15)',
+                        color: 'white',
+                        fontSize: '13px',
+                        fontWeight: 600,
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: '8px',
+                      }}
+                    >
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <path d="M5 3l14 9-14 9V3z"/>
+                      </svg>
+                      Start Schedule Tour
+                    </button>
                   </div>
-                  <button
-                    onClick={() => {
-                      onClose()
-                      onStartTour()
-                    }}
-                    style={{
-                      width: '100%',
-                      padding: '10px',
-                      borderRadius: '8px',
-                      border: '2px solid rgba(255,255,255,0.3)',
-                      background: 'rgba(255,255,255,0.15)',
-                      color: 'white',
-                      fontSize: '13px',
-                      fontWeight: 600,
-                      cursor: 'pointer',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      gap: '8px',
-                    }}
-                  >
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                      <path d="M5 3l14 9-14 9V3z"/>
-                    </svg>
-                    Launch Interactive Tour
-                  </button>
+
+                  {/* EHR Tour */}
+                  <div style={{
+                    padding: '16px',
+                    background: 'linear-gradient(135deg, #0D9488 0%, #0F766E 100%)',
+                    borderRadius: '12px',
+                    color: 'white',
+                  }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '12px' }}>
+                      <span style={{ fontSize: '24px' }}>📋</span>
+                      <div>
+                        <h4 style={{ fontSize: '14px', fontWeight: 600, margin: 0 }}>EHR Tour</h4>
+                        <p style={{ fontSize: '12px', opacity: 0.9, margin: '2px 0 0 0' }}>
+                          Master clinical documentation, AI features, and note generation
+                        </p>
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => {
+                        onClose()
+                        onStartTour('ehr')
+                      }}
+                      style={{
+                        width: '100%',
+                        padding: '10px',
+                        borderRadius: '8px',
+                        border: '2px solid rgba(255,255,255,0.3)',
+                        background: 'rgba(255,255,255,0.15)',
+                        color: 'white',
+                        fontSize: '13px',
+                        fontWeight: 600,
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: '8px',
+                      }}
+                    >
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <path d="M5 3l14 9-14 9V3z"/>
+                      </svg>
+                      Start EHR Tour
+                    </button>
+                  </div>
                 </div>
               )}
 
