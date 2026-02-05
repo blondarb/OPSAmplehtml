@@ -82,7 +82,7 @@ const healthyNormalTasks: SDNETaskResult[] = [
 
 const healthyNormal: SDNESessionResult = {
   sessionId: 'sdne-healthy-normal',
-  examDate: new Date().toISOString(),
+  examDate: '2026-02-05T10:00:00.000Z', // Fixed date for SSR hydration
   totalDurationSeconds: 862,
   completed: true,
   sessionFlag: 'GREEN',
@@ -128,7 +128,7 @@ const parkinsonismTasks: SDNETaskResult[] = [
 
 const parkinsonism: SDNESessionResult = {
   sessionId: 'sdne-parkinsonism',
-  examDate: new Date().toISOString(),
+  examDate: '2026-02-05T10:15:00.000Z', // Fixed date for SSR hydration
   totalDurationSeconds: 885,
   completed: true,
   sessionFlag: 'RED',
@@ -200,7 +200,7 @@ const cognitiveImpairmentTasks: SDNETaskResult[] = [
 
 const cognitiveImpairment: SDNESessionResult = {
   sessionId: 'sdne-cognitive-impairment',
-  examDate: new Date().toISOString(),
+  examDate: '2026-02-05T10:30:00.000Z', // Fixed date for SSR hydration
   totalDurationSeconds: 846,
   completed: true,
   sessionFlag: 'RED',
@@ -272,7 +272,7 @@ const fallRiskTasks: SDNETaskResult[] = [
 
 const fallRisk: SDNESessionResult = {
   sessionId: 'sdne-fall-risk',
-  examDate: new Date().toISOString(),
+  examDate: '2026-02-05T10:45:00.000Z', // Fixed date for SSR hydration
   totalDurationSeconds: 955,
   completed: true,
   sessionFlag: 'RED',
@@ -355,7 +355,7 @@ const postStrokeTasks: SDNETaskResult[] = [
 
 const postStroke: SDNESessionResult = {
   sessionId: 'sdne-post-stroke',
-  examDate: new Date().toISOString(),
+  examDate: '2026-02-05T11:00:00.000Z', // Fixed date for SSR hydration
   totalDurationSeconds: 882,
   completed: true,
   sessionFlag: 'RED',
