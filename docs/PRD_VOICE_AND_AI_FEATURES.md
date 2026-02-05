@@ -471,8 +471,23 @@ formData.append('audio', audioBlob, `recording.${extension}`)
 ### Pipeline
 1. Receive audio file (webm/mp4/m4a/ogg)
 2. Transcribe with Whisper (`whisper-1`)
-3. Clean up with GPT-5-mini (remove filler words, fix medical terms)
+3. Clean up with GPT-5-mini:
+   - Fix grammar, punctuation, and spelling errors
+   - Correct medical terminology and abbreviations
+   - **Handle verbal corrections** (e.g., "right hand, no wait, left hand" → "left hand")
+   - Remove filler words (um, uh, like, you know) and false starts
+   - Remove meta-commentary about the dictation
+   - Never add information that wasn't dictated
 4. Return cleaned transcript
+
+### Transcription Cleanup Rules
+| Behavior | Example Input | Example Output |
+|----------|---------------|----------------|
+| Verbal corrections | "right hand numbness, no I mean left hand" | "left hand numbness" |
+| Filler words | "She, um, has had headaches for, like, two weeks" | "She has had headaches for two weeks" |
+| False starts | "The patient, the patient reports..." | "The patient reports..." |
+| Medical terms | "topomax 100 milligrams" | "Topiramate 100 mg" |
+| Meta-commentary | "Let me start over. She presents with..." | "She presents with..." |
 
 ## 9. Note Merge Engine
 
