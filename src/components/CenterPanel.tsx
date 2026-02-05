@@ -1760,7 +1760,7 @@ ${noteData.plan || 'Not documented'}`.trim()
             <div data-section="allergies-section">
             <div style={{ position: 'relative', marginBottom: '16px' }}>
               {/* Only show Required badge if no allergies are listed and no status selected */}
-              {!(allergies.filter(a => a.is_active).length > 0 || noteData.allergies) && (
+              {!((allergies ?? []).filter(a => a.is_active).length > 0 || noteData.allergies) && (
                 <span style={{
                   position: 'absolute',
                   right: '-12px',
@@ -1784,11 +1784,11 @@ ${noteData.plan || 'Not documented'}`.trim()
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                     <span style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text-primary)' }}>Allergies</span>
                     {/* Only show asterisk if no allergies listed and no status selected */}
-                    {!(allergies.filter(a => a.is_active).length > 0 || noteData.allergies) && (
+                    {!((allergies ?? []).filter(a => a.is_active).length > 0 || noteData.allergies) && (
                       <span style={{ color: '#EF4444', marginLeft: '2px' }}>*</span>
                     )}
                     {/* Show green checkmark when allergies are reviewed */}
-                    {(allergies.filter(a => a.is_active).length > 0 || noteData.allergies) && (
+                    {((allergies ?? []).filter(a => a.is_active).length > 0 || noteData.allergies) && (
                       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#10B981" strokeWidth="2.5">
                         <polyline points="20 6 9 17 4 12"/>
                       </svg>
@@ -1808,7 +1808,7 @@ ${noteData.plan || 'Not documented'}`.trim()
                 </div>
 
                 {/* Quick shortcuts */}
-                <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginBottom: (allergies.length > 0 || showAllergyForm) ? '12px' : '0' }}>
+                <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginBottom: ((allergies ?? []).length > 0 || showAllergyForm) ? '12px' : '0' }}>
                   {ALLERGY_OPTIONS.map(option => (
                     <button
                       key={option}
@@ -1839,9 +1839,9 @@ ${noteData.plan || 'Not documented'}`.trim()
                 </div>
 
                 {/* Allergy pills */}
-                {allergies.filter(a => a.is_active && a.allergen !== 'NKDA').length > 0 && (
+                {(allergies ?? []).filter(a => a.is_active && a.allergen !== 'NKDA').length > 0 && (
                   <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginBottom: showAllergyForm ? '12px' : '0' }}>
-                    {allergies.filter(a => a.is_active && a.allergen !== 'NKDA').map(allergy => {
+                    {(allergies ?? []).filter(a => a.is_active && a.allergen !== 'NKDA').map(allergy => {
                       const severityColors: Record<string, { bg: string; text: string; border: string }> = {
                         'life-threatening': { bg: '#FEE2E2', text: '#991B1B', border: '#FCA5A5' },
                         severe: { bg: '#FEF3C7', text: '#92400E', border: '#FCD34D' },
