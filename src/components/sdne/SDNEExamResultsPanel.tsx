@@ -112,13 +112,18 @@ export function SDNEExamResultsPanel({
     return trends
   }, [hasHistory, selectedSessionIndex, session.domainFlags, allSessions])
 
+  const handleToggle = () => {
+    setIsExpanded(prev => !prev)
+  }
+
   return (
     <div
       style={{ border: '1px solid var(--border)', borderRadius: '8px', marginBottom: '8px', overflow: 'hidden' }}
     >
       {/* Header - clickable accordion toggle */}
-      <div
-        onClick={() => setIsExpanded(!isExpanded)}
+      <button
+        type="button"
+        onClick={handleToggle}
         style={{
           display: 'flex',
           alignItems: 'center',
@@ -127,6 +132,9 @@ export function SDNEExamResultsPanel({
           background: isExpanded ? 'var(--bg-dark)' : 'transparent',
           cursor: 'pointer',
           transition: 'background 0.15s ease',
+          width: '100%',
+          border: 'none',
+          textAlign: 'left',
         }}
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
@@ -191,11 +199,12 @@ export function SDNEExamResultsPanel({
             transform: isExpanded ? 'rotate(180deg)' : 'rotate(0deg)',
             transition: 'transform 0.2s ease',
             color: 'var(--text-muted)',
+            flexShrink: 0,
           }}
         >
           <polyline points="6 9 12 15 18 9" />
         </svg>
-      </div>
+      </button>
 
       {/* Expanded content */}
       {isExpanded && (
