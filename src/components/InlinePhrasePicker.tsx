@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, forwardRef } from 'react'
 
 interface Phrase {
   id: string
@@ -18,15 +18,14 @@ interface InlinePhrasePickerProps {
   onOpenFullDrawer: () => void
 }
 
-export default function InlinePhrasePicker({
+const InlinePhrasePicker = forwardRef<HTMLDivElement, InlinePhrasePickerProps>(({
   fieldName,
   onInsertPhrase,
   onOpenFullDrawer
-}: InlinePhrasePickerProps) {
+}, ref) => {
   const [phrases, setPhrases] = useState<Phrase[]>([])
   const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState('')
-  const containerRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     fetchPhrases()
@@ -82,7 +81,7 @@ export default function InlinePhrasePicker({
 
   return (
     <div
-      ref={containerRef}
+      ref={ref}
       style={{
         position: 'fixed',
         top: '120px',
@@ -255,4 +254,8 @@ export default function InlinePhrasePicker({
       </div>
     </div>
   )
-}
+})
+
+InlinePhrasePicker.displayName = 'InlinePhrasePicker'
+
+export default InlinePhrasePicker

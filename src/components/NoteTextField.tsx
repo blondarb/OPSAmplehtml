@@ -50,6 +50,7 @@ export default function NoteTextField({
   const [showPicker, setShowPicker] = useState(false)
   const [phrases, setPhrases] = useState<Phrase[]>([])
   const containerRef = useRef<HTMLDivElement>(null)
+  const pickerRef = useRef<HTMLDivElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const lastExpandedRef = useRef<string>('')
 
@@ -204,7 +205,12 @@ export default function NoteTextField({
   // Close picker when clicking outside
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
+      const target = event.target as Node
+      const isInsideContainer = containerRef.current?.contains(target)
+      const isInsidePicker = pickerRef.current?.contains(target)
+
+      // Close if click is outside both the container AND the picker
+      if (!isInsideContainer && !isInsidePicker) {
         setShowPicker(false)
         setShowAiMenu(false)
       }
@@ -559,6 +565,7 @@ export default function NoteTextField({
         {/* Inline Phrase Picker - positioned above buttons */}
         {showPicker && (
           <InlinePhrasePicker
+            ref={pickerRef}
             fieldName={fieldName}
             onInsertPhrase={handleInsertPhrase}
             onOpenFullDrawer={handleOpenFullDrawer}

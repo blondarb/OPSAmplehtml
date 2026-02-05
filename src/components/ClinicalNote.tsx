@@ -40,11 +40,12 @@ interface ClinicalNoteProps {
 }
 
 // Icon sidebar navigation
-function IconSidebar({ activeIcon, setActiveIcon, viewMode, onViewModeChange }: {
+function IconSidebar({ activeIcon, setActiveIcon, viewMode, onViewModeChange, onOpenSettings }: {
   activeIcon: string,
   setActiveIcon: (icon: string) => void,
   viewMode: 'appointments' | 'chart',
-  onViewModeChange: (mode: 'appointments' | 'chart') => void
+  onViewModeChange: (mode: 'appointments' | 'chart') => void,
+  onOpenSettings: () => void
 }) {
   const icons = [
     { id: 'home', tooltip: 'Appointments', icon: (
@@ -122,6 +123,10 @@ function IconSidebar({ activeIcon, setActiveIcon, viewMode, onViewModeChange }: 
     // Notes icon shows current chart (if a patient is selected)
     if (iconId === 'notes') {
       onViewModeChange('chart')
+    }
+    // Settings icon opens the settings drawer
+    if (iconId === 'settings') {
+      onOpenSettings()
     }
   }
 
@@ -1338,6 +1343,7 @@ export default function ClinicalNote({
           setActiveIcon={setActiveIcon}
           viewMode={viewMode}
           onViewModeChange={setViewMode}
+          onOpenSettings={() => setSettingsOpen(true)}
         />
 
         {/* Main Content Area - Switch between Appointments and Chart view */}
