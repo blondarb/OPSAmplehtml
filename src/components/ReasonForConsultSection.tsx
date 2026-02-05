@@ -217,15 +217,11 @@ export default function ReasonForConsultSection({
                     fontWeight: 500,
                     color: isSelected ? 'var(--primary)' : 'var(--text-primary)',
                     textAlign: 'left',
-                    lineHeight: 1.2,
+                    lineHeight: 1.3,
+                    whiteSpace: 'nowrap',
                   }}
                 >
                   {category.label}
-                  {isSelected && (
-                    <span style={{ display: 'block', fontSize: '10px', fontWeight: 400, color: 'var(--text-muted)', marginTop: '1px' }}>
-                      (select details below)
-                    </span>
-                  )}
                 </span>
               </button>
             )
