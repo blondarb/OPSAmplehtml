@@ -1,16 +1,11 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 
-// Check if user is a feedback admin
-async function isAdmin(email: string | undefined): Promise<boolean> {
-  if (!email) return false
-  // Check environment variable first (comma-separated emails)
-  const envAdmins = process.env.FEEDBACK_ADMIN_EMAILS
-  if (envAdmins) {
-    const adminList = envAdmins.split(',').map(e => e.trim().toLowerCase())
-    if (adminList.includes(email.toLowerCase())) return true
-  }
-  // Check app_settings table as fallback
+// Seed admin - always has admin access and cannot be removed
+const SEED_ADMIN_EMAIL = 'steve@sevaro.com'
+
+// Get list of elevated admin emails from app_settings
+async function getElevatedAdmins(): Promise<string[]> {
   try {
     const supabase = await createClient()
     const { data } = await supabase
@@ -19,13 +14,29 @@ async function isAdmin(email: string | undefined): Promise<boolean> {
       .eq('key', 'feedback_admin_emails')
       .single()
     if (data?.value) {
-      const adminList = data.value.split(',').map((e: string) => e.trim().toLowerCase())
-      return adminList.includes(email.toLowerCase())
+      return data.value.split(',').map((e: string) => e.trim().toLowerCase()).filter(Boolean)
     }
   } catch {
-    // Ignore - no admin setting configured
+    // No admin setting configured yet
   }
-  return false
+  return []
+}
+
+// Check if user is a feedback admin
+async function isAdmin(email: string | undefined): Promise<boolean> {
+  if (!email) return false
+  const emailLower = email.toLowerCase()
+  // Seed admin always has access
+  if (emailLower === SEED_ADMIN_EMAIL) return true
+  // Check environment variable (comma-separated emails)
+  const envAdmins = process.env.FEEDBACK_ADMIN_EMAILS
+  if (envAdmins) {
+    const adminList = envAdmins.split(',').map(e => e.trim().toLowerCase())
+    if (adminList.includes(emailLower)) return true
+  }
+  // Check elevated admins from app_settings
+  const elevated = await getElevatedAdmins()
+  return elevated.includes(emailLower)
 }
 
 // GET /api/feedback - List all feedback with comments count
