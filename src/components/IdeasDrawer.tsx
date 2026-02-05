@@ -295,6 +295,7 @@ export default function IdeasDrawer({ isOpen, onClose, initialTab, onStartTour }
   const [adminDataLoading, setAdminDataLoading] = useState(false)
   const [systemPrompts, setSystemPrompts] = useState<Array<{ id: string; name: string; file: string; model: string; description: string }>>([])
   const [expandedPrompt, setExpandedPrompt] = useState<string | null>(null)
+  const [backlogCopied, setBacklogCopied] = useState(false)
 
   // Voice recording for feedback
   const {
@@ -2142,6 +2143,124 @@ export default function IdeasDrawer({ isOpen, onClose, initialTab, onStartTour }
                           </button>
                         </div>
                       </div>
+
+                      {/* Copy Approved Backlog Section */}
+                      {(() => {
+                        const approvedItems = allFeedback.filter(f => f.status === 'approved')
+                        return (
+                          <div style={{
+                            marginBottom: '24px',
+                            padding: '16px',
+                            borderRadius: '12px',
+                            background: 'linear-gradient(135deg, #EDE9FE 0%, #DDD6FE 100%)',
+                            border: '1px solid #C4B5FD',
+                          }}>
+                            <h4 style={{ fontSize: '14px', fontWeight: 600, margin: '0 0 8px 0', color: '#6D28D9', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/>
+                                <path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/>
+                              </svg>
+                              Approved Backlog
+                            </h4>
+                            <p style={{ fontSize: '12px', color: '#7C3AED', margin: '0 0 12px 0' }}>
+                              {approvedItems.length === 0
+                                ? 'No approved items yet. Approve feedback in the Browse tab to build a backlog.'
+                                : `${approvedItems.length} approved item${approvedItems.length !== 1 ? 's' : ''} ready to copy for dev planning.`
+                              }
+                            </p>
+
+                            {approvedItems.length > 0 && (
+                              <>
+                                <div style={{
+                                  maxHeight: '200px',
+                                  overflowY: 'auto',
+                                  marginBottom: '12px',
+                                  display: 'flex',
+                                  flexDirection: 'column',
+                                  gap: '6px',
+                                }}>
+                                  {approvedItems.map((item, idx) => (
+                                    <div key={item.id} style={{
+                                      padding: '8px 10px',
+                                      borderRadius: '6px',
+                                      background: 'white',
+                                      border: '1px solid #C4B5FD',
+                                      fontSize: '12px',
+                                      color: 'var(--text-primary)',
+                                      lineHeight: 1.4,
+                                    }}>
+                                      <span style={{ fontWeight: 600, color: '#7C3AED', marginRight: '6px' }}>#{idx + 1}</span>
+                                      {item.text}
+                                      <div style={{ display: 'flex', gap: '8px', marginTop: '4px', fontSize: '11px', color: 'var(--text-muted)' }}>
+                                        <span>{item.user_email}</span>
+                                        <span>·</span>
+                                        <span>{item.upvotes.length} upvote{item.upvotes.length !== 1 ? 's' : ''}</span>
+                                        <span>·</span>
+                                        <span>{item.comment_count} comment{item.comment_count !== 1 ? 's' : ''}</span>
+                                      </div>
+                                    </div>
+                                  ))}
+                                </div>
+
+                                <button
+                                  onClick={() => {
+                                    const lines = approvedItems.map((item, idx) => {
+                                      const net = item.upvotes.length - item.downvotes.length
+                                      const parts = [
+                                        `${idx + 1}. ${item.text}`,
+                                        `   By: ${item.user_email} | Votes: ${net >= 0 ? '+' : ''}${net} | Comments: ${item.comment_count}`,
+                                        `   Submitted: ${new Date(item.created_at).toLocaleDateString()}`,
+                                      ]
+                                      if (item.admin_response) {
+                                        parts.push(`   Admin note: ${item.admin_response}`)
+                                      }
+                                      return parts.join('\n')
+                                    })
+                                    const text = `=== Approved Feedback Backlog (${approvedItems.length} items) ===\nExported: ${new Date().toLocaleString()}\n\n${lines.join('\n\n')}`
+                                    navigator.clipboard.writeText(text).then(() => {
+                                      setBacklogCopied(true)
+                                      setTimeout(() => setBacklogCopied(false), 2000)
+                                    })
+                                  }}
+                                  style={{
+                                    width: '100%',
+                                    padding: '10px',
+                                    borderRadius: '8px',
+                                    border: 'none',
+                                    background: backlogCopied ? '#10B981' : '#7C3AED',
+                                    color: 'white',
+                                    fontSize: '13px',
+                                    fontWeight: 600,
+                                    cursor: 'pointer',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    gap: '8px',
+                                    transition: 'background 0.2s',
+                                  }}
+                                >
+                                  {backlogCopied ? (
+                                    <>
+                                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                                        <polyline points="20 6 9 17 4 12"/>
+                                      </svg>
+                                      Copied to Clipboard!
+                                    </>
+                                  ) : (
+                                    <>
+                                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                        <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/>
+                                        <path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/>
+                                      </svg>
+                                      Copy Approved Backlog
+                                    </>
+                                  )}
+                                </button>
+                              </>
+                            )}
+                          </div>
+                        )
+                      })()}
 
                       {/* System Prompts Section */}
                       <div>
