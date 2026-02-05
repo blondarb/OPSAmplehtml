@@ -258,7 +258,7 @@ export default function LeftSidebar({ patient, priorVisits, scoreHistory, patien
         {medsOpen && (
           <div>
             {/* Severe/life-threatening allergy alerts */}
-            {allergies.filter(a => a.is_active && (a.severity === 'severe' || a.severity === 'life-threatening')).length > 0 && (
+            {(allergies ?? []).filter(a => a.is_active && (a.severity === 'severe' || a.severity === 'life-threatening')).length > 0 && (
               <div style={{
                 background: '#FEE2E2',
                 border: '1px solid #FCA5A5',
@@ -275,7 +275,7 @@ export default function LeftSidebar({ patient, priorVisits, scoreHistory, patien
                   <line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>
                 </svg>
                 <div style={{ fontSize: '11px', color: '#991B1B', fontWeight: 500 }}>
-                  {allergies.filter(a => a.is_active && (a.severity === 'severe' || a.severity === 'life-threatening')).map(a =>
+                  {(allergies ?? []).filter(a => a.is_active && (a.severity === 'severe' || a.severity === 'life-threatening')).map(a =>
                     `${a.allergen}${a.reaction ? ` (${a.reaction})` : ''}`
                   ).join(', ')}
                 </div>
@@ -313,11 +313,11 @@ export default function LeftSidebar({ patient, priorVisits, scoreHistory, patien
             )}
 
             {/* Active allergies summary */}
-            {allergies.filter(a => a.is_active).length > 0 && (
+            {(allergies ?? []).filter(a => a.is_active).length > 0 && (
               <div style={{ marginTop: '8px', paddingTop: '8px', borderTop: '1px solid var(--border)' }}>
                 <div style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text-muted)', marginBottom: '4px', textTransform: 'uppercase' }}>Allergies</div>
                 <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>
-                  {allergies.filter(a => a.is_active).map(a => a.allergen).join(', ')}
+                  {(allergies ?? []).filter(a => a.is_active).map(a => a.allergen).join(', ')}
                 </div>
               </div>
             )}

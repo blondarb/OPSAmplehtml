@@ -1105,7 +1105,7 @@ ${noteData.plan || 'Not documented'}`.trim()
                     { label: 'Chief complaint documented', check: !!noteData.chiefComplaint?.length },
                     { label: 'HPI completed (min. 25 words)', check: (noteData.hpi?.split(' ').length || 0) >= 25 },
                     { label: 'Review of systems documented', check: !!noteData.ros },
-                    { label: 'Allergies documented', check: !!noteData.allergies || allergies.length > 0 },
+                    { label: 'Allergies documented', check: !!noteData.allergies || (allergies ?? []).length > 0 },
                     { label: 'Assessment completed', check: !!noteData.assessment },
                   ].map((item, i) => (
                     <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
