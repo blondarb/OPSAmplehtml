@@ -3,10 +3,16 @@ import { NextResponse } from 'next/server'
 
 const SEED_ADMIN_EMAIL = 'steve@sevaro.com'
 
+// Temporary: allow all authenticated users admin access for feedback review
+// TODO: Set to false once admin roles are fully configured in production
+const ALLOW_ALL_ADMIN = true
+
 async function getAuthenticatedAdmin() {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { user: null, supabase, error: 'Unauthorized' }
+
+  if (ALLOW_ALL_ADMIN) return { user, supabase, error: null }
 
   const emailLower = (user.email || '').toLowerCase()
   let isAdmin = emailLower === SEED_ADMIN_EMAIL

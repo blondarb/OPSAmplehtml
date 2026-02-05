@@ -4,6 +4,10 @@ import { NextResponse } from 'next/server'
 // Seed admin - always has admin access and cannot be removed
 const SEED_ADMIN_EMAIL = 'steve@sevaro.com'
 
+// Temporary: allow all authenticated users admin access for feedback review
+// TODO: Set to false once admin roles are fully configured in production
+const ALLOW_ALL_ADMIN = true
+
 // Get list of elevated admin emails from app_settings
 async function getElevatedAdmins(): Promise<string[]> {
   try {
@@ -24,6 +28,7 @@ async function getElevatedAdmins(): Promise<string[]> {
 
 // Check if user is a feedback admin
 async function isAdmin(email: string | undefined): Promise<boolean> {
+  if (ALLOW_ALL_ADMIN) return true
   if (!email) return false
   const emailLower = email.toLowerCase()
   // Seed admin always has access
