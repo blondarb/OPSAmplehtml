@@ -70,7 +70,7 @@ Respond with valid JSON matching this schema:
 If the note has no issues, return: { "suggestions": [] }`
 
     const completion = await openai.chat.completions.create({
-      model: 'gpt-4o-mini',
+      model: 'gpt-5-mini',
       messages: [
         { role: 'system', content: systemPrompt },
         { role: 'user', content: noteText }

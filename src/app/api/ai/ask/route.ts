@@ -88,7 +88,7 @@ ${context?.fullNoteText ? `\nFull Clinical Note:\n${context.fullNoteText}\n` : '
 Provide concise, evidence-based responses. When discussing medications, include typical dosing. Always recommend consulting current guidelines for complex decisions.${userPreferences}`
 
     const completion = await openai.chat.completions.create({
-      model: 'gpt-4o-mini', // Cost-effective for general Q&A ($0.15/$0.60 per 1M tokens)
+      model: 'gpt-5-mini', // Cost-effective for general Q&A ($0.25/$2 per 1M tokens)
       messages: [
         { role: 'system', content: systemPrompt },
         { role: 'user', content: question }
