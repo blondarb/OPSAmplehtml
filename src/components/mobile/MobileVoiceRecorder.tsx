@@ -2,16 +2,38 @@
 
 import { useState, useRef, useEffect } from 'react'
 
+interface ChartPrepSections {
+  summary?: string
+  alerts?: string
+  suggestedHPI?: string
+  suggestedAssessment?: string
+  suggestedPlan?: string
+}
+
 interface MobileVoiceRecorderProps {
   onTranscription: (text: string, rawText: string) => void
   onClose: () => void
   fieldLabel?: string
+  mode?: 'dictate' | 'chart-prep'
+  patient?: {
+    id: string
+    name: string
+    age: number
+    gender: string
+    reason?: string
+  }
+  noteData?: Record<string, string>
+  onChartPrepComplete?: (sections: ChartPrepSections) => void
 }
 
 export default function MobileVoiceRecorder({
   onTranscription,
   onClose,
   fieldLabel = 'Note',
+  mode = 'dictate',
+  patient,
+  noteData,
+  onChartPrepComplete,
 }: MobileVoiceRecorderProps) {
   const [isRecording, setIsRecording] = useState(false)
   const [isPaused, setIsPaused] = useState(false)
@@ -19,6 +41,9 @@ export default function MobileVoiceRecorder({
   const [duration, setDuration] = useState(0)
   const [audioLevel, setAudioLevel] = useState(0)
   const [error, setError] = useState<string | null>(null)
+  const [chartPrepSections, setChartPrepSections] = useState<ChartPrepSections | null>(null)
+  const [showChartPrepResults, setShowChartPrepResults] = useState(false)
+  const [transcribedText, setTranscribedText] = useState<string | null>(null)
 
   const mediaRecorderRef = useRef<MediaRecorder | null>(null)
   const chunksRef = useRef<Blob[]>([])
@@ -225,6 +250,14 @@ export default function MobileVoiceRecorder({
         throw new Error('No speech detected. Please try again.')
       }
 
+      // In chart-prep mode, process with AI after transcription
+      if (mode === 'chart-prep') {
+        setTranscribedText(data.text)
+        audioBlobRef.current = null
+        await processChartPrep(data.text)
+        return // Don't call onTranscription in chart-prep mode
+      }
+
       onTranscription(data.text, data.rawText || data.text)
       audioBlobRef.current = null // Clear on success
 
@@ -248,6 +281,74 @@ export default function MobileVoiceRecorder({
     const mins = Math.floor(seconds / 60)
     const secs = seconds % 60
     return `${mins}:${secs.toString().padStart(2, '0')}`
+  }
+
+  const processChartPrep = async (transcription: string) => {
+    setIsProcessing(true)
+    setError(null)
+
+    try {
+      const response = await fetch('/api/ai/chart-prep', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          patient: patient ? {
+            id: patient.id,
+            first_name: patient.name.split(' ')[0],
+            last_name: patient.name.split(' ').slice(1).join(' '),
+            date_of_birth: '', // Not available from mobile view
+            gender: patient.gender,
+          } : undefined,
+          noteData: {
+            chiefComplaint: patient?.reason ? [patient.reason] : [],
+            ...noteData,
+          },
+          prepNotes: [{
+            category: 'general',
+            text: transcription,
+            timestamp: new Date().toISOString(),
+          }],
+          userSettings: {},
+        }),
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}))
+        throw new Error(errorData.error || 'Chart Prep failed')
+      }
+
+      const data = await response.json()
+      setChartPrepSections(data.sections || data)
+      setShowChartPrepResults(true)
+
+      // Success haptic
+      if ('vibrate' in navigator) navigator.vibrate([100, 50, 100])
+    } catch (err) {
+      console.error('Chart Prep error:', err)
+      setError(err instanceof Error ? err.message : 'Failed to generate chart prep')
+    } finally {
+      setIsProcessing(false)
+    }
+  }
+
+  const handleAddSection = (field: string, content: string) => {
+    if (onChartPrepComplete && chartPrepSections) {
+      // Build a partial sections object with just this field
+      const sectionKey = field === 'hpi' ? 'suggestedHPI'
+        : field === 'assessment' ? 'suggestedAssessment'
+        : field === 'plan' ? 'suggestedPlan'
+        : 'summary'
+      onChartPrepComplete({ [sectionKey]: content })
+    }
+    if ('vibrate' in navigator) navigator.vibrate(30)
+  }
+
+  const handleAddAllSections = () => {
+    if (onChartPrepComplete && chartPrepSections) {
+      onChartPrepComplete(chartPrepSections)
+    }
+    if ('vibrate' in navigator) navigator.vibrate([100, 50, 100])
+    onClose()
   }
 
   const cancelRecording = () => {
@@ -529,6 +630,363 @@ export default function MobileVoiceRecorder({
           </>
         )}
       </div>
+
+      {/* Chart Prep Results Panel */}
+      {showChartPrepResults && chartPrepSections && (
+        <div style={{
+          position: 'fixed',
+          inset: 0,
+          background: 'var(--bg-white, #fff)',
+          zIndex: 10000,
+          display: 'flex',
+          flexDirection: 'column',
+          overflow: 'hidden',
+        }}>
+          {/* Header */}
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            padding: '16px',
+            paddingTop: 'max(16px, env(safe-area-inset-top))',
+            borderBottom: '1px solid var(--border, #e5e7eb)',
+            background: 'linear-gradient(135deg, #F0FDFA 0%, #CCFBF1 100%)',
+          }}>
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+            }}>
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#0D9488" strokeWidth="2">
+                <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
+              </svg>
+              <span style={{ fontSize: '16px', fontWeight: 600, color: '#0D9488' }}>
+                Chart Prep Results
+              </span>
+            </div>
+            <button
+              onClick={() => {
+                setShowChartPrepResults(false)
+                onClose()
+              }}
+              style={{
+                background: 'none',
+                border: 'none',
+                padding: '8px',
+                cursor: 'pointer',
+                color: 'var(--text-muted, #6b7280)',
+              }}
+            >
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <line x1="18" y1="6" x2="6" y2="18"/>
+                <line x1="6" y1="6" x2="18" y2="18"/>
+              </svg>
+            </button>
+          </div>
+
+          {/* Transcription preview */}
+          {transcribedText && (
+            <div style={{
+              padding: '12px 16px',
+              background: 'var(--bg-gray, #f9fafb)',
+              borderBottom: '1px solid var(--border, #e5e7eb)',
+            }}>
+              <div style={{
+                fontSize: '11px',
+                fontWeight: 500,
+                color: 'var(--text-muted, #6b7280)',
+                marginBottom: '4px',
+                textTransform: 'uppercase',
+                letterSpacing: '0.5px',
+              }}>
+                Your Dictation
+              </div>
+              <div style={{
+                fontSize: '13px',
+                color: 'var(--text-secondary, #4b5563)',
+                lineHeight: 1.4,
+              }}>
+                {transcribedText.length > 150 ? transcribedText.slice(0, 150) + '...' : transcribedText}
+              </div>
+            </div>
+          )}
+
+          {/* Sections */}
+          <div style={{
+            flex: 1,
+            overflow: 'auto',
+            padding: '12px 16px',
+            WebkitOverflowScrolling: 'touch',
+          }}>
+            {/* Alerts */}
+            {chartPrepSections.alerts && chartPrepSections.alerts.trim() && (
+              <div style={{
+                background: '#FEF2F2',
+                border: '1px solid #FECACA',
+                borderRadius: '10px',
+                padding: '12px',
+                marginBottom: '12px',
+              }}>
+                <div style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  marginBottom: '6px',
+                }}>
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#EF4444" strokeWidth="2">
+                    <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+                    <line x1="12" y1="9" x2="12" y2="13"/>
+                    <line x1="12" y1="17" x2="12.01" y2="17"/>
+                  </svg>
+                  <span style={{ fontSize: '13px', fontWeight: 600, color: '#DC2626' }}>
+                    Alerts
+                  </span>
+                </div>
+                <div style={{ fontSize: '13px', color: '#991B1B', lineHeight: 1.5 }}>
+                  {chartPrepSections.alerts}
+                </div>
+              </div>
+            )}
+
+            {/* Summary */}
+            {chartPrepSections.summary && (
+              <div style={{
+                background: 'var(--bg-gray, #f9fafb)',
+                borderRadius: '10px',
+                padding: '12px',
+                marginBottom: '12px',
+              }}>
+                <div style={{
+                  fontSize: '12px',
+                  fontWeight: 600,
+                  color: 'var(--text-muted, #6b7280)',
+                  marginBottom: '6px',
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.5px',
+                }}>
+                  Summary
+                </div>
+                <div style={{ fontSize: '14px', color: 'var(--text-primary, #111827)', lineHeight: 1.5 }}>
+                  {chartPrepSections.summary}
+                </div>
+              </div>
+            )}
+
+            {/* Suggested HPI */}
+            {chartPrepSections.suggestedHPI && (
+              <div style={{
+                background: 'var(--bg-white, #fff)',
+                border: '1px solid var(--border, #e5e7eb)',
+                borderRadius: '10px',
+                padding: '12px',
+                marginBottom: '12px',
+              }}>
+                <div style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  marginBottom: '8px',
+                }}>
+                  <div style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                  }}>
+                    <div style={{
+                      width: '24px',
+                      height: '24px',
+                      borderRadius: '6px',
+                      background: '#0D948815',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                    }}>
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#0D9488" strokeWidth="2">
+                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                        <polyline points="14 2 14 8 20 8"/>
+                      </svg>
+                    </div>
+                    <span style={{ fontSize: '13px', fontWeight: 600, color: '#0D9488' }}>
+                      Suggested HPI
+                    </span>
+                  </div>
+                  <button
+                    onClick={() => handleAddSection('hpi', chartPrepSections.suggestedHPI!)}
+                    style={{
+                      padding: '4px 10px',
+                      borderRadius: '6px',
+                      border: '1px solid #0D9488',
+                      background: 'transparent',
+                      color: '#0D9488',
+                      fontSize: '11px',
+                      fontWeight: 600,
+                      cursor: 'pointer',
+                    }}
+                  >
+                    Add
+                  </button>
+                </div>
+                <div style={{ fontSize: '13px', color: 'var(--text-secondary, #4b5563)', lineHeight: 1.5 }}>
+                  {chartPrepSections.suggestedHPI}
+                </div>
+              </div>
+            )}
+
+            {/* Suggested Assessment */}
+            {chartPrepSections.suggestedAssessment && (
+              <div style={{
+                background: 'var(--bg-white, #fff)',
+                border: '1px solid var(--border, #e5e7eb)',
+                borderRadius: '10px',
+                padding: '12px',
+                marginBottom: '12px',
+              }}>
+                <div style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  marginBottom: '8px',
+                }}>
+                  <div style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                  }}>
+                    <div style={{
+                      width: '24px',
+                      height: '24px',
+                      borderRadius: '6px',
+                      background: '#EF444415',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                    }}>
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#EF4444" strokeWidth="2">
+                        <circle cx="12" cy="12" r="10"/>
+                        <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/>
+                        <line x1="12" y1="17" x2="12.01" y2="17"/>
+                      </svg>
+                    </div>
+                    <span style={{ fontSize: '13px', fontWeight: 600, color: '#EF4444' }}>
+                      Suggested Assessment
+                    </span>
+                  </div>
+                  <button
+                    onClick={() => handleAddSection('assessment', chartPrepSections.suggestedAssessment!)}
+                    style={{
+                      padding: '4px 10px',
+                      borderRadius: '6px',
+                      border: '1px solid #EF4444',
+                      background: 'transparent',
+                      color: '#EF4444',
+                      fontSize: '11px',
+                      fontWeight: 600,
+                      cursor: 'pointer',
+                    }}
+                  >
+                    Add
+                  </button>
+                </div>
+                <div style={{ fontSize: '13px', color: 'var(--text-secondary, #4b5563)', lineHeight: 1.5 }}>
+                  {chartPrepSections.suggestedAssessment}
+                </div>
+              </div>
+            )}
+
+            {/* Suggested Plan */}
+            {chartPrepSections.suggestedPlan && (
+              <div style={{
+                background: 'var(--bg-white, #fff)',
+                border: '1px solid var(--border, #e5e7eb)',
+                borderRadius: '10px',
+                padding: '12px',
+                marginBottom: '12px',
+              }}>
+                <div style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  marginBottom: '8px',
+                }}>
+                  <div style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                  }}>
+                    <div style={{
+                      width: '24px',
+                      height: '24px',
+                      borderRadius: '6px',
+                      background: '#10B98115',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                    }}>
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#10B981" strokeWidth="2">
+                        <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+                        <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+                      </svg>
+                    </div>
+                    <span style={{ fontSize: '13px', fontWeight: 600, color: '#10B981' }}>
+                      Suggested Plan
+                    </span>
+                  </div>
+                  <button
+                    onClick={() => handleAddSection('plan', chartPrepSections.suggestedPlan!)}
+                    style={{
+                      padding: '4px 10px',
+                      borderRadius: '6px',
+                      border: '1px solid #10B981',
+                      background: 'transparent',
+                      color: '#10B981',
+                      fontSize: '11px',
+                      fontWeight: 600,
+                      cursor: 'pointer',
+                    }}
+                  >
+                    Add
+                  </button>
+                </div>
+                <div style={{ fontSize: '13px', color: 'var(--text-secondary, #4b5563)', lineHeight: 1.5, whiteSpace: 'pre-wrap' }}>
+                  {chartPrepSections.suggestedPlan}
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Add All button */}
+          <div style={{
+            padding: '12px 16px',
+            paddingBottom: 'calc(12px + env(safe-area-inset-bottom))',
+            borderTop: '1px solid var(--border, #e5e7eb)',
+            background: 'var(--bg-white, #fff)',
+          }}>
+            <button
+              onClick={handleAddAllSections}
+              style={{
+                width: '100%',
+                padding: '14px',
+                borderRadius: '10px',
+                border: 'none',
+                background: 'linear-gradient(135deg, #0D9488 0%, #14B8A6 100%)',
+                color: 'white',
+                fontSize: '15px',
+                fontWeight: 600,
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '8px',
+              }}
+            >
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <polyline points="20 6 9 17 4 12"/>
+              </svg>
+              Add All to Note
+            </button>
+          </div>
+        </div>
+      )}
 
       <style jsx global>{`
         @keyframes spin {
