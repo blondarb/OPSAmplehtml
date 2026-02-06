@@ -200,6 +200,75 @@ export default function MobileSettingsPage() {
           </div>
         </div>
 
+        {/* View Toggle */}
+        <div style={{ marginBottom: '24px' }}>
+          <h2 style={{
+            fontSize: '13px',
+            fontWeight: 600,
+            color: 'var(--text-muted)',
+            textTransform: 'uppercase',
+            letterSpacing: '0.5px',
+            marginBottom: '12px',
+            padding: '0 4px',
+          }}>
+            View Mode
+          </h2>
+          <button
+            onClick={() => {
+              // Set cookie and redirect to desktop
+              document.cookie = 'preferred_view=desktop; max-age=' + (60 * 60 * 24 * 30) + '; path=/'
+              router.push('/dashboard')
+            }}
+            style={{
+              width: '100%',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '12px',
+              padding: '16px',
+              background: 'var(--bg-white)',
+              border: '1px solid var(--border)',
+              borderRadius: '16px',
+              cursor: 'pointer',
+              textAlign: 'left',
+            }}
+          >
+            <div style={{
+              width: '40px',
+              height: '40px',
+              borderRadius: '10px',
+              background: 'linear-gradient(135deg, #8B5CF6 0%, #A78BFA 100%)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}>
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="white" stroke="none">
+                <rect x="2" y="3" width="20" height="14" rx="2" fill="none" stroke="white" strokeWidth="2"/>
+                <line x1="8" y1="21" x2="16" y2="21" stroke="white" strokeWidth="2"/>
+                <line x1="12" y1="17" x2="12" y2="21" stroke="white" strokeWidth="2"/>
+              </svg>
+            </div>
+            <div style={{ flex: 1 }}>
+              <div style={{
+                fontSize: '15px',
+                fontWeight: 600,
+                color: 'var(--text-primary)',
+              }}>
+                Switch to Desktop View
+              </div>
+              <div style={{
+                fontSize: '13px',
+                color: 'var(--text-muted)',
+                marginTop: '2px',
+              }}>
+                Use the full-featured desktop interface
+              </div>
+            </div>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--text-muted)" strokeWidth="2">
+              <polyline points="9 18 15 12 9 6" />
+            </svg>
+          </button>
+        </div>
+
         {/* Quick actions */}
         <div style={{ marginBottom: '24px' }}>
           <h2 style={{
