@@ -459,12 +459,13 @@ export default function SmartRecommendationsSection({
     })
   }
 
-  const toggleTooltip = (itemKey: string, type: TooltipType) => {
-    if (activeTooltip?.itemKey === itemKey && activeTooltip?.type === type) {
-      setActiveTooltip(null)
-    } else {
-      setActiveTooltip({ itemKey, type })
-    }
+  // Show tooltip on hover (replaces click-based toggle for faster clinical workflow)
+  const showTooltip = (itemKey: string, type: TooltipType) => {
+    setActiveTooltip({ itemKey, type })
+  }
+
+  const hideTooltip = () => {
+    setActiveTooltip(null)
   }
 
   const handleAddCustomItem = (sectionKey: string) => {
@@ -735,20 +736,17 @@ export default function SmartRecommendationsSection({
               )}
               {renderPriorityBadge(item.priority)}
 
-              {/* Icon buttons for details */}
+              {/* Icon buttons for details - hover to show tooltip */}
               {availableDetails.length > 0 && (
                 <div style={{ display: 'flex', gap: '4px', marginLeft: '4px' }}>
                   {availableDetails.map(({ type }) => {
                     const iconConfig = TOOLTIP_ICONS[type]
                     const isActive = activeTooltip?.itemKey === itemKey && activeTooltip?.type === type
                     return (
-                      <button
+                      <div
                         key={type}
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          toggleTooltip(itemKey, type)
-                        }}
-                        title={iconConfig.label}
+                        onMouseEnter={() => showTooltip(itemKey, type)}
+                        onMouseLeave={hideTooltip}
                         style={{
                           width: '22px',
                           height: '22px',
@@ -759,12 +757,13 @@ export default function SmartRecommendationsSection({
                           display: 'flex',
                           alignItems: 'center',
                           justifyContent: 'center',
-                          cursor: 'pointer',
+                          cursor: 'default',
                           transition: 'all 0.15s ease',
                         }}
+                        title={iconConfig.label}
                       >
                         {iconConfig.icon}
-                      </button>
+                      </div>
                     )
                   })}
                 </div>
@@ -899,15 +898,18 @@ export default function SmartRecommendationsSection({
               </div>
             )}
 
-            {/* Tooltip content (shown when icon is clicked) */}
+            {/* Tooltip content (shown on hover - stays visible while mouse is over it) */}
             {activeTooltip?.itemKey === itemKey && (
-              <div style={{
-                marginTop: '8px',
-                padding: '10px 12px',
-                background: isDarkMode ? TOOLTIP_ICONS[activeTooltip.type].darkBg : TOOLTIP_ICONS[activeTooltip.type].bg,
-                borderRadius: '6px',
-                border: `1px solid ${isDarkMode ? TOOLTIP_ICONS[activeTooltip.type].darkColor : TOOLTIP_ICONS[activeTooltip.type].color}30`,
-              }}>
+              <div
+                onMouseEnter={() => showTooltip(itemKey, activeTooltip.type)}
+                onMouseLeave={hideTooltip}
+                style={{
+                  marginTop: '8px',
+                  padding: '10px 12px',
+                  background: isDarkMode ? TOOLTIP_ICONS[activeTooltip.type].darkBg : TOOLTIP_ICONS[activeTooltip.type].bg,
+                  borderRadius: '6px',
+                  border: `1px solid ${isDarkMode ? TOOLTIP_ICONS[activeTooltip.type].darkColor : TOOLTIP_ICONS[activeTooltip.type].color}30`,
+                }}>
                 <div style={{
                   fontSize: '11px',
                   fontWeight: 600,
