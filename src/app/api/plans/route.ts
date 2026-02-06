@@ -213,10 +213,18 @@ export async function GET(request: NextRequest) {
     // If fetching plan for a specific diagnosis
     if (diagnosisId) {
       // Get ALL ICD-10 codes for this diagnosis (primary + alternates)
-      const diagnosisCodes = diagnosisToIcd10Map[diagnosisId]
+      let diagnosisCodes = diagnosisToIcd10Map[diagnosisId]
 
+      // If not found by diagnosis ID, check if the diagnosisId is actually an ICD-10 code
+      // This supports mobile view which passes ICD-10 codes directly (e.g., G40.909)
       if (!diagnosisCodes || diagnosisCodes.length === 0) {
-        return NextResponse.json({ plan: null, message: 'Diagnosis not found' })
+        // Check if it looks like an ICD-10 code (letter followed by digits, with optional decimal)
+        if (/^[A-Z]\d+(\.\d+)?$/i.test(diagnosisId)) {
+          // Use the ICD-10 code directly for matching
+          diagnosisCodes = [diagnosisId.toUpperCase()]
+        } else {
+          return NextResponse.json({ plan: null, message: 'Diagnosis not found' })
+        }
       }
 
       // Find plans that match any of this diagnosis's ICD-10 codes
