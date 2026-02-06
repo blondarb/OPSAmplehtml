@@ -87,8 +87,8 @@ export default function MobilePatientCard({
       style={{
         position: 'relative',
         overflow: 'hidden',
-        borderRadius: '16px',
-        marginBottom: '12px',
+        borderRadius: '12px',
+        marginBottom: '8px',
       }}
     >
       {/* Swipe action backgrounds */}
@@ -103,13 +103,13 @@ export default function MobilePatientCard({
           background: '#10B981',
           display: 'flex',
           alignItems: 'center',
-          paddingLeft: '20px',
+          paddingLeft: '16px',
           color: 'white',
           fontWeight: 600,
-          fontSize: '14px',
-          gap: '8px',
+          fontSize: '12px',
+          gap: '6px',
         }}>
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
             <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
             <polyline points="22 4 12 14.01 9 11.01" />
           </svg>
@@ -122,14 +122,14 @@ export default function MobilePatientCard({
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'flex-end',
-          paddingRight: '20px',
+          paddingRight: '16px',
           color: 'white',
           fontWeight: 600,
-          fontSize: '14px',
-          gap: '8px',
+          fontSize: '12px',
+          gap: '6px',
         }}>
           Cancel
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
             <circle cx="12" cy="12" r="10" />
             <line x1="15" y1="9" x2="9" y2="15" />
             <line x1="9" y1="9" x2="15" y2="15" />
@@ -137,7 +137,7 @@ export default function MobilePatientCard({
         </div>
       </div>
 
-      {/* Card content */}
+      {/* Card content - more compact */}
       <div
         onClick={onClick}
         onTouchStart={onTouchStart}
@@ -145,7 +145,7 @@ export default function MobilePatientCard({
         onTouchEnd={onTouchEnd}
         style={{
           background: 'var(--bg-white)',
-          padding: '16px',
+          padding: '10px 12px',
           cursor: 'pointer',
           transform: `translateX(${swipeOffset}px)`,
           transition: swipeOffset === 0 ? 'transform 0.3s ease-out' : 'none',
@@ -153,61 +153,34 @@ export default function MobilePatientCard({
           zIndex: 1,
         }}
       >
-        {/* Top row: Time and badges */}
+        {/* Single row layout */}
         <div style={{
           display: 'flex',
           alignItems: 'center',
-          justifyContent: 'space-between',
-          marginBottom: '8px',
+          gap: '10px',
         }}>
-          <span style={{
-            fontSize: '13px',
+          {/* Time */}
+          <div style={{
+            fontSize: '12px',
             fontWeight: 600,
             color: 'var(--text-muted)',
+            width: '52px',
+            flexShrink: 0,
           }}>
             {patient.time || '9:00 AM'}
-          </span>
-          <div style={{ display: 'flex', gap: '6px' }}>
-            <span style={{
-              padding: '4px 8px',
-              borderRadius: '12px',
-              fontSize: '11px',
-              fontWeight: 600,
-              background: type.bg,
-              color: type.text,
-            }}>
-              {patient.type === 'new' ? 'New' : 'Follow-up'}
-            </span>
-            <span style={{
-              padding: '4px 8px',
-              borderRadius: '12px',
-              fontSize: '11px',
-              fontWeight: 600,
-              background: status.bg,
-              color: status.text,
-            }}>
-              {patient.status === 'in-progress' ? 'In Progress' : patient.status === 'completed' ? 'Done' : 'Scheduled'}
-            </span>
           </div>
-        </div>
 
-        {/* Patient name and details */}
-        <div style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: '12px',
-        }}>
-          {/* Avatar */}
+          {/* Avatar - smaller */}
           <div style={{
-            width: '48px',
-            height: '48px',
+            width: '36px',
+            height: '36px',
             borderRadius: '50%',
             background: 'linear-gradient(135deg, #0D9488 0%, #14B8A6 100%)',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
             color: 'white',
-            fontSize: '18px',
+            fontSize: '13px',
             fontWeight: 600,
             flexShrink: 0,
           }}>
@@ -217,41 +190,65 @@ export default function MobilePatientCard({
           {/* Info */}
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{
-              fontSize: '16px',
-              fontWeight: 600,
-              color: 'var(--text-primary)',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
               marginBottom: '2px',
             }}>
-              {patient.name}
+              <span style={{
+                fontSize: '14px',
+                fontWeight: 600,
+                color: 'var(--text-primary)',
+              }}>
+                {patient.name}
+              </span>
+              <span style={{
+                padding: '2px 5px',
+                borderRadius: '8px',
+                fontSize: '9px',
+                fontWeight: 600,
+                background: type.bg,
+                color: type.text,
+              }}>
+                {patient.type === 'new' ? 'NEW' : 'F/U'}
+              </span>
             </div>
             <div style={{
-              fontSize: '13px',
+              fontSize: '11px',
               color: 'var(--text-secondary)',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '4px',
             }}>
-              {patient.age}yo {patient.gender} · MRN: {patient.mrn}
+              <span>{patient.age}yo {patient.gender}</span>
+              {patient.reason && (
+                <>
+                  <span style={{ color: 'var(--text-muted)' }}>·</span>
+                  <span style={{ color: 'var(--primary)', fontWeight: 500 }}>
+                    {patient.reason}
+                  </span>
+                </>
+              )}
             </div>
-            {patient.reason && (
-              <div style={{
-                fontSize: '13px',
-                color: 'var(--primary)',
-                fontWeight: 500,
-                marginTop: '4px',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '4px',
-              }}>
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <path d="M22 12h-4l-3 9L9 3l-3 9H2" />
-                </svg>
-                {patient.reason}
-              </div>
-            )}
           </div>
+
+          {/* Status badge */}
+          <span style={{
+            padding: '3px 6px',
+            borderRadius: '10px',
+            fontSize: '10px',
+            fontWeight: 600,
+            background: status.bg,
+            color: status.text,
+            flexShrink: 0,
+          }}>
+            {patient.status === 'in-progress' ? 'Active' : patient.status === 'completed' ? 'Done' : 'Sched'}
+          </span>
 
           {/* Chevron */}
           <svg
-            width="20"
-            height="20"
+            width="16"
+            height="16"
             viewBox="0 0 24 24"
             fill="none"
             stroke="var(--text-muted)"
