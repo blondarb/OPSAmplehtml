@@ -176,7 +176,7 @@ IMPORTANT: Return ONLY valid JSON, no markdown formatting.
         { role: 'user', content: 'Generate the structured chart prep JSON for this patient visit.' }
       ],
       max_completion_tokens: 2000,
-      temperature: 0.4,
+      // Note: gpt-5-mini only supports default temperature (1)
       response_format: { type: 'json_object' },
     })
 

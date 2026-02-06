@@ -76,7 +76,7 @@ If the note has no issues, return: { "suggestions": [] }`
         { role: 'user', content: noteText }
       ],
       max_completion_tokens: 1500,
-      temperature: 0.3,
+      // Note: gpt-5-mini only supports default temperature (1)
       response_format: { type: 'json_object' },
     })
 

@@ -133,7 +133,7 @@ CRITICAL RULES:
           }
         ],
         max_completion_tokens: 2000,
-        temperature: 0.2,
+        // Note: gpt-5-mini only supports default temperature (1)
       })
 
       const cleanedText = cleanupResponse.choices[0]?.message?.content?.trim()

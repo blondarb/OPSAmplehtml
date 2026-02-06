@@ -94,7 +94,7 @@ Provide concise, evidence-based responses. When discussing medications, include 
         { role: 'user', content: question }
       ],
       max_completion_tokens: 1000,
-      temperature: 0.7,
+      // Note: gpt-5-mini only supports default temperature (1)
     })
 
     const response = completion.choices[0]?.message?.content || 'No response generated'

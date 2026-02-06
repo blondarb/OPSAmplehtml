@@ -102,7 +102,7 @@ Generate a professional clinical summary:`
           model: 'gpt-5-mini',
           messages: [{ role: 'user', content: prompt }],
           max_completion_tokens: 300,
-          temperature: 0.3,
+          // Note: gpt-5-mini only supports default temperature (1)
         })
 
         aiSummary = completion.choices[0]?.message?.content?.trim() || ''

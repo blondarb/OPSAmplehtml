@@ -165,9 +165,7 @@ ${complaintContext}
 
 Important: This is for a neurology practice. Ensure the output is appropriate for neurological documentation.${safetyReminder}${userPreferences}`
 
-    // Use lower temperature for expand to reduce hallucination risk
-    const temperature = action === 'expand' ? 0.3 : 0.5
-
+    // Note: gpt-5-mini only supports default temperature (1)
     const completion = await openai.chat.completions.create({
       model: 'gpt-5-mini', // Cost-effective for text transformation ($0.25/$2 per 1M tokens)
       messages: [
@@ -175,7 +173,6 @@ Important: This is for a neurology practice. Ensure the output is appropriate fo
         { role: 'user', content: text }
       ],
       max_completion_tokens: 1500,
-      temperature,
     })
 
     const result = completion.choices[0]?.message?.content || text
