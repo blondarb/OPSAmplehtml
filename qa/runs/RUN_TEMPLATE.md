@@ -2,11 +2,11 @@
 
 **Run ID:** RUN-YYYY-MM-DD-NNN
 **Date:** YYYY-MM-DD
-**Branch:** `claude/feature-name`
-**Preview URL:** https://ops-amplehtml-xxx.vercel.app
+**Branch:** `branch-name`
+**Preview URL:** https://ops-amplehtml.vercel.app
 **Tester:** (name or "Claude Code for Chrome")
-**Runbook version:** 1.0
-**Test cases version:** 1.0
+**Runbook version:** 2.0
+**Test cases version:** 2.0
 
 ---
 
@@ -18,53 +18,106 @@
 - (one-line description of each change)
 
 **Focus test cases:**
-- C1, C2, C3 (patient picker)
-- A2 (reason for consult — if touched)
+- (list specific test case IDs to focus on)
 
 **Risk areas:**
 - (areas that might break due to this change)
 
 ---
 
-## Smoke Suite
+## Smoke Suite (Required)
 
-| ID | Result | Notes |
-|----|--------|-------|
-| S1 | PASS / FAIL | |
-| S2 | PASS / FAIL | |
-| S3 | PASS / FAIL | |
-| S4 | PASS / FAIL | |
-| S5 | PASS / FAIL | |
+| ID | Title | Result | Notes |
+|----|-------|--------|-------|
+| S1 | App loads (Desktop) | PASS / FAIL | |
+| S2 | App loads (Mobile) | PASS / FAIL | |
+| S3 | Login | PASS / FAIL | |
+| S4 | Tabs render | PASS / FAIL | |
+| S5 | Patient portal | PASS / FAIL | |
+| S6 | Mobile app | PASS / FAIL | |
+| S7 | Build passes | PASS / FAIL | |
+
+---
 
 ## Focus Cases
 
-| ID | Result | Notes |
-|----|--------|-------|
-| | PASS / FAIL | |
-| | PASS / FAIL | |
-| | PASS / FAIL | |
+| ID | Title | Result | Notes | Data Verification |
+|----|-------|--------|-------|-------------------|
+| | | PASS / FAIL | | |
+| | | PASS / FAIL | | |
+| | | PASS / FAIL | | |
+
+---
 
 ## Regression Spot-Checks
 
 > Pick 3-5 from the runbook outside the focus area. Rotate each release.
 
-| ID | Result | Notes |
-|----|--------|-------|
-| | PASS / FAIL | |
-| | PASS / FAIL | |
-| | PASS / FAIL | |
+| ID | Title | Result | Notes |
+|----|-------|--------|-------|
+| | | PASS / FAIL | |
+| | | PASS / FAIL | |
+| | | PASS / FAIL | |
 
-## Mobile Check
+---
 
-| ID | Result | Notes |
-|----|--------|-------|
-| E1 | PASS / FAIL | |
+## Mobile Testing
+
+| ID | Title | Result | Device | Notes |
+|----|-------|--------|--------|-------|
+| M1 | Auto-redirect | PASS / FAIL | | |
+| O6 | Safari/iOS transcription | PASS / FAIL | iPhone model | |
+| P2 | Switch to Desktop | PASS / FAIL | | |
+
+---
+
+## AI Data Flow Verification
+
+> Only required for AI-related changes. Check applicable items.
+
+| # | Verification | Result | Notes |
+|---|--------------|--------|-------|
+| 1 | Chart Prep sections | PASS / FAIL / N/A | |
+| 2 | Chart Prep → Note | PASS / FAIL / N/A | |
+| 3 | Visit AI extraction | PASS / FAIL / N/A | |
+| 4 | Historian structured output | PASS / FAIL / N/A | |
+| 5 | Historian → Note fields | PASS / FAIL / N/A | |
+| 6 | AI no hallucination | PASS / FAIL / N/A | |
+| 7 | Transcription cleanup | PASS / FAIL / N/A | |
+| 8 | Scale autofill | PASS / FAIL / N/A | |
+
+---
+
+## Patient Historian Data Flow
+
+> Only required for Historian changes. Test with real interview.
+
+| ID | Title | Patient Said | Imported Correctly? | Notes |
+|----|-------|--------------|---------------------|-------|
+| I3 | Medication mention | "(what patient said)" | YES / NO | |
+| I4 | Allergy mention | "(what patient said)" | YES / NO | |
+| I5 | PMH mention | "(what patient said)" | YES / NO | |
+| I11 | Import to HPI | | YES / NO | |
+| I12 | Import medications | | YES / NO | |
+| I13 | Import allergies | | YES / NO | |
+
+---
 
 ## Bugs Found
 
-| Bug ID | Severity | Test Case | Summary |
-|--------|----------|-----------|---------|
-| | | | |
+| Bug ID | Severity | Test Case | Summary | Status |
+|--------|----------|-----------|---------|--------|
+| | P0/P1/P2 | | | Open/Fixed |
+
+---
+
+## Screenshot Evidence
+
+> Attach or link to screenshots for key flows, especially failures.
+
+- [ ] Mobile app screenshot (S6)
+- [ ] Transcription success screenshot (O6)
+- [ ] AI data import screenshot (I14)
 
 ---
 
@@ -72,5 +125,9 @@
 
 - [ ] **GO** — Ship to production
 - [ ] **NO-GO** — Blocked by: (list bug IDs)
+
+**Sign-off:**
+- Tested by: _______________
+- Date: _______________
 
 **Notes:**

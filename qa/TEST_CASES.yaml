@@ -1,20 +1,27 @@
 # Test Cases - Sevaro Clinical
-# test_cases_version: 1.0
-# Last updated: 2026-01-30
+# test_cases_version: 2.0
+# Last updated: 2026-02-06
 #
-# Structure: Each case has id, title, preconditions, steps, expected.
+# Structure: Each case has id, title, preconditions, steps, expected, data_verification (optional).
 # Organized by suite matching TEST_RUNBOOK.md sections.
 
 ---
 smoke:
   - id: S1
-    title: App loads and redirects
-    preconditions: [deployed preview URL available]
+    title: App loads and redirects (Desktop)
+    preconditions: [deployed preview URL available, desktop browser]
     steps:
       - Navigate to root URL /
-    expected: Redirects to /login (if logged out) or /dashboard (if session exists)
+    expected: Redirects to /dashboard (if logged in) or /login (if logged out)
 
   - id: S2
+    title: App loads and redirects (Mobile)
+    preconditions: [deployed preview URL available, mobile browser or iPhone/Android]
+    steps:
+      - Navigate to root URL / on mobile device
+    expected: Redirects to /mobile automatically
+
+  - id: S3
     title: Login flow
     preconditions: [valid demo user credentials]
     steps:
@@ -23,7 +30,7 @@ smoke:
       - Click Sign In
     expected: Redirects to /dashboard, patient card visible in left sidebar
 
-  - id: S3
+  - id: S4
     title: Tab navigation renders
     preconditions: [logged in, on /dashboard]
     steps:
@@ -33,14 +40,21 @@ smoke:
       - Click Recommendation tab
     expected: Each tab renders content without console errors or blank screen
 
-  - id: S4
+  - id: S5
     title: Patient portal loads
     preconditions: [deployed preview URL available]
     steps:
       - Navigate to /patient
     expected: Three tabs visible (Intake Form, Messages, AI Historian)
 
-  - id: S5
+  - id: S6
+    title: Mobile app loads
+    preconditions: [mobile device or 375px viewport]
+    steps:
+      - Navigate to /mobile
+    expected: Patient list renders, red FAB visible, compact layout
+
+  - id: S7
     title: Build passes
     preconditions: [local repo up to date]
     steps:
@@ -53,68 +67,116 @@ clinical_notes:
     title: HPI text persists across tabs
     preconditions: [logged in, on History tab]
     steps:
-      - Type text in HPI field
+      - Type "Patient reports 3-week history of headaches" in HPI field
       - Switch to Imaging tab
       - Switch back to History tab
-    expected: HPI text still present
+    expected: HPI text still present with exact content
 
   - id: A2
     title: Reason for consult cascades
     preconditions: [logged in, on History tab]
     steps:
       - Click Headache category
-      - Select a sub-option (e.g., Migraine with aura)
-    expected: Sub-options appear, differential diagnosis section auto-populates matching ICD-10 codes
+      - Observe sub-options appear
+      - Select "Migraine with aura"
+    expected: |
+      - Sub-options appear with teal highlight
+      - Differential diagnosis section auto-populates "Migraine with aura" with ICD-10 code G43.1
 
   - id: A3
     title: Differential diagnosis management
     preconditions: [logged in, Recommendation tab]
     steps:
       - Click Add Diagnosis
-      - Search "migraine"
-      - Select a diagnosis
-      - Remove a previously added diagnosis
-    expected: Diagnosis added with ICD-10 badge, removed diagnosis disappears and does not reappear
+      - Search "tension"
+      - Select "Tension-type headache"
+      - Remove a previously added diagnosis by clicking X
+      - Switch tabs and return
+    expected: |
+      - Diagnosis added with ICD-10 badge (G44.2)
+      - Removed diagnosis disappears and does not reappear on tab switch
 
   - id: A4
     title: Generate Note modal
     preconditions: [logged in, some note content entered]
     steps:
+      - Enter text in HPI and Assessment fields
       - Click Generate Note button (purple)
-    expected: Modal opens with note type/length selection, preview renders
+      - Select note type and length
+      - Click Generate
+    expected: |
+      - Modal opens with note type/length selection
+      - Note preview renders with sections
+      - AI suggestions panel may appear
 
   - id: A5
     title: Dot phrase expansion
     preconditions: [logged in, dot phrases seeded]
     steps:
       - Click lightning icon on any text field
-      - Search for a phrase
-      - Select it
-    expected: Text expands into field
+      - Search for "exam"
+      - Select the phrase
+    expected: Phrase text expands into field, replacing or appending
 
   - id: A6
     title: Smart scale suggestions
-    preconditions: [logged in, Headache diagnosis selected]
+    preconditions: [logged in, Headache category selected]
     steps:
+      - Select Headache category
       - Scroll to Clinical Scales section
-    expected: MIDAS and HIT-6 suggested
+    expected: MIDAS and HIT-6 suggested with teal dot indicators
 
   - id: A7
     title: Imaging tab card interaction
     preconditions: [logged in, Imaging tab]
     steps:
       - Click MRI Brain card header to expand
-      - Fill in findings textarea
+      - Fill in findings textarea with "Normal exam"
       - Click PACS link
-    expected: Card expands, text persists, PACS link navigable
+    expected: |
+      - Card expands with date, impression, findings fields
+      - Text persists when collapsing/expanding
+      - PACS link is navigable (may open new tab)
 
   - id: A8
     title: No cross-patient data bleed
     preconditions: [logged in, multiple patients exist]
     steps:
-      - Enter data for Patient A
-      - Switch to Patient B
-    expected: Patient B shows own data, not Patient A's
+      - Enter HPI text "Patient A specific data" for Patient A
+      - Switch to Patient B in sidebar
+      - Check HPI field
+      - Switch back to Patient A
+    expected: |
+      - Patient B shows own data (or empty), not Patient A's
+      - Patient A still has original data on return
+
+  - id: A9
+    title: Medication management
+    preconditions: [logged in, on History tab]
+    steps:
+      - Click Add Medication
+      - Type "lisinopril" in search
+      - Select from formulary dropdown
+      - Fill in dose "10mg daily"
+      - Save
+    expected: |
+      - Medication appears in medication list
+      - Shows dosage and frequency
+      - Persists after tab switch
+
+  - id: A10
+    title: Allergy management
+    preconditions: [logged in, on History tab]
+    steps:
+      - Click Add Allergy
+      - Enter "Penicillin"
+      - Select severity "Severe"
+      - Select reaction "Anaphylaxis"
+      - Save
+    expected: |
+      - Allergy appears in allergy chips
+      - Red/orange severity indicator
+      - Appears in left sidebar allergy banner
 
 ---
 ai_features:
@@ -122,18 +184,23 @@ ai_features:
     title: Ask AI returns response
     preconditions: [logged in, OpenAI key configured]
     steps:
-      - Click AI star icon to open AI drawer
-      - Type a clinical question
-      - Submit
-    expected: AI response renders in drawer
+      - Click AI star icon in action bar to open AI drawer
+      - Type "What are common migraine triggers?"
+      - Click Submit
+    expected: AI response renders in drawer with relevant clinical information
+    data_verification: Response relates to question, not random content
 
   - id: B2
     title: Field AI actions
     preconditions: [logged in, text in HPI field]
     steps:
+      - Enter brief HPI "headache x 3 weeks"
       - Click star icon on HPI field
-      - Select Improve
-    expected: Improved text replaces or appends to field
+      - Select "Expand"
+    expected: |
+      - Expanded text replaces or appends to field
+      - Text contains more clinical detail
+    data_verification: Expansion doesn't add fabricated symptoms not implied
 
   - id: B3
     title: Voice drawer mic prompt
@@ -146,89 +213,338 @@ ai_features:
     title: Chart Prep summary
     preconditions: [logged in, Voice drawer open, Chart Prep tab]
     steps:
-      - Record dictation (or provide mock audio)
-      - Click generate summary
-    expected: Structured summary with section headers appears
+      - Click Start Recording
+      - Dictate "The patient was referred for new onset headaches starting 3 weeks ago"
+      - Stop recording
+      - Wait for transcription
+      - Click Generate Summary
+    expected: |
+      - Structured summary appears with sections
+      - Alerts section (red) if concerning findings
+      - Suggested Focus section (yellow)
+      - Key Points section
+    data_verification: Summary reflects dictated content accurately
 
   - id: B5
+    title: Chart Prep to HPI flow
+    preconditions: [Chart Prep summary generated]
+    steps:
+      - With Chart Prep summary visible
+      - Click "Add All to Note"
+    expected: Content appears in HPI field, properly formatted
+    data_verification: HPI field contains Chart Prep summary content
+
+  - id: B6
     title: Generate Assessment from diagnoses
     preconditions: [logged in, 1+ diagnosis added]
     steps:
+      - Add "Migraine with aura" diagnosis
+      - Navigate to Recommendation tab
       - Click Generate Assessment button
-    expected: Assessment text populates from selected diagnoses
+    expected: Assessment text populates based on selected diagnoses
+    data_verification: Assessment mentions migraine, includes relevant clinical language
+
+  - id: B7
+    title: Patient-friendly summary
+    preconditions: [logged in, clinical content entered]
+    steps:
+      - Open AI drawer
+      - Click Summary tab
+      - Select "Simple" level
+      - Click Generate
+    expected: Output is patient-readable, minimal medical jargon
+
+  - id: B8
+    title: Note review suggestions
+    preconditions: [logged in, note content entered]
+    steps:
+      - Click Generate Note
+      - Generate a note
+      - Observe AI Review panel
+    expected: |
+      - Suggestions panel appears with improvement ideas
+      - Each suggestion has type badge (consistency/completeness/quality)
+      - "Go to section" links work
 
 ---
-historian:
+historian_physician:
   - id: C1
-    title: Patient picker shows real patients
-    preconditions: [demo data seeded in Supabase, migration 011 applied]
+    title: Historian session list shows real patients
+    preconditions: [logged in, historian sessions exist with patient_id FK]
     steps:
-      - Navigate to /patient
-      - Click AI Historian tab
-    expected: Patient cards with names, referral reason, MRN displayed
+      - Look at left sidebar AI Historian section
+    expected: Session cards show real patient names, not "Demo Patient"
+    data_verification: Names match patients table
 
   - id: C2
-    title: Add new patient from portal
-    preconditions: [on Historian tab]
+    title: Historian session details
+    preconditions: [historian session exists]
     steps:
-      - Click Add New Patient
-      - Fill first name, last name, referral reason
-      - Submit
-    expected: Patient appears in list, form clears
+      - Expand a session card in sidebar
+      - Click Transcript tab
+      - Click Summary tab
+      - Click Structured Data tab
+    expected: All three tabs render content correctly
 
   - id: C3
-    title: Patient context loads for interview
-    preconditions: [patient with prior visit exists]
+    title: Red flags display
+    preconditions: [historian session with red flags]
     steps:
-      - Select patient from list
-      - Wait for /patient/historian page to load
-    expected: Context card shows patient name, session type (new/follow-up), referral reason
+      - Find session with red flags
+      - Expand session card
+    expected: Red flag banner visible with severity indicator and description
 
   - id: C4
-    title: Demo scenario still works
-    preconditions: [on Historian tab]
-    steps:
-      - Expand "Or try a demo scenario"
-      - Click a scenario
-    expected: Navigates to /patient/historian?scenario=<id>, scenario loads
-
-  - id: C5
-    title: Voice interview starts
-    preconditions: [on historian page with scenario or patient selected, mic available]
-    steps:
-      - Click Start Voice Interview
-      - Grant mic permission
-    expected: Status changes to Connecting then Active, AI greeting plays
-
-  - id: C6
-    title: Session saved with patient_id
-    preconditions: [interview completed for a real patient]
-    steps:
-      - End interview
-      - Check historian_sessions table
-    expected: Row has patient_id FK set to selected patient's UUID
-
-  - id: C7
-    title: Physician sees real patient name
-    preconditions: [logged in as physician, historian session exists with patient_id]
-    steps:
-      - Check AI Historian section in left sidebar
-    expected: Session card shows joined patient name, not "Demo Patient"
-
-  - id: C8
-    title: Import to note
+    title: Import HPI from historian
     preconditions: [historian session with structured output]
     steps:
       - Expand session card
-      - Click Import to Note
-    expected: HPI, assessment, medications populate in clinical note
+      - Click "Import to Note"
+      - Check HPI field
+    expected: HPI field populates with interview summary
+    data_verification: HPI contains chief complaint and symptom details from interview
 
-  - id: C9
-    title: Safety escalation
-    preconditions: [active interview session]
+  - id: C5
+    title: Import medications from historian
+    preconditions: [historian session where patient mentioned medications]
     steps:
-      - Speak a safety keyword (e.g., test phrase)
-    expected: Red escalation overlay with 911, 988, Crisis Text Line links
+      - Import session to note
+      - Check medication list
+    expected: Patient-stated medications appear in medication list
+    data_verification: Medications match what patient said in interview
+
+  - id: C6
+    title: Import allergies from historian
+    preconditions: [historian session where patient mentioned allergies]
+    steps:
+      - Import session to note
+      - Check allergy section
+    expected: Patient-stated allergies appear in allergy list
+    data_verification: Allergies match what patient said in interview
+
+  - id: C7
+    title: Import all structured data
+    preconditions: [complete historian session]
+    steps:
+      - Click Import All
+      - Check all note fields
+    expected: |
+      - HPI populated
+      - Medications populated
+      - Allergies populated
+      - PMH populated
+      - ROS populated
+    data_verification: All fields reflect interview content accurately
+
+---
+mobile_app:
+  - id: M1
+    title: Mobile auto-redirect
+    preconditions: [mobile device, cookies cleared]
+    steps:
+      - Navigate to / on mobile browser
+    expected: Auto-redirects to /mobile based on User-Agent
+
+  - id: M2
+    title: Patient list display
+    preconditions: [on /mobile]
+    steps:
+      - View patient list
+    expected: |
+      - Compact patient cards
+      - Status badges (Sched, Active, NEW, F/U)
+      - Times visible
+
+  - id: M3
+    title: Patient search
+    preconditions: [on /mobile, patients exist]
+    steps:
+      - Tap search bar
+      - Type patient name partial
+    expected: List filters in real-time to matching patients
+
+  - id: M4
+    title: Filter pills
+    preconditions: [on /mobile]
+    steps:
+      - Tap "Scheduled" pill
+      - Tap "Active" pill
+      - Tap "All" pill
+    expected: Patient list updates to show filtered results
+
+  - id: M5
+    title: Swipe gestures
+    preconditions: [on /mobile, scheduled patient exists]
+    steps:
+      - Swipe right on a scheduled patient card
+    expected: Check-in action triggers, patient status changes
+
+  - id: M6
+    title: FAB navigation
+    preconditions: [on /mobile]
+    steps:
+      - Tap red microphone FAB
+    expected: Navigates to /mobile/voice page
+
+---
+mobile_chart:
+  - id: N1
+    title: Chart access
+    preconditions: [on /mobile]
+    steps:
+      - Tap on a patient card
+    expected: Navigates to /mobile/chart/[id]
+
+  - id: N2
+    title: AI Summary card
+    preconditions: [on patient chart]
+    steps:
+      - View AI Summary section
+    expected: |
+      - Shows referral context
+      - Key considerations listed
+      - Collapsible
+
+  - id: N3
+    title: Section navigation pills
+    preconditions: [on patient chart]
+    steps:
+      - Tap HPI pill
+      - Tap Exam pill
+      - Tap Assessment pill
+      - Tap Plan pill
+    expected: Page scrolls to correct section each time
+
+  - id: N4
+    title: Section expand/collapse
+    preconditions: [on patient chart]
+    steps:
+      - Tap HPI section card header
+    expected: Section expands showing editable content
+
+  - id: N5
+    title: Section voice record
+    preconditions: [section expanded]
+    steps:
+      - Tap microphone button on section
+    expected: Voice recorder UI appears for that section
+
+  - id: N6
+    title: Section transcription
+    preconditions: [recording in section]
+    steps:
+      - Record speech
+      - Stop recording
+    expected: Transcribed text appears in section field
+
+---
+mobile_voice:
+  - id: O1
+    title: Voice page navigation
+    preconditions: [on /mobile]
+    steps:
+      - Tap FAB or section mic button
+    expected: Voice recorder page/UI opens
+
+  - id: O2
+    title: Mic permission
+    preconditions: [voice recorder open, permissions not yet granted]
+    steps:
+      - Tap Start Recording
+    expected: Browser/device requests microphone permission
+
+  - id: O3
+    title: Recording visualization
+    preconditions: [mic permission granted]
+    steps:
+      - Start recording
+      - Speak into microphone
+    expected: Audio level visualization animates in response to voice
+
+  - id: O4
+    title: Pause and resume
+    preconditions: [actively recording]
+    steps:
+      - Tap Pause
+      - Wait 2 seconds
+      - Tap Resume
+      - Stop recording
+    expected: |
+      - Recording pauses (visualization stops)
+      - Timer pauses
+      - Resume continues recording
+      - Final transcription includes all audio
+
+  - id: O5
+    title: Transcription completes
+    preconditions: [recording stopped]
+    steps:
+      - Stop recording
+      - Wait for processing
+    expected: Transcribed text displays on screen
+
+  - id: O6
+    title: Safari/iOS transcription
+    preconditions: [iPhone with Safari browser]
+    steps:
+      - Navigate to /mobile/voice
+      - Start recording
+      - Speak "Testing transcription on iPhone"
+      - Stop recording
+    expected: |
+      - Transcription succeeds (not "failed to transcribe")
+      - Text displays correctly
+    data_verification: MIME type is audio/mp4 or audio/aac, mapped to .m4a extension
+
+  - id: O7
+    title: Error retry
+    preconditions: [transcription failed]
+    steps:
+      - If transcription fails, observe Retry button
+      - Tap Retry
+    expected: Retry attempts transcription again
+
+  - id: O8
+    title: AI cleanup of verbal corrections
+    preconditions: [voice recorder ready]
+    steps:
+      - Record "The patient has pain in the left hand, no wait, the right hand"
+      - Stop recording
+    expected: Transcription shows "The patient has pain in the right hand"
+    data_verification: Verbal corrections are applied, not kept literally
+
+---
+mobile_settings:
+  - id: P1
+    title: Settings page renders
+    preconditions: [on /mobile]
+    steps:
+      - Tap Settings in bottom nav
+    expected: Settings page loads with toggle switches
+
+  - id: P2
+    title: Switch to Desktop View
+    preconditions: [on /mobile/settings]
+    steps:
+      - Tap "Switch to Desktop View" button
+    expected: |
+      - Redirects to /dashboard
+      - Cookie 'preferred_view' set to 'desktop'
+
+  - id: P3
+    title: View preference persistence
+    preconditions: [switched to desktop on mobile]
+    steps:
+      - Navigate to / on same mobile device
+    expected: Stays on desktop view (respects cookie preference)
+
+  - id: P4
+    title: Reset preference
+    preconditions: [mobile device]
+    steps:
+      - Clear cookies
+      - Navigate to /
+    expected: Auto-redirects to /mobile (default behavior restored)
 
 ---
 patient_portal:
@@ -236,7 +552,7 @@ patient_portal:
     title: Intake form submission
     preconditions: [on /patient, Intake tab]
     steps:
-      - Fill name, chief complaint (required)
+      - Fill name, DOB, chief complaint
       - Submit
     expected: Success message, form resets
 
@@ -249,24 +565,254 @@ patient_portal:
     expected: "Message sent successfully" toast
 
   - id: D3
-    title: Historian tab full flow
-    preconditions: [on /patient, Historian tab]
+    title: Portal accessible without auth
+    preconditions: [logged out]
     steps:
-      - Verify patient list loads
-      - Verify Add New Patient form works
-      - Verify demo scenario collapsible section
-    expected: All three sections functional
+      - Navigate to /patient
+    expected: Portal renders, no auth redirect
 
 ---
-mobile:
+historian_patient:
+  - id: H1
+    title: Patient picker shows patients
+    preconditions: [on /patient, Historian tab]
+    steps:
+      - View patient list
+    expected: Patient cards with names, referral reason, MRN
+
+  - id: H2
+    title: Add new patient
+    preconditions: [on Historian tab]
+    steps:
+      - Click Add New Patient
+      - Fill first name, last name, referral reason
+      - Submit
+    expected: Patient appears in list, form clears
+
+  - id: H3
+    title: Start interview
+    preconditions: [patient selected]
+    steps:
+      - Click Start Voice Interview
+      - Grant mic permission
+    expected: |
+      - Status changes to Connecting then Active
+      - AI greeting plays
+
+  - id: H4
+    title: Voice capture
+    preconditions: [interview active]
+    steps:
+      - Speak responses to AI questions
+    expected: Transcript shows patient responses in real-time
+
+  - id: H5
+    title: Interview flow
+    preconditions: [interview active]
+    steps:
+      - Answer AI questions about symptoms, medications, history
+    expected: AI asks appropriate follow-up questions based on responses
+
+  - id: H6
+    title: Session complete
+    preconditions: [interview finished]
+    steps:
+      - End interview
+    expected: |
+      - Success screen displays
+      - Duration and question count shown
+
+  - id: H7
+    title: Session saved to database
+    preconditions: [interview completed]
+    steps:
+      - Check historian_sessions table in Supabase
+    expected: |
+      - Row exists with session data
+      - patient_id FK set correctly
+      - structured_output JSON populated
+    data_verification: Database record matches interview content
+
+  - id: H8
+    title: Demo scenario
+    preconditions: [on Historian tab]
+    steps:
+      - Expand "Or try a demo scenario"
+      - Select a scenario
+    expected: Navigates to /patient/historian?scenario=<id>, mock context loads
+
+---
+historian_data_flow:
+  - id: I1
+    title: Chief complaint extraction
+    preconditions: [interview active]
+    steps:
+      - When asked, say "I've been having terrible headaches"
+    expected: Structured output chiefComplaint contains "headaches"
+    data_verification: |
+      structured_output.chiefComplaint includes "headaches"
+
+  - id: I2
+    title: HPI OLDCARTS extraction
+    preconditions: [interview active]
+    steps:
+      - Describe symptoms with timing, location, severity
+      - Say "Started 3 weeks ago, left side of my head, about 7 out of 10 pain"
+    expected: HPI text includes onset (3 weeks), location (left side), severity (7/10)
+    data_verification: |
+      structured_output.hpi contains temporal, location, and severity info
+
+  - id: I3
+    title: Medication mention extraction
+    preconditions: [interview active]
+    steps:
+      - When asked about medications, say "I take lisinopril 10mg daily for blood pressure"
+    expected: Medication appears in structured medications array
+    data_verification: |
+      structured_output.medications contains:
+        - name: lisinopril
+        - dose: 10mg
+        - frequency: daily
+
+  - id: I4
+    title: Allergy mention extraction
+    preconditions: [interview active]
+    steps:
+      - When asked about allergies, say "I'm allergic to penicillin, I get hives"
+    expected: Allergy appears in structured allergies array
+    data_verification: |
+      structured_output.allergies contains:
+        - allergen: penicillin
+        - reaction: hives
+
+  - id: I5
+    title: PMH extraction
+    preconditions: [interview active]
+    steps:
+      - When asked, say "I have diabetes and high blood pressure"
+    expected: Conditions appear in pastMedicalHistory
+    data_verification: |
+      structured_output.pastMedicalHistory contains:
+        - diabetes
+        - hypertension/high blood pressure
+
+  - id: I6
+    title: Family history extraction
+    preconditions: [interview active]
+    steps:
+      - Say "My mother had migraines and my father had a stroke"
+    expected: Conditions appear in familyHistory
+    data_verification: |
+      structured_output.familyHistory contains:
+        - mother: migraines
+        - father: stroke
+
+  - id: I7
+    title: Social history extraction
+    preconditions: [interview active]
+    steps:
+      - Say "I smoke half a pack a day, drink socially, work as an accountant"
+    expected: Details appear in socialHistory
+    data_verification: |
+      structured_output.socialHistory contains:
+        - tobacco use
+        - alcohol use
+        - occupation
+
+  - id: I8
+    title: ROS positive findings
+    preconditions: [interview active]
+    steps:
+      - Mention symptoms "I've also had some nausea and sensitivity to light"
+    expected: Appears in reviewOfSystems with affected systems
+    data_verification: |
+      structured_output.reviewOfSystems contains:
+        - GI: nausea
+        - Neuro/Eyes: photophobia
+
+  - id: I9
+    title: Red flag detection
+    preconditions: [interview active]
+    steps:
+      - Mention concerning symptom "The headache woke me up from sleep"
+    expected: Red flag array populated
+    data_verification: |
+      structured_output.redFlags contains:
+        - description: nocturnal headache
+        - severity: moderate or high
+
+  - id: I10
+    title: Safety trigger escalation
+    preconditions: [interview active]
+    steps:
+      - Say safety-concerning phrase (test carefully in controlled setting)
+    expected: |
+      - Safety escalation overlay appears
+      - 911, 988, Crisis Text Line links visible
+      - Interview pauses
+
+  - id: I11
+    title: Import to HPI field
+    preconditions: [historian session completed, physician logged in]
+    steps:
+      - Find session in sidebar
+      - Click Import to Note
+      - Check HPI field in clinical note
+    expected: HPI field contains interview summary
+    data_verification: |
+      HPI text includes:
+        - Chief complaint
+        - Symptom details from interview
+
+  - id: I12
+    title: Import medications to list
+    preconditions: [historian session with medications mentioned]
+    steps:
+      - Import session to note
+      - Check medication list
+    expected: Medications from interview appear in list
+    data_verification: |
+      Medication list contains medications patient mentioned during interview
+
+  - id: I13
+    title: Import allergies to section
+    preconditions: [historian session with allergies mentioned]
+    steps:
+      - Import session to note
+      - Check allergy section
+    expected: Allergies from interview appear
+    data_verification: |
+      Allergy section contains allergies patient mentioned during interview
+
+  - id: I14
+    title: Import all fields
+    preconditions: [complete historian session]
+    steps:
+      - Click Import All on session
+      - Check all relevant note fields
+    expected: |
+      All fields populated:
+        - HPI: interview summary
+        - Medications: patient-stated meds
+        - Allergies: patient-stated allergies
+        - PMH: mentioned conditions
+        - ROS: mentioned symptoms
+    data_verification: |
+      No data loss between interview and imported fields
+
+---
+cross_platform:
   - id: E1
     title: iPhone SE layout (375px)
-    preconditions: [browser devtools, 375px width]
+    preconditions: [browser devtools or real device, 375px width]
     steps:
       - Load /dashboard
       - Tap hamburger menu
       - Open any drawer
-    expected: Sidebar slides in, drawers full-screen, no horizontal overflow
+    expected: |
+      - Sidebar slides in
+      - Drawers full-screen
+      - No horizontal overflow
 
   - id: E2
     title: iPad layout (768px)
@@ -279,7 +825,7 @@ mobile:
     title: Touch targets
     preconditions: [mobile viewport]
     steps:
-      - Inspect action bar buttons
+      - Inspect action bar buttons with devtools
     expected: All interactive elements >= 44px min dimension
 
   - id: E4
@@ -290,8 +836,14 @@ mobile:
       - Navigate all three tabs
     expected: Forms usable, no horizontal scroll
 
----
-cross_cutting:
+  - id: E5
+    title: Mobile app layout
+    preconditions: [375px viewport or mobile device]
+    steps:
+      - Load /mobile
+      - Navigate to chart and settings
+    expected: Optimized compact layout, no horizontal scroll
+
   - id: F1
     title: Dark mode rendering
     preconditions: [logged in]
@@ -320,3 +872,24 @@ cross_cutting:
     steps:
       - Trigger an AI action (Ask AI, Generate Assessment)
     expected: Error message in UI, not white screen or unhandled exception
+
+  - id: F5
+    title: Mobile Safari transcription
+    preconditions: [iPhone with Safari]
+    steps:
+      - Test voice transcription on iPhone Safari
+    expected: Transcription works (MIME type fix applied)
+
+  - id: F6
+    title: Chrome desktop
+    preconditions: [Chrome browser]
+    steps:
+      - Run through smoke suite on Chrome
+    expected: All features work
+
+  - id: F7
+    title: Firefox desktop
+    preconditions: [Firefox browser]
+    steps:
+      - Run through smoke suite on Firefox
+    expected: Core features work

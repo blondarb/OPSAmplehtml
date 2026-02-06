@@ -1,11 +1,11 @@
 # Test Runbook - Sevaro Clinical
 
-> runbook_version: 1.0
-> Last updated: 2026-01-30
+> runbook_version: 2.0
+> Last updated: 2026-02-06
 
 ## Purpose
 
-Stable baseline test plan for Sevaro Clinical. Each release uses a **mission brief** (see `runs/`) that lists only the delta — new/changed features to focus on. The runbook itself changes only when flows are added or removed.
+Comprehensive test plan for Sevaro Clinical covering desktop, mobile, and patient portal. Each release uses a **mission brief** (see `runs/`) that lists only the delta — new/changed features to focus on. The runbook itself changes only when flows are added or removed.
 
 ---
 
@@ -16,6 +16,7 @@ Stable baseline test plan for Sevaro Clinical. Each release uses a **mission bri
 | **Planner** | Claude Code (VS Code) | Draft mission brief, triage failures, update test cases |
 | **Executor** | Claude Code for Chrome | Walk through UI flows, capture screenshots, log results |
 | **CI gate** | `npm run build` | Must pass before any deploy |
+| **Device testing** | Real iPhone/Android | Required for mobile voice transcription tests |
 
 **Workflow:** Planner writes a mission brief in `qa/runs/`. Executor opens the preview URL and runs the brief's focus areas plus the smoke suite. Results go into the run log.
 
@@ -27,62 +28,157 @@ Run these first. Any failure blocks release.
 
 | # | Flow | Steps | Pass criteria |
 |---|------|-------|---------------|
-| S1 | App loads | Open `/` | Redirects to `/login` or `/dashboard` |
-| S2 | Login | Email + password | Lands on `/dashboard`, patient card visible |
-| S3 | Tabs render | Click History, Imaging, Exams, Recommendation | Each tab renders without error |
-| S4 | Patient portal | Open `/patient` | Three tabs (Intake, Messages, Historian) render |
-| S5 | Build passes | `npm run build` | Exit code 0, no TS errors |
+| S1 | App loads (Desktop) | Open `/` on desktop browser | Redirects to `/dashboard` |
+| S2 | App loads (Mobile) | Open `/` on mobile browser (iPhone/Android) | Redirects to `/mobile` |
+| S3 | Login | Email + password on `/login` | Lands on `/dashboard`, patient card visible |
+| S4 | Tabs render | Click History, Imaging, Exams, Recommendation | Each tab renders without error |
+| S5 | Patient portal | Open `/patient` | Three tabs (Intake, Messages, Historian) render |
+| S6 | Mobile app | Open `/mobile` on phone | Patient list renders, FAB visible |
+| S7 | Build passes | `npm run build` | Exit code 0, no TS errors |
 
 ---
 
-## Regression Flows
+## Desktop Physician Flows
 
-### A. Clinical Notes (Physician)
+### A. Clinical Notes
 
 | ID | Flow | Key checks |
 |----|------|------------|
 | A1 | HPI text entry | Type text, field persists across tab switches |
 | A2 | Reason for consult | Select category, sub-options appear, differential auto-populates |
-| A3 | Differential diagnosis | Search picker, add/remove ICD-10, custom entry |
+| A3 | Differential diagnosis | Search picker, add/remove ICD-10, custom entry, removed diagnoses don't reappear |
 | A4 | Generate Note | Click Generate Note, modal opens, note preview renders |
 | A5 | Dot phrases | Type `.exam` in text field, expansion triggers |
 | A6 | Clinical scales | Select headache diagnosis, MIDAS/HIT-6 suggested |
 | A7 | Imaging tab | Expand MRI card, fill findings, PACS link clickable |
 | A8 | Autosave isolation | Switch patient, verify no cross-patient data bleed |
+| A9 | Medications | Add medication from formulary, displays in list, persists |
+| A10 | Allergies | Add allergy with severity, appears in header banner |
 
-### B. AI Features
+### B. AI Features (Desktop)
+
+| ID | Flow | Key checks | Data verification |
+|----|------|------------|-------------------|
+| B1 | Ask AI | Open AI drawer, submit question, response renders | Response is contextual to patient data |
+| B2 | Field AI actions | Click star on HPI, Improve/Expand/Summarize return text | Text modifies field appropriately |
+| B3 | Voice dictation | Open Voice drawer, mic permission prompt appears | Microphone activates |
+| B4 | Chart Prep | Dictate pre-visit info, AI summary generates | Summary contains Alerts (red), Focus (yellow), structured sections |
+| B5 | Chart Prep to HPI | Click "Add All to Note" | Content appears in correct note fields |
+| B6 | Generate Assessment | Add diagnoses, click Generate Assessment | Assessment text populates with ICD-10 context |
+| B7 | Patient Summary | Generate patient-friendly summary | Output is understandable, no jargon |
+| B8 | Note Review | Generate note, AI review shows suggestions | Suggestions have severity badges, "Go to section" works |
+
+### C. AI Historian (Physician View)
+
+| ID | Flow | Key checks | Data verification |
+|----|------|------------|-------------------|
+| C1 | Session list | Dashboard left sidebar shows historian sessions | Real patient names (not "Demo Patient") |
+| C2 | Session details | Expand session card | Transcript, Summary, Structured Data tabs work |
+| C3 | Red flags | Session with red flags | Red flag banner visible with severity |
+| C4 | Import HPI | Click Import to Note > HPI | HPI field populates with session data |
+| C5 | Import Medications | Click Import to Note | Medications from interview appear in medication list |
+| C6 | Import Allergies | Click Import to Note | Allergies from interview appear in allergy section |
+| C7 | Import All | Import entire structured output | All fields populate correctly: HPI, meds, allergies, PMH, ROS |
+
+---
+
+## Mobile App Flows
+
+### M. Mobile Patient List
 
 | ID | Flow | Key checks |
 |----|------|------------|
-| B1 | Ask AI | Open AI drawer, submit question, response renders |
-| B2 | Field AI actions | Click star on HPI, Improve/Expand/Summarize return text |
-| B3 | Voice dictation | Open Voice drawer, mic permission prompt appears |
-| B4 | Chart Prep | Dictate (or mock), AI summary generates with sections |
-| B5 | Generate Assessment | Add diagnoses, click Generate Assessment, text populates |
+| M1 | Auto-redirect | Visit `/` on mobile | Auto-redirects to `/mobile` |
+| M2 | Patient list | View patient cards | Compact cards with status badges (Sched, Active, NEW, F/U) |
+| M3 | Search | Type patient name or MRN | Results filter in real-time |
+| M4 | Filter pills | Tap Scheduled/Active filters | List updates correctly |
+| M5 | Swipe gestures | Swipe right on patient card | Check-in action triggers |
+| M6 | FAB | Tap red microphone FAB | Navigates to `/mobile/voice` |
 
-### C. AI Historian
-
-| ID | Flow | Key checks |
-|----|------|------------|
-| C1 | Patient picker | `/patient` > Historian tab > real patients listed from DB |
-| C2 | Add new patient | Fill form, submit, patient appears in list |
-| C3 | Patient context | Select patient > `/patient/historian?patient_id=` > context card shows name + type |
-| C4 | Demo scenario | Collapse "demo scenarios", select one, navigates with `?scenario=` |
-| C5 | Voice interview | Start interview, mic prompt, AI greeting plays |
-| C6 | Session save | End interview, session saved with `patient_id` FK |
-| C7 | Physician panel | Dashboard left sidebar shows session with real patient name |
-| C8 | Import to note | Click "Import to Note", fields populate |
-| C9 | Safety escalation | Trigger safety keyword, escalation overlay with 911/988 |
-
-### D. Patient Portal
+### N. Mobile Chart View
 
 | ID | Flow | Key checks |
 |----|------|------------|
-| D1 | Intake form | Fill all fields, submit, success message |
-| D2 | Messages | Send message, success toast |
-| D3 | Historian tab | Patient list loads, add patient works, demo collapsible |
+| N1 | Chart access | Tap patient card | Navigates to `/mobile/chart/[id]` |
+| N2 | AI Summary | View AI summary card | Shows referral context, key considerations |
+| N3 | Section pills | Tap HPI, Exam, Assessment, Plan pills | Scrolls to correct section |
+| N4 | Section expand | Tap section card | Expands with editable content |
+| N5 | Voice record | Tap mic on section | Opens voice recorder for that section |
+| N6 | Transcription | Record and stop | Text appears in section field |
 
-### E. Mobile-First Checks
+### O. Mobile Voice Recorder
+
+| ID | Flow | Key checks | Data verification |
+|----|------|------------|-------------------|
+| O1 | Navigate | Tap FAB or section mic | Voice recorder page opens |
+| O2 | Permission | Tap Start Recording | Mic permission prompt appears |
+| O3 | Recording | Grant permission, speak | Audio level visualization animates |
+| O4 | Pause/Resume | Tap pause, then resume | Recording continues, timer correct |
+| O5 | Transcription | Tap Stop | Transcription processes and displays |
+| O6 | Safari/iOS | Test on iPhone Safari | Transcription succeeds (not "failed to transcribe") |
+| O7 | Error retry | If transcription fails | Retry button appears, retry works |
+| O8 | AI cleanup | Dictate with verbal corrections | Corrections applied (e.g., "left hand, no wait, right hand" → "right hand") |
+
+### P. Mobile Settings
+
+| ID | Flow | Key checks |
+|----|------|------------|
+| P1 | Settings page | Navigate to settings | Toggle switches work |
+| P2 | Switch to Desktop | Tap "Switch to Desktop View" | Redirects to `/dashboard`, cookie saved |
+| P3 | View persistence | Return to `/` on mobile | Continues to desktop (cookie respected) |
+| P4 | Reset preference | Clear cookies, visit `/` on mobile | Auto-redirects to `/mobile` again |
+
+---
+
+## Patient Portal Flows
+
+### D. Patient Intake & Messages
+
+| ID | Flow | Key checks |
+|----|------|------------|
+| D1 | Intake form | Fill all fields, submit | Success message, form resets |
+| D2 | Messages | Send message | Success toast |
+| D3 | No auth required | Visit `/patient` logged out | Portal accessible |
+
+### H. AI Historian (Patient Interview)
+
+| ID | Flow | Key checks | Data verification |
+|----|------|------------|-------------------|
+| H1 | Patient picker | Historian tab shows patient list | Cards show name, referral reason, MRN |
+| H2 | Add new patient | Fill form, submit | Patient appears in list |
+| H3 | Start interview | Select patient, click Start | WebRTC connects, AI greeting plays |
+| H4 | Voice capture | Speak responses | Transcript shows patient responses |
+| H5 | Interview flow | Answer AI questions | AI asks appropriate follow-ups |
+| H6 | Session complete | End interview | Success screen with duration/stats |
+| H7 | Session saved | Check database | Session has `patient_id` FK, structured output |
+| H8 | Demo scenarios | Select demo scenario | Interview loads with mock context |
+
+### I. AI Historian Data Flow
+
+**Critical: Verify patient-reported data flows to physician note correctly**
+
+| ID | Flow | Key checks | Data verification |
+|----|------|------------|-------------------|
+| I1 | Chief complaint | Patient states chief complaint | Appears in structured output `chiefComplaint` |
+| I2 | HPI extraction | Patient describes symptoms (OLDCARTS) | HPI text contains onset, location, duration, character, etc. |
+| I3 | Medication mention | Patient says "I take lisinopril 10mg daily" | Medication appears in structured `medications` array |
+| I4 | Allergy mention | Patient says "I'm allergic to penicillin" | Allergy appears in structured `allergies` array |
+| I5 | PMH mention | Patient says "I have diabetes and hypertension" | Conditions appear in `pastMedicalHistory` |
+| I6 | Family history | Patient mentions family conditions | Appears in `familyHistory` |
+| I7 | Social history | Patient describes smoking, alcohol, occupation | Appears in `socialHistory` |
+| I8 | ROS positive | Patient mentions headaches, nausea | Appears in `reviewOfSystems` with affected systems |
+| I9 | Red flag detection | Patient mentions concerning symptom | Red flag array populated with severity |
+| I10 | Safety trigger | Patient mentions self-harm | Safety escalation overlay appears |
+| I11 | Import to HPI | Physician clicks Import | HPI field contains interview summary |
+| I12 | Import meds | Physician clicks Import | Patient-stated meds in medication list |
+| I13 | Import allergies | Physician clicks Import | Patient-stated allergies in allergy section |
+| I14 | Import full | Import all structured data | All fields populated, no data loss |
+
+---
+
+## Cross-Cutting Tests
+
+### E. Responsive/Mobile Layout
 
 | ID | Viewport | Key checks |
 |----|----------|------------|
@@ -90,28 +186,50 @@ Run these first. Any failure blocks release.
 | E2 | 768px (iPad) | Reduced padding, sidebar visible, no overflow |
 | E3 | Touch targets | All buttons >= 44px tap area |
 | E4 | Portal mobile | `/patient` usable on phone-width viewport |
+| E5 | Mobile app 375px | `/mobile` optimized layout, no horizontal scroll |
 
-### F. Cross-Cutting
+### F. Cross-Platform
 
 | ID | Check | Key checks |
 |----|-------|------------|
 | F1 | Dark mode | Toggle, all form fields readable, no white-on-white |
 | F2 | Auth guard | Visit `/dashboard` logged out, redirects to `/login` |
 | F3 | Portal no-auth | `/patient` accessible without login |
-| F4 | Error states | Bad API key > graceful error, not white screen |
+| F4 | Error states | Bad API key → graceful error, not white screen |
+| F5 | Mobile Safari | Voice transcription works on iPhone Safari |
+| F6 | Chrome desktop | All features work in Chrome |
+| F7 | Firefox desktop | Core features work in Firefox |
 
 ---
 
 ## Role-Based Test Matrix
 
-| Flow area | Physician (authed) | Patient (no auth) | Notes |
-|-----------|-------------------|-------------------|-------|
-| Dashboard | Full access | Redirect to login | |
-| Clinical notes | CRUD | No access | |
-| AI drawers | Full access | No access | |
-| Patient portal | N/A | Full access | `/patient` |
-| Historian interview | View sessions | Start interviews | Different views |
-| Import to note | Can import | N/A | Physician only |
+| Flow area | Physician (authed) | Patient (no auth) | Mobile (authed) |
+|-----------|-------------------|-------------------|-----------------|
+| Dashboard | Full access | Redirect to login | Via /mobile |
+| Clinical notes | CRUD | No access | View/dictate |
+| AI drawers | Full access | No access | Voice only |
+| Patient portal | N/A | Full access | Accessible |
+| Historian interview | View sessions | Start interviews | N/A |
+| Import to note | Can import | N/A | N/A |
+| Voice transcription | Full | Limited | Full |
+
+---
+
+## AI Data Verification Checklist
+
+**Run these after any changes to AI prompts, API routes, or data flow:**
+
+| # | Verification | How to check |
+|---|--------------|--------------|
+| 1 | Chart Prep sections | Summary has: Alerts (red), Focus (yellow), Key Points, Timeline |
+| 2 | Chart Prep → Note | "Add All to Note" populates HPI, not random fields |
+| 3 | Visit AI extraction | Recorded visit produces HPI, Exam, Assessment, Plan sections |
+| 4 | Historian structured output | JSON contains all 8 sections: chiefComplaint, hpi, medications, allergies, pmh, familyHistory, socialHistory, ros |
+| 5 | Historian → Note fields | Import maps: hpi→HPI, medications→medication list, allergies→allergy list |
+| 6 | AI no hallucination | Field AI actions (Improve/Expand) don't add fabricated clinical data |
+| 7 | Transcription cleanup | Verbal corrections applied, filler words removed |
+| 8 | Scale autofill | AI extracts only from provided data, shows confidence levels |
 
 ---
 
@@ -123,4 +241,19 @@ Before running tests, confirm:
 - [ ] Supabase project has latest migration applied
 - [ ] `OPENAI_API_KEY` is set (or `app_settings` populated)
 - [ ] At least one demo patient exists (seed data ran)
-- [ ] Browser mic permission available (for historian tests)
+- [ ] Browser mic permission available (for voice tests)
+- [ ] Real mobile device available (for Safari transcription tests)
+- [ ] Cookies cleared for view preference tests
+
+---
+
+## Quick Reference: Test Coverage by Release Type
+
+| Release Type | Required Tests |
+|--------------|----------------|
+| Hotfix | S1-S7, affected flow only |
+| Minor feature | S1-S7 + Mission brief focus + 3 regression spot-checks |
+| Major feature | Full regression (A, B, C, M, N, O, H, I) + all smoke |
+| Mobile changes | S1-S7 + M1-M6, N1-N6, O1-O8, P1-P4, E5 |
+| AI changes | S1-S7 + B1-B8, C1-C7, I1-I14 + AI verification checklist |
+| Historian changes | S1-S7 + C1-C7, H1-H8, I1-I14 |
