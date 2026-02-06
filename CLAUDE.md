@@ -35,6 +35,11 @@ src/
 │   ├── auth/              # Auth callback handler
 │   ├── dashboard/         # Main clinical interface
 │   ├── login/             # Login page
+│   ├── mobile/            # Mobile-optimized clinical interface
+│   │   ├── page.tsx       # Mobile patient list with FAB menu
+│   │   ├── chart/[id]/    # Mobile chart view with voice recorder
+│   │   ├── settings/      # Mobile settings page
+│   │   └── voice/         # Mobile voice recording page
 │   ├── patient/           # Patient portal
 │   │   ├── page.tsx       # Patient portal (intake, messages, historian)
 │   │   └── historian/     # AI Historian voice interview page
@@ -61,7 +66,14 @@ src/
 │   ├── SmartRecommendationsSection.tsx # Treatment recommendations per diagnosis
 │   ├── SmartScalesSection.tsx # Clinical scales based on selected conditions
 │   ├── TopNav.tsx         # Navigation with queue tabs, timer, PHI toggle
-│   └── VoiceDrawer.tsx    # Voice & Dictation drawer (Chart Prep, Document)
+│   ├── VoiceDrawer.tsx    # Voice & Dictation drawer (Chart Prep, Document)
+│   └── mobile/            # Mobile-specific components
+│       ├── MobileChartView.tsx        # Main mobile chart interface
+│       ├── MobileLayout.tsx           # Mobile navigation and layout wrapper
+│       ├── MobileNotePreview.tsx      # Mobile note preview modal
+│       ├── MobilePatientCard.tsx      # Patient info card for mobile
+│       ├── MobileRecommendationsSheet.tsx # Treatment recommendations bottom sheet
+│       └── MobileVoiceRecorder.tsx    # Voice recording with waveform
 ├── hooks/
 │   ├── useRealtimeSession.ts # WebRTC hook for OpenAI Realtime API
 │   └── useVoiceRecorder.ts # Voice recording hook with pause/resume
@@ -181,6 +193,21 @@ The OpenAI API key can be stored securely in Supabase `app_settings` table or as
     - Physician-side session panel with transcript, summary, and structured data views
     - Import-to-note functionality for EHR integration
     - 4 demo scenarios (headache referral, seizure eval, migraine follow-up, MS follow-up)
+
+12. **Mobile App** (`/mobile`):
+    - Mobile-optimized clinical interface for smartphones
+    - **Routes**:
+      - `/mobile` - Patient list with FAB menu for quick actions
+      - `/mobile/chart/[id]` - Full chart view with voice recording
+      - `/mobile/settings` - Mobile settings
+      - `/mobile/voice` - Dedicated voice recording page
+    - **Key Components**:
+      - `MobileChartView` - Scrollable sections (HPI, ROS, Exam, Assessment, Plan)
+      - `MobileRecommendationsSheet` - Bottom sheet with treatment recommendations per diagnosis
+      - `MobileVoiceRecorder` - Voice recording with waveform visualization
+      - `MobileNotePreview` - Note preview modal
+    - **Treatment Recommendations**: Tap any diagnosis to see evidence-based treatment plans from neuro-plans
+    - **API**: `/api/plans?diagnosisId=` accepts both diagnosis IDs (`epilepsy-management`) and ICD-10 codes (`G40.909`)
 
 ## UI Components
 
@@ -401,6 +428,12 @@ When redeploying after changes, use "Redeploy without cache" to ensure fresh bui
 - Push to feature branch, create PR, merge to main for deployment
 
 ## Recent Changes (February 2026)
+
+### Mobile Recommendations Fix (February 6, 2026)
+- **ICD-10 Code Lookup Support**: `/api/plans` now accepts both diagnosis IDs (e.g., `epilepsy-management`) AND ICD-10 codes directly (e.g., `G40.909`)
+- **Mobile View Fix**: MobileRecommendationsSheet was passing ICD-10 codes but API only supported diagnosis IDs - now both work
+- **Regex Detection**: API detects ICD-10 format (`/^[A-Z]\d+(\.\d+)?$/i`) and uses code directly for plan matching
+- **Mobile PRD Docs**: Added `docs/PRD_MOBILE_APP.md` and `docs/PRD_MOBILE_ENGINEERING_HANDOFF.md`
 
 ### OpenAI Model Migration & Order Sentences (February 5, 2026)
 - **Model Migration**: All `gpt-4o-mini` → `gpt-5-mini`, `gpt-4o-realtime-preview` → `gpt-realtime` (deprecation deadlines Feb 16 & Feb 27)

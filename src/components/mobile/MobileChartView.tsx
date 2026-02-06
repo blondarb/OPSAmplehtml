@@ -1,9 +1,10 @@
 'use client'
 
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, useMemo } from 'react'
 import MobileVoiceRecorder from './MobileVoiceRecorder'
 import MobileNotePreview from './MobileNotePreview'
 import MobileRecommendationsSheet from './MobileRecommendationsSheet'
+import { searchDiagnoses, type Diagnosis } from '@/lib/diagnosisData'
 
 interface Section {
   id: string
@@ -43,9 +44,19 @@ export default function MobileChartView({
   const [fabOpen, setFabOpen] = useState(false)
   const [showNotePreview, setShowNotePreview] = useState(false)
   const [isChartPrepMode, setIsChartPrepMode] = useState(false)
-  const [selectedDiagnoses, setSelectedDiagnoses] = useState<Array<{ id: string; name: string }>>([])
-  const [activeRecommendation, setActiveRecommendation] = useState<{ id: string; name: string } | null>(null)
+  const [selectedDiagnoses, setSelectedDiagnoses] = useState<Diagnosis[]>([])
+  const [activeRecommendation, setActiveRecommendation] = useState<Diagnosis | null>(null)
+  const [diagnosisSearch, setDiagnosisSearch] = useState('')
+  const [showDiagnosisSearch, setShowDiagnosisSearch] = useState(false)
   const scrollRef = useRef<HTMLDivElement>(null)
+
+  // Search diagnoses from the full 166+ diagnosis database
+  const diagnosisSearchResults = useMemo(() => {
+    if (!diagnosisSearch.trim()) return []
+    const results = searchDiagnoses(diagnosisSearch)
+    const selectedIds = new Set(selectedDiagnoses.map(d => d.id))
+    return results.filter(d => !selectedIds.has(d.id)).slice(0, 10)
+  }, [diagnosisSearch, selectedDiagnoses])
 
   interface ChartPrepSections {
     summary?: string
@@ -97,17 +108,17 @@ export default function MobileChartView({
     onUpdateNote('plan', newPlan)
   }
 
-  // Common diagnoses for quick selection (could be fetched from API)
-  const commonDiagnoses = [
-    { id: 'G43.909', name: 'Migraine' },
-    { id: 'G40.909', name: 'Epilepsy' },
-    { id: 'G20', name: 'Parkinson\'s Disease' },
-    { id: 'G35', name: 'Multiple Sclerosis' },
-    { id: 'G30.9', name: 'Alzheimer\'s Disease' },
-    { id: 'R51', name: 'Headache' },
-    { id: 'G25.0', name: 'Essential Tremor' },
-    { id: 'G62.9', name: 'Neuropathy' },
-  ]
+  // Common diagnoses for quick selection (subset of full database)
+  const commonDiagnoses = useMemo(() => [
+    { id: 'migraine-chronic', name: 'Chronic Migraine', icd10: 'G43.709', category: 'headache' as const },
+    { id: 'epilepsy-management', name: 'Epilepsy Management', icd10: 'G40.909', category: 'seizure' as const },
+    { id: 'parkinsons-disease', name: "Parkinson's Disease", icd10: 'G20', category: 'movement' as const },
+    { id: 'multiple-sclerosis', name: 'Multiple Sclerosis', icd10: 'G35', category: 'demyelinating' as const },
+    { id: 'alzheimers-disease', name: "Alzheimer's Disease", icd10: 'G30.9', category: 'cognitive' as const },
+    { id: 'tension-headache', name: 'Tension-type Headache', icd10: 'G44.2', category: 'headache' as const },
+    { id: 'essential-tremor', name: 'Essential Tremor', icd10: 'G25.0', category: 'movement' as const },
+    { id: 'peripheral-neuropathy', name: 'Peripheral Neuropathy', icd10: 'G62.9', category: 'neuromuscular' as const },
+  ], [])
 
   const sections: Section[] = [
     {
@@ -130,15 +141,8 @@ export default function MobileChartView({
       color: '#F59E0B',
     },
     {
-      id: 'assessment',
-      title: 'Assessment',
-      icon: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>,
-      color: '#EF4444',
-      required: true,
-    },
-    {
-      id: 'plan',
-      title: 'Plan',
+      id: 'assessment-plan',
+      title: 'Assessment & Plan',
       icon: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>,
       color: '#10B981',
       required: true,
@@ -191,6 +195,15 @@ export default function MobileChartView({
   }
 
   const getSectionStatus = (sectionId: string) => {
+    // Handle combined assessment-plan section
+    if (sectionId === 'assessment-plan') {
+      const assessment = noteData['assessment'] || ''
+      const plan = noteData['plan'] || ''
+      const totalLength = assessment.trim().length + plan.trim().length
+      if (totalLength === 0) return 'empty'
+      if (totalLength < 20) return 'incomplete'
+      return 'complete'
+    }
     const content = noteData[sectionId]
     if (!content || content.trim().length === 0) return 'empty'
     if (content.trim().length < 20) return 'incomplete'
@@ -537,28 +550,56 @@ export default function MobileChartView({
               </button>
             </div>
 
-            {/* Text area */}
-            <textarea
-              value={noteData[activeSection] || ''}
-              onChange={(e) => onUpdateNote(activeSection, e.target.value)}
-              placeholder={`Enter ${sections.find(s => s.id === activeSection)?.title.toLowerCase()}...`}
-              style={{
-                width: '100%',
-                minHeight: '120px',
-                padding: '10px',
-                border: '1px solid var(--border)',
-                borderRadius: '8px',
-                fontSize: '14px',
-                lineHeight: 1.5,
-                resize: 'vertical',
-                fontFamily: 'inherit',
-                background: 'var(--bg-gray)',
-              }}
-            />
+            {/* Text area - special handling for combined assessment-plan */}
+            {activeSection === 'assessment-plan' ? (
+              <>
+                {/* Assessment textarea */}
+                <div style={{ marginBottom: '16px' }}>
+                  <label style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-muted)', marginBottom: '6px', display: 'block' }}>
+                    Assessment
+                  </label>
+                  <textarea
+                    value={noteData['assessment'] || ''}
+                    onChange={(e) => onUpdateNote('assessment', e.target.value)}
+                    placeholder="Enter clinical assessment..."
+                    style={{
+                      width: '100%',
+                      minHeight: '80px',
+                      padding: '10px',
+                      border: '1px solid var(--border)',
+                      borderRadius: '8px',
+                      fontSize: '14px',
+                      lineHeight: 1.5,
+                      resize: 'vertical',
+                      fontFamily: 'inherit',
+                      background: 'var(--bg-gray)',
+                    }}
+                  />
+                </div>
+              </>
+            ) : (
+              <textarea
+                value={noteData[activeSection] || ''}
+                onChange={(e) => onUpdateNote(activeSection, e.target.value)}
+                placeholder={`Enter ${sections.find(s => s.id === activeSection)?.title.toLowerCase()}...`}
+                style={{
+                  width: '100%',
+                  minHeight: '120px',
+                  padding: '10px',
+                  border: '1px solid var(--border)',
+                  borderRadius: '8px',
+                  fontSize: '14px',
+                  lineHeight: 1.5,
+                  resize: 'vertical',
+                  fontFamily: 'inherit',
+                  background: 'var(--bg-gray)',
+                }}
+              />
+            )}
 
-            {/* Diagnosis selection for Assessment section */}
-            {activeSection === 'assessment' && (
-              <div style={{ marginTop: '12px' }}>
+            {/* Diagnosis selection for Assessment & Plan section */}
+            {activeSection === 'assessment-plan' && (
+              <div style={{ marginTop: '12px', marginBottom: '16px' }}>
                 <div style={{
                   fontSize: '12px',
                   fontWeight: 600,
@@ -574,6 +615,112 @@ export default function MobileChartView({
                     <line x1="12" y1="17" x2="12.01" y2="17"/>
                   </svg>
                   Diagnoses — Tap for Treatment Recommendations
+                </div>
+
+                {/* Searchable diagnosis input */}
+                <div style={{ position: 'relative', marginBottom: '8px' }}>
+                  <div style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                    padding: '8px 12px',
+                    background: 'var(--bg-gray)',
+                    borderRadius: '8px',
+                    border: showDiagnosisSearch ? '1px solid #0D9488' : '1px solid var(--border)',
+                  }}>
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ color: 'var(--text-muted)', flexShrink: 0 }}>
+                      <circle cx="11" cy="11" r="8"/>
+                      <line x1="21" y1="21" x2="16.65" y2="16.65"/>
+                    </svg>
+                    <input
+                      type="text"
+                      value={diagnosisSearch}
+                      onChange={(e) => {
+                        setDiagnosisSearch(e.target.value)
+                        setShowDiagnosisSearch(true)
+                      }}
+                      onFocus={() => setShowDiagnosisSearch(true)}
+                      placeholder="Search 166 diagnoses..."
+                      style={{
+                        flex: 1,
+                        border: 'none',
+                        background: 'transparent',
+                        fontSize: '14px',
+                        outline: 'none',
+                        color: 'var(--text-primary)',
+                      }}
+                    />
+                    {diagnosisSearch && (
+                      <button
+                        onClick={() => {
+                          setDiagnosisSearch('')
+                          setShowDiagnosisSearch(false)
+                        }}
+                        style={{ background: 'none', border: 'none', padding: '2px', cursor: 'pointer', color: 'var(--text-muted)' }}
+                      >
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                          <line x1="18" y1="6" x2="6" y2="18"/>
+                          <line x1="6" y1="6" x2="18" y2="18"/>
+                        </svg>
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Search results dropdown */}
+                  {showDiagnosisSearch && diagnosisSearchResults.length > 0 && (
+                    <div style={{
+                      position: 'absolute',
+                      top: '100%',
+                      left: 0,
+                      right: 0,
+                      background: 'var(--bg-white)',
+                      border: '1px solid var(--border)',
+                      borderRadius: '8px',
+                      boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+                      zIndex: 100,
+                      maxHeight: '200px',
+                      overflowY: 'auto',
+                      marginTop: '4px',
+                    }}>
+                      {diagnosisSearchResults.map(dx => (
+                        <button
+                          key={dx.id}
+                          onClick={() => {
+                            setSelectedDiagnoses([...selectedDiagnoses, dx])
+                            setActiveRecommendation(dx)
+                            setDiagnosisSearch('')
+                            setShowDiagnosisSearch(false)
+                            triggerHaptic(30)
+                          }}
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                            width: '100%',
+                            padding: '10px 12px',
+                            border: 'none',
+                            background: 'transparent',
+                            cursor: 'pointer',
+                            textAlign: 'left',
+                            borderBottom: '1px solid var(--border)',
+                          }}
+                        >
+                          <div>
+                            <div style={{ fontSize: '14px', fontWeight: 500, color: 'var(--text-primary)' }}>
+                              {dx.name}
+                            </div>
+                            <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
+                              {dx.icd10}
+                            </div>
+                          </div>
+                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#0D9488" strokeWidth="2">
+                            <line x1="12" y1="5" x2="12" y2="19"/>
+                            <line x1="5" y1="12" x2="19" y2="12"/>
+                          </svg>
+                        </button>
+                      ))}
+                    </div>
+                  )}
                 </div>
 
                 {/* Selected diagnoses */}
@@ -606,43 +753,83 @@ export default function MobileChartView({
                         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                           <polyline points="9 18 15 12 9 6"/>
                         </svg>
+                        <span
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            setSelectedDiagnoses(selectedDiagnoses.filter(d => d.id !== dx.id))
+                          }}
+                          style={{ marginLeft: '2px', opacity: 0.7 }}
+                        >
+                          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                            <line x1="18" y1="6" x2="6" y2="18"/>
+                            <line x1="6" y1="6" x2="18" y2="18"/>
+                          </svg>
+                        </span>
                       </button>
                     ))}
                   </div>
                 )}
 
-                {/* Quick diagnosis pills */}
-                <div style={{
-                  display: 'flex',
-                  flexWrap: 'wrap',
-                  gap: '6px',
-                }}>
-                  {commonDiagnoses
-                    .filter(dx => !selectedDiagnoses.some(s => s.id === dx.id))
-                    .slice(0, 6)
-                    .map(dx => (
-                      <button
-                        key={dx.id}
-                        onClick={() => {
-                          setSelectedDiagnoses([...selectedDiagnoses, dx])
-                          setActiveRecommendation(dx)
-                          triggerHaptic(30)
-                        }}
-                        style={{
-                          padding: '6px 10px',
-                          borderRadius: '16px',
-                          border: '1px solid var(--border)',
-                          background: 'var(--bg-white)',
-                          color: 'var(--text-secondary)',
-                          fontSize: '12px',
-                          fontWeight: 500,
-                          cursor: 'pointer',
-                        }}
-                      >
-                        + {dx.name}
-                      </button>
-                    ))}
-                </div>
+                {/* Quick diagnosis pills - show when no search active */}
+                {!showDiagnosisSearch && (
+                  <div style={{
+                    display: 'flex',
+                    flexWrap: 'wrap',
+                    gap: '6px',
+                  }}>
+                    {commonDiagnoses
+                      .filter(dx => !selectedDiagnoses.some(s => s.id === dx.id))
+                      .slice(0, 6)
+                      .map(dx => (
+                        <button
+                          key={dx.id}
+                          onClick={() => {
+                            setSelectedDiagnoses([...selectedDiagnoses, dx])
+                            setActiveRecommendation(dx)
+                            triggerHaptic(30)
+                          }}
+                          style={{
+                            padding: '6px 10px',
+                            borderRadius: '16px',
+                            border: '1px solid var(--border)',
+                            background: 'var(--bg-white)',
+                            color: 'var(--text-secondary)',
+                            fontSize: '12px',
+                            fontWeight: 500,
+                            cursor: 'pointer',
+                          }}
+                        >
+                          + {dx.name}
+                        </button>
+                      ))}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Plan textarea - shown after diagnoses in combined section */}
+            {activeSection === 'assessment-plan' && (
+              <div>
+                <label style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-muted)', marginBottom: '6px', display: 'block' }}>
+                  Plan
+                </label>
+                <textarea
+                  value={noteData['plan'] || ''}
+                  onChange={(e) => onUpdateNote('plan', e.target.value)}
+                  placeholder="Enter treatment plan..."
+                  style={{
+                    width: '100%',
+                    minHeight: '100px',
+                    padding: '10px',
+                    border: '1px solid var(--border)',
+                    borderRadius: '8px',
+                    fontSize: '14px',
+                    lineHeight: 1.5,
+                    resize: 'vertical',
+                    fontFamily: 'inherit',
+                    background: 'var(--bg-gray)',
+                  }}
+                />
               </div>
             )}
           </div>
@@ -650,7 +837,10 @@ export default function MobileChartView({
           // Show all sections in compact view when none selected
           <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', paddingBottom: '12px' }}>
             {sections.map(section => {
-              const content = noteData[section.id] || ''
+              // Handle combined assessment-plan section
+              const content = section.id === 'assessment-plan'
+                ? [noteData['assessment'], noteData['plan']].filter(Boolean).join(' | ') || ''
+                : noteData[section.id] || ''
               const status = getSectionStatus(section.id)
 
               return (
