@@ -31,6 +31,37 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Audio file is empty' }, { status: 400 })
     }
 
+    // Validate file size (Whisper API max is 25MB)
+    if (audioFile.size > 25 * 1024 * 1024) {
+      return NextResponse.json({ error: 'Recording too long (max 25MB)' }, { status: 400 })
+    }
+
+    // Ensure we have a valid filename with correct extension for Whisper
+    // Whisper accepts: flac, m4a, mp3, mp4, mpeg, mpga, oga, ogg, wav, webm
+    let fileName = audioFile.name || 'recording.webm'
+    const validExtensions = ['flac', 'm4a', 'mp3', 'mp4', 'mpeg', 'mpga', 'oga', 'ogg', 'wav', 'webm']
+    const currentExt = fileName.split('.').pop()?.toLowerCase()
+
+    if (!currentExt || !validExtensions.includes(currentExt)) {
+      // Try to infer from MIME type
+      const mimeType = audioFile.type.toLowerCase()
+      if (mimeType.includes('mp4') || mimeType.includes('m4a') || mimeType.includes('aac')) {
+        fileName = 'recording.m4a'
+      } else if (mimeType.includes('webm')) {
+        fileName = 'recording.webm'
+      } else if (mimeType.includes('ogg')) {
+        fileName = 'recording.ogg'
+      } else if (mimeType.includes('wav')) {
+        fileName = 'recording.wav'
+      } else if (mimeType.includes('mpeg') || mimeType.includes('mp3')) {
+        fileName = 'recording.mp3'
+      } else {
+        // Default to m4a for Safari/iOS compatibility
+        fileName = 'recording.m4a'
+      }
+      console.log('Remapped filename to:', fileName, 'from MIME:', mimeType)
+    }
+
     // Get OpenAI API key - first try environment variable, then try Supabase
     let apiKey = process.env.OPENAI_API_KEY
 
@@ -53,7 +84,8 @@ export async function POST(request: Request) {
     const buffer = Buffer.from(arrayBuffer)
 
     // Use OpenAI's toFile helper to create a proper file object
-    const openaiFile = await toFile(buffer, audioFile.name, { type: audioFile.type })
+    // Use the corrected filename for better Whisper compatibility
+    const openaiFile = await toFile(buffer, fileName, { type: audioFile.type })
 
     // Call Whisper API for transcription
     const transcription = await openai.audio.transcriptions.create({
