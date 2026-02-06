@@ -71,23 +71,44 @@ export default function MobileVoiceRecorder({
       }
       updateLevel()
 
-      // Determine MIME type - Safari compatibility
-      let mimeType = 'audio/webm'
-      if (MediaRecorder.isTypeSupported('audio/webm;codecs=opus')) {
-        mimeType = 'audio/webm;codecs=opus'
-      } else if (MediaRecorder.isTypeSupported('audio/webm')) {
-        mimeType = 'audio/webm'
-      } else if (MediaRecorder.isTypeSupported('audio/mp4')) {
-        mimeType = 'audio/mp4'
-      } else if (MediaRecorder.isTypeSupported('audio/ogg;codecs=opus')) {
-        mimeType = 'audio/ogg;codecs=opus'
-      } else {
-        // Fallback - let browser choose
-        mimeType = ''
+      // Determine MIME type - iPhone Safari compatibility is critical
+      // Safari on iOS typically only supports audio/mp4 or audio/aac
+      let mimeType = ''
+
+      // Check in order of preference for Whisper API compatibility
+      const mimeTypes = [
+        'audio/webm;codecs=opus',
+        'audio/webm',
+        'audio/mp4',
+        'audio/aac',
+        'audio/mpeg',
+        'audio/ogg;codecs=opus',
+        'audio/ogg',
+        'audio/wav',
+      ]
+
+      for (const type of mimeTypes) {
+        if (MediaRecorder.isTypeSupported(type)) {
+          mimeType = type
+          console.log('Using MIME type:', type)
+          break
+        }
+      }
+
+      if (!mimeType) {
+        console.log('No supported MIME type found, using default')
       }
 
       const options: MediaRecorderOptions = mimeType ? { mimeType } : {}
-      const mediaRecorder = new MediaRecorder(stream, options)
+      let mediaRecorder: MediaRecorder
+
+      try {
+        mediaRecorder = new MediaRecorder(stream, options)
+      } catch (e) {
+        // If options fail, try without options
+        console.log('MediaRecorder with options failed, trying without:', e)
+        mediaRecorder = new MediaRecorder(stream)
+      }
       mediaRecorderRef.current = mediaRecorder
       chunksRef.current = []
 
@@ -168,15 +189,22 @@ export default function MobileVoiceRecorder({
         throw new Error('Recording too long. Please keep recordings under 2 minutes.')
       }
 
-      // Map MIME type to file extension
+      // Map MIME type to file extension - critical for Whisper API
+      // Whisper accepts: flac, m4a, mp3, mp4, mpeg, mpga, oga, ogg, wav, webm
       let extension = 'webm'
-      if (mimeType.includes('mp4') || mimeType.includes('m4a')) {
-        extension = 'mp4'
-      } else if (mimeType.includes('ogg')) {
+      if (mimeType.includes('mp4') || mimeType.includes('m4a') || mimeType.includes('aac')) {
+        extension = 'm4a' // Use m4a for Safari recordings - Whisper handles this well
+      } else if (mimeType.includes('mpeg') || mimeType.includes('mp3')) {
+        extension = 'mp3'
+      } else if (mimeType.includes('ogg') || mimeType.includes('oga')) {
         extension = 'ogg'
       } else if (mimeType.includes('wav')) {
         extension = 'wav'
+      } else if (mimeType.includes('webm')) {
+        extension = 'webm'
       }
+
+      console.log('Recording MIME type:', mimeType, '-> extension:', extension, 'size:', blob.size)
 
       const formData = new FormData()
       formData.append('audio', blob, `recording.${extension}`)

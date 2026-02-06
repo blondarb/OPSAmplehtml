@@ -57,15 +57,45 @@ export function useVoiceRecorder(options?: UseVoiceRecorderOptions): UseVoiceRec
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
       streamRef.current = stream
 
-      // Determine supported mime type
-      const mimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
-        ? 'audio/webm;codecs=opus'
-        : MediaRecorder.isTypeSupported('audio/webm')
-        ? 'audio/webm'
-        : 'audio/mp4'
-      mimeTypeRef.current = mimeType
+      // Determine supported mime type - Safari/iOS compatibility is critical
+      // Safari on iOS typically only supports audio/mp4 or no options at all
+      let mimeType = ''
+      const mimeTypes = [
+        'audio/webm;codecs=opus',
+        'audio/webm',
+        'audio/mp4',
+        'audio/aac',
+        'audio/mpeg',
+        'audio/ogg;codecs=opus',
+        'audio/ogg',
+        'audio/wav',
+      ]
 
-      const mediaRecorder = new MediaRecorder(stream, { mimeType })
+      for (const type of mimeTypes) {
+        if (MediaRecorder.isTypeSupported(type)) {
+          mimeType = type
+          console.log('Using MIME type:', type)
+          break
+        }
+      }
+
+      mimeTypeRef.current = mimeType || 'audio/mp4' // Default for Safari
+
+      let mediaRecorder: MediaRecorder
+      try {
+        if (mimeType) {
+          mediaRecorder = new MediaRecorder(stream, { mimeType })
+        } else {
+          // Let browser choose if no supported type found
+          mediaRecorder = new MediaRecorder(stream)
+          mimeTypeRef.current = mediaRecorder.mimeType || 'audio/mp4'
+        }
+      } catch (e) {
+        // If options fail, try without options (Safari fallback)
+        console.log('MediaRecorder with options failed, trying without:', e)
+        mediaRecorder = new MediaRecorder(stream)
+        mimeTypeRef.current = mediaRecorder.mimeType || 'audio/mp4'
+      }
       mediaRecorderRef.current = mediaRecorder
 
       mediaRecorder.ondataavailable = (event) => {
@@ -113,13 +143,26 @@ export function useVoiceRecorder(options?: UseVoiceRecorderOptions): UseVoiceRec
         setIsTranscribing(true)
         try {
           const formData = new FormData()
-          // Convert to a file with proper extension for OpenAI
-          // Safari uses audio/mp4 or audio/x-m4a; Chrome/Firefox use audio/webm
+          // Convert to a file with proper extension for OpenAI Whisper
+          // Whisper accepts: flac, m4a, mp3, mp4, mpeg, mpga, oga, ogg, wav, webm
+          // Safari/iOS uses audio/mp4 or audio/aac
           const mime = mimeTypeRef.current.toLowerCase()
-          const extension = mime.includes('webm') ? 'webm'
-            : mime.includes('mp4') || mime.includes('m4a') ? 'm4a'
-            : mime.includes('ogg') ? 'ogg'
-            : 'webm'
+          let extension = 'webm'
+          if (mime.includes('mp4') || mime.includes('m4a') || mime.includes('aac') || mime.includes('x-m4a')) {
+            extension = 'm4a' // Best for Safari recordings - Whisper handles this well
+          } else if (mime.includes('mpeg') || mime.includes('mp3')) {
+            extension = 'mp3'
+          } else if (mime.includes('ogg') || mime.includes('oga')) {
+            extension = 'ogg'
+          } else if (mime.includes('wav')) {
+            extension = 'wav'
+          } else if (mime.includes('webm')) {
+            extension = 'webm'
+          } else {
+            // Default to m4a for unknown types (safer for Safari)
+            extension = 'm4a'
+          }
+          console.log('Sending audio with MIME:', mime, '-> extension:', extension, 'size:', audioBlob.size)
           const audioFile = new File([audioBlob], `recording.${extension}`, { type: mimeTypeRef.current })
           formData.append('audio', audioFile)
 
