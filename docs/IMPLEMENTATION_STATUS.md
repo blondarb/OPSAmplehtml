@@ -1,7 +1,7 @@
 # Implementation Status - Sevaro Clinical
 
-**Last Updated:** February 3, 2026 (Follow-up visit workflow, plan sync pipeline, ICD-10 matching, Sign & Complete fixes)
-**Based on:** PRD_AI_Scribe.md v1.4, Sevaro_Outpatient_MVP_PRD_v1.4, PRD_Roadmap_Phase3.md
+**Last Updated:** February 6, 2026 (Mobile chart enhancements: FAB menu, Chart Prep AI, Note Preview, Smart Recommendations)
+**Based on:** PRD_AI_Scribe.md v1.4, Sevaro_Outpatient_MVP_PRD_v1.4, PRD_Roadmap_Phase3.md, PRD_MOBILE_APP.md
 
 ---
 
@@ -9,6 +9,8 @@
 
 - **[CONSOLIDATED_ROADMAP.md](./CONSOLIDATED_ROADMAP.md)** - Master roadmap combining all phases from all PRDs
 - **[PRD_Roadmap_Phase3.md](./PRD_Roadmap_Phase3.md)** - UX enhancements and workflow support
+- **[PRD_MOBILE_APP.md](./PRD_MOBILE_APP.md)** - Mobile clinical app documentation
+- **[PRD_MOBILE_ENGINEERING_HANDOFF.md](./PRD_MOBILE_ENGINEERING_HANDOFF.md)** - Mobile engineering handoff
 
 ---
 
@@ -17,6 +19,15 @@
 This document tracks implementation progress against the product requirements and notes current work, issues, and next steps.
 
 ### Current Priority Focus
+
+**Mobile Chart Enhancements (February 6, 2026):**
+- ✅ **FAB Menu** — Floating Action Button with Save Draft, Prepare Note, Sign & Complete actions; replaces bottom action bar
+- ✅ **Chart Prep AI (Mobile)** — MobileVoiceRecorder supports chart-prep mode; dictation → AI summary → HPI/Assessment/Plan suggestions
+- ✅ **MobileNotePreview** — New bottom sheet component for note generation; type/length selection; AI synthesis with fallback
+- ✅ **MobileRecommendationsSheet** — New bottom sheet for treatment recommendations; fetches from /api/plans; checkbox selection
+- ✅ **Safari Audio Compatibility** — MIME type mapping for iOS (webm → mp4/aac fallback)
+- ✅ **Haptic Feedback** — navigator.vibrate() on all touch interactions
+- ✅ **Safe Area Handling** — Proper padding for notch/home indicator
 
 **Recently Completed:**
 - ✅ **Responsive/Mobile Design** - Full mobile, tablet, desktop support with slide-in sidebar

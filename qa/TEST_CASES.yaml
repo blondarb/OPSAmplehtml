@@ -547,6 +547,284 @@ mobile_settings:
     expected: Auto-redirects to /mobile (default behavior restored)
 
 ---
+mobile_fab:
+  - id: Q1
+    title: FAB visible on chart view
+    preconditions: [on /mobile/chart/[id]]
+    steps:
+      - View bottom-right corner of screen
+    expected: Teal FAB button visible with checkmark icon
+
+  - id: Q2
+    title: FAB expands on tap
+    preconditions: [on chart view, FAB visible]
+    steps:
+      - Tap the FAB button
+    expected: |
+      - Menu expands with 3 vertically stacked buttons
+      - Save Draft (amber), Prepare Note (teal), Sign & Complete (green)
+      - Backdrop appears behind menu
+
+  - id: Q3
+    title: FAB Save Draft action
+    preconditions: [FAB menu open, note has content]
+    steps:
+      - Tap Save Draft button
+    expected: |
+      - Note saves via PATCH /api/visits/[id]
+      - Success feedback (toast or haptic)
+      - Menu closes
+
+  - id: Q4
+    title: FAB Prepare Note action
+    preconditions: [FAB menu open]
+    steps:
+      - Tap Prepare Note button
+    expected: MobileNotePreview bottom sheet slides up
+
+  - id: Q5
+    title: FAB Sign & Complete action
+    preconditions: [FAB menu open]
+    steps:
+      - Tap Sign & Complete button
+    expected: |
+      - Confirmation dialog or direct sign
+      - Patient status changes to completed
+      - Returns to patient list
+
+  - id: Q6
+    title: FAB collapses on outside tap
+    preconditions: [FAB menu expanded]
+    steps:
+      - Tap on backdrop (outside menu)
+    expected: Menu collapses, FAB returns to single button
+
+  - id: Q7
+    title: FAB haptic feedback
+    preconditions: [real mobile device, FAB visible]
+    steps:
+      - Tap FAB to expand
+      - Tap an action button
+    expected: Haptic vibration felt on each tap
+
+---
+mobile_chart_prep:
+  - id: R1
+    title: Chart Prep mode opens
+    preconditions: [on chart view, section expanded]
+    steps:
+      - Tap microphone button on a section in chart-prep mode
+    expected: MobileVoiceRecorder opens in chart-prep mode
+
+  - id: R2
+    title: Chart Prep recording
+    preconditions: [voice recorder open in chart-prep mode]
+    steps:
+      - Tap Start Recording
+      - Dictate patient information for 10-15 seconds
+    expected: Audio level bars animate during speech
+
+  - id: R3
+    title: Chart Prep processing
+    preconditions: [recording stopped]
+    steps:
+      - Stop recording
+      - Wait for processing
+    expected: |
+      - "Processing..." spinner appears
+      - AI summary appears with categorized sections
+
+  - id: R4
+    title: Chart Prep results display
+    preconditions: [Chart Prep processing complete]
+    steps:
+      - View results panel
+    expected: |
+      - Alerts section (red background) if concerning findings
+      - Suggested Focus section (yellow background)
+      - Key Points and other sections (gray background)
+
+  - id: R5
+    title: Add single Chart Prep item
+    preconditions: [Chart Prep results visible]
+    steps:
+      - Tap "Add" on a specific section item
+    expected: |
+      - Item added to target note section
+      - Visual confirmation
+
+  - id: R6
+    title: Add all Chart Prep items
+    preconditions: [Chart Prep results visible]
+    steps:
+      - Tap "Add All to Note" button
+    expected: |
+      - All items added to respective note sections
+      - Content wrapped with Chart Prep markers
+      - Recorder closes or shows success
+
+  - id: R7
+    title: Chart Prep marker replacement
+    preconditions: [previous Chart Prep content in note]
+    steps:
+      - Run Chart Prep again for same section
+      - Add new content
+    expected: |
+      - Previous Chart Prep content replaced (not duplicated)
+      - Only new AI content between markers
+      - Manual content preserved
+    data_verification: |
+      Note section contains only one set of Chart Prep markers
+
+---
+mobile_note_preview:
+  - id: S1
+    title: Note preview opens from FAB
+    preconditions: [on chart view]
+    steps:
+      - Tap FAB
+      - Tap Prepare Note
+    expected: MobileNotePreview bottom sheet slides up from bottom
+
+  - id: S2
+    title: Note type toggle
+    preconditions: [note preview open]
+    steps:
+      - Tap "New Consult" button
+      - Tap "Follow-up" button
+    expected: |
+      - Toggle visually updates (purple border on selected)
+      - Selection persists
+
+  - id: S3
+    title: Note length toggle
+    preconditions: [note preview open]
+    steps:
+      - Tap "Concise" button
+      - Tap "Standard" button
+    expected: Toggle visually updates with selection
+
+  - id: S4
+    title: Generate note with AI
+    preconditions: [note preview open, note has content]
+    steps:
+      - Select type and length
+      - Tap "Generate with AI" button
+    expected: |
+      - Loading spinner appears
+      - Formatted note appears in preview area
+      - Copy and Sign buttons appear in footer
+
+  - id: S5
+    title: Copy note to clipboard
+    preconditions: [note generated]
+    steps:
+      - Tap Copy button
+    expected: |
+      - Clipboard contains note text
+      - Button shows "Copied!" feedback
+
+  - id: S6
+    title: Sign from preview
+    preconditions: [note generated]
+    steps:
+      - Tap "Sign & Complete" button
+    expected: |
+      - Note signed
+      - Sheet closes
+      - Patient status updated
+
+  - id: S7
+    title: Manual fallback on API failure
+    preconditions: [note preview open, API will fail]
+    steps:
+      - Attempt to generate note when API is down
+    expected: |
+      - Error doesn't crash UI
+      - Fallback formatting produces readable note
+      - User can still copy and sign
+
+---
+mobile_recommendations:
+  - id: T1
+    title: Diagnosis pills appear
+    preconditions: [on chart view, Assessment section visible]
+    steps:
+      - Add a diagnosis in Assessment section
+    expected: |
+      - Diagnosis pill appears with name and ICD-10 code
+      - "Tap for Treatment Recommendations" hint visible
+
+  - id: T2
+    title: Recommendations sheet opens
+    preconditions: [diagnosis pill visible]
+    steps:
+      - Tap on diagnosis pill
+    expected: MobileRecommendationsSheet slides up from bottom
+
+  - id: T3
+    title: Plan loads in sheet
+    preconditions: [recommendations sheet open]
+    steps:
+      - Wait for loading
+    expected: |
+      - Loading spinner while fetching
+      - Plan title and ICD-10 badge displayed
+      - Sections appear (first section auto-expanded)
+
+  - id: T4
+    title: Section expand/collapse
+    preconditions: [plan loaded in sheet]
+    steps:
+      - Tap on collapsed section header
+      - Tap on expanded section header
+    expected: |
+      - Section expands showing subsections and items
+      - Section collapses hiding content
+      - Chevron icon rotates
+
+  - id: T5
+    title: Select recommendation items
+    preconditions: [section expanded with items]
+    steps:
+      - Tap checkbox on 3 items
+    expected: |
+      - Checkboxes fill with teal
+      - Add button shows count "Add 3 to Plan"
+
+  - id: T6
+    title: Priority badges display
+    preconditions: [plan with priority items]
+    steps:
+      - View items with priorities
+    expected: |
+      - STAT badge in red
+      - URGENT badge in amber
+      - ROUTINE badge in blue
+
+  - id: T7
+    title: Add selected to plan
+    preconditions: [items selected]
+    steps:
+      - Tap "Add to Plan" button
+    expected: |
+      - Items added to Plan section in note
+      - "Added!" confirmation shown
+      - Sheet closes after brief delay
+      - Haptic feedback felt
+
+  - id: T8
+    title: No plan available fallback
+    preconditions: [diagnosis without treatment plan in database]
+    steps:
+      - Tap diagnosis pill
+      - Wait for loading
+    expected: |
+      - Graceful error message "No treatment plan available for this diagnosis"
+      - Sheet can be closed
+      - App doesn't crash
+
+---
 patient_portal:
   - id: D1
     title: Intake form submission

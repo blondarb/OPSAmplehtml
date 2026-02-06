@@ -128,6 +128,55 @@ Run these first. Any failure blocks release.
 | P3 | View persistence | Return to `/` on mobile | Continues to desktop (cookie respected) |
 | P4 | Reset preference | Clear cookies, visit `/` on mobile | Auto-redirects to `/mobile` again |
 
+### Q. Mobile FAB Menu
+
+| ID | Flow | Key checks |
+|----|------|------------|
+| Q1 | FAB visible | Open chart view | Teal FAB visible bottom-right |
+| Q2 | FAB expand | Tap FAB | Menu expands with 3 options |
+| Q3 | Save Draft | Tap Save Draft | Note saves, success feedback, menu closes |
+| Q4 | Prepare Note | Tap Prepare Note | MobileNotePreview sheet opens |
+| Q5 | Sign & Complete | Tap Sign & Complete | Confirmation, patient marked complete |
+| Q6 | FAB collapse | Tap outside menu | Menu collapses |
+| Q7 | Haptic feedback | Tap FAB | Vibration felt (real device only) |
+
+### R. Mobile Chart Prep AI
+
+| ID | Flow | Key checks | Data verification |
+|----|------|------------|-------------------|
+| R1 | Open Chart Prep | Tap mic on section in chart-prep mode | Voice recorder opens |
+| R2 | Record dictation | Speak for 10-15 seconds | Audio levels animate |
+| R3 | Process Chart Prep | Stop recording | Processing spinner, then AI summary appears |
+| R4 | View results | Results panel displays | Alerts (red), Focus (yellow), Key Points (gray) |
+| R5 | Add single item | Tap Add on specific item | Item added to target section |
+| R6 | Add all items | Tap Add All to Note | All items added with markers |
+| R7 | Marker replacement | Re-run Chart Prep | Previous content replaced, not duplicated |
+
+### S. Mobile Note Preview
+
+| ID | Flow | Key checks |
+|----|------|------------|
+| S1 | Open preview | Tap Prepare Note from FAB | MobileNotePreview sheet opens |
+| S2 | Note type toggle | Tap New Consult / Follow-up | Toggle updates visually |
+| S3 | Note length toggle | Tap Concise / Standard | Toggle updates visually |
+| S4 | Generate note | Tap Generate with AI | Loading state, then formatted note appears |
+| S5 | Copy note | Tap Copy button | Clipboard updated, "Copied!" feedback |
+| S6 | Sign from preview | Tap Sign & Complete | Note signed, sheet closes |
+| S7 | Manual fallback | API fails | Fallback formatting still displays note |
+
+### T. Mobile Smart Recommendations
+
+| ID | Flow | Key checks |
+|----|------|------------|
+| T1 | Diagnosis pills | Add diagnosis in Assessment | Pill appears with "Tap for Treatment Recommendations" |
+| T2 | Open sheet | Tap diagnosis pill | MobileRecommendationsSheet slides up |
+| T3 | Plan loads | Sheet opens | Loading spinner, then sections display |
+| T4 | Section expand | Tap section header | Section expands with subsections |
+| T5 | Select items | Tap checkboxes | Items selected, count updates |
+| T6 | Priority badges | View items | STAT (red), URGENT (amber) visible |
+| T7 | Add to Plan | Tap Add button | Items added, haptic feedback, sheet closes |
+| T8 | No plan fallback | Open for diagnosis without plan | Graceful "No treatment plan available" message |
+
 ---
 
 ## Patient Portal Flows
@@ -254,6 +303,6 @@ Before running tests, confirm:
 | Hotfix | S1-S7, affected flow only |
 | Minor feature | S1-S7 + Mission brief focus + 3 regression spot-checks |
 | Major feature | Full regression (A, B, C, M, N, O, H, I) + all smoke |
-| Mobile changes | S1-S7 + M1-M6, N1-N6, O1-O8, P1-P4, E5 |
+| Mobile changes | S1-S7 + M1-M6, N1-N6, O1-O8, P1-P4, Q1-Q7, R1-R7, S1-S7, T1-T8, E5 |
 | AI changes | S1-S7 + B1-B8, C1-C7, I1-I14 + AI verification checklist |
 | Historian changes | S1-S7 + C1-C7, H1-H8, I1-I14 |
