@@ -753,10 +753,10 @@ export default function SmartRecommendationsSection({
               )}
               {renderPriorityBadge(item.priority)}
 
-              {/* Icon buttons for details - hover to show tooltip */}
+              {/* Icon buttons for details - hover to show floating tooltip */}
               {availableDetails.length > 0 && (
                 <div style={{ display: 'flex', gap: '4px', marginLeft: '4px' }}>
-                  {availableDetails.map(({ type }) => {
+                  {availableDetails.map(({ type, content }) => {
                     const iconConfig = TOOLTIP_ICONS[type]
                     const isActive = activeTooltip?.itemKey === itemKey && activeTooltip?.type === type
                     return (
@@ -765,21 +765,61 @@ export default function SmartRecommendationsSection({
                         onMouseEnter={() => showTooltip(itemKey, type)}
                         onMouseLeave={hideTooltip}
                         style={{
-                          width: '22px',
-                          height: '22px',
-                          borderRadius: '4px',
-                          border: 'none',
-                          background: isActive ? (isDarkMode ? iconConfig.darkColor : iconConfig.color) : (isDarkMode ? iconConfig.darkBg : iconConfig.bg),
-                          color: isActive ? 'white' : (isDarkMode ? iconConfig.darkColor : iconConfig.color),
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          cursor: 'default',
-                          transition: 'all 0.15s ease',
+                          position: 'relative',
                         }}
-                        title={iconConfig.label}
                       >
-                        {iconConfig.icon}
+                        <div
+                          style={{
+                            width: '22px',
+                            height: '22px',
+                            borderRadius: '4px',
+                            border: 'none',
+                            background: isActive ? (isDarkMode ? iconConfig.darkColor : iconConfig.color) : (isDarkMode ? iconConfig.darkBg : iconConfig.bg),
+                            color: isActive ? 'white' : (isDarkMode ? iconConfig.darkColor : iconConfig.color),
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            cursor: 'default',
+                            transition: 'all 0.15s ease',
+                          }}
+                        >
+                          {iconConfig.icon}
+                        </div>
+                        {/* Floating tooltip popover */}
+                        {isActive && (
+                          <div
+                            style={{
+                              position: 'absolute',
+                              top: '100%',
+                              left: '50%',
+                              transform: 'translateX(-50%)',
+                              marginTop: '8px',
+                              padding: '10px 12px',
+                              background: isDarkMode ? iconConfig.darkBg : iconConfig.bg,
+                              borderRadius: '6px',
+                              border: `1px solid ${isDarkMode ? iconConfig.darkColor : iconConfig.color}30`,
+                              boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+                              zIndex: 50,
+                              minWidth: '200px',
+                              maxWidth: '300px',
+                              whiteSpace: 'normal',
+                            }}
+                          >
+                            <div style={{
+                              fontSize: '11px',
+                              fontWeight: 600,
+                              color: isDarkMode ? iconConfig.darkColor : iconConfig.color,
+                              marginBottom: '4px',
+                              textTransform: 'uppercase',
+                              letterSpacing: '0.5px',
+                            }}>
+                              {iconConfig.label}
+                            </div>
+                            <div style={{ fontSize: '12px', color: 'var(--text-primary)', lineHeight: '1.5' }}>
+                              {content}
+                            </div>
+                          </div>
+                        )}
                       </div>
                     )
                   })}
@@ -915,33 +955,6 @@ export default function SmartRecommendationsSection({
               </div>
             )}
 
-            {/* Tooltip content (shown on hover - stays visible while mouse is over it) */}
-            {activeTooltip?.itemKey === itemKey && (
-              <div
-                onMouseEnter={() => showTooltip(itemKey, activeTooltip.type)}
-                onMouseLeave={hideTooltip}
-                style={{
-                  marginTop: '8px',
-                  padding: '10px 12px',
-                  background: isDarkMode ? TOOLTIP_ICONS[activeTooltip.type].darkBg : TOOLTIP_ICONS[activeTooltip.type].bg,
-                  borderRadius: '6px',
-                  border: `1px solid ${isDarkMode ? TOOLTIP_ICONS[activeTooltip.type].darkColor : TOOLTIP_ICONS[activeTooltip.type].color}30`,
-                }}>
-                <div style={{
-                  fontSize: '11px',
-                  fontWeight: 600,
-                  color: isDarkMode ? TOOLTIP_ICONS[activeTooltip.type].darkColor : TOOLTIP_ICONS[activeTooltip.type].color,
-                  marginBottom: '4px',
-                  textTransform: 'uppercase',
-                  letterSpacing: '0.5px',
-                }}>
-                  {TOOLTIP_ICONS[activeTooltip.type].label}
-                </div>
-                <div style={{ fontSize: '12px', color: 'var(--text-primary)', lineHeight: '1.5' }}>
-                  {availableDetails.find(d => d.type === activeTooltip.type)?.content}
-                </div>
-              </div>
-            )}
           </div>
         </div>
       </div>
