@@ -1,5 +1,5 @@
 # Test Cases - Sevaro Clinical
-# test_cases_version: 2.1
+# test_cases_version: 2.2
 # Last updated: 2026-02-07
 #
 # Structure: Each case has id, title, preconditions, steps, expected, data_verification (optional).
@@ -511,6 +511,555 @@ chart_prep_recording:
     data_verification: |
       isPrepTranscribing or autoProcessing state true
       Bar shows processing UI, not recording UI
+
+---
+visit_ai:
+  - id: VA1
+    title: Visit recording starts
+    priority: P1
+    preconditions: [logged in, Voice drawer open, Document tab]
+    steps:
+      - Click large red microphone circle
+    expected: |
+      - Waveform animation starts
+      - Timer begins counting
+      - Pause/Stop buttons appear
+    data_verification: isVisitRecording state true
+
+  - id: VA2
+    title: Pause/Resume recording
+    priority: P1
+    preconditions: [Visit AI recording active]
+    steps:
+      - Click Pause button
+      - Wait 2 seconds
+      - Click Resume button
+    expected: |
+      - Waveform pauses
+      - Timer pauses
+      - Resume continues recording
+    data_verification: Audio chunks continue capturing after resume
+
+  - id: VA3
+    title: Stop triggers processing
+    priority: P0
+    preconditions: [Visit AI recording with 30+ seconds audio]
+    steps:
+      - Click Stop button
+      - Wait for processing
+    expected: |
+      - "Processing..." indicator appears
+      - Structured output displays after 10-30 seconds
+      - 5 section cards appear (HPI, ROS, Exam, Assessment, Plan)
+    data_verification: visitAIOutput state populated with all 5 sections
+
+  - id: VA4
+    title: Section extraction accuracy
+    priority: P0
+    preconditions: [Visit AI processing complete]
+    steps:
+      - Review extracted HPI section
+      - Review extracted ROS section
+      - Review extracted Exam section
+      - Review extracted Assessment section
+      - Review extracted Plan section
+    expected: |
+      - HPI contains patient-reported symptoms and timeline
+      - ROS contains yes/no symptom review
+      - Exam contains physician findings
+      - Assessment contains clinical impression
+      - Plan contains next steps
+    data_verification: Each section reflects actual visit content, not hallucinated
+
+  - id: VA5
+    title: Confidence scores display
+    priority: P1
+    preconditions: [Visit AI processing complete]
+    steps:
+      - View each section card
+      - Check confidence percentage
+    expected: |
+      - Each section shows confidence score (0-100%)
+      - Clear sections have higher confidence
+      - Sparse/missing content shows lower confidence
+    data_verification: confidence object has hpi, ros, exam, assessment, plan keys
+
+  - id: VA6
+    title: Add individual section
+    priority: P1
+    preconditions: [Visit AI results visible]
+    steps:
+      - Click "Add" button on HPI section
+      - Check HPI field in note
+    expected: |
+      - HPI field populated with extracted content
+      - Content marked as from Visit AI
+    data_verification: noteData.hpi contains visitAIOutput.hpiFromVisit
+
+  - id: VA7
+    title: Generate Note integration
+    priority: P0
+    preconditions: [Visit AI complete, results visible]
+    steps:
+      - Click "Generate Note" button (purple)
+      - View note preview modal
+      - Check sections for Visit AI content
+    expected: |
+      - Modal opens with EnhancedNotePreviewModal
+      - Visit AI sections merged into appropriate note sections
+      - Source attribution shows "Visit AI"
+    data_verification: formattedNote includes visitAI content
+
+  - id: VA8
+    title: Long recording handling
+    priority: P1
+    preconditions: [logged in, Voice drawer open]
+    steps:
+      - Record 10+ minute audio (or simulate with test file)
+      - Click Stop
+      - Wait for processing (may take 60-120 seconds)
+    expected: |
+      - Processing completes without timeout
+      - All sections extracted
+      - No truncation of content
+    data_verification: Transcript contains full visit content
+
+  - id: VA9
+    title: Safari audio format
+    priority: P0
+    preconditions: [iPhone Safari browser]
+    steps:
+      - Open Voice drawer → Document tab
+      - Record 30 seconds of speech
+      - Click Stop
+    expected: |
+      - Audio MIME type is audio/mp4 or audio/aac
+      - Transcription succeeds (not "failed to transcribe")
+      - Sections extracted correctly
+    data_verification: Network tab shows m4a extension in FormData
+
+  - id: VA10
+    title: Error retry with saved audio
+    priority: P1
+    preconditions: [Visit AI recording stopped, API error occurred]
+    steps:
+      - Observe error message
+      - Click Retry button
+    expected: |
+      - Retry button visible
+      - Same audio reprocessed (no re-recording needed)
+      - If API succeeds, results display
+    data_verification: lastVisitAudioBlobRef contains original audio
+
+---
+field_dictation:
+  - id: FD1
+    title: Mic button opens recorder
+    priority: P1
+    preconditions: [logged in, HPI field visible]
+    steps:
+      - Click red mic button on HPI field
+    expected: |
+      - Recording starts
+      - Mic button turns into stop button (or shows recording state)
+    data_verification: useVoiceRecorder isRecording = true
+
+  - id: FD2
+    title: Insert at cursor position
+    priority: P1
+    preconditions: [HPI field has existing text, cursor in middle]
+    steps:
+      - Click in middle of HPI text
+      - Click mic button
+      - Dictate "new text"
+      - Stop recording
+    expected: |
+      - "new text" inserted at cursor position
+      - Existing text before and after preserved
+    data_verification: Text insertion at cursorPositionRef.current
+
+  - id: FD3
+    title: Append if field unfocused
+    priority: P1
+    preconditions: [HPI field has existing text]
+    steps:
+      - Click outside HPI field (unfocus)
+      - Click mic button on HPI
+      - Dictate "appended text"
+      - Stop recording
+    expected: |
+      - "appended text" added to end of field
+      - Existing text preserved
+    data_verification: Text appended when no cursor position saved
+
+  - id: FD4
+    title: Multi-field dictation
+    priority: P1
+    preconditions: [logged in, multiple note fields visible]
+    steps:
+      - Dictate into HPI field
+      - Dictate into Assessment field
+      - Dictate into Plan field
+    expected: |
+      - Each field contains its own dictation
+      - No cross-field contamination
+    data_verification: Each field's value matches its dictation
+
+  - id: FD5
+    title: Raw text preserved
+    priority: P2
+    preconditions: [dictation completed on a field]
+    steps:
+      - Complete dictation
+      - Click info button (if available)
+      - View raw dictation history
+    expected: |
+      - Original (uncleaned) transcription available
+      - Shows history of dictations for that field
+    data_verification: onDictationRaw callback captures rawText
+
+---
+field_ai_actions:
+  - id: FA1
+    title: Improve action
+    priority: P1
+    preconditions: [HPI field has poorly formatted text]
+    steps:
+      - Enter "pt has ha for 3wk, worse am"
+      - Click star button on HPI field
+      - Select "Improve"
+    expected: |
+      - Text replaced with polished version
+      - Grammar and spelling fixed
+      - Clinical meaning preserved
+      - Example: "Patient has headaches for 3 weeks, worse in the morning"
+    data_verification: Field action API returns improved text
+
+  - id: FA2
+    title: Expand action
+    priority: P1
+    preconditions: [Assessment field has brief text]
+    steps:
+      - Enter "Migraine without aura"
+      - Click star button on Assessment
+      - Select "Expand"
+    expected: |
+      - Text expanded with clinical context
+      - Includes relevant details (characteristics, severity, etc.)
+      - No hallucinated symptoms not implied by original
+    data_verification: Expanded text is longer, contains clinical detail
+
+  - id: FA3
+    title: Summarize action
+    priority: P1
+    preconditions: [Plan field has lengthy text]
+    steps:
+      - Enter long detailed plan
+      - Click star button on Plan
+      - Select "Summarize"
+    expected: |
+      - Text condensed to key points
+      - Critical information preserved
+      - Shorter than original
+    data_verification: Summarized text is shorter, maintains key points
+
+  - id: FA4
+    title: No hallucination
+    priority: P0
+    preconditions: [any field with text]
+    steps:
+      - Enter "headache"
+      - Click Expand
+      - Review expanded text
+    expected: |
+      - Expanded text doesn't add specific symptoms not implied
+      - No fabricated lab values, dates, or medications
+      - Stays general/clinical context only
+    data_verification: Expanded text doesn't contain specifics not in original
+
+  - id: FA5
+    title: Works on all applicable fields
+    priority: P1
+    preconditions: [logged in]
+    steps:
+      - Test Improve on HPI field
+      - Test Expand on ROS notes
+      - Test Summarize on Assessment
+      - Test Improve on Plan
+      - Test Expand on Imaging findings
+    expected: |
+      - All fields accept AI actions
+      - Actions appropriate to field context
+    data_verification: field-action API accepts fieldName parameter
+
+---
+dot_phrases:
+  - id: DP1
+    title: Basic expansion
+    priority: P1
+    preconditions: [logged in, dot phrases seeded, HPI field focused]
+    steps:
+      - Type ".exam " (dot, exam, space)
+    expected: |
+      - Phrase expands to exam template
+      - ".exam " replaced with full expansion text
+    data_verification: Field onChange triggered with expanded text
+
+  - id: DP2
+    title: Field scope restriction
+    priority: P1
+    preconditions: [dot phrase with scope: 'plan']
+    steps:
+      - Try typing the phrase in HPI field
+      - Try typing the phrase in Plan field
+    expected: |
+      - HPI field: phrase does NOT expand
+      - Plan field: phrase expands correctly
+    data_verification: Scope matching in phrases.filter()
+
+  - id: DP3
+    title: Global scope
+    priority: P1
+    preconditions: [dot phrase with scope: 'global']
+    steps:
+      - Type phrase in HPI field
+      - Type phrase in Assessment field
+      - Type phrase in Plan field
+    expected: |
+      - Phrase expands in all fields
+      - Same expansion text everywhere
+    data_verification: Global phrases pass scope filter for all fields
+
+  - id: DP4
+    title: Usage tracking
+    priority: P2
+    preconditions: [dot phrase exists with usage_count]
+    steps:
+      - Use the phrase
+      - Check phrase in DotPhrasesDrawer
+    expected: |
+      - Usage count incremented by 1
+    data_verification: PATCH /api/phrases/{id} called with increment
+
+  - id: DP5
+    title: Custom phrase creation
+    priority: P2
+    preconditions: [logged in, DotPhrasesDrawer open]
+    steps:
+      - Click "Create New Phrase"
+      - Enter trigger, expansion, scope
+      - Save
+      - Use the new phrase in appropriate field
+    expected: |
+      - Phrase saved to database
+      - Phrase expands when triggered
+    data_verification: POST /api/phrases creates new phrase
+
+---
+note_generation:
+  - id: NG1
+    title: Generate Note opens modal
+    priority: P0
+    preconditions: [logged in, some note content entered]
+    steps:
+      - Click purple "Generate Note" button in action bar
+    expected: |
+      - EnhancedNotePreviewModal opens
+      - Note type selection visible
+      - Note length selection visible
+    data_verification: Modal isOpen state true
+
+  - id: NG2
+    title: Note type selection
+    priority: P1
+    preconditions: [Generate Note modal open]
+    steps:
+      - Click "New Consult" button
+      - Click "Follow-up" button
+    expected: |
+      - Toggle visually updates
+      - Selection affects generated note format
+    data_verification: noteType state changes between 'new-consult' and 'follow-up'
+
+  - id: NG3
+    title: Note length selection
+    priority: P1
+    preconditions: [Generate Note modal open]
+    steps:
+      - Select "Concise"
+      - Generate note
+      - Select "Detailed"
+      - Generate note
+    expected: |
+      - Concise: shorter, bullet-style
+      - Standard: balanced paragraphs
+      - Detailed: comprehensive narrative
+    data_verification: noteLength preference passed to synthesize-note API
+
+  - id: NG4
+    title: Include toggles
+    priority: P1
+    preconditions: [Generate Note modal open]
+    steps:
+      - Toggle "Include Scales" off
+      - Toggle "Include Imaging" on
+      - Generate note
+    expected: |
+      - Scales section hidden when off
+      - Imaging section visible when on
+      - Toggles persist during session
+    data_verification: preferences object includes/excludes sections
+
+  - id: NG5
+    title: Source attribution
+    priority: P1
+    preconditions: [Chart Prep + Visit AI + Manual content exists]
+    steps:
+      - Generate note
+      - View section sources
+    expected: |
+      - Manual content shows "Manual" badge
+      - Chart Prep content shows "Chart Prep" badge
+      - Visit AI content shows "Visit AI" badge
+    data_verification: ContentSource tracking in merge engine
+
+  - id: NG6
+    title: Note review suggestions
+    priority: P1
+    preconditions: [note generated]
+    steps:
+      - Wait for AI review to complete
+      - View "Suggested Improvements" panel
+    expected: |
+      - Panel appears (may be collapsed)
+      - Each suggestion has type badge (consistency/completeness/quality)
+      - "Go to section" link scrolls to relevant section
+    data_verification: note-review API returns suggestions array
+
+  - id: NG7
+    title: Section editing
+    priority: P1
+    preconditions: [note generated, in review mode]
+    steps:
+      - Click on a section header
+      - Edit the section content
+      - Save changes
+    expected: |
+      - Section expands with textarea
+      - Changes saved to formattedNote
+      - Updated content displays
+    data_verification: Section content updated in state
+
+  - id: NG8
+    title: Copy to clipboard
+    priority: P0
+    preconditions: [note generated]
+    steps:
+      - Click "Copy" button
+    expected: |
+      - Full note copied to clipboard
+      - Button shows "Copied!" feedback
+    data_verification: navigator.clipboard.writeText called
+
+  - id: NG9
+    title: Sign & Complete
+    priority: P0
+    preconditions: [note generated, all required sections present]
+    steps:
+      - Click "Sign & Complete" button
+    expected: |
+      - Note saved to clinical_notes table
+      - Visit marked as signed
+      - Modal closes
+      - Patient status updated
+    data_verification: PATCH /api/visits/{id}/sign called successfully
+
+  - id: NG10
+    title: Ask about this note
+    priority: P1
+    preconditions: [note generated]
+    steps:
+      - Find chat input at bottom of modal
+      - Type question about the note
+      - Submit
+    expected: |
+      - Question sent to Ask AI with note context
+      - Answer displays in chat area
+      - Suggested questions visible
+    data_verification: /api/ai/ask called with fullNoteText
+
+---
+note_merge:
+  - id: NM1
+    title: Manual content priority
+    priority: P0
+    preconditions: [Manual HPI entered, Visit AI HPI extracted]
+    steps:
+      - Enter HPI manually: "Patient reports headaches"
+      - Run Visit AI (extracts different HPI)
+      - Generate note
+    expected: |
+      - Manual content preserved
+      - Visit AI content available as alternative/addition
+      - Manual not overwritten
+    data_verification: Merge engine prioritizes manual source
+
+  - id: NM2
+    title: Chart Prep markers prevent duplication
+    priority: P0
+    preconditions: [Chart Prep content added to HPI]
+    steps:
+      - Add Chart Prep to HPI (creates markers)
+      - Run Chart Prep again
+      - Add new Chart Prep to HPI
+    expected: |
+      - Old Chart Prep content replaced (not duplicated)
+      - Only one set of markers exists
+      - Manual content outside markers preserved
+    data_verification: Marker-based replace in insertSection function
+
+  - id: NM3
+    title: Visit AI merge
+    priority: P1
+    preconditions: [Visit AI complete with all 5 sections]
+    steps:
+      - Complete Visit AI recording
+      - Generate note
+      - Review each section
+    expected: |
+      - Visit AI HPI merged into HPI section
+      - Visit AI ROS merged appropriately
+      - Visit AI Exam, Assessment, Plan all present
+    data_verification: visitAIOutput fields appear in formattedNote
+
+  - id: NM4
+    title: Combined sources display
+    priority: P1
+    preconditions: [Chart Prep + Visit AI + Manual all exist]
+    steps:
+      - Complete Chart Prep
+      - Add manual content
+      - Complete Visit AI
+      - Generate note
+    expected: |
+      - All three sources visible in preview
+      - Sources attributed correctly
+      - No content lost
+    data_verification: All source types present in merged note
+
+  - id: NM5
+    title: Conflict resolution
+    priority: P1
+    preconditions: [Conflicting content from multiple sources]
+    steps:
+      - Manual: "right-sided headache"
+      - Visit AI: "left-sided headache"
+      - Generate note
+    expected: |
+      - Manual version shown in note
+      - Visit AI version may be shown as note/alternative
+      - Clear indication of conflict (if any)
+    data_verification: Manual prioritized in merge resolution
 
 ---
 historian_physician:

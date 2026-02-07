@@ -1,0 +1,13 @@
+{
+  "fixture": "corrections.wav",
+  "rawText": "The pain is in the left hand, no wait, the right hand.",
+  "expectedText": "The pain is in the right hand.",
+  "allowedVariations": [
+    "Pain is in the right hand.",
+    "The pain is in the right hand"
+  ],
+  "audioFormat": "wav",
+  "duration_seconds": 5,
+  "testCases": ["FD4", "O8"],
+  "notes": "Tests verbal correction handling - 'no wait' should trigger correction, final answer is 'right hand'"
+}

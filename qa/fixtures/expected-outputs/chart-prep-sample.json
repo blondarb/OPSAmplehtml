@@ -1,0 +1,26 @@
+{
+  "fixture": "chart-prep-sample.wav",
+  "expectedText": "Reviewing the referral for this patient. 52-year-old female referred for new onset headaches starting about three weeks ago. Located on the right side, described as throbbing, severity 7 out of 10. Associated with nausea and light sensitivity. No prior history of migraines. Previous workup included CT head which was normal. She's currently taking ibuprofen with minimal relief. Alert: patient reports recent weight loss of 10 pounds.",
+  "expectedSections": {
+    "summary": {
+      "mustContain": ["52-year-old", "female", "headaches", "weeks"],
+      "description": "Brief narrative summary of the pre-visit notes"
+    },
+    "alerts": {
+      "mustContain": ["weight loss"],
+      "description": "Critical findings that warrant attention - weight loss is a red flag"
+    },
+    "suggestedHPI": {
+      "mustContain": ["right", "throbbing", "nausea", "light sensitivity"],
+      "description": "Formatted HPI ready for insertion into note"
+    },
+    "suggestedFocus": {
+      "mayContain": ["migraine", "secondary headache", "weight loss workup"],
+      "description": "Areas to focus on during visit"
+    }
+  },
+  "audioFormat": "wav",
+  "duration_seconds": 30,
+  "testCases": ["CP1", "CP3", "CP4", "B4", "B5"],
+  "notes": "Chart Prep dictation with clear red flag (weight loss) that should trigger alert"
+}

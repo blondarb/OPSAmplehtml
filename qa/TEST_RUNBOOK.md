@@ -1,6 +1,6 @@
 # Test Runbook - Sevaro Clinical
 
-> runbook_version: 2.1
+> runbook_version: 2.2
 > Last updated: 2026-02-07
 
 ## Purpose
@@ -109,6 +109,50 @@ Run these first. Any failure blocks release.
 | CR3 | TopNav indicator | Red dot with timer appears in top nav when drawer closed but recording |
 | CR4 | Expand button | Full drawer opens, recording continues uninterrupted |
 | CR5 | Processing state | Bar turns teal, shows spinner and "Processing..." text |
+
+### VA. Visit AI Recording (P1)
+
+| ID | Flow | Key checks | Data verification |
+|----|------|------------|-------------------|
+| VA1 | Start recording | Click large mic → waveform animates | Recording state active |
+| VA3 | Stop processing | Stop → "Processing..." → structured output | 5 sections extracted |
+| VA4 | Section accuracy | Review extracted content | Content matches spoken input |
+| VA7 | Generate Note | Click Generate Note → Visit AI merged | All sections in preview |
+| VA9 | Safari format | iPhone Safari audio processes | m4a format transcribed |
+
+### FD. Field Dictation (P1)
+
+| ID | Flow | Key checks |
+|----|------|------------|
+| FD1 | Mic button | Click red mic → recording starts |
+| FD2 | Cursor insert | Text inserted at cursor position |
+| FD4 | Multi-field | Dictate HPI → Dictate Assessment → both work |
+
+### FA. Field AI Actions (P1)
+
+| ID | Flow | Key checks | Data verification |
+|----|------|------------|-------------------|
+| FA1 | Improve | Polishes grammar, preserves meaning | Text improved, meaning same |
+| FA2 | Expand | Adds clinical context | Longer, no fabricated data |
+| FA4 | No hallucination | Doesn't add specifics not implied | Anti-hallucination check |
+
+### NG. Note Generation (P0)
+
+| ID | Flow | Key checks |
+|----|------|------------|
+| NG1 | Open modal | Purple button → modal opens |
+| NG3 | Length selection | Concise/Standard/Detailed output differs |
+| NG6 | Review suggestions | AI suggestions panel with type badges |
+| NG8 | Copy | Full note copied to clipboard |
+| NG9 | Sign & Complete | Note saved, visit signed |
+
+### NM. Note Merge Engine (P0)
+
+| ID | Flow | Key checks | Data verification |
+|----|------|------------|-------------------|
+| NM1 | Manual priority | Manual content preserved over AI | Manual not overwritten |
+| NM2 | Markers | Chart Prep markers prevent duplication | One set of markers only |
+| NM4 | Combined | Chart Prep + Visit AI + Manual all present | All sources visible |
 
 ---
 
@@ -334,6 +378,9 @@ Before running tests, confirm:
 | Minor feature | S1-S7 + Mission brief focus + 3 regression spot-checks |
 | Major feature | Full regression (A, B, C, CP, CR, M, N, O, H, I) + all smoke |
 | Mobile changes | S1-S7 + M1-M6, N1-N6, O1-O8, P1-P4, Q1-Q7, R1-R7, S1-S7, T1-T8, E5 |
-| AI changes | S1-S7 + B1-B8, C1-C7, CP1-CP10, CR1-CR5, I1-I14 + AI verification checklist |
+| AI changes | S1-S7 + B1-B8, C1-C7, CP1-CP10, CR1-CR5, VA1-VA10, FA1-FA5, NG1-NG10, NM1-NM5, I1-I14 + AI verification checklist |
 | Historian changes | S1-S7 + C1-C7, H1-H8, I1-I14 |
 | Chart Prep changes | S1-S7 + B4-B5, CP1-CP10, CR1-CR5 |
+| Visit AI changes | S1-S7 + VA1-VA10, NG1-NG10, NM1-NM5 |
+| Note Generation changes | S1-S7 + NG1-NG10, NM1-NM5, FA1-FA5 |
+| Documentation workflows | S1-S7 + CP1-CP10, VA1-VA10, FD1-FD5, FA1-FA5, DP1-DP5, NG1-NG10, NM1-NM5 |

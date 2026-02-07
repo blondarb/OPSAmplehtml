@@ -1,0 +1,41 @@
+{
+  "fixture": "visit-sample.wav",
+  "description": "Full visit recording simulation - physician and patient conversation",
+  "expectedSections": {
+    "hpiFromVisit": {
+      "mustContain": ["headaches", "three weeks", "right side", "throbbing"],
+      "description": "Chief complaint and history of present illness from patient statements"
+    },
+    "rosFromVisit": {
+      "mustContain": ["nausea", "light sensitivity"],
+      "mayContain": ["no fever", "no vision changes", "no weakness"],
+      "description": "Review of systems - positive and pertinent negatives"
+    },
+    "examFromVisit": {
+      "mustContain": ["neurological", "cranial nerves", "motor", "sensory"],
+      "description": "Physical examination findings from physician statements"
+    },
+    "assessmentFromVisit": {
+      "mustContain": ["migraine"],
+      "mayContain": ["without aura", "episodic", "new onset"],
+      "description": "Clinical impression/diagnosis"
+    },
+    "planFromVisit": {
+      "mustContain": ["sumatriptan", "follow", "MRI"],
+      "mayContain": ["headache diary", "trigger avoidance", "return"],
+      "description": "Treatment plan and next steps"
+    }
+  },
+  "minConfidence": {
+    "hpi": 0.7,
+    "ros": 0.5,
+    "exam": 0.7,
+    "assessment": 0.6,
+    "plan": 0.6
+  },
+  "audioFormat": "wav",
+  "duration_seconds": 120,
+  "testCases": ["VA1", "VA3", "VA4", "VA5", "VA7", "VA8"],
+  "script": "See visit-sample-script.md for full conversation script",
+  "notes": "2-minute visit simulation with clear sections for all 5 extraction targets"
+}

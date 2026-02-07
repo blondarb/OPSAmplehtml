@@ -1,0 +1,13 @@
+{
+  "fixture": "simple-sentence.wav",
+  "expectedText": "The patient reports headaches for two weeks.",
+  "allowedVariations": [
+    "The patient reports headaches for 2 weeks.",
+    "Patient reports headaches for two weeks.",
+    "The patient reports headaches for two weeks"
+  ],
+  "audioFormat": "wav",
+  "duration_seconds": 3,
+  "testCases": ["FD1", "FD2", "VA9"],
+  "notes": "Basic transcription test - single clear sentence"
+}
