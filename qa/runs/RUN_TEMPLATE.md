@@ -5,8 +5,8 @@
 **Branch:** `branch-name`
 **Preview URL:** https://ops-amplehtml.vercel.app
 **Tester:** (name or "Claude Code for Chrome")
-**Runbook version:** 2.0
-**Test cases version:** 2.0
+**Runbook version:** 2.1
+**Test cases version:** 2.1
 
 ---
 
@@ -68,6 +68,29 @@
 | M1 | Auto-redirect | PASS / FAIL | | |
 | O6 | Safari/iOS transcription | PASS / FAIL | iPhone model | |
 | P2 | Switch to Desktop | PASS / FAIL | | |
+
+---
+
+## Chart Prep State Management (P0 - Test Every AI Release)
+
+> Required for any changes to VoiceDrawer, ClinicalNote, or localStorage handling.
+
+| ID | Title | Result | Notes | Data Verification |
+|----|-------|--------|-------|-------------------|
+| CP1 | Home button auto-save | PASS / FAIL | | localStorage saved? |
+| CP2 | Patient switch auto-save | PASS / FAIL | | Clean state on Patient B? |
+| CP4 | Return to patient | PASS / FAIL | | LeftSidebar shows summary? |
+| CP10 | No cross-contamination | PASS / FAIL | | No Patient A data on B? |
+
+## Chart Prep Recording States (P1)
+
+> Test if Voice drawer or recording behavior changed.
+
+| ID | Title | Result | Notes |
+|----|-------|--------|-------|
+| CR1 | Minimized bar appears | PASS / FAIL / N/A | |
+| CR2 | Minimized bar controls | PASS / FAIL / N/A | |
+| CR5 | Processing indicator | PASS / FAIL / N/A | |
 
 ---
 

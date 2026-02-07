@@ -1,7 +1,7 @@
 # Test Runbook - Sevaro Clinical
 
-> runbook_version: 2.0
-> Last updated: 2026-02-06
+> runbook_version: 2.1
+> Last updated: 2026-02-07
 
 ## Purpose
 
@@ -79,6 +79,36 @@ Run these first. Any failure blocks release.
 | C5 | Import Medications | Click Import to Note | Medications from interview appear in medication list |
 | C6 | Import Allergies | Click Import to Note | Allergies from interview appear in allergy section |
 | C7 | Import All | Import entire structured output | All fields populate correctly: HPI, meds, allergies, PMH, ROS |
+
+### CP. Chart Prep State Management (P0 - Test Every Release)
+
+**Critical:** These tests verify Chart Prep data durability and state management across navigation. Test after any changes to VoiceDrawer, ClinicalNote patient handling, or localStorage.
+
+| ID | Flow | Key checks | Data verification |
+|----|------|------------|-------------------|
+| CP1 | Home button auto-save | Start recording → Click Home | Recording stops, processing starts, data saved |
+| CP2 | Patient switch auto-save | Recording on Patient A → Click Patient B | Patient A data saved, Patient B has clean state |
+| CP3 | Drawer close/reopen | Complete Chart Prep → Close drawer → Reopen | Data still visible, "Add All to Note" available |
+| CP4 | Return to patient | Chart Prep on A → Switch to B → Return to A | LeftSidebar shows Chart Prep summary |
+| CP5 | Background processing | Minimize during recording → Stop via bar | Processing completes, results saved, drawer auto-expands |
+| CP6 | LeftSidebar display | Complete processing | Alerts (red) and Summary sections visible in sidebar |
+| CP7 | View button | Click "View" in LeftSidebar Chart Prep panel | VoiceDrawer opens to Chart Prep tab with data |
+| CP10 | No cross-contamination | Chart Prep on A → Switch to B | Patient B never sees Patient A's Chart Prep data |
+
+**localStorage verification:**
+- Check localStorage for `chart-prep-{visitId}` key
+- Verify `chartPrepSections` object has `summary`, `alerts`, `suggestedHPI` fields
+- Verify LeftSidebar renders content matching localStorage data
+
+### CR. Chart Prep Recording States (P1)
+
+| ID | Flow | Key checks |
+|----|------|------------|
+| CR1 | Click outside while recording | Floating red bar appears at bottom-right with timer |
+| CR2 | Minimized bar buttons | Pause shows blue pause icon, Resume works, Stop triggers processing |
+| CR3 | TopNav indicator | Red dot with timer appears in top nav when drawer closed but recording |
+| CR4 | Expand button | Full drawer opens, recording continues uninterrupted |
+| CR5 | Processing state | Bar turns teal, shows spinner and "Processing..." text |
 
 ---
 
@@ -302,7 +332,8 @@ Before running tests, confirm:
 |--------------|----------------|
 | Hotfix | S1-S7, affected flow only |
 | Minor feature | S1-S7 + Mission brief focus + 3 regression spot-checks |
-| Major feature | Full regression (A, B, C, M, N, O, H, I) + all smoke |
+| Major feature | Full regression (A, B, C, CP, CR, M, N, O, H, I) + all smoke |
 | Mobile changes | S1-S7 + M1-M6, N1-N6, O1-O8, P1-P4, Q1-Q7, R1-R7, S1-S7, T1-T8, E5 |
-| AI changes | S1-S7 + B1-B8, C1-C7, I1-I14 + AI verification checklist |
+| AI changes | S1-S7 + B1-B8, C1-C7, CP1-CP10, CR1-CR5, I1-I14 + AI verification checklist |
 | Historian changes | S1-S7 + C1-C7, H1-H8, I1-I14 |
+| Chart Prep changes | S1-S7 + B4-B5, CP1-CP10, CR1-CR5 |

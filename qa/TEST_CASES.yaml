@@ -1,6 +1,6 @@
 # Test Cases - Sevaro Clinical
-# test_cases_version: 2.0
-# Last updated: 2026-02-06
+# test_cases_version: 2.1
+# Last updated: 2026-02-07
 #
 # Structure: Each case has id, title, preconditions, steps, expected, data_verification (optional).
 # Organized by suite matching TEST_RUNBOOK.md sections.
@@ -265,6 +265,252 @@ ai_features:
       - Suggestions panel appears with improvement ideas
       - Each suggestion has type badge (consistency/completeness/quality)
       - "Go to section" links work
+
+---
+chart_prep_state:
+  - id: CP1
+    title: Auto-save on Home button
+    priority: P0
+    preconditions: [logged in, Voice drawer open, Chart Prep recording active]
+    steps:
+      - Start Chart Prep recording
+      - Dictate some patient information
+      - Click Home icon in IconSidebar (house icon)
+    expected: |
+      - Recording stops automatically
+      - "Processing..." indicator appears
+      - Data saved to localStorage
+      - User navigated to appointments view
+    data_verification: |
+      localStorage has key 'chart-prep-{visitId}' with prepNotes and pendingAIProcessing flag
+
+  - id: CP2
+    title: Auto-save on patient switch
+    priority: P0
+    preconditions: [logged in, Voice drawer open, Chart Prep recording active, multiple patients exist]
+    steps:
+      - Start Chart Prep recording on Patient A
+      - Dictate some patient information
+      - Click on Patient B in left sidebar
+    expected: |
+      - Recording stops automatically
+      - Patient A's data saved to localStorage
+      - Patient B's chart loads with clean state (no Patient A data)
+    data_verification: |
+      localStorage has 'chart-prep-{patientA-visitId}' with saved content
+      Patient B's Chart Prep area is empty
+
+  - id: CP3
+    title: localStorage persistence on drawer close
+    priority: P0
+    preconditions: [logged in, Chart Prep summary generated]
+    steps:
+      - Generate Chart Prep summary via Voice drawer
+      - Close the Voice drawer
+      - Reopen the Voice drawer
+    expected: |
+      - Chart Prep data still visible in drawer
+      - prepNotes and chartPrepSections restored
+      - "Add All to Note" button still available
+    data_verification: |
+      localStorage key 'chart-prep-{visitId}' contains chartPrepSections with summary, alerts, suggestedHPI
+
+  - id: CP4
+    title: Restore Chart Prep on patient return
+    priority: P0
+    preconditions: [logged in, Chart Prep processed for Patient A, switched away]
+    steps:
+      - Complete Chart Prep on Patient A (generate summary)
+      - Switch to Patient B
+      - Switch back to Patient A
+    expected: |
+      - LeftSidebar shows Chart Prep panel with summary sections
+      - Alerts section (red) visible if present
+      - Summary section visible
+      - "View" button opens VoiceDrawer to Chart Prep tab
+    data_verification: |
+      chartPrepOutput state is restored from localStorage
+      LeftSidebar renders ChartPrepPanel component
+
+  - id: CP5
+    title: Background processing completion
+    priority: P1
+    preconditions: [logged in, Voice drawer open, recording in progress]
+    steps:
+      - Start Chart Prep recording
+      - Dictate patient information
+      - Click outside drawer to minimize (floating bar appears)
+      - Stop recording via floating bar
+      - Wait for processing
+    expected: |
+      - Floating bar shows teal "Processing..." state
+      - Processing completes while minimized
+      - Results saved to localStorage
+      - Drawer auto-expands when processing completes
+    data_verification: |
+      localStorage updated with chartPrepSections after processing
+
+  - id: CP6
+    title: LeftSidebar Chart Prep panel display
+    priority: P1
+    preconditions: [logged in, Chart Prep processing completed]
+    steps:
+      - Complete Chart Prep processing
+      - Close Voice drawer if open
+      - Observe LeftSidebar
+    expected: |
+      - Chart Prep panel appears in LeftSidebar (above Prior Visits)
+      - Alerts section with red background (if alerts present)
+      - Summary section visible
+      - "View" button visible
+    data_verification: |
+      chartPrepOutput in ClinicalNote state matches localStorage data
+
+  - id: CP7
+    title: View button opens correct drawer tab
+    priority: P1
+    preconditions: [logged in, Chart Prep summary exists in LeftSidebar]
+    steps:
+      - Find Chart Prep panel in LeftSidebar
+      - Click "View" button
+    expected: |
+      - VoiceDrawer opens
+      - Chart Prep tab is active (not Document tab)
+      - Previously generated summary is visible
+      - "Add All to Note" button available
+    data_verification: |
+      VoiceDrawer activeTab is 'chart-prep'
+      chartPrepSections displayed in drawer
+
+  - id: CP8
+    title: Multiple Chart Prep sessions combine
+    priority: P1
+    preconditions: [logged in, first Chart Prep completed]
+    steps:
+      - Complete first Chart Prep recording
+      - Generate summary
+      - Start a new Chart Prep recording (additional dictation)
+      - Generate summary again
+    expected: |
+      - Combined summary includes content from both sessions
+      - prepNotes array contains all recordings
+      - Single comprehensive summary generated
+    data_verification: |
+      prepNotes array has 2+ entries
+      chartPrepSections summary references content from both dictations
+
+  - id: CP9
+    title: Sign & Complete clears Chart Prep data
+    priority: P2
+    preconditions: [logged in, Chart Prep completed, note ready to sign]
+    steps:
+      - Complete Chart Prep and add to note
+      - Click "Sign & Complete" button
+      - Return to same patient (if possible) or check localStorage
+    expected: |
+      - Visit signed successfully
+      - Chart Prep localStorage key cleared for that visit
+      - Fresh Chart Prep state on return
+    data_verification: |
+      localStorage key 'chart-prep-{visitId}' removed or reset
+
+  - id: CP10
+    title: No cross-patient Chart Prep contamination
+    priority: P0
+    preconditions: [logged in, Chart Prep completed for Patient A, multiple patients exist]
+    steps:
+      - Complete Chart Prep on Patient A with specific content (e.g., "headaches for 3 weeks")
+      - Switch to Patient B
+      - Check LeftSidebar for Chart Prep section
+      - Check Voice drawer Chart Prep tab
+    expected: |
+      - Patient B's LeftSidebar does NOT show Patient A's Chart Prep
+      - Patient B's Voice drawer shows empty/fresh Chart Prep state
+      - No Patient A content visible on Patient B
+    data_verification: |
+      chartPrepOutput is null or specific to Patient B's visit
+      No cross-visit localStorage key confusion
+
+---
+chart_prep_recording:
+  - id: CR1
+    title: Minimized recording bar appears
+    priority: P1
+    preconditions: [logged in, Voice drawer open, Chart Prep recording active]
+    steps:
+      - Start Chart Prep recording
+      - Click outside the Voice drawer (on center panel)
+    expected: |
+      - Voice drawer closes/minimizes
+      - Floating red bar appears at bottom-right
+      - Timer continues counting
+      - Recording continues (audio still captured)
+    data_verification: |
+      isRecording state remains true
+      showMinimizedBar condition met
+
+  - id: CR2
+    title: Minimized bar controls function correctly
+    priority: P1
+    preconditions: [Chart Prep recording active, minimized bar visible]
+    steps:
+      - Click Pause button on minimized bar
+      - Observe timer pauses
+      - Click Resume button
+      - Click Stop button
+    expected: |
+      - Pause: Timer pauses, icon changes to play/resume
+      - Resume: Timer resumes, recording continues
+      - Stop: Recording stops, processing begins
+    data_verification: |
+      isPaused state toggles correctly
+      Audio chunks captured throughout
+
+  - id: CR3
+    title: TopNav recording indicator shows
+    priority: P1
+    preconditions: [logged in, Chart Prep recording active]
+    steps:
+      - Start Chart Prep recording
+      - Close/minimize Voice drawer
+      - Look at TopNav area
+    expected: |
+      - Red recording indicator visible in TopNav
+      - Timer displayed
+      - Indicator visible regardless of drawer state
+    data_verification: |
+      TopNav receives isPrepRecording={true}
+
+  - id: CR4
+    title: Expand from minimized state
+    priority: P1
+    preconditions: [Chart Prep recording active, minimized bar visible]
+    steps:
+      - While minimized bar is showing
+      - Click the expand button (arrow icon)
+    expected: |
+      - Voice drawer opens
+      - Chart Prep tab active
+      - Recording still in progress (timer, waveform)
+      - All controls available (pause, stop, restart)
+    data_verification: |
+      Drawer state restored without interrupting recording
+
+  - id: CR5
+    title: Processing indicator in minimized state
+    priority: P1
+    preconditions: [Chart Prep recording active, minimized bar visible]
+    steps:
+      - While minimized, click Stop button
+      - Observe minimized bar state
+    expected: |
+      - Bar turns teal (processing color)
+      - Shows spinner/loading indicator
+      - Text changes to "Processing..."
+      - Bar remains visible until processing completes
+    data_verification: |
+      isPrepTranscribing or autoProcessing state true
+      Bar shows processing UI, not recording UI
 
 ---
 historian_physician:
