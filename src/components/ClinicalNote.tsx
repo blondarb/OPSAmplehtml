@@ -598,6 +598,18 @@ export default function ClinicalNote({
       autosaveTimeoutRef.current = null
     }
 
+    // CRITICAL: Auto-save any active Chart Prep recording before switching
+    // This ensures recording is stopped and transcription completes for the CURRENT patient
+    if (voiceDrawerRef.current) {
+      try {
+        console.log('[ClinicalNote] Patient switch - awaiting Chart Prep auto-save...')
+        await voiceDrawerRef.current.triggerAutoSave()
+        console.log('[ClinicalNote] Chart Prep auto-save complete before patient switch')
+      } catch (err) {
+        console.error('[ClinicalNote] Chart Prep auto-save failed:', err)
+      }
+    }
+
     // SAVE the current patient's data before switching (if we have a patient)
     if (patient?.id && noteData) {
       const oldAutosaveKey = `sevaro-autosave-${patient.id}-${currentVisit?.id || 'draft'}`
@@ -838,21 +850,28 @@ export default function ClinicalNote({
   }
 
   // CRITICAL: Clear ALL clinical state to prevent cross-patient data contamination
-  const resetAllClinicalState = useCallback(() => {
-    // Auto-save any active Chart Prep recording before switching
-    // This ensures recording is stopped and saved for the current patient
-    if (voiceDrawerRef.current) {
-      voiceDrawerRef.current.triggerAutoSave()
-    }
+  // This is now async to properly wait for Chart Prep auto-save to complete
+  const resetAllClinicalState = useCallback(async () => {
+    // Block autosave during reset FIRST
+    isSwitchingPatientRef.current = true
 
-    // Cancel any pending autosave FIRST
+    // Cancel any pending autosave
     if (autosaveTimeoutRef.current) {
       clearTimeout(autosaveTimeoutRef.current)
       autosaveTimeoutRef.current = null
     }
 
-    // Block autosave during reset
-    isSwitchingPatientRef.current = true
+    // Auto-save any active Chart Prep recording before switching
+    // AWAIT this to ensure recording is stopped and saved for the current patient
+    if (voiceDrawerRef.current) {
+      try {
+        console.log('[ClinicalNote] Awaiting Chart Prep auto-save before reset...')
+        await voiceDrawerRef.current.triggerAutoSave()
+        console.log('[ClinicalNote] Chart Prep auto-save complete')
+      } catch (err) {
+        console.error('[ClinicalNote] Chart Prep auto-save failed:', err)
+      }
+    }
 
     // Clear note content
     setNoteData({
@@ -906,8 +925,8 @@ export default function ClinicalNote({
   }, [])
 
   // Handle going back to appointments list
-  const handleBackToAppointments = useCallback(() => {
-    resetAllClinicalState()
+  const handleBackToAppointments = useCallback(async () => {
+    await resetAllClinicalState()
     setViewMode('appointments')
     setActiveIcon('home')
   }, [resetAllClinicalState])
@@ -1339,7 +1358,7 @@ export default function ClinicalNote({
       // CRITICAL: Clear all clinical state BEFORE opening follow-up modal
       // This prevents stale Patient A data from bleeding into Patient B
       // Note: We keep patient/currentVisit for the follow-up modal to reference
-      resetAllClinicalState()
+      await resetAllClinicalState()
 
       // Clear the autosave for this (now signed) visit
       localStorage.removeItem(autosaveKey)
@@ -1463,7 +1482,7 @@ export default function ClinicalNote({
               allergies={allergies}
               chartPrepOutput={chartPrepOutput}
               isChartPrepProcessing={chartPrepProcessing}
-              onOpenVoiceDrawer={() => { setVoiceDrawerOpen(true); setVoiceDrawerMinimized(false); }}
+              onOpenVoiceDrawer={() => { setVoiceDrawerTab('chart-prep'); setVoiceDrawerOpen(true); setVoiceDrawerMinimized(false); }}
             />
 
             <CenterPanel

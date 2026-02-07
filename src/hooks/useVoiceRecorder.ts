@@ -20,6 +20,10 @@ interface UseVoiceRecorderResult {
   pauseRecording: () => void
   resumeRecording: () => void
   stopRecording: () => void
+  // Promise-based stop that waits for transcription to complete
+  stopRecordingAsync: () => Promise<{ text: string | null; error: string | null; audioBlob: Blob | null }>
+  // Immediately capture audio blob without waiting for transcription
+  captureAudioBlob: () => Blob | null
   restartRecording: () => void
   clearTranscription: () => void
 }
@@ -39,6 +43,8 @@ export function useVoiceRecorder(options?: UseVoiceRecorderOptions): UseVoiceRec
   const timerRef = useRef<NodeJS.Timeout | null>(null)
   const mimeTypeRef = useRef<string>('')
   const lastAudioBlobRef = useRef<Blob | null>(null)
+  // Promise resolvers for async stop - allows waiting for transcription completion
+  const stopResolverRef = useRef<((result: { text: string | null; error: string | null; audioBlob: Blob | null }) => void) | null>(null)
 
   const clearTranscription = useCallback(() => {
     setTranscribedText(null)
@@ -125,6 +131,11 @@ export function useVoiceRecorder(options?: UseVoiceRecorderOptions): UseVoiceRec
         if (audioBlob.size === 0) {
           setError('No audio recorded')
           setIsRecording(false)
+          // Resolve async stop promise with error
+          if (stopResolverRef.current) {
+            stopResolverRef.current({ text: null, error: 'No audio recorded', audioBlob: null })
+            stopResolverRef.current = null
+          }
           return
         }
 
@@ -136,11 +147,18 @@ export function useVoiceRecorder(options?: UseVoiceRecorderOptions): UseVoiceRec
         // If a callback is provided, use it instead of auto-transcribing
         if (options?.onRecordingComplete) {
           options.onRecordingComplete(audioBlob)
+          // Resolve async stop promise - callback mode doesn't do transcription
+          if (stopResolverRef.current) {
+            stopResolverRef.current({ text: null, error: null, audioBlob })
+            stopResolverRef.current = null
+          }
           return
         }
 
         // Default behavior: Send to transcription API
         setIsTranscribing(true)
+        let resultText: string | null = null
+        let resultError: string | null = null
         try {
           const formData = new FormData()
           // Convert to a file with proper extension for OpenAI Whisper
@@ -175,14 +193,23 @@ export function useVoiceRecorder(options?: UseVoiceRecorderOptions): UseVoiceRec
 
           if (data.error) {
             setError(data.error)
+            resultError = data.error
           } else {
             setTranscribedText(data.text)
             setRawText(data.rawText || data.text)
+            resultText = data.text
           }
         } catch (err) {
           setError('Failed to transcribe audio. Please try again.')
+          resultError = 'Failed to transcribe audio. Please try again.'
         }
         setIsTranscribing(false)
+
+        // Resolve async stop promise with result
+        if (stopResolverRef.current) {
+          stopResolverRef.current({ text: resultText, error: resultError, audioBlob })
+          stopResolverRef.current = null
+        }
       }
 
       mediaRecorder.onerror = () => {
@@ -251,6 +278,47 @@ export function useVoiceRecorder(options?: UseVoiceRecorderOptions): UseVoiceRec
     }
   }, [])
 
+  // Promise-based stop that waits for transcription to complete
+  // Use this when you need to ensure recording is fully processed before continuing
+  const stopRecordingAsync = useCallback((): Promise<{ text: string | null; error: string | null; audioBlob: Blob | null }> => {
+    return new Promise((resolve) => {
+      if (!mediaRecorderRef.current || mediaRecorderRef.current.state === 'inactive') {
+        // Not recording, resolve immediately
+        resolve({ text: null, error: null, audioBlob: lastAudioBlobRef.current })
+        return
+      }
+
+      // Store the resolver so onstop handler can call it when transcription completes
+      stopResolverRef.current = resolve
+
+      // Request any remaining data before stopping
+      mediaRecorderRef.current.requestData()
+      // Small delay to ensure data is collected
+      setTimeout(() => {
+        if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+          mediaRecorderRef.current.stop()
+        }
+        setIsRecording(false)
+        setIsPaused(false)
+      }, 100)
+    })
+  }, [])
+
+  // Immediately capture current audio chunks as a blob without stopping
+  // Useful for saving progress before a context switch
+  const captureAudioBlob = useCallback((): Blob | null => {
+    if (audioChunksRef.current.length === 0) {
+      return null
+    }
+    // Request any pending data (this is synchronous for the ondataavailable callback)
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
+      mediaRecorderRef.current.requestData()
+    }
+    // Create blob from current chunks
+    const audioBlob = new Blob(audioChunksRef.current, { type: mimeTypeRef.current || 'audio/webm' })
+    return audioBlob.size > 0 ? audioBlob : null
+  }, [])
+
   const restartRecording = useCallback(() => {
     // Stop current recording without transcribing
     if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
@@ -288,6 +356,8 @@ export function useVoiceRecorder(options?: UseVoiceRecorderOptions): UseVoiceRec
     pauseRecording,
     resumeRecording,
     stopRecording,
+    stopRecordingAsync,
+    captureAudioBlob,
     restartRecording,
     clearTranscription,
   }

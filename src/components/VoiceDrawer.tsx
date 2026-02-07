@@ -4,8 +4,9 @@ import { useState, useEffect, useRef, useImperativeHandle, forwardRef } from 're
 import { useVoiceRecorder } from '@/hooks/useVoiceRecorder'
 
 // Expose auto-save function to parent
+// Returns a promise that resolves when recording is stopped and transcription is complete
 export interface VoiceDrawerRef {
-  triggerAutoSave: () => void
+  triggerAutoSave: () => Promise<void>
 }
 
 interface VisitAIOutput {
@@ -82,7 +83,11 @@ const VoiceDrawer = forwardRef<VoiceDrawerRef, VoiceDrawerProps>(function VoiceD
   // localStorage key for Chart Prep persistence (per-visit)
   const chartPrepStorageKey = visitId ? `chart-prep-${visitId}` : null
 
+  // Track if we've already triggered pending AI processing for this visit
+  const hasTriggeredPendingProcessingRef = useRef<string | null>(null)
+
   // Restore Chart Prep from localStorage on mount/visitId change
+  // Also process any pending AI requests that were interrupted
   useEffect(() => {
     if (chartPrepStorageKey) {
       try {
@@ -94,16 +99,33 @@ const VoiceDrawer = forwardRef<VoiceDrawerRef, VoiceDrawerProps>(function VoiceD
           }
           if (data.chartPrepSections) {
             setChartPrepSections(data.chartPrepSections)
+            // Also notify parent so LeftSidebar shows the data
+            if (onChartPrepComplete && data.chartPrepSections) {
+              onChartPrepComplete(data.chartPrepSections)
+            }
           }
           if (data.insertedSections) {
             setInsertedSections(new Set(data.insertedSections))
+          }
+
+          // Check if there's pending AI processing that was interrupted
+          // Only process if we haven't already for this visit and there's no existing summary
+          if (data.pendingAIProcessing && !data.chartPrepSections && data.prepNotes?.length > 0) {
+            if (hasTriggeredPendingProcessingRef.current !== chartPrepStorageKey) {
+              hasTriggeredPendingProcessingRef.current = chartPrepStorageKey
+              console.log('[Chart Prep] Found pending AI processing, triggering now')
+              // Trigger AI processing after a short delay to let component mount
+              setTimeout(() => {
+                processPendingChartPrep(data.prepNotes)
+              }, 500)
+            }
           }
         }
       } catch (e) {
         console.warn('Failed to restore Chart Prep from localStorage:', e)
       }
     }
-  }, [chartPrepStorageKey])
+  }, [chartPrepStorageKey, onChartPrepComplete])
 
   // Save Chart Prep to localStorage when state changes
   useEffect(() => {
@@ -140,6 +162,8 @@ const VoiceDrawer = forwardRef<VoiceDrawerRef, VoiceDrawerProps>(function VoiceD
     pauseRecording: pausePrepRecording,
     resumeRecording: resumePrepRecording,
     stopRecording: stopPrepRecording,
+    stopRecordingAsync: stopPrepRecordingAsync,
+    captureAudioBlob: capturePrepAudioBlob,
     restartRecording: restartPrepRecording,
     clearTranscription: clearPrepTranscription,
   } = useVoiceRecorder()
@@ -192,25 +216,59 @@ const VoiceDrawer = forwardRef<VoiceDrawerRef, VoiceDrawerProps>(function VoiceD
   }, [loading, autoProcessing, chartPrepSections, isMinimized, onClose])
 
   // Auto-save function for context switch scenarios
-  // Stops recording if active, saves to localStorage, and triggers AI processing
-  const triggerAutoSave = () => {
-    // Stop any active recording
+  // Stops recording if active, waits for transcription, and saves to localStorage
+  // Returns a promise that resolves when the recording is fully saved
+  const triggerAutoSave = async (): Promise<void> => {
+    // If recording Chart Prep, stop and wait for transcription to complete
     if (isPrepRecording) {
-      stopPrepRecording()
-      // Note: transcription and AI processing will happen automatically via the existing effect
+      console.log('[Chart Prep] Auto-save triggered - stopping recording and waiting for transcription')
+
+      try {
+        // Use async stop which waits for transcription to complete
+        const result = await stopPrepRecordingAsync()
+
+        if (result.text && result.text.trim()) {
+          console.log('[Chart Prep] Transcription complete, adding note:', result.text.substring(0, 50) + '...')
+
+          // Add the transcribed text as a prep note
+          const autoCategory = detectCategory(result.text)
+          const newNote = {
+            text: result.text.trim(),
+            timestamp: new Date().toISOString(),
+            category: autoCategory,
+          }
+
+          // Update prepNotes - this will trigger localStorage save via the effect
+          const updatedNotes = [...prepNotes, newNote]
+          setPrepNotes(updatedNotes)
+
+          // Explicitly save to localStorage immediately (don't wait for effect)
+          if (chartPrepStorageKey) {
+            localStorage.setItem(chartPrepStorageKey, JSON.stringify({
+              prepNotes: updatedNotes,
+              chartPrepSections,
+              insertedSections: Array.from(insertedSections),
+              timestamp: Date.now(),
+              pendingAIProcessing: true, // Flag that AI processing is needed
+            }))
+            console.log('[Chart Prep] Saved to localStorage with pendingAIProcessing flag')
+          }
+        }
+      } catch (err) {
+        console.error('[Chart Prep] Error during auto-save:', err)
+      }
     }
+
+    // If recording Visit AI, stop it (callback will handle processing)
     if (isVisitRecording) {
       stopVisitRecording()
-      // Note: Visit AI processing will happen automatically via the callback
     }
-    // Data is already saved to localStorage via the effect above
-    // The auto-process effect will handle AI generation when transcription completes
   }
 
   // Expose auto-save function to parent via ref
   useImperativeHandle(ref, () => ({
     triggerAutoSave
-  }), [isPrepRecording, isVisitRecording, stopPrepRecording, stopVisitRecording])
+  }), [isPrepRecording, isVisitRecording, stopPrepRecordingAsync, stopVisitRecording, prepNotes, chartPrepSections, insertedSections, chartPrepStorageKey])
 
   // Format duration as MM:SS
   const formatDuration = (seconds: number) => {
@@ -301,6 +359,62 @@ const VoiceDrawer = forwardRef<VoiceDrawerRef, VoiceDrawerProps>(function VoiceD
     }
 
     setLoading(false)
+  }
+
+  // Process pending Chart Prep notes that were saved during a patient switch
+  // This is called when localStorage has prepNotes but no chartPrepSections
+  const processPendingChartPrep = async (notesToProcess: Array<{ text: string; timestamp: string; category: string }>) => {
+    console.log('[Chart Prep] Processing pending notes:', notesToProcess.length)
+    setLoading(true)
+    setAutoProcessing(true)
+    setChartPrepSections(null)
+    setInsertedSections(new Set())
+
+    try {
+      const userSettings = getUserSettings()
+      const response = await fetch('/api/ai/chart-prep', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          patient,
+          noteData,
+          prepNotes: notesToProcess,
+          userSettings,
+        }),
+      })
+
+      const data = await response.json()
+      if (data.sections) {
+        setChartPrepSections(data.sections)
+        setAiResponse('')
+        if (onChartPrepComplete) {
+          onChartPrepComplete(data.sections)
+        }
+
+        // Update localStorage to mark processing complete (remove pendingAIProcessing flag)
+        if (chartPrepStorageKey) {
+          localStorage.setItem(chartPrepStorageKey, JSON.stringify({
+            prepNotes: notesToProcess,
+            chartPrepSections: data.sections,
+            insertedSections: [],
+            timestamp: Date.now(),
+            // No pendingAIProcessing flag = processing complete
+          }))
+        }
+
+        console.log('[Chart Prep] Pending processing complete, sections:', Object.keys(data.sections))
+      } else {
+        setAiResponse(data.response || data.error || 'No response')
+        setChartPrepSections(null)
+      }
+    } catch (error) {
+      console.error('[Chart Prep] Error processing pending notes:', error)
+      setAiResponse('Error generating chart prep')
+      setChartPrepSections(null)
+    }
+
+    setLoading(false)
+    setAutoProcessing(false)
   }
 
   // Process Visit AI recording
