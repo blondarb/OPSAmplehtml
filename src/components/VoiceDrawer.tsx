@@ -1,7 +1,12 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useImperativeHandle, forwardRef } from 'react'
 import { useVoiceRecorder } from '@/hooks/useVoiceRecorder'
+
+// Expose auto-save function to parent
+export interface VoiceDrawerRef {
+  triggerAutoSave: () => void
+}
 
 interface VisitAIOutput {
   hpiFromVisit?: string
@@ -32,9 +37,15 @@ interface VoiceDrawerProps {
   chartPrepOutput?: any
   onChartPrepComplete?: (output: any) => void
   onVisitAIComplete?: (output: VisitAIOutput, transcript: string) => void
+  // New props for persistence and minimized mode
+  visitId?: string
+  isMinimized?: boolean
+  onMinimize?: () => void
+  onRecordingStateChange?: (isRecording: boolean, isPrepRecording: boolean, duration: number) => void
+  onProcessingStateChange?: (isProcessing: boolean) => void
 }
 
-export default function VoiceDrawer({
+const VoiceDrawer = forwardRef<VoiceDrawerRef, VoiceDrawerProps>(function VoiceDrawer({
   isOpen,
   onClose,
   activeTab,
@@ -47,7 +58,12 @@ export default function VoiceDrawer({
   chartPrepOutput,
   onChartPrepComplete,
   onVisitAIComplete,
-}: VoiceDrawerProps) {
+  visitId,
+  isMinimized,
+  onMinimize,
+  onRecordingStateChange,
+  onProcessingStateChange,
+}, ref) {
   const [aiResponse, setAiResponse] = useState('')
   const [chartPrepSections, setChartPrepSections] = useState<any>(null)
   const [loading, setLoading] = useState(false)
@@ -62,6 +78,48 @@ export default function VoiceDrawer({
   // Ref to always have latest noteData in async callbacks (prevents stale closure bugs)
   const noteDataRef = useRef(noteData)
   useEffect(() => { noteDataRef.current = noteData }, [noteData])
+
+  // localStorage key for Chart Prep persistence (per-visit)
+  const chartPrepStorageKey = visitId ? `chart-prep-${visitId}` : null
+
+  // Restore Chart Prep from localStorage on mount/visitId change
+  useEffect(() => {
+    if (chartPrepStorageKey) {
+      try {
+        const saved = localStorage.getItem(chartPrepStorageKey)
+        if (saved) {
+          const data = JSON.parse(saved)
+          if (data.prepNotes?.length > 0) {
+            setPrepNotes(data.prepNotes)
+          }
+          if (data.chartPrepSections) {
+            setChartPrepSections(data.chartPrepSections)
+          }
+          if (data.insertedSections) {
+            setInsertedSections(new Set(data.insertedSections))
+          }
+        }
+      } catch (e) {
+        console.warn('Failed to restore Chart Prep from localStorage:', e)
+      }
+    }
+  }, [chartPrepStorageKey])
+
+  // Save Chart Prep to localStorage when state changes
+  useEffect(() => {
+    if (chartPrepStorageKey && (prepNotes.length > 0 || chartPrepSections)) {
+      try {
+        localStorage.setItem(chartPrepStorageKey, JSON.stringify({
+          prepNotes,
+          chartPrepSections,
+          insertedSections: Array.from(insertedSections),
+          timestamp: Date.now()
+        }))
+      } catch (e) {
+        console.warn('Failed to save Chart Prep to localStorage:', e)
+      }
+    }
+  }, [chartPrepStorageKey, prepNotes, chartPrepSections, insertedSections])
 
   // Visit AI specific state
   const [visitAIOutput, setVisitAIOutput] = useState<VisitAIOutput | null>(null)
@@ -105,6 +163,41 @@ export default function VoiceDrawer({
     }
   })
 
+  // Notify parent of recording state changes for floating indicator
+  useEffect(() => {
+    if (onRecordingStateChange) {
+      onRecordingStateChange(isPrepRecording || isVisitRecording, isPrepRecording, isPrepRecording ? prepRecordingDuration : visitRecordingDuration)
+    }
+  }, [isPrepRecording, isVisitRecording, prepRecordingDuration, visitRecordingDuration, onRecordingStateChange])
+
+  // Notify parent of processing state changes
+  useEffect(() => {
+    if (onProcessingStateChange) {
+      onProcessingStateChange(loading || autoProcessing || visitAIProcessing)
+    }
+  }, [loading, autoProcessing, visitAIProcessing, onProcessingStateChange])
+
+  // Auto-save function for context switch scenarios
+  // Stops recording if active, saves to localStorage, and triggers AI processing
+  const triggerAutoSave = () => {
+    // Stop any active recording
+    if (isPrepRecording) {
+      stopPrepRecording()
+      // Note: transcription and AI processing will happen automatically via the existing effect
+    }
+    if (isVisitRecording) {
+      stopVisitRecording()
+      // Note: Visit AI processing will happen automatically via the callback
+    }
+    // Data is already saved to localStorage via the effect above
+    // The auto-process effect will handle AI generation when transcription completes
+  }
+
+  // Expose auto-save function to parent via ref
+  useImperativeHandle(ref, () => ({
+    triggerAutoSave
+  }), [isPrepRecording, isVisitRecording, stopPrepRecording, stopVisitRecording])
+
   // Format duration as MM:SS
   const formatDuration = (seconds: number) => {
     const mins = Math.floor(seconds / 60)
@@ -112,17 +205,9 @@ export default function VoiceDrawer({
     return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`
   }
 
-  // Reset Chart Prep state when the Chart Prep tab is activated
-  // This ensures a fresh session each time
+  // Track previous tab for reference (no longer resets state - we persist to localStorage now)
   const prevTabRef = useRef(activeTab)
   useEffect(() => {
-    if (activeTab === 'chart-prep' && prevTabRef.current !== 'chart-prep') {
-      setPrepNotes([])
-      setChartPrepSections(null)
-      setInsertedSections(new Set())
-      setAiResponse('')
-      hasAutoProcessedRef.current = false
-    }
     prevTabRef.current = activeTab
   }, [activeTab])
 
@@ -131,13 +216,21 @@ export default function VoiceDrawer({
     { id: 'document', label: 'Document' },
   ]
 
-  // Start a fresh Chart Prep recording session, clearing previous state
-  const startFreshPrepRecording = () => {
+  // Clear all Chart Prep state (including localStorage)
+  const clearChartPrepState = () => {
     setPrepNotes([])
     setChartPrepSections(null)
     setInsertedSections(new Set())
     setAiResponse('')
     hasAutoProcessedRef.current = false
+    if (chartPrepStorageKey) {
+      localStorage.removeItem(chartPrepStorageKey)
+    }
+  }
+
+  // Start a fresh Chart Prep recording session, clearing previous state
+  const startFreshPrepRecording = () => {
+    clearChartPrepState()
     startPrepRecording()
   }
 
@@ -522,11 +615,138 @@ export default function VoiceDrawer({
 
   if (!isOpen) return null
 
+  // Minimized drawer mode - shows compact recording bar
+  if (isMinimized && (isPrepRecording || isVisitRecording)) {
+    const currentDuration = isPrepRecording ? prepRecordingDuration : visitRecordingDuration
+    const currentPaused = isPrepRecording ? isPrepPaused : isVisitPaused
+    const handlePause = isPrepRecording ? pausePrepRecording : pauseVisitRecording
+    const handleResume = isPrepRecording ? resumePrepRecording : resumeVisitRecording
+    const handleStop = isPrepRecording ? stopPrepRecording : stopVisitRecording
+
+    return (
+      <div style={{
+        position: 'fixed',
+        bottom: '20px',
+        right: '20px',
+        background: 'linear-gradient(135deg, #EF4444 0%, #F87171 100%)',
+        borderRadius: '12px',
+        padding: '12px 16px',
+        boxShadow: '0 4px 20px rgba(239, 68, 68, 0.4)',
+        zIndex: 1001,
+        display: 'flex',
+        alignItems: 'center',
+        gap: '12px',
+        animation: 'slideUp 0.3s ease',
+      }}>
+        {/* Recording indicator */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <span style={{
+            width: '10px',
+            height: '10px',
+            borderRadius: '50%',
+            background: 'white',
+            animation: currentPaused ? 'none' : 'pulse 1s infinite',
+            opacity: currentPaused ? 0.5 : 1,
+          }} />
+          <span style={{ color: 'white', fontWeight: 600, fontFamily: 'monospace', fontSize: '14px' }}>
+            {formatDuration(currentDuration)}
+          </span>
+        </div>
+
+        {/* Pause/Resume button */}
+        <button
+          onClick={currentPaused ? handleResume : handlePause}
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            width: '32px',
+            height: '32px',
+            borderRadius: '6px',
+            border: 'none',
+            background: 'rgba(255,255,255,0.2)',
+            color: 'white',
+            cursor: 'pointer',
+          }}
+          title={currentPaused ? 'Resume' : 'Pause'}
+        >
+          {currentPaused ? (
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+              <polygon points="5 3 19 12 5 21 5 3"/>
+            </svg>
+          ) : (
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+              <rect x="6" y="4" width="4" height="16"/>
+              <rect x="14" y="4" width="4" height="16"/>
+            </svg>
+          )}
+        </button>
+
+        {/* Stop button */}
+        <button
+          onClick={handleStop}
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: '6px',
+            padding: '8px 12px',
+            borderRadius: '6px',
+            border: 'none',
+            background: 'white',
+            color: '#EF4444',
+            cursor: 'pointer',
+            fontSize: '12px',
+            fontWeight: 600,
+          }}
+        >
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
+            <rect x="4" y="4" width="16" height="16" rx="2"/>
+          </svg>
+          Done
+        </button>
+
+        {/* Expand button */}
+        <button
+          onClick={onClose} // onClose expands back to full drawer
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            width: '32px',
+            height: '32px',
+            borderRadius: '6px',
+            border: 'none',
+            background: 'rgba(255,255,255,0.2)',
+            color: 'white',
+            cursor: 'pointer',
+          }}
+          title="Expand"
+        >
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/>
+          </svg>
+        </button>
+
+        <style jsx>{`
+          @keyframes slideUp {
+            from { transform: translateY(100px); opacity: 0; }
+            to { transform: translateY(0); opacity: 1; }
+          }
+          @keyframes pulse {
+            0%, 100% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.8; transform: scale(1.1); }
+          }
+        `}</style>
+      </div>
+    )
+  }
+
   return (
     <>
       {/* Overlay */}
       <div
-        onClick={onClose}
+        onClick={onMinimize && (isPrepRecording || isVisitRecording) ? onMinimize : onClose}
         style={{
           position: 'fixed',
           top: 0,
@@ -571,20 +791,41 @@ export default function VoiceDrawer({
             </svg>
             <span style={{ fontWeight: 600 }}>Voice & Dictation</span>
           </div>
-          <button
-            onClick={onClose}
-            style={{
-              background: 'transparent',
-              border: 'none',
-              color: 'white',
-              cursor: 'pointer',
-              padding: '4px',
-            }}
-          >
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <path d="M18 6L6 18M6 6l12 12"/>
-            </svg>
-          </button>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            {/* Minimize button (when recording) */}
+            {(isPrepRecording || isVisitRecording) && onMinimize && (
+              <button
+                onClick={onMinimize}
+                style={{
+                  background: 'rgba(255,255,255,0.2)',
+                  border: 'none',
+                  color: 'white',
+                  cursor: 'pointer',
+                  padding: '4px',
+                  borderRadius: '4px',
+                }}
+                title="Minimize (continue recording)"
+              >
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M4 14h16"/>
+                </svg>
+              </button>
+            )}
+            <button
+              onClick={onClose}
+              style={{
+                background: 'transparent',
+                border: 'none',
+                color: 'white',
+                cursor: 'pointer',
+                padding: '4px',
+              }}
+            >
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M18 6L6 18M6 6l12 12"/>
+              </svg>
+            </button>
+          </div>
         </div>
 
         {/* Tabs */}
@@ -1562,4 +1803,6 @@ export default function VoiceDrawer({
       `}</style>
     </>
   )
-}
+})
+
+export default VoiceDrawer

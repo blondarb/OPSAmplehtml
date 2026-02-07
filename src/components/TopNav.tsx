@@ -13,6 +13,11 @@ interface TopNavProps {
   onToggleSidebar?: () => void
   isSidebarOpen?: boolean
   onResetDemo?: () => void
+  // Chart Prep recording indicator
+  isChartPrepRecording?: boolean
+  chartPrepDuration?: number
+  isChartPrepProcessing?: boolean
+  onOpenVoiceDrawer?: () => void
 }
 
 // Sample notifications data
@@ -33,7 +38,7 @@ const BILLING_CODES = [
   { code: '99215', label: '99215 - Office Visit (45+ min)', color: '#EF4444' },
 ]
 
-export default function TopNav({ user, onSignOut, openAiDrawer, onOpenSettings, onOpenIdeas, onToggleSidebar, isSidebarOpen, onResetDemo }: TopNavProps) {
+export default function TopNav({ user, onSignOut, openAiDrawer, onOpenSettings, onOpenIdeas, onToggleSidebar, isSidebarOpen, onResetDemo, isChartPrepRecording, chartPrepDuration, isChartPrepProcessing, onOpenVoiceDrawer }: TopNavProps) {
   const [aiMenuOpen, setAiMenuOpen] = useState(false)
   const [userMenuOpen, setUserMenuOpen] = useState(false)
   const [activeQueue, setActiveQueue] = useState('outpatient')
@@ -270,6 +275,55 @@ export default function TopNav({ user, onSignOut, openAiDrawer, onOpenSettings, 
 
         {/* Right Section */}
         <div className="nav-right" style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+          {/* Chart Prep Recording Indicator */}
+          {(isChartPrepRecording || isChartPrepProcessing) && (
+            <button
+              onClick={onOpenVoiceDrawer}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                padding: '6px 12px',
+                borderRadius: '8px',
+                border: 'none',
+                background: isChartPrepProcessing
+                  ? 'linear-gradient(135deg, #0D9488 0%, #14B8A6 100%)'
+                  : 'linear-gradient(135deg, #EF4444 0%, #F87171 100%)',
+                color: 'white',
+                cursor: 'pointer',
+                fontSize: '12px',
+                fontWeight: 600,
+                animation: 'pulse-glow 2s infinite',
+              }}
+              title={isChartPrepProcessing ? 'Chart Prep processing...' : 'Chart Prep recording - click to view'}
+            >
+              {isChartPrepProcessing ? (
+                <>
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ animation: 'spin 1s linear infinite' }}>
+                    <circle cx="12" cy="12" r="10" strokeDasharray="32" strokeDashoffset="12" />
+                  </svg>
+                  Processing...
+                </>
+              ) : (
+                <>
+                  <span style={{
+                    width: '8px',
+                    height: '8px',
+                    borderRadius: '50%',
+                    background: 'white',
+                    animation: 'pulse 1s infinite',
+                  }} />
+                  {chartPrepDuration !== undefined && (
+                    <span style={{ fontFamily: 'monospace' }}>
+                      {Math.floor(chartPrepDuration / 60).toString().padStart(2, '0')}:{(chartPrepDuration % 60).toString().padStart(2, '0')}
+                    </span>
+                  )}
+                  Chart Prep
+                </>
+              )}
+            </button>
+          )}
+
           {/* Timer with MD2 badge - NOW WITH DROPDOWN */}
           <div style={{ position: 'relative' }}>
             <button
@@ -914,6 +968,22 @@ export default function TopNav({ user, onSignOut, openAiDrawer, onOpenSettings, 
       </nav>
 
       {/* Lock Screen Modal */}
+      {/* Chart Prep Recording Indicator Styles */}
+      <style jsx>{`
+        @keyframes pulse {
+          0%, 100% { opacity: 1; transform: scale(1); }
+          50% { opacity: 0.8; transform: scale(1.1); }
+        }
+        @keyframes pulse-glow {
+          0%, 100% { box-shadow: 0 2px 8px rgba(239, 68, 68, 0.3); }
+          50% { box-shadow: 0 2px 16px rgba(239, 68, 68, 0.5); }
+        }
+        @keyframes spin {
+          from { transform: rotate(0deg); }
+          to { transform: rotate(360deg); }
+        }
+      `}</style>
+
       {lockScreenOpen && (
         <div style={{
           position: 'fixed',

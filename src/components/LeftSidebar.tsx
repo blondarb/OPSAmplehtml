@@ -4,6 +4,15 @@ import { useState, useEffect } from 'react'
 import HistorianSessionPanel from './HistorianSessionPanel'
 import type { PatientMedication, PatientAllergy } from '@/lib/medicationTypes'
 
+interface ChartPrepOutput {
+  summary?: string
+  alerts?: string
+  visitPurpose?: string
+  suggestedHPI?: string
+  suggestedAssessment?: string
+  suggestedPlan?: string
+}
+
 interface LeftSidebarProps {
   patient: any
   priorVisits: any[]
@@ -15,9 +24,13 @@ interface LeftSidebarProps {
   onClose?: () => void
   medications?: PatientMedication[]
   allergies?: PatientAllergy[]
+  // Chart Prep viewer
+  chartPrepOutput?: ChartPrepOutput | null
+  isChartPrepProcessing?: boolean
+  onOpenVoiceDrawer?: () => void
 }
 
-export default function LeftSidebar({ patient, priorVisits, scoreHistory, patientMessages = [], historianSessions = [], onImportHistorian, isOpen = true, onClose, medications = [], allergies = [] }: LeftSidebarProps) {
+export default function LeftSidebar({ patient, priorVisits, scoreHistory, patientMessages = [], historianSessions = [], onImportHistorian, isOpen = true, onClose, medications = [], allergies = [], chartPrepOutput, isChartPrepProcessing, onOpenVoiceDrawer }: LeftSidebarProps) {
   const [expandedVisit, setExpandedVisit] = useState<string | null>(priorVisits[0]?.id || null)
   const [aiSummaryEnabled, setAiSummaryEnabled] = useState(true)
   const [scoreHistoryOpen, setScoreHistoryOpen] = useState(true)
@@ -196,6 +209,120 @@ export default function LeftSidebar({ patient, priorVisits, scoreHistory, patien
         <span style={{ color: 'var(--text-muted)' }}> | </span>
         <a href="#" style={{ color: 'var(--primary)', textDecoration: 'none' }}>Epic</a>
       </div>
+
+      {/* Chart Prep Summary Panel */}
+      {(chartPrepOutput || isChartPrepProcessing) && (
+        <div style={{ padding: '12px 16px', borderBottom: '1px solid var(--border)' }}>
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
+            marginBottom: '10px',
+          }}>
+            <div style={{
+              width: '24px',
+              height: '24px',
+              borderRadius: '50%',
+              background: isChartPrepProcessing
+                ? 'linear-gradient(135deg, #0D9488 0%, #14B8A6 100%)'
+                : 'linear-gradient(135deg, #EF4444 0%, #F87171 100%)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}>
+              {isChartPrepProcessing ? (
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" style={{ animation: 'spin 1s linear infinite' }}>
+                  <circle cx="12" cy="12" r="10" strokeDasharray="32" strokeDashoffset="12" />
+                </svg>
+              ) : (
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2">
+                  <path d="M12 1a3 3 0 00-3 3v8a3 3 0 006 0V4a3 3 0 00-3-3z"/>
+                </svg>
+              )}
+            </div>
+            <h4 style={{
+              fontSize: '13px',
+              fontWeight: 600,
+              color: 'var(--text-primary)',
+              margin: 0,
+              flex: 1,
+            }}>
+              Chart Prep Notes
+            </h4>
+            {onOpenVoiceDrawer && (
+              <button
+                onClick={onOpenVoiceDrawer}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  cursor: 'pointer',
+                  color: 'var(--primary)',
+                  fontSize: '12px',
+                  padding: 0,
+                }}
+              >
+                View
+              </button>
+            )}
+          </div>
+
+          {isChartPrepProcessing ? (
+            <div style={{
+              padding: '12px',
+              background: 'linear-gradient(135deg, #F0FDFA 0%, #CCFBF1 100%)',
+              borderRadius: '6px',
+              border: '1px solid #5EEAD4',
+            }}>
+              <p style={{ fontSize: '12px', color: '#0D9488', margin: 0 }}>
+                Processing your chart review notes...
+              </p>
+            </div>
+          ) : chartPrepOutput && (
+            <>
+              {/* Alerts */}
+              {chartPrepOutput.alerts && (
+                <div style={{
+                  padding: '8px 10px',
+                  background: 'linear-gradient(135deg, #FEE2E2 0%, #FECACA 100%)',
+                  borderRadius: '6px',
+                  marginBottom: '8px',
+                  border: '1px solid #EF4444',
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'flex-start', gap: '6px' }}>
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#991B1B" strokeWidth="2" style={{ flexShrink: 0, marginTop: '1px' }}>
+                      <path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/>
+                      <line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>
+                    </svg>
+                    <p style={{ fontSize: '11px', color: '#991B1B', margin: 0, lineHeight: 1.4 }}>
+                      {chartPrepOutput.alerts.length > 150 ? chartPrepOutput.alerts.slice(0, 150) + '...' : chartPrepOutput.alerts}
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              {/* Summary */}
+              {(chartPrepOutput.summary || chartPrepOutput.visitPurpose) && (
+                <div style={{
+                  padding: '8px 10px',
+                  background: 'var(--bg-gray)',
+                  borderRadius: '6px',
+                  borderLeft: '3px solid var(--primary)',
+                }}>
+                  <p style={{
+                    fontSize: '12px',
+                    color: 'var(--text-secondary)',
+                    margin: 0,
+                    lineHeight: 1.5,
+                  }}>
+                    {(chartPrepOutput.summary || chartPrepOutput.visitPurpose || '').slice(0, 200)}
+                    {(chartPrepOutput.summary || chartPrepOutput.visitPurpose || '').length > 200 && '...'}
+                  </p>
+                </div>
+              )}
+            </>
+          )}
+        </div>
+      )}
 
       {/* Medications & Allergies Summary */}
       <div style={{ padding: '12px 16px', borderBottom: '1px solid var(--border)' }}>

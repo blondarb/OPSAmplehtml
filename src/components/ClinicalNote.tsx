@@ -7,7 +7,7 @@ import TopNav from './TopNav'
 import LeftSidebar from './LeftSidebar'
 import CenterPanel from './CenterPanel'
 import AiDrawer from './AiDrawer'
-import VoiceDrawer from './VoiceDrawer'
+import VoiceDrawer, { type VoiceDrawerRef } from './VoiceDrawer'
 import DotPhrasesDrawer from './DotPhrasesDrawer'
 import EnhancedNotePreviewModal from './EnhancedNotePreviewModal'
 import SettingsDrawer from './SettingsDrawer'
@@ -202,6 +202,10 @@ export default function ClinicalNote({
   const [aiDrawerTab, setAiDrawerTab] = useState('ask-ai')
   const [voiceDrawerOpen, setVoiceDrawerOpen] = useState(false)
   const [voiceDrawerTab, setVoiceDrawerTab] = useState('chart-prep')
+  const [voiceDrawerMinimized, setVoiceDrawerMinimized] = useState(false)
+  const [chartPrepRecording, setChartPrepRecording] = useState(false)
+  const [chartPrepRecordingDuration, setChartPrepRecordingDuration] = useState(0)
+  const [chartPrepProcessing, setChartPrepProcessing] = useState(false)
   const [dotPhrasesOpen, setDotPhrasesOpen] = useState(false)
   const [notePreviewOpen, setNotePreviewOpen] = useState(false)
   const [settingsOpen, setSettingsOpen] = useState(false)
@@ -231,6 +235,9 @@ export default function ClinicalNote({
 
   // Track patient switching to prevent autosave race conditions
   const isSwitchingPatientRef = useRef(false)
+
+  // Ref to VoiceDrawer for triggering auto-save on context switch
+  const voiceDrawerRef = useRef<VoiceDrawerRef>(null)
 
   // Generate a unique key for this visit's autosave data
   // CRITICAL: Include patient ID to prevent cross-patient data contamination
@@ -832,6 +839,12 @@ export default function ClinicalNote({
 
   // CRITICAL: Clear ALL clinical state to prevent cross-patient data contamination
   const resetAllClinicalState = useCallback(() => {
+    // Auto-save any active Chart Prep recording before switching
+    // This ensures recording is stopped and saved for the current patient
+    if (voiceDrawerRef.current) {
+      voiceDrawerRef.current.triggerAutoSave()
+    }
+
     // Cancel any pending autosave FIRST
     if (autosaveTimeoutRef.current) {
       clearTimeout(autosaveTimeoutRef.current)
@@ -946,7 +959,46 @@ export default function ClinicalNote({
   const openVoiceDrawer = (tab: string) => {
     setVoiceDrawerTab(tab)
     setVoiceDrawerOpen(true)
+    setVoiceDrawerMinimized(false) // Always expand when opening
   }
+
+  // Handle minimizing the voice drawer (recording continues)
+  const handleVoiceDrawerMinimize = useCallback(() => {
+    setVoiceDrawerMinimized(true)
+    // Keep voiceDrawerOpen true so the minimized bar shows
+  }, [])
+
+  // Handle closing the voice drawer (stops recording if active)
+  const handleVoiceDrawerClose = useCallback(() => {
+    setVoiceDrawerOpen(false)
+    setVoiceDrawerMinimized(false)
+  }, [])
+
+  // Track recording state from VoiceDrawer
+  const handleRecordingStateChange = useCallback((isRecording: boolean, isPrepRecording: boolean, duration: number) => {
+    setChartPrepRecording(isRecording)
+    setChartPrepRecordingDuration(duration)
+  }, [])
+
+  // Track processing state from VoiceDrawer
+  const handleProcessingStateChange = useCallback((isProcessing: boolean) => {
+    setChartPrepProcessing(isProcessing)
+  }, [])
+
+  // Auto-save Chart Prep on browser tab close / navigation away
+  useEffect(() => {
+    const handleBeforeUnload = () => {
+      // Trigger auto-save if recording is active
+      if (voiceDrawerRef.current && chartPrepRecording) {
+        voiceDrawerRef.current.triggerAutoSave()
+      }
+    }
+
+    window.addEventListener('beforeunload', handleBeforeUnload)
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload)
+    }
+  }, [chartPrepRecording])
 
   const updateNote = (field: string, value: any) => {
     setNoteData(prev => ({ ...prev, [field]: value }))
@@ -1352,6 +1404,10 @@ export default function ClinicalNote({
         onToggleSidebar={() => setMobileSidebarOpen(!mobileSidebarOpen)}
         isSidebarOpen={mobileSidebarOpen}
         onResetDemo={handleResetDemo}
+        isChartPrepRecording={chartPrepRecording && !voiceDrawerOpen}
+        chartPrepDuration={chartPrepRecordingDuration}
+        isChartPrepProcessing={chartPrepProcessing && !voiceDrawerOpen}
+        onOpenVoiceDrawer={() => { setVoiceDrawerOpen(true); setVoiceDrawerMinimized(false); }}
       />
 
       <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
@@ -1405,6 +1461,9 @@ export default function ClinicalNote({
               onClose={() => setMobileSidebarOpen(false)}
               medications={medications}
               allergies={allergies}
+              chartPrepOutput={chartPrepOutput}
+              isChartPrepProcessing={chartPrepProcessing}
+              onOpenVoiceDrawer={() => { setVoiceDrawerOpen(true); setVoiceDrawerMinimized(false); }}
             />
 
             <CenterPanel
@@ -1464,7 +1523,7 @@ export default function ClinicalNote({
       {voiceDrawerOpen && (
         <VoiceDrawer
           isOpen={voiceDrawerOpen}
-          onClose={() => setVoiceDrawerOpen(false)}
+          onClose={handleVoiceDrawerClose}
           activeTab={voiceDrawerTab}
           setActiveTab={setVoiceDrawerTab}
           patient={patient}
@@ -1473,6 +1532,12 @@ export default function ClinicalNote({
           chartPrepOutput={chartPrepOutput}
           onChartPrepComplete={handleChartPrepComplete}
           onVisitAIComplete={handleVisitAIComplete}
+          visitId={currentVisit?.id}
+          isMinimized={voiceDrawerMinimized}
+          onMinimize={handleVoiceDrawerMinimize}
+          onRecordingStateChange={handleRecordingStateChange}
+          onProcessingStateChange={handleProcessingStateChange}
+          ref={voiceDrawerRef}
         />
       )}
 
