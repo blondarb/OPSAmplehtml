@@ -40,11 +40,12 @@ interface ClinicalNoteProps {
 }
 
 // Icon sidebar navigation
-function IconSidebar({ activeIcon, setActiveIcon, viewMode, onViewModeChange, onOpenSettings }: {
+function IconSidebar({ activeIcon, setActiveIcon, viewMode, onHomeClick, onViewModeChange, onOpenSettings }: {
   activeIcon: string,
   setActiveIcon: (icon: string) => void,
   viewMode: 'appointments' | 'chart',
-  onViewModeChange: (mode: 'appointments' | 'chart') => void,
+  onHomeClick: () => void, // Handler for home button - should trigger auto-save
+  onViewModeChange: (mode: 'appointments' | 'chart') => void, // For notes icon
   onOpenSettings: () => void
 }) {
   const icons = [
@@ -116,9 +117,9 @@ function IconSidebar({ activeIcon, setActiveIcon, viewMode, onViewModeChange, on
 
   const handleIconClick = (iconId: string) => {
     setActiveIcon(iconId)
-    // Home icon always shows appointments list
+    // Home icon triggers the full back-to-appointments flow (includes auto-save)
     if (iconId === 'home') {
-      onViewModeChange('appointments')
+      onHomeClick()
     }
     // Notes icon shows current chart (if a patient is selected)
     if (iconId === 'notes') {
@@ -1435,6 +1436,7 @@ export default function ClinicalNote({
           activeIcon={activeIcon}
           setActiveIcon={setActiveIcon}
           viewMode={viewMode}
+          onHomeClick={handleBackToAppointments}
           onViewModeChange={setViewMode}
           onOpenSettings={() => setSettingsOpen(true)}
         />
