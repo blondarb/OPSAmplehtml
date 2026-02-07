@@ -834,6 +834,22 @@ export default function ClinicalNote({
 
         // Mark autosave as loaded - we've handled it manually
         setAutosaveLoaded(true)
+
+        // Restore Chart Prep output from localStorage if available
+        // This ensures LeftSidebar shows Chart Prep summary when returning to a patient
+        const chartPrepKey = `chart-prep-${visit.id}`
+        try {
+          const savedChartPrep = localStorage.getItem(chartPrepKey)
+          if (savedChartPrep) {
+            const chartPrepData = JSON.parse(savedChartPrep)
+            if (chartPrepData.chartPrepSections) {
+              console.log('[ClinicalNote] Restoring Chart Prep output from localStorage for visit:', visit.id)
+              setChartPrepOutput(chartPrepData.chartPrepSections)
+            }
+          }
+        } catch (e) {
+          console.error('Failed to restore Chart Prep from localStorage:', e)
+        }
       }
 
       setViewMode('chart')
