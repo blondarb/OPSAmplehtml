@@ -177,6 +177,20 @@ const VoiceDrawer = forwardRef<VoiceDrawerRef, VoiceDrawerProps>(function VoiceD
     }
   }, [loading, autoProcessing, visitAIProcessing, onProcessingStateChange])
 
+  // Track previous processing state to detect when processing completes
+  const wasProcessingRef = useRef(false)
+  useEffect(() => {
+    const isProcessing = loading || autoProcessing
+    // If we were processing and now we're done, and we have results, auto-expand
+    if (wasProcessingRef.current && !isProcessing && chartPrepSections && isMinimized) {
+      // Processing just completed - trigger expand via onClose (which expands the drawer)
+      if (onClose) {
+        onClose()
+      }
+    }
+    wasProcessingRef.current = isProcessing
+  }, [loading, autoProcessing, chartPrepSections, isMinimized, onClose])
+
   // Auto-save function for context switch scenarios
   // Stops recording if active, saves to localStorage, and triggers AI processing
   const triggerAutoSave = () => {
@@ -615,96 +629,129 @@ const VoiceDrawer = forwardRef<VoiceDrawerRef, VoiceDrawerProps>(function VoiceD
 
   if (!isOpen) return null
 
-  // Minimized drawer mode - shows compact recording bar
-  if (isMinimized && (isPrepRecording || isVisitRecording)) {
+  // Minimized drawer mode - shows compact recording bar OR processing indicator
+  // Stay in minimized mode if:
+  // 1. Recording is active, OR
+  // 2. Transcribing (after stop), OR
+  // 3. Auto-processing AI summary
+  const showMinimizedBar = isMinimized && (isPrepRecording || isVisitRecording || isPrepTranscribing || autoProcessing || loading)
+
+  if (showMinimizedBar) {
+    const isRecordingActive = isPrepRecording || isVisitRecording
+    const isProcessingPhase = isPrepTranscribing || autoProcessing || loading
     const currentDuration = isPrepRecording ? prepRecordingDuration : visitRecordingDuration
     const currentPaused = isPrepRecording ? isPrepPaused : isVisitPaused
     const handlePause = isPrepRecording ? pausePrepRecording : pauseVisitRecording
     const handleResume = isPrepRecording ? resumePrepRecording : resumeVisitRecording
     const handleStop = isPrepRecording ? stopPrepRecording : stopVisitRecording
 
+    // Determine what state to show
+    const statusText = isPrepTranscribing
+      ? 'Transcribing...'
+      : (autoProcessing || loading)
+        ? 'Processing...'
+        : formatDuration(currentDuration)
+
     return (
       <div style={{
         position: 'fixed',
         bottom: '20px',
         right: '20px',
-        background: 'linear-gradient(135deg, #EF4444 0%, #F87171 100%)',
+        background: isProcessingPhase
+          ? 'linear-gradient(135deg, #0D9488 0%, #14B8A6 100%)' // Teal for processing
+          : 'linear-gradient(135deg, #EF4444 0%, #F87171 100%)', // Red for recording
         borderRadius: '12px',
         padding: '12px 16px',
-        boxShadow: '0 4px 20px rgba(239, 68, 68, 0.4)',
+        boxShadow: isProcessingPhase
+          ? '0 4px 20px rgba(13, 148, 136, 0.4)'
+          : '0 4px 20px rgba(239, 68, 68, 0.4)',
         zIndex: 1001,
         display: 'flex',
         alignItems: 'center',
         gap: '12px',
         animation: 'slideUp 0.3s ease',
       }}>
-        {/* Recording indicator */}
+        {/* Status indicator */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <span style={{
-            width: '10px',
-            height: '10px',
-            borderRadius: '50%',
-            background: 'white',
-            animation: currentPaused ? 'none' : 'pulse 1s infinite',
-            opacity: currentPaused ? 0.5 : 1,
-          }} />
+          {isProcessingPhase ? (
+            // Spinner for processing
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" style={{ animation: 'spin 1s linear infinite' }}>
+              <circle cx="12" cy="12" r="10" strokeOpacity="0.3" />
+              <path d="M12 2a10 10 0 0 1 10 10" />
+            </svg>
+          ) : (
+            // Pulse dot for recording
+            <span style={{
+              width: '10px',
+              height: '10px',
+              borderRadius: '50%',
+              background: 'white',
+              animation: currentPaused ? 'none' : 'pulse 1s infinite',
+              opacity: currentPaused ? 0.5 : 1,
+            }} />
+          )}
           <span style={{ color: 'white', fontWeight: 600, fontFamily: 'monospace', fontSize: '14px' }}>
-            {formatDuration(currentDuration)}
+            {statusText}
           </span>
         </div>
 
-        {/* Pause/Resume button */}
-        <button
-          onClick={currentPaused ? handleResume : handlePause}
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            width: '32px',
-            height: '32px',
-            borderRadius: '6px',
-            border: 'none',
-            background: 'rgba(255,255,255,0.2)',
-            color: 'white',
-            cursor: 'pointer',
-          }}
-          title={currentPaused ? 'Resume' : 'Pause'}
-        >
-          {currentPaused ? (
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
-              <polygon points="5 3 19 12 5 21 5 3"/>
-            </svg>
-          ) : (
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
-              <rect x="6" y="4" width="4" height="16"/>
-              <rect x="14" y="4" width="4" height="16"/>
-            </svg>
-          )}
-        </button>
+        {/* Only show recording controls if actually recording */}
+        {isRecordingActive && (
+          <>
+            {/* Pause/Resume button */}
+            <button
+              onClick={currentPaused ? handleResume : handlePause}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                width: '32px',
+                height: '32px',
+                borderRadius: '6px',
+                border: 'none',
+                background: 'rgba(255,255,255,0.2)',
+                color: 'white',
+                cursor: 'pointer',
+              }}
+              title={currentPaused ? 'Resume' : 'Pause'}
+            >
+              {currentPaused ? (
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+                  <polygon points="5 3 19 12 5 21 5 3"/>
+                </svg>
+              ) : (
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+                  <rect x="6" y="4" width="4" height="16"/>
+                  <rect x="14" y="4" width="4" height="16"/>
+                </svg>
+              )}
+            </button>
 
-        {/* Stop button */}
-        <button
-          onClick={handleStop}
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            gap: '6px',
-            padding: '8px 12px',
-            borderRadius: '6px',
-            border: 'none',
-            background: 'white',
-            color: '#EF4444',
-            cursor: 'pointer',
-            fontSize: '12px',
-            fontWeight: 600,
-          }}
-        >
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
-            <rect x="4" y="4" width="16" height="16" rx="2"/>
-          </svg>
-          Done
-        </button>
+            {/* Stop button */}
+            <button
+              onClick={handleStop}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '6px',
+                padding: '8px 12px',
+                borderRadius: '6px',
+                border: 'none',
+                background: 'white',
+                color: '#EF4444',
+                cursor: 'pointer',
+                fontSize: '12px',
+                fontWeight: 600,
+              }}
+            >
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
+                <rect x="4" y="4" width="16" height="16" rx="2"/>
+              </svg>
+              Done
+            </button>
+          </>
+        )}
 
         {/* Expand button */}
         <button
@@ -736,6 +783,10 @@ const VoiceDrawer = forwardRef<VoiceDrawerRef, VoiceDrawerProps>(function VoiceD
           @keyframes pulse {
             0%, 100% { opacity: 1; transform: scale(1); }
             50% { opacity: 0.8; transform: scale(1.1); }
+          }
+          @keyframes spin {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
           }
         `}</style>
       </div>
