@@ -1,0 +1,13 @@
+{
+  "fixture": "field-assessment.m4a",
+  "expectedText": "Benign paroxysmal positional vertigo, right posterior canal. Classic history and positive Dix-Hallpike on the right.",
+  "allowedVariations": [
+    "Benign paroxysmal positional vertigo right posterior canal.",
+    "BPPV, right posterior canal. Classic history and positive Dix-Hallpike on the right."
+  ],
+  "audioFormat": "m4a",
+  "duration_seconds": 8,
+  "testCases": ["FD1", "FD4", "FA1"],
+  "targetField": "assessment",
+  "notes": "Assessment dictation with medical terminology (BPPV, Dix-Hallpike)"
+}

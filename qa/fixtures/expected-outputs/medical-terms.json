@@ -1,0 +1,20 @@
+{
+  "fixture": "medical-terms.m4a",
+  "expectedText": "Patient has a history of paroxysmal atrial fibrillation on apixaban, hyperlipidemia on atorvastatin, and benign prostatic hyperplasia on tamsulosin.",
+  "requiredTerms": [
+    "paroxysmal atrial fibrillation",
+    "apixaban",
+    "hyperlipidemia",
+    "atorvastatin",
+    "benign prostatic hyperplasia",
+    "tamsulosin"
+  ],
+  "allowedVariations": [
+    "Patient has a history of paroxysmal atrial fibrillation on Eliquis",
+    "History of paroxysmal AFib on apixaban"
+  ],
+  "audioFormat": "m4a",
+  "duration_seconds": 10,
+  "testCases": ["FD1", "VA4"],
+  "notes": "Tests medical terminology accuracy - complex condition and medication names"
+}

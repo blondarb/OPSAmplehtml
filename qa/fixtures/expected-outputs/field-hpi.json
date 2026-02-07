@@ -1,0 +1,13 @@
+{
+  "fixture": "field-hpi.m4a",
+  "expectedText": "Patient is a 45-year-old male presenting with intermittent dizziness for the past 2 weeks. Episodes last 30 seconds to 1 minute. Triggered by head movements. No hearing loss or tinnitus.",
+  "allowedVariations": [
+    "Patient is a 45 year old male presenting with intermittent dizziness for the past two weeks.",
+    "45-year-old male with intermittent dizziness for 2 weeks."
+  ],
+  "audioFormat": "m4a",
+  "duration_seconds": 12,
+  "testCases": ["FD1", "FD2", "FD4"],
+  "targetField": "hpi",
+  "notes": "Standard HPI dictation for BPPV patient"
+}

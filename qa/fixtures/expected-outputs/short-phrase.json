@@ -1,0 +1,12 @@
+{
+  "fixture": "short-phrase.m4a",
+  "expectedText": "Headache.",
+  "allowedVariations": [
+    "Headache",
+    "headache"
+  ],
+  "audioFormat": "m4a",
+  "duration_seconds": 1,
+  "testCases": ["FD1"],
+  "notes": "Edge case - very short audio. May produce warning about short recording."
+}

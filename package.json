@@ -7,7 +7,9 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "sync-plans": "npx ts-node --project tsconfig.scripts.json scripts/sync-plans.ts"
+    "sync-plans": "npx ts-node --project tsconfig.scripts.json scripts/sync-plans.ts",
+    "test:audio": "npx ts-node --project tsconfig.scripts.json scripts/test-audio-fixtures.ts",
+    "qa:generate-audio": "cd qa/fixtures/audio && echo 'Use macOS say command to generate audio fixtures'"
   },
   "dependencies": {
     "@supabase/ssr": "^0.8.0",

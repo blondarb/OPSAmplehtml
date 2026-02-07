@@ -1,0 +1,13 @@
+{
+  "fixture": "field-plan.m4a",
+  "expectedText": "Perform Epley maneuver today. Provide vestibular exercises handout. Follow up in 2 weeks if symptoms persist. Consider audiology referral if no improvement.",
+  "allowedVariations": [
+    "Perform Epley maneuver today. Provide vestibular exercises handout. Follow up in two weeks if symptoms persist.",
+    "Epley maneuver today. Vestibular exercises handout. Follow up in 2 weeks. Audiology referral if no improvement."
+  ],
+  "audioFormat": "m4a",
+  "duration_seconds": 10,
+  "testCases": ["FD1", "FD4", "FA3"],
+  "targetField": "plan",
+  "notes": "Plan dictation with treatment steps"
+}

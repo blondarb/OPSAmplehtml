@@ -1,0 +1,13 @@
+{
+  "fixture": "multiple-corrections.m4a",
+  "rawText": "The patient takes metoprolol, no sorry, I meant lisinopril, wait actually it's amlodipine 5 milligrams daily.",
+  "expectedText": "The patient takes amlodipine 5 milligrams daily.",
+  "allowedVariations": [
+    "The patient takes amlodipine 5mg daily.",
+    "Patient takes amlodipine 5 milligrams daily."
+  ],
+  "audioFormat": "m4a",
+  "duration_seconds": 8,
+  "testCases": ["O8", "FD5"],
+  "notes": "Tests multiple verbal corrections - final medication should be amlodipine only"
+}
