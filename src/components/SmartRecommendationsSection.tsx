@@ -425,13 +425,17 @@ export default function SmartRecommendationsSection({
   // Reset plan builder when selected diagnoses change (from parent)
   // This ensures recommendations update when diagnoses are added/removed
   useEffect(() => {
-    // If the currently selected plan is no longer relevant, reset it
-    if (selectedDiagnosisId && !selectedDiagnoses.includes(selectedDiagnosisId)) {
-      setSelectedDiagnosisId(null)
-      setCurrentPlan(null)
-      setShowPlanBuilder(false)
+    // If the currently selected plan is no longer linked to any selected diagnosis, reset it
+    if (selectedDiagnosisId) {
+      const selectedPlan = availablePlans.find(p => p.plan_id === selectedDiagnosisId)
+      const isStillRelevant = selectedPlan?.linked_diagnoses.some(diagId => selectedDiagnoses.includes(diagId))
+      if (!isStillRelevant) {
+        setSelectedDiagnosisId(null)
+        setCurrentPlan(null)
+        setShowPlanBuilder(false)
+      }
     }
-  }, [selectedDiagnoses, selectedDiagnosisId])
+  }, [selectedDiagnoses, selectedDiagnosisId, availablePlans])
 
   const toggleSection = (sectionName: string) => {
     setExpandedSections(prev => ({
