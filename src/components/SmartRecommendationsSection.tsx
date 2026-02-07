@@ -502,6 +502,23 @@ export default function SmartRecommendationsSection({
     })
   }
 
+  // Ensure an item is selected (for when dose option is chosen)
+  const selectItem = (sectionKey: string, itemText: string) => {
+    setSelectedItems(prev => {
+      const newMap = new Map(prev)
+      const sectionItems = newMap.get(sectionKey) || new Set()
+      sectionItems.add(itemText)
+      newMap.set(sectionKey, sectionItems)
+      return newMap
+    })
+  }
+
+  // Select dose option AND auto-check the medication
+  const selectDoseOption = (itemKey: string, orderSentence: string, sectionKey: string, itemName: string) => {
+    setSelectedDoseOptions(prev => ({ ...prev, [itemKey]: orderSentence }))
+    selectItem(sectionKey, itemName)
+  }
+
   const isItemSelected = (sectionKey: string, itemText: string): boolean => {
     return selectedItems.get(sectionKey)?.has(itemText) || false
   }
@@ -809,7 +826,7 @@ export default function SmartRecommendationsSection({
                               type="radio"
                               name={`dose-${itemKey}`}
                               checked={isOptionSelected}
-                              onChange={() => setSelectedDoseOptions(prev => ({ ...prev, [itemKey]: opt.orderSentence }))}
+                              onChange={() => selectDoseOption(itemKey, opt.orderSentence, sectionKey, item.item)}
                               style={{ accentColor: 'var(--primary)' }}
                             />
                             <div style={{ flex: 1 }}>
@@ -842,7 +859,7 @@ export default function SmartRecommendationsSection({
                           type="radio"
                           name={`dose-${itemKey}`}
                           checked={selectedDoseOptions[itemKey] === 'custom'}
-                          onChange={() => setSelectedDoseOptions(prev => ({ ...prev, [itemKey]: 'custom' }))}
+                          onChange={() => selectDoseOption(itemKey, 'custom', sectionKey, item.item)}
                           style={{ accentColor: 'var(--primary)', marginTop: '4px' }}
                         />
                         <div style={{ flex: 1 }}>
