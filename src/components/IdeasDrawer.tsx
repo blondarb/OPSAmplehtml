@@ -279,6 +279,7 @@ export default function IdeasDrawer({ isOpen, onClose, initialTab, onStartTour }
   const [feedbackLoading, setFeedbackLoading] = useState(false)
   const [isUserAdmin, setIsUserAdmin] = useState(false)
   const [statusFilter, setStatusFilter] = useState<FeedbackStatus | 'all'>('all')
+  const [ownershipFilter, setOwnershipFilter] = useState<'mine' | 'all'>('mine')  // Default to "My Feedback"
 
   // Edit feedback state
   const [editingFeedbackId, setEditingFeedbackId] = useState<string | null>(null)
@@ -649,17 +650,24 @@ export default function IdeasDrawer({ isOpen, onClose, initialTab, onStartTour }
     { id: 'feedback' as const, label: 'Feedback', icon: '💬' },
   ]
 
-  // Filter feedback by status
-  const filteredFeedback = statusFilter === 'all'
+  // Filter feedback by ownership first, then by status
+  const ownershipFilteredFeedback = ownershipFilter === 'all'
     ? allFeedback
-    : allFeedback.filter(f => f.status === statusFilter)
+    : allFeedback.filter(f => f.user_id === currentUserId)
 
-  // Count by status
-  const statusCounts = allFeedback.reduce((acc, f) => {
+  const filteredFeedback = statusFilter === 'all'
+    ? ownershipFilteredFeedback
+    : ownershipFilteredFeedback.filter(f => f.status === statusFilter)
+
+  // Count by status (within current ownership filter)
+  const statusCounts = ownershipFilteredFeedback.reduce((acc, f) => {
     const s = f.status || 'pending'
     acc[s] = (acc[s] || 0) + 1
     return acc
   }, {} as Record<string, number>)
+
+  // Count my feedback vs all feedback
+  const myFeedbackCount = allFeedback.filter(f => f.user_id === currentUserId).length
 
   return (
     <>
@@ -1371,6 +1379,52 @@ export default function IdeasDrawer({ isOpen, onClose, initialTab, onStartTour }
                     Vote on feedback to help us prioritize improvements. Sorted by popularity.
                   </p>
 
+                  {/* Ownership Filter Toggle */}
+                  <div style={{
+                    display: 'flex',
+                    gap: '0',
+                    marginBottom: '12px',
+                    background: 'var(--bg-gray)',
+                    borderRadius: '8px',
+                    padding: '3px',
+                    width: 'fit-content',
+                  }}>
+                    <button
+                      onClick={() => setOwnershipFilter('mine')}
+                      style={{
+                        padding: '6px 14px',
+                        borderRadius: '6px',
+                        border: 'none',
+                        background: ownershipFilter === 'mine' ? 'var(--bg-white)' : 'transparent',
+                        boxShadow: ownershipFilter === 'mine' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none',
+                        fontSize: '12px',
+                        fontWeight: 500,
+                        cursor: 'pointer',
+                        color: ownershipFilter === 'mine' ? 'var(--text-primary)' : 'var(--text-muted)',
+                        transition: 'all 0.15s ease',
+                      }}
+                    >
+                      My Feedback ({myFeedbackCount})
+                    </button>
+                    <button
+                      onClick={() => setOwnershipFilter('all')}
+                      style={{
+                        padding: '6px 14px',
+                        borderRadius: '6px',
+                        border: 'none',
+                        background: ownershipFilter === 'all' ? 'var(--bg-white)' : 'transparent',
+                        boxShadow: ownershipFilter === 'all' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none',
+                        fontSize: '12px',
+                        fontWeight: 500,
+                        cursor: 'pointer',
+                        color: ownershipFilter === 'all' ? 'var(--text-primary)' : 'var(--text-muted)',
+                        transition: 'all 0.15s ease',
+                      }}
+                    >
+                      All Feedback ({allFeedback.length})
+                    </button>
+                  </div>
+
                   {/* Status Filter Pills */}
                   <div style={{
                     display: 'flex',
@@ -1391,7 +1445,7 @@ export default function IdeasDrawer({ isOpen, onClose, initialTab, onStartTour }
                         color: statusFilter === 'all' ? 'var(--primary)' : 'var(--text-muted)',
                       }}
                     >
-                      All ({allFeedback.length})
+                      All ({ownershipFilteredFeedback.length})
                     </button>
                     {(Object.keys(STATUS_CONFIG) as FeedbackStatus[]).map(s => (
                       <button
