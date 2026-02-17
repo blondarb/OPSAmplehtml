@@ -9,6 +9,7 @@ import VoiceConversationalIntake from './VoiceConversationalIntake'
 import MessageConversationalChat from './MessageConversationalChat'
 
 type Tab = 'intake' | 'messages' | 'historian'
+type View = 'home' | 'tab'
 
 interface IntakeForm {
   patient_name: string
@@ -37,6 +38,7 @@ const EMPTY_INTAKE: IntakeForm = {
 }
 
 export default function PatientPortal() {
+  const [view, setView] = useState<View>('home')
   const [tab, setTab] = useState<Tab>('intake')
   const [intake, setIntake] = useState<IntakeForm>(EMPTY_INTAKE)
   const [intakeSubmitted, setIntakeSubmitted] = useState(false)
@@ -65,6 +67,12 @@ export default function PatientPortal() {
   const [showDemoScenarios, setShowDemoScenarios] = useState(false)
 
   const tenant = getTenantClient()
+
+  const navigateToTab = (t: Tab) => {
+    setTab(t)
+    setView('tab')
+    setError(null)
+  }
 
   const fetchPatients = useCallback(async () => {
     setPatientsLoading(true)
@@ -245,37 +253,208 @@ export default function PatientPortal() {
         <PatientPortalDemoBanner />
       </div>
 
-      {/* Tab Bar */}
-      <div style={{ display: 'flex', gap: '0', borderBottom: '1px solid #334155', padding: '0 24px' }}>
-        {(['intake', 'messages', 'historian'] as Tab[]).map(t => (
+      {/* Tab Bar — only visible when inside a tab */}
+      {view === 'tab' && (
+        <div style={{ display: 'flex', gap: '0', borderBottom: '1px solid #334155', padding: '0 24px', alignItems: 'center' }}>
           <button
-            key={t}
-            onClick={() => { setTab(t); setError(null) }}
+            onClick={() => setView('home')}
+            aria-label="Back to home"
             style={{
-              padding: '12px 20px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '4px',
+              padding: '12px 16px 12px 0',
               background: 'none',
               border: 'none',
-              borderBottom: tab === t ? '2px solid #8B5CF6' : '2px solid transparent',
-              color: tab === t ? '#fff' : '#94a3b8',
+              borderBottom: '2px solid transparent',
+              color: '#94a3b8',
               fontWeight: 600,
               fontSize: '0.875rem',
               cursor: 'pointer',
             }}
           >
-            {t === 'intake' ? 'Intake Form' : t === 'messages' ? 'Messages' : (
-              <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M12 1a3 3 0 00-3 3v8a3 3 0 006 0V4a3 3 0 00-3-3z" />
-                  <path d="M19 10v2a7 7 0 01-14 0v-2" />
-                </svg>
-                AI Historian
-              </span>
-            )}
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <polyline points="15 18 9 12 15 6" />
+            </svg>
+            Home
           </button>
-        ))}
-      </div>
+          <div style={{ width: '1px', height: '20px', background: '#334155', margin: '0 4px' }} />
+          {(['intake', 'messages', 'historian'] as Tab[]).map(t => (
+            <button
+              key={t}
+              onClick={() => { setTab(t); setError(null) }}
+              style={{
+                padding: '12px 20px',
+                background: 'none',
+                border: 'none',
+                borderBottom: tab === t ? '2px solid #8B5CF6' : '2px solid transparent',
+                color: tab === t ? '#fff' : '#94a3b8',
+                fontWeight: 600,
+                fontSize: '0.875rem',
+                cursor: 'pointer',
+              }}
+            >
+              {t === 'intake' ? 'Intake Form' : t === 'messages' ? 'Messages' : (
+                <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M12 1a3 3 0 00-3 3v8a3 3 0 006 0V4a3 3 0 00-3-3z" />
+                    <path d="M19 10v2a7 7 0 01-14 0v-2" />
+                  </svg>
+                  AI Historian
+                </span>
+              )}
+            </button>
+          ))}
+        </div>
+      )}
 
-      {/* Content */}
+      {/* ======= HOME LANDING PAGE ======= */}
+      {view === 'home' && (
+        <div style={{ maxWidth: '640px', margin: '0 auto', padding: '48px 24px' }}>
+          <div style={{ textAlign: 'center', marginBottom: '40px' }}>
+            <h1 style={{
+              color: '#fff',
+              fontSize: '1.75rem',
+              fontWeight: 700,
+              margin: '0 0 8px',
+            }}>
+              Welcome
+            </h1>
+            <p style={{
+              color: '#94a3b8',
+              fontSize: '1rem',
+              margin: 0,
+              lineHeight: 1.5,
+            }}>
+              What would you like to do today?
+            </p>
+          </div>
+
+          <div style={{ display: 'grid', gap: '16px' }}>
+            {/* Intake Card */}
+            <button
+              onClick={() => navigateToTab('intake')}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '20px',
+                padding: '24px',
+                borderRadius: '16px',
+                border: '1px solid #334155',
+                background: '#1e293b',
+                cursor: 'pointer',
+                textAlign: 'left',
+                transition: 'border-color 0.2s, transform 0.15s',
+              }}
+              onMouseEnter={e => {
+                (e.currentTarget as HTMLButtonElement).style.borderColor = '#8B5CF6';
+                (e.currentTarget as HTMLButtonElement).style.transform = 'translateY(-2px)'
+              }}
+              onMouseLeave={e => {
+                (e.currentTarget as HTMLButtonElement).style.borderColor = '#334155';
+                (e.currentTarget as HTMLButtonElement).style.transform = 'none'
+              }}
+            >
+              <div style={{
+                width: 56, height: 56, borderRadius: '14px',
+                background: 'linear-gradient(135deg, #8B5CF6, #A78BFA)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                flexShrink: 0,
+              }}>
+                <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M9 11l3 3L22 4" />
+                  <path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11" />
+                </svg>
+              </div>
+              <div style={{ flex: 1 }}>
+                <div style={{ color: '#fff', fontWeight: 700, fontSize: '1.125rem', marginBottom: '4px' }}>
+                  Complete Your Intake
+                </div>
+                <div style={{ color: '#94a3b8', fontSize: '0.875rem', lineHeight: 1.4 }}>
+                  Fill out your pre-appointment intake form — by hand, by chatting with AI, or by talking with AI.
+                </div>
+              </div>
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#64748b" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
+                <polyline points="9 18 15 12 9 6" />
+              </svg>
+            </button>
+
+            {/* Messages Card */}
+            <button
+              onClick={() => navigateToTab('messages')}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '20px',
+                padding: '24px',
+                borderRadius: '16px',
+                border: '1px solid #334155',
+                background: '#1e293b',
+                cursor: 'pointer',
+                textAlign: 'left',
+                transition: 'border-color 0.2s, transform 0.15s',
+              }}
+              onMouseEnter={e => {
+                (e.currentTarget as HTMLButtonElement).style.borderColor = '#0d9488';
+                (e.currentTarget as HTMLButtonElement).style.transform = 'translateY(-2px)'
+              }}
+              onMouseLeave={e => {
+                (e.currentTarget as HTMLButtonElement).style.borderColor = '#334155';
+                (e.currentTarget as HTMLButtonElement).style.transform = 'none'
+              }}
+            >
+              <div style={{
+                width: 56, height: 56, borderRadius: '14px',
+                background: 'linear-gradient(135deg, #0d9488, #14b8a6)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                flexShrink: 0,
+              }}>
+                <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z" />
+                </svg>
+              </div>
+              <div style={{ flex: 1 }}>
+                <div style={{ color: '#fff', fontWeight: 700, fontSize: '1.125rem', marginBottom: '4px' }}>
+                  Send a Message
+                </div>
+                <div style={{ color: '#94a3b8', fontSize: '0.875rem', lineHeight: 1.4 }}>
+                  Contact your provider&apos;s office — write your message directly or let AI help compose it.
+                </div>
+              </div>
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#64748b" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
+                <polyline points="9 18 15 12 9 6" />
+              </svg>
+            </button>
+          </div>
+
+          {/* AI Historian link */}
+          <div style={{ textAlign: 'center', marginTop: '32px' }}>
+            <button
+              onClick={() => navigateToTab('historian')}
+              style={{
+                background: 'none',
+                border: 'none',
+                color: '#64748b',
+                fontSize: '0.85rem',
+                cursor: 'pointer',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '6px',
+                padding: '8px 16px',
+              }}
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M12 1a3 3 0 00-3 3v8a3 3 0 006 0V4a3 3 0 00-3-3z" />
+                <path d="M19 10v2a7 7 0 01-14 0v-2" />
+              </svg>
+              AI Voice Historian Interview
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* ======= TAB CONTENT ======= */}
+      {view === 'tab' && (
       <div style={{ maxWidth: '640px', margin: '0 auto', padding: '32px 24px' }}>
         {error && (
           <div style={{
@@ -425,16 +604,28 @@ export default function PatientPortal() {
                 </div>
                 <h2 style={{ color: '#fff', margin: '0 0 8px' }}>Intake Form Submitted</h2>
                 <p style={{ color: '#94a3b8' }}>Your provider will review this before your appointment.</p>
-                <button
-                  onClick={() => { setIntakeSubmitted(false); setIntake(EMPTY_INTAKE) }}
-                  style={{
-                    marginTop: '24px', padding: '10px 24px', borderRadius: '8px',
-                    background: '#8B5CF6', color: '#fff', border: 'none',
-                    fontWeight: 600, cursor: 'pointer', fontSize: '0.875rem',
-                  }}
-                >
-                  Submit Another
-                </button>
+                <div style={{ display: 'flex', gap: '12px', justifyContent: 'center', marginTop: '24px' }}>
+                  <button
+                    onClick={() => { setView('home'); setIntakeSubmitted(false); setIntake(EMPTY_INTAKE) }}
+                    style={{
+                      padding: '10px 24px', borderRadius: '8px',
+                      background: '#8B5CF6', color: '#fff', border: 'none',
+                      fontWeight: 600, cursor: 'pointer', fontSize: '0.875rem',
+                    }}
+                  >
+                    ← Back to Home
+                  </button>
+                  <button
+                    onClick={() => { setIntakeSubmitted(false); setIntake(EMPTY_INTAKE) }}
+                    style={{
+                      padding: '10px 24px', borderRadius: '8px',
+                      background: 'transparent', color: '#94a3b8', border: '1px solid #334155',
+                      fontWeight: 600, cursor: 'pointer', fontSize: '0.875rem',
+                    }}
+                  >
+                    Submit Another
+                  </button>
+                </div>
               </div>
             ) : (
               <form onSubmit={handleIntakeSubmit}>
@@ -673,16 +864,28 @@ export default function PatientPortal() {
                 </div>
                 <h2 style={{ color: '#fff', margin: '0 0 8px' }}>Message Sent</h2>
                 <p style={{ color: '#94a3b8' }}>Your provider&apos;s office will respond soon.</p>
-                <button
-                  onClick={() => { setMsgSent(false); setMsgSubject(''); setMsgBody('') }}
-                  style={{
-                    marginTop: '24px', padding: '10px 24px', borderRadius: '8px',
-                    background: '#8B5CF6', color: '#fff', border: 'none',
-                    fontWeight: 600, cursor: 'pointer', fontSize: '0.875rem',
-                  }}
-                >
-                  Send Another Message
-                </button>
+                <div style={{ display: 'flex', gap: '12px', justifyContent: 'center', marginTop: '24px' }}>
+                  <button
+                    onClick={() => { setView('home'); setMsgSent(false); setMsgSubject(''); setMsgBody('') }}
+                    style={{
+                      padding: '10px 24px', borderRadius: '8px',
+                      background: '#8B5CF6', color: '#fff', border: 'none',
+                      fontWeight: 600, cursor: 'pointer', fontSize: '0.875rem',
+                    }}
+                  >
+                    ← Back to Home
+                  </button>
+                  <button
+                    onClick={() => { setMsgSent(false); setMsgSubject(''); setMsgBody('') }}
+                    style={{
+                      padding: '10px 24px', borderRadius: '8px',
+                      background: 'transparent', color: '#94a3b8', border: '1px solid #334155',
+                      fontWeight: 600, cursor: 'pointer', fontSize: '0.875rem',
+                    }}
+                  >
+                    Send Another Message
+                  </button>
+                </div>
               </div>
             ) : (
               <form onSubmit={handleMessageSend}>
@@ -1047,6 +1250,7 @@ export default function PatientPortal() {
           </div>
         )}
       </div>
+      )}
     </div>
   )
 }
