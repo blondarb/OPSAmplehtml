@@ -72,8 +72,8 @@ export async function POST(request: Request) {
       result.nextQuestion = 'Could you tell me a bit more? I want to make sure I have everything.'
     }
 
-    // If all 9 fields are collected but the model didn't set isComplete,
-    // force completion so the conversation doesn't loop.
+    // If all 9 fields are collected but the model hasn't shown a summary yet,
+    // trigger the review summary so the patient can confirm or correct.
     const requiredFields = [
       'patient_name', 'date_of_birth', 'email', 'phone',
       'chief_complaint', 'current_medications', 'allergies',
@@ -81,8 +81,8 @@ export async function POST(request: Request) {
     ]
     const allData = { ...currentData, ...(result.extractedData as Record<string, string> || {}) }
     const collectedFields = requiredFields.filter(f => allData[f] && String(allData[f]).trim() !== '')
-    if (collectedFields.length >= 9 && !result.isComplete) {
-      result.isComplete = true
+    if (collectedFields.length >= 9 && !result.isComplete && !result.readyForReview) {
+      result.readyForReview = true
       result.nextQuestion = `Great, I have all your information! Here's a summary:\n\n` +
         `• Name: ${allData.patient_name}\n` +
         `• DOB: ${allData.date_of_birth}\n` +
@@ -93,7 +93,7 @@ export async function POST(request: Request) {
         `• Allergies: ${allData.allergies}\n` +
         `• Medical History: ${allData.medical_history}\n` +
         `• Family History: ${allData.family_history}\n\n` +
-        `I'll now switch you to the form so you can review and submit.`
+        `Does everything look correct? Let me know if you'd like to change or add anything, or say "looks good" to submit.`
     }
 
     return NextResponse.json(result)

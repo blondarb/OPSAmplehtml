@@ -26,6 +26,7 @@ export default function TextConversationalIntake({ onComplete, onCancel }: Conve
   const [loading, setLoading] = useState(false)
   const [intakeData, setIntakeData] = useState<Record<string, string>>({})
   const [error, setError] = useState<string | null>(null)
+  const [reviewMode, setReviewMode] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
 
   // Calculate fields collected for progress indicator
@@ -41,10 +42,11 @@ export default function TextConversationalIntake({ onComplete, onCancel }: Conve
     scrollToBottom()
   }, [messages])
 
-  const handleSend = async () => {
-    if (!input.trim() || loading) return
+  const handleSend = async (overrideMessage?: string) => {
+    const text = overrideMessage || input.trim()
+    if (!text || loading) return
 
-    const userMessage = input.trim()
+    const userMessage = text
     const newMessages: Message[] = [...messages, { role: 'user', text: userMessage }]
     setMessages(newMessages)
     setInput('')
@@ -73,11 +75,12 @@ export default function TextConversationalIntake({ onComplete, onCancel }: Conve
         throw new Error(data.error)
       }
 
-      const { nextQuestion, extractedData, isComplete, requiresEmergencyCare } = data
+      const { nextQuestion, extractedData, isComplete, readyForReview, requiresEmergencyCare } = data
 
       // Update collected data
+      const updatedData = extractedData ? { ...intakeData, ...extractedData } : intakeData
       if (extractedData) {
-        setIntakeData(prev => ({ ...prev, ...extractedData }))
+        setIntakeData(updatedData)
       }
 
       // Show emergency warning if needed
@@ -89,11 +92,14 @@ export default function TextConversationalIntake({ onComplete, onCancel }: Conve
       const questionText = nextQuestion || 'Could you tell me a bit more about that?'
       setMessages([...newMessages, { role: 'assistant', text: questionText }])
 
-      // If complete, trigger review
+      // Enter review mode when AI presents the summary
+      if (readyForReview && !reviewMode) {
+        setReviewMode(true)
+      }
+
+      // Patient confirmed — submit the data
       if (isComplete) {
-        setTimeout(() => {
-          onComplete({ ...intakeData, ...extractedData })
-        }, 1000)
+        onComplete(updatedData)
       }
     } catch (err) {
       setError('Sorry, something went wrong. Please try again or switch to the form.')
@@ -258,6 +264,55 @@ export default function TextConversationalIntake({ onComplete, onCancel }: Conve
         </div>
       )}
 
+      {/* Quick actions when in review mode */}
+      {reviewMode && !loading && (
+        <div style={{
+          padding: '12px 20px',
+          borderTop: '1px solid #334155',
+          display: 'flex',
+          gap: '8px',
+          flexWrap: 'wrap',
+        }}>
+          <button
+            onClick={() => handleSend('Looks good, please submit!')}
+            style={{
+              padding: '8px 16px',
+              borderRadius: '20px',
+              background: '#22c55e',
+              color: 'white',
+              border: 'none',
+              cursor: 'pointer',
+              fontWeight: 600,
+              fontSize: '13px',
+            }}
+          >
+            ✓ Looks good, submit!
+          </button>
+          <button
+            onClick={() => {
+              setInput('I need to correct something: ')
+              // Focus the input so they can type what to change
+              const inputEl = document.querySelector<HTMLInputElement>('input[aria-label="Type your answer to the intake question"]')
+              if (inputEl) {
+                setTimeout(() => inputEl.focus(), 50)
+              }
+            }}
+            style={{
+              padding: '8px 16px',
+              borderRadius: '20px',
+              background: '#334155',
+              color: '#e2e8f0',
+              border: '1px solid #475569',
+              cursor: 'pointer',
+              fontWeight: 500,
+              fontSize: '13px',
+            }}
+          >
+            ✏️ Make a correction
+          </button>
+        </div>
+      )}
+
       {/* Input */}
       <div style={{
         padding: '16px 20px',
@@ -271,7 +326,7 @@ export default function TextConversationalIntake({ onComplete, onCancel }: Conve
           value={input}
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={handleKeyDown}
-          placeholder="Type your answer..."
+          placeholder={reviewMode ? 'Type a correction or say "looks good"...' : 'Type your answer...'}
           disabled={loading}
           style={{
             flex: 1,
@@ -286,7 +341,7 @@ export default function TextConversationalIntake({ onComplete, onCancel }: Conve
         />
         <button
           aria-label="Send message"
-          onClick={handleSend}
+          onClick={() => handleSend()}
           disabled={loading || !input.trim()}
           style={{
             padding: '12px 24px',
