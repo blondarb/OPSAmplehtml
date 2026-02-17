@@ -55,7 +55,14 @@ export default function TextConversationalIntake({ onComplete, onCancel }: Conve
         throw new Error('Failed to get response')
       }
 
-      const { nextQuestion, extractedData, isComplete, requiresEmergencyCare } = await response.json()
+      const data = await response.json()
+
+      // Check for API error response
+      if (data.error) {
+        throw new Error(data.error)
+      }
+
+      const { nextQuestion, extractedData, isComplete, requiresEmergencyCare } = data
 
       // Update collected data
       if (extractedData) {
@@ -67,8 +74,9 @@ export default function TextConversationalIntake({ onComplete, onCancel }: Conve
         setError('⚠️ Based on your symptoms, please seek immediate emergency care by calling 911 or going to the nearest emergency room.')
       }
 
-      // Add AI response
-      setMessages([...newMessages, { role: 'assistant', text: nextQuestion }])
+      // Add AI response (with fallback if nextQuestion is missing)
+      const questionText = nextQuestion || 'Could you tell me a bit more about that?'
+      setMessages([...newMessages, { role: 'assistant', text: questionText }])
 
       // If complete, trigger review
       if (isComplete) {

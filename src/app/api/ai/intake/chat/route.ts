@@ -41,10 +41,22 @@ export async function POST(request: Request) {
       model: 'gpt-5-mini',
       messages,
       response_format: { type: 'json_object' },
-      max_completion_tokens: 500,
+      max_completion_tokens: 1000,
     })
 
-    const result = JSON.parse(response.choices[0].message.content || '{}')
+    const rawContent = response.choices[0].message.content || '{}'
+    let result: Record<string, unknown>
+    try {
+      result = JSON.parse(rawContent)
+    } catch {
+      console.error('Failed to parse AI response:', rawContent)
+      result = { nextQuestion: 'Sorry, I had trouble processing that. Could you repeat your last answer?' }
+    }
+
+    // Ensure nextQuestion always exists
+    if (!result.nextQuestion) {
+      result.nextQuestion = 'Could you tell me a bit more? I want to make sure I have everything.'
+    }
 
     return NextResponse.json(result)
   } catch (error) {
