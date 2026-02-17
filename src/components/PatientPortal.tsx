@@ -4,9 +4,9 @@ import { useState, useEffect, useCallback } from 'react'
 import { getTenantClient } from '@/lib/tenant'
 import { DEMO_SCENARIOS, type PortalPatient } from '@/lib/historianTypes'
 import PatientPortalDemoBanner from './PatientPortalDemoBanner'
-import InlineDictationButton from './InlineDictationButton'
 import TextConversationalIntake from './TextConversationalIntake'
 import VoiceConversationalIntake from './VoiceConversationalIntake'
+import MessageConversationalChat from './MessageConversationalChat'
 
 type Tab = 'intake' | 'messages' | 'historian'
 
@@ -43,6 +43,7 @@ export default function PatientPortal() {
   const [intakeLoading, setIntakeLoading] = useState(false)
   const [intakeMode, setIntakeMode] = useState<'form' | 'conversation' | 'voice'>('form')
 
+  const [messageMode, setMessageMode] = useState<'form' | 'conversation'>('form')
   const [msgSubject, setMsgSubject] = useState('')
   const [msgBody, setMsgBody] = useState('')
   const [msgSent, setMsgSent] = useState(false)
@@ -600,93 +601,179 @@ export default function PatientPortal() {
         {/* ======= MESSAGES TAB ======= */}
         {tab === 'messages' && (
           <div>
-            <h2 style={{ color: '#fff', margin: '0 0 4px', fontSize: '1.25rem' }}>Send a Message</h2>
-            <p style={{ color: '#94a3b8', margin: '0 0 24px', fontSize: '0.875rem' }}>
-              Contact your provider&apos;s office.
-            </p>
-
-            {msgSent && (
-              <div style={{
-                background: 'rgba(34,197,94,0.15)',
-                border: '1px solid rgba(34,197,94,0.3)',
-                borderRadius: '8px',
-                padding: '12px 16px',
-                color: '#86efac',
-                fontSize: '0.875rem',
+            {/* Mode toggle */}
+            <div
+              role="radiogroup"
+              aria-label="Choose messaging method"
+              style={{
+                display: 'flex',
+                gap: '4px',
                 marginBottom: '24px',
-              }}>
-                Message sent successfully.
-              </div>
-            )}
+                padding: '4px',
+                background: '#1e293b',
+                borderRadius: '10px',
+                border: '1px solid #334155',
+              }}
+            >
+              {([
+                { mode: 'form' as const, label: '📝 Write Message' },
+                { mode: 'conversation' as const, label: '💬 Chat with AI' },
+              ]).map(({ mode, label }) => (
+                <button
+                  key={mode}
+                  role="radio"
+                  aria-checked={messageMode === mode}
+                  tabIndex={messageMode === mode ? 0 : -1}
+                  onClick={() => setMessageMode(mode)}
+                  style={{
+                    flex: 1,
+                    padding: '10px',
+                    borderRadius: '6px',
+                    background: messageMode === mode ? '#8B5CF6' : 'transparent',
+                    color: messageMode === mode ? 'white' : '#94a3b8',
+                    border: 'none',
+                    cursor: 'pointer',
+                    fontSize: '13px',
+                    fontWeight: 600,
+                    transition: 'all 0.2s',
+                  }}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
 
-            <form onSubmit={handleMessageSend}>
-              <div style={{ marginBottom: '16px' }}>
-                <label style={labelStyle}>Your Name *</label>
-                <input
-                  required
-                  style={inputStyle}
-                  value={intake.patient_name}
-                  onChange={e => setIntake({ ...intake, patient_name: e.target.value })}
-                  placeholder="Jane Doe"
-                />
-              </div>
-              <div style={{ marginBottom: '16px' }}>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '4px' }}>
-                  <label style={labelStyle}>Subject *</label>
-                  <InlineDictationButton
-                    onTranscriptionComplete={(text) => {
-                      setMsgSubject(prev => prev ? `${prev} ${text}` : text)
-                    }}
-                    disabled={msgLoading}
-                    size="small"
-                  />
-                </div>
-                <input
-                  required
-                  style={inputStyle}
-                  value={msgSubject}
-                  onChange={e => setMsgSubject(e.target.value)}
-                  placeholder="Medication refill request"
-                />
-              </div>
-              <div style={{ marginBottom: '24px' }}>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '4px' }}>
-                  <label style={labelStyle}>Message *</label>
-                  <InlineDictationButton
-                    onTranscriptionComplete={(text) => {
-                      setMsgBody(prev => prev ? `${prev} ${text}` : text)
-                    }}
-                    disabled={msgLoading}
-                    size="small"
-                  />
-                </div>
-                <textarea
-                  required
-                  rows={5}
-                  style={{ ...inputStyle, resize: 'vertical' }}
-                  value={msgBody}
-                  onChange={e => setMsgBody(e.target.value)}
-                  placeholder="Type your message or use voice dictation..."
-                />
-              </div>
-              <button
-                type="submit"
-                disabled={msgLoading}
-                style={{
-                  width: '100%',
-                  padding: '12px',
-                  borderRadius: '8px',
-                  background: msgLoading ? '#64748b' : '#8B5CF6',
-                  color: '#fff',
-                  border: 'none',
-                  fontWeight: 600,
-                  fontSize: '0.875rem',
-                  cursor: msgLoading ? 'not-allowed' : 'pointer',
+            {/* Conditional render based on mode */}
+            {messageMode === 'conversation' ? (
+              <MessageConversationalChat
+                onComplete={(data) => {
+                  console.log('[Sevaro Analytics] message_composed', { mode: 'conversation', timestamp: new Date().toISOString() })
+                  // Pre-fill form fields and switch to form for final review/send
+                  setIntake(prev => ({
+                    ...prev,
+                    patient_name: data.patient_name || prev.patient_name,
+                    date_of_birth: data.date_of_birth || prev.date_of_birth,
+                  }))
+                  setMsgSubject(data.subject || '')
+                  setMsgBody(data.body || '')
+                  lookupPatient(data.patient_name || '', data.date_of_birth || '')
+                  setMessageMode('form')
                 }}
-              >
-                {msgLoading ? 'Sending...' : 'Send Message'}
-              </button>
-            </form>
+                onCancel={() => setMessageMode('form')}
+              />
+            ) : msgSent ? (
+              <div style={{ textAlign: 'center', padding: '48px 0' }}>
+                <div style={{
+                  width: 64, height: 64, borderRadius: '50%',
+                  background: 'rgba(34,197,94,0.15)',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  margin: '0 auto 16px',
+                }}>
+                  <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#22c55e" strokeWidth="2"><polyline points="20 6 9 17 4 12"/></svg>
+                </div>
+                <h2 style={{ color: '#fff', margin: '0 0 8px' }}>Message Sent</h2>
+                <p style={{ color: '#94a3b8' }}>Your provider&apos;s office will respond soon.</p>
+                <button
+                  onClick={() => { setMsgSent(false); setMsgSubject(''); setMsgBody('') }}
+                  style={{
+                    marginTop: '24px', padding: '10px 24px', borderRadius: '8px',
+                    background: '#8B5CF6', color: '#fff', border: 'none',
+                    fontWeight: 600, cursor: 'pointer', fontSize: '0.875rem',
+                  }}
+                >
+                  Send Another Message
+                </button>
+              </div>
+            ) : (
+              <form onSubmit={handleMessageSend}>
+                <h2 style={{ color: '#fff', margin: '0 0 4px', fontSize: '1.25rem' }}>Send a Message</h2>
+                <p style={{ color: '#94a3b8', margin: '0 0 24px', fontSize: '0.875rem' }}>
+                  Contact your provider&apos;s office.
+                </p>
+
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '16px' }}>
+                  <div>
+                    <label style={labelStyle}>Your Name *</label>
+                    <input
+                      required
+                      style={inputStyle}
+                      value={intake.patient_name}
+                      onChange={e => setIntake({ ...intake, patient_name: e.target.value })}
+                      onBlur={() => lookupPatient(intake.patient_name, intake.date_of_birth)}
+                      placeholder="Jane Doe"
+                    />
+                  </div>
+                  <div>
+                    <label style={labelStyle}>Date of Birth</label>
+                    <input
+                      type="date"
+                      style={inputStyle}
+                      value={intake.date_of_birth}
+                      onChange={e => {
+                        setIntake({ ...intake, date_of_birth: e.target.value })
+                        lookupPatient(intake.patient_name, e.target.value)
+                      }}
+                    />
+                  </div>
+                </div>
+
+                {matchedPatientId && (
+                  <div style={{
+                    display: 'flex', alignItems: 'center', gap: '6px',
+                    padding: '8px 12px', marginBottom: '16px',
+                    background: 'rgba(34,197,94,0.1)',
+                    border: '1px solid rgba(34,197,94,0.3)',
+                    borderRadius: '8px',
+                  }}>
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#22c55e" strokeWidth="2">
+                      <polyline points="20 6 9 17 4 12"/>
+                    </svg>
+                    <span style={{ fontSize: '0.8rem', color: '#22c55e', fontWeight: 500 }}>
+                      Matched to patient record: {matchedPatientName || intake.patient_name}
+                    </span>
+                  </div>
+                )}
+
+                <div style={{ marginBottom: '16px' }}>
+                  <label style={labelStyle}>Subject *</label>
+                  <input
+                    required
+                    style={inputStyle}
+                    value={msgSubject}
+                    onChange={e => setMsgSubject(e.target.value)}
+                    placeholder="Medication refill request"
+                  />
+                </div>
+                <div style={{ marginBottom: '24px' }}>
+                  <label style={labelStyle}>Message *</label>
+                  <textarea
+                    required
+                    rows={5}
+                    style={{ ...inputStyle, resize: 'vertical' }}
+                    value={msgBody}
+                    onChange={e => setMsgBody(e.target.value)}
+                    placeholder="What would you like to tell your doctor?"
+                  />
+                </div>
+                <button
+                  type="submit"
+                  disabled={msgLoading}
+                  style={{
+                    width: '100%',
+                    padding: '12px',
+                    borderRadius: '8px',
+                    background: msgLoading ? '#64748b' : '#8B5CF6',
+                    color: '#fff',
+                    border: 'none',
+                    fontWeight: 600,
+                    fontSize: '0.875rem',
+                    cursor: msgLoading ? 'not-allowed' : 'pointer',
+                  }}
+                >
+                  {msgLoading ? 'Sending...' : 'Send Message'}
+                </button>
+              </form>
+            )}
           </div>
         )}
 
