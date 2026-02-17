@@ -34,14 +34,17 @@ COMMENT ON COLUMN historian_sessions.session_source IS
 
 -- 5. Allow anon role to insert into patient_intake_forms and patient_messages
 --    (portal operates without auth for demo purposes)
-CREATE POLICY IF NOT EXISTS "Allow anon inserts on intake" ON patient_intake_forms
-  FOR INSERT TO anon WITH CHECK (true);
-
-CREATE POLICY IF NOT EXISTS "Allow anon selects on intake" ON patient_intake_forms
-  FOR SELECT TO anon USING (true);
-
-CREATE POLICY IF NOT EXISTS "Allow anon inserts on messages" ON patient_messages
-  FOR INSERT TO anon WITH CHECK (true);
-
-CREATE POLICY IF NOT EXISTS "Allow anon selects on messages" ON patient_messages
-  FOR SELECT TO anon USING (true);
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'Allow anon inserts on intake' AND tablename = 'patient_intake_forms') THEN
+    CREATE POLICY "Allow anon inserts on intake" ON patient_intake_forms FOR INSERT TO anon WITH CHECK (true);
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'Allow anon selects on intake' AND tablename = 'patient_intake_forms') THEN
+    CREATE POLICY "Allow anon selects on intake" ON patient_intake_forms FOR SELECT TO anon USING (true);
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'Allow anon inserts on messages' AND tablename = 'patient_messages') THEN
+    CREATE POLICY "Allow anon inserts on messages" ON patient_messages FOR INSERT TO anon WITH CHECK (true);
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'Allow anon selects on messages' AND tablename = 'patient_messages') THEN
+    CREATE POLICY "Allow anon selects on messages" ON patient_messages FOR SELECT TO anon USING (true);
+  END IF;
+END $$;
