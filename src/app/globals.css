@@ -2376,3 +2376,23 @@ a:hover {
     color: #9CA3AF;
   }
 }
+
+/* ========== Font Size Preference Scaling ========== */
+/* Applied via data-font-size attribute on <html>, set by the init script in layout.tsx
+   and updated by SettingsDrawer on save. Since the app uses hardcoded inline font sizes
+   throughout, we use CSS zoom on the main content area to proportionally scale all text
+   and UI elements. This approach works universally without touching each component. */
+
+/* Body font-size is already set via --base-font-size in the body rule above. */
+
+/* SMALL: zoom down the main clinical content slightly (~93%) */
+[data-font-size="small"] .center-panel {
+  zoom: 0.93;
+}
+[data-font-size="small"] .form-textarea { font-size: 12px; }
+
+/* LARGE: zoom up the main clinical content (~114%) */
+[data-font-size="large"] .center-panel {
+  zoom: 1.14;
+}
+[data-font-size="large"] .form-textarea { font-size: 15px; }

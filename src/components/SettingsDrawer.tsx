@@ -254,6 +254,7 @@ export default function SettingsDrawer({
       '--base-font-size',
       settings.fontSize === 'small' ? '13px' : settings.fontSize === 'large' ? '16px' : '14px'
     )
+    document.documentElement.setAttribute('data-font-size', settings.fontSize)
 
     // Apply dark mode preference
     applyDarkModePreference(settings.darkModePreference)
