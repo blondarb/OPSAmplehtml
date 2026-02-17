@@ -239,7 +239,7 @@ export default function PatientPortal() {
           <span style={{ color: '#fff', fontWeight: 600, fontSize: '1.125rem' }}>Sevaro Patient Portal</span>
         </div>
         <a
-          href="/"
+          href="/?switch_app=true"
           style={{
             display: 'flex',
             alignItems: 'center',
@@ -266,34 +266,91 @@ export default function PatientPortal() {
         <PatientPortalDemoBanner />
       </div>
 
-      {/* Tab Bar */}
-      <div style={{ display: 'flex', gap: '0', borderBottom: '1px solid #334155', padding: '0 24px' }}>
-        {(['intake', 'messages', 'historian'] as Tab[]).map(t => (
-          <button
-            key={t}
-            onClick={() => { setTab(t); setError(null) }}
-            style={{
-              padding: '12px 20px',
-              background: 'none',
-              border: 'none',
-              borderBottom: tab === t ? '2px solid #8B5CF6' : '2px solid transparent',
-              color: tab === t ? '#fff' : '#94a3b8',
-              fontWeight: 600,
-              fontSize: '0.875rem',
-              cursor: 'pointer',
-            }}
-          >
-            {t === 'intake' ? 'Intake Form' : t === 'messages' ? 'Messages' : (
-              <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      {/* Service Cards */}
+      <div style={{ maxWidth: '720px', margin: '0 auto', padding: '24px 24px 0' }}>
+        <p style={{ color: '#94a3b8', fontSize: '0.9rem', margin: '0 0 16px', textAlign: 'center' }}>
+          What would you like to do?
+        </p>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '12px' }}>
+          {([
+            {
+              id: 'intake' as Tab,
+              icon: (
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M9 11l3 3L22 4" />
+                  <path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11" />
+                </svg>
+              ),
+              label: 'Intake Form',
+              desc: 'Complete your pre-appointment intake',
+              color: '#8B5CF6',
+            },
+            {
+              id: 'messages' as Tab,
+              icon: (
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z" />
+                </svg>
+              ),
+              label: 'Messages',
+              desc: 'Send a message to your provider',
+              color: '#0d9488',
+            },
+            {
+              id: 'historian' as Tab,
+              icon: (
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M12 1a3 3 0 00-3 3v8a3 3 0 006 0V4a3 3 0 00-3-3z" />
                   <path d="M19 10v2a7 7 0 01-14 0v-2" />
                 </svg>
-                AI Historian
-              </span>
-            )}
-          </button>
-        ))}
+              ),
+              label: 'AI Historian',
+              desc: 'Voice interview with AI',
+              color: '#f59e0b',
+            },
+          ]).map(card => (
+            <button
+              key={card.id}
+              onClick={() => { setTab(card.id); setError(null) }}
+              style={{
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                gap: '8px',
+                padding: '20px 12px',
+                borderRadius: '14px',
+                border: tab === card.id ? `2px solid ${card.color}` : '2px solid #334155',
+                background: tab === card.id ? `${card.color}12` : '#1e293b',
+                cursor: 'pointer',
+                transition: 'all 0.2s',
+                textAlign: 'center',
+              }}
+            >
+              <div style={{
+                width: 44, height: 44, borderRadius: '12px',
+                background: tab === card.id ? `${card.color}25` : 'rgba(148,163,184,0.1)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                color: tab === card.id ? card.color : '#94a3b8',
+              }}>
+                {card.icon}
+              </div>
+              <div style={{
+                color: tab === card.id ? '#fff' : '#cbd5e1',
+                fontWeight: 600,
+                fontSize: '0.85rem',
+              }}>
+                {card.label}
+              </div>
+              <div style={{
+                color: '#64748b',
+                fontSize: '0.7rem',
+                lineHeight: 1.3,
+              }}>
+                {card.desc}
+              </div>
+            </button>
+          ))}
+        </div>
       </div>
 
       {/* Content */}
@@ -448,7 +505,7 @@ export default function PatientPortal() {
                 <p style={{ color: '#94a3b8' }}>Your provider will review this before your appointment.</p>
                 <div style={{ display: 'flex', gap: '12px', justifyContent: 'center', marginTop: '24px' }}>
                   <a
-                    href="/"
+                    href="/?switch_app=true"
                     style={{
                       padding: '10px 24px', borderRadius: '8px',
                       background: '#8B5CF6', color: '#fff', border: 'none',
@@ -709,7 +766,7 @@ export default function PatientPortal() {
                 <p style={{ color: '#94a3b8' }}>Your provider&apos;s office will respond soon.</p>
                 <div style={{ display: 'flex', gap: '12px', justifyContent: 'center', marginTop: '24px' }}>
                   <a
-                    href="/"
+                    href="/?switch_app=true"
                     style={{
                       padding: '10px 24px', borderRadius: '8px',
                       background: '#8B5CF6', color: '#fff', border: 'none',

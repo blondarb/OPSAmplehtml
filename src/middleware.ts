@@ -37,13 +37,8 @@ export function middleware(request: NextRequest) {
       return NextResponse.redirect(new URL('/dashboard', request.url))
     }
 
-    // No saved preference - detect device type
-    const userAgent = request.headers.get('user-agent') || ''
-    const isMobile = /iPhone|iPad|iPod|Android|webOS|BlackBerry|IEMobile|Opera Mini|Mobile|mobile/i.test(userAgent)
-
-    // Redirect to appropriate view
-    const destination = isMobile ? '/mobile' : '/dashboard'
-    return NextResponse.redirect(new URL(destination, request.url))
+    // No saved preference — show the landing page so users can choose
+    return NextResponse.next()
   }
 
   // Allow all other routes to pass through
