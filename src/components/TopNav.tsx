@@ -876,6 +876,39 @@ export default function TopNav({ user, onSignOut, openAiDrawer, onOpenSettings, 
                       </button>
                     )}
 
+                    {/* Switch App - Navigate back to landing page */}
+                    <button
+                      onClick={() => {
+                        setUserMenuOpen(false)
+                        window.location.href = '/'
+                      }}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '10px',
+                        width: '100%',
+                        padding: '10px 12px',
+                        background: 'none',
+                        border: 'none',
+                        borderRadius: '6px',
+                        cursor: 'pointer',
+                        textAlign: 'left',
+                        color: '#8B5CF6',
+                        fontSize: '13px',
+                      }}
+                      onMouseEnter={(e) => e.currentTarget.style.background = 'var(--bg-gray)'}
+                      onMouseLeave={(e) => e.currentTarget.style.background = 'none'}
+                      title="Return to app selection"
+                    >
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <rect x="3" y="3" width="7" height="7" rx="1"/>
+                        <rect x="14" y="3" width="7" height="7" rx="1"/>
+                        <rect x="14" y="14" width="7" height="7" rx="1"/>
+                        <rect x="3" y="14" width="7" height="7" rx="1"/>
+                      </svg>
+                      Switch App
+                    </button>
+
                     <div style={{ height: '1px', background: 'var(--border)', margin: '6px 0' }} />
 
                     <button
