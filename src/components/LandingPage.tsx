@@ -39,6 +39,9 @@ export default function LandingPage() {
         <p style={{ color: '#94a3b8', fontSize: '1rem', marginTop: '8px' }}>
           AI-Powered Clinical Documentation Demo
         </p>
+        <p style={{ color: '#64748b', fontSize: '0.8rem', marginTop: '12px', maxWidth: '480px', lineHeight: 1.6 }}>
+          Choose a role below to explore AI-assisted clinical workflows. Each view is a standalone proof-of-concept you can demo independently.
+        </p>
       </div>
 
       {/* Selection Cards */}

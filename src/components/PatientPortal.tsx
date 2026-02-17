@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { getTenantClient } from '@/lib/tenant'
 import { DEMO_SCENARIOS, type PortalPatient } from '@/lib/historianTypes'
-import PatientPortalDemoBanner from './PatientPortalDemoBanner'
+// PatientPortalDemoBanner removed — demo instructions are now inline in each tab
 import TextConversationalIntake from './TextConversationalIntake'
 import VoiceConversationalIntake from './VoiceConversationalIntake'
 import MessageConversationalChat from './MessageConversationalChat'
@@ -262,15 +262,31 @@ export default function PatientPortal() {
       </header>
 
       {/* Demo Context Banner */}
-      <div style={{ padding: '0 24px', marginTop: '16px' }}>
-        <PatientPortalDemoBanner />
+      <div style={{ maxWidth: '720px', margin: '0 auto', padding: '16px 24px 0' }}>
+        <div style={{
+          background: 'rgba(139, 92, 246, 0.08)',
+          border: '1px solid rgba(139, 92, 246, 0.25)',
+          borderRadius: '12px',
+          padding: '14px 18px',
+          marginBottom: '8px',
+        }}>
+          <div style={{ display: 'flex', alignItems: 'flex-start', gap: '10px' }}>
+            <span style={{ fontSize: '18px', lineHeight: 1 }}>🧪</span>
+            <div>
+              <div style={{ fontWeight: 600, fontSize: '13px', color: '#ddd6fe', marginBottom: '4px' }}>
+                Demo Environment — Patient Portal
+              </div>
+              <p style={{ color: '#94a3b8', fontSize: '12px', margin: 0, lineHeight: 1.6 }}>
+                This is a proof-of-concept showing how patients could interact with their clinic before an appointment.
+                Each card below is a standalone feature you can demo. Tap any card, try it out, then come back to explore the others.
+              </p>
+            </div>
+          </div>
+        </div>
       </div>
 
       {/* Service Cards */}
-      <div style={{ maxWidth: '720px', margin: '0 auto', padding: '24px 24px 0' }}>
-        <p style={{ color: '#94a3b8', fontSize: '0.9rem', margin: '0 0 16px', textAlign: 'center' }}>
-          What would you like to do?
-        </p>
+      <div style={{ maxWidth: '720px', margin: '0 auto', padding: '16px 24px 0' }}>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '12px' }}>
           {([
             {
@@ -282,7 +298,7 @@ export default function PatientPortal() {
                 </svg>
               ),
               label: 'Intake Form',
-              desc: 'Complete your pre-appointment intake',
+              desc: 'AI-assisted pre-visit questionnaire',
               color: '#8B5CF6',
             },
             {
@@ -293,7 +309,7 @@ export default function PatientPortal() {
                 </svg>
               ),
               label: 'Messages',
-              desc: 'Send a message to your provider',
+              desc: 'AI-composed provider messages',
               color: '#0d9488',
             },
             {
@@ -305,7 +321,7 @@ export default function PatientPortal() {
                 </svg>
               ),
               label: 'AI Historian',
-              desc: 'Voice interview with AI',
+              desc: 'Voice-based clinical interview',
               color: '#f59e0b',
             },
           ]).map(card => (
@@ -372,6 +388,30 @@ export default function PatientPortal() {
         {/* ======= INTAKE TAB ======= */}
         {tab === 'intake' && (
           <div>
+            {/* Demo instructions for intake */}
+            <div style={{
+              background: 'rgba(139,92,246,0.08)',
+              border: '1px solid rgba(139,92,246,0.2)',
+              borderRadius: '10px',
+              padding: '14px 16px',
+              marginBottom: '20px',
+            }}>
+              <div style={{ fontWeight: 600, fontSize: '12px', color: '#a78bfa', marginBottom: '6px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                💡 How to demo this
+              </div>
+              <p style={{ color: '#94a3b8', fontSize: '12px', margin: '0 0 8px', lineHeight: 1.6 }}>
+                This shows three ways a patient can complete pre-visit paperwork — from traditional to fully AI-driven:
+              </p>
+              <div style={{ color: '#94a3b8', fontSize: '12px', lineHeight: 1.8 }}>
+                <div><strong style={{ color: '#cbd5e1' }}>📋 Fill Out Form</strong> — Standard form. The patient types everything manually.</div>
+                <div><strong style={{ color: '#cbd5e1' }}>💬 Chat with AI</strong> — The AI asks questions one at a time in a text chat, then fills out the form for you.</div>
+                <div><strong style={{ color: '#cbd5e1' }}>🎙️ Talk with AI</strong> — Same as chat, but you speak your answers out loud. Best on mobile.</div>
+              </div>
+              <p style={{ color: '#64748b', fontSize: '11px', margin: '8px 0 0', lineHeight: 1.5, fontStyle: 'italic' }}>
+                Try &quot;Chat with AI&quot; — give a fake name, DOB, and describe symptoms. Watch it fill the whole form for you.
+              </p>
+            </div>
+
             {/* Mode toggle pills */}
             <div
               role="radiogroup"
@@ -692,6 +732,29 @@ export default function PatientPortal() {
         {/* ======= MESSAGES TAB ======= */}
         {tab === 'messages' && (
           <div>
+            {/* Demo instructions for messages */}
+            <div style={{
+              background: 'rgba(13,148,136,0.08)',
+              border: '1px solid rgba(13,148,136,0.2)',
+              borderRadius: '10px',
+              padding: '14px 16px',
+              marginBottom: '20px',
+            }}>
+              <div style={{ fontWeight: 600, fontSize: '12px', color: '#5eead4', marginBottom: '6px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                💡 How to demo this
+              </div>
+              <p style={{ color: '#94a3b8', fontSize: '12px', margin: '0 0 8px', lineHeight: 1.6 }}>
+                This shows how a patient can send a message to their provider — manually or with AI help:
+              </p>
+              <div style={{ color: '#94a3b8', fontSize: '12px', lineHeight: 1.8 }}>
+                <div><strong style={{ color: '#cbd5e1' }}>📝 Write Message</strong> — Traditional form where the patient types the subject and body.</div>
+                <div><strong style={{ color: '#cbd5e1' }}>💬 Chat with AI</strong> — The AI asks what you need, then composes a clear, professional message for you to review and send.</div>
+              </div>
+              <p style={{ color: '#64748b', fontSize: '11px', margin: '8px 0 0', lineHeight: 1.5, fontStyle: 'italic' }}>
+                Try &quot;Chat with AI&quot; — say you need a medication refill or have a question about a test result.
+              </p>
+            </div>
+
             {/* Mode toggle */}
             <div
               role="radiogroup"
@@ -884,6 +947,32 @@ export default function PatientPortal() {
         {/* ======= AI HISTORIAN TAB ======= */}
         {tab === 'historian' && (
           <div>
+            {/* Demo instructions for historian */}
+            <div style={{
+              background: 'rgba(245,158,11,0.08)',
+              border: '1px solid rgba(245,158,11,0.2)',
+              borderRadius: '10px',
+              padding: '14px 16px',
+              marginBottom: '20px',
+            }}>
+              <div style={{ fontWeight: 600, fontSize: '12px', color: '#fbbf24', marginBottom: '6px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                💡 How to demo this
+              </div>
+              <p style={{ color: '#94a3b8', fontSize: '12px', margin: '0 0 8px', lineHeight: 1.6 }}>
+                This is the flagship feature — an AI that conducts a full neurological intake interview by voice, just like a clinician would.
+                It asks follow-up questions, understands context, and generates a structured clinical summary.
+              </p>
+              <div style={{ color: '#94a3b8', fontSize: '12px', lineHeight: 1.8 }}>
+                <div><strong style={{ color: '#cbd5e1' }}>Step 1:</strong> Select a patient name below (or add yourself as a new one).</div>
+                <div><strong style={{ color: '#cbd5e1' }}>Step 2:</strong> Allow microphone access when prompted.</div>
+                <div><strong style={{ color: '#cbd5e1' }}>Step 3:</strong> Speak naturally — the AI will guide you through the interview one question at a time.</div>
+                <div><strong style={{ color: '#cbd5e1' }}>Step 4:</strong> When finished, review the structured clinical summary it generates.</div>
+              </div>
+              <p style={{ color: '#64748b', fontSize: '11px', margin: '8px 0 0', lineHeight: 1.5, fontStyle: 'italic' }}>
+                Try a demo scenario below for pre-loaded patient context, or add your own name and make up symptoms.
+              </p>
+            </div>
+
             <h2 style={{ color: '#fff', margin: '0 0 4px', fontSize: '1.25rem' }}>AI Neurologic Historian</h2>
             <p style={{ color: '#94a3b8', margin: '0 0 24px', fontSize: '0.875rem' }}>
               Select your name to begin your intake interview, or add yourself as a new patient.

@@ -48,6 +48,9 @@ function IconSidebar({ activeIcon, setActiveIcon, viewMode, onViewModeChange, on
   onViewModeChange: (mode: 'appointments' | 'chart') => void,
   onOpenSettings: () => void
 }) {
+  // Icons that have actual functionality behind them
+  const ACTIVE_ICONS = new Set(['home', 'notes', 'settings'])
+
   const icons = [
     { id: 'home', tooltip: 'Appointments', icon: (
       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -55,13 +58,13 @@ function IconSidebar({ activeIcon, setActiveIcon, viewMode, onViewModeChange, on
         <polyline points="9 22 9 12 15 12 15 22"/>
       </svg>
     )},
-    { id: 'calendar', tooltip: 'Calendar', icon: (
+    { id: 'calendar', tooltip: 'Calendar — not active in demo', icon: (
       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
         <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/>
         <line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>
       </svg>
     )},
-    { id: 'users', tooltip: 'Patients', icon: (
+    { id: 'users', tooltip: 'Patients — not active in demo', icon: (
       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
         <path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/>
         <circle cx="9" cy="7" r="4"/>
@@ -69,12 +72,12 @@ function IconSidebar({ activeIcon, setActiveIcon, viewMode, onViewModeChange, on
         <path d="M16 3.13a4 4 0 010 7.75"/>
       </svg>
     )},
-    { id: 'clock', tooltip: 'Schedule', icon: (
+    { id: 'clock', tooltip: 'Schedule — not active in demo', icon: (
       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
         <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
       </svg>
     )},
-    { id: 'branch', tooltip: 'Workflows', icon: (
+    { id: 'branch', tooltip: 'Workflows — not active in demo', icon: (
       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
         <line x1="6" y1="3" x2="6" y2="15"/>
         <circle cx="18" cy="6" r="3"/>
@@ -89,13 +92,13 @@ function IconSidebar({ activeIcon, setActiveIcon, viewMode, onViewModeChange, on
         <line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/>
       </svg>
     )},
-    { id: 'document', tooltip: 'Documents', icon: (
+    { id: 'document', tooltip: 'Documents — not active in demo', icon: (
       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
         <path d="M13 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V9z"/>
         <polyline points="13 2 13 9 20 9"/>
       </svg>
     )},
-    { id: 'phone', tooltip: 'Calls', icon: (
+    { id: 'phone', tooltip: 'Calls — not active in demo', icon: (
       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
         <path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07 19.5 19.5 0 01-6-6 19.79 19.79 0 01-3.07-8.67A2 2 0 014.11 2h3a2 2 0 012 1.72 12.84 12.84 0 00.7 2.81 2 2 0 01-.45 2.11L8.09 9.91a16 16 0 006 6l1.27-1.27a2 2 0 012.11-.45 12.84 12.84 0 002.81.7A2 2 0 0122 16.92z"/>
       </svg>
@@ -106,7 +109,7 @@ function IconSidebar({ activeIcon, setActiveIcon, viewMode, onViewModeChange, on
         <path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-2 2 2 2 0 01-2-2v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83 0 2 2 0 010-2.83l.06-.06a1.65 1.65 0 00.33-1.82 1.65 1.65 0 00-1.51-1H3a2 2 0 01-2-2 2 2 0 012-2h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 010-2.83 2 2 0 012.83 0l.06.06a1.65 1.65 0 001.82.33H9a1.65 1.65 0 001-1.51V3a2 2 0 012-2 2 2 0 012 2v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 0 2 2 0 010 2.83l-.06.06a1.65 1.65 0 00-.33 1.82V9a1.65 1.65 0 001.51 1H21a2 2 0 012 2 2 2 0 01-2 2h-.09a1.65 1.65 0 00-1.51 1z"/>
       </svg>
     )},
-    { id: 'help', tooltip: 'Help', icon: (
+    { id: 'help', tooltip: 'Help — not active in demo', icon: (
       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
         <circle cx="12" cy="12" r="10"/>
         <path d="M9.09 9a3 3 0 015.83 1c0 2-3 3-3 3"/>
@@ -116,6 +119,9 @@ function IconSidebar({ activeIcon, setActiveIcon, viewMode, onViewModeChange, on
   ]
 
   const handleIconClick = (iconId: string) => {
+    // Ignore clicks on non-functional icons
+    if (!ACTIVE_ICONS.has(iconId)) return
+
     setActiveIcon(iconId)
     // Home icon always shows appointments list
     if (iconId === 'home') {
@@ -149,28 +155,33 @@ function IconSidebar({ activeIcon, setActiveIcon, viewMode, onViewModeChange, on
       paddingTop: '12px',
       gap: '4px',
     }}>
-      {icons.map(item => (
-        <button
-          key={item.id}
-          onClick={() => handleIconClick(item.id)}
-          title={item.tooltip}
-          style={{
-            width: '40px',
-            height: '40px',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            borderRadius: '8px',
-            border: 'none',
-            background: getIsActive(item.id) ? 'var(--bg-gray)' : 'transparent',
-            cursor: 'pointer',
-            color: getIsActive(item.id) ? 'var(--primary)' : 'var(--text-muted)',
-            transition: 'all 0.2s',
-          }}
-        >
-          {item.icon}
-        </button>
-      ))}
+      {icons.map(item => {
+        const isActive = getIsActive(item.id)
+        const isFunctional = ACTIVE_ICONS.has(item.id)
+        return (
+          <button
+            key={item.id}
+            onClick={() => handleIconClick(item.id)}
+            title={item.tooltip}
+            style={{
+              width: '40px',
+              height: '40px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              borderRadius: '8px',
+              border: 'none',
+              background: isActive ? 'var(--bg-gray)' : 'transparent',
+              cursor: isFunctional ? 'pointer' : 'default',
+              color: isActive ? 'var(--primary)' : 'var(--text-muted)',
+              opacity: isFunctional ? 1 : 0.3,
+              transition: 'all 0.2s',
+            }}
+          >
+            {item.icon}
+          </button>
+        )
+      })}
     </div>
   )
 }

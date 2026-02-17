@@ -47,6 +47,7 @@ export default function TopNav({ user, onSignOut, openAiDrawer, onOpenSettings, 
   const [notificationsOpen, setNotificationsOpen] = useState(false)
   const [notifications, setNotifications] = useState(SAMPLE_NOTIFICATIONS)
   const [searchValue, setSearchValue] = useState('')
+  const [queueToast, setQueueToast] = useState(false)
 
   const searchVoice = useVoiceRecorder()
 
@@ -243,7 +244,15 @@ export default function TopNav({ user, onSignOut, openAiDrawer, onOpenSettings, 
             {queues.map(queue => (
               <button
                 key={queue.id}
-                onClick={() => setActiveQueue(queue.id)}
+                onClick={() => {
+                  if (queue.id === 'outpatient') {
+                    setActiveQueue(queue.id)
+                  } else {
+                    // Show toast for non-outpatient modules
+                    setQueueToast(true)
+                    setTimeout(() => setQueueToast(false), 4000)
+                  }
+                }}
                 style={{
                   padding: '6px 14px',
                   borderRadius: '20px',
@@ -997,6 +1006,30 @@ export default function TopNav({ user, onSignOut, openAiDrawer, onOpenSettings, 
               Session will timeout after 15 minutes of inactivity
             </p>
           </div>
+        </div>
+      )}
+
+      {/* Queue module toast */}
+      {queueToast && (
+        <div style={{
+          position: 'fixed',
+          top: '72px',
+          left: '50%',
+          transform: 'translateX(-50%)',
+          background: '#1e293b',
+          color: '#e2e8f0',
+          padding: '10px 20px',
+          borderRadius: '8px',
+          fontSize: '13px',
+          fontWeight: 500,
+          boxShadow: '0 4px 24px rgba(0,0,0,0.3)',
+          border: '1px solid #334155',
+          zIndex: 9999,
+          maxWidth: '480px',
+          textAlign: 'center',
+          animation: 'fadeIn 0.2s ease',
+        }}>
+          This is the outpatient module demo. Acute Care, Rounding, and EEG modules are already active in production.
         </div>
       )}
     </>

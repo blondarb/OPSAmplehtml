@@ -965,20 +965,20 @@ ${noteData.plan || 'Not documented'}`.trim()
             style={{
               display: 'flex',
               alignItems: 'center',
-              gap: '6px',
-              padding: '8px 14px',
-              borderRadius: '8px',
+              gap: '4px',
+              padding: '4px 10px',
+              borderRadius: '6px',
               border: 'none',
               background: 'linear-gradient(135deg, #8B5CF6 0%, #A78BFA 100%)',
               cursor: 'pointer',
-              fontSize: '13px',
+              fontSize: '11px',
               fontWeight: 500,
               color: 'white',
               position: 'relative',
             }}
             title="Generate clinical note from entered data"
           >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
               <path d="M12 1L13.5 9.5L22 12L13.5 14.5L12 23L10.5 14.5L2 12L10.5 9.5L12 1Z"/>
             </svg>
             Generate Note
@@ -987,8 +987,8 @@ ${noteData.plan || 'Not documented'}`.trim()
                 position: 'absolute',
                 top: '-4px',
                 right: '-4px',
-                width: '10px',
-                height: '10px',
+                width: '8px',
+                height: '8px',
                 borderRadius: '50%',
                 background: '#22C55E',
                 border: '2px solid white',
@@ -1001,27 +1001,27 @@ ${noteData.plan || 'Not documented'}`.trim()
             onClick={handlePend}
             disabled={pendStatus === 'pending'}
             style={{
-              padding: '8px 16px',
-              borderRadius: '8px',
+              padding: '4px 10px',
+              borderRadius: '6px',
               border: '1px solid var(--border)',
               background: pendStatus === 'saved' ? '#D1FAE5' : 'var(--bg-white)',
               cursor: pendStatus === 'pending' ? 'wait' : 'pointer',
-              fontSize: '13px',
+              fontSize: '11px',
               fontWeight: 500,
               color: pendStatus === 'saved' ? '#059669' : 'var(--text-primary)',
               display: 'flex',
               alignItems: 'center',
-              gap: '6px',
+              gap: '4px',
               transition: 'all 0.2s',
             }}
           >
             {pendStatus === 'pending' && (
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ animation: 'spin 1s linear infinite' }}>
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ animation: 'spin 1s linear infinite' }}>
                 <circle cx="12" cy="12" r="10" strokeDasharray="32" strokeDashoffset="32"/>
               </svg>
             )}
             {pendStatus === 'saved' && (
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                 <polyline points="20 6 9 17 4 12"/>
               </svg>
             )}
@@ -1032,12 +1032,12 @@ ${noteData.plan || 'Not documented'}`.trim()
           <button
             onClick={() => setShowSignModal(true)}
             style={{
-              padding: '8px 16px',
-              borderRadius: '8px',
+              padding: '4px 10px',
+              borderRadius: '6px',
               border: 'none',
               background: 'var(--primary)',
               cursor: 'pointer',
-              fontSize: '13px',
+              fontSize: '11px',
               fontWeight: 500,
               color: 'white',
             }}
