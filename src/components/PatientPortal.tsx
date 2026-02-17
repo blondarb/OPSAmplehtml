@@ -315,10 +315,16 @@ export default function PatientPortal() {
             {intakeMode === 'conversation' ? (
               <TextConversationalIntake
                 onComplete={(data) => {
+                  // Convert DOB from MM/DD/YYYY to YYYY-MM-DD for date input
+                  let dob = data.date_of_birth || ''
+                  const dobParts = dob.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/)
+                  if (dobParts) {
+                    dob = `${dobParts[3]}-${dobParts[1].padStart(2, '0')}-${dobParts[2].padStart(2, '0')}`
+                  }
                   // Map AI data to form state
                   setIntake({
                     patient_name: data.patient_name || '',
-                    date_of_birth: data.date_of_birth || '',
+                    date_of_birth: dob,
                     email: data.email || '',
                     phone: data.phone || '',
                     chief_complaint: data.chief_complaint || '',
