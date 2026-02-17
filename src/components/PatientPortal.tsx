@@ -3,6 +3,8 @@
 import { useState, useEffect, useCallback } from 'react'
 import { getTenantClient } from '@/lib/tenant'
 import { DEMO_SCENARIOS, type PortalPatient } from '@/lib/historianTypes'
+import PatientPortalDemoBanner from './PatientPortalDemoBanner'
+import InlineDictationButton from './InlineDictationButton'
 
 type Tab = 'intake' | 'messages' | 'historian'
 
@@ -206,6 +208,11 @@ export default function PatientPortal() {
           <span style={{ color: '#fff', fontWeight: 600, fontSize: '1.125rem' }}>Sevaro Patient Portal</span>
         </div>
       </header>
+
+      {/* Demo Context Banner */}
+      <div style={{ padding: '0 24px', marginTop: '16px' }}>
+        <PatientPortalDemoBanner />
+      </div>
 
       {/* Tab Bar */}
       <div style={{ display: 'flex', gap: '0', borderBottom: '1px solid #334155', padding: '0 24px' }}>
@@ -447,7 +454,16 @@ export default function PatientPortal() {
                 />
               </div>
               <div style={{ marginBottom: '16px' }}>
-                <label style={labelStyle}>Subject *</label>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '4px' }}>
+                  <label style={labelStyle}>Subject *</label>
+                  <InlineDictationButton
+                    onTranscriptionComplete={(text) => {
+                      setMsgSubject(prev => prev ? `${prev} ${text}` : text)
+                    }}
+                    disabled={msgLoading}
+                    size="small"
+                  />
+                </div>
                 <input
                   required
                   style={inputStyle}
@@ -457,14 +473,23 @@ export default function PatientPortal() {
                 />
               </div>
               <div style={{ marginBottom: '24px' }}>
-                <label style={labelStyle}>Message *</label>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '4px' }}>
+                  <label style={labelStyle}>Message *</label>
+                  <InlineDictationButton
+                    onTranscriptionComplete={(text) => {
+                      setMsgBody(prev => prev ? `${prev} ${text}` : text)
+                    }}
+                    disabled={msgLoading}
+                    size="small"
+                  />
+                </div>
                 <textarea
                   required
                   rows={5}
                   style={{ ...inputStyle, resize: 'vertical' }}
                   value={msgBody}
                   onChange={e => setMsgBody(e.target.value)}
-                  placeholder="Type your message here..."
+                  placeholder="Type your message or use voice dictation..."
                 />
               </div>
               <button
