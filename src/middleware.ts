@@ -3,6 +3,15 @@ import { NextResponse, type NextRequest } from 'next/server'
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl
 
+  // Check for switch_app flag - allow landing page to show when switching apps
+  const switchApp = request.nextUrl.searchParams.get('switch_app')
+  if (switchApp === 'true') {
+    // Clear the preferred_view cookie and show landing page
+    const response = NextResponse.next()
+    response.cookies.delete('preferred_view')
+    return response
+  }
+
   // Check for manual view override via query param
   const viewOverride = request.nextUrl.searchParams.get('view')
   if (viewOverride === 'desktop' || viewOverride === 'mobile') {

@@ -880,7 +880,7 @@ export default function TopNav({ user, onSignOut, openAiDrawer, onOpenSettings, 
                     <button
                       onClick={() => {
                         setUserMenuOpen(false)
-                        window.location.href = '/'
+                        window.location.href = '/?switch_app=true'
                       }}
                       style={{
                         display: 'flex',
