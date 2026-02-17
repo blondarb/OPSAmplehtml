@@ -20,7 +20,7 @@ const REQUIRED_FIELDS = [
 
 export default function TextConversationalIntake({ onComplete, onCancel }: ConversationalIntakeProps) {
   const [messages, setMessages] = useState<Message[]>([
-    { role: 'assistant', text: "Hi! I'm here to help you complete your intake form. Let's start with your full name - what's your first and last name?" }
+    { role: 'assistant', text: "Hello! 👋 Welcome to Sevaro Clinical. I'm your AI intake assistant and I'll help you get set up before your appointment. This will only take a few minutes — I'll ask you some simple questions to gather your information.\n\nLet's start with the basics — what is your full name?" }
   ])
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)

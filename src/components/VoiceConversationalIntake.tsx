@@ -400,8 +400,11 @@ export default function VoiceConversationalIntake({ onComplete, onCancel }: Voic
               <line x1="8" y1="23" x2="16" y2="23" />
             </svg>
           </div>
+          <h3 style={{ color: '#fff', fontSize: '16px', fontWeight: 600, margin: 0 }}>
+            Welcome to Voice Intake
+          </h3>
           <p style={{ color: '#94a3b8', fontSize: '14px', textAlign: 'center', maxWidth: '320px', lineHeight: '1.6' }}>
-            Speak naturally with an AI assistant to complete your intake form. You&apos;ll need to allow microphone access.
+            Have a quick conversation with our AI assistant to complete your intake form. Just speak naturally — it&apos;ll feel like talking to a receptionist. You&apos;ll need to allow microphone access when prompted.
           </p>
           <button
             onClick={startSession}
