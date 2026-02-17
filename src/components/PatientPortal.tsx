@@ -5,6 +5,7 @@ import { getTenantClient } from '@/lib/tenant'
 import { DEMO_SCENARIOS, type PortalPatient } from '@/lib/historianTypes'
 import PatientPortalDemoBanner from './PatientPortalDemoBanner'
 import InlineDictationButton from './InlineDictationButton'
+import TextConversationalIntake from './TextConversationalIntake'
 
 type Tab = 'intake' | 'messages' | 'historian'
 
@@ -39,6 +40,7 @@ export default function PatientPortal() {
   const [intake, setIntake] = useState<IntakeForm>(EMPTY_INTAKE)
   const [intakeSubmitted, setIntakeSubmitted] = useState(false)
   const [intakeLoading, setIntakeLoading] = useState(false)
+  const [intakeMode, setIntakeMode] = useState<'form' | 'conversation'>('form')
 
   const [msgSubject, setMsgSubject] = useState('')
   const [msgBody, setMsgBody] = useState('')
@@ -262,31 +264,99 @@ export default function PatientPortal() {
 
         {/* ======= INTAKE TAB ======= */}
         {tab === 'intake' && (
-          intakeSubmitted ? (
-            <div style={{ textAlign: 'center', padding: '48px 0' }}>
-              <div style={{
-                width: 64, height: 64, borderRadius: '50%',
-                background: 'rgba(34,197,94,0.15)',
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                margin: '0 auto 16px',
-              }}>
-                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#22c55e" strokeWidth="2"><polyline points="20 6 9 17 4 12"/></svg>
-              </div>
-              <h2 style={{ color: '#fff', margin: '0 0 8px' }}>Intake Form Submitted</h2>
-              <p style={{ color: '#94a3b8' }}>Your provider will review this before your appointment.</p>
+          <div>
+            {/* Mode toggle pills */}
+            <div style={{
+              display: 'flex',
+              gap: '12px',
+              marginBottom: '24px',
+              padding: '4px',
+              background: '#1e293b',
+              borderRadius: '10px',
+              border: '1px solid #334155',
+            }}>
               <button
-                onClick={() => { setIntakeSubmitted(false); setIntake(EMPTY_INTAKE) }}
+                onClick={() => setIntakeMode('form')}
                 style={{
-                  marginTop: '24px', padding: '10px 24px', borderRadius: '8px',
-                  background: '#8B5CF6', color: '#fff', border: 'none',
-                  fontWeight: 600, cursor: 'pointer', fontSize: '0.875rem',
+                  flex: 1,
+                  padding: '10px',
+                  borderRadius: '6px',
+                  background: intakeMode === 'form' ? '#8B5CF6' : 'transparent',
+                  color: intakeMode === 'form' ? 'white' : '#94a3b8',
+                  border: 'none',
+                  cursor: 'pointer',
+                  fontSize: '13px',
+                  fontWeight: 600,
+                  transition: 'all 0.2s',
                 }}
               >
-                Submit Another
+                📋 Fill Out Form
+              </button>
+              <button
+                onClick={() => setIntakeMode('conversation')}
+                style={{
+                  flex: 1,
+                  padding: '10px',
+                  borderRadius: '6px',
+                  background: intakeMode === 'conversation' ? '#8B5CF6' : 'transparent',
+                  color: intakeMode === 'conversation' ? 'white' : '#94a3b8',
+                  border: 'none',
+                  cursor: 'pointer',
+                  fontSize: '13px',
+                  fontWeight: 600,
+                  transition: 'all 0.2s',
+                }}
+              >
+                💬 Chat with AI
               </button>
             </div>
-          ) : (
-            <form onSubmit={handleIntakeSubmit}>
+
+            {/* Conditional render based on mode */}
+            {intakeMode === 'conversation' ? (
+              <TextConversationalIntake
+                onComplete={(data) => {
+                  // Map AI data to form state
+                  setIntake({
+                    patient_name: data.patient_name || '',
+                    date_of_birth: data.date_of_birth || '',
+                    email: data.email || '',
+                    phone: data.phone || '',
+                    chief_complaint: data.chief_complaint || '',
+                    current_medications: data.current_medications || '',
+                    allergies: data.allergies || '',
+                    medical_history: data.medical_history || '',
+                    family_history: data.family_history || '',
+                    notes: '',
+                  })
+                  setIntakeMode('form') // Switch to review
+                }}
+                onCancel={() => setIntakeMode('form')}
+              />
+            ) : intakeSubmitted ? (
+              <div style={{ textAlign: 'center', padding: '48px 0' }}>
+                <div style={{
+                  width: 64, height: 64, borderRadius: '50%',
+                  background: 'rgba(34,197,94,0.15)',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  margin: '0 auto 16px',
+                }}>
+                  <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#22c55e" strokeWidth="2"><polyline points="20 6 9 17 4 12"/></svg>
+                </div>
+                <h2 style={{ color: '#fff', margin: '0 0 8px' }}>Intake Form Submitted</h2>
+                <p style={{ color: '#94a3b8' }}>Your provider will review this before your appointment.</p>
+                <button
+                  onClick={() => { setIntakeSubmitted(false); setIntake(EMPTY_INTAKE) }}
+                  style={{
+                    marginTop: '24px', padding: '10px 24px', borderRadius: '8px',
+                    background: '#8B5CF6', color: '#fff', border: 'none',
+                    fontWeight: 600, cursor: 'pointer', fontSize: '0.875rem',
+                  }}
+                >
+                  Submit Another
+                </button>
+              </div>
+            ) : (
+              <form onSubmit={handleIntakeSubmit}>
               <h2 style={{ color: '#fff', margin: '0 0 4px', fontSize: '1.25rem' }}>Patient Intake Form</h2>
               <p style={{ color: '#94a3b8', margin: '0 0 24px', fontSize: '0.875rem' }}>
                 Please complete this form before your appointment.
@@ -417,7 +487,8 @@ export default function PatientPortal() {
                 {intakeLoading ? 'Submitting...' : 'Submit Intake Form'}
               </button>
             </form>
-          )
+            )}
+          </div>
         )}
 
         {/* ======= MESSAGES TAB ======= */}
