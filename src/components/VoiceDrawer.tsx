@@ -112,19 +112,28 @@ export default function VoiceDrawer({
     return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`
   }
 
-  // Reset Chart Prep state when the Chart Prep tab is activated
-  // This ensures a fresh session each time
-  const prevTabRef = useRef(activeTab)
+  // Clear all VoiceDrawer state when patient changes
+  // VoiceDrawer stays mounted (CSS visibility) so state persists across open/close,
+  // but must reset when switching to a different patient
+  const prevPatientIdRef = useRef(patient?.id)
   useEffect(() => {
-    if (activeTab === 'chart-prep' && prevTabRef.current !== 'chart-prep') {
+    if (patient?.id && prevPatientIdRef.current && patient.id !== prevPatientIdRef.current) {
+      // Patient changed — clear everything
       setPrepNotes([])
       setChartPrepSections(null)
       setInsertedSections(new Set())
       setAiResponse('')
+      setVisitAIOutput(null)
+      setVisitTranscript('')
+      setVisitAIProcessing(false)
+      setVisitAIError(null)
+      lastVisitAudioBlobRef.current = null
       hasAutoProcessedRef.current = false
+      setAutoProcessing(false)
+      setLoading(false)
     }
-    prevTabRef.current = activeTab
-  }, [activeTab])
+    prevPatientIdRef.current = patient?.id
+  }, [patient?.id])
 
   const tabs = [
     { id: 'chart-prep', label: 'Chart Prep' },

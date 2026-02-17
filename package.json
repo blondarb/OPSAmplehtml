@@ -10,6 +10,7 @@
     "sync-plans": "npx ts-node --project tsconfig.scripts.json scripts/sync-plans.ts"
   },
   "dependencies": {
+    "@deepgram/sdk": "^4.11.3",
     "@supabase/ssr": "^0.8.0",
     "@supabase/supabase-js": "^2.91.0",
     "next": "15.1.11",

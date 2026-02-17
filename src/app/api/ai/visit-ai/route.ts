@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import OpenAI from 'openai'
+import { createClient as createDeepgramClient } from '@deepgram/sdk'
 import { createClient } from '@/lib/supabase/server'
 
 // Allow up to 120s for long audio transcription + GPT processing
@@ -31,7 +32,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'No audio file provided' }, { status: 400 })
     }
 
-    // File size check (Whisper limit is 25MB)
+    // File size check (25MB limit)
     const MAX_FILE_SIZE = 25 * 1024 * 1024
     if (audioFile.size > MAX_FILE_SIZE) {
       return NextResponse.json({
@@ -39,39 +40,80 @@ export async function POST(request: Request) {
       }, { status: 400 })
     }
 
-    // Get OpenAI API key
-    let apiKey = process.env.OPENAI_API_KEY
-
-    if (!apiKey) {
-      const { data: setting } = await supabase.rpc('get_openai_key')
-      apiKey = setting
+    // Check for Deepgram API key
+    const deepgramKey = process.env.DEEPGRAM_API_KEY
+    if (!deepgramKey) {
+      return NextResponse.json({
+        error: 'Deepgram API key not configured. Please add DEEPGRAM_API_KEY to your environment variables.'
+      }, { status: 500 })
     }
 
-    if (!apiKey) {
+    // Get OpenAI API key for GPT clinical extraction
+    let openaiKey = process.env.OPENAI_API_KEY
+    if (!openaiKey) {
+      const { data: setting } = await supabase.rpc('get_openai_key')
+      openaiKey = setting
+    }
+    if (!openaiKey) {
       return NextResponse.json({
         error: 'OpenAI API key not configured'
       }, { status: 500 })
     }
 
-    const openai = new OpenAI({ apiKey })
+    // Step 1: Transcribe the audio with Deepgram (speaker diarization enabled)
+    const arrayBuffer = await audioFile.arrayBuffer()
+    const audioBuffer = Buffer.from(arrayBuffer)
 
-    // Step 1: Transcribe the audio with Whisper
-    const transcriptionResponse = await openai.audio.transcriptions.create({
-      file: audioFile,
-      model: 'whisper-1',
-      language: 'en',
-      response_format: 'verbose_json',
-      timestamp_granularities: ['segment'],
-    })
+    const deepgram = createDeepgramClient(deepgramKey)
+    const { result, error: dgError } = await deepgram.listen.prerecorded.transcribeFile(
+      audioBuffer,
+      {
+        model: 'nova-3',
+        smart_format: true,
+        language: 'en',
+        punctuate: true,
+        diarize: true,       // Speaker diarization — identifies who is speaking
+        utterances: true,    // Split into speaker turns
+        paragraphs: true,    // Group into paragraphs
+      }
+    )
 
-    const transcript = transcriptionResponse.text
-    const segments = (transcriptionResponse as any).segments || []
+    if (dgError) {
+      console.error('Deepgram transcription error:', dgError)
+      return NextResponse.json({
+        error: 'Transcription failed. Please try again.'
+      }, { status: 500 })
+    }
 
-    if (!transcript || transcript.trim().length === 0) {
+    // Get the plain transcript
+    const plainTranscript = result?.results?.channels?.[0]?.alternatives?.[0]?.transcript?.trim() || ''
+
+    if (!plainTranscript || plainTranscript.length === 0) {
       return NextResponse.json({
         error: 'No speech detected in the recording'
       }, { status: 400 })
     }
+
+    // Build diarized transcript from utterances (speaker-labeled)
+    const utterances = result?.results?.utterances || []
+    let diarizedTranscript = plainTranscript // fallback if no utterances
+
+    if (utterances.length > 0) {
+      diarizedTranscript = utterances
+        .map((u: any) => `Speaker ${u.speaker}: ${u.transcript}`)
+        .join('\n')
+    }
+
+    // Build segments from utterances for downstream consumers
+    const segments = utterances.map((u: any) => ({
+      text: u.transcript,
+      start: u.start,
+      end: u.end,
+      speaker: u.speaker,
+    }))
+
+    console.log('Deepgram diarized transcript:', diarizedTranscript.substring(0, 300))
+    console.log('Speakers detected:', new Set(utterances.map((u: any) => u.speaker)).size)
 
     // Parse patient, chart prep, and user settings data if provided
     let patient = null
@@ -105,12 +147,10 @@ Pre-Visit Chart Prep Notes:
     if (userSettings) {
       const prefs: string[] = []
 
-      // Global AI instructions
       if (userSettings.globalAiInstructions) {
         prefs.push(`User preferences: ${userSettings.globalAiInstructions}`)
       }
 
-      // Documentation style
       if (userSettings.documentationStyle) {
         const styleGuide: Record<string, string> = {
           concise: 'Keep all sections brief and focused on essential information only.',
@@ -120,7 +160,6 @@ Pre-Visit Chart Prep Notes:
         prefs.push(styleGuide[userSettings.documentationStyle])
       }
 
-      // Terminology preference
       if (userSettings.preferredTerminology) {
         const termGuide: Record<string, string> = {
           formal: 'Use formal, academic medical terminology.',
@@ -135,15 +174,23 @@ Pre-Visit Chart Prep Notes:
       }
     }
 
-    // Step 2: Process transcript with GPT-4 to extract clinical content
+    // Step 2: Process transcript with GPT to extract clinical content
+    const openai = new OpenAI({ apiKey: openaiKey })
+
     const systemPrompt = `You are a clinical documentation assistant for a neurology practice.
 Analyze the following transcript of a provider-patient visit and extract clinical content organized by note section.
 
 ${patientContext}
 ${chartPrepContext}
 
-TRANSCRIPT:
-${transcript}
+TRANSCRIPT (with speaker diarization):
+${diarizedTranscript}
+
+SPEAKER IDENTIFICATION:
+The transcript includes speaker labels from automatic diarization. Typically:
+- One speaker is the clinician (asks questions, gives medical advice, discusses diagnoses, performs examinations)
+- Another speaker is the patient (describes symptoms, answers questions, reports concerns)
+Use speaker context to better distinguish subjective complaints (patient-reported) from clinical observations (clinician-noted). If there are more than 2 speakers, additional speakers may be family members or other staff.
 
 Based on this conversation, generate structured clinical note content.
 Focus on extracting:
@@ -152,10 +199,6 @@ Focus on extracting:
 3. Physical Exam - Findings mentioned by the provider
 4. Assessment - Clinical impressions and diagnoses discussed
 5. Plan - Treatment recommendations, follow-up, medications discussed
-
-Speaker identification hints:
-- Provider usually asks questions, gives medical advice, discusses diagnoses
-- Patient usually describes symptoms, answers questions, reports concerns
 
 IMPORTANT GUARDRAILS:
 - Return ONLY valid JSON, no markdown formatting.
@@ -211,13 +254,9 @@ IMPORTANT GUARDRAILS:
       return NextResponse.json({
         success: true,
         visitAI: visitAIOutput,
-        transcript: transcript,
-        segments: segments.map((s: any) => ({
-          text: s.text,
-          start: s.start,
-          end: s.end,
-        })),
-        duration: (transcriptionResponse as any).duration || null,
+        transcript: plainTranscript,
+        segments: segments,
+        duration: result?.metadata?.duration || null,
       })
     } catch (parseError) {
       // If JSON parsing fails, return what we have
@@ -225,7 +264,7 @@ IMPORTANT GUARDRAILS:
       return NextResponse.json({
         success: true,
         visitAI: null,
-        transcript: transcript,
+        transcript: plainTranscript,
         segments: segments,
         rawResponse: responseText,
         parseError: 'Failed to parse structured response',

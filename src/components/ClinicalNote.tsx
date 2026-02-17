@@ -1497,19 +1497,22 @@ export default function ClinicalNote({
         />
       )}
 
-      {voiceDrawerOpen && (
-        <VoiceDrawer
-          isOpen={voiceDrawerOpen}
-          onClose={() => setVoiceDrawerOpen(false)}
-          activeTab={voiceDrawerTab}
-          setActiveTab={setVoiceDrawerTab}
-          patient={patient}
-          noteData={noteData}
-          updateNote={updateNote}
-          chartPrepOutput={chartPrepOutput}
-          onChartPrepComplete={handleChartPrepComplete}
-          onVisitAIComplete={handleVisitAIComplete}
-        />
+      {/* VoiceDrawer stays mounted (hidden via CSS) so state persists across open/close on same patient */}
+      {patient && (
+        <div style={{ display: voiceDrawerOpen ? undefined : 'none' }}>
+          <VoiceDrawer
+            isOpen={voiceDrawerOpen}
+            onClose={() => setVoiceDrawerOpen(false)}
+            activeTab={voiceDrawerTab}
+            setActiveTab={setVoiceDrawerTab}
+            patient={patient}
+            noteData={noteData}
+            updateNote={updateNote}
+            chartPrepOutput={chartPrepOutput}
+            onChartPrepComplete={handleChartPrepComplete}
+            onVisitAIComplete={handleVisitAIComplete}
+          />
+        </div>
       )}
 
       {dotPhrasesOpen && (
