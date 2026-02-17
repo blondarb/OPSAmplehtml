@@ -7,12 +7,9 @@ export async function POST(request: Request) {
   try {
     const { message, conversationHistory, currentData } = await request.json()
 
-    // Auth check
+    // Patient portal is publicly accessible — no auth required.
+    // Create a Supabase client only for the OpenAI key lookup.
     const supabase = await createClient()
-    const { data: { user }, error: authError } = await supabase.auth.getUser()
-    if (authError || !user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
 
     // Get OpenAI key
     let apiKey = process.env.OPENAI_API_KEY
@@ -39,12 +36,12 @@ export async function POST(request: Request) {
     ]
 
     // Call GPT-5-mini
+    // Note: gpt-5-mini only supports default temperature (1)
     const response = await openai.chat.completions.create({
       model: 'gpt-5-mini',
       messages,
       response_format: { type: 'json_object' },
       max_completion_tokens: 500,
-      temperature: 0.7
     })
 
     const result = JSON.parse(response.choices[0].message.content || '{}')
