@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import HistorianSessionPanel from './HistorianSessionPanel'
+import IntakeFormPanel from './IntakeFormPanel'
 import type { PatientMedication, PatientAllergy } from '@/lib/medicationTypes'
 
 interface LeftSidebarProps {
@@ -9,15 +10,17 @@ interface LeftSidebarProps {
   priorVisits: any[]
   scoreHistory: any[]
   patientMessages?: any[]
+  patientIntakeForms?: any[]
   historianSessions?: any[]
   onImportHistorian?: (session: any) => void
+  onImportIntake?: (form: any) => void
   isOpen?: boolean
   onClose?: () => void
   medications?: PatientMedication[]
   allergies?: PatientAllergy[]
 }
 
-export default function LeftSidebar({ patient, priorVisits, scoreHistory, patientMessages = [], historianSessions = [], onImportHistorian, isOpen = true, onClose, medications = [], allergies = [] }: LeftSidebarProps) {
+export default function LeftSidebar({ patient, priorVisits, scoreHistory, patientMessages = [], patientIntakeForms = [], historianSessions = [], onImportHistorian, onImportIntake, isOpen = true, onClose, medications = [], allergies = [] }: LeftSidebarProps) {
   const [expandedVisit, setExpandedVisit] = useState<string | null>(priorVisits[0]?.id || null)
   const [aiSummaryEnabled, setAiSummaryEnabled] = useState(true)
   const [scoreHistoryOpen, setScoreHistoryOpen] = useState(true)
@@ -632,6 +635,16 @@ export default function LeftSidebar({ patient, priorVisits, scoreHistory, patien
           </div>
         )}
       </div>
+      {/* Patient Intake Forms Section */}
+      {patientIntakeForms.length > 0 && (
+        <div style={{ padding: '12px 16px', borderTop: '1px solid var(--border)' }}>
+          <IntakeFormPanel
+            forms={patientIntakeForms}
+            onImport={onImportIntake}
+          />
+        </div>
+      )}
+
       {/* Patient Messages Section */}
       {patientMessages.length > 0 && (
         <div style={{ padding: '12px 16px', borderTop: '1px solid var(--border)' }}>

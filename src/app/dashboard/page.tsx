@@ -16,6 +16,7 @@ export default async function DashboardPage() {
       imagingStudies={data.imagingStudies}
       scoreHistory={data.scoreHistory}
       patientMessages={data.patientMessages}
+      patientIntakeForms={data.patientIntakeForms}
       historianSessions={data.historianSessions}
     />
   )

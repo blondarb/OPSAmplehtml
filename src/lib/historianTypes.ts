@@ -62,6 +62,7 @@ export interface HistorianSession {
   status: HistorianSessionStatus
   reviewed: boolean
   imported_to_note: boolean
+  session_source?: string
   created_at: string
   updated_at: string
   // Joined patient data (from dashboardData query)

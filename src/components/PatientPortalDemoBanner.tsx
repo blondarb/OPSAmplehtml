@@ -6,7 +6,7 @@ import { DEMO_SCENARIOS } from '@/lib/historianTypes'
 export default function PatientPortalDemoBanner() {
   const [dismissed, setDismissed] = useState(() => {
     try {
-      return !!localStorage.getItem('sevaro-patient-portal-demo-banner-dismissed')
+      return !!sessionStorage.getItem('sevaro-patient-portal-demo-banner-dismissed')
     } catch {
       return false
     }
@@ -18,7 +18,7 @@ export default function PatientPortalDemoBanner() {
 
   const dismiss = () => {
     try {
-      localStorage.setItem('sevaro-patient-portal-demo-banner-dismissed', 'true')
+      sessionStorage.setItem('sevaro-patient-portal-demo-banner-dismissed', 'true')
     } catch {}
     setDismissed(true)
   }
@@ -71,7 +71,7 @@ export default function PatientPortalDemoBanner() {
             textAlign: 'left',
           }}
         >
-          <span style={{ fontWeight: 600, fontSize: '13px', color: '#a78bfa' }}>
+          <span style={{ fontWeight: 600, fontSize: '13px', color: '#ddd6fe' }}>
             🩺 Demo Patient Personas
           </span>
           <svg
@@ -79,7 +79,7 @@ export default function PatientPortalDemoBanner() {
             height="14"
             viewBox="0 0 24 24"
             fill="none"
-            stroke="#a78bfa"
+            stroke="#ddd6fe"
             strokeWidth="2"
             style={{ transform: expandedSection === 'personas' ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.2s' }}
           >
@@ -90,7 +90,7 @@ export default function PatientPortalDemoBanner() {
           <div style={{ padding: '12px', fontSize: '12px', color: '#cbd5e1', lineHeight: '1.6' }}>
             {DEMO_SCENARIOS.map((scenario, i) => (
               <div key={i} style={{ marginBottom: i < DEMO_SCENARIOS.length - 1 ? '10px' : 0 }}>
-                <strong style={{ color: '#a78bfa' }}>{scenario.patient_name}</strong> - {scenario.referral_reason}
+                <strong style={{ color: '#ddd6fe' }}>{scenario.patient_name}</strong> - {scenario.referral_reason}
                 <div style={{ color: '#94a3b8', fontSize: '11px', marginTop: '2px' }}>
                   {scenario.session_type === 'new_patient' ? '🆕 New Patient' : '🔄 Follow-Up'} | {scenario.description}
                 </div>
@@ -117,7 +117,7 @@ export default function PatientPortalDemoBanner() {
             textAlign: 'left',
           }}
         >
-          <span style={{ fontWeight: 600, fontSize: '13px', color: '#a78bfa' }}>
+          <span style={{ fontWeight: 600, fontSize: '13px', color: '#ddd6fe' }}>
             ✨ Portal Features
           </span>
           <svg
@@ -125,7 +125,7 @@ export default function PatientPortalDemoBanner() {
             height="14"
             viewBox="0 0 24 24"
             fill="none"
-            stroke="#a78bfa"
+            stroke="#ddd6fe"
             strokeWidth="2"
             style={{ transform: expandedSection === 'features' ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.2s' }}
           >
@@ -158,7 +158,7 @@ export default function PatientPortalDemoBanner() {
             textAlign: 'left',
           }}
         >
-          <span style={{ fontWeight: 600, fontSize: '13px', color: '#a78bfa' }}>
+          <span style={{ fontWeight: 600, fontSize: '13px', color: '#ddd6fe' }}>
             🎯 How to Use the AI Historian
           </span>
           <svg
@@ -166,7 +166,7 @@ export default function PatientPortalDemoBanner() {
             height="14"
             viewBox="0 0 24 24"
             fill="none"
-            stroke="#a78bfa"
+            stroke="#ddd6fe"
             strokeWidth="2"
             style={{ transform: expandedSection === 'howto' ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.2s' }}
           >

@@ -18,21 +18,28 @@ export async function POST(request: Request) {
 
     const supabase = await createClient()
 
+    const insertData: Record<string, any> = {
+      tenant_id: tenant,
+      patient_name: body.patient_name,
+      date_of_birth: body.date_of_birth || null,
+      email: body.email || null,
+      phone: body.phone || null,
+      chief_complaint: body.chief_complaint,
+      current_medications: body.current_medications || null,
+      allergies: body.allergies || null,
+      medical_history: body.medical_history || null,
+      family_history: body.family_history || null,
+      notes: body.notes || null,
+    }
+
+    // Link to patient record if patient_id is provided
+    if (body.patient_id) {
+      insertData.patient_id = body.patient_id
+    }
+
     const { data, error } = await supabase
       .from('patient_intake_forms')
-      .insert({
-        tenant_id: tenant,
-        patient_name: body.patient_name,
-        date_of_birth: body.date_of_birth || null,
-        email: body.email || null,
-        phone: body.phone || null,
-        chief_complaint: body.chief_complaint,
-        current_medications: body.current_medications || null,
-        allergies: body.allergies || null,
-        medical_history: body.medical_history || null,
-        family_history: body.family_history || null,
-        notes: body.notes || null,
-      })
+      .insert(insertData)
       .select()
       .single()
 

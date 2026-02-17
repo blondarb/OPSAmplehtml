@@ -12,6 +12,12 @@ interface ConversationalIntakeProps {
   onCancel: () => void
 }
 
+const REQUIRED_FIELDS = [
+  'patient_name', 'date_of_birth', 'email', 'phone',
+  'chief_complaint', 'current_medications', 'allergies',
+  'medical_history', 'family_history'
+] as const
+
 export default function TextConversationalIntake({ onComplete, onCancel }: ConversationalIntakeProps) {
   const [messages, setMessages] = useState<Message[]>([
     { role: 'assistant', text: "Hi! I'm here to help you complete your intake form. Let's start with your full name - what's your first and last name?" }
@@ -21,6 +27,11 @@ export default function TextConversationalIntake({ onComplete, onCancel }: Conve
   const [intakeData, setIntakeData] = useState<Record<string, string>>({})
   const [error, setError] = useState<string | null>(null)
   const messagesEndRef = useRef<HTMLDivElement>(null)
+
+  // Calculate fields collected for progress indicator
+  const fieldsCollected = REQUIRED_FIELDS.filter(
+    f => intakeData[f] && String(intakeData[f]).trim() !== ''
+  ).length
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
@@ -92,7 +103,7 @@ export default function TextConversationalIntake({ onComplete, onCancel }: Conve
     }
   }
 
-  const handleKeyPress = (e: React.KeyboardEvent) => {
+  const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault()
       handleSend()
@@ -150,8 +161,46 @@ export default function TextConversationalIntake({ onComplete, onCancel }: Conve
         </button>
       </div>
 
+      {/* Progress indicator */}
+      <div
+        role="status"
+        aria-live="polite"
+        style={{
+          padding: '8px 20px',
+          borderBottom: '1px solid #334155',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '10px',
+        }}
+      >
+        <div style={{
+          flex: 1,
+          height: '6px',
+          borderRadius: '3px',
+          background: '#1e293b',
+          overflow: 'hidden',
+        }}>
+          <div style={{
+            width: `${(fieldsCollected / REQUIRED_FIELDS.length) * 100}%`,
+            height: '100%',
+            borderRadius: '3px',
+            background: fieldsCollected === REQUIRED_FIELDS.length
+              ? '#22c55e'
+              : 'linear-gradient(90deg, #8B5CF6, #A78BFA)',
+            transition: 'width 0.4s ease',
+          }} />
+        </div>
+        <span style={{ fontSize: '11px', color: '#94a3b8', whiteSpace: 'nowrap' }}>
+          {fieldsCollected} of {REQUIRED_FIELDS.length} fields
+        </span>
+      </div>
+
       {/* Messages */}
-      <div style={{
+      <div
+        role="log"
+        aria-live="polite"
+        aria-label="Intake conversation"
+        style={{
         flex: 1,
         overflowY: 'auto',
         padding: '20px',
@@ -218,9 +267,10 @@ export default function TextConversationalIntake({ onComplete, onCancel }: Conve
       }}>
         <input
           type="text"
+          aria-label="Type your answer to the intake question"
           value={input}
           onChange={(e) => setInput(e.target.value)}
-          onKeyPress={handleKeyPress}
+          onKeyDown={handleKeyDown}
           placeholder="Type your answer..."
           disabled={loading}
           style={{
@@ -235,6 +285,7 @@ export default function TextConversationalIntake({ onComplete, onCancel }: Conve
           }}
         />
         <button
+          aria-label="Send message"
           onClick={handleSend}
           disabled={loading || !input.trim()}
           style={{

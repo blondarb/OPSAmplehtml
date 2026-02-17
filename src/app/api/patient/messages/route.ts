@@ -18,15 +18,22 @@ export async function POST(request: Request) {
 
     const supabase = await createClient()
 
+    const insertData: Record<string, any> = {
+      tenant_id: tenant,
+      patient_name: body.patient_name,
+      subject: body.subject || '',
+      body: msgBody,
+      direction: 'inbound',
+    }
+
+    // Link to patient record if patient_id is provided
+    if (body.patient_id) {
+      insertData.patient_id = body.patient_id
+    }
+
     const { data, error } = await supabase
       .from('patient_messages')
-      .insert({
-        tenant_id: tenant,
-        patient_name: body.patient_name,
-        subject: body.subject || '',
-        body: msgBody,
-        direction: 'inbound',
-      })
+      .insert(insertData)
       .select()
       .single()
 

@@ -36,6 +36,7 @@ interface ClinicalNoteProps {
   imagingStudies: any[]
   scoreHistory: any[]
   patientMessages?: any[]
+  patientIntakeForms?: any[]
   historianSessions?: any[]
 }
 
@@ -182,6 +183,7 @@ export default function ClinicalNote({
   imagingStudies: initialImagingStudies,
   scoreHistory: initialScoreHistory,
   patientMessages = [],
+  patientIntakeForms = [],
   historianSessions = [],
 }: ClinicalNoteProps) {
   const [darkMode, setDarkMode] = useState(false)
@@ -974,6 +976,27 @@ export default function ClinicalNote({
     }))
   }
 
+  const handleImportIntake = (form: any) => {
+    if (!form) return
+    if (isSwitchingPatientRef.current) {
+      console.warn('Ignoring intake import - patient switch in progress')
+      return
+    }
+    const hpiParts: string[] = []
+    if (form.chief_complaint) hpiParts.push(`Chief Complaint: ${form.chief_complaint}`)
+    if (form.current_medications) hpiParts.push(`Medications: ${form.current_medications}`)
+    if (form.medical_history) hpiParts.push(`Medical History: ${form.medical_history}`)
+    if (form.family_history) hpiParts.push(`Family History: ${form.family_history}`)
+
+    setNoteData(prev => ({
+      ...prev,
+      hpi: hpiParts.length > 0
+        ? `${hpiParts.join('\n\n')}${prev.hpi ? '\n\n' + prev.hpi : ''}`
+        : prev.hpi,
+      allergies: form.allergies || prev.allergies,
+    }))
+  }
+
   // Fetch medications and allergies when patient changes
   useEffect(() => {
     if (!patient?.id) return
@@ -1399,8 +1422,10 @@ export default function ClinicalNote({
               priorVisits={priorVisits}
               scoreHistory={scoreHistory}
               patientMessages={patientMessages}
+              patientIntakeForms={patientIntakeForms}
               historianSessions={patientHistorianSessions}
               onImportHistorian={handleImportHistorian}
+              onImportIntake={handleImportIntake}
               isOpen={mobileSidebarOpen}
               onClose={() => setMobileSidebarOpen(false)}
               medications={medications}

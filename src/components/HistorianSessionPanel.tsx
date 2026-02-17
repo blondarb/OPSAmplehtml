@@ -142,6 +142,20 @@ export default function HistorianSessionPanel({ sessions, onImport }: HistorianS
                     }}>
                       {session.session_type === 'new_patient' ? 'New' : 'F/U'}
                     </span>
+                    {session.session_source === 'voice_intake' && (
+                      <span style={{
+                        display: 'inline-block',
+                        padding: '1px 6px',
+                        borderRadius: '4px',
+                        background: 'rgba(245,158,11,0.15)',
+                        color: '#f59e0b',
+                        fontSize: '0.65rem',
+                        fontWeight: 600,
+                        textTransform: 'uppercase',
+                      }}>
+                        Intake
+                      </span>
+                    )}
                     <span style={{ fontWeight: 600, fontSize: '0.8rem', color: 'var(--text-primary, #1e293b)' }}>
                       {displayName}
                     </span>

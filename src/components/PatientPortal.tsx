@@ -6,6 +6,7 @@ import { DEMO_SCENARIOS, type PortalPatient } from '@/lib/historianTypes'
 import PatientPortalDemoBanner from './PatientPortalDemoBanner'
 import InlineDictationButton from './InlineDictationButton'
 import TextConversationalIntake from './TextConversationalIntake'
+import VoiceConversationalIntake from './VoiceConversationalIntake'
 
 type Tab = 'intake' | 'messages' | 'historian'
 
@@ -40,13 +41,17 @@ export default function PatientPortal() {
   const [intake, setIntake] = useState<IntakeForm>(EMPTY_INTAKE)
   const [intakeSubmitted, setIntakeSubmitted] = useState(false)
   const [intakeLoading, setIntakeLoading] = useState(false)
-  const [intakeMode, setIntakeMode] = useState<'form' | 'conversation'>('form')
+  const [intakeMode, setIntakeMode] = useState<'form' | 'conversation' | 'voice'>('form')
 
   const [msgSubject, setMsgSubject] = useState('')
   const [msgBody, setMsgBody] = useState('')
   const [msgSent, setMsgSent] = useState(false)
   const [msgLoading, setMsgLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+
+  // Patient identification state
+  const [matchedPatientId, setMatchedPatientId] = useState<string | null>(null)
+  const [matchedPatientName, setMatchedPatientName] = useState<string | null>(null)
 
   // Historian tab state
   const [portalPatients, setPortalPatients] = useState<PortalPatient[]>([])
@@ -81,6 +86,27 @@ export default function PatientPortal() {
       fetchPatients()
     }
   }, [tab, fetchPatients])
+
+  // Attempt patient lookup when name or DOB changes
+  const lookupPatient = useCallback(async (name: string, dob: string) => {
+    if (!name || name.trim().length < 3) {
+      setMatchedPatientId(null)
+      setMatchedPatientName(null)
+      return
+    }
+    try {
+      const params = new URLSearchParams({ name, tenant_id: tenant })
+      if (dob) params.set('dob', dob)
+      const res = await fetch(`/api/patient/lookup?${params}`)
+      if (res.ok) {
+        const data = await res.json()
+        setMatchedPatientId(data.patient_id || null)
+        setMatchedPatientName(data.patient_name || null)
+      }
+    } catch {
+      // Silently fail - lookup is optional
+    }
+  }, [tenant])
 
   const handleAddPatient = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -118,9 +144,10 @@ export default function PatientPortal() {
       const res = await fetch('/api/patient/intake', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...intake, tenant_id: tenant }),
+        body: JSON.stringify({ ...intake, tenant_id: tenant, patient_id: matchedPatientId }),
       })
       if (!res.ok) throw new Error('Failed to submit intake form')
+      console.log('[Sevaro Analytics] intake_form_submitted', { mode: intakeMode, matchedPatientId, timestamp: new Date().toISOString() })
       setIntakeSubmitted(true)
     } catch (err: any) {
       setError(err.message)
@@ -142,6 +169,7 @@ export default function PatientPortal() {
           subject: msgSubject,
           body: msgBody,
           tenant_id: tenant,
+          patient_id: matchedPatientId,
         }),
       })
       if (!res.ok) throw new Error('Failed to send message')
@@ -266,55 +294,99 @@ export default function PatientPortal() {
         {tab === 'intake' && (
           <div>
             {/* Mode toggle pills */}
-            <div style={{
-              display: 'flex',
-              gap: '12px',
-              marginBottom: '24px',
-              padding: '4px',
-              background: '#1e293b',
-              borderRadius: '10px',
-              border: '1px solid #334155',
-            }}>
-              <button
-                onClick={() => setIntakeMode('form')}
-                style={{
-                  flex: 1,
-                  padding: '10px',
-                  borderRadius: '6px',
-                  background: intakeMode === 'form' ? '#8B5CF6' : 'transparent',
-                  color: intakeMode === 'form' ? 'white' : '#94a3b8',
-                  border: 'none',
-                  cursor: 'pointer',
-                  fontSize: '13px',
-                  fontWeight: 600,
-                  transition: 'all 0.2s',
-                }}
-              >
-                📋 Fill Out Form
-              </button>
-              <button
-                onClick={() => setIntakeMode('conversation')}
-                style={{
-                  flex: 1,
-                  padding: '10px',
-                  borderRadius: '6px',
-                  background: intakeMode === 'conversation' ? '#8B5CF6' : 'transparent',
-                  color: intakeMode === 'conversation' ? 'white' : '#94a3b8',
-                  border: 'none',
-                  cursor: 'pointer',
-                  fontSize: '13px',
-                  fontWeight: 600,
-                  transition: 'all 0.2s',
-                }}
-              >
-                💬 Chat with AI
-              </button>
+            <div
+              role="radiogroup"
+              aria-label="Choose intake method"
+              onKeyDown={(e) => {
+                const modes: Array<typeof intakeMode> = ['form', 'conversation', 'voice']
+                const idx = modes.indexOf(intakeMode)
+                if (e.key === 'ArrowRight' || e.key === 'ArrowDown') {
+                  e.preventDefault()
+                  const next = modes[(idx + 1) % modes.length]
+                  setIntakeMode(next)
+                  console.log('[Sevaro Analytics] intake_mode_switch', { from: intakeMode, to: next, method: 'keyboard', timestamp: new Date().toISOString() })
+                } else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') {
+                  e.preventDefault()
+                  const prev = modes[(idx - 1 + modes.length) % modes.length]
+                  setIntakeMode(prev)
+                  console.log('[Sevaro Analytics] intake_mode_switch', { from: intakeMode, to: prev, method: 'keyboard', timestamp: new Date().toISOString() })
+                }
+              }}
+              style={{
+                display: 'flex',
+                gap: '4px',
+                marginBottom: '24px',
+                padding: '4px',
+                background: '#1e293b',
+                borderRadius: '10px',
+                border: '1px solid #334155',
+              }}
+            >
+              {([
+                { mode: 'form' as const, label: '📋 Fill Out Form' },
+                { mode: 'conversation' as const, label: '💬 Chat with AI' },
+                { mode: 'voice' as const, label: '🎙️ Talk with AI' },
+              ]).map(({ mode, label }) => (
+                <button
+                  key={mode}
+                  role="radio"
+                  aria-checked={intakeMode === mode}
+                  tabIndex={intakeMode === mode ? 0 : -1}
+                  onClick={() => {
+                    console.log('[Sevaro Analytics] intake_mode_switch', { from: intakeMode, to: mode, method: 'click', timestamp: new Date().toISOString() })
+                    setIntakeMode(mode)
+                  }}
+                  style={{
+                    flex: 1,
+                    padding: '10px',
+                    borderRadius: '6px',
+                    background: intakeMode === mode ? '#8B5CF6' : 'transparent',
+                    color: intakeMode === mode ? 'white' : '#94a3b8',
+                    border: 'none',
+                    cursor: 'pointer',
+                    fontSize: '13px',
+                    fontWeight: 600,
+                    transition: 'all 0.2s',
+                  }}
+                >
+                  {label}
+                </button>
+              ))}
             </div>
 
             {/* Conditional render based on mode */}
-            {intakeMode === 'conversation' ? (
+            {intakeMode === 'voice' ? (
+              <VoiceConversationalIntake
+                onComplete={(data) => {
+                  console.log('[Sevaro Analytics] intake_completed', { mode: 'voice', fieldsCollected: Object.keys(data).length, timestamp: new Date().toISOString() })
+                  // Convert DOB from MM/DD/YYYY to YYYY-MM-DD for date input
+                  let dob = data.date_of_birth || ''
+                  const dobParts = dob.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/)
+                  if (dobParts) {
+                    dob = `${dobParts[3]}-${dobParts[1].padStart(2, '0')}-${dobParts[2].padStart(2, '0')}`
+                  }
+                  setIntake({
+                    patient_name: data.patient_name || '',
+                    date_of_birth: dob,
+                    email: data.email || '',
+                    phone: data.phone || '',
+                    chief_complaint: data.chief_complaint || '',
+                    current_medications: data.current_medications || '',
+                    allergies: data.allergies || '',
+                    medical_history: data.medical_history || '',
+                    family_history: data.family_history || '',
+                    notes: '',
+                  })
+                  // Attempt patient lookup with AI-collected data
+                  lookupPatient(data.patient_name || '', dob)
+                  setIntakeMode('form')
+                }}
+                onCancel={() => setIntakeMode('form')}
+              />
+            ) : intakeMode === 'conversation' ? (
               <TextConversationalIntake
                 onComplete={(data) => {
+                  console.log('[Sevaro Analytics] intake_completed', { mode: 'conversation', fieldsCollected: Object.keys(data).length, timestamp: new Date().toISOString() })
                   // Convert DOB from MM/DD/YYYY to YYYY-MM-DD for date input
                   let dob = data.date_of_birth || ''
                   const dobParts = dob.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/)
@@ -334,6 +406,8 @@ export default function PatientPortal() {
                     family_history: data.family_history || '',
                     notes: '',
                   })
+                  // Attempt patient lookup with AI-collected data
+                  lookupPatient(data.patient_name || '', dob)
                   setIntakeMode('form') // Switch to review
                 }}
                 onCancel={() => setIntakeMode('form')}
@@ -368,6 +442,27 @@ export default function PatientPortal() {
                 Please complete this form before your appointment.
               </p>
 
+              {/* Patient match indicator */}
+              {matchedPatientId && (
+                <div style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  padding: '8px 12px',
+                  background: 'rgba(34,197,94,0.1)',
+                  border: '1px solid rgba(34,197,94,0.3)',
+                  borderRadius: '8px',
+                  marginBottom: '16px',
+                }}>
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#22c55e" strokeWidth="2">
+                    <polyline points="20 6 9 17 4 12"/>
+                  </svg>
+                  <span style={{ fontSize: '0.8rem', color: '#22c55e', fontWeight: 500 }}>
+                    Matched to patient record: {matchedPatientName || intake.patient_name}
+                  </span>
+                </div>
+              )}
+
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '16px' }}>
                 <div>
                   <label style={labelStyle}>Full Name *</label>
@@ -376,6 +471,7 @@ export default function PatientPortal() {
                     style={inputStyle}
                     value={intake.patient_name}
                     onChange={e => setIntake({ ...intake, patient_name: e.target.value })}
+                    onBlur={() => lookupPatient(intake.patient_name, intake.date_of_birth)}
                     placeholder="Jane Doe"
                   />
                 </div>
@@ -385,7 +481,11 @@ export default function PatientPortal() {
                     type="date"
                     style={inputStyle}
                     value={intake.date_of_birth}
-                    onChange={e => setIntake({ ...intake, date_of_birth: e.target.value })}
+                    onChange={e => {
+                      setIntake({ ...intake, date_of_birth: e.target.value })
+                      // Auto-lookup when DOB changes (since it's a date picker, no blur needed)
+                      lookupPatient(intake.patient_name, e.target.value)
+                    }}
                   />
                 </div>
                 <div>
