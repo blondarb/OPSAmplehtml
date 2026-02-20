@@ -884,37 +884,6 @@ ${noteData.plan || 'Not documented'}`.trim()
             </svg>
           </button>
 
-          {/* Chart Prep - opens Voice Drawer to Chart Prep tab */}
-          <button
-            title="Chart Prep"
-            onClick={() => openVoiceDrawer?.('chart-prep')}
-            style={{
-              width: '32px',
-              height: '32px',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              borderRadius: '6px',
-              border: 'none',
-              background: chartPrepOutput ? '#D1FAE5' : '#FEF3C7',
-              cursor: 'pointer',
-              color: chartPrepOutput ? '#059669' : '#F59E0B',
-              position: 'relative',
-            }}
-          >
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2"/>
-              <rect x="9" y="3" width="6" height="4" rx="1"/>
-            </svg>
-            {chartPrepOutput && (
-              <span style={{
-                position: 'absolute', top: '-3px', right: '-3px',
-                width: '10px', height: '10px', borderRadius: '50%',
-                background: '#22C55E', border: '2px solid white',
-              }} />
-            )}
-          </button>
-
           {/* Microphone - opens Voice Drawer to Document Visit tab */}
           <button
             data-tour="voice-button"

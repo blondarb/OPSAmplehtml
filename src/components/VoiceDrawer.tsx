@@ -399,113 +399,114 @@ export default function VoiceDrawer({
   // Auto-process Chart Prep when transcription completes
   // This effect runs when prepTranscribedText changes and we're not recording
   useEffect(() => {
-    // Only auto-process if:
-    // 1. We have transcribed text
-    // 2. We're not currently recording
-    // 3. We're not currently transcribing
-    // 4. We haven't already auto-processed this transcription
-    if (
-      prepTranscribedText &&
-      prepTranscribedText.trim() &&
-      !isPrepRecording &&
-      !isPrepTranscribing &&
-      !hasAutoProcessedRef.current &&
-      !autoProcessing
-    ) {
-      hasAutoProcessedRef.current = true
-      setAutoProcessing(true)
-
-      // Add the note first
-      const autoCategory = detectCategory(prepTranscribedText)
-      const newNote = {
-        text: prepTranscribedText.trim(),
-        timestamp: new Date().toISOString(),
-        category: autoCategory,
-      }
-
-      // Use functional update to get the latest prepNotes
-      setPrepNotes(prev => {
-        const updatedNotes = [...prev, newNote]
-
-        // After adding note, trigger AI summary generation
-        // Use setTimeout to ensure state is updated
-        setTimeout(async () => {
-          try {
-            setLoading(true)
-            setChartPrepSections(null)
-            setInsertedSections(new Set())
-
-            const userSettings = getUserSettings()
-            const response = await fetch('/api/ai/chart-prep', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                patient,
-                noteData,
-                prepNotes: updatedNotes,
-                userSettings,
-              }),
-            })
-
-            const data = await response.json()
-            if (data.sections) {
-              setChartPrepSections(data.sections)
-              setAiResponse('')
-              if (onChartPrepComplete) {
-                onChartPrepComplete(data.sections)
-              }
-
-              // Auto-insert sections into note fields
-              // Uses noteDataRef for current values (avoids stale closure)
-              // Replaces any previous chart prep content to prevent duplication
-              const config = [
-                { key: 'suggestedHPI', targetField: 'hpi' },
-                { key: 'suggestedAssessment', targetField: 'assessment' },
-                { key: 'suggestedPlan', targetField: 'plan' },
-              ]
-
-              config.forEach(section => {
-                if (section.targetField && data.sections[section.key]) {
-                  const currentValue = noteDataRef.current[section.targetField] || ''
-                  const aiContent = data.sections[section.key]
-
-                  // Strip any previous chart prep content (between markers) before inserting
-                  const stripped = currentValue
-                    .replace(/--- Chart Prep ---[\s\S]*?--- End Chart Prep ---\n*/g, '')
-                    .trim()
-
-                  const markedContent = `--- Chart Prep ---\n${aiContent}\n--- End Chart Prep ---`
-                  const newValue = stripped
-                    ? `${stripped}\n\n${markedContent}`
-                    : markedContent
-                  updateNote(section.targetField, newValue)
-                }
-              })
-
-              setInsertedSections(new Set(config.map(s => s.key)))
-            } else {
-              setAiResponse(data.response || data.error || 'No response')
-              setChartPrepSections(null)
-            }
-          } catch (error) {
-            setAiResponse('Error generating chart prep')
-            setChartPrepSections(null)
-          } finally {
-            setLoading(false)
-            setAutoProcessing(false)
-            clearPrepTranscription()
-          }
-        }, 100)
-
-        return updatedNotes
-      })
-    }
-
-    // Reset the ref when we start a new recording
+    // Reset guard when a new recording starts so the next transcription can auto-process
     if (isPrepRecording) {
       hasAutoProcessedRef.current = false
+      return
     }
-  }, [prepTranscribedText, isPrepRecording, isPrepTranscribing, patient, noteData, onChartPrepComplete, updateNote, clearPrepTranscription, autoProcessing])
+
+    // Only auto-process if we have new transcribed text and nothing is in-flight
+    if (
+      !prepTranscribedText ||
+      !prepTranscribedText.trim() ||
+      isPrepTranscribing ||
+      hasAutoProcessedRef.current ||
+      autoProcessing
+    ) {
+      return
+    }
+
+    hasAutoProcessedRef.current = true
+    setAutoProcessing(true)
+
+    // Capture text locally before any async work (avoids stale closure)
+    const transcribedText = prepTranscribedText.trim()
+
+    // Add the note first
+    const autoCategory = detectCategory(transcribedText)
+    const newNote = {
+      text: transcribedText,
+      timestamp: new Date().toISOString(),
+      category: autoCategory,
+    }
+
+    // Use functional update to get the latest prepNotes
+    setPrepNotes(prev => {
+      const updatedNotes = [...prev, newNote]
+
+      // After adding note, trigger AI summary generation
+      // Use setTimeout to ensure state is updated
+      setTimeout(async () => {
+        try {
+          setLoading(true)
+          setChartPrepSections(null)
+          setInsertedSections(new Set())
+
+          const userSettings = getUserSettings()
+          const response = await fetch('/api/ai/chart-prep', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              patient,
+              noteData: noteDataRef.current,
+              prepNotes: updatedNotes,
+              userSettings,
+            }),
+          })
+
+          const data = await response.json()
+          if (data.sections) {
+            setChartPrepSections(data.sections)
+            setAiResponse('')
+            if (onChartPrepComplete) {
+              onChartPrepComplete(data.sections)
+            }
+
+            // Auto-insert sections into note fields
+            // Uses noteDataRef for current values (avoids stale closure)
+            // Replaces any previous chart prep content to prevent duplication
+            const config = [
+              { key: 'suggestedHPI', targetField: 'hpi' },
+              { key: 'suggestedAssessment', targetField: 'assessment' },
+              { key: 'suggestedPlan', targetField: 'plan' },
+            ]
+
+            config.forEach(section => {
+              if (section.targetField && data.sections[section.key]) {
+                const currentValue = noteDataRef.current[section.targetField] || ''
+                const aiContent = data.sections[section.key]
+
+                // Strip any previous chart prep content (between markers) before inserting
+                const stripped = currentValue
+                  .replace(/--- Chart Prep ---[\s\S]*?--- End Chart Prep ---\n*/g, '')
+                  .trim()
+
+                const markedContent = `--- Chart Prep ---\n${aiContent}\n--- End Chart Prep ---`
+                const newValue = stripped
+                  ? `${stripped}\n\n${markedContent}`
+                  : markedContent
+                updateNote(section.targetField, newValue)
+              }
+            })
+
+            setInsertedSections(new Set(config.map(s => s.key)))
+          } else {
+            setAiResponse(data.response || data.error || 'No response')
+            setChartPrepSections(null)
+          }
+        } catch (error) {
+          setAiResponse('Error generating chart prep')
+          setChartPrepSections(null)
+        } finally {
+          setLoading(false)
+          setAutoProcessing(false)
+          clearPrepTranscription()
+        }
+      }, 100)
+
+      return updatedNotes
+    })
+  }, [prepTranscribedText, isPrepRecording, isPrepTranscribing, patient, onChartPrepComplete, updateNote, clearPrepTranscription, autoProcessing])
 
   // Toggle section expansion
   const toggleSection = (key: string) => {
