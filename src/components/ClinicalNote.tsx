@@ -1461,6 +1461,7 @@ export default function ClinicalNote({
               updateRawDictation={updateRawDictation}
               onGenerateNote={generateNote}
               hasAIContent={!!(chartPrepOutput || visitAIOutput)}
+              chartPrepOutput={chartPrepOutput}
               onRecommendationsSelected={handleRecommendationsSelected}
               onScaleComplete={handleScaleComplete}
               onDiagnosesChange={handleDiagnosesChange}

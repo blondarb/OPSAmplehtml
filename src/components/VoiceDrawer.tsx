@@ -137,7 +137,7 @@ export default function VoiceDrawer({
 
   const tabs = [
     { id: 'chart-prep', label: 'Chart Prep' },
-    { id: 'document', label: 'Document' },
+    { id: 'document', label: 'Document Visit' },
   ]
 
   // Start a fresh Chart Prep recording session, clearing previous state
@@ -261,6 +261,36 @@ export default function VoiceDrawer({
 
         if (onVisitAIComplete && data.visitAI) {
           onVisitAIComplete(data.visitAI, data.transcript || '')
+        }
+
+        // Auto-insert Visit AI content into note fields (same pattern as Chart Prep)
+        // Preserves manual entries and chart prep markers — appends below with Visit AI markers
+        if (data.visitAI) {
+          const visitFields = [
+            { key: 'hpiFromVisit', targetField: 'hpi' },
+            { key: 'rosFromVisit', targetField: 'ros' },
+            { key: 'examFromVisit', targetField: 'physicalExam' },
+            { key: 'assessmentFromVisit', targetField: 'assessment' },
+            { key: 'planFromVisit', targetField: 'plan' },
+          ]
+
+          visitFields.forEach(({ key, targetField }) => {
+            const aiContent = data.visitAI[key]
+            if (aiContent && aiContent.trim()) {
+              const currentValue = noteDataRef.current[targetField] || ''
+
+              // Strip any previous Visit AI content (between markers) before inserting
+              const stripped = currentValue
+                .replace(/--- Visit AI ---[\s\S]*?--- End Visit AI ---\n*/g, '')
+                .trim()
+
+              const markedContent = `--- Visit AI ---\n${aiContent}\n--- End Visit AI ---`
+              const newValue = stripped
+                ? `${stripped}\n\n${markedContent}`
+                : markedContent
+              updateNote(targetField, newValue)
+            }
+          })
         }
       }
     } catch (error: any) {
@@ -621,6 +651,48 @@ export default function VoiceDrawer({
             >
               {tab.label}
             </button>
+          ))}
+        </div>
+
+        {/* Workflow Progress */}
+        <div style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          gap: '6px',
+          padding: '8px 16px',
+          background: 'var(--bg-gray)',
+          borderBottom: '1px solid var(--border)',
+          fontSize: '11px',
+        }}>
+          {[
+            { label: 'Chart Prep', done: !!chartPrepSections || !!chartPrepOutput, active: activeTab === 'chart-prep' },
+            { label: 'Document Visit', done: !!visitAIOutput, active: activeTab === 'document' },
+            { label: 'Review & Sign', done: false, active: false },
+          ].map((step, i) => (
+            <span key={step.label} style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+              {i > 0 && <span style={{ color: 'var(--text-tertiary)', margin: '0 2px' }}>→</span>}
+              <span style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                width: '16px',
+                height: '16px',
+                borderRadius: '50%',
+                fontSize: '9px',
+                fontWeight: 600,
+                background: step.done ? '#059669' : step.active ? '#EF4444' : 'var(--border)',
+                color: step.done || step.active ? 'white' : 'var(--text-tertiary)',
+              }}>
+                {step.done ? '✓' : i + 1}
+              </span>
+              <span style={{
+                fontWeight: step.active ? 600 : 400,
+                color: step.active ? 'var(--text-primary)' : step.done ? '#059669' : 'var(--text-tertiary)',
+              }}>
+                {step.label}
+              </span>
+            </span>
           ))}
         </div>
 
@@ -1087,7 +1159,7 @@ export default function VoiceDrawer({
           {activeTab === 'document' && (
             <div>
               <p style={{ marginBottom: '12px', color: 'var(--text-secondary)', fontSize: '12px' }}>
-                Record your patient visit. AI will transcribe the conversation and generate clinical note sections.
+                Record your patient encounter. AI will identify speakers and extract clinical content into your note.
               </p>
 
               {/* Main Recording UI */}
@@ -1140,7 +1212,7 @@ export default function VoiceDrawer({
                         Start Visit Recording
                       </p>
                       <p style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
-                        AI will transcribe and extract clinical content
+                        AI identifies speakers and extracts content into your note
                       </p>
                     </div>
                   ) : (
@@ -1445,7 +1517,7 @@ export default function VoiceDrawer({
                   )}
 
                   <p style={{ fontSize: '11px', fontWeight: 500, color: 'var(--text-muted)', marginBottom: '8px' }}>
-                    Extracted Content (click &quot;Generate Note&quot; in toolbar to apply)
+                    Extracted Content (added to note fields)
                   </p>
 
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
@@ -1512,17 +1584,17 @@ export default function VoiceDrawer({
                   <div style={{
                     marginTop: '12px',
                     padding: '10px',
-                    background: '#FEF3C7',
+                    background: '#ECFDF5',
                     borderRadius: '6px',
                     display: 'flex',
                     alignItems: 'center',
                     gap: '8px',
                   }}>
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="#92400E">
-                      <path d="M12 1L13.5 9.5L22 12L13.5 14.5L12 23L10.5 14.5L2 12L10.5 9.5L12 1Z"/>
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#059669" strokeWidth="2">
+                      <polyline points="20 6 9 17 4 12"/>
                     </svg>
-                    <span style={{ fontSize: '11px', color: '#92400E' }}>
-                      Click <strong>&quot;Generate Note&quot;</strong> in the note toolbar to apply this content
+                    <span style={{ fontSize: '11px', color: '#065F46' }}>
+                      Visit content has been added to your note fields. Review and edit as needed.
                     </span>
                   </div>
                 </div>

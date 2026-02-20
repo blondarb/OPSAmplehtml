@@ -39,6 +39,7 @@ interface CenterPanelProps {
   updateRawDictation?: (field: string, rawText: string) => void
   onGenerateNote?: () => void
   hasAIContent?: boolean
+  chartPrepOutput?: any
   onRecommendationsSelected?: (items: string[], category?: string) => void
   onScaleComplete?: (scaleId: string, result: any) => void
   onDiagnosesChange?: (diagnoses: Diagnosis[]) => void
@@ -79,6 +80,7 @@ export default function CenterPanel({
   updateRawDictation,
   onGenerateNote,
   hasAIContent,
+  chartPrepOutput,
   onRecommendationsSelected,
   onScaleComplete,
   onDiagnosesChange,
@@ -115,6 +117,10 @@ export default function CenterPanel({
   // Allergy form state
   const [showAllergyForm, setShowAllergyForm] = useState(false)
   const [allergyFormData, setAllergyFormData] = useState({ allergen: '', allergen_type: 'drug' as AllergenType, reaction: '', severity: 'unknown' as AllergySeverity })
+
+  // Chart prep banner state
+  const [chartPrepExpanded, setChartPrepExpanded] = useState(false)
+  const [chartPrepDismissed, setChartPrepDismissed] = useState(false)
 
   // Tab customization state
   const [tabs, setTabs] = useState(DEFAULT_TABS)
@@ -878,7 +884,38 @@ ${noteData.plan || 'Not documented'}`.trim()
             </svg>
           </button>
 
-          {/* Microphone - opens Voice Drawer */}
+          {/* Chart Prep - opens Voice Drawer to Chart Prep tab */}
+          <button
+            title="Chart Prep"
+            onClick={() => openVoiceDrawer?.('chart-prep')}
+            style={{
+              width: '32px',
+              height: '32px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              borderRadius: '6px',
+              border: 'none',
+              background: chartPrepOutput ? '#D1FAE5' : '#FEF3C7',
+              cursor: 'pointer',
+              color: chartPrepOutput ? '#059669' : '#F59E0B',
+              position: 'relative',
+            }}
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2"/>
+              <rect x="9" y="3" width="6" height="4" rx="1"/>
+            </svg>
+            {chartPrepOutput && (
+              <span style={{
+                position: 'absolute', top: '-3px', right: '-3px',
+                width: '10px', height: '10px', borderRadius: '50%',
+                background: '#22C55E', border: '2px solid white',
+              }} />
+            )}
+          </button>
+
+          {/* Microphone - opens Voice Drawer to Document Visit tab */}
           <button
             data-tour="voice-button"
             onClick={() => openVoiceDrawer?.('document')}
@@ -1296,6 +1333,103 @@ ${noteData.plan || 'Not documented'}`.trim()
                     {sec.label}
                   </button>
                 ))}
+              </div>
+            )}
+
+            {/* Chart Prep Summary Banner — visible reference while seeing the patient */}
+            {chartPrepOutput && !chartPrepDismissed && (
+              <div style={{
+                marginBottom: '12px',
+                background: 'var(--bg-white)',
+                border: '1px solid #F59E0B',
+                borderLeft: '4px solid #F59E0B',
+                borderRadius: '8px',
+                overflow: 'hidden',
+              }}>
+                <div
+                  onClick={() => setChartPrepExpanded(!chartPrepExpanded)}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                    padding: '10px 12px',
+                    cursor: 'pointer',
+                    userSelect: 'none',
+                  }}
+                >
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="#F59E0B" style={{ flexShrink: 0 }}>
+                    <path d="M12 1L13.5 9.5L22 12L13.5 14.5L12 23L10.5 14.5L2 12L10.5 9.5L12 1Z"/>
+                  </svg>
+                  <span style={{ fontSize: '12px', fontWeight: 600, color: '#B45309', whiteSpace: 'nowrap' }}>
+                    Chart Prep
+                  </span>
+                  <span style={{
+                    fontSize: '12px',
+                    color: 'var(--text-secondary)',
+                    flex: 1,
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    whiteSpace: chartPrepExpanded ? 'normal' : 'nowrap',
+                  }}>
+                    {chartPrepOutput.summary
+                      ? (chartPrepExpanded ? '' : chartPrepOutput.summary.split('.')[0] + '.')
+                      : 'AI summary ready'}
+                  </span>
+                  <svg
+                    width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--text-tertiary)" strokeWidth="2"
+                    style={{ flexShrink: 0, transform: chartPrepExpanded ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }}
+                  >
+                    <polyline points="6 9 12 15 18 9"/>
+                  </svg>
+                  <button
+                    onClick={(e) => { e.stopPropagation(); setChartPrepDismissed(true) }}
+                    style={{
+                      background: 'none', border: 'none', cursor: 'pointer', padding: '2px',
+                      color: 'var(--text-tertiary)', flexShrink: 0, lineHeight: 1,
+                    }}
+                    title="Dismiss"
+                  >
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+                    </svg>
+                  </button>
+                </div>
+
+                {chartPrepExpanded && (
+                  <div style={{ padding: '0 12px 12px', fontSize: '13px', color: 'var(--text-primary)', lineHeight: 1.5 }}>
+                    {/* Alerts */}
+                    {chartPrepOutput.alerts && chartPrepOutput.alerts.length > 0 && (
+                      <div style={{
+                        background: '#FEF2F2', borderRadius: '6px', padding: '8px 10px', marginBottom: '8px',
+                        fontSize: '12px', color: '#DC2626',
+                      }}>
+                        <strong>Alerts:</strong> {chartPrepOutput.alerts.join(' | ')}
+                      </div>
+                    )}
+
+                    {/* Full summary */}
+                    {chartPrepOutput.summary && (
+                      <p style={{ margin: '0 0 8px' }}>{chartPrepOutput.summary}</p>
+                    )}
+
+                    {/* Key considerations */}
+                    {chartPrepOutput.keyConsiderations && (
+                      <p style={{ margin: 0, fontSize: '12px', color: 'var(--text-secondary)' }}>
+                        <strong>Key considerations:</strong> {chartPrepOutput.keyConsiderations}
+                      </p>
+                    )}
+
+                    <button
+                      onClick={() => openVoiceDrawer?.('chart-prep')}
+                      style={{
+                        marginTop: '8px', padding: '4px 10px', borderRadius: '4px', border: '1px solid #F59E0B',
+                        background: 'transparent', color: '#B45309', fontSize: '11px', fontWeight: 500, cursor: 'pointer',
+                      }}
+                    >
+                      View Details
+                    </button>
+                  </div>
+                )}
               </div>
             )}
 
