@@ -313,6 +313,7 @@ export default function ClinicalNote({
   // Autosave status
   const [autosaveStatus, setAutosaveStatus] = useState<'saved' | 'saving' | 'unsaved'>('saved')
   const autosaveTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+  const handleSignCompleteRef = useRef<() => Promise<void>>(() => Promise.resolve())
 
   // Autosave effect - debounced save to localStorage
   // Only start autosaving after initial load to avoid overwriting saved data
@@ -440,12 +441,20 @@ export default function ClinicalNote({
 
   // Callback when Chart Prep completes
   // Guard: Only accept if we're still on the same patient (prevents stale async responses)
+  // Maps API response fields to the ChartPrepOutput type expected by the synthesis pipeline
   const handleChartPrepComplete = useCallback((output: ChartPrepOutput) => {
     if (isSwitchingPatientRef.current) {
       console.warn('Ignoring chart prep result - patient switch in progress')
       return
     }
-    setChartPrepOutput(output)
+    // The chart-prep API returns 'summary' and 'alerts' but ChartPrepOutput uses
+    // 'patientSummary' and 'keyConsiderations'. Map them so synthesis gets the data.
+    const mapped: ChartPrepOutput = {
+      ...output,
+      patientSummary: output.patientSummary || (output as any).summary || '',
+      keyConsiderations: output.keyConsiderations || (output as any).alerts || '',
+    }
+    setChartPrepOutput(mapped)
   }, [])
 
   // Callback when Visit AI completes
@@ -476,17 +485,22 @@ export default function ClinicalNote({
   }, [noteData])
 
   // Handle signing note from preview modal
-  const handleSignFromPreview = useCallback((finalNote: Record<string, string>) => {
-    // Update all note fields with the final content
+  const handleSignFromPreview = useCallback(async (finalNote: Record<string, string>) => {
+    // Update all note fields with the synthesized/reviewed content
     Object.entries(finalNote).forEach(([field, value]) => {
       if (field in noteData) {
         updateNote(field, value)
       }
     })
-    // Mark as signed
-    // TODO: Update visit status to signed in database
+    // Close the modal before signing (sign flow may open follow-up modal)
     setNotePreviewOpen(false)
-    // Could show a success toast here
+    // Delegate to the real sign flow via ref (defined later in file):
+    // save → sign API → reset state → follow-up modal
+    try {
+      await handleSignCompleteRef.current()
+    } catch (error) {
+      console.error('Error signing from preview:', error)
+    }
   }, [noteData])
 
   // Track recommendations selected in SmartRecommendationsSection
@@ -1333,6 +1347,9 @@ export default function ClinicalNote({
       throw error
     }
   }, [currentVisit, handlePend, resetAllClinicalState, autosaveKey])
+
+  // Keep ref current so handleSignFromPreview (defined earlier) can call it
+  handleSignCompleteRef.current = handleSignComplete
 
   // Schedule follow-up appointment handler
   const handleScheduleFollowup = useCallback(async (appointmentData: {

@@ -179,13 +179,32 @@ export default function EnhancedNotePreviewModal({
     try {
       const userSettings = getUserSettings()
 
+      // Strip AI markers from manual data so the synthesis API doesn't
+      // receive the same content as both "Manual Entry" and "Visit Transcription"
+      const stripMarkers = (text: string | undefined): string => {
+        if (!text) return ''
+        return text
+          .replace(/--- Visit AI ---[\s\S]*?--- End Visit AI ---\n*/g, '')
+          .replace(/--- Chart Prep ---[\s\S]*?--- End Chart Prep ---\n*/g, '')
+          .replace(/--- Pre-Visit Notes ---[\s\S]*?--- End Pre-Visit Notes ---\n*/g, '')
+          .trim()
+      }
+      const cleanManualData = {
+        ...noteData.manualData,
+        hpi: stripMarkers(noteData.manualData?.hpi),
+        ros: stripMarkers(noteData.manualData?.ros),
+        physicalExam: stripMarkers(noteData.manualData?.physicalExam),
+        assessment: stripMarkers(noteData.manualData?.assessment),
+        plan: stripMarkers(noteData.manualData?.plan),
+      }
+
       const response = await fetch('/api/ai/synthesize-note', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           noteType,
           noteLength,
-          manualData: noteData.manualData,
+          manualData: cleanManualData,
           chartPrepData: noteData.chartPrepData,
           visitAIData: noteData.visitAIData,
           scales: noteData.scales,

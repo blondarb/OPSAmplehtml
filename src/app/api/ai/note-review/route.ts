@@ -49,7 +49,7 @@ export async function POST(request: Request) {
 Rules:
 - Return at most 6 suggestions, prioritized by clinical importance.
 - Only flag genuine issues; do not fabricate problems.
-- Each suggestion must reference the relevant section by its ID.
+- Each suggestion must reference the relevant section by its ID. Valid section IDs are: chiefComplaint, hpi, ros, scales, vitals, physicalExam, imaging, labs, assessment, plan
 - Be specific and actionable in your message text.
 - Severity "warning" = likely documentation gap or inconsistency. Severity "info" = optional improvement.
 
