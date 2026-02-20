@@ -51,8 +51,6 @@ export default function VoiceDrawer({
   const [aiResponse, setAiResponse] = useState('')
   const [chartPrepSections, setChartPrepSections] = useState<any>(null)
   const [loading, setLoading] = useState(false)
-  const [insertedSections, setInsertedSections] = useState<Set<string>>(new Set())
-
   // Chart Prep specific state
   const [prepNotes, setPrepNotes] = useState<Array<{ text: string; timestamp: string; category: string }>>([])
   const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set(['patientSummary', 'keyConsiderations']))
@@ -121,7 +119,6 @@ export default function VoiceDrawer({
       // Patient changed — clear everything
       setPrepNotes([])
       setChartPrepSections(null)
-      setInsertedSections(new Set())
       setAiResponse('')
       setVisitAIOutput(null)
       setVisitTranscript('')
@@ -144,7 +141,6 @@ export default function VoiceDrawer({
   const startFreshPrepRecording = () => {
     setPrepNotes([])
     setChartPrepSections(null)
-    setInsertedSections(new Set())
     setAiResponse('')
     hasAutoProcessedRef.current = false
     startPrepRecording()
@@ -166,43 +162,6 @@ export default function VoiceDrawer({
       // Ignore parse errors
     }
     return null
-  }
-
-  const generateChartPrep = async () => {
-    setLoading(true)
-    setChartPrepSections(null)
-    setInsertedSections(new Set())
-
-    try {
-      const userSettings = getUserSettings()
-      const response = await fetch('/api/ai/chart-prep', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          patient,
-          noteData,
-          prepNotes,
-          userSettings,
-        }),
-      })
-
-      const data = await response.json()
-      if (data.sections) {
-        setChartPrepSections(data.sections)
-        setAiResponse('')
-        if (onChartPrepComplete) {
-          onChartPrepComplete(data.sections)
-        }
-      } else {
-        setAiResponse(data.response || data.error || 'No response')
-        setChartPrepSections(null)
-      }
-    } catch (error) {
-      setAiResponse('Error generating chart prep')
-      setChartPrepSections(null)
-    }
-
-    setLoading(false)
   }
 
   // Process Visit AI recording
@@ -307,32 +266,11 @@ export default function VoiceDrawer({
     setVisitAIError(null)
   }
 
-  // Insert a chart prep section into a note field
-  // Replaces any previous chart prep content in that field to prevent duplication
-  const insertSection = (sectionKey: string, targetField: string) => {
-    if (!chartPrepSections || !chartPrepSections[sectionKey]) return
-
-    const content = chartPrepSections[sectionKey]
-    const currentValue = noteData[targetField] || ''
-
-    // Strip any previous chart prep content (between markers) before inserting
-    const stripped = currentValue
-      .replace(/--- Chart Prep ---[\s\S]*?--- End Chart Prep ---\n*/g, '')
-      .trim()
-
-    const markedContent = `--- Chart Prep ---\n${content}\n--- End Chart Prep ---`
-    const newValue = stripped
-      ? `${stripped}\n\n${markedContent}`
-      : markedContent
-    updateNote(targetField, newValue)
-    setInsertedSections(prev => new Set([...prev, sectionKey]))
-  }
-
-  // Chart prep section configuration - insertable sections that map to note fields
-  const chartPrepConfig = [
-    { key: 'suggestedHPI', label: 'Suggested HPI', targetField: 'hpi' },
-    { key: 'suggestedAssessment', label: 'Suggested Assessment', targetField: 'assessment' },
-    { key: 'suggestedPlan', label: 'Suggested Plan', targetField: 'plan' },
+  // Chart prep section labels for read-only display in the drawer
+  const chartPrepDisplaySections = [
+    { key: 'suggestedHPI', label: 'Suggested HPI' },
+    { key: 'suggestedAssessment', label: 'Suggested Assessment' },
+    { key: 'suggestedPlan', label: 'Suggested Plan' },
   ]
 
   // Prep note categories
@@ -440,7 +378,6 @@ export default function VoiceDrawer({
         try {
           setLoading(true)
           setChartPrepSections(null)
-          setInsertedSections(new Set())
 
           const userSettings = getUserSettings()
           const response = await fetch('/api/ai/chart-prep', {
@@ -462,34 +399,21 @@ export default function VoiceDrawer({
               onChartPrepComplete(data.sections)
             }
 
-            // Auto-insert sections into note fields
-            // Uses noteDataRef for current values (avoids stale closure)
-            // Replaces any previous chart prep content to prevent duplication
-            const config = [
-              { key: 'suggestedHPI', targetField: 'hpi' },
-              { key: 'suggestedAssessment', targetField: 'assessment' },
-              { key: 'suggestedPlan', targetField: 'plan' },
-            ]
-
-            config.forEach(section => {
-              if (section.targetField && data.sections[section.key]) {
-                const currentValue = noteDataRef.current[section.targetField] || ''
-                const aiContent = data.sections[section.key]
-
-                // Strip any previous chart prep content (between markers) before inserting
-                const stripped = currentValue
+            // Chart prep is now reference-only — do NOT insert into note fields.
+            // Clean up any legacy chart prep markers that may exist in fields from prior behavior.
+            const fieldsToClean = ['hpi', 'assessment', 'plan']
+            fieldsToClean.forEach(field => {
+              const currentValue = noteDataRef.current[field] || ''
+              if (currentValue.includes('--- Chart Prep ---')) {
+                const cleaned = currentValue
                   .replace(/--- Chart Prep ---[\s\S]*?--- End Chart Prep ---\n*/g, '')
+                  .replace(/--- Pre-Visit Notes ---[\s\S]*?--- End Pre-Visit Notes ---\n*/g, '')
                   .trim()
-
-                const markedContent = `--- Chart Prep ---\n${aiContent}\n--- End Chart Prep ---`
-                const newValue = stripped
-                  ? `${stripped}\n\n${markedContent}`
-                  : markedContent
-                updateNote(section.targetField, newValue)
+                if (cleaned !== currentValue.trim()) {
+                  updateNote(field, cleaned)
+                }
               }
             })
-
-            setInsertedSections(new Set(config.map(s => s.key)))
           } else {
             setAiResponse(data.response || data.error || 'No response')
             setChartPrepSections(null)
@@ -519,40 +443,6 @@ export default function VoiceDrawer({
       }
       return next
     })
-  }
-
-  // Add all insertable sections to note at once
-  const insertAllSections = () => {
-    if (!chartPrepSections) return
-
-    const fieldUpdates: Record<string, string[]> = {
-      hpi: [],
-      assessment: [],
-      plan: [],
-    }
-
-    chartPrepConfig.forEach(section => {
-      if (section.targetField && chartPrepSections[section.key]) {
-        fieldUpdates[section.targetField].push(chartPrepSections[section.key])
-      }
-    })
-
-    if (prepNotes.length > 0) {
-      const prepNotesText = prepNotes.map(n => `[${n.category}] ${n.text}`).join('\n\n')
-      fieldUpdates.hpi.unshift(`--- Pre-Visit Notes ---\n${prepNotesText}\n--- End Pre-Visit Notes ---\n`)
-    }
-
-    Object.entries(fieldUpdates).forEach(([field, contents]) => {
-      if (contents.length > 0) {
-        const currentValue = noteData[field] || ''
-        const newValue = currentValue
-          ? `${currentValue}\n\n${contents.join('\n\n')}`
-          : contents.join('\n\n')
-        updateNote(field, newValue)
-      }
-    })
-
-    setInsertedSections(new Set(chartPrepConfig.map(s => s.key)))
   }
 
   // Delete a prep note
@@ -991,61 +881,21 @@ export default function VoiceDrawer({
                 </div>
               )}
 
-              {/* Add All Button */}
-              {chartPrepSections && (
-                <button
-                  onClick={insertAllSections}
-                  disabled={insertedSections.size === chartPrepConfig.length}
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '8px',
-                    padding: '10px 16px',
-                    background: insertedSections.size === chartPrepConfig.length ? '#D1FAE5' : 'var(--warning)',
-                    color: insertedSections.size === chartPrepConfig.length ? '#059669' : 'white',
-                    border: 'none',
-                    borderRadius: '8px',
-                    fontWeight: 500,
-                    cursor: insertedSections.size === chartPrepConfig.length ? 'default' : 'pointer',
-                    marginBottom: '12px',
-                    width: '100%',
-                    justifyContent: 'center',
-                  }}
-                >
-                  {insertedSections.size === chartPrepConfig.length ? (
-                    <>
-                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                        <path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><path d="M22 4L12 14.01l-3-3"/>
-                      </svg>
-                      All Sections Added to Note
-                    </>
-                  ) : (
-                    <>
-                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                        <path d="M12 5v14M5 12h14"/>
-                      </svg>
-                      Add All to Note
-                    </>
-                  )}
-                </button>
-              )}
-
-              {/* Insertable sections (HPI, Assessment, Plan) */}
+              {/* AI-generated reference sections (read-only — chart prep does not write to note fields) */}
               {chartPrepSections && (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                  {chartPrepConfig.map(section => {
+                  {chartPrepDisplaySections.map(section => {
                     const content = chartPrepSections[section.key]
                     if (!content) return null
 
                     const isExpanded = expandedSections.has(section.key)
-                    const isInserted = insertedSections.has(section.key)
 
                     return (
                       <div
                         key={section.key}
                         style={{
-                          background: isInserted ? '#F0FDF4' : 'var(--bg-white)',
-                          border: isInserted ? '1px solid #86EFAC' : '1px solid var(--border)',
+                          background: 'var(--bg-white)',
+                          border: '1px solid var(--border)',
                           borderRadius: '6px',
                           overflow: 'hidden',
                         }}
@@ -1063,16 +913,9 @@ export default function VoiceDrawer({
                             cursor: 'pointer',
                           }}
                         >
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                            <span style={{ fontWeight: 500, fontSize: '12px', color: 'var(--text-primary)' }}>
-                              {section.label}
-                            </span>
-                            {isInserted && (
-                              <span style={{ fontSize: '9px', padding: '1px 4px', borderRadius: '3px', background: '#22C55E', color: 'white' }}>
-                                ✓
-                              </span>
-                            )}
-                          </div>
+                          <span style={{ fontWeight: 500, fontSize: '12px', color: 'var(--text-primary)' }}>
+                            {section.label}
+                          </span>
                           <svg
                             width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--text-muted)" strokeWidth="2"
                             style={{ transform: isExpanded ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.2s' }}
@@ -1088,33 +931,9 @@ export default function VoiceDrawer({
                               color: 'var(--text-secondary)',
                               lineHeight: 1.5,
                               whiteSpace: 'pre-wrap',
-                              marginBottom: '8px',
                             }}>
                               {content}
                             </div>
-                            {!isInserted && (
-                              <button
-                                onClick={() => insertSection(section.key, section.targetField)}
-                                style={{
-                                  display: 'flex',
-                                  alignItems: 'center',
-                                  gap: '4px',
-                                  padding: '4px 8px',
-                                  background: '#EF4444',
-                                  color: 'white',
-                                  border: 'none',
-                                  borderRadius: '4px',
-                                  fontSize: '10px',
-                                  fontWeight: 500,
-                                  cursor: 'pointer',
-                                }}
-                              >
-                                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                                  <path d="M12 5v14M5 12h14"/>
-                                </svg>
-                                Insert to {section.targetField.toUpperCase()}
-                              </button>
-                            )}
                           </div>
                         )}
                       </div>
@@ -1595,7 +1414,7 @@ export default function VoiceDrawer({
                       <polyline points="20 6 9 17 4 12"/>
                     </svg>
                     <span style={{ fontSize: '11px', color: '#065F46' }}>
-                      Visit content has been added to your note fields. Review and edit as needed.
+                      Visit AI has drafted content into your note fields. Review and edit each section.
                     </span>
                   </div>
                 </div>

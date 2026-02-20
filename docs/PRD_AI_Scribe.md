@@ -72,6 +72,24 @@ The AI Scribe is an integrated AI-driven system for ambient transcription and cl
 
 ## Solution Overview
 
+### Workflow Architecture (Updated Feb 2026)
+
+Based on research into leading AI scribe products (Ambience, DAX Copilot, Abridge, DeepScribe, Suki):
+
+| Phase | What Happens | Writes to Note Fields? |
+|-------|-------------|----------------------|
+| **Chart Prep** (pre-visit) | Physician dictates observations, AI generates summary | No — reference panel only |
+| **During Visit** | Ambient recording + simultaneous manual data entry as parallel streams | Manual entry only |
+| **Visit AI** (post-visit) | AI extracts HPI/ROS/Exam/Assessment/Plan from diarized transcript | Yes — auto-inserts as draft |
+| **Review & Edit** | Physician reviews combined note (manual + AI draft), edits, resolves overlaps | Physician edits fields |
+| **Sign** | Final review and attestation | N/A |
+
+**Key principles:**
+- Chart prep is a distilled reference, not a field writer
+- Recording and manual EHR interaction are parallel, independent streams
+- AI-generated content is a draft, not a final product
+- Deduplication between manual and AI content happens at the review stage, not automatically
+
 ### Core Concept
 
 The AI Scribe listens to the clinical encounter (with appropriate consent), transcribes the conversation in real-time, and uses medical AI to:

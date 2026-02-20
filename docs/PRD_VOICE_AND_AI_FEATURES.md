@@ -45,7 +45,7 @@ The Voice and AI Features provide intelligent assistance throughout the clinical
 |-----------|-------|------|----------|
 | Simple | `gpt-5-mini` | Low | Ask AI, Chart Prep, Field Actions, Transcribe cleanup, Note Review |
 | Complex | `gpt-5.2` | High | Visit AI extraction, Scale Autofill, Note Synthesis, Assessment Generation |
-| Audio | `whisper-1` | Low | Audio transcription |
+| Audio | Deepgram Nova-3 | Low | Audio transcription (with speaker diarization for Visit AI) |
 | Realtime | `gpt-realtime` | High | AI Historian voice sessions (see PRD_AI_HISTORIAN.md) |
 
 ### Migration Notes
@@ -60,12 +60,17 @@ The Voice and AI Features provide intelligent assistance throughout the clinical
 
 ### 4.1 Chart Prep Tab
 
+#### Design Philosophy
+Chart Prep is a **reference panel, not a field writer**. Industry research (Ambience Patient Recap, DeepScribe Pre-Charting, DAX Copilot) shows that pre-visit summaries should be a distilled, always-accessible reference — not auto-inserted into note fields. Only the post-visit AI scribe (Document Visit) writes into note fields.
+
 #### Workflow
 1. Click "Start Recording" (fresh session)
 2. Dictate observations while reviewing chart
 3. Pause/resume as needed
-4. Stop recording → transcription sent to Whisper
+4. Stop recording → transcription sent to Deepgram Nova-3
 5. AI categorizes content and generates summary
+6. Summary appears in the drawer AND as a sticky reference banner in the main UI
+7. Banner stays visible across all tabs while seeing the patient
 
 #### State Management
 ```typescript
@@ -131,35 +136,28 @@ Also identify:
 {userSettings.globalAiInstructions}
 ```
 
-#### Marker-Based Content Replacement
-```typescript
-// When re-processing Chart Prep, replace previous content using markers
-const CHART_PREP_START = '--- Chart Prep ---'
-const CHART_PREP_END = '--- End Chart Prep ---'
+#### Content Handling
+Chart Prep does NOT insert content into note fields. The AI summary is:
+- Displayed in the VoiceDrawer as read-only reference sections
+- Shown as a sticky banner at the top of the main note area (CenterPanel)
+- Passed as context to the Visit AI endpoint so the scribe can build on prep findings
+- Available to the Generate Note modal for final note synthesis
 
-function insertChartPrepContent(currentText: string, newContent: string): string {
-  const startIdx = currentText.indexOf(CHART_PREP_START)
-  const endIdx = currentText.indexOf(CHART_PREP_END)
+Any legacy `--- Chart Prep ---` markers in note fields are automatically cleaned up.
 
-  if (startIdx !== -1 && endIdx !== -1) {
-    // Replace existing Chart Prep content
-    return currentText.slice(0, startIdx) +
-           CHART_PREP_START + '\n' + newContent + '\n' + CHART_PREP_END +
-           currentText.slice(endIdx + CHART_PREP_END.length)
-  }
+### 4.2 Document Visit Tab (Visit AI)
 
-  // Append new Chart Prep content
-  return currentText + '\n\n' + CHART_PREP_START + '\n' + newContent + '\n' + CHART_PREP_END
-}
-```
-
-### 4.2 Document Tab (Visit AI)
+#### Design Philosophy
+Visit AI is the **field writer**. After the visit recording is processed, AI-extracted content is auto-inserted into note fields (HPI, ROS, Exam, Assessment, Plan) using `--- Visit AI ---` markers. This is the draft the physician reviews and edits.
 
 #### Workflow
 1. Click "Start Recording" to begin visit capture
-2. Record entire patient encounter
-3. Stop recording → audio sent to Visit AI endpoint
-4. AI transcribes and extracts clinical content
+2. Record entire patient encounter (AI runs silently in background)
+3. Physician can simultaneously type/click in the EHR
+4. Stop recording → audio sent to Deepgram Nova-3 with speaker diarization
+5. GPT-5.2 extracts clinical content from diarized transcript
+6. Content auto-inserts into note fields with `--- Visit AI ---` markers
+7. Physician reviews and edits the combined note
 
 #### API: `/api/ai/visit-ai`
 ```typescript
