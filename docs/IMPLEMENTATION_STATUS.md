@@ -627,14 +627,15 @@ Optimized all AI API endpoints for best cost/performance:
 - `/api/ai/transcribe` - Text cleanup
 - `/api/ai/field-action` - Improve/Expand/Summarize
 
-**Complex Tasks (gpt-5 - $1.25/$10 per 1M tokens):**
+**Complex Tasks (gpt-5.2 - $1.25/$10 per 1M tokens):**
 - `/api/ai/visit-ai` - Clinical extraction from visit transcripts
 - `/api/ai/scale-autofill` - Scale data extraction from patient data
 - `/api/ai/synthesize-note` - Note synthesis and merging
+- `/api/ai/generate-assessment` - Differential diagnosis generation
 
 **Cost Savings:**
 - Simple tasks: ~93% cheaper than previous gpt-4
-- Complex tasks: ~50% cheaper input vs gpt-4o, better reasoning with GPT-5
+- Complex tasks: ~50% cheaper input vs gpt-4o, better reasoning with GPT-5.2
 
 ---
 

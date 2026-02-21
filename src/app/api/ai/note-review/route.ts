@@ -48,10 +48,11 @@ export async function POST(request: Request) {
 
 Rules:
 - Return at most 6 suggestions, prioritized by clinical importance.
-- Only flag genuine issues; do not fabricate problems.
+- Only flag genuine issues; do not fabricate problems. Be conservative — when in doubt, do not flag.
 - Each suggestion must reference the relevant section by its ID. Valid section IDs are: chiefComplaint, hpi, ros, scales, vitals, physicalExam, imaging, labs, assessment, plan
-- Be specific and actionable in your message text.
+- Be specific and actionable in your message text. Use concrete clinical language.
 - Severity "warning" = likely documentation gap or inconsistency. Severity "info" = optional improvement.
+- Be deterministic: given the same note, always produce the same suggestions. Do not vary phrasing or findings between runs.
 
 Note type: ${noteType || 'new-consult'}${diagnosisContext}
 
@@ -76,7 +77,9 @@ If the note has no issues, return: { "suggestions": [] }`
         { role: 'user', content: noteText }
       ],
       max_completion_tokens: 1500,
-      // Note: gpt-5-mini only supports default temperature (1)
+      // gpt-5-mini does not support temperature or reasoning_effort parameters.
+      // Determinism is achieved via prompt instructions ("be deterministic").
+      // Suggestions may still vary slightly between runs due to default temperature=1.
       response_format: { type: 'json_object' },
     })
 

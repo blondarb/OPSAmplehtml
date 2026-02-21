@@ -7,7 +7,9 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "sync-plans": "npx ts-node --project tsconfig.scripts.json scripts/sync-plans.ts"
+    "sync-plans": "npx ts-node --project tsconfig.scripts.json scripts/sync-plans.ts",
+    "test": "vitest run",
+    "test:watch": "vitest"
   },
   "dependencies": {
     "@deepgram/sdk": "^4.11.3",
@@ -30,6 +32,7 @@
     "postcss": "^8.4.49",
     "tailwindcss": "^3.4.17",
     "ts-node": "^10.9.2",
-    "typescript": "5.9.3"
+    "typescript": "5.9.3",
+    "vitest": "^4.0.18"
   }
 }
