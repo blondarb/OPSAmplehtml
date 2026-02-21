@@ -109,6 +109,7 @@ export default function EnhancedNotePreviewModal({
   const [isSynthesizing, setIsSynthesizing] = useState(false)
   const [hasSynthesized, setHasSynthesized] = useState(false)
   const [synthesisJustCompleted, setSynthesisJustCompleted] = useState(false)
+  const [synthesisError, setSynthesisError] = useState<string | null>(null)
 
   // Editing state
   const [editingSection, setEditingSection] = useState<string | null>(null)
@@ -174,7 +175,7 @@ export default function EnhancedNotePreviewModal({
     if (!noteData || isSynthesizing) return
 
     setIsSynthesizing(true)
-    setGenerationError(null)
+    setSynthesisError(null)
 
     try {
       const userSettings = getUserSettings()
@@ -219,7 +220,7 @@ export default function EnhancedNotePreviewModal({
       const data = await response.json()
 
       if (data.error) {
-        setGenerationError(data.error)
+        setSynthesisError(data.error)
         return
       }
 
@@ -262,7 +263,7 @@ export default function EnhancedNotePreviewModal({
       }
     } catch (error) {
       console.error('Error synthesizing note:', error)
-      setGenerationError('Failed to synthesize note with AI')
+      setSynthesisError('Failed to synthesize note with AI. Your local merge is still available below.')
     } finally {
       setIsSynthesizing(false)
     }
@@ -380,6 +381,7 @@ export default function EnhancedNotePreviewModal({
       try {
         setGenerationError(null)
         setHasSynthesized(false)
+        setSynthesisError(null)
         // Ensure manualData exists with required structure
         const safeNoteData: ComprehensiveNoteData = {
           ...noteData,
@@ -1420,15 +1422,20 @@ export default function EnhancedNotePreviewModal({
 
             {/* AI Synthesize Button */}
             <button
-              onClick={synthesizeWithAI}
+              onClick={() => {
+                setSynthesisError(null)
+                synthesizeWithAI()
+              }}
               disabled={isSynthesizing}
               style={{
                 padding: '8px 16px',
                 borderRadius: '8px',
                 border: 'none',
-                background: hasSynthesized
-                  ? 'linear-gradient(135deg, #10B981 0%, #059669 100%)'
-                  : 'linear-gradient(135deg, #0D9488 0%, #0F766E 100%)',
+                background: synthesisError
+                  ? 'linear-gradient(135deg, #F59E0B 0%, #D97706 100%)'
+                  : hasSynthesized
+                    ? 'linear-gradient(135deg, #10B981 0%, #059669 100%)'
+                    : 'linear-gradient(135deg, #0D9488 0%, #0F766E 100%)',
                 color: 'white',
                 fontSize: '13px',
                 fontWeight: 600,
@@ -1437,7 +1444,9 @@ export default function EnhancedNotePreviewModal({
                 alignItems: 'center',
                 gap: '8px',
                 opacity: isSynthesizing ? 0.7 : 1,
-                boxShadow: '0 2px 8px rgba(13, 148, 136, 0.3)',
+                boxShadow: synthesisError
+                  ? '0 2px 8px rgba(245, 158, 11, 0.3)'
+                  : '0 2px 8px rgba(13, 148, 136, 0.3)',
               }}
             >
               {isSynthesizing ? (
@@ -1454,6 +1463,14 @@ export default function EnhancedNotePreviewModal({
                     <path d="M21 12a9 9 0 11-6.219-8.56" />
                   </svg>
                   Synthesizing...
+                </>
+              ) : synthesisError ? (
+                <>
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <path d="M1 4v6h6M23 20v-6h-6"/>
+                    <path d="M20.49 9A9 9 0 005.64 5.64L1 10m22 4l-4.64 4.36A9 9 0 013.51 15"/>
+                  </svg>
+                  Retry Synthesis
                 </>
               ) : hasSynthesized ? (
                 <>
@@ -1493,6 +1510,70 @@ export default function EnhancedNotePreviewModal({
           overflowY: 'auto',
           padding: '24px',
         }}>
+          {/* Synthesis Error Banner — local merge stays visible below */}
+          {synthesisError && (
+            <div style={{
+              background: '#FEF2F2',
+              border: '1px solid #FECACA',
+              borderRadius: '10px',
+              padding: '14px 18px',
+              marginBottom: '16px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '12px',
+            }}>
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#DC2626" strokeWidth="2" style={{ flexShrink: 0 }}>
+                <circle cx="12" cy="12" r="10"/>
+                <line x1="12" y1="8" x2="12" y2="12"/>
+                <line x1="12" y1="16" x2="12.01" y2="16"/>
+              </svg>
+              <div style={{ flex: 1 }}>
+                <p style={{ margin: 0, fontSize: '13px', color: '#991B1B', fontWeight: 500 }}>
+                  AI Synthesis Failed
+                </p>
+                <p style={{ margin: '4px 0 0', fontSize: '12px', color: '#B91C1C' }}>
+                  {synthesisError}
+                </p>
+              </div>
+              <button
+                onClick={() => {
+                  setSynthesisError(null)
+                  synthesizeWithAI()
+                }}
+                disabled={isSynthesizing}
+                style={{
+                  padding: '6px 14px',
+                  borderRadius: '6px',
+                  border: 'none',
+                  background: '#DC2626',
+                  color: 'white',
+                  fontSize: '12px',
+                  fontWeight: 600,
+                  cursor: isSynthesizing ? 'wait' : 'pointer',
+                  opacity: isSynthesizing ? 0.7 : 1,
+                  whiteSpace: 'nowrap',
+                }}
+              >
+                Retry Synthesis
+              </button>
+              <button
+                onClick={() => setSynthesisError(null)}
+                style={{
+                  padding: '4px',
+                  borderRadius: '4px',
+                  border: 'none',
+                  background: 'transparent',
+                  color: '#B91C1C',
+                  cursor: 'pointer',
+                  lineHeight: 1,
+                }}
+                title="Dismiss"
+              >
+                ✕
+              </button>
+            </div>
+          )}
+
           {viewMode === 'review' ? (
             <>
               {formattedNote.sections
