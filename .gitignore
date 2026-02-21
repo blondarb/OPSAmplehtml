@@ -6,6 +6,9 @@
 
 # Testing
 /coverage
+tests/audio/generated/*.aiff
+tests/audio/generated/*.wav
+tests/audio/generated/*.mp3
 
 # Next.js
 /.next/

@@ -9,7 +9,9 @@
     "lint": "eslint",
     "sync-plans": "npx ts-node --project tsconfig.scripts.json scripts/sync-plans.ts",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "test:audio": "npx tsx tests/audio/run-pipeline-test.ts",
+    "test:audio:generate": "bash tests/audio/scripts/generate-visit-audio.sh"
   },
   "dependencies": {
     "@deepgram/sdk": "^4.11.3",
