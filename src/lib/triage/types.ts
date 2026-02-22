@@ -218,3 +218,123 @@ export const LOW_CONFIDENCE_DISCLAIMER =
 
 export const RED_FLAG_DISCLAIMER =
   'One or more clinical red flags have been identified. This case should be reviewed by a clinician promptly.'
+
+// ── Phase 2: Extraction, Batch, Fusion Types ──
+
+// Source type for how the input was provided
+export type SourceType = 'paste' | 'pdf' | 'docx' | 'txt'
+
+// Detected clinical note type
+export type NoteType =
+  | 'ed_note'
+  | 'pcp_note'
+  | 'discharge_summary'
+  | 'specialist_consult'
+  | 'imaging_report'
+  | 'referral'
+  | 'unknown'
+
+// File upload constraints
+export const FILE_CONSTRAINTS = {
+  MAX_FILE_SIZE_BYTES: 10 * 1024 * 1024, // 10MB
+  MAX_FILE_SIZE_DISPLAY: '10MB',
+  MAX_BATCH_FILES: 20,
+  MAX_TEXT_LENGTH: 50_000,
+  SHORT_NOTE_THRESHOLD: 2_000, // below this, skip extraction
+  ALLOWED_TYPES: ['application/pdf', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', 'text/plain'] as const,
+  ALLOWED_EXTENSIONS: ['.pdf', '.docx', '.txt'] as const,
+} as const
+
+// Key clinical findings extracted from a note
+export interface ExtractionKeyFindings {
+  chief_complaint: string
+  neurological_symptoms: string[]
+  timeline: string
+  relevant_history: string
+  medications_and_therapies: string[]
+  failed_therapies: FailedTherapy[]
+  imaging_results: string[]
+  red_flags_noted: string[]
+  functional_status: string
+}
+
+// Result of Stage 1 extraction
+export interface ClinicalExtraction {
+  extraction_id: string
+  note_type_detected: NoteType
+  extraction_confidence: TriageConfidence
+  extracted_summary: string
+  key_findings: ExtractionKeyFindings
+  original_text_length: number
+  source_filename?: string
+}
+
+// Request to the extraction endpoint
+export interface ExtractionRequest {
+  text: string
+  patient_age?: number
+  patient_sex?: string
+}
+
+// Result of multi-note fusion
+export interface FusionResult {
+  fusion_group_id: string
+  fused_summary: string
+  fusion_confidence: TriageConfidence
+  sources_used: string[]
+  conflicts_resolved: string[]
+  timeline_reconstructed: string
+}
+
+// Request to the fusion endpoint
+export interface FusionRequest {
+  extractions: Array<{
+    extracted_summary: string
+    note_type_detected: string
+    key_findings: ExtractionKeyFindings
+    source_filename?: string
+  }>
+  patient_age?: number
+  patient_sex?: string
+}
+
+// Enhanced triage request with Phase 2 fields (backward-compatible)
+export interface EnhancedTriageRequest extends TriageRequest {
+  extracted_summary?: string
+  source_type?: SourceType
+  source_filename?: string
+  extraction_confidence?: TriageConfidence
+  note_type_detected?: NoteType
+  batch_id?: string
+  fusion_group_id?: string
+}
+
+// Batch processing
+export interface BatchItem {
+  id: string
+  filename?: string
+  text?: string
+  file?: File
+  status: 'pending' | 'extracting' | 'extracted' | 'triaging' | 'completed' | 'error'
+  extraction?: ClinicalExtraction
+  triageResult?: TriageResult
+  error?: string
+}
+
+export interface BatchState {
+  batch_id: string
+  items: BatchItem[]
+  total: number
+  completed: number
+  status: 'idle' | 'processing' | 'completed' | 'partial_failure'
+  autoApproveExtractions: boolean
+}
+
+// Page state machine for Phase 2 multi-step flow
+export type TriagePageState =
+  | 'input'        // User entering text or uploading files
+  | 'extracting'   // Stage 1: AI extracting from note
+  | 'review'       // User reviewing extraction
+  | 'triaging'     // Stage 2: AI scoring triage
+  | 'result'       // Showing triage result
+  | 'batch'        // Batch mode: processing multiple items
