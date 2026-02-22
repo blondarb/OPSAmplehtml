@@ -64,9 +64,9 @@ export async function POST(request: Request) {
       referringProviderType: referring_provider_type,
     })
 
-    // Call OpenAI with 15-second timeout
+    // Call OpenAI with 45-second timeout
     const controller = new AbortController()
-    const timeout = setTimeout(() => controller.abort(), 15000)
+    const timeout = setTimeout(() => controller.abort(), 45000)
 
     let completion
     try {
