@@ -10,7 +10,12 @@ const AI_MODEL = 'gpt-5.2'
 export async function POST(request: Request) {
   try {
     const body = await request.json()
-    const { referral_text, patient_age, patient_sex, referring_provider_type, patient_id } = body
+    const {
+      referral_text, patient_age, patient_sex, referring_provider_type, patient_id,
+      // Phase 2 optional fields
+      extracted_summary, source_type, source_filename, extraction_confidence,
+      note_type_detected, batch_id, fusion_group_id
+    } = body
 
     // Validate input
     if (!referral_text || typeof referral_text !== 'string') {
@@ -49,8 +54,11 @@ export async function POST(request: Request) {
 
     const openai = new OpenAI({ apiKey })
 
+    // Use extracted summary for scoring if provided (Phase 2 two-stage pipeline)
+    const textForScoring = extracted_summary || referral_text
+
     // Build prompt
-    const userPrompt = buildTriageUserPrompt(referral_text, {
+    const userPrompt = buildTriageUserPrompt(textForScoring, {
       patientAge: patient_age,
       patientSex: patient_sex,
       referringProviderType: referring_provider_type,
@@ -127,6 +135,14 @@ export async function POST(request: Request) {
           ai_model_used: AI_MODEL,
           ai_raw_response: aiResponse,
           patient_id: patient_id || null,
+          // Phase 2 fields
+          source_type: source_type || 'paste',
+          source_filename: source_filename || null,
+          extracted_summary: extracted_summary || null,
+          extraction_confidence: extraction_confidence || null,
+          note_type_detected: note_type_detected || null,
+          batch_id: batch_id || null,
+          fusion_group_id: fusion_group_id || null,
         })
         .select('id')
         .single()
