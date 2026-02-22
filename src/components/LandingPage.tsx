@@ -50,7 +50,7 @@ export default function LandingPage() {
         gap: '24px',
         flexWrap: 'wrap',
         justifyContent: 'center',
-        maxWidth: '720px',
+        maxWidth: '1080px',
         width: '100%',
       }}>
         {/* Physician Card */}
@@ -165,6 +165,65 @@ export default function LandingPage() {
               display: 'inline-block',
             }}>
               Enter Patient Demo
+            </div>
+          </div>
+        </Link>
+
+        {/* SDNE Neurologic Screening Card */}
+        <Link href="/sdne" style={{ textDecoration: 'none', flex: '1 1 300px', maxWidth: '340px' }}>
+          <div style={{
+            background: '#1e293b',
+            border: '1px solid #334155',
+            borderRadius: '16px',
+            padding: '32px',
+            cursor: 'pointer',
+            transition: 'all 0.2s',
+            textAlign: 'center',
+          }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.borderColor = '#3B82F6'
+              e.currentTarget.style.boxShadow = '0 8px 32px rgba(59,130,246,0.2)'
+              e.currentTarget.style.transform = 'translateY(-2px)'
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.borderColor = '#334155'
+              e.currentTarget.style.boxShadow = 'none'
+              e.currentTarget.style.transform = 'translateY(0)'
+            }}
+          >
+            <div style={{
+              width: 56,
+              height: 56,
+              borderRadius: '12px',
+              background: 'rgba(59,130,246,0.15)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              margin: '0 auto 16px',
+            }}>
+              <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#60A5FA" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M12 2C8 2 4 6 4 10c0 3 2 5 4 6v2h8v-2c2-1 4-3 4-6 0-4-4-8-8-8z" />
+                <path d="M10 18h4" />
+                <path d="M10 22h4" />
+              </svg>
+            </div>
+            <h2 style={{ color: '#fff', fontSize: '1.25rem', fontWeight: 600, margin: '0 0 8px' }}>
+              Neurologic Screening
+            </h2>
+            <p style={{ color: '#94a3b8', fontSize: '0.875rem', margin: 0, lineHeight: 1.5 }}>
+              SDNE Core-15 exam results with domain heatmaps, clinical interpretation, and differential diagnoses.
+            </p>
+            <div style={{
+              marginTop: '20px',
+              padding: '10px 20px',
+              borderRadius: '8px',
+              background: '#3B82F6',
+              color: '#fff',
+              fontWeight: 600,
+              fontSize: '0.875rem',
+              display: 'inline-block',
+            }}>
+              View Screening Results
             </div>
           </div>
         </Link>
