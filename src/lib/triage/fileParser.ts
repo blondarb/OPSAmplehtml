@@ -1,5 +1,3 @@
-import { PDFParse } from 'pdf-parse'
-import mammoth from 'mammoth'
 import { SourceType, FILE_CONSTRAINTS } from './types'
 
 export interface ParsedFile {
@@ -89,12 +87,14 @@ export async function parseUploadedFile(file: File): Promise<ParsedFile> {
 }
 
 async function parsePdf(buffer: Buffer): Promise<string> {
+  const { PDFParse } = await import('pdf-parse')
   const pdf = new PDFParse({ data: new Uint8Array(buffer) })
   const result = await pdf.getText()
   return result.text
 }
 
 async function parseDocx(buffer: Buffer): Promise<string> {
+  const mammoth = await import('mammoth')
   const result = await mammoth.extractRawText({ buffer })
   return result.value
 }

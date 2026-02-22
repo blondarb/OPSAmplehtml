@@ -16,14 +16,14 @@ vi.mock('pdf-parse', () => {
   return { PDFParse: MockPDFParse }
 })
 
-// Mock mammoth
+// Mock mammoth (dynamic import resolves with extractRawText at top level)
+const mockExtractRawText = vi.fn(async ({ buffer }: { buffer: Buffer }) => ({
+  value: 'Parsed DOCX content: Patient with seizure history.',
+  messages: [],
+}))
 vi.mock('mammoth', () => ({
-  default: {
-    extractRawText: vi.fn(async ({ buffer }: { buffer: Buffer }) => ({
-      value: 'Parsed DOCX content: Patient with seizure history.',
-      messages: [],
-    })),
-  },
+  default: { extractRawText: mockExtractRawText },
+  extractRawText: mockExtractRawText,
 }))
 
 function createMockFile(name: string, content: string, type: string, size?: number): File {
