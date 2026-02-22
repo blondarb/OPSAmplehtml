@@ -4,12 +4,32 @@ import { TriageTier, TIER_DISPLAY } from '@/lib/triage/types'
 
 interface Props {
   tier: TriageTier
-  weightedScore: number | null
+  weightedScore?: number | null
   isRedFlagOverride?: boolean
+  compact?: boolean
 }
 
-export default function TriageTierBadge({ tier, weightedScore, isRedFlagOverride }: Props) {
+export default function TriageTierBadge({ tier, weightedScore, isRedFlagOverride, compact }: Props) {
   const config = TIER_DISPLAY[tier]
+
+  if (compact) {
+    return (
+      <span style={{
+        display: 'inline-block',
+        padding: '2px 10px',
+        borderRadius: '10px',
+        fontSize: '11px',
+        fontWeight: 700,
+        letterSpacing: '0.03em',
+        backgroundColor: config.bgColor,
+        color: config.textColor,
+        border: `1px solid ${config.borderColor}`,
+        whiteSpace: 'nowrap',
+      }}>
+        {config.label}
+      </span>
+    )
+  }
 
   return (
     <>
@@ -40,7 +60,7 @@ export default function TriageTierBadge({ tier, weightedScore, isRedFlagOverride
           {config.timeframe}
           {isRedFlagOverride && ' (Red Flag Override)'}
         </span>
-        {weightedScore !== null && (
+        {weightedScore !== null && weightedScore !== undefined && (
           <span style={{ fontSize: '0.75rem', opacity: 0.7, marginTop: '2px' }}>
             Weighted Score: {weightedScore.toFixed(2)}
           </span>
