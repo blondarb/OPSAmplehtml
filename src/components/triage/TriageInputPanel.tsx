@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import SampleNoteLoader from './SampleNoteLoader'
 
 interface Props {
@@ -28,13 +28,16 @@ export default function TriageInputPanel({ onSubmit, loading }: Props) {
   const [loadingMsgIndex, setLoadingMsgIndex] = useState(0)
 
   // Rotate loading messages
-  useState(() => {
-    if (!loading) return
+  useEffect(() => {
+    if (!loading) {
+      setLoadingMsgIndex(0)
+      return
+    }
     const interval = setInterval(() => {
       setLoadingMsgIndex(prev => (prev + 1) % LOADING_MESSAGES.length)
     }, 2000)
     return () => clearInterval(interval)
-  })
+  }, [loading])
 
   function handleSubmit() {
     if (text.length < 50 || loading) return
