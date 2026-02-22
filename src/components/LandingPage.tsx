@@ -50,7 +50,7 @@ export default function LandingPage() {
         gap: '24px',
         flexWrap: 'wrap',
         justifyContent: 'center',
-        maxWidth: '1080px',
+        maxWidth: '1440px',
         width: '100%',
       }}>
         {/* Physician Card */}
@@ -224,6 +224,66 @@ export default function LandingPage() {
               display: 'inline-block',
             }}>
               View Screening Results
+            </div>
+          </div>
+        </Link>
+        {/* AI Triage Tool Card */}
+        <Link href="/triage" style={{ textDecoration: 'none', flex: '1 1 300px', maxWidth: '340px' }}>
+          <div style={{
+            background: '#1e293b',
+            border: '1px solid #334155',
+            borderRadius: '16px',
+            padding: '32px',
+            cursor: 'pointer',
+            transition: 'all 0.2s',
+            textAlign: 'center',
+          }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.borderColor = '#EA580C'
+              e.currentTarget.style.boxShadow = '0 8px 32px rgba(234,88,12,0.2)'
+              e.currentTarget.style.transform = 'translateY(-2px)'
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.borderColor = '#334155'
+              e.currentTarget.style.boxShadow = 'none'
+              e.currentTarget.style.transform = 'translateY(0)'
+            }}
+          >
+            <div style={{
+              width: 56,
+              height: 56,
+              borderRadius: '12px',
+              background: 'rgba(234,88,12,0.15)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              margin: '0 auto 16px',
+            }}>
+              <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#FB923C" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                <polyline points="14 2 14 8 20 8" />
+                <line x1="16" y1="13" x2="8" y2="13" />
+                <line x1="16" y1="17" x2="8" y2="17" />
+                <polyline points="10 9 9 9 8 9" />
+              </svg>
+            </div>
+            <h2 style={{ color: '#fff', fontSize: '1.25rem', fontWeight: 600, margin: '0 0 8px' }}>
+              AI Triage Tool
+            </h2>
+            <p style={{ color: '#94a3b8', fontSize: '0.875rem', margin: 0, lineHeight: 1.5 }}>
+              Paste a referral note and get an AI-powered triage recommendation with clinical reasoning, red flags, and subspecialty routing.
+            </p>
+            <div style={{
+              marginTop: '20px',
+              padding: '10px 20px',
+              borderRadius: '8px',
+              background: '#EA580C',
+              color: '#fff',
+              fontWeight: 600,
+              fontSize: '0.875rem',
+              display: 'inline-block',
+            }}>
+              Open Triage Tool
             </div>
           </div>
         </Link>
