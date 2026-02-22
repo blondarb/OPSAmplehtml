@@ -16,6 +16,8 @@ interface SDNEExamResultsPanelProps {
   consultCategories?: string[]
   // Optional: pass in a specific session if loading from database
   session?: SDNESessionResult
+  // Start expanded (for standalone pages)
+  defaultExpanded?: boolean
 }
 
 /**
@@ -64,8 +66,9 @@ export function SDNEExamResultsPanel({
   chiefComplaints = [],
   consultCategories = [],
   session: providedSession,
+  defaultExpanded = false,
 }: SDNEExamResultsPanelProps) {
-  const [isExpanded, setIsExpanded] = useState(false)
+  const [isExpanded, setIsExpanded] = useState(defaultExpanded)
   const [selectedSessionIndex, setSelectedSessionIndex] = useState(0)
   const [selectedDomain, setSelectedDomain] = useState<SDNEDomain | null>(null)
 
