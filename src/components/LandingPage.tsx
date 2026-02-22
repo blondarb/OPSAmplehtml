@@ -287,6 +287,65 @@ export default function LandingPage() {
             </div>
           </div>
         </Link>
+        {/* Post-Visit Follow-Up Card */}
+        <Link href="/follow-up" style={{ textDecoration: 'none', flex: '1 1 300px', maxWidth: '340px' }}>
+          <div style={{
+            background: '#1e293b',
+            border: '1px solid #334155',
+            borderRadius: '16px',
+            padding: '32px',
+            cursor: 'pointer',
+            transition: 'all 0.2s',
+            textAlign: 'center',
+          }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.borderColor = '#16A34A'
+              e.currentTarget.style.boxShadow = '0 8px 32px rgba(22,163,74,0.2)'
+              e.currentTarget.style.transform = 'translateY(-2px)'
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.borderColor = '#334155'
+              e.currentTarget.style.boxShadow = 'none'
+              e.currentTarget.style.transform = 'translateY(0)'
+            }}
+          >
+            <div style={{
+              width: 56,
+              height: 56,
+              borderRadius: '12px',
+              background: 'rgba(22,163,74,0.15)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              margin: '0 auto 16px',
+            }}>
+              <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#4ADE80" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+                <path d="M8 10h.01" />
+                <path d="M12 10h.01" />
+                <path d="M16 10h.01" />
+              </svg>
+            </div>
+            <h2 style={{ color: '#fff', fontSize: '1.25rem', fontWeight: 600, margin: '0 0 8px' }}>
+              Post-Visit Follow-Up
+            </h2>
+            <p style={{ color: '#94a3b8', fontSize: '0.875rem', margin: 0, lineHeight: 1.5 }}>
+              AI-powered patient follow-up agent that checks on medication tolerance, side effects, and symptoms after a neurology visit — with real-time escalation alerts.
+            </p>
+            <div style={{
+              marginTop: '20px',
+              padding: '10px 20px',
+              borderRadius: '8px',
+              background: '#16A34A',
+              color: '#fff',
+              fontWeight: 600,
+              fontSize: '0.875rem',
+              display: 'inline-block',
+            }}>
+              Start Follow-Up Demo
+            </div>
+          </div>
+        </Link>
       </div>
 
       {/* Footer */}
