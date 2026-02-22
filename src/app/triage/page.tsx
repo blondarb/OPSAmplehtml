@@ -2,21 +2,37 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
-import { TriageResult } from '@/lib/triage/types'
+import { TriageResult, ClinicalExtraction, TriagePageState, FILE_CONSTRAINTS } from '@/lib/triage/types'
 import TriageInputPanel from '@/components/triage/TriageInputPanel'
 import TriageOutputPanel from '@/components/triage/TriageOutputPanel'
+import ExtractionReviewPanel from '@/components/triage/ExtractionReviewPanel'
 import DisclaimerBanner from '@/components/triage/DisclaimerBanner'
 
 export default function TriagePage() {
+  const [pageState, setPageState] = useState<TriagePageState>('input')
   const [result, setResult] = useState<TriageResult | null>(null)
-  const [loading, setLoading] = useState(false)
+  const [extraction, setExtraction] = useState<ClinicalExtraction | null>(null)
+  const [originalText, setOriginalText] = useState('')
+  const [inputMode, setInputMode] = useState<'paste' | 'upload'>('paste')
+  const [uploadedFiles, setUploadedFiles] = useState<File[]>([])
   const [error, setError] = useState('')
 
+  // Phase 1 flow: short paste text — triage directly (no extraction)
   async function handleSubmit(
     referralText: string,
     metadata: { patient_age?: number; patient_sex?: string; referring_provider_type?: string }
   ) {
-    setLoading(true)
+    const isLongNote = referralText.length >= FILE_CONSTRAINTS.SHORT_NOTE_THRESHOLD
+
+    if (isLongNote) {
+      // Long text: run extraction first
+      setOriginalText(referralText)
+      await runExtraction(referralText, metadata)
+      return
+    }
+
+    // Short text: triage directly (Phase 1 flow)
+    setPageState('triaging')
     setError('')
     setResult(null)
 
@@ -34,17 +50,137 @@ export default function TriagePage() {
 
       const data: TriageResult = await res.json()
       setResult(data)
+      setPageState('result')
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'An unexpected error occurred. Please try again.')
-    } finally {
-      setLoading(false)
+      setPageState('input')
     }
   }
 
+  // Phase 2: run extraction on long text
+  async function runExtraction(
+    text: string,
+    metadata?: { patient_age?: number; patient_sex?: string; referring_provider_type?: string }
+  ) {
+    setPageState('extracting')
+    setError('')
+
+    try {
+      const res = await fetch('/api/triage/extract', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          text,
+          patient_age: metadata?.patient_age,
+          patient_sex: metadata?.patient_sex,
+        }),
+      })
+
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}))
+        throw new Error(data.error || 'Extraction failed. Please try again.')
+      }
+
+      const extractionResult: ClinicalExtraction = await res.json()
+      setExtraction(extractionResult)
+      setPageState('review')
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'An unexpected error occurred during extraction.')
+      setPageState('input')
+    }
+  }
+
+  // Phase 2: handle file upload — send to extract endpoint
+  async function handleSubmitFiles(files: File[]) {
+    if (files.length === 0) return
+
+    setUploadedFiles(files)
+    setPageState('extracting')
+    setError('')
+
+    try {
+      // Process the first file (single-file flow for now)
+      const file = files[0]
+      const formData = new FormData()
+      formData.append('file', file)
+
+      const res = await fetch('/api/triage/extract', {
+        method: 'POST',
+        body: formData,
+      })
+
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}))
+        throw new Error(data.error || 'File extraction failed. Please try again.')
+      }
+
+      const extractionResult: ClinicalExtraction = await res.json()
+      setExtraction(extractionResult)
+      // Store original text from extraction for the review panel
+      setOriginalText(extractionResult.extracted_summary)
+      setPageState('review')
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'An unexpected error occurred during file processing.')
+      setPageState('input')
+    }
+  }
+
+  // Phase 2: user approves extraction, proceed to triage
+  async function handleApproveExtraction(editedSummary: string) {
+    setPageState('triaging')
+    setError('')
+
+    try {
+      const res = await fetch('/api/triage', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          referral_text: editedSummary,
+          extracted_summary: editedSummary,
+          source_type: inputMode === 'upload' ? 'pdf' : 'paste',
+          source_filename: extraction?.source_filename,
+          extraction_confidence: extraction?.extraction_confidence,
+          note_type_detected: extraction?.note_type_detected,
+        }),
+      })
+
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}))
+        throw new Error(data.error || 'The triage system is temporarily unavailable. Please triage this patient manually and contact support.')
+      }
+
+      const data: TriageResult = await res.json()
+      setResult(data)
+      setPageState('result')
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'An unexpected error occurred. Please try again.')
+      setPageState('review')
+    }
+  }
+
+  // Reset everything
   function handleTryAnother() {
     setResult(null)
+    setExtraction(null)
+    setOriginalText('')
+    setUploadedFiles([])
     setError('')
+    setPageState('input')
   }
+
+  // Go back from review to input
+  function handleBackFromReview() {
+    setExtraction(null)
+    setPageState('input')
+  }
+
+  // Determine loading state for input panel
+  const isInputLoading = pageState === 'extracting' || pageState === 'triaging'
+  const loadingMessage = pageState === 'extracting'
+    ? 'Extracting clinical information...'
+    : pageState === 'triaging'
+      ? undefined
+      : undefined
 
   return (
     <div style={{
@@ -124,17 +260,24 @@ export default function TriagePage() {
             maxWidth: '600px',
             margin: '0 auto',
           }}>
-            Paste a referral note below. The AI analyzes clinical features, scores five dimensions,
+            Paste a referral note or upload clinical documents. The AI analyzes clinical features, scores five dimensions,
             and the application calculates a triage tier deterministically. All scoring is transparent and auditable.
           </p>
         </div>
 
-        {/* Input or Output */}
-        {result ? (
-          <TriageOutputPanel result={result} onTryAnother={handleTryAnother} />
-        ) : (
+        {/* State machine rendering */}
+
+        {/* Input state */}
+        {(pageState === 'input' || pageState === 'extracting') && (
           <>
-            <TriageInputPanel onSubmit={handleSubmit} loading={loading} />
+            <TriageInputPanel
+              onSubmit={handleSubmit}
+              loading={isInputLoading}
+              onSubmitFiles={handleSubmitFiles}
+              inputMode={inputMode}
+              onInputModeChange={setInputMode}
+              loadingMessage={loadingMessage}
+            />
 
             {/* Error message */}
             {error && (
@@ -159,9 +302,77 @@ export default function TriagePage() {
               </div>
             )}
 
-            {/* Disclaimer on input side too */}
             <DisclaimerBanner />
           </>
+        )}
+
+        {/* Review state */}
+        {pageState === 'review' && extraction && (
+          <>
+            <ExtractionReviewPanel
+              extraction={extraction}
+              originalText={originalText}
+              onApprove={handleApproveExtraction}
+              onBack={handleBackFromReview}
+            />
+
+            {/* Error message */}
+            {error && (
+              <div style={{
+                marginTop: '16px',
+                padding: '14px 16px',
+                background: 'rgba(220, 38, 38, 0.1)',
+                border: '1px solid #DC2626',
+                borderRadius: '8px',
+                display: 'flex',
+                alignItems: 'flex-start',
+                gap: '8px',
+              }}>
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#DC2626" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0, marginTop: '1px' }}>
+                  <circle cx="12" cy="12" r="10" />
+                  <line x1="15" y1="9" x2="9" y2="15" />
+                  <line x1="9" y1="9" x2="15" y2="15" />
+                </svg>
+                <p style={{ color: '#fca5a5', fontSize: '0.85rem', margin: 0, lineHeight: 1.5 }}>
+                  {error}
+                </p>
+              </div>
+            )}
+
+            <DisclaimerBanner />
+          </>
+        )}
+
+        {/* Triaging state (standalone loading) */}
+        {pageState === 'triaging' && !result && (
+          <div style={{
+            background: '#0f172a',
+            borderRadius: '12px',
+            border: '1px solid #334155',
+            padding: '48px 24px',
+            textAlign: 'center',
+          }}>
+            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#EA580C" strokeWidth="2" style={{ animation: 'spin 1s linear infinite', marginBottom: '16px' }}>
+              <path d="M21 12a9 9 0 1 1-6.219-8.56" />
+            </svg>
+            <p style={{ color: '#e2e8f0', fontSize: '0.95rem', fontWeight: 500, margin: '0 0 4px' }}>
+              Scoring triage dimensions...
+            </p>
+            <p style={{ color: '#94a3b8', fontSize: '0.8rem', margin: 0 }}>
+              The AI is analyzing clinical features and generating a recommendation.
+            </p>
+            <style>{`
+              @keyframes spin {
+                from { transform: rotate(0deg); }
+                to { transform: rotate(360deg); }
+              }
+            `}</style>
+          </div>
+        )}
+
+        {/* Result state */}
+        {pageState === 'result' && result && (
+          <TriageOutputPanel result={result} onTryAnother={handleTryAnother} />
         )}
       </div>
     </div>
