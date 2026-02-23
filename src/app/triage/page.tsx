@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 import Link from 'next/link'
 import { TriageResult, ClinicalExtraction, TriagePageState, FILE_CONSTRAINTS } from '@/lib/triage/types'
 import TriageInputPanel from '@/components/triage/TriageInputPanel'
@@ -16,6 +16,17 @@ export default function TriagePage() {
   const [inputMode, setInputMode] = useState<'paste' | 'upload'>('paste')
   const [uploadedFiles, setUploadedFiles] = useState<File[]>([])
   const [error, setError] = useState('')
+  const abortControllerRef = useRef<AbortController | null>(null)
+
+  // Cancel in-flight AI requests
+  function handleCancel() {
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort()
+      abortControllerRef.current = null
+    }
+    setPageState('input')
+    setError('')
+  }
 
   // Phase 1 flow: short paste text — triage directly (no extraction)
   async function handleSubmit(
@@ -36,11 +47,15 @@ export default function TriagePage() {
     setError('')
     setResult(null)
 
+    const controller = new AbortController()
+    abortControllerRef.current = controller
+
     try {
       const res = await fetch('/api/triage', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ referral_text: referralText, ...metadata }),
+        signal: controller.signal,
       })
 
       if (!res.ok) {
@@ -52,6 +67,7 @@ export default function TriagePage() {
       setResult(data)
       setPageState('result')
     } catch (err: unknown) {
+      if (err instanceof DOMException && err.name === 'AbortError') return // User cancelled
       setError(err instanceof Error ? err.message : 'An unexpected error occurred. Please try again.')
       setPageState('input')
     }
@@ -65,6 +81,9 @@ export default function TriagePage() {
     setPageState('extracting')
     setError('')
 
+    const controller = new AbortController()
+    abortControllerRef.current = controller
+
     try {
       const res = await fetch('/api/triage/extract', {
         method: 'POST',
@@ -74,6 +93,7 @@ export default function TriagePage() {
           patient_age: metadata?.patient_age,
           patient_sex: metadata?.patient_sex,
         }),
+        signal: controller.signal,
       })
 
       if (!res.ok) {
@@ -85,6 +105,7 @@ export default function TriagePage() {
       setExtraction(extractionResult)
       setPageState('review')
     } catch (err: unknown) {
+      if (err instanceof DOMException && err.name === 'AbortError') return // User cancelled
       setError(err instanceof Error ? err.message : 'An unexpected error occurred during extraction.')
       setPageState('input')
     }
@@ -98,6 +119,9 @@ export default function TriagePage() {
     setPageState('extracting')
     setError('')
 
+    const controller = new AbortController()
+    abortControllerRef.current = controller
+
     try {
       // Process the first file (single-file flow for now)
       const file = files[0]
@@ -107,6 +131,7 @@ export default function TriagePage() {
       const res = await fetch('/api/triage/extract', {
         method: 'POST',
         body: formData,
+        signal: controller.signal,
       })
 
       if (!res.ok) {
@@ -120,6 +145,7 @@ export default function TriagePage() {
       setOriginalText(extractionResult.extracted_summary)
       setPageState('review')
     } catch (err: unknown) {
+      if (err instanceof DOMException && err.name === 'AbortError') return // User cancelled
       setError(err instanceof Error ? err.message : 'An unexpected error occurred during file processing.')
       setPageState('input')
     }
@@ -130,6 +156,9 @@ export default function TriagePage() {
     setPageState('triaging')
     setError('')
 
+    const controller = new AbortController()
+    abortControllerRef.current = controller
+
     try {
       const res = await fetch('/api/triage', {
         method: 'POST',
@@ -137,11 +166,12 @@ export default function TriagePage() {
         body: JSON.stringify({
           referral_text: editedSummary,
           extracted_summary: editedSummary,
-          source_type: inputMode === 'upload' ? 'pdf' : 'paste',
+          source_type: inputMode === 'upload' ? (extraction?.source_filename?.toLowerCase().endsWith('.docx') ? 'docx' : extraction?.source_filename?.toLowerCase().endsWith('.txt') ? 'txt' : 'pdf') : 'paste',
           source_filename: extraction?.source_filename,
           extraction_confidence: extraction?.extraction_confidence,
           note_type_detected: extraction?.note_type_detected,
         }),
+        signal: controller.signal,
       })
 
       if (!res.ok) {
@@ -153,6 +183,7 @@ export default function TriagePage() {
       setResult(data)
       setPageState('result')
     } catch (err: unknown) {
+      if (err instanceof DOMException && err.name === 'AbortError') return // User cancelled
       setError(err instanceof Error ? err.message : 'An unexpected error occurred. Please try again.')
       setPageState('review')
     }
@@ -277,6 +308,7 @@ export default function TriagePage() {
               inputMode={inputMode}
               onInputModeChange={setInputMode}
               loadingMessage={loadingMessage}
+              onCancel={isInputLoading ? handleCancel : undefined}
             />
 
             {/* Error message */}
@@ -358,9 +390,24 @@ export default function TriagePage() {
             <p style={{ color: '#e2e8f0', fontSize: '0.95rem', fontWeight: 500, margin: '0 0 4px' }}>
               Scoring triage dimensions...
             </p>
-            <p style={{ color: '#94a3b8', fontSize: '0.8rem', margin: 0 }}>
+            <p style={{ color: '#94a3b8', fontSize: '0.8rem', margin: '0 0 16px' }}>
               The AI is analyzing clinical features and generating a recommendation.
             </p>
+            <button
+              onClick={handleCancel}
+              style={{
+                padding: '8px 24px',
+                borderRadius: '8px',
+                background: 'transparent',
+                color: '#94a3b8',
+                border: '1px solid #475569',
+                fontSize: '0.8rem',
+                fontWeight: 500,
+                cursor: 'pointer',
+              }}
+            >
+              Cancel
+            </button>
             <style>{`
               @keyframes spin {
                 from { transform: rotate(0deg); }

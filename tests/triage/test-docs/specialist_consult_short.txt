@@ -1,0 +1,27 @@
+NEUROLOGY CONSULT REQUEST
+
+To: Outpatient Neurology
+From: Dr. James Park, MD — Internal Medicine
+Date: 02/15/2026
+Priority: Routine
+
+Patient: [REDACTED]
+Age: 34 | Sex: Female
+
+Reason for Referral: Chronic daily headaches, failed multiple preventive therapies
+
+Brief History: 34F with 8-year history of chronic migraine, now transformed to chronic daily headache (25+ headache days/month for past 14 months). Currently experiencing medication overuse headache superimposed on chronic migraine.
+
+Failed Therapies:
+- Topiramate 100mg BID — discontinued after 4 months due to cognitive side effects ("word-finding difficulty, brain fog"), partial response on headache frequency
+- Propranolol 80mg BID — discontinued after 3 months, no significant improvement, caused fatigue and exercise intolerance
+- Amitriptyline 50mg QHS — discontinued after 6 weeks due to excessive sedation and 12-lb weight gain, minimal headache improvement
+- Botox (onabotulinumtoxinA) — completed 2 cycles (31 injection sites per session), moderate improvement in headache severity but insurance denied continued coverage
+- Aimovig (erenumab) 140mg monthly — 6-month trial, reduced headache days from 25 to 18/month but patient developed constipation and injection site reactions, discontinued by patient preference
+- Nurtec (rimegepant) 75mg — used as acute treatment, effective for individual attacks but insurance limits to 8 tablets/month
+
+Current medications: Excedrin (acetaminophen/aspirin/caffeine) — using 4-5 days/week (medication overuse), Sumatriptan 100mg PRN (limited effectiveness at this point), Magnesium 400mg daily, Riboflavin 400mg daily
+
+No neuroimaging has been obtained.
+
+Please evaluate and advise on next steps for preventive therapy and medication overuse headache management.

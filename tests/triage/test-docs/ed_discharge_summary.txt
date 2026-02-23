@@ -1,0 +1,109 @@
+EMERGENCY DEPARTMENT DISCHARGE SUMMARY
+
+Patient: [REDACTED]
+DOB: 03/15/1978 (Age 47)
+Sex: Female
+MRN: 9284710
+Date of Visit: 02/18/2026
+Attending: Dr. Michael Torres, MD — Emergency Medicine
+Disposition: Discharged with outpatient neurology referral
+
+CHIEF COMPLAINT: Sudden onset severe headache with transient right arm weakness
+
+HISTORY OF PRESENT ILLNESS:
+47-year-old right-handed female presents to the ED via EMS after experiencing sudden onset of a severe headache approximately 3 hours prior to arrival. Patient was at work when she developed what she describes as the "worst headache of my life," rated 10/10 in intensity, located in the left temporal-occipital region. The headache was accompanied by transient right arm weakness lasting approximately 15 minutes that self-resolved prior to EMS arrival. Patient also reports photophobia, mild nausea without vomiting, and mild neck stiffness. She denies loss of consciousness, seizure activity, visual changes, speech difficulty, or leg weakness. No recent trauma. No prior history of similar headaches.
+
+PAST MEDICAL HISTORY:
+- Hypertension, diagnosed 2019, on lisinopril 10mg daily
+- Hyperlipidemia, on atorvastatin 20mg daily
+- Migraine without aura, infrequent (2-3 per year), typically responsive to ibuprofen
+- Appendectomy 2005
+
+MEDICATIONS:
+- Lisinopril 10mg PO daily
+- Atorvastatin 20mg PO daily
+- Ibuprofen 400mg PRN (uses 2-3x/month for headaches)
+- Multivitamin daily
+
+ALLERGIES: Sulfa drugs (rash)
+
+FAMILY HISTORY:
+Mother: Hypertension, stroke at age 72
+Father: Type 2 diabetes, coronary artery disease
+Sister: Migraines
+
+SOCIAL HISTORY:
+Non-smoker. Occasional alcohol (1-2 glasses wine per week). Works as an accountant. No illicit drug use. Lives with husband and two children.
+
+REVIEW OF SYSTEMS:
+Constitutional: No fever, chills, weight loss
+HEENT: Photophobia, mild neck stiffness as noted; no vision changes, hearing changes
+Cardiovascular: No chest pain, palpitations
+Respiratory: No shortness of breath, cough
+GI: Mild nausea, no vomiting, diarrhea, abdominal pain
+Neurological: As per HPI — severe headache, transient R arm weakness (resolved), no current focal deficits
+Psychiatric: Denies depression, anxiety, suicidal ideation
+
+PHYSICAL EXAMINATION:
+Vitals: BP 162/94, HR 88, RR 16, Temp 98.6°F, SpO2 99% RA
+General: Alert, oriented x4, in moderate distress due to headache
+HEENT: Pupils equal round reactive to light, EOMI, no papilledema on fundoscopic exam, mild nuchal rigidity
+Cardiovascular: Regular rate and rhythm, no murmurs
+Respiratory: Clear to auscultation bilaterally
+Neurological:
+  - Mental Status: Alert, oriented to person/place/time/situation, speech fluent, follows complex commands
+  - Cranial Nerves: II-XII intact
+  - Motor: 5/5 strength all extremities bilaterally (right arm weakness has resolved)
+  - Sensory: Intact to light touch and pinprick throughout
+  - Reflexes: 2+ symmetric, toes downgoing
+  - Coordination: Finger-to-nose and heel-to-shin intact bilaterally
+  - Gait: Steady, tandem walk normal
+
+DIAGNOSTIC WORKUP:
+CT Head without contrast: No acute intracranial hemorrhage, mass, or midline shift. No evidence of acute ischemia. Age-appropriate brain volume.
+
+CTA Head and Neck: No aneurysm identified. No vascular occlusion or significant stenosis. Vertebral and carotid arteries patent bilaterally. Circle of Willis intact.
+
+CT Perfusion: No perfusion deficits identified.
+
+Labs:
+- CBC: WBC 8.2, Hgb 13.1, Plt 245 — within normal limits
+- BMP: Na 140, K 4.1, Cr 0.8, Glucose 102 — within normal limits
+- Coagulation: PT 12.1, INR 1.0, PTT 28 — within normal limits
+- ESR: 12 (normal)
+- CRP: 0.4 (normal)
+- Troponin: <0.01 (normal)
+
+LP (Lumbar Puncture):
+- Opening pressure: 18 cm H2O (normal)
+- CSF appearance: Clear, colorless
+- CSF WBC: 2 (normal)
+- CSF RBC: 0 (normal — no xanthochromia)
+- CSF glucose: 62 (normal)
+- CSF protein: 35 (normal)
+- Gram stain: No organisms seen
+
+ED COURSE:
+Patient received morphine 4mg IV for pain control with partial relief (pain reduced to 6/10). IV normal saline bolus 1L administered. BP improved to 148/88 after pain control. CT, CTA, and CT perfusion were negative for hemorrhage, aneurysm, or ischemic stroke. LP was performed given thunderclap headache presentation — results within normal limits with no evidence of subarachnoid hemorrhage. Patient's headache improved to 4/10 with additional ketorolac 30mg IV.
+
+ASSESSMENT:
+1. Thunderclap headache — ED workup (CT, CTA, LP) negative for subarachnoid hemorrhage, aneurysm, and ischemic stroke. Etiology remains unclear. Differential includes primary thunderclap headache, reversible cerebral vasoconstriction syndrome (RCVS), vs atypical migraine presentation.
+2. Transient right arm weakness — resolved, no focal deficits on exam. CT perfusion negative. Differential includes TIA, migraine with aura, vs functional.
+3. Hypertension — elevated on presentation, improved with pain control.
+
+DISCHARGE PLAN:
+- Discharge home in stable condition
+- Sumatriptan 50mg PO prescribed for breakthrough headache (first triptan trial)
+- Continue home medications
+- Strict return precautions: return immediately for recurrent thunderclap headache, new neurological symptoms, vision changes, worst headache, fever, or altered mental status
+- URGENT outpatient neurology referral requested — recommend evaluation within 1 week given thunderclap headache with transient focal deficit
+- Consider outpatient MRI brain with and without contrast and MRA for further evaluation
+- Follow up with PCP in 1-2 weeks for BP management
+
+DISCHARGE DIAGNOSIS:
+1. Thunderclap headache, etiology undetermined
+2. Transient right upper extremity weakness, resolved
+3. Hypertension
+
+Electronically signed by: Michael Torres, MD
+Date: 02/18/2026 19:42 EST

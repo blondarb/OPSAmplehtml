@@ -1,9 +1,11 @@
 import { NextResponse } from 'next/server'
 import OpenAI from 'openai'
 import { createClient } from '@/lib/supabase/server'
-import { calculateTriageTier } from '@/lib/triage/scoring'
+import { calculateTriageTier, validateAIResponse } from '@/lib/triage/scoring'
 import { TRIAGE_SYSTEM_PROMPT, buildTriageUserPrompt } from '@/lib/triage/systemPrompt'
 import { AITriageResponse, DISCLAIMER_TEXT } from '@/lib/triage/types'
+
+export const maxDuration = 60
 
 const AI_MODEL = 'gpt-5.2'
 
@@ -28,6 +30,14 @@ export async function POST(request: Request) {
     if (referral_text.trim().length < 50) {
       return NextResponse.json(
         { error: 'Referral text must be at least 50 characters for meaningful triage.' },
+        { status: 400 }
+      )
+    }
+
+    // Cap input length to prevent excessive token usage
+    if (referral_text.length > 50000) {
+      return NextResponse.json(
+        { error: 'Referral text exceeds the maximum length of 50,000 characters. Please shorten the text or use the extraction pipeline for long documents.' },
         { status: 400 }
       )
     }
@@ -95,10 +105,22 @@ export async function POST(request: Request) {
       )
     }
 
-    // Parse AI response
+    // Parse and validate AI response
     let aiResponse: AITriageResponse
     try {
-      aiResponse = JSON.parse(rawContent) as AITriageResponse
+      const parsed = JSON.parse(rawContent)
+
+      // Validate structure before trusting the cast
+      const validationError = validateAIResponse(parsed)
+      if (validationError) {
+        console.error('AI response validation failed:', validationError, parsed)
+        return NextResponse.json(
+          { error: 'The triage system returned an unexpected response format. Please try again.' },
+          { status: 500 }
+        )
+      }
+
+      aiResponse = parsed as AITriageResponse
     } catch {
       console.error('Failed to parse AI triage response:', rawContent)
       return NextResponse.json(

@@ -47,6 +47,50 @@ export function formatTierDisplay(tier: TriageTier, isRedFlagOverride?: boolean)
   return base
 }
 
+/**
+ * Validate AI response structure before scoring.
+ * Returns null if valid, or an error message string if invalid.
+ */
+export function validateAIResponse(parsed: unknown): string | null {
+  if (!parsed || typeof parsed !== 'object') {
+    return 'Response is not an object'
+  }
+
+  const r = parsed as Record<string, unknown>
+
+  // Check boolean fields exist
+  if (typeof r.emergent_override !== 'boolean') return 'Missing or invalid emergent_override (expected boolean)'
+  if (typeof r.insufficient_data !== 'boolean') return 'Missing or invalid insufficient_data (expected boolean)'
+  if (typeof r.red_flag_override !== 'boolean') return 'Missing or invalid red_flag_override (expected boolean)'
+
+  // Check confidence
+  if (!['high', 'moderate', 'low'].includes(r.confidence as string)) {
+    return 'Missing or invalid confidence (expected high/moderate/low)'
+  }
+
+  // Check dimension scores
+  const ds = r.dimension_scores
+  if (!ds || typeof ds !== 'object') return 'Missing dimension_scores object'
+
+  const dimensions = ['symptom_acuity', 'diagnostic_concern', 'rate_of_progression', 'functional_impairment', 'red_flag_presence']
+  for (const dim of dimensions) {
+    const d = (ds as Record<string, unknown>)[dim]
+    if (!d || typeof d !== 'object') return `Missing dimension_scores.${dim}`
+    const score = (d as Record<string, unknown>).score
+    if (typeof score !== 'number' || !Number.isInteger(score) || score < 1 || score > 5) {
+      return `dimension_scores.${dim}.score must be an integer 1-5 (got ${score})`
+    }
+  }
+
+  // Check required arrays exist (can be empty)
+  if (!Array.isArray(r.clinical_reasons)) return 'Missing clinical_reasons array'
+  if (!Array.isArray(r.red_flags)) return 'Missing red_flags array'
+  if (!Array.isArray(r.suggested_workup)) return 'Missing suggested_workup array'
+  if (!Array.isArray(r.failed_therapies)) return 'Missing failed_therapies array'
+
+  return null
+}
+
 export function calculateTriageTier(aiResponse: AITriageResponse): ScoringResult {
   // 1. Check emergent override FIRST
   if (aiResponse.emergent_override) {

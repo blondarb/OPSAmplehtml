@@ -17,6 +17,7 @@ interface Props {
   inputMode?: 'paste' | 'upload'
   onInputModeChange?: (mode: 'paste' | 'upload') => void
   loadingMessage?: string
+  onCancel?: () => void
 }
 
 const LOADING_MESSAGES = [
@@ -40,6 +41,7 @@ export default function TriageInputPanel({
   inputMode: controlledInputMode,
   onInputModeChange,
   loadingMessage,
+  onCancel,
 }: Props) {
   const [text, setText] = useState('')
   const [showMetadata, setShowMetadata] = useState(false)
@@ -444,22 +446,40 @@ export default function TriageInputPanel({
           )}
         </button>
 
-        {((activeMode === 'paste' && text.length > 0) || (activeMode === 'upload' && hasFiles)) && !loading && (
+        {loading && onCancel ? (
           <button
-            onClick={handleReset}
+            onClick={onCancel}
             style={{
               padding: '12px 20px',
               borderRadius: '8px',
               background: 'transparent',
-              color: '#94a3b8',
-              border: '1px solid #475569',
+              color: '#f87171',
+              border: '1px solid #DC2626',
               fontSize: '0.85rem',
               fontWeight: 500,
               cursor: 'pointer',
             }}
           >
-            Clear
+            Cancel
           </button>
+        ) : (
+          ((activeMode === 'paste' && text.length > 0) || (activeMode === 'upload' && hasFiles)) && !loading && (
+            <button
+              onClick={handleReset}
+              style={{
+                padding: '12px 20px',
+                borderRadius: '8px',
+                background: 'transparent',
+                color: '#94a3b8',
+                border: '1px solid #475569',
+                fontSize: '0.85rem',
+                fontWeight: 500,
+                cursor: 'pointer',
+              }}
+            >
+              Clear
+            </button>
+          )
         )}
       </div>
 

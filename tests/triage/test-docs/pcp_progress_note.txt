@@ -1,0 +1,120 @@
+OFFICE VISIT — PROGRESS NOTE
+
+Provider: Dr. Sarah Kim, DO — Family Medicine
+Clinic: Riverside Family Practice
+Date: 02/10/2026
+Patient: [REDACTED]
+DOB: 11/22/1955 (Age 70)
+Sex: Male
+MRN: 4471823
+
+VISIT TYPE: Follow-up — Multiple chronic conditions
+
+CHIEF COMPLAINT: "My hands have been shaking more, and my wife says I'm walking differently"
+
+HISTORY OF PRESENT ILLNESS:
+Mr. [REDACTED] is a 70-year-old right-handed male presenting for routine follow-up of hypertension, type 2 diabetes, and benign prostatic hyperplasia. During today's visit, patient reports progressive bilateral hand tremor that has worsened over the past 6-8 months. He initially noticed it in his right hand when eating soup — the spoon would shake. Now bilateral, right worse than left. The tremor is most prominent at rest and improves when he reaches for objects. His wife, who accompanied him today, reports that his gait has become slower and he appears to shuffle his feet. She also notes he has become quieter and his facial expressions seem reduced — "he doesn't smile as much." Patient reports difficulty with buttons and has switched to slip-on shoes. Handwriting has become smaller.
+
+Additional symptoms reported:
+- Constipation for the past year, worsening (now BM every 3-4 days despite fiber)
+- REM sleep behavior disorder — wife reports he acts out dreams, punching and kicking in sleep (occurring for ~2 years)
+- Mild depression/apathy — less interest in hobbies (woodworking, gardening), attributes to "getting old"
+- Mild decreased sense of smell noticed over past 1-2 years
+- No falls, no syncope, no urinary incontinence beyond known BPH symptoms
+- No cognitive complaints — no word-finding difficulty, no getting lost, manages finances independently
+
+MEDICATIONS:
+1. Metformin 1000mg PO BID
+2. Lisinopril 20mg PO daily
+3. Amlodipine 5mg PO daily
+4. Tamsulosin 0.4mg PO daily
+5. Atorvastatin 40mg PO daily
+6. Aspirin 81mg PO daily
+7. Vitamin D 2000 IU daily
+
+ALLERGIES: NKDA
+
+PAST MEDICAL HISTORY:
+- Type 2 Diabetes Mellitus, diagnosed 2010, A1c last 7.2% (12/2025)
+- Hypertension, diagnosed 2008
+- Hyperlipidemia
+- BPH, diagnosed 2020
+- Rotator cuff repair, right shoulder, 2018
+- Colonoscopy 2023 — two benign polyps removed
+
+FAMILY HISTORY:
+Father: Parkinson's disease (diagnosed age 75, deceased age 82), coronary artery disease
+Mother: Alzheimer's disease (diagnosed age 80, deceased age 87)
+Brother: Type 2 diabetes
+No family history of essential tremor
+
+SOCIAL HISTORY:
+Retired mechanical engineer. Lives with wife of 44 years. Former smoker — quit 2005 (20 pack-year history). Occasional beer (1-2 per week). No illicit drugs. Independent in all ADLs but reports increasing difficulty with fine motor tasks. Still drives. Active in church community.
+
+REVIEW OF SYSTEMS:
+Constitutional: No weight loss, no fever, mild fatigue
+HEENT: Decreased smell as noted, no vision changes, no hearing loss, no dysphagia
+Cardiovascular: No chest pain, no edema
+Respiratory: No cough, no SOB
+GI: Constipation as noted, no blood in stool
+GU: Urinary frequency/hesitancy (known BPH), no hematuria
+Musculoskeletal: Mild bilateral shoulder stiffness, worse in morning
+Neurological: Tremor and gait changes as per HPI
+Psychiatric: Mild apathy/decreased motivation, denies suicidal ideation, denies hallucinations
+
+PHYSICAL EXAMINATION:
+Vitals: BP 138/82 (sitting), HR 72, RR 14, Temp 98.4°F, Weight 185 lbs (stable), BMI 27.2
+General: Pleasant elderly male, appears stated age, mild hypomimia noted
+HEENT: PERRLA, EOMI, oropharynx clear
+Neck: Supple, no lymphadenopathy, no thyromegaly
+Cardiovascular: RRR, no murmurs, no peripheral edema
+Respiratory: CTAB
+Abdomen: Soft, non-tender, non-distended, normal bowel sounds
+Extremities: No edema, good capillary refill
+
+Neurological Examination (focused):
+- Mental Status: Alert, oriented x4, MMSE 28/30 (missed serial 7s and delayed recall 2/3)
+- Speech: Mildly hypophonic but fluent, no dysarthria
+- Cranial Nerves: II-XII intact, mild hypomimia (reduced facial expression)
+- Motor:
+  * Tone: Mild cogwheel rigidity bilateral upper extremities, right > left
+  * Strength: 5/5 all extremities
+  * Resting tremor: 4-5 Hz pill-rolling tremor, right hand > left hand, intermittent
+  * Postural tremor: Mild re-emergent tremor bilaterally
+- Sensory: Intact to light touch, vibration intact at great toes
+- Reflexes: 2+ and symmetric, toes downgoing
+- Coordination: Mild difficulty with rapid alternating movements (dysdiadochokinesia), right > left
+- Gait: Mildly reduced arm swing bilaterally (right > left), short stride length, mild shuffling, no festination, turns require 4-5 steps. Romberg negative. Pull test: 1 step retropulsion.
+- Handwriting sample obtained: Micrographia noted
+
+LABS (obtained 2 weeks ago):
+- A1c: 7.2%
+- Fasting glucose: 132
+- Comprehensive metabolic panel: Within normal limits
+- CBC: Within normal limits
+- TSH: 2.1 (normal)
+- Vitamin B12: 482 (normal)
+- RPR: Non-reactive
+
+ASSESSMENT AND PLAN:
+
+1. Tremor and Bradykinesia — Clinical presentation highly concerning for Parkinson's disease given: rest tremor (pill-rolling, asymmetric, R>L), cogwheel rigidity, bradykinesia, hypomimia, micrographia, reduced arm swing, and shuffling gait. Prodromal features include REM sleep behavior disorder (2 years), constipation, and hyposmia. Strong family history (father with PD). URGENT REFERRAL TO NEUROLOGY (movement disorders subspecialty preferred) for evaluation, diagnostic workup, and consideration of dopaminergic therapy initiation. Recommend DaTscan if available.
+
+2. Type 2 Diabetes — A1c 7.2%, reasonable control. Continue metformin. Recheck A1c in 3 months.
+
+3. Hypertension — BP 138/82, at target. Continue current regimen. Monitor for orthostatic hypotension given concern for parkinsonism.
+
+4. BPH — Stable on tamsulosin. PSA due.
+
+5. Depression/Apathy — Likely related to emerging parkinsonian syndrome. Defer antidepressant initiation pending neurology evaluation. PHQ-9 score: 8 (mild depression). If worsening, consider SSRI (note: avoid antipsychotics, metoclopramide, and other dopamine blockers given PD concern).
+
+6. Constipation — Increase fiber, add MiraLAX PRN. May worsen with dopaminergic therapy — discuss with neurology.
+
+7. REM Sleep Behavior Disorder — Safety counseling provided (remove sharp objects from bedside, consider bed rails). This is a known prodromal feature of synucleinopathies.
+
+Follow-up: 4-6 weeks or sooner if symptoms worsen. Patient and wife counseled on Parkinson's disease — provided educational materials. Encouraged to maintain physical activity.
+
+REFERRAL PLACED: Neurology — Movement Disorders — URGENT
+
+Electronically signed by: Sarah Kim, DO
+Date: 02/10/2026 14:15 EST
