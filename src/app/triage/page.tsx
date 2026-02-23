@@ -2,10 +2,11 @@
 
 import { useState, useRef } from 'react'
 import Link from 'next/link'
-import { TriageResult, ClinicalExtraction, TriagePageState, FILE_CONSTRAINTS } from '@/lib/triage/types'
+import { TriageResult, ClinicalExtraction, TriagePageState, FILE_CONSTRAINTS, BatchItem } from '@/lib/triage/types'
 import TriageInputPanel from '@/components/triage/TriageInputPanel'
 import TriageOutputPanel from '@/components/triage/TriageOutputPanel'
 import ExtractionReviewPanel from '@/components/triage/ExtractionReviewPanel'
+import BatchResultsPanel from '@/components/triage/BatchResultsPanel'
 import DisclaimerBanner from '@/components/triage/DisclaimerBanner'
 
 export default function TriagePage() {
@@ -15,6 +16,7 @@ export default function TriagePage() {
   const [originalText, setOriginalText] = useState('')
   const [inputMode, setInputMode] = useState<'paste' | 'upload'>('paste')
   const [uploadedFiles, setUploadedFiles] = useState<File[]>([])
+  const [batchItems, setBatchItems] = useState<BatchItem[]>([])
   const [error, setError] = useState('')
   const abortControllerRef = useRef<AbortController | null>(null)
 
@@ -24,6 +26,7 @@ export default function TriagePage() {
       abortControllerRef.current.abort()
       abortControllerRef.current = null
     }
+    setBatchItems([])
     setPageState('input')
     setError('')
   }
@@ -111,43 +114,90 @@ export default function TriagePage() {
     }
   }
 
-  // Phase 2: handle file upload — send to extract endpoint
+  // Batch file upload: extract + triage all files end-to-end, no review step
   async function handleSubmitFiles(files: File[]) {
     if (files.length === 0) return
 
     setUploadedFiles(files)
-    setPageState('extracting')
     setError('')
+
+    // Initialize batch items
+    const items: BatchItem[] = files.map((file, i) => ({
+      id: `batch-${Date.now()}-${i}`,
+      filename: file.name,
+      file,
+      status: 'pending' as const,
+    }))
+    setBatchItems(items)
+    setPageState('batch')
 
     const controller = new AbortController()
     abortControllerRef.current = controller
 
-    try {
-      // Process the first file (single-file flow for now)
-      const file = files[0]
-      const formData = new FormData()
-      formData.append('file', file)
+    // Process each file sequentially: extract → triage
+    for (let i = 0; i < items.length; i++) {
+      if (controller.signal.aborted) return
 
-      const res = await fetch('/api/triage/extract', {
-        method: 'POST',
-        body: formData,
-        signal: controller.signal,
-      })
+      const item = items[i]
+      const file = files[i]
 
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}))
-        throw new Error(data.error || 'File extraction failed. Please try again.')
+      // --- Stage 1: Extract ---
+      setBatchItems(prev => prev.map(b =>
+        b.id === item.id ? { ...b, status: 'extracting' } : b
+      ))
+
+      try {
+        const formData = new FormData()
+        formData.append('file', file)
+
+        const extractRes = await fetch('/api/triage/extract', {
+          method: 'POST',
+          body: formData,
+          signal: controller.signal,
+        })
+
+        if (!extractRes.ok) {
+          const data = await extractRes.json().catch(() => ({}))
+          throw new Error(data.error || 'Extraction failed')
+        }
+
+        const extraction: ClinicalExtraction = await extractRes.json()
+
+        setBatchItems(prev => prev.map(b =>
+          b.id === item.id ? { ...b, status: 'triaging', extraction } : b
+        ))
+
+        // --- Stage 2: Triage the extracted summary ---
+        const triageRes = await fetch('/api/triage', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            referral_text: extraction.extracted_summary,
+            extracted_summary: extraction.extracted_summary,
+            source_type: file.name.toLowerCase().endsWith('.docx') ? 'docx' : file.name.toLowerCase().endsWith('.txt') ? 'txt' : 'pdf',
+            source_filename: file.name,
+            extraction_confidence: extraction.extraction_confidence,
+            note_type_detected: extraction.note_type_detected,
+          }),
+          signal: controller.signal,
+        })
+
+        if (!triageRes.ok) {
+          const data = await triageRes.json().catch(() => ({}))
+          throw new Error(data.error || 'Triage failed')
+        }
+
+        const triageResult: TriageResult = await triageRes.json()
+
+        setBatchItems(prev => prev.map(b =>
+          b.id === item.id ? { ...b, status: 'completed', triageResult } : b
+        ))
+      } catch (err: unknown) {
+        if (err instanceof DOMException && err.name === 'AbortError') return
+        setBatchItems(prev => prev.map(b =>
+          b.id === item.id ? { ...b, status: 'error', error: err instanceof Error ? err.message : 'Processing failed' } : b
+        ))
       }
-
-      const extractionResult: ClinicalExtraction = await res.json()
-      setExtraction(extractionResult)
-      // Store original text from extraction for the review panel
-      setOriginalText(extractionResult.extracted_summary)
-      setPageState('review')
-    } catch (err: unknown) {
-      if (err instanceof DOMException && err.name === 'AbortError') return // User cancelled
-      setError(err instanceof Error ? err.message : 'An unexpected error occurred during file processing.')
-      setPageState('input')
     }
   }
 
@@ -195,6 +245,7 @@ export default function TriagePage() {
     setExtraction(null)
     setOriginalText('')
     setUploadedFiles([])
+    setBatchItems([])
     setError('')
     setPageState('input')
   }
@@ -420,6 +471,11 @@ export default function TriagePage() {
         {/* Result state */}
         {pageState === 'result' && result && (
           <TriageOutputPanel result={result} onTryAnother={handleTryAnother} />
+        )}
+
+        {/* Batch state */}
+        {pageState === 'batch' && batchItems.length > 0 && (
+          <BatchResultsPanel items={batchItems} onTryAnother={handleTryAnother} />
         )}
       </div>
     </div>
