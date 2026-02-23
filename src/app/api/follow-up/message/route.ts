@@ -15,6 +15,7 @@ import type {
   MedicationStatus,
   CaregiverInfo,
 } from '@/lib/follow-up/types'
+import { suggestCptCode, CPT_CODES } from '@/lib/follow-up/cptCodes'
 
 export const maxDuration = 30
 
@@ -333,6 +334,40 @@ export async function POST(request: Request) {
 
         if (escError) {
           console.error('Supabase escalation insert error (non-fatal):', escError)
+        }
+      }
+
+      // Auto-create billing entry when conversation completes
+      if (conversationComplete) {
+        try {
+          // Estimate call duration from conversation turns (clinician adjusts actual time later)
+          const turnCount = (conversation_history?.length || 0) + 2
+          const callMinutes = Math.max(Math.ceil(turnCount / 2), 5)
+          const hasEscalation = highestTier === 'urgent' || highestTier === 'same_day'
+          const coordMinutes = hasEscalation ? 10 : 0
+          const billingTotal = 2 + callMinutes + 5 + coordMinutes
+          const cptCode = suggestCptCode('ccm', billingTotal)
+          const cptRate = CPT_CODES[cptCode]?.rate || 37.07
+
+          await supabase.from('followup_billing_entries').insert({
+            session_id: responsePayload.session_id,
+            patient_id: patient_context.id || null,
+            patient_name: patient_context.name,
+            service_date: new Date().toISOString().split('T')[0],
+            billing_month: new Date().toISOString().slice(0, 7),
+            program: 'ccm',
+            cpt_code: cptCode,
+            cpt_rate: cptRate,
+            prep_minutes: 2,
+            call_minutes: callMinutes,
+            documentation_minutes: 5,
+            coordination_minutes: coordMinutes,
+            total_minutes: billingTotal,
+            meets_threshold: billingTotal >= (CPT_CODES[cptCode]?.minMinutes || 20),
+            billing_status: 'not_reviewed',
+          })
+        } catch (billingErr) {
+          console.error('Billing entry auto-create error (non-fatal):', billingErr)
         }
       }
     } catch (err) {
