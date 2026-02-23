@@ -55,11 +55,14 @@ export function useFollowUpRealtimeSession(
   const dcRef = useRef<RTCDataChannel | null>(null)
   const audioElRef = useRef<HTMLAudioElement | null>(null)
   const streamRef = useRef<MediaStream | null>(null)
+  const micTrackRef = useRef<MediaStreamTrack | null>(null)
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  const unmuteTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const startTimeRef = useRef<number>(0)
   const escalationFlagsRef = useRef<EscalationFlag[]>([])
   const safetyEscalatedRef = useRef<boolean>(false)
   const transcriptRef = useRef<TranscriptEntry[]>([])
+  const aiSpeakingRef = useRef<boolean>(false)
 
   // Store callbacks in refs to avoid dependency churn
   const onSafetyEscalationRef = useRef(options.onSafetyEscalation)
@@ -70,6 +73,32 @@ export function useFollowUpRealtimeSession(
     onEscalationRef.current = options.onEscalation
     onCompleteRef.current = options.onComplete
   }, [options.onSafetyEscalation, options.onEscalation, options.onComplete])
+
+  // Mute mic to prevent echo when AI is speaking
+  const muteMic = useCallback(() => {
+    if (micTrackRef.current) {
+      micTrackRef.current.enabled = false
+    }
+    // Cancel any pending unmute
+    if (unmuteTimerRef.current) {
+      clearTimeout(unmuteTimerRef.current)
+      unmuteTimerRef.current = null
+    }
+  }, [])
+
+  // Unmute mic after a delay to catch trailing echo
+  const unmuteMicAfterDelay = useCallback((delayMs = 350) => {
+    // Cancel any existing unmute timer
+    if (unmuteTimerRef.current) {
+      clearTimeout(unmuteTimerRef.current)
+    }
+    unmuteTimerRef.current = setTimeout(() => {
+      if (micTrackRef.current) {
+        micTrackRef.current.enabled = true
+      }
+      unmuteTimerRef.current = null
+    }, delayMs)
+  }, [])
 
   // Safety keyword check (secondary defense)
   const checkSafety = useCallback((text: string) => {
@@ -97,6 +126,10 @@ export function useFollowUpRealtimeSession(
   }, [])
 
   const cleanup = useCallback(() => {
+    if (unmuteTimerRef.current) {
+      clearTimeout(unmuteTimerRef.current)
+      unmuteTimerRef.current = null
+    }
     if (timerRef.current) {
       clearInterval(timerRef.current)
       timerRef.current = null
@@ -113,6 +146,8 @@ export function useFollowUpRealtimeSession(
       streamRef.current.getTracks().forEach(t => t.stop())
       streamRef.current = null
     }
+    micTrackRef.current = null
+    aiSpeakingRef.current = false
     if (audioElRef.current) {
       audioElRef.current.srcObject = null
       // Remove from DOM if we appended it
@@ -126,6 +161,11 @@ export function useFollowUpRealtimeSession(
     switch (msg.type) {
       case 'response.audio_transcript.delta': {
         // Streaming AI text transcript (audio plays concurrently via WebRTC)
+        // Mute mic on first delta to prevent echo pickup
+        if (!aiSpeakingRef.current) {
+          aiSpeakingRef.current = true
+          muteMic()
+        }
         setCurrentAssistantText(prev => prev + (msg.delta || ''))
         setIsAiSpeaking(true)
         break
@@ -145,6 +185,9 @@ export function useFollowUpRealtimeSession(
         }
         setCurrentAssistantText('')
         setIsAiSpeaking(false)
+        aiSpeakingRef.current = false
+        // Unmute mic after delay so trailing echo dissipates
+        unmuteMicAfterDelay(350)
         break
       }
 
@@ -238,7 +281,7 @@ export function useFollowUpRealtimeSession(
         break
       }
     }
-  }, [checkSafety, checkEscalation])
+  }, [checkSafety, checkEscalation, muteMic, unmuteMicAfterDelay])
 
   const startSession = useCallback(async () => {
     setStatus('connecting')
@@ -298,6 +341,8 @@ export function useFollowUpRealtimeSession(
         },
       })
       streamRef.current = stream
+      const audioTrack = stream.getAudioTracks()[0]
+      micTrackRef.current = audioTrack
       stream.getTracks().forEach(track => pc.addTrack(track, stream))
 
       // 5. Create data channel for events
