@@ -61,6 +61,16 @@ export function useFollowUpRealtimeSession(
   const safetyEscalatedRef = useRef<boolean>(false)
   const transcriptRef = useRef<TranscriptEntry[]>([])
 
+  // Store callbacks in refs to avoid dependency churn
+  const onSafetyEscalationRef = useRef(options.onSafetyEscalation)
+  const onEscalationRef = useRef(options.onEscalation)
+  const onCompleteRef = useRef(options.onComplete)
+  useEffect(() => {
+    onSafetyEscalationRef.current = options.onSafetyEscalation
+    onEscalationRef.current = options.onEscalation
+    onCompleteRef.current = options.onComplete
+  }, [options.onSafetyEscalation, options.onEscalation, options.onComplete])
+
   // Safety keyword check (secondary defense)
   const checkSafety = useCallback((text: string) => {
     const lower = text.toLowerCase()
@@ -68,12 +78,12 @@ export function useFollowUpRealtimeSession(
       if (lower.includes(kw)) {
         safetyEscalatedRef.current = true
         setStatus('safety_escalation')
-        options.onSafetyEscalation?.()
+        onSafetyEscalationRef.current?.()
         return true
       }
     }
     return false
-  }, [options])
+  }, [])
 
   // Escalation trigger check via regex rules
   const checkEscalation = useCallback((text: string) => {
@@ -81,10 +91,10 @@ export function useFollowUpRealtimeSession(
     if (flags.length > 0) {
       escalationFlagsRef.current = [...escalationFlagsRef.current, ...flags]
       for (const flag of flags) {
-        options.onEscalation?.(flag)
+        onEscalationRef.current?.(flag)
       }
     }
-  }, [options])
+  }, [])
 
   const cleanup = useCallback(() => {
     if (timerRef.current) {
@@ -105,6 +115,8 @@ export function useFollowUpRealtimeSession(
     }
     if (audioElRef.current) {
       audioElRef.current.srcObject = null
+      // Remove from DOM if we appended it
+      audioElRef.current.remove()
       audioElRef.current = null
     }
   }, [])
@@ -113,7 +125,7 @@ export function useFollowUpRealtimeSession(
   const handleServerEvent = useCallback((msg: any) => {
     switch (msg.type) {
       case 'response.audio_transcript.delta': {
-        // Streaming AI text
+        // Streaming AI text transcript (audio plays concurrently via WebRTC)
         setCurrentAssistantText(prev => prev + (msg.delta || ''))
         setIsAiSpeaking(true)
         break
@@ -137,7 +149,7 @@ export function useFollowUpRealtimeSession(
       }
 
       case 'conversation.item.input_audio_transcription.completed': {
-        // User finished speaking
+        // User finished speaking — their audio was transcribed
         const userText = msg.transcript || ''
         if (userText.trim()) {
           const entry: TranscriptEntry = {
@@ -189,7 +201,7 @@ export function useFollowUpRealtimeSession(
                       timestamp: new Date().toISOString(),
                     }
                     escalationFlagsRef.current = [...escalationFlagsRef.current, escalation]
-                    options.onEscalation?.(escalation)
+                    onEscalationRef.current?.(escalation)
                   }
                 }
 
@@ -226,7 +238,7 @@ export function useFollowUpRealtimeSession(
         break
       }
     }
-  }, [checkSafety, checkEscalation, options])
+  }, [checkSafety, checkEscalation])
 
   const startSession = useCallback(async () => {
     setStatus('connecting')
@@ -260,19 +272,31 @@ export function useFollowUpRealtimeSession(
       const pc = new RTCPeerConnection()
       pcRef.current = pc
 
-      // 3. Set up remote audio playback
+      // 3. Set up remote audio playback — append to DOM for better browser support
       const audioEl = document.createElement('audio')
       audioEl.autoplay = true
       // @ts-expect-error - playsinline is valid for iOS Safari
       audioEl.playsInline = true
+      audioEl.style.display = 'none'
+      document.body.appendChild(audioEl)
       audioElRef.current = audioEl
 
       pc.ontrack = (event) => {
         audioEl.srcObject = event.streams[0]
+        // Force play in case autoplay was blocked
+        audioEl.play().catch(() => {
+          console.warn('Audio autoplay blocked — user may need to interact')
+        })
       }
 
-      // 4. Get user mic
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+      // 4. Get user mic with echo cancellation and noise suppression
+      const stream = await navigator.mediaDevices.getUserMedia({
+        audio: {
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true,
+        },
+      })
       streamRef.current = stream
       stream.getTracks().forEach(track => pc.addTrack(track, stream))
 
@@ -341,15 +365,15 @@ export function useFollowUpRealtimeSession(
 
     cleanup()
 
-    // Fire completion callback
-    options.onComplete?.({
+    // Fire completion callback via ref (avoids stale closure)
+    onCompleteRef.current?.({
       transcript: transcriptRef.current,
       duration: finalDuration,
       escalationFlags: escalationFlagsRef.current,
     })
 
     setStatus('complete')
-  }, [cleanup, options])
+  }, [cleanup])
 
   // Clean up on unmount
   useEffect(() => {
