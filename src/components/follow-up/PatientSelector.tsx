@@ -168,24 +168,22 @@ export default function PatientSelector({ onSelect, disabled }: PatientSelectorP
             </div>
           </div>
 
-          {/* Scenario Hint */}
+          {/* Role-play suggestions */}
           {selectedScenario.scenarioHint && (
             <div style={{
-              background: 'rgba(234, 179, 8, 0.08)',
-              border: '1px solid rgba(234, 179, 8, 0.25)',
+              background: 'rgba(13, 148, 136, 0.08)',
+              border: '1px solid rgba(13, 148, 136, 0.25)',
               borderRadius: '8px',
               padding: '10px 12px',
               display: 'flex',
               gap: '8px',
               alignItems: 'flex-start',
             }}>
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#EAB308" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0, marginTop: '1px' }}>
-                <circle cx="12" cy="12" r="10" />
-                <line x1="12" y1="16" x2="12" y2="12" />
-                <line x1="12" y1="8" x2="12.01" y2="8" />
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#0D9488" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0, marginTop: '1px' }}>
+                <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
               </svg>
-              <div style={{ color: '#EAB308', fontSize: '12px', lineHeight: '1.5' }}>
-                {selectedScenario.scenarioHint}
+              <div style={{ color: '#0D9488', fontSize: '12px', lineHeight: '1.5' }}>
+                <span style={{ fontWeight: 600 }}>Role-play ideas: </span>{selectedScenario.scenarioHint}
               </div>
             </div>
           )}

@@ -13,7 +13,7 @@ export const DEMO_SCENARIOS: PatientScenario[] = [
       { name: 'Tecfidera (dimethyl fumarate)', dose: '240mg BID', isNew: true }
     ],
     visitSummary: 'MS follow-up. Started Tecfidera 240mg BID. Baseline labs ordered. Return in 4 weeks.',
-    scenarioHint: 'Happy path: filled, taking, mild flushing (expected side effect). Reports feeling better.',
+    scenarioHint: 'Try: "Yeah I started the new pill. I get a little flushing after I take it but it goes away." Or try saying you feel great and see how the AI wraps up.',
   },
   {
     id: 'demo-followup-002',
@@ -27,7 +27,7 @@ export const DEMO_SCENARIOS: PatientScenario[] = [
       { name: 'Levetiracetam (Keppra)', dose: '500mg BID', isNew: true }
     ],
     visitSummary: 'New patient, first unprovoked seizure. Started levetiracetam 500mg BID. EEG and MRI brain ordered. Return in 4 weeks.',
-    scenarioHint: 'Escalation: reports having another seizure 2 days after visit. Triggers URGENT escalation.',
+    scenarioHint: 'Try: "I had another seizure two days ago" and see how the AI responds. Or try: "I\'m nervous about the driving restrictions — when can I drive again?"',
   },
   {
     id: 'demo-followup-003',
@@ -41,7 +41,7 @@ export const DEMO_SCENARIOS: PatientScenario[] = [
       { name: 'Donepezil (Aricept)', dose: '5mg daily', isNew: true }
     ],
     visitSummary: 'Memory clinic evaluation. MoCA 22/30. Started donepezil 5mg daily. Return in 3 months.',
-    scenarioHint: 'Medication access issue: not filled due to insurance denial. Triggers care coordinator flag.',
+    scenarioHint: 'Try: "I haven\'t been able to get it — my insurance denied it." Or try: "My daughter picked it up but I keep forgetting to take it."',
   },
   {
     id: 'demo-followup-004',
@@ -55,7 +55,7 @@ export const DEMO_SCENARIOS: PatientScenario[] = [
       { name: 'Carbidopa/Levodopa (Sinemet)', dose: '25/100mg TID (increased from BID)', isNew: false }
     ],
     visitSummary: "Parkinson's follow-up. Carbidopa/levodopa increased from BID to TID for motor fluctuations. PHQ-9 score 12.",
-    scenarioHint: 'CRITICAL escalation: reports feeling hopeless, "what\'s the point." Triggers suicidal ideation protocol — script terminates immediately.',
+    scenarioHint: 'Try: "Honestly, I just feel hopeless. What\'s the point of all this?" and see if the AI activates the safety protocol. Or try: "The extra dose isn\'t helping much — can I just stop taking it?"',
   },
   {
     id: 'demo-followup-005',
@@ -69,7 +69,7 @@ export const DEMO_SCENARIOS: PatientScenario[] = [
       { name: 'Donepezil (Aricept)', dose: '10mg daily (increased from 5mg)', isNew: false }
     ],
     visitSummary: "Alzheimer's follow-up. Donepezil increased to 10mg daily. OT referral placed. Return in 3 months.",
-    scenarioHint: 'Caregiver scenario: daughter Linda answers. Mild nausea reported (expected side effect). Tier 3 flag.',
+    scenarioHint: 'Try answering as a family member: "This is his daughter Linda. Dad can\'t really come to the phone." Or try: "He\'s been a little nauseous since the dose went up."',
   },
   {
     id: 'demo-followup-006',
@@ -83,6 +83,6 @@ export const DEMO_SCENARIOS: PatientScenario[] = [
       { name: 'Levetiracetam (Keppra)', dose: '750mg BID', isNew: false }
     ],
     visitSummary: 'Epilepsy follow-up. Well-controlled on levetiracetam 750mg BID. Continue current regimen. Return in 6 months.',
-    scenarioHint: 'URGENT escalation: ran out of medication 3 days ago (insurance issue). Abrupt anti-epileptic cessation — risk of breakthrough seizures/status epilepticus.',
+    scenarioHint: 'Try: "I actually ran out of my Keppra three days ago — my insurance wouldn\'t cover the refill." Or try: "Everything\'s fine, no seizures. But I want to talk about getting pregnant eventually."',
   },
 ]
