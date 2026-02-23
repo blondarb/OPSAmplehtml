@@ -63,7 +63,7 @@ export default function FollowUpPage() {
         alignItems: 'center',
         gap: '16px',
       }}>
-        <Link href="/" style={{
+        <Link href="/follow-up" style={{
           color: '#bbf7d0',
           textDecoration: 'none',
           fontSize: '0.875rem',
@@ -75,7 +75,7 @@ export default function FollowUpPage() {
             <path d="M19 12H5" />
             <polyline points="12 19 5 12 12 5" />
           </svg>
-          Home
+          Follow-Up Center
         </Link>
         <div style={{
           width: '1px',
