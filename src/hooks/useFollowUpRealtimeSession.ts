@@ -63,6 +63,7 @@ export function useFollowUpRealtimeSession(
   const safetyEscalatedRef = useRef<boolean>(false)
   const transcriptRef = useRef<TranscriptEntry[]>([])
   const aiSpeakingRef = useRef<boolean>(false)
+  const responseHadAudioRef = useRef<boolean>(false)
 
   // Store callbacks in refs to avoid dependency churn
   const onSafetyEscalationRef = useRef(options.onSafetyEscalation)
@@ -148,6 +149,7 @@ export function useFollowUpRealtimeSession(
     }
     micTrackRef.current = null
     aiSpeakingRef.current = false
+    responseHadAudioRef.current = false
     if (audioElRef.current) {
       audioElRef.current.srcObject = null
       // Remove from DOM if we appended it
@@ -159,20 +161,26 @@ export function useFollowUpRealtimeSession(
   // Handle server events from the data channel
   const handleServerEvent = useCallback((msg: any) => {
     switch (msg.type) {
+      // ── Mute mic BEFORE audio begins ──────────────────────────
+      case 'response.created': {
+        // This fires before any audio output — mute mic immediately
+        // to prevent echo from being captured
+        muteMic()
+        aiSpeakingRef.current = true
+        responseHadAudioRef.current = false
+        break
+      }
+
       case 'response.audio_transcript.delta': {
         // Streaming AI text transcript (audio plays concurrently via WebRTC)
-        // Mute mic on first delta to prevent echo pickup
-        if (!aiSpeakingRef.current) {
-          aiSpeakingRef.current = true
-          muteMic()
-        }
+        responseHadAudioRef.current = true
         setCurrentAssistantText(prev => prev + (msg.delta || ''))
         setIsAiSpeaking(true)
         break
       }
 
       case 'response.audio_transcript.done': {
-        // AI finished speaking this response
+        // AI finished speaking this response — unmute mic after delay
         const fullText = msg.transcript || ''
         if (fullText.trim()) {
           const entry: TranscriptEntry = {
@@ -187,10 +195,11 @@ export function useFollowUpRealtimeSession(
         setIsAiSpeaking(false)
         aiSpeakingRef.current = false
         // Unmute mic after delay so trailing echo dissipates
-        unmuteMicAfterDelay(350)
+        unmuteMicAfterDelay(400)
         break
       }
 
+      // ── User speech events ────────────────────────────────────
       case 'conversation.item.input_audio_transcription.completed': {
         // User finished speaking — their audio was transcribed
         const userText = msg.transcript || ''
@@ -223,12 +232,18 @@ export function useFollowUpRealtimeSession(
         break
       }
 
+      // ── Response complete ─────────────────────────────────────
       case 'response.done': {
+        // If response had no audio (e.g. tool-call only), unmute as fallback
+        // but only if we're not about to trigger another response
+        let triggeredFollowUp = false
+
         // Check if the response includes a tool call (save_followup_output)
         const output = msg.response?.output
         if (output && Array.isArray(output)) {
           for (const item of output) {
             if (item.type === 'function_call' && item.name === 'save_followup_output') {
+              triggeredFollowUp = true
               try {
                 const args = JSON.parse(item.arguments || '{}')
 
@@ -249,6 +264,7 @@ export function useFollowUpRealtimeSession(
                 }
 
                 // Send function call output back so the model can respond
+                // (this will trigger response.created → mic stays muted)
                 if (dcRef.current?.readyState === 'open') {
                   dcRef.current.send(JSON.stringify({
                     type: 'conversation.item.create',
@@ -258,7 +274,6 @@ export function useFollowUpRealtimeSession(
                       output: JSON.stringify({ success: true }),
                     },
                   }))
-                  // Let the model generate a closing response
                   dcRef.current.send(JSON.stringify({
                     type: 'response.create',
                     response: {
@@ -272,12 +287,21 @@ export function useFollowUpRealtimeSession(
             }
           }
         }
+
+        // Fallback unmute: if response had no audio and didn't trigger follow-up
+        if (!responseHadAudioRef.current && !triggeredFollowUp) {
+          aiSpeakingRef.current = false
+          unmuteMicAfterDelay(400)
+        }
         break
       }
 
       case 'error': {
         console.error('Realtime API error:', msg.error)
         setError(msg.error?.message || 'Realtime API error')
+        // Unmute on error so user isn't stuck muted
+        aiSpeakingRef.current = false
+        unmuteMicAfterDelay(0)
         break
       }
     }
