@@ -12,7 +12,7 @@ export const DEMO_SCENARIOS: PatientScenario[] = [
     medications: [
       { name: 'Tecfidera (dimethyl fumarate)', dose: '240mg BID', isNew: true }
     ],
-    visitSummary: 'MS follow-up visit. Started on Tecfidera 240mg BID after discussing disease-modifying therapy options. Counseled on expected side effects including flushing and GI symptoms. Labs ordered for baseline.',
+    visitSummary: 'MS follow-up. Started Tecfidera 240mg BID. Baseline labs ordered. Return in 4 weeks.',
     scenarioHint: 'Happy path: filled, taking, mild flushing (expected side effect). Reports feeling better.',
   },
   {
@@ -26,7 +26,7 @@ export const DEMO_SCENARIOS: PatientScenario[] = [
     medications: [
       { name: 'Levetiracetam (Keppra)', dose: '500mg BID', isNew: true }
     ],
-    visitSummary: 'New patient with first unprovoked seizure. Started levetiracetam 500mg BID. EEG and MRI brain ordered. Driving restrictions discussed. Return in 4 weeks.',
+    visitSummary: 'New patient, first unprovoked seizure. Started levetiracetam 500mg BID. EEG and MRI brain ordered. Return in 4 weeks.',
     scenarioHint: 'Escalation: reports having another seizure 2 days after visit. Triggers URGENT escalation.',
   },
   {
@@ -40,7 +40,7 @@ export const DEMO_SCENARIOS: PatientScenario[] = [
     medications: [
       { name: 'Donepezil (Aricept)', dose: '5mg daily', isNew: true }
     ],
-    visitSummary: 'Memory clinic evaluation. MoCA 22/30. Started donepezil 5mg daily. Discussed expectations and timeline for potential benefit. Caregiver education provided.',
+    visitSummary: 'Memory clinic evaluation. MoCA 22/30. Started donepezil 5mg daily. Return in 3 months.',
     scenarioHint: 'Medication access issue: not filled due to insurance denial. Triggers care coordinator flag.',
   },
   {
@@ -54,7 +54,7 @@ export const DEMO_SCENARIOS: PatientScenario[] = [
     medications: [
       { name: 'Carbidopa/Levodopa (Sinemet)', dose: '25/100mg TID (increased from BID)', isNew: false }
     ],
-    visitSummary: "Parkinson's follow-up. Increased carbidopa/levodopa from BID to TID for worsening motor fluctuations. Discussed depression screening - PHQ-9 score 12 (moderate). Referral to psychiatry offered but patient declined.",
+    visitSummary: "Parkinson's follow-up. Carbidopa/levodopa increased from BID to TID for motor fluctuations. PHQ-9 score 12.",
     scenarioHint: 'CRITICAL escalation: reports feeling hopeless, "what\'s the point." Triggers suicidal ideation protocol — script terminates immediately.',
   },
   {
@@ -68,7 +68,7 @@ export const DEMO_SCENARIOS: PatientScenario[] = [
     medications: [
       { name: 'Donepezil (Aricept)', dose: '10mg daily (increased from 5mg)', isNew: false }
     ],
-    visitSummary: "Memory clinic follow-up for moderate Alzheimer's. Increased donepezil to 10mg daily. Caregiver (daughter Linda) reports increased wandering. Safety assessment completed. OT referral placed.",
+    visitSummary: "Alzheimer's follow-up. Donepezil increased to 10mg daily. OT referral placed. Return in 3 months.",
     scenarioHint: 'Caregiver scenario: daughter Linda answers. Mild nausea reported (expected side effect). Tier 3 flag.',
   },
   {
@@ -82,7 +82,7 @@ export const DEMO_SCENARIOS: PatientScenario[] = [
     medications: [
       { name: 'Levetiracetam (Keppra)', dose: '750mg BID', isNew: false }
     ],
-    visitSummary: 'Epilepsy follow-up. Well-controlled on levetiracetam 750mg BID. Discussed pregnancy planning and folic acid supplementation. Continue current regimen. Return in 6 months.',
+    visitSummary: 'Epilepsy follow-up. Well-controlled on levetiracetam 750mg BID. Continue current regimen. Return in 6 months.',
     scenarioHint: 'URGENT escalation: ran out of medication 3 days ago (insurance issue). Abrupt anti-epileptic cessation — risk of breakthrough seizures/status epilepticus.',
   },
 ]
