@@ -1,9 +1,10 @@
 import type { Metadata } from "next";
 import "./globals.css";
+import { AuthProvider } from "@/contexts/AuthContext";
 
 export const metadata: Metadata = {
-  title: "Sevaro Clinical - AI-Powered Clinical Documentation",
-  description: "Streamline your clinical documentation with AI-powered tools for neurology practices",
+  title: "Sevaro Ambulatory - AI-Powered Outpatient Neurology",
+  description: "Reimagining every step of outpatient neurology with AI — from referral triage to continuous monitoring.",
 };
 
 // Inline script that runs before first paint to apply saved font-size preference.
@@ -35,7 +36,7 @@ export default function RootLayout({
         <script dangerouslySetInnerHTML={{ __html: fontSizeInitScript }} />
       </head>
       <body className="antialiased" style={{ fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif" }}>
-        {children}
+        <AuthProvider>{children}</AuthProvider>
       </body>
     </html>
   );
