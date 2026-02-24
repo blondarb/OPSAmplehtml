@@ -1,3 +1,5 @@
+'use client'
+
 import PlatformShell from '@/components/layout/PlatformShell'
 import HeroSection from '@/components/homepage/HeroSection'
 import JourneyTrack from '@/components/homepage/JourneyTrack'

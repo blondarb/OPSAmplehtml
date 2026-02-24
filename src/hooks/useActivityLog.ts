@@ -13,11 +13,11 @@ export function useActivityLog() {
       // Fire-and-forget — don't await, don't block UI
       import('@/lib/supabase/client').then(({ createClient }) => {
         const supabase = createClient()
-        supabase
-          .from('user_activity_log')
-          .insert({ user_id: user.id, action, target, metadata: metadata ?? {} })
-          .then(() => {})
-          .catch(() => {})
+        Promise.resolve(
+          supabase
+            .from('user_activity_log')
+            .insert({ user_id: user.id, action, target, metadata: metadata ?? {} })
+        ).catch(() => {})
       })
     },
     [user]
