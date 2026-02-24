@@ -6,6 +6,13 @@ import type { WearableDemoData } from '@/lib/wearable/types'
 import ConceptHero from '@/components/wearable/ConceptHero'
 import DataSourceCards from '@/components/wearable/DataSourceCards'
 import DataTypeMatrix from '@/components/wearable/DataTypeMatrix'
+import ClinicalUseCaseTable from '@/components/wearable/ClinicalUseCaseTable'
+import PatientTimeline from '@/components/wearable/PatientTimeline'
+import ClinicianAlertDashboard from '@/components/wearable/ClinicianAlertDashboard'
+import AIAnalysisLog from '@/components/wearable/AIAnalysisLog'
+import PatientNudgePreview from '@/components/wearable/PatientNudgePreview'
+import SDNEBaselineOverlay from '@/components/wearable/SDNEBaselineOverlay'
+import DisclaimerBanner from '@/components/wearable/DisclaimerBanner'
 
 export default function WearablePage() {
   const [loading, setLoading] = useState(true)
@@ -176,6 +183,23 @@ export default function WearablePage() {
           <ConceptHero />
           <DataSourceCards />
           <DataTypeMatrix />
+          <ClinicalUseCaseTable />
+          <PatientTimeline
+            dailySummaries={data.dailySummaries}
+            anomalies={data.anomalies}
+            patient={data.patient}
+          />
+          <ClinicianAlertDashboard
+            alerts={data.alerts}
+            anomalies={data.anomalies}
+          />
+          <AIAnalysisLog
+            patientId={data.patient.id}
+            anomalies={data.anomalies}
+          />
+          <PatientNudgePreview anomalies={data.anomalies} />
+          <SDNEBaselineOverlay />
+          <DisclaimerBanner />
         </div>
       )}
     </div>

@@ -87,8 +87,9 @@ export default function SleepTrack({ data, baseline, onDayClick }: SleepTrackPro
       </div>
 
       <ResponsiveContainer width="100%" height={180}>
-        <BarChart data={data} onClick={(e) => {
-          if (e?.activePayload?.[0]?.payload?.date) {
+        {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
+        <BarChart data={data} onClick={(e: any) => {
+          if (e && e.activePayload && e.activePayload.length > 0) {
             onDayClick(e.activePayload[0].payload.date)
           }
         }}>
@@ -105,9 +106,9 @@ export default function SleepTrack({ data, baseline, onDayClick }: SleepTrackPro
           />
           <Tooltip
             {...darkTooltipStyle}
-            labelFormatter={formatDate}
-            formatter={(value: number, name: string) => {
-              return [`${value.toFixed(1)} hrs`, SLEEP_LABELS[name] || name]
+            labelFormatter={(label: any) => formatDate(String(label))}
+            formatter={(value: any, name: any) => {
+              return [`${Number(value).toFixed(1)} hrs`, SLEEP_LABELS[name] || name]
             }}
           />
           <Legend content={<CustomLegend />} />

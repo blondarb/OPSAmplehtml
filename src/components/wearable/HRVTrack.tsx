@@ -103,8 +103,9 @@ export default function HRVTrack({ data, baseline, onDayClick }: HRVTrackProps) 
       </div>
 
       <ResponsiveContainer width="100%" height={180}>
-        <LineChart data={data} onClick={(e) => {
-          if (e?.activePayload?.[0]?.payload?.date) {
+        {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
+        <LineChart data={data} onClick={(e: any) => {
+          if (e && e.activePayload && e.activePayload.length > 0) {
             onDayClick(e.activePayload[0].payload.date)
           }
         }}>
@@ -121,8 +122,8 @@ export default function HRVTrack({ data, baseline, onDayClick }: HRVTrackProps) 
           />
           <Tooltip
             {...darkTooltipStyle}
-            labelFormatter={formatDate}
-            formatter={(value: number, name: string) => {
+            labelFormatter={(label: any) => formatDate(String(label))}
+            formatter={(value: any, name: any) => {
               const label = name === 'hrv_rmssd' ? 'HRV RMSSD' : '7-Day Avg'
               return [`${value} ms`, label]
             }}

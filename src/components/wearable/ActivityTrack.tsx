@@ -69,8 +69,9 @@ export default function ActivityTrack({ data, baseline, onDayClick }: ActivityTr
       </div>
 
       <ResponsiveContainer width="100%" height={180}>
-        <ComposedChart data={data} onClick={(e) => {
-          if (e?.activePayload?.[0]?.payload?.date) {
+        {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
+        <ComposedChart data={data} onClick={(e: any) => {
+          if (e && e.activePayload && e.activePayload.length > 0) {
             onDayClick(e.activePayload[0].payload.date)
           }
         }}>
@@ -87,10 +88,10 @@ export default function ActivityTrack({ data, baseline, onDayClick }: ActivityTr
           />
           <Tooltip
             {...darkTooltipStyle}
-            labelFormatter={formatDate}
-            formatter={(value: number, name: string) => {
+            labelFormatter={(label: any) => formatDate(String(label))}
+            formatter={(value: any, name: any) => {
               const label = name === 'total_steps' ? 'Steps' : '7-Day Avg'
-              return [value.toLocaleString(), label]
+              return [Number(value).toLocaleString(), label]
             }}
           />
           <ReferenceArea

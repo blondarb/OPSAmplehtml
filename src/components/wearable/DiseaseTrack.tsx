@@ -103,8 +103,9 @@ export default function DiseaseTrack({ data, baseline, onDayClick }: DiseaseTrac
       </div>
 
       <ResponsiveContainer width="100%" height={180}>
-        <ComposedChart data={data} onClick={(e) => {
-          if (e?.activePayload?.[0]?.payload?.date) {
+        {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
+        <ComposedChart data={data} onClick={(e: any) => {
+          if (e && e.activePayload && e.activePayload.length > 0) {
             onDayClick(e.activePayload[0].payload.date)
           }
         }}>
@@ -128,8 +129,8 @@ export default function DiseaseTrack({ data, baseline, onDayClick }: DiseaseTrac
           />
           <Tooltip
             {...darkTooltipStyle}
-            labelFormatter={formatDate}
-            formatter={(value: number, name: string) => {
+            labelFormatter={(label: any) => formatDate(String(label))}
+            formatter={(value: any, name: any) => {
               if (name === 'tremor_pct') return [`${value}%`, 'Tremor']
               if (name === 'dyskinetic_mins') return [`${value} min`, 'Dyskinetic']
               return [value, name]

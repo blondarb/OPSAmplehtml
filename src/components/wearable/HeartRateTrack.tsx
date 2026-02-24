@@ -103,8 +103,9 @@ export default function HeartRateTrack({ data, baseline, onDayClick }: HeartRate
       </div>
 
       <ResponsiveContainer width="100%" height={180}>
-        <LineChart data={data} onClick={(e) => {
-          if (e?.activePayload?.[0]?.payload?.date) {
+        {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
+        <LineChart data={data} onClick={(e: any) => {
+          if (e && e.activePayload && e.activePayload.length > 0) {
             onDayClick(e.activePayload[0].payload.date)
           }
         }}>
@@ -121,8 +122,8 @@ export default function HeartRateTrack({ data, baseline, onDayClick }: HeartRate
           />
           <Tooltip
             {...darkTooltipStyle}
-            labelFormatter={formatDate}
-            formatter={(value: number, name: string) => {
+            labelFormatter={(label: any) => formatDate(String(label))}
+            formatter={(value: any, name: any) => {
               const label = name === 'avg_hr' ? 'Avg HR' : 'Resting HR'
               return [`${value} bpm`, label]
             }}
