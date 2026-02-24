@@ -28,8 +28,8 @@ export async function middleware(request: NextRequest) {
     }
   )
 
-  // Refresh session (important for keeping auth alive)
-  const { data: { session } } = await supabase.auth.getSession()
+  // Validate auth with Supabase server (getUser verifies the JWT, unlike getSession)
+  const { data: { user } } = await supabase.auth.getUser()
 
   // --- Existing view preference logic for root path ---
   if (pathname === '/') {
@@ -58,7 +58,7 @@ export async function middleware(request: NextRequest) {
   const isApi = pathname.startsWith('/api/')
   const isStatic = pathname.startsWith('/_next/') || pathname.includes('.')
 
-  if (!isPublic && !isApi && !isStatic && !session) {
+  if (!isPublic && !isApi && !isStatic && !user) {
     const loginUrl = new URL('/login', request.url)
     loginUrl.searchParams.set('redirect', pathname)
     return NextResponse.redirect(loginUrl)

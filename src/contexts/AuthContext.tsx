@@ -46,6 +46,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     let mounted = true
+    let unsubscribe: (() => void) | undefined
 
     const init = async () => {
       const { createClient } = await import('@/lib/supabase/client')
@@ -77,13 +78,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
       )
 
-      return () => {
-        mounted = false
-        subscription.unsubscribe()
-      }
+      unsubscribe = () => subscription.unsubscribe()
     }
 
     init()
+
+    return () => {
+      mounted = false
+      unsubscribe?.()
+    }
   }, [fetchProfile])
 
   const signIn = async (email: string, password: string) => {

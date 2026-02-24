@@ -27,7 +27,9 @@ function LoginForm() {
   const searchParams = useSearchParams()
   const { signIn } = useAuth()
 
-  const redirect = searchParams.get('redirect')
+  const rawRedirect = searchParams.get('redirect')
+  // Prevent open redirect attacks — only allow relative paths
+  const redirect = rawRedirect && rawRedirect.startsWith('/') && !rawRedirect.startsWith('//') ? rawRedirect : null
   const cardName = redirect ? routeNames[redirect] ?? null : null
 
   const handleLogin = async (e: React.FormEvent) => {
@@ -78,8 +80,9 @@ function LoginForm() {
           {/* Form */}
           <form onSubmit={handleLogin}>
             <div className="mb-4">
-              <label className="block text-sm font-medium text-slate-700 mb-1">Email</label>
+              <label htmlFor="login-email" className="block text-sm font-medium text-slate-700 mb-1">Email</label>
               <input
+                id="login-email"
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
@@ -90,8 +93,9 @@ function LoginForm() {
             </div>
 
             <div className="mb-6">
-              <label className="block text-sm font-medium text-slate-700 mb-1">Password</label>
+              <label htmlFor="login-password" className="block text-sm font-medium text-slate-700 mb-1">Password</label>
               <input
+                id="login-password"
                 type="password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
@@ -113,7 +117,7 @@ function LoginForm() {
           {/* Sign up link */}
           <p className="mt-6 text-center text-sm text-slate-500">
             New here?{' '}
-            <Link href="/signup" className="font-medium text-teal-600 hover:text-teal-700">
+            <Link href={redirect ? `/signup?redirect=${encodeURIComponent(redirect)}` : '/signup'} className="font-medium text-teal-600 hover:text-teal-700">
               Create an account
             </Link>
           </p>

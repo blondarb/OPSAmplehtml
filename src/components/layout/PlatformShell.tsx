@@ -11,15 +11,22 @@ export default function PlatformShell({ children }: { children: React.ReactNode 
   const dropdownRef = useRef<HTMLDivElement>(null)
   const router = useRouter()
 
-  // Close dropdown on outside click
+  // Close dropdown on outside click or Escape key
   useEffect(() => {
     const handleClick = (e: MouseEvent) => {
       if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
         setDropdownOpen(false)
       }
     }
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setDropdownOpen(false)
+    }
     document.addEventListener('mousedown', handleClick)
-    return () => document.removeEventListener('mousedown', handleClick)
+    document.addEventListener('keydown', handleKeyDown)
+    return () => {
+      document.removeEventListener('mousedown', handleClick)
+      document.removeEventListener('keydown', handleKeyDown)
+    }
   }, [])
 
   const handleSignOut = async () => {
@@ -57,6 +64,8 @@ export default function PlatformShell({ children }: { children: React.ReactNode 
             <div className="relative" ref={dropdownRef}>
               <button
                 onClick={() => setDropdownOpen(!dropdownOpen)}
+                aria-expanded={dropdownOpen}
+                aria-haspopup="true"
                 className="flex items-center gap-2 hover:bg-slate-800 rounded-lg px-2 py-1.5 transition-colors"
               >
                 <div className="w-8 h-8 rounded-full bg-teal-600 flex items-center justify-center text-xs font-bold">
@@ -65,12 +74,13 @@ export default function PlatformShell({ children }: { children: React.ReactNode 
                 <span className="hidden md:block text-sm text-slate-300">{displayName}</span>
               </button>
               {dropdownOpen && (
-                <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-xl border border-slate-200 py-1 z-50">
+                <div role="menu" className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-xl border border-slate-200 py-1 z-50">
                   <div className="px-4 py-2 border-b border-slate-100">
                     <p className="text-sm font-medium text-slate-900">{displayName}</p>
                     <p className="text-xs text-slate-500">{userProfile?.role ?? 'demo'}</p>
                   </div>
                   <button
+                    role="menuitem"
                     onClick={handleSignOut}
                     className="w-full text-left px-4 py-2 text-sm text-slate-700 hover:bg-slate-50 transition-colors"
                   >
