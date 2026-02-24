@@ -1,6 +1,7 @@
 # Homepage Redesign + Authentication Implementation Plan
 
-> **For Claude:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task.
+> **Status: ✅ COMPLETE** — All 15 tasks implemented, code reviewed, deployed to production on February 24, 2026.
+> See `docs/HANDOFF_2026-02-24_homepage-redesign.md` for the full handoff document.
 
 **Goal:** Replace the flat 6-card homepage with a narrative three-track journey layout, add Supabase auth with route protection, and rebrand to "Sevaro Ambulatory."
 
@@ -1452,20 +1453,31 @@ git commit -m "chore: remove deprecated LandingPage component"
 
 ## Summary
 
-| Task | Description | Est. Complexity |
-|------|-------------|-----------------|
-| 1 | Install dependencies | Trivial |
-| 2 | Supabase migration | Small |
-| 3 | Auth context provider | Medium |
-| 4 | Activity logging hook | Small |
-| 5 | Update layout with AuthProvider | Small |
-| 6 | Middleware auth protection | Medium |
-| 7 | PlatformShell nav bar | Medium |
-| 8 | Homepage section components (7 files) | Large |
-| 9 | Assemble new homepage | Small |
-| 10 | Redesign login page | Medium |
-| 11 | PatientPortal tab query param | Small |
-| 12 | Signup page branding | Small |
-| 13 | Build verification | Small |
-| 14 | Visual verification | Medium |
-| 15 | Delete old LandingPage | Trivial |
+| Task | Description | Est. Complexity | Status |
+|------|-------------|-----------------|--------|
+| 1 | Install dependencies | Trivial | ✅ Done |
+| 2 | Supabase migration | Small | ✅ Done (applied to remote) |
+| 3 | Auth context provider | Medium | ✅ Done (+ leak fix) |
+| 4 | Activity logging hook | Small | ✅ Done |
+| 5 | Update layout with AuthProvider | Small | ✅ Done |
+| 6 | Middleware auth protection | Medium | ✅ Done (uses getUser) |
+| 7 | PlatformShell nav bar | Medium | ✅ Done (+ ARIA, Escape key) |
+| 8 | Homepage section components (7 files) | Large | ✅ Done |
+| 9 | Assemble new homepage | Small | ✅ Done |
+| 10 | Redesign login page | Medium | ✅ Done (+ open redirect fix) |
+| 11 | PatientPortal tab query param | Small | ✅ Done |
+| 12 | Signup page branding | Small | ✅ Done |
+| 13 | Build verification | Small | ✅ Done (67 pages clean) |
+| 14 | Visual verification | Medium | ✅ Done |
+| 15 | Delete old LandingPage | Trivial | ✅ Done (413 lines removed) |
+
+### Post-Implementation Code Review Fixes
+| Fix | Severity | Status |
+|-----|----------|--------|
+| Auth subscription memory leak | Critical | ✅ Fixed |
+| Open redirect vulnerability | Critical | ✅ Fixed |
+| getSession → getUser in middleware | Critical | ✅ Fixed |
+| Missing htmlFor/id on form labels | Important | ✅ Fixed |
+| Dropdown ARIA attributes | Important | ✅ Fixed |
+| Escape key handler | Important | ✅ Fixed |
+| Redirect param forwarding login↔signup | Important | ✅ Fixed |
