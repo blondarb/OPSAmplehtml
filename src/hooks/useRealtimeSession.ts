@@ -195,6 +195,9 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
       streamRef.current = stream
       const audioTrack = stream.getAudioTracks()[0]
       micTrackRef.current = audioTrack
+      // Start mic MUTED — the first AI greeting will play immediately,
+      // and we don't want to capture it. Mic unmutes after AI finishes speaking.
+      audioTrack.enabled = false
       stream.getTracks().forEach(track => pc.addTrack(track, stream))
 
       // 5. Create data channel for events
