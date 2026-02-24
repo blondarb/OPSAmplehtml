@@ -346,6 +346,62 @@ export default function LandingPage() {
             </div>
           </div>
         </Link>
+        {/* Wearable Monitoring Card */}
+        <Link href="/wearable" style={{ textDecoration: 'none', flex: '1 1 300px', maxWidth: '340px' }}>
+          <div style={{
+            background: '#1e293b',
+            border: '1px solid #334155',
+            borderRadius: '16px',
+            padding: '32px',
+            cursor: 'pointer',
+            transition: 'all 0.2s',
+            textAlign: 'center',
+          }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.borderColor = '#0EA5E9'
+              e.currentTarget.style.boxShadow = '0 8px 32px rgba(14,165,233,0.2)'
+              e.currentTarget.style.transform = 'translateY(-2px)'
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.borderColor = '#334155'
+              e.currentTarget.style.boxShadow = 'none'
+              e.currentTarget.style.transform = 'translateY(0)'
+            }}
+          >
+            <div style={{
+              width: 56,
+              height: 56,
+              borderRadius: '12px',
+              background: 'rgba(14,165,233,0.15)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              margin: '0 auto 16px',
+            }}>
+              <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#38BDF8" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <polyline points="2 12 5 12 7 4 10 20 13 8 15 16 17 12 22 12" />
+              </svg>
+            </div>
+            <h2 style={{ color: '#fff', fontSize: '1.25rem', fontWeight: 600, margin: '0 0 8px' }}>
+              Wearable Monitoring
+            </h2>
+            <p style={{ color: '#94a3b8', fontSize: '0.875rem', margin: 0, lineHeight: 1.5 }}>
+              Continuous patient monitoring between visits using consumer wearable devices, with AI-powered anomaly detection and clinician alerts.
+            </p>
+            <div style={{
+              marginTop: '20px',
+              padding: '10px 20px',
+              borderRadius: '8px',
+              background: '#0EA5E9',
+              color: '#fff',
+              fontWeight: 600,
+              fontSize: '0.875rem',
+              display: 'inline-block',
+            }}>
+              Open Wearable Monitor
+            </div>
+          </div>
+        </Link>
       </div>
 
       {/* Footer */}
