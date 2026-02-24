@@ -1,0 +1,99 @@
+'use client'
+
+import Link from 'next/link'
+import { useAuth } from '@/contexts/AuthContext'
+import { useState, useRef, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
+
+export default function PlatformShell({ children }: { children: React.ReactNode }) {
+  const { user, userProfile, loading, signOut } = useAuth()
+  const [dropdownOpen, setDropdownOpen] = useState(false)
+  const dropdownRef = useRef<HTMLDivElement>(null)
+  const router = useRouter()
+
+  // Close dropdown on outside click
+  useEffect(() => {
+    const handleClick = (e: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
+        setDropdownOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClick)
+    return () => document.removeEventListener('mousedown', handleClick)
+  }, [])
+
+  const handleSignOut = async () => {
+    await signOut()
+    setDropdownOpen(false)
+    router.push('/')
+  }
+
+  const initials = userProfile?.display_name
+    ? userProfile.display_name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)
+    : user?.email?.[0]?.toUpperCase() ?? '?'
+
+  const displayName = userProfile?.display_name ?? user?.email ?? ''
+
+  return (
+    <div className="min-h-screen flex flex-col">
+      {/* Nav Bar */}
+      <nav className="sticky top-0 z-50 bg-slate-900 text-white h-16 flex items-center justify-between px-6 shadow-lg">
+        {/* Left: Product Name */}
+        <Link href="/" className="text-lg font-bold tracking-tight hover:text-teal-400 transition-colors">
+          Sevaro Ambulatory
+        </Link>
+
+        {/* Center: Nav Links */}
+        <div className="hidden md:flex items-center gap-6 text-sm">
+          <Link href="/" className="text-slate-300 hover:text-white transition-colors">Home</Link>
+          <Link href="/about" className="text-slate-300 hover:text-white transition-colors">About</Link>
+        </div>
+
+        {/* Right: Auth */}
+        <div className="flex items-center gap-4">
+          {loading ? (
+            <div className="w-8 h-8 rounded-full bg-slate-700 animate-pulse" />
+          ) : user ? (
+            <div className="relative" ref={dropdownRef}>
+              <button
+                onClick={() => setDropdownOpen(!dropdownOpen)}
+                className="flex items-center gap-2 hover:bg-slate-800 rounded-lg px-2 py-1.5 transition-colors"
+              >
+                <div className="w-8 h-8 rounded-full bg-teal-600 flex items-center justify-center text-xs font-bold">
+                  {initials}
+                </div>
+                <span className="hidden md:block text-sm text-slate-300">{displayName}</span>
+              </button>
+              {dropdownOpen && (
+                <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-xl border border-slate-200 py-1 z-50">
+                  <div className="px-4 py-2 border-b border-slate-100">
+                    <p className="text-sm font-medium text-slate-900">{displayName}</p>
+                    <p className="text-xs text-slate-500">{userProfile?.role ?? 'demo'}</p>
+                  </div>
+                  <button
+                    onClick={handleSignOut}
+                    className="w-full text-left px-4 py-2 text-sm text-slate-700 hover:bg-slate-50 transition-colors"
+                  >
+                    Sign Out
+                  </button>
+                </div>
+              )}
+            </div>
+          ) : (
+            <Link
+              href="/login"
+              className="text-sm font-medium px-4 py-2 rounded-lg border border-slate-600 hover:bg-slate-800 transition-colors"
+            >
+              Sign In
+            </Link>
+          )}
+        </div>
+      </nav>
+
+      {/* Page Content */}
+      <main className="flex-1">
+        {children}
+      </main>
+    </div>
+  )
+}
