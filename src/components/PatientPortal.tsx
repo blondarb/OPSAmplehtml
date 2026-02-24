@@ -7,6 +7,9 @@ import { DEMO_SCENARIOS, type PortalPatient } from '@/lib/historianTypes'
 import TextConversationalIntake from './TextConversationalIntake'
 import VoiceConversationalIntake from './VoiceConversationalIntake'
 import MessageConversationalChat from './MessageConversationalChat'
+import PlatformShell from '@/components/layout/PlatformShell'
+import FeatureSubHeader from '@/components/layout/FeatureSubHeader'
+import { User } from 'lucide-react'
 
 type Tab = 'intake' | 'messages' | 'historian'
 
@@ -212,59 +215,18 @@ export default function PatientPortal() {
   }
 
   return (
+    <PlatformShell>
+    <FeatureSubHeader
+      title="Patient Portal"
+      icon={User}
+      accentColor="#8B5CF6"
+      nextStep={{ label: 'AI Health Interview', route: '/patient/historian' }}
+    />
     <div style={{
       minHeight: '100vh',
       background: 'linear-gradient(135deg, #0f172a 0%, #1e293b 100%)',
       fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif",
     }}>
-      {/* Header */}
-      <header style={{
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        padding: '16px 24px',
-        borderBottom: '1px solid #1e293b',
-        background: '#0f172a',
-      }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-          <div style={{
-            width: 36,
-            height: 36,
-            borderRadius: '50%',
-            background: 'linear-gradient(135deg, #8B5CF6, #A78BFA)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-          }}>
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
-              <circle cx="12" cy="7" r="4" />
-            </svg>
-          </div>
-          <span style={{ color: '#fff', fontWeight: 600, fontSize: '1.125rem' }}>Sevaro Patient Portal</span>
-        </div>
-        <a
-          href="/?switch_app=true"
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '6px',
-            color: '#94a3b8',
-            textDecoration: 'none',
-            fontSize: '0.875rem',
-            fontWeight: 500,
-            padding: '8px 14px',
-            borderRadius: '8px',
-            border: '1px solid #334155',
-            transition: 'color 0.15s, border-color 0.15s',
-          }}
-        >
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <polyline points="15 18 9 12 15 6" />
-          </svg>
-          Home
-        </a>
-      </header>
 
       {/* Demo Context Banner */}
       <div style={{ maxWidth: '720px', margin: '0 auto', padding: '16px 24px 0' }}>
@@ -1246,5 +1208,6 @@ export default function PatientPortal() {
         )}
       </div>
     </div>
+    </PlatformShell>
   )
 }

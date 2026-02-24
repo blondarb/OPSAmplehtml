@@ -74,10 +74,10 @@ export const patientTrack: JourneyTrackData = {
     {
       phase: 'Between Visits',
       name: 'Patient Messaging',
-      route: '/patient?tab=messages',
+      route: '/patient/messages',
       icon: MessageCircle,
       status: 'live',
-      description: 'Send questions and updates to your care team between visits.',
+      description: 'Send questions and updates to your care team — with AI-assisted message composition.',
     },
     {
       phase: 'After the Visit',
@@ -112,11 +112,11 @@ export const ongoingCareTrack: JourneyTrackData = {
     },
     {
       phase: 'The Full Picture',
-      name: 'Clinician Command Center',
+      name: 'Command Center',
       route: '/dashboard',
       icon: LayoutDashboard,
       status: 'live',
-      description: 'Everything in one place — triage queue, alerts, wearable trends, follow-up status.',
+      description: 'Aggregate overview — follow-up completions, wearable alerts, triage queue, and pending messages.',
     },
   ],
 }

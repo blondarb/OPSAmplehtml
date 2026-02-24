@@ -6,6 +6,9 @@ import { useRealtimeSession } from '@/hooks/useRealtimeSession'
 import { DEMO_SCENARIOS, type DemoScenario, type HistorianStructuredOutput, type HistorianRedFlag, type HistorianTranscriptEntry, type HistorianSessionType, type PatientContext } from '@/lib/historianTypes'
 import { getTenantClient } from '@/lib/tenant'
 import HistorianSessionComplete from './HistorianSessionComplete'
+import PlatformShell from '@/components/layout/PlatformShell'
+import FeatureSubHeader from '@/components/layout/FeatureSubHeader'
+import { Mic } from 'lucide-react'
 
 type Phase = 'loading_context' | 'scenario_select' | 'connecting' | 'active' | 'ending' | 'complete' | 'safety_escalation'
 
@@ -285,6 +288,13 @@ export default function NeurologicHistorian() {
   }
 
   return (
+    <PlatformShell>
+    <FeatureSubHeader
+      title="AI Health Interview"
+      icon={Mic}
+      accentColor="#0D9488"
+      nextStep={{ label: 'Patient Messaging', route: '/patient/messages' }}
+    />
     <div style={{
       minHeight: '100vh',
       background: 'linear-gradient(135deg, #0f172a 0%, #1e293b 100%)',
@@ -292,40 +302,6 @@ export default function NeurologicHistorian() {
       display: 'flex',
       flexDirection: 'column',
     }}>
-      {/* Header */}
-      <header style={{
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        padding: '16px 24px',
-        borderBottom: '1px solid #1e293b',
-        background: '#0f172a',
-        flexShrink: 0,
-      }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-          <div style={{
-            width: 36, height: 36, borderRadius: '50%',
-            background: 'linear-gradient(135deg, #0d9488, #14b8a6)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-          }}>
-            {/* Brain icon */}
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M9.5 2A5.5 5.5 0 005 7.5c0 .88.21 1.71.58 2.45" />
-              <path d="M4.5 12.5C3 13.5 2 15.37 2 17.5 2 20 4 22 6.5 22c1.5 0 2.84-.73 3.67-1.85" />
-              <path d="M14.5 2A5.5 5.5 0 0120 7.5c0 .88-.21 1.71-.58 2.45" />
-              <path d="M19.5 12.5c1.5 1 2.5 2.87 2.5 5 0 2.5-2 4.5-4.5 4.5-1.5 0-2.84-.73-3.67-1.85" />
-              <path d="M12 2v20" />
-            </svg>
-          </div>
-          <span style={{ color: '#fff', fontWeight: 600, fontSize: '1.125rem' }}>AI Neurologic Historian</span>
-        </div>
-        <button
-          onClick={handleBackToPortal}
-          style={{ background: 'none', border: 'none', color: '#94a3b8', fontSize: '0.875rem', cursor: 'pointer' }}
-        >
-          Back to Portal
-        </button>
-      </header>
 
       {/* Main content */}
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
@@ -782,5 +758,6 @@ export default function NeurologicHistorian() {
         )}
       </div>
     </div>
+    </PlatformShell>
   )
 }

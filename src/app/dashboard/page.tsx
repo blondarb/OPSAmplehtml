@@ -1,23 +1,8 @@
-import ClinicalNote from '@/components/ClinicalNote'
-import { fetchDashboardData } from '@/lib/dashboardData'
+import CommandCenterDashboard from '@/components/CommandCenterDashboard'
 
 // Force dynamic rendering - this page requires auth
 export const dynamic = 'force-dynamic'
 
-export default async function DashboardPage() {
-  const data = await fetchDashboardData()
-
-  return (
-    <ClinicalNote
-      user={data.user}
-      patient={data.patient}
-      currentVisit={data.currentVisit}
-      priorVisits={data.priorVisits}
-      imagingStudies={data.imagingStudies}
-      scoreHistory={data.scoreHistory}
-      patientMessages={data.patientMessages}
-      patientIntakeForms={data.patientIntakeForms}
-      historianSessions={data.historianSessions}
-    />
-  )
+export default function DashboardPage() {
+  return <CommandCenterDashboard />
 }

@@ -178,6 +178,31 @@ export default function TopNav({ user, onSignOut, openAiDrawer, onOpenSettings, 
             </svg>
           </button>
 
+          {/* Home link */}
+          <a
+            href="/"
+            title="Back to Sevaro Home"
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '4px',
+              color: 'var(--text-muted)',
+              textDecoration: 'none',
+              fontSize: '0.8rem',
+              fontWeight: 500,
+              padding: '4px 10px',
+              borderRadius: '6px',
+              border: '1px solid var(--border)',
+              transition: 'color 0.15s',
+            }}
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z" />
+              <polyline points="9 22 9 12 15 12 15 22" />
+            </svg>
+            Home
+          </a>
+
           {/* Search */}
           <div style={{
             display: 'flex',
