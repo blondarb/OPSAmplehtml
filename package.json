@@ -11,7 +11,8 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:audio": "npx tsx tests/audio/run-pipeline-test.ts",
-    "test:audio:generate": "bash tests/audio/scripts/generate-visit-audio.sh"
+    "test:audio:generate": "bash tests/audio/scripts/generate-visit-audio.sh",
+    "seed:wearable": "npx tsx scripts/seed-wearable-demo.ts"
   },
   "dependencies": {
     "@deepgram/sdk": "^4.11.3",
