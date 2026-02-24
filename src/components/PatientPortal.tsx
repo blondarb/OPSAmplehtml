@@ -37,7 +37,12 @@ const EMPTY_INTAKE: IntakeForm = {
 }
 
 export default function PatientPortal() {
-  const [tab, setTab] = useState<Tab>('intake')
+  // Read initial tab from URL query param (enables direct linking from homepage)
+  const searchParams = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : null
+  const initialTab = (['intake', 'messages', 'historian'] as Tab[]).includes(searchParams?.get('tab') as Tab)
+    ? (searchParams!.get('tab') as Tab)
+    : 'intake'
+  const [tab, setTab] = useState<Tab>(initialTab)
   const [intake, setIntake] = useState<IntakeForm>(EMPTY_INTAKE)
   const [intakeSubmitted, setIntakeSubmitted] = useState(false)
   const [intakeLoading, setIntakeLoading] = useState(false)
