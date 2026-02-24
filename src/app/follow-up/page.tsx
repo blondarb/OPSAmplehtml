@@ -1,30 +1,21 @@
 'use client'
 
-import Link from 'next/link'
 import HubTile from '@/components/follow-up/HubTile'
+import PlatformShell from '@/components/layout/PlatformShell'
+import FeatureSubHeader from '@/components/layout/FeatureSubHeader'
+import { MessageSquare } from 'lucide-react'
 import DisclaimerBanner from '@/components/follow-up/DisclaimerBanner'
 
 export default function FollowUpHub() {
   return (
+    <PlatformShell>
+    <FeatureSubHeader
+      title="AI Follow-Up Agent"
+      icon={MessageSquare}
+      accentColor="#16A34A"
+      nextStep={{ label: 'Wearable Monitoring', route: '/wearable' }}
+    />
     <div style={{ minHeight: '100vh', background: '#0f172a', color: '#fff' }}>
-      {/* Header */}
-      <div style={{ background: '#16A34A', padding: '16px 24px', display: 'flex', alignItems: 'center', gap: '16px' }}>
-        <Link href="/" style={{ color: '#fff', textDecoration: 'none', fontSize: '0.875rem', opacity: 0.9 }}>
-          ← Home
-        </Link>
-        <h1 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 700, flex: 1 }}>
-          Post-Visit Follow-Up Center
-        </h1>
-        <span style={{
-          background: 'rgba(255,255,255,0.2)',
-          padding: '4px 12px',
-          borderRadius: '12px',
-          fontSize: '0.75rem',
-          fontWeight: 600,
-        }}>
-          DEMO
-        </span>
-      </div>
 
       {/* Intro */}
       <div style={{ textAlign: 'center', padding: '40px 24px 16px', maxWidth: '700px', margin: '0 auto' }}>
@@ -91,5 +82,6 @@ export default function FollowUpHub() {
         <DisclaimerBanner />
       </div>
     </div>
+    </PlatformShell>
   )
 }

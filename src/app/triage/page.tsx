@@ -1,8 +1,10 @@
 'use client'
 
 import { useState, useRef } from 'react'
-import Link from 'next/link'
 import { TriageResult, ClinicalExtraction, TriagePageState, FILE_CONSTRAINTS, BatchItem } from '@/lib/triage/types'
+import PlatformShell from '@/components/layout/PlatformShell'
+import FeatureSubHeader from '@/components/layout/FeatureSubHeader'
+import { Brain } from 'lucide-react'
 import TriageInputPanel from '@/components/triage/TriageInputPanel'
 import TriageOutputPanel from '@/components/triage/TriageOutputPanel'
 import ExtractionReviewPanel from '@/components/triage/ExtractionReviewPanel'
@@ -265,67 +267,18 @@ export default function TriagePage() {
       : undefined
 
   return (
+    <PlatformShell>
+    <FeatureSubHeader
+      title="AI Triage Tool"
+      icon={Brain}
+      accentColor="#F59E0B"
+      nextStep={{ label: 'Physician Workspace', route: '/physician' }}
+    />
     <div style={{
       minHeight: '100vh',
       background: 'linear-gradient(135deg, #0f172a 0%, #1e293b 100%)',
       fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif",
     }}>
-      {/* Header */}
-      <div style={{
-        background: '#9a3412',
-        padding: '12px 24px',
-        display: 'flex',
-        alignItems: 'center',
-        gap: '16px',
-      }}>
-        <Link href="/" style={{
-          color: '#fed7aa',
-          textDecoration: 'none',
-          fontSize: '0.875rem',
-          display: 'flex',
-          alignItems: 'center',
-          gap: '4px',
-        }}>
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M19 12H5" />
-            <polyline points="12 19 5 12 12 5" />
-          </svg>
-          Home
-        </Link>
-        <div style={{
-          width: '1px',
-          height: '20px',
-          background: 'rgba(255,255,255,0.2)',
-        }} />
-        <h1 style={{
-          color: '#fff',
-          fontSize: '1rem',
-          fontWeight: 600,
-          margin: 0,
-          display: 'flex',
-          alignItems: 'center',
-          gap: '8px',
-        }}>
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#fdba74" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-            <polyline points="14 2 14 8 20 8" />
-            <line x1="16" y1="13" x2="8" y2="13" />
-            <line x1="16" y1="17" x2="8" y2="17" />
-            <polyline points="10 9 9 9 8 9" />
-          </svg>
-          AI Triage Tool
-        </h1>
-        <span style={{
-          color: '#fdba74',
-          fontSize: '0.7rem',
-          fontWeight: 500,
-          padding: '2px 8px',
-          background: 'rgba(251,146,60,0.2)',
-          borderRadius: '4px',
-        }}>
-          Demo
-        </span>
-      </div>
 
       {/* Main content */}
       <div style={{
@@ -479,5 +432,6 @@ export default function TriagePage() {
         )}
       </div>
     </div>
+    </PlatformShell>
   )
 }

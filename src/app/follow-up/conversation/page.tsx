@@ -1,7 +1,9 @@
 'use client'
 
 import { useState } from 'react'
-import Link from 'next/link'
+import PlatformShell from '@/components/layout/PlatformShell'
+import FeatureSubHeader from '@/components/layout/FeatureSubHeader'
+import { HeartPulse } from 'lucide-react'
 import PatientSelector from '@/components/follow-up/PatientSelector'
 import ModeSelector from '@/components/follow-up/ModeSelector'
 import ChatConversation from '@/components/follow-up/ChatConversation'
@@ -49,65 +51,67 @@ export default function FollowUpPage() {
     setSessionId(null)
   }
 
+  const [showLanding, setShowLanding] = useState(true)
+
   return (
+    <PlatformShell>
+    <FeatureSubHeader
+      title="Post-Visit Check-In"
+      icon={HeartPulse}
+      accentColor="#16A34A"
+    />
     <div style={{
       minHeight: '100vh',
       background: 'linear-gradient(135deg, #0f172a 0%, #1e293b 100%)',
       fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif",
     }}>
-      {/* Header */}
-      <div style={{
-        background: '#16A34A',
-        padding: '12px 24px',
-        display: 'flex',
-        alignItems: 'center',
-        gap: '16px',
-      }}>
-        <Link href="/follow-up" style={{
-          color: '#bbf7d0',
-          textDecoration: 'none',
-          fontSize: '0.875rem',
-          display: 'flex',
-          alignItems: 'center',
-          gap: '4px',
-        }}>
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M19 12H5" />
-            <polyline points="12 19 5 12 12 5" />
-          </svg>
-          Follow-Up Center
-        </Link>
-        <div style={{
-          width: '1px',
-          height: '20px',
-          background: 'rgba(255,255,255,0.2)',
-        }} />
-        <h1 style={{
-          color: '#fff',
-          fontSize: '1rem',
-          fontWeight: 600,
-          margin: 0,
-          display: 'flex',
-          alignItems: 'center',
-          gap: '8px',
-        }}>
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#86efac" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z" />
-          </svg>
-          Post-Visit Follow-Up Agent
-        </h1>
-        <span style={{
-          color: '#16A34A',
-          fontSize: '0.7rem',
-          fontWeight: 500,
-          padding: '2px 8px',
-          background: '#fff',
-          borderRadius: '4px',
-        }}>
-          Demo
-        </span>
-      </div>
 
+      {showLanding ? (
+        <div style={{ maxWidth: 640, margin: '0 auto', padding: '60px 24px 0', textAlign: 'center' }}>
+          <div style={{
+            width: 64, height: 64, borderRadius: '50%',
+            background: 'linear-gradient(135deg, #16A34A, #22C55E)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            margin: '0 auto 24px',
+          }}>
+            <HeartPulse size={32} color="white" />
+          </div>
+          <h1 style={{ fontSize: 28, fontWeight: 700, marginBottom: 12, color: '#fff' }}>
+            Post-Visit Check-In
+          </h1>
+          <p style={{ fontSize: 16, color: '#94a3b8', lineHeight: 1.6, marginBottom: 32 }}>
+            After every visit, our AI care coordinator follows up with the patient to check on
+            medication tolerance, symptom changes, and any new concerns. This conversation
+            generates structured alerts for the care team when escalation is needed.
+          </p>
+          <div style={{
+            background: 'rgba(22, 163, 74, 0.1)', border: '1px solid rgba(22, 163, 74, 0.3)', borderRadius: 12,
+            padding: 24, marginBottom: 32, textAlign: 'left',
+          }}>
+            <h3 style={{ fontSize: 14, fontWeight: 600, color: '#4ade80', marginBottom: 12, marginTop: 0 }}>
+              What happens during a check-in:
+            </h3>
+            <ul style={{ fontSize: 14, color: '#94a3b8', lineHeight: 1.8, paddingLeft: 20, margin: 0 }}>
+              <li>AI asks about medication side effects and adherence</li>
+              <li>Screens for new or worsening symptoms</li>
+              <li>Checks if the patient has questions about their care plan</li>
+              <li>Generates a structured summary for the clinician</li>
+              <li>Flags urgent concerns for immediate review</li>
+            </ul>
+          </div>
+          <button
+            onClick={() => setShowLanding(false)}
+            style={{
+              background: '#16A34A', color: 'white', border: 'none',
+              padding: '14px 32px', borderRadius: 8, fontSize: 16,
+              fontWeight: 600, cursor: 'pointer',
+            }}
+          >
+            Start Check-In Demo
+          </button>
+        </div>
+      ) : (
+      <>
       {/* Main content */}
       <div style={{
         maxWidth: '1400px',
@@ -210,6 +214,9 @@ export default function FollowUpPage() {
         {/* Disclaimer Banner */}
         <DisclaimerBanner />
       </div>
+      </>
+      )}
     </div>
+    </PlatformShell>
   )
 }

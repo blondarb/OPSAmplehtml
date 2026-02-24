@@ -1,8 +1,10 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import Link from 'next/link'
 import type { WearableDemoData } from '@/lib/wearable/types'
+import PlatformShell from '@/components/layout/PlatformShell'
+import FeatureSubHeader from '@/components/layout/FeatureSubHeader'
+import { Watch } from 'lucide-react'
 import ConceptHero from '@/components/wearable/ConceptHero'
 import DataSourceCards from '@/components/wearable/DataSourceCards'
 import DataTypeMatrix from '@/components/wearable/DataTypeMatrix'
@@ -39,66 +41,18 @@ export default function WearablePage() {
   }, [])
 
   return (
+    <PlatformShell>
+    <FeatureSubHeader
+      title="Wearable Monitoring"
+      icon={Watch}
+      accentColor="#0EA5E9"
+      nextStep={{ label: 'Command Center', route: '/dashboard' }}
+    />
     <div style={{
       minHeight: '100vh',
       background: '#0f172a',
       fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif",
     }}>
-      {/* Header */}
-      <div style={{
-        background: '#0EA5E9',
-        padding: '12px 24px',
-        display: 'flex',
-        alignItems: 'center',
-        gap: '16px',
-      }}>
-        <Link href="/" style={{
-          color: 'rgba(255,255,255,0.9)',
-          textDecoration: 'none',
-          fontSize: '0.875rem',
-          display: 'flex',
-          alignItems: 'center',
-          gap: '4px',
-        }}>
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M19 12H5" />
-            <polyline points="12 19 5 12 12 5" />
-          </svg>
-          Home
-        </Link>
-        <div style={{
-          width: '1px',
-          height: '20px',
-          background: 'rgba(255,255,255,0.3)',
-        }} />
-        <h1 style={{
-          color: '#fff',
-          fontSize: '1rem',
-          fontWeight: 600,
-          margin: 0,
-          display: 'flex',
-          alignItems: 'center',
-          gap: '8px',
-          flex: 1,
-        }}>
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <rect x="3" y="3" width="18" height="18" rx="3" />
-            <path d="M7 12h2l2-4 2 8 2-4h2" />
-          </svg>
-          Wearable Monitoring
-        </h1>
-        <span style={{
-          color: '#0EA5E9',
-          fontSize: '0.7rem',
-          fontWeight: 600,
-          padding: '2px 10px',
-          background: '#fff',
-          borderRadius: '10px',
-          letterSpacing: '0.5px',
-        }}>
-          DEMO
-        </span>
-      </div>
 
       {/* Loading State */}
       {loading && (
@@ -203,5 +157,6 @@ export default function WearablePage() {
         </div>
       )}
     </div>
+    </PlatformShell>
   )
 }
