@@ -60,7 +60,7 @@ export default function PatientTimeline({ dailySummaries, anomalies, patient }: 
   }
 
   const dateRange = formatDateRange(dailySummaries)
-  const deviceName = patient.wearable_devices?.[0] || 'Wearable Device'
+  const deviceName = patient.wearable_devices?.[0]?.name || 'Wearable Device'
   const diagnosis = patient.primary_diagnosis
   const medications = patient.medications || []
 
@@ -129,7 +129,7 @@ export default function PatientTimeline({ dailySummaries, anomalies, patient }: 
               fontSize: '12px',
               color: '#94a3b8',
             }}>
-              {med}
+              {med.name}{med.dose ? ` ${med.dose}` : ''}
             </span>
           ))}
         </div>

@@ -37,6 +37,20 @@ export interface BaselineMetrics {
   tremor_pct?: number
 }
 
+// Medication entry (from JSONB)
+export interface PatientMedication {
+  name: string
+  dose?: string
+  frequency?: string
+}
+
+// Device entry (from JSONB)
+export interface PatientDevice {
+  name: string
+  status?: string
+  data_types?: string[]
+}
+
 // Patient record with wearable monitoring context
 export interface WearablePatient {
   id: string
@@ -44,8 +58,8 @@ export interface WearablePatient {
   age: number
   sex: string
   primary_diagnosis: string
-  medications: string[]
-  wearable_devices: string[]
+  medications: PatientMedication[]
+  wearable_devices: PatientDevice[]
   baseline_metrics: BaselineMetrics
   monitoring_start_date: string
 }

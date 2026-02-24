@@ -69,14 +69,6 @@ CREATE TABLE IF NOT EXISTS followup_escalations (
 CREATE INDEX IF NOT EXISTS idx_followup_escalations_session ON followup_escalations (session_id);
 CREATE INDEX IF NOT EXISTS idx_followup_escalations_severity ON followup_escalations (severity);
 
--- Seed 6 demo patients for follow-up scenarios
--- Uses ON CONFLICT to be idempotent
-INSERT INTO patients (mrn, first_name, last_name, date_of_birth, gender, phone, email, user_id)
-VALUES
-  ('FUDEMO-001', 'Maria', 'Santos', '1992-03-15', 'F', '555-0101', 'maria.santos@demo.test', '00000000-0000-0000-0000-000000000000'),
-  ('FUDEMO-002', 'James', 'Okonkwo', '1984-07-22', 'M', '555-0102', 'james.okonkwo@demo.test', '00000000-0000-0000-0000-000000000000'),
-  ('FUDEMO-003', 'Dorothy', 'Chen', '1954-11-08', 'F', '555-0103', 'dorothy.chen@demo.test', '00000000-0000-0000-0000-000000000000'),
-  ('FUDEMO-004', 'Robert', 'Alvarez', '1971-01-30', 'M', '555-0104', 'robert.alvarez@demo.test', '00000000-0000-0000-0000-000000000000'),
-  ('FUDEMO-005', 'Harold', 'Washington', '1948-06-12', 'M', '555-0105', 'harold.washington@demo.test', '00000000-0000-0000-0000-000000000000'),
-  ('FUDEMO-006', 'Keisha', 'Brown', '1998-09-25', 'F', '555-0106', 'keisha.brown@demo.test', '00000000-0000-0000-0000-000000000000')
-ON CONFLICT (mrn) DO NOTHING;
+-- NOTE: Demo patient seeding removed from migration.
+-- The follow-up demo seeds patients via its own seed script,
+-- because the dummy user_id does not exist in auth.users.
