@@ -12,6 +12,7 @@ Sevaro Clinical is a web application for AI-powered clinical documentation, spec
 - **Database**: Supabase (PostgreSQL)
 - **Authentication**: Supabase Auth
 - **AI**: OpenAI GPT-5/GPT-4o-mini APIs + Whisper (transcription) + Realtime API (WebRTC)
+- **SMS/Voice**: Twilio (SDK v5) for live patient follow-up demos
 - **Deployment**: Vercel
 
 ## Project Structure
@@ -35,6 +36,10 @@ src/
 │   │   │   ├── briefing/  # AI morning briefing (GPT-5.2)
 │   │   │   ├── metrics/   # Status tile metrics
 │   │   │   └── patients/  # Patient queue + AI summaries
+│   │   ├── follow-up/     # Follow-Up Agent APIs
+│   │   │   ├── message/   # Browser chat conversation turns
+│   │   │   ├── send-sms/  # Initiate live SMS demo (Twilio)
+│   │   │   └── twilio-sms/ # Inbound Twilio SMS webhook
 │   │   ├── consults/      # Consult request CRUD
 │   │   ├── incomplete-docs/ # Incomplete documentation detection
 │   │   ├── medications/   # Medication CRUD API
@@ -130,6 +135,13 @@ src/
 │   │   ├── types.ts       # Command Center TypeScript interfaces
 │   │   ├── demoActions.ts # Shared demo action data for API routes
 │   │   └── briefingPrompt.ts # GPT-5.2 system prompt + demo briefing
+│   ├── follow-up/
+│   │   ├── types.ts             # Follow-Up Agent TypeScript interfaces
+│   │   ├── demoScenarios.ts     # 6 demo patient scenarios
+│   │   ├── systemPrompt.ts      # AI system prompt builder
+│   │   ├── escalationRules.ts   # Regex + merge escalation logic
+│   │   ├── conversationEngine.ts # Shared AI turn logic (browser + SMS)
+│   │   └── twilioClient.ts      # Twilio SMS send/validate helpers
 │   ├── supabase/
 │   │   ├── client.ts      # Browser Supabase client
 │   │   └── server.ts      # Server Supabase client
@@ -540,6 +552,8 @@ When redeploying after changes, use "Redeploy without cache" to ensure fresh bui
 - Push to feature branch, create PR, merge to main for deployment
 
 ## Recent Changes
+
+- **Live Follow-Up Agent Phase A: SMS (2026-02-25)**: Implemented real-phone SMS demo for Follow-Up Agent. User enters phone number on conversation page, receives a real Twilio text, replies via SMS, and the clinician dashboard updates in real-time via Supabase Realtime. New files: `twilioClient.ts` (send/validate), `conversationEngine.ts` (shared AI turn logic), `send-sms/route.ts` (initiate), `twilio-sms/route.ts` (webhook), `LiveDemoPanel.tsx` (UI). Migration 031 fixes schema mismatches and adds `followup_phone_sessions` table. Refactored `message/route.ts` to use shared engine. `ClinicianDashboard` now accepts `liveSessionId` prop for Realtime subscription. See `docs/plans/2026-02-25-live-followup-sms-plan.md` for implementation plan.
 
 - **Live Follow-Up Agent Design (2026-02-25)**: Design doc for real phone demo — Twilio SMS + OpenAI Realtime voice. User enters phone number, gets a real text, can reply or call back. Dashboard updates in real-time. See `docs/plans/2026-02-25-live-followup-agent-design.md`. Playbook `04_post_visit_agent.md` updated with Phase 1.5 roadmap.
 

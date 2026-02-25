@@ -9,6 +9,7 @@ import ModeSelector from '@/components/follow-up/ModeSelector'
 import ChatConversation from '@/components/follow-up/ChatConversation'
 import VoiceConversation from '@/components/follow-up/VoiceConversation'
 import ClinicianDashboard from '@/components/follow-up/ClinicianDashboard'
+import LiveDemoPanel from '@/components/follow-up/LiveDemoPanel'
 import EscalationAlert from '@/components/follow-up/EscalationAlert'
 import PostCallSummary from '@/components/follow-up/PostCallSummary'
 import DisclaimerBanner from '@/components/follow-up/DisclaimerBanner'
@@ -23,6 +24,7 @@ export default function FollowUpPage() {
   const [dashboard, setDashboard] = useState<DashboardUpdate | null>(null)
   const [escalationAlert, setEscalationAlert] = useState<EscalationFlag | null>(null)
   const [sessionId, setSessionId] = useState<string | null>(null)
+  const [liveSessionId, setLiveSessionId] = useState<string | null>(null)
 
   function handlePatientSelect(scenario: PatientScenario) {
     setSelectedScenario(scenario)
@@ -49,6 +51,11 @@ export default function FollowUpPage() {
     setDashboard(null)
     setEscalationAlert(null)
     setSessionId(null)
+    setLiveSessionId(null)
+  }
+
+  function handleLiveSessionStarted(id: string) {
+    setLiveSessionId(id)
   }
 
   const [showLanding, setShowLanding] = useState(true)
@@ -149,6 +156,15 @@ export default function FollowUpPage() {
               <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
                 <PatientSelector onSelect={handlePatientSelect} disabled={false} />
                 <ModeSelector mode={mode} onModeChange={setMode} disabled={false} />
+
+                {/* Live SMS Demo */}
+                <div style={{
+                  marginTop: '8px',
+                  borderTop: '1px solid #334155',
+                  paddingTop: '24px',
+                }}>
+                  <LiveDemoPanel onSessionStarted={handleLiveSessionStarted} />
+                </div>
               </div>
             )}
 
@@ -207,7 +223,7 @@ export default function FollowUpPage() {
                 <EscalationAlert flag={escalationAlert} onDismiss={() => setEscalationAlert(null)} />
               </div>
             )}
-            <ClinicianDashboard dashboard={dashboard} escalationAlert={escalationAlert} sessionId={sessionId} />
+            <ClinicianDashboard dashboard={dashboard} escalationAlert={escalationAlert} sessionId={sessionId} liveSessionId={liveSessionId} />
           </div>
         </div>
 

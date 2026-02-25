@@ -1,25 +1,10 @@
 import { NextResponse } from 'next/server'
-import OpenAI from 'openai'
 import { createClient } from '@/lib/supabase/server'
-import { buildFollowUpSystemPrompt } from '@/lib/follow-up/systemPrompt'
-import {
-  scanForEscalationTriggers,
-  mergeEscalations,
-  getHighestTier,
-} from '@/lib/follow-up/escalationRules'
-import type {
-  FollowUpMessageRequest,
-  FollowUpMessageResponse,
-  EscalationFlag,
-  FollowUpModule,
-  MedicationStatus,
-  CaregiverInfo,
-} from '@/lib/follow-up/types'
+import { processConversationTurn } from '@/lib/follow-up/conversationEngine'
+import type { FollowUpMessageRequest, FollowUpMessageResponse } from '@/lib/follow-up/types'
 import { suggestCptCode, CPT_CODES } from '@/lib/follow-up/cptCodes'
 
 export const maxDuration = 30
-
-const AI_MODEL = 'gpt-5.2'
 
 export async function POST(request: Request) {
   try {
@@ -54,181 +39,21 @@ export async function POST(request: Request) {
       )
     }
 
-    const openai = new OpenAI({ apiKey })
-
-    // Build system prompt
-    const systemPrompt = buildFollowUpSystemPrompt(patient_context)
-
-    // Construct messages array for OpenAI
-    const messages: Array<{ role: 'system' | 'user' | 'assistant'; content: string }> = [
-      { role: 'system', content: systemPrompt },
-    ]
-
-    // Add conversation history — convert 'agent' role to 'assistant' for OpenAI
-    if (conversation_history && conversation_history.length > 0) {
-      for (const entry of conversation_history) {
-        const role = entry.role === 'agent' ? 'assistant' : entry.role
-        messages.push({
-          role: role as 'user' | 'assistant',
-          content: entry.content,
-        })
-      }
-    }
-
-    // Add the new patient message (unless it's the first greeting trigger with empty message)
-    if (patient_message !== undefined && patient_message !== '') {
-      messages.push({ role: 'user', content: patient_message })
-    }
-
-    // Call OpenAI
-    const controller = new AbortController()
-    const timeout = setTimeout(() => controller.abort(), 25000)
-
-    let completion
-    try {
-      completion = await openai.chat.completions.create(
-        {
-          model: AI_MODEL,
-          messages,
-          response_format: { type: 'json_object' },
-          temperature: 1,
-        },
-        { signal: controller.signal }
-      )
-    } finally {
-      clearTimeout(timeout)
-    }
-
-    const rawContent = completion.choices[0]?.message?.content
-    if (!rawContent) {
-      return NextResponse.json(
-        { error: 'The follow-up system is temporarily unavailable. Please try again.' },
-        { status: 500 }
-      )
-    }
-
-    // Parse AI response
-    let aiOutput: {
-      agent_message?: string
-      current_module?: FollowUpModule
-      escalation_triggered?: boolean
-      escalation_details?: {
-        tier?: string
-        trigger_text?: string
-        category?: string
-        recommended_action?: string
-      } | null
-      conversation_complete?: boolean
-      extracted_data?: {
-        medication_status?: Array<{
-          medication?: string
-          filled?: boolean | null
-          taking?: boolean | null
-          side_effects?: string[]
-        }>
-        new_symptoms?: string[]
-        functional_status?: string | null
-        functional_details?: string | null
-        patient_questions?: string[]
-        caregiver_info?: {
-          is_caregiver?: boolean
-          name?: string | null
-          relationship?: string | null
-        }
-      }
-    }
-
-    try {
-      aiOutput = JSON.parse(rawContent)
-    } catch {
-      console.error('Failed to parse follow-up AI response:', rawContent)
-      // Return a graceful fallback response
-      const fallbackResponse: FollowUpMessageResponse = {
-        session_id: session_id || crypto.randomUUID(),
-        agent_response: "I'm sorry, could you repeat that?",
-        current_module: 'greeting',
-        escalation_triggered: false,
-        escalation_details: null,
-        conversation_complete: false,
-        dashboard_update: {
-          status: 'in_progress',
-          currentModule: 'greeting',
-          flags: [],
-          medicationStatus: [],
-          functionalStatus: null,
-          functionalDetails: null,
-          patientQuestions: [],
-          caregiverInfo: { isCaregiver: false, name: null, relationship: null },
-        },
-      }
-      return NextResponse.json(fallbackResponse)
-    }
-
-    // Run regex-based escalation safety net on patient message
-    const regexFlags = patient_message ? scanForEscalationTriggers(patient_message) : []
-
-    // Build AI-detected escalation flags
-    const aiFlags: EscalationFlag[] = []
-    if (aiOutput.escalation_triggered && aiOutput.escalation_details) {
-      const details = aiOutput.escalation_details
-      aiFlags.push({
-        tier: (details.tier as EscalationFlag['tier']) || 'informational',
-        triggerText: details.trigger_text || '',
-        category: details.category || 'ai_detected',
-        aiAssessment: `AI detected escalation: ${details.category || 'unknown'}`,
-        recommendedAction: details.recommended_action || '',
-        timestamp: new Date().toISOString(),
-      })
-    }
-
-    // Merge escalations from AI and regex safety net
-    const allFlags = mergeEscalations(aiFlags, regexFlags)
-    const highestTier = getHighestTier(allFlags)
-    const escalationTriggered = allFlags.length > 0
-
-    // Map extracted data
-    const extractedData = aiOutput.extracted_data || {}
-
-    const medicationStatus: MedicationStatus[] = (extractedData.medication_status || []).map(
-      (ms) => ({
-        medication: ms.medication || '',
-        filled: ms.filled ?? null,
-        taking: ms.taking ?? null,
-        sideEffects: ms.side_effects || [],
-      })
+    // Call shared conversation engine
+    const result = await processConversationTurn(
+      { patient_message, patient_context, conversation_history },
+      apiKey
     )
-
-    const caregiverInfo: CaregiverInfo = {
-      isCaregiver: extractedData.caregiver_info?.is_caregiver || false,
-      name: extractedData.caregiver_info?.name || null,
-      relationship: extractedData.caregiver_info?.relationship || null,
-    }
-
-    const currentModule: FollowUpModule = aiOutput.current_module || 'greeting'
-    const conversationComplete = aiOutput.conversation_complete || false
 
     // Build the response
     const responsePayload: FollowUpMessageResponse = {
       session_id: session_id || crypto.randomUUID(),
-      agent_response: aiOutput.agent_message || "I'm sorry, could you repeat that?",
-      current_module: currentModule,
-      escalation_triggered: escalationTriggered,
-      escalation_details: allFlags.length > 0 ? allFlags[0] : null,
-      conversation_complete: conversationComplete,
-      dashboard_update: {
-        status: conversationComplete
-          ? 'completed'
-          : escalationTriggered && highestTier === 'urgent'
-            ? 'escalated'
-            : 'in_progress',
-        currentModule,
-        flags: allFlags,
-        medicationStatus,
-        functionalStatus: extractedData.functional_status || null,
-        functionalDetails: extractedData.functional_details || null,
-        patientQuestions: extractedData.patient_questions || [],
-        caregiverInfo,
-      },
+      agent_response: result.agent_response,
+      current_module: result.current_module,
+      escalation_triggered: result.escalation_triggered,
+      escalation_details: result.all_flags.length > 0 ? result.all_flags[0] : null,
+      conversation_complete: result.conversation_complete,
+      dashboard_update: result.dashboard_update,
     }
 
     // Supabase operations
@@ -267,15 +92,15 @@ export async function POST(request: Request) {
             medications: patient_context.medications,
             visit_summary: patient_context.visitSummary,
             follow_up_method: 'sms',
-            status: responsePayload.dashboard_update.status,
-            current_module: currentModule,
+            status: result.dashboard_update.status,
+            current_module: result.current_module,
             transcript: newTranscriptEntries,
-            medication_status: medicationStatus,
-            escalation_level: highestTier !== 'none' ? highestTier : null,
-            functional_status: extractedData.functional_status || null,
-            functional_details: extractedData.functional_details || null,
-            patient_questions: extractedData.patient_questions || [],
-            caregiver_info: caregiverInfo,
+            medication_status: result.medication_status,
+            escalation_level: result.highest_tier !== 'none' ? result.highest_tier : null,
+            functional_status: result.extracted_data.functional_status,
+            functional_details: result.extracted_data.functional_details,
+            patient_questions: result.extracted_data.patient_questions,
+            caregiver_info: result.caregiver_info,
           })
           .select('id')
           .single()
@@ -287,7 +112,6 @@ export async function POST(request: Request) {
         }
       } else {
         // Existing session — UPDATE
-        // Fetch current transcript to append
         const { data: existing } = await supabase
           .from('followup_sessions')
           .select('transcript')
@@ -300,16 +124,16 @@ export async function POST(request: Request) {
         const { error: updateError } = await supabase
           .from('followup_sessions')
           .update({
-            status: responsePayload.dashboard_update.status,
-            current_module: currentModule,
+            status: result.dashboard_update.status,
+            current_module: result.current_module,
             transcript: updatedTranscript,
-            medication_status: medicationStatus,
-            escalation_level: highestTier !== 'none' ? highestTier : null,
-            functional_status: extractedData.functional_status || null,
-            functional_details: extractedData.functional_details || null,
-            patient_questions: extractedData.patient_questions || [],
-            caregiver_info: caregiverInfo,
-            conversation_complete: conversationComplete,
+            medication_status: result.medication_status,
+            escalation_level: result.highest_tier !== 'none' ? result.highest_tier : null,
+            functional_status: result.extracted_data.functional_status,
+            functional_details: result.extracted_data.functional_details,
+            patient_questions: result.extracted_data.patient_questions,
+            caregiver_info: result.caregiver_info,
+            conversation_complete: result.conversation_complete,
           })
           .eq('id', session_id)
 
@@ -319,15 +143,17 @@ export async function POST(request: Request) {
       }
 
       // Insert escalation record if triggered
-      if (escalationTriggered && allFlags.length > 0) {
-        const topFlag = allFlags[0]
+      if (result.escalation_triggered && result.all_flags.length > 0) {
+        const topFlag = result.all_flags[0]
         const { error: escError } = await supabase
           .from('followup_escalations')
           .insert({
             session_id: responsePayload.session_id,
             tier: topFlag.tier,
+            severity: topFlag.tier,
             trigger_text: topFlag.triggerText,
             category: topFlag.category,
+            trigger_category: topFlag.category,
             ai_assessment: topFlag.aiAssessment,
             recommended_action: topFlag.recommendedAction,
           })
@@ -338,12 +164,11 @@ export async function POST(request: Request) {
       }
 
       // Auto-create billing entry when conversation completes
-      if (conversationComplete) {
+      if (result.conversation_complete) {
         try {
-          // Estimate call duration from conversation turns (clinician adjusts actual time later)
           const turnCount = (conversation_history?.length || 0) + 2
           const callMinutes = Math.max(Math.ceil(turnCount / 2), 5)
-          const hasEscalation = highestTier === 'urgent' || highestTier === 'same_day'
+          const hasEscalation = result.highest_tier === 'urgent' || result.highest_tier === 'same_day'
           const coordMinutes = hasEscalation ? 10 : 0
           const billingTotal = 2 + callMinutes + 5 + coordMinutes
           const cptCode = suggestCptCode('ccm', billingTotal)
