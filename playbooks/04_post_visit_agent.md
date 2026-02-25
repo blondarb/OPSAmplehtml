@@ -189,7 +189,7 @@ of what we discussed today. Take care!"
 | Response parsing | AI must understand: yes/no, side effect descriptions, symptom descriptions, questions, emotional language |
 | Response timeout | If patient doesn't respond within **24 hours**, send one follow-up nudge. If no response within **48 hours**, log as incomplete. *(CMIO correction: A 2-hour nudge feels like spam, increases opt-out rates, and ignores that patients are at work, driving, or sleeping. 24 hours is the appropriate window for asynchronous SMS.)* |
 | Opt-out | "Reply STOP to opt out" in initial message |
-| Multi-language | **Auto-detect and respond in patient's language from Phase 1.** Claude is natively polyglot — if a patient replies in Spanish ("No me siento bien"), the AI should seamlessly transition to Spanish. Do not artificially restrict to English. Full localization of templates/outbound messages is Phase 2, but *responsive* multilingual support is free and immediate. |
+| Multi-language | **Auto-detect and respond in patient's language from Phase 1.** Modern LLMs are natively polyglot — if a patient replies in Spanish ("No me siento bien"), the AI should seamlessly transition to Spanish. Do not artificially restrict to English. Full localization of templates/outbound messages is Phase 2, but *responsive* multilingual support is free and immediate. |
 | Default outreach method | **SMS is the default outreach method.** Voice is opt-in only. *(Equity rationale: Voice calls consume prepaid minutes for lower-income patients; SMS is generally unlimited in the US. SMS also has higher engagement rates for asynchronous clinical communication.)* |
 
 ### 4.5 Escalation Dashboard
@@ -260,6 +260,8 @@ src/
 │       ├── AbruptCessationAlert.tsx         # Specific alert for medication withdrawal danger
 │       └── DisclaimerBanner.tsx             # Safety disclaimer
 ```
+
+> **Implementation note:** The current build uses a hub layout at `/follow-up` with a session list, active session panel, and tabbed views rather than the single conversation interface described above.
 
 ### 5.2 Supabase Schema
 
@@ -378,7 +380,7 @@ Response:
 
 | Service | Purpose | Phase |
 |---|---|---|
-| Anthropic Claude API | Conversation AI engine | Phase 1 |
+| OpenAI API (gpt-5.2) | Conversation AI engine | Phase 1 |
 | Vapi.ai or ElevenLabs | Production voice quality | Phase 2 (pre-recorded audio demo only in Phase 1) |
 | Twilio | SMS sending/receiving | Phase 2 (simulated in Phase 1) |
 | Supabase | Database, real-time subscriptions for dashboard | Phase 1 |
@@ -396,7 +398,7 @@ Patient responds → message sent to POST /api/follow-up/message
         ↓
 API constructs prompt: system prompt + conversation history + patient message
         ↓
-Claude API processes → returns structured response
+OpenAI API processes → returns structured response
         ↓
 Parse response: agent reply + module tracking + escalation check
         ↓
@@ -428,13 +430,16 @@ The AI manages a multi-turn clinical conversation following a structured script.
 
 ### 6.2 Model Selection
 
-**Conversation Engine: Anthropic Claude (claude-sonnet-4-5-20250929)**
+**Conversation Engine: OpenAI gpt-5.2** (multi-turn conversation, escalation detection, structured output)
 
 Rationale:
 - Excellent multi-turn conversation management
 - Strong at following structured scripts while remaining natural
 - Reliable escalation detection with low false-negative rate
 - Consistent structured output for dashboard updates
+- Existing integration with the project's OpenAI API infrastructure
+
+> **🔄 AI Model Flexibility (Platform Policy):** The demo uses OpenAI models, but the production platform is designed to be **model-agnostic**. Production deployments may use different providers optimized for specific capabilities: **Deepgram** (Nova-3 Medical) for clinical speech recognition and transcription, **Anthropic Claude** for complex clinical reasoning and multi-step analysis, **specialized providers** (e.g., Snowflake, domain-specific models) for billing, coding, and diagnostic pattern matching. All AI integrations are abstracted behind API route handlers — model swaps require only changing the API call, not the clinical logic, system prompts, or frontend. BAA requirements apply to whichever provider handles PHI in production.
 
 **Voice Engine (Phase 1): Pre-recorded audio demo only**
 
@@ -442,6 +447,8 @@ Rationale (CMIO recommendation):
 - Live voice AI introduces latency, interruption handling, and transcription errors that distract from the core value and look buggy in a demo
 - A pre-recorded audio file with scrolling transcript effectively communicates the vision without engineering risk
 - All Phase 1 engineering effort is focused on the interactive SMS experience
+
+> **Implementation note:** The current build has advanced beyond this pre-recorded-only spec. Live WebRTC voice is implemented via the OpenAI Realtime API, matching the Phase 2 vision rather than the Phase 1 constraint described here.
 
 **Voice Engine (Phase 2): Vapi.ai or ElevenLabs**
 
@@ -722,7 +729,7 @@ The AI must have contextual awareness of the current day/time and the clinic's o
 
 ### 7.3 Regulatory Considerations
 
-- **HIPAA**: All conversation data is PHI. Encryption at rest and in transit mandatory. Voice recordings especially sensitive — require explicit patient consent before recording. For POC: use synthetic data only. For production: ensure BAAs with all vendors (Supabase, Anthropic, Twilio, voice provider).
+- **HIPAA**: All conversation data is PHI. Encryption at rest and in transit mandatory. Voice recordings especially sensitive — require explicit patient consent before recording. For POC: use synthetic data only. For production: ensure BAAs with all vendors (Supabase, OpenAI or whichever AI provider is used in production, Twilio, voice provider — see AI Model Flexibility note in Section 6.2).
 - **Telehealth regulations**: AI follow-up calls are not telehealth visits (no clinical decision-making occurs). However, state laws vary. Some states may require disclosure that the call is AI-powered (the script already includes this).
 - **FDA**: Post-visit follow-up that collects data and routes to clinicians is not a medical device. However, if the AI begins making autonomous clinical recommendations (e.g., "you should stop your medication"), it could be classified as SaMD. Maintain strict guardrails.
 - **TCPA (Telephone Consumer Protection Act)**: For SMS — patients must opt in before receiving automated messages. Must include opt-out mechanism. Cannot send messages before 8am or after 9pm local time.
@@ -812,9 +819,11 @@ Patient: Keisha Brown, 28F. Visit: Epilepsy follow-up. Medication: Levetiracetam
 - No real patient contact
 - No real SMS/voice infrastructure
 
+> **Implementation note:** The current build also includes a billing code suggestion module (CPT code suggestions based on visit context) and an analytics dashboard with session metrics, escalation rates, and compliance tracking. Neither is described in this playbook but both exist in the build.
+
 **Technical:**
 - Next.js page at `/follow-up`
-- Claude API for conversation management
+- OpenAI API for conversation management
 - Simulated SMS in browser (no Twilio needed for demo)
 - Optional: Pre-recorded voice demo audio file + scrolling transcript (NOT live OpenAI Realtime API)
 - Supabase tables for conversation storage
@@ -823,11 +832,27 @@ Patient: Keisha Brown, 28F. Visit: Epilepsy follow-up. Medication: Levetiracetam
 
 > **CMIO recommendation:** Focus 100% of Phase 1 engineering on a flawless, interactive SMS demo. A highly polished, bug-free SMS chat with a live-updating dashboard is more than enough to prove the concept. De-risk the build by deferring live voice to Phase 2.
 
+### Phase 1.5: Live Demo (Twilio + OpenAI Realtime)
+
+**Scope:** Real phone interaction for demos — user enters phone number on website, gets an actual SMS, can reply or call back for voice conversation. Dashboard updates in real-time.
+
+**Design doc:** `docs/plans/2026-02-25-live-followup-agent-design.md`
+
+**Technical:**
+- Twilio for SMS send/receive + voice telephony
+- OpenAI Realtime API for voice AI (via Twilio Media Streams)
+- Lightweight voice bridge server (Railway/Fly.io) for WebSocket relay
+- New Supabase table `followup_phone_sessions` for ephemeral phone→session mapping
+- Cross-channel context: SMS history injected into voice session when user calls back
+- ~670 lines of new code; reuses all existing conversation logic, prompts, and escalation rules
+
+**Timeline:** 2-3 development sessions (Phase A: SMS, Phase B: Voice, Phase C: Polish)
+
 ### Phase 2: Clinical Pilot Version
 
 **New Features:**
-- Real SMS via Twilio
-- Production voice via Vapi.ai or ElevenLabs
+- Real SMS via Twilio (foundation built in Phase 1.5)
+- Production voice via Twilio + OpenAI Realtime (foundation built in Phase 1.5)
 - EHR integration: auto-populate visit context, write-back summaries
 - Multi-language support (Spanish)
 - Patient consent management
@@ -867,7 +892,7 @@ Patient: Keisha Brown, 28F. Visit: Epilepsy follow-up. Medication: Levetiracetam
 
 ### Still Open
 
-2. **Voice provider for Phase 2**: Vapi.ai vs. ElevenLabs vs. other? Need to evaluate on: voice naturalness, latency, cost, HIPAA compliance, language support.
+2. ~~**Voice provider for Phase 2**~~ → **RESOLVED:** Twilio + OpenAI Realtime API (direct integration). Avoids third-party voice AI platform markup. Organization already uses Twilio. See `docs/plans/2026-02-25-live-followup-agent-design.md` for full architecture.
 4. **Consent model**: How is patient consent collected? During the visit (nurse-administered), via patient portal, or via initial SMS opt-in? Who tracks consent status?
 7. **Human handoff mechanism**: When a patient requests a human, what happens? Direct transfer to nurse line? Callback scheduled? Portal message sent?
 9. **Success metrics**: What defines success for this tool? Proposed: (a) 80%+ patient engagement rate, (b) <5 min clinician notification for urgent escalations, (c) 90%+ escalation accuracy, (d) patient satisfaction ≥4/5.

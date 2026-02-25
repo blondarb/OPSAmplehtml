@@ -113,6 +113,8 @@ The SDNE creates a new data layer in neurology that does not currently exist: qu
 | Partnership value | Why this matters for Samsung's healthcare strategy |
 | Competitive landscape | Brief comparison to existing digital neuro-assessment tools (CNS Vital Signs, BrainBaseline, etc.) |
 
+> **Implementation note:** The current SDNE build uses an **8-domain Core-15 framework** rather than the 5 modules listed below. Domain organization differs from this playbook — refer to the standalone SDNE display site for the actual domain structure.
+
 ### 4.2 Exam Modules — Detailed
 
 **Module 1: Eye Tracking / Saccadic Assessment**
@@ -183,6 +185,8 @@ The SDNE creates a new data layer in neurology that does not currently exist: qu
 
 ## 5. Technical Architecture
 
+> **Implementation note:** The current `/sdne` route is an **iframe embed** pointing to the standalone SDNE display site, not a native Next.js page. There are no `/api/sdne/*` API routes, no SDNE-specific Supabase tables, and no AI interpretation calls in this repo. The component tree, schema, and API endpoints described below reflect the planned architecture, not the current build.
+
 ### 5.1 Frontend Components (React / Next.js)
 
 ```
@@ -215,6 +219,8 @@ src/
 ```
 
 ### 5.2 Supabase Schema
+
+> **Implementation note:** None of the SDNE-specific Supabase tables below exist in the current build. The iframe embed manages its own data independently of this repo's Supabase instance.
 
 **Table: `sdne_exams`**
 
@@ -330,7 +336,7 @@ Response body:
 
 | Service | Purpose |
 |---|---|
-| Anthropic Claude API | Clinical interpretation of exam results |
+| OpenAI API (gpt-5.2) | Clinical interpretation of exam results |
 | Supabase | Data storage, real-time display updates |
 | Galaxy XR SDK | Headset data collection (separate repo) |
 | Recharts / D3.js | Data visualization (frontend) |
@@ -349,7 +355,7 @@ Galaxy XR App (Android) processes raw sensor data into structured metrics
         ↓
 POST /api/sdne/exam → Supabase (raw + processed data)
         ↓
-POST /api/sdne/interpret → Claude API generates clinical interpretations
+POST /api/sdne/interpret → OpenAI API generates clinical interpretations
         ↓
 Interpretations stored back in Supabase
         ↓
@@ -376,6 +382,8 @@ Clinician reviews during visit → may export as PDF for chart
 
 ## 6. AI & Algorithm Design
 
+> **Implementation note:** The current iframe-based SDNE build uses **rule-based interpretation only** — no AI/LLM calls are made. The AI-powered interpretation described in this section is planned but not yet implemented.
+
 ### 6.1 What the AI Does
 
 The AI performs clinical interpretation of quantified exam data. It does NOT perform the measurement — that is done by the XR headset's sensors and algorithms. The AI:
@@ -388,13 +396,16 @@ The AI performs clinical interpretation of quantified exam data. It does NOT per
 
 ### 6.2 Model Selection
 
-**Primary: Anthropic Claude (claude-sonnet-4-5-20250929)**
+**Primary: OpenAI gpt-5.2** (clinical interpretation, narrative generation, structured output)
 
 Rationale:
 - Strong at synthesizing multi-parameter clinical data into coherent narratives
 - Follows structured output formats reliably
 - Appropriate guardrails against over-diagnosis
 - Cost-effective for per-exam interpretation
+- Existing integration with the project's OpenAI API infrastructure
+
+> **🔄 AI Model Flexibility (Platform Policy):** The demo uses OpenAI models, but the production platform is designed to be **model-agnostic**. Production deployments may use different providers optimized for specific capabilities: **Deepgram** (Nova-3 Medical) for clinical speech recognition and transcription, **Anthropic Claude** for complex clinical reasoning and multi-step analysis, **specialized providers** (e.g., Snowflake, domain-specific models) for billing, coding, and diagnostic pattern matching. All AI integrations are abstracted behind API route handlers — model swaps require only changing the API call, not the clinical logic, system prompts, or frontend. BAA requirements apply to whichever provider handles PHI in production.
 
 ### 6.3 System Prompt — Draft
 
@@ -563,7 +574,7 @@ This pair demonstrates clear progression across all domains — a powerful demo 
 - SDNE page integrated into outpatient demo site
 - Pre-loaded demo data (2 exams for 1 patient)
 - All 5 exam module visualizations with normative comparison
-- AI-generated clinical interpretations via Claude API
+- AI-generated clinical interpretations via OpenAI API
 - Composite radar chart and narrative summary
 - Trend comparison view
 - Architecture diagram and investor narrative sections
@@ -572,7 +583,7 @@ This pair demonstrates clear progression across all domains — a powerful demo 
 **Technical:**
 - Next.js page at `/sdne`
 - Supabase tables with seeded demo data
-- Claude API for interpretation
+- OpenAI API for interpretation
 - Recharts for visualizations
 
 **Timeline:** 1-2 development sessions

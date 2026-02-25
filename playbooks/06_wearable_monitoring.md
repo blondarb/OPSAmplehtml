@@ -369,7 +369,7 @@ Response body:
 
 | Service | Purpose | Phase |
 |---|---|---|
-| Anthropic Claude API | Anomaly analysis and clinical interpretation | Phase 1 |
+| OpenAI API (gpt-5.2) | Anomaly analysis and clinical interpretation | Phase 1 |
 | **Samsung Health SDK** | **Primary wearable data source — Galaxy Watch pilot group** | **Phase 1 (Pilot)** |
 | Apple HealthKit API | Secondary wearable data source (patients who own Apple Watches) | Phase 2 |
 | Google Health Connect API | Android wearable data (broader ecosystem) | Phase 2 |
@@ -378,6 +378,8 @@ Response body:
 | Recharts / D3.js | Timeline and chart visualizations | Phase 1 |
 
 > **Samsung-First Rationale (CMIO):** The Samsung Health SDK is significantly more open and developer-friendly than Apple HealthKit — it provides direct access to raw accelerometer/gyroscope data, heart rate streams, and sleep staging without the entitlement restrictions Apple imposes. A Samsung partnership provides elevated API access, potential co-development support, and device subsidies for pilot patients. For a 10-20 patient pilot, providing Samsung Galaxy Watches (~$250/device) is feasible and creates a controlled, uniform data environment. Apple HealthKit integration follows in Phase 2 for patients who already own Apple Watches.
+
+> **Implementation note:** The current build inverts this priority. Apple Watch is the primary wearable pipeline with live HealthKit data integration already built. Samsung Health SDK integration has not been implemented yet.
 
 > **⚠️ Frontend Performance Note (CMIO):** The demo dataset contains ~10,000 data points. Rendering 10K individual SVG points in React Recharts will cause severe browser lag. **All frontend visualizations must use aggregated daily or hourly rollups**, not raw minute-by-minute data. The `wearable_daily_summaries` table provides the pre-aggregated data. Raw data points are stored for AI analysis but never rendered directly in charts.
 
@@ -398,9 +400,9 @@ wearable_daily_summaries table populated
         ↓
 AI analysis triggered (daily or on anomaly detection threshold)
         ↓
-POST /api/wearable/analyze → Claude API
+POST /api/wearable/analyze → OpenAI API
         ↓
-Claude analyzes: baseline comparison + pattern detection + clinical context
+AI analyzes: baseline comparison + pattern detection + clinical context
         ↓
 Anomalies stored in wearable_anomalies
         ↓
@@ -454,13 +456,16 @@ The AI performs two distinct functions:
 
 ### 6.2 Model Selection
 
-**Primary: Anthropic Claude (claude-sonnet-4-5-20250929)**
+**Primary: OpenAI gpt-5.2** (anomaly analysis, pattern detection, clinical interpretation)
 
 Rationale:
 - Strong at multi-variate pattern recognition in structured data
 - Excellent at generating contextual clinical interpretations
 - Reliable structured output for alert generation
 - Good balance of speed and reasoning quality for daily analysis runs
+- Existing integration with the project's OpenAI API infrastructure
+
+> **🔄 AI Model Flexibility (Platform Policy):** The demo uses OpenAI models, but the production platform is designed to be **model-agnostic**. Production deployments may use different providers optimized for specific capabilities: **Deepgram** (Nova-3 Medical) for clinical speech recognition and transcription, **Anthropic Claude** for complex clinical reasoning and multi-step analysis, **specialized providers** (e.g., Snowflake, domain-specific models) for billing, coding, and diagnostic pattern matching. All AI integrations are abstracted behind API route handlers — model swaps require only changing the API call, not the clinical logic, system prompts, or frontend. BAA requirements apply to whichever provider handles PHI in production.
 
 ### 6.3 Detection Algorithms (Rule-Based + AI Hybrid)
 
@@ -771,17 +776,19 @@ Wearable monitoring is not just good medicine — it is **highly reimbursable**.
 - Wearable monitoring page with all sections
 - Pre-loaded 30-day demo data for Linda Martinez (Parkinson's)
 - Patient timeline visualization with all data tracks
-- AI-generated anomaly detection and clinical interpretation (rules-based + Claude API)
+- AI-generated anomaly detection and clinical interpretation (rules-based + OpenAI API)
 - Clinician alert dashboard with Triage Team and Neurologist views
 - AI analysis log with reasoning chains
 - Clinical use case mapping table
 - SDNE baseline overlay markers (mockup data from Card 5)
 - No real wearable device connection yet
 
+> **Implementation note:** The current build already supports live patient data visualization, going beyond the demo-data-only scope described here. Additionally, `DailySummaryPopover` and `AnomalyDetailPanel` components are built but not yet wired into the UI.
+
 **Technical:**
 - Next.js page at `/wearable`
 - Supabase tables with seeded demo data (30 days, ~10,000 raw data points stored, but **frontend renders daily/hourly aggregated rollups only** to prevent browser lag)
-- Claude API for daily analysis simulation
+- OpenAI API for daily analysis simulation
 - Recharts/D3 for timeline and charts (using `wearable_daily_summaries` for rendering, NOT raw `wearable_data_points`)
 
 **Timeline:** 1-2 development sessions
