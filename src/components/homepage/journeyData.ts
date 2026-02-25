@@ -33,20 +33,12 @@ export const clinicianTrack: JourneyTrackData = {
       description: 'A referral arrives. AI reads it, scores acuity, and routes to the right subspecialist.',
     },
     {
-      phase: 'Command Center',
-      name: 'Clinician Dashboard',
-      route: '/dashboard',
-      icon: LayoutDashboard,
-      status: 'live',
-      description: 'AI-powered command center with morning briefing, action queue, and patient priority list.',
-    },
-    {
-      phase: 'Schedule',
-      name: 'My Schedule',
+      phase: 'My Day',
+      name: 'Clinician Cockpit',
       route: '/physician',
       icon: CalendarClock,
       status: 'live',
-      description: 'Day, week, and month calendar views with appointment management and patient chart access.',
+      description: 'Morning briefing, today\'s schedule, and priority notifications — your clinical home base.',
     },
     {
       phase: 'Documentation',
@@ -110,6 +102,14 @@ export const ongoingCareTrack: JourneyTrackData = {
   title: 'Ongoing Care',
   subtitle: 'Continuous intelligence between the 30-minute visits',
   cards: [
+    {
+      phase: 'Operations',
+      name: 'Operations Dashboard',
+      route: '/dashboard',
+      icon: LayoutDashboard,
+      status: 'live',
+      description: 'Practice-wide operational intelligence — staffing, action queue, and patient priority across all providers.',
+    },
     {
       phase: 'Post-Visit',
       name: 'AI Follow-Up Agent',
