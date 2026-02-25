@@ -1,9 +1,9 @@
+'use client'
+
 import CommandCenterPage from '@/components/command-center/CommandCenterPage'
 import PlatformShell from '@/components/layout/PlatformShell'
 import FeatureSubHeader from '@/components/layout/FeatureSubHeader'
 import { LayoutDashboard } from 'lucide-react'
-
-export const dynamic = 'force-dynamic'
 
 export default function DashboardPage() {
   return (
