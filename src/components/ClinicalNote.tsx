@@ -16,6 +16,9 @@ import OnboardingTour, { resetAllTours, type TourPhase } from './OnboardingTour'
 import PatientAppointments, { type Appointment } from './PatientAppointments'
 import ScheduleFollowupModal from './ScheduleFollowupModal'
 import ScheduleNewPatientModal from './ScheduleNewPatientModal'
+import UrgencyBanner from './UrgencyBanner'
+import PhysicianHome from './PhysicianHome'
+import { useNotificationCounts } from '@/hooks/useNotificationCounts'
 import {
   type ChartPrepOutput,
   type VisitAIOutput,
@@ -41,95 +44,65 @@ interface ClinicalNoteProps {
 }
 
 // Icon sidebar navigation
-function IconSidebar({ activeIcon, setActiveIcon, viewMode, onViewModeChange, onOpenSettings }: {
+function IconSidebar({ activeIcon, setActiveIcon, viewMode, onViewModeChange, onOpenSettings, notificationCounts }: {
   activeIcon: string,
   setActiveIcon: (icon: string) => void,
-  viewMode: 'appointments' | 'chart',
-  onViewModeChange: (mode: 'appointments' | 'chart') => void,
-  onOpenSettings: () => void
+  viewMode: 'appointments' | 'chart' | 'cockpit',
+  onViewModeChange: (mode: 'appointments' | 'chart' | 'cockpit') => void,
+  onOpenSettings: () => void,
+  notificationCounts?: { total: number, critical: number, patientMessages: number, providerMessages: number, incompleteDocs: number }
 }) {
   // Icons that have actual functionality behind them
-  const ACTIVE_ICONS = new Set(['home', 'notes', 'settings'])
+  const ACTIVE_ICONS = new Set(['home', 'notes', 'messages', 'chat', 'settings'])
 
   const icons = [
-    { id: 'home', tooltip: 'Appointments', icon: (
+    { id: 'home', tooltip: 'Clinical Cockpit', badge: viewMode === 'chart' && notificationCounts?.critical ? notificationCounts.critical : 0, badgeColor: '#EF4444', icon: (
       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
         <path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/>
         <polyline points="9 22 9 12 15 12 15 22"/>
       </svg>
     )},
-    { id: 'calendar', tooltip: 'Calendar — not active in demo', icon: (
-      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-        <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/>
-        <line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>
-      </svg>
-    )},
-    { id: 'users', tooltip: 'Patients — not active in demo', icon: (
-      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-        <path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/>
-        <circle cx="9" cy="7" r="4"/>
-        <path d="M23 21v-2a4 4 0 00-3-3.87"/>
-        <path d="M16 3.13a4 4 0 010 7.75"/>
-      </svg>
-    )},
-    { id: 'clock', tooltip: 'Schedule — not active in demo', icon: (
-      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-        <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
-      </svg>
-    )},
-    { id: 'branch', tooltip: 'Workflows — not active in demo', icon: (
-      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-        <line x1="6" y1="3" x2="6" y2="15"/>
-        <circle cx="18" cy="6" r="3"/>
-        <circle cx="6" cy="18" r="3"/>
-        <path d="M18 9a9 9 0 01-9 9"/>
-      </svg>
-    )},
-    { id: 'notes', tooltip: 'Notes', active: viewMode === 'chart', icon: (
+    { id: 'notes', tooltip: 'Chart', badge: notificationCounts?.incompleteDocs || 0, badgeColor: '#F59E0B', icon: (
       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
         <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/>
         <polyline points="14 2 14 8 20 8"/>
         <line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/>
       </svg>
     )},
-    { id: 'document', tooltip: 'Documents — not active in demo', icon: (
+    { id: 'messages', tooltip: 'Patient Messages', badge: notificationCounts?.patientMessages || 0, badgeColor: '#3B82F6', icon: (
       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-        <path d="M13 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V9z"/>
-        <polyline points="13 2 13 9 20 9"/>
+        <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/>
+        <polyline points="22,6 12,13 2,6"/>
       </svg>
     )},
-    { id: 'phone', tooltip: 'Calls — not active in demo', icon: (
+    { id: 'chat', tooltip: 'Team Chat', badge: notificationCounts?.providerMessages || 0, badgeColor: '#3B82F6', icon: (
       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-        <path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07 19.5 19.5 0 01-6-6 19.79 19.79 0 01-3.07-8.67A2 2 0 014.11 2h3a2 2 0 012 1.72 12.84 12.84 0 00.7 2.81 2 2 0 01-.45 2.11L8.09 9.91a16 16 0 006 6l1.27-1.27a2 2 0 012.11-.45 12.84 12.84 0 002.81.7A2 2 0 0122 16.92z"/>
+        <path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/>
       </svg>
     )},
-    { id: 'settings', tooltip: 'Settings', icon: (
+    { id: 'settings', tooltip: 'Settings', badge: 0, badgeColor: '', icon: (
       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
         <circle cx="12" cy="12" r="3"/>
         <path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-2 2 2 2 0 01-2-2v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83 0 2 2 0 010-2.83l.06-.06a1.65 1.65 0 00.33-1.82 1.65 1.65 0 00-1.51-1H3a2 2 0 01-2-2 2 2 0 012-2h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 010-2.83 2 2 0 012.83 0l.06.06a1.65 1.65 0 001.82.33H9a1.65 1.65 0 001-1.51V3a2 2 0 012-2 2 2 0 012 2v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 0 2 2 0 010 2.83l-.06.06a1.65 1.65 0 00-.33 1.82V9a1.65 1.65 0 001.51 1H21a2 2 0 012 2 2 2 0 01-2 2h-.09a1.65 1.65 0 00-1.51 1z"/>
       </svg>
     )},
-    { id: 'help', tooltip: 'Help — not active in demo', icon: (
-      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-        <circle cx="12" cy="12" r="10"/>
-        <path d="M9.09 9a3 3 0 015.83 1c0 2-3 3-3 3"/>
-        <line x1="12" y1="17" x2="12.01" y2="17"/>
-      </svg>
-    )},
   ]
 
   const handleIconClick = (iconId: string) => {
-    // Ignore clicks on non-functional icons
     if (!ACTIVE_ICONS.has(iconId)) return
 
     setActiveIcon(iconId)
-    // Home icon always shows appointments list
+    // Home icon shows the Clinical Cockpit
     if (iconId === 'home') {
-      onViewModeChange('appointments')
+      onViewModeChange('cockpit')
     }
     // Notes icon shows current chart (if a patient is selected)
     if (iconId === 'notes') {
       onViewModeChange('chart')
+    }
+    // Messages and chat navigate to cockpit filtered to that category
+    if (iconId === 'messages' || iconId === 'chat') {
+      onViewModeChange('cockpit')
     }
     // Settings icon opens the settings drawer
     if (iconId === 'settings') {
@@ -139,7 +112,7 @@ function IconSidebar({ activeIcon, setActiveIcon, viewMode, onViewModeChange, on
 
   // Determine which icon is actually active based on viewMode
   const getIsActive = (iconId: string) => {
-    if (viewMode === 'appointments' && iconId === 'home') return true
+    if ((viewMode === 'cockpit' || viewMode === 'appointments') && iconId === 'home') return true
     if (viewMode === 'chart' && iconId === 'notes') return true
     return activeIcon === iconId && iconId !== 'home' && iconId !== 'notes'
   }
@@ -158,28 +131,44 @@ function IconSidebar({ activeIcon, setActiveIcon, viewMode, onViewModeChange, on
       {icons.map(item => {
         const isActive = getIsActive(item.id)
         const isFunctional = ACTIVE_ICONS.has(item.id)
+        const badge = (item as any).badge || 0
+        const badgeColor = (item as any).badgeColor || '#EF4444'
         return (
-          <button
-            key={item.id}
-            onClick={() => handleIconClick(item.id)}
-            title={item.tooltip}
-            style={{
-              width: '40px',
-              height: '40px',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              borderRadius: '8px',
-              border: 'none',
-              background: isActive ? 'var(--bg-gray)' : 'transparent',
-              cursor: isFunctional ? 'pointer' : 'default',
-              color: isActive ? 'var(--primary)' : 'var(--text-muted)',
-              opacity: isFunctional ? 1 : 0.3,
-              transition: 'all 0.2s',
-            }}
-          >
-            {item.icon}
-          </button>
+          <div key={item.id} style={{ position: 'relative' }}>
+            <button
+              onClick={() => handleIconClick(item.id)}
+              title={item.tooltip}
+              style={{
+                width: '40px',
+                height: '40px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                borderRadius: '8px',
+                border: 'none',
+                background: isActive ? 'var(--bg-gray)' : 'transparent',
+                cursor: isFunctional ? 'pointer' : 'default',
+                color: isActive ? 'var(--primary)' : 'var(--text-muted)',
+                opacity: isFunctional ? 1 : 0.3,
+                transition: 'all 0.2s',
+              }}
+            >
+              {item.icon}
+            </button>
+            {badge > 0 && (
+              <span style={{
+                position: 'absolute', top: '2px', right: '2px',
+                minWidth: '16px', height: '16px', borderRadius: '8px',
+                background: badgeColor, color: 'white',
+                fontSize: '10px', fontWeight: 700,
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                padding: '0 4px', lineHeight: 1,
+                border: '2px solid var(--bg-white)',
+              }}>
+                {badge > 9 ? '9+' : badge}
+              </span>
+            )}
+          </div>
         )
       })}
     </div>
@@ -199,7 +188,7 @@ export default function ClinicalNote({
 }: ClinicalNoteProps) {
   const [darkMode, setDarkMode] = useState(false)
   const [activeIcon, setActiveIcon] = useState('home')
-  const [viewMode, setViewMode] = useState<'appointments' | 'chart'>('appointments') // Start with appointments view
+  const [viewMode, setViewMode] = useState<'appointments' | 'chart' | 'cockpit'>('cockpit') // Start with Clinical Cockpit
   const [selectedAppointment, setSelectedAppointment] = useState<Appointment | null>(null)
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false)
 
@@ -241,6 +230,9 @@ export default function ClinicalNote({
   const [imagingData, setImagingData] = useState<ImagingStudyEntry[]>([])
   const [examFindings, setExamFindings] = useState<Record<string, boolean>>({})
   const [examSectionNotes, setExamSectionNotes] = useState<Record<string, string>>({})
+
+  // Notification counts for badges and urgency banner
+  const { counts: notifCounts } = useNotificationCounts()
 
   // Track patient switching to prevent autosave race conditions
   const isSwitchingPatientRef = useRef(false)
@@ -1405,6 +1397,21 @@ export default function ClinicalNote({
         onResetDemo={handleResetDemo}
       />
 
+      {/* Urgency Banner - visible across all views when critical items exist */}
+      <UrgencyBanner
+        counts={{
+          critical: notifCounts.critical,
+          wearableAlerts: notifCounts.wearableAlerts,
+          patientMessages: notifCounts.patientMessages,
+          consultRequests: notifCounts.consultRequests,
+          incompleteDocs: notifCounts.incompleteDocs,
+        }}
+        onFilterCategory={(category) => {
+          setViewMode('cockpit')
+          setActiveIcon('home')
+        }}
+      />
+
       <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
         {/* Icon Sidebar */}
         <IconSidebar
@@ -1413,10 +1420,28 @@ export default function ClinicalNote({
           viewMode={viewMode}
           onViewModeChange={setViewMode}
           onOpenSettings={() => setSettingsOpen(true)}
+          notificationCounts={{
+            total: notifCounts.total,
+            critical: notifCounts.critical,
+            patientMessages: notifCounts.patientMessages,
+            providerMessages: 3, // Demo: 3 unread provider messages
+            incompleteDocs: notifCounts.incompleteDocs,
+          }}
         />
 
-        {/* Main Content Area - Switch between Appointments and Chart view */}
-        {viewMode === 'appointments' ? (
+        {/* Main Content Area - Switch between Cockpit, Appointments, and Chart view */}
+        {viewMode === 'cockpit' ? (
+          <PhysicianHome
+            onSelectPatient={(aptId) => {
+              // From cockpit demo data, switch to appointments view to select
+              // In production, this would look up the appointment by ID
+              setViewMode('appointments')
+              setActiveIcon('home')
+            }}
+            onScheduleNew={() => setScheduleNewPatientOpen(true)}
+            onScheduleFollowup={() => setFollowupModalOpen(true)}
+          />
+        ) : viewMode === 'appointments' ? (
           <PatientAppointments
             onSelectPatient={handleSelectPatient}
             onScheduleNew={() => setScheduleNewPatientOpen(true)}
