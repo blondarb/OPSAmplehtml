@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import type { WearableDemoData } from '@/lib/wearable/types'
+import type { WearableDemoData, PatientSummary, AIAnalysisResponse } from '@/lib/wearable/types'
 import PlatformShell from '@/components/layout/PlatformShell'
 import FeatureSubHeader from '@/components/layout/FeatureSubHeader'
 import { Watch } from 'lucide-react'
@@ -20,25 +20,66 @@ export default function WearablePage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [data, setData] = useState<WearableDemoData | null>(null)
+  const [patients, setPatients] = useState<PatientSummary[]>([])
+  const [selectedPatientId, setSelectedPatientId] = useState<string | null>(null)
 
   useEffect(() => {
-    async function fetchData() {
+    async function init() {
       try {
-        const res = await fetch('/api/wearable/demo-data')
-        if (!res.ok) {
-          const body = await res.json().catch(() => ({}))
-          throw new Error(body.error || 'Failed to load wearable demo data')
+        // Fetch patient list
+        const pRes = await fetch('/api/wearable/patients')
+        if (pRes.ok) {
+          const pJson = await pRes.json()
+          setPatients(pJson.patients || [])
+          // Auto-select first patient
+          if (pJson.patients?.length > 0) {
+            const firstId = pJson.patients[0].id
+            setSelectedPatientId(firstId)
+            // Fetch data for first patient
+            const dRes = await fetch(`/api/wearable/demo-data?patient_id=${firstId}`)
+            if (!dRes.ok) {
+              const body = await dRes.json().catch(() => ({}))
+              throw new Error(body.error || 'Failed to load wearable data')
+            }
+            const dJson = await dRes.json()
+            setData(dJson)
+          }
+        } else {
+          // Fallback: load demo data without patient switcher
+          const res = await fetch('/api/wearable/demo-data')
+          if (!res.ok) throw new Error('Failed to load wearable demo data')
+          const json = await res.json()
+          setData(json)
         }
-        const json = await res.json()
-        setData(json)
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Failed to load')
       } finally {
         setLoading(false)
       }
     }
-    fetchData()
+    init()
   }, [])
+
+  async function handlePatientChange(patientId: string) {
+    setSelectedPatientId(patientId)
+    setLoading(true)
+    setError(null)
+    try {
+      const res = await fetch(`/api/wearable/demo-data?patient_id=${patientId}`)
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}))
+        throw new Error(body.error || 'Failed to load patient data')
+      }
+      const json = await res.json()
+      setData(json)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to load')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const selectedSource = patients.find(p => p.id === selectedPatientId)?.source || 'demo'
 
   return (
     <PlatformShell>
@@ -46,6 +87,9 @@ export default function WearablePage() {
       title="Wearable Monitoring"
       icon={Watch}
       accentColor="#0EA5E9"
+      showDemo={selectedSource === 'demo'}
+      badgeText={selectedSource === 'live' ? 'Live' : undefined}
+      badgeBg={selectedSource === 'live' ? 'rgba(16, 185, 129, 0.4)' : undefined}
       nextStep={{ label: 'Command Center', route: '/dashboard' }}
     />
     <div style={{
@@ -67,7 +111,7 @@ export default function WearablePage() {
             <path d="M21 12a9 9 0 1 1-6.219-8.56" />
           </svg>
           <p style={{ color: '#e2e8f0', fontSize: '0.95rem', fontWeight: 500, margin: 0 }}>
-            Loading wearable demo data...
+            Loading wearable data...
           </p>
           <style>{`
             @keyframes wearable-spin {
@@ -99,7 +143,7 @@ export default function WearablePage() {
             onClick={() => {
               setError(null)
               setLoading(true)
-              fetch('/api/wearable/demo-data')
+              fetch(`/api/wearable/demo-data${selectedPatientId ? `?patient_id=${selectedPatientId}` : ''}`)
                 .then(res => {
                   if (!res.ok) throw new Error('Failed to load')
                   return res.json()
@@ -134,6 +178,38 @@ export default function WearablePage() {
           flexDirection: 'column',
           gap: '48px',
         }}>
+          {/* Patient Switcher */}
+          {patients.length > 1 && (
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '12px',
+            }}>
+              <label style={{ color: '#94a3b8', fontSize: '0.85rem', fontWeight: 500 }}>
+                Patient:
+              </label>
+              <select
+                value={selectedPatientId || ''}
+                onChange={(e) => handlePatientChange(e.target.value)}
+                style={{
+                  background: '#1e293b',
+                  color: '#e2e8f0',
+                  border: '1px solid #334155',
+                  borderRadius: '8px',
+                  padding: '8px 12px',
+                  fontSize: '0.85rem',
+                  cursor: 'pointer',
+                  minWidth: '280px',
+                }}
+              >
+                {patients.map(p => (
+                  <option key={p.id} value={p.id}>
+                    {p.name} — {p.primary_diagnosis} [{p.source === 'live' ? '● Live' : 'Demo'}]
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
           <ConceptHero />
           <DataSourceCards />
           <DataTypeMatrix />

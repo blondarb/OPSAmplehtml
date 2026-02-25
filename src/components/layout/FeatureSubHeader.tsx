@@ -9,6 +9,8 @@ interface FeatureSubHeaderProps {
   icon: LucideIcon
   accentColor: string
   showDemo?: boolean
+  badgeText?: string
+  badgeBg?: string
   homeLink?: string
   nextStep?: {
     label: string
@@ -21,6 +23,8 @@ export default function FeatureSubHeader({
   icon: Icon,
   accentColor,
   showDemo = true,
+  badgeText,
+  badgeBg,
   homeLink = '/',
   nextStep,
 }: FeatureSubHeaderProps) {
@@ -57,10 +61,10 @@ export default function FeatureSubHeader({
         <span style={{ color: 'white', fontWeight: 600, fontSize: 15 }}>
           {title}
         </span>
-        {showDemo && (
+        {(showDemo || badgeText) && (
           <span
             style={{
-              background: 'rgba(255,255,255,0.2)',
+              background: badgeBg || 'rgba(255,255,255,0.2)',
               color: 'white',
               fontSize: 11,
               fontWeight: 600,
@@ -69,7 +73,7 @@ export default function FeatureSubHeader({
               letterSpacing: 0.5,
             }}
           >
-            Demo
+            {badgeText || 'Demo'}
           </span>
         )}
       </div>

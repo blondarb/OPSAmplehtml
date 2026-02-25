@@ -81,6 +81,10 @@ export interface DailyMetrics {
   awakenings: number
   tremor_pct?: number
   dyskinetic_mins?: number
+  // iOS-specific fields (from Sevaro Monitor app)
+  spo2_avg?: number
+  spo2_min?: number
+  active_calories?: number
 }
 
 // Daily summary combining metrics + AI analysis
@@ -164,6 +168,16 @@ export interface WearableDevice {
   data_types: string[]
   integration_status: IntegrationStatus
   priority: number
+}
+
+// Patient summary for the switcher dropdown
+export interface PatientSummary {
+  id: string
+  name: string
+  age: number
+  sex: string
+  primary_diagnosis: string
+  source: 'live' | 'demo'
 }
 
 // ── Display Config Objects ──
@@ -332,7 +346,7 @@ export const WEARABLE_DEVICES: WearableDevice[] = [
     name: 'Apple Watch',
     image_icon: 'apple-watch',
     data_types: ['HR', 'HRV', 'Steps', 'Sleep', 'SpO2', 'Accelerometer', 'Fall Detection', 'ECG'],
-    integration_status: 'planned',
+    integration_status: 'live',
     priority: 2,
   },
   {
@@ -411,7 +425,7 @@ export const WEARABLE_DISCLAIMER_TEXT =
   'This system analyzes consumer wearable device data to identify patterns that may be clinically relevant. Consumer wearables are not medical devices and their measurements may not be accurate. All alerts are intended to support, not replace, clinical judgment.'
 
 export const WEARABLE_POC_BANNER_TEXT =
-  'Proof of Concept: This wearable monitoring dashboard uses simulated data to demonstrate AI-assisted pattern detection for neurological conditions. No real patient data is displayed.'
+  'This wearable monitoring dashboard combines live Apple Watch data (via the Sevaro Monitor iOS app) with simulated data to demonstrate AI-assisted pattern detection for neurological conditions.'
 
 export const WEARABLE_DATA_QUALITY_NOTE =
   'Data quality depends on consistent device wear. Gaps in wear time may affect anomaly detection accuracy. Encourage patients to wear devices during sleep for best results.'
