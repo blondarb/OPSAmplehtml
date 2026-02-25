@@ -82,6 +82,32 @@ export default function AIAnalysisLog({
     return '\u2192'
   }
 
+  if (!anomalies || anomalies.length === 0) {
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+        <div>
+          <h3 style={{ color: '#F1F5F9', fontSize: '1.25rem', fontWeight: 600, margin: 0 }}>
+            AI Analysis Log
+          </h3>
+          <p style={{ color: '#94A3B8', fontSize: '0.85rem', margin: '4px 0 0 0' }}>
+            Every alert decision is explainable and auditable
+          </p>
+        </div>
+        <div style={{
+          background: '#1e293b',
+          border: '1px solid #334155',
+          borderRadius: '12px',
+          padding: '48px 24px',
+          textAlign: 'center',
+        }}>
+          <p style={{ color: '#64748b', fontSize: '0.9rem', margin: 0 }}>
+            No data yet — sync from the Sevaro Monitor app to see results here.
+          </p>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
       {/* Header */}

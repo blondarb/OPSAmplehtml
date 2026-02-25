@@ -32,6 +32,32 @@ export default function PatientNudgePreview({
 }: {
   anomalies: WearableAnomaly[]
 }) {
+  if (!anomalies || anomalies.length === 0) {
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+        <div>
+          <h3 style={{ color: '#F1F5F9', fontSize: '1.25rem', fontWeight: 600, margin: 0 }}>
+            Patient Communication Examples
+          </h3>
+          <p style={{ color: '#94A3B8', fontSize: '0.85rem', margin: '4px 0 0 0', lineHeight: 1.5 }}>
+            All messages are empathetic, actionable, and at a 6th-grade reading level. Raw metrics are never shared with patients.
+          </p>
+        </div>
+        <div style={{
+          background: '#1e293b',
+          border: '1px solid #334155',
+          borderRadius: '12px',
+          padding: '48px 24px',
+          textAlign: 'center',
+        }}>
+          <p style={{ color: '#64748b', fontSize: '0.9rem', margin: 0 }}>
+            No data yet — sync from the Sevaro Monitor app to see results here.
+          </p>
+        </div>
+      </div>
+    )
+  }
+
   const anomaliesWithMessages = anomalies.filter((a) => a.patient_message !== null)
   const hasRealMessages = anomaliesWithMessages.length > 0
 

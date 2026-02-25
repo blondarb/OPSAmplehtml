@@ -47,6 +47,46 @@ function formatDateRange(summaries: DailySummary[]): string {
 export default function PatientTimeline({ dailySummaries, anomalies, patient }: PatientTimelineProps) {
   const [selectedDay, setSelectedDay] = useState<string | null>(null)
 
+  if (!dailySummaries || dailySummaries.length === 0) {
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+        <div style={{
+          background: '#1e293b',
+          border: '1px solid #334155',
+          borderRadius: '12px',
+          padding: '20px',
+        }}>
+          <h2 style={{
+            fontSize: '18px',
+            fontWeight: 700,
+            color: '#f1f5f9',
+            margin: '0 0 4px',
+          }}>
+            Patient Timeline — {patient.name}, {patient.age}{patient.sex}, {patient.primary_diagnosis}
+          </h2>
+          <p style={{
+            fontSize: '13px',
+            color: '#94a3b8',
+            margin: '0 0 12px',
+          }}>
+            30-Day Monitoring Period
+          </p>
+        </div>
+        <div style={{
+          background: '#1e293b',
+          border: '1px solid #334155',
+          borderRadius: '12px',
+          padding: '48px 24px',
+          textAlign: 'center',
+        }}>
+          <p style={{ color: '#64748b', fontSize: '0.9rem', margin: 0 }}>
+            No data yet — sync from the Sevaro Monitor app to see results here.
+          </p>
+        </div>
+      </div>
+    )
+  }
+
   const chartData: ChartDataPoint[] = dailySummaries.map(s => ({
     date: s.date,
     ...s.metrics,

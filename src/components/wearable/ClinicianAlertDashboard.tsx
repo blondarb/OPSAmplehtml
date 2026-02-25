@@ -13,6 +13,37 @@ interface ClinicianAlertDashboardProps {
 export default function ClinicianAlertDashboard({ alerts, anomalies }: ClinicianAlertDashboardProps) {
   const [activeView, setActiveView] = useState<DashboardView>('triage_team')
 
+  if (!alerts || alerts.length === 0) {
+    return (
+      <div style={{
+        background: '#0f172a',
+        borderRadius: '12px',
+        border: '1px solid #334155',
+        padding: '24px',
+      }}>
+        <h2 style={{
+          color: '#f1f5f9',
+          fontSize: '1.15rem',
+          fontWeight: 700,
+          margin: '0 0 16px',
+        }}>
+          Clinician Alert Dashboard
+        </h2>
+        <div style={{
+          background: '#1e293b',
+          border: '1px solid #334155',
+          borderRadius: '12px',
+          padding: '48px 24px',
+          textAlign: 'center',
+        }}>
+          <p style={{ color: '#64748b', fontSize: '0.9rem', margin: 0 }}>
+            No data yet — sync from the Sevaro Monitor app to see results here.
+          </p>
+        </div>
+      </div>
+    )
+  }
+
   const totalAlerts = alerts.length
   const urgentCount = alerts.filter((a) => a.severity === 'urgent').length
   const unacknowledgedCount = alerts.filter((a) => !a.acknowledged).length
