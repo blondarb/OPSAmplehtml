@@ -51,7 +51,7 @@ export const clinicianTrack: JourneyTrackData = {
     {
       phase: 'Documentation',
       name: 'Documentation',
-      route: '/physician',
+      route: '/ehr',
       icon: Stethoscope,
       status: 'live',
       description: 'Full clinical documentation with AI-assisted note creation, voice dictation, and clinical scales.',
