@@ -230,8 +230,7 @@ export default function ConceptHero() {
           lineHeight: 1.7,
           margin: 0,
         }}>
-          This proof of concept demonstrates the full pipeline using simulated data for a Parkinson&apos;s
-          disease patient, showing how wearable data flows from device to clinical action.
+          This system now includes a live integration path: Apple Watch data flows through the Sevaro Monitor iOS companion app into Supabase, where the AI engine can analyze it against personal baselines. The demo patient shows 30 days of simulated Parkinson&apos;s data; live patients show real Apple Watch biometrics.
         </p>
       </div>
 
@@ -262,6 +261,161 @@ export default function ConceptHero() {
             {label}
           </span>
         ))}
+      </div>
+
+      {/* System Architecture */}
+      <div style={{
+        background: 'rgba(14, 165, 233, 0.05)',
+        border: '1px solid rgba(14, 165, 233, 0.15)',
+        borderRadius: '8px',
+        padding: '24px',
+        marginTop: '24px',
+      }}>
+        <h3 style={{
+          color: '#e2e8f0',
+          fontSize: '0.95rem',
+          fontWeight: 700,
+          margin: '0 0 4px',
+          textAlign: 'center',
+        }}>
+          System Architecture
+        </h3>
+        <p style={{
+          color: '#64748b',
+          fontSize: '0.78rem',
+          margin: '0 0 20px',
+          textAlign: 'center',
+        }}>
+          How data flows from wrist to clinical insight
+        </p>
+        <div style={{
+          display: 'flex',
+          alignItems: 'flex-start',
+          justifyContent: 'center',
+          gap: '0',
+          flexWrap: 'wrap',
+        }}>
+          {/* Apple Watch */}
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px', minWidth: '120px', maxWidth: '140px' }}>
+            <div style={{
+              width: '44px', height: '44px', borderRadius: '50%',
+              background: 'rgba(14, 165, 233, 0.15)', border: '2px solid #0EA5E9',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+            }}>
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#0EA5E9" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                <rect x="5" y="2" width="14" height="20" rx="3" />
+                <path d="M9 12h1.5l1.5-3 1.5 6 1.5-3H17" />
+              </svg>
+            </div>
+            <span style={{ color: '#e2e8f0', fontSize: '0.72rem', fontWeight: 600 }}>Apple Watch</span>
+            <span style={{ color: '#64748b', fontSize: '0.65rem', textAlign: 'center', lineHeight: 1.3 }}>
+              HR every 5 min, HRV, SpO2, accelerometer, sleep stages
+            </span>
+          </div>
+
+          <div style={{ padding: '0 4px', marginTop: '16px' }}>
+            <svg width="24" height="12" viewBox="0 0 24 12" fill="none">
+              <path d="M0 6h16" stroke="#475569" strokeWidth="1.5" strokeDasharray="3 2" />
+              <path d="M14 2l6 4-6 4" stroke="#475569" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          </div>
+
+          {/* HealthKit */}
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px', minWidth: '120px', maxWidth: '140px' }}>
+            <div style={{
+              width: '44px', height: '44px', borderRadius: '50%',
+              background: 'rgba(255, 45, 85, 0.15)', border: '2px solid #FF2D55',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+            }}>
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#FF2D55" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
+              </svg>
+            </div>
+            <span style={{ color: '#e2e8f0', fontSize: '0.72rem', fontWeight: 600 }}>HealthKit</span>
+            <span style={{ color: '#64748b', fontSize: '0.65rem', textAlign: 'center', lineHeight: 1.3 }}>
+              Apple&apos;s on-device health data aggregation
+            </span>
+          </div>
+
+          <div style={{ padding: '0 4px', marginTop: '16px' }}>
+            <svg width="24" height="12" viewBox="0 0 24 12" fill="none">
+              <path d="M0 6h16" stroke="#475569" strokeWidth="1.5" strokeDasharray="3 2" />
+              <path d="M14 2l6 4-6 4" stroke="#475569" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          </div>
+
+          {/* Sevaro Monitor */}
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px', minWidth: '120px', maxWidth: '140px' }}>
+            <div style={{
+              width: '44px', height: '44px', borderRadius: '50%',
+              background: 'rgba(16, 185, 129, 0.15)', border: '2px solid #10B981',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+            }}>
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#10B981" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                <rect x="7" y="2" width="10" height="20" rx="2" />
+                <line x1="12" y1="18" x2="12" y2="18.01" />
+              </svg>
+            </div>
+            <span style={{ color: '#e2e8f0', fontSize: '0.72rem', fontWeight: 600 }}>Sevaro Monitor</span>
+            <span style={{ color: '#64748b', fontSize: '0.65rem', textAlign: 'center', lineHeight: 1.3 }}>
+              Daily HealthKit queries, tremor assessment, encrypted sync
+            </span>
+          </div>
+
+          <div style={{ padding: '0 4px', marginTop: '16px' }}>
+            <svg width="24" height="12" viewBox="0 0 24 12" fill="none">
+              <path d="M0 6h16" stroke="#475569" strokeWidth="1.5" strokeDasharray="3 2" />
+              <path d="M14 2l6 4-6 4" stroke="#475569" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          </div>
+
+          {/* Supabase */}
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px', minWidth: '120px', maxWidth: '140px' }}>
+            <div style={{
+              width: '44px', height: '44px', borderRadius: '50%',
+              background: 'rgba(62, 207, 142, 0.15)', border: '2px solid #3ECF8E',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+            }}>
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#3ECF8E" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                <ellipse cx="12" cy="5" rx="9" ry="3" />
+                <path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3" />
+                <path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5" />
+              </svg>
+            </div>
+            <span style={{ color: '#e2e8f0', fontSize: '0.72rem', fontWeight: 600 }}>Supabase</span>
+            <span style={{ color: '#64748b', fontSize: '0.65rem', textAlign: 'center', lineHeight: 1.3 }}>
+              Patient profiles, daily summaries, baselines, anomalies
+            </span>
+          </div>
+
+          <div style={{ padding: '0 4px', marginTop: '16px' }}>
+            <svg width="24" height="12" viewBox="0 0 24 12" fill="none">
+              <path d="M0 6h16" stroke="#475569" strokeWidth="1.5" strokeDasharray="3 2" />
+              <path d="M14 2l6 4-6 4" stroke="#475569" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          </div>
+
+          {/* AI Engine */}
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px', minWidth: '120px', maxWidth: '140px' }}>
+            <div style={{
+              width: '44px', height: '44px', borderRadius: '50%',
+              background: 'rgba(139, 92, 246, 0.15)', border: '2px solid #8B5CF6',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+            }}>
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#8B5CF6" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M12 2a4 4 0 0 1 4 4c0 1.5-.8 2.8-2 3.5V11h-4V9.5C8.8 8.8 8 7.5 8 6a4 4 0 0 1 4-4z" />
+                <rect x="8" y="13" width="8" height="4" rx="1" />
+                <path d="M10 17v3" />
+                <path d="M14 17v3" />
+                <path d="M8 20h8" />
+              </svg>
+            </div>
+            <span style={{ color: '#e2e8f0', fontSize: '0.72rem', fontWeight: 600 }}>AI Engine (GPT-5.2)</span>
+            <span style={{ color: '#64748b', fontSize: '0.65rem', textAlign: 'center', lineHeight: 1.3 }}>
+              Baseline comparison, trend analysis, anomaly detection, alert routing
+            </span>
+          </div>
+        </div>
       </div>
     </div>
   )
