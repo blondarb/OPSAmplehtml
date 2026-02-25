@@ -3,12 +3,12 @@ import { redirect } from 'next/navigation'
 import { getTenantServer } from '@/lib/tenant'
 
 /**
- * Shared server-side data-fetching used by both /dashboard and /physician.
+ * Shared server-side data-fetching used by /physician, /ehr, and /dashboard.
  *
  * Returns all props expected by the <ClinicalNote> component.
  * Redirects to /login if the user is not authenticated.
  */
-export async function fetchDashboardData() {
+export async function fetchDashboardData(patientId?: string) {
   const supabase = await createClient()
   const tenant = getTenantServer()
   const { data: { user } } = await supabase.auth.getUser()
@@ -17,13 +17,25 @@ export async function fetchDashboardData() {
     redirect('/login')
   }
 
-  // Fetch patient data
-  const { data: patients } = await supabase
-    .from('patients')
-    .select('*')
-    .eq('tenant_id', tenant)
-    .limit(1)
-    .single()
+  // Fetch patient data — by ID if provided, otherwise random
+  let patients: any = null
+  if (patientId) {
+    const { data } = await supabase
+      .from('patients')
+      .select('*')
+      .eq('id', patientId)
+      .eq('tenant_id', tenant)
+      .single()
+    patients = data
+  } else {
+    const { data: allPatients } = await supabase
+      .from('patients')
+      .select('*')
+      .eq('tenant_id', tenant)
+    if (allPatients && allPatients.length > 0) {
+      patients = allPatients[Math.floor(Math.random() * allPatients.length)]
+    }
+  }
 
   // Fetch current visit with notes
   const { data: currentVisit } = await supabase

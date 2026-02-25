@@ -41,6 +41,7 @@ interface ClinicalNoteProps {
   patientMessages?: any[]
   patientIntakeForms?: any[]
   historianSessions?: any[]
+  initialViewMode?: 'cockpit' | 'appointments' | 'chart'
 }
 
 // Icon sidebar navigation
@@ -185,10 +186,11 @@ export default function ClinicalNote({
   patientMessages = [],
   patientIntakeForms = [],
   historianSessions = [],
+  initialViewMode,
 }: ClinicalNoteProps) {
   const [darkMode, setDarkMode] = useState(false)
   const [activeIcon, setActiveIcon] = useState('home')
-  const [viewMode, setViewMode] = useState<'appointments' | 'chart' | 'cockpit'>('cockpit') // Start with Clinical Cockpit
+  const [viewMode, setViewMode] = useState<'appointments' | 'chart' | 'cockpit'>(initialViewMode || 'cockpit')
   const [selectedAppointment, setSelectedAppointment] = useState<Appointment | null>(null)
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false)
 
