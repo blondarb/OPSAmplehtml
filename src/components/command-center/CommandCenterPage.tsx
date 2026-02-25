@@ -3,7 +3,7 @@
 import { useState, useRef, useCallback } from 'react'
 import RoleToggle from './RoleToggle'
 import TimeRangeSelector from './TimeRangeSelector'
-import MorningBriefing from './MorningBriefing'
+import OperationalSummary from './OperationalSummary'
 import StatusBar from './StatusBar'
 import ActionQueue from './ActionQueue'
 import PatientQueue from './PatientQueue'
@@ -46,8 +46,8 @@ export default function CommandCenterPage() {
         <TimeRangeSelector value={timeRange} onChange={setTimeRange} />
       </div>
 
-      {/* Zone 1: Morning Briefing */}
-      <MorningBriefing viewMode={viewMode} timeRange={timeRange} />
+      {/* Zone 1: Operational Summary */}
+      <OperationalSummary viewMode={viewMode} timeRange={timeRange} />
 
       {/* Zone 2: Status Bar */}
       <StatusBar
