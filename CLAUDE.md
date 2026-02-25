@@ -30,6 +30,11 @@ src/
 │   │   │   └── visit-ai/  # Visit AI - full visit transcription & clinical extraction
 │   │   │   └── draft-response/ # AI draft for patient messages (GPT-5-mini)
 │   │   ├── allergies/     # Allergy CRUD API
+│   │   ├── command-center/ # Command Center Revamp APIs
+│   │   │   ├── actions/   # Action queue (list + approve + batch-approve)
+│   │   │   ├── briefing/  # AI morning briefing (GPT-5.2)
+│   │   │   ├── metrics/   # Status tile metrics
+│   │   │   └── patients/  # Patient queue + AI summaries
 │   │   ├── consults/      # Consult request CRUD
 │   │   ├── incomplete-docs/ # Incomplete documentation detection
 │   │   ├── medications/   # Medication CRUD API
@@ -74,6 +79,26 @@ src/
 │   ├── UrgencyBanner.tsx  # Persistent urgency banner below TopNav
 │   ├── PhysicianHome.tsx  # Clinical Cockpit three-column home view
 │   ├── VoiceDrawer.tsx    # Voice & Dictation drawer (Chart Prep, Document)
+│   ├── command-center/    # Command Center Revamp components (5-zone layout)
+│   │   ├── CommandCenterPage.tsx    # Top-level orchestrator
+│   │   ├── MorningBriefing.tsx      # Zone 1: AI briefing card
+│   │   ├── StatusBar.tsx            # Zone 2: 8 metric tiles
+│   │   ├── ActionQueue.tsx          # Zone 3: Batch + individual actions
+│   │   ├── PatientQueue.tsx         # Zone 4: Priority patient list
+│   │   ├── QuickAccessStrip.tsx     # Zone 5: Feature links
+│   │   ├── DisclaimerBanner.tsx     # Demo disclaimer
+│   │   ├── ActionItemCard.tsx       # Single action card
+│   │   ├── ActionBatchGroup.tsx     # Grouped batch-approvable actions
+│   │   ├── DraftedContentPreview.tsx # Expandable AI draft preview
+│   │   ├── PatientRow.tsx           # Level 1 scan row
+│   │   ├── PatientDetailCard.tsx    # Level 2 expanded AI summary
+│   │   ├── StatusTile.tsx           # Clickable metric card
+│   │   ├── ConfidenceBadge.tsx      # High/Medium/Low pill
+│   │   ├── UrgencyIndicator.tsx     # 4px colored left border
+│   │   ├── SourceBadge.tsx          # Origin tag (Sevaro/EHR/Wearable)
+│   │   ├── PendingItemBadges.tsx    # Icon+count badges
+│   │   ├── RoleToggle.tsx           # My Patients / All Patients toggle
+│   │   └── TimeRangeSelector.tsx    # Date display + range dropdown
 │   ├── home/              # Clinical Cockpit sub-components
 │   │   ├── ScheduleColumn.tsx     # Today's schedule with prep status
 │   │   ├── NotificationFeed.tsx   # Priority-sorted notification cards
@@ -100,6 +125,10 @@ src/
 │   │   ├── merge-engine.ts # Core merge logic + formatting functions
 │   │   └── types.ts       # TypeScript interfaces (ComprehensiveNoteData, FormattedNote)
 │   ├── reasonForConsultData.ts # Consult categories and sub-options
+│   ├── command-center/
+│   │   ├── types.ts       # Command Center TypeScript interfaces
+│   │   ├── demoActions.ts # Shared demo action data for API routes
+│   │   └── briefingPrompt.ts # GPT-5.2 system prompt + demo briefing
 │   ├── supabase/
 │   │   ├── client.ts      # Browser Supabase client
 │   │   └── server.ts      # Server Supabase client
@@ -129,6 +158,8 @@ Located in `supabase/migrations/`:
 - **provider_messages**: Messages within provider threads
 - **consult_requests**: Structured consult requests with urgency/type/status
 - **patient_messages** (updated): Added `ai_draft`, `ai_assisted`, `draft_status` columns
+- **command_center_actions**: AI-suggested actions with confidence scoring, batch grouping, approval workflow
+- **command_center_briefings**: Cached AI morning briefings with reasoning chain
 
 ## Environment Variables
 
@@ -235,6 +266,18 @@ The OpenAI API key can be stored securely in Supabase `app_settings` table or as
     - **AI Draft Responses**: Auto-generated draft replies for patient messages (always draft, never auto-send)
     - **Incomplete Doc Detection**: Detects unsigned notes, missing Assessment/Plan, visits without notes
     - **Badge System**: IconSidebar badges for unread notifications by category
+
+14. **Command Center Revamp** (`/dashboard` — 5-zone layout):
+    - **Zone 1 — AI Morning Briefing**: GPT-5.2-generated daily summary with gradient border, show reasoning, regenerate
+    - **Zone 2 — Status Bar**: 8 clickable metric tiles (Pending Actions, Urgent Patients, Unread Messages, etc.) with trend arrows
+    - **Zone 3 — Action Queue**: Batch-approvable groups (refills, scale reminders) + individual actions with confidence badges, drafted content preview, approve/dismiss with toast notifications
+    - **Zone 4 — Patient Queue**: Urgency-sorted patient list with 3-level drill-down (scan row → AI summary card → full feature page), category/urgency/search filters
+    - **Zone 5 — Quick Access**: 6 pill-shaped links to other Sevaro features + demo disclaimer banner
+    - **Controls**: Role toggle (My Patients / All Patients), time range selector (Today / Yesterday / Last 7 Days)
+    - **Confidence-based batch approval**: Only all-High-confidence batches get "Approve All" button
+    - **17 demo actions** spanning 8 action types: refill, order, call, message, care_gap, pcp_summary, appointment, pa_followup, scale_reminder
+    - **12 demo patients** with urgency levels, pending items, micro-summaries
+    - **Design**: Dark gradient background (#0F172A → #1E293B), indigo accent, glassmorphic cards
 
 ## UI Components
 
@@ -363,6 +406,15 @@ The middleware (`src/middleware.ts`) handles session refresh. Uses a simplified 
 - `/api/ai/historian/session` - Create ephemeral token for WebRTC (gpt-realtime)
 - `/api/ai/historian/save` - Save/list historian interview sessions
 
+**Command Center Endpoints:**
+- `/api/command-center/metrics` - GET: 8 aggregate status tile metrics
+- `/api/command-center/actions` - GET: Action queue with batch groups
+- `/api/command-center/actions/[id]/approve` - POST: Approve single action
+- `/api/command-center/actions/batch-approve` - POST: Batch approve multiple actions
+- `/api/command-center/patients` - GET: Priority patient queue (filterable)
+- `/api/command-center/patients/[id]/summary` - GET: AI patient summary
+- `/api/command-center/briefing` - POST: Generate AI morning briefing (GPT-5.2)
+
 **Other Endpoints:**
 - `/api/phrases` - List and create dot phrases
 - `/api/phrases/[id]` - Get, update, delete individual phrases
@@ -416,6 +468,24 @@ The middleware (`src/middleware.ts`) handles session refresh. Uses a simplified 
 
 ### Design Docs
 - `docs/plans/2026-02-24-clinical-cockpit-design.md` - Clinical Cockpit workspace redesign
+- `docs/plans/2026-02-25-command-center-revamp-design.md` - Command Center 5-zone revamp design
+- `docs/plans/2026-02-25-command-center-revamp-plan.md` - Command Center implementation plan (19 tasks)
+
+### Product Playbooks (`playbooks/`)
+
+Comprehensive product playbooks for the 6-card Sevaro Ambulatory demo platform plus the homepage. **Read the relevant playbook before building or modifying any card's features, demo flow, data model, or AI prompts.**
+
+| File | Card | Route(s) |
+|------|------|----------|
+| `playbooks/00_homepage_hero.md` | Homepage & Platform Shell | `/` |
+| `playbooks/01_my_patients_schedule.md` | My Patients & Schedule | `/physician`, `/ehr` |
+| `playbooks/02_clinician_command_center.md` | Clinician Command Center | `/dashboard` |
+| `playbooks/03_ai_triage.md` | AI-Powered Triage | `/triage` |
+| `playbooks/04_post_visit_agent.md` | AI Follow-Up Agent | `/post-visit`, `/follow-up` |
+| `playbooks/05_sdne.md` | Digital Neurological Exam | `/sdne` |
+| `playbooks/06_wearable_monitoring.md` | Continuous Wearable Monitoring | `/wearable` |
+
+Each playbook contains 10 sections: Executive Summary, How To Use, Clinical Context, Functional Requirements, Technical Architecture, AI & Algorithm Design, Safety & Guardrails, Demo Design, Phased Roadmap, and Open Questions. They include complete Supabase schemas, API contracts, system prompts, and 3-minute demo scripts. Demo patients overlap across cards for continuity.
 
 ### Engineering Handoff Docs (February 2026)
 - `docs/SCHEMA_REFERENCE.md` - Complete database schema for all Supabase tables
