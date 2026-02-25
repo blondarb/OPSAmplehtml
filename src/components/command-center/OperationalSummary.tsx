@@ -56,25 +56,14 @@ export default function OperationalSummary({ viewMode, timeRange }: OperationalS
       setError(null)
       if (regenerate) setSpinning(true)
 
-      try {
-        const url = regenerate
-          ? '/api/command-center/briefing?regenerate=true'
-          : '/api/command-center/briefing'
-        const res = await fetch(url, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ view_mode: viewMode, time_range: timeRange }),
-        })
-        if (!res.ok) throw new Error(`HTTP ${res.status}`)
-        const data: BriefingData = await res.json()
-        setBriefing(data)
-      } catch {
-        // Use fallback on any API failure
-        setBriefing(FALLBACK_SUMMARY)
-      } finally {
-        setLoading(false)
-        setSpinning(false)
-      }
+      // TODO: When a dedicated /api/command-center/operational-summary endpoint
+      // exists, call it here. For now, use the operations-focused demo data
+      // directly so the Dashboard shows practice-wide content (not the
+      // clinician-personal briefing returned by /api/command-center/briefing).
+      await new Promise((r) => setTimeout(r, 400)) // simulate loading
+      setBriefing({ ...FALLBACK_SUMMARY, generated_at: new Date().toISOString() })
+      setLoading(false)
+      setSpinning(false)
     },
     [viewMode, timeRange],
   )
