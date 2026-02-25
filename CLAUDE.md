@@ -44,7 +44,7 @@ src/
 │   │   └── scales/        # Clinical scales API
 │   ├── auth/              # Auth callback handler
 │   ├── dashboard/         # Command Center (5-zone AI dashboard)
-│   ├── ehr/               # Clinical EHR (direct chart access, random patient)
+│   ├── ehr/               # Documentation (direct chart access, random patient)
 │   ├── login/             # Login page
 │   ├── mobile/            # Mobile-optimized clinical interface
 │   │   ├── page.tsx       # Mobile patient list with FAB menu
@@ -161,6 +161,7 @@ Located in `supabase/migrations/`:
 - **patient_messages** (updated): Added `ai_draft`, `ai_assisted`, `draft_status` columns
 - **command_center_actions**: AI-suggested actions with confidence scoring, batch grouping, approval workflow
 - **command_center_briefings**: Cached AI morning briefings with reasoning chain
+- **followup_phone_sessions**: Ephemeral phone-to-session mapping for live Twilio demo (24hr auto-expiry)
 
 ## Environment Variables
 
@@ -174,6 +175,15 @@ NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
 Optional (can also be stored in Supabase `app_settings`):
 ```
 OPENAI_API_KEY=sk-...
+```
+
+Optional (for live follow-up agent demo — see `docs/plans/2026-02-25-live-followup-agent-design.md`):
+```
+TWILIO_ACCOUNT_SID=AC...
+TWILIO_AUTH_TOKEN=...
+TWILIO_PHONE_NUMBER=+1XXXXXXXXXX
+TWILIO_WEBHOOK_BASE_URL=https://ops-amplehtml.vercel.app
+VOICE_BRIDGE_WSS_URL=wss://sevaro-voice-bridge.up.railway.app
 ```
 
 The OpenAI API key can be stored securely in Supabase `app_settings` table or as an environment variable.
@@ -471,6 +481,7 @@ The middleware (`src/middleware.ts`) handles session refresh. Uses a simplified 
 - `docs/plans/2026-02-24-clinical-cockpit-design.md` - Clinical Cockpit workspace redesign
 - `docs/plans/2026-02-25-command-center-revamp-design.md` - Command Center 5-zone revamp design
 - `docs/plans/2026-02-25-command-center-revamp-plan.md` - Command Center implementation plan (19 tasks)
+- `docs/plans/2026-02-25-live-followup-agent-design.md` - Live Follow-Up Agent: Twilio + OpenAI Realtime for real phone demos
 
 ### Product Playbooks (`playbooks/`)
 
@@ -479,7 +490,7 @@ Comprehensive product playbooks for the 6-card Sevaro Ambulatory demo platform p
 | File | Card | Route(s) |
 |------|------|----------|
 | `playbooks/00_homepage_hero.md` | Homepage & Platform Shell | `/` |
-| `playbooks/01_my_patients_schedule.md` | My Patients & Schedule | `/physician`, `/ehr` |
+| `playbooks/01_my_patients_schedule.md` | My Schedule & Documentation | `/physician` (schedule), `/ehr` (chart) |
 | `playbooks/02_clinician_command_center.md` | Clinician Command Center | `/dashboard` |
 | `playbooks/03_ai_triage.md` | AI-Powered Triage | `/triage` |
 | `playbooks/04_post_visit_agent.md` | AI Follow-Up Agent | `/post-visit`, `/follow-up` |
@@ -530,13 +541,16 @@ When redeploying after changes, use "Redeploy without cache" to ensure fresh bui
 
 ## Recent Changes
 
+- **Live Follow-Up Agent Design (2026-02-25)**: Design doc for real phone demo — Twilio SMS + OpenAI Realtime voice. User enters phone number, gets a real text, can reply or call back. Dashboard updates in real-time. See `docs/plans/2026-02-25-live-followup-agent-design.md`. Playbook `04_post_visit_agent.md` updated with Phase 1.5 roadmap.
+
 - **Physician Workspace Card Breakout**: Replaced single "Physician Workspace" homepage card with 3 cards:
-  - **Clinician Dashboard** → `/dashboard` (Command Center)
-  - **My Schedule** → `/physician` (schedule-first, AppointmentsDashboard with inline chart swap)
-  - **Clinical EHR** → `/ehr` (direct chart access with random patient selection, supports `?patient=ID`)
-  - Command Center card moved from Ongoing Care track to Clinician track
+  - **Clinician Dashboard** → `/dashboard` (Command Center — 5-zone AI dashboard)
+  - **My Schedule** → `/physician` (schedule-first via `initialViewMode="appointments"`, click patient for inline chart swap)
+  - **Documentation** → `/ehr` (lands directly on patient chart via `initialViewMode="chart"`, random patient selection, supports `?patient=ID`)
+  - Command Center card moved from Ongoing Care track to Clinician track (Ongoing Care now has 2 cards: Follow-Up Agent + Wearable)
   - `ClinicalNote` now accepts `initialViewMode` prop (`'cockpit' | 'appointments' | 'chart'`)
   - `fetchDashboardData()` accepts optional `patientId` for specific patient loading
+  - Client wrapper components (`PhysicianPageWrapper.tsx`, `EhrPageWrapper.tsx`) handle Server→Client icon serialization boundary
 
 Full changelog: [`docs/CHANGELOG.md`](docs/CHANGELOG.md)
 

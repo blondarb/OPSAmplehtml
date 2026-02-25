@@ -2,7 +2,9 @@
 
 > **For Claude:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task.
 
-**Goal:** Break the single Physician Workspace homepage card into 3 cards (Dashboard, Schedule, EHR) with proper routing.
+**Status:** Implemented (PRs #39–#42). "Clinical EHR" was renamed to "Documentation" post-implementation.
+
+**Goal:** Break the single Physician Workspace homepage card into 3 cards (Dashboard, Schedule, Documentation) with proper routing.
 
 **Architecture:** Replace one card in `journeyData.ts` with three. Refactor `/physician` to be schedule-first (render `AppointmentsDashboard`, swap to `ClinicalNote` on patient click). Create new `/ehr` route for direct chart access with random patient selection. `/dashboard` is unchanged.
 
