@@ -22,6 +22,9 @@ export default function WearablePage() {
   const [data, setData] = useState<WearableDemoData | null>(null)
   const [patients, setPatients] = useState<PatientSummary[]>([])
   const [selectedPatientId, setSelectedPatientId] = useState<string | null>(null)
+  const [analyzing, setAnalyzing] = useState(false)
+  const [analysisResult, setAnalysisResult] = useState<AIAnalysisResponse | null>(null)
+  const [analysisError, setAnalysisError] = useState<string | null>(null)
 
   useEffect(() => {
     async function init() {
@@ -64,6 +67,8 @@ export default function WearablePage() {
     setSelectedPatientId(patientId)
     setLoading(true)
     setError(null)
+    setAnalysisResult(null)
+    setAnalysisError(null)
     try {
       const res = await fetch(`/api/wearable/demo-data?patient_id=${patientId}`)
       if (!res.ok) {
@@ -76,6 +81,36 @@ export default function WearablePage() {
       setError(err instanceof Error ? err.message : 'Failed to load')
     } finally {
       setLoading(false)
+    }
+  }
+
+  async function runAnalysis() {
+    if (!data?.patient?.id) return
+    setAnalyzing(true)
+    setAnalysisError(null)
+    setAnalysisResult(null)
+    try {
+      const res = await fetch('/api/wearable/analyze', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ patient_id: data.patient.id, analysis_window_days: 7 }),
+      })
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}))
+        throw new Error(body.error || 'Analysis failed')
+      }
+      const result = await res.json()
+      setAnalysisResult(result)
+      // Re-fetch patient data to pick up any new anomalies/alerts
+      const refreshRes = await fetch(`/api/wearable/demo-data?patient_id=${data.patient.id}`)
+      if (refreshRes.ok) {
+        const refreshed = await refreshRes.json()
+        setData(refreshed)
+      }
+    } catch (err) {
+      setAnalysisError(err instanceof Error ? err.message : 'Analysis failed')
+    } finally {
+      setAnalyzing(false)
     }
   }
 
@@ -219,6 +254,153 @@ export default function WearablePage() {
             anomalies={data.anomalies}
             patient={data.patient}
           />
+
+          {/* AI Analysis Section */}
+          <div>
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              marginBottom: '16px',
+            }}>
+              <div>
+                <h2 style={{ color: '#fff', fontSize: '1.15rem', fontWeight: 700, margin: '0 0 4px' }}>
+                  AI Analysis
+                </h2>
+                <p style={{ color: '#94a3b8', fontSize: '0.85rem', margin: 0 }}>
+                  Run GPT-5.2 analysis on this patient&apos;s wearable data
+                </p>
+              </div>
+              <button
+                onClick={runAnalysis}
+                disabled={analyzing || !data}
+                style={{
+                  padding: '10px 24px',
+                  borderRadius: '8px',
+                  background: analyzing ? '#334155' : '#8B5CF6',
+                  color: '#fff',
+                  border: 'none',
+                  fontSize: '0.85rem',
+                  fontWeight: 600,
+                  cursor: analyzing ? 'not-allowed' : 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                }}
+              >
+                {analyzing && (
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ animation: 'wearable-spin 1s linear infinite' }}>
+                    <path d="M21 12a9 9 0 1 1-6.219-8.56" />
+                  </svg>
+                )}
+                {analyzing ? 'Analyzing...' : 'Run AI Analysis'}
+              </button>
+            </div>
+
+            {analysisError && (
+              <div style={{
+                background: 'rgba(220, 38, 38, 0.1)',
+                border: '1px solid rgba(220, 38, 38, 0.3)',
+                borderRadius: '8px',
+                padding: '12px 16px',
+                marginBottom: '16px',
+              }}>
+                <p style={{ color: '#fca5a5', fontSize: '0.85rem', margin: 0 }}>{analysisError}</p>
+              </div>
+            )}
+
+            {analysisResult && (
+              <div style={{
+                background: '#1e293b',
+                border: '1px solid #334155',
+                borderRadius: '12px',
+                padding: '24px',
+              }}>
+                {/* Status badge */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '16px' }}>
+                  <span style={{
+                    padding: '4px 12px',
+                    borderRadius: '8px',
+                    background: analysisResult.overall_status === 'normal' ? 'rgba(16, 185, 129, 0.15)' :
+                                analysisResult.overall_status === 'watch' ? 'rgba(37, 99, 235, 0.15)' :
+                                analysisResult.overall_status === 'concern' ? 'rgba(217, 119, 6, 0.15)' :
+                                'rgba(220, 38, 38, 0.15)',
+                    color: analysisResult.overall_status === 'normal' ? '#10B981' :
+                           analysisResult.overall_status === 'watch' ? '#3B82F6' :
+                           analysisResult.overall_status === 'concern' ? '#F59E0B' : '#DC2626',
+                    fontSize: '0.8rem',
+                    fontWeight: 600,
+                  }}>
+                    {analysisResult.overall_status.toUpperCase()}
+                  </span>
+                  <span style={{ color: '#64748b', fontSize: '0.8rem' }}>
+                    {analysisResult.analysis_period}
+                  </span>
+                </div>
+
+                {/* Narrative */}
+                <p style={{ color: '#cbd5e1', fontSize: '0.85rem', lineHeight: 1.7, margin: '0 0 16px' }}>
+                  {analysisResult.narrative_summary}
+                </p>
+
+                {/* Anomalies detected */}
+                {analysisResult.anomalies && analysisResult.anomalies.length > 0 && (
+                  <div style={{ marginBottom: '16px' }}>
+                    <h4 style={{ color: '#e2e8f0', fontSize: '0.9rem', fontWeight: 600, margin: '0 0 8px' }}>
+                      Anomalies Detected
+                    </h4>
+                    {analysisResult.anomalies.map((a, i) => (
+                      <div key={i} style={{
+                        background: '#0f172a',
+                        borderRadius: '8px',
+                        padding: '12px 16px',
+                        marginBottom: '8px',
+                      }}>
+                        <div style={{ display: 'flex', gap: '8px', marginBottom: '4px' }}>
+                          <span style={{ color: '#e2e8f0', fontSize: '0.85rem', fontWeight: 600 }}>
+                            {a.description}
+                          </span>
+                        </div>
+                        <p style={{ color: '#94a3b8', fontSize: '0.8rem', margin: '4px 0 0', lineHeight: 1.5 }}>
+                          {a.clinical_significance}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* Trends */}
+                {analysisResult.trends_observed && analysisResult.trends_observed.length > 0 && (
+                  <div>
+                    <h4 style={{ color: '#e2e8f0', fontSize: '0.9rem', fontWeight: 600, margin: '0 0 8px' }}>
+                      Trends Observed
+                    </h4>
+                    <ul style={{ margin: 0, paddingLeft: '20px' }}>
+                      {analysisResult.trends_observed.map((t, i) => (
+                        <li key={i} style={{ color: '#94a3b8', fontSize: '0.8rem', marginBottom: '4px', lineHeight: 1.5 }}>
+                          {t}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+
+                {/* Not HIPAA disclaimer */}
+                <div style={{
+                  marginTop: '16px',
+                  padding: '8px 12px',
+                  background: 'rgba(245, 158, 11, 0.08)',
+                  border: '1px solid rgba(245, 158, 11, 0.2)',
+                  borderRadius: '6px',
+                }}>
+                  <p style={{ color: '#F59E0B', fontSize: '0.75rem', margin: 0, fontStyle: 'italic' }}>
+                    This analysis is for demonstration purposes only. This system is not HIPAA-compliant and should not be used for clinical decision-making.
+                  </p>
+                </div>
+              </div>
+            )}
+          </div>
+
           <ClinicianAlertDashboard
             alerts={data.alerts}
             anomalies={data.anomalies}
