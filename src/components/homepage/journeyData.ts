@@ -49,9 +49,9 @@ export const clinicianTrack: JourneyTrackData = {
       description: 'Day, week, and month calendar views with appointment management and patient chart access.',
     },
     {
-      phase: 'Chart & Document',
-      name: 'Clinical EHR',
-      route: '/ehr',
+      phase: 'Documentation',
+      name: 'Documentation',
+      route: '/physician',
       icon: Stethoscope,
       status: 'live',
       description: 'Full clinical documentation with AI-assisted note creation, voice dictation, and clinical scales.',
