@@ -1,8 +1,9 @@
 # Physician Workspace Card Breakout — Design Document
 
 **Date:** 2026-02-25
-**Status:** Approved
+**Status:** Implemented (PRs #39, #40, #41, #42)
 **Author:** Claude (brainstorming session)
+**Note:** "Clinical EHR" was renamed to "Documentation" post-implementation since the entire platform is an EHR.
 
 ## Summary
 
@@ -46,7 +47,7 @@ Homepage → "My Schedule" card → /physician → AppointmentsDashboard
                                                ↓ back button
                                              AppointmentsDashboard
 
-Homepage → "Clinical EHR" card → /ehr → ClinicalNote (random patient)
+Homepage → "Documentation" card → /ehr → ClinicalNote (random patient, initialViewMode="chart")
 
 Homepage → "Clinician Dashboard" card → /dashboard → CommandCenterPage (unchanged)
 ```
@@ -64,7 +65,7 @@ Homepage → "Clinician Dashboard" card → /dashboard → CommandCenterPage (un
 1. AI-Powered Triage → `/triage` (unchanged)
 2. **Clinician Dashboard** → `/dashboard` — "AI-powered command center with morning briefing, action queue, and patient priority list"
 3. **My Schedule** → `/physician` — "Day, week, and month calendar views with appointment management and patient chart access"
-4. **Clinical EHR** → `/ehr` — "Full clinical documentation with AI-assisted note creation, voice dictation, and clinical scales"
+4. **Documentation** → `/ehr` — "Full clinical documentation with AI-assisted note creation, voice dictation, and clinical scales"
 5. Digital Neurological Exam → `/sdne` (unchanged)
 
 ## `/physician` Page Redesign (Schedule-First)
@@ -89,7 +90,8 @@ Homepage → "Clinician Dashboard" card → /dashboard → CommandCenterPage (un
 ### Landing State
 - Server component picks a random demo patient (or specific one via `?patient=ID` query param)
 - Renders `ClinicalNote` with that patient's data
-- Wrapped in `PlatformShell` with `FeatureSubHeader` ("Clinical EHR" with clipboard icon)
+- Wrapped in `PlatformShell` with `FeatureSubHeader` ("Documentation" with Stethoscope icon)
+- Uses `initialViewMode="chart"` to land directly on the patient chart (not cockpit/calendar)
 
 ### Implementation
 - Essentially the current `/physician/page.tsx` logic moved to `/ehr/page.tsx`

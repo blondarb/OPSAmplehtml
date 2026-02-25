@@ -4,6 +4,16 @@ Full history of notable changes. For project overview and architecture, see [CLA
 
 ## February 2026
 
+### Physician Workspace Card Breakout (February 25, 2026)
+- **Homepage redesign**: Replaced single "Physician Workspace" card with 3 distinct entry points in the Clinician Journey track
+- **Clinician Dashboard** → `/dashboard` — Command Center (5-zone AI dashboard, unchanged)
+- **My Schedule** → `/physician` — Lands on calendar view (`initialViewMode="appointments"`), click any patient to swap inline to their chart
+- **Documentation** → `/ehr` — Lands directly on a random sample patient chart (`initialViewMode="chart"`), supports `?patient=ID` for specific patients
+- **Ongoing Care track**: Removed duplicate Command Center card (now 2 cards: Follow-Up Agent + Wearable)
+- **New components**: `EhrPageWrapper.tsx`, `PhysicianPageWrapper.tsx` — client wrapper components that handle Server→Client icon serialization boundary
+- **ClinicalNote enhancement**: New `initialViewMode` prop controls which view loads first (`'cockpit' | 'appointments' | 'chart'`)
+- **Data fetching**: `fetchDashboardData()` now accepts optional `patientId` parameter; random patient selection when none specified
+
 ### Command Center Revamp (February 25, 2026)
 - **5-Zone Layout**: AI Morning Briefing → Status Bar (8 tiles) → Action Queue → Patient Queue → Quick Access
 - **AI Morning Briefing** (Zone 1): GPT-5.2-generated daily summary with gradient border card, show reasoning toggle, regenerate
