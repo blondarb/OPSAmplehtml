@@ -32,7 +32,7 @@ export default function EhrPageWrapper({
   return (
     <PlatformShell>
       <FeatureSubHeader
-        title="Clinical EHR"
+        title="Documentation"
         icon={Stethoscope}
         accentColor="#0D9488"
         showDemo={true}
@@ -47,6 +47,7 @@ export default function EhrPageWrapper({
         patientMessages={patientMessages}
         patientIntakeForms={patientIntakeForms}
         historianSessions={historianSessions}
+        initialViewMode="chart"
       />
     </PlatformShell>
   )
