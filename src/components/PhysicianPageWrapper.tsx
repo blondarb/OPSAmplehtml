@@ -3,7 +3,7 @@
 import PlatformShell from './layout/PlatformShell'
 import FeatureSubHeader from './layout/FeatureSubHeader'
 import ClinicalNote from './ClinicalNote'
-import { CalendarClock } from 'lucide-react'
+import { Home } from 'lucide-react'
 import type { User } from '@supabase/supabase-js'
 
 interface PhysicianPageWrapperProps {
@@ -32,8 +32,8 @@ export default function PhysicianPageWrapper({
   return (
     <PlatformShell>
       <FeatureSubHeader
-        title="My Schedule"
-        icon={CalendarClock}
+        title="Clinician Cockpit"
+        icon={Home}
         accentColor="#0D9488"
         showDemo={true}
       />

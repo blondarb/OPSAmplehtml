@@ -6,7 +6,7 @@ interface RoleToggleProps {
 }
 
 const OPTIONS: { key: 'my_patients' | 'all_patients'; label: string }[] = [
-  { key: 'my_patients', label: 'My Patients' },
+  { key: 'my_patients', label: 'By Provider' },
   { key: 'all_patients', label: 'All Patients' },
 ]
 
