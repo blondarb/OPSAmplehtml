@@ -4,6 +4,20 @@ Full history of notable changes. For project overview and architecture, see [CLA
 
 ## February 2026
 
+### Command Center Revamp (February 25, 2026)
+- **5-Zone Layout**: AI Morning Briefing → Status Bar (8 tiles) → Action Queue → Patient Queue → Quick Access
+- **AI Morning Briefing** (Zone 1): GPT-5.2-generated daily summary with gradient border card, show reasoning toggle, regenerate
+- **Status Bar** (Zone 2): 8 clickable metric tiles (Pending Actions, Urgent Patients, Unread Messages, Incomplete Docs, Open Consults, Care Gaps, Refill Requests, Upcoming Follow-ups) with trend arrows and tile-to-queue scrolling
+- **Action Queue** (Zone 3): 17 demo actions across 8 action types; batch-approvable groups for all-High-confidence batches; individual action cards with confidence badges (High/Medium/Low), drafted content preview, approve/dismiss with toast notifications
+- **Patient Queue** (Zone 4): 12 demo patients with urgency-sorted list; 3-level drill-down (scan row → AI summary card → full feature page); category/urgency/search filters
+- **Quick Access** (Zone 5): 6 pill-shaped links to other Sevaro features + demo disclaimer banner
+- **Controls**: Role toggle (My Patients / All Patients), time range selector (Today / Yesterday / Last 7 Days)
+- **New API routes**: `/api/command-center/metrics`, `/api/command-center/actions` (+ approve + batch-approve), `/api/command-center/patients` (+ `[id]/summary`), `/api/command-center/briefing`
+- **New database tables**: `command_center_actions` (AI action suggestions), `command_center_briefings` (cached briefings) — migration 030
+- **New TypeScript types**: `src/lib/command-center/types.ts` with full type coverage
+- **20 new components** in `src/components/command-center/` organized by zone
+- **Design**: Dark gradient background (#0F172A → #1E293B), indigo accent, glassmorphic cards via PlatformShell + FeatureSubHeader
+
 ### Mobile Recommendations Fix (February 6, 2026)
 - **ICD-10 Code Lookup Support**: `/api/plans` now accepts both diagnosis IDs (e.g., `epilepsy-management`) AND ICD-10 codes directly (e.g., `G40.909`)
 - **Mobile View Fix**: MobileRecommendationsSheet was passing ICD-10 codes but API only supported diagnosis IDs - now both work

@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
-import { DEMO_ACTIONS } from '../../route'
+import { DEMO_ACTIONS } from '@/lib/command-center/demoActions'
 
 // POST /api/command-center/actions/[id]/approve — Approve a single action
 
