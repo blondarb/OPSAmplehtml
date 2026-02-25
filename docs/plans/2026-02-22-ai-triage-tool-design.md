@@ -550,3 +550,57 @@ git push -u origin feature/card-3-ai-triage
 ```
 
 > **Ask user before pushing.** Per CLAUDE.md rules.
+
+---
+
+## Appendix: Phase 2 Additions (February 24, 2026)
+
+The following were implemented after the Phase 1 plan above was completed and merged. They are documented here for completeness.
+
+### Phase 2 Prompt Architecture
+
+The triage system now uses **three AI prompts** (all in `src/lib/triage/`):
+
+| Prompt | File | Purpose | Model |
+|--------|------|---------|-------|
+| Triage System Prompt | `systemPrompt.ts` → `TRIAGE_SYSTEM_PROMPT` | Scores 5 clinical dimensions (1-5) from referral text | gpt-5.2 |
+| Extraction System Prompt | `extractionPrompt.ts` → `EXTRACTION_SYSTEM_PROMPT` | Pre-processes full clinical notes (ED, PCP, discharge, etc.) into neurology-relevant summaries | gpt-5.2 |
+| Fusion System Prompt | `extractionPrompt.ts` → `FUSION_SYSTEM_PROMPT` | Combines multiple extractions for the same patient into one unified summary | gpt-5.2 |
+
+**Two-stage pipeline flow:**
+1. Long notes (>2K chars) or uploaded files go through **Stage 1 (Extraction)** first
+2. User reviews/edits the extracted summary
+3. Reviewed summary goes through **Stage 2 (Triage Scoring)** — same as Phase 1 flow
+4. Short referral-style text (<2K chars) skips Stage 1 and goes directly to triage
+
+### Phase 2 Files Added
+
+**Library files:**
+- `src/lib/triage/extractionPrompt.ts` — Extraction + Fusion system prompts and user prompt builders
+- `src/lib/triage/demoScenarios.ts` — 26 demo scenarios with pre-extracted PDF text
+- `src/lib/triage/fileParser.ts` — PDF/DOCX/TXT file parser
+
+**API endpoints:**
+- `src/app/api/triage/extract/route.ts` — Stage 1 extraction (`POST /api/triage/extract`)
+- `src/app/api/triage/fuse/route.ts` — Multi-note fusion (`POST /api/triage/fuse`)
+
+**Components (7 new):**
+- `FileUploadZone.tsx` — Drag-and-drop file upload (PDF/DOCX/TXT)
+- `ExtractionReviewPanel.tsx` — User review of AI extraction before triage
+- `BatchQueuePanel.tsx` — Queue display for batch processing
+- `BatchResultsPanel.tsx` — Results view with export
+- `FusionControls.tsx` — Multi-note fusion UI
+- `DemoScenarioLoader.tsx` — 26-scenario categorized picker
+- `DemoPreviewModal.tsx` — Full-text preview modal
+
+**Database (Migration 021):**
+- New columns on `triage_sessions`: `source_type`, `source_filename`, `extracted_summary`, `extraction_confidence`, `note_type_detected`, `batch_id`, `fusion_group_id`
+- New table: `triage_batches` (batch processing tracking)
+
+**Types added to `types.ts`:**
+- `SourceType`, `NoteType`, `ClinicalExtraction`, `FusionResult`, `BatchItem`, `BatchState`, `TriagePageState`, `DemoScenario`, `DemoScenarioFile`, `DemoCategory`
+- `FILE_CONSTRAINTS` (10MB max, 50K chars max, 20 files per batch)
+
+### Full Prompt Reference
+
+For the complete text of all three prompts, see `docs/AI_TRIAGE_PROMPTS.md`.
