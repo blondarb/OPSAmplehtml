@@ -1,25 +1,27 @@
-# Card 2: Clinician Command Center — Product Playbook
+# Card 2: Operations Dashboard — Product Playbook
+
+> **⚠️ ACTIVE DEVELOPMENT (February 2026):** This card has been renamed to **Operations Dashboard** (previously "Clinician Command Center"). The current build implements a 5-zone layout: Operational Summary (Zone 1, practice-wide metrics replacing the former Morning Briefing) + Status Bar + Action Queue + Patient Queue + Quick Access. The target audience is practice managers and medical directors (not individual clinicians — the clinician's daily view is now the Clinician Cockpit at `/physician`). The "My Patients / All Patients" toggle has been renamed to "By Provider / All Patients". For the current build's architecture, see the main CLAUDE.md and the codebase at `src/app/dashboard/` and `src/components/command-center/`.
 
 ---
 
 ## 1. Executive Summary
 
-The Clinician Command Center is the operational intelligence layer of the platform — a single-screen dashboard that aggregates real-time data from every other card into an actionable overview. It answers the question a clinic medical director, practice administrator, or supervising neurologist asks at 7:30 AM and again at 4:00 PM: "What needs my attention right now?" The Command Center pulls from the triage queue (Card 3), the follow-up escalation pipeline (Card 4), the wearable alert stream (Card 6), SDNE population trends (Card 5), and the physician schedule (Card 1) — and presents them in a unified, priority-sorted view. This is not a read-only analytics dashboard. It is a clinical operations tool with action buttons: acknowledge an alert, escalate to a physician, schedule a callback, open a patient chart, draft an order. For investors, the Command Center demonstrates platform maturity — it proves that the individual AI tools are not standalone experiments but components of an integrated clinical intelligence system. For health system administrators, it demonstrates the operational ROI: reduced time-to-action on escalations, measurable alert-to-resolution workflows, and population-level visibility into panel health. For Samsung and other technology partners, it shows how wearable data becomes clinically actionable at scale — not just for one patient, but across an entire panel.
+The Operations Dashboard (formerly Clinician Command Center) is the operational intelligence layer of the platform — a single-screen dashboard that aggregates real-time data from every other card into an actionable overview. It answers the question a clinic medical director, practice administrator, or supervising neurologist asks at 7:30 AM and again at 4:00 PM: "What needs my attention right now?" The Command Center pulls from the triage queue (Card 3), the follow-up escalation pipeline (Card 4), the wearable alert stream (Card 6), SDNE population trends (Card 5), and the physician schedule (Card 1) — and presents them in a unified, priority-sorted view. This is not a read-only analytics dashboard. It is a clinical operations tool with action buttons: acknowledge an alert, escalate to a physician, schedule a callback, open a patient chart, draft an order. For investors, the Command Center demonstrates platform maturity — it proves that the individual AI tools are not standalone experiments but components of an integrated clinical intelligence system. For health system administrators, it demonstrates the operational ROI: reduced time-to-action on escalations, measurable alert-to-resolution workflows, and population-level visibility into panel health. For Samsung and other technology partners, it shows how wearable data becomes clinically actionable at scale — not just for one patient, but across an entire panel.
 
-> **Design principle (CMIO):** The Command Center must function at two scales simultaneously. For a solo neurologist with 500 patients on their panel, it's a personal operations dashboard — "what needs my attention today." For a neurology group with 5 physicians and 3,000 patients, it's a practice-level operations console — "which patients across the practice need intervention, and who is handling it." The architecture must support both without requiring a separate build.
+> **Design principle (CMIO):** The Operations Dashboard is primarily a practice-level operations console for practice managers and medical directors — "which patients across the practice need intervention, and who is handling it." Individual clinician daily views are handled by the Clinician Cockpit (`/physician`). For a neurology group with 5 physicians and 3,000 patients, this is the bird's-eye view. The "By Provider" filter allows drilling into a single provider's panel.
 
 ---
 
 ## 2. How To Use This Section
 
-- **Step 1:** Navigate to the Clinician Command Center from the homepage (Journey Step 6: "The Full Picture").
+- **Step 1:** Navigate to the Operations Dashboard from the homepage (bottom row, "Ongoing Care" track).
 - **Step 2:** You will see four **Priority Lanes** at the top — color-coded swim lanes showing the most urgent items across the platform: Triage Queue (amber), Follow-Up Escalations (red/orange), Wearable Alerts (blue), and Pending Messages (teal). Each lane shows a count and the most urgent items.
 - **Step 3:** Below the Priority Lanes, the **Patient Panel Overview** shows population-level metrics: total active patients, patients with active wearable monitoring, patients overdue for follow-up, and panel health score.
 - **Step 4:** Click on any item in a Priority Lane to expand it. Expanded items show: patient name, clinical context, recommended action, and action buttons (Acknowledge, Escalate, Open Chart, Schedule Callback).
 - **Step 5:** The **Activity Feed** on the right side shows a chronological log of all platform events: triage completions, follow-up conversations, wearable anomalies, schedule changes. Filter by event type or patient.
 - **Step 6:** Use the **Time Range** selector to view today, this week, or this month. Historical views show trends: are escalations increasing? Are triage volumes growing?
 - **Step 7:** The **Quick Access** panel provides one-click navigation to every other card in the platform, plus links to frequently used external tools (PACS, Epic, VizAI).
-- **Step 8:** In multi-provider mode, use the **Provider Filter** to view one physician's panel or the entire practice.
+- **Step 8:** Use the **By Provider / All Patients** toggle to view one physician's panel or the entire practice.
 
 ---
 
@@ -48,10 +50,10 @@ Clinical team discovers events through manual checking or interruption
 Response time varies: minutes for interruptions, hours/days for queue-checked items
 ```
 
-The Command Center replaces this with:
+The Operations Dashboard replaces this with:
 
 ```
-Events occur → Command Center aggregates and prioritizes → Clinical team sees unified queue → Action taken → Resolution logged
+Events occur → Operations Dashboard aggregates and prioritizes → Clinical team sees unified queue → Action taken → Resolution logged
 ```
 
 ### Who Uses This Dashboard
@@ -78,7 +80,7 @@ Events occur → Command Center aggregates and prioritizes → Clinical team see
 
 | Section | Position | Details |
 |---|---|---|
-| **Top Bar** | Full width, sticky | Date/time range selector (Today / This Week / This Month / Custom), Provider filter (All / Individual), Refresh button, Last updated timestamp |
+| **Top Bar** | Full width, sticky | Date/time range selector (Today / This Week / This Month / Custom), By Provider / All Patients toggle, Refresh button, Last updated timestamp |
 | **Priority Lanes** | Full width, 4 columns | Four color-coded swim lanes: Triage Queue (amber), Follow-Up Escalations (red/orange), Wearable Alerts (blue), Pending Messages (teal). Each shows count + 3-5 most urgent items. |
 | **Patient Panel Overview** | Full width, below Priority Lanes | Population-level metric cards in a horizontal row |
 | **Main Content Area** | Left 65% | Expanded priority item list — all items from all lanes, merged and sorted by urgency |
@@ -233,7 +235,7 @@ The Command Center should be pre-populated with data that tells a coherent story
 8:00 AM — Triage completed: Harold Jennings → Routine-priority (parkinsonism)
 ```
 
-> **Design rationale (CMIO):** The demo data is carefully constructed so that the Command Center tells a story of an active neurology practice with a mix of routine and urgent items. The critical items (Robert Alvarez's safety protocol, Carlos Delgado's GBS, Keisha Brown's medication cessation) demonstrate the safety net value. The wearable alerts (Linda Martinez's falls) demonstrate the between-visit monitoring value. The routine items (scheduling messages, stable triages) demonstrate that the system handles volume. Every item in the Command Center can be traced back to a specific demo scenario in another card — this proves integration.
+> **Design rationale (CMIO):** The demo data is carefully constructed so that the Operations Dashboard tells a story of an active neurology practice with a mix of routine and urgent items. The critical items (Robert Alvarez's safety protocol, Carlos Delgado's GBS, Keisha Brown's medication cessation) demonstrate the safety net value. The wearable alerts (Linda Martinez's falls) demonstrate the between-visit monitoring value. The routine items (scheduling messages, stable triages) demonstrate that the system handles volume. Every item in the Operations Dashboard can be traced back to a specific demo scenario in another card — this proves integration.
 
 ---
 
@@ -245,7 +247,7 @@ The Command Center should be pre-populated with data that tells a coherent story
 src/
 ├── app/
 │   └── dashboard/
-│       └── page.tsx                          # Command Center page (renders CommandCenterDashboard)
+│       └── page.tsx                          # Operations Dashboard page (renders CommandCenterDashboard)
 ├── components/
 │   ├── CommandCenterDashboard.tsx             # Master orchestrator (Phase 1: hardcoded; Phase 2: live data)
 │   │
@@ -276,14 +278,14 @@ src/
 │   │   │
 │   │   │   # ── Controls ──
 │   │   ├── TimeRangeSelector.tsx                # Today / This Week / This Month / Custom
-│   │   ├── ProviderFilter.tsx                   # All providers / Individual provider dropdown
+│   │   ├── ProviderFilter.tsx                   # By Provider / All Patients toggle
 │   │   ├── QuickAccessPanel.tsx                 # Card navigation + external tool links
 │   │   └── DemoDisclaimer.tsx                   # "Simulated data" banner
 ```
 
 ### 5.2 Supabase Schema
 
-The Command Center is primarily a **read-only aggregation view** — it reads from tables created by other cards. No new tables are needed for Phase 1. Phase 2 introduces operational tracking tables.
+The Operations Dashboard is primarily a **read-only aggregation view** — it reads from tables created by other cards. No new tables are needed for Phase 1. Phase 2 introduces operational tracking tables.
 
 **Tables Read (All Existing)**
 
@@ -335,7 +337,7 @@ The Command Center is primarily a **read-only aggregation view** — it reads fr
 
 ### 5.3 API Endpoints
 
-**`GET /api/command-center`** — Fetch all Command Center data
+**`GET /api/command-center`** — Fetch all Operations Dashboard data
 
 Request query:
 ```
@@ -655,11 +657,11 @@ The panel health score is a composite of 5 operational metrics:
 
 ### 7.1 Clinical Safety Boundaries
 
-- **The Command Center is a routing and awareness tool, not a clinical decision engine.** It presents data and suggests actions. A human reviews and acts.
+- **The Operations Dashboard is a routing and awareness tool, not a clinical decision engine.** It presents data and suggests actions. A human reviews and acts.
 - **CRITICAL items cannot be dismissed without explicit action.** The pulsing animation and red border persist until the item is acknowledged. There is no "dismiss all" button for critical items.
 - **Escalation acknowledgment creates an audit record.** When a physician acknowledges a follow-up escalation, the system records who acknowledged it, when, and what action was taken. This is the compliance audit trail.
 - **The triage team (MA/RN) serves as the first filter for wearable alerts.** This prevents 50+ informational alerts per day from reaching the physician. However, Tier 1 urgent alerts (falls, seizure-like events) bypass the triage team and appear in both views simultaneously.
-- **After-hours behavior**: Follow-up escalations that occur after clinic hours include after-hours messaging (Card 4 Section 7.2.1). The Command Center displays the after-hours flag prominently.
+- **After-hours behavior**: Follow-up escalations that occur after clinic hours include after-hours messaging (Card 4 Section 7.2.1). The Operations Dashboard displays the after-hours flag prominently.
 
 ### 7.2 Alert Fatigue Prevention
 
@@ -672,14 +674,14 @@ The panel health score is a composite of 5 operational metrics:
 
 ### 7.3 Regulatory Considerations
 
-- **HIPAA**: The Command Center displays PHI (patient names, diagnoses, clinical data) for multiple patients simultaneously. Access must be restricted to authorized clinical staff. Screen lock and session timeout apply. PHI toggle (from TopNav) redacts identifiers for presentations.
-- **Clinical documentation**: Actions taken from the Command Center (acknowledge, escalate, schedule callback) are logged but do NOT constitute clinical documentation. The action log is an operational record, not a medical record.
-- **Billing**: The Command Center facilitates RPM (Remote Patient Monitoring) and CCM (Chronic Care Management) billing by tracking time spent reviewing wearable data and follow-up summaries. Phase 3 adds billing code tracking.
+- **HIPAA**: The Operations Dashboard displays PHI (patient names, diagnoses, clinical data) for multiple patients simultaneously. Access must be restricted to authorized clinical staff. Screen lock and session timeout apply. PHI toggle (from TopNav) redacts identifiers for presentations.
+- **Clinical documentation**: Actions taken from the Operations Dashboard (acknowledge, escalate, schedule callback) are logged but do NOT constitute clinical documentation. The action log is an operational record, not a medical record.
+- **Billing**: The Operations Dashboard facilitates RPM (Remote Patient Monitoring) and CCM (Chronic Care Management) billing by tracking time spent reviewing wearable data and follow-up summaries. Phase 3 adds billing code tracking.
 
 ### 7.4 UI Disclaimers
 
-**On the Command Center page:**
-> "This Command Center shows simulated aggregate data. In production, this view would pull real-time metrics from the EHR, wearable integrations, and AI follow-up system."
+**On the Operations Dashboard page:**
+> "This Operations Dashboard shows simulated aggregate data. In production, this view would pull real-time metrics from the EHR, wearable integrations, and AI follow-up system."
 
 **On action buttons:**
 > "All actions are logged. Clinical decisions based on this dashboard should be documented in the patient's medical record."
@@ -694,7 +696,7 @@ The panel health score is a composite of 5 operational metrics:
 ### 8.1 The 3-Minute Demo
 
 **Minute 0:00-0:30 — The Problem Statement**
-"You're the medical director of a neurology practice. It's 3 PM. Somewhere in your system, a patient reported a seizure on an AI follow-up call 2 hours ago. Another patient's wearable detected a fall at 3 AM. A referral for possible GBS has been sitting in the triage queue since lunch. And you don't know about any of it — because the information is scattered across four different systems. This is the Clinician Command Center."
+"You're the medical director of a neurology practice. It's 3 PM. Somewhere in your system, a patient reported a seizure on an AI follow-up call 2 hours ago. Another patient's wearable detected a fall at 3 AM. A referral for possible GBS has been sitting in the triage queue since lunch. And you don't know about any of it — because the information is scattered across four different systems. This is the Operations Dashboard."
 
 **Minute 0:30-1:30 — The Priority Lanes**
 - Point to the four Priority Lanes: "At a glance, I can see 8 pending triages, 3 follow-up escalations, 5 wearable alerts, and 6 pending messages."
@@ -708,8 +710,8 @@ The panel health score is a composite of 5 operational metrics:
 - Point to the triage queue: "Carlos Delgado was triaged as urgent for possible GBS. He's been in the queue for 30 minutes. I can review the full triage result and approve or override — without leaving this screen."
 
 **Minute 2:30-3:00 — The Revenue and Compliance Story**
-- "Every action I take here is logged: when I reviewed the alert, what I did, how long it took. That's your compliance audit trail. And every minute I spend reviewing wearable data and follow-up conversations counts toward RPM and CCM billing — CPT 99453 through 99458. The Command Center doesn't just improve clinical operations — it documents the work that generates revenue."
-- "This is not six separate tools. This is one platform. Triage feeds the queue. Follow-up catches problems. Wearables monitor between visits. And this Command Center is where it all comes together."
+- "Every action I take here is logged: when I reviewed the alert, what I did, how long it took. That's your compliance audit trail. And every minute I spend reviewing wearable data and follow-up conversations counts toward RPM and CCM billing — CPT 99453 through 99458. The Operations Dashboard doesn't just improve clinical operations — it documents the work that generates revenue."
+- "This is not six separate tools. This is one platform. Triage feeds the queue. Follow-up catches problems. Wearables monitor between visits. And this Operations Dashboard is where it all comes together."
 
 ### 8.2 Key Wow Moments
 
@@ -721,8 +723,8 @@ The panel health score is a composite of 5 operational metrics:
 
 ### 8.3 Demo Walkthrough Script
 
-**Opening the Command Center:**
-> "This is the Clinician Command Center — the bird's-eye view of your entire practice. Four priority lanes, each pulling from a different AI system in the platform."
+**Opening the Operations Dashboard:**
+> "This is the Operations Dashboard — the bird's-eye view of your entire practice. Four priority lanes, each pulling from a different AI system in the platform."
 
 **Follow-Up Escalation Lane:**
 > "Let me start with the most critical item. Robert Alvarez — he was seen last week for Parkinson's, and during the AI follow-up call, he said 'I just feel hopeless. What's the point of all this?' The safety protocol activated immediately: 988 Lifeline number provided, clinical team flagged. I can see his exact words, the AI's response, and I can call him right now. This was caught by an AI — not a nurse who happened to call at the right time."
@@ -740,7 +742,7 @@ The panel health score is a composite of 5 operational metrics:
 ### Phase 1: POC / Demo Version (Current Sprint)
 
 **Scope:**
-- Command Center page with 4 Priority Lanes populated from hardcoded demo data
+- Operations Dashboard page with 4 Priority Lanes populated from hardcoded demo data
 - Status cards (existing) upgraded to interactive Priority Lane layout
 - Quick Access panel linking to all 6 cards (existing, enhanced)
 - Activity Feed with chronological demo events
@@ -781,7 +783,7 @@ The panel health score is a composite of 5 operational metrics:
 - Predictive flagging: AI predicts which patients are likely to need intervention based on trends
 - Custom dashboard layouts per role (MA/RN view vs. physician view vs. administrator view)
 - Shift handoff report: AI generates an end-of-day summary of outstanding items
-- Multi-site aggregation: single Command Center across multiple clinic locations
+- Multi-site aggregation: single Operations Dashboard across multiple clinic locations
 - EHR integration: push action logs and acknowledgments to Epic/Athena
 - RPM/CCM billing timer: tracks time spent on wearable review and follow-up review for billing codes
 - Historical analytics: weekly/monthly trends for escalation volumes, response times, panel health
@@ -806,15 +808,15 @@ The panel health score is a composite of 5 operational metrics:
 ### Still Open
 
 5. **Browser notifications**: Should CRITICAL items trigger browser push notifications? This is high-value (physician gets notified even if not looking at the dashboard) but adds complexity (notification permission, mobile support, do-not-disturb handling).
-6. **Shift handoff workflow**: When the MA/RN shift ends, should the Command Center generate an automated handoff summary? If so, what does it include? Outstanding items, actions taken, items not yet addressed?
+6. **Shift handoff workflow**: When the MA/RN shift ends, should the Operations Dashboard generate an automated handoff summary? If so, what does it include? Outstanding items, actions taken, items not yet addressed?
 7. **Panel health score adoption**: Will physicians and administrators actually look at a composite panel health score, or is it a vanity metric? Consider: the score is most useful if it's benchmarked — "Your panel health is 82, practice average is 78, top quartile is 91."
 8. **Wearable alert volume at scale**: With 1,000 patients on wearable monitoring, the Wearable Alerts lane could have 50+ items per day. Is the current consolidation algorithm sufficient, or do we need an ML-based noise filter from Phase 2?
 9. **Cross-card action triggers**: When a physician acknowledges a wearable alert and clicks "Schedule Follow-up," should this trigger a Card 4 follow-up conversation automatically? Or just create a scheduling task for the MA? Automatic triggering is more integrated but creates a complex cross-card dependency.
-10. **Dashboard access for non-clinical staff**: Should practice administrators (non-clinical) have access to the Command Center? They need operational metrics but should not see PHI. Consider a "de-identified view" that shows aggregate metrics without patient names.
+10. **Dashboard access for non-clinical staff**: Should practice administrators (non-clinical) have access to the Operations Dashboard? They need operational metrics but should not see PHI. Consider a "de-identified view" that shows aggregate metrics without patient names.
 
 ### New Questions (from CMIO Review)
 
 11. **Escalation response SLA**: Should the system enforce a response SLA (e.g., Tier 1 must be acknowledged within 15 minutes)? If the SLA is breached, what happens — auto-escalate to a backup physician? Send a text message to the attending?
-12. **Duplicate event handling**: If a patient calls the office (creating a message) AND the AI follow-up detects the same issue (creating an escalation), the Command Center shows two items for the same problem. How should duplicates be handled — manual merge by MA, or AI-assisted deduplication?
-13. **RPM billing integration**: RPM requires 16+ days of data collection AND 20+ minutes of clinical staff time per month per patient. Should the Command Center track both metrics per patient and flag when the billing threshold is reached? This is Phase 3 scope but architecture decisions affect Phase 2.
+12. **Duplicate event handling**: If a patient calls the office (creating a message) AND the AI follow-up detects the same issue (creating an escalation), the Operations Dashboard shows two items for the same problem. How should duplicates be handled — manual merge by MA, or AI-assisted deduplication?
+13. **RPM billing integration**: RPM requires 16+ days of data collection AND 20+ minutes of clinical staff time per month per patient. Should the Operations Dashboard track both metrics per patient and flag when the billing threshold is reached? This is Phase 3 scope but architecture decisions affect Phase 2.
 14. **Regulatory audit trail**: In production, the `command_center_actions` table becomes a HIPAA audit log. Should it be immutable (append-only, no updates/deletes)? Should it include the user's IP address and session ID?

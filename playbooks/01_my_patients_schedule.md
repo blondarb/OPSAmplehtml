@@ -1,5 +1,7 @@
 # Card 1: My Patients & Schedule — Product Playbook
 
+> **⚠️ ACTIVE DEVELOPMENT (February 2026):** This card has been redesigned as the **Clinician Cockpit** — a three-column "overview of my day" view at `/physician`. The Cockpit layout is: Schedule (left column) | Morning Briefing (center column) | Notifications (right column). There is no inline charting — clicking a patient navigates to `/ehr` for full Documentation. The schedule is no longer a standalone homepage card; it is one column within the Clinician Cockpit card. For the current build's architecture, see the main CLAUDE.md and the codebase at `src/app/physician/` and `src/components/home/`.
+
 ---
 
 ## 1. Executive Summary
@@ -12,9 +14,9 @@ My Patients & Schedule is the physician's home base — the central workspace wh
 
 ## 2. How To Use This Section
 
-- **Step 1:** Navigate to the My Patients & Schedule card from the homepage (Journey Step 2: "Physician Workspace").
-- **Step 2:** You will see a schedule view showing the day's patient appointments. Each row displays: time, patient name, visit type (new/follow-up), chief complaint, triage tier badge (from Card 3), and any active alerts (wearable, follow-up escalation).
-- **Step 3:** Click on a patient row to open their full chart. The chart opens in the clinical workspace — a multi-panel layout with patient demographics on the left, clinical documentation tabs in the center, and AI tools on the right.
+- **Step 1:** Navigate to the **Clinician Cockpit** card from the homepage (top row, "Clinician Journey" track). This opens `/physician`, a three-column overview: Schedule (left), Morning Briefing (center), Notifications (right).
+- **Step 2:** In the Schedule column (left), you will see the day's patient appointments. Each row displays: time, patient name, visit type (new/follow-up), chief complaint, triage tier badge (from Card 3), and any active alerts (wearable, follow-up escalation).
+- **Step 3:** Click on a patient row to navigate to `/ehr` for full charting. The chart opens in the Documentation view — a multi-panel layout with patient demographics on the left, clinical documentation tabs in the center, and AI tools on the right.
 - **Step 4:** Before reviewing the chart, notice the **AI Pre-Visit Briefing** panel at the top of the center area. This is a synthesized summary pulling from triage results, follow-up conversations, wearable data, SDNE history, and prior visit notes — everything the platform knows about this patient, compressed into a 15-second read.
 - **Step 5:** Navigate the chart tabs: **Summary** (AI briefing + longitudinal overview), **History** (HPI, ROS, meds, allergies, scales), **Imaging/Results** (studies with findings), **Physical Exams** (structured exam + SDNE data), **Recommendation** (assessment, DDx, plan with smart recommendations).
 - **Step 6:** On the Summary tab, notice the cross-card data sections: Triage Result (from Card 3), Follow-Up Status (from Card 4), SDNE Exam History (from Card 5), and Wearable Trends (from Card 6). Each section links to the source card for full detail.
