@@ -43,7 +43,8 @@ src/
 │   │   ├── provider-messages/ # Provider messaging + threads
 │   │   └── scales/        # Clinical scales API
 │   ├── auth/              # Auth callback handler
-│   ├── dashboard/         # Main clinical interface
+│   ├── dashboard/         # Command Center (5-zone AI dashboard)
+│   ├── ehr/               # Clinical EHR (direct chart access, random patient)
 │   ├── login/             # Login page
 │   ├── mobile/            # Mobile-optimized clinical interface
 │   │   ├── page.tsx       # Mobile patient list with FAB menu
@@ -528,6 +529,14 @@ When redeploying after changes, use "Redeploy without cache" to ensure fresh bui
 - Push to feature branch, create PR, merge to main for deployment
 
 ## Recent Changes
+
+- **Physician Workspace Card Breakout**: Replaced single "Physician Workspace" homepage card with 3 cards:
+  - **Clinician Dashboard** → `/dashboard` (Command Center)
+  - **My Schedule** → `/physician` (schedule-first, AppointmentsDashboard with inline chart swap)
+  - **Clinical EHR** → `/ehr` (direct chart access with random patient selection, supports `?patient=ID`)
+  - Command Center card moved from Ongoing Care track to Clinician track
+  - `ClinicalNote` now accepts `initialViewMode` prop (`'cockpit' | 'appointments' | 'chart'`)
+  - `fetchDashboardData()` accepts optional `patientId` for specific patient loading
 
 Full changelog: [`docs/CHANGELOG.md`](docs/CHANGELOG.md)
 

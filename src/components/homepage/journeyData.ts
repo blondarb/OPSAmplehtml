@@ -1,5 +1,5 @@
 import {
-  Brain, CalendarClock, Activity,
+  Brain, CalendarClock, Activity, Stethoscope,
   ClipboardList, Mic, MessageCircle, HeartPulse,
   MessageSquare, Watch, LayoutDashboard,
 } from 'lucide-react'
@@ -33,12 +33,28 @@ export const clinicianTrack: JourneyTrackData = {
       description: 'A referral arrives. AI reads it, scores acuity, and routes to the right subspecialist.',
     },
     {
-      phase: 'Physician Workspace',
-      name: 'Physician Workspace',
+      phase: 'Command Center',
+      name: 'Clinician Dashboard',
+      route: '/dashboard',
+      icon: LayoutDashboard,
+      status: 'live',
+      description: 'AI-powered command center with morning briefing, action queue, and patient priority list.',
+    },
+    {
+      phase: 'Schedule',
+      name: 'My Schedule',
       route: '/physician',
       icon: CalendarClock,
       status: 'live',
-      description: 'Your schedule, your charts, your triage recommendations — the physician\'s home base.',
+      description: 'Day, week, and month calendar views with appointment management and patient chart access.',
+    },
+    {
+      phase: 'Chart & Document',
+      name: 'Clinical EHR',
+      route: '/ehr',
+      icon: Stethoscope,
+      status: 'live',
+      description: 'Full clinical documentation with AI-assisted note creation, voice dictation, and clinical scales.',
     },
     {
       phase: 'In-Office Exam',
@@ -109,14 +125,6 @@ export const ongoingCareTrack: JourneyTrackData = {
       icon: Watch,
       status: 'live',
       description: 'Galaxy Watch + AI turn the months between visits into actionable clinical intelligence.',
-    },
-    {
-      phase: 'The Full Picture',
-      name: 'Command Center',
-      route: '/dashboard',
-      icon: LayoutDashboard,
-      status: 'live',
-      description: 'Aggregate overview — follow-up completions, wearable alerts, triage queue, and pending messages.',
     },
   ],
 }
