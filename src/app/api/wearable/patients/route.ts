@@ -1,0 +1,30 @@
+import { NextResponse } from 'next/server'
+import { createClient } from '@/lib/supabase/server'
+
+export async function GET() {
+  try {
+    const supabase = await createClient()
+    const { data, error } = await supabase
+      .from('wearable_patients')
+      .select('id, name, age, sex, primary_diagnosis, wearable_devices, monitoring_start_date')
+      .order('name')
+
+    if (error) throw error
+
+    // Tag each patient as 'demo' or 'live' based on whether they have
+    // an Apple Watch with status 'connected' (from the iOS app)
+    const patients = (data || []).map((p: Record<string, unknown>) => {
+      const devices = p.wearable_devices as Array<{ name: string; status?: string }>
+      const hasLiveAppleWatch = devices?.some(
+        (d) => d.name === 'Apple Watch' && d.status === 'connected'
+      )
+      return { ...p, source: hasLiveAppleWatch ? 'live' : 'demo' }
+    })
+
+    return NextResponse.json({ patients })
+  } catch (error: unknown) {
+    console.error('Wearable patients API Error:', error)
+    const message = error instanceof Error ? error.message : 'Failed to load patients'
+    return NextResponse.json({ error: message }, { status: 500 })
+  }
+}
