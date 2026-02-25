@@ -1,11 +1,12 @@
 'use client'
 
-import { useState, useRef, useCallback } from 'react'
+import { useState, useRef, useCallback, useEffect } from 'react'
 import { FILE_CONSTRAINTS } from '@/lib/triage/types'
 
 interface FileUploadZoneProps {
   onFilesChange: (files: File[]) => void
   disabled?: boolean
+  externalFiles?: File[]  // Files injected from demo loader
 }
 
 function formatFileSize(bytes: number): string {
@@ -34,11 +35,19 @@ function isValidFileType(file: File): boolean {
   return (FILE_CONSTRAINTS.ALLOWED_EXTENSIONS as readonly string[]).includes(ext)
 }
 
-export default function FileUploadZone({ onFilesChange, disabled }: FileUploadZoneProps) {
+export default function FileUploadZone({ onFilesChange, disabled, externalFiles }: FileUploadZoneProps) {
   const [files, setFiles] = useState<File[]>([])
   const [dragOver, setDragOver] = useState(false)
   const [errors, setErrors] = useState<string[]>([])
   const inputRef = useRef<HTMLInputElement>(null)
+
+  // Sync external files (from demo loader) into internal state
+  useEffect(() => {
+    if (externalFiles && externalFiles.length > 0) {
+      setFiles(externalFiles)
+      setErrors([])
+    }
+  }, [externalFiles])
 
   const addFiles = useCallback((newFiles: FileList | File[]) => {
     const incoming = Array.from(newFiles)

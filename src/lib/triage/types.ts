@@ -139,6 +139,30 @@ export interface SampleNote {
   text: string
 }
 
+// Demo Scenario types
+export type DemoCategory = 'outpatient' | 'cross_specialty' | 'packet'
+
+export interface DemoScenarioFile {
+  filename: string
+  path: string           // relative path from public/, e.g. '/samples/triage/outpatient/01_Jennings_Harold.pdf'
+  docType: string        // e.g. 'PCP Referral', 'MRI Brain Report'
+  previewText: string    // pre-extracted full text from PDF
+}
+
+export interface DemoScenario {
+  id: string
+  patientName: string
+  age: number
+  sex: 'M' | 'F'
+  category: DemoCategory
+  referringSpecialty: string
+  briefDescription: string
+  clinicalHighlight: string
+  expectedTier: TriageTier
+  files: DemoScenarioFile[]
+  demoPoints: string[]
+}
+
 // Tier display configuration
 export interface TierDisplayConfig {
   label: string

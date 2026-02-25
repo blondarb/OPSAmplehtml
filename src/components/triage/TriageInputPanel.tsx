@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import SampleNoteLoader from './SampleNoteLoader'
+import DemoScenarioLoader from './DemoScenarioLoader'
 import FileUploadZone from './FileUploadZone'
 import { FILE_CONSTRAINTS } from '@/lib/triage/types'
 
@@ -51,6 +52,7 @@ export default function TriageInputPanel({
   const [loadingMsgIndex, setLoadingMsgIndex] = useState(0)
   const [internalMode, setInternalMode] = useState<'paste' | 'upload'>('paste')
   const [uploadedFiles, setUploadedFiles] = useState<File[]>([])
+  const [demoFiles, setDemoFiles] = useState<File[] | undefined>(undefined)
 
   // Use controlled mode if provided, otherwise internal state
   const activeMode = controlledInputMode ?? internalMode
@@ -96,12 +98,21 @@ export default function TriageInputPanel({
     onSubmit(text, metadata)
   }
 
+  function handleLoadDemoFiles(files: File[]) {
+    setUploadedFiles(files)
+    // Create a new array reference each time so useEffect in FileUploadZone re-triggers
+    // even if the same demo is loaded twice
+    setDemoFiles([...files])
+    setActiveMode('upload')
+  }
+
   function handleReset() {
     setText('')
     setAge('')
     setSex('')
     setProviderType('')
     setUploadedFiles([])
+    setDemoFiles(undefined)
   }
 
   const charCount = text.length
@@ -138,9 +149,12 @@ export default function TriageInputPanel({
             ? 'Paste Referral Note or Intake Summary'
             : 'Upload Clinical Documents'}
         </h2>
-        {activeMode === 'paste' && (
-          <SampleNoteLoader onSelect={(noteText) => setText(noteText)} />
-        )}
+        <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+          {activeMode === 'paste' && (
+            <SampleNoteLoader onSelect={(noteText) => setText(noteText)} />
+          )}
+          <DemoScenarioLoader onLoadFiles={handleLoadDemoFiles} />
+        </div>
       </div>
 
       {/* Tab switcher */}
@@ -283,6 +297,7 @@ export default function TriageInputPanel({
         <FileUploadZone
           onFilesChange={setUploadedFiles}
           disabled={loading}
+          externalFiles={demoFiles}
         />
       )}
 
