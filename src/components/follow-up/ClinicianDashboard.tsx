@@ -1,16 +1,21 @@
 'use client'
 
+import { useEffect, useState } from 'react'
+import { createClient as createBrowserClient } from '@/lib/supabase/client'
 import type {
   DashboardUpdate,
   EscalationFlag,
   FollowUpModule,
   EscalationTier,
+  MedicationStatus,
+  CaregiverInfo,
 } from '@/lib/follow-up/types'
 
 interface ClinicianDashboardProps {
   dashboard: DashboardUpdate | null
   escalationAlert: EscalationFlag | null
   sessionId: string | null
+  liveSessionId?: string | null
 }
 
 const MODULE_LABELS: Record<FollowUpModule, string> = {
@@ -75,8 +80,54 @@ export default function ClinicianDashboard({
   dashboard,
   escalationAlert,
   sessionId,
+  liveSessionId,
 }: ClinicianDashboardProps) {
-  if (!dashboard) {
+  const [liveDashboard, setLiveDashboard] = useState<DashboardUpdate | null>(null)
+
+  // Subscribe to Supabase Realtime when a live session is active
+  useEffect(() => {
+    if (!liveSessionId) {
+      setLiveDashboard(null)
+      return
+    }
+
+    const supabase = createBrowserClient()
+    const channel = supabase
+      .channel(`followup-live-${liveSessionId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'followup_sessions',
+          filter: `id=eq.${liveSessionId}`,
+        },
+        (payload) => {
+          const row = payload.new as Record<string, unknown>
+          // Map DB row to DashboardUpdate
+          const update: DashboardUpdate = {
+            status: (row.status as DashboardUpdate['status']) || 'in_progress',
+            currentModule: (row.current_module as FollowUpModule) || 'greeting',
+            flags: [],
+            medicationStatus: (row.medication_status as MedicationStatus[]) || [],
+            functionalStatus: (row.functional_status as string) || null,
+            functionalDetails: (row.functional_details as string) || null,
+            patientQuestions: (row.patient_questions as string[]) || [],
+            caregiverInfo: (row.caregiver_info as CaregiverInfo) || { isCaregiver: false, name: null, relationship: null },
+          }
+          setLiveDashboard(update)
+        }
+      )
+      .subscribe()
+
+    return () => {
+      supabase.removeChannel(channel)
+    }
+  }, [liveSessionId])
+
+  const activeDashboard = liveDashboard ?? dashboard
+
+  if (!activeDashboard) {
     return (
       <div style={{
         background: '#1e293b',
@@ -92,13 +143,13 @@ export default function ClinicianDashboard({
     )
   }
 
-  const statusColor = dashboard.status === 'in_progress' ? '#22C55E' : '#64748b'
+  const statusColor = activeDashboard.status === 'in_progress' ? '#22C55E' : '#64748b'
 
-  const functionalColor = dashboard.functionalStatus === 'better'
+  const functionalColor = activeDashboard.functionalStatus === 'better'
     ? '#22C55E'
-    : dashboard.functionalStatus === 'worse'
+    : activeDashboard.functionalStatus === 'worse'
       ? '#EF4444'
-      : dashboard.functionalStatus === 'about the same'
+      : activeDashboard.functionalStatus === 'about the same'
         ? '#EAB308'
         : '#64748b'
 
@@ -144,10 +195,10 @@ export default function ClinicianDashboard({
               background: statusColor,
               display: 'inline-block',
             }} />
-            {dashboard.status.replace('_', ' ').toUpperCase()}
+            {activeDashboard.status.replace('_', ' ').toUpperCase()}
           </span>
           <span style={{ color: 'white', fontSize: '14px', fontWeight: 500 }}>
-            {MODULE_LABELS[dashboard.currentModule]}
+            {MODULE_LABELS[activeDashboard.currentModule]}
           </span>
         </div>
       </div>
@@ -169,11 +220,11 @@ export default function ClinicianDashboard({
         }}>
           Medication Status
         </div>
-        {dashboard.medicationStatus.length === 0 ? (
+        {activeDashboard.medicationStatus.length === 0 ? (
           <div style={{ color: '#64748b', fontSize: '13px' }}>Pending</div>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-            {dashboard.medicationStatus.map((med, i) => (
+            {activeDashboard.medicationStatus.map((med, i) => (
               <div key={i} style={{
                 background: '#334155',
                 borderRadius: '8px',
@@ -228,7 +279,7 @@ export default function ClinicianDashboard({
         }}>
           Functional Status
         </div>
-        {dashboard.functionalStatus ? (
+        {activeDashboard.functionalStatus ? (
           <div>
             <span style={{
               display: 'inline-block',
@@ -239,11 +290,11 @@ export default function ClinicianDashboard({
               fontSize: '13px',
               fontWeight: 600,
             }}>
-              {dashboard.functionalStatus.charAt(0).toUpperCase() + dashboard.functionalStatus.slice(1)}
+              {activeDashboard.functionalStatus.charAt(0).toUpperCase() + activeDashboard.functionalStatus.slice(1)}
             </span>
-            {dashboard.functionalDetails && (
+            {activeDashboard.functionalDetails && (
               <div style={{ color: '#94a3b8', fontSize: '13px', marginTop: '8px', lineHeight: '1.5' }}>
-                {dashboard.functionalDetails}
+                {activeDashboard.functionalDetails}
               </div>
             )}
           </div>
@@ -269,11 +320,11 @@ export default function ClinicianDashboard({
         }}>
           Patient Questions
         </div>
-        {dashboard.patientQuestions.length === 0 ? (
+        {activeDashboard.patientQuestions.length === 0 ? (
           <div style={{ color: '#64748b', fontSize: '13px' }}>None</div>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-            {dashboard.patientQuestions.map((q, i) => (
+            {activeDashboard.patientQuestions.map((q, i) => (
               <div key={i} style={{
                 display: 'flex',
                 gap: '8px',
@@ -313,11 +364,11 @@ export default function ClinicianDashboard({
         }}>
           Escalation Flags
         </div>
-        {dashboard.flags.length === 0 ? (
+        {activeDashboard.flags.length === 0 ? (
           <div style={{ color: '#64748b', fontSize: '13px' }}>&mdash;</div>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-            {dashboard.flags.map((flag, i) => {
+            {activeDashboard.flags.map((flag, i) => {
               const tierColor = TIER_COLORS[flag.tier]
               return (
                 <div key={i} style={{
@@ -361,7 +412,7 @@ export default function ClinicianDashboard({
       </div>
 
       {/* Section 6: Caregiver Info */}
-      {dashboard.caregiverInfo.isCaregiver && (
+      {activeDashboard.caregiverInfo.isCaregiver && (
         <div style={{
           background: '#1e293b',
           border: '1px solid #334155',
@@ -393,10 +444,10 @@ export default function ClinicianDashboard({
               <path d="M16 3.13a4 4 0 010 7.75" />
             </svg>
             <span style={{ color: '#60A5FA', fontSize: '13px', fontWeight: 500 }}>
-              {dashboard.caregiverInfo.name || 'Unknown'}
-              {dashboard.caregiverInfo.relationship && (
+              {activeDashboard.caregiverInfo.name || 'Unknown'}
+              {activeDashboard.caregiverInfo.relationship && (
                 <span style={{ color: '#94a3b8', fontWeight: 400 }}>
-                  {' '}({dashboard.caregiverInfo.relationship})
+                  {' '}({activeDashboard.caregiverInfo.relationship})
                 </span>
               )}
             </span>
