@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import ScheduleColumn from './home/ScheduleColumn'
 import NotificationFeed from './home/NotificationFeed'
-import ProviderCommColumn from './home/ProviderCommColumn'
+import MorningBriefing from './command-center/MorningBriefing'
 
 interface PhysicianHomeProps {
   onSelectPatient: (appointmentId: string) => void
@@ -25,14 +25,6 @@ export default function PhysicianHome({ onSelectPatient, onScheduleNew, onSchedu
   const handleNavigateToPatient = (notifId: string) => {
     // In production: look up patient from notification and navigate
     console.log(`Navigate to patient for notification ${notifId}`)
-  }
-
-  const handleOpenThread = (threadId: string) => {
-    console.log(`Open thread ${threadId}`)
-  }
-
-  const handleCreateConsult = () => {
-    console.log('Create consult request')
   }
 
   return (
@@ -63,22 +55,28 @@ export default function PhysicianHome({ onSelectPatient, onScheduleNew, onSchedu
         </div>
       </div>
 
-      {/* Three-column layout */}
+      {/* Three-column layout: Schedule | Morning Briefing | Notifications */}
       <div style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
         <ScheduleColumn
           onSelectPatient={onSelectPatient}
           onScheduleNew={onScheduleNew}
           onScheduleFollowup={onScheduleFollowup}
         />
+        <div style={{
+          flex: 1,
+          borderLeft: '1px solid var(--border)',
+          borderRight: '1px solid var(--border)',
+          overflow: 'auto',
+          padding: '16px',
+          background: 'linear-gradient(180deg, #0f172a 0%, #1e293b 100%)',
+        }}>
+          <MorningBriefing viewMode="my_patients" timeRange="today" />
+        </div>
         <NotificationFeed
           activeFilter={activeFilter}
           onFilterChange={setActiveFilter}
           onAction={handleNotifAction}
           onNavigateToPatient={handleNavigateToPatient}
-        />
-        <ProviderCommColumn
-          onOpenThread={handleOpenThread}
-          onCreateConsult={handleCreateConsult}
         />
       </div>
     </div>

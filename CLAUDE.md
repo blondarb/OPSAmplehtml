@@ -87,7 +87,8 @@ src/
 │   ├── VoiceDrawer.tsx    # Voice & Dictation drawer (Chart Prep, Document)
 │   ├── command-center/    # Command Center Revamp components (5-zone layout)
 │   │   ├── CommandCenterPage.tsx    # Top-level orchestrator
-│   │   ├── MorningBriefing.tsx      # Zone 1: AI briefing card
+│   │   ├── OperationalSummary.tsx   # Zone 1: Practice-wide operational summary
+│   │   ├── MorningBriefing.tsx      # Zone 1 (legacy): AI briefing card
 │   │   ├── StatusBar.tsx            # Zone 2: 8 metric tiles
 │   │   ├── ActionQueue.tsx          # Zone 3: Batch + individual actions
 │   │   ├── PatientQueue.tsx         # Zone 4: Priority patient list
@@ -503,7 +504,7 @@ Comprehensive product playbooks for the 6-card Sevaro Ambulatory demo platform p
 |------|------|----------|
 | `playbooks/00_homepage_hero.md` | Homepage & Platform Shell | `/` |
 | `playbooks/01_my_patients_schedule.md` | My Schedule & Documentation | `/physician` (schedule), `/ehr` (chart) |
-| `playbooks/02_clinician_command_center.md` | Clinician Command Center | `/dashboard` |
+| `playbooks/02_clinician_command_center.md` | Operations Dashboard | `/dashboard` |
 | `playbooks/03_ai_triage.md` | AI-Powered Triage | `/triage` |
 | `playbooks/04_post_visit_agent.md` | AI Follow-Up Agent | `/post-visit`, `/follow-up` |
 | `playbooks/05_sdne.md` | Digital Neurological Exam | `/sdne` |
@@ -554,6 +555,8 @@ When redeploying after changes, use "Redeploy without cache" to ensure fresh bui
 ## Recent Changes
 
 - **Live Follow-Up Agent Phase A: SMS (2026-02-25)**: Implemented real-phone SMS demo for Follow-Up Agent. User enters phone number on conversation page, receives a real Twilio text, replies via SMS, and the clinician dashboard updates in real-time via Supabase Realtime. New files: `twilioClient.ts` (send/validate), `conversationEngine.ts` (shared AI turn logic), `send-sms/route.ts` (initiate), `twilio-sms/route.ts` (webhook), `LiveDemoPanel.tsx` (UI). Migration 031 fixes schema mismatches and adds `followup_phone_sessions` table. Refactored `message/route.ts` to use shared engine. `ClinicianDashboard` now accepts `liveSessionId` prop for Realtime subscription. See `docs/plans/2026-02-25-live-followup-sms-plan.md` for implementation plan.
+
+- **Cockpit/Dashboard Separation (2026-02-25)**: Separated Clinician Cockpit and Operations Dashboard into distinct tools. Cockpit (`/physician`) now has 3 columns: Schedule | Morning Briefing | Notifications — purely "overview of my day" with no inline charting. Dashboard (`/dashboard`) renamed to Operations Dashboard with new Zone 1 Operational Summary (practice-wide metrics for practice managers). Homepage rearranged to 4+3: top row (Clinician Journey) = AI Triage, Clinician Cockpit, Documentation, Digital Neuro Exam; bottom row (Ongoing Care) = Operations Dashboard, Follow-Up Agent, Wearable. Dashboard "My Patients" toggle renamed to "By Provider". See `docs/plans/2026-02-25-cockpit-dashboard-separation-design.md`.
 
 - **Live Follow-Up Agent Design (2026-02-25)**: Design doc for real phone demo — Twilio SMS + OpenAI Realtime voice. User enters phone number, gets a real text, can reply or call back. Dashboard updates in real-time. See `docs/plans/2026-02-25-live-followup-agent-design.md`. Playbook `04_post_visit_agent.md` updated with Phase 1.5 roadmap.
 

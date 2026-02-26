@@ -10,6 +10,8 @@ From the first referral to years of continuous monitoring, this platform reimagi
 
 ## 3. The Problem with "6 Cards in a Grid"
 
+> **Implementation note:** The current build uses **7 cards organized in a 4+3 layout across 2 rows** — Top row (Clinician Journey, 4 cards): AI-Powered Triage, Clinician Cockpit, Documentation, Digital Neuro Exam; Bottom row (Ongoing Care, 3 cards): Operations Dashboard, AI Follow-Up Agent, Wearable Monitoring. See `src/components/homepage/journeyData.ts`.
+
 The original homepage concept was a simple 6-card grid: click a card, see a demo. This works for an engineer reviewing modules, but it fails for the two audiences that matter most:
 
 * **Clinicians** see a disconnected list of tools rather than an integrated workflow. It feels like a tech company's feature list, not a clinic.
@@ -52,6 +54,8 @@ Before the homepage content, the entire site needs a platform shell — a persis
 
 **THIS IS THE KEY UX CHANGE.** Instead of 6 equal cards in a grid, arrange them as a horizontal patient journey timeline — a visual narrative that follows a single patient from referral to long-term monitoring.
 
+> **Implementation note:** The current build renders a **4+3 two-row layout**: Top row (Clinician Journey, 4 cards) = AI-Powered Triage, Clinician Cockpit, Documentation, Digital Neuro Exam; Bottom row (Ongoing Care, 3 cards) = Operations Dashboard, AI Follow-Up Agent, Wearable Monitoring.
+
 **Layout: Horizontal scrolling journey with vertical depth**
 
 ```
@@ -82,6 +86,8 @@ Before the homepage content, the entire site needs a platform shell — a persis
 
 The cards should be reordered to follow the patient journey chronology, not the order they were built.
 
+> **Implementation note:** The current build uses `/physician` for card 2 (not `/ehr`), labeled "Physician Workspace." Card 4 uses `/follow-up` (not `/post-visit`), with a separate patient-facing route at `/follow-up/conversation`.
+
 | Journey Order | Journey Phase | Old Card # | Old Label | New Label | 1-Line Description |
 |---------------|---------------|------------|-----------|-----------|---------------------|
 | 1 | Referral Triage | Card 3 | AI Triage Tool | AI-Powered Triage | "A referral arrives. AI reads it, scores acuity, and routes to the right subspecialist — in seconds." |
@@ -89,7 +95,7 @@ The cards should be reordered to follow the patient journey chronology, not the 
 | 3 | In-Office Exam | Card 5 | SDNE | Digital Neurological Exam | "The exam that remembers everything — quantified, reproducible, trackable over time." |
 | 4 | Post-Visit Follow-Up | Card 4 | Post-Visit AI Agent | AI Follow-Up Agent | "Your AI care coordinator checks in after every visit — before the patient forgets to call." |
 | 5 | Between Visits | Card 6 | Wearable Monitoring | Continuous Wearable Monitoring | "Galaxy Watch + AI turn the months between visits into actionable clinical intelligence." |
-| 6 | The Full Picture | Card 2 | Clinical Dashboard | Clinician Command Center | "Everything in one place — triage queue, alerts, wearable trends, SDNE history, follow-up status." |
+| 6 | The Full Picture | Card 2 | Clinical Dashboard | Operations Dashboard | "Everything in one place — triage queue, alerts, wearable trends, SDNE history, follow-up status." |
 
 **Why this order:**
 
@@ -114,13 +120,14 @@ A clean, centered row of 3-4 key metrics that ground the vision in market realit
 
 A subtle logo bar showing technology partners:
 
-* Anthropic Claude · Samsung · Supabase · Vercel · Apple HealthKit (Phase 2)
+* OpenAI · Samsung · Supabase · Vercel · Apple HealthKit (Phase 2)
+* Note: Production may use different AI providers (see AI Model Flexibility notes in individual card playbooks)
 * This is important for Samsung partnership conversations — they see their brand alongside the platform
 
 **Section: Footer**
 
 * "Built by [Your Name/Company]"
-* "Powered by Anthropic Claude"
+* "Powered by AI" (keep provider-agnostic in branding)
 * Privacy Policy · Terms · Contact
 * "This is a demonstration platform. Not for clinical use."
 
@@ -155,7 +162,7 @@ The current site has no authentication — anyone with the URL can see everythin
 | admin | Everything + admin panel | Product team |
 | clinician | All clinical cards + clinical depth views | Neurologists reviewing the platform |
 | investor | All cards + market data overlays + analytics | Investors and advisors |
-| partner | All cards + technology integration views | Samsung, Anthropic, other partners |
+| partner | All cards + technology integration views | Samsung, AI providers, other partners |
 | demo | Limited read-only view, pre-loaded demo data | General public demo access |
 
 ### 5.3 What's Public vs. What's Gated
@@ -164,6 +171,8 @@ The current site has no authentication — anyone with the URL can see everythin
 |------|--------|
 | Homepage (hero + journey overview + By the Numbers) | Public — no login required |
 | /login, /about | Public |
+> **Implementation note:** The current build uses `/physician` instead of `/ehr` and `/follow-up` instead of `/post-visit`.
+
 | /triage, /ehr, /sdne, /post-visit, /wearable, /dashboard | Protected — login required |
 
 When an unauthenticated user clicks a card on the journey timeline, they are redirected to the login page with a clear message: "Sign in to explore [Card Name]."
@@ -273,6 +282,8 @@ Each journey card should be a glassmorphism-style panel with:
 
 * White background with subtle border (border: 1px solid rgba(15, 23, 42, 0.08))
 * Subtle drop shadow on hover (lift effect)
+> **Implementation note:** Status badges are implemented in `JourneyCard.tsx` with three states: **Live** (emerald), **Building** (amber), **Planned** (slate). Currently all 10 cards are marked `live`.
+
 * A status indicator in the top-right corner: Live / In Development / Planned
 * An icon unique to each card (Lucide React icons):
   * AI-Powered Triage → Brain
@@ -280,7 +291,7 @@ Each journey card should be a glassmorphism-style panel with:
   * Digital Neurological Exam → Scan or Activity
   * AI Follow-Up Agent → MessageSquare
   * Continuous Wearable Monitoring → Watch
-  * Clinician Command Center → LayoutDashboard
+  * Operations Dashboard → LayoutDashboard
 
 ### 6.4 Animations (Subtle, Professional)
 
@@ -347,6 +358,8 @@ Note: @supabase/supabase-js and @supabase/ssr should already be installed.
 
 **2d. Route Protection Middleware**
 - Public routes: /, /login, /about
+> **Implementation note:** Current routes are `/physician` (not `/ehr`) and `/follow-up` (not `/post-visit`). Additional routes include `/patient`, `/patient/historian`, and `/patient/messages`.
+
 - Protected routes: /triage, /sdne, /wearable, /post-visit, /dashboard, /ehr
 - Redirect to /login?redirect={path} when unauthenticated
 
@@ -366,7 +379,9 @@ Note: @supabase/supabase-js and @supabase/ssr should already be installed.
 - Background: white or slate-50
 - Title: "The Patient Journey" + subtitle
 - Horizontal timeline (desktop) / vertical stack (mobile)
-- 6 cards with Lucide icons, status badges, hover lift effects
+- 7 cards with Lucide icons, status badges, hover lift effects arranged in 4+3 layout
+
+> **Implementation note:** The current build uses **7 cards in a 4+3 two-row layout**. Top row (Clinician Journey): AI-Powered Triage, Clinician Cockpit (`/physician`), Documentation (`/ehr`), Digital Neuro Exam (`/sdne`). Bottom row (Ongoing Care): Operations Dashboard (`/dashboard`), AI Follow-Up Agent (`/follow-up`), Wearable Monitoring (`/wearable`). All cards are currently marked `live`.
 
 Card order:
 1. AI-Powered Triage → Brain → /triage → Live

@@ -5,10 +5,10 @@ import Link from 'next/link'
 
 const QUICK_LINKS = [
   { label: 'AI Triage', href: '/triage', color: '#F59E0B' },
-  { label: 'Physician Workspace', href: '/physician', color: '#0D9488' },
+  { label: 'Clinician Cockpit', href: '/physician', color: '#0D9488' },
+  { label: 'Documentation', href: '/ehr', color: '#8B5CF6' },
   { label: 'Digital Neuro Exam', href: '/sdne', color: '#1E40AF' },
-  { label: 'Patient Portal', href: '/patient', color: '#8B5CF6' },
-  { label: 'Post-Visit Follow-Up', href: '/follow-up', color: '#16A34A' },
+  { label: 'Follow-Up Agent', href: '/follow-up', color: '#16A34A' },
   { label: 'Wearable Monitoring', href: '/wearable', color: '#0EA5E9' },
 ]
 

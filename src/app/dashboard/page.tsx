@@ -9,7 +9,7 @@ export default function DashboardPage() {
   return (
     <PlatformShell>
       <FeatureSubHeader
-        title="Command Center"
+        title="Operations Dashboard"
         icon={LayoutDashboard}
         accentColor="#4F46E5"
         showDemo={true}
