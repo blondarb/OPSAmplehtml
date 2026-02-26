@@ -18,24 +18,26 @@ interface DemoNotification {
   time: string
   patientName?: string
   aiDraft?: string
+  clinicalSnippet?: string
+  detailText?: string
   actionLabel: string
   secondaryAction?: string
   filterGroup: string
 }
 
 const DEMO_NOTIFICATIONS: DemoNotification[] = [
-  { id: 'n1', sourceType: 'wearable_alert', priority: 'critical', title: 'Fall detected', body: '2 fall events in 4 hours. Last event 22 min ago.', time: '22 min ago', patientName: 'Linda Martinez', actionLabel: 'View Details', filterGroup: 'urgent' },
-  { id: 'n2', sourceType: 'wearable_alert', priority: 'critical', title: 'Seizure-like activity cluster', body: 'HR spike + accelerometer pattern at 6:14 AM and 7:02 AM.', time: '1 hr ago', patientName: 'James Wilson', actionLabel: 'View Details', filterGroup: 'urgent' },
-  { id: 'n3', sourceType: 'patient_message', priority: 'high', title: 'Question about medication side effects', body: '"I\'ve been experiencing dizziness since starting the new dosage. Should I..."', time: '45 min ago', patientName: 'Maria Garcia', aiDraft: 'Thank you for reaching out about the dizziness. This can be a common side effect when adjusting Topiramate dosage...', actionLabel: 'Review & Send', filterGroup: 'messages' },
+  { id: 'n1', sourceType: 'wearable_alert', priority: 'critical', title: 'Fall detected', body: '2 fall events in 4 hours. Last event 22 min ago.', time: '22 min ago', patientName: 'Linda Martinez', clinicalSnippet: 'BP: 142/88 · HR: 92 · Last fall: 4h ago', detailText: 'Wearable detected 2 fall events in 4 hours. First event at 5:48 AM (moderate impact), second at 9:32 AM (high impact). Patient heart rate elevated post-event at 92 bpm. Automated check-in prompt sent — no response after 5 minutes. Baseline tremor score has increased from 2.1 to 3.4 over the past 9 days.', actionLabel: 'View Details', filterGroup: 'urgent' },
+  { id: 'n2', sourceType: 'wearable_alert', priority: 'critical', title: 'Seizure-like activity cluster', body: 'HR spike + accelerometer pattern at 6:14 AM and 7:02 AM.', time: '1 hr ago', patientName: 'James Wilson', clinicalSnippet: 'HR spike: 145 bpm · Duration: 2m 14s', detailText: 'Accelerometer pattern consistent with tonic-clonic activity detected at 6:14 AM and 7:02 AM. Heart rate peak 145 bpm during first event, 138 bpm during second. Events lasted 2m14s and 1m48s respectively. SpO2 dipped to 91% briefly during first event.', actionLabel: 'View Details', filterGroup: 'urgent' },
+  { id: 'n3', sourceType: 'patient_message', priority: 'high', title: 'Question about medication side effects', body: '"I\'ve been experiencing dizziness since starting the new dosage. Should I..."', time: '45 min ago', patientName: 'Maria Garcia', clinicalSnippet: 'Re: Topiramate 100mg dosage change', aiDraft: 'Thank you for reaching out about the dizziness. This can be a common side effect when adjusting Topiramate dosage...', actionLabel: 'Review & Send', filterGroup: 'messages' },
   { id: 'n4', sourceType: 'patient_message', priority: 'normal', title: 'Appointment rescheduling request', body: '"I need to reschedule my appointment next Thursday. Is Friday available?"', time: '2 hrs ago', patientName: 'Frank Russo', aiDraft: 'We\'d be happy to help reschedule your appointment. I\'ve checked our availability for Friday...', actionLabel: 'Review & Send', filterGroup: 'messages' },
-  { id: 'n5', sourceType: 'consult_request', priority: 'high', title: 'EEG Review Request', body: 'Abnormal EEG findings - requesting your interpretation of temporal lobe activity.', time: '1 hr ago', patientName: 'Helen Park', actionLabel: 'Respond', filterGroup: 'urgent' },
-  { id: 'n6', sourceType: 'incomplete_doc', priority: 'normal', title: 'Unsigned note (2 days overdue)', body: 'Visit on Feb 22 - Assessment and Plan sections missing.', time: '2 days', patientName: 'Robert Chen', actionLabel: 'Complete Now', filterGroup: 'tasks' },
+  { id: 'n5', sourceType: 'consult_request', priority: 'high', title: 'EEG Review Request', body: 'Abnormal EEG findings - requesting your interpretation of temporal lobe activity.', time: '1 hr ago', patientName: 'Helen Park', clinicalSnippet: 'Left temporal sharp waves · Abnormal', actionLabel: 'Respond', filterGroup: 'urgent' },
+  { id: 'n6', sourceType: 'incomplete_doc', priority: 'normal', title: 'Unsigned note (2 days overdue)', body: 'Visit on Feb 22 - Assessment and Plan sections missing.', time: '2 days', patientName: 'Robert Chen', clinicalSnippet: 'Missing: Assessment, Plan sections', detailText: 'Visit on Feb 22 with Robert Chen. Chief complaint: Headache evaluation. HPI and ROS completed. Physical exam documented. Assessment and Plan sections are empty. Note has been unsigned for 2 days.', actionLabel: 'Complete Now', filterGroup: 'tasks' },
   { id: 'n7', sourceType: 'incomplete_doc', priority: 'normal', title: 'Unsigned note', body: 'Follow-up visit on Feb 21 - awaiting signature.', time: '3 days', patientName: 'Helen Park', actionLabel: 'Complete Now', filterGroup: 'tasks' },
-  { id: 'n8', sourceType: 'lab_result', priority: 'normal', title: 'MRI Brain results ready', body: 'Completed Feb 23 - impression pending physician review.', time: '3 hrs ago', patientName: 'Sarah Kim', actionLabel: 'Review', filterGroup: 'tasks' },
-  { id: 'n9', sourceType: 'refill_request', priority: 'normal', title: 'Topiramate 50mg refill request', body: 'Pharmacy-forwarded. 90-day supply. Last filled Dec 2025.', time: '4 hrs ago', patientName: 'James Wilson', actionLabel: 'Approve', secondaryAction: 'Deny', filterGroup: 'tasks' },
+  { id: 'n8', sourceType: 'lab_result', priority: 'normal', title: 'MRI Brain results ready', body: 'Completed Feb 23 - impression pending physician review.', time: '3 hrs ago', patientName: 'Sarah Kim', clinicalSnippet: 'MRI Brain · Completed Feb 23', detailText: 'MRI Brain without contrast completed Feb 23 at Regional Medical Center. Impression pending physician review. Prior MRI (Nov 2025) showed no significant abnormalities.', actionLabel: 'Review', filterGroup: 'tasks' },
+  { id: 'n9', sourceType: 'refill_request', priority: 'normal', title: 'Topiramate 50mg refill request', body: 'Pharmacy-forwarded. 90-day supply. Last filled Dec 2025.', time: '4 hrs ago', patientName: 'James Wilson', clinicalSnippet: 'Topiramate 50mg · 90-day · Last: Dec 2025', actionLabel: 'Approve', secondaryAction: 'Deny', filterGroup: 'tasks' },
   { id: 'n10', sourceType: 'patient_message', priority: 'normal', title: 'Thank you note', body: '"Thank you for explaining the treatment plan so clearly. I feel much better..."', time: '5 hrs ago', patientName: 'David Thompson', actionLabel: 'Review & Send', filterGroup: 'messages' },
-  { id: 'n11', sourceType: 'care_gap', priority: 'normal', title: 'PHQ-9 reassessment overdue', body: 'Last completed Sep 2025 (3 months overdue). Score was 12 (moderate).', time: 'Overdue', patientName: 'Maria Garcia', actionLabel: 'Address', filterGroup: 'tasks' },
-  { id: 'n12', sourceType: 'incomplete_doc', priority: 'low', title: 'Follow-up not scheduled', body: 'Treatment plan recommended 3-month follow-up but no appointment exists.', time: '5 days', patientName: 'Frank Russo', actionLabel: 'Schedule', filterGroup: 'tasks' },
+  { id: 'n11', sourceType: 'care_gap', priority: 'normal', title: 'PHQ-9 reassessment overdue', body: 'Last completed Sep 2025 (3 months overdue). Score was 12 (moderate).', time: 'Overdue', patientName: 'Maria Garcia', clinicalSnippet: 'PHQ-9 · Last: Sep 2025 (score: 12) · 90d overdue', actionLabel: 'Address', filterGroup: 'tasks' },
+  { id: 'n12', sourceType: 'incomplete_doc', priority: 'low', title: 'Follow-up not scheduled', body: 'Treatment plan recommended 3-month follow-up but no appointment exists.', time: '5 days', patientName: 'Frank Russo', clinicalSnippet: '3-month follow-up recommended · None scheduled', actionLabel: 'Schedule', filterGroup: 'tasks' },
 ]
 
 const FILTER_TABS = [
@@ -76,6 +78,7 @@ function getSourceIcon(sourceType: string) {
 export default function NotificationFeed({ activeFilter, onFilterChange, onAction, onNavigateToPatient }: NotificationFeedProps) {
   const [hoveredId, setHoveredId] = useState<string | null>(null)
   const [expandedDraft, setExpandedDraft] = useState<string | null>(null)
+  const [expandedDetail, setExpandedDetail] = useState<string | null>(null)
   const [hoveredTab, setHoveredTab] = useState<string | null>(null)
 
   const filtered = activeFilter === 'all'
@@ -83,7 +86,7 @@ export default function NotificationFeed({ activeFilter, onFilterChange, onActio
     : DEMO_NOTIFICATIONS.filter(n => n.filterGroup === activeFilter)
 
   return (
-    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', borderRight: '1px solid var(--border)', background: 'var(--bg-white)', minWidth: 0 }}>
+    <div style={{ display: 'flex', flexDirection: 'column', background: 'var(--bg-white)', height: '100%' }}>
       {/* Filter tabs */}
       <div style={{ display: 'flex', gap: '4px', padding: '12px 16px', borderBottom: '1px solid var(--border)' }}>
         {FILTER_TABS.map(tab => {
@@ -158,6 +161,22 @@ export default function NotificationFeed({ activeFilter, onFilterChange, onActio
                 )}
                 <p style={{ fontSize: '12px', color: 'var(--text-muted)', margin: 0, lineHeight: 1.4 }}>{notif.body}</p>
 
+                {/* Clinical snippet */}
+                {notif.clinicalSnippet && (
+                  <div style={{
+                    marginTop: '4px', padding: '4px 8px',
+                    borderRadius: '4px', background: 'var(--bg-gray)',
+                    fontSize: '11px', fontWeight: 500, color: 'var(--text-primary)',
+                    fontFamily: 'monospace',
+                    display: 'flex', alignItems: 'center', gap: '6px',
+                  }}>
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke={accent} strokeWidth="2">
+                      <path d="M22 12h-4l-3 9L9 3l-3 9H2"/>
+                    </svg>
+                    {notif.clinicalSnippet}
+                  </div>
+                )}
+
                 {/* AI Draft preview for patient messages */}
                 {notif.aiDraft && (
                   <div style={{ marginTop: '6px' }}>
@@ -177,6 +196,31 @@ export default function NotificationFeed({ activeFilter, onFilterChange, onActio
                         fontSize: '12px', color: '#115E59', lineHeight: 1.5,
                       }}>
                         {notif.aiDraft}
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Expandable detail section */}
+                {notif.detailText && (
+                  <div style={{ marginTop: '6px' }}>
+                    <button
+                      onClick={() => setExpandedDetail(expandedDetail === notif.id ? null : notif.id)}
+                      style={{
+                        fontSize: '11px', fontWeight: 600, color: 'var(--text-muted)',
+                        background: 'none', border: 'none', padding: 0, cursor: 'pointer',
+                        display: 'flex', alignItems: 'center', gap: '4px',
+                      }}
+                    >
+                      {expandedDetail === notif.id ? 'Less detail \u25B4' : 'More detail \u25BE'}
+                    </button>
+                    {expandedDetail === notif.id && (
+                      <div style={{
+                        marginTop: '4px', padding: '8px 10px', borderRadius: '6px',
+                        background: '#F8FAFC', border: '1px solid var(--border)',
+                        fontSize: '12px', color: 'var(--text-primary)', lineHeight: 1.5,
+                      }}>
+                        {notif.detailText}
                       </div>
                     )}
                   </div>

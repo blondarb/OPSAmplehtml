@@ -1432,6 +1432,43 @@ export default function ClinicalNote({
         />
 
         {/* Main Content Area - Switch between Cockpit, Appointments, and Chart view */}
+        <div style={{ display: 'flex', flexDirection: 'column', flex: 1, overflow: 'hidden' }}>
+        {/* Breadcrumb bar: shown when navigated away from cockpit, only if cockpit was the landing view */}
+        {viewMode !== 'cockpit' && initialViewMode === 'cockpit' && (
+          <div style={{
+            padding: '8px 16px',
+            borderBottom: '1px solid var(--border)',
+            display: 'flex', alignItems: 'center', gap: '8px',
+            background: 'var(--bg-white)',
+          }}>
+            <button
+              onClick={() => setViewMode('cockpit')}
+              style={{
+                background: 'none', border: 'none', cursor: 'pointer',
+                color: 'var(--text-muted)', padding: '2px',
+                display: 'flex', alignItems: 'center',
+              }}
+              title="Back to Cockpit"
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <polyline points="15 18 9 12 15 6"/>
+              </svg>
+            </button>
+            <button
+              onClick={() => setViewMode('cockpit')}
+              style={{
+                background: 'none', border: 'none', cursor: 'pointer',
+                color: '#0D9488', fontSize: '13px', fontWeight: 500, padding: 0,
+              }}
+            >
+              Clinical Cockpit
+            </button>
+            <span style={{ color: 'var(--text-muted)', fontSize: '13px' }}>&gt;</span>
+            <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)' }}>
+              {patient ? `${patient.first_name || ''} ${patient.last_name || ''}`.trim() || patient.name || 'Patient' : 'Patient'}
+            </span>
+          </div>
+        )}
         {viewMode === 'cockpit' ? (
           <PhysicianHome
             onSelectPatient={(aptId) => {
@@ -1527,6 +1564,7 @@ export default function ClinicalNote({
             />
           </>
         )}
+        </div>
       </div>
 
       {aiDrawerOpen && (
