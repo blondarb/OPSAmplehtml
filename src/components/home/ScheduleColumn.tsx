@@ -1,11 +1,13 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
+import { Calendar } from 'lucide-react'
 
 interface ScheduleColumnProps {
   onSelectPatient: (appointmentId: string) => void
   onScheduleNew: () => void
   onScheduleFollowup: () => void
+  onPrepPatient?: (appointmentId: string) => void
 }
 
 // Demo data for today's schedule
@@ -19,8 +21,6 @@ const DEMO_APPOINTMENTS = [
   { id: 'apt-7', time: '2:15 PM', name: 'Helen Park', type: 'Follow-up', reason: 'Epilepsy med review', prepStatus: 'none', incompletePrior: true },
   { id: 'apt-8', time: '3:00 PM', name: 'Frank Russo', type: 'Follow-up', reason: 'Essential tremor', prepStatus: 'done', incompletePrior: false },
 ]
-
-const WEEKDAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri']
 
 function getTypeBadgeStyle(type: string) {
   switch (type) {
@@ -49,10 +49,127 @@ function getPrepLabel(status: string) {
   }
 }
 
-export default function ScheduleColumn({ onSelectPatient, onScheduleNew, onScheduleFollowup }: ScheduleColumnProps) {
+/** Get Monday of the week containing a given date */
+function getMonday(d: Date): Date {
+  const date = new Date(d)
+  const day = date.getDay() // 0=Sun..6=Sat
+  const diff = day === 0 ? -6 : 1 - day // if Sunday, go back 6; else go to Monday
+  date.setDate(date.getDate() + diff)
+  date.setHours(0, 0, 0, 0)
+  return date
+}
+
+/** Format as "Feb 17" */
+function shortDate(d: Date): string {
+  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+}
+
+/** Days in a given month (1-indexed) */
+function daysInMonth(year: number, month: number): number {
+  return new Date(year, month + 1, 0).getDate()
+}
+
+/** What day-of-week does the 1st of a month fall on? 0=Sun..6=Sat */
+function firstDayOfMonth(year: number, month: number): number {
+  return new Date(year, month, 1).getDay()
+}
+
+const DAY_LABELS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri']
+const MONTH_NAMES = ['January', 'February', 'March', 'April', 'May', 'June',
+  'July', 'August', 'September', 'October', 'November', 'December']
+
+export default function ScheduleColumn({ onSelectPatient, onScheduleNew, onScheduleFollowup, onPrepPatient }: ScheduleColumnProps) {
   const [hoveredId, setHoveredId] = useState<string | null>(null)
-  const today = new Date()
-  const todayDayIndex = Math.min(today.getDay() - 1, 4) // Mon=0..Fri=4
+  const [weekOffset, setWeekOffset] = useState(0)
+  const [showMonthGrid, setShowMonthGrid] = useState(false)
+
+  const today = useMemo(() => {
+    const d = new Date()
+    d.setHours(0, 0, 0, 0)
+    return d
+  }, [])
+
+  // Calendar month state (initialized to current month)
+  const [displayMonth, setDisplayMonth] = useState(today.getMonth())
+  const [displayYear, setDisplayYear] = useState(today.getFullYear())
+
+  // Compute the Monday of the displayed week
+  const currentMonday = useMemo(() => getMonday(today), [today])
+  const displayMonday = useMemo(() => {
+    const d = new Date(currentMonday)
+    d.setDate(d.getDate() + weekOffset * 7)
+    return d
+  }, [currentMonday, weekOffset])
+
+  // Build weekDays array (Mon-Fri)
+  const weekDays = useMemo(() => Array.from({ length: 5 }, (_, i) => {
+    const d = new Date(displayMonday)
+    d.setDate(d.getDate() + i)
+    return {
+      label: DAY_LABELS[i],
+      dateNum: d.getDate(),
+      isToday: d.getTime() === today.getTime(),
+      fullDate: d,
+    }
+  }), [displayMonday, today])
+
+  // Week range label
+  const isCurrentWeek = weekOffset === 0
+  const weekFriday = new Date(displayMonday)
+  weekFriday.setDate(weekFriday.getDate() + 4)
+
+  const weekLabel = isCurrentWeek
+    ? `Today \u00B7 ${DEMO_APPOINTMENTS.length} patients`
+    : `${shortDate(displayMonday)} week \u00B7 ${DEMO_APPOINTMENTS.length} patients`
+
+  const weekSublabel = isCurrentWeek
+    ? today.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+    : `${shortDate(displayMonday)} \u2013 ${shortDate(weekFriday)}`
+
+  // --- Mini-month helpers ---
+  const calendarCells = useMemo(() => {
+    const totalDays = daysInMonth(displayYear, displayMonth)
+    const startDay = firstDayOfMonth(displayYear, displayMonth) // 0=Sun
+    const cells: (number | null)[] = []
+    for (let i = 0; i < startDay; i++) cells.push(null)
+    for (let d = 1; d <= totalDays; d++) cells.push(d)
+    return cells
+  }, [displayYear, displayMonth])
+
+  function prevMonth() {
+    setDisplayMonth(m => {
+      if (m === 0) { setDisplayYear(y => y - 1); return 11 }
+      return m - 1
+    })
+  }
+  function nextMonth() {
+    setDisplayMonth(m => {
+      if (m === 11) { setDisplayYear(y => y + 1); return 0 }
+      return m + 1
+    })
+  }
+
+  /** Click a day in the month grid: jump to that day's week */
+  function handleDayClick(dayNum: number) {
+    const clicked = new Date(displayYear, displayMonth, dayNum)
+    const clickedMonday = getMonday(clicked)
+    const diffMs = clickedMonday.getTime() - currentMonday.getTime()
+    const diffWeeks = Math.round(diffMs / (7 * 24 * 60 * 60 * 1000))
+    setWeekOffset(diffWeeks)
+    setShowMonthGrid(false)
+  }
+
+  function isTodayCell(dayNum: number): boolean {
+    return displayYear === today.getFullYear()
+      && displayMonth === today.getMonth()
+      && dayNum === today.getDate()
+  }
+
+  /** Is a given day a weekday (Mon-Fri)? Used to show teal dot. */
+  function isWeekday(dayNum: number): boolean {
+    const d = new Date(displayYear, displayMonth, dayNum).getDay()
+    return d >= 1 && d <= 5
+  }
 
   return (
     <div style={{
@@ -60,34 +177,181 @@ export default function ScheduleColumn({ onSelectPatient, onScheduleNew, onSched
       borderRight: '1px solid var(--border)', background: 'var(--bg-white)',
       minWidth: '260px', maxWidth: '320px', width: '280px',
     }}>
-      {/* Week strip */}
+      {/* Week strip with navigation arrows */}
       <div style={{
-        display: 'flex', gap: '4px', padding: '12px 16px 8px',
+        display: 'flex', alignItems: 'center', gap: '2px', padding: '12px 8px 8px',
         borderBottom: '1px solid var(--border)',
       }}>
-        {WEEKDAYS.map((day, i) => (
-          <div key={day} style={{
-            flex: 1, textAlign: 'center', padding: '6px 0', borderRadius: '8px',
-            fontSize: '12px', fontWeight: 600,
-            background: i === todayDayIndex ? '#0D9488' : 'transparent',
-            color: i === todayDayIndex ? 'white' : 'var(--text-muted)',
-            cursor: 'pointer', transition: 'all 0.2s',
-          }}>
-            <div>{day}</div>
-            <div style={{ fontSize: '14px', fontWeight: 700, marginTop: '2px' }}>
-              {today.getDate() - todayDayIndex + i}
+        {/* Prev week arrow */}
+        <button
+          onClick={() => setWeekOffset(w => w - 1)}
+          aria-label="Previous week"
+          style={{
+            background: 'none', border: 'none', cursor: 'pointer',
+            padding: '4px', display: 'flex', alignItems: 'center', justifyContent: 'center',
+            color: '#9CA3AF', flexShrink: 0,
+          }}
+        >
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+            <polyline points="15 18 9 12 15 6" />
+          </svg>
+        </button>
+
+        {/* Day cells */}
+        <div style={{ display: 'flex', gap: '4px', flex: 1 }}>
+          {weekDays.map((day) => (
+            <div key={day.label + day.dateNum} style={{
+              flex: 1, textAlign: 'center', padding: '6px 0', borderRadius: '8px',
+              fontSize: '12px', fontWeight: 600,
+              background: day.isToday ? '#0D9488' : 'transparent',
+              color: day.isToday ? 'white' : 'var(--text-muted)',
+              transition: 'all 0.2s',
+            }}>
+              <div>{day.label}</div>
+              <div style={{ fontSize: '14px', fontWeight: 700, marginTop: '2px' }}>
+                {day.dateNum}
+              </div>
             </div>
-          </div>
-        ))}
+          ))}
+        </div>
+
+        {/* Next week arrow */}
+        <button
+          onClick={() => setWeekOffset(w => w + 1)}
+          aria-label="Next week"
+          style={{
+            background: 'none', border: 'none', cursor: 'pointer',
+            padding: '4px', display: 'flex', alignItems: 'center', justifyContent: 'center',
+            color: '#9CA3AF', flexShrink: 0,
+          }}
+        >
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+            <polyline points="9 18 15 12 9 6" />
+          </svg>
+        </button>
       </div>
 
-      {/* Today label */}
-      <div style={{ padding: '12px 16px 4px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+      {/* Today pill (only when not on current week) */}
+      {!isCurrentWeek && (
+        <div style={{ display: 'flex', justifyContent: 'center', padding: '6px 0 0' }}>
+          <button
+            onClick={() => setWeekOffset(0)}
+            style={{
+              background: 'transparent', border: '1px solid #0D9488',
+              color: '#0D9488', fontSize: '11px', fontWeight: 600,
+              padding: '3px 14px', borderRadius: '12px', cursor: 'pointer',
+              transition: 'all 0.15s',
+            }}
+          >
+            Today
+          </button>
+        </div>
+      )}
+
+      {/* Month view toggle */}
+      <div style={{ display: 'flex', justifyContent: 'center', padding: '6px 0 0' }}>
+        <button
+          onClick={() => {
+            setShowMonthGrid(v => !v)
+            // Reset calendar to current month when opening
+            if (!showMonthGrid) {
+              setDisplayMonth(today.getMonth())
+              setDisplayYear(today.getFullYear())
+            }
+          }}
+          style={{
+            display: 'flex', alignItems: 'center', gap: '4px',
+            background: showMonthGrid ? '#F0FDFA' : 'transparent',
+            border: showMonthGrid ? '1px solid #99F6E4' : '1px solid transparent',
+            color: showMonthGrid ? '#0D9488' : '#9CA3AF',
+            fontSize: '11px', fontWeight: 600,
+            padding: '4px 10px', borderRadius: '6px', cursor: 'pointer',
+            transition: 'all 0.15s',
+          }}
+        >
+          <Calendar size={13} />
+          {showMonthGrid ? 'Hide calendar' : 'Month view'}
+        </button>
+      </div>
+
+      {/* Mini-month calendar grid */}
+      {showMonthGrid && (
+        <div style={{ padding: '8px 12px 4px' }}>
+          {/* Month header with nav */}
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' }}>
+            <button onClick={prevMonth} aria-label="Previous month" style={{
+              background: 'none', border: 'none', cursor: 'pointer', padding: '2px',
+              color: '#9CA3AF', display: 'flex', alignItems: 'center',
+            }}>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <polyline points="15 18 9 12 15 6" />
+              </svg>
+            </button>
+            <span style={{ fontSize: '12px', fontWeight: 700, color: 'var(--text-primary)' }}>
+              {MONTH_NAMES[displayMonth]} {displayYear}
+            </span>
+            <button onClick={nextMonth} aria-label="Next month" style={{
+              background: 'none', border: 'none', cursor: 'pointer', padding: '2px',
+              color: '#9CA3AF', display: 'flex', alignItems: 'center',
+            }}>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <polyline points="9 18 15 12 9 6" />
+              </svg>
+            </button>
+          </div>
+
+          {/* Weekday headers */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', textAlign: 'center' }}>
+            {['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'].map(d => (
+              <div key={d} style={{ fontSize: '10px', fontWeight: 600, color: '#9CA3AF', padding: '2px 0' }}>{d}</div>
+            ))}
+          </div>
+
+          {/* Day cells */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', textAlign: 'center' }}>
+            {calendarCells.map((cell, idx) => (
+              <div key={idx} style={{ padding: '1px' }}>
+                {cell !== null ? (
+                  <button
+                    onClick={() => handleDayClick(cell)}
+                    style={{
+                      width: '28px', height: '28px', borderRadius: '50%',
+                      border: 'none', cursor: 'pointer',
+                      fontSize: '11px', fontWeight: isTodayCell(cell) ? 700 : 500,
+                      background: isTodayCell(cell) ? '#0D9488' : 'transparent',
+                      color: isTodayCell(cell) ? 'white' : 'var(--text-primary)',
+                      display: 'flex', flexDirection: 'column',
+                      alignItems: 'center', justifyContent: 'center',
+                      position: 'relative',
+                      transition: 'background 0.1s',
+                    }}
+                  >
+                    {cell}
+                    {/* Teal dot for weekdays (Mon-Fri) indicating appointments */}
+                    {isWeekday(cell) && !isTodayCell(cell) && (
+                      <span style={{
+                        position: 'absolute', bottom: '2px',
+                        width: '3px', height: '3px', borderRadius: '50%',
+                        background: '#0D9488',
+                      }} />
+                    )}
+                  </button>
+                ) : (
+                  <span style={{ width: '28px', height: '28px', display: 'inline-block' }} />
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Week label */}
+      <div style={{ padding: '8px 16px 4px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <span style={{ fontSize: '13px', fontWeight: 700, color: 'var(--text-primary)' }}>
-          Today &middot; {DEMO_APPOINTMENTS.length} patients
+          {weekLabel}
         </span>
         <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
-          {today.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+          {weekSublabel}
         </span>
       </div>
 
@@ -105,9 +369,10 @@ export default function ScheduleColumn({ onSelectPatient, onScheduleNew, onSched
               padding: '10px 12px', borderRadius: '10px', marginBottom: '4px',
               background: hoveredId === apt.id ? 'var(--bg-gray)' : 'transparent',
               cursor: 'pointer', transition: 'background 0.15s',
+              position: 'relative',
             }}
           >
-            {/* Top row: time + name + prep dot */}
+            {/* Top row: time + name + (prep button on hover) + prep dot */}
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
               <span style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-muted)', minWidth: '60px' }}>
                 {apt.time}
@@ -115,6 +380,25 @@ export default function ScheduleColumn({ onSelectPatient, onScheduleNew, onSched
               <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)', flex: 1 }}>
                 {apt.name}
               </span>
+              {/* Quick Prep button: visible on hover when prep is not done */}
+              {apt.prepStatus !== 'done' && hoveredId === apt.id && onPrepPatient && (
+                <span
+                  role="button"
+                  tabIndex={0}
+                  onClick={(e) => { e.stopPropagation(); onPrepPatient(apt.id) }}
+                  onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.stopPropagation(); onPrepPatient(apt.id) } }}
+                  style={{
+                    fontSize: '10px', fontWeight: 700,
+                    padding: '2px 8px', borderRadius: '6px',
+                    background: '#F0FDFA', color: '#0D9488',
+                    border: '1px solid #99F6E4',
+                    cursor: 'pointer', whiteSpace: 'nowrap',
+                    transition: 'all 0.1s', flexShrink: 0,
+                  }}
+                >
+                  Prep
+                </span>
+              )}
               <span title={getPrepLabel(apt.prepStatus)} style={{
                 width: '8px', height: '8px', borderRadius: '50%',
                 background: getPrepDotColor(apt.prepStatus), flexShrink: 0,

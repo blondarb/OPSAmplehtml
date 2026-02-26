@@ -78,12 +78,12 @@ src/
 │   ├── SmartScalesSection.tsx # Clinical scales based on selected conditions
 │   ├── TopNav.tsx         # Navigation with queue tabs, timer, PHI toggle
 │   ├── UrgencyBanner.tsx  # Persistent urgency banner below TopNav
-│   ├── PhysicianHome.tsx  # Clinical Cockpit three-column home view
+│   ├── PhysicianHome.tsx  # Clinical Cockpit two-column home view (Schedule + Briefing, notification drawer)
 │   ├── VoiceDrawer.tsx    # Voice & Dictation drawer (Chart Prep, Document)
 │   ├── command-center/    # Command Center Revamp components (5-zone layout)
 │   │   ├── CommandCenterPage.tsx    # Top-level orchestrator
 │   │   ├── OperationalSummary.tsx   # Zone 1: Practice-wide operational summary
-│   │   ├── MorningBriefing.tsx      # Zone 1 (legacy): AI briefing card
+│   │   ├── MorningBriefing.tsx      # Cockpit time-phased briefing (Morning/Midday/End of Day, local fallback data)
 │   │   ├── StatusBar.tsx            # Zone 2: 8 metric tiles
 │   │   ├── ActionQueue.tsx          # Zone 3: Batch + individual actions
 │   │   ├── PatientQueue.tsx         # Zone 4: Priority patient list
@@ -102,8 +102,8 @@ src/
 │   │   ├── RoleToggle.tsx           # My Patients / All Patients toggle
 │   │   └── TimeRangeSelector.tsx    # Date display + range dropdown
 │   ├── home/              # Clinical Cockpit sub-components
-│   │   ├── ScheduleColumn.tsx     # Today's schedule with prep status
-│   │   ├── NotificationFeed.tsx   # Priority-sorted notification cards
+│   │   ├── ScheduleColumn.tsx     # Schedule with week-strip nav, mini-month grid, prep badges
+│   │   ├── NotificationFeed.tsx   # Enhanced notification cards with inline clinical data, filter tabs
 │   │   └── ProviderCommColumn.tsx # Team chat + quick consult
 │   └── mobile/            # Mobile-specific components
 │       ├── MobileChartView.tsx        # Main mobile chart interface
@@ -270,13 +270,11 @@ The OpenAI API key can be stored securely in Supabase `app_settings` table or as
     - **API**: `/api/plans?diagnosisId=` accepts both diagnosis IDs (`epilepsy-management`) and ICD-10 codes (`G40.909`)
 
 13. **Clinical Cockpit** (physician home view):
-    - Three-column layout: Schedule | Notification Feed | Provider Communication
-    - **Urgency Banner**: Persistent bar below TopNav showing critical item counts (alerts, messages, docs, consults)
-    - **Schedule Column**: Today's patients with prep status, type badges, incomplete doc warnings
-    - **Notification Feed**: Priority-sorted cards for 9 notification types with filter tabs (All/Urgent/Messages/Tasks)
-    - **Provider Communication**: Team chat threads + quick consult form + consult history
-    - **AI Draft Responses**: Auto-generated draft replies for patient messages (always draft, never auto-send)
-    - **Incomplete Doc Detection**: Detects unsigned notes, missing Assessment/Plan, visits without notes
+    - Two-column layout: Schedule (~380px) | Time-Phased Briefing (flex), with notification slide-over drawer
+    - **Schedule Column**: Week-strip navigation (Mon–Fri) with prev/next arrows, toggleable mini-month grid with appointment dots, "Today" pill to jump back. Patient cards show time, name, type badge (New/Follow-up/Urgent), chief complaint, prep status dot (green/yellow/red), and alert icons.
+    - **Time-Phased Briefing**: Adapts to time of day — Morning Briefing (sunrise icon, amber→teal gradient), Midday Update (sun icon, teal→blue), End of Day Summary (sunset icon, indigo→purple). Phase-specific narratives with "Regenerate" button and collapsible "Show reasoning" chain. Uses local demo fallback data (no API dependency).
+    - **Notification Drawer**: Bell icon with badge count opens a 380px slide-over panel. Filter tabs (All/Urgent/Messages/Tasks) with counts. Enhanced notification cards with inline clinical data (vitals, wearable readings in code blocks), expandable detail sections, severity badges (CRITICAL/HIGH/MEDIUM/LOW), and "View Details" buttons.
+    - **Navigation**: Breadcrumb bar ("< Home | Clinician Cockpit | Demo") persists across view modes. Home icon in sidebar returns to cockpit view.
     - **Badge System**: IconSidebar badges for unread notifications by category
 
 14. **Command Center Revamp** (`/dashboard` — 5-zone layout):
@@ -542,7 +540,7 @@ When redeploying after changes, use "Redeploy without cache" to ensure fresh bui
 
 ## Recent Changes
 
-- **Cockpit/Dashboard Separation (2026-02-25)**: Separated Clinician Cockpit and Operations Dashboard into distinct tools. Cockpit (`/physician`) now has 3 columns: Schedule | Morning Briefing | Notifications — purely "overview of my day" with no inline charting. Dashboard (`/dashboard`) renamed to Operations Dashboard with new Zone 1 Operational Summary (practice-wide metrics for practice managers). Homepage rearranged to 4+3: top row (Clinician Journey) = AI Triage, Clinician Cockpit, Documentation, Digital Neuro Exam; bottom row (Ongoing Care) = Operations Dashboard, Follow-Up Agent, Wearable. Dashboard "My Patients" toggle renamed to "By Provider". See `docs/plans/2026-02-25-cockpit-dashboard-separation-design.md`.
+- **Cockpit/Dashboard Separation (2026-02-25)**: Separated Clinician Cockpit and Operations Dashboard into distinct tools. Cockpit (`/physician`) redesigned as a 2-column layout: Schedule (~380px, with week-strip nav, mini-month grid, prep badges) | Time-Phased Briefing (Morning/Midday/End of Day with phase-specific narratives, icons, gradients). Notifications moved to a bell-triggered 380px slide-over drawer with enhanced cards showing inline clinical data (vitals, wearable readings). Breadcrumb bar ("< Home | Clinician Cockpit | Demo") added for navigation. Dashboard (`/dashboard`) renamed to Operations Dashboard with new Zone 1 Operational Summary. Homepage rearranged to 4+3 layout. See `docs/plans/2026-02-25-cockpit-dashboard-separation-design.md`.
 
 - **Live Follow-Up Agent Design (2026-02-25)**: Design doc for real phone demo — Twilio SMS + OpenAI Realtime voice. User enters phone number, gets a real text, can reply or call back. Dashboard updates in real-time. See `docs/plans/2026-02-25-live-followup-agent-design.md`. Playbook `04_post_visit_agent.md` updated with Phase 1.5 roadmap.
 
