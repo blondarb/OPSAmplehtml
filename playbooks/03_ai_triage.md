@@ -409,6 +409,8 @@ New optional fields in request body:
 | Supabase | Database storage, auth (future), real-time subscriptions (future) |
 | Vercel | Frontend hosting and serverless API routes |
 
+> **Implementation note:** The extraction and fusion endpoints (`/api/triage/extract`, `/api/triage/fuse`) currently use `max_completion_tokens: 3000`, not `4000` as stated above.
+
 ### 5.5 Data Flow
 
 ```
@@ -454,6 +456,9 @@ User provides input (paste text OR upload file(s))
 │                                                     │
 │ File upload?                                        │
 │   → Parse file (pdf-parse / mammoth / readFile)     │
+│                                                     │
+│   > **Implementation note:** The actual codebase    │
+│   > uses `unpdf` (not `pdf-parse`) for PDF parsing. │
 │   → Extract raw text                                │
 │                                                     │
 │ Multiple items (batch)?                             │
@@ -464,6 +469,10 @@ User provides input (paste text OR upload file(s))
 │   → All selected notes extracted individually first  │
 │   → POST /api/triage/fuse combines them             │
 │   → Fused extraction proceeds to Stage 2            │
+│                                                     │
+│   > **Implementation note:** FusionControls exists  │
+│   > as a component but is not yet wired into the    │
+│   > triage page UI.                                 │
 └─────────────────────────────────────────────────────┘
         ↓
 STAGE 1: PRE-EXTRACTION (POST /api/triage/extract)
@@ -498,6 +507,8 @@ BatchQueuePanel shows all results sorted by tier severity
   - Each result expandable to full triage detail
 ```
 
+> **Implementation note:** The component used in the triage page is `BatchResultsPanel`, not `BatchQueuePanel`. Both files exist, but `BatchResultsPanel` is the one imported and rendered.
+
 ---
 
 ## 6. AI & Algorithm Design
@@ -526,7 +537,9 @@ Rationale:
 - Long context window handles detailed referral notes and full clinical documents
 - Existing integration with the project's OpenAI API infrastructure
 
-> **Implementation note (February 2026):** The original playbook specified Claude/Anthropic. The production implementation uses OpenAI gpt-5.2 for all triage, extraction, and fusion tasks due to existing API infrastructure. The system prompt, scoring algorithm, and clinical logic are model-agnostic — they work identically with any capable LLM. Model swap requires only changing the API call in the route handlers.
+> **Implementation note (February 2026):** The original playbook specified Claude/Anthropic. The current demo implementation uses OpenAI gpt-5.2 for all triage, extraction, and fusion tasks due to existing API infrastructure. The system prompt, scoring algorithm, and clinical logic are model-agnostic — they work identically with any capable LLM. Model swap requires only changing the API call in the route handlers.
+
+> **🔄 AI Model Flexibility (Platform Policy):** The demo uses OpenAI models, but the production platform is designed to be **model-agnostic**. Production deployments may use different providers optimized for specific capabilities: **Deepgram** (Nova-3 Medical) for clinical speech recognition and transcription, **Anthropic Claude** for complex clinical reasoning and multi-step analysis, **specialized providers** (e.g., Snowflake, domain-specific models) for billing, coding, and diagnostic pattern matching. All AI integrations are abstracted behind API route handlers — model swaps require only changing the API call, not the clinical logic, system prompts, or frontend. BAA requirements apply to whichever provider handles PHI in production.
 
 ### 6.3 Triage Algorithm — Explicit Scoring Criteria
 
@@ -1023,7 +1036,7 @@ Referring provider: {type or "not provided"}
 
 ### 7.3 Regulatory Considerations
 
-- **HIPAA**: All referral text is transmitted via HTTPS to the API. Stored in Supabase with encryption at rest. For POC/demo, use only synthetic data. For clinical pilot, ensure BAA with Supabase and Anthropic.
+- **HIPAA**: All referral text is transmitted via HTTPS to the API. Stored in Supabase with encryption at rest. For POC/demo, use only synthetic data. For clinical pilot, ensure BAA with Supabase and OpenAI (or whichever AI provider is used in production — see AI Model Flexibility note in Section 6.2).
 - **FDA**: As a clinical decision support tool where a human clinician makes the final decision, this likely falls under FDA enforcement discretion for Clinical Decision Support (CDS) software per 21st Century Cures Act Section 3060(a). However, if the tool begins making autonomous scheduling decisions without human review, it may require FDA clearance as a Software as a Medical Device (SaMD). Consult regulatory counsel before Phase 2.
 - **State medical practice laws**: The AI does not practice medicine. It provides information to support a licensed clinician's decision. All outputs must include appropriate disclaimers.
 
@@ -1088,7 +1101,7 @@ Referring provider: {type or "not provided"}
 **Scope:**
 - Single-page triage tool with text input and AI output
 - 11 pre-loaded sample referral notes (including Emergent, Insufficient Data, and Failed Therapies examples)
-- Claude API integration for clinical scoring (AI scores dimensions; app code calculates tiers)
+- OpenAI API integration for clinical scoring (AI scores dimensions; app code calculates tiers)
 - 6-tier output: Emergent, Urgent, Semi-urgent, Routine-priority, Routine, Non-urgent + Insufficient Data state
 - Subspecialty routing recommendation for every triage (7 subspecialties)
 - Failed therapies extraction from referral notes
