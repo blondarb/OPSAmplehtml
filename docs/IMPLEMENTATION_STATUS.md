@@ -1,6 +1,6 @@
 # Implementation Status - Sevaro Clinical
 
-**Last Updated:** February 6, 2026 (Mobile chart enhancements: FAB menu, Chart Prep AI, Note Preview, Smart Recommendations)
+**Last Updated:** February 26, 2026 (Role-based Operations Dashboards: MA Dashboard + Practice Manager Dashboard)
 **Based on:** PRD_AI_Scribe.md v1.4, Sevaro_Outpatient_MVP_PRD_v1.4, PRD_Roadmap_Phase3.md, PRD_MOBILE_APP.md
 
 ---
@@ -93,6 +93,57 @@ This document tracks implementation progress against the product requirements an
 
 **Remaining (Lower Priority):**
 - Expand Smart Recommendations plan coverage — 98 plans in DB covering 148/166 diagnoses (89%); 18 diagnoses still need plans
+
+---
+
+## Recent Updates (February 26, 2026) — Role-Based Operations Dashboards
+
+Replaced the single Operations Dashboard (`/dashboard`) with a role-based system:
+
+- **Landing page** (`/dashboard`): Role chooser with two glassmorphic cards (MA Dashboard + Practice Manager) on dark gradient background. Teaser metrics computed from demo data.
+- **MA Dashboard** (`/dashboard/ma`): Light clinical theme with 3-zone layout:
+  - ProviderStatusStrip: sticky horizontal row of 3 provider cards with status dots, seen/remaining stats, behind badges, click-to-filter
+  - PatientFlowBoard: horizontal timeline with 30-min time slots, "now" indicator, morning/afternoon toggle, expandable patient detail panels with AI readiness, flow status, quick actions
+  - MATaskQueue: collapsible bottom panel with priority sorting (urgent/time-sensitive/routine), provider/type filtering, routine task collapsing
+- **Practice Manager Dashboard** (`/dashboard/admin`): Dark glassmorphic theme with 4-zone layout:
+  - ClinicPulse: 5 metric tiles (patients, utilization, wait time, no-shows, AI prep rate)
+  - Left column: ProviderPerformancePanel (utilization bars), StaffingPanel (VMA + sites), PendingActionsOverview (action counts)
+  - Right column: AlertsPanel (severity-coded alerts), ActivityFeed (15 chronological events), QualitySnapshot (progress bars vs targets)
+  - SiteComparison: collapsible comparison table (3 sites × 5 metrics)
+- **Data layer**: Shared types (`src/lib/dashboard/types.ts`) + 4 demo data files (providers, patients, tasks, metrics)
+- **Demo snapshot**: ~9:40 AM, 3 providers (Chen/Patel/Rivera), 21 patients, 10 MA tasks, 15 activity events, 4 alerts
+
+### New Files (24)
+- `src/lib/dashboard/types.ts` — 12 union types + 13 interfaces
+- `src/lib/dashboard/demoProviders.ts` — 3 providers, 3 sites, 2 virtual MAs
+- `src/lib/dashboard/demoPatients.ts` — 21 patients with AI readiness
+- `src/lib/dashboard/demoTasks.ts` — 10 MA tasks
+- `src/lib/dashboard/demoMetrics.ts` — PM metrics, performance, quality, activity feed, alerts
+- `src/components/dashboard/RoleChooserPage.tsx`
+- `src/components/dashboard/ma/ProviderCard.tsx`
+- `src/components/dashboard/ma/ProviderStatusStrip.tsx`
+- `src/components/dashboard/ma/PatientFlowCard.tsx`
+- `src/components/dashboard/ma/PatientDetailPanel.tsx`
+- `src/components/dashboard/ma/TimelineRow.tsx`
+- `src/components/dashboard/ma/PatientFlowBoard.tsx`
+- `src/components/dashboard/ma/MATaskCard.tsx`
+- `src/components/dashboard/ma/MATaskQueue.tsx`
+- `src/components/dashboard/ma/MADashboardPage.tsx`
+- `src/app/dashboard/ma/page.tsx`
+- `src/components/dashboard/admin/ClinicPulse.tsx`
+- `src/components/dashboard/admin/ProviderPerformancePanel.tsx`
+- `src/components/dashboard/admin/StaffingPanel.tsx`
+- `src/components/dashboard/admin/PendingActionsOverview.tsx`
+- `src/components/dashboard/admin/AlertsPanel.tsx`
+- `src/components/dashboard/admin/ActivityFeed.tsx`
+- `src/components/dashboard/admin/QualitySnapshot.tsx`
+- `src/components/dashboard/admin/SiteComparison.tsx`
+- `src/components/dashboard/admin/AdminDashboardPage.tsx`
+- `src/app/dashboard/admin/page.tsx`
+
+### Modified Files (2)
+- `src/app/dashboard/page.tsx` — replaced CommandCenterPage with RoleChooserPage
+- `src/components/homepage/journeyData.ts` — updated Operations Dashboard card description
 
 ---
 

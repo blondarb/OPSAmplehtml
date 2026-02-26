@@ -108,7 +108,7 @@ export const ongoingCareTrack: JourneyTrackData = {
       route: '/dashboard',
       icon: LayoutDashboard,
       status: 'live',
-      description: 'Practice-wide operational intelligence — staffing, action queue, and patient priority across all providers.',
+      description: 'Role-based views for MAs (patient flow board, task queue) and practice managers (utilization metrics, alerts, site comparison).',
     },
     {
       phase: 'Post-Visit',
