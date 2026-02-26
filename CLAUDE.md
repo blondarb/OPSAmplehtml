@@ -106,6 +106,28 @@ src/
 │   │   ├── PendingItemBadges.tsx    # Icon+count badges
 │   │   ├── RoleToggle.tsx           # My Patients / All Patients toggle
 │   │   └── TimeRangeSelector.tsx    # Date display + range dropdown
+│   ├── dashboard/         # Role-based Operations Dashboards
+│   │   ├── RoleChooserPage.tsx          # Landing page with MA/PM role cards
+│   │   ├── ma/                          # MA Dashboard components
+│   │   │   ├── MADashboardPage.tsx      # MA orchestrator (provider strip + flow board + task queue)
+│   │   │   ├── ProviderStatusStrip.tsx  # Sticky provider selection row
+│   │   │   ├── ProviderCard.tsx         # Single provider card with status
+│   │   │   ├── PatientFlowBoard.tsx     # Horizontal timeline with block toggle
+│   │   │   ├── TimelineRow.tsx          # Single provider's patient row
+│   │   │   ├── PatientFlowCard.tsx      # Compact patient card with flow stage
+│   │   │   ├── PatientDetailPanel.tsx   # Expandable patient details
+│   │   │   ├── MATaskQueue.tsx          # Collapsible task queue with filtering
+│   │   │   └── MATaskCard.tsx           # Single task card
+│   │   └── admin/                       # Practice Manager Dashboard components
+│   │       ├── AdminDashboardPage.tsx   # PM orchestrator (4-zone grid layout)
+│   │       ├── ClinicPulse.tsx          # 5 metric tiles (reuses StatusTile)
+│   │       ├── ProviderPerformancePanel.tsx # Utilization bars per provider
+│   │       ├── StaffingPanel.tsx        # VMA assignments + clinic site coverage
+│   │       ├── PendingActionsOverview.tsx   # Action counts by type
+│   │       ├── AlertsPanel.tsx          # Severity-coded operational alerts
+│   │       ├── ActivityFeed.tsx         # Chronological event log
+│   │       ├── QualitySnapshot.tsx      # Progress bars vs quality targets
+│   │       └── SiteComparison.tsx       # Collapsible site comparison table
 │   ├── home/              # Clinical Cockpit sub-components
 │   │   ├── ScheduleColumn.tsx     # Schedule with week-strip nav, mini-month grid, prep badges
 │   │   ├── NotificationFeed.tsx   # Enhanced notification cards with inline clinical data, filter tabs
@@ -132,6 +154,12 @@ src/
 │   │   ├── merge-engine.ts # Core merge logic + formatting functions
 │   │   └── types.ts       # TypeScript interfaces (ComprehensiveNoteData, FormattedNote)
 │   ├── reasonForConsultData.ts # Consult categories and sub-options
+│   ├── dashboard/
+│   │   ├── types.ts           # Role-based dashboard TypeScript types (12 unions + 13 interfaces)
+│   │   ├── demoProviders.ts   # 3 providers, 3 clinic sites, 2 virtual MAs
+│   │   ├── demoPatients.ts    # 21 patients (7 per provider) with AI readiness
+│   │   ├── demoTasks.ts       # 10 MA tasks with helper functions
+│   │   └── demoMetrics.ts     # PM metrics, performance, quality, activity feed, alerts
 │   ├── command-center/
 │   │   ├── types.ts       # Command Center TypeScript interfaces
 │   │   ├── demoActions.ts # Shared demo action data for API routes
@@ -551,6 +579,8 @@ When redeploying after changes, use "Redeploy without cache" to ensure fresh bui
 - Push to feature branch, create PR, merge to main for deployment
 
 ## Recent Changes
+
+- **Role-Based Operations Dashboards (2026-02-26)**: Replaced single Operations Dashboard at `/dashboard` with a role-based system. Landing page (`/dashboard`) now shows a role chooser with two cards. MA Dashboard (`/dashboard/ma`) provides a light-themed 3-zone layout: provider status strip, patient flow board (horizontal timeline with expandable detail panels), and collapsible task queue. Practice Manager Dashboard (`/dashboard/admin`) provides a dark glassmorphic 4-zone layout: clinic pulse metrics, two-column grid (provider performance + staffing + pending actions | alerts + activity feed + quality snapshot), and collapsible site comparison table. 24 new files in `src/lib/dashboard/`, `src/components/dashboard/ma/`, and `src/components/dashboard/admin/`. See `docs/plans/2026-02-25-role-based-dashboards-design.md` and `docs/plans/2026-02-26-role-based-dashboards-plan.md`.
 
 - **Live Follow-Up Agent Phase A: SMS (2026-02-25)**: Implemented real-phone SMS demo for Follow-Up Agent. User enters phone number on conversation page, receives a real Twilio text, replies via SMS, and the clinician dashboard updates in real-time via Supabase Realtime. New files: `twilioClient.ts` (send/validate), `conversationEngine.ts` (shared AI turn logic), `send-sms/route.ts` (initiate), `twilio-sms/route.ts` (webhook), `LiveDemoPanel.tsx` (UI). Migration 031 fixes schema mismatches and adds `followup_phone_sessions` table. Refactored `message/route.ts` to use shared engine. `ClinicianDashboard` now accepts `liveSessionId` prop for Realtime subscription. See `docs/plans/2026-02-25-live-followup-sms-plan.md` for implementation plan.
 
