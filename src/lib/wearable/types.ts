@@ -20,6 +20,11 @@ export type AnomalyType =
   | 'sleep_fragmentation'
   | 'hrv_depression'
   | 'pattern_match'
+  // Device-detected events (from Sevaro Monitor iOS app)
+  | 'irregular_heart_rhythm'
+  | 'high_heart_rate'
+  | 'low_heart_rate'
+  | 'gait_instability'
 
 export type IntegrationStatus = 'live' | 'planned' | 'future'
 
@@ -142,6 +147,18 @@ export interface AIAnalysisResponse {
   }>
   trends_observed: string[]
   data_quality_notes: string[]
+}
+
+// Hourly metric snapshot (from Sevaro Monitor iOS app)
+export interface HourlySnapshot {
+  id: string
+  patient_id: string
+  hour_timestamp: string
+  avg_hr: number | null
+  hrv_sdnn: number | null
+  spo2_avg: number | null
+  steps: number | null
+  active_calories: number | null
 }
 
 // Demo data bundle (returned by /api/wearable/demo-data)
@@ -311,6 +328,22 @@ export const ANOMALY_TYPE_DISPLAY: Record<AnomalyType, AnomalyTypeDisplayConfig>
   pattern_match: {
     label: 'Pattern Match',
     description: 'Recognized clinical pattern across multiple signals',
+  },
+  irregular_heart_rhythm: {
+    label: 'Irregular Heart Rhythm',
+    description: 'Apple Watch detected irregular heart rhythm (possible AFib)',
+  },
+  high_heart_rate: {
+    label: 'High Heart Rate',
+    description: 'Sustained elevated heart rate detected while at rest',
+  },
+  low_heart_rate: {
+    label: 'Low Heart Rate',
+    description: 'Heart rate dropped below expected threshold',
+  },
+  gait_instability: {
+    label: 'Gait Instability',
+    description: 'Apple Watch detected declining walking steadiness',
   },
 }
 
