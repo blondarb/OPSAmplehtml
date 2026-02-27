@@ -40,10 +40,13 @@ export default function VoiceConversationalIntake({ onComplete, onCancel }: Voic
   const dcRef = useRef<RTCDataChannel | null>(null)
   const audioElRef = useRef<HTMLAudioElement | null>(null)
   const streamRef = useRef<MediaStream | null>(null)
+  const micTrackRef = useRef<MediaStreamTrack | null>(null)
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  const unmuteTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const startTimeRef = useRef<number>(0)
   const transcriptRef = useRef<TranscriptEntry[]>([])
   const messagesEndRef = useRef<HTMLDivElement>(null)
+  const responseHadAudioRef = useRef<boolean>(false)
 
   const fieldsCollected = REQUIRED_FIELDS.filter(
     f => intakeData[f] && String(intakeData[f]).trim() !== ''
@@ -58,7 +61,35 @@ export default function VoiceConversationalIntake({ onComplete, onCancel }: Voic
     return SAFETY_KEYWORDS.some(kw => lower.includes(kw))
   }, [])
 
+  // Mute mic to prevent echo when AI is speaking
+  const muteMic = useCallback(() => {
+    if (micTrackRef.current) {
+      micTrackRef.current.enabled = false
+    }
+    if (unmuteTimerRef.current) {
+      clearTimeout(unmuteTimerRef.current)
+      unmuteTimerRef.current = null
+    }
+  }, [])
+
+  // Unmute mic after a delay to let trailing echo dissipate
+  const unmuteMicAfterDelay = useCallback((delayMs = 350) => {
+    if (unmuteTimerRef.current) {
+      clearTimeout(unmuteTimerRef.current)
+    }
+    unmuteTimerRef.current = setTimeout(() => {
+      if (micTrackRef.current) {
+        micTrackRef.current.enabled = true
+      }
+      unmuteTimerRef.current = null
+    }, delayMs)
+  }, [])
+
   const cleanup = useCallback(() => {
+    if (unmuteTimerRef.current) {
+      clearTimeout(unmuteTimerRef.current)
+      unmuteTimerRef.current = null
+    }
     if (timerRef.current) {
       clearInterval(timerRef.current)
       timerRef.current = null
@@ -75,6 +106,8 @@ export default function VoiceConversationalIntake({ onComplete, onCancel }: Voic
       streamRef.current.getTracks().forEach(t => t.stop())
       streamRef.current = null
     }
+    micTrackRef.current = null
+    responseHadAudioRef.current = false
     if (audioElRef.current) {
       audioElRef.current.srcObject = null
       audioElRef.current = null
@@ -123,9 +156,20 @@ export default function VoiceConversationalIntake({ onComplete, onCancel }: Voic
         audioEl.srcObject = event.streams[0]
       }
 
-      // 4. Get user mic
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+      // 4. Get user mic with echo cancellation and noise suppression
+      const stream = await navigator.mediaDevices.getUserMedia({
+        audio: {
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true,
+        },
+      })
       streamRef.current = stream
+      const audioTrack = stream.getAudioTracks()[0]
+      micTrackRef.current = audioTrack
+      // Start mic MUTED — the first AI greeting will play immediately,
+      // and we don't want to capture it. Mic unmutes after AI finishes speaking.
+      audioTrack.enabled = false
       stream.getTracks().forEach(track => pc.addTrack(track, stream))
 
       // 5. Create data channel
@@ -186,6 +230,12 @@ export default function VoiceConversationalIntake({ onComplete, onCancel }: Voic
   const handleRealtimeEvent = useCallback((msg: Record<string, any>) => {
     const type = msg.type
 
+    // Mute mic BEFORE audio begins to prevent echo
+    if (type === 'response.created') {
+      muteMic()
+      responseHadAudioRef.current = false
+    }
+
     // User speech transcript
     if (type === 'conversation.item.input_audio_transcription.completed') {
       const text = msg.transcript?.trim()
@@ -202,11 +252,12 @@ export default function VoiceConversationalIntake({ onComplete, onCancel }: Voic
 
     // AI speech started
     if (type === 'response.audio_transcript.delta') {
+      responseHadAudioRef.current = true
       setIsAiSpeaking(true)
       setCurrentAssistantText(prev => prev + (msg.delta || ''))
     }
 
-    // AI speech done
+    // AI speech done — unmute mic after delay
     if (type === 'response.audio_transcript.done') {
       const text = msg.transcript?.trim() || currentAssistantText
       if (text) {
@@ -216,6 +267,7 @@ export default function VoiceConversationalIntake({ onComplete, onCancel }: Voic
       }
       setCurrentAssistantText('')
       setIsAiSpeaking(false)
+      unmuteMicAfterDelay(400)
     }
 
     // Tool call — the model is saving structured intake data
@@ -227,6 +279,7 @@ export default function VoiceConversationalIntake({ onComplete, onCancel }: Voic
           setIntakeData(data)
 
           // Send tool result back so the model can deliver closing message
+          // (this will trigger response.created → mic stays muted)
           if (dcRef.current?.readyState === 'open') {
             dcRef.current.send(JSON.stringify({
               type: 'conversation.item.create',
@@ -251,6 +304,18 @@ export default function VoiceConversationalIntake({ onComplete, onCancel }: Voic
       }
     }
 
+    // Response complete — fallback unmute if no audio was in this response
+    if (type === 'response.done') {
+      if (!responseHadAudioRef.current) {
+        unmuteMicAfterDelay(400)
+      }
+    }
+
+    // Error — unmute so user isn't stuck muted
+    if (type === 'error') {
+      unmuteMicAfterDelay(0)
+    }
+
     // User speech activity
     if (type === 'input_audio_buffer.speech_started') {
       setCurrentUserText('...')
@@ -259,7 +324,7 @@ export default function VoiceConversationalIntake({ onComplete, onCancel }: Voic
       setCurrentUserText('')
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [checkSafety, cleanup, onComplete])
+  }, [checkSafety, cleanup, onComplete, muteMic, unmuteMicAfterDelay])
 
   const endSession = useCallback(() => {
     setStatus('ending')

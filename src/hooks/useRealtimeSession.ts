@@ -55,7 +55,9 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
   const dcRef = useRef<RTCDataChannel | null>(null)
   const audioElRef = useRef<HTMLAudioElement | null>(null)
   const streamRef = useRef<MediaStream | null>(null)
+  const micTrackRef = useRef<MediaStreamTrack | null>(null)
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  const unmuteTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const startTimeRef = useRef<number>(0)
   const questionCountRef = useRef<number>(0)
   const structuredOutputRef = useRef<HistorianStructuredOutput | null>(null)
@@ -63,6 +65,32 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
   const redFlagsRef = useRef<HistorianRedFlag[]>([])
   const safetyEscalatedRef = useRef<boolean>(false)
   const transcriptRef = useRef<HistorianTranscriptEntry[]>([])
+  const aiSpeakingRef = useRef<boolean>(false)
+  const responseHadAudioRef = useRef<boolean>(false)
+
+  // Mute mic to prevent echo when AI is speaking
+  const muteMic = useCallback(() => {
+    if (micTrackRef.current) {
+      micTrackRef.current.enabled = false
+    }
+    if (unmuteTimerRef.current) {
+      clearTimeout(unmuteTimerRef.current)
+      unmuteTimerRef.current = null
+    }
+  }, [])
+
+  // Unmute mic after a delay to let trailing echo dissipate
+  const unmuteMicAfterDelay = useCallback((delayMs = 350) => {
+    if (unmuteTimerRef.current) {
+      clearTimeout(unmuteTimerRef.current)
+    }
+    unmuteTimerRef.current = setTimeout(() => {
+      if (micTrackRef.current) {
+        micTrackRef.current.enabled = true
+      }
+      unmuteTimerRef.current = null
+    }, delayMs)
+  }, [])
 
   // Safety keyword check (secondary defense)
   const checkSafety = useCallback((text: string) => {
@@ -79,6 +107,10 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
   }, [options])
 
   const cleanup = useCallback(() => {
+    if (unmuteTimerRef.current) {
+      clearTimeout(unmuteTimerRef.current)
+      unmuteTimerRef.current = null
+    }
     if (timerRef.current) {
       clearInterval(timerRef.current)
       timerRef.current = null
@@ -95,6 +127,9 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
       streamRef.current.getTracks().forEach(t => t.stop())
       streamRef.current = null
     }
+    micTrackRef.current = null
+    aiSpeakingRef.current = false
+    responseHadAudioRef.current = false
     if (audioElRef.current) {
       audioElRef.current.srcObject = null
       audioElRef.current = null
@@ -149,9 +184,20 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
         audioEl.srcObject = event.streams[0]
       }
 
-      // 4. Get user mic
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+      // 4. Get user mic with echo cancellation and noise suppression
+      const stream = await navigator.mediaDevices.getUserMedia({
+        audio: {
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true,
+        },
+      })
       streamRef.current = stream
+      const audioTrack = stream.getAudioTracks()[0]
+      micTrackRef.current = audioTrack
+      // Start mic MUTED — the first AI greeting will play immediately,
+      // and we don't want to capture it. Mic unmutes after AI finishes speaking.
+      audioTrack.enabled = false
       stream.getTracks().forEach(track => pc.addTrack(track, stream))
 
       // 5. Create data channel for events
@@ -214,15 +260,24 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
   // Handle server events from the data channel
   const handleServerEvent = useCallback((msg: any) => {
     switch (msg.type) {
+      // Mute mic BEFORE audio begins to prevent echo
+      case 'response.created': {
+        muteMic()
+        aiSpeakingRef.current = true
+        responseHadAudioRef.current = false
+        break
+      }
+
       case 'response.audio_transcript.delta': {
-        // Streaming AI text
+        // Streaming AI text transcript (audio plays concurrently via WebRTC)
+        responseHadAudioRef.current = true
         setCurrentAssistantText(prev => prev + (msg.delta || ''))
         setIsAiSpeaking(true)
         break
       }
 
       case 'response.audio_transcript.done': {
-        // AI finished speaking this response
+        // AI finished speaking — unmute mic after delay
         const fullText = msg.transcript || ''
         if (fullText.trim()) {
           const entry: HistorianTranscriptEntry = {
@@ -236,6 +291,8 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
         }
         setCurrentAssistantText('')
         setIsAiSpeaking(false)
+        aiSpeakingRef.current = false
+        unmuteMicAfterDelay(400)
         break
       }
 
@@ -271,10 +328,12 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
 
       case 'response.done': {
         // Check if the response includes a tool call (structured output)
+        let triggeredFollowUp = false
         const output = msg.response?.output
         if (output && Array.isArray(output)) {
           for (const item of output) {
             if (item.type === 'function_call' && item.name === 'save_interview_output') {
+              triggeredFollowUp = true
               try {
                 const args = JSON.parse(item.arguments || '{}')
                 // Extract structured data
@@ -289,6 +348,7 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
                 }
 
                 // Send function call output back so the model can respond
+                // (this will trigger response.created → mic stays muted)
                 if (dcRef.current?.readyState === 'open') {
                   dcRef.current.send(JSON.stringify({
                     type: 'conversation.item.create',
@@ -312,16 +372,24 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
             }
           }
         }
+        // Fallback unmute: if response had no audio and didn't trigger follow-up
+        if (!responseHadAudioRef.current && !triggeredFollowUp) {
+          aiSpeakingRef.current = false
+          unmuteMicAfterDelay(400)
+        }
         break
       }
 
       case 'error': {
         console.error('Realtime API error:', msg.error)
         setError(msg.error?.message || 'Realtime API error')
+        // Unmute on error so user isn't stuck muted
+        aiSpeakingRef.current = false
+        unmuteMicAfterDelay(0)
         break
       }
     }
-  }, [checkSafety])
+  }, [checkSafety, muteMic, unmuteMicAfterDelay])
 
   const endSession = useCallback(() => {
     setStatus('ending')
