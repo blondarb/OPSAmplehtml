@@ -16,8 +16,15 @@ export async function POST(request: Request) {
       referral_text, patient_age, patient_sex, referring_provider_type, patient_id,
       // Phase 2 optional fields
       extracted_summary, source_type, source_filename, extraction_confidence,
-      note_type_detected, batch_id, fusion_group_id
+      note_type_detected, batch_id, fusion_group_id,
+      // Validation: optional temperature override (default 0.2)
+      temperature: requestedTemp,
     } = body
+
+    // Clamp temperature to [0, 1] range
+    const temperature = typeof requestedTemp === 'number'
+      ? Math.max(0, Math.min(1, requestedTemp))
+      : 0.2
 
     // Validate input
     if (!referral_text || typeof referral_text !== 'string') {
@@ -89,7 +96,7 @@ export async function POST(request: Request) {
           ],
           response_format: { type: 'json_object' },
           max_completion_tokens: 2000,
-          temperature: 0.2,
+          temperature,
         },
         { signal: controller.signal }
       )
@@ -198,6 +205,9 @@ export async function POST(request: Request) {
       failed_therapies: aiResponse.failed_therapies,
       subspecialty_recommendation: aiResponse.subspecialty_recommendation,
       subspecialty_rationale: aiResponse.subspecialty_rationale,
+      redirect_to_non_neuro: aiResponse.redirect_to_non_neuro || false,
+      redirect_specialty: aiResponse.redirect_specialty || null,
+      redirect_rationale: aiResponse.redirect_rationale || null,
       disclaimer: DISCLAIMER_TEXT,
     })
   } catch (error: unknown) {

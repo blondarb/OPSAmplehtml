@@ -171,6 +171,9 @@ export default function TriageOutputPanel({ result, onTryAnother }: Props) {
             <SubspecialtyRouter
               subspecialty={result.subspecialty_recommendation}
               rationale={result.subspecialty_rationale}
+              redirectToNonNeuro={result.redirect_to_non_neuro}
+              redirectSpecialty={result.redirect_specialty}
+              redirectRationale={result.redirect_rationale}
             />
 
             {/* Dimension scores breakdown */}

@@ -77,7 +77,22 @@ Set "red_flag_override": true if ANY of these are present (patient is medically 
 - New diplopia with ptosis
 - Suicidal ideation (passive, without plan) in neurological context
 
-## STEP 5: EXTRACT FAILED THERAPIES
+## STEP 5: CHECK FOR NON-NEUROLOGICAL PRESENTATION
+
+Evaluate whether the referral describes a condition that is NOT primarily neurological and would be better served by a different specialty. Set "redirect_to_non_neuro": true if the presentation is clearly:
+- Musculoskeletal (e.g., mechanical low back pain without radiculopathy, joint pain without neurological signs) → Orthopedics, Spine Surgery, or Physical Medicine & Rehab
+- Peripheral vascular (e.g., claudication without neuropathy) → Vascular Surgery
+- Psychiatric without neurological features (e.g., depression, anxiety without focal deficits) → Psychiatry
+- Isolated foot/ankle complaints without neuropathy → Podiatry
+- Autoimmune without CNS/PNS involvement → Rheumatology
+- Pain syndrome without neurological deficit → Pain Management
+- Vestibular/hearing without central features → ENT / Otolaryngology
+
+IMPORTANT: Still complete all scoring even if redirect is recommended. Some presentations have neurological overlap — if there is ANY neurological component (e.g., radiculopathy, neuropathy, myelopathy), the referral IS appropriate for neurology. Only redirect when the presentation is clearly non-neurological.
+
+If "redirect_to_non_neuro" is true, specify the recommended specialty in "redirect_specialty" and explain in "redirect_rationale".
+
+## STEP 6: EXTRACT FAILED THERAPIES
 
 If the referral mentions any previously tried treatments that were stopped or failed, extract them. This impacts routing and priority (e.g., a migraine patient who failed 3 preventives is higher priority than one who has tried none).
 
@@ -120,7 +135,10 @@ Return ONLY valid JSON (no markdown, no backticks, no explanation outside JSON):
     { "therapy": "medication or treatment name", "reason_stopped": "reason if stated" }
   ],
   "subspecialty_recommendation": "General Neurology | Epilepsy | Movement Disorders | Headache | Neuromuscular | Cognitive/Memory | Stroke",
-  "subspecialty_rationale": "Why this subspecialty is the best fit"
+  "subspecialty_rationale": "Why this subspecialty is the best fit",
+  "redirect_to_non_neuro": false,
+  "redirect_specialty": null,
+  "redirect_rationale": null
 }
 
 ## RULES
@@ -134,7 +152,8 @@ Return ONLY valid JSON (no markdown, no backticks, no explanation outside JSON):
 7. NEVER diagnose the patient. Use language like "evaluate for," "rule out," "consider."
 8. Extract ALL failed/tried therapies mentioned in the note.
 9. If you detect safety-critical information (suicidal ideation, abuse, etc.), include it in red_flags regardless of other scoring.
-10. Evaluate symptoms based on clinical descriptors only — do not adjust scoring based on patient demographics.`
+10. Evaluate symptoms based on clinical descriptors only — do not adjust scoring based on patient demographics.
+11. If the referral describes a condition better suited for another specialty (orthopedics, spine surgery, podiatry, pain management, rheumatology, psychiatry, ENT, etc.), set "redirect_to_non_neuro": true and specify the recommended specialty. Still complete all scoring — some cases warrant BOTH neurology evaluation AND another specialty.`
 
 /**
  * Build the user prompt with referral text and optional metadata
