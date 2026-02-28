@@ -265,8 +265,8 @@ export default function AdminPage() {
     setConsistencyRunning(true)
     setConsistencyResults(null)
 
-    // Batch size: 3 cases per request keeps each call under ~3 min
-    const BATCH_SIZE = 3
+    // Batch size: 2 cases per request — runs parallelize server-side
+    const BATCH_SIZE = 2
     const batches: string[][] = []
     for (let i = 0; i < caseIds.length; i += BATCH_SIZE) {
       batches.push(caseIds.slice(i, i + BATCH_SIZE))
