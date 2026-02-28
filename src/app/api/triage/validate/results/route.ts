@@ -450,6 +450,76 @@ export async function GET(req: NextRequest) {
     }
   })
 
+  // ── AI Self-Consistency (multi-run analysis) ──
+  let aiConsistency = undefined
+  {
+    const { data: aiRuns } = await supabase
+      .from('validation_ai_runs')
+      .select('*')
+      .in('case_id', caseIds)
+      .order('run_number', { ascending: true })
+
+    if (aiRuns && aiRuns.length > 0) {
+      // Group runs by case
+      const runsByCase = new Map<string, typeof aiRuns>()
+      for (const run of aiRuns) {
+        const list = runsByCase.get(run.case_id) || []
+        list.push(run)
+        runsByCase.set(run.case_id, list)
+      }
+
+      const caseConsistency = cases
+        .filter(c => runsByCase.has(c.id))
+        .map(c => {
+          const runs = runsByCase.get(c.id) || []
+          const successRuns = runs.filter(r => !r.error)
+          const baseline = successRuns.find(r => r.run_number === 0)
+          const standardRuns = successRuns.filter(r => r.run_number > 0)
+
+          const allTiers = successRuns.map(r => r.ai_triage_tier as TriageTier).filter(Boolean)
+          const distinctTiers = [...new Set(allTiers)].length
+
+          const scores = successRuns
+            .map(r => parseFloat(r.ai_weighted_score))
+            .filter(s => !isNaN(s))
+          const scoreMean = scores.length > 0
+            ? scores.reduce((a, b) => a + b, 0) / scores.length
+            : null
+          const scoreStd = scores.length > 1
+            ? Math.sqrt(scores.reduce((sum, s) => sum + (s - scoreMean!) ** 2, 0) / (scores.length - 1))
+            : null
+
+          return {
+            case_id: c.id,
+            case_number: c.case_number,
+            case_title: c.title,
+            baseline_tier: baseline?.ai_triage_tier as TriageTier | null ?? null,
+            baseline_score: baseline?.ai_weighted_score ? parseFloat(baseline.ai_weighted_score) : null,
+            run_tiers: standardRuns.map(r => r.ai_triage_tier as TriageTier).filter(Boolean),
+            run_scores: standardRuns.map(r => parseFloat(r.ai_weighted_score)).filter(s => !isNaN(s)),
+            distinct_tiers: distinctTiers,
+            score_mean: scoreMean !== null ? Math.round(scoreMean * 100) / 100 : null,
+            score_std: scoreStd !== null ? Math.round(scoreStd * 100) / 100 : null,
+            all_agree: distinctTiers <= 1,
+          }
+        })
+
+      const casesWithRuns = caseConsistency.length
+      const perfectAgreement = caseConsistency.filter(c => c.all_agree).length
+      const avgDistinct = casesWithRuns > 0
+        ? caseConsistency.reduce((s, c) => s + c.distinct_tiers, 0) / casesWithRuns
+        : 0
+
+      aiConsistency = {
+        total_cases_with_runs: casesWithRuns,
+        total_runs: aiRuns.length,
+        perfect_agreement_rate: casesWithRuns > 0 ? Math.round((perfectAgreement / casesWithRuns) * 1000) / 1000 : 0,
+        avg_distinct_tiers_per_case: Math.round(avgDistinct * 100) / 100,
+        case_consistency: caseConsistency,
+      }
+    }
+  }
+
   // ── Reviewer summaries ──
   const reviewerSummaries = reviewerIds.map(rid => ({
     reviewer_id: rid,
@@ -473,6 +543,7 @@ export async function GET(req: NextRequest) {
     tier_agreement: tierAgreement,
     pairwise,
     ai_vs_consensus: aiVsConsensus,
+    ai_consistency: aiConsistency,
     redirect_agreement: {
       agreement_rate: redirectTotalCount > 0 ? Math.round((redirectAgreeCount / redirectTotalCount) * 1000) / 1000 : 0,
       total_cases: redirectTotalCount,

@@ -5,7 +5,7 @@ import { useAuth } from '@/contexts/AuthContext'
 import { useRouter } from 'next/navigation'
 import PlatformShell from '@/components/layout/PlatformShell'
 import FeatureSubHeader from '@/components/layout/FeatureSubHeader'
-import { Settings, Plus, Play, Trash2, Check, AlertCircle, Upload, Loader2 } from 'lucide-react'
+import { Settings, Plus, Play, Trash2, Check, AlertCircle, Upload, Loader2, RefreshCw, BarChart3 } from 'lucide-react'
 import { TIER_DISPLAY, TriageTier } from '@/lib/triage/types'
 import Link from 'next/link'
 
@@ -34,13 +34,31 @@ interface ProcessResult {
   error?: string
 }
 
+interface ConsistencyRunResult {
+  run_number: number
+  temperature: number
+  status: 'success' | 'error'
+  ai_tier?: string
+  ai_score?: number
+  ai_confidence?: string
+  duration_ms?: number
+  error?: string
+}
+
+interface ConsistencyResult {
+  case_id: string
+  case_number: number
+  title: string
+  runs: ConsistencyRunResult[]
+}
+
 export default function AdminPage() {
   const { user, loading: authLoading } = useAuth()
   const router = useRouter()
 
   const [cases, setCases] = useState<CaseRow[]>([])
   const [loading, setLoading] = useState(true)
-  const [mode, setMode] = useState<'list' | 'single' | 'bulk'>('list')
+  const [mode, setMode] = useState<'list' | 'single' | 'bulk' | 'consistency'>('list')
 
   // Single note form
   const [noteTitle, setNoteTitle] = useState('')
@@ -56,6 +74,14 @@ export default function AdminPage() {
   const [bulkDelimiter, setBulkDelimiter] = useState('---')
   const [bulkProcessing, setBulkProcessing] = useState(false)
   const [bulkResults, setBulkResults] = useState<ProcessResult[]>([])
+
+  // Consistency testing
+  const [runCount, setRunCount] = useState(3)
+  const [includeBaseline, setIncludeBaseline] = useState(true)
+  const [consistencyRunning, setConsistencyRunning] = useState(false)
+  const [consistencyProgress, setConsistencyProgress] = useState('')
+  const [consistencyResults, setConsistencyResults] = useState<ConsistencyResult[] | null>(null)
+  const [selectedCaseIds, setSelectedCaseIds] = useState<Set<string>>(new Set())
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -171,6 +197,63 @@ export default function AdminPage() {
     }
   }
 
+  // Toggle case selection for consistency runs
+  function toggleCaseSelection(caseId: string) {
+    setSelectedCaseIds(prev => {
+      const next = new Set(prev)
+      if (next.has(caseId)) next.delete(caseId)
+      else next.add(caseId)
+      return next
+    })
+  }
+
+  function selectAllCases() {
+    if (selectedCaseIds.size === cases.length) {
+      setSelectedCaseIds(new Set())
+    } else {
+      setSelectedCaseIds(new Set(cases.map(c => c.id)))
+    }
+  }
+
+  // Run consistency test
+  async function handleConsistencyRun() {
+    const caseIds = selectedCaseIds.size > 0
+      ? Array.from(selectedCaseIds)
+      : cases.map(c => c.id)
+
+    if (caseIds.length === 0) return
+
+    setConsistencyRunning(true)
+    setConsistencyProgress(`Running ${runCount} standard runs${includeBaseline ? ' + 1 baseline (temp=0)' : ''} on ${caseIds.length} cases...`)
+    setConsistencyResults(null)
+
+    try {
+      const res = await fetch('/api/triage/validate/cases/rerun', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          case_ids: caseIds,
+          run_count: runCount,
+          include_baseline: includeBaseline,
+          clear_previous: true,
+        }),
+      })
+
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}))
+        throw new Error(data.error || 'Consistency run failed')
+      }
+
+      const data = await res.json()
+      setConsistencyResults(data.results || [])
+      setConsistencyProgress(`Complete: ${data.successful_runs}/${data.total_runs} runs succeeded across ${data.total_cases} cases`)
+    } catch (err) {
+      setConsistencyProgress(err instanceof Error ? err.message : 'Failed')
+    } finally {
+      setConsistencyRunning(false)
+    }
+  }
+
   if (authLoading || loading) {
     return (
       <PlatformShell>
@@ -255,6 +338,7 @@ export default function AdminPage() {
               { key: 'list' as const, label: 'Case List', icon: null },
               { key: 'single' as const, label: 'Add Single Note', icon: Plus },
               { key: 'bulk' as const, label: 'Bulk Add', icon: Upload },
+              { key: 'consistency' as const, label: 'Consistency Test', icon: BarChart3 },
             ].map(tab => (
               <button
                 key={tab.key}
@@ -519,6 +603,300 @@ export default function AdminPage() {
                           {r.error && <span style={{ color: '#EF4444', fontSize: '0.7rem' }}>{r.error}</span>}
                         </div>
                       ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              <style>{`@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }`}</style>
+            </div>
+          )}
+
+          {/* ── Consistency Test ── */}
+          {mode === 'consistency' && (
+            <div style={{
+              background: 'rgba(30, 41, 59, 0.6)', border: '1px solid #334155',
+              borderRadius: '12px', overflow: 'hidden',
+            }}>
+              <div style={{ padding: '16px 20px', borderBottom: '1px solid #334155' }}>
+                <h3 style={{ color: '#e2e8f0', fontSize: '0.9rem', fontWeight: 600, margin: '0 0 4px' }}>
+                  AI Consistency / Intra-Rater Reliability Test
+                </h3>
+                <p style={{ color: '#64748b', fontSize: '0.75rem', margin: 0, lineHeight: 1.6 }}>
+                  Run each case through the triage algorithm multiple times to measure AI self-consistency.
+                  Includes a deterministic baseline run at temperature=0 plus N standard runs at temperature=0.2.
+                </p>
+              </div>
+
+              <div style={{ padding: '16px 20px' }}>
+                {/* Controls */}
+                <div style={{ display: 'flex', gap: '20px', marginBottom: '16px', flexWrap: 'wrap' }}>
+                  <div>
+                    <label style={{ color: '#94a3b8', fontSize: '0.72rem', fontWeight: 600, display: 'block', marginBottom: '6px' }}>
+                      Standard Runs (temp=0.2)
+                    </label>
+                    <div style={{ display: 'flex', gap: '4px' }}>
+                      {[1, 2, 3, 4, 5].map(n => (
+                        <button
+                          key={n}
+                          onClick={() => setRunCount(n)}
+                          style={{
+                            width: '36px', height: '36px', borderRadius: '6px', fontSize: '0.85rem', fontWeight: 700,
+                            background: runCount === n ? '#8B5CF6' : 'rgba(15, 23, 42, 0.5)',
+                            color: runCount === n ? '#fff' : '#94a3b8',
+                            border: runCount === n ? '1px solid #8B5CF6' : '1px solid #334155',
+                            cursor: 'pointer',
+                          }}
+                        >
+                          {n}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div style={{ display: 'flex', alignItems: 'flex-end', paddingBottom: '4px' }}>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
+                      <input
+                        type="checkbox"
+                        checked={includeBaseline}
+                        onChange={e => setIncludeBaseline(e.target.checked)}
+                        style={{ accentColor: '#16A34A', width: '16px', height: '16px' }}
+                      />
+                      <div>
+                        <span style={{ color: '#e2e8f0', fontSize: '0.8rem', fontWeight: 600 }}>Include baseline (temp=0)</span>
+                        <span style={{ color: '#64748b', fontSize: '0.7rem', display: 'block' }}>
+                          Deterministic reference run
+                        </span>
+                      </div>
+                    </label>
+                  </div>
+                </div>
+
+                {/* Estimated total */}
+                <div style={{
+                  padding: '10px 14px', background: 'rgba(139, 92, 246, 0.06)', border: '1px solid rgba(139, 92, 246, 0.15)',
+                  borderRadius: '8px', marginBottom: '16px',
+                }}>
+                  <span style={{ color: '#a78bfa', fontSize: '0.75rem' }}>
+                    {selectedCaseIds.size > 0 ? selectedCaseIds.size : cases.length} cases
+                    &times; {runCount + (includeBaseline ? 1 : 0)} runs each
+                    = <strong>{(selectedCaseIds.size > 0 ? selectedCaseIds.size : cases.length) * (runCount + (includeBaseline ? 1 : 0))}</strong> total API calls
+                  </span>
+                  <span style={{ color: '#64748b', fontSize: '0.7rem', marginLeft: '12px' }}>
+                    (~{Math.ceil(((selectedCaseIds.size > 0 ? selectedCaseIds.size : cases.length) * (runCount + (includeBaseline ? 1 : 0)) * 8) / 60)} min est.)
+                  </span>
+                </div>
+
+                {/* Case selection */}
+                <div style={{ marginBottom: '16px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
+                    <label style={{ color: '#94a3b8', fontSize: '0.72rem', fontWeight: 600 }}>
+                      Select Cases
+                    </label>
+                    <button
+                      onClick={selectAllCases}
+                      style={{
+                        padding: '2px 10px', borderRadius: '4px', fontSize: '0.68rem', fontWeight: 600,
+                        background: 'rgba(139, 92, 246, 0.1)', border: '1px solid rgba(139, 92, 246, 0.3)',
+                        color: '#a78bfa', cursor: 'pointer',
+                      }}
+                    >
+                      {selectedCaseIds.size === cases.length ? 'Deselect All' : 'Select All'}
+                    </button>
+                    {selectedCaseIds.size > 0 && (
+                      <span style={{ color: '#64748b', fontSize: '0.7rem' }}>
+                        {selectedCaseIds.size} selected
+                      </span>
+                    )}
+                  </div>
+
+                  <div style={{
+                    maxHeight: '240px', overflowY: 'auto',
+                    border: '1px solid #334155', borderRadius: '8px', background: 'rgba(15, 23, 42, 0.3)',
+                  }}>
+                    {cases.length === 0 ? (
+                      <div style={{ padding: '24px', textAlign: 'center', color: '#64748b', fontSize: '0.8rem' }}>
+                        No cases available. Add cases first.
+                      </div>
+                    ) : (
+                      cases.map(c => (
+                        <label
+                          key={c.id}
+                          style={{
+                            display: 'flex', alignItems: 'center', gap: '10px', padding: '8px 12px',
+                            cursor: 'pointer', borderBottom: '1px solid rgba(51, 65, 85, 0.3)',
+                            background: selectedCaseIds.has(c.id) ? 'rgba(139, 92, 246, 0.05)' : 'transparent',
+                          }}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={selectedCaseIds.has(c.id)}
+                            onChange={() => toggleCaseSelection(c.id)}
+                            style={{ accentColor: '#8B5CF6' }}
+                          />
+                          <span style={{ color: '#64748b', fontSize: '0.7rem', minWidth: '28px' }}>#{c.case_number}</span>
+                          <span style={{ color: '#cbd5e1', fontSize: '0.8rem', flex: 1 }}>{c.title}</span>
+                          {c.ai_triage_tier && (
+                            <span style={{
+                              padding: '1px 6px', borderRadius: '3px', fontSize: '0.6rem', fontWeight: 700,
+                              background: TIER_DISPLAY[c.ai_triage_tier as TriageTier]?.bgColor || '#6B7280', color: '#fff',
+                            }}>
+                              {TIER_DISPLAY[c.ai_triage_tier as TriageTier]?.label || c.ai_triage_tier}
+                            </span>
+                          )}
+                        </label>
+                      ))
+                    )}
+                  </div>
+                </div>
+
+                {/* Run button */}
+                <button
+                  onClick={handleConsistencyRun}
+                  disabled={cases.length === 0 || consistencyRunning}
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: '6px',
+                    padding: '10px 24px', borderRadius: '8px', fontSize: '0.85rem', fontWeight: 600,
+                    background: cases.length === 0 || consistencyRunning ? '#334155' : '#8B5CF6',
+                    color: cases.length === 0 || consistencyRunning ? '#64748b' : '#fff',
+                    border: 'none', cursor: cases.length === 0 || consistencyRunning ? 'not-allowed' : 'pointer',
+                  }}
+                >
+                  {consistencyRunning ? (
+                    <><Loader2 size={14} style={{ animation: 'spin 1s linear infinite' }} /> Running...</>
+                  ) : (
+                    <><RefreshCw size={14} /> Run Consistency Test</>
+                  )}
+                </button>
+
+                {consistencyProgress && (
+                  <div style={{ marginTop: '12px', color: consistencyRunning ? '#a78bfa' : (consistencyProgress.startsWith('Complete') ? '#16A34A' : '#EF4444'), fontSize: '0.8rem', fontWeight: 500 }}>
+                    {consistencyRunning && <Loader2 size={12} style={{ display: 'inline', marginRight: '6px', animation: 'spin 1s linear infinite' }} />}
+                    {consistencyProgress}
+                  </div>
+                )}
+
+                {/* Consistency Results */}
+                {consistencyResults && consistencyResults.length > 0 && (
+                  <div style={{ marginTop: '20px' }}>
+                    <h4 style={{ color: '#e2e8f0', fontSize: '0.85rem', fontWeight: 600, margin: '0 0 12px' }}>
+                      Run Results
+                    </h4>
+
+                    {/* Summary stats */}
+                    {(() => {
+                      const casesWithAllSuccess = consistencyResults.filter(c => c.runs.every(r => r.status === 'success'))
+                      const casesWithAllSameTier = casesWithAllSuccess.filter(c => {
+                        const tiers = c.runs.map(r => r.ai_tier).filter(Boolean)
+                        return tiers.length > 0 && new Set(tiers).size === 1
+                      })
+                      return (
+                        <div style={{
+                          display: 'flex', gap: '12px', marginBottom: '16px',
+                        }}>
+                          <div style={{
+                            flex: 1, padding: '12px 16px', background: 'rgba(22, 163, 74, 0.06)',
+                            border: '1px solid rgba(22, 163, 74, 0.15)', borderRadius: '8px',
+                          }}>
+                            <div style={{ color: '#64748b', fontSize: '0.65rem', fontWeight: 600, textTransform: 'uppercase', marginBottom: '4px' }}>
+                              Perfect Agreement
+                            </div>
+                            <div style={{ color: '#16A34A', fontSize: '1.25rem', fontWeight: 700 }}>
+                              {casesWithAllSuccess.length > 0
+                                ? Math.round((casesWithAllSameTier.length / casesWithAllSuccess.length) * 100)
+                                : 0}%
+                            </div>
+                            <div style={{ color: '#64748b', fontSize: '0.65rem' }}>
+                              {casesWithAllSameTier.length}/{casesWithAllSuccess.length} cases all runs agree
+                            </div>
+                          </div>
+                          <div style={{
+                            flex: 1, padding: '12px 16px', background: 'rgba(139, 92, 246, 0.06)',
+                            border: '1px solid rgba(139, 92, 246, 0.15)', borderRadius: '8px',
+                          }}>
+                            <div style={{ color: '#64748b', fontSize: '0.65rem', fontWeight: 600, textTransform: 'uppercase', marginBottom: '4px' }}>
+                              Total Runs
+                            </div>
+                            <div style={{ color: '#a78bfa', fontSize: '1.25rem', fontWeight: 700 }}>
+                              {consistencyResults.reduce((s, c) => s + c.runs.length, 0)}
+                            </div>
+                            <div style={{ color: '#64748b', fontSize: '0.65rem' }}>
+                              {consistencyResults.reduce((s, c) => s + c.runs.filter(r => r.status === 'success').length, 0)} succeeded
+                            </div>
+                          </div>
+                        </div>
+                      )
+                    })()}
+
+                    {/* Per-case detail */}
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                      {consistencyResults.map(c => {
+                        const successRuns = c.runs.filter(r => r.status === 'success')
+                        const tiers = successRuns.map(r => r.ai_tier!).filter(Boolean)
+                        const uniqueTiers = [...new Set(tiers)]
+                        const allAgree = uniqueTiers.length === 1
+                        const scores = successRuns.map(r => r.ai_score).filter((s): s is number => s != null)
+                        const avgScore = scores.length > 0 ? scores.reduce((a, b) => a + b, 0) / scores.length : null
+                        const scoreRange = scores.length > 1 ? Math.max(...scores) - Math.min(...scores) : 0
+                        const baseline = c.runs.find(r => r.run_number === 0)
+
+                        return (
+                          <div key={c.case_id} style={{
+                            padding: '12px 16px', borderRadius: '8px',
+                            background: allAgree ? 'rgba(22, 163, 74, 0.04)' : 'rgba(234, 179, 8, 0.04)',
+                            border: `1px solid ${allAgree ? 'rgba(22, 163, 74, 0.15)' : 'rgba(234, 179, 8, 0.2)'}`,
+                          }}>
+                            {/* Case header */}
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '8px' }}>
+                              <span style={{ color: '#64748b', fontSize: '0.7rem', fontWeight: 600 }}>#{c.case_number}</span>
+                              <span style={{ color: '#e2e8f0', fontSize: '0.8rem', fontWeight: 600, flex: 1 }}>{c.title}</span>
+                              {allAgree ? (
+                                <span style={{ color: '#16A34A', fontSize: '0.68rem', fontWeight: 700 }}>
+                                  <Check size={12} style={{ display: 'inline', verticalAlign: 'middle', marginRight: '3px' }} />
+                                  CONSISTENT
+                                </span>
+                              ) : (
+                                <span style={{ color: '#EAB308', fontSize: '0.68rem', fontWeight: 700 }}>
+                                  <AlertCircle size={12} style={{ display: 'inline', verticalAlign: 'middle', marginRight: '3px' }} />
+                                  {uniqueTiers.length} TIERS
+                                </span>
+                              )}
+                            </div>
+
+                            {/* Run pills */}
+                            <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
+                              {baseline && baseline.status === 'success' && (
+                                <span style={{
+                                  padding: '3px 8px', borderRadius: '4px', fontSize: '0.62rem', fontWeight: 700,
+                                  background: TIER_DISPLAY[baseline.ai_tier as TriageTier]?.bgColor || '#6B7280', color: '#fff',
+                                  border: '2px solid rgba(255,255,255,0.3)',
+                                }}>
+                                  Baseline: {TIER_DISPLAY[baseline.ai_tier as TriageTier]?.label || baseline.ai_tier}
+                                </span>
+                              )}
+                              {c.runs.filter(r => r.run_number > 0).map(r => (
+                                <span key={r.run_number} style={{
+                                  padding: '3px 8px', borderRadius: '4px', fontSize: '0.62rem', fontWeight: 600,
+                                  background: r.status === 'success'
+                                    ? (TIER_DISPLAY[r.ai_tier as TriageTier]?.bgColor || '#6B7280')
+                                    : '#7f1d1d',
+                                  color: '#fff',
+                                  opacity: r.status === 'error' ? 0.6 : 1,
+                                }}>
+                                  Run {r.run_number}: {r.status === 'success' ? (TIER_DISPLAY[r.ai_tier as TriageTier]?.label || r.ai_tier) : 'ERR'}
+                                </span>
+                              ))}
+                            </div>
+
+                            {/* Score range */}
+                            {scores.length > 1 && (
+                              <div style={{ marginTop: '6px', color: '#64748b', fontSize: '0.68rem' }}>
+                                Score: avg {avgScore?.toFixed(2)} | range {scoreRange.toFixed(2)} ({Math.min(...scores).toFixed(2)} – {Math.max(...scores).toFixed(2)})
+                              </div>
+                            )}
+                          </div>
+                        )
+                      })}
                     </div>
                   </div>
                 )}

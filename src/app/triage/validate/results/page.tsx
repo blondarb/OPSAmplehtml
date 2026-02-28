@@ -5,7 +5,7 @@ import { useAuth } from '@/contexts/AuthContext'
 import { useRouter } from 'next/navigation'
 import PlatformShell from '@/components/layout/PlatformShell'
 import FeatureSubHeader from '@/components/layout/FeatureSubHeader'
-import { BarChart3, AlertCircle, Users, CheckCircle2, ArrowRight, ArrowUpRight } from 'lucide-react'
+import { BarChart3, AlertCircle, Users, CheckCircle2, ArrowRight, ArrowUpRight, RefreshCw, Check } from 'lucide-react'
 import { TIER_DISPLAY, TriageTier } from '@/lib/triage/types'
 import { ValidationResults } from '@/lib/triage/validationTypes'
 import Link from 'next/link'
@@ -333,6 +333,134 @@ export default function ResultsPage() {
                       </div>
                     </div>
                   )}
+                </div>
+              )}
+
+              {/* AI Self-Consistency (Multi-Run) */}
+              {results.ai_consistency && results.ai_consistency.total_cases_with_runs > 0 && (
+                <div style={{
+                  background: 'rgba(30, 41, 59, 0.8)',
+                  border: '1px solid rgba(139, 92, 246, 0.3)',
+                  borderRadius: '12px',
+                  padding: '20px',
+                  marginBottom: '24px',
+                }}>
+                  <h3 style={{ color: '#e2e8f0', fontSize: '0.9rem', fontWeight: 600, margin: '0 0 4px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <RefreshCw size={16} color="#A78BFA" />
+                    AI Self-Consistency (Intra-Rater Reliability)
+                  </h3>
+                  <p style={{ color: '#64748b', fontSize: '0.72rem', margin: '0 0 16px', lineHeight: 1.5 }}>
+                    Each case was run through the triage algorithm multiple times. A &quot;baseline&quot; run uses temperature=0 (near-deterministic),
+                    while standard runs use temperature=0.2. Perfect agreement means all runs produced the same tier.
+                  </p>
+
+                  {/* Summary stats */}
+                  <div style={{ display: 'flex', gap: '16px', marginBottom: '20px' }}>
+                    <div style={{
+                      flex: 1, background: 'rgba(15, 23, 42, 0.5)',
+                      border: '1px solid #1e293b', borderRadius: '10px', padding: '16px',
+                    }}>
+                      <div style={{ color: '#94a3b8', fontSize: '0.65rem', fontWeight: 600, textTransform: 'uppercase', marginBottom: '6px' }}>
+                        Perfect Agreement
+                      </div>
+                      <div style={{ color: results.ai_consistency.perfect_agreement_rate >= 0.8 ? '#16A34A' : results.ai_consistency.perfect_agreement_rate >= 0.6 ? '#F59E0B' : '#EF4444', fontSize: '2rem', fontWeight: 700, lineHeight: 1 }}>
+                        {formatPct(results.ai_consistency.perfect_agreement_rate)}
+                      </div>
+                      <div style={{ color: '#64748b', fontSize: '0.65rem', marginTop: '4px' }}>
+                        All runs agree on tier
+                      </div>
+                    </div>
+                    <div style={{
+                      flex: 1, background: 'rgba(15, 23, 42, 0.5)',
+                      border: '1px solid #1e293b', borderRadius: '10px', padding: '16px',
+                    }}>
+                      <div style={{ color: '#94a3b8', fontSize: '0.65rem', fontWeight: 600, textTransform: 'uppercase', marginBottom: '6px' }}>
+                        Avg Distinct Tiers
+                      </div>
+                      <div style={{ color: results.ai_consistency.avg_distinct_tiers_per_case <= 1.2 ? '#16A34A' : '#F59E0B', fontSize: '2rem', fontWeight: 700, lineHeight: 1 }}>
+                        {results.ai_consistency.avg_distinct_tiers_per_case.toFixed(2)}
+                      </div>
+                      <div style={{ color: '#64748b', fontSize: '0.65rem', marginTop: '4px' }}>
+                        Per case across runs (1.0 = perfect)
+                      </div>
+                    </div>
+                    <div style={{
+                      flex: 1, background: 'rgba(15, 23, 42, 0.5)',
+                      border: '1px solid #1e293b', borderRadius: '10px', padding: '16px',
+                    }}>
+                      <div style={{ color: '#94a3b8', fontSize: '0.65rem', fontWeight: 600, textTransform: 'uppercase', marginBottom: '6px' }}>
+                        Total Runs
+                      </div>
+                      <div style={{ color: '#a78bfa', fontSize: '2rem', fontWeight: 700, lineHeight: 1 }}>
+                        {results.ai_consistency.total_runs}
+                      </div>
+                      <div style={{ color: '#64748b', fontSize: '0.65rem', marginTop: '4px' }}>
+                        Across {results.ai_consistency.total_cases_with_runs} cases
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Per-case consistency */}
+                  <h4 style={{ color: '#cbd5e1', fontSize: '0.8rem', fontWeight: 600, margin: '0 0 10px' }}>
+                    Per-Case Consistency
+                  </h4>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', maxHeight: '400px', overflowY: 'auto' }}>
+                    {results.ai_consistency.case_consistency.map(cc => (
+                      <div key={cc.case_id} style={{
+                        padding: '10px 14px', borderRadius: '8px',
+                        background: cc.all_agree ? 'rgba(22, 163, 74, 0.04)' : 'rgba(234, 179, 8, 0.04)',
+                        border: `1px solid ${cc.all_agree ? 'rgba(22, 163, 74, 0.15)' : 'rgba(234, 179, 8, 0.15)'}`,
+                      }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '6px' }}>
+                          <span style={{ color: '#64748b', fontSize: '0.7rem', fontWeight: 600 }}>#{cc.case_number}</span>
+                          <span style={{ color: '#e2e8f0', fontSize: '0.78rem', fontWeight: 500, flex: 1 }}>{cc.case_title}</span>
+                          {cc.all_agree ? (
+                            <span style={{ color: '#16A34A', fontSize: '0.65rem', fontWeight: 700 }}>
+                              <Check size={10} style={{ display: 'inline', verticalAlign: 'middle', marginRight: '2px' }} />
+                              CONSISTENT
+                            </span>
+                          ) : (
+                            <span style={{ color: '#EAB308', fontSize: '0.65rem', fontWeight: 700 }}>
+                              {cc.distinct_tiers} DISTINCT TIERS
+                            </span>
+                          )}
+                        </div>
+
+                        <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap', alignItems: 'center' }}>
+                          {/* Baseline */}
+                          {cc.baseline_tier && (
+                            <span style={{
+                              padding: '2px 7px', borderRadius: '3px', fontSize: '0.58rem', fontWeight: 700,
+                              background: TIER_DISPLAY[cc.baseline_tier]?.bgColor || '#6B7280', color: '#fff',
+                              border: '1.5px solid rgba(255,255,255,0.3)',
+                            }}>
+                              T0: {TIER_DISPLAY[cc.baseline_tier]?.label || cc.baseline_tier}
+                            </span>
+                          )}
+
+                          {/* Standard runs */}
+                          {cc.run_tiers.map((tier, i) => (
+                            <span key={i} style={{
+                              padding: '2px 7px', borderRadius: '3px', fontSize: '0.58rem', fontWeight: 600,
+                              background: TIER_DISPLAY[tier]?.bgColor || '#6B7280', color: '#fff',
+                            }}>
+                              R{i + 1}: {TIER_DISPLAY[tier]?.label || tier}
+                            </span>
+                          ))}
+
+                          {/* Score stats */}
+                          {cc.score_mean !== null && (
+                            <span style={{ color: '#64748b', fontSize: '0.65rem', marginLeft: '8px' }}>
+                              Score: {cc.score_mean.toFixed(2)}
+                              {cc.score_std !== null && cc.score_std > 0 && (
+                                <> &plusmn; {cc.score_std.toFixed(2)}</>
+                              )}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
                 </div>
               )}
 
@@ -678,6 +806,7 @@ export default function ResultsPage() {
                       <li><strong style={{ color: '#cbd5e1' }}>Krippendorff&apos;s Alpha</strong> — Handles missing data and ordinal scales. Penalizes large disagreements more than small ones.</li>
                       <li><strong style={{ color: '#cbd5e1' }}>Weighted Kappa</strong> — Pairwise agreement that accounts for the ordered nature of triage tiers (being off by 1 tier is less severe than being off by 3).</li>
                       <li><strong style={{ color: '#cbd5e1' }}>Consensus</strong> — Determined by majority vote among all reviewers for each case.</li>
+                      <li><strong style={{ color: '#cbd5e1' }}>AI Self-Consistency</strong> — Measures how often the AI produces the same tier across multiple runs. A baseline run (temp=0) is near-deterministic; standard runs (temp=0.2) measure real-world variance.</li>
                       <li><strong style={{ color: '#cbd5e1' }}>Redirect</strong> — Indicates when AI or a reviewer flagged the case as belonging to a non-neurology specialty (e.g. Orthopedics, Psychiatry).</li>
                     </ul>
                   </div>
