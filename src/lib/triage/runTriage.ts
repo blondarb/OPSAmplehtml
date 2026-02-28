@@ -7,7 +7,7 @@
 import OpenAI from 'openai'
 import { calculateTriageTier, validateAIResponse } from './scoring'
 import { TRIAGE_SYSTEM_PROMPT, buildTriageUserPrompt } from './systemPrompt'
-import { AITriageResponse, DISCLAIMER_TEXT } from './types'
+import { AITriageResponse, DimensionScores, DISCLAIMER_TEXT } from './types'
 
 const AI_MODEL = 'gpt-5.2'
 
@@ -24,13 +24,13 @@ export interface TriageResult {
   triage_tier: string
   triage_tier_display: string
   confidence: string
-  dimension_scores: Record<string, unknown>
+  dimension_scores: DimensionScores
   weighted_score: number | null
   red_flag_override: boolean
   emergent_override: boolean
   emergent_reason: string | null
   insufficient_data: boolean
-  missing_information: string | null
+  missing_information: string[] | null
   clinical_reasons: string[]
   red_flags: string[]
   suggested_workup: string[]
