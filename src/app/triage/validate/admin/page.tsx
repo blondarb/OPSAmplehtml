@@ -1,11 +1,11 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import React, { useState, useEffect, useCallback } from 'react'
 import { useAuth } from '@/contexts/AuthContext'
 import { useRouter } from 'next/navigation'
 import PlatformShell from '@/components/layout/PlatformShell'
 import FeatureSubHeader from '@/components/layout/FeatureSubHeader'
-import { Settings, Plus, Play, Trash2, Check, AlertCircle, Upload, Loader2, RefreshCw, BarChart3 } from 'lucide-react'
+import { Settings, Plus, Play, Trash2, Check, AlertCircle, Upload, Loader2, RefreshCw, BarChart3, Database } from 'lucide-react'
 import { TIER_DISPLAY, TriageTier } from '@/lib/triage/types'
 import Link from 'next/link'
 
@@ -18,8 +18,12 @@ interface CaseRow {
   patient_sex: string | null
   ai_triage_tier: string | null
   ai_weighted_score: number | null
+  ai_dimension_scores: Record<string, number> | null
   ai_subspecialty: string | null
+  ai_redirect_to_non_neuro: boolean
+  ai_redirect_specialty: string | null
   ai_confidence: string | null
+  ai_session_id: string | null
   is_calibration: boolean
   active: boolean
   study_name: string
@@ -59,6 +63,7 @@ export default function AdminPage() {
   const [cases, setCases] = useState<CaseRow[]>([])
   const [loading, setLoading] = useState(true)
   const [mode, setMode] = useState<'list' | 'single' | 'bulk' | 'consistency'>('list')
+  const [expandedCaseId, setExpandedCaseId] = useState<string | null>(null)
 
   // Single note form
   const [noteTitle, setNoteTitle] = useState('')
@@ -82,6 +87,10 @@ export default function AdminPage() {
   const [consistencyProgress, setConsistencyProgress] = useState('')
   const [consistencyResults, setConsistencyResults] = useState<ConsistencyResult[] | null>(null)
   const [selectedCaseIds, setSelectedCaseIds] = useState<Set<string>>(new Set())
+
+  // Seeding
+  const [seeding, setSeeding] = useState(false)
+  const [seedMessage, setSeedMessage] = useState('')
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -197,6 +206,36 @@ export default function AdminPage() {
     }
   }
 
+  // Seed from demo scenarios
+  async function handleSeedFromDemos() {
+    setSeeding(true)
+    setSeedMessage('Loading 26 demo scenarios and running AI triage on each...')
+
+    try {
+      const res = await fetch('/api/triage/validate/cases/seed', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          run_ai: true,
+          clear_existing: cases.length === 0, // only clear if empty
+        }),
+      })
+
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}))
+        throw new Error(data.error || 'Seeding failed')
+      }
+
+      const data = await res.json()
+      setSeedMessage(`Seeded ${data.seeded} cases (${data.with_ai_results} with AI results, ${data.errors} errors)`)
+      await fetchCases()
+    } catch (err) {
+      setSeedMessage(err instanceof Error ? err.message : 'Seeding failed')
+    } finally {
+      setSeeding(false)
+    }
+  }
+
   // Toggle case selection for consistency runs
   function toggleCaseSelection(caseId: string) {
     setSelectedCaseIds(prev => {
@@ -305,7 +344,32 @@ export default function AdminPage() {
               }}>
                 View Results
               </Link>
+              {cases.length > 0 && (
+                <button
+                  onClick={handleSeedFromDemos}
+                  disabled={seeding}
+                  style={{
+                    padding: '6px 14px', borderRadius: '6px', fontSize: '0.75rem', fontWeight: 500,
+                    background: seeding ? 'rgba(51, 65, 85, 0.5)' : 'rgba(139, 92, 246, 0.1)',
+                    border: '1px solid rgba(139, 92, 246, 0.3)',
+                    color: seeding ? '#64748b' : '#8B5CF6', cursor: seeding ? 'not-allowed' : 'pointer',
+                    display: 'flex', alignItems: 'center', gap: '4px',
+                  }}
+                >
+                  {seeding ? <Loader2 size={12} style={{ animation: 'spin 1s linear infinite' }} /> : <Database size={12} />}
+                  {seeding ? 'Seeding...' : 'Re-seed Demos'}
+                </button>
+              )}
             </div>
+            {seedMessage && cases.length > 0 && (
+              <div style={{
+                marginTop: '8px',
+                color: seedMessage.includes('Seeded') ? '#16A34A' : seedMessage.includes('Loading') ? '#a78bfa' : '#EF4444',
+                fontSize: '0.75rem', fontWeight: 500,
+              }}>
+                {seedMessage}
+              </div>
+            )}
           </div>
 
           {/* Stats bar */}
@@ -331,6 +395,55 @@ export default function AdminPage() {
               </div>
             ))}
           </div>
+
+          {/* Seed from Demo Scenarios */}
+          {cases.length === 0 && (
+            <div style={{
+              background: 'rgba(139, 92, 246, 0.06)',
+              border: '1px solid rgba(139, 92, 246, 0.2)',
+              borderRadius: '12px',
+              padding: '20px',
+              marginBottom: '20px',
+              textAlign: 'center',
+            }}>
+              <Database size={28} color="#A78BFA" style={{ marginBottom: '8px' }} />
+              <h3 style={{ color: '#e2e8f0', fontSize: '0.95rem', fontWeight: 600, margin: '0 0 6px' }}>
+                No Validation Cases Yet
+              </h3>
+              <p style={{ color: '#94a3b8', fontSize: '0.8rem', margin: '0 0 14px', lineHeight: 1.5 }}>
+                Seed the study with 26 pre-built demo referral scenarios. Each note will be run through the AI triage
+                algorithm to establish the AI baseline. You can also add your own notes manually afterwards.
+              </p>
+              <button
+                onClick={handleSeedFromDemos}
+                disabled={seeding}
+                style={{
+                  display: 'inline-flex', alignItems: 'center', gap: '8px',
+                  padding: '12px 28px', borderRadius: '8px', fontSize: '0.9rem', fontWeight: 600,
+                  background: seeding ? '#334155' : '#8B5CF6',
+                  color: seeding ? '#64748b' : '#fff',
+                  border: 'none', cursor: seeding ? 'not-allowed' : 'pointer',
+                }}
+              >
+                {seeding ? (
+                  <><Loader2 size={16} style={{ animation: 'spin 1s linear infinite' }} /> Seeding &amp; Running AI...</>
+                ) : (
+                  <><Database size={16} /> Seed 26 Demo Cases with AI Triage</>
+                )}
+              </button>
+              {seedMessage && (
+                <div style={{
+                  marginTop: '12px',
+                  color: seedMessage.includes('Seeded') ? '#16A34A' : seedMessage.includes('Loading') ? '#a78bfa' : '#EF4444',
+                  fontSize: '0.8rem', fontWeight: 500,
+                }}>
+                  {seeding && <Loader2 size={12} style={{ display: 'inline', marginRight: '6px', animation: 'spin 1s linear infinite' }} />}
+                  {seedMessage}
+                </div>
+              )}
+              <style>{`@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }`}</style>
+            </div>
+          )}
 
           {/* Mode Tabs */}
           <div style={{ display: 'flex', gap: '4px', marginBottom: '20px' }}>
@@ -938,40 +1051,142 @@ export default function AdminPage() {
                       </tr>
                     </thead>
                     <tbody>
-                      {cases.map(c => (
-                        <tr key={c.id}>
-                          <td style={tdStyle}>{c.case_number}</td>
-                          <td style={{ ...tdStyle, maxWidth: '250px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                            {c.title}
-                            {c.patient_age && <span style={{ color: '#64748b', marginLeft: '6px' }}>{c.patient_age}{c.patient_sex ? c.patient_sex : ''}</span>}
-                          </td>
-                          <td style={{ ...tdStyle, textAlign: 'center' }}>
-                            {c.ai_triage_tier ? (
-                              <span style={{
-                                padding: '2px 8px', borderRadius: '4px', fontSize: '0.6rem', fontWeight: 700,
-                                background: TIER_DISPLAY[c.ai_triage_tier as TriageTier]?.bgColor || '#6B7280', color: '#fff',
-                              }}>
-                                {TIER_DISPLAY[c.ai_triage_tier as TriageTier]?.label || c.ai_triage_tier}
-                              </span>
-                            ) : (
-                              <span style={{ color: '#475569', fontSize: '0.7rem' }}>Pending</span>
+                      {cases.map(c => {
+                        const isExpanded = expandedCaseId === c.id
+                        return (
+                          <React.Fragment key={c.id}>
+                            <tr
+                              onClick={() => setExpandedCaseId(isExpanded ? null : c.id)}
+                              style={{ cursor: 'pointer', background: isExpanded ? 'rgba(139, 92, 246, 0.04)' : 'transparent' }}
+                            >
+                              <td style={tdStyle}>{c.case_number}</td>
+                              <td style={{ ...tdStyle, maxWidth: '250px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                {c.title}
+                                {c.patient_age && <span style={{ color: '#64748b', marginLeft: '6px' }}>{c.patient_age}{c.patient_sex ? c.patient_sex : ''}</span>}
+                              </td>
+                              <td style={{ ...tdStyle, textAlign: 'center' }}>
+                                {c.ai_triage_tier ? (
+                                  <span style={{
+                                    padding: '2px 8px', borderRadius: '4px', fontSize: '0.6rem', fontWeight: 700,
+                                    background: TIER_DISPLAY[c.ai_triage_tier as TriageTier]?.bgColor || '#6B7280', color: '#fff',
+                                  }}>
+                                    {TIER_DISPLAY[c.ai_triage_tier as TriageTier]?.label || c.ai_triage_tier}
+                                  </span>
+                                ) : (
+                                  <span style={{ color: '#475569', fontSize: '0.7rem' }}>Pending</span>
+                                )}
+                              </td>
+                              <td style={{ ...tdStyle, textAlign: 'center', color: '#94a3b8', fontSize: '0.8rem' }}>
+                                {c.ai_weighted_score ?? '—'}
+                              </td>
+                              <td style={{ ...tdStyle, textAlign: 'center', color: '#94a3b8', fontSize: '0.75rem' }}>
+                                {c.ai_subspecialty || '—'}
+                              </td>
+                              <td style={{ ...tdStyle, textAlign: 'center' }}>
+                                {c.is_calibration ? (
+                                  <span style={{ color: '#F59E0B', fontSize: '0.65rem', fontWeight: 700 }}>CAL</span>
+                                ) : (
+                                  <span style={{ color: '#64748b', fontSize: '0.65rem' }}>Scored</span>
+                                )}
+                              </td>
+                            </tr>
+                            {isExpanded && (
+                              <tr>
+                                <td colSpan={6} style={{ padding: 0, border: 'none' }}>
+                                  <div style={{
+                                    padding: '16px 20px', background: 'rgba(15, 23, 42, 0.5)',
+                                    borderBottom: '1px solid #334155',
+                                  }}>
+                                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '14px' }}>
+                                      {/* AI Tier & Score */}
+                                      <div>
+                                        <div style={{ color: '#94a3b8', fontSize: '0.65rem', fontWeight: 600, textTransform: 'uppercase', marginBottom: '6px' }}>
+                                          AI Assessment
+                                        </div>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '6px' }}>
+                                          {c.ai_triage_tier && (
+                                            <span style={{
+                                              padding: '3px 10px', borderRadius: '4px', fontSize: '0.7rem', fontWeight: 700,
+                                              background: TIER_DISPLAY[c.ai_triage_tier as TriageTier]?.bgColor || '#6B7280', color: '#fff',
+                                            }}>
+                                              {TIER_DISPLAY[c.ai_triage_tier as TriageTier]?.label || c.ai_triage_tier}
+                                            </span>
+                                          )}
+                                          <span style={{ color: '#e2e8f0', fontSize: '0.8rem', fontWeight: 600 }}>
+                                            Score: {c.ai_weighted_score ?? 'N/A'}
+                                          </span>
+                                          {c.ai_confidence && (
+                                            <span style={{
+                                              padding: '2px 8px', borderRadius: '4px', fontSize: '0.6rem', fontWeight: 600,
+                                              background: c.ai_confidence === 'high' ? 'rgba(22, 163, 74, 0.15)' : c.ai_confidence === 'medium' ? 'rgba(245, 158, 11, 0.15)' : 'rgba(239, 68, 68, 0.15)',
+                                              color: c.ai_confidence === 'high' ? '#16A34A' : c.ai_confidence === 'medium' ? '#F59E0B' : '#EF4444',
+                                            }}>
+                                              {c.ai_confidence} confidence
+                                            </span>
+                                          )}
+                                        </div>
+                                        {c.ai_subspecialty && (
+                                          <div style={{ color: '#94a3b8', fontSize: '0.75rem' }}>
+                                            Subspecialty: <span style={{ color: '#cbd5e1' }}>{c.ai_subspecialty}</span>
+                                          </div>
+                                        )}
+                                        {c.ai_redirect_to_non_neuro && (
+                                          <div style={{ color: '#F59E0B', fontSize: '0.75rem', fontWeight: 600, marginTop: '4px' }}>
+                                            Redirect → {c.ai_redirect_specialty || 'Non-Neuro'}
+                                          </div>
+                                        )}
+                                      </div>
+
+                                      {/* Dimension Scores */}
+                                      {c.ai_dimension_scores && (
+                                        <div>
+                                          <div style={{ color: '#94a3b8', fontSize: '0.65rem', fontWeight: 600, textTransform: 'uppercase', marginBottom: '6px' }}>
+                                            Dimension Scores
+                                          </div>
+                                          <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
+                                            {Object.entries(c.ai_dimension_scores).map(([dim, score]) => (
+                                              <div key={dim} style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                                <span style={{ color: '#64748b', fontSize: '0.68rem', width: '140px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                                  {dim.replace(/_/g, ' ')}
+                                                </span>
+                                                <div style={{ flex: 1, height: '5px', background: '#1e293b', borderRadius: '3px', overflow: 'hidden' }}>
+                                                  <div style={{
+                                                    height: '100%', width: `${(score / 5) * 100}%`,
+                                                    background: score >= 4 ? '#EF4444' : score >= 3 ? '#F59E0B' : '#16A34A',
+                                                    borderRadius: '3px',
+                                                  }} />
+                                                </div>
+                                                <span style={{ color: '#e2e8f0', fontSize: '0.7rem', fontWeight: 600, width: '20px', textAlign: 'right' }}>
+                                                  {score}
+                                                </span>
+                                              </div>
+                                            ))}
+                                          </div>
+                                        </div>
+                                      )}
+                                    </div>
+
+                                    {/* Referral text preview */}
+                                    <div>
+                                      <div style={{ color: '#94a3b8', fontSize: '0.65rem', fontWeight: 600, textTransform: 'uppercase', marginBottom: '4px' }}>
+                                        Referral Note (preview)
+                                      </div>
+                                      <div style={{
+                                        background: '#0f172a', border: '1px solid #1e293b', borderRadius: '6px',
+                                        padding: '10px 12px', maxHeight: '120px', overflowY: 'auto',
+                                        color: '#94a3b8', fontSize: '0.72rem', lineHeight: 1.5,
+                                        whiteSpace: 'pre-wrap', fontFamily: 'monospace',
+                                      }}>
+                                        {c.referral_text.substring(0, 800)}{c.referral_text.length > 800 ? '...' : ''}
+                                      </div>
+                                    </div>
+                                  </div>
+                                </td>
+                              </tr>
                             )}
-                          </td>
-                          <td style={{ ...tdStyle, textAlign: 'center', color: '#94a3b8', fontSize: '0.8rem' }}>
-                            {c.ai_weighted_score ?? '—'}
-                          </td>
-                          <td style={{ ...tdStyle, textAlign: 'center', color: '#94a3b8', fontSize: '0.75rem' }}>
-                            {c.ai_subspecialty || '—'}
-                          </td>
-                          <td style={{ ...tdStyle, textAlign: 'center' }}>
-                            {c.is_calibration ? (
-                              <span style={{ color: '#F59E0B', fontSize: '0.65rem', fontWeight: 700 }}>CAL</span>
-                            ) : (
-                              <span style={{ color: '#64748b', fontSize: '0.65rem' }}>Scored</span>
-                            )}
-                          </td>
-                        </tr>
-                      ))}
+                          </React.Fragment>
+                        )
+                      })}
                     </tbody>
                   </table>
                 </div>
