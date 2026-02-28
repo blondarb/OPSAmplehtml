@@ -121,7 +121,7 @@ export async function POST(req: NextRequest) {
             ai_redirect_to_non_neuro: data.redirect_to_non_neuro || false,
             ai_redirect_specialty: data.redirect_specialty || null,
             ai_confidence: data.confidence,
-            ai_session_id: data.session_id,
+            ai_session_id: null,          // no triage_sessions row for validation runs
             ai_raw_response: data,
             duration_ms: durationMs,
             error: null,
