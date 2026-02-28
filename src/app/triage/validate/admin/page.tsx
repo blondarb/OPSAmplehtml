@@ -254,7 +254,7 @@ export default function AdminPage() {
     }
   }
 
-  // Run consistency test
+  // Run consistency test — batches cases to stay within Vercel function timeout
   async function handleConsistencyRun() {
     const caseIds = selectedCaseIds.size > 0
       ? Array.from(selectedCaseIds)
@@ -263,31 +263,61 @@ export default function AdminPage() {
     if (caseIds.length === 0) return
 
     setConsistencyRunning(true)
-    setConsistencyProgress(`Running ${runCount} standard runs${includeBaseline ? ' + 1 baseline (temp=0)' : ''} on ${caseIds.length} cases...`)
     setConsistencyResults(null)
 
-    try {
-      const res = await fetch('/api/triage/validate/cases/rerun', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          case_ids: caseIds,
-          run_count: runCount,
-          include_baseline: includeBaseline,
-          clear_previous: true,
-        }),
-      })
+    // Batch size: 3 cases per request keeps each call under ~3 min
+    const BATCH_SIZE = 3
+    const batches: string[][] = []
+    for (let i = 0; i < caseIds.length; i += BATCH_SIZE) {
+      batches.push(caseIds.slice(i, i + BATCH_SIZE))
+    }
 
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}))
-        throw new Error(data.error || 'Consistency run failed')
+    const runsPerCase = runCount + (includeBaseline ? 1 : 0)
+    const totalCalls = caseIds.length * runsPerCase
+    let completedCases = 0
+    let totalSuccessful = 0
+    let totalFailed = 0
+    const allResults: ConsistencyResult[] = []
+
+    try {
+      for (let b = 0; b < batches.length; b++) {
+        const batch = batches[b]
+        setConsistencyProgress(
+          `Batch ${b + 1}/${batches.length}: running ${batch.length} cases (${completedCases}/${caseIds.length} done, ~${totalCalls - completedCases * runsPerCase} API calls remaining)...`
+        )
+
+        const res = await fetch('/api/triage/validate/cases/rerun', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            case_ids: batch,
+            run_count: runCount,
+            include_baseline: includeBaseline,
+            clear_previous: true,
+          }),
+        })
+
+        if (!res.ok) {
+          const data = await res.json().catch(() => ({}))
+          throw new Error(data.error || `Batch ${b + 1} failed`)
+        }
+
+        const data = await res.json()
+        completedCases += batch.length
+        totalSuccessful += data.successful_runs || 0
+        totalFailed += data.failed_runs || 0
+        if (data.results) allResults.push(...data.results)
+
+        // Update results incrementally so user sees progress
+        setConsistencyResults([...allResults])
       }
 
-      const data = await res.json()
-      setConsistencyResults(data.results || [])
-      setConsistencyProgress(`Complete: ${data.successful_runs}/${data.total_runs} runs succeeded across ${data.total_cases} cases`)
+      setConsistencyProgress(
+        `Complete: ${totalSuccessful}/${totalSuccessful + totalFailed} runs succeeded across ${caseIds.length} cases`
+      )
     } catch (err) {
-      setConsistencyProgress(err instanceof Error ? err.message : 'Failed')
+      const partial = allResults.length > 0 ? ` (${completedCases}/${caseIds.length} cases completed before error)` : ''
+      setConsistencyProgress((err instanceof Error ? err.message : 'Failed') + partial)
     } finally {
       setConsistencyRunning(false)
     }
