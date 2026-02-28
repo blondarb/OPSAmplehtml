@@ -5,7 +5,7 @@ import { useAuth } from '@/contexts/AuthContext'
 import { useRouter } from 'next/navigation'
 import PlatformShell from '@/components/layout/PlatformShell'
 import FeatureSubHeader from '@/components/layout/FeatureSubHeader'
-import { ClipboardCheck, ChevronRight, Check, AlertCircle, Clock, BarChart3 } from 'lucide-react'
+import { ClipboardCheck, ChevronRight, Check, AlertCircle, Clock, BarChart3, Settings } from 'lucide-react'
 import { TIER_DISPLAY, TriageTier } from '@/lib/triage/types'
 import { ValidationCaseWithStatus, KEY_FACTOR_OPTIONS, SUBSPECIALTY_OPTIONS } from '@/lib/triage/validationTypes'
 import Link from 'next/link'
@@ -37,6 +37,7 @@ export default function ValidationPage() {
   const [selectedConfidence, setSelectedConfidence] = useState<'high' | 'moderate' | 'low' | ''>('')
   const [selectedFactors, setSelectedFactors] = useState<string[]>([])
   const [reasoning, setReasoning] = useState('')
+  const [feedback, setFeedback] = useState('')
 
   // Timer
   const startTimeRef = useRef<Date | null>(null)
@@ -78,12 +79,14 @@ export default function ValidationPage() {
       setSelectedConfidence((c.review.confidence as 'high' | 'moderate' | 'low') || '')
       setSelectedFactors(c.review.key_factors || [])
       setReasoning(c.review.reasoning || '')
+      setFeedback('')
     } else {
       setSelectedTier('')
       setSelectedSubspecialty('')
       setSelectedConfidence('')
       setSelectedFactors([])
       setReasoning('')
+      setFeedback('')
     }
   }
 
@@ -113,7 +116,7 @@ export default function ValidationPage() {
           subspecialty: selectedSubspecialty || null,
           confidence: selectedConfidence || null,
           key_factors: selectedFactors,
-          reasoning: reasoning || null,
+          reasoning: [reasoning, feedback].filter(Boolean).join('\n\n---\nAlgorithm Feedback:\n') || null,
           started_at: startTimeRef.current?.toISOString() || null,
           duration_seconds: durationSeconds,
         }),
@@ -226,6 +229,27 @@ export default function ValidationPage() {
                 }} />
               </div>
             </div>
+            <div style={{ display: 'flex', gap: '8px', flexShrink: 0 }}>
+            <Link
+              href="/triage/validate/admin"
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '4px',
+                padding: '8px 12px',
+                background: 'rgba(100, 116, 139, 0.15)',
+                color: '#94a3b8',
+                borderRadius: '8px',
+                fontSize: '0.75rem',
+                fontWeight: 500,
+                textDecoration: 'none',
+                border: '1px solid rgba(100, 116, 139, 0.2)',
+                whiteSpace: 'nowrap',
+              }}
+            >
+              <Settings size={13} />
+              Admin
+            </Link>
             <Link
               href="/triage/validate/results"
               style={{
@@ -246,6 +270,7 @@ export default function ValidationPage() {
               <BarChart3 size={14} />
               Results
             </Link>
+            </div>
           </div>
 
           {/* Empty state */}
@@ -598,6 +623,37 @@ export default function ValidationPage() {
                         style={{
                           width: '100%',
                           minHeight: '80px',
+                          padding: '10px 12px',
+                          background: '#0f172a',
+                          border: '1px solid #334155',
+                          borderRadius: '8px',
+                          color: '#e2e8f0',
+                          fontSize: '0.8rem',
+                          lineHeight: 1.5,
+                          resize: 'vertical',
+                          outline: 'none',
+                          fontFamily: 'inherit',
+                          boxSizing: 'border-box',
+                        }}
+                      />
+                    </div>
+
+                    {/* Feedback for Algorithm Improvement */}
+                    <div style={{ padding: '16px 20px', borderBottom: '1px solid #334155' }}>
+                      <label style={{ color: '#94a3b8', fontSize: '0.75rem', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px', display: 'block', marginBottom: '4px' }}>
+                        Feedback for Algorithm (optional)
+                      </label>
+                      <p style={{ color: '#64748b', fontSize: '0.7rem', margin: '0 0 8px', lineHeight: 1.4 }}>
+                        Is anything missing from this note that would change your triage? Would you weigh certain factors differently?
+                        Any suggestions for how the scoring algorithm could be improved?
+                      </p>
+                      <textarea
+                        value={feedback}
+                        onChange={e => setFeedback(e.target.value)}
+                        placeholder="e.g. The note doesn't mention whether imaging was done. I weighed functional impairment more heavily here because..."
+                        style={{
+                          width: '100%',
+                          minHeight: '70px',
                           padding: '10px 12px',
                           background: '#0f172a',
                           border: '1px solid #334155',
