@@ -4,7 +4,8 @@ import { useState, useRef } from 'react'
 import { TriageResult, ClinicalExtraction, TriagePageState, FILE_CONSTRAINTS, BatchItem } from '@/lib/triage/types'
 import PlatformShell from '@/components/layout/PlatformShell'
 import FeatureSubHeader from '@/components/layout/FeatureSubHeader'
-import { Brain } from 'lucide-react'
+import { Brain, ClipboardCheck } from 'lucide-react'
+import Link from 'next/link'
 import TriageInputPanel from '@/components/triage/TriageInputPanel'
 import TriageOutputPanel from '@/components/triage/TriageOutputPanel'
 import ExtractionReviewPanel from '@/components/triage/ExtractionReviewPanel'
@@ -298,6 +299,26 @@ export default function TriagePage() {
             Paste a referral note or upload clinical documents. The AI analyzes clinical features, scores five dimensions,
             and the application calculates a triage tier deterministically. All scoring is transparent and auditable.
           </p>
+          <Link
+            href="/triage/validate"
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '6px',
+              marginTop: '12px',
+              padding: '6px 14px',
+              background: 'rgba(139, 92, 246, 0.1)',
+              border: '1px solid rgba(139, 92, 246, 0.3)',
+              borderRadius: '6px',
+              color: '#8B5CF6',
+              fontSize: '0.75rem',
+              fontWeight: 500,
+              textDecoration: 'none',
+            }}
+          >
+            <ClipboardCheck size={13} />
+            Independent Reviewers — Click Here for Validation Study
+          </Link>
         </div>
 
         {/* State machine rendering */}
