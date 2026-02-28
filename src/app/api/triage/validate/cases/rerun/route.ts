@@ -1,11 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { runTriage } from '@/lib/triage/runTriage'
 
 /**
  * POST /api/triage/validate/cases/rerun
  *
  * Re-runs one or more validation cases through the AI triage algorithm
  * multiple times to measure consistency. Stores each run in validation_ai_runs.
+ *
+ * Uses the shared runTriage() function directly instead of HTTP self-fetch
+ * to avoid serverless deadlocks on Vercel.
  *
  * Body:
  *   {
@@ -61,12 +65,6 @@ export async function POST(req: NextRequest) {
       .in('case_id', case_ids)
   }
 
-  // Build internal API URL
-  const protocol = req.headers.get('x-forwarded-proto') || 'http'
-  const host = req.headers.get('host') || 'localhost:3000'
-  const baseUrl = `${protocol}://${host}`
-  const cookieHeader = req.headers.get('cookie') || ''
-
   const allResults: Array<{
     case_id: string
     case_number: number
@@ -76,7 +74,7 @@ export async function POST(req: NextRequest) {
       temperature: number
       status: 'success' | 'error'
       ai_tier?: string
-      ai_score?: number
+      ai_score?: number | null
       ai_confidence?: string
       duration_ms?: number
       error?: string
@@ -100,81 +98,52 @@ export async function POST(req: NextRequest) {
       const startTime = Date.now()
 
       try {
-        const triageRes = await fetch(`${baseUrl}/api/triage`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Cookie': cookieHeader,
-          },
-          body: JSON.stringify({
-            referral_text: c.referral_text,
-            patient_age: c.patient_age,
-            patient_sex: c.patient_sex,
-            temperature: run.temperature,
-          }),
+        // Call triage logic directly — no HTTP self-fetch
+        const data = await runTriage({
+          referral_text: c.referral_text,
+          patient_age: c.patient_age,
+          patient_sex: c.patient_sex,
+          temperature: run.temperature,
         })
 
         const durationMs = Date.now() - startTime
 
-        if (triageRes.ok) {
-          const data = await triageRes.json()
+        // Store in validation_ai_runs
+        await supabase.from('validation_ai_runs').upsert({
+          case_id: c.id,
+          run_number: run.run_number,
+          temperature: run.temperature,
+          ai_triage_tier: data.triage_tier,
+          ai_weighted_score: data.weighted_score,
+          ai_dimension_scores: data.dimension_scores,
+          ai_subspecialty: data.subspecialty_recommendation,
+          ai_redirect_to_non_neuro: data.redirect_to_non_neuro || false,
+          ai_redirect_specialty: data.redirect_specialty || null,
+          ai_confidence: data.confidence,
+          ai_session_id: data.session_id,
+          ai_raw_response: data,
+          duration_ms: durationMs,
+          error: null,
+        }, { onConflict: 'case_id,run_number' })
 
-          // Store in validation_ai_runs
-          await supabase.from('validation_ai_runs').upsert({
-            case_id: c.id,
-            run_number: run.run_number,
-            temperature: run.temperature,
-            ai_triage_tier: data.triage_tier,
-            ai_weighted_score: data.weighted_score,
-            ai_dimension_scores: data.dimension_scores,
-            ai_subspecialty: data.subspecialty_recommendation,
-            ai_redirect_to_non_neuro: data.redirect_to_non_neuro || false,
-            ai_redirect_specialty: data.redirect_specialty || null,
-            ai_confidence: data.confidence,
-            ai_session_id: data.session_id,
-            ai_raw_response: data,
-            duration_ms: durationMs,
-            error: null,
-          }, { onConflict: 'case_id,run_number' })
-
-          caseRuns.push({
-            run_number: run.run_number,
-            temperature: run.temperature,
-            status: 'success',
-            ai_tier: data.triage_tier,
-            ai_score: data.weighted_score,
-            ai_confidence: data.confidence,
-            duration_ms: durationMs,
-          })
-        } else {
-          const errData = await triageRes.json().catch(() => ({}))
-          const durationMsErr = Date.now() - startTime
-
-          await supabase.from('validation_ai_runs').upsert({
-            case_id: c.id,
-            run_number: run.run_number,
-            temperature: run.temperature,
-            duration_ms: durationMsErr,
-            error: errData.error || 'Triage API returned an error',
-          }, { onConflict: 'case_id,run_number' })
-
-          caseRuns.push({
-            run_number: run.run_number,
-            temperature: run.temperature,
-            status: 'error',
-            duration_ms: durationMsErr,
-            error: errData.error || 'Triage API error',
-          })
-        }
+        caseRuns.push({
+          run_number: run.run_number,
+          temperature: run.temperature,
+          status: 'success',
+          ai_tier: data.triage_tier,
+          ai_score: data.weighted_score,
+          ai_confidence: data.confidence,
+          duration_ms: durationMs,
+        })
       } catch (err) {
-        const durationMsErr = Date.now() - startTime
+        const durationMs = Date.now() - startTime
         const errorMsg = err instanceof Error ? err.message : 'Unknown error'
 
         await supabase.from('validation_ai_runs').upsert({
           case_id: c.id,
           run_number: run.run_number,
           temperature: run.temperature,
-          duration_ms: durationMsErr,
+          duration_ms: durationMs,
           error: errorMsg,
         }, { onConflict: 'case_id,run_number' })
 
@@ -182,7 +151,7 @@ export async function POST(req: NextRequest) {
           run_number: run.run_number,
           temperature: run.temperature,
           status: 'error',
-          duration_ms: durationMsErr,
+          duration_ms: durationMs,
           error: errorMsg,
         })
       }
