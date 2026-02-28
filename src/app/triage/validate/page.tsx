@@ -7,7 +7,7 @@ import PlatformShell from '@/components/layout/PlatformShell'
 import FeatureSubHeader from '@/components/layout/FeatureSubHeader'
 import { ClipboardCheck, ChevronRight, Check, AlertCircle, Clock, BarChart3, Settings } from 'lucide-react'
 import { TIER_DISPLAY, TriageTier } from '@/lib/triage/types'
-import { ValidationCaseWithStatus, KEY_FACTOR_OPTIONS, SUBSPECIALTY_OPTIONS } from '@/lib/triage/validationTypes'
+import { ValidationCaseWithStatus, KEY_FACTOR_OPTIONS, SUBSPECIALTY_OPTIONS, NON_NEURO_SPECIALTY_OPTIONS } from '@/lib/triage/validationTypes'
 import Link from 'next/link'
 
 const TRIAGE_TIERS: { value: TriageTier; label: string; color: string; timeframe: string }[] = [
@@ -34,6 +34,8 @@ export default function ValidationPage() {
   // Form state
   const [selectedTier, setSelectedTier] = useState<TriageTier | ''>('')
   const [selectedSubspecialty, setSelectedSubspecialty] = useState('')
+  const [redirectToNonNeuro, setRedirectToNonNeuro] = useState(false)
+  const [redirectSpecialty, setRedirectSpecialty] = useState('')
   const [selectedConfidence, setSelectedConfidence] = useState<'high' | 'moderate' | 'low' | ''>('')
   const [selectedFactors, setSelectedFactors] = useState<string[]>([])
   const [reasoning, setReasoning] = useState('')
@@ -76,6 +78,8 @@ export default function ValidationPage() {
     if (c.review) {
       setSelectedTier(c.review.triage_tier)
       setSelectedSubspecialty(c.review.subspecialty || '')
+      setRedirectToNonNeuro(c.review.redirect_to_non_neuro || false)
+      setRedirectSpecialty(c.review.redirect_specialty || '')
       setSelectedConfidence((c.review.confidence as 'high' | 'moderate' | 'low') || '')
       setSelectedFactors(c.review.key_factors || [])
       setReasoning(c.review.reasoning || '')
@@ -83,6 +87,8 @@ export default function ValidationPage() {
     } else {
       setSelectedTier('')
       setSelectedSubspecialty('')
+      setRedirectToNonNeuro(false)
+      setRedirectSpecialty('')
       setSelectedConfidence('')
       setSelectedFactors([])
       setReasoning('')
@@ -114,6 +120,8 @@ export default function ValidationPage() {
           case_id: selectedCase.id,
           triage_tier: selectedTier,
           subspecialty: selectedSubspecialty || null,
+          redirect_to_non_neuro: redirectToNonNeuro,
+          redirect_specialty: redirectToNonNeuro ? (redirectSpecialty || null) : null,
           confidence: selectedConfidence || null,
           key_factors: selectedFactors,
           reasoning: [reasoning, feedback].filter(Boolean).join('\n\n---\nAlgorithm Feedback:\n') || null,
@@ -543,6 +551,54 @@ export default function ValidationPage() {
                           )
                         })}
                       </div>
+                    </div>
+
+                    {/* Non-Neuro Redirect */}
+                    <div style={{ padding: '16px 20px', borderBottom: '1px solid #334155' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: redirectToNonNeuro ? '10px' : '0' }}>
+                        <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
+                          <input
+                            type="checkbox"
+                            checked={redirectToNonNeuro}
+                            onChange={e => {
+                              setRedirectToNonNeuro(e.target.checked)
+                              if (!e.target.checked) setRedirectSpecialty('')
+                            }}
+                            style={{ accentColor: '#F59E0B', width: '16px', height: '16px' }}
+                          />
+                          <span style={{ color: '#F59E0B', fontSize: '0.75rem', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                            Redirect to non-neurology specialty?
+                          </span>
+                        </label>
+                        <span style={{ color: '#64748b', fontSize: '0.7rem' }}>
+                          (Check if this referral is better suited for another specialty)
+                        </span>
+                      </div>
+                      {redirectToNonNeuro && (
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+                          {NON_NEURO_SPECIALTY_OPTIONS.map(spec => {
+                            const isSelected = redirectSpecialty === spec
+                            return (
+                              <button
+                                key={spec}
+                                onClick={() => setRedirectSpecialty(isSelected ? '' : spec)}
+                                style={{
+                                  padding: '6px 12px',
+                                  background: isSelected ? 'rgba(245, 158, 11, 0.2)' : 'rgba(15, 23, 42, 0.5)',
+                                  border: isSelected ? '1px solid #F59E0B' : '1px solid #334155',
+                                  borderRadius: '6px',
+                                  color: isSelected ? '#F59E0B' : '#94a3b8',
+                                  fontSize: '0.72rem',
+                                  fontWeight: isSelected ? 600 : 400,
+                                  cursor: 'pointer',
+                                }}
+                              >
+                                {spec}
+                              </button>
+                            )
+                          })}
+                        </div>
+                      )}
                     </div>
 
                     {/* Key Clinical Factors */}

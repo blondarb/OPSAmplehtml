@@ -19,6 +19,48 @@ export type SubspecialtyType =
   | 'Cognitive/Memory'
   | 'Stroke'
 
+// Non-neurology specialties for redirect routing
+export type NonNeuroSpecialtyType =
+  | 'Primary Care / PCP'
+  | 'Orthopedics'
+  | 'Spine Surgery'
+  | 'Pain Management'
+  | 'Rheumatology'
+  | 'Psychiatry'
+  | 'Podiatry'
+  | 'Physical Medicine & Rehab'
+  | 'ENT / Otolaryngology'
+  | 'Ophthalmology'
+  | 'Cardiology'
+  | 'Endocrinology'
+  | 'Other Specialty'
+
+export const NON_NEURO_SPECIALTIES: NonNeuroSpecialtyType[] = [
+  'Primary Care / PCP',
+  'Orthopedics',
+  'Spine Surgery',
+  'Pain Management',
+  'Rheumatology',
+  'Psychiatry',
+  'Podiatry',
+  'Physical Medicine & Rehab',
+  'ENT / Otolaryngology',
+  'Ophthalmology',
+  'Cardiology',
+  'Endocrinology',
+  'Other Specialty',
+]
+
+export const NEURO_SUBSPECIALTIES: SubspecialtyType[] = [
+  'General Neurology',
+  'Epilepsy',
+  'Movement Disorders',
+  'Headache',
+  'Neuromuscular',
+  'Cognitive/Memory',
+  'Stroke',
+]
+
 // Override categories per CMIO review
 export type OverrideCategory =
   | 'Acuity higher than assessed'
@@ -70,6 +112,10 @@ export interface AITriageResponse {
   failed_therapies: FailedTherapy[]
   subspecialty_recommendation: SubspecialtyType | string
   subspecialty_rationale: string
+  // Non-neuro redirect (new — AI may recommend a different specialty entirely)
+  redirect_to_non_neuro?: boolean
+  redirect_specialty?: string
+  redirect_rationale?: string
 }
 
 // Full result after app-side scoring
@@ -91,6 +137,9 @@ export interface TriageResult {
   failed_therapies: FailedTherapy[]
   subspecialty_recommendation: string
   subspecialty_rationale: string
+  redirect_to_non_neuro: boolean
+  redirect_specialty: string | null
+  redirect_rationale: string | null
   disclaimer: string
 }
 

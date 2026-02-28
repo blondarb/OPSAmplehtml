@@ -1,4 +1,4 @@
-import { TriageTier, TriageConfidence, DimensionScores, SubspecialtyType } from './types'
+import { TriageTier, TriageConfidence, DimensionScores, SubspecialtyType, NonNeuroSpecialtyType, NON_NEURO_SPECIALTIES, NEURO_SUBSPECIALTIES } from './types'
 
 // ── Validation Case (the note to be graded) ──
 
@@ -29,6 +29,8 @@ export interface ValidationReview {
   reviewer_id: string
   triage_tier: TriageTier
   subspecialty: string | null
+  redirect_to_non_neuro: boolean
+  redirect_specialty: string | null
   confidence: TriageConfidence | null
   key_factors: string[]
   reasoning: string | null
@@ -59,15 +61,10 @@ export type KeyFactor = typeof KEY_FACTOR_OPTIONS[number]
 
 // ── Subspecialty options (matching existing types) ──
 
-export const SUBSPECIALTY_OPTIONS: SubspecialtyType[] = [
-  'General Neurology',
-  'Epilepsy',
-  'Movement Disorders',
-  'Headache',
-  'Neuromuscular',
-  'Cognitive/Memory',
-  'Stroke',
-]
+export const SUBSPECIALTY_OPTIONS: SubspecialtyType[] = NEURO_SUBSPECIALTIES
+
+// Re-export for convenience in validation form
+export const NON_NEURO_SPECIALTY_OPTIONS: NonNeuroSpecialtyType[] = NON_NEURO_SPECIALTIES
 
 // ── Case with review status (for the reviewer's case list) ──
 
@@ -130,14 +127,23 @@ export interface ValidationResults {
       reviewer_tiers: Record<string, TriageTier>
     }>
   }
+  // Redirect agreement
+  redirect_agreement: {
+    agreement_rate: number
+    total_cases: number
+    cases_with_any_redirect: number
+  }
   // Per-case detail
   case_details: Array<{
     case_id: string
     case_number: number
     case_title: string
     ai_tier: TriageTier | null
+    ai_redirect: string | null
     reviewer_tiers: Record<string, TriageTier>
+    reviewer_redirects: Record<string, string | null>
     consensus_tier: TriageTier | null
     agreement: boolean
+    any_redirect: boolean
   }>
 }

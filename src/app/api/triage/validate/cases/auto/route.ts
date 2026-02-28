@@ -108,6 +108,8 @@ export async function POST(req: NextRequest) {
       let aiScore = null
       let aiDimensionScores = null
       let aiSubspecialty = null
+      let aiRedirectToNonNeuro = false
+      let aiRedirectSpecialty = null
       let aiConfidence = null
       let aiSessionId = null
 
@@ -117,6 +119,8 @@ export async function POST(req: NextRequest) {
         aiScore = triageData.weighted_score
         aiDimensionScores = triageData.dimension_scores
         aiSubspecialty = triageData.subspecialty_recommendation
+        aiRedirectToNonNeuro = triageData.redirect_to_non_neuro || false
+        aiRedirectSpecialty = triageData.redirect_specialty || null
         aiConfidence = triageData.confidence
         aiSessionId = triageData.session_id
       } else {
@@ -140,6 +144,8 @@ export async function POST(req: NextRequest) {
           ai_weighted_score: aiScore,
           ai_dimension_scores: aiDimensionScores,
           ai_subspecialty: aiSubspecialty,
+          ai_redirect_to_non_neuro: aiRedirectToNonNeuro,
+          ai_redirect_specialty: aiRedirectSpecialty,
           ai_confidence: aiConfidence,
           ai_session_id: aiSessionId,
         }, { onConflict: 'study_name,case_number' })

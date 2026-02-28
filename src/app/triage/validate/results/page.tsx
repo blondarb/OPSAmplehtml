@@ -5,7 +5,7 @@ import { useAuth } from '@/contexts/AuthContext'
 import { useRouter } from 'next/navigation'
 import PlatformShell from '@/components/layout/PlatformShell'
 import FeatureSubHeader from '@/components/layout/FeatureSubHeader'
-import { BarChart3, AlertCircle, Users, CheckCircle2, ArrowRight } from 'lucide-react'
+import { BarChart3, AlertCircle, Users, CheckCircle2, ArrowRight, ArrowUpRight } from 'lucide-react'
 import { TIER_DISPLAY, TriageTier } from '@/lib/triage/types'
 import { ValidationResults } from '@/lib/triage/validationTypes'
 import Link from 'next/link'
@@ -336,6 +336,44 @@ export default function ResultsPage() {
                 </div>
               )}
 
+              {/* Non-Neuro Redirect Agreement */}
+              {results.redirect_agreement.cases_with_any_redirect > 0 && (
+                <div style={{
+                  background: 'rgba(30, 41, 59, 0.8)',
+                  border: '1px solid #334155',
+                  borderRadius: '12px',
+                  padding: '20px',
+                  marginBottom: '24px',
+                }}>
+                  <h3 style={{ color: '#e2e8f0', fontSize: '0.9rem', fontWeight: 600, margin: '0 0 14px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <ArrowUpRight size={16} color="#F59E0B" />
+                    Non-Neuro Redirect Agreement
+                  </h3>
+                  <div style={{ display: 'flex', gap: '24px', marginBottom: '12px' }}>
+                    <div>
+                      <div style={{ color: '#94a3b8', fontSize: '0.7rem', fontWeight: 600, textTransform: 'uppercase', marginBottom: '4px' }}>
+                        Redirect Consensus
+                      </div>
+                      <span style={{ color: '#e2e8f0', fontSize: '1.3rem', fontWeight: 700 }}>
+                        {formatPct(results.redirect_agreement.agreement_rate)}
+                      </span>
+                    </div>
+                    <div>
+                      <div style={{ color: '#94a3b8', fontSize: '0.7rem', fontWeight: 600, textTransform: 'uppercase', marginBottom: '4px' }}>
+                        Cases With Redirects
+                      </div>
+                      <span style={{ color: '#F59E0B', fontSize: '1.3rem', fontWeight: 700 }}>
+                        {results.redirect_agreement.cases_with_any_redirect}
+                      </span>
+                    </div>
+                  </div>
+                  <p style={{ color: '#64748b', fontSize: '0.72rem', margin: 0, lineHeight: 1.5 }}>
+                    Measures how often reviewers unanimously agree on whether a case should be redirected to a non-neurology specialty.
+                    Cases where at least one reviewer or the AI flagged a redirect are highlighted in the detail table below.
+                  </p>
+                </div>
+              )}
+
               {/* Pairwise Reviewer Comparison */}
               {results.pairwise.length > 0 && (
                 <div style={{
@@ -483,11 +521,14 @@ export default function ResultsPage() {
                         <th style={{ padding: '8px 10px', textAlign: 'center', color: '#94a3b8', fontSize: '0.7rem', fontWeight: 600, textTransform: 'uppercase', borderBottom: '1px solid #334155' }}>
                           Agree?
                         </th>
+                        <th style={{ padding: '8px 10px', textAlign: 'center', color: '#94a3b8', fontSize: '0.7rem', fontWeight: 600, textTransform: 'uppercase', borderBottom: '1px solid #334155' }}>
+                          Redirect
+                        </th>
                       </tr>
                     </thead>
                     <tbody>
                       {results.case_details.map(cd => (
-                        <tr key={cd.case_id} style={{ background: cd.agreement ? 'transparent' : 'rgba(245, 158, 11, 0.05)' }}>
+                        <tr key={cd.case_id} style={{ background: cd.any_redirect || cd.ai_redirect ? 'rgba(245, 158, 11, 0.06)' : cd.agreement ? 'transparent' : 'rgba(245, 158, 11, 0.03)' }}>
                           <td style={{ padding: '6px 10px', color: '#94a3b8', fontSize: '0.75rem', borderBottom: '1px solid rgba(51, 65, 85, 0.5)' }}>
                             {cd.case_number}
                           </td>
@@ -554,6 +595,40 @@ export default function ResultsPage() {
                               <span style={{ color: '#F59E0B', fontSize: '0.7rem', fontWeight: 600 }}>Disagree</span>
                             )}
                           </td>
+                          <td style={{ padding: '6px 10px', textAlign: 'center', borderBottom: '1px solid rgba(51, 65, 85, 0.5)' }}>
+                            {cd.any_redirect || cd.ai_redirect ? (
+                              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '2px' }}>
+                                {cd.ai_redirect && (
+                                  <span style={{
+                                    padding: '1px 5px',
+                                    borderRadius: '3px',
+                                    fontSize: '0.55rem',
+                                    fontWeight: 600,
+                                    background: 'rgba(245, 158, 11, 0.15)',
+                                    color: '#F59E0B',
+                                    border: '1px solid rgba(245, 158, 11, 0.3)',
+                                  }}>
+                                    AI: {cd.ai_redirect}
+                                  </span>
+                                )}
+                                {Object.entries(cd.reviewer_redirects || {}).map(([name, spec]) => (
+                                  <span key={name} style={{
+                                    padding: '1px 5px',
+                                    borderRadius: '3px',
+                                    fontSize: '0.55rem',
+                                    fontWeight: 600,
+                                    background: 'rgba(139, 92, 246, 0.15)',
+                                    color: '#A78BFA',
+                                    border: '1px solid rgba(139, 92, 246, 0.3)',
+                                  }}>
+                                    {name.split(' ')[0]}: {spec || 'Yes'}
+                                  </span>
+                                ))}
+                              </div>
+                            ) : (
+                              <span style={{ color: '#475569', fontSize: '0.7rem' }}>—</span>
+                            )}
+                          </td>
                         </tr>
                       ))}
                     </tbody>
@@ -603,6 +678,7 @@ export default function ResultsPage() {
                       <li><strong style={{ color: '#cbd5e1' }}>Krippendorff&apos;s Alpha</strong> — Handles missing data and ordinal scales. Penalizes large disagreements more than small ones.</li>
                       <li><strong style={{ color: '#cbd5e1' }}>Weighted Kappa</strong> — Pairwise agreement that accounts for the ordered nature of triage tiers (being off by 1 tier is less severe than being off by 3).</li>
                       <li><strong style={{ color: '#cbd5e1' }}>Consensus</strong> — Determined by majority vote among all reviewers for each case.</li>
+                      <li><strong style={{ color: '#cbd5e1' }}>Redirect</strong> — Indicates when AI or a reviewer flagged the case as belonging to a non-neurology specialty (e.g. Orthopedics, Psychiatry).</li>
                     </ul>
                   </div>
                 </div>

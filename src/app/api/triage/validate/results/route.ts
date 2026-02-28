@@ -405,24 +405,48 @@ export async function GET(req: NextRequest) {
     disagreements: aiDisagreements,
   }
 
+  // ── Redirect agreement ──
+  let redirectAgreeCount = 0
+  let redirectTotalCount = 0
+  for (const c of eligibleCases) {
+    const caseReviews = reviewsByCase.get(c.id) || []
+    if (caseReviews.length < 2) continue
+    const redirectVotes = caseReviews.filter(r => r.redirect_to_non_neuro).length
+    const noRedirectVotes = caseReviews.length - redirectVotes
+    redirectTotalCount++
+    // Agreement = majority agrees (either mostly redirect or mostly not)
+    if (redirectVotes === 0 || noRedirectVotes === 0) {
+      redirectAgreeCount++ // unanimous
+    }
+  }
+
   // ── Per-case detail ──
   const caseDetails = cases.map(c => {
     const caseReviews = reviewsByCase.get(c.id) || []
     const revTiers: Record<string, TriageTier> = {}
+    const revRedirects: Record<string, string | null> = {}
     for (const r of caseReviews) {
-      revTiers[profileMap.get(r.reviewer_id) || r.reviewer_id] = r.triage_tier as TriageTier
+      const name = profileMap.get(r.reviewer_id) || r.reviewer_id
+      revTiers[name] = r.triage_tier as TriageTier
+      if (r.redirect_to_non_neuro) {
+        revRedirects[name] = r.redirect_specialty || 'Yes (unspecified)'
+      }
     }
     const consTier = consensusTier(caseReviews.map(r => r.triage_tier as TriageTier))
     const allSame = caseReviews.length > 1 && caseReviews.every(r => r.triage_tier === caseReviews[0].triage_tier)
+    const anyRedirect = caseReviews.some(r => r.redirect_to_non_neuro)
 
     return {
       case_id: c.id,
       case_number: c.case_number,
       case_title: c.title,
       ai_tier: c.ai_triage_tier as TriageTier | null,
+      ai_redirect: c.ai_redirect_to_non_neuro ? (c.ai_redirect_specialty || 'Yes') : null,
       reviewer_tiers: revTiers,
+      reviewer_redirects: revRedirects,
       consensus_tier: consTier,
       agreement: allSame,
+      any_redirect: anyRedirect,
     }
   })
 
@@ -433,6 +457,8 @@ export async function GET(req: NextRequest) {
     cases_completed: (reviewsByReviewer.get(rid) || []).length,
     total_cases: cases.length,
   }))
+
+  const casesWithAnyRedirect = caseDetails.filter(cd => cd.any_redirect || cd.ai_redirect).length
 
   return NextResponse.json({
     study_name: studyName,
@@ -447,6 +473,11 @@ export async function GET(req: NextRequest) {
     tier_agreement: tierAgreement,
     pairwise,
     ai_vs_consensus: aiVsConsensus,
+    redirect_agreement: {
+      agreement_rate: redirectTotalCount > 0 ? Math.round((redirectAgreeCount / redirectTotalCount) * 1000) / 1000 : 0,
+      total_cases: redirectTotalCount,
+      cases_with_any_redirect: casesWithAnyRedirect,
+    },
     case_details: caseDetails,
   })
 }

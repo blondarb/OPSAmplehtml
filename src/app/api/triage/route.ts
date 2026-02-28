@@ -198,6 +198,9 @@ export async function POST(request: Request) {
       failed_therapies: aiResponse.failed_therapies,
       subspecialty_recommendation: aiResponse.subspecialty_recommendation,
       subspecialty_rationale: aiResponse.subspecialty_rationale,
+      redirect_to_non_neuro: aiResponse.redirect_to_non_neuro || false,
+      redirect_specialty: aiResponse.redirect_specialty || null,
+      redirect_rationale: aiResponse.redirect_rationale || null,
       disclaimer: DISCLAIMER_TEXT,
     })
   } catch (error: unknown) {

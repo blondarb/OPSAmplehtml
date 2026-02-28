@@ -18,6 +18,8 @@ CREATE TABLE IF NOT EXISTS validation_cases (
   ai_weighted_score       NUMERIC(4,2),
   ai_dimension_scores     JSONB,
   ai_subspecialty         TEXT,
+  ai_redirect_to_non_neuro BOOLEAN DEFAULT false,
+  ai_redirect_specialty   TEXT,
   ai_confidence           TEXT,
   ai_session_id           UUID REFERENCES triage_sessions(id),
   -- metadata
@@ -40,7 +42,9 @@ CREATE TABLE IF NOT EXISTS validation_reviews (
   triage_tier             TEXT NOT NULL CHECK (triage_tier IN (
     'emergent','urgent','semi_urgent','routine_priority','routine','non_urgent','insufficient_data'
   )),
-  subspecialty            TEXT,                          -- recommended subspecialty
+  subspecialty            TEXT,                          -- recommended neuro subspecialty
+  redirect_to_non_neuro   BOOLEAN NOT NULL DEFAULT false, -- reviewer thinks this isn't neurology
+  redirect_specialty      TEXT,                          -- if redirect, which non-neuro specialty
   confidence              TEXT CHECK (confidence IN ('high','moderate','low')),
   key_factors             TEXT[] DEFAULT '{}',           -- checkboxes: what drove the decision
   reasoning               TEXT,                         -- free-text explanation
