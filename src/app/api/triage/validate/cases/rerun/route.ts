@@ -94,66 +94,75 @@ export async function POST(req: NextRequest) {
       runsToPerform.push({ run_number: i, temperature: 0.2 })
     }
 
-    for (const run of runsToPerform) {
-      const startTime = Date.now()
+    // Run all variations in parallel to stay within Vercel proxy timeout.
+    // Each case's 4 runs fire concurrently (~12s) instead of serially (~48s).
+    const runResults = await Promise.allSettled(
+      runsToPerform.map(async (run) => {
+        const startTime = Date.now()
 
-      try {
-        // Call triage logic directly — no HTTP self-fetch
-        const data = await runTriage({
-          referral_text: c.referral_text,
-          patient_age: c.patient_age,
-          patient_sex: c.patient_sex,
-          temperature: run.temperature,
-        })
+        try {
+          const data = await runTriage({
+            referral_text: c.referral_text,
+            patient_age: c.patient_age,
+            patient_sex: c.patient_sex,
+            temperature: run.temperature,
+          })
 
-        const durationMs = Date.now() - startTime
+          const durationMs = Date.now() - startTime
 
-        // Store in validation_ai_runs
-        await supabase.from('validation_ai_runs').upsert({
-          case_id: c.id,
-          run_number: run.run_number,
-          temperature: run.temperature,
-          ai_triage_tier: data.triage_tier,
-          ai_weighted_score: data.weighted_score,
-          ai_dimension_scores: data.dimension_scores,
-          ai_subspecialty: data.subspecialty_recommendation,
-          ai_redirect_to_non_neuro: data.redirect_to_non_neuro || false,
-          ai_redirect_specialty: data.redirect_specialty || null,
-          ai_confidence: data.confidence,
-          ai_session_id: data.session_id,
-          ai_raw_response: data,
-          duration_ms: durationMs,
-          error: null,
-        }, { onConflict: 'case_id,run_number' })
+          await supabase.from('validation_ai_runs').upsert({
+            case_id: c.id,
+            run_number: run.run_number,
+            temperature: run.temperature,
+            ai_triage_tier: data.triage_tier,
+            ai_weighted_score: data.weighted_score,
+            ai_dimension_scores: data.dimension_scores,
+            ai_subspecialty: data.subspecialty_recommendation,
+            ai_redirect_to_non_neuro: data.redirect_to_non_neuro || false,
+            ai_redirect_specialty: data.redirect_specialty || null,
+            ai_confidence: data.confidence,
+            ai_session_id: data.session_id,
+            ai_raw_response: data,
+            duration_ms: durationMs,
+            error: null,
+          }, { onConflict: 'case_id,run_number' })
 
-        caseRuns.push({
-          run_number: run.run_number,
-          temperature: run.temperature,
-          status: 'success',
-          ai_tier: data.triage_tier,
-          ai_score: data.weighted_score,
-          ai_confidence: data.confidence,
-          duration_ms: durationMs,
-        })
-      } catch (err) {
-        const durationMs = Date.now() - startTime
-        const errorMsg = err instanceof Error ? err.message : 'Unknown error'
+          return {
+            run_number: run.run_number,
+            temperature: run.temperature,
+            status: 'success' as const,
+            ai_tier: data.triage_tier,
+            ai_score: data.weighted_score,
+            ai_confidence: data.confidence,
+            duration_ms: durationMs,
+          }
+        } catch (err) {
+          const durationMs = Date.now() - startTime
+          const errorMsg = err instanceof Error ? err.message : 'Unknown error'
 
-        await supabase.from('validation_ai_runs').upsert({
-          case_id: c.id,
-          run_number: run.run_number,
-          temperature: run.temperature,
-          duration_ms: durationMs,
-          error: errorMsg,
-        }, { onConflict: 'case_id,run_number' })
+          await supabase.from('validation_ai_runs').upsert({
+            case_id: c.id,
+            run_number: run.run_number,
+            temperature: run.temperature,
+            duration_ms: durationMs,
+            error: errorMsg,
+          }, { onConflict: 'case_id,run_number' })
 
-        caseRuns.push({
-          run_number: run.run_number,
-          temperature: run.temperature,
-          status: 'error',
-          duration_ms: durationMs,
-          error: errorMsg,
-        })
+          return {
+            run_number: run.run_number,
+            temperature: run.temperature,
+            status: 'error' as const,
+            duration_ms: durationMs,
+            error: errorMsg,
+          }
+        }
+      })
+    )
+
+    // Collect results — Promise.allSettled never rejects, every item is fulfilled
+    for (const result of runResults) {
+      if (result.status === 'fulfilled') {
+        caseRuns.push(result.value)
       }
     }
 
