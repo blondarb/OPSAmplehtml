@@ -5,7 +5,7 @@ import { useAuth } from '@/contexts/AuthContext'
 import { useRouter } from 'next/navigation'
 import PlatformShell from '@/components/layout/PlatformShell'
 import FeatureSubHeader from '@/components/layout/FeatureSubHeader'
-import { ClipboardCheck, ChevronRight, Check, AlertCircle, Clock, BarChart3, Settings } from 'lucide-react'
+import { ClipboardCheck, ChevronRight, Check, AlertCircle, Clock, BarChart3, Settings, User } from 'lucide-react'
 import { TIER_DISPLAY, TriageTier } from '@/lib/triage/types'
 import { ValidationCaseWithStatus, KEY_FACTOR_OPTIONS, SUBSPECIALTY_OPTIONS, NON_NEURO_SPECIALTY_OPTIONS } from '@/lib/triage/validationTypes'
 import Link from 'next/link'
@@ -41,6 +41,15 @@ export default function ValidationPage() {
   const [reasoning, setReasoning] = useState('')
   const [feedback, setFeedback] = useState('')
 
+  // Profile state
+  const [showProfileModal, setShowProfileModal] = useState(false)
+  const [profileName, setProfileName] = useState('')
+  const [profileRole, setProfileRole] = useState('clinician')
+  const [profileOrg, setProfileOrg] = useState('')
+  const [profileSpecialty, setProfileSpecialty] = useState('')
+  const [profileSaving, setProfileSaving] = useState(false)
+  const [profileError, setProfileError] = useState('')
+
   // Timer
   const startTimeRef = useRef<Date | null>(null)
 
@@ -50,6 +59,56 @@ export default function ValidationPage() {
       router.push('/login?redirect=/triage/validate')
     }
   }, [user, authLoading, router])
+
+  // Check for profile on load
+  useEffect(() => {
+    if (!user) return
+    async function checkProfile() {
+      try {
+        const res = await fetch('/api/triage/validate/profile')
+        if (!res.ok) return
+        const data = await res.json()
+        if (!data.profile) {
+          setShowProfileModal(true)
+        }
+      } catch {
+        // silently fail — profile is optional UX
+      } finally {
+        // profile check complete
+      }
+    }
+    checkProfile()
+  }, [user])
+
+  async function handleSaveProfile() {
+    if (!profileName.trim()) {
+      setProfileError('Please enter your name')
+      return
+    }
+    setProfileSaving(true)
+    setProfileError('')
+    try {
+      const res = await fetch('/api/triage/validate/profile', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          display_name: profileName.trim(),
+          role: profileRole,
+          organization: profileOrg.trim() || null,
+          specialty: profileSpecialty.trim() || null,
+        }),
+      })
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}))
+        throw new Error(data.error || 'Failed to save profile')
+      }
+      setShowProfileModal(false)
+    } catch (err) {
+      setProfileError(err instanceof Error ? err.message : 'Failed to save')
+    } finally {
+      setProfileSaving(false)
+    }
+  }
 
   const fetchCases = useCallback(async () => {
     try {
@@ -187,6 +246,151 @@ export default function ValidationPage() {
         fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif",
       }}>
         <div style={{ maxWidth: '1000px', margin: '0 auto', padding: '32px 24px' }}>
+
+          {/* Profile Setup Modal */}
+          {showProfileModal && (
+            <div style={{
+              position: 'fixed',
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              background: 'rgba(0, 0, 0, 0.7)',
+              display: 'flex',
+              justifyContent: 'center',
+              alignItems: 'center',
+              zIndex: 1000,
+            }}>
+              <div style={{
+                background: '#1e293b',
+                border: '1px solid #334155',
+                borderRadius: '16px',
+                padding: '32px',
+                width: '100%',
+                maxWidth: '440px',
+                boxShadow: '0 20px 60px rgba(0, 0, 0, 0.5)',
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '8px' }}>
+                  <div style={{
+                    width: '36px',
+                    height: '36px',
+                    borderRadius: '50%',
+                    background: 'rgba(139, 92, 246, 0.2)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}>
+                    <User size={18} color="#8B5CF6" />
+                  </div>
+                  <h2 style={{ color: '#f1f5f9', fontSize: '1.1rem', fontWeight: 700, margin: 0 }}>
+                    Welcome, Reviewer
+                  </h2>
+                </div>
+                <p style={{ color: '#94a3b8', fontSize: '0.8rem', lineHeight: 1.5, margin: '0 0 20px' }}>
+                  Please identify yourself before starting your review. Your name will appear on the results page alongside your triage decisions.
+                </p>
+
+                {/* Name (required) */}
+                <div style={{ marginBottom: '14px' }}>
+                  <label style={{ color: '#94a3b8', fontSize: '0.72rem', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px', display: 'block', marginBottom: '6px' }}>
+                    Your Name *
+                  </label>
+                  <input
+                    type="text"
+                    value={profileName}
+                    onChange={e => setProfileName(e.target.value)}
+                    placeholder="e.g. Dr. Smith"
+                    autoFocus
+                    style={{
+                      width: '100%',
+                      padding: '10px 12px',
+                      background: '#0f172a',
+                      border: '1px solid #334155',
+                      borderRadius: '8px',
+                      color: '#e2e8f0',
+                      fontSize: '0.85rem',
+                      outline: 'none',
+                      boxSizing: 'border-box',
+                      fontFamily: 'inherit',
+                    }}
+                  />
+                </div>
+
+                {/* Specialty */}
+                <div style={{ marginBottom: '14px' }}>
+                  <label style={{ color: '#94a3b8', fontSize: '0.72rem', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px', display: 'block', marginBottom: '6px' }}>
+                    Specialty
+                  </label>
+                  <input
+                    type="text"
+                    value={profileSpecialty}
+                    onChange={e => setProfileSpecialty(e.target.value)}
+                    placeholder="e.g. Neurology, Family Medicine"
+                    style={{
+                      width: '100%',
+                      padding: '10px 12px',
+                      background: '#0f172a',
+                      border: '1px solid #334155',
+                      borderRadius: '8px',
+                      color: '#e2e8f0',
+                      fontSize: '0.85rem',
+                      outline: 'none',
+                      boxSizing: 'border-box',
+                      fontFamily: 'inherit',
+                    }}
+                  />
+                </div>
+
+                {/* Organization */}
+                <div style={{ marginBottom: '20px' }}>
+                  <label style={{ color: '#94a3b8', fontSize: '0.72rem', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px', display: 'block', marginBottom: '6px' }}>
+                    Organization
+                  </label>
+                  <input
+                    type="text"
+                    value={profileOrg}
+                    onChange={e => setProfileOrg(e.target.value)}
+                    placeholder="e.g. University Hospital"
+                    style={{
+                      width: '100%',
+                      padding: '10px 12px',
+                      background: '#0f172a',
+                      border: '1px solid #334155',
+                      borderRadius: '8px',
+                      color: '#e2e8f0',
+                      fontSize: '0.85rem',
+                      outline: 'none',
+                      boxSizing: 'border-box',
+                      fontFamily: 'inherit',
+                    }}
+                  />
+                </div>
+
+                {profileError && (
+                  <p style={{ color: '#EF4444', fontSize: '0.8rem', margin: '0 0 12px' }}>{profileError}</p>
+                )}
+
+                <button
+                  onClick={handleSaveProfile}
+                  disabled={profileSaving || !profileName.trim()}
+                  style={{
+                    width: '100%',
+                    padding: '12px',
+                    background: !profileName.trim() ? '#334155' : '#8B5CF6',
+                    color: !profileName.trim() ? '#64748b' : '#fff',
+                    border: 'none',
+                    borderRadius: '8px',
+                    fontSize: '0.9rem',
+                    fontWeight: 600,
+                    cursor: !profileName.trim() ? 'not-allowed' : 'pointer',
+                    opacity: profileSaving ? 0.7 : 1,
+                  }}
+                >
+                  {profileSaving ? 'Saving...' : 'Continue to Review'}
+                </button>
+              </div>
+            </div>
+          )}
 
           {/* Header */}
           <div style={{ marginBottom: '24px' }}>
