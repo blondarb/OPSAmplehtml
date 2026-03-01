@@ -229,6 +229,18 @@ export async function GET(req: NextRequest) {
 
   const profileMap = new Map((profiles || []).map(p => [p.id, p.display_name || 'Reviewer']))
 
+  // Build a consistent name map for all reviewers (avoids mismatched fallbacks)
+  const nameMap = new Map<string, string>()
+  let unnamedIdx = 1
+  for (const rid of reviewerIds) {
+    const profileName = profileMap.get(rid)
+    if (profileName) {
+      nameMap.set(rid, profileName)
+    } else {
+      nameMap.set(rid, reviewerIds.length === 1 ? 'Reviewer' : `Reviewer ${unnamedIdx++}`)
+    }
+  }
+
   // Group reviews by case_id
   const reviewsByCase = new Map<string, typeof reviews>()
   for (const r of reviews) {
@@ -344,8 +356,8 @@ export async function GET(req: NextRequest) {
         pairwise.push({
           reviewer_a: a,
           reviewer_b: b,
-          reviewer_a_name: profileMap.get(a) || 'Reviewer',
-          reviewer_b_name: profileMap.get(b) || 'Reviewer',
+          reviewer_a_name: nameMap.get(a) || 'Reviewer',
+          reviewer_b_name: nameMap.get(b) || 'Reviewer',
           agreement_rate: agree / ratingsA.length,
           weighted_kappa: weightedKappa(ratingsA, ratingsB, numCategories),
           cases_compared: ratingsA.length,
@@ -385,7 +397,7 @@ export async function GET(req: NextRequest) {
     } else {
       const revTiers: Record<string, TriageTier> = {}
       for (const r of caseReviews) {
-        revTiers[profileMap.get(r.reviewer_id) || r.reviewer_id] = r.triage_tier as TriageTier
+        revTiers[nameMap.get(r.reviewer_id) || r.reviewer_id] = r.triage_tier as TriageTier
       }
       aiDisagreements.push({
         case_id: c.id,
@@ -426,14 +438,17 @@ export async function GET(req: NextRequest) {
     const revTiers: Record<string, TriageTier> = {}
     const revRedirects: Record<string, string | null> = {}
     for (const r of caseReviews) {
-      const name = profileMap.get(r.reviewer_id) || r.reviewer_id
+      const name = nameMap.get(r.reviewer_id) || r.reviewer_id
       revTiers[name] = r.triage_tier as TriageTier
       if (r.redirect_to_non_neuro) {
         revRedirects[name] = r.redirect_specialty || 'Yes (unspecified)'
       }
     }
     const consTier = consensusTier(caseReviews.map(r => r.triage_tier as TriageTier))
-    const allSame = caseReviews.length > 1 && caseReviews.every(r => r.triage_tier === caseReviews[0].triage_tier)
+    // agreement: true = all same, false = disagree, null = only 1 reviewer (N/A)
+    const agreement = caseReviews.length > 1
+      ? caseReviews.every(r => r.triage_tier === caseReviews[0].triage_tier)
+      : null
     const anyRedirect = caseReviews.some(r => r.redirect_to_non_neuro)
 
     return {
@@ -445,7 +460,7 @@ export async function GET(req: NextRequest) {
       reviewer_tiers: revTiers,
       reviewer_redirects: revRedirects,
       consensus_tier: consTier,
-      agreement: allSame,
+      agreement,
       any_redirect: anyRedirect,
     }
   })
@@ -523,7 +538,7 @@ export async function GET(req: NextRequest) {
   // ── Reviewer summaries ──
   const reviewerSummaries = reviewerIds.map(rid => ({
     reviewer_id: rid,
-    reviewer_name: profileMap.get(rid) || 'Reviewer',
+    reviewer_name: nameMap.get(rid) || 'Reviewer',
     cases_completed: (reviewsByReviewer.get(rid) || []).length,
     total_cases: cases.length,
   }))
