@@ -717,10 +717,12 @@ export default function ResultsPage() {
                             )}
                           </td>
                           <td style={{ padding: '6px 10px', textAlign: 'center', borderBottom: '1px solid rgba(51, 65, 85, 0.5)' }}>
-                            {cd.agreement ? (
+                            {cd.agreement === true ? (
                               <CheckCircle2 size={14} color="#16A34A" />
-                            ) : (
+                            ) : cd.agreement === false ? (
                               <span style={{ color: '#F59E0B', fontSize: '0.7rem', fontWeight: 600 }}>Disagree</span>
+                            ) : (
+                              <span style={{ color: '#475569', fontSize: '0.7rem' }}>—</span>
                             )}
                           </td>
                           <td style={{ padding: '6px 10px', textAlign: 'center', borderBottom: '1px solid rgba(51, 65, 85, 0.5)' }}>

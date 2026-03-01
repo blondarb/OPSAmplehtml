@@ -192,7 +192,7 @@ export interface ValidationResults {
     reviewer_tiers: Record<string, TriageTier>
     reviewer_redirects: Record<string, string | null>
     consensus_tier: TriageTier | null
-    agreement: boolean
+    agreement: boolean | null
     any_redirect: boolean
   }>
 }
