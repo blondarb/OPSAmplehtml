@@ -121,16 +121,16 @@ export default function DailySummaryPopover({ summary, onClose }: DailySummaryPo
             value={m.avg_hr}
             unit="bpm"
             subLabel="Resting"
-            subValue={m.resting_hr}
-            subUnit=" bpm"
+            subValue={m.resting_hr != null ? Math.round(m.resting_hr) : '—'}
+            subUnit={m.resting_hr != null ? ' bpm' : ''}
           />
           <MetricCard
             label="HRV (RMSSD)"
             value={m.hrv_rmssd}
             unit="ms"
             subLabel="7-day avg"
-            subValue={m.hrv_7day_avg}
-            subUnit=" ms"
+            subValue={m.hrv_7day_avg > 0 ? Math.round(m.hrv_7day_avg) : '—'}
+            subUnit={m.hrv_7day_avg > 0 ? ' ms' : ''}
           />
           <MetricCard
             label="Steps"
@@ -148,18 +148,22 @@ export default function DailySummaryPopover({ summary, onClose }: DailySummaryPo
         }}>
           <MetricCard
             label="Sleep"
-            value={m.sleep_hours.toFixed(1)}
-            unit="hrs"
+            value={m.sleep_hours != null ? m.sleep_hours.toFixed(1) : '—'}
+            unit={m.sleep_hours != null ? 'hrs' : ''}
             subLabel="Efficiency"
-            subValue={`${(m.sleep_efficiency * 100).toFixed(0)}`}
-            subUnit="%"
+            subValue={m.sleep_efficiency != null ? `${(m.sleep_efficiency * 100).toFixed(0)}` : '—'}
+            subUnit={m.sleep_efficiency != null ? '%' : ''}
           />
           <MetricCard
             label="Awakenings"
-            value={m.awakenings}
+            value={m.awakenings != null ? m.awakenings : '—'}
             subLabel="Deep/REM"
-            subValue={`${m.sleep_deep.toFixed(1)}/${m.sleep_rem.toFixed(1)}`}
-            subUnit=" hrs"
+            subValue={
+              m.sleep_deep != null && m.sleep_rem != null
+                ? `${m.sleep_deep.toFixed(1)}/${m.sleep_rem.toFixed(1)}`
+                : 'N/A'
+            }
+            subUnit={m.sleep_deep != null ? ' hrs' : ''}
           />
           {m.tremor_pct !== undefined && (
             <MetricCard

@@ -124,6 +124,7 @@ export default function HeartRateTrack({ data, baseline, onDayClick }: HeartRate
             {...darkTooltipStyle}
             labelFormatter={(label: any) => formatDate(String(label))}
             formatter={(value: any, name: any) => {
+              if (value === null || value === undefined) return ['—', name === 'avg_hr' ? 'Avg HR' : 'Resting HR']
               const label = name === 'avg_hr' ? 'Avg HR' : 'Resting HR'
               return [`${value} bpm`, label]
             }}
@@ -148,6 +149,7 @@ export default function HeartRateTrack({ data, baseline, onDayClick }: HeartRate
             dataKey="resting_hr"
             stroke="#DC2626"
             strokeWidth={2}
+            connectNulls={true}
             dot={{ r: 2, fill: '#DC2626' }}
             activeDot={{ r: 5, fill: '#DC2626' }}
           />
