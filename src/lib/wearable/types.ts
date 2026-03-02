@@ -72,18 +72,19 @@ export interface WearablePatient {
 // Daily biometric readings from wearable
 export interface DailyMetrics {
   avg_hr: number
-  resting_hr: number
+  resting_hr: number | null        // null when HealthKit has no data (was defaulting to 0)
   hrv_rmssd: number
   hrv_7day_avg: number
   total_steps: number
   steps_7day_avg: number
-  sleep_hours: number
-  sleep_deep: number
-  sleep_rem: number
-  sleep_light: number
-  sleep_awake: number
-  sleep_efficiency: number
-  awakenings: number
+  sleep_hours: number | null        // null when watch not worn overnight
+  sleep_deep: number | null         // null when stages unavailable
+  sleep_rem: number | null
+  sleep_light: number | null
+  sleep_awake: number | null
+  sleep_total: number | null        // total sleep when stages unavailable
+  sleep_efficiency: number | null   // null when no sleep data
+  awakenings: number | null         // null when no sleep data
   tremor_pct?: number
   dyskinetic_mins?: number
   // iOS-specific fields (from Sevaro Monitor app)

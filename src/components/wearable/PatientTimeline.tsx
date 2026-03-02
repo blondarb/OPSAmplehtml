@@ -17,18 +17,19 @@ interface PatientTimelineProps {
 export interface ChartDataPoint {
   date: string
   avg_hr: number
-  resting_hr: number
+  resting_hr: number | null
   hrv_rmssd: number
   hrv_7day_avg: number
   total_steps: number
   steps_7day_avg: number
-  sleep_hours: number
-  sleep_deep: number
-  sleep_rem: number
-  sleep_light: number
-  sleep_awake: number
-  sleep_efficiency: number
-  awakenings: number
+  sleep_hours: number | null
+  sleep_deep: number | null
+  sleep_rem: number | null
+  sleep_light: number | null
+  sleep_awake: number | null
+  sleep_total: number | null
+  sleep_efficiency: number | null
+  awakenings: number | null
   tremor_pct?: number
   dyskinetic_mins?: number
   hasAnomaly: boolean
@@ -230,6 +231,7 @@ export default function PatientTimeline({ dailySummaries, anomalies, patient }: 
       <DiseaseTrack
         data={chartData}
         baseline={patient.baseline_metrics}
+        diagnosis={patient.primary_diagnosis}
         onDayClick={handleDayClick}
       />
     </div>

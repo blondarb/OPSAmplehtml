@@ -25,6 +25,7 @@ export default function WearablePage() {
   const [analyzing, setAnalyzing] = useState(false)
   const [analysisResult, setAnalysisResult] = useState<AIAnalysisResponse | null>(null)
   const [analysisError, setAnalysisError] = useState<string | null>(null)
+  const [lastUpdated, setLastUpdated] = useState<Date | null>(null)
 
   useEffect(() => {
     async function init() {
@@ -46,6 +47,7 @@ export default function WearablePage() {
             }
             const dJson = await dRes.json()
             setData(dJson)
+            setLastUpdated(new Date())
           }
         } else {
           // Fallback: load demo data without patient switcher
@@ -53,6 +55,7 @@ export default function WearablePage() {
           if (!res.ok) throw new Error('Failed to load wearable demo data')
           const json = await res.json()
           setData(json)
+          setLastUpdated(new Date())
         }
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Failed to load')
@@ -62,6 +65,53 @@ export default function WearablePage() {
     }
     init()
   }, [])
+
+  // Auto-refresh every 15 minutes, pause when tab hidden
+  useEffect(() => {
+    if (!selectedPatientId) return
+
+    const POLL_INTERVAL = 15 * 60 * 1000 // 15 minutes
+    let intervalId: ReturnType<typeof setInterval>
+    let lastFetchTime = Date.now()
+
+    async function silentRefresh() {
+      try {
+        const res = await fetch(`/api/wearable/demo-data?patient_id=${selectedPatientId}`)
+        if (res.ok) {
+          const json = await res.json()
+          setData(json)
+          setLastUpdated(new Date())
+          lastFetchTime = Date.now()
+        }
+      } catch {
+        // Silent fail — don't disrupt the UI
+      }
+    }
+
+    function startPolling() {
+      intervalId = setInterval(silentRefresh, POLL_INTERVAL)
+    }
+
+    function handleVisibilityChange() {
+      if (document.visibilityState === 'visible') {
+        // If enough time passed while hidden, refresh immediately
+        if (Date.now() - lastFetchTime >= POLL_INTERVAL) {
+          silentRefresh()
+        }
+        startPolling()
+      } else {
+        clearInterval(intervalId)
+      }
+    }
+
+    startPolling()
+    document.addEventListener('visibilitychange', handleVisibilityChange)
+
+    return () => {
+      clearInterval(intervalId)
+      document.removeEventListener('visibilitychange', handleVisibilityChange)
+    }
+  }, [selectedPatientId])
 
   async function handlePatientChange(patientId: string) {
     setSelectedPatientId(patientId)
@@ -77,6 +127,7 @@ export default function WearablePage() {
       }
       const json = await res.json()
       setData(json)
+      setLastUpdated(new Date())
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load')
     } finally {
@@ -243,6 +294,11 @@ export default function WearablePage() {
                   </option>
                 ))}
               </select>
+              {lastUpdated && (
+                <span style={{ color: '#64748b', fontSize: '0.75rem' }}>
+                  Last updated: {lastUpdated.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                </span>
+              )}
             </div>
           )}
           <ConceptHero />
