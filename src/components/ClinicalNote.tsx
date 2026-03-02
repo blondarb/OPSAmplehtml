@@ -1508,7 +1508,7 @@ export default function ClinicalNote({
             <p style={{ color: 'var(--text-muted)', fontSize: '14px' }}>Loading patient chart...</p>
           </div>
         ) : (
-          <>
+          <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
             <LeftSidebar
               patient={patient}
               priorVisits={priorVisits}
@@ -1562,7 +1562,7 @@ export default function ClinicalNote({
               priorVisits={priorVisits}
               scoreHistory={scoreHistory}
             />
-          </>
+          </div>
         )}
         </div>
       </div>
