@@ -3,6 +3,8 @@
 import { useState } from 'react'
 import { BatchItem, TIER_DISPLAY } from '@/lib/triage/types'
 import TriageTierBadge from './TriageTierBadge'
+import PreVisitWorkup from './PreVisitWorkup'
+import FailedTherapiesList from './FailedTherapiesList'
 import DisclaimerBanner from './DisclaimerBanner'
 
 interface Props {
@@ -231,6 +233,12 @@ export default function BatchResultsPanel({ items, onTryAnother }: Props) {
                       </ul>
                     </div>
                   )}
+
+                  {/* Suggested workup */}
+                  <PreVisitWorkup workup={result.suggested_workup} />
+
+                  {/* Failed therapies */}
+                  <FailedTherapiesList therapies={result.failed_therapies} />
 
                   {/* Dimension scores */}
                   <div style={{
