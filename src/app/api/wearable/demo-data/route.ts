@@ -137,10 +137,11 @@ export async function GET(request: NextRequest) {
       patient = data[0]
     }
 
-    const [summariesRes, anomaliesRes, alertsRes] = await Promise.all([
+    const [summariesRes, anomaliesRes, alertsRes, assessmentsRes] = await Promise.all([
       supabase.from('wearable_daily_summaries').select('*').eq('patient_id', patient.id).order('date', { ascending: true }),
       supabase.from('wearable_anomalies').select('*').eq('patient_id', patient.id).order('detected_at', { ascending: true }),
       supabase.from('wearable_alerts').select('*').eq('patient_id', patient.id).order('created_at', { ascending: true }),
+      supabase.from('wearable_tremor_assessments').select('*').eq('patient_id', patient.id).order('assessed_at', { ascending: true }),
     ])
 
     // Normalize metrics in each daily summary
@@ -161,6 +162,7 @@ export async function GET(request: NextRequest) {
       dailySummaries,
       anomalies: anomaliesRes.data || [],
       alerts: alertsRes.data || [],
+      assessments: assessmentsRes.data || [],
     })
   } catch (error: unknown) {
     console.error('Wearable demo-data API Error:', error)

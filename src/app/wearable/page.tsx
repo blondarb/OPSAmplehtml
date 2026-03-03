@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import type { WearableDemoData, PatientSummary, AIAnalysisResponse } from '@/lib/wearable/types'
+import type { WearableDemoData, PatientSummary, AIAnalysisResponse, TremorAssessment } from '@/lib/wearable/types'
 import PlatformShell from '@/components/layout/PlatformShell'
 import FeatureSubHeader from '@/components/layout/FeatureSubHeader'
 import { Watch } from 'lucide-react'
@@ -309,6 +309,7 @@ export default function WearablePage() {
             dailySummaries={data.dailySummaries}
             anomalies={data.anomalies}
             patient={data.patient}
+            assessments={data.assessments}
           />
 
           {/* AI Analysis Section */}
