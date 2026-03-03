@@ -31,7 +31,7 @@ const darkTooltipStyle = {
 }
 
 const SLEEP_COLORS = {
-  sleep_deep: '#1e3a5f',
+  sleep_deep: '#3b82f6',
   sleep_rem: '#0d9488',
   sleep_light: '#60a5fa',
   sleep_awake: '#ef4444',
