@@ -162,12 +162,31 @@ export interface HourlySnapshot {
   active_calories: number | null
 }
 
+// Guided tremor assessment result (from SevaroMonitor iOS app)
+export interface TremorAssessmentTaskResult {
+  taskType: string           // "postural_hold" | "pouring_motion" | "drinking_motion"
+  tremorPct: number
+  avgIntensity: number
+  peakIntensity: number
+  durationSeconds: number
+}
+
+export interface TremorAssessment {
+  id: string
+  patient_id: string
+  assessed_at: string
+  composite_score: number
+  composite_intensity: number
+  tasks: TremorAssessmentTaskResult[]
+}
+
 // Demo data bundle (returned by /api/wearable/demo-data)
 export interface WearableDemoData {
   patient: WearablePatient
   dailySummaries: DailySummary[]
   anomalies: WearableAnomaly[]
   alerts: WearableAlert[]
+  assessments?: TremorAssessment[]
 }
 
 // Clinical use case table row

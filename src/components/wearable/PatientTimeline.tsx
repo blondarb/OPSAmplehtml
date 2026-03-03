@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import type { DailySummary, WearableAnomaly, WearablePatient } from '@/lib/wearable/types'
+import type { DailySummary, WearableAnomaly, WearablePatient, TremorAssessment } from '@/lib/wearable/types'
 import HeartRateTrack from './HeartRateTrack'
 import HRVTrack from './HRVTrack'
 import SleepTrack from './SleepTrack'
@@ -12,6 +12,7 @@ interface PatientTimelineProps {
   dailySummaries: DailySummary[]
   anomalies: WearableAnomaly[]
   patient: WearablePatient
+  assessments?: TremorAssessment[]
 }
 
 export interface ChartDataPoint {
@@ -45,7 +46,7 @@ function formatDateRange(summaries: DailySummary[]): string {
   return `${fmt(first)} to ${fmt(last)}`
 }
 
-export default function PatientTimeline({ dailySummaries, anomalies, patient }: PatientTimelineProps) {
+export default function PatientTimeline({ dailySummaries, anomalies, patient, assessments }: PatientTimelineProps) {
   const [selectedDay, setSelectedDay] = useState<string | null>(null)
 
   if (!dailySummaries || dailySummaries.length === 0) {
@@ -233,6 +234,7 @@ export default function PatientTimeline({ dailySummaries, anomalies, patient }: 
         baseline={patient.baseline_metrics}
         diagnosis={patient.primary_diagnosis}
         onDayClick={handleDayClick}
+        assessments={assessments}
       />
     </div>
   )

@@ -10,7 +10,7 @@ import {
   ReferenceArea,
   CartesianGrid,
 } from 'recharts'
-import type { BaselineMetrics } from '@/lib/wearable/types'
+import type { BaselineMetrics, TremorAssessment } from '@/lib/wearable/types'
 import type { ChartDataPoint } from './PatientTimeline'
 
 interface DiseaseTrackProps {
@@ -18,6 +18,7 @@ interface DiseaseTrackProps {
   baseline: BaselineMetrics
   diagnosis: string
   onDayClick: (date: string) => void
+  assessments?: TremorAssessment[]
 }
 
 function formatDate(dateStr: string) {
@@ -65,7 +66,14 @@ function AnomalyDot({ cx, cy, payload, onDayClick }: DotProps) {
   )
 }
 
-export default function DiseaseTrack({ data, baseline, diagnosis, onDayClick }: DiseaseTrackProps) {
+function severityLabel(pct: number): { label: string; color: string } {
+  if (pct < 10) return { label: 'Minimal', color: '#22C55E' }
+  if (pct < 25) return { label: 'Mild', color: '#EAB308' }
+  if (pct < 50) return { label: 'Moderate', color: '#F97316' }
+  return { label: 'Significant', color: '#EF4444' }
+}
+
+export default function DiseaseTrack({ data, baseline, diagnosis, onDayClick, assessments }: DiseaseTrackProps) {
   const isParkinsons = diagnosis.toLowerCase().includes('parkinson')
   const isEssentialTremor = diagnosis.toLowerCase().includes('essential tremor')
 
@@ -82,6 +90,24 @@ export default function DiseaseTrack({ data, baseline, diagnosis, onDayClick }: 
   const tremorDays = data.filter(d => d.tremor_pct != null && d.tremor_pct !== undefined).length
   const hasTremorData = tremorDays > 0
   const sparseTremorData = hasTremorData && tremorDays < 3
+
+  // Build assessment lookup and augment chart data
+  const assessmentsByDate = new Map<string, TremorAssessment>()
+  if (assessments) {
+    assessments.forEach(a => {
+      const date = a.assessed_at.split('T')[0]
+      assessmentsByDate.set(date, a)
+    })
+  }
+  const chartData = data.map(d => ({
+    ...d,
+    assessment_score: assessmentsByDate.get(d.date)?.composite_score ?? null,
+  }))
+  const hasAssessments = assessmentsByDate.size > 0
+  const sortedAssessments = assessments
+    ? [...assessments].sort((a, b) => b.assessed_at.localeCompare(a.assessed_at))
+    : []
+  const latestAssessment = sortedAssessments[0] ?? null
 
   const title = isParkinsons ? "Parkinson\u2019s Motor Metrics" : 'Essential Tremor Monitoring'
 
@@ -117,12 +143,18 @@ export default function DiseaseTrack({ data, baseline, diagnosis, onDayClick }: 
             <div style={{ width: '12px', height: '6px', background: '#374151', opacity: 0.5, borderRadius: '2px' }} />
             <span style={{ fontSize: '11px', color: '#94a3b8' }}>Baseline</span>
           </div>
+          {hasAssessments && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <div style={{ width: '8px', height: '8px', background: '#A855F7', transform: 'rotate(45deg)' }} />
+              <span style={{ fontSize: '11px', color: '#94a3b8' }}>Assessment</span>
+            </div>
+          )}
         </div>
       </div>
 
       <ResponsiveContainer width="100%" height={180}>
         {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
-        <ComposedChart data={data} onClick={(e: any) => {
+        <ComposedChart data={chartData} onClick={(e: any) => {
           if (e && e.activePayload && e.activePayload.length > 0) {
             onDayClick(e.activePayload[0].payload.date)
           }
@@ -154,6 +186,7 @@ export default function DiseaseTrack({ data, baseline, diagnosis, onDayClick }: 
               if (value === null || value === undefined) return ['—', 'No data']
               if (name === 'tremor_pct') return [`${value}%`, 'Tremor']
               if (name === 'dyskinetic_mins') return [`${value} min`, 'Dyskinetic']
+              if (name === 'assessment_score') return [`${value}%`, 'Assessment']
               return [value, name]
             }}
           />
@@ -187,8 +220,103 @@ export default function DiseaseTrack({ data, baseline, diagnosis, onDayClick }: 
               activeDot={{ r: 5, fill: '#FBBF24' }}
             />
           )}
+          {hasAssessments && (
+            <Line
+              yAxisId="left"
+              type="monotone"
+              dataKey="assessment_score"
+              stroke="#A855F7"
+              strokeWidth={0}
+              connectNulls={false}
+              /* eslint-disable-next-line @typescript-eslint/no-explicit-any */
+              dot={(props: any) => {
+                if (props.payload?.assessment_score == null) return <g />
+                const { cx, cy } = props
+                if (!cx || !cy) return <g />
+                return (
+                  <polygon
+                    points={`${cx},${cy - 7} ${cx + 7},${cy} ${cx},${cy + 7} ${cx - 7},${cy}`}
+                    fill="#A855F7"
+                    stroke="#C084FC"
+                    strokeWidth={2}
+                    style={{ cursor: 'pointer' }}
+                    onClick={() => onDayClick(props.payload.date)}
+                  />
+                )
+              }}
+              activeDot={{ r: 6, fill: '#A855F7' }}
+            />
+          )}
         </ComposedChart>
       </ResponsiveContainer>
+
+      {/* Assessment Details */}
+      {latestAssessment && (
+        <div style={{
+          marginTop: '12px',
+          padding: '14px',
+          background: 'rgba(168, 85, 247, 0.06)',
+          border: '1px solid rgba(168, 85, 247, 0.2)',
+          borderRadius: '8px',
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px' }}>
+            <span style={{ fontSize: '13px', fontWeight: 600, color: '#C084FC' }}>
+              Latest Guided Assessment
+            </span>
+            <span style={{ fontSize: '11px', color: '#94a3b8' }}>
+              {new Date(latestAssessment.assessed_at).toLocaleDateString('en-US', {
+                month: 'short', day: 'numeric', year: 'numeric',
+                hour: 'numeric', minute: '2-digit',
+              })}
+            </span>
+          </div>
+          <div style={{ display: 'flex', gap: '16px', alignItems: 'center', flexWrap: 'wrap' }}>
+            <div style={{ textAlign: 'center' }}>
+              <div style={{
+                fontSize: '20px',
+                fontWeight: 700,
+                color: severityLabel(latestAssessment.composite_score).color,
+              }}>
+                {latestAssessment.composite_score.toFixed(1)}%
+              </div>
+              <div style={{ fontSize: '11px', color: '#94a3b8', marginTop: '2px' }}>
+                Composite
+              </div>
+              <div style={{
+                fontSize: '10px',
+                fontWeight: 600,
+                color: severityLabel(latestAssessment.composite_score).color,
+                marginTop: '2px',
+              }}>
+                {severityLabel(latestAssessment.composite_score).label}
+              </div>
+            </div>
+            <div style={{ width: '1px', height: '36px', background: '#334155' }} />
+            {latestAssessment.tasks.map((task) => (
+              <div key={task.taskType} style={{ textAlign: 'center' }}>
+                <div style={{
+                  fontSize: '14px',
+                  fontWeight: 600,
+                  color: severityLabel(task.tremorPct).color,
+                }}>
+                  {task.tremorPct.toFixed(0)}%
+                </div>
+                <div style={{ fontSize: '10px', color: '#94a3b8', marginTop: '2px' }}>
+                  {task.taskType === 'postural_hold' ? 'Hold'
+                    : task.taskType === 'pouring_motion' ? 'Pour'
+                    : task.taskType === 'drinking_motion' ? 'Drink'
+                    : task.taskType}
+                </div>
+              </div>
+            ))}
+          </div>
+          {sortedAssessments.length > 1 && (
+            <div style={{ marginTop: '8px', fontSize: '11px', color: '#64748b' }}>
+              {sortedAssessments.length} total assessments on record
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Informational banners */}
       {!hasTremorData && (
