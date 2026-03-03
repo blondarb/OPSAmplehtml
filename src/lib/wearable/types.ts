@@ -180,6 +180,27 @@ export interface TremorAssessment {
   tasks: TremorAssessmentTaskResult[]
 }
 
+// Finger tapping assessment result (from SevaroMonitor iOS app)
+export interface TappingHandResult {
+  hand: string              // "right" | "left"
+  tap_count: number
+  taps_per_second: number
+  inter_tap_mean: number    // milliseconds
+  inter_tap_cv: number      // coefficient of variation
+  fatigue_decrement: number // percentage
+  accuracy: number          // percentage
+  duration_seconds: number
+}
+
+export interface TappingAssessment {
+  id: string
+  patient_id: string
+  assessed_at: string
+  composite_score: number
+  asymmetry_index: number
+  hands: TappingHandResult[]
+}
+
 // Demo data bundle (returned by /api/wearable/demo-data)
 export interface WearableDemoData {
   patient: WearablePatient
@@ -187,6 +208,7 @@ export interface WearableDemoData {
   anomalies: WearableAnomaly[]
   alerts: WearableAlert[]
   assessments?: TremorAssessment[]
+  tappingAssessments?: TappingAssessment[]
 }
 
 // Clinical use case table row
