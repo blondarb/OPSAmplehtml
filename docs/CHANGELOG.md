@@ -2,6 +2,22 @@
 
 Full history of notable changes. For project overview and architecture, see [CLAUDE.md](../CLAUDE.md).
 
+## March 2026
+
+### Wearable Dashboard Data Fixes (March 2–3, 2026)
+- **Null-safe rendering**: Resting HR 0 treated as missing data; all metric fields made nullable in TypeScript types
+- **Sleep fallback mode**: Single "Total Sleep" bar rendered when sleep stage breakdown unavailable from device
+- **Rolling averages**: Server-side 7-day rolling average computation for HRV and steps (previously missing)
+- **Auto-computed baselines**: Baselines calculated from actual patient data instead of hardcoded zeros
+- **Diagnosis-aware Disease Track**: Shows "Essential Tremor Monitoring" or "Parkinson's Motor Metrics" based on patient diagnosis
+- **Auto-refresh polling**: 15-minute visibility-aware polling on `/wearable` page
+- **Files**: 8 modified across types, API route, and 5 chart components (PR #59)
+
+### SevaroMonitor iOS — Sleep Fixes (March 2–3, 2026)
+- **Sleep midnight boundary**: Changed HealthKit sleep query from midnight-to-midnight to 6 PM-to-6 PM window, preventing overnight sleep sessions from being split across two calendar days
+- **Sleep stage breakdown**: Now collects per-stage hours (Deep, Light/Core, REM, Awake) from HealthKit and uploads to Supabase JSONB metrics; web dashboard automatically shows stacked stage bars
+- **Files**: `HealthKitCollector.swift`, `WearableModels.swift` (SevaroMonitor repo)
+
 ## February 2026
 
 ### Physician Workspace Card Breakout (February 25, 2026)
