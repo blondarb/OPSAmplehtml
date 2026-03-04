@@ -137,14 +137,21 @@ export async function GET(request: NextRequest) {
       patient = data[0]
     }
 
-    const [summariesRes, anomaliesRes, alertsRes, assessmentsRes, tappingRes, fluencyRes] = await Promise.all([
+    const [summariesRes, anomaliesRes, alertsRes, assessmentsRes, fluencyRes] = await Promise.all([
       supabase.from('wearable_daily_summaries').select('*').eq('patient_id', patient.id).order('date', { ascending: true }),
       supabase.from('wearable_anomalies').select('*').eq('patient_id', patient.id).order('detected_at', { ascending: true }),
       supabase.from('wearable_alerts').select('*').eq('patient_id', patient.id).order('created_at', { ascending: true }),
       supabase.from('wearable_tremor_assessments').select('*').eq('patient_id', patient.id).order('assessed_at', { ascending: true }),
-      supabase.from('wearable_tapping_assessments').select('*').eq('patient_id', patient.id).order('assessed_at', { ascending: true }),
       supabase.from('wearable_fluency_assessments').select('*').eq('patient_id', patient.id).order('assessed_at', { ascending: true }),
     ])
+
+    // Check for query errors and collect warnings
+    const warnings: string[] = []
+    if (summariesRes.error) { console.error('wearable_daily_summaries query error:', summariesRes.error.message); warnings.push('daily_summaries: ' + summariesRes.error.message) }
+    if (anomaliesRes.error) { console.error('wearable_anomalies query error:', anomaliesRes.error.message); warnings.push('anomalies: ' + anomaliesRes.error.message) }
+    if (alertsRes.error) { console.error('wearable_alerts query error:', alertsRes.error.message); warnings.push('alerts: ' + alertsRes.error.message) }
+    if (assessmentsRes.error) { console.error('wearable_tremor_assessments query error:', assessmentsRes.error.message); warnings.push('tremor_assessments: ' + assessmentsRes.error.message) }
+    if (fluencyRes.error) { console.error('wearable_fluency_assessments query error:', fluencyRes.error.message); warnings.push('fluency_assessments: ' + fluencyRes.error.message) }
 
     // Normalize metrics in each daily summary
     const dailySummaries = (summariesRes.data || []).map((s: Record<string, unknown>) => ({
@@ -165,8 +172,8 @@ export async function GET(request: NextRequest) {
       anomalies: anomaliesRes.data || [],
       alerts: alertsRes.data || [],
       assessments: assessmentsRes.data || [],
-      tappingAssessments: tappingRes.data || [],
       fluencyAssessments: fluencyRes.data || [],
+      ...(warnings.length > 0 ? { warnings } : {}),
     })
   } catch (error: unknown) {
     console.error('Wearable demo-data API Error:', error)

@@ -99,12 +99,17 @@ export default function DiseaseTrack({ data, baseline, diagnosis, onDayClick, as
   const hasTremorData = tremorDays > 0
   const sparseTremorData = hasTremorData && tremorDays < 3
 
+  // Convert UTC timestamp to local date string for matching against daily summary dates
+  const toLocalDate = (isoString: string): string => {
+    const d = new Date(isoString)
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+  }
+
   // Build tremor assessment lookup and augment chart data
   const assessmentsByDate = new Map<string, TremorAssessment>()
   if (assessments) {
     assessments.forEach(a => {
-      const date = a.assessed_at.split('T')[0]
-      assessmentsByDate.set(date, a)
+      assessmentsByDate.set(toLocalDate(a.assessed_at), a)
     })
   }
 
@@ -112,8 +117,7 @@ export default function DiseaseTrack({ data, baseline, diagnosis, onDayClick, as
   const fluencyByDate = new Map<string, FluencyAssessment>()
   if (fluencyAssessments) {
     fluencyAssessments.forEach(a => {
-      const date = a.assessed_at.split('T')[0]
-      fluencyByDate.set(date, a)
+      fluencyByDate.set(toLocalDate(a.assessed_at), a)
     })
   }
 
@@ -132,6 +136,7 @@ export default function DiseaseTrack({ data, baseline, diagnosis, onDayClick, as
     ? [...fluencyAssessments].sort((a, b) => b.assessed_at.localeCompare(a.assessed_at))
     : []
   const latestFluency = sortedFluency[0] ?? null
+  const fluencyLabel = latestFluency ? fluencyScoreLabel(latestFluency.composite_score) : null
 
   const title = isParkinsons ? "Parkinson\u2019s Motor Metrics" : 'Essential Tremor Monitoring'
 
@@ -173,7 +178,7 @@ export default function DiseaseTrack({ data, baseline, diagnosis, onDayClick, as
               <span style={{ fontSize: '11px', color: '#94a3b8' }}>Assessment</span>
             </div>
           )}
-          {hasFluencyAssessments && (
+          {isParkinsons && hasFluencyAssessments && (
             <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
               <div style={{ width: '8px', height: '8px', background: '#22C55E', borderRadius: '50%' }} />
               <span style={{ fontSize: '11px', color: '#94a3b8' }}>Fluency</span>
@@ -207,6 +212,15 @@ export default function DiseaseTrack({ data, baseline, diagnosis, onDayClick, as
               orientation="right"
               tick={{ fill: '#94a3b8', fontSize: 11 }}
               label={{ value: 'Minutes', angle: 90, position: 'insideRight', fill: '#94a3b8', fontSize: 11 }}
+            />
+          )}
+          {isParkinsons && hasFluencyAssessments && (
+            <YAxis
+              yAxisId="fluency"
+              orientation="right"
+              tick={{ fill: '#94a3b8', fontSize: 11 }}
+              label={{ value: 'Fluency', angle: 90, position: 'insideRight', fill: '#94a3b8', fontSize: 11 }}
+              domain={[0, 100]}
             />
           )}
           <Tooltip
@@ -278,9 +292,9 @@ export default function DiseaseTrack({ data, baseline, diagnosis, onDayClick, as
               activeDot={{ r: 6, fill: '#A855F7' }}
             />
           )}
-          {hasFluencyAssessments && (
+          {isParkinsons && hasFluencyAssessments && (
             <Line
-              yAxisId="left"
+              yAxisId="fluency"
               type="monotone"
               dataKey="fluency_score"
               stroke="#22C55E"
@@ -379,7 +393,7 @@ export default function DiseaseTrack({ data, baseline, diagnosis, onDayClick, as
       )}
 
       {/* Fluency Assessment Details */}
-      {latestFluency && (
+      {isParkinsons && latestFluency && (
         <div style={{
           marginTop: '12px',
           padding: '14px',
@@ -403,7 +417,7 @@ export default function DiseaseTrack({ data, baseline, diagnosis, onDayClick, as
               <div style={{
                 fontSize: '20px',
                 fontWeight: 700,
-                color: fluencyScoreLabel(latestFluency.composite_score).color,
+                color: fluencyLabel!.color,
               }}>
                 {latestFluency.composite_score.toFixed(1)}
               </div>
@@ -413,10 +427,10 @@ export default function DiseaseTrack({ data, baseline, diagnosis, onDayClick, as
               <div style={{
                 fontSize: '10px',
                 fontWeight: 600,
-                color: fluencyScoreLabel(latestFluency.composite_score).color,
+                color: fluencyLabel!.color,
                 marginTop: '2px',
               }}>
-                {fluencyScoreLabel(latestFluency.composite_score).label}
+                {fluencyLabel!.label}
               </div>
             </div>
             <div style={{ width: '1px', height: '36px', background: '#334155' }} />
