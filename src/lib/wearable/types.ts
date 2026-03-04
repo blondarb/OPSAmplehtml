@@ -205,6 +205,7 @@ export interface WearableDemoData {
   alerts: WearableAlert[]
   assessments?: TremorAssessment[]
   fluencyAssessments?: FluencyAssessment[]
+  warnings?: string[]
 }
 
 // Clinical use case table row

@@ -27,6 +27,12 @@ function formatDate(dateStr: string) {
   return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
 }
 
+// Convert UTC timestamp to local date string (YYYY-MM-DD) for matching against daily summary dates
+function toLocalDate(isoString: string): string {
+  const d = new Date(isoString)
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}
+
 const darkTooltipStyle = {
   contentStyle: { backgroundColor: '#1e293b', border: '1px solid #334155', borderRadius: '8px', color: '#f1f5f9' },
   labelStyle: { color: '#94a3b8' },
@@ -98,12 +104,6 @@ export default function DiseaseTrack({ data, baseline, diagnosis, onDayClick, as
   const tremorDays = data.filter(d => d.tremor_pct != null && d.tremor_pct !== undefined).length
   const hasTremorData = tremorDays > 0
   const sparseTremorData = hasTremorData && tremorDays < 3
-
-  // Convert UTC timestamp to local date string for matching against daily summary dates
-  const toLocalDate = (isoString: string): string => {
-    const d = new Date(isoString)
-    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
-  }
 
   // Build tremor assessment lookup and augment chart data
   const assessmentsByDate = new Map<string, TremorAssessment>()
@@ -393,7 +393,7 @@ export default function DiseaseTrack({ data, baseline, diagnosis, onDayClick, as
       )}
 
       {/* Fluency Assessment Details */}
-      {isParkinsons && latestFluency && (
+      {isParkinsons && latestFluency && fluencyLabel && (
         <div style={{
           marginTop: '12px',
           padding: '14px',
@@ -417,7 +417,7 @@ export default function DiseaseTrack({ data, baseline, diagnosis, onDayClick, as
               <div style={{
                 fontSize: '20px',
                 fontWeight: 700,
-                color: fluencyLabel!.color,
+                color: fluencyLabel.color,
               }}>
                 {latestFluency.composite_score.toFixed(1)}
               </div>
@@ -427,10 +427,10 @@ export default function DiseaseTrack({ data, baseline, diagnosis, onDayClick, as
               <div style={{
                 fontSize: '10px',
                 fontWeight: 600,
-                color: fluencyLabel!.color,
+                color: fluencyLabel.color,
                 marginTop: '2px',
               }}>
-                {fluencyLabel!.label}
+                {fluencyLabel.label}
               </div>
             </div>
             <div style={{ width: '1px', height: '36px', background: '#334155' }} />
