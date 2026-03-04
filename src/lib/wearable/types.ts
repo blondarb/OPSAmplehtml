@@ -180,6 +180,27 @@ export interface TremorAssessment {
   tasks: TremorAssessmentTaskResult[]
 }
 
+// Finger tapping assessment per-hand result (from SevaroMonitor iOS app)
+export interface TappingHandResult {
+  hand: 'right' | 'left'
+  totalTaps: number
+  tapsPerSecond: number
+  coefficientOfVariation: number
+  fatigueDecrement: number
+  accuracy: number
+  score: number
+}
+
+// Finger tapping assessment result (from SevaroMonitor iOS app)
+export interface TappingAssessment {
+  id: string
+  patient_id: string
+  assessed_at: string
+  composite_score: number
+  asymmetry_index: number
+  hands: TappingHandResult[]
+}
+
 // Verbal fluency assessment result (from SevaroMonitor iOS app)
 export interface FluencyAssessment {
   id: string
@@ -205,6 +226,7 @@ export interface WearableDemoData {
   alerts: WearableAlert[]
   assessments?: TremorAssessment[]
   fluencyAssessments?: FluencyAssessment[]
+  tappingAssessments?: TappingAssessment[]
   warnings?: string[]
 }
 

@@ -311,6 +311,7 @@ export default function WearablePage() {
             patient={data.patient}
             assessments={data.assessments}
             fluencyAssessments={data.fluencyAssessments}
+            tappingAssessments={data.tappingAssessments}
           />
 
           {/* AI Analysis Section */}

@@ -10,7 +10,7 @@ import {
   ReferenceArea,
   CartesianGrid,
 } from 'recharts'
-import type { BaselineMetrics, TremorAssessment, FluencyAssessment } from '@/lib/wearable/types'
+import type { BaselineMetrics, TremorAssessment, FluencyAssessment, TappingAssessment } from '@/lib/wearable/types'
 import type { ChartDataPoint } from './PatientTimeline'
 
 interface DiseaseTrackProps {
@@ -20,6 +20,7 @@ interface DiseaseTrackProps {
   onDayClick: (date: string) => void
   assessments?: TremorAssessment[]
   fluencyAssessments?: FluencyAssessment[]
+  tappingAssessments?: TappingAssessment[]
 }
 
 function formatDate(dateStr: string) {
@@ -87,7 +88,15 @@ function fluencyScoreLabel(score: number): { label: string; color: string } {
   return { label: 'Low', color: '#EF4444' }
 }
 
-export default function DiseaseTrack({ data, baseline, diagnosis, onDayClick, assessments, fluencyAssessments }: DiseaseTrackProps) {
+function tappingScoreLabel(score: number): { label: string; color: string } {
+  if (score >= 80) return { label: 'Excellent', color: '#22C55E' }
+  if (score >= 60) return { label: 'Good', color: '#3B82F6' }
+  if (score >= 40) return { label: 'Fair', color: '#EAB308' }
+  if (score >= 20) return { label: 'Below Average', color: '#F97316' }
+  return { label: 'Poor', color: '#EF4444' }
+}
+
+export default function DiseaseTrack({ data, baseline, diagnosis, onDayClick, assessments, fluencyAssessments, tappingAssessments }: DiseaseTrackProps) {
   const isParkinsons = diagnosis.toLowerCase().includes('parkinson')
   const isEssentialTremor = diagnosis.toLowerCase().includes('essential tremor')
 
@@ -121,13 +130,23 @@ export default function DiseaseTrack({ data, baseline, diagnosis, onDayClick, as
     })
   }
 
+  // Build tapping assessment lookup
+  const tappingByDate = new Map<string, TappingAssessment>()
+  if (tappingAssessments) {
+    tappingAssessments.forEach(a => {
+      tappingByDate.set(toLocalDate(a.assessed_at), a)
+    })
+  }
+
   const chartData = data.map(d => ({
     ...d,
     assessment_score: assessmentsByDate.get(d.date)?.composite_score ?? null,
     fluency_score: fluencyByDate.get(d.date)?.composite_score ?? null,
+    tapping_score: tappingByDate.get(d.date)?.composite_score ?? null,
   }))
   const hasAssessments = assessmentsByDate.size > 0
   const hasFluencyAssessments = fluencyByDate.size > 0
+  const hasTappingAssessments = tappingByDate.size > 0
   const sortedAssessments = assessments
     ? [...assessments].sort((a, b) => b.assessed_at.localeCompare(a.assessed_at))
     : []
@@ -137,6 +156,11 @@ export default function DiseaseTrack({ data, baseline, diagnosis, onDayClick, as
     : []
   const latestFluency = sortedFluency[0] ?? null
   const fluencyLabel = latestFluency ? fluencyScoreLabel(latestFluency.composite_score) : null
+  const sortedTapping = tappingAssessments
+    ? [...tappingAssessments].sort((a, b) => b.assessed_at.localeCompare(a.assessed_at))
+    : []
+  const latestTapping = sortedTapping[0] ?? null
+  const tappingLabel = latestTapping ? tappingScoreLabel(latestTapping.composite_score) : null
 
   const title = isParkinsons ? "Parkinson\u2019s Motor Metrics" : 'Essential Tremor Monitoring'
 
@@ -184,6 +208,12 @@ export default function DiseaseTrack({ data, baseline, diagnosis, onDayClick, as
               <span style={{ fontSize: '11px', color: '#94a3b8' }}>Fluency</span>
             </div>
           )}
+          {hasTappingAssessments && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <div style={{ width: '8px', height: '8px', background: '#3B82F6', borderRadius: '4px' }} />
+              <span style={{ fontSize: '11px', color: '#94a3b8' }}>Tapping</span>
+            </div>
+          )}
         </div>
       </div>
 
@@ -214,12 +244,12 @@ export default function DiseaseTrack({ data, baseline, diagnosis, onDayClick, as
               label={{ value: 'Minutes', angle: 90, position: 'insideRight', fill: '#94a3b8', fontSize: 11 }}
             />
           )}
-          {hasFluencyAssessments && (
+          {(hasFluencyAssessments || hasTappingAssessments) && (
             <YAxis
               yAxisId="fluency"
               orientation="right"
               tick={{ fill: '#94a3b8', fontSize: 11 }}
-              label={{ value: 'Fluency', angle: 90, position: 'insideRight', fill: '#94a3b8', fontSize: 11 }}
+              label={{ value: 'Score', angle: 90, position: 'insideRight', fill: '#94a3b8', fontSize: 11 }}
               domain={[0, 100]}
             />
           )}
@@ -232,6 +262,7 @@ export default function DiseaseTrack({ data, baseline, diagnosis, onDayClick, as
               if (name === 'dyskinetic_mins') return [`${value} min`, 'Dyskinetic']
               if (name === 'assessment_score') return [`${value}%`, 'Assessment']
               if (name === 'fluency_score') return [`${value}`, 'Fluency']
+              if (name === 'tapping_score') return [`${Number(value).toFixed(1)}`, 'Tapping']
               return [value, name]
             }}
           />
@@ -319,6 +350,37 @@ export default function DiseaseTrack({ data, baseline, diagnosis, onDayClick, as
                 )
               }}
               activeDot={{ r: 6, fill: '#22C55E' }}
+            />
+          )}
+          {hasTappingAssessments && (
+            <Line
+              yAxisId="fluency"
+              type="monotone"
+              dataKey="tapping_score"
+              stroke="#3B82F6"
+              strokeWidth={0}
+              connectNulls={false}
+              /* eslint-disable-next-line @typescript-eslint/no-explicit-any */
+              dot={(props: any) => {
+                if (props.payload?.tapping_score == null) return <g />
+                const { cx, cy } = props
+                if (!cx || !cy) return <g />
+                return (
+                  <rect
+                    x={cx - 6}
+                    y={cy - 6}
+                    width={12}
+                    height={12}
+                    rx={3}
+                    fill="#3B82F6"
+                    stroke="#60A5FA"
+                    strokeWidth={2}
+                    style={{ cursor: 'pointer' }}
+                    onClick={() => onDayClick(props.payload.date)}
+                  />
+                )
+              }}
+              activeDot={{ r: 6, fill: '#3B82F6' }}
             />
           )}
         </ComposedChart>
@@ -487,6 +549,83 @@ export default function DiseaseTrack({ data, baseline, diagnosis, onDayClick, as
           {sortedFluency.length > 1 && (
             <div style={{ marginTop: '8px', fontSize: '11px', color: '#64748b' }}>
               {sortedFluency.length} total fluency assessments on record
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Tapping Assessment Details */}
+      {latestTapping && tappingLabel && (
+        <div style={{
+          marginTop: '12px',
+          padding: '14px',
+          background: 'rgba(59, 130, 246, 0.06)',
+          border: '1px solid rgba(59, 130, 246, 0.2)',
+          borderRadius: '8px',
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px' }}>
+            <span style={{ fontSize: '13px', fontWeight: 600, color: '#60A5FA' }}>
+              Latest Finger Tapping Assessment
+            </span>
+            <span style={{ fontSize: '11px', color: '#94a3b8' }}>
+              {new Date(latestTapping.assessed_at).toLocaleDateString('en-US', {
+                month: 'short', day: 'numeric', year: 'numeric',
+                hour: 'numeric', minute: '2-digit',
+              })}
+            </span>
+          </div>
+          <div style={{ display: 'flex', gap: '16px', alignItems: 'center', flexWrap: 'wrap' }}>
+            <div style={{ textAlign: 'center' }}>
+              <div style={{
+                fontSize: '20px',
+                fontWeight: 700,
+                color: tappingLabel.color,
+              }}>
+                {latestTapping.composite_score.toFixed(1)}
+              </div>
+              <div style={{ fontSize: '11px', color: '#94a3b8', marginTop: '2px' }}>
+                Composite
+              </div>
+              <div style={{
+                fontSize: '10px',
+                fontWeight: 600,
+                color: tappingLabel.color,
+                marginTop: '2px',
+              }}>
+                {tappingLabel.label}
+              </div>
+            </div>
+            <div style={{ width: '1px', height: '36px', background: '#334155' }} />
+            {latestTapping.hands.map((hand) => (
+              <div key={hand.hand} style={{ textAlign: 'center' }}>
+                <div style={{
+                  fontSize: '14px',
+                  fontWeight: 600,
+                  color: '#f1f5f9',
+                }}>
+                  {hand.tapsPerSecond.toFixed(1)}/s
+                </div>
+                <div style={{ fontSize: '10px', color: '#94a3b8', marginTop: '2px', textTransform: 'capitalize' }}>
+                  {hand.hand} ({hand.totalTaps} taps)
+                </div>
+              </div>
+            ))}
+            {latestTapping.asymmetry_index > 15 && (
+              <span style={{
+                fontSize: '10px',
+                fontWeight: 600,
+                color: '#F59E0B',
+                padding: '2px 8px',
+                background: 'rgba(245, 158, 11, 0.15)',
+                borderRadius: '9999px',
+              }}>
+                Asymmetry: {latestTapping.asymmetry_index.toFixed(0)}%
+              </span>
+            )}
+          </div>
+          {sortedTapping.length > 1 && (
+            <div style={{ marginTop: '8px', fontSize: '11px', color: '#64748b' }}>
+              {sortedTapping.length} total tapping assessments on record
             </div>
           )}
         </div>

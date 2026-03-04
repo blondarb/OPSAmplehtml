@@ -137,12 +137,13 @@ export async function GET(request: NextRequest) {
       patient = data[0]
     }
 
-    const [summariesRes, anomaliesRes, alertsRes, assessmentsRes, fluencyRes] = await Promise.all([
+    const [summariesRes, anomaliesRes, alertsRes, assessmentsRes, fluencyRes, tappingRes] = await Promise.all([
       supabase.from('wearable_daily_summaries').select('*').eq('patient_id', patient.id).order('date', { ascending: true }),
       supabase.from('wearable_anomalies').select('*').eq('patient_id', patient.id).order('detected_at', { ascending: true }),
       supabase.from('wearable_alerts').select('*').eq('patient_id', patient.id).order('created_at', { ascending: true }),
       supabase.from('wearable_tremor_assessments').select('*').eq('patient_id', patient.id).order('assessed_at', { ascending: true }),
       supabase.from('wearable_fluency_assessments').select('*').eq('patient_id', patient.id).order('assessed_at', { ascending: true }),
+      supabase.from('wearable_tapping_assessments').select('*').eq('patient_id', patient.id).order('assessed_at', { ascending: true }),
     ])
 
     // Check for query errors and collect warnings
@@ -152,6 +153,7 @@ export async function GET(request: NextRequest) {
     if (alertsRes.error) { console.error('wearable_alerts query error:', alertsRes.error.message); warnings.push('alerts: ' + alertsRes.error.message) }
     if (assessmentsRes.error) { console.error('wearable_tremor_assessments query error:', assessmentsRes.error.message); warnings.push('tremor_assessments: ' + assessmentsRes.error.message) }
     if (fluencyRes.error) { console.error('wearable_fluency_assessments query error:', fluencyRes.error.message); warnings.push('fluency_assessments: ' + fluencyRes.error.message) }
+    if (tappingRes.error) { console.error('wearable_tapping_assessments query error:', tappingRes.error.message); warnings.push('tapping_assessments: ' + tappingRes.error.message) }
 
     // Normalize metrics in each daily summary
     const dailySummaries = (summariesRes.data || []).map((s: Record<string, unknown>) => ({
@@ -173,6 +175,7 @@ export async function GET(request: NextRequest) {
       alerts: alertsRes.data || [],
       assessments: assessmentsRes.data || [],
       fluencyAssessments: fluencyRes.data || [],
+      tappingAssessments: tappingRes.data || [],
       ...(warnings.length > 0 ? { warnings } : {}),
     })
   } catch (error: unknown) {
