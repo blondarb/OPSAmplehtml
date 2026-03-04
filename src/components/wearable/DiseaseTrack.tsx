@@ -10,7 +10,7 @@ import {
   ReferenceArea,
   CartesianGrid,
 } from 'recharts'
-import type { BaselineMetrics, TremorAssessment } from '@/lib/wearable/types'
+import type { BaselineMetrics, TremorAssessment, FluencyAssessment } from '@/lib/wearable/types'
 import type { ChartDataPoint } from './PatientTimeline'
 
 interface DiseaseTrackProps {
@@ -19,11 +19,18 @@ interface DiseaseTrackProps {
   diagnosis: string
   onDayClick: (date: string) => void
   assessments?: TremorAssessment[]
+  fluencyAssessments?: FluencyAssessment[]
 }
 
 function formatDate(dateStr: string) {
   const d = new Date(dateStr + 'T00:00:00')
   return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+}
+
+// Convert UTC timestamp to local date string (YYYY-MM-DD) for matching against daily summary dates
+function toLocalDate(isoString: string): string {
+  const d = new Date(isoString)
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
 }
 
 const darkTooltipStyle = {
@@ -73,7 +80,14 @@ function severityLabel(pct: number): { label: string; color: string } {
   return { label: 'Significant', color: '#EF4444' }
 }
 
-export default function DiseaseTrack({ data, baseline, diagnosis, onDayClick, assessments }: DiseaseTrackProps) {
+function fluencyScoreLabel(score: number): { label: string; color: string } {
+  if (score >= 70) return { label: 'Strong', color: '#22C55E' }
+  if (score >= 50) return { label: 'Average', color: '#EAB308' }
+  if (score >= 30) return { label: 'Below Average', color: '#F97316' }
+  return { label: 'Low', color: '#EF4444' }
+}
+
+export default function DiseaseTrack({ data, baseline, diagnosis, onDayClick, assessments, fluencyAssessments }: DiseaseTrackProps) {
   const isParkinsons = diagnosis.toLowerCase().includes('parkinson')
   const isEssentialTremor = diagnosis.toLowerCase().includes('essential tremor')
 
@@ -91,23 +105,38 @@ export default function DiseaseTrack({ data, baseline, diagnosis, onDayClick, as
   const hasTremorData = tremorDays > 0
   const sparseTremorData = hasTremorData && tremorDays < 3
 
-  // Build assessment lookup and augment chart data
+  // Build tremor assessment lookup and augment chart data
   const assessmentsByDate = new Map<string, TremorAssessment>()
   if (assessments) {
     assessments.forEach(a => {
-      const date = a.assessed_at.split('T')[0]
-      assessmentsByDate.set(date, a)
+      assessmentsByDate.set(toLocalDate(a.assessed_at), a)
     })
   }
+
+  // Build fluency assessment lookup
+  const fluencyByDate = new Map<string, FluencyAssessment>()
+  if (fluencyAssessments) {
+    fluencyAssessments.forEach(a => {
+      fluencyByDate.set(toLocalDate(a.assessed_at), a)
+    })
+  }
+
   const chartData = data.map(d => ({
     ...d,
     assessment_score: assessmentsByDate.get(d.date)?.composite_score ?? null,
+    fluency_score: fluencyByDate.get(d.date)?.composite_score ?? null,
   }))
   const hasAssessments = assessmentsByDate.size > 0
+  const hasFluencyAssessments = fluencyByDate.size > 0
   const sortedAssessments = assessments
     ? [...assessments].sort((a, b) => b.assessed_at.localeCompare(a.assessed_at))
     : []
   const latestAssessment = sortedAssessments[0] ?? null
+  const sortedFluency = fluencyAssessments
+    ? [...fluencyAssessments].sort((a, b) => b.assessed_at.localeCompare(a.assessed_at))
+    : []
+  const latestFluency = sortedFluency[0] ?? null
+  const fluencyLabel = latestFluency ? fluencyScoreLabel(latestFluency.composite_score) : null
 
   const title = isParkinsons ? "Parkinson\u2019s Motor Metrics" : 'Essential Tremor Monitoring'
 
@@ -149,6 +178,12 @@ export default function DiseaseTrack({ data, baseline, diagnosis, onDayClick, as
               <span style={{ fontSize: '11px', color: '#94a3b8' }}>Assessment</span>
             </div>
           )}
+          {isParkinsons && hasFluencyAssessments && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <div style={{ width: '8px', height: '8px', background: '#22C55E', borderRadius: '50%' }} />
+              <span style={{ fontSize: '11px', color: '#94a3b8' }}>Fluency</span>
+            </div>
+          )}
         </div>
       </div>
 
@@ -179,6 +214,15 @@ export default function DiseaseTrack({ data, baseline, diagnosis, onDayClick, as
               label={{ value: 'Minutes', angle: 90, position: 'insideRight', fill: '#94a3b8', fontSize: 11 }}
             />
           )}
+          {isParkinsons && hasFluencyAssessments && (
+            <YAxis
+              yAxisId="fluency"
+              orientation="right"
+              tick={{ fill: '#94a3b8', fontSize: 11 }}
+              label={{ value: 'Fluency', angle: 90, position: 'insideRight', fill: '#94a3b8', fontSize: 11 }}
+              domain={[0, 100]}
+            />
+          )}
           <Tooltip
             {...darkTooltipStyle}
             labelFormatter={(label: any) => formatDate(String(label))}
@@ -187,6 +231,7 @@ export default function DiseaseTrack({ data, baseline, diagnosis, onDayClick, as
               if (name === 'tremor_pct') return [`${value}%`, 'Tremor']
               if (name === 'dyskinetic_mins') return [`${value} min`, 'Dyskinetic']
               if (name === 'assessment_score') return [`${value}%`, 'Assessment']
+              if (name === 'fluency_score') return [`${value}`, 'Fluency']
               return [value, name]
             }}
           />
@@ -245,6 +290,35 @@ export default function DiseaseTrack({ data, baseline, diagnosis, onDayClick, as
                 )
               }}
               activeDot={{ r: 6, fill: '#A855F7' }}
+            />
+          )}
+          {isParkinsons && hasFluencyAssessments && (
+            <Line
+              yAxisId="fluency"
+              type="monotone"
+              dataKey="fluency_score"
+              stroke="#22C55E"
+              strokeWidth={0}
+              connectNulls={false}
+              /* eslint-disable-next-line @typescript-eslint/no-explicit-any */
+              dot={(props: any) => {
+                if (props.payload?.fluency_score == null) return <g />
+                const { cx, cy } = props
+                if (!cx || !cy) return <g />
+                return (
+                  <circle
+                    cx={cx}
+                    cy={cy}
+                    r={7}
+                    fill="#22C55E"
+                    stroke="#4ADE80"
+                    strokeWidth={2}
+                    style={{ cursor: 'pointer' }}
+                    onClick={() => onDayClick(props.payload.date)}
+                  />
+                )
+              }}
+              activeDot={{ r: 6, fill: '#22C55E' }}
             />
           )}
         </ComposedChart>
@@ -313,6 +387,106 @@ export default function DiseaseTrack({ data, baseline, diagnosis, onDayClick, as
           {sortedAssessments.length > 1 && (
             <div style={{ marginTop: '8px', fontSize: '11px', color: '#64748b' }}>
               {sortedAssessments.length} total assessments on record
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Fluency Assessment Details */}
+      {isParkinsons && latestFluency && fluencyLabel && (
+        <div style={{
+          marginTop: '12px',
+          padding: '14px',
+          background: 'rgba(34, 197, 94, 0.06)',
+          border: '1px solid rgba(34, 197, 94, 0.2)',
+          borderRadius: '8px',
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px' }}>
+            <span style={{ fontSize: '13px', fontWeight: 600, color: '#4ADE80' }}>
+              Latest Verbal Fluency Assessment
+            </span>
+            <span style={{ fontSize: '11px', color: '#94a3b8' }}>
+              {new Date(latestFluency.assessed_at).toLocaleDateString('en-US', {
+                month: 'short', day: 'numeric', year: 'numeric',
+                hour: 'numeric', minute: '2-digit',
+              })}
+            </span>
+          </div>
+          <div style={{ display: 'flex', gap: '16px', alignItems: 'center', flexWrap: 'wrap' }}>
+            <div style={{ textAlign: 'center' }}>
+              <div style={{
+                fontSize: '20px',
+                fontWeight: 700,
+                color: fluencyLabel.color,
+              }}>
+                {latestFluency.composite_score.toFixed(1)}
+              </div>
+              <div style={{ fontSize: '11px', color: '#94a3b8', marginTop: '2px' }}>
+                Composite
+              </div>
+              <div style={{
+                fontSize: '10px',
+                fontWeight: 600,
+                color: fluencyLabel.color,
+                marginTop: '2px',
+              }}>
+                {fluencyLabel.label}
+              </div>
+            </div>
+            <div style={{ width: '1px', height: '36px', background: '#334155' }} />
+            <div style={{ textAlign: 'center' }}>
+              <div style={{ fontSize: '14px', fontWeight: 600, color: '#f1f5f9' }}>
+                {latestFluency.total_words}
+              </div>
+              <div style={{ fontSize: '10px', color: '#94a3b8', marginTop: '2px' }}>
+                Words
+              </div>
+            </div>
+            <div style={{ textAlign: 'center' }}>
+              <div style={{
+                fontSize: '12px',
+                fontWeight: 600,
+                color: '#f1f5f9',
+                textTransform: 'capitalize',
+              }}>
+                {latestFluency.category}
+              </div>
+              <div style={{ fontSize: '10px', color: '#94a3b8', marginTop: '2px' }}>
+                Category
+              </div>
+            </div>
+            <div style={{ textAlign: 'center' }}>
+              <div style={{ fontSize: '14px', fontWeight: 600, color: '#EAB308' }}>
+                {latestFluency.repetitions}
+              </div>
+              <div style={{ fontSize: '10px', color: '#94a3b8', marginTop: '2px' }}>
+                Repeats
+              </div>
+            </div>
+            <div style={{ textAlign: 'center' }}>
+              <div style={{ fontSize: '14px', fontWeight: 600, color: '#EF4444' }}>
+                {latestFluency.errors}
+              </div>
+              <div style={{ fontSize: '10px', color: '#94a3b8', marginTop: '2px' }}>
+                Errors
+              </div>
+            </div>
+            {latestFluency.ai_refined && (
+              <span style={{
+                fontSize: '10px',
+                fontWeight: 600,
+                color: '#22C55E',
+                padding: '2px 8px',
+                background: 'rgba(34, 197, 94, 0.15)',
+                borderRadius: '9999px',
+              }}>
+                AI Enhanced
+              </span>
+            )}
+          </div>
+          {sortedFluency.length > 1 && (
+            <div style={{ marginTop: '8px', fontSize: '11px', color: '#64748b' }}>
+              {sortedFluency.length} total fluency assessments on record
             </div>
           )}
         </div>

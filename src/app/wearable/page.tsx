@@ -310,6 +310,7 @@ export default function WearablePage() {
             anomalies={data.anomalies}
             patient={data.patient}
             assessments={data.assessments}
+            fluencyAssessments={data.fluencyAssessments}
           />
 
           {/* AI Analysis Section */}

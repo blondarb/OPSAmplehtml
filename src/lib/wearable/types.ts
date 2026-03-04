@@ -180,6 +180,23 @@ export interface TremorAssessment {
   tasks: TremorAssessmentTaskResult[]
 }
 
+// Verbal fluency assessment result (from SevaroMonitor iOS app)
+export interface FluencyAssessment {
+  id: string
+  patient_id: string
+  assessed_at: string
+  category: 'animals' | 'fruits' | 'tools' | 'clothing'
+  total_words: number
+  quartile_words: number[]     // [q1, q2, q3, q4] words per 15s window
+  repetitions: number
+  errors: number
+  clustering_score: number | null
+  transcript: string | null
+  word_list: string[]
+  composite_score: number
+  ai_refined: boolean
+}
+
 // Demo data bundle (returned by /api/wearable/demo-data)
 export interface WearableDemoData {
   patient: WearablePatient
@@ -187,6 +204,8 @@ export interface WearableDemoData {
   anomalies: WearableAnomaly[]
   alerts: WearableAlert[]
   assessments?: TremorAssessment[]
+  fluencyAssessments?: FluencyAssessment[]
+  warnings?: string[]
 }
 
 // Clinical use case table row
