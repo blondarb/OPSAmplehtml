@@ -178,7 +178,7 @@ export default function DiseaseTrack({ data, baseline, diagnosis, onDayClick, as
               <span style={{ fontSize: '11px', color: '#94a3b8' }}>Assessment</span>
             </div>
           )}
-          {isParkinsons && hasFluencyAssessments && (
+          {hasFluencyAssessments && (
             <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
               <div style={{ width: '8px', height: '8px', background: '#22C55E', borderRadius: '50%' }} />
               <span style={{ fontSize: '11px', color: '#94a3b8' }}>Fluency</span>
@@ -214,7 +214,7 @@ export default function DiseaseTrack({ data, baseline, diagnosis, onDayClick, as
               label={{ value: 'Minutes', angle: 90, position: 'insideRight', fill: '#94a3b8', fontSize: 11 }}
             />
           )}
-          {isParkinsons && hasFluencyAssessments && (
+          {hasFluencyAssessments && (
             <YAxis
               yAxisId="fluency"
               orientation="right"
@@ -292,7 +292,7 @@ export default function DiseaseTrack({ data, baseline, diagnosis, onDayClick, as
               activeDot={{ r: 6, fill: '#A855F7' }}
             />
           )}
-          {isParkinsons && hasFluencyAssessments && (
+          {hasFluencyAssessments && (
             <Line
               yAxisId="fluency"
               type="monotone"
@@ -393,7 +393,7 @@ export default function DiseaseTrack({ data, baseline, diagnosis, onDayClick, as
       )}
 
       {/* Fluency Assessment Details */}
-      {isParkinsons && latestFluency && fluencyLabel && (
+      {latestFluency && fluencyLabel && (
         <div style={{
           marginTop: '12px',
           padding: '14px',
