@@ -312,6 +312,7 @@ export default function WearablePage() {
             assessments={data.assessments}
             fluencyAssessments={data.fluencyAssessments}
             tappingAssessments={data.tappingAssessments}
+            narratives={data.narratives}
           />
 
           {/* AI Analysis Section */}

@@ -178,6 +178,9 @@ export interface TremorAssessment {
   composite_score: number
   composite_intensity: number
   tasks: TremorAssessmentTaskResult[]
+  // Enhanced AI analysis fields
+  ai_refined?: boolean
+  dominant_pattern?: string
 }
 
 // Finger tapping assessment per-hand result (from SevaroMonitor iOS app)
@@ -199,6 +202,10 @@ export interface TappingAssessment {
   composite_score: number
   asymmetry_index: number
   hands: TappingHandResult[]
+  // Enhanced AI analysis fields
+  ai_refined?: boolean
+  fatigue_curve_type?: string
+  bradykinesia_severity?: string
 }
 
 // Verbal fluency assessment result (from SevaroMonitor iOS app)
@@ -216,6 +223,42 @@ export interface FluencyAssessment {
   word_list: string[]
   composite_score: number
   ai_refined: boolean
+  // Enhanced AI analysis fields
+  semantic_clusters?: Array<{ name: string; words: string[]; size: number }>
+  switch_count?: number
+  perseveration_types?: { exact: number; phonemic: number; rule_based: number }
+  intrusion_types?: { category_adjacent: number; phonemic: number; unrelated: number }
+  temporal_slope?: number
+  confidence_weighted_score?: number
+}
+
+// Clinical narrative from two-stage AI analysis pipeline
+export interface SeverityFlag {
+  metric: string
+  level: 'green' | 'yellow' | 'orange' | 'red'
+  note: string
+}
+
+export interface StructuredSummary {
+  key_findings: string[]
+  pattern_analysis: string
+  baseline_comparison: string
+  clinical_considerations: string
+  trend_context: string
+  severity_flags: SeverityFlag[]
+  // Longitudinal-only field
+  trend_data?: Record<string, unknown>
+}
+
+export interface ClinicalNarrative {
+  id: string
+  patient_id: string
+  narrative_type: 'tremor' | 'tapping' | 'fluency' | 'longitudinal'
+  assessment_id: string | null
+  structured_summary: StructuredSummary
+  clinical_narrative: string
+  model_versions: { stage1: string; stage2: string }
+  created_at: string
 }
 
 // Demo data bundle (returned by /api/wearable/demo-data)
@@ -227,6 +270,7 @@ export interface WearableDemoData {
   assessments?: TremorAssessment[]
   fluencyAssessments?: FluencyAssessment[]
   tappingAssessments?: TappingAssessment[]
+  narratives?: ClinicalNarrative[]
   warnings?: string[]
 }
 

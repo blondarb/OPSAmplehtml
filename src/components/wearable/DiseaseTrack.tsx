@@ -10,8 +10,9 @@ import {
   ReferenceArea,
   CartesianGrid,
 } from 'recharts'
-import type { BaselineMetrics, TremorAssessment, FluencyAssessment, TappingAssessment } from '@/lib/wearable/types'
+import type { BaselineMetrics, TremorAssessment, FluencyAssessment, TappingAssessment, ClinicalNarrative } from '@/lib/wearable/types'
 import type { ChartDataPoint } from './PatientTimeline'
+import ClinicalNarrativePanel from './ClinicalNarrativePanel'
 
 interface DiseaseTrackProps {
   data: ChartDataPoint[]
@@ -21,6 +22,7 @@ interface DiseaseTrackProps {
   assessments?: TremorAssessment[]
   fluencyAssessments?: FluencyAssessment[]
   tappingAssessments?: TappingAssessment[]
+  narratives?: ClinicalNarrative[]
 }
 
 function formatDate(dateStr: string) {
@@ -96,7 +98,7 @@ function tappingScoreLabel(score: number): { label: string; color: string } {
   return { label: 'Poor', color: '#EF4444' }
 }
 
-export default function DiseaseTrack({ data, baseline, diagnosis, onDayClick, assessments, fluencyAssessments, tappingAssessments }: DiseaseTrackProps) {
+export default function DiseaseTrack({ data, baseline, diagnosis, onDayClick, assessments, fluencyAssessments, tappingAssessments, narratives }: DiseaseTrackProps) {
   const isParkinsons = diagnosis.toLowerCase().includes('parkinson')
   const isEssentialTremor = diagnosis.toLowerCase().includes('essential tremor')
 
@@ -161,6 +163,20 @@ export default function DiseaseTrack({ data, baseline, diagnosis, onDayClick, as
     : []
   const latestTapping = sortedTapping[0] ?? null
   const tappingLabel = latestTapping ? tappingScoreLabel(latestTapping.composite_score) : null
+
+  // Build narrative lookups by assessment ID and type
+  const tremorNarratives = (narratives || []).filter(n => n.narrative_type === 'tremor')
+  const fluencyNarratives = (narratives || []).filter(n => n.narrative_type === 'fluency')
+  const tappingNarratives = (narratives || []).filter(n => n.narrative_type === 'tapping')
+  const latestTremorNarrative = latestAssessment
+    ? tremorNarratives.find(n => n.assessment_id === latestAssessment.id) ?? tremorNarratives[0]
+    : null
+  const latestFluencyNarrative = latestFluency
+    ? fluencyNarratives.find(n => n.assessment_id === latestFluency.id) ?? fluencyNarratives[0]
+    : null
+  const latestTappingNarrative = latestTapping
+    ? tappingNarratives.find(n => n.assessment_id === latestTapping.id) ?? tappingNarratives[0]
+    : null
 
   const title = isParkinsons ? "Parkinson\u2019s Motor Metrics" : 'Essential Tremor Monitoring'
 
@@ -453,6 +469,9 @@ export default function DiseaseTrack({ data, baseline, diagnosis, onDayClick, as
           )}
         </div>
       )}
+      {latestTremorNarrative && (
+        <ClinicalNarrativePanel narrative={latestTremorNarrative} accentColor="#A855F7" />
+      )}
 
       {/* Fluency Assessment Details */}
       {latestFluency && fluencyLabel && (
@@ -553,6 +572,9 @@ export default function DiseaseTrack({ data, baseline, diagnosis, onDayClick, as
           )}
         </div>
       )}
+      {latestFluencyNarrative && (
+        <ClinicalNarrativePanel narrative={latestFluencyNarrative} accentColor="#22C55E" />
+      )}
 
       {/* Tapping Assessment Details */}
       {latestTapping && tappingLabel && (
@@ -629,6 +651,9 @@ export default function DiseaseTrack({ data, baseline, diagnosis, onDayClick, as
             </div>
           )}
         </div>
+      )}
+      {latestTappingNarrative && (
+        <ClinicalNarrativePanel narrative={latestTappingNarrative} accentColor="#3B82F6" />
       )}
 
       {/* Informational banners */}

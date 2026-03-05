@@ -1,12 +1,13 @@
 'use client'
 
 import { useState } from 'react'
-import type { DailySummary, WearableAnomaly, WearablePatient, TremorAssessment, FluencyAssessment, TappingAssessment } from '@/lib/wearable/types'
+import type { DailySummary, WearableAnomaly, WearablePatient, TremorAssessment, FluencyAssessment, TappingAssessment, ClinicalNarrative } from '@/lib/wearable/types'
 import HeartRateTrack from './HeartRateTrack'
 import HRVTrack from './HRVTrack'
 import SleepTrack from './SleepTrack'
 import ActivityTrack from './ActivityTrack'
 import DiseaseTrack from './DiseaseTrack'
+import LongitudinalSummaryBanner from './LongitudinalSummaryBanner'
 
 interface PatientTimelineProps {
   dailySummaries: DailySummary[]
@@ -15,6 +16,7 @@ interface PatientTimelineProps {
   assessments?: TremorAssessment[]
   fluencyAssessments?: FluencyAssessment[]
   tappingAssessments?: TappingAssessment[]
+  narratives?: ClinicalNarrative[]
 }
 
 export interface ChartDataPoint {
@@ -48,7 +50,7 @@ function formatDateRange(summaries: DailySummary[]): string {
   return `${fmt(first)} to ${fmt(last)}`
 }
 
-export default function PatientTimeline({ dailySummaries, anomalies, patient, assessments, fluencyAssessments, tappingAssessments }: PatientTimelineProps) {
+export default function PatientTimeline({ dailySummaries, anomalies, patient, assessments, fluencyAssessments, tappingAssessments, narratives }: PatientTimelineProps) {
   const [selectedDay, setSelectedDay] = useState<string | null>(null)
 
   if (!dailySummaries || dailySummaries.length === 0) {
@@ -231,6 +233,10 @@ export default function PatientTimeline({ dailySummaries, anomalies, patient, as
         baseline={patient.baseline_metrics}
         onDayClick={handleDayClick}
       />
+      {/* Longitudinal Summary Banner (if available) */}
+      {narratives?.filter(n => n.narrative_type === 'longitudinal').slice(0, 1).map(n => (
+        <LongitudinalSummaryBanner key={n.id} narrative={n} />
+      ))}
       <DiseaseTrack
         data={chartData}
         baseline={patient.baseline_metrics}
@@ -239,6 +245,7 @@ export default function PatientTimeline({ dailySummaries, anomalies, patient, as
         assessments={assessments}
         fluencyAssessments={fluencyAssessments}
         tappingAssessments={tappingAssessments}
+        narratives={narratives}
       />
     </div>
   )
