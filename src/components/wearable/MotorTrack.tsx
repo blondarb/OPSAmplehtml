@@ -383,7 +383,7 @@ export default function MotorTrack({ data, baseline, diagnosis, onDayClick, asse
         </div>
       )}
       {latestTremorNarrative ? (
-        <ClinicalNarrativePanel narrative={latestTremorNarrative} accentColor="#A855F7" />
+        <ClinicalNarrativePanel narrative={latestTremorNarrative} accentColor="#A855F7" onRegenerate={onGenerateNarrative ? () => onGenerateNarrative('tremor', latestAssessment!.id) : undefined} />
       ) : latestAssessment && onGenerateNarrative && (
         <button
           onClick={async () => {
@@ -499,7 +499,7 @@ export default function MotorTrack({ data, baseline, diagnosis, onDayClick, asse
         </div>
       )}
       {latestTappingNarrative ? (
-        <ClinicalNarrativePanel narrative={latestTappingNarrative} accentColor="#3B82F6" />
+        <ClinicalNarrativePanel narrative={latestTappingNarrative} accentColor="#3B82F6" onRegenerate={onGenerateNarrative ? () => onGenerateNarrative('tapping', latestTapping!.id) : undefined} />
       ) : latestTapping && onGenerateNarrative && (
         <button
           onClick={async () => {

@@ -287,7 +287,7 @@ export default function CognitiveTrack({ data, onDayClick, fluencyAssessments, n
         </div>
       )}
       {latestFluencyNarrative ? (
-        <ClinicalNarrativePanel narrative={latestFluencyNarrative} accentColor="#22C55E" />
+        <ClinicalNarrativePanel narrative={latestFluencyNarrative} accentColor="#22C55E" onRegenerate={onGenerateNarrative ? () => onGenerateNarrative('fluency', latestFluency!.id) : undefined} />
       ) : latestFluency && onGenerateNarrative && (
         <button
           onClick={async () => {
