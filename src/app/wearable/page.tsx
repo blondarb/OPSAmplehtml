@@ -165,6 +165,30 @@ export default function WearablePage() {
     }
   }
 
+  async function handleGenerateNarrative(type: string, assessmentId: string) {
+    if (!data?.patient?.id) return
+    const res = await fetch('/api/wearable/analyze-assessment', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        type,
+        patient_id: data.patient.id,
+        assessment_id: assessmentId,
+      }),
+    })
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({}))
+      throw new Error(body.error || 'Failed to generate interpretation')
+    }
+    // Refresh patient data to pick up the new narrative
+    const refreshRes = await fetch(`/api/wearable/demo-data?patient_id=${data.patient.id}`)
+    if (refreshRes.ok) {
+      const refreshed = await refreshRes.json()
+      setData(refreshed)
+      setLastUpdated(new Date())
+    }
+  }
+
   const selectedSource = patients.find(p => p.id === selectedPatientId)?.source || 'demo'
 
   return (
@@ -313,6 +337,7 @@ export default function WearablePage() {
             fluencyAssessments={data.fluencyAssessments}
             tappingAssessments={data.tappingAssessments}
             narratives={data.narratives}
+            onGenerateNarrative={handleGenerateNarrative}
           />
 
           {/* AI Analysis Section */}

@@ -18,6 +18,7 @@ interface PatientTimelineProps {
   fluencyAssessments?: FluencyAssessment[]
   tappingAssessments?: TappingAssessment[]
   narratives?: ClinicalNarrative[]
+  onGenerateNarrative?: (type: string, assessmentId: string) => Promise<void>
 }
 
 export interface ChartDataPoint {
@@ -51,7 +52,7 @@ function formatDateRange(summaries: DailySummary[]): string {
   return `${fmt(first)} to ${fmt(last)}`
 }
 
-export default function PatientTimeline({ dailySummaries, anomalies, patient, assessments, fluencyAssessments, tappingAssessments, narratives }: PatientTimelineProps) {
+export default function PatientTimeline({ dailySummaries, anomalies, patient, assessments, fluencyAssessments, tappingAssessments, narratives, onGenerateNarrative }: PatientTimelineProps) {
   const [selectedDay, setSelectedDay] = useState<string | null>(null)
 
   if (!dailySummaries || dailySummaries.length === 0) {
@@ -246,6 +247,7 @@ export default function PatientTimeline({ dailySummaries, anomalies, patient, as
         assessments={assessments}
         tappingAssessments={tappingAssessments}
         narratives={narratives}
+        onGenerateNarrative={onGenerateNarrative}
       />
       <CognitiveTrack
         data={chartData}
@@ -253,6 +255,7 @@ export default function PatientTimeline({ dailySummaries, anomalies, patient, as
         onDayClick={handleDayClick}
         fluencyAssessments={fluencyAssessments}
         narratives={narratives}
+        onGenerateNarrative={onGenerateNarrative}
       />
     </div>
   )

@@ -1,5 +1,6 @@
 'use client'
 
+import { useState } from 'react'
 import {
   ResponsiveContainer,
   ComposedChart,
@@ -23,6 +24,7 @@ interface MotorTrackProps {
   assessments?: TremorAssessment[]
   tappingAssessments?: TappingAssessment[]
   narratives?: ClinicalNarrative[]
+  onGenerateNarrative?: (type: string, assessmentId: string) => Promise<void>
 }
 
 interface DotProps {
@@ -60,7 +62,9 @@ function AnomalyDot({ cx, cy, payload, onDayClick }: DotProps) {
   )
 }
 
-export default function MotorTrack({ data, baseline, diagnosis, onDayClick, assessments, tappingAssessments, narratives }: MotorTrackProps) {
+export default function MotorTrack({ data, baseline, diagnosis, onDayClick, assessments, tappingAssessments, narratives, onGenerateNarrative }: MotorTrackProps) {
+  const [generatingTremor, setGeneratingTremor] = useState(false)
+  const [generatingTapping, setGeneratingTapping] = useState(false)
   const isParkinsons = diagnosis.toLowerCase().includes('parkinson')
   const isEssentialTremor = diagnosis.toLowerCase().includes('essential tremor')
 
@@ -378,8 +382,44 @@ export default function MotorTrack({ data, baseline, diagnosis, onDayClick, asse
           )}
         </div>
       )}
-      {latestTremorNarrative && (
+      {latestTremorNarrative ? (
         <ClinicalNarrativePanel narrative={latestTremorNarrative} accentColor="#A855F7" />
+      ) : latestAssessment && onGenerateNarrative && (
+        <button
+          onClick={async () => {
+            setGeneratingTremor(true)
+            try { await onGenerateNarrative('tremor', latestAssessment.id) }
+            finally { setGeneratingTremor(false) }
+          }}
+          disabled={generatingTremor}
+          style={{
+            marginTop: '8px',
+            width: '100%',
+            padding: '10px 16px',
+            background: generatingTremor ? '#334155' : 'rgba(168, 85, 247, 0.1)',
+            border: '1px solid rgba(168, 85, 247, 0.25)',
+            borderRadius: '8px',
+            color: generatingTremor ? '#94a3b8' : '#C084FC',
+            fontSize: '12px',
+            fontWeight: 600,
+            cursor: generatingTremor ? 'not-allowed' : 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: '8px',
+          }}
+        >
+          {generatingTremor ? (
+            <>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ animation: 'spin 1s linear infinite' }}>
+                <path d="M21 12a9 9 0 1 1-6.219-8.56" />
+              </svg>
+              Generating Clinical Interpretation...
+            </>
+          ) : (
+            <>🧠 Generate AI Clinical Interpretation</>
+          )}
+        </button>
       )}
 
       {/* Tapping Assessment Details */}
@@ -458,8 +498,44 @@ export default function MotorTrack({ data, baseline, diagnosis, onDayClick, asse
           )}
         </div>
       )}
-      {latestTappingNarrative && (
+      {latestTappingNarrative ? (
         <ClinicalNarrativePanel narrative={latestTappingNarrative} accentColor="#3B82F6" />
+      ) : latestTapping && onGenerateNarrative && (
+        <button
+          onClick={async () => {
+            setGeneratingTapping(true)
+            try { await onGenerateNarrative('tapping', latestTapping.id) }
+            finally { setGeneratingTapping(false) }
+          }}
+          disabled={generatingTapping}
+          style={{
+            marginTop: '8px',
+            width: '100%',
+            padding: '10px 16px',
+            background: generatingTapping ? '#334155' : 'rgba(59, 130, 246, 0.1)',
+            border: '1px solid rgba(59, 130, 246, 0.25)',
+            borderRadius: '8px',
+            color: generatingTapping ? '#94a3b8' : '#60A5FA',
+            fontSize: '12px',
+            fontWeight: 600,
+            cursor: generatingTapping ? 'not-allowed' : 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: '8px',
+          }}
+        >
+          {generatingTapping ? (
+            <>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ animation: 'spin 1s linear infinite' }}>
+                <path d="M21 12a9 9 0 1 1-6.219-8.56" />
+              </svg>
+              Generating Clinical Interpretation...
+            </>
+          ) : (
+            <>🧠 Generate AI Clinical Interpretation</>
+          )}
+        </button>
       )}
 
       {/* Informational banners */}

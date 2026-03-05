@@ -1,5 +1,6 @@
 'use client'
 
+import { useState } from 'react'
 import {
   ResponsiveContainer,
   ComposedChart,
@@ -46,9 +47,11 @@ interface CognitiveTrackProps {
   onDayClick: (date: string) => void
   fluencyAssessments?: FluencyAssessment[]
   narratives?: ClinicalNarrative[]
+  onGenerateNarrative?: (type: string, assessmentId: string) => Promise<void>
 }
 
-export default function CognitiveTrack({ data, onDayClick, fluencyAssessments, narratives }: CognitiveTrackProps) {
+export default function CognitiveTrack({ data, onDayClick, fluencyAssessments, narratives, onGenerateNarrative }: CognitiveTrackProps) {
+  const [generatingFluency, setGeneratingFluency] = useState(false)
   // Check if we have any cognitive assessment data
   const hasFluency = (fluencyAssessments?.length ?? 0) > 0
   // Future: const hasTrailMaking = ...
@@ -283,8 +286,44 @@ export default function CognitiveTrack({ data, onDayClick, fluencyAssessments, n
           )}
         </div>
       )}
-      {latestFluencyNarrative && (
+      {latestFluencyNarrative ? (
         <ClinicalNarrativePanel narrative={latestFluencyNarrative} accentColor="#22C55E" />
+      ) : latestFluency && onGenerateNarrative && (
+        <button
+          onClick={async () => {
+            setGeneratingFluency(true)
+            try { await onGenerateNarrative('fluency', latestFluency.id) }
+            finally { setGeneratingFluency(false) }
+          }}
+          disabled={generatingFluency}
+          style={{
+            marginTop: '8px',
+            width: '100%',
+            padding: '10px 16px',
+            background: generatingFluency ? '#334155' : 'rgba(34, 197, 94, 0.1)',
+            border: '1px solid rgba(34, 197, 94, 0.25)',
+            borderRadius: '8px',
+            color: generatingFluency ? '#94a3b8' : '#4ADE80',
+            fontSize: '12px',
+            fontWeight: 600,
+            cursor: generatingFluency ? 'not-allowed' : 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: '8px',
+          }}
+        >
+          {generatingFluency ? (
+            <>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ animation: 'spin 1s linear infinite' }}>
+                <path d="M21 12a9 9 0 1 1-6.219-8.56" />
+              </svg>
+              Generating Clinical Interpretation...
+            </>
+          ) : (
+            <>🧠 Generate AI Clinical Interpretation</>
+          )}
+        </button>
       )}
     </div>
   )
