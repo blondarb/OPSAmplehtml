@@ -107,6 +107,31 @@ function computeBaselineFromData(
   }
 }
 
+// Normalize tapping hand results from iOS snake_case to web camelCase
+// iOS app stores: taps_per_second, tap_count, inter_tap_cv, fatigue_decrement, duration_seconds
+// Web expects: tapsPerSecond, totalTaps, coefficientOfVariation, fatigueDecrement
+function normalizeTappingHand(raw: Record<string, unknown>): Record<string, unknown> {
+  return {
+    hand: raw.hand,
+    totalTaps: raw.totalTaps ?? raw.tap_count,
+    tapsPerSecond: raw.tapsPerSecond ?? raw.taps_per_second,
+    coefficientOfVariation: raw.coefficientOfVariation ?? raw.inter_tap_cv,
+    fatigueDecrement: raw.fatigueDecrement ?? raw.fatigue_decrement,
+    accuracy: raw.accuracy,
+    score: raw.score,
+    durationSeconds: raw.durationSeconds ?? raw.duration_seconds,
+    interTapMean: raw.interTapMean ?? raw.inter_tap_mean,
+  }
+}
+
+function normalizeTappingAssessment(raw: Record<string, unknown>): Record<string, unknown> {
+  const hands = (raw.hands as Array<Record<string, unknown>>) || []
+  return {
+    ...raw,
+    hands: hands.map(normalizeTappingHand),
+  }
+}
+
 export async function GET(request: NextRequest) {
   try {
     const supabase = await createClient()
@@ -177,7 +202,7 @@ export async function GET(request: NextRequest) {
       alerts: alertsRes.data || [],
       assessments: assessmentsRes.data || [],
       fluencyAssessments: fluencyRes.data || [],
-      tappingAssessments: tappingRes.data || [],
+      tappingAssessments: (tappingRes.data || []).map(a => normalizeTappingAssessment(a as Record<string, unknown>)),
       narratives: narrativesRes.data || [],
       ...(warnings.length > 0 ? { warnings } : {}),
     })

@@ -338,7 +338,7 @@ export default function MotorTrack({ data, baseline, diagnosis, onDayClick, asse
                 fontWeight: 700,
                 color: severityLabel(latestAssessment.composite_score).color,
               }}>
-                {latestAssessment.composite_score.toFixed(1)}%
+                {(latestAssessment.composite_score ?? 0).toFixed(1)}%
               </div>
               <div style={{ fontSize: '11px', color: '#94a3b8', marginTop: '2px' }}>
                 Composite
@@ -360,7 +360,7 @@ export default function MotorTrack({ data, baseline, diagnosis, onDayClick, asse
                   fontWeight: 600,
                   color: severityLabel(task.tremorPct).color,
                 }}>
-                  {task.tremorPct.toFixed(0)}%
+                  {(task.tremorPct ?? 0).toFixed(0)}%
                 </div>
                 <div style={{ fontSize: '10px', color: '#94a3b8', marginTop: '2px' }}>
                   {task.taskType === 'postural_hold' ? 'Hold'
@@ -409,7 +409,7 @@ export default function MotorTrack({ data, baseline, diagnosis, onDayClick, asse
                 fontWeight: 700,
                 color: tappingLabel.color,
               }}>
-                {latestTapping.composite_score.toFixed(1)}
+                {(latestTapping.composite_score ?? 0).toFixed(1)}
               </div>
               <div style={{ fontSize: '11px', color: '#94a3b8', marginTop: '2px' }}>
                 Composite
@@ -431,10 +431,10 @@ export default function MotorTrack({ data, baseline, diagnosis, onDayClick, asse
                   fontWeight: 600,
                   color: '#f1f5f9',
                 }}>
-                  {hand.tapsPerSecond.toFixed(1)}/s
+                  {(hand.tapsPerSecond ?? 0).toFixed(1)}/s
                 </div>
                 <div style={{ fontSize: '10px', color: '#94a3b8', marginTop: '2px', textTransform: 'capitalize' }}>
-                  {hand.hand} ({hand.totalTaps} taps)
+                  {hand.hand} ({hand.totalTaps ?? 0} taps)
                 </div>
               </div>
             ))}
@@ -447,7 +447,7 @@ export default function MotorTrack({ data, baseline, diagnosis, onDayClick, asse
                 background: 'rgba(245, 158, 11, 0.15)',
                 borderRadius: '9999px',
               }}>
-                Asymmetry: {latestTapping.asymmetry_index.toFixed(0)}%
+                Asymmetry: {(latestTapping.asymmetry_index ?? 0).toFixed(0)}%
               </span>
             )}
           </div>

@@ -211,7 +211,7 @@ export default function CognitiveTrack({ data, onDayClick, fluencyAssessments, n
                 fontWeight: 700,
                 color: fluencyLabel.color,
               }}>
-                {latestFluency.composite_score.toFixed(1)}
+                {(latestFluency.composite_score ?? 0).toFixed(1)}
               </div>
               <div style={{ fontSize: '11px', color: '#94a3b8', marginTop: '2px' }}>
                 Composite
