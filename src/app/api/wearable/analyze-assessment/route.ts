@@ -81,6 +81,7 @@ export async function POST(request: Request) {
         headers: {
           'Authorization': `Bearer ${SUPABASE_KEY}`,
           'Content-Type': 'application/json',
+          'X-OpenAI-Key': process.env.OPENAI_API_KEY || '',
         },
         body: JSON.stringify({
           type,
