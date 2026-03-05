@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import type { WearableDemoData, PatientSummary, AIAnalysisResponse, TremorAssessment } from '@/lib/wearable/types'
 import PlatformShell from '@/components/layout/PlatformShell'
 import FeatureSubHeader from '@/components/layout/FeatureSubHeader'
@@ -26,6 +26,8 @@ export default function WearablePage() {
   const [analysisResult, setAnalysisResult] = useState<AIAnalysisResponse | null>(null)
   const [analysisError, setAnalysisError] = useState<string | null>(null)
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null)
+  const [autoGenProgress, setAutoGenProgress] = useState<{ current: number; total: number } | null>(null)
+  const autoGeneratingRef = useRef(false)
 
   useEffect(() => {
     async function init() {
@@ -48,6 +50,7 @@ export default function WearablePage() {
             const dJson = await dRes.json()
             setData(dJson)
             setLastUpdated(new Date())
+            autoGenerateNarratives(dJson)
           }
         } else {
           // Fallback: load demo data without patient switcher
@@ -56,6 +59,7 @@ export default function WearablePage() {
           const json = await res.json()
           setData(json)
           setLastUpdated(new Date())
+          autoGenerateNarratives(json)
         }
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Failed to load')
@@ -64,6 +68,7 @@ export default function WearablePage() {
       }
     }
     init()
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   // Auto-refresh every 15 minutes, pause when tab hidden
@@ -82,6 +87,7 @@ export default function WearablePage() {
           setData(json)
           setLastUpdated(new Date())
           lastFetchTime = Date.now()
+          autoGenerateNarratives(json)
         }
       } catch {
         // Silent fail — don't disrupt the UI
@@ -128,6 +134,7 @@ export default function WearablePage() {
       const json = await res.json()
       setData(json)
       setLastUpdated(new Date())
+      autoGenerateNarratives(json)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load')
     } finally {
@@ -188,6 +195,46 @@ export default function WearablePage() {
       setLastUpdated(new Date())
     }
   }
+
+  const autoGenerateNarratives = useCallback(async (freshData: WearableDemoData) => {
+    if (autoGeneratingRef.current) return
+    if (!freshData.patient?.id) return
+
+    const existingIds = new Set(
+      (freshData.narratives || []).map(n => n.assessment_id).filter(Boolean)
+    )
+
+    type PendingItem = { type: string; id: string }
+    const pending: PendingItem[] = []
+
+    for (const a of freshData.assessments || []) {
+      if (!existingIds.has(a.id)) pending.push({ type: 'tremor', id: a.id })
+    }
+    for (const a of freshData.tappingAssessments || []) {
+      if (!existingIds.has(a.id)) pending.push({ type: 'tapping', id: a.id })
+    }
+    for (const a of freshData.fluencyAssessments || []) {
+      if (!existingIds.has(a.id)) pending.push({ type: 'fluency', id: a.id })
+    }
+
+    if (pending.length === 0) return
+
+    autoGeneratingRef.current = true
+    try {
+      for (let i = 0; i < pending.length; i++) {
+        setAutoGenProgress({ current: i + 1, total: pending.length })
+        try {
+          await handleGenerateNarrative(pending[i].type, pending[i].id)
+        } catch {
+          // Silent fail per item — don't block the rest
+        }
+      }
+    } finally {
+      setAutoGenProgress(null)
+      autoGeneratingRef.current = false
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   const selectedSource = patients.find(p => p.id === selectedPatientId)?.source || 'demo'
 
@@ -323,6 +370,24 @@ export default function WearablePage() {
                   Last updated: {lastUpdated.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                 </span>
               )}
+            </div>
+          )}
+          {autoGenProgress && (
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              padding: '6px 12px',
+              background: 'rgba(99, 102, 241, 0.08)',
+              border: '1px solid rgba(99, 102, 241, 0.2)',
+              borderRadius: '8px',
+            }}>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#818CF8" strokeWidth="2" style={{ animation: 'wearable-spin 1s linear infinite' }}>
+                <path d="M21 12a9 9 0 1 1-6.219-8.56" />
+              </svg>
+              <span style={{ color: '#a78bfa', fontSize: '0.8rem', fontWeight: 500 }}>
+                Auto-generating interpretations... ({autoGenProgress.current}/{autoGenProgress.total})
+              </span>
             </div>
           )}
           <ConceptHero />
