@@ -86,9 +86,9 @@ export default function LongitudinalSummaryBanner({ narrative }: Props) {
       </div>
 
       {/* Key findings (always visible) */}
-      {summary?.key_findings?.length > 0 && (
+      {(summary?.key_findings?.length ?? 0) > 0 && (
         <div style={{ marginTop: '10px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
-          {summary.key_findings.map((finding, i) => (
+          {summary!.key_findings.map((finding, i) => (
             <div key={i} style={{ fontSize: '12px', color: '#cbd5e1', display: 'flex', gap: '6px' }}>
               <span style={{ color: '#a78bfa' }}>•</span>
               <span>{finding}</span>
@@ -98,9 +98,9 @@ export default function LongitudinalSummaryBanner({ narrative }: Props) {
       )}
 
       {/* Severity flags */}
-      {summary?.severity_flags?.length > 0 && (
+      {(summary?.severity_flags?.length ?? 0) > 0 && (
         <div style={{ marginTop: '8px', display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
-          {summary.severity_flags.map((flag, i) => (
+          {summary!.severity_flags.map((flag, i) => (
             <span key={i} style={{
               fontSize: '10px',
               padding: '2px 8px',

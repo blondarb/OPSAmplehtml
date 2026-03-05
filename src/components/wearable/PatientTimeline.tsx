@@ -6,7 +6,8 @@ import HeartRateTrack from './HeartRateTrack'
 import HRVTrack from './HRVTrack'
 import SleepTrack from './SleepTrack'
 import ActivityTrack from './ActivityTrack'
-import DiseaseTrack from './DiseaseTrack'
+import MotorTrack from './MotorTrack'
+import CognitiveTrack from './CognitiveTrack'
 import LongitudinalSummaryBanner from './LongitudinalSummaryBanner'
 
 interface PatientTimelineProps {
@@ -237,14 +238,20 @@ export default function PatientTimeline({ dailySummaries, anomalies, patient, as
       {narratives?.filter(n => n.narrative_type === 'longitudinal').slice(0, 1).map(n => (
         <LongitudinalSummaryBanner key={n.id} narrative={n} />
       ))}
-      <DiseaseTrack
+      <MotorTrack
         data={chartData}
         baseline={patient.baseline_metrics}
         diagnosis={patient.primary_diagnosis}
         onDayClick={handleDayClick}
         assessments={assessments}
-        fluencyAssessments={fluencyAssessments}
         tappingAssessments={tappingAssessments}
+        narratives={narratives}
+      />
+      <CognitiveTrack
+        data={chartData}
+        baseline={patient.baseline_metrics}
+        onDayClick={handleDayClick}
+        fluencyAssessments={fluencyAssessments}
         narratives={narratives}
       />
     </div>

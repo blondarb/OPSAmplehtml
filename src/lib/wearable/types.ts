@@ -255,7 +255,7 @@ export interface ClinicalNarrative {
   patient_id: string
   narrative_type: 'tremor' | 'tapping' | 'fluency' | 'longitudinal'
   assessment_id: string | null
-  structured_summary: StructuredSummary
+  structured_summary: StructuredSummary | null
   clinical_narrative: string
   model_versions: { stage1: string; stage2: string }
   created_at: string

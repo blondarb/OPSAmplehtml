@@ -70,9 +70,9 @@ export default function ClinicalNarrativePanel({ narrative, accentColor = '#818c
       </div>
 
       {/* Key Findings (always visible) */}
-      {summary?.key_findings?.length > 0 && (
+      {(summary?.key_findings?.length ?? 0) > 0 && (
         <div style={{ marginTop: '8px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
-          {summary.key_findings.map((finding, i) => (
+          {summary!.key_findings.map((finding, i) => (
             <div key={i} style={{ fontSize: '11px', color: '#cbd5e1', display: 'flex', gap: '6px' }}>
               <span style={{ color: accentColor }}>•</span>
               <span>{finding}</span>
@@ -82,9 +82,9 @@ export default function ClinicalNarrativePanel({ narrative, accentColor = '#818c
       )}
 
       {/* Severity Flags */}
-      {summary?.severity_flags?.length > 0 && (
+      {(summary?.severity_flags?.length ?? 0) > 0 && (
         <div style={{ marginTop: '8px', display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
-          {summary.severity_flags.map((flag, i) => (
+          {summary!.severity_flags.map((flag, i) => (
             <span key={i} style={{
               fontSize: '10px',
               padding: '2px 8px',
