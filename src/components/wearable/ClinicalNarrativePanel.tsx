@@ -24,10 +24,12 @@ function flagBg(level: SeverityFlag['level']): string {
 interface Props {
   narrative: ClinicalNarrative
   accentColor?: string
+  onRegenerate?: () => Promise<void>
 }
 
-export default function ClinicalNarrativePanel({ narrative, accentColor = '#818cf8' }: Props) {
+export default function ClinicalNarrativePanel({ narrative, accentColor = '#818cf8', onRegenerate }: Props) {
   const [expanded, setExpanded] = useState(false)
+  const [regenerating, setRegenerate] = useState(false)
   const summary = narrative.structured_summary
 
   return (
@@ -64,9 +66,55 @@ export default function ClinicalNarrativePanel({ narrative, accentColor = '#818c
             {narrative.model_versions.stage1} → {narrative.model_versions.stage2}
           </span>
         </div>
-        <span style={{ fontSize: '12px', color: '#64748b', transition: 'transform 0.2s', transform: expanded ? 'rotate(180deg)' : 'rotate(0)' }}>
-          ▼
-        </span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+          {onRegenerate && (
+            <button
+              onClick={async (e) => {
+                e.stopPropagation()
+                if (regenerating) return
+                setRegenerate(true)
+                try {
+                  await onRegenerate()
+                } finally {
+                  setRegenerate(false)
+                }
+              }}
+              disabled={regenerating}
+              title="Regenerate narrative"
+              style={{
+                background: 'none',
+                border: 'none',
+                padding: '2px',
+                cursor: regenerating ? 'default' : 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                borderRadius: '4px',
+                transition: 'color 0.15s',
+                color: '#64748b',
+              }}
+              onMouseEnter={(e) => { if (!regenerating) e.currentTarget.style.color = accentColor }}
+              onMouseLeave={(e) => { e.currentTarget.style.color = '#64748b' }}
+            >
+              {regenerating ? (
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="none" style={{ animation: 'spin 1s linear infinite' }}>
+                  <circle cx="8" cy="8" r="6" stroke="currentColor" strokeWidth="2" strokeDasharray="28" strokeDashoffset="8" strokeLinecap="round" />
+                  <style>{`@keyframes spin { to { transform: rotate(360deg) } }`}</style>
+                </svg>
+              ) : (
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M13.5 2.5v4h-4" />
+                  <path d="M2.5 8a5.5 5.5 0 0 1 9.37-3.87L13.5 6.5" />
+                  <path d="M2.5 13.5v-4h4" />
+                  <path d="M13.5 8a5.5 5.5 0 0 1-9.37 3.87L2.5 9.5" />
+                </svg>
+              )}
+            </button>
+          )}
+          <span style={{ fontSize: '12px', color: '#64748b', transition: 'transform 0.2s', transform: expanded ? 'rotate(180deg)' : 'rotate(0)' }}>
+            ▼
+          </span>
+        </div>
       </div>
 
       {/* Key Findings (always visible) */}
