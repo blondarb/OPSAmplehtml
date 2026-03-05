@@ -552,6 +552,10 @@ When redeploying after changes, use "Redeploy without cache" to ensure fresh bui
 
 ## Recent Changes
 
+- **Wearable Narrative Enhancements (2026-03-05)**: Added "Generate 30-Day Summary" button to PatientTimeline header for longitudinal narrative generation. Added regenerate (refresh) buttons to ClinicalNarrativePanel and LongitudinalSummaryBanner. Added auto-generation logic that detects assessments without narratives on data load/poll/patient-switch and generates them sequentially with progress indicator.
+
+- **AI Clinical Narrative Pipeline (2026-03-04)**: Split DiseaseTrack into MotorTrack + CognitiveTrack. Built 2-stage AI pipeline (gpt-4o-mini extraction → gpt-5.2 narrative) via Supabase Edge Function `analyze-assessment`. "Generate AI Clinical Interpretation" buttons on each assessment card produce clinical narratives with severity-flagged findings. API key passed via `X-OpenAI-Key` header from Vercel. See `docs/HANDOFF_2026-03-04_clinical-narrative-pipeline.md`.
+
 - **Wearable Dashboard Data Fixes (2026-03-02)**: Fixed 6 data display issues on `/wearable` for real Apple Watch data: resting HR 0 treated as null, sleep fallback to total bar when stages unavailable, server-side rolling 7-day averages, auto-computed baselines from actual data, diagnosis-aware Disease Track (ET vs PD), 15-minute auto-refresh polling. See `docs/HANDOFF_2026-03-02_wearable-dashboard-fixes.md`.
 
 - **SevaroMonitor iOS Sleep Fixes (2026-03-02)**: Fixed overnight sleep split (6 PM-to-6 PM window instead of midnight) and added per-stage sleep breakdown (Deep, Light, REM, Awake) to HealthKit collection. Changes in `blondarb/SevaroMonitor` repo.

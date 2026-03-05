@@ -4,6 +4,22 @@ Full history of notable changes. For project overview and architecture, see [CLA
 
 ## March 2026
 
+### Wearable Narrative Enhancements (March 5, 2026)
+- **30-Day Longitudinal Summary**: "Generate 30-Day Summary" pill button in PatientTimeline header triggers longitudinal narrative generation via existing Edge Function pipeline; label switches to "Regenerate" after first generation
+- **Narrative Regeneration**: Refresh icon buttons on ClinicalNarrativePanel and LongitudinalSummaryBanner allow re-generating any narrative; spinner during regeneration, hover accent color matching panel theme
+- **Auto-Generation on Data Load**: After initial load, 15-minute poll refresh, or patient switch, any assessments (tremor, tapping, fluency) without narratives are automatically queued for sequential generation with progress indicator ("Auto-generating interpretations... 2/5")
+- **Files**: Modified `ClinicalNarrativePanel.tsx`, `LongitudinalSummaryBanner.tsx`, `MotorTrack.tsx`, `CognitiveTrack.tsx`, `PatientTimeline.tsx`, `page.tsx` (wearable)
+
+### AI Clinical Narrative Pipeline (March 3–4, 2026)
+- **Motor/Cognitive track split**: Separated `DiseaseTrack` into `MotorTrack` (tremor, tapping) and `CognitiveTrack` (verbal fluency) with shared utilities in `trackUtils.ts`
+- **2-stage AI pipeline**: gpt-4o-mini (structured metric extraction) → gpt-5.2 (clinical narrative generation) via Supabase Edge Function `analyze-assessment`
+- **Generate buttons**: "Generate AI Clinical Interpretation" on each assessment card — purple for tremor, blue for tapping, green for fluency
+- **ClinicalNarrativePanel**: Renders AI narrative text with color-coded severity flags (orange/yellow/green pills) for key metrics
+- **API key passthrough**: `X-OpenAI-Key` header from Vercel env to Edge Function (Supabase secret not yet set)
+- **Data format fixes**: Snake_case → camelCase normalization for tapping data; null guards on `.toFixed()`; nullable `structured_summary`
+- **Files**: New `analyze-assessment/route.ts` API route; modified MotorTrack, CognitiveTrack, PatientTimeline, page.tsx; Edge Function deployed to Supabase
+- **Tested live**: All 3 assessment types generate narratives successfully on production site
+
 ### Wearable Dashboard Data Fixes (March 2–3, 2026)
 - **Null-safe rendering**: Resting HR 0 treated as missing data; all metric fields made nullable in TypeScript types
 - **Sleep fallback mode**: Single "Total Sleep" bar rendered when sleep stage breakdown unavailable from device
