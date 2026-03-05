@@ -10,33 +10,19 @@ import {
   ReferenceArea,
   CartesianGrid,
 } from 'recharts'
-import type { BaselineMetrics, TremorAssessment, FluencyAssessment, TappingAssessment } from '@/lib/wearable/types'
+import type { BaselineMetrics, TremorAssessment, TappingAssessment, ClinicalNarrative } from '@/lib/wearable/types'
 import type { ChartDataPoint } from './PatientTimeline'
+import ClinicalNarrativePanel from './ClinicalNarrativePanel'
+import { formatDate, toLocalDate, darkTooltipStyle, severityLabel, tappingScoreLabel } from './trackUtils'
 
-interface DiseaseTrackProps {
+interface MotorTrackProps {
   data: ChartDataPoint[]
   baseline: BaselineMetrics
   diagnosis: string
   onDayClick: (date: string) => void
   assessments?: TremorAssessment[]
-  fluencyAssessments?: FluencyAssessment[]
   tappingAssessments?: TappingAssessment[]
-}
-
-function formatDate(dateStr: string) {
-  const d = new Date(dateStr + 'T00:00:00')
-  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
-}
-
-// Convert UTC timestamp to local date string (YYYY-MM-DD) for matching against daily summary dates
-function toLocalDate(isoString: string): string {
-  const d = new Date(isoString)
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
-}
-
-const darkTooltipStyle = {
-  contentStyle: { backgroundColor: '#1e293b', border: '1px solid #334155', borderRadius: '8px', color: '#f1f5f9' },
-  labelStyle: { color: '#94a3b8' },
+  narratives?: ClinicalNarrative[]
 }
 
 interface DotProps {
@@ -74,29 +60,7 @@ function AnomalyDot({ cx, cy, payload, onDayClick }: DotProps) {
   )
 }
 
-function severityLabel(pct: number): { label: string; color: string } {
-  if (pct < 10) return { label: 'Minimal', color: '#22C55E' }
-  if (pct < 25) return { label: 'Mild', color: '#EAB308' }
-  if (pct < 50) return { label: 'Moderate', color: '#F97316' }
-  return { label: 'Significant', color: '#EF4444' }
-}
-
-function fluencyScoreLabel(score: number): { label: string; color: string } {
-  if (score >= 70) return { label: 'Strong', color: '#22C55E' }
-  if (score >= 50) return { label: 'Average', color: '#EAB308' }
-  if (score >= 30) return { label: 'Below Average', color: '#F97316' }
-  return { label: 'Low', color: '#EF4444' }
-}
-
-function tappingScoreLabel(score: number): { label: string; color: string } {
-  if (score >= 80) return { label: 'Excellent', color: '#22C55E' }
-  if (score >= 60) return { label: 'Good', color: '#3B82F6' }
-  if (score >= 40) return { label: 'Fair', color: '#EAB308' }
-  if (score >= 20) return { label: 'Below Average', color: '#F97316' }
-  return { label: 'Poor', color: '#EF4444' }
-}
-
-export default function DiseaseTrack({ data, baseline, diagnosis, onDayClick, assessments, fluencyAssessments, tappingAssessments }: DiseaseTrackProps) {
+export default function MotorTrack({ data, baseline, diagnosis, onDayClick, assessments, tappingAssessments, narratives }: MotorTrackProps) {
   const isParkinsons = diagnosis.toLowerCase().includes('parkinson')
   const isEssentialTremor = diagnosis.toLowerCase().includes('essential tremor')
 
@@ -122,14 +86,6 @@ export default function DiseaseTrack({ data, baseline, diagnosis, onDayClick, as
     })
   }
 
-  // Build fluency assessment lookup
-  const fluencyByDate = new Map<string, FluencyAssessment>()
-  if (fluencyAssessments) {
-    fluencyAssessments.forEach(a => {
-      fluencyByDate.set(toLocalDate(a.assessed_at), a)
-    })
-  }
-
   // Build tapping assessment lookup
   const tappingByDate = new Map<string, TappingAssessment>()
   if (tappingAssessments) {
@@ -141,26 +97,29 @@ export default function DiseaseTrack({ data, baseline, diagnosis, onDayClick, as
   const chartData = data.map(d => ({
     ...d,
     assessment_score: assessmentsByDate.get(d.date)?.composite_score ?? null,
-    fluency_score: fluencyByDate.get(d.date)?.composite_score ?? null,
     tapping_score: tappingByDate.get(d.date)?.composite_score ?? null,
   }))
   const hasAssessments = assessmentsByDate.size > 0
-  const hasFluencyAssessments = fluencyByDate.size > 0
   const hasTappingAssessments = tappingByDate.size > 0
   const sortedAssessments = assessments
     ? [...assessments].sort((a, b) => b.assessed_at.localeCompare(a.assessed_at))
     : []
   const latestAssessment = sortedAssessments[0] ?? null
-  const sortedFluency = fluencyAssessments
-    ? [...fluencyAssessments].sort((a, b) => b.assessed_at.localeCompare(a.assessed_at))
-    : []
-  const latestFluency = sortedFluency[0] ?? null
-  const fluencyLabel = latestFluency ? fluencyScoreLabel(latestFluency.composite_score) : null
   const sortedTapping = tappingAssessments
     ? [...tappingAssessments].sort((a, b) => b.assessed_at.localeCompare(a.assessed_at))
     : []
   const latestTapping = sortedTapping[0] ?? null
   const tappingLabel = latestTapping ? tappingScoreLabel(latestTapping.composite_score) : null
+
+  // Build narrative lookups by assessment ID and type
+  const tremorNarratives = (narratives || []).filter(n => n.narrative_type === 'tremor')
+  const tappingNarratives = (narratives || []).filter(n => n.narrative_type === 'tapping')
+  const latestTremorNarrative = latestAssessment
+    ? tremorNarratives.find(n => n.assessment_id === latestAssessment.id) ?? tremorNarratives[0]
+    : null
+  const latestTappingNarrative = latestTapping
+    ? tappingNarratives.find(n => n.assessment_id === latestTapping.id) ?? tappingNarratives[0]
+    : null
 
   const title = isParkinsons ? "Parkinson\u2019s Motor Metrics" : 'Essential Tremor Monitoring'
 
@@ -202,12 +161,6 @@ export default function DiseaseTrack({ data, baseline, diagnosis, onDayClick, as
               <span style={{ fontSize: '11px', color: '#94a3b8' }}>Assessment</span>
             </div>
           )}
-          {hasFluencyAssessments && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-              <div style={{ width: '8px', height: '8px', background: '#22C55E', borderRadius: '50%' }} />
-              <span style={{ fontSize: '11px', color: '#94a3b8' }}>Fluency</span>
-            </div>
-          )}
           {hasTappingAssessments && (
             <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
               <div style={{ width: '8px', height: '8px', background: '#3B82F6', borderRadius: '4px' }} />
@@ -244,9 +197,9 @@ export default function DiseaseTrack({ data, baseline, diagnosis, onDayClick, as
               label={{ value: 'Minutes', angle: 90, position: 'insideRight', fill: '#94a3b8', fontSize: 11 }}
             />
           )}
-          {(hasFluencyAssessments || hasTappingAssessments) && (
+          {hasTappingAssessments && (
             <YAxis
-              yAxisId="fluency"
+              yAxisId="score"
               orientation="right"
               tick={{ fill: '#94a3b8', fontSize: 11 }}
               label={{ value: 'Score', angle: 90, position: 'insideRight', fill: '#94a3b8', fontSize: 11 }}
@@ -255,13 +208,14 @@ export default function DiseaseTrack({ data, baseline, diagnosis, onDayClick, as
           )}
           <Tooltip
             {...darkTooltipStyle}
+            /* eslint-disable-next-line @typescript-eslint/no-explicit-any */
             labelFormatter={(label: any) => formatDate(String(label))}
+            /* eslint-disable-next-line @typescript-eslint/no-explicit-any */
             formatter={(value: any, name: any) => {
               if (value === null || value === undefined) return ['—', 'No data']
               if (name === 'tremor_pct') return [`${value}%`, 'Tremor']
               if (name === 'dyskinetic_mins') return [`${value} min`, 'Dyskinetic']
               if (name === 'assessment_score') return [`${value}%`, 'Assessment']
-              if (name === 'fluency_score') return [`${value}`, 'Fluency']
               if (name === 'tapping_score') return [`${Number(value).toFixed(1)}`, 'Tapping']
               return [value, name]
             }}
@@ -323,38 +277,9 @@ export default function DiseaseTrack({ data, baseline, diagnosis, onDayClick, as
               activeDot={{ r: 6, fill: '#A855F7' }}
             />
           )}
-          {hasFluencyAssessments && (
-            <Line
-              yAxisId="fluency"
-              type="monotone"
-              dataKey="fluency_score"
-              stroke="#22C55E"
-              strokeWidth={0}
-              connectNulls={false}
-              /* eslint-disable-next-line @typescript-eslint/no-explicit-any */
-              dot={(props: any) => {
-                if (props.payload?.fluency_score == null) return <g />
-                const { cx, cy } = props
-                if (!cx || !cy) return <g />
-                return (
-                  <circle
-                    cx={cx}
-                    cy={cy}
-                    r={7}
-                    fill="#22C55E"
-                    stroke="#4ADE80"
-                    strokeWidth={2}
-                    style={{ cursor: 'pointer' }}
-                    onClick={() => onDayClick(props.payload.date)}
-                  />
-                )
-              }}
-              activeDot={{ r: 6, fill: '#22C55E' }}
-            />
-          )}
           {hasTappingAssessments && (
             <Line
-              yAxisId="fluency"
+              yAxisId="score"
               type="monotone"
               dataKey="tapping_score"
               stroke="#3B82F6"
@@ -386,7 +311,7 @@ export default function DiseaseTrack({ data, baseline, diagnosis, onDayClick, as
         </ComposedChart>
       </ResponsiveContainer>
 
-      {/* Assessment Details */}
+      {/* Tremor Assessment Details */}
       {latestAssessment && (
         <div style={{
           marginTop: '12px',
@@ -453,105 +378,8 @@ export default function DiseaseTrack({ data, baseline, diagnosis, onDayClick, as
           )}
         </div>
       )}
-
-      {/* Fluency Assessment Details */}
-      {latestFluency && fluencyLabel && (
-        <div style={{
-          marginTop: '12px',
-          padding: '14px',
-          background: 'rgba(34, 197, 94, 0.06)',
-          border: '1px solid rgba(34, 197, 94, 0.2)',
-          borderRadius: '8px',
-        }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px' }}>
-            <span style={{ fontSize: '13px', fontWeight: 600, color: '#4ADE80' }}>
-              Latest Verbal Fluency Assessment
-            </span>
-            <span style={{ fontSize: '11px', color: '#94a3b8' }}>
-              {new Date(latestFluency.assessed_at).toLocaleDateString('en-US', {
-                month: 'short', day: 'numeric', year: 'numeric',
-                hour: 'numeric', minute: '2-digit',
-              })}
-            </span>
-          </div>
-          <div style={{ display: 'flex', gap: '16px', alignItems: 'center', flexWrap: 'wrap' }}>
-            <div style={{ textAlign: 'center' }}>
-              <div style={{
-                fontSize: '20px',
-                fontWeight: 700,
-                color: fluencyLabel.color,
-              }}>
-                {latestFluency.composite_score.toFixed(1)}
-              </div>
-              <div style={{ fontSize: '11px', color: '#94a3b8', marginTop: '2px' }}>
-                Composite
-              </div>
-              <div style={{
-                fontSize: '10px',
-                fontWeight: 600,
-                color: fluencyLabel.color,
-                marginTop: '2px',
-              }}>
-                {fluencyLabel.label}
-              </div>
-            </div>
-            <div style={{ width: '1px', height: '36px', background: '#334155' }} />
-            <div style={{ textAlign: 'center' }}>
-              <div style={{ fontSize: '14px', fontWeight: 600, color: '#f1f5f9' }}>
-                {latestFluency.total_words}
-              </div>
-              <div style={{ fontSize: '10px', color: '#94a3b8', marginTop: '2px' }}>
-                Words
-              </div>
-            </div>
-            <div style={{ textAlign: 'center' }}>
-              <div style={{
-                fontSize: '12px',
-                fontWeight: 600,
-                color: '#f1f5f9',
-                textTransform: 'capitalize',
-              }}>
-                {latestFluency.category}
-              </div>
-              <div style={{ fontSize: '10px', color: '#94a3b8', marginTop: '2px' }}>
-                Category
-              </div>
-            </div>
-            <div style={{ textAlign: 'center' }}>
-              <div style={{ fontSize: '14px', fontWeight: 600, color: '#EAB308' }}>
-                {latestFluency.repetitions}
-              </div>
-              <div style={{ fontSize: '10px', color: '#94a3b8', marginTop: '2px' }}>
-                Repeats
-              </div>
-            </div>
-            <div style={{ textAlign: 'center' }}>
-              <div style={{ fontSize: '14px', fontWeight: 600, color: '#EF4444' }}>
-                {latestFluency.errors}
-              </div>
-              <div style={{ fontSize: '10px', color: '#94a3b8', marginTop: '2px' }}>
-                Errors
-              </div>
-            </div>
-            {latestFluency.ai_refined && (
-              <span style={{
-                fontSize: '10px',
-                fontWeight: 600,
-                color: '#22C55E',
-                padding: '2px 8px',
-                background: 'rgba(34, 197, 94, 0.15)',
-                borderRadius: '9999px',
-              }}>
-                AI Enhanced
-              </span>
-            )}
-          </div>
-          {sortedFluency.length > 1 && (
-            <div style={{ marginTop: '8px', fontSize: '11px', color: '#64748b' }}>
-              {sortedFluency.length} total fluency assessments on record
-            </div>
-          )}
-        </div>
+      {latestTremorNarrative && (
+        <ClinicalNarrativePanel narrative={latestTremorNarrative} accentColor="#A855F7" />
       )}
 
       {/* Tapping Assessment Details */}
@@ -629,6 +457,9 @@ export default function DiseaseTrack({ data, baseline, diagnosis, onDayClick, as
             </div>
           )}
         </div>
+      )}
+      {latestTappingNarrative && (
+        <ClinicalNarrativePanel narrative={latestTappingNarrative} accentColor="#3B82F6" />
       )}
 
       {/* Informational banners */}
