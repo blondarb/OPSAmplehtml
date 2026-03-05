@@ -54,6 +54,9 @@ function formatDateRange(summaries: DailySummary[]): string {
 
 export default function PatientTimeline({ dailySummaries, anomalies, patient, assessments, fluencyAssessments, tappingAssessments, narratives, onGenerateNarrative }: PatientTimelineProps) {
   const [selectedDay, setSelectedDay] = useState<string | null>(null)
+  const [generatingLongitudinal, setGeneratingLongitudinal] = useState(false)
+
+  const hasLongitudinalNarrative = narratives?.some(n => n.narrative_type === 'longitudinal') ?? false
 
   if (!dailySummaries || dailySummaries.length === 0) {
     return (
@@ -180,6 +183,41 @@ export default function PatientTimeline({ dailySummaries, anomalies, patient, as
               {med.name}{med.dose ? ` ${med.dose}` : ''}
             </span>
           ))}
+          {onGenerateNarrative && (
+            <button
+              onClick={async () => {
+                setGeneratingLongitudinal(true)
+                try { await onGenerateNarrative('longitudinal', '') }
+                finally { setGeneratingLongitudinal(false) }
+              }}
+              disabled={generatingLongitudinal}
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '6px',
+                padding: '4px 12px',
+                background: generatingLongitudinal ? '#334155' : 'rgba(99, 102, 241, 0.15)',
+                border: '1px solid rgba(99, 102, 241, 0.3)',
+                borderRadius: '9999px',
+                fontSize: '12px',
+                color: generatingLongitudinal ? '#94a3b8' : '#a78bfa',
+                fontWeight: 600,
+                cursor: generatingLongitudinal ? 'not-allowed' : 'pointer',
+              }}
+            >
+              {generatingLongitudinal ? (
+                <>
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ animation: 'spin 1s linear infinite' }}>
+                    <path d="M21 12a9 9 0 1 1-6.219-8.56" />
+                  </svg>
+                  <style>{`@keyframes spin { to { transform: rotate(360deg) } }`}</style>
+                  Generating...
+                </>
+              ) : (
+                <>{hasLongitudinalNarrative ? '↻ Regenerate' : '📊 Generate'} 30-Day Summary</>
+              )}
+            </button>
+          )}
         </div>
       </div>
 
@@ -237,7 +275,11 @@ export default function PatientTimeline({ dailySummaries, anomalies, patient, as
       />
       {/* Longitudinal Summary Banner (if available) */}
       {narratives?.filter(n => n.narrative_type === 'longitudinal').slice(0, 1).map(n => (
-        <LongitudinalSummaryBanner key={n.id} narrative={n} />
+        <LongitudinalSummaryBanner
+          key={n.id}
+          narrative={n}
+          onRegenerate={onGenerateNarrative ? () => onGenerateNarrative('longitudinal', '') : undefined}
+        />
       ))}
       <MotorTrack
         data={chartData}
