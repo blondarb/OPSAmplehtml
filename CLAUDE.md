@@ -552,6 +552,8 @@ When redeploying after changes, use "Redeploy without cache" to ensure fresh bui
 
 ## Recent Changes
 
+- **RPM Multi-Specialty Expansion Design (2026-03-06)**: Created comprehensive design document for expanding RPM beyond neurology into heart failure, COPD, diabetes, and general cardiology. Includes spiral drawing analysis for PD vs ET differentiation, apathy behavioral monitoring, device integration plans (Whoop, CGMs, smart scales, connected BP monitors, spirometers), multi-specialty dashboard design, RPM billing analysis, and phased roadmap. Updated playbook 06 with Section 11 covering new features and expansion vision. See `docs/plans/2026-03-06-rpm-multi-specialty-expansion-design.md`.
+
 - **Wearable Narrative Enhancements (2026-03-05)**: Added "Generate 30-Day Summary" button to PatientTimeline header for longitudinal narrative generation. Added regenerate (refresh) buttons to ClinicalNarrativePanel and LongitudinalSummaryBanner. Added auto-generation logic that detects assessments without narratives on data load/poll/patient-switch and generates them sequentially with progress indicator.
 
 - **AI Clinical Narrative Pipeline (2026-03-04)**: Split DiseaseTrack into MotorTrack + CognitiveTrack. Built 2-stage AI pipeline (gpt-4o-mini extraction → gpt-5.2 narrative) via Supabase Edge Function `analyze-assessment`. "Generate AI Clinical Interpretation" buttons on each assessment card produce clinical narratives with severity-flagged findings. API key passed via `X-OpenAI-Key` header from Vercel. See `docs/HANDOFF_2026-03-04_clinical-narrative-pipeline.md`.

@@ -956,3 +956,38 @@ This creates a **labeled dataset** that no one else has: wearable data streams w
 21. **SDNE-to-wearable data handoff**: What is the technical integration point between Card 5 (SDNE) and Card 6 (wearable)? Shared Supabase tables? API endpoint on Card 5 that Card 6 reads? This cross-card data flow needs to be specified.
 22. **Apple BYOD consent and scope**: For BYOD Apple Health participants in Phase 1B, what data types should the export include? Full export (years of data, 500MB+) or filtered to last 90 days of relevant types (HR, HRV, steps, sleep)? What consent language covers use of team members' personal health data for platform validation?
 23. **Apple HealthKit Movement Disorder data in BYOD exports**: If the product lead or any Apple Watch user has a Parkinson's patient profile enabled on their device, the Health Export may include Movement Disorder API data (tremor %, dyskinetic minutes). Without this profile enabled, the export will only contain standard metrics. Should any BYOD participants enable the Research profile on their Apple Watch to generate this data, even if they don't have Parkinson's? (The data would be near-zero tremor, which is useful as a "healthy baseline" comparison.)
+
+---
+
+## 11. Multi-Specialty Expansion & Enhanced Monitoring (2026-03-06)
+
+### New Neurology Features Under Consideration
+
+**Spiral Drawing Analysis (Movement Disorders):**
+Digitized Archimedes spiral tracing on smartphone/tablet to objectively differentiate Parkinson's vs Essential Tremor. Published literature reports 85–95% classification accuracy using frequency (PD: 4–6 Hz, ET: 6–12 Hz), amplitude, smoothness, and pen pressure metrics. SevaroMonitor would guide patients through 3 spiral tracings per session (weekly), extract ~75 quantitative features, and track motor progression longitudinally. New `wearable_spiral_assessments` table and Spiral sub-track within MotorTrack on the dashboard.
+
+**Apathy Monitoring (Neuropsychiatric):**
+Continuous behavioral biomarker tracking for apathy — a prevalent and disabling symptom across PD (40–60%), dementia (50–80%), MS (20–40%), and stroke (30–40%). Uses existing wearable signals (step count decline, activity bout frequency, sedentary time, circadian rhythm flattening, sleep schedule drift) to generate an Apathy Risk Score. AI pattern detection distinguishes apathy from depression and physical limitation using clinical decision rules.
+
+### Multi-Specialty Expansion Vision
+
+The 4-layer architecture (ingestion → processing → AI analysis → alert routing) is specialty-agnostic. By adding disease-specific pattern libraries, device integrations, and dashboard sections, the platform extends to:
+
+- **Heart Failure** — Daily weight (smart scale), BP (connected cuff), SpO2, fluid balance. Alert on 2+ lb/24h or 5+ lb/7d weight gain. Targets 30-day readmission reduction.
+- **COPD** — SpO2 trends, respiratory rate, peak flow (connected spirometer), rescue inhaler usage (Propeller Health), CAT scores. Alert on exacerbation prodrome patterns.
+- **Diabetes** — CGM integration (Dexcom G7, Libre 3). Time-in-range, time-below-range, AGP visualization, hypo/hyper event detection. Standardized international consensus targets.
+- **General Cardiology** — AFib detection (Apple Watch FDA-cleared), connected BP monitoring, cardiac rehab exercise compliance, HRV trends.
+
+### New Device Integrations Planned
+
+- **Whoop** — Recovery score, HRV, respiratory rate, skin temp, strain (OAuth2 API)
+- **Withings** — Smart scales (Body+/Body Comp), BP monitors (BPM Connect) — best-in-class API for RPM
+- **Dexcom Clarity** — CGM glucose data via cloud API
+- **Connected spirometers** — Nuvoair Air Next, MIR Spirobank Smart
+- **Smart inhalers** — Propeller Health sensors
+
+### Revenue Implications
+
+RPM billing codes (99453–99458) are specialty-agnostic. Each new specialty panel adds $105–$175/patient/month. Multi-condition patients (e.g., PD + HF) can bill RPM + CCM concurrently ($175–$220/month). AI-generated summaries auto-document the clinical review time required for billing.
+
+**Full design document:** `docs/plans/2026-03-06-rpm-multi-specialty-expansion-design.md`
