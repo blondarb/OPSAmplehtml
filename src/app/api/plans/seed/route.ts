@@ -1,14 +1,13 @@
-import { createClient } from '@/lib/supabase/server'
+import { getUser } from '@/lib/cognito/server'
 import { NextResponse } from 'next/server'
 import { OUTPATIENT_PLANS } from '@/lib/recommendationPlans'
 import { from } from '@/lib/db-query'
 
 // POST /api/plans/seed - Seed clinical_plans table from OUTPATIENT_PLANS
 export async function POST() {
-  const supabase = await createClient()
 
-  const { data: { user }, error: authError } = await supabase.auth.getUser()
-  if (authError || !user) {
+  const user = await getUser()
+  if (!user) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 

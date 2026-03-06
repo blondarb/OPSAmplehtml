@@ -1,7 +1,6 @@
 import { NextResponse } from 'next/server'
-import OpenAI from 'openai'
-import { createClient } from '@/lib/supabase/server'
-import { getOpenAIKey } from '@/lib/db-query'
+import { getUser } from '@/lib/cognito/server'
+import { invokeBedrock } from '@/lib/bedrock'
 
 
 interface DiagnosisInput {
@@ -38,8 +37,7 @@ interface UserSettings {
 export async function POST(request: Request) {
   try {
     // Check authentication
-    const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
+    const user = await getUser()
 
     if (!user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -52,22 +50,6 @@ export async function POST(request: Request) {
         error: 'At least one diagnosis must be selected to generate an assessment'
       }, { status: 400 })
     }
-
-    // Get OpenAI API key
-    let apiKey = process.env.OPENAI_API_KEY
-
-    if (!apiKey) {
-      const { data: setting } = await getOpenAIKey()
-      apiKey = setting
-    }
-
-    if (!apiKey) {
-      return NextResponse.json({
-        error: 'OpenAI API key not configured'
-      }, { status: 500 })
-    }
-
-    const openai = new OpenAI({ apiKey })
 
     // Format diagnoses for the prompt
     const diagnosisListFormatted = context.selectedDiagnoses
@@ -154,28 +136,19 @@ ${diagnosisListFormatted}
 
 Generate a clinical assessment that addresses each diagnosis with relevant supporting findings from ALL the clinical data above. Format as a numbered list matching the diagnosis order above.`
 
-    const completion = await openai.chat.completions.create({
-      model: 'gpt-5.2', // Complex clinical reasoning task - use latest GPT-5.2 for best accuracy
-      messages: [
-        { role: 'system', content: systemPrompt },
-        { role: 'user', content: userPrompt }
-      ],
-      max_completion_tokens: 1500,
-      temperature: 0.3, // Lower temperature for more consistent clinical output
+    const bedrockResult = await invokeBedrock({
+      system: systemPrompt,
+      messages: [{ role: 'user', content: userPrompt }],
+      maxTokens: 1500,
+      temperature: 0.3,
     })
 
-    const assessment = completion.choices[0]?.message?.content || 'Unable to generate assessment'
+    const assessment = bedrockResult.text || 'Unable to generate assessment'
 
     return NextResponse.json({ assessment })
 
   } catch (error: any) {
     console.error('Generate Assessment API Error:', error)
-
-    if (error?.status === 401) {
-      return NextResponse.json({
-        error: 'Invalid OpenAI API key'
-      }, { status: 500 })
-    }
 
     return NextResponse.json({
       error: error?.message || 'An error occurred while generating assessment'

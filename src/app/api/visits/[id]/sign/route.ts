@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
+import { getUser } from '@/lib/cognito/server'
 import { getTenantServer } from '@/lib/tenant'
-import OpenAI from 'openai'
+import { invokeBedrock } from '@/lib/bedrock'
 import { from } from '@/lib/db-query'
 
 // POST /api/visits/[id]/sign - Sign and complete a visit
@@ -11,11 +11,10 @@ export async function POST(
 ) {
   try {
     const { id } = await params
-    const supabase = await createClient()
 
     // Check authentication
-    const { data: { user }, error: authError } = await supabase.auth.getUser()
-    if (authError || !user) {
+    const user = await getUser()
+    if (!user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
@@ -63,26 +62,16 @@ export async function POST(
     // Generate AI summary
     let aiSummary = ''
     try {
-      // Get OpenAI API key
-      const { data: settings } = await from('app_settings')
-        .select('value')
-        .eq('key', 'openai_api_key')
-        .single()
+      // Calculate age
+      const age = visit.patient?.date_of_birth
+        ? Math.floor((Date.now() - new Date(visit.patient.date_of_birth).getTime()) / (365.25 * 24 * 60 * 60 * 1000))
+        : null
 
-      const apiKey = settings?.value || process.env.OPENAI_API_KEY
-      if (apiKey) {
-        const openai = new OpenAI({ apiKey })
+      const patientInfo = visit.patient
+        ? `${age || ''} year old ${visit.patient.gender || ''} patient ${visit.patient.first_name} ${visit.patient.last_name}`
+        : 'Patient'
 
-        // Calculate age
-        const age = visit.patient?.date_of_birth
-          ? Math.floor((Date.now() - new Date(visit.patient.date_of_birth).getTime()) / (365.25 * 24 * 60 * 60 * 1000))
-          : null
-
-        const patientInfo = visit.patient
-          ? `${age || ''} year old ${visit.patient.gender || ''} patient ${visit.patient.first_name} ${visit.patient.last_name}`
-          : 'Patient'
-
-        const prompt = `Generate a concise clinical summary (2-4 sentences) for the following visit note. Focus on the chief complaint, key findings, diagnosis, and plan. Use standard medical abbreviations where appropriate.
+      const prompt = `Generate a concise clinical summary (2-4 sentences) for the following visit note. Focus on the chief complaint, key findings, diagnosis, and plan. Use standard medical abbreviations where appropriate.
 
 Patient: ${patientInfo}
 Chief Complaint: ${visit.chief_complaint?.join(', ') || 'Not documented'}
@@ -95,15 +84,14 @@ Plan: ${clinicalNote.plan || 'Not documented'}
 
 Generate a professional clinical summary:`
 
-        const completion = await openai.chat.completions.create({
-          model: 'gpt-5-mini',
-          messages: [{ role: 'user', content: prompt }],
-          max_completion_tokens: 300,
-          // Note: gpt-5-mini only supports default temperature (1)
-        })
+      const result = await invokeBedrock({
+        system: 'You are a clinical documentation assistant. Generate concise, accurate clinical summaries.',
+        messages: [{ role: 'user', content: prompt }],
+        maxTokens: 300,
+        temperature: 1,
+      })
 
-        aiSummary = completion.choices[0]?.message?.content?.trim() || ''
-      }
+      aiSummary = result.text?.trim() || ''
     } catch (aiError) {
       console.error('Error generating AI summary:', aiError)
       // Continue without AI summary - not a fatal error

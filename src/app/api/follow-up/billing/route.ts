@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
+import { getUser } from '@/lib/cognito/server'
 import { suggestCptCode, CPT_CODES } from '@/lib/follow-up/cptCodes'
 import type { BillingMonthlySummary } from '@/lib/follow-up/billingTypes'
 import { from } from '@/lib/db-query'

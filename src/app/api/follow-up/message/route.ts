@@ -1,9 +1,9 @@
 import { NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
+import { getUser } from '@/lib/cognito/server'
 import { processConversationTurn } from '@/lib/follow-up/conversationEngine'
 import type { FollowUpMessageRequest, FollowUpMessageResponse } from '@/lib/follow-up/types'
 import { suggestCptCode, CPT_CODES } from '@/lib/follow-up/cptCodes'
-import { from, getOpenAIKey } from '@/lib/db-query'
+import { from } from '@/lib/db-query'
 
 
 export const maxDuration = 30
@@ -21,29 +21,10 @@ export async function POST(request: Request) {
       )
     }
 
-    // Get OpenAI API key — env var first, then Supabase app_settings
-    let apiKey = process.env.OPENAI_API_KEY
-
-    if (!apiKey) {
-      try {
-        const { data: setting } = await getOpenAIKey()
-        apiKey = setting
-      } catch {
-        // Supabase may not be available in demo mode
-      }
-    }
-
-    if (!apiKey) {
-      return NextResponse.json(
-        { error: 'OpenAI API key not configured. Please add your API key to the environment variables.' },
-        { status: 500 }
-      )
-    }
-
-    // Call shared conversation engine
+    // Call shared conversation engine (uses Bedrock — no API key needed)
     const result = await processConversationTurn(
       { patient_message, patient_context, conversation_history },
-      apiKey
+      '' // API key param kept for backward compatibility; engine uses Bedrock env credentials
     )
 
     // Build the response

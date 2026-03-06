@@ -1,12 +1,10 @@
 import { NextResponse } from 'next/server'
-import OpenAI from 'openai'
+import { invokeBedrockJSON } from '@/lib/bedrock'
 import { WEARABLE_ANALYSIS_SYSTEM_PROMPT, buildAnalysisUserPrompt } from '@/lib/wearable/systemPrompt'
-import { from, getOpenAIKey } from '@/lib/db-query'
+import { from } from '@/lib/db-query'
 
 
 export const maxDuration = 60
-
-const AI_MODEL = 'gpt-5.2'
 
 export async function POST(request: Request) {
   try {
@@ -32,19 +30,6 @@ export async function POST(request: Request) {
       .order('detected_at', { ascending: false })
       .limit(10)
 
-    // Get OpenAI API key — check env first, then Supabase fallback
-    let apiKey = process.env.OPENAI_API_KEY
-    if (!apiKey) {
-      try {
-        const { data: setting } = await getOpenAIKey()
-        apiKey = setting
-      } catch { /* fallback not available */ }
-    }
-    if (!apiKey) {
-      return NextResponse.json({ error: 'AI API key not configured.' }, { status: 500 })
-    }
-
-    const openai = new OpenAI({ apiKey })
     const sortedSummaries = (summaries || []).reverse()
     const dates = sortedSummaries.map((s: any) => s.date)
 
@@ -63,35 +48,19 @@ export async function POST(request: Request) {
 
     const controller = new AbortController()
     const timeout = setTimeout(() => controller.abort(), 45000)
-    let completion
+
+    let analysis: Record<string, unknown>
     try {
-      completion = await openai.chat.completions.create(
-        {
-          model: AI_MODEL,
-          messages: [
-            { role: 'system', content: WEARABLE_ANALYSIS_SYSTEM_PROMPT },
-            { role: 'user', content: userPrompt },
-          ],
-          response_format: { type: 'json_object' },
-          max_completion_tokens: 4000,
-          temperature: 0.2,
-        },
-        { signal: controller.signal }
-      )
+      const result = await invokeBedrockJSON({
+        system: WEARABLE_ANALYSIS_SYSTEM_PROMPT,
+        messages: [{ role: 'user', content: userPrompt }],
+        maxTokens: 4000,
+        temperature: 0.2,
+        signal: controller.signal,
+      })
+      analysis = result.parsed
     } finally {
       clearTimeout(timeout)
-    }
-
-    const rawContent = completion.choices[0]?.message?.content
-    if (!rawContent) {
-      return NextResponse.json({ error: 'AI returned empty response.' }, { status: 500 })
-    }
-
-    let analysis
-    try {
-      analysis = JSON.parse(rawContent)
-    } catch {
-      return NextResponse.json({ error: 'AI returned invalid JSON.' }, { status: 500 })
     }
 
     return NextResponse.json(analysis)

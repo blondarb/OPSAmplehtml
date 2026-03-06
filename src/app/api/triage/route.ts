@@ -1,14 +1,12 @@
 import { NextResponse } from 'next/server'
-import OpenAI from 'openai'
+import { invokeBedrockJSON } from '@/lib/bedrock'
 import { calculateTriageTier, validateAIResponse } from '@/lib/triage/scoring'
 import { TRIAGE_SYSTEM_PROMPT, buildTriageUserPrompt } from '@/lib/triage/systemPrompt'
 import { AITriageResponse, DISCLAIMER_TEXT } from '@/lib/triage/types'
-import { from, getOpenAIKey } from '@/lib/db-query'
+import { from } from '@/lib/db-query'
 
 
 export const maxDuration = 60
-
-const AI_MODEL = 'gpt-5.2'
 
 export async function POST(request: Request) {
   try {
@@ -50,27 +48,6 @@ export async function POST(request: Request) {
       )
     }
 
-    // Get OpenAI API key — env var first, then Supabase app_settings
-    let apiKey = process.env.OPENAI_API_KEY
-
-    if (!apiKey) {
-      try {
-        const { data: setting } = await getOpenAIKey()
-        apiKey = setting
-      } catch {
-        // Supabase may not be available in demo mode
-      }
-    }
-
-    if (!apiKey) {
-      return NextResponse.json(
-        { error: 'OpenAI API key not configured. Please add your API key to the environment variables.' },
-        { status: 500 }
-      )
-    }
-
-    const openai = new OpenAI({ apiKey })
-
     // Use extracted summary for scoring if provided (Phase 2 two-stage pipeline)
     const textForScoring = extracted_summary || referral_text
 
@@ -81,60 +58,35 @@ export async function POST(request: Request) {
       referringProviderType: referring_provider_type,
     })
 
-    // Call OpenAI with 45-second timeout
+    // Call Bedrock with 45-second timeout
     const controller = new AbortController()
     const timeout = setTimeout(() => controller.abort(), 45000)
 
-    let completion
+    let parsed: Record<string, unknown>
     try {
-      completion = await openai.chat.completions.create(
-        {
-          model: AI_MODEL,
-          messages: [
-            { role: 'system', content: TRIAGE_SYSTEM_PROMPT },
-            { role: 'user', content: userPrompt },
-          ],
-          response_format: { type: 'json_object' },
-          max_completion_tokens: 2000,
-          temperature,
-        },
-        { signal: controller.signal }
-      )
+      const result = await invokeBedrockJSON({
+        system: TRIAGE_SYSTEM_PROMPT,
+        messages: [{ role: 'user', content: userPrompt }],
+        maxTokens: 2000,
+        temperature,
+        signal: controller.signal,
+      })
+      parsed = result.parsed as Record<string, unknown>
     } finally {
       clearTimeout(timeout)
     }
 
-    const rawContent = completion.choices[0]?.message?.content
-    if (!rawContent) {
+    // Validate structure before trusting the cast
+    const validationError = validateAIResponse(parsed)
+    if (validationError) {
+      console.error('AI response validation failed:', validationError, parsed)
       return NextResponse.json(
-        { error: 'The triage system is temporarily unavailable. Please triage this patient manually and contact support.' },
+        { error: 'The triage system returned an unexpected response format. Please try again.' },
         { status: 500 }
       )
     }
 
-    // Parse and validate AI response
-    let aiResponse: AITriageResponse
-    try {
-      const parsed = JSON.parse(rawContent)
-
-      // Validate structure before trusting the cast
-      const validationError = validateAIResponse(parsed)
-      if (validationError) {
-        console.error('AI response validation failed:', validationError, parsed)
-        return NextResponse.json(
-          { error: 'The triage system returned an unexpected response format. Please try again.' },
-          { status: 500 }
-        )
-      }
-
-      aiResponse = parsed as AITriageResponse
-    } catch {
-      console.error('Failed to parse AI triage response:', rawContent)
-      return NextResponse.json(
-        { error: 'The triage system returned an invalid response. Please try again.' },
-        { status: 500 }
-      )
-    }
+    const aiResponse = parsed as unknown as AITriageResponse
 
     // Deterministic scoring — application code calculates tier
     const scoring = calculateTriageTier(aiResponse)
@@ -159,7 +111,7 @@ export async function POST(request: Request) {
           missing_information: aiResponse.missing_information,
           subspecialty_recommendation: aiResponse.subspecialty_recommendation,
           subspecialty_rationale: aiResponse.subspecialty_rationale,
-          ai_model_used: AI_MODEL,
+          ai_model_used: 'bedrock-claude-sonnet-4.5',
           ai_raw_response: aiResponse,
           patient_id: patient_id || null,
           // Phase 2 fields

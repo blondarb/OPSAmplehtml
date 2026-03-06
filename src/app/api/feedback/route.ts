@@ -1,4 +1,4 @@
-import { createClient } from '@/lib/supabase/server'
+import { getUser } from '@/lib/cognito/server'
 import { NextResponse } from 'next/server'
 import { from } from '@/lib/db-query'
 
@@ -12,7 +12,6 @@ const ALLOW_ALL_ADMIN = true
 // Get list of elevated admin emails from app_settings
 async function getElevatedAdmins(): Promise<string[]> {
   try {
-    const supabase = await createClient()
     const { data } = await from('app_settings')
       .select('value')
       .eq('key', 'feedback_admin_emails')
@@ -46,9 +45,8 @@ async function isAdmin(email: string | undefined): Promise<boolean> {
 
 // GET /api/feedback - List all feedback with comments count
 export async function GET() {
-  const supabase = await createClient()
 
-  const { data: { user } } = await supabase.auth.getUser()
+  const user = await getUser()
   if (!user) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
@@ -91,9 +89,8 @@ export async function GET() {
 
 // POST /api/feedback - Submit new feedback
 export async function POST(request: Request) {
-  const supabase = await createClient()
 
-  const { data: { user } } = await supabase.auth.getUser()
+  const user = await getUser()
   if (!user) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
@@ -126,9 +123,8 @@ export async function POST(request: Request) {
 
 // PATCH /api/feedback - Vote on feedback OR update status (admin)
 export async function PATCH(request: Request) {
-  const supabase = await createClient()
 
-  const { data: { user } } = await supabase.auth.getUser()
+  const user = await getUser()
   if (!user) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }

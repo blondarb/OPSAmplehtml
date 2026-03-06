@@ -1,4 +1,4 @@
-import { createClient } from '@/lib/supabase/server'
+import { getUser } from '@/lib/cognito/server'
 import { redirect } from 'next/navigation'
 import { getTenantServer } from '@/lib/tenant'
 import { from } from '@/lib/db-query'
@@ -10,9 +10,8 @@ import { from } from '@/lib/db-query'
  * Redirects to /login if the user is not authenticated.
  */
 export async function fetchDashboardData(patientId?: string) {
-  const supabase = await createClient()
   const tenant = getTenantServer()
-  const { data: { user } } = await supabase.auth.getUser()
+  const user = await getUser()
 
   if (!user) {
     redirect('/login')

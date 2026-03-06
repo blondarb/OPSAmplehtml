@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
-import OpenAI from 'openai'
+import { getUser } from '@/lib/cognito/server'
+import { invokeBedrockJSON } from '@/lib/bedrock'
 import { from } from '@/lib/db-query'
 
 interface SynthesizeNoteRequest {
@@ -92,8 +92,7 @@ interface SynthesizeNoteRequest {
 
 export async function POST(request: NextRequest) {
   try {
-    const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
+    const user = await getUser()
 
     if (!user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -114,24 +113,6 @@ export async function POST(request: NextRequest) {
       userSettings,
     } = body
 
-    // Get OpenAI API key
-    let apiKey = process.env.OPENAI_API_KEY
-
-    if (!apiKey) {
-      const { data: settings } = await from('app_settings')
-        .select('value')
-        .eq('key', 'openai_api_key')
-        .single()
-
-      apiKey = settings?.value
-    }
-
-    if (!apiKey) {
-      return NextResponse.json({ error: 'OpenAI API key not configured' }, { status: 500 })
-    }
-
-    const openai = new OpenAI({ apiKey })
-
     // Build comprehensive context for the AI
     const context = buildNoteContext({
       manualData,
@@ -148,22 +129,12 @@ export async function POST(request: NextRequest) {
     const systemPrompt = buildSystemPrompt(noteType, noteLength, userSettings)
     const userPrompt = buildUserPrompt(context, noteType, noteLength)
 
-    const response = await openai.chat.completions.create({
-      model: 'gpt-5.2', // Best reasoning for complex note synthesis ($1.25/$10 per 1M tokens)
-      messages: [
-        { role: 'system', content: systemPrompt },
-        { role: 'user', content: userPrompt },
-      ],
+    const { parsed: synthesizedNote } = await invokeBedrockJSON({
+      system: systemPrompt,
+      messages: [{ role: 'user', content: userPrompt }],
       temperature: 0.3,
-      response_format: { type: 'json_object' },
+      maxTokens: 4000,
     })
-
-    const content = response.choices[0]?.message?.content
-    if (!content) {
-      return NextResponse.json({ error: 'No response from AI' }, { status: 500 })
-    }
-
-    const synthesizedNote = JSON.parse(content)
 
     return NextResponse.json({
       success: true,
@@ -306,7 +277,7 @@ function buildNoteContext(data: {
   // Recommendations
   if (data.recommendations && data.recommendations.length > 0) {
     const recLines = data.recommendations.map(r =>
-      `${r.category}:\n${r.items.map(item => `  • ${item}`).join('\n')}`
+      `${r.category}:\n${r.items.map(item => `  - ${item}`).join('\n')}`
     )
     sections.push(`SMART RECOMMENDATIONS:\n${recLines.join('\n\n')}`)
   }
@@ -325,7 +296,6 @@ function buildSystemPrompt(
     detailed: 'Be comprehensive. Include all relevant details, nuances, and clinical reasoning.',
   }
 
-  // Get note-type specific instructions from user settings or use defaults
   const defaultNewConsultGuidance = `This is a NEW CONSULTATION note. Include:
 - Comprehensive history and background
 - Detailed reason for referral/consultation
@@ -342,19 +312,16 @@ function buildSystemPrompt(
 - Assessment of progress
 - Plan adjustments and next steps`
 
-  // Use custom instructions if provided, otherwise use defaults
   const noteTypeGuidance = noteType === 'new-consult'
     ? (userSettings?.newConsultInstructions || defaultNewConsultGuidance)
     : (userSettings?.followUpInstructions || defaultFollowUpGuidance)
 
-  // Terminology preference affects language style
   const terminologyGuidance = {
     formal: 'Use formal medical terminology throughout. Prefer technical terms.',
     standard: 'Use standard medical language appropriate for clinical documentation.',
     simplified: 'Use clear, accessible language while maintaining clinical accuracy.',
   }
 
-  // Documentation style preference
   const styleGuidance = {
     concise: 'Write in a concise, bullet-point-friendly style when appropriate.',
     detailed: 'Write comprehensive, detailed prose with full explanations.',
@@ -369,12 +336,10 @@ ${noteTypeGuidance}
 DOCUMENTATION LENGTH: ${noteLength.toUpperCase()}
 ${lengthGuidance[noteLength]}`
 
-  // Add terminology preference
   const terminology = userSettings?.preferredTerminology || 'standard'
   prompt += `\n\nTERMINOLOGY: ${terminology.toUpperCase()}
 ${terminologyGuidance[terminology]}`
 
-  // Add documentation style
   const docStyle = userSettings?.documentationStyle || 'detailed'
   prompt += `\n\nDOCUMENTATION STYLE: ${docStyle.toUpperCase()}
 ${styleGuidance[docStyle]}`
@@ -389,7 +354,6 @@ GENERAL GUIDELINES:
 - Use standard medical abbreviations appropriately
 - Structure content logically within each section`
 
-  // Add section-specific instructions if provided
   if (userSettings?.sectionInstructions) {
     const sectionInstr = userSettings.sectionInstructions
     const customSections: string[] = []
@@ -405,7 +369,6 @@ GENERAL GUIDELINES:
     }
   }
 
-  // Add layout preferences
   if (userSettings?.noteLayout) {
     const layout = userSettings.noteLayout
     const layoutInstructions: string[] = []
@@ -428,7 +391,6 @@ GENERAL GUIDELINES:
     }
   }
 
-  // Legacy support for global instructions
   if (userSettings?.globalInstructions && !userSettings.newConsultInstructions && !userSettings.followUpInstructions) {
     prompt += `\n\nADDITIONAL PROVIDER INSTRUCTIONS:\n${userSettings.globalInstructions}`
   }

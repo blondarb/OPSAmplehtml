@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { createClient } from '@/lib/supabase/client'
+import { signOut as cognitoSignOut } from '@/lib/cognito/client'
 import { useRouter } from 'next/navigation'
 import TopNav from './TopNav'
 import LeftSidebar from './LeftSidebar'
@@ -29,7 +29,10 @@ import {
   type RecommendationItem,
 } from '@/lib/note-merge'
 import type { PatientMedication, PatientAllergy } from '@/lib/medicationTypes'
-import type { User } from '@supabase/supabase-js'
+interface User {
+  id: string
+  email?: string
+}
 
 interface ClinicalNoteProps {
   user: User
@@ -546,7 +549,6 @@ export default function ClinicalNote({
   }, [])
 
   const router = useRouter()
-  const supabase = createClient()
 
   useEffect(() => {
     // Check for saved dark mode preference from user settings
@@ -948,7 +950,7 @@ export default function ClinicalNote({
   }
 
   const handleSignOut = async () => {
-    await supabase.auth.signOut()
+    await cognitoSignOut()
     router.push('/login')
     router.refresh()
   }

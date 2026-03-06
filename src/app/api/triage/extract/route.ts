@@ -1,16 +1,13 @@
 import { NextResponse } from 'next/server'
-import OpenAI from 'openai'
-import { createClient } from '@/lib/supabase/server'
+import { invokeBedrockJSON } from '@/lib/bedrock'
+import { getUser } from '@/lib/cognito/server'
 import { parseUploadedFile } from '@/lib/triage/fileParser'
 import { EXTRACTION_SYSTEM_PROMPT, buildExtractionUserPrompt } from '@/lib/triage/extractionPrompt'
 import { FILE_CONSTRAINTS } from '@/lib/triage/types'
 import type { ClinicalExtraction, ExtractionKeyFindings } from '@/lib/triage/types'
-import { getOpenAIKey } from '@/lib/db-query'
 
 
 export const maxDuration = 60
-
-const AI_MODEL = 'gpt-5.2'
 
 export async function POST(request: Request) {
   try {
@@ -61,63 +58,15 @@ export async function POST(request: Request) {
       )
     }
 
-    // Get OpenAI API key — env var first, then Supabase app_settings fallback
-    let apiKey = process.env.OPENAI_API_KEY
-
-    if (!apiKey) {
-      try {
-        const { data: setting } = await getOpenAIKey()
-        apiKey = setting
-      } catch {
-        // Supabase may not be available in demo mode
-      }
-    }
-
-    if (!apiKey) {
-      return NextResponse.json(
-        { error: 'OpenAI API key not configured.' },
-        { status: 500 }
-      )
-    }
-
-    const openai = new OpenAI({ apiKey })
-
     const userPrompt = buildExtractionUserPrompt(text, {
       patientAge,
       patientSex,
       sourceFilename,
     })
 
-    // Call OpenAI with 30-second timeout
+    // Call Bedrock with 30-second timeout
     const controller = new AbortController()
     const timeout = setTimeout(() => controller.abort(), 30000)
-
-    let completion
-    try {
-      completion = await openai.chat.completions.create(
-        {
-          model: AI_MODEL,
-          messages: [
-            { role: 'system', content: EXTRACTION_SYSTEM_PROMPT },
-            { role: 'user', content: userPrompt },
-          ],
-          response_format: { type: 'json_object' },
-          max_completion_tokens: 3000,
-          temperature: 0.2,
-        },
-        { signal: controller.signal }
-      )
-    } finally {
-      clearTimeout(timeout)
-    }
-
-    const rawContent = completion.choices[0]?.message?.content
-    if (!rawContent) {
-      return NextResponse.json(
-        { error: 'The extraction system returned no response. Please try again.' },
-        { status: 500 }
-      )
-    }
 
     let aiResponse: {
       note_type_detected: string
@@ -126,13 +75,28 @@ export async function POST(request: Request) {
       key_findings: ExtractionKeyFindings
     }
     try {
-      aiResponse = JSON.parse(rawContent)
-    } catch {
-      console.error('Failed to parse extraction response:', rawContent)
+      const result = await invokeBedrockJSON<typeof aiResponse>({
+        system: EXTRACTION_SYSTEM_PROMPT,
+        messages: [{ role: 'user', content: userPrompt }],
+        maxTokens: 3000,
+        temperature: 0.2,
+        signal: controller.signal,
+      })
+      aiResponse = result.parsed
+    } catch (parseErr) {
+      if (parseErr instanceof Error && parseErr.name === 'AbortError') {
+        return NextResponse.json(
+          { error: 'Extraction is taking longer than expected. Please try again.' },
+          { status: 504 }
+        )
+      }
+      console.error('Failed to parse extraction response:', parseErr)
       return NextResponse.json(
         { error: 'The extraction system returned an invalid response. Please try again.' },
         { status: 500 }
       )
+    } finally {
+      clearTimeout(timeout)
     }
 
     const extraction: ClinicalExtraction = {

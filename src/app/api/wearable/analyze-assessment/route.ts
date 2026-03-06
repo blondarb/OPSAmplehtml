@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
+import { getUser } from '@/lib/cognito/server'
 import { from } from '@/lib/db-query'
 
 export const maxDuration = 120  // Edge Function runs a 2-stage AI pipeline

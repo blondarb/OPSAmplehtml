@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
+import { getUser } from '@/lib/cognito/server'
 import { TriageTier } from '@/lib/triage/types'
 import { from } from '@/lib/db-query'
 
@@ -179,10 +179,9 @@ function consensusTier(tiers: TriageTier[]): TriageTier | null {
 
 // GET /api/triage/validate/results
 export async function GET(req: NextRequest) {
-  const supabase = await createClient()
 
-  const { data: { user }, error: authError } = await supabase.auth.getUser()
-  if (authError || !user) {
+  const user = await getUser()
+  if (!user) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 

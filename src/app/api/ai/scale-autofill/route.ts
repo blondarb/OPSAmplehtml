@@ -1,9 +1,8 @@
 import { NextResponse } from 'next/server'
-import OpenAI from 'openai'
-import { createClient } from '@/lib/supabase/server'
+import { invokeBedrockJSON } from '@/lib/bedrock'
+import { getUser } from '@/lib/cognito/server'
 import { ALL_SCALES } from '@/lib/scales/scale-definitions'
 import { ScaleDefinition, ScaleQuestion } from '@/lib/scales/types'
-import { getOpenAIKey } from '@/lib/db-query'
 
 
 interface ScaleAutofillRequest {
@@ -69,26 +68,24 @@ function buildExtractionPrompt(scale: ScaleDefinition, clinicalText: string, pat
     // Demographics - critical for scales like CHA2DS2-VASc that use age/sex
     if (patientContext.age !== undefined) {
       contextParts.push(`Age: ${patientContext.age} years`)
-      // Add age-related flags for common scale thresholds
-      if (patientContext.age >= 75) contextParts.push('  → Age ≥75 years (relevant for stroke risk scales)')
-      else if (patientContext.age >= 65) contextParts.push('  → Age 65-74 years (relevant for stroke risk scales)')
+      if (patientContext.age >= 75) contextParts.push('  -> Age >=75 years (relevant for stroke risk scales)')
+      else if (patientContext.age >= 65) contextParts.push('  -> Age 65-74 years (relevant for stroke risk scales)')
     }
     if (patientContext.sex) {
       contextParts.push(`Sex: ${patientContext.sex}`)
     }
 
-    // Vital signs - important for scales like CHA2DS2-VASc (hypertension)
+    // Vital signs
     if (patientContext.vitalSigns) {
       const vitals: string[] = []
       if (patientContext.vitalSigns.bloodPressure) {
         vitals.push(`Blood Pressure: ${patientContext.vitalSigns.bloodPressure}`)
-        // Parse BP to flag hypertension
         const bpMatch = patientContext.vitalSigns.bloodPressure.match(/(\d+)\s*\/\s*(\d+)/)
         if (bpMatch) {
           const systolic = parseInt(bpMatch[1])
           const diastolic = parseInt(bpMatch[2])
           if (systolic >= 140 || diastolic >= 90) {
-            vitals.push('  → BP ≥140/90 (meets hypertension criteria)')
+            vitals.push('  -> BP >=140/90 (meets hypertension criteria)')
           }
         }
       }
@@ -98,60 +95,55 @@ function buildExtractionPrompt(scale: ScaleDefinition, clinicalText: string, pat
       if (vitals.length > 0) contextParts.push(`Vital Signs:\n${vitals.join('\n')}`)
     }
 
-    // Active diagnoses - critical for risk stratification scales
+    // Active diagnoses
     if (patientContext.diagnoses?.length) {
       contextParts.push(`Current Diagnoses: ${patientContext.diagnoses.join(', ')}`)
-      // Flag relevant conditions for common scales
       const dx = patientContext.diagnoses.map(d => d.toLowerCase())
       const flags: string[] = []
       if (dx.some(d => d.includes('heart failure') || d.includes('chf') || d.includes('cardiomyopathy'))) {
-        flags.push('  → CHF/LV dysfunction present (relevant for stroke risk)')
+        flags.push('  -> CHF/LV dysfunction present (relevant for stroke risk)')
       }
       if (dx.some(d => d.includes('hypertension') || d.includes('htn'))) {
-        flags.push('  → Hypertension present (relevant for stroke risk)')
+        flags.push('  -> Hypertension present (relevant for stroke risk)')
       }
       if (dx.some(d => d.includes('diabetes') || d.includes('dm') || d.includes('a1c'))) {
-        flags.push('  → Diabetes mellitus present (relevant for stroke risk)')
+        flags.push('  -> Diabetes mellitus present (relevant for stroke risk)')
       }
       if (dx.some(d => d.includes('stroke') || d.includes('tia') || d.includes('cva') || d.includes('embolism'))) {
-        flags.push('  → Prior stroke/TIA/thromboembolism (relevant for stroke risk)')
+        flags.push('  -> Prior stroke/TIA/thromboembolism (relevant for stroke risk)')
       }
       if (dx.some(d => d.includes('peripheral') || d.includes('pad') || d.includes('mi') || d.includes('myocardial') || d.includes('coronary'))) {
-        flags.push('  → Vascular disease present (relevant for stroke risk)')
+        flags.push('  -> Vascular disease present (relevant for stroke risk)')
       }
       if (dx.some(d => d.includes('atrial fibrillation') || d.includes('afib') || d.includes('a-fib'))) {
-        flags.push('  → Atrial fibrillation present')
+        flags.push('  -> Atrial fibrillation present')
       }
       if (flags.length > 0) contextParts.push(flags.join('\n'))
     }
 
-    // Medical history
     if (patientContext.medicalHistory?.length) {
       contextParts.push(`Medical History: ${patientContext.medicalHistory.join(', ')}`)
     }
 
-    // Medications - can indicate conditions (e.g., antihypertensives = hypertension)
     if (patientContext.medications?.length) {
       contextParts.push(`Current Medications: ${patientContext.medications.join(', ')}`)
-      // Flag medication-implied conditions
       const meds = patientContext.medications.map(m => m.toLowerCase())
       const medFlags: string[] = []
       if (meds.some(m => m.includes('metformin') || m.includes('insulin') || m.includes('glipizide') || m.includes('glyburide') || m.includes('januvia') || m.includes('jardiance') || m.includes('ozempic'))) {
-        medFlags.push('  → Diabetes medications detected (implies diabetes)')
+        medFlags.push('  -> Diabetes medications detected (implies diabetes)')
       }
       if (meds.some(m => m.includes('lisinopril') || m.includes('losartan') || m.includes('amlodipine') || m.includes('metoprolol') || m.includes('hydrochlorothiazide') || m.includes('hctz'))) {
-        medFlags.push('  → Antihypertensive medications detected (may indicate hypertension)')
+        medFlags.push('  -> Antihypertensive medications detected (may indicate hypertension)')
       }
       if (meds.some(m => m.includes('warfarin') || m.includes('eliquis') || m.includes('xarelto') || m.includes('pradaxa') || m.includes('apixaban') || m.includes('rivaroxaban'))) {
-        medFlags.push('  → Anticoagulation detected')
+        medFlags.push('  -> Anticoagulation detected')
       }
       if (meds.some(m => m.includes('sinemet') || m.includes('carbidopa') || m.includes('levodopa') || m.includes('ropinirole') || m.includes('pramipexole'))) {
-        medFlags.push('  → Parkinson\'s medications detected')
+        medFlags.push('  -> Parkinson\'s medications detected')
       }
       if (medFlags.length > 0) contextParts.push(medFlags.join('\n'))
     }
 
-    // Allergies
     if (patientContext.allergies?.length) {
       contextParts.push(`Allergies: ${patientContext.allergies.join(', ')}`)
     }
@@ -161,9 +153,7 @@ function buildExtractionPrompt(scale: ScaleDefinition, clinicalText: string, pat
     }
   }
 
-  return `You are a clinical documentation AI assistant helping to extract structured data from clinical notes for clinical assessment scales.
-
-${scalePrompt}
+  return `${scalePrompt}
 ${contextSection}
 Clinical Text to Analyze:
 """
@@ -218,8 +208,7 @@ Include question IDs where you found relevant information from ANY source. Do no
 export async function POST(request: Request) {
   try {
     // Check authentication
-    const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
+    const user = await getUser()
 
     if (!user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -240,46 +229,14 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: `Scale "${scaleId}" not found` }, { status: 400 })
     }
 
-    // Get OpenAI API key
-    let apiKey = process.env.OPENAI_API_KEY
-
-    if (!apiKey) {
-      const { data: setting } = await getOpenAIKey()
-      apiKey = setting
-    }
-
-    if (!apiKey) {
-      return NextResponse.json({
-        error: 'OpenAI API key not configured. Please add your API key to the environment variables or Supabase settings.'
-      }, { status: 500 })
-    }
-
-    const openai = new OpenAI({ apiKey })
-
     const prompt = buildExtractionPrompt(scale, clinicalText, patientContext)
 
-    const completion = await openai.chat.completions.create({
-      model: 'gpt-5.2', // Best reasoning for structured extraction ($1.25/$10 per 1M tokens)
-      messages: [
-        { role: 'system', content: 'You are a clinical documentation expert specializing in neurology. Extract structured data from clinical notes AND patient demographics/history accurately. Use all available patient data (age, sex, diagnoses, medications, vitals) to complete scale questions. Never hallucinate information not present in any data source.' },
-        { role: 'user', content: prompt }
-      ],
-      max_completion_tokens: 2500,
-      temperature: 0.1, // Very low temperature for maximum consistency
-      response_format: { type: 'json_object' }
+    const { parsed: result } = await invokeBedrockJSON<AutofillResult>({
+      system: 'You are a clinical documentation expert specializing in neurology. Extract structured data from clinical notes AND patient demographics/history accurately. Use all available patient data (age, sex, diagnoses, medications, vitals) to complete scale questions. Never hallucinate information not present in any data source.',
+      messages: [{ role: 'user', content: prompt }],
+      maxTokens: 2500,
+      temperature: 0.1,
     })
-
-    const responseText = completion.choices[0]?.message?.content || '{}'
-
-    let result: AutofillResult
-    try {
-      result = JSON.parse(responseText)
-    } catch {
-      return NextResponse.json({
-        error: 'Failed to parse AI response',
-        rawResponse: responseText
-      }, { status: 500 })
-    }
 
     // Validate extracted responses against scale question types
     const validatedResponses: Record<string, number | boolean | string> = {}
@@ -292,19 +249,16 @@ export async function POST(request: Request) {
         continue
       }
 
-      // Validate value is appropriate for question type
       if (question.type === 'boolean') {
         validatedResponses[questionId] = Boolean(value)
       } else if (question.type === 'number') {
         const numVal = Number(value)
         if (!isNaN(numVal)) {
-          // Clamp to min/max if specified
           const min = question.min ?? 0
           const max = question.max ?? 999
           validatedResponses[questionId] = Math.min(Math.max(numVal, min), max)
         }
       } else if (question.type === 'select' || question.type === 'radio') {
-        // Ensure value is one of the valid options
         if (question.options) {
           const validValues = question.options.map(o => o.value)
           if (validValues.includes(value as number)) {
@@ -331,13 +285,6 @@ export async function POST(request: Request) {
 
   } catch (error: any) {
     console.error('Scale Autofill API Error:', error)
-
-    if (error?.status === 401) {
-      return NextResponse.json({
-        error: 'Invalid OpenAI API key. Please check your configuration.'
-      }, { status: 500 })
-    }
-
     return NextResponse.json({
       error: error?.message || 'An error occurred while processing your request'
     }, { status: 500 })

@@ -1,4 +1,4 @@
-import { createClient } from '@/lib/supabase/server'
+import { getUser } from '@/lib/cognito/server'
 import { redirect } from 'next/navigation'
 
 export default async function EhrLayout({
@@ -6,8 +6,7 @@ export default async function EhrLayout({
 }: {
   children: React.ReactNode
 }) {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const user = await getUser()
 
   if (!user) {
     redirect('/login')

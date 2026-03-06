@@ -1,12 +1,11 @@
-import { createClient } from '@/lib/supabase/server'
+import { getUser } from '@/lib/cognito/server'
 import { NextResponse, NextRequest } from 'next/server'
 import { from } from '@/lib/db-query'
 
 // GET /api/feedback/comments?feedbackId=xxx - Get comments for a feedback item
 export async function GET(request: NextRequest) {
-  const supabase = await createClient()
 
-  const { data: { user } } = await supabase.auth.getUser()
+  const user = await getUser()
   if (!user) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
@@ -30,9 +29,8 @@ export async function GET(request: NextRequest) {
 
 // POST /api/feedback/comments - Add a comment to a feedback item
 export async function POST(request: Request) {
-  const supabase = await createClient()
 
-  const { data: { user } } = await supabase.auth.getUser()
+  const user = await getUser()
   if (!user) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
@@ -64,9 +62,8 @@ export async function POST(request: Request) {
 
 // DELETE /api/feedback/comments - Delete a comment (own comments only)
 export async function DELETE(request: Request) {
-  const supabase = await createClient()
 
-  const { data: { user } } = await supabase.auth.getUser()
+  const user = await getUser()
   if (!user) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }

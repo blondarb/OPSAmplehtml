@@ -1,56 +1,34 @@
 import { NextResponse } from 'next/server'
-import OpenAI from 'openai'
-import { createClient } from '@/lib/supabase/server'
 import { MESSAGE_CHAT_SYSTEM_PROMPT } from '@/lib/intakePrompts'
-import { getOpenAIKey } from '@/lib/db-query'
+import { invokeBedrockJSON } from '@/lib/bedrock'
 
 
 export async function POST(request: Request) {
   try {
     const { message, conversationHistory, currentData } = await request.json()
 
-
-    let apiKey = process.env.OPENAI_API_KEY
-    if (!apiKey) {
-      const { data: setting } = await getOpenAIKey()
-      apiKey = setting
-    }
-
-    if (!apiKey) {
-      return NextResponse.json({ error: 'OpenAI API key not configured' }, { status: 500 })
-    }
-
-    const openai = new OpenAI({ apiKey })
+    // Build the system prompt that includes the current collected data context
+    const systemPromptWithContext = `${MESSAGE_CHAT_SYSTEM_PROMPT}\n\nCurrent collected data: ${JSON.stringify(currentData)}`
 
     const recentHistory = Array.isArray(conversationHistory)
       ? conversationHistory.slice(-10)
       : []
 
-    const messages: OpenAI.Chat.ChatCompletionMessageParam[] = [
-      { role: 'system', content: MESSAGE_CHAT_SYSTEM_PROMPT },
-      { role: 'system', content: `Current collected data: ${JSON.stringify(currentData)}` },
+    // Build messages array — only user/assistant roles for Bedrock
+    const messages = [
       ...recentHistory.map((msg: { role: string; text: string }) => ({
         role: msg.role as 'user' | 'assistant',
         content: msg.text,
       })),
-      { role: 'user', content: message },
+      { role: 'user' as const, content: message },
     ]
 
-    const response = await openai.chat.completions.create({
-      model: 'gpt-5-mini',
+    const { parsed: result } = await invokeBedrockJSON<Record<string, unknown>>({
+      system: systemPromptWithContext,
       messages,
-      response_format: { type: 'json_object' },
-      max_completion_tokens: 1500,
+      maxTokens: 1500,
+      temperature: 1,
     })
-
-    const rawContent = response.choices[0].message.content || '{}'
-    let result: Record<string, unknown>
-    try {
-      result = JSON.parse(rawContent)
-    } catch {
-      console.error('Failed to parse AI response:', rawContent)
-      result = { nextQuestion: 'Sorry, I had trouble processing that. Could you try again?' }
-    }
 
     if (!result.nextQuestion) {
       result.nextQuestion = 'Could you tell me a bit more about what you need?'

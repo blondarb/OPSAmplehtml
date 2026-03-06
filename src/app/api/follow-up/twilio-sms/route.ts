@@ -1,9 +1,9 @@
-import { createClient } from '@/lib/supabase/server'
+import { getUser } from '@/lib/cognito/server'
 import { validateTwilioSignature } from '@/lib/follow-up/twilioClient'
 import { processConversationTurn } from '@/lib/follow-up/conversationEngine'
 import { DEMO_SCENARIOS } from '@/lib/follow-up/demoScenarios'
 import { suggestCptCode, CPT_CODES } from '@/lib/follow-up/cptCodes'
-import { from, getOpenAIKey } from '@/lib/db-query'
+import { from } from '@/lib/db-query'
 
 
 export const maxDuration = 30
@@ -75,22 +75,10 @@ export async function POST(request: Request) {
       return twimlResponse('Session configuration error. Please start a new session.')
     }
 
-    // Get OpenAI API key
-    let apiKey = process.env.OPENAI_API_KEY
-    if (!apiKey) {
-      try {
-        const { data: setting } = await getOpenAIKey()
-        apiKey = setting
-      } catch { /* fallback */ }
-    }
-    if (!apiKey) {
-      return twimlResponse('AI service is temporarily unavailable. Please try again later.')
-    }
-
-    // Call the shared conversation engine
+    // Call the shared conversation engine (uses Bedrock — no API key needed)
     const result = await processConversationTurn(
       { patient_message: messageBody, patient_context: scenario, conversation_history: conversationHistory },
-      apiKey
+      '' // API key param kept for backward compatibility; engine uses Bedrock env credentials
     )
 
     // Build new transcript entries

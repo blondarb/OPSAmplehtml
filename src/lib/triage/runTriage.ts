@@ -1,15 +1,13 @@
 /**
  * Core triage execution — shared between the main triage API and the
- * consistency-test rerun route. Calls OpenAI directly without HTTP
+ * consistency-test rerun route. Calls AWS Bedrock directly without HTTP
  * self-fetch so it works reliably on Vercel serverless.
  */
 
-import OpenAI from 'openai'
+import { invokeBedrockJSON } from '@/lib/bedrock'
 import { calculateTriageTier, validateAIResponse } from './scoring'
 import { TRIAGE_SYSTEM_PROMPT, buildTriageUserPrompt } from './systemPrompt'
 import { AITriageResponse, DimensionScores, DISCLAIMER_TEXT } from './types'
-
-const AI_MODEL = 'gpt-5.2'
 
 export interface TriageInput {
   referral_text: string
@@ -44,7 +42,7 @@ export interface TriageResult {
 }
 
 /**
- * Run a single triage call against OpenAI and return structured results.
+ * Run a single triage call against AWS Bedrock Claude and return structured results.
  * Does NOT persist to Supabase — callers handle storage.
  */
 export async function runTriage(input: TriageInput): Promise<TriageResult> {
@@ -52,12 +50,6 @@ export async function runTriage(input: TriageInput): Promise<TriageResult> {
     ? Math.max(0, Math.min(1, input.temperature))
     : 0.2
 
-  const apiKey = process.env.OPENAI_API_KEY
-  if (!apiKey) {
-    throw new Error('OpenAI API key not configured')
-  }
-
-  const openai = new OpenAI({ apiKey })
   const textForScoring = input.referral_text
 
   const userPrompt = buildTriageUserPrompt(textForScoring, {
@@ -70,37 +62,26 @@ export async function runTriage(input: TriageInput): Promise<TriageResult> {
   const controller = new AbortController()
   const timeout = setTimeout(() => controller.abort(), 45000)
 
-  let completion
+  let parsed: Record<string, unknown>
   try {
-    completion = await openai.chat.completions.create(
-      {
-        model: AI_MODEL,
-        messages: [
-          { role: 'system', content: TRIAGE_SYSTEM_PROMPT },
-          { role: 'user', content: userPrompt },
-        ],
-        response_format: { type: 'json_object' },
-        max_completion_tokens: 2000,
-        temperature,
-      },
-      { signal: controller.signal }
-    )
+    const result = await invokeBedrockJSON({
+      system: TRIAGE_SYSTEM_PROMPT,
+      messages: [{ role: 'user', content: userPrompt }],
+      maxTokens: 2000,
+      temperature,
+      signal: controller.signal,
+    })
+    parsed = result.parsed as Record<string, unknown>
   } finally {
     clearTimeout(timeout)
   }
 
-  const rawContent = completion.choices[0]?.message?.content
-  if (!rawContent) {
-    throw new Error('AI returned empty response')
-  }
-
-  const parsed = JSON.parse(rawContent)
   const validationError = validateAIResponse(parsed)
   if (validationError) {
     throw new Error(`AI response validation failed: ${validationError}`)
   }
 
-  const aiResponse = parsed as AITriageResponse
+  const aiResponse = parsed as unknown as AITriageResponse
   const scoring = calculateTriageTier(aiResponse)
 
   return {

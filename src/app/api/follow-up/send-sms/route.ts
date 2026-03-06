@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
+import { getUser } from '@/lib/cognito/server'
 import { sendSms, normalizePhoneNumber } from '@/lib/follow-up/twilioClient'
 import { DEMO_SCENARIOS } from '@/lib/follow-up/demoScenarios'
 import { from } from '@/lib/db-query'

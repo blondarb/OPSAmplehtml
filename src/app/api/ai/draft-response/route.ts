@@ -1,13 +1,12 @@
 import { NextResponse } from 'next/server'
-import OpenAI from 'openai'
-import { createClient } from '@/lib/supabase/server'
-import { from, getOpenAIKey } from '@/lib/db-query'
+import { invokeBedrock } from '@/lib/bedrock'
+import { getUser } from '@/lib/cognito/server'
+import { from } from '@/lib/db-query'
 
 
 export async function POST(request: Request) {
   try {
-    const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
+    const user = await getUser()
 
     if (!user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -18,21 +17,6 @@ export async function POST(request: Request) {
     if (!patient_message) {
       return NextResponse.json({ error: 'patient_message is required' }, { status: 400 })
     }
-
-    // Get OpenAI API key
-    let apiKey = process.env.OPENAI_API_KEY
-    if (!apiKey) {
-      const { data: setting } = await getOpenAIKey()
-      apiKey = setting
-    }
-
-    if (!apiKey) {
-      return NextResponse.json({
-        error: 'OpenAI API key not configured.',
-      }, { status: 500 })
-    }
-
-    const openai = new OpenAI({ apiKey })
 
     // Build patient context section
     let contextSection = ''
@@ -68,16 +52,14 @@ Guidelines:
 
 Draft a response to the following patient message. The physician will review and may edit before sending.`
 
-    const completion = await openai.chat.completions.create({
-      model: 'gpt-5-mini',
-      messages: [
-        { role: 'system', content: systemPrompt },
-        { role: 'user', content: patient_message },
-      ],
-      max_completion_tokens: 500,
+    const result = await invokeBedrock({
+      system: systemPrompt,
+      messages: [{ role: 'user', content: patient_message }],
+      maxTokens: 500,
+      temperature: 1,
     })
 
-    const draft = completion.choices[0]?.message?.content || ''
+    const draft = result.text || ''
 
     // If message_id provided, store the draft on the message record
     if (message_id && draft) {

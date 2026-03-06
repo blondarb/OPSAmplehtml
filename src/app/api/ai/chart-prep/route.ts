@@ -1,8 +1,8 @@
 import { NextResponse } from 'next/server'
-import OpenAI from 'openai'
-import { createClient } from '@/lib/supabase/server'
+import { invokeBedrockJSON } from '@/lib/bedrock'
+import { getUser } from '@/lib/cognito/server'
 import { getTenantServer } from '@/lib/tenant'
-import { from, getOpenAIKey } from '@/lib/db-query'
+import { from } from '@/lib/db-query'
 
 
 interface UserSettings {
@@ -14,30 +14,13 @@ interface UserSettings {
 export async function POST(request: Request) {
   try {
     // Check authentication
-    const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
+    const user = await getUser()
 
     if (!user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
     const { patient, noteData, prepNotes, userSettings } = await request.json()
-
-    // Get OpenAI API key
-    let apiKey = process.env.OPENAI_API_KEY
-
-    if (!apiKey) {
-      const { data: setting } = await getOpenAIKey()
-      apiKey = setting
-    }
-
-    if (!apiKey) {
-      return NextResponse.json({
-        error: 'OpenAI API key not configured'
-      }, { status: 500 })
-    }
-
-    const openai = new OpenAI({ apiKey })
 
     const tenant = getTenantServer()
 
@@ -159,58 +142,26 @@ IMPORTANT GUARDRAILS:
 
 Generate a JSON response with a single narrative paragraph summary plus optional alerts.
 
-IMPORTANT: Return ONLY valid JSON, no markdown formatting.
-
 {
   "summary": "A single concise paragraph (4-8 sentences) summarizing: who this patient is, why they are being seen, relevant history highlights, current treatments and responses, recent scale scores with trends, and suggested focus areas for today's visit. Write in clinical prose, not bullets.",
-  "alerts": "Urgent items only: drug interactions, overdue screenings, critical labs, safety concerns. Use ⚠️ prefix. Return empty string if none.",
+  "alerts": "Urgent items only: drug interactions, overdue screenings, critical labs, safety concerns. Use warning prefix. Return empty string if none.",
   "suggestedHPI": "A draft HPI paragraph (3-5 sentences) incorporating chief complaint and relevant history context.",
   "suggestedAssessment": "1-2 sentence clinical impression based on available data",
   "suggestedPlan": "3-5 bullet points with specific, actionable recommendations"
 }${userPreferences}`
 
-    const completion = await openai.chat.completions.create({
-      model: 'gpt-5-mini', // Cost-effective for summarization ($0.25/$2 per 1M tokens)
-      messages: [
-        { role: 'system', content: systemPrompt },
-        { role: 'user', content: 'Generate the structured chart prep JSON for this patient visit.' }
-      ],
-      max_completion_tokens: 2000,
-      // Note: gpt-5-mini only supports default temperature (1)
-      response_format: { type: 'json_object' },
+    const { parsed: sections } = await invokeBedrockJSON({
+      system: systemPrompt,
+      messages: [{ role: 'user', content: 'Generate the structured chart prep JSON for this patient visit.' }],
+      maxTokens: 2000,
+      temperature: 1,
     })
 
-    const responseText = completion.choices[0]?.message?.content || ''
-
-    // Parse the JSON response
-    try {
-      // Clean up the response - remove markdown code blocks if present
-      let cleanedResponse = responseText.trim()
-      if (cleanedResponse.startsWith('```json')) {
-        cleanedResponse = cleanedResponse.slice(7)
-      } else if (cleanedResponse.startsWith('```')) {
-        cleanedResponse = cleanedResponse.slice(3)
-      }
-      if (cleanedResponse.endsWith('```')) {
-        cleanedResponse = cleanedResponse.slice(0, -3)
-      }
-      cleanedResponse = cleanedResponse.trim()
-
-      const sections = JSON.parse(cleanedResponse)
-
-      return NextResponse.json({
-        sections,
-        // Also include raw response for backwards compatibility
-        response: formatSectionsAsText(sections)
-      })
-    } catch (parseError) {
-      // If JSON parsing fails, return the raw text
-      console.error('Failed to parse chart prep JSON:', parseError)
-      return NextResponse.json({
-        response: responseText,
-        sections: null
-      })
-    }
+    return NextResponse.json({
+      sections,
+      // Also include raw response for backwards compatibility
+      response: formatSectionsAsText(sections)
+    })
 
   } catch (error: any) {
     console.error('Chart Prep Error:', error)
