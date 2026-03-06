@@ -1190,22 +1190,29 @@ export default function ClinicalNote({
   }
 
   const saveNote = async () => {
-    if (!currentVisit?.clinical_notes?.id) return
+    if (!currentVisit?.id) return
 
-    const { error } = await supabase
-      .from('clinical_notes')
-      .update({
-        hpi: noteData.hpi,
-        ros: noteData.ros,
-        allergies: noteData.allergies,
-        assessment: noteData.assessment,
-        plan: noteData.plan,
-        raw_dictation: rawDictation,
+    try {
+      const res = await fetch(`/api/visits/${currentVisit.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          clinicalNote: {
+            hpi: noteData.hpi,
+            ros: noteData.ros,
+            allergies: noteData.allergies,
+            assessment: noteData.assessment,
+            plan: noteData.plan,
+            rawDictation: rawDictation,
+          },
+        }),
       })
-      .eq('id', currentVisit.clinical_notes.id)
-
-    if (error) {
-      console.error('Error saving note:', error)
+      if (!res.ok) {
+        const data = await res.json()
+        console.error('Error saving note:', data.error)
+      }
+    } catch (err) {
+      console.error('Error saving note:', err)
     }
   }
 

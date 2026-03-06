@@ -11,14 +11,11 @@ export function useActivityLog() {
       if (!user) return
 
       // Fire-and-forget — don't await, don't block UI
-      import('@/lib/supabase/client').then(({ createClient }) => {
-        const supabase = createClient()
-        Promise.resolve(
-          supabase
-            .from('user_activity_log')
-            .insert({ user_id: user.id, action, target, metadata: metadata ?? {} })
-        ).catch(() => {})
-      })
+      fetch('/api/activity-log', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action, target, metadata: metadata ?? {} }),
+      }).catch(() => {})
     },
     [user]
   )

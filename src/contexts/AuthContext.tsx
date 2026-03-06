@@ -29,16 +29,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null)
   const [loading, setLoading] = useState(true)
 
-  const fetchProfile = useCallback(async (userId: string) => {
+  const fetchProfile = useCallback(async (_userId: string) => {
     try {
-      const { createClient } = await import('@/lib/supabase/client')
-      const supabase = createClient()
-      const { data } = await supabase
-        .from('user_profiles')
-        .select('id, display_name, role, organization, specialty')
-        .eq('id', userId)
-        .single()
-      if (data) setUserProfile(data)
+      const res = await fetch('/api/auth/profile')
+      if (res.ok) {
+        const { profile } = await res.json()
+        if (profile) setUserProfile(profile)
+      }
     } catch {
       // Profile may not exist yet (trigger hasn't fired)
     }
