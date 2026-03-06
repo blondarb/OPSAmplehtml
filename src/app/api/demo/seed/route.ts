@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { getTenantServer } from '@/lib/tenant'
+import { from } from '@/lib/db-query'
+
 
 // TypeScript interfaces for the seed payload
 interface SeedMedication {
@@ -110,8 +112,7 @@ export async function POST(request: Request) {
       const mrn = patientData.mrn || `DEMO-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`
 
       // Step 1: Insert patient
-      const { data: patient, error: patientError } = await supabase
-        .from('patients')
+      const { data: patient, error: patientError } = await from('patients')
         .insert({
           user_id: user.id,
           tenant_id,
@@ -154,7 +155,7 @@ export async function POST(request: Request) {
           confirmed_by_user: true,
         }))
 
-        const { error: medError } = await supabase.from('patient_medications').insert(medRows)
+        const { error: medError } = await from('patient_medications').insert(medRows)
         if (medError) {
           console.error(`Error inserting medications for ${patientData.firstName}:`, medError)
         }
@@ -174,7 +175,7 @@ export async function POST(request: Request) {
           is_active: true,
         }))
 
-        const { error: allergyError } = await supabase.from('patient_allergies').insert(allergyRows)
+        const { error: allergyError } = await from('patient_allergies').insert(allergyRows)
         if (allergyError) {
           console.error(`Error inserting allergies for ${patientData.firstName}:`, allergyError)
         }
@@ -188,8 +189,7 @@ export async function POST(request: Request) {
 
       for (const pv of priorVisits) {
         // Insert visit
-        const { data: visit, error: visitError } = await supabase
-          .from('visits')
+        const { data: visit, error: visitError } = await from('visits')
           .insert({
             patient_id: patientId,
             user_id: user.id,
@@ -214,8 +214,7 @@ export async function POST(request: Request) {
         const signedAt = new Date(pv.visitDate)
         signedAt.setHours(signedAt.getHours() + 1) // Signed 1 hour after visit
 
-        const { error: noteError } = await supabase
-          .from('clinical_notes')
+        const { error: noteError } = await from('clinical_notes')
           .insert({
             visit_id: visit.id,
             tenant_id,
@@ -252,7 +251,7 @@ export async function POST(request: Request) {
             is_primary: dx.is_primary || false,
           }))
 
-          const { error: dxError } = await supabase.from('diagnoses').insert(dxRows)
+          const { error: dxError } = await from('diagnoses').insert(dxRows)
           if (dxError) {
             console.error(`Error inserting diagnoses:`, dxError)
           }
@@ -270,7 +269,7 @@ export async function POST(request: Request) {
             impression: img.impression || null,
           }))
 
-          const { error: imgError } = await supabase.from('imaging_studies').insert(imgRows)
+          const { error: imgError } = await from('imaging_studies').insert(imgRows)
           if (imgError) {
             console.error(`Error inserting imaging studies:`, imgError)
           }
@@ -281,8 +280,7 @@ export async function POST(request: Request) {
       let appointmentCreated = false
       if (patientData.appointment) {
         const appt = patientData.appointment
-        const { error: apptError } = await supabase
-          .from('appointments')
+        const { error: apptError } = await from('appointments')
           .insert({
             tenant_id,
             patient_id: patientId,

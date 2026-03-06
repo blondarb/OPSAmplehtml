@@ -3,6 +3,8 @@ import { createClient } from '@/lib/supabase/server'
 import { processConversationTurn } from '@/lib/follow-up/conversationEngine'
 import type { FollowUpMessageRequest, FollowUpMessageResponse } from '@/lib/follow-up/types'
 import { suggestCptCode, CPT_CODES } from '@/lib/follow-up/cptCodes'
+import { from, getOpenAIKey } from '@/lib/db-query'
+
 
 export const maxDuration = 30
 
@@ -24,8 +26,7 @@ export async function POST(request: Request) {
 
     if (!apiKey) {
       try {
-        const supabase = await createClient()
-        const { data: setting } = await supabase.rpc('get_openai_key')
+        const { data: setting } = await getOpenAIKey()
         apiKey = setting
       } catch {
         // Supabase may not be available in demo mode
@@ -58,7 +59,6 @@ export async function POST(request: Request) {
 
     // Supabase operations
     try {
-      const supabase = await createClient()
 
       // Build transcript entry for this turn
       const newTranscriptEntries = []
@@ -78,8 +78,7 @@ export async function POST(request: Request) {
       if (!session_id) {
         // First message — INSERT new session
         const newSessionId = responsePayload.session_id
-        const { data: inserted, error: insertError } = await supabase
-          .from('followup_sessions')
+        const { data: inserted, error: insertError } = await from('followup_sessions')
           .insert({
             id: newSessionId,
             patient_id: patient_context.id,
@@ -112,8 +111,7 @@ export async function POST(request: Request) {
         }
       } else {
         // Existing session — UPDATE
-        const { data: existing } = await supabase
-          .from('followup_sessions')
+        const { data: existing } = await from('followup_sessions')
           .select('transcript')
           .eq('id', session_id)
           .single()
@@ -121,8 +119,7 @@ export async function POST(request: Request) {
         const currentTranscript = (existing?.transcript as Array<unknown>) || []
         const updatedTranscript = [...currentTranscript, ...newTranscriptEntries]
 
-        const { error: updateError } = await supabase
-          .from('followup_sessions')
+        const { error: updateError } = await from('followup_sessions')
           .update({
             status: result.dashboard_update.status,
             current_module: result.current_module,
@@ -145,8 +142,7 @@ export async function POST(request: Request) {
       // Insert escalation record if triggered
       if (result.escalation_triggered && result.all_flags.length > 0) {
         const topFlag = result.all_flags[0]
-        const { error: escError } = await supabase
-          .from('followup_escalations')
+        const { error: escError } = await from('followup_escalations')
           .insert({
             session_id: responsePayload.session_id,
             tier: topFlag.tier,
@@ -174,7 +170,7 @@ export async function POST(request: Request) {
           const cptCode = suggestCptCode('ccm', billingTotal)
           const cptRate = CPT_CODES[cptCode]?.rate || 37.07
 
-          await supabase.from('followup_billing_entries').insert({
+          await from('followup_billing_entries').insert({
             session_id: responsePayload.session_id,
             patient_id: patient_context.id || null,
             patient_name: patient_context.name,

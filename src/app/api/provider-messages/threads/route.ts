@@ -1,15 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { getTenantServer } from '@/lib/tenant'
+import { from } from '@/lib/db-query'
 
 // GET /api/provider-messages/threads — List threads for current tenant
 export async function GET() {
   try {
-    const supabase = await createClient()
     const tenant = getTenantServer()
 
-    const { data, error } = await supabase
-      .from('provider_threads')
+    const { data, error } = await from('provider_threads')
       .select('*')
       .eq('tenant_id', tenant)
       .order('last_message_at', { ascending: false })
@@ -28,7 +27,6 @@ export async function GET() {
 // POST /api/provider-messages/threads — Create a new thread
 export async function POST(request: NextRequest) {
   try {
-    const supabase = await createClient()
     const tenant = getTenantServer()
     const body = await request.json()
 
@@ -41,8 +39,7 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const { data, error } = await supabase
-      .from('provider_threads')
+    const { data, error } = await from('provider_threads')
       .insert({
         tenant_id: tenant,
         thread_type: thread_type || 'general',

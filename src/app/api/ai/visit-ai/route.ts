@@ -2,6 +2,8 @@ import { NextResponse } from 'next/server'
 import OpenAI from 'openai'
 import { createClient as createDeepgramClient } from '@deepgram/sdk'
 import { createClient } from '@/lib/supabase/server'
+import { getOpenAIKey } from '@/lib/db-query'
+
 
 // Allow up to 120s for long audio transcription + GPT processing
 export const maxDuration = 120
@@ -51,7 +53,7 @@ export async function POST(request: Request) {
     // Get OpenAI API key for GPT clinical extraction
     let openaiKey = process.env.OPENAI_API_KEY
     if (!openaiKey) {
-      const { data: setting } = await supabase.rpc('get_openai_key')
+      const { data: setting } = await getOpenAIKey()
       openaiKey = setting
     }
     if (!openaiKey) {

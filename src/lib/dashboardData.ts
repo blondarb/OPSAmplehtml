@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import { getTenantServer } from '@/lib/tenant'
+import { from } from '@/lib/db-query'
 
 /**
  * Shared server-side data-fetching used by /physician, /ehr, and /dashboard.
@@ -20,16 +21,14 @@ export async function fetchDashboardData(patientId?: string) {
   // Fetch patient data — by ID if provided, otherwise random
   let patients: any = null
   if (patientId) {
-    const { data } = await supabase
-      .from('patients')
+    const { data } = await from('patients')
       .select('*')
       .eq('id', patientId)
       .eq('tenant_id', tenant)
       .single()
     patients = data
   } else {
-    const { data: allPatients } = await supabase
-      .from('patients')
+    const { data: allPatients } = await from('patients')
       .select('*')
       .eq('tenant_id', tenant)
     if (allPatients && allPatients.length > 0) {
@@ -38,8 +37,7 @@ export async function fetchDashboardData(patientId?: string) {
   }
 
   // Fetch current visit with notes
-  const { data: currentVisit } = await supabase
-    .from('visits')
+  const { data: currentVisit } = await from('visits')
     .select(`
       *,
       clinical_notes(*),
@@ -53,8 +51,7 @@ export async function fetchDashboardData(patientId?: string) {
     .single()
 
   // Fetch prior visits with full clinical note content for history summary
-  const { data: priorVisits } = await supabase
-    .from('visits')
+  const { data: priorVisits } = await from('visits')
     .select(`
       *,
       clinical_notes(hpi, ros, assessment, plan, ai_summary)
@@ -65,16 +62,14 @@ export async function fetchDashboardData(patientId?: string) {
     .limit(5)
 
   // Fetch imaging studies
-  const { data: imagingStudies } = await supabase
-    .from('imaging_studies')
+  const { data: imagingStudies } = await from('imaging_studies')
     .select('*')
     .eq('tenant_id', tenant)
     .order('study_date', { ascending: false })
     .limit(10)
 
   // Fetch score history from scale_results (new Smart Scales)
-  const { data: scaleResults } = await supabase
-    .from('scale_results')
+  const { data: scaleResults } = await from('scale_results')
     .select('*')
     .eq('patient_id', patients?.id)
     .eq('tenant_id', tenant)
@@ -82,7 +77,7 @@ export async function fetchDashboardData(patientId?: string) {
     .limit(20)
 
   // Transform scale_results to scoreHistory format
-  const scoreHistory = (scaleResults || []).map(result => ({
+  const scoreHistory = (scaleResults || []).map((result: any) => ({
     id: result.id,
     scale_type: result.scale_id.toUpperCase().replace('PHQ9', 'PHQ-9').replace('GAD7', 'GAD-7').replace('HIT6', 'HIT-6'),
     score: result.raw_score,
@@ -93,8 +88,7 @@ export async function fetchDashboardData(patientId?: string) {
   // Fetch patient messages for physician view
   let patientMessages: any[] = []
   try {
-    const { data: msgs } = await supabase
-      .from('patient_messages')
+    const { data: msgs } = await from('patient_messages')
       .select('*')
       .eq('tenant_id', tenant)
       .order('created_at', { ascending: false })
@@ -107,8 +101,7 @@ export async function fetchDashboardData(patientId?: string) {
   // Fetch patient intake forms for physician view
   let patientIntakeForms: any[] = []
   try {
-    const { data: forms } = await supabase
-      .from('patient_intake_forms')
+    const { data: forms } = await from('patient_intake_forms')
       .select('*')
       .eq('tenant_id', tenant)
       .order('created_at', { ascending: false })
@@ -121,8 +114,7 @@ export async function fetchDashboardData(patientId?: string) {
   // Fetch historian sessions for physician view (scoped to current patient)
   let historianSessions: any[] = []
   try {
-    let query = supabase
-      .from('historian_sessions')
+    let query = from('historian_sessions')
       .select('*, patient:patients(id, first_name, last_name, mrn)')
       .eq('tenant_id', tenant)
     if (patients?.id) {

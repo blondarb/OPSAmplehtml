@@ -1,5 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { rpc } from '@/lib/db-query'
+
 
 export async function GET(request: Request) {
   try {
@@ -10,9 +12,8 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: 'patient_id is required' }, { status: 400 })
     }
 
-    const supabase = await createClient()
 
-    const { data, error } = await supabase.rpc('get_patient_context_for_portal', {
+    const { data, error } = await rpc('get_patient_context_for_portal', {
       p_patient_id: patientId,
     })
 

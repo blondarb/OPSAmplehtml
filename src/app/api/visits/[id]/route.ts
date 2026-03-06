@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { getTenantServer } from '@/lib/tenant'
+import { from } from '@/lib/db-query'
 
 // GET /api/visits/[id] - Get a visit with clinical note
 export async function GET(
@@ -17,8 +18,7 @@ export async function GET(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const { data, error } = await supabase
-      .from('visits')
+    const { data, error } = await from('visits')
       .select(`
         *,
         clinical_notes (*),
@@ -70,8 +70,7 @@ export async function PATCH(
     }
     if (status !== undefined) visitUpdate.status = status
 
-    const { data: visit, error: visitError } = await supabase
-      .from('visits')
+    const { data: visit, error: visitError } = await from('visits')
       .update(visitUpdate)
       .eq('id', id)
       .select()
@@ -104,8 +103,7 @@ export async function PATCH(
       if (clinicalNote.examFreeText !== undefined) noteUpdate.exam_free_text = clinicalNote.examFreeText
 
       // Try update first
-      const { data: updated } = await supabase
-        .from('clinical_notes')
+      const { data: updated } = await from('clinical_notes')
         .update(noteUpdate)
         .eq('visit_id', id)
         .select()
@@ -113,8 +111,7 @@ export async function PATCH(
       // If no rows updated, create the clinical note
       if (!updated || updated.length === 0) {
         const tenantId = await getTenantServer()
-        const { error: insertError } = await supabase
-          .from('clinical_notes')
+        const { error: insertError } = await from('clinical_notes')
           .insert({ visit_id: id, status: 'draft', tenant_id: tenantId, ...noteUpdate })
         if (insertError) {
           console.error('Error creating clinical note:', insertError)
@@ -123,8 +120,7 @@ export async function PATCH(
     }
 
     // Fetch updated visit with clinical note
-    const { data: updatedVisit } = await supabase
-      .from('visits')
+    const { data: updatedVisit } = await from('visits')
       .select(`
         *,
         clinical_notes (*)

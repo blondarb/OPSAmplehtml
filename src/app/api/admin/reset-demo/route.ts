@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { from } from '@/lib/db-query'
 
 /**
  * POST /api/admin/reset-demo
@@ -49,7 +50,6 @@ export async function POST(request: NextRequest) {
   }
 
   // 3. Delete rows in dependency order
-  const supabase = await createClient()
   const tables = [
     'patient_messages',
     'patient_intake_forms',
@@ -67,8 +67,7 @@ export async function POST(request: NextRequest) {
 
   for (const table of tables) {
     try {
-      const { error } = await supabase
-        .from(table)
+      const { error } = await from(table)
         .delete()
         .eq('tenant_id', tenantId)
 

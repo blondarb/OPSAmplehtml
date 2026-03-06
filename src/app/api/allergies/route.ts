@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 import { getTenantServer } from '@/lib/tenant'
+import { from } from '@/lib/db-query'
 
 // GET /api/allergies?patient_id=X — list allergies for patient
 export async function GET(request: Request) {
@@ -20,8 +21,7 @@ export async function GET(request: Request) {
   const tenant = getTenantServer()
   const showAll = searchParams.get('all') === 'true'
 
-  let query = supabase
-    .from('patient_allergies')
+  let query = from('patient_allergies')
     .select('*')
     .eq('patient_id', patientId)
     .eq('tenant_id', tenant)
@@ -61,8 +61,7 @@ export async function POST(request: Request) {
 
   const tenant = getTenantServer()
 
-  const { data: allergy, error } = await supabase
-    .from('patient_allergies')
+  const { data: allergy, error } = await from('patient_allergies')
     .insert({
       patient_id,
       tenant_id: tenant,

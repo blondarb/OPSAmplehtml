@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { from } from '@/lib/db-query'
 
 export async function GET(request: Request) {
   try {
@@ -7,10 +8,8 @@ export async function GET(request: Request) {
     const month = searchParams.get('month') || new Date().toISOString().slice(0, 7)
     const format = searchParams.get('format') || 'csv'
 
-    const supabase = await createClient()
 
-    const { data: entries, error } = await supabase
-      .from('followup_billing_entries')
+    const { data: entries, error } = await from('followup_billing_entries')
       .select('*')
       .eq('billing_month', month)
       .order('service_date', { ascending: true })

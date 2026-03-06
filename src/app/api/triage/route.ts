@@ -1,9 +1,10 @@
 import { NextResponse } from 'next/server'
 import OpenAI from 'openai'
-import { createClient } from '@/lib/supabase/server'
 import { calculateTriageTier, validateAIResponse } from '@/lib/triage/scoring'
 import { TRIAGE_SYSTEM_PROMPT, buildTriageUserPrompt } from '@/lib/triage/systemPrompt'
 import { AITriageResponse, DISCLAIMER_TEXT } from '@/lib/triage/types'
+import { from, getOpenAIKey } from '@/lib/db-query'
+
 
 export const maxDuration = 60
 
@@ -54,8 +55,7 @@ export async function POST(request: Request) {
 
     if (!apiKey) {
       try {
-        const supabase = await createClient()
-        const { data: setting } = await supabase.rpc('get_openai_key')
+        const { data: setting } = await getOpenAIKey()
         apiKey = setting
       } catch {
         // Supabase may not be available in demo mode
@@ -142,9 +142,7 @@ export async function POST(request: Request) {
     // Store in Supabase
     let sessionId = crypto.randomUUID()
     try {
-      const supabase = await createClient()
-      const { data: inserted, error: insertError } = await supabase
-        .from('triage_sessions')
+      const { data: inserted, error: insertError } = await from('triage_sessions')
         .insert({
           referral_text,
           patient_age: patient_age || null,

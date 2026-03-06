@@ -2,16 +2,17 @@ import { NextResponse } from 'next/server'
 import OpenAI from 'openai'
 import { createClient } from '@/lib/supabase/server'
 import { MESSAGE_CHAT_SYSTEM_PROMPT } from '@/lib/intakePrompts'
+import { getOpenAIKey } from '@/lib/db-query'
+
 
 export async function POST(request: Request) {
   try {
     const { message, conversationHistory, currentData } = await request.json()
 
-    const supabase = await createClient()
 
     let apiKey = process.env.OPENAI_API_KEY
     if (!apiKey) {
-      const { data: setting } = await supabase.rpc('get_openai_key')
+      const { data: setting } = await getOpenAIKey()
       apiKey = setting
     }
 

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { from } from '@/lib/db-query'
 
 // GET /api/appointments/[id] - Get a single appointment
 export async function GET(
@@ -16,8 +17,7 @@ export async function GET(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const { data, error } = await supabase
-      .from('appointments')
+    const { data, error } = await from('appointments')
       .select(`
         *,
         patient:patients (
@@ -90,8 +90,7 @@ export async function PATCH(
     if (visitId !== undefined) updateData.visit_id = visitId
     if (schedulingNotes !== undefined) updateData.scheduling_notes = schedulingNotes
 
-    const { data, error } = await supabase
-      .from('appointments')
+    const { data, error } = await from('appointments')
       .update(updateData)
       .eq('id', id)
       .select()
@@ -125,8 +124,7 @@ export async function DELETE(
     }
 
     // Soft delete by setting status to 'cancelled'
-    const { data, error } = await supabase
-      .from('appointments')
+    const { data, error } = await from('appointments')
       .update({
         status: 'cancelled',
         updated_at: new Date().toISOString(),

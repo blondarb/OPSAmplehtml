@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { DIAGNOSIS_CATEGORIES } from '@/lib/diagnosisData'
 import { OUTPATIENT_PLANS } from '@/lib/recommendationPlans'
+import { from } from '@/lib/db-query'
 
 // Build a map of diagnosis ID to ALL ICD-10 codes (primary + alternates)
 const diagnosisToIcd10Map: Record<string, string[]> = {}
@@ -89,8 +90,7 @@ export async function GET(request: NextRequest) {
 
     // If searching plans by keyword — returns matching plans with linked_diagnoses
     if (searchQuery) {
-      const { data, error } = await supabase
-        .from('clinical_plans')
+      const { data, error } = await from('clinical_plans')
         .select('plan_key, title, icd10_codes, scope')
         .order('title')
 
@@ -100,7 +100,7 @@ export async function GET(request: NextRequest) {
       }
 
       // Search across title, ICD-10 codes, and scope
-      const matchingPlans = plansData.filter(plan => {
+      const matchingPlans = plansData.filter((plan: any) => {
         const title = (plan.title || '').toLowerCase()
         const scope = (plan.scope || '').toLowerCase()
         const codes = (plan.icd10_codes || []).map((c: string) => c.toLowerCase())
@@ -111,7 +111,7 @@ export async function GET(request: NextRequest) {
       })
 
       // Build linked_diagnoses and diagnosis_scores for each matching plan
-      const plans = matchingPlans.map(plan => {
+      const plans = matchingPlans.map((plan: any) => {
         const linkedDiagnoses: string[] = []
         const diagnosisScores: Record<string, number> = {}
         const planIcd10s = plan.icd10_codes || []
@@ -135,8 +135,7 @@ export async function GET(request: NextRequest) {
 
     // If listing all plans - query the table directly
     if (listAll) {
-      const { data, error } = await supabase
-        .from('clinical_plans')
+      const { data, error } = await from('clinical_plans')
         .select('plan_key, title, icd10_codes')
         .order('title')
 
@@ -147,7 +146,7 @@ export async function GET(request: NextRequest) {
       }
 
       // Transform to include plan_id, linked_diagnoses, and diagnosis_scores
-      const plans = plansData.map(plan => {
+      const plans = plansData.map((plan: any) => {
         const linkedDiagnoses: string[] = []
         const diagnosisScores: Record<string, number> = {}
         const planIcd10s = plan.icd10_codes || []
@@ -173,8 +172,7 @@ export async function GET(request: NextRequest) {
 
     // If fetching plan by its plan_key directly
     if (planKey) {
-      const { data: planRow, error } = await supabase
-        .from('clinical_plans')
+      const { data: planRow, error } = await from('clinical_plans')
         .select('*')
         .eq('plan_key', planKey)
         .single()
@@ -228,8 +226,7 @@ export async function GET(request: NextRequest) {
       }
 
       // Find plans that match any of this diagnosis's ICD-10 codes
-      const { data: allPlans, error } = await supabase
-        .from('clinical_plans')
+      const { data: allPlans, error } = await from('clinical_plans')
         .select('*')
         .order('title')
 
@@ -277,8 +274,7 @@ export async function GET(request: NextRequest) {
     }
 
     // If no params, return all plans with full data
-    const { data, error } = await supabase
-      .from('clinical_plans')
+    const { data, error } = await from('clinical_plans')
       .select('*')
       .order('title')
 
@@ -289,7 +285,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Transform to match expected interface
-    const transformedPlans = allData.map(plan => ({
+    const transformedPlans = allData.map((plan: any) => ({
       id: plan.plan_key,
       title: plan.title,
       icd10: plan.icd10_codes || [],

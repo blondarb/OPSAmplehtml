@@ -2,6 +2,8 @@ import { NextResponse } from 'next/server'
 import OpenAI from 'openai'
 import { createClient as createDeepgramClient } from '@deepgram/sdk'
 import { createClient } from '@/lib/supabase/server'
+import { getOpenAIKey } from '@/lib/db-query'
+
 
 export async function POST(request: Request) {
   try {
@@ -82,7 +84,7 @@ export async function POST(request: Request) {
     // Get OpenAI API key for GPT cleanup step
     let openaiKey = process.env.OPENAI_API_KEY
     if (!openaiKey) {
-      const { data: setting } = await supabase.rpc('get_openai_key')
+      const { data: setting } = await getOpenAIKey()
       openaiKey = setting
     }
 

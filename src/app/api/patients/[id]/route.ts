@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { from } from '@/lib/db-query'
 
 // GET /api/patients/[id] - Get patient with full history
 export async function GET(
@@ -17,8 +18,7 @@ export async function GET(
     }
 
     // Fetch patient basic info
-    const { data: patient, error: patientError } = await supabase
-      .from('patients')
+    const { data: patient, error: patientError } = await from('patients')
       .select('*')
       .eq('id', id)
       .single()
@@ -29,24 +29,21 @@ export async function GET(
     }
 
     // Fetch medications
-    const { data: medications } = await supabase
-      .from('patient_medications')
+    const { data: medications } = await from('patient_medications')
       .select('*')
       .eq('patient_id', id)
       .eq('is_active', true)
       .order('medication_name')
 
     // Fetch allergies
-    const { data: allergies } = await supabase
-      .from('patient_allergies')
+    const { data: allergies } = await from('patient_allergies')
       .select('*')
       .eq('patient_id', id)
       .eq('is_active', true)
       .order('allergen')
 
     // Fetch visits with clinical notes
-    const { data: visits } = await supabase
-      .from('visits')
+    const { data: visits } = await from('visits')
       .select(`
         *,
         clinical_notes (*)
@@ -56,24 +53,21 @@ export async function GET(
       .limit(10)
 
     // Fetch appointments
-    const { data: appointments } = await supabase
-      .from('appointments')
+    const { data: appointments } = await from('appointments')
       .select('*')
       .eq('patient_id', id)
       .order('appointment_date', { ascending: false })
       .limit(20)
 
     // Fetch scale results
-    const { data: scaleResults } = await supabase
-      .from('scale_results')
+    const { data: scaleResults } = await from('scale_results')
       .select('*')
       .eq('patient_id', id)
       .order('completed_at', { ascending: false })
       .limit(20)
 
     // Fetch imaging studies
-    const { data: imagingStudies } = await supabase
-      .from('imaging_studies')
+    const { data: imagingStudies } = await from('imaging_studies')
       .select('*')
       .eq('patient_id', id)
       .order('study_date', { ascending: false })
@@ -108,7 +102,7 @@ export async function GET(
     }
 
     // Transform medications
-    const transformedMedications = (medications || []).map(med => ({
+    const transformedMedications = (medications || []).map((med: any) => ({
       id: med.id,
       name: med.medication_name,
       dosage: med.dosage,
@@ -120,7 +114,7 @@ export async function GET(
     }))
 
     // Transform allergies
-    const transformedAllergies = (allergies || []).map(allergy => ({
+    const transformedAllergies = (allergies || []).map((allergy: any) => ({
       id: allergy.id,
       allergen: allergy.allergen,
       reaction: allergy.reaction,
@@ -129,7 +123,7 @@ export async function GET(
 
     // Transform visits with clinical notes
     // Supabase returns clinical_notes as object (unique FK on visit_id) not array
-    const transformedVisits = (visits || []).map(visit => {
+    const transformedVisits = (visits || []).map((visit: any) => {
       const note = Array.isArray(visit.clinical_notes)
         ? visit.clinical_notes[0]
         : visit.clinical_notes
@@ -155,7 +149,7 @@ export async function GET(
     })
 
     // Transform scale results for score history
-    const scoreHistory = (scaleResults || []).map(result => ({
+    const scoreHistory = (scaleResults || []).map((result: any) => ({
       id: result.id,
       scaleType: result.scale_id?.toUpperCase().replace('PHQ9', 'PHQ-9').replace('GAD7', 'GAD-7').replace('HIT6', 'HIT-6'),
       score: result.raw_score,

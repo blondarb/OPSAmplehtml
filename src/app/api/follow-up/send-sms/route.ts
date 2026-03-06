@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { sendSms, normalizePhoneNumber } from '@/lib/follow-up/twilioClient'
 import { DEMO_SCENARIOS } from '@/lib/follow-up/demoScenarios'
+import { from } from '@/lib/db-query'
 
 export async function POST(request: Request) {
   try {
@@ -24,11 +25,9 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Twilio not configured' }, { status: 500 })
     }
 
-    const supabase = await createClient()
 
     // Rate limit: max 1 active session per phone
-    const { data: existingActive } = await supabase
-      .from('followup_phone_sessions')
+    const { data: existingActive } = await from('followup_phone_sessions')
       .select('id')
       .eq('phone_number', normalized)
       .eq('opted_out', false)
@@ -43,8 +42,7 @@ export async function POST(request: Request) {
     }
 
     // Rate limit: max 5 sessions per phone per 24h
-    const { count: recentCount } = await supabase
-      .from('followup_phone_sessions')
+    const { count: recentCount } = await from('followup_phone_sessions')
       .select('id', { count: 'exact', head: true })
       .eq('phone_number', normalized)
 
@@ -60,8 +58,7 @@ export async function POST(request: Request) {
     const med = scenario.medications[0]
     const initialGreeting = `Hi ${scenario.name.split(' ')[0]}, this is the Sevaro Neurology care team following up after your recent visit with Dr. ${scenario.providerName} on ${scenario.visitDate}. We'd like to check in about your ${med?.name || 'treatment'}. You can reply here by text, or call this number if you'd prefer to talk. Reply STOP to opt out.`
 
-    const { error: sessionError } = await supabase
-      .from('followup_sessions')
+    const { error: sessionError } = await from('followup_sessions')
       .insert({
         id: sessionId,
         patient_id: null,
@@ -85,8 +82,7 @@ export async function POST(request: Request) {
     }
 
     // Create phone→session mapping
-    const { error: phoneError } = await supabase
-      .from('followup_phone_sessions')
+    const { error: phoneError } = await from('followup_phone_sessions')
       .insert({
         phone_number: normalized,
         session_id: sessionId,

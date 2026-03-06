@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { from } from '@/lib/db-query'
 
 /**
  * POST /api/wearable/events
@@ -16,7 +17,6 @@ import { createClient } from '@/lib/supabase/server'
  */
 export async function POST(request: NextRequest) {
   try {
-    const supabase = await createClient()
     const body = await request.json()
 
     // Support single event or batch
@@ -46,8 +46,7 @@ export async function POST(request: NextRequest) {
     // Verify patient exists (check first patient_id — in practice all events
     // from one device share the same patient_id)
     const patientIds = [...new Set(events.map(e => e.patient_id))]
-    const { data: patients, error: patientError } = await supabase
-      .from('wearable_patients')
+    const { data: patients, error: patientError } = await from('wearable_patients')
       .select('id')
       .in('id', patientIds)
 
@@ -55,7 +54,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: patientError.message }, { status: 500 })
     }
 
-    const validIds = new Set((patients || []).map(p => p.id))
+    const validIds = new Set((patients || []).map((p: any) => p.id))
     const invalidIds = patientIds.filter(id => !validIds.has(id))
     if (invalidIds.length > 0) {
       return NextResponse.json(
@@ -74,8 +73,7 @@ export async function POST(request: NextRequest) {
       clinical_significance: event.clinical_significance || null,
     }))
 
-    const { data, error } = await supabase
-      .from('wearable_anomalies')
+    const { data, error } = await from('wearable_anomalies')
       .insert(rows)
       .select('id, patient_id, anomaly_type, severity, detected_at')
 

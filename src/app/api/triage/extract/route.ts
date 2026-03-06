@@ -5,6 +5,8 @@ import { parseUploadedFile } from '@/lib/triage/fileParser'
 import { EXTRACTION_SYSTEM_PROMPT, buildExtractionUserPrompt } from '@/lib/triage/extractionPrompt'
 import { FILE_CONSTRAINTS } from '@/lib/triage/types'
 import type { ClinicalExtraction, ExtractionKeyFindings } from '@/lib/triage/types'
+import { getOpenAIKey } from '@/lib/db-query'
+
 
 export const maxDuration = 60
 
@@ -64,8 +66,7 @@ export async function POST(request: Request) {
 
     if (!apiKey) {
       try {
-        const supabase = await createClient()
-        const { data: setting } = await supabase.rpc('get_openai_key')
+        const { data: setting } = await getOpenAIKey()
         apiKey = setting
       } catch {
         // Supabase may not be available in demo mode

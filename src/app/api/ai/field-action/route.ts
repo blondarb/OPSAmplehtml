@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server'
 import OpenAI from 'openai'
 import { createClient } from '@/lib/supabase/server'
+import { getOpenAIKey } from '@/lib/db-query'
+
 
 export type FieldActionType = 'improve' | 'expand' | 'summarize'
 
@@ -95,7 +97,7 @@ export async function POST(request: Request) {
     let apiKey = process.env.OPENAI_API_KEY
 
     if (!apiKey) {
-      const { data: setting } = await supabase.rpc('get_openai_key')
+      const { data: setting } = await getOpenAIKey()
       apiKey = setting
     }
 

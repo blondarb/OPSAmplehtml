@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 import { getTenantServer } from '@/lib/tenant'
+import { from } from '@/lib/db-query'
 
 // GET /api/medications/[id] — get single medication
 export async function GET(
@@ -17,8 +18,7 @@ export async function GET(
 
   const tenant = getTenantServer()
 
-  const { data: medication, error } = await supabase
-    .from('patient_medications')
+  const { data: medication, error } = await from('patient_medications')
     .select('*')
     .eq('id', id)
     .eq('tenant_id', tenant)
@@ -65,8 +65,7 @@ export async function PATCH(
 
   const tenant = getTenantServer()
 
-  const { data: medication, error } = await supabase
-    .from('patient_medications')
+  const { data: medication, error } = await from('patient_medications')
     .update(updateData)
     .eq('id', id)
     .eq('tenant_id', tenant)
@@ -95,8 +94,7 @@ export async function DELETE(
 
   const tenant = getTenantServer()
 
-  const { error } = await supabase
-    .from('patient_medications')
+  const { error } = await from('patient_medications')
     .delete()
     .eq('id', id)
     .eq('tenant_id', tenant)

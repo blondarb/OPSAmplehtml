@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { getTenantServer } from '@/lib/tenant'
 import OpenAI from 'openai'
+import { from } from '@/lib/db-query'
 
 // POST /api/visits/[id]/sign - Sign and complete a visit
 export async function POST(
@@ -19,8 +20,7 @@ export async function POST(
     }
 
     // Get the visit with clinical note and patient info
-    const { data: visit, error: visitError } = await supabase
-      .from('visits')
+    const { data: visit, error: visitError } = await from('visits')
       .select(`
         *,
         clinical_notes (*),
@@ -38,8 +38,7 @@ export async function POST(
     let clinicalNote = visit.clinical_notes?.[0]
     if (!clinicalNote) {
       // Clinical note not found in join - try fetching directly
-      const { data: existingNote } = await supabase
-        .from('clinical_notes')
+      const { data: existingNote } = await from('clinical_notes')
         .select('*')
         .eq('visit_id', id)
         .single()
@@ -49,8 +48,7 @@ export async function POST(
       } else {
         // Create a clinical note if one truly doesn't exist
         const tenantId = await getTenantServer()
-        const { data: newNote, error: createNoteError } = await supabase
-          .from('clinical_notes')
+        const { data: newNote, error: createNoteError } = await from('clinical_notes')
           .insert({ visit_id: id, status: 'draft', tenant_id: tenantId })
           .select()
           .single()
@@ -66,8 +64,7 @@ export async function POST(
     let aiSummary = ''
     try {
       // Get OpenAI API key
-      const { data: settings } = await supabase
-        .from('app_settings')
+      const { data: settings } = await from('app_settings')
         .select('value')
         .eq('key', 'openai_api_key')
         .single()
@@ -113,8 +110,7 @@ Generate a professional clinical summary:`
     }
 
     // Update the clinical note to signed status with AI summary
-    const { error: noteUpdateError } = await supabase
-      .from('clinical_notes')
+    const { error: noteUpdateError } = await from('clinical_notes')
       .update({
         status: 'signed',
         ai_summary: aiSummary || clinicalNote.ai_summary,
@@ -130,8 +126,7 @@ Generate a professional clinical summary:`
     }
 
     // Update visit status to completed
-    const { error: visitUpdateError } = await supabase
-      .from('visits')
+    const { error: visitUpdateError } = await from('visits')
       .update({
         status: 'completed',
         updated_at: new Date().toISOString(),
@@ -144,8 +139,7 @@ Generate a professional clinical summary:`
 
     // Update appointment status to completed (if visit has an appointment_id)
     if (visit.appointment_id) {
-      await supabase
-        .from('appointments')
+      await from('appointments')
         .update({
           status: 'completed',
           updated_at: new Date().toISOString(),
@@ -154,8 +148,7 @@ Generate a professional clinical summary:`
     }
 
     // Fetch the updated visit
-    const { data: updatedVisit } = await supabase
-      .from('visits')
+    const { data: updatedVisit } = await from('visits')
       .select(`
         *,
         clinical_notes (*)

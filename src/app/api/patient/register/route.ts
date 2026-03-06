@@ -1,5 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { rpc } from '@/lib/db-query'
+
 
 export async function POST(request: Request) {
   try {
@@ -13,9 +15,8 @@ export async function POST(request: Request) {
       )
     }
 
-    const supabase = await createClient()
 
-    const { data, error } = await supabase.rpc('portal_register_patient', {
+    const { data, error } = await rpc('portal_register_patient', {
       p_first_name: first_name,
       p_last_name: last_name,
       p_referral_reason: referral_reason || null,

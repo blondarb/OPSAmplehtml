@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { from } from '@/lib/db-query'
 
 // POST /api/patients - Create a new patient
 export async function POST(request: NextRequest) {
@@ -41,8 +42,7 @@ export async function POST(request: NextRequest) {
     // Auto-generate MRN if not provided
     const generatedMrn = mrn || `${new Date().getFullYear()}-${String(Math.floor(Math.random() * 99999)).padStart(5, '0')}`
 
-    const { data, error } = await supabase
-      .from('patients')
+    const { data, error } = await from('patients')
       .insert({
         user_id: user.id,
         mrn: generatedMrn,

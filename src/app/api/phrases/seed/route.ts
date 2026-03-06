@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 import { getTenantServer } from '@/lib/tenant'
+import { from } from '@/lib/db-query'
 
 // Comprehensive neurology dot phrases library
 const DEFAULT_PHRASES = [
@@ -713,8 +714,7 @@ export async function POST() {
   const tenant = getTenantServer()
 
   // Check if user already has phrases
-  const { data: existing } = await supabase
-    .from('dot_phrases')
+  const { data: existing } = await from('dot_phrases')
     .select('id')
     .eq('user_id', user.id)
     .eq('tenant_id', tenant)
@@ -734,8 +734,7 @@ export async function POST() {
     tenant_id: tenant,
   }))
 
-  const { data: phrases, error } = await supabase
-    .from('dot_phrases')
+  const { data: phrases, error } = await from('dot_phrases')
     .insert(phrasesToInsert)
     .select()
 

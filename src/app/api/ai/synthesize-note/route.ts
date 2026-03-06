@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import OpenAI from 'openai'
+import { from } from '@/lib/db-query'
 
 interface SynthesizeNoteRequest {
   noteType: 'new-consult' | 'follow-up'
@@ -117,8 +118,7 @@ export async function POST(request: NextRequest) {
     let apiKey = process.env.OPENAI_API_KEY
 
     if (!apiKey) {
-      const { data: settings } = await supabase
-        .from('app_settings')
+      const { data: settings } = await from('app_settings')
         .select('value')
         .eq('key', 'openai_api_key')
         .single()

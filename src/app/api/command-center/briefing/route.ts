@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { DEMO_BRIEFING } from '@/lib/command-center/briefingPrompt'
+import { from, getOpenAIKey } from '@/lib/db-query'
+
 
 // ─── POST /api/command-center/briefing ──────────────────────────────────────
 // Returns an AI-generated morning briefing for the physician's command center.
@@ -84,7 +86,7 @@ export async function POST(request: NextRequest) {
     //
     //    let apiKey = process.env.OPENAI_API_KEY
     //    if (!apiKey) {
-    //      const { data: setting } = await supabase.rpc('get_openai_key')
+    //      const { data: setting } = await getOpenAIKey()
     //      apiKey = setting
     //    }
     //
@@ -103,7 +105,7 @@ export async function POST(request: NextRequest) {
     //
     // 4. Cache the new briefing in command_center_briefings:
     //
-    //    await supabase.from('command_center_briefings').insert({
+    //    await from('command_center_briefings').insert({
     //      physician_id: physician_id || user.id,
     //      narrative: parsed.narrative,
     //      reasoning: parsed.reasoning,

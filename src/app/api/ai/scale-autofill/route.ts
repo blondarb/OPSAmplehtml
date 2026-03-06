@@ -3,6 +3,8 @@ import OpenAI from 'openai'
 import { createClient } from '@/lib/supabase/server'
 import { ALL_SCALES } from '@/lib/scales/scale-definitions'
 import { ScaleDefinition, ScaleQuestion } from '@/lib/scales/types'
+import { getOpenAIKey } from '@/lib/db-query'
+
 
 interface ScaleAutofillRequest {
   scaleId: string
@@ -242,7 +244,7 @@ export async function POST(request: Request) {
     let apiKey = process.env.OPENAI_API_KEY
 
     if (!apiKey) {
-      const { data: setting } = await supabase.rpc('get_openai_key')
+      const { data: setting } = await getOpenAIKey()
       apiKey = setting
     }
 

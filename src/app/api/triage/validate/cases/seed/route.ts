@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { DEMO_SCENARIOS } from '@/lib/triage/demoScenarios'
+import { from } from '@/lib/db-query'
 
 /**
  * POST /api/triage/validate/cases/seed
@@ -33,8 +34,7 @@ export async function POST(req: NextRequest) {
 
   // Optionally clear existing cases
   if (clearExisting) {
-    await supabase
-      .from('validation_cases')
+    await from('validation_cases')
       .delete()
       .eq('study_name', studyName)
   }
@@ -123,8 +123,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Upsert into validation_cases
-    const { error: insertError } = await supabase
-      .from('validation_cases')
+    const { error: insertError } = await from('validation_cases')
       .upsert({
         case_number: caseNumber,
         title,

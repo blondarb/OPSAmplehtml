@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
+import { from } from '@/lib/db-query'
 
 const SEED_ADMIN_EMAIL = 'steve@sevaro.com'
 
@@ -27,8 +28,7 @@ async function getAuthenticatedAdmin() {
 
   if (!isAdmin) {
     try {
-      const { data } = await supabase
-        .from('app_settings')
+      const { data } = await from('app_settings')
         .select('value')
         .eq('key', 'feedback_admin_emails')
         .single()
@@ -54,8 +54,7 @@ export async function GET() {
   // Get elevated admins
   let elevatedAdmins: string[] = []
   try {
-    const { data } = await supabase
-      .from('app_settings')
+    const { data } = await from('app_settings')
       .select('value')
       .eq('key', 'feedback_admin_emails')
       .single()
@@ -196,8 +195,7 @@ export async function POST(request: Request) {
   // Get current list
   let currentAdmins: string[] = []
   try {
-    const { data } = await supabase
-      .from('app_settings')
+    const { data } = await from('app_settings')
       .select('value')
       .eq('key', 'feedback_admin_emails')
       .single()
@@ -215,8 +213,7 @@ export async function POST(request: Request) {
   const updatedList = [...currentAdmins, newEmail].join(',')
 
   // Upsert into app_settings
-  const { error: upsertError } = await supabase
-    .from('app_settings')
+  const { error: upsertError } = await from('app_settings')
     .upsert(
       { key: 'feedback_admin_emails', value: updatedList, updated_at: new Date().toISOString() },
       { onConflict: 'key' }
@@ -250,8 +247,7 @@ export async function DELETE(request: Request) {
   // Get current list
   let currentAdmins: string[] = []
   try {
-    const { data } = await supabase
-      .from('app_settings')
+    const { data } = await from('app_settings')
       .select('value')
       .eq('key', 'feedback_admin_emails')
       .single()
@@ -264,8 +260,7 @@ export async function DELETE(request: Request) {
 
   const updatedList = currentAdmins.filter(e => e !== removeEmail)
 
-  const { error: updateError } = await supabase
-    .from('app_settings')
+  const { error: updateError } = await from('app_settings')
     .upsert(
       { key: 'feedback_admin_emails', value: updatedList.join(','), updated_at: new Date().toISOString() },
       { onConflict: 'key' }

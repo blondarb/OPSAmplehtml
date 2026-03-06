@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { from } from '@/lib/db-query'
 
 // GET /api/appointments - Get appointments with optional filters
 export async function GET(request: NextRequest) {
@@ -20,8 +21,7 @@ export async function GET(request: NextRequest) {
     const date = searchParams.get('date') // Single date query
 
     // Build query
-    let query = supabase
-      .from('appointments')
+    let query = from('appointments')
       .select(`
         *,
         patient:patients (
@@ -73,7 +73,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Transform data to match frontend expectations
-    const appointments = (data || []).map(apt => ({
+    const appointments = (data || []).map((apt: any) => ({
       id: apt.id,
       appointmentDate: apt.appointment_date,
       appointmentTime: apt.appointment_time,
@@ -151,8 +151,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Create appointment
-    const { data, error } = await supabase
-      .from('appointments')
+    const { data, error } = await from('appointments')
       .insert({
         patient_id: patientId,
         appointment_date: appointmentDate,

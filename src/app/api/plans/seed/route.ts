@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 import { OUTPATIENT_PLANS } from '@/lib/recommendationPlans'
+import { from } from '@/lib/db-query'
 
 // POST /api/plans/seed - Seed clinical_plans table from OUTPATIENT_PLANS
 export async function POST() {
@@ -28,8 +29,7 @@ export async function POST() {
   }))
 
   // Upsert: ON CONFLICT plan_key DO UPDATE
-  const { data, error } = await supabase
-    .from('clinical_plans')
+  const { data, error } = await from('clinical_plans')
     .upsert(plans, { onConflict: 'plan_key' })
     .select('plan_key')
 

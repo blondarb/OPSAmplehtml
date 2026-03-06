@@ -1,16 +1,15 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { getTenantServer } from '@/lib/tenant'
+import { from } from '@/lib/db-query'
 
 export async function POST(request: Request) {
   try {
     const body = await request.json()
     const tenant = body.tenant_id || getTenantServer()
 
-    const supabase = await createClient()
 
-    const { data, error } = await supabase
-      .from('historian_sessions')
+    const { data, error } = await from('historian_sessions')
       .insert({
         tenant_id: tenant,
         patient_id: body.patient_id || null,
@@ -52,10 +51,8 @@ export async function GET(request: Request) {
     const tenant = searchParams.get('tenant_id') || getTenantServer()
     const patientId = searchParams.get('patient_id')
 
-    const supabase = await createClient()
 
-    let query = supabase
-      .from('historian_sessions')
+    let query = from('historian_sessions')
       .select('*, patient:patients(id, first_name, last_name, mrn)')
       .eq('tenant_id', tenant)
     if (patientId) {

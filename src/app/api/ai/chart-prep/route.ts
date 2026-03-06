@@ -2,6 +2,8 @@ import { NextResponse } from 'next/server'
 import OpenAI from 'openai'
 import { createClient } from '@/lib/supabase/server'
 import { getTenantServer } from '@/lib/tenant'
+import { from, getOpenAIKey } from '@/lib/db-query'
+
 
 interface UserSettings {
   globalAiInstructions?: string
@@ -25,7 +27,7 @@ export async function POST(request: Request) {
     let apiKey = process.env.OPENAI_API_KEY
 
     if (!apiKey) {
-      const { data: setting } = await supabase.rpc('get_openai_key')
+      const { data: setting } = await getOpenAIKey()
       apiKey = setting
     }
 
@@ -40,8 +42,7 @@ export async function POST(request: Request) {
     const tenant = getTenantServer()
 
     // Fetch patient's visit history for context
-    const { data: visits } = await supabase
-      .from('visits')
+    const { data: visits } = await from('visits')
       .select(`
         *,
         clinical_notes(hpi, assessment, plan, ai_summary),
@@ -55,15 +56,14 @@ export async function POST(request: Request) {
       .limit(3)
 
     // Fetch imaging studies
-    const { data: imaging } = await supabase
-      .from('imaging_studies')
+    const { data: imaging } = await from('imaging_studies')
       .select('*')
       .eq('patient_id', patient?.id)
       .eq('tenant_id', tenant)
       .order('study_date', { ascending: false })
       .limit(5)
 
-    const visitHistory = visits?.map(v => ({
+    const visitHistory = visits?.map((v: any) => ({
       date: new Date(v.visit_date).toLocaleDateString(),
       type: v.visit_type,
       chiefComplaint: v.chief_complaint?.join(', '),
@@ -73,7 +73,7 @@ export async function POST(request: Request) {
       diagnoses: v.diagnoses?.map((d: any) => `${d.icd10_code} - ${d.description}`).join(', '),
     })) || []
 
-    const imagingSummary = imaging?.map(i => ({
+    const imagingSummary = imaging?.map((i: any) => ({
       date: new Date(i.study_date).toLocaleDateString(),
       type: i.study_type,
       description: i.description,
@@ -91,7 +91,7 @@ Current Visit:
 - Chief Complaint: ${noteData?.chiefComplaint?.join(', ') || 'Not specified'}
 
 Visit History:
-${visitHistory.length > 0 ? visitHistory.map(v => `
+${visitHistory.length > 0 ? visitHistory.map((v: any) => `
 - ${v.date} (${v.type}): ${v.chiefComplaint}
   HPI: ${v.hpi?.substring(0, 300) || 'N/A'}
   Assessment: ${v.assessment || 'N/A'}
@@ -100,7 +100,7 @@ ${visitHistory.length > 0 ? visitHistory.map(v => `
 `).join('\n') : 'No prior visits on record'}
 
 Imaging Studies:
-${imagingSummary.length > 0 ? imagingSummary.map(i => `
+${imagingSummary.length > 0 ? imagingSummary.map((i: any) => `
 - ${i.date}: ${i.type} - ${i.description}
   Impression: ${i.impression || 'N/A'}
 `).join('\n') : 'No imaging studies on record'}

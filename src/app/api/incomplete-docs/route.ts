@@ -1,11 +1,11 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { getTenantServer } from '@/lib/tenant'
+import { from } from '@/lib/db-query'
 
 // GET /api/incomplete-docs — Scan for unsigned/incomplete clinical notes
 export async function GET() {
   try {
-    const supabase = await createClient()
     const tenant = getTenantServer()
 
     const incompleteItems: Array<{
@@ -23,8 +23,7 @@ export async function GET() {
     //    and the visit was more than 24 hours ago
     const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
 
-    const { data: unsignedNotes } = await supabase
-      .from('clinical_notes')
+    const { data: unsignedNotes } = await from('clinical_notes')
       .select(`
         id,
         visit_id,
@@ -76,8 +75,7 @@ export async function GET() {
     }
 
     // 2. Visits with no clinical note at all (visit > 24hrs ago, status completed or in-progress)
-    const { data: visitsWithoutNotes } = await supabase
-      .from('visits')
+    const { data: visitsWithoutNotes } = await from('visits')
       .select(`
         id,
         visit_date,
@@ -93,14 +91,13 @@ export async function GET() {
 
     if (visitsWithoutNotes) {
       // Check which of these visits have clinical notes
-      const visitIds = visitsWithoutNotes.map(v => v.id)
+      const visitIds = visitsWithoutNotes.map((v: any) => v.id)
       if (visitIds.length > 0) {
-        const { data: existingNotes } = await supabase
-          .from('clinical_notes')
+        const { data: existingNotes } = await from('clinical_notes')
           .select('visit_id')
           .in('visit_id', visitIds)
 
-        const visitIdsWithNotes = new Set((existingNotes || []).map(n => n.visit_id))
+        const visitIdsWithNotes = new Set((existingNotes || []).map((n: any) => n.visit_id))
 
         for (const visit of visitsWithoutNotes) {
           if (!visitIdsWithNotes.has(visit.id)) {

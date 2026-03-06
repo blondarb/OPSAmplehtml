@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server'
 import OpenAI from 'openai'
 import { createClient } from '@/lib/supabase/server'
+import { from, getOpenAIKey } from '@/lib/db-query'
+
 
 export async function POST(request: Request) {
   try {
@@ -20,7 +22,7 @@ export async function POST(request: Request) {
     // Get OpenAI API key
     let apiKey = process.env.OPENAI_API_KEY
     if (!apiKey) {
-      const { data: setting } = await supabase.rpc('get_openai_key')
+      const { data: setting } = await getOpenAIKey()
       apiKey = setting
     }
 
@@ -79,8 +81,7 @@ Draft a response to the following patient message. The physician will review and
 
     // If message_id provided, store the draft on the message record
     if (message_id && draft) {
-      await supabase
-        .from('patient_messages')
+      await from('patient_messages')
         .update({ ai_draft: draft, draft_status: 'pending' })
         .eq('id', message_id)
     }

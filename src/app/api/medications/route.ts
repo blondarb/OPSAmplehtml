@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 import { getTenantServer } from '@/lib/tenant'
+import { from } from '@/lib/db-query'
 
 // GET /api/medications?patient_id=X — list medications for patient
 export async function GET(request: Request) {
@@ -21,8 +22,7 @@ export async function GET(request: Request) {
   const statusFilter = searchParams.get('status')
   const showAll = searchParams.get('all') === 'true'
 
-  let query = supabase
-    .from('patient_medications')
+  let query = from('patient_medications')
     .select('*')
     .eq('patient_id', patientId)
     .eq('tenant_id', tenant)
@@ -64,8 +64,7 @@ export async function POST(request: Request) {
 
   const tenant = getTenantServer()
 
-  const { data: medication, error } = await supabase
-    .from('patient_medications')
+  const { data: medication, error } = await from('patient_medications')
     .insert({
       patient_id,
       tenant_id: tenant,

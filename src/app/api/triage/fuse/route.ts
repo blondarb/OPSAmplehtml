@@ -3,6 +3,8 @@ import OpenAI from 'openai'
 import { createClient } from '@/lib/supabase/server'
 import { FUSION_SYSTEM_PROMPT, buildFusionUserPrompt } from '@/lib/triage/extractionPrompt'
 import type { FusionResult } from '@/lib/triage/types'
+import { getOpenAIKey } from '@/lib/db-query'
+
 
 export const maxDuration = 60
 
@@ -24,8 +26,7 @@ export async function POST(request: Request) {
     let apiKey = process.env.OPENAI_API_KEY
     if (!apiKey) {
       try {
-        const supabase = await createClient()
-        const { data: setting } = await supabase.rpc('get_openai_key')
+        const { data: setting } = await getOpenAIKey()
         apiKey = setting
       } catch { /* demo mode */ }
     }

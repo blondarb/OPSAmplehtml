@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
+import { from } from '@/lib/db-query'
 
 // GET /api/diagnostic - Check database setup
 export async function GET() {
@@ -23,8 +24,7 @@ export async function GET() {
     }
 
     // Check dot_phrases table
-    const { error: tableError } = await supabase
-      .from('dot_phrases')
+    const { error: tableError } = await from('dot_phrases')
       .select('id')
       .limit(1)
 
@@ -39,8 +39,7 @@ export async function GET() {
 
     // Check if scope column exists (try a query with scope)
     if (tableExists) {
-      const { error: scopeError } = await supabase
-        .from('dot_phrases')
+      const { error: scopeError } = await from('dot_phrases')
         .select('scope')
         .limit(1)
 
@@ -54,8 +53,7 @@ export async function GET() {
     }
 
     // Check app_settings table for OpenAI key
-    const { data: apiKeySetting, error: settingsError } = await supabase
-      .from('app_settings')
+    const { data: apiKeySetting, error: settingsError } = await from('app_settings')
       .select('key')
       .eq('key', 'openai_api_key')
       .single()
@@ -69,8 +67,7 @@ export async function GET() {
     }
 
     // Check appointments table
-    const { data: aptData, error: aptError } = await supabase
-      .from('appointments')
+    const { data: aptData, error: aptError } = await from('appointments')
       .select('id')
       .limit(1)
 
