@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
-import OpenAI from 'openai'
-import { createClient } from '@/lib/supabase/server'
+import { getUser } from '@/lib/cognito/server'
+import { invokeBedrock } from '@/lib/bedrock'
+
 
 export type FieldActionType = 'improve' | 'expand' | 'summarize'
 
@@ -74,8 +75,7 @@ const FIELD_CONTEXT: Record<string, string> = {
 export async function POST(request: Request) {
   try {
     // Check authentication
-    const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
+    const user = await getUser()
 
     if (!user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -90,22 +90,6 @@ export async function POST(request: Request) {
     if (!text || text.trim().length === 0) {
       return NextResponse.json({ error: 'Text content is required' }, { status: 400 })
     }
-
-    // Get OpenAI API key - first try environment variable, then try Supabase
-    let apiKey = process.env.OPENAI_API_KEY
-
-    if (!apiKey) {
-      const { data: setting } = await supabase.rpc('get_openai_key')
-      apiKey = setting
-    }
-
-    if (!apiKey) {
-      return NextResponse.json({
-        error: 'OpenAI API key not configured. Please add your API key to the environment variables or Supabase settings.'
-      }, { status: 500 })
-    }
-
-    const openai = new OpenAI({ apiKey })
 
     // Build the system prompt with field context
     const fieldContext = FIELD_CONTEXT[fieldName] || 'This is a clinical documentation field.'
@@ -165,17 +149,14 @@ ${complaintContext}
 
 Important: This is for a neurology practice. Ensure the output is appropriate for neurological documentation.${safetyReminder}${userPreferences}`
 
-    // Note: gpt-5-mini only supports default temperature (1)
-    const completion = await openai.chat.completions.create({
-      model: 'gpt-5-mini', // Cost-effective for text transformation ($0.25/$2 per 1M tokens)
-      messages: [
-        { role: 'system', content: systemPrompt },
-        { role: 'user', content: text }
-      ],
-      max_completion_tokens: 1500,
+    const bedrockResult = await invokeBedrock({
+      system: systemPrompt,
+      messages: [{ role: 'user', content: text }],
+      maxTokens: 1500,
+      temperature: 1,
     })
 
-    const result = completion.choices[0]?.message?.content || text
+    const result = bedrockResult.text || text
 
     return NextResponse.json({
       result,
@@ -186,12 +167,6 @@ Important: This is for a neurology practice. Ensure the output is appropriate fo
 
   } catch (error: any) {
     console.error('Field Action API Error:', error)
-
-    if (error?.status === 401) {
-      return NextResponse.json({
-        error: 'Invalid OpenAI API key. Please check your configuration.'
-      }, { status: 500 })
-    }
 
     return NextResponse.json({
       error: error?.message || 'An error occurred while processing your request'

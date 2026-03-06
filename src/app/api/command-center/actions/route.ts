@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
+import { getUser } from '@/lib/cognito/server'
 import { DEMO_ACTIONS, buildBatchGroups } from '@/lib/command-center/demoActions'
 import type {
   ActionsResponse,
@@ -11,10 +11,7 @@ import type {
 
 export async function GET(request: NextRequest) {
   try {
-    const supabase = await createClient()
-    const {
-      data: { user },
-    } = await supabase.auth.getUser()
+    const user = await getUser()
     if (!user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }

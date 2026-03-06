@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
+import { getUser } from '@/lib/cognito/server'
 import { getTenantServer } from '@/lib/tenant'
-import OpenAI from 'openai'
+import { invokeBedrock } from '@/lib/bedrock'
+import { from } from '@/lib/db-query'
 
 // POST /api/visits/[id]/sign - Sign and complete a visit
 export async function POST(
@@ -10,17 +11,15 @@ export async function POST(
 ) {
   try {
     const { id } = await params
-    const supabase = await createClient()
 
     // Check authentication
-    const { data: { user }, error: authError } = await supabase.auth.getUser()
-    if (authError || !user) {
+    const user = await getUser()
+    if (!user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
     // Get the visit with clinical note and patient info
-    const { data: visit, error: visitError } = await supabase
-      .from('visits')
+    const { data: visit, error: visitError } = await from('visits')
       .select(`
         *,
         clinical_notes (*),
@@ -38,8 +37,7 @@ export async function POST(
     let clinicalNote = visit.clinical_notes?.[0]
     if (!clinicalNote) {
       // Clinical note not found in join - try fetching directly
-      const { data: existingNote } = await supabase
-        .from('clinical_notes')
+      const { data: existingNote } = await from('clinical_notes')
         .select('*')
         .eq('visit_id', id)
         .single()
@@ -49,8 +47,7 @@ export async function POST(
       } else {
         // Create a clinical note if one truly doesn't exist
         const tenantId = await getTenantServer()
-        const { data: newNote, error: createNoteError } = await supabase
-          .from('clinical_notes')
+        const { data: newNote, error: createNoteError } = await from('clinical_notes')
           .insert({ visit_id: id, status: 'draft', tenant_id: tenantId })
           .select()
           .single()
@@ -65,27 +62,16 @@ export async function POST(
     // Generate AI summary
     let aiSummary = ''
     try {
-      // Get OpenAI API key
-      const { data: settings } = await supabase
-        .from('app_settings')
-        .select('value')
-        .eq('key', 'openai_api_key')
-        .single()
+      // Calculate age
+      const age = visit.patient?.date_of_birth
+        ? Math.floor((Date.now() - new Date(visit.patient.date_of_birth).getTime()) / (365.25 * 24 * 60 * 60 * 1000))
+        : null
 
-      const apiKey = settings?.value || process.env.OPENAI_API_KEY
-      if (apiKey) {
-        const openai = new OpenAI({ apiKey })
+      const patientInfo = visit.patient
+        ? `${age || ''} year old ${visit.patient.gender || ''} patient ${visit.patient.first_name} ${visit.patient.last_name}`
+        : 'Patient'
 
-        // Calculate age
-        const age = visit.patient?.date_of_birth
-          ? Math.floor((Date.now() - new Date(visit.patient.date_of_birth).getTime()) / (365.25 * 24 * 60 * 60 * 1000))
-          : null
-
-        const patientInfo = visit.patient
-          ? `${age || ''} year old ${visit.patient.gender || ''} patient ${visit.patient.first_name} ${visit.patient.last_name}`
-          : 'Patient'
-
-        const prompt = `Generate a concise clinical summary (2-4 sentences) for the following visit note. Focus on the chief complaint, key findings, diagnosis, and plan. Use standard medical abbreviations where appropriate.
+      const prompt = `Generate a concise clinical summary (2-4 sentences) for the following visit note. Focus on the chief complaint, key findings, diagnosis, and plan. Use standard medical abbreviations where appropriate.
 
 Patient: ${patientInfo}
 Chief Complaint: ${visit.chief_complaint?.join(', ') || 'Not documented'}
@@ -98,23 +84,21 @@ Plan: ${clinicalNote.plan || 'Not documented'}
 
 Generate a professional clinical summary:`
 
-        const completion = await openai.chat.completions.create({
-          model: 'gpt-5-mini',
-          messages: [{ role: 'user', content: prompt }],
-          max_completion_tokens: 300,
-          // Note: gpt-5-mini only supports default temperature (1)
-        })
+      const result = await invokeBedrock({
+        system: 'You are a clinical documentation assistant. Generate concise, accurate clinical summaries.',
+        messages: [{ role: 'user', content: prompt }],
+        maxTokens: 300,
+        temperature: 1,
+      })
 
-        aiSummary = completion.choices[0]?.message?.content?.trim() || ''
-      }
+      aiSummary = result.text?.trim() || ''
     } catch (aiError) {
       console.error('Error generating AI summary:', aiError)
       // Continue without AI summary - not a fatal error
     }
 
     // Update the clinical note to signed status with AI summary
-    const { error: noteUpdateError } = await supabase
-      .from('clinical_notes')
+    const { error: noteUpdateError } = await from('clinical_notes')
       .update({
         status: 'signed',
         ai_summary: aiSummary || clinicalNote.ai_summary,
@@ -130,8 +114,7 @@ Generate a professional clinical summary:`
     }
 
     // Update visit status to completed
-    const { error: visitUpdateError } = await supabase
-      .from('visits')
+    const { error: visitUpdateError } = await from('visits')
       .update({
         status: 'completed',
         updated_at: new Date().toISOString(),
@@ -144,8 +127,7 @@ Generate a professional clinical summary:`
 
     // Update appointment status to completed (if visit has an appointment_id)
     if (visit.appointment_id) {
-      await supabase
-        .from('appointments')
+      await from('appointments')
         .update({
           status: 'completed',
           updated_at: new Date().toISOString(),
@@ -154,8 +136,7 @@ Generate a professional clinical summary:`
     }
 
     // Fetch the updated visit
-    const { data: updatedVisit } = await supabase
-      .from('visits')
+    const { data: updatedVisit } = await from('visits')
       .select(`
         *,
         clinical_notes (*)

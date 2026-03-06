@@ -1,24 +1,23 @@
-import { createClient } from '@/lib/supabase/server'
+import { getUser } from '@/lib/cognito/server'
 import { NextResponse } from 'next/server'
 import { getTenantServer } from '@/lib/tenant'
+import { from } from '@/lib/db-query'
 
 // GET /api/medications/[id] — get single medication
 export async function GET(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const supabase = await createClient()
   const { id } = await params
 
-  const { data: { user } } = await supabase.auth.getUser()
+  const user = await getUser()
   if (!user) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
   const tenant = getTenantServer()
 
-  const { data: medication, error } = await supabase
-    .from('patient_medications')
+  const { data: medication, error } = await from('patient_medications')
     .select('*')
     .eq('id', id)
     .eq('tenant_id', tenant)
@@ -36,10 +35,9 @@ export async function PATCH(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const supabase = await createClient()
   const { id } = await params
 
-  const { data: { user } } = await supabase.auth.getUser()
+  const user = await getUser()
   if (!user) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
@@ -65,8 +63,7 @@ export async function PATCH(
 
   const tenant = getTenantServer()
 
-  const { data: medication, error } = await supabase
-    .from('patient_medications')
+  const { data: medication, error } = await from('patient_medications')
     .update(updateData)
     .eq('id', id)
     .eq('tenant_id', tenant)
@@ -85,18 +82,16 @@ export async function DELETE(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const supabase = await createClient()
   const { id } = await params
 
-  const { data: { user } } = await supabase.auth.getUser()
+  const user = await getUser()
   if (!user) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
   const tenant = getTenantServer()
 
-  const { error } = await supabase
-    .from('patient_medications')
+  const { error } = await from('patient_medications')
     .delete()
     .eq('id', id)
     .eq('tenant_id', tenant)

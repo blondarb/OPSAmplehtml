@@ -1,18 +1,17 @@
 import { NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
+import { getUser } from '@/lib/cognito/server'
 import { suggestCptCode, CPT_CODES } from '@/lib/follow-up/cptCodes'
 import type { BillingMonthlySummary } from '@/lib/follow-up/billingTypes'
+import { from } from '@/lib/db-query'
 
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url)
     const month = searchParams.get('month') || new Date().toISOString().slice(0, 7)
 
-    const supabase = await createClient()
 
     // Fetch billing entries for the month, joined with session data
-    const { data: entries, error } = await supabase
-      .from('followup_billing_entries')
+    const { data: entries, error } = await from('followup_billing_entries')
       .select(`
         *,
         followup_sessions (
@@ -100,7 +99,6 @@ export async function POST(request: Request) {
     const cptRate = CPT_CODES[cptCode]?.rate || 0
     const meetsThreshold = totalMinutes >= (CPT_CODES[cptCode]?.minMinutes || 20)
 
-    const supabase = await createClient()
 
     const entryData = {
       session_id,
@@ -129,8 +127,7 @@ export async function POST(request: Request) {
     let result
     if (id) {
       // Update existing entry
-      const { data, error } = await supabase
-        .from('followup_billing_entries')
+      const { data, error } = await from('followup_billing_entries')
         .update(entryData)
         .eq('id', id)
         .select()
@@ -143,8 +140,7 @@ export async function POST(request: Request) {
       result = data
     } else {
       // Upsert by session_id to avoid duplicates
-      const { data, error } = await supabase
-        .from('followup_billing_entries')
+      const { data, error } = await from('followup_billing_entries')
         .upsert(entryData, { onConflict: 'session_id' })
         .select()
         .single()

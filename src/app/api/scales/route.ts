@@ -1,12 +1,12 @@
-import { createClient } from '@/lib/supabase/server'
+import { getUser } from '@/lib/cognito/server'
 import { NextRequest, NextResponse } from 'next/server'
 import { getTenantServer } from '@/lib/tenant'
+import { from } from '@/lib/db-query'
 
 // GET - Fetch scale results for a patient
 export async function GET(request: NextRequest) {
-  const supabase = await createClient()
 
-  const { data: { user } } = await supabase.auth.getUser()
+  const user = await getUser()
   if (!user) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
@@ -23,8 +23,7 @@ export async function GET(request: NextRequest) {
   const tenant = getTenantServer()
 
   // Fetch scale results for the patient
-  let query = supabase
-    .from('scale_results')
+  let query = from('scale_results')
     .select('*')
     .eq('patient_id', patientId)
     .eq('tenant_id', tenant)
@@ -46,9 +45,8 @@ export async function GET(request: NextRequest) {
 
 // POST - Save a scale result
 export async function POST(request: NextRequest) {
-  const supabase = await createClient()
 
-  const { data: { user } } = await supabase.auth.getUser()
+  const user = await getUser()
   if (!user) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
@@ -76,8 +74,7 @@ export async function POST(request: NextRequest) {
 
   const tenant = getTenantServer()
 
-  const { data, error } = await supabase
-    .from('scale_results')
+  const { data, error } = await from('scale_results')
     .insert({
       tenant_id: tenant,
       patient_id: patientId,

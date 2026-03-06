@@ -1,14 +1,15 @@
 import { NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
+import { getUser } from '@/lib/cognito/server'
+import { rpc } from '@/lib/db-query'
+
 
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url)
     const tenantId = searchParams.get('tenant_id') || 'default'
 
-    const supabase = await createClient()
 
-    const { data, error } = await supabase.rpc('get_patients_for_portal', {
+    const { data, error } = await rpc('get_patients_for_portal', {
       p_tenant_id: tenantId,
     })
 

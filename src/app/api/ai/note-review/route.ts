@@ -1,11 +1,11 @@
 import { NextResponse } from 'next/server'
-import OpenAI from 'openai'
-import { createClient } from '@/lib/supabase/server'
+import { getUser } from '@/lib/cognito/server'
+import { invokeBedrockJSON } from '@/lib/bedrock'
+
 
 export async function POST(request: Request) {
   try {
-    const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
+    const user = await getUser()
 
     if (!user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -16,21 +16,6 @@ export async function POST(request: Request) {
     if (!sections || !Array.isArray(sections) || sections.length === 0) {
       return NextResponse.json({ error: 'Note sections are required' }, { status: 400 })
     }
-
-    let apiKey = process.env.OPENAI_API_KEY
-
-    if (!apiKey) {
-      const { data: setting } = await supabase.rpc('get_openai_key')
-      apiKey = setting
-    }
-
-    if (!apiKey) {
-      return NextResponse.json({
-        error: 'OpenAI API key not configured.'
-      }, { status: 500 })
-    }
-
-    const openai = new OpenAI({ apiKey })
 
     const noteText = sections
       .map((s: { title: string; content: string }) => `${s.title.toUpperCase()}:\n${s.content || '(empty)'}`)
@@ -56,7 +41,7 @@ Rules:
 
 Note type: ${noteType || 'new-consult'}${diagnosisContext}
 
-Respond with valid JSON matching this schema:
+Return a JSON object with the following format:
 {
   "suggestions": [
     {
@@ -70,21 +55,12 @@ Respond with valid JSON matching this schema:
 
 If the note has no issues, return: { "suggestions": [] }`
 
-    const completion = await openai.chat.completions.create({
-      model: 'gpt-5-mini',
-      messages: [
-        { role: 'system', content: systemPrompt },
-        { role: 'user', content: noteText }
-      ],
-      max_completion_tokens: 1500,
-      // gpt-5-mini does not support temperature or reasoning_effort parameters.
-      // Determinism is achieved via prompt instructions ("be deterministic").
-      // Suggestions may still vary slightly between runs due to default temperature=1.
-      response_format: { type: 'json_object' },
+    const { parsed } = await invokeBedrockJSON<{ suggestions: Array<{ type?: string; message?: string; sectionId?: string; severity?: string }> }>({
+      system: systemPrompt,
+      messages: [{ role: 'user', content: noteText }],
+      maxTokens: 1500,
+      temperature: 1,
     })
-
-    const raw = completion.choices[0]?.message?.content || '{"suggestions":[]}'
-    const parsed = JSON.parse(raw)
 
     // Validate and sanitize
     const suggestions = (parsed.suggestions || [])

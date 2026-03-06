@@ -1,4 +1,5 @@
-import OpenAI from 'openai'
+import { invokeBedrockJSON } from '@/lib/bedrock'
+import type { BedrockMessage } from '@/lib/bedrock'
 import { buildFollowUpSystemPrompt } from '@/lib/follow-up/systemPrompt'
 import {
   scanForEscalationTriggers,
@@ -13,8 +14,6 @@ import type {
   CaregiverInfo,
   DashboardUpdate,
 } from '@/lib/follow-up/types'
-
-const AI_MODEL = 'gpt-5.2'
 
 export interface ConversationTurnInput {
   patient_message: string
@@ -67,31 +66,33 @@ const FALLBACK_OUTPUT: ConversationTurnOutput = {
 
 /**
  * Core conversation turn logic — shared between browser chat and Twilio SMS webhook.
- * Takes a patient message + context, calls OpenAI, runs escalation detection,
+ * Takes a patient message + context, calls AWS Bedrock Claude, runs escalation detection,
  * returns structured output. Does NOT handle Supabase persistence (caller does that).
+ *
+ * Note: The `apiKey` parameter is kept for backward compatibility but is no longer used.
+ * AWS credentials come from environment variables.
  */
 export async function processConversationTurn(
   input: ConversationTurnInput,
-  apiKey: string
+  _apiKey: string
 ): Promise<ConversationTurnOutput> {
   const { patient_message, patient_context, conversation_history } = input
-  const openai = new OpenAI({ apiKey })
 
   // Build system prompt
   const systemPrompt = buildFollowUpSystemPrompt(patient_context)
 
-  // Construct messages array
-  const messages: Array<{ role: 'system' | 'user' | 'assistant'; content: string }> = [
-    { role: 'system', content: systemPrompt },
-  ]
+  // Construct messages array — Bedrock Claude uses user/assistant only (no system role in messages)
+  const messages: BedrockMessage[] = []
 
   if (conversation_history && conversation_history.length > 0) {
     for (const entry of conversation_history) {
       const role = entry.role === 'agent' ? 'assistant' : entry.role
-      messages.push({
-        role: role as 'user' | 'assistant',
-        content: entry.content,
-      })
+      if (role === 'user' || role === 'assistant') {
+        messages.push({
+          role: role as 'user' | 'assistant',
+          content: entry.content,
+        })
+      }
     }
   }
 
@@ -99,31 +100,10 @@ export async function processConversationTurn(
     messages.push({ role: 'user', content: patient_message })
   }
 
-  // Call OpenAI with timeout
+  // Call Bedrock with timeout
   const controller = new AbortController()
   const timeout = setTimeout(() => controller.abort(), 25000)
 
-  let completion
-  try {
-    completion = await openai.chat.completions.create(
-      {
-        model: AI_MODEL,
-        messages,
-        response_format: { type: 'json_object' },
-        temperature: 1,
-      },
-      { signal: controller.signal }
-    )
-  } finally {
-    clearTimeout(timeout)
-  }
-
-  const rawContent = completion.choices[0]?.message?.content
-  if (!rawContent) {
-    throw new Error('Empty response from AI model')
-  }
-
-  // Parse AI response
   let aiOutput: {
     agent_message?: string
     current_module?: FollowUpModule
@@ -155,10 +135,23 @@ export async function processConversationTurn(
   }
 
   try {
-    aiOutput = JSON.parse(rawContent)
-  } catch {
-    console.error('Failed to parse follow-up AI response:', rawContent)
+    const result = await invokeBedrockJSON({
+      system: systemPrompt,
+      messages,
+      maxTokens: 2000,
+      temperature: 1,
+      signal: controller.signal,
+    })
+    aiOutput = result.parsed as typeof aiOutput
+  } catch (parseErr) {
+    // If JSON parse fails, check if it's an abort
+    if (parseErr instanceof Error && parseErr.name === 'AbortError') {
+      throw parseErr
+    }
+    console.error('Failed to parse follow-up AI response:', parseErr)
     return { ...FALLBACK_OUTPUT }
+  } finally {
+    clearTimeout(timeout)
   }
 
   // Run regex escalation safety net

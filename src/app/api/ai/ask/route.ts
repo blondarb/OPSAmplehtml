@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
-import OpenAI from 'openai'
-import { createClient } from '@/lib/supabase/server'
+import { getUser } from '@/lib/cognito/server'
+import { invokeBedrock } from '@/lib/bedrock'
 
 interface UserSettings {
   globalAiInstructions?: string
@@ -11,8 +11,7 @@ interface UserSettings {
 export async function POST(request: Request) {
   try {
     // Check authentication
-    const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
+    const user = await getUser()
 
     if (!user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -23,25 +22,6 @@ export async function POST(request: Request) {
     if (!question) {
       return NextResponse.json({ error: 'Question is required' }, { status: 400 })
     }
-
-    // Get OpenAI API key - first try environment variable, then try Supabase
-    let apiKey = process.env.OPENAI_API_KEY
-
-    if (!apiKey) {
-      // Try to get from Supabase app_settings (requires service role)
-      const { data: setting } = await supabase
-        .rpc('get_openai_key')
-
-      apiKey = setting
-    }
-
-    if (!apiKey) {
-      return NextResponse.json({
-        error: 'OpenAI API key not configured. Please add your API key to the environment variables or Supabase settings.'
-      }, { status: 500 })
-    }
-
-    const openai = new OpenAI({ apiKey })
 
     // Build user preferences section
     let userPreferences = ''
@@ -87,28 +67,19 @@ Current patient context:
 ${context?.fullNoteText ? `\nFull Clinical Note:\n${context.fullNoteText}\n` : ''}
 Provide concise, evidence-based responses. When discussing medications, include typical dosing. Always recommend consulting current guidelines for complex decisions.${userPreferences}`
 
-    const completion = await openai.chat.completions.create({
-      model: 'gpt-5-mini', // Cost-effective for general Q&A ($0.25/$2 per 1M tokens)
-      messages: [
-        { role: 'system', content: systemPrompt },
-        { role: 'user', content: question }
-      ],
-      max_completion_tokens: 1000,
-      // Note: gpt-5-mini only supports default temperature (1)
+    const bedrockResult = await invokeBedrock({
+      system: systemPrompt,
+      messages: [{ role: 'user', content: question }],
+      maxTokens: 1000,
+      temperature: 1,
     })
 
-    const response = completion.choices[0]?.message?.content || 'No response generated'
+    const response = bedrockResult.text || 'No response generated'
 
     return NextResponse.json({ response })
 
   } catch (error: any) {
     console.error('AI API Error:', error)
-
-    if (error?.status === 401) {
-      return NextResponse.json({
-        error: 'Invalid OpenAI API key. Please check your configuration.'
-      }, { status: 500 })
-    }
 
     return NextResponse.json({
       error: error?.message || 'An error occurred while processing your request'

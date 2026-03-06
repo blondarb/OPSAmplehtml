@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
+import { getUser } from '@/lib/cognito/server'
+import { from } from '@/lib/db-query'
 
 export async function POST(
   request: Request,
@@ -28,10 +29,8 @@ export async function POST(
       )
     }
 
-    const supabase = await createClient()
 
-    const { data, error } = await supabase
-      .from('triage_sessions')
+    const { data, error } = await from('triage_sessions')
       .update({
         physician_override_tier: new_tier,
         physician_override_reason: override_reason,

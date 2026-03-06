@@ -1,13 +1,13 @@
 import { NextResponse } from 'next/server'
-import OpenAI from 'openai'
 import { createClient as createDeepgramClient } from '@deepgram/sdk'
-import { createClient } from '@/lib/supabase/server'
+import { getUser } from '@/lib/cognito/server'
+import { invokeBedrock } from '@/lib/bedrock'
+
 
 export async function POST(request: Request) {
   try {
     // Check authentication
-    const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
+    const user = await getUser()
 
     if (!user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -79,27 +79,10 @@ export async function POST(request: Request) {
       })
     }
 
-    // Get OpenAI API key for GPT cleanup step
-    let openaiKey = process.env.OPENAI_API_KEY
-    if (!openaiKey) {
-      const { data: setting } = await supabase.rpc('get_openai_key')
-      openaiKey = setting
-    }
-
-    // If no OpenAI key, return raw Deepgram transcription (still better than nothing)
-    if (!openaiKey) {
-      return NextResponse.json({ text: rawTranscription, rawText: rawTranscription })
-    }
-
-    // Clean up the transcription with GPT to fix errors and improve readability
-    const openai = new OpenAI({ apiKey: openaiKey })
+    // Clean up the transcription with Bedrock Claude to fix errors and improve readability
     try {
-      const cleanupResponse = await openai.chat.completions.create({
-        model: 'gpt-5-mini', // Cost-effective for text cleanup ($0.25/$2 per 1M tokens)
-        messages: [
-          {
-            role: 'system',
-            content: `You are a medical transcription editor. Clean up dictated clinical notes for accuracy and readability.
+      const cleanupResult = await invokeBedrock({
+        system: `You are a medical transcription editor. Clean up dictated clinical notes for accuracy and readability.
 
 CRITICAL RULES:
 - Output ONLY the cleaned text - no explanations, no comments, no meta-text
@@ -111,17 +94,13 @@ CRITICAL RULES:
 - Maintain clinical accuracy - when in doubt about a correction, keep both versions
 - NEVER add information that wasn't dictated
 - NEVER say things like "not enough information" or "please provide more"
-- If the input is short, still clean it up and return it`
-          },
-          {
-            role: 'user',
-            content: rawTranscription
-          }
-        ],
-        max_completion_tokens: 2000,
+- If the input is short, still clean it up and return it`,
+        messages: [{ role: 'user', content: rawTranscription }],
+        maxTokens: 2000,
+        temperature: 1,
       })
 
-      const cleanedText = cleanupResponse.choices[0]?.message?.content?.trim()
+      const cleanedText = cleanupResult.text?.trim()
 
       // If cleanup result looks like an error message or refusal, use raw transcription
       if (!cleanedText ||

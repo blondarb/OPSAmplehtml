@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
+import { getUser } from '@/lib/cognito/server'
 import { runTriage } from '@/lib/triage/runTriage'
+import { from } from '@/lib/db-query'
+
 
 /**
  * POST /api/triage/validate/cases/rerun
@@ -24,10 +26,9 @@ import { runTriage } from '@/lib/triage/runTriage'
 export const maxDuration = 300
 
 export async function POST(req: NextRequest) {
-  const supabase = await createClient()
 
-  const { data: { user }, error: authError } = await supabase.auth.getUser()
-  if (authError || !user) {
+  const user = await getUser()
+  if (!user) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
@@ -48,8 +49,7 @@ export async function POST(req: NextRequest) {
   }
 
   // Fetch the cases
-  const { data: cases, error: fetchError } = await supabase
-    .from('validation_cases')
+  const { data: cases, error: fetchError } = await from('validation_cases')
     .select('id, case_number, title, referral_text, patient_age, patient_sex')
     .in('id', case_ids)
 
@@ -59,8 +59,7 @@ export async function POST(req: NextRequest) {
 
   // Optionally clear previous runs
   if (clear_previous) {
-    await supabase
-      .from('validation_ai_runs')
+    await from('validation_ai_runs')
       .delete()
       .in('case_id', case_ids)
   }
@@ -110,7 +109,7 @@ export async function POST(req: NextRequest) {
 
           const durationMs = Date.now() - startTime
 
-          await supabase.from('validation_ai_runs').upsert({
+          await from('validation_ai_runs').upsert({
             case_id: c.id,
             run_number: run.run_number,
             temperature: run.temperature,
@@ -140,7 +139,7 @@ export async function POST(req: NextRequest) {
           const durationMs = Date.now() - startTime
           const errorMsg = err instanceof Error ? err.message : 'Unknown error'
 
-          await supabase.from('validation_ai_runs').upsert({
+          await from('validation_ai_runs').upsert({
             case_id: c.id,
             run_number: run.run_number,
             temperature: run.temperature,

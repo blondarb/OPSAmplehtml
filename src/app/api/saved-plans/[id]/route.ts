@@ -1,24 +1,23 @@
-import { createClient } from '@/lib/supabase/server'
+import { getUser } from '@/lib/cognito/server'
 import { NextResponse } from 'next/server'
 import { getTenantServer } from '@/lib/tenant'
+import { from } from '@/lib/db-query'
 
 // GET /api/saved-plans/[id] - Get a single saved plan
 export async function GET(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const supabase = await createClient()
   const { id } = await params
 
-  const { data: { user } } = await supabase.auth.getUser()
+  const user = await getUser()
   if (!user) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
   const tenant = getTenantServer()
 
-  const { data: plan, error } = await supabase
-    .from('saved_plans')
+  const { data: plan, error } = await from('saved_plans')
     .select('*')
     .eq('id', id)
     .eq('user_id', user.id)
@@ -37,10 +36,9 @@ export async function PUT(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const supabase = await createClient()
   const { id } = await params
 
-  const { data: { user } } = await supabase.auth.getUser()
+  const user = await getUser()
   if (!user) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
@@ -57,8 +55,7 @@ export async function PUT(
 
   const tenant = getTenantServer()
 
-  const { data: plan, error } = await supabase
-    .from('saved_plans')
+  const { data: plan, error } = await from('saved_plans')
     .update(updateData)
     .eq('id', id)
     .eq('user_id', user.id)
@@ -78,18 +75,16 @@ export async function DELETE(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const supabase = await createClient()
   const { id } = await params
 
-  const { data: { user } } = await supabase.auth.getUser()
+  const user = await getUser()
   if (!user) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
   const tenant = getTenantServer()
 
-  const { error } = await supabase
-    .from('saved_plans')
+  const { error } = await from('saved_plans')
     .delete()
     .eq('id', id)
     .eq('user_id', user.id)
@@ -107,10 +102,9 @@ export async function PATCH(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const supabase = await createClient()
   const { id } = await params
 
-  const { data: { user } } = await supabase.auth.getUser()
+  const user = await getUser()
   if (!user) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
@@ -118,8 +112,7 @@ export async function PATCH(
   const tenant = getTenantServer()
 
   // Get current use_count
-  const { data: current, error: fetchError } = await supabase
-    .from('saved_plans')
+  const { data: current, error: fetchError } = await from('saved_plans')
     .select('use_count')
     .eq('id', id)
     .eq('user_id', user.id)
@@ -131,8 +124,7 @@ export async function PATCH(
   }
 
   // Increment use_count and update last_used
-  const { error: updateError } = await supabase
-    .from('saved_plans')
+  const { error: updateError } = await from('saved_plans')
     .update({
       last_used: new Date().toISOString(),
       use_count: (current?.use_count || 0) + 1,

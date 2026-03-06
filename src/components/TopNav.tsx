@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import type { User } from '@supabase/supabase-js'
+interface User { id: string; email?: string }
 import { useVoiceRecorder } from '@/hooks/useVoiceRecorder'
 
 interface TopNavProps {

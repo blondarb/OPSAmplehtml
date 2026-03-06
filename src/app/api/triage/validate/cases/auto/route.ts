@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
+import { getUser } from '@/lib/cognito/server'
+import { from } from '@/lib/db-query'
 
 /**
  * POST /api/triage/validate/cases/auto
@@ -16,10 +17,9 @@ import { createClient } from '@/lib/supabase/server'
 export const maxDuration = 120
 
 export async function POST(req: NextRequest) {
-  const supabase = await createClient()
 
-  const { data: { user }, error: authError } = await supabase.auth.getUser()
-  if (authError || !user) {
+  const user = await getUser()
+  if (!user) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
@@ -30,8 +30,7 @@ export async function POST(req: NextRequest) {
   const studyName = body.study_name || 'default'
 
   // Get the current max case_number for this study to auto-increment
-  const { data: maxCase } = await supabase
-    .from('validation_cases')
+  const { data: maxCase } = await from('validation_cases')
     .select('case_number')
     .eq('study_name', studyName)
     .order('case_number', { ascending: false })
@@ -130,8 +129,7 @@ export async function POST(req: NextRequest) {
       }
 
       // Create the validation case
-      const { data: caseData, error: insertError } = await supabase
-        .from('validation_cases')
+      const { data: caseData, error: insertError } = await from('validation_cases')
         .upsert({
           case_number: caseNum,
           title,

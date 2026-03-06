@@ -1,24 +1,23 @@
-import { createClient } from '@/lib/supabase/server'
+import { getUser } from '@/lib/cognito/server'
 import { NextResponse } from 'next/server'
 import { getTenantServer } from '@/lib/tenant'
+import { from } from '@/lib/db-query'
 
 // GET /api/allergies/[id] — get single allergy
 export async function GET(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const supabase = await createClient()
   const { id } = await params
 
-  const { data: { user } } = await supabase.auth.getUser()
+  const user = await getUser()
   if (!user) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
   const tenant = getTenantServer()
 
-  const { data: allergy, error } = await supabase
-    .from('patient_allergies')
+  const { data: allergy, error } = await from('patient_allergies')
     .select('*')
     .eq('id', id)
     .eq('tenant_id', tenant)
@@ -36,10 +35,9 @@ export async function PATCH(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const supabase = await createClient()
   const { id } = await params
 
-  const { data: { user } } = await supabase.auth.getUser()
+  const user = await getUser()
   if (!user) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
@@ -59,8 +57,7 @@ export async function PATCH(
 
   const tenant = getTenantServer()
 
-  const { data: allergy, error } = await supabase
-    .from('patient_allergies')
+  const { data: allergy, error } = await from('patient_allergies')
     .update(updateData)
     .eq('id', id)
     .eq('tenant_id', tenant)
@@ -79,18 +76,16 @@ export async function DELETE(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const supabase = await createClient()
   const { id } = await params
 
-  const { data: { user } } = await supabase.auth.getUser()
+  const user = await getUser()
   if (!user) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
   const tenant = getTenantServer()
 
-  const { error } = await supabase
-    .from('patient_allergies')
+  const { error } = await from('patient_allergies')
     .delete()
     .eq('id', id)
     .eq('tenant_id', tenant)

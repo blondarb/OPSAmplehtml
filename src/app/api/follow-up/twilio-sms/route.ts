@@ -1,8 +1,10 @@
-import { createClient } from '@/lib/supabase/server'
+import { getUser } from '@/lib/cognito/server'
 import { validateTwilioSignature } from '@/lib/follow-up/twilioClient'
 import { processConversationTurn } from '@/lib/follow-up/conversationEngine'
 import { DEMO_SCENARIOS } from '@/lib/follow-up/demoScenarios'
 import { suggestCptCode, CPT_CODES } from '@/lib/follow-up/cptCodes'
+import { from } from '@/lib/db-query'
+
 
 export const maxDuration = 30
 
@@ -29,12 +31,10 @@ export async function POST(request: Request) {
       return twimlResponse('Sorry, something went wrong. Please try again.')
     }
 
-    const supabase = await createClient()
 
     // Handle STOP opt-out
     if (messageBody.toUpperCase() === 'STOP') {
-      await supabase
-        .from('followup_phone_sessions')
+      await from('followup_phone_sessions')
         .update({ opted_out: true })
         .eq('phone_number', fromPhone)
 
@@ -42,8 +42,7 @@ export async function POST(request: Request) {
     }
 
     // Look up phone session
-    const { data: phoneSession } = await supabase
-      .from('followup_phone_sessions')
+    const { data: phoneSession } = await from('followup_phone_sessions')
       .select('*')
       .eq('phone_number', fromPhone)
       .eq('opted_out', false)
@@ -57,8 +56,7 @@ export async function POST(request: Request) {
     }
 
     // Load the session transcript
-    const { data: session } = await supabase
-      .from('followup_sessions')
+    const { data: session } = await from('followup_sessions')
       .select('transcript')
       .eq('id', phoneSession.session_id)
       .single()
@@ -77,22 +75,10 @@ export async function POST(request: Request) {
       return twimlResponse('Session configuration error. Please start a new session.')
     }
 
-    // Get OpenAI API key
-    let apiKey = process.env.OPENAI_API_KEY
-    if (!apiKey) {
-      try {
-        const { data: setting } = await supabase.rpc('get_openai_key')
-        apiKey = setting
-      } catch { /* fallback */ }
-    }
-    if (!apiKey) {
-      return twimlResponse('AI service is temporarily unavailable. Please try again later.')
-    }
-
-    // Call the shared conversation engine
+    // Call the shared conversation engine (uses Bedrock — no API key needed)
     const result = await processConversationTurn(
       { patient_message: messageBody, patient_context: scenario, conversation_history: conversationHistory },
-      apiKey
+      '' // API key param kept for backward compatibility; engine uses Bedrock env credentials
     )
 
     // Build new transcript entries
@@ -103,8 +89,7 @@ export async function POST(request: Request) {
     const updatedTranscript = [...transcript, ...newEntries]
 
     // Update followup_sessions
-    await supabase
-      .from('followup_sessions')
+    await from('followup_sessions')
       .update({
         status: result.dashboard_update.status,
         current_module: result.current_module,
@@ -121,15 +106,14 @@ export async function POST(request: Request) {
 
     // Append to sms_history on phone session
     const currentSmsHistory = (phoneSession.sms_history as Array<unknown>) || []
-    await supabase
-      .from('followup_phone_sessions')
+    await from('followup_phone_sessions')
       .update({ sms_history: [...currentSmsHistory, ...newEntries] })
       .eq('id', phoneSession.id)
 
     // Insert escalation record if triggered
     if (result.escalation_triggered && result.all_flags.length > 0) {
       const topFlag = result.all_flags[0]
-      await supabase.from('followup_escalations').insert({
+      await from('followup_escalations').insert({
         session_id: phoneSession.session_id,
         tier: topFlag.tier,
         severity: topFlag.tier,
@@ -152,7 +136,7 @@ export async function POST(request: Request) {
         const cptCode = suggestCptCode('ccm', billingTotal)
         const cptRate = CPT_CODES[cptCode]?.rate || 37.07
 
-        await supabase.from('followup_billing_entries').insert({
+        await from('followup_billing_entries').insert({
           session_id: phoneSession.session_id,
           patient_id: null,
           patient_name: scenario.name,

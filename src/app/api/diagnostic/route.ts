@@ -1,9 +1,9 @@
-import { createClient } from '@/lib/supabase/server'
+import { getUser } from '@/lib/cognito/server'
 import { NextResponse } from 'next/server'
+import { from } from '@/lib/db-query'
 
 // GET /api/diagnostic - Check database setup
 export async function GET() {
-  const supabase = await createClient()
   const diagnostics: Record<string, unknown> = {
     timestamp: new Date().toISOString(),
     supabaseUrl: process.env.NEXT_PUBLIC_SUPABASE_URL || 'NOT SET',
@@ -12,19 +12,18 @@ export async function GET() {
 
   try {
     // Check auth
-    const { data: { user }, error: authError } = await supabase.auth.getUser()
+    const user = await getUser()
     diagnostics.checks = {
       ...diagnostics.checks as object,
       auth: {
         status: user ? 'authenticated' : 'not authenticated',
         userId: user?.id?.substring(0, 8) + '...' || null,
-        error: authError?.message || null
+        error: null
       }
     }
 
     // Check dot_phrases table
-    const { error: tableError } = await supabase
-      .from('dot_phrases')
+    const { error: tableError } = await from('dot_phrases')
       .select('id')
       .limit(1)
 
@@ -39,8 +38,7 @@ export async function GET() {
 
     // Check if scope column exists (try a query with scope)
     if (tableExists) {
-      const { error: scopeError } = await supabase
-        .from('dot_phrases')
+      const { error: scopeError } = await from('dot_phrases')
         .select('scope')
         .limit(1)
 
@@ -53,24 +51,27 @@ export async function GET() {
       }
     }
 
-    // Check app_settings table for OpenAI key
-    const { data: apiKeySetting, error: settingsError } = await supabase
-      .from('app_settings')
-      .select('key')
-      .eq('key', 'openai_api_key')
-      .single()
-
+    // Check AWS Bedrock configuration (used for all non-Realtime AI calls)
     diagnostics.checks = {
       ...diagnostics.checks as object,
-      openai_key: {
-        configured: !!apiKeySetting && !settingsError,
-        error: settingsError?.message || null
+      aws_bedrock: {
+        region: process.env.AWS_REGION || 'us-east-2 (default)',
+        access_key_configured: !!process.env.AWS_ACCESS_KEY_ID,
+        secret_key_configured: !!process.env.AWS_SECRET_ACCESS_KEY,
+      }
+    }
+
+    // Check OpenAI key (only needed for Realtime API features)
+    diagnostics.checks = {
+      ...diagnostics.checks as object,
+      openai_key_realtime: {
+        configured: !!process.env.OPENAI_API_KEY,
+        note: 'Only needed for Realtime API features (voice historian, intake voice)',
       }
     }
 
     // Check appointments table
-    const { data: aptData, error: aptError } = await supabase
-      .from('appointments')
+    const { data: aptData, error: aptError } = await from('appointments')
       .select('id')
       .limit(1)
 
@@ -85,11 +86,13 @@ export async function GET() {
     }
 
     // Overall status
-    const checks = diagnostics.checks as Record<string, { error?: string | null; configured?: boolean }>
+    const checks = diagnostics.checks as Record<string, { error?: string | null; configured?: boolean; access_key_configured?: boolean }>
     diagnostics.overall = {
       dot_phrases_ready: checks.dot_phrases_table && !checks.dot_phrases_table.error &&
                          checks.scope_column && !checks.scope_column.error,
-      transcription_ready: checks.openai_key?.configured || !!process.env.OPENAI_API_KEY
+      ai_ready: !!process.env.AWS_ACCESS_KEY_ID && !!process.env.AWS_SECRET_ACCESS_KEY,
+      realtime_ready: !!process.env.OPENAI_API_KEY,
+      transcription_ready: !!process.env.DEEPGRAM_API_KEY,
     }
 
     return NextResponse.json(diagnostics)

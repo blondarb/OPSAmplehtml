@@ -1,9 +1,10 @@
 import { NextResponse } from 'next/server'
-import OpenAI from 'openai'
 import { createClient as createDeepgramClient } from '@deepgram/sdk'
-import { createClient } from '@/lib/supabase/server'
+import { getUser } from '@/lib/cognito/server'
+import { invokeBedrockJSON } from '@/lib/bedrock'
 
-// Allow up to 120s for long audio transcription + GPT processing
+
+// Allow up to 120s for long audio transcription + AI processing
 export const maxDuration = 120
 
 interface UserSettings {
@@ -15,8 +16,7 @@ interface UserSettings {
 export async function POST(request: Request) {
   try {
     // Check authentication
-    const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
+    const user = await getUser()
 
     if (!user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -45,18 +45,6 @@ export async function POST(request: Request) {
     if (!deepgramKey) {
       return NextResponse.json({
         error: 'Deepgram API key not configured. Please add DEEPGRAM_API_KEY to your environment variables.'
-      }, { status: 500 })
-    }
-
-    // Get OpenAI API key for GPT clinical extraction
-    let openaiKey = process.env.OPENAI_API_KEY
-    if (!openaiKey) {
-      const { data: setting } = await supabase.rpc('get_openai_key')
-      openaiKey = setting
-    }
-    if (!openaiKey) {
-      return NextResponse.json({
-        error: 'OpenAI API key not configured'
       }, { status: 500 })
     }
 
@@ -174,9 +162,7 @@ Pre-Visit Chart Prep Notes:
       }
     }
 
-    // Step 2: Process transcript with GPT to extract clinical content
-    const openai = new OpenAI({ apiKey: openaiKey })
-
+    // Step 2: Process transcript with Bedrock Claude to extract clinical content
     const systemPrompt = `You are a clinical documentation assistant for a neurology practice.
 Analyze the following transcript of a provider-patient visit and extract clinical content organized by note section.
 
@@ -201,11 +187,11 @@ Focus on extracting:
 5. Plan - Treatment recommendations, follow-up, medications discussed
 
 IMPORTANT GUARDRAILS:
-- Return ONLY valid JSON, no markdown formatting.
 - Do NOT comment on, judge, or flag missing or undocumented findings. Only include what IS documented in the transcript.
 - Do NOT say things like "no exam documented", "physical exam not performed", "ROS not discussed", or "missing data".
 - If a section has no relevant content in the transcript, return an empty string — do not call out its absence.
 
+Return a JSON object with the following fields:
 {
   "hpiFromVisit": "Narrative paragraph of HPI based on patient-reported information. Use third-person medical style. Include onset, duration, severity, associated symptoms. 3-5 sentences.",
   "rosFromVisit": "Review of systems in bullet format if discussed. Example: • Constitutional: Denies fever, weight loss\\n• Neuro: Reports headaches, denies vision changes. Return empty string if no ROS discussed.",
@@ -222,54 +208,20 @@ IMPORTANT GUARDRAILS:
   }
 }${userPreferences}`
 
-    const completion = await openai.chat.completions.create({
-      model: 'gpt-5.2', // Best reasoning for clinical extraction ($1.25/$10 per 1M tokens)
-      messages: [
-        { role: 'system', content: systemPrompt },
-        { role: 'user', content: 'Extract and organize the clinical content from this visit transcript.' }
-      ],
-      max_completion_tokens: 2500,
+    const { parsed: visitAIOutput } = await invokeBedrockJSON({
+      system: systemPrompt,
+      messages: [{ role: 'user', content: 'Extract and organize the clinical content from this visit transcript.' }],
+      maxTokens: 2500,
       temperature: 0.3,
-      response_format: { type: 'json_object' },
     })
 
-    const responseText = completion.choices[0]?.message?.content || ''
-
-    // Parse the JSON response
-    try {
-      // Clean up the response - remove markdown code blocks if present
-      let cleanedResponse = responseText.trim()
-      if (cleanedResponse.startsWith('```json')) {
-        cleanedResponse = cleanedResponse.slice(7)
-      } else if (cleanedResponse.startsWith('```')) {
-        cleanedResponse = cleanedResponse.slice(3)
-      }
-      if (cleanedResponse.endsWith('```')) {
-        cleanedResponse = cleanedResponse.slice(0, -3)
-      }
-      cleanedResponse = cleanedResponse.trim()
-
-      const visitAIOutput = JSON.parse(cleanedResponse)
-
-      return NextResponse.json({
-        success: true,
-        visitAI: visitAIOutput,
-        transcript: plainTranscript,
-        segments: segments,
-        duration: result?.metadata?.duration || null,
-      })
-    } catch (parseError) {
-      // If JSON parsing fails, return what we have
-      console.error('Failed to parse visit AI JSON:', parseError)
-      return NextResponse.json({
-        success: true,
-        visitAI: null,
-        transcript: plainTranscript,
-        segments: segments,
-        rawResponse: responseText,
-        parseError: 'Failed to parse structured response',
-      })
-    }
+    return NextResponse.json({
+      success: true,
+      visitAI: visitAIOutput,
+      transcript: plainTranscript,
+      segments: segments,
+      duration: result?.metadata?.duration || null,
+    })
 
   } catch (error: any) {
     console.error('Visit AI Error:', error)

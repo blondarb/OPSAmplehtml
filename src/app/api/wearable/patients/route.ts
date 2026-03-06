@@ -1,11 +1,10 @@
 import { NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
+import { getUser } from '@/lib/cognito/server'
+import { from } from '@/lib/db-query'
 
 export async function GET() {
   try {
-    const supabase = await createClient()
-    const { data, error } = await supabase
-      .from('wearable_patients')
+    const { data, error } = await from('wearable_patients')
       .select('id, name, age, sex, primary_diagnosis, wearable_devices, monitoring_start_date')
       .order('name')
 

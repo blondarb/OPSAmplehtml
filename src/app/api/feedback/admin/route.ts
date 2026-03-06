@@ -1,5 +1,6 @@
-import { createClient } from '@/lib/supabase/server'
+import { getUser } from '@/lib/cognito/server'
 import { NextResponse } from 'next/server'
+import { from } from '@/lib/db-query'
 
 const SEED_ADMIN_EMAIL = 'steve@sevaro.com'
 
@@ -8,11 +9,10 @@ const SEED_ADMIN_EMAIL = 'steve@sevaro.com'
 const ALLOW_ALL_ADMIN = true
 
 async function getAuthenticatedAdmin() {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return { user: null, supabase, error: 'Unauthorized' }
+  const user = await getUser()
+  if (!user) return { user: null, error: 'Unauthorized' }
 
-  if (ALLOW_ALL_ADMIN) return { user, supabase, error: null }
+  if (ALLOW_ALL_ADMIN) return { user, error: null }
 
   const emailLower = (user.email || '').toLowerCase()
   let isAdmin = emailLower === SEED_ADMIN_EMAIL
@@ -27,8 +27,7 @@ async function getAuthenticatedAdmin() {
 
   if (!isAdmin) {
     try {
-      const { data } = await supabase
-        .from('app_settings')
+      const { data } = await from('app_settings')
         .select('value')
         .eq('key', 'feedback_admin_emails')
         .single()
@@ -41,21 +40,20 @@ async function getAuthenticatedAdmin() {
     }
   }
 
-  if (!isAdmin) return { user, supabase, error: 'Admin access required' }
-  return { user, supabase, error: null }
+  if (!isAdmin) return { user, error: 'Admin access required' }
+  return { user, error: null }
 }
 
 // GET /api/feedback/admin - Get admin list and system prompts overview
 export async function GET() {
-  const { user, supabase, error } = await getAuthenticatedAdmin()
+  const { user, error } = await getAuthenticatedAdmin()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   if (error) return NextResponse.json({ error }, { status: 403 })
 
   // Get elevated admins
   let elevatedAdmins: string[] = []
   try {
-    const { data } = await supabase
-      .from('app_settings')
+    const { data } = await from('app_settings')
       .select('value')
       .eq('key', 'feedback_admin_emails')
       .single()
@@ -177,7 +175,7 @@ export async function GET() {
 
 // POST /api/feedback/admin - Add an elevated admin
 export async function POST(request: Request) {
-  const { user, supabase, error } = await getAuthenticatedAdmin()
+  const { user, error } = await getAuthenticatedAdmin()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   if (error) return NextResponse.json({ error }, { status: 403 })
 
@@ -196,8 +194,7 @@ export async function POST(request: Request) {
   // Get current list
   let currentAdmins: string[] = []
   try {
-    const { data } = await supabase
-      .from('app_settings')
+    const { data } = await from('app_settings')
       .select('value')
       .eq('key', 'feedback_admin_emails')
       .single()
@@ -215,8 +212,7 @@ export async function POST(request: Request) {
   const updatedList = [...currentAdmins, newEmail].join(',')
 
   // Upsert into app_settings
-  const { error: upsertError } = await supabase
-    .from('app_settings')
+  const { error: upsertError } = await from('app_settings')
     .upsert(
       { key: 'feedback_admin_emails', value: updatedList, updated_at: new Date().toISOString() },
       { onConflict: 'key' }
@@ -231,7 +227,7 @@ export async function POST(request: Request) {
 
 // DELETE /api/feedback/admin - Remove an elevated admin
 export async function DELETE(request: Request) {
-  const { user, supabase, error } = await getAuthenticatedAdmin()
+  const { user, error } = await getAuthenticatedAdmin()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   if (error) return NextResponse.json({ error }, { status: 403 })
 
@@ -250,8 +246,7 @@ export async function DELETE(request: Request) {
   // Get current list
   let currentAdmins: string[] = []
   try {
-    const { data } = await supabase
-      .from('app_settings')
+    const { data } = await from('app_settings')
       .select('value')
       .eq('key', 'feedback_admin_emails')
       .single()
@@ -264,8 +259,7 @@ export async function DELETE(request: Request) {
 
   const updatedList = currentAdmins.filter(e => e !== removeEmail)
 
-  const { error: updateError } = await supabase
-    .from('app_settings')
+  const { error: updateError } = await from('app_settings')
     .upsert(
       { key: 'feedback_admin_emails', value: updatedList.join(','), updated_at: new Date().toISOString() },
       { onConflict: 'key' }

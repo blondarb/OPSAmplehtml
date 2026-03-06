@@ -1,5 +1,6 @@
-import { createClient } from '@/lib/supabase/server'
+import { getUser } from '@/lib/cognito/server'
 import { NextResponse } from 'next/server'
+import { from } from '@/lib/db-query'
 
 // Seed admin - always has admin access and cannot be removed
 const SEED_ADMIN_EMAIL = 'steve@sevaro.com'
@@ -11,9 +12,7 @@ const ALLOW_ALL_ADMIN = true
 // Get list of elevated admin emails from app_settings
 async function getElevatedAdmins(): Promise<string[]> {
   try {
-    const supabase = await createClient()
-    const { data } = await supabase
-      .from('app_settings')
+    const { data } = await from('app_settings')
       .select('value')
       .eq('key', 'feedback_admin_emails')
       .single()
@@ -46,15 +45,13 @@ async function isAdmin(email: string | undefined): Promise<boolean> {
 
 // GET /api/feedback - List all feedback with comments count
 export async function GET() {
-  const supabase = await createClient()
 
-  const { data: { user } } = await supabase.auth.getUser()
+  const user = await getUser()
   if (!user) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
-  const { data: feedback, error } = await supabase
-    .from('feedback')
+  const { data: feedback, error } = await from('feedback')
     .select('*')
     .order('created_at', { ascending: false })
 
@@ -63,11 +60,10 @@ export async function GET() {
   }
 
   // Get comment counts for all feedback items
-  const feedbackIds = (feedback || []).map(f => f.id)
+  const feedbackIds = (feedback || []).map((f: any) => f.id)
   let commentCounts: Record<string, number> = {}
   if (feedbackIds.length > 0) {
-    const { data: comments } = await supabase
-      .from('feedback_comments')
+    const { data: comments } = await from('feedback_comments')
       .select('feedback_id')
       .in('feedback_id', feedbackIds)
     if (comments) {
@@ -77,7 +73,7 @@ export async function GET() {
     }
   }
 
-  const enriched = (feedback || []).map(f => ({
+  const enriched = (feedback || []).map((f: any) => ({
     ...f,
     comment_count: commentCounts[f.id] || 0,
   }))
@@ -93,9 +89,8 @@ export async function GET() {
 
 // POST /api/feedback - Submit new feedback
 export async function POST(request: Request) {
-  const supabase = await createClient()
 
-  const { data: { user } } = await supabase.auth.getUser()
+  const user = await getUser()
   if (!user) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
@@ -107,8 +102,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Feedback text is required' }, { status: 400 })
   }
 
-  const { data: feedback, error } = await supabase
-    .from('feedback')
+  const { data: feedback, error } = await from('feedback')
     .insert({
       text: text.trim(),
       user_id: user.id,
@@ -129,9 +123,8 @@ export async function POST(request: Request) {
 
 // PATCH /api/feedback - Vote on feedback OR update status (admin)
 export async function PATCH(request: Request) {
-  const supabase = await createClient()
 
-  const { data: { user } } = await supabase.auth.getUser()
+  const user = await getUser()
   if (!user) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
@@ -150,8 +143,7 @@ export async function PATCH(request: Request) {
     }
 
     // Verify ownership
-    const { data: existing } = await supabase
-      .from('feedback')
+    const { data: existing } = await from('feedback')
       .select('user_id')
       .eq('id', feedbackId)
       .single()
@@ -160,8 +152,7 @@ export async function PATCH(request: Request) {
       return NextResponse.json({ error: 'You can only edit your own feedback' }, { status: 403 })
     }
 
-    const { data: updated, error: updateError } = await supabase
-      .from('feedback')
+    const { data: updated, error: updateError } = await from('feedback')
       .update({ text: text.trim(), updated_at: new Date().toISOString() })
       .eq('id', feedbackId)
       .select()
@@ -198,8 +189,7 @@ export async function PATCH(request: Request) {
       updateData.admin_response = adminResponse
     }
 
-    const { data: updated, error: updateError } = await supabase
-      .from('feedback')
+    const { data: updated, error: updateError } = await from('feedback')
       .update(updateData)
       .eq('id', feedbackId)
       .select()
@@ -218,8 +208,7 @@ export async function PATCH(request: Request) {
   }
 
   // Get current feedback item
-  const { data: existing, error: fetchError } = await supabase
-    .from('feedback')
+  const { data: existing, error: fetchError } = await from('feedback')
     .select('upvotes, downvotes')
     .eq('id', feedbackId)
     .single()
@@ -248,8 +237,7 @@ export async function PATCH(request: Request) {
     }
   }
 
-  const { data: updated, error: updateError } = await supabase
-    .from('feedback')
+  const { data: updated, error: updateError } = await from('feedback')
     .update({ upvotes, downvotes, updated_at: new Date().toISOString() })
     .eq('id', feedbackId)
     .select()

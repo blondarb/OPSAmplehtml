@@ -1,20 +1,19 @@
-import { createClient } from '@/lib/supabase/server'
+import { getUser } from '@/lib/cognito/server'
 import { NextResponse } from 'next/server'
 import { getTenantServer } from '@/lib/tenant'
+import { from } from '@/lib/db-query'
 
 // GET /api/phrases - List all phrases for current user
 export async function GET() {
-  const supabase = await createClient()
 
-  const { data: { user } } = await supabase.auth.getUser()
+  const user = await getUser()
   if (!user) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
   const tenant = getTenantServer()
 
-  const { data: phrases, error } = await supabase
-    .from('dot_phrases')
+  const { data: phrases, error } = await from('dot_phrases')
     .select('*')
     .eq('user_id', user.id)
     .eq('tenant_id', tenant)
@@ -30,9 +29,8 @@ export async function GET() {
 
 // POST /api/phrases - Create a new phrase
 export async function POST(request: Request) {
-  const supabase = await createClient()
 
-  const { data: { user } } = await supabase.auth.getUser()
+  const user = await getUser()
   if (!user) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
@@ -54,8 +52,7 @@ export async function POST(request: Request) {
 
   const tenant = getTenantServer()
 
-  const { data: phrase, error } = await supabase
-    .from('dot_phrases')
+  const { data: phrase, error } = await from('dot_phrases')
     .insert({
       tenant_id: tenant,
       user_id: user.id,

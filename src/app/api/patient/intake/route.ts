@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
+import { getUser } from '@/lib/cognito/server'
 import { getTenantServer } from '@/lib/tenant'
+import { from } from '@/lib/db-query'
 
 // POST /api/patient/intake — Submit a patient intake form
 export async function POST(request: Request) {
@@ -16,7 +17,6 @@ export async function POST(request: Request) {
       )
     }
 
-    const supabase = await createClient()
 
     const insertData: Record<string, any> = {
       tenant_id: tenant,
@@ -37,8 +37,7 @@ export async function POST(request: Request) {
       insertData.patient_id = body.patient_id
     }
 
-    const { data, error } = await supabase
-      .from('patient_intake_forms')
+    const { data, error } = await from('patient_intake_forms')
       .insert(insertData)
       .select()
       .single()
@@ -58,11 +57,9 @@ export async function POST(request: Request) {
 // GET /api/patient/intake — List intake forms for current tenant
 export async function GET() {
   try {
-    const supabase = await createClient()
     const tenant = getTenantServer()
 
-    const { data, error } = await supabase
-      .from('patient_intake_forms')
+    const { data, error } = await from('patient_intake_forms')
       .select('*')
       .eq('tenant_id', tenant)
       .order('created_at', { ascending: false })

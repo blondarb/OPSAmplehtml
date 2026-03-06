@@ -1,24 +1,23 @@
-import { createClient } from '@/lib/supabase/server'
+import { getUser } from '@/lib/cognito/server'
 import { NextResponse } from 'next/server'
 import { getTenantServer } from '@/lib/tenant'
+import { from } from '@/lib/db-query'
 
 // GET /api/phrases/[id] - Get a single phrase
 export async function GET(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const supabase = await createClient()
   const { id } = await params
 
-  const { data: { user } } = await supabase.auth.getUser()
+  const user = await getUser()
   if (!user) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
   const tenant = getTenantServer()
 
-  const { data: phrase, error } = await supabase
-    .from('dot_phrases')
+  const { data: phrase, error } = await from('dot_phrases')
     .select('*')
     .eq('id', id)
     .eq('user_id', user.id)
@@ -37,10 +36,9 @@ export async function PUT(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const supabase = await createClient()
   const { id } = await params
 
-  const { data: { user } } = await supabase.auth.getUser()
+  const user = await getUser()
   if (!user) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
@@ -62,8 +60,7 @@ export async function PUT(
 
   const tenant = getTenantServer()
 
-  const { data: phrase, error } = await supabase
-    .from('dot_phrases')
+  const { data: phrase, error } = await from('dot_phrases')
     .update(updateData)
     .eq('id', id)
     .eq('user_id', user.id)
@@ -83,18 +80,16 @@ export async function DELETE(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const supabase = await createClient()
   const { id } = await params
 
-  const { data: { user } } = await supabase.auth.getUser()
+  const user = await getUser()
   if (!user) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
   const tenant = getTenantServer()
 
-  const { error } = await supabase
-    .from('dot_phrases')
+  const { error } = await from('dot_phrases')
     .delete()
     .eq('id', id)
     .eq('user_id', user.id)
@@ -112,10 +107,9 @@ export async function PATCH(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const supabase = await createClient()
   const { id } = await params
 
-  const { data: { user } } = await supabase.auth.getUser()
+  const user = await getUser()
   if (!user) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
@@ -123,8 +117,7 @@ export async function PATCH(
   const tenant = getTenantServer()
 
   // First get the current use_count
-  const { data: currentPhrase, error: fetchError } = await supabase
-    .from('dot_phrases')
+  const { data: currentPhrase, error: fetchError } = await from('dot_phrases')
     .select('use_count')
     .eq('id', id)
     .eq('user_id', user.id)
@@ -136,8 +129,7 @@ export async function PATCH(
   }
 
   // Increment use_count and update last_used
-  const { error: updateError } = await supabase
-    .from('dot_phrases')
+  const { error: updateError } = await from('dot_phrases')
     .update({
       last_used: new Date().toISOString(),
       use_count: (currentPhrase?.use_count || 0) + 1

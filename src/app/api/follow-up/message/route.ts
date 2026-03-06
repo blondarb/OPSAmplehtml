@@ -1,8 +1,10 @@
 import { NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
+import { getUser } from '@/lib/cognito/server'
 import { processConversationTurn } from '@/lib/follow-up/conversationEngine'
 import type { FollowUpMessageRequest, FollowUpMessageResponse } from '@/lib/follow-up/types'
 import { suggestCptCode, CPT_CODES } from '@/lib/follow-up/cptCodes'
+import { from } from '@/lib/db-query'
+
 
 export const maxDuration = 30
 
@@ -19,30 +21,10 @@ export async function POST(request: Request) {
       )
     }
 
-    // Get OpenAI API key — env var first, then Supabase app_settings
-    let apiKey = process.env.OPENAI_API_KEY
-
-    if (!apiKey) {
-      try {
-        const supabase = await createClient()
-        const { data: setting } = await supabase.rpc('get_openai_key')
-        apiKey = setting
-      } catch {
-        // Supabase may not be available in demo mode
-      }
-    }
-
-    if (!apiKey) {
-      return NextResponse.json(
-        { error: 'OpenAI API key not configured. Please add your API key to the environment variables.' },
-        { status: 500 }
-      )
-    }
-
-    // Call shared conversation engine
+    // Call shared conversation engine (uses Bedrock — no API key needed)
     const result = await processConversationTurn(
       { patient_message, patient_context, conversation_history },
-      apiKey
+      '' // API key param kept for backward compatibility; engine uses Bedrock env credentials
     )
 
     // Build the response
@@ -58,7 +40,6 @@ export async function POST(request: Request) {
 
     // Supabase operations
     try {
-      const supabase = await createClient()
 
       // Build transcript entry for this turn
       const newTranscriptEntries = []
@@ -78,8 +59,7 @@ export async function POST(request: Request) {
       if (!session_id) {
         // First message — INSERT new session
         const newSessionId = responsePayload.session_id
-        const { data: inserted, error: insertError } = await supabase
-          .from('followup_sessions')
+        const { data: inserted, error: insertError } = await from('followup_sessions')
           .insert({
             id: newSessionId,
             patient_id: patient_context.id,
@@ -112,8 +92,7 @@ export async function POST(request: Request) {
         }
       } else {
         // Existing session — UPDATE
-        const { data: existing } = await supabase
-          .from('followup_sessions')
+        const { data: existing } = await from('followup_sessions')
           .select('transcript')
           .eq('id', session_id)
           .single()
@@ -121,8 +100,7 @@ export async function POST(request: Request) {
         const currentTranscript = (existing?.transcript as Array<unknown>) || []
         const updatedTranscript = [...currentTranscript, ...newTranscriptEntries]
 
-        const { error: updateError } = await supabase
-          .from('followup_sessions')
+        const { error: updateError } = await from('followup_sessions')
           .update({
             status: result.dashboard_update.status,
             current_module: result.current_module,
@@ -145,8 +123,7 @@ export async function POST(request: Request) {
       // Insert escalation record if triggered
       if (result.escalation_triggered && result.all_flags.length > 0) {
         const topFlag = result.all_flags[0]
-        const { error: escError } = await supabase
-          .from('followup_escalations')
+        const { error: escError } = await from('followup_escalations')
           .insert({
             session_id: responsePayload.session_id,
             tier: topFlag.tier,
@@ -174,7 +151,7 @@ export async function POST(request: Request) {
           const cptCode = suggestCptCode('ccm', billingTotal)
           const cptRate = CPT_CODES[cptCode]?.rate || 37.07
 
-          await supabase.from('followup_billing_entries').insert({
+          await from('followup_billing_entries').insert({
             session_id: responsePayload.session_id,
             patient_id: patient_context.id || null,
             patient_name: patient_context.name,

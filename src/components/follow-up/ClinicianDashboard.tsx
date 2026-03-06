@@ -1,7 +1,6 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { createClient as createBrowserClient } from '@/lib/supabase/client'
 import type {
   DashboardUpdate,
   EscalationFlag,
@@ -84,44 +83,46 @@ export default function ClinicianDashboard({
 }: ClinicianDashboardProps) {
   const [liveDashboard, setLiveDashboard] = useState<DashboardUpdate | null>(null)
 
-  // Subscribe to Supabase Realtime when a live session is active
+  // Poll for live session updates (replaces Supabase Realtime)
   useEffect(() => {
     if (!liveSessionId) {
       setLiveDashboard(null)
       return
     }
 
-    const supabase = createBrowserClient()
-    const channel = supabase
-      .channel(`followup-live-${liveSessionId}`)
-      .on(
-        'postgres_changes',
-        {
-          event: 'UPDATE',
-          schema: 'public',
-          table: 'followup_sessions',
-          filter: `id=eq.${liveSessionId}`,
-        },
-        (payload) => {
-          const row = payload.new as Record<string, unknown>
-          // Map DB row to DashboardUpdate
-          const update: DashboardUpdate = {
-            status: (row.status as DashboardUpdate['status']) || 'in_progress',
-            currentModule: (row.current_module as FollowUpModule) || 'greeting',
-            flags: [],
-            medicationStatus: (row.medication_status as MedicationStatus[]) || [],
-            functionalStatus: (row.functional_status as string) || null,
-            functionalDetails: (row.functional_details as string) || null,
-            patientQuestions: (row.patient_questions as string[]) || [],
-            caregiverInfo: (row.caregiver_info as CaregiverInfo) || { isCaregiver: false, name: null, relationship: null },
+    let active = true
+
+    const poll = async () => {
+      try {
+        const res = await fetch(`/api/follow-up/${liveSessionId}/summary`)
+        if (res.ok) {
+          const data = await res.json()
+          if (active && data.session) {
+            const row = data.session
+            const update: DashboardUpdate = {
+              status: (row.status as DashboardUpdate['status']) || 'in_progress',
+              currentModule: (row.current_module as FollowUpModule) || 'greeting',
+              flags: [],
+              medicationStatus: (row.medication_status as MedicationStatus[]) || [],
+              functionalStatus: (row.functional_status as string) || null,
+              functionalDetails: (row.functional_details as string) || null,
+              patientQuestions: (row.patient_questions as string[]) || [],
+              caregiverInfo: (row.caregiver_info as CaregiverInfo) || { isCaregiver: false, name: null, relationship: null },
+            }
+            setLiveDashboard(update)
           }
-          setLiveDashboard(update)
         }
-      )
-      .subscribe()
+      } catch {
+        // Polling failure — will retry on next interval
+      }
+    }
+
+    poll()
+    const interval = setInterval(poll, 5000)
 
     return () => {
-      supabase.removeChannel(channel)
+      active = false
+      clearInterval(interval)
     }
   }, [liveSessionId])
 

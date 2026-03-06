@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
+import { getUser } from '@/lib/cognito/server'
+import { from } from '@/lib/db-query'
+
 
 // Normalize metrics from iOS app format to web dashboard format
 function normalizeMetrics(raw: Record<string, unknown>): Record<string, unknown> {
@@ -134,21 +136,18 @@ function normalizeTappingAssessment(raw: Record<string, unknown>): Record<string
 
 export async function GET(request: NextRequest) {
   try {
-    const supabase = await createClient()
     const patientId = request.nextUrl.searchParams.get('patient_id')
 
     let patient
     if (patientId) {
-      const { data, error } = await supabase
-        .from('wearable_patients')
+      const { data, error } = await from('wearable_patients')
         .select('*')
         .eq('id', patientId)
         .single()
       if (error) throw error
       patient = data
     } else {
-      const { data, error } = await supabase
-        .from('wearable_patients')
+      const { data, error } = await from('wearable_patients')
         .select('*')
         .eq('name', 'Linda Martinez')
         .limit(1)
@@ -163,13 +162,13 @@ export async function GET(request: NextRequest) {
     }
 
     const [summariesRes, anomaliesRes, alertsRes, assessmentsRes, fluencyRes, tappingRes, narrativesRes] = await Promise.all([
-      supabase.from('wearable_daily_summaries').select('*').eq('patient_id', patient.id).order('date', { ascending: true }),
-      supabase.from('wearable_anomalies').select('*').eq('patient_id', patient.id).order('detected_at', { ascending: true }),
-      supabase.from('wearable_alerts').select('*').eq('patient_id', patient.id).order('created_at', { ascending: true }),
-      supabase.from('wearable_tremor_assessments').select('*').eq('patient_id', patient.id).order('assessed_at', { ascending: true }),
-      supabase.from('wearable_fluency_assessments').select('*').eq('patient_id', patient.id).order('assessed_at', { ascending: true }),
-      supabase.from('wearable_tapping_assessments').select('*').eq('patient_id', patient.id).order('assessed_at', { ascending: true }),
-      supabase.from('wearable_clinical_narratives').select('*').eq('patient_id', patient.id).order('created_at', { ascending: false }),
+      from('wearable_daily_summaries').select('*').eq('patient_id', patient.id).order('date', { ascending: true }),
+      from('wearable_anomalies').select('*').eq('patient_id', patient.id).order('detected_at', { ascending: true }),
+      from('wearable_alerts').select('*').eq('patient_id', patient.id).order('created_at', { ascending: true }),
+      from('wearable_tremor_assessments').select('*').eq('patient_id', patient.id).order('assessed_at', { ascending: true }),
+      from('wearable_fluency_assessments').select('*').eq('patient_id', patient.id).order('assessed_at', { ascending: true }),
+      from('wearable_tapping_assessments').select('*').eq('patient_id', patient.id).order('assessed_at', { ascending: true }),
+      from('wearable_clinical_narratives').select('*').eq('patient_id', patient.id).order('created_at', { ascending: false }),
     ])
 
     // Check for query errors and collect warnings
@@ -202,7 +201,7 @@ export async function GET(request: NextRequest) {
       alerts: alertsRes.data || [],
       assessments: assessmentsRes.data || [],
       fluencyAssessments: fluencyRes.data || [],
-      tappingAssessments: (tappingRes.data || []).map(a => normalizeTappingAssessment(a as Record<string, unknown>)),
+      tappingAssessments: (tappingRes.data || []).map((a: any) => normalizeTappingAssessment(a as Record<string, unknown>)),
       narratives: narrativesRes.data || [],
       ...(warnings.length > 0 ? { warnings } : {}),
     })

@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
+import { getUser } from '@/lib/cognito/server'
 import { getTenantServer } from '@/lib/tenant'
+import { from } from '@/lib/db-query'
 
 // GET /api/consults — List consult requests
 export async function GET(request: NextRequest) {
   try {
-    const supabase = await createClient()
     const tenant = getTenantServer()
 
     const { searchParams } = new URL(request.url)
@@ -14,8 +14,7 @@ export async function GET(request: NextRequest) {
     const patientId = searchParams.get('patient_id')
     const status = searchParams.get('status')
 
-    let query = supabase
-      .from('consult_requests')
+    let query = from('consult_requests')
       .select('*')
       .eq('tenant_id', tenant)
       .order('created_at', { ascending: false })
@@ -50,7 +49,6 @@ export async function GET(request: NextRequest) {
 // POST /api/consults — Create a consult request
 export async function POST(request: NextRequest) {
   try {
-    const supabase = await createClient()
     const tenant = getTenantServer()
     const body = await request.json()
 
@@ -66,8 +64,7 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const { data, error } = await supabase
-      .from('consult_requests')
+    const { data, error } = await from('consult_requests')
       .insert({
         tenant_id: tenant,
         requester_id,
@@ -96,7 +93,6 @@ export async function POST(request: NextRequest) {
 // PATCH /api/consults — Update consult status or add response
 export async function PATCH(request: NextRequest) {
   try {
-    const supabase = await createClient()
     const body = await request.json()
 
     const { id, status, response } = body
@@ -112,8 +108,7 @@ export async function PATCH(request: NextRequest) {
     if (status) updateData.status = status
     if (response) updateData.response = response
 
-    const { data, error } = await supabase
-      .from('consult_requests')
+    const { data, error } = await from('consult_requests')
       .update(updateData)
       .eq('id', id)
       .select()

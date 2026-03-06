@@ -1,14 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
+import { getUser } from '@/lib/cognito/server'
+import { from } from '@/lib/db-query'
 
 // POST /api/visits - Create a new visit (when starting an appointment)
 export async function POST(request: NextRequest) {
   try {
-    const supabase = await createClient()
 
     // Check authentication
-    const { data: { user }, error: authError } = await supabase.auth.getUser()
-    if (authError || !user) {
+    const user = await getUser()
+    if (!user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
@@ -29,8 +29,7 @@ export async function POST(request: NextRequest) {
 
     // Prevent duplicate visits for the same appointment
     if (appointmentId) {
-      const { data: existing } = await supabase
-        .from('appointments')
+      const { data: existing } = await from('appointments')
         .select('visit_id')
         .eq('id', appointmentId)
         .single()
@@ -55,8 +54,7 @@ export async function POST(request: NextRequest) {
     const mappedVisitType = visitTypeMap[visitType] || visitType
 
     // Create the visit (only insert columns that exist in the visits table)
-    const { data: visit, error: visitError } = await supabase
-      .from('visits')
+    const { data: visit, error: visitError } = await from('visits')
       .insert({
         patient_id: patientId,
         user_id: user.id,
@@ -74,8 +72,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Create an empty clinical note for the visit
-    const { data: clinicalNote, error: noteError } = await supabase
-      .from('clinical_notes')
+    const { data: clinicalNote, error: noteError } = await from('clinical_notes')
       .insert({
         visit_id: visit.id,
         status: 'draft',
@@ -90,8 +87,7 @@ export async function POST(request: NextRequest) {
 
     // Update the appointment to link to this visit and mark as in-progress
     if (appointmentId) {
-      await supabase
-        .from('appointments')
+      await from('appointments')
         .update({
           visit_id: visit.id,
           status: 'in_progress',

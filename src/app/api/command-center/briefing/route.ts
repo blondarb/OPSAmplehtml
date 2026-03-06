@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
+import { getUser } from '@/lib/cognito/server'
 import { DEMO_BRIEFING } from '@/lib/command-center/briefingPrompt'
+
 
 // ─── POST /api/command-center/briefing ──────────────────────────────────────
 // Returns an AI-generated morning briefing for the physician's command center.
@@ -18,8 +19,7 @@ import { DEMO_BRIEFING } from '@/lib/command-center/briefingPrompt'
 export async function POST(request: NextRequest) {
   try {
     // ── Auth check ──────────────────────────────────────────────────────────
-    const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
+    const user = await getUser()
 
     if (!user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -66,44 +66,20 @@ export async function POST(request: NextRequest) {
     // 2. Check command_center_briefings table for a cached briefing that is
     //    less than 1 hour old (unless `regenerate` query param is set).
     //
-    //    const { data: cached } = await supabase
-    //      .from('command_center_briefings')
-    //      .select('*')
-    //      .eq('physician_id', physician_id || user.id)
-    //      .gte('generated_at', oneHourAgo.toISOString())
-    //      .order('generated_at', { ascending: false })
-    //      .limit(1)
-    //      .maybeSingle()
+    // 3. Call Bedrock Claude with the system prompt + data snapshot:
     //
-    //    if (cached && !regenerate) return NextResponse.json(cached)
-    //
-    // 3. Call OpenAI GPT-5.2 with the system prompt + data snapshot:
-    //
-    //    import OpenAI from 'openai'
+    //    import { invokeBedrockJSON } from '@/lib/bedrock'
     //    import { BRIEFING_SYSTEM_PROMPT } from '@/lib/command-center/briefingPrompt'
     //
-    //    let apiKey = process.env.OPENAI_API_KEY
-    //    if (!apiKey) {
-    //      const { data: setting } = await supabase.rpc('get_openai_key')
-    //      apiKey = setting
-    //    }
-    //
-    //    const openai = new OpenAI({ apiKey })
-    //    const completion = await openai.chat.completions.create({
-    //      model: 'gpt-5.2',
-    //      messages: [
-    //        { role: 'system', content: BRIEFING_SYSTEM_PROMPT },
-    //        { role: 'user', content: JSON.stringify(dataSnapshot) },
-    //      ],
-    //      response_format: { type: 'json_object' },
-    //      max_completion_tokens: 1000,
+    //    const { parsed } = await invokeBedrockJSON({
+    //      system: BRIEFING_SYSTEM_PROMPT,
+    //      messages: [{ role: 'user', content: JSON.stringify(dataSnapshot) }],
+    //      maxTokens: 1000,
     //    })
-    //
-    //    const parsed = JSON.parse(completion.choices[0].message.content)
     //
     // 4. Cache the new briefing in command_center_briefings:
     //
-    //    await supabase.from('command_center_briefings').insert({
+    //    await from('command_center_briefings').insert({
     //      physician_id: physician_id || user.id,
     //      narrative: parsed.narrative,
     //      reasoning: parsed.reasoning,

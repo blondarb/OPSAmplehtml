@@ -1,28 +1,13 @@
 import { NextResponse } from 'next/server'
-import OpenAI from 'openai'
-import { createClient } from '@/lib/supabase/server'
 import { INTAKE_CHAT_SYSTEM_PROMPT } from '@/lib/intakePrompts'
+import { invokeBedrockJSON } from '@/lib/bedrock'
+
 
 export async function POST(request: Request) {
   try {
     const { message, conversationHistory, currentData } = await request.json()
 
     // Patient portal is publicly accessible — no auth required.
-    // Create a Supabase client only for the OpenAI key lookup.
-    const supabase = await createClient()
-
-    // Get OpenAI key
-    let apiKey = process.env.OPENAI_API_KEY
-    if (!apiKey) {
-      const { data: setting } = await supabase.rpc('get_openai_key')
-      apiKey = setting
-    }
-
-    if (!apiKey) {
-      return NextResponse.json({ error: 'OpenAI API key not configured' }, { status: 500 })
-    }
-
-    const openai = new OpenAI({ apiKey })
 
     // Keep only the last 10 messages of conversation history to stay within
     // context limits. The currentData object already has all extracted info,
@@ -31,41 +16,25 @@ export async function POST(request: Request) {
       ? conversationHistory.slice(-10)
       : []
 
-    // Build messages array
-    const messages: OpenAI.Chat.ChatCompletionMessageParam[] = [
-      { role: 'system', content: INTAKE_CHAT_SYSTEM_PROMPT },
-      { role: 'system', content: `Current collected data: ${JSON.stringify(currentData)}` },
+    // Build the system prompt that includes the current collected data context
+    const systemPromptWithContext = `${INTAKE_CHAT_SYSTEM_PROMPT}\n\nCurrent collected data: ${JSON.stringify(currentData)}`
+
+    // Build messages array — only user/assistant roles for Bedrock
+    const messages = [
       ...recentHistory.map((msg: { role: string; text: string }) => ({
         role: msg.role as 'user' | 'assistant',
         content: msg.text
       })),
-      { role: 'user', content: message }
+      { role: 'user' as const, content: message }
     ]
 
-    // Call GPT-5-mini
-    // Note: gpt-5-mini only supports default temperature (1)
     // Use 2000 tokens to ensure the summary response (listing all 9 fields) isn't truncated
-    const response = await openai.chat.completions.create({
-      model: 'gpt-5-mini',
+    const { parsed: result } = await invokeBedrockJSON<Record<string, unknown>>({
+      system: systemPromptWithContext,
       messages,
-      response_format: { type: 'json_object' },
-      max_completion_tokens: 2000,
+      maxTokens: 2000,
+      temperature: 1,
     })
-
-    // Check for truncated responses
-    const finishReason = response.choices[0].finish_reason
-    if (finishReason === 'length') {
-      console.warn('AI response truncated (finish_reason: length)')
-    }
-
-    const rawContent = response.choices[0].message.content || '{}'
-    let result: Record<string, unknown>
-    try {
-      result = JSON.parse(rawContent)
-    } catch {
-      console.error('Failed to parse AI response:', rawContent)
-      result = { nextQuestion: 'Sorry, I had trouble processing that. Could you repeat your last answer?' }
-    }
 
     // Ensure nextQuestion always exists
     if (!result.nextQuestion) {

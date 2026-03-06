@@ -1,7 +1,6 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { createClient } from '@/lib/supabase/client'
 
 interface Patient {
   id: string
@@ -24,14 +23,11 @@ export default function PatientSelector({ sessionId }: Props) {
   useEffect(() => {
     async function loadPatients() {
       try {
-        const supabase = createClient()
-        const { data } = await supabase
-          .from('patients')
-          .select('id, first_name, last_name, date_of_birth')
-          .order('last_name')
-          .limit(100)
-
-        if (data) setPatients(data)
+        const res = await fetch('/api/patients/list')
+        if (res.ok) {
+          const { patients: data } = await res.json()
+          if (data) setPatients(data)
+        }
       } catch {
         // Non-critical — patient list may not be available in demo mode
       }
@@ -45,13 +41,16 @@ export default function PatientSelector({ sessionId }: Props) {
     setError('')
 
     try {
-      const supabase = createClient()
-      const { error: updateError } = await supabase
-        .from('triage_sessions')
-        .update({ patient_id: selectedId })
-        .eq('id', sessionId)
+      const res = await fetch(`/api/triage/${sessionId}/patient`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ patient_id: selectedId }),
+      })
 
-      if (updateError) throw updateError
+      if (!res.ok) {
+        const data = await res.json()
+        throw new Error(data.error || 'Failed to save')
+      }
       setSaved(true)
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Failed to save')

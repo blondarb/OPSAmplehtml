@@ -1,14 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
+import { getUser } from '@/lib/cognito/server'
+import { from } from '@/lib/db-query'
 
 // GET /api/appointments - Get appointments with optional filters
 export async function GET(request: NextRequest) {
   try {
-    const supabase = await createClient()
 
     // Check authentication
-    const { data: { user }, error: authError } = await supabase.auth.getUser()
-    if (authError || !user) {
+    const user = await getUser()
+    if (!user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
@@ -20,8 +20,7 @@ export async function GET(request: NextRequest) {
     const date = searchParams.get('date') // Single date query
 
     // Build query
-    let query = supabase
-      .from('appointments')
+    let query = from('appointments')
       .select(`
         *,
         patient:patients (
@@ -73,7 +72,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Transform data to match frontend expectations
-    const appointments = (data || []).map(apt => ({
+    const appointments = (data || []).map((apt: any) => ({
       id: apt.id,
       appointmentDate: apt.appointment_date,
       appointmentTime: apt.appointment_time,
@@ -121,11 +120,10 @@ export async function GET(request: NextRequest) {
 // POST /api/appointments - Create a new appointment
 export async function POST(request: NextRequest) {
   try {
-    const supabase = await createClient()
 
     // Check authentication
-    const { data: { user }, error: authError } = await supabase.auth.getUser()
-    if (authError || !user) {
+    const user = await getUser()
+    if (!user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
@@ -151,8 +149,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Create appointment
-    const { data, error } = await supabase
-      .from('appointments')
+    const { data, error } = await from('appointments')
       .insert({
         patient_id: patientId,
         appointment_date: appointmentDate,

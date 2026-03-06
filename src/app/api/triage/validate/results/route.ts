@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
+import { getUser } from '@/lib/cognito/server'
 import { TriageTier } from '@/lib/triage/types'
+import { from } from '@/lib/db-query'
 
 // Ordered tiers for weighted calculations (0 = least urgent, 6 = most urgent)
 const TIER_ORDER: TriageTier[] = [
@@ -178,18 +179,16 @@ function consensusTier(tiers: TriageTier[]): TriageTier | null {
 
 // GET /api/triage/validate/results
 export async function GET(req: NextRequest) {
-  const supabase = await createClient()
 
-  const { data: { user }, error: authError } = await supabase.auth.getUser()
-  if (authError || !user) {
+  const user = await getUser()
+  if (!user) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
   const studyName = req.nextUrl.searchParams.get('study') || 'default'
 
   // Fetch all non-calibration active cases
-  const { data: cases, error: casesError } = await supabase
-    .from('validation_cases')
+  const { data: cases, error: casesError } = await from('validation_cases')
     .select('*')
     .eq('study_name', studyName)
     .eq('active', true)
@@ -204,11 +203,10 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: 'No validation cases found' }, { status: 404 })
   }
 
-  const caseIds = cases.map(c => c.id)
+  const caseIds = cases.map((c: any) => c.id)
 
   // Fetch all reviews
-  const { data: reviews, error: reviewsError } = await supabase
-    .from('validation_reviews')
+  const { data: reviews, error: reviewsError } = await from('validation_reviews')
     .select('*')
     .in('case_id', caseIds)
 
@@ -221,13 +219,12 @@ export async function GET(req: NextRequest) {
   }
 
   // Fetch reviewer profiles
-  const reviewerIds = [...new Set(reviews.map(r => r.reviewer_id))]
-  const { data: profiles } = await supabase
-    .from('user_profiles')
+  const reviewerIds = [...new Set<string>(reviews.map((r: any) => r.reviewer_id))]
+  const { data: profiles } = await from('user_profiles')
     .select('id, display_name')
     .in('id', reviewerIds)
 
-  const profileMap = new Map((profiles || []).map(p => [p.id, p.display_name || 'Reviewer']))
+  const profileMap = new Map<string, string>((profiles || []).map((p: any) => [p.id, p.display_name || 'Reviewer']))
 
   // Build a consistent name map for all reviewers (avoids mismatched fallbacks)
   const nameMap = new Map<string, string>()
@@ -260,12 +257,12 @@ export async function GET(req: NextRequest) {
   // ── Build Fleiss' Kappa matrix ──
   const numCategories = TIER_ORDER.length
   // Only include cases where at least 2 reviewers have responded
-  const eligibleCases = cases.filter(c => {
+  const eligibleCases = cases.filter((c: any) => {
     const caseReviews = reviewsByCase.get(c.id) || []
     return caseReviews.length >= 2
   })
 
-  const fleissMatrix: number[][] = eligibleCases.map(c => {
+  const fleissMatrix: number[][] = eligibleCases.map((c: any) => {
     const caseReviews = reviewsByCase.get(c.id) || []
     const row = Array(numCategories).fill(0) as number[]
     for (const r of caseReviews) {
@@ -279,9 +276,9 @@ export async function GET(req: NextRequest) {
 
   // ── Krippendorff's Alpha ──
   const raterData: (number | null)[][] = reviewerIds.map(rid => {
-    return eligibleCases.map(c => {
+    return eligibleCases.map((c: any) => {
       const caseReviews = reviewsByCase.get(c.id) || []
-      const review = caseReviews.find(r => r.reviewer_id === rid)
+      const review = caseReviews.find((r: any) => r.reviewer_id === rid)
       if (!review) return null
       return tierToOrdinal(review.triage_tier as TriageTier)
     })
@@ -308,14 +305,14 @@ export async function GET(req: NextRequest) {
   // ── Per-tier agreement ──
   const tierAgreement: Record<string, { agreement_rate: number; total: number }> = {}
   for (const tier of TIER_ORDER) {
-    const casesWithThisTier = eligibleCases.filter(c => {
+    const casesWithThisTier = eligibleCases.filter((c: any) => {
       const caseReviews = reviewsByCase.get(c.id) || []
-      const consTier = consensusTier(caseReviews.map(r => r.triage_tier as TriageTier))
+      const consTier = consensusTier(caseReviews.map((r: any) => r.triage_tier as TriageTier))
       return consTier === tier
     })
-    const agreed = casesWithThisTier.filter(c => {
+    const agreed = casesWithThisTier.filter((c: any) => {
       const caseReviews = reviewsByCase.get(c.id) || []
-      return caseReviews.every(r => r.triage_tier === caseReviews[0].triage_tier)
+      return caseReviews.every((r: any) => r.triage_tier === caseReviews[0].triage_tier)
     })
     tierAgreement[tier] = {
       total: casesWithThisTier.length,
@@ -343,8 +340,8 @@ export async function GET(req: NextRequest) {
 
       for (const c of eligibleCases) {
         const caseReviews = reviewsByCase.get(c.id) || []
-        const ra = caseReviews.find(r => r.reviewer_id === a)
-        const rb = caseReviews.find(r => r.reviewer_id === b)
+        const ra = caseReviews.find((r: any) => r.reviewer_id === a)
+        const rb = caseReviews.find((r: any) => r.reviewer_id === b)
         if (ra && rb) {
           ratingsA.push(tierToOrdinal(ra.triage_tier as TriageTier))
           ratingsB.push(tierToOrdinal(rb.triage_tier as TriageTier))
@@ -383,7 +380,7 @@ export async function GET(req: NextRequest) {
   for (const c of eligibleCases) {
     if (!c.ai_triage_tier) continue
     const caseReviews = reviewsByCase.get(c.id) || []
-    const consTier = consensusTier(caseReviews.map(r => r.triage_tier as TriageTier))
+    const consTier = consensusTier(caseReviews.map((r: any) => r.triage_tier as TriageTier))
     if (!consTier) continue
 
     aiCompareCount++
@@ -423,7 +420,7 @@ export async function GET(req: NextRequest) {
   for (const c of eligibleCases) {
     const caseReviews = reviewsByCase.get(c.id) || []
     if (caseReviews.length < 2) continue
-    const redirectVotes = caseReviews.filter(r => r.redirect_to_non_neuro).length
+    const redirectVotes = caseReviews.filter((r: any) => r.redirect_to_non_neuro).length
     const noRedirectVotes = caseReviews.length - redirectVotes
     redirectTotalCount++
     // Agreement = majority agrees (either mostly redirect or mostly not)
@@ -433,7 +430,7 @@ export async function GET(req: NextRequest) {
   }
 
   // ── Per-case detail ──
-  const caseDetails = cases.map(c => {
+  const caseDetails = cases.map((c: any) => {
     const caseReviews = reviewsByCase.get(c.id) || []
     const revTiers: Record<string, TriageTier> = {}
     const revRedirects: Record<string, string | null> = {}
@@ -444,12 +441,12 @@ export async function GET(req: NextRequest) {
         revRedirects[name] = r.redirect_specialty || 'Yes (unspecified)'
       }
     }
-    const consTier = consensusTier(caseReviews.map(r => r.triage_tier as TriageTier))
+    const consTier = consensusTier(caseReviews.map((r: any) => r.triage_tier as TriageTier))
     // agreement: true = all same, false = disagree, null = only 1 reviewer (N/A)
     const agreement = caseReviews.length > 1
-      ? caseReviews.every(r => r.triage_tier === caseReviews[0].triage_tier)
+      ? caseReviews.every((r: any) => r.triage_tier === caseReviews[0].triage_tier)
       : null
-    const anyRedirect = caseReviews.some(r => r.redirect_to_non_neuro)
+    const anyRedirect = caseReviews.some((r: any) => r.redirect_to_non_neuro)
 
     return {
       case_id: c.id,
@@ -468,8 +465,7 @@ export async function GET(req: NextRequest) {
   // ── AI Self-Consistency (multi-run analysis) ──
   let aiConsistency = undefined
   {
-    const { data: aiRuns } = await supabase
-      .from('validation_ai_runs')
+    const { data: aiRuns } = await from('validation_ai_runs')
       .select('*')
       .in('case_id', caseIds)
       .order('run_number', { ascending: true })
@@ -484,24 +480,24 @@ export async function GET(req: NextRequest) {
       }
 
       const caseConsistency = cases
-        .filter(c => runsByCase.has(c.id))
-        .map(c => {
+        .filter((c: any) => runsByCase.has(c.id))
+        .map((c: any) => {
           const runs = runsByCase.get(c.id) || []
-          const successRuns = runs.filter(r => !r.error)
-          const baseline = successRuns.find(r => r.run_number === 0)
-          const standardRuns = successRuns.filter(r => r.run_number > 0)
+          const successRuns = runs.filter((r: any) => !r.error)
+          const baseline = successRuns.find((r: any) => r.run_number === 0)
+          const standardRuns = successRuns.filter((r: any) => r.run_number > 0)
 
-          const allTiers = successRuns.map(r => r.ai_triage_tier as TriageTier).filter(Boolean)
+          const allTiers = successRuns.map((r: any) => r.ai_triage_tier as TriageTier).filter(Boolean)
           const distinctTiers = [...new Set(allTiers)].length
 
           const scores = successRuns
-            .map(r => parseFloat(r.ai_weighted_score))
-            .filter(s => !isNaN(s))
+            .map((r: any) => parseFloat(r.ai_weighted_score))
+            .filter((s: any) => !isNaN(s))
           const scoreMean = scores.length > 0
-            ? scores.reduce((a, b) => a + b, 0) / scores.length
+            ? scores.reduce((a: any, b: any) => a + b, 0) / scores.length
             : null
           const scoreStd = scores.length > 1
-            ? Math.sqrt(scores.reduce((sum, s) => sum + (s - scoreMean!) ** 2, 0) / (scores.length - 1))
+            ? Math.sqrt(scores.reduce((sum: any, s: any) => sum + (s - scoreMean!) ** 2, 0) / (scores.length - 1))
             : null
 
           return {
@@ -510,8 +506,8 @@ export async function GET(req: NextRequest) {
             case_title: c.title,
             baseline_tier: baseline?.ai_triage_tier as TriageTier | null ?? null,
             baseline_score: baseline?.ai_weighted_score ? parseFloat(baseline.ai_weighted_score) : null,
-            run_tiers: standardRuns.map(r => r.ai_triage_tier as TriageTier).filter(Boolean),
-            run_scores: standardRuns.map(r => parseFloat(r.ai_weighted_score)).filter(s => !isNaN(s)),
+            run_tiers: standardRuns.map((r: any) => r.ai_triage_tier as TriageTier).filter(Boolean),
+            run_scores: standardRuns.map((r: any) => parseFloat(r.ai_weighted_score)).filter((s: any) => !isNaN(s)),
             distinct_tiers: distinctTiers,
             score_mean: scoreMean !== null ? Math.round(scoreMean * 100) / 100 : null,
             score_std: scoreStd !== null ? Math.round(scoreStd * 100) / 100 : null,
@@ -520,9 +516,9 @@ export async function GET(req: NextRequest) {
         })
 
       const casesWithRuns = caseConsistency.length
-      const perfectAgreement = caseConsistency.filter(c => c.all_agree).length
+      const perfectAgreement = caseConsistency.filter((c: any) => c.all_agree).length
       const avgDistinct = casesWithRuns > 0
-        ? caseConsistency.reduce((s, c) => s + c.distinct_tiers, 0) / casesWithRuns
+        ? caseConsistency.reduce((s: any, c: any) => s + c.distinct_tiers, 0) / casesWithRuns
         : 0
 
       aiConsistency = {
@@ -543,7 +539,7 @@ export async function GET(req: NextRequest) {
     total_cases: cases.length,
   }))
 
-  const casesWithAnyRedirect = caseDetails.filter(cd => cd.any_redirect || cd.ai_redirect).length
+  const casesWithAnyRedirect = caseDetails.filter((cd: any) => cd.any_redirect || cd.ai_redirect).length
 
   return NextResponse.json({
     study_name: studyName,

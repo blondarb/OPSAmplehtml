@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
+import { getUser } from '@/lib/cognito/server'
 import { getTenantServer } from '@/lib/tenant'
+import { from } from '@/lib/db-query'
 
 // GET /api/notifications — List notifications with optional filters
 export async function GET(request: NextRequest) {
   try {
-    const supabase = await createClient()
     const tenant = getTenantServer()
 
     const { searchParams } = new URL(request.url)
@@ -14,8 +14,7 @@ export async function GET(request: NextRequest) {
     const sourceType = searchParams.get('source_type')
     const limit = parseInt(searchParams.get('limit') || '50', 10)
 
-    let query = supabase
-      .from('notifications')
+    let query = from('notifications')
       .select('*')
       .eq('tenant_id', tenant)
       .order('created_at', { ascending: false })
@@ -47,7 +46,7 @@ export async function GET(request: NextRequest) {
 
     // Filter out actively snoozed items client-side for simplicity
     const now = new Date().toISOString()
-    const filtered = (data || []).filter(n => {
+    const filtered = (data || []).filter((n: any) => {
       if (n.status === 'snoozed' && n.snoozed_until && n.snoozed_until > now) {
         return false
       }
@@ -63,7 +62,6 @@ export async function GET(request: NextRequest) {
 // PATCH /api/notifications — Update notification status (read, dismiss, snooze, action)
 export async function PATCH(request: NextRequest) {
   try {
-    const supabase = await createClient()
     const body = await request.json()
 
     const { id, ids, status, snoozed_until } = body
@@ -87,8 +85,7 @@ export async function PATCH(request: NextRequest) {
       return NextResponse.json({ error: 'id or ids required' }, { status: 400 })
     }
 
-    const { data, error } = await supabase
-      .from('notifications')
+    const { data, error } = await from('notifications')
       .update(updateData)
       .in('id', targetIds)
       .select()
@@ -106,7 +103,6 @@ export async function PATCH(request: NextRequest) {
 // POST /api/notifications — Create a notification (used by other services)
 export async function POST(request: NextRequest) {
   try {
-    const supabase = await createClient()
     const tenant = getTenantServer()
     const body = await request.json()
 
@@ -116,8 +112,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'source_type and title are required' }, { status: 400 })
     }
 
-    const { data, error } = await supabase
-      .from('notifications')
+    const { data, error } = await from('notifications')
       .insert({
         tenant_id: tenant,
         recipient_user_id: recipient_user_id || null,

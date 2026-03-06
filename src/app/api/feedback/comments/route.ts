@@ -1,11 +1,11 @@
-import { createClient } from '@/lib/supabase/server'
+import { getUser } from '@/lib/cognito/server'
 import { NextResponse, NextRequest } from 'next/server'
+import { from } from '@/lib/db-query'
 
 // GET /api/feedback/comments?feedbackId=xxx - Get comments for a feedback item
 export async function GET(request: NextRequest) {
-  const supabase = await createClient()
 
-  const { data: { user } } = await supabase.auth.getUser()
+  const user = await getUser()
   if (!user) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
@@ -15,8 +15,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: 'feedbackId query param is required' }, { status: 400 })
   }
 
-  const { data: comments, error } = await supabase
-    .from('feedback_comments')
+  const { data: comments, error } = await from('feedback_comments')
     .select('*')
     .eq('feedback_id', feedbackId)
     .order('created_at', { ascending: true })
@@ -30,9 +29,8 @@ export async function GET(request: NextRequest) {
 
 // POST /api/feedback/comments - Add a comment to a feedback item
 export async function POST(request: Request) {
-  const supabase = await createClient()
 
-  const { data: { user } } = await supabase.auth.getUser()
+  const user = await getUser()
   if (!user) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
@@ -44,8 +42,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'feedbackId and text are required' }, { status: 400 })
   }
 
-  const { data: comment, error } = await supabase
-    .from('feedback_comments')
+  const { data: comment, error } = await from('feedback_comments')
     .insert({
       feedback_id: feedbackId,
       user_id: user.id,
@@ -65,9 +62,8 @@ export async function POST(request: Request) {
 
 // DELETE /api/feedback/comments - Delete a comment (own comments only)
 export async function DELETE(request: Request) {
-  const supabase = await createClient()
 
-  const { data: { user } } = await supabase.auth.getUser()
+  const user = await getUser()
   if (!user) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
@@ -80,8 +76,7 @@ export async function DELETE(request: Request) {
   }
 
   // Verify ownership
-  const { data: existing } = await supabase
-    .from('feedback_comments')
+  const { data: existing } = await from('feedback_comments')
     .select('user_id')
     .eq('id', commentId)
     .single()
@@ -94,8 +89,7 @@ export async function DELETE(request: Request) {
     return NextResponse.json({ error: 'Cannot delete another user\'s comment' }, { status: 403 })
   }
 
-  const { error } = await supabase
-    .from('feedback_comments')
+  const { error } = await from('feedback_comments')
     .delete()
     .eq('id', commentId)
 

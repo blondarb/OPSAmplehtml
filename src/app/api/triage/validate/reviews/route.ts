@@ -1,20 +1,19 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
+import { getUser } from '@/lib/cognito/server'
+import { from } from '@/lib/db-query'
 
 // GET /api/triage/validate/reviews — get all reviews (for results page)
 export async function GET(req: NextRequest) {
-  const supabase = await createClient()
 
-  const { data: { user }, error: authError } = await supabase.auth.getUser()
-  if (authError || !user) {
+  const user = await getUser()
+  if (!user) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
   const studyName = req.nextUrl.searchParams.get('study') || 'default'
 
   // Get case IDs for this study
-  const { data: cases, error: casesError } = await supabase
-    .from('validation_cases')
+  const { data: cases, error: casesError } = await from('validation_cases')
     .select('id')
     .eq('study_name', studyName)
     .eq('active', true)
@@ -24,15 +23,14 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: casesError.message }, { status: 500 })
   }
 
-  const caseIds = (cases || []).map(c => c.id)
+  const caseIds = (cases || []).map((c: any) => c.id)
 
   if (caseIds.length === 0) {
     return NextResponse.json({ reviews: [] })
   }
 
   // Get all reviews for those cases
-  const { data: reviews, error: reviewsError } = await supabase
-    .from('validation_reviews')
+  const { data: reviews, error: reviewsError } = await from('validation_reviews')
     .select('*')
     .in('case_id', caseIds)
     .order('created_at', { ascending: true })
@@ -46,10 +44,9 @@ export async function GET(req: NextRequest) {
 
 // POST /api/triage/validate/reviews — submit a review
 export async function POST(req: NextRequest) {
-  const supabase = await createClient()
 
-  const { data: { user }, error: authError } = await supabase.auth.getUser()
-  if (authError || !user) {
+  const user = await getUser()
+  if (!user) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
@@ -84,8 +81,7 @@ export async function POST(req: NextRequest) {
   }
 
   // Verify the case exists
-  const { data: caseData, error: caseError } = await supabase
-    .from('validation_cases')
+  const { data: caseData, error: caseError } = await from('validation_cases')
     .select('id')
     .eq('id', case_id)
     .single()
@@ -95,8 +91,7 @@ export async function POST(req: NextRequest) {
   }
 
   // Upsert the review (allows updating a previous review)
-  const { data, error } = await supabase
-    .from('validation_reviews')
+  const { data, error } = await from('validation_reviews')
     .upsert({
       case_id,
       reviewer_id: user.id,

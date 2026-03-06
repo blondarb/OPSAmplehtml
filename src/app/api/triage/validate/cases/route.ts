@@ -1,20 +1,19 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
+import { getUser } from '@/lib/cognito/server'
+import { from } from '@/lib/db-query'
 
 // GET /api/triage/validate/cases — list validation cases with reviewer's completion status
 export async function GET(req: NextRequest) {
-  const supabase = await createClient()
 
-  const { data: { user }, error: authError } = await supabase.auth.getUser()
-  if (authError || !user) {
+  const user = await getUser()
+  if (!user) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
   const studyName = req.nextUrl.searchParams.get('study') || 'default'
 
   // Fetch all active cases for this study
-  const { data: cases, error: casesError } = await supabase
-    .from('validation_cases')
+  const { data: cases, error: casesError } = await from('validation_cases')
     .select('*')
     .eq('study_name', studyName)
     .eq('active', true)
@@ -25,19 +24,18 @@ export async function GET(req: NextRequest) {
   }
 
   // Fetch this reviewer's reviews
-  const { data: reviews, error: reviewsError } = await supabase
-    .from('validation_reviews')
+  const { data: reviews, error: reviewsError } = await from('validation_reviews')
     .select('*')
     .eq('reviewer_id', user.id)
-    .in('case_id', (cases || []).map(c => c.id))
+    .in('case_id', (cases || []).map((c: any) => c.id))
 
   if (reviewsError) {
     return NextResponse.json({ error: reviewsError.message }, { status: 500 })
   }
 
-  const reviewMap = new Map((reviews || []).map(r => [r.case_id, r]))
+  const reviewMap = new Map((reviews || []).map((r: any) => [r.case_id, r]))
 
-  const casesWithStatus = (cases || []).map(c => ({
+  const casesWithStatus = (cases || []).map((c: any) => ({
     ...c,
     reviewed: reviewMap.has(c.id),
     review: reviewMap.get(c.id) || undefined,
@@ -46,17 +44,16 @@ export async function GET(req: NextRequest) {
   return NextResponse.json({
     cases: casesWithStatus,
     total: casesWithStatus.length,
-    completed: casesWithStatus.filter(c => c.reviewed).length,
-    calibration_count: casesWithStatus.filter(c => c.is_calibration).length,
+    completed: casesWithStatus.filter((c: any) => c.reviewed).length,
+    calibration_count: casesWithStatus.filter((c: any) => c.is_calibration).length,
   })
 }
 
 // POST /api/triage/validate/cases — add new validation cases (admin/setup)
 export async function POST(req: NextRequest) {
-  const supabase = await createClient()
 
-  const { data: { user }, error: authError } = await supabase.auth.getUser()
-  if (authError || !user) {
+  const user = await getUser()
+  if (!user) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
@@ -109,8 +106,7 @@ export async function POST(req: NextRequest) {
     ai_session_id: c.ai_session_id ?? null,
   }))
 
-  const { data, error } = await supabase
-    .from('validation_cases')
+  const { data, error } = await from('validation_cases')
     .upsert(rows, { onConflict: 'study_name,case_number' })
     .select()
 

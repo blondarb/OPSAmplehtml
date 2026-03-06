@@ -4,7 +4,7 @@ import PlatformShell from './layout/PlatformShell'
 import FeatureSubHeader from './layout/FeatureSubHeader'
 import ClinicalNote from './ClinicalNote'
 import { Stethoscope } from 'lucide-react'
-import type { User } from '@supabase/supabase-js'
+interface User { id: string; email?: string }
 
 interface EhrPageWrapperProps {
   user: User

@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
+import { getUser } from '@/lib/cognito/server'
 import type { AnalyticsData } from '@/lib/follow-up/billingTypes'
+import { from } from '@/lib/db-query'
 
 export async function GET(request: Request) {
   try {
@@ -8,11 +9,9 @@ export async function GET(request: Request) {
     const fromDate = searchParams.get('from') || new Date(Date.now() - 30 * 86400000).toISOString()
     const toDate = searchParams.get('to') || new Date().toISOString()
 
-    const supabase = await createClient()
 
     // Fetch all sessions in range
-    const { data: sessions, error: sessionsError } = await supabase
-      .from('followup_sessions')
+    const { data: sessions, error: sessionsError } = await from('followup_sessions')
       .select('*')
       .gte('created_at', fromDate)
       .lte('created_at', toDate)
@@ -39,8 +38,7 @@ export async function GET(request: Request) {
     const avgDuration = totalCalls > 0 ? Math.round(totalDuration / totalCalls) : 0
 
     // Estimated revenue from billing entries
-    const { data: billingData } = await supabase
-      .from('followup_billing_entries')
+    const { data: billingData } = await from('followup_billing_entries')
       .select('cpt_rate, billing_status')
       .in('billing_status', ['ready_to_bill', 'billed'])
       .gte('created_at', fromDate)
@@ -133,8 +131,7 @@ export async function GET(request: Request) {
     }
 
     // Recent escalations
-    const { data: escalations } = await supabase
-      .from('followup_escalations')
+    const { data: escalations } = await from('followup_escalations')
       .select('id, session_id, tier, category, created_at, acknowledged')
       .gte('created_at', fromDate)
       .lte('created_at', toDate)

@@ -1,7 +1,11 @@
 'use client'
 
 import { createContext, useContext, useState, useEffect, useCallback, type ReactNode } from 'react'
-import type { User, Session } from '@supabase/supabase-js'
+
+interface AuthUser {
+  id: string
+  email: string
+}
 
 interface UserProfile {
   id: string
@@ -12,115 +16,130 @@ interface UserProfile {
 }
 
 interface AuthContextType {
-  user: User | null
-  session: Session | null
+  user: AuthUser | null
   userProfile: UserProfile | null
   loading: boolean
   signIn: (email: string, password: string) => Promise<{ error: string | null }>
   signUp: (email: string, password: string) => Promise<{ error: string | null; needsConfirmation: boolean }>
+  confirmSignUp: (email: string, code: string) => Promise<{ error: string | null }>
+  resendCode: (email: string) => Promise<{ error: string | null }>
+  forgotPassword: (email: string) => Promise<{ error: string | null }>
+  confirmForgotPassword: (email: string, code: string, newPassword: string) => Promise<{ error: string | null }>
   signOut: () => Promise<void>
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<User | null>(null)
-  const [session, setSession] = useState<Session | null>(null)
+  const [user, setUser] = useState<AuthUser | null>(null)
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null)
   const [loading, setLoading] = useState(true)
 
-  const fetchProfile = useCallback(async (userId: string) => {
+  const fetchProfile = useCallback(async () => {
     try {
-      const { createClient } = await import('@/lib/supabase/client')
-      const supabase = createClient()
-      const { data } = await supabase
-        .from('user_profiles')
-        .select('id, display_name, role, organization, specialty')
-        .eq('id', userId)
-        .single()
-      if (data) setUserProfile(data)
+      const res = await fetch('/api/auth/profile')
+      if (res.ok) {
+        const { profile } = await res.json()
+        if (profile) setUserProfile(profile)
+      }
     } catch {
-      // Profile may not exist yet (trigger hasn't fired)
+      // Profile may not exist yet
     }
   }, [])
 
   useEffect(() => {
     let mounted = true
-    let unsubscribe: (() => void) | undefined
 
     const init = async () => {
-      const { createClient } = await import('@/lib/supabase/client')
-      const supabase = createClient()
+      const { getCurrentUser, getCurrentSession } = await import('@/lib/cognito/client')
+      const currentUser = await getCurrentUser()
 
-      // Get initial session
-      const { data: { session: initialSession } } = await supabase.auth.getSession()
       if (mounted) {
-        setSession(initialSession)
-        setUser(initialSession?.user ?? null)
-        if (initialSession?.user) {
-          await fetchProfile(initialSession.user.id)
+        setUser(currentUser)
+        if (currentUser) {
+          // Refresh the cookie in case the token was refreshed by the SDK
+          const session = await getCurrentSession()
+          if (session) {
+            await fetch('/api/auth/session', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                idToken: session.getIdToken().getJwtToken(),
+                accessToken: session.getAccessToken().getJwtToken(),
+                refreshToken: session.getRefreshToken().getToken(),
+              }),
+            })
+          }
+          await fetchProfile()
         }
         setLoading(false)
       }
-
-      // Listen for auth changes
-      const { data: { subscription } } = supabase.auth.onAuthStateChange(
-        async (_event, newSession) => {
-          if (mounted) {
-            setSession(newSession)
-            setUser(newSession?.user ?? null)
-            if (newSession?.user) {
-              await fetchProfile(newSession.user.id)
-            } else {
-              setUserProfile(null)
-            }
-          }
-        }
-      )
-
-      unsubscribe = () => subscription.unsubscribe()
     }
 
     init()
 
-    return () => {
-      mounted = false
-      unsubscribe?.()
-    }
+    return () => { mounted = false }
   }, [fetchProfile])
 
-  const signIn = async (email: string, password: string) => {
-    const { createClient } = await import('@/lib/supabase/client')
-    const supabase = createClient()
-    const { error } = await supabase.auth.signInWithPassword({ email, password })
-    return { error: error?.message ?? null }
+  const handleSignIn = async (email: string, password: string) => {
+    const { signIn } = await import('@/lib/cognito/client')
+    const result = await signIn(email, password)
+
+    if (!result.error) {
+      const { getCurrentUser } = await import('@/lib/cognito/client')
+      const currentUser = await getCurrentUser()
+      setUser(currentUser)
+      if (currentUser) await fetchProfile()
+    }
+
+    return result
   }
 
-  const signUp = async (email: string, password: string) => {
-    const { createClient } = await import('@/lib/supabase/client')
-    const supabase = createClient()
-    const { data, error } = await supabase.auth.signUp({
-      email,
-      password,
-      options: { emailRedirectTo: `${window.location.origin}/auth/callback` },
-    })
-    if (error) return { error: error.message, needsConfirmation: false }
-    // If user exists but no session, email confirmation is needed
-    const needsConfirmation = !!(data.user && !data.session)
-    return { error: null, needsConfirmation }
+  const handleSignUp = async (email: string, password: string) => {
+    const { signUp } = await import('@/lib/cognito/client')
+    return signUp(email, password)
   }
 
-  const signOut = async () => {
-    const { createClient } = await import('@/lib/supabase/client')
-    const supabase = createClient()
-    await supabase.auth.signOut()
+  const handleConfirmSignUp = async (email: string, code: string) => {
+    const mod = await import('@/lib/cognito/client')
+    return mod.confirmSignUp(email, code)
+  }
+
+  const handleResendCode = async (email: string) => {
+    const { resendConfirmationCode } = await import('@/lib/cognito/client')
+    return resendConfirmationCode(email)
+  }
+
+  const handleForgotPassword = async (email: string) => {
+    const mod = await import('@/lib/cognito/client')
+    return mod.forgotPassword(email)
+  }
+
+  const handleConfirmForgotPassword = async (email: string, code: string, newPassword: string) => {
+    const mod = await import('@/lib/cognito/client')
+    return mod.confirmForgotPassword(email, code, newPassword)
+  }
+
+  const handleSignOut = async () => {
+    const { signOut } = await import('@/lib/cognito/client')
+    await signOut()
     setUser(null)
-    setSession(null)
     setUserProfile(null)
   }
 
   return (
-    <AuthContext.Provider value={{ user, session, userProfile, loading, signIn, signUp, signOut }}>
+    <AuthContext.Provider value={{
+      user,
+      userProfile,
+      loading,
+      signIn: handleSignIn,
+      signUp: handleSignUp,
+      confirmSignUp: handleConfirmSignUp,
+      resendCode: handleResendCode,
+      forgotPassword: handleForgotPassword,
+      confirmForgotPassword: handleConfirmForgotPassword,
+      signOut: handleSignOut,
+    }}>
       {children}
     </AuthContext.Provider>
   )

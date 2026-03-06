@@ -1,35 +1,52 @@
 import { NextResponse, type NextRequest } from 'next/server'
-import { createServerClient } from '@supabase/ssr'
+import { createRemoteJWKSet, jwtVerify } from 'jose'
 
-const PUBLIC_ROUTES = ['/', '/login', '/signup', '/about', '/auth/callback', '/patient', '/triage']
+const PUBLIC_ROUTES = ['/', '/login', '/signup', '/about', '/auth/confirm', '/patient', '/triage']
+
+const COGNITO_USER_POOL_ID = process.env.COGNITO_USER_POOL_ID || process.env.NEXT_PUBLIC_COGNITO_USER_POOL_ID
+const COGNITO_REGION = process.env.COGNITO_REGION || process.env.NEXT_PUBLIC_COGNITO_REGION || 'us-east-2'
+const COGNITO_CLIENT_ID = process.env.COGNITO_CLIENT_ID || process.env.NEXT_PUBLIC_COGNITO_CLIENT_ID
+
+const ISSUER = COGNITO_USER_POOL_ID
+  ? `https://cognito-idp.${COGNITO_REGION}.amazonaws.com/${COGNITO_USER_POOL_ID}`
+  : ''
+
+const JWKS_URL = ISSUER ? `${ISSUER}/.well-known/jwks.json` : ''
+
+let cachedJWKS: ReturnType<typeof createRemoteJWKSet> | null = null
+
+function getJWKS() {
+  if (!cachedJWKS && JWKS_URL) {
+    cachedJWKS = createRemoteJWKSet(new URL(JWKS_URL))
+  }
+  return cachedJWKS
+}
+
+async function verifyIdToken(token: string): Promise<boolean> {
+  if (!COGNITO_USER_POOL_ID || !COGNITO_CLIENT_ID) return false
+
+  try {
+    const jwks = getJWKS()
+    if (!jwks) return false
+
+    await jwtVerify(token, jwks, {
+      issuer: ISSUER,
+      audience: COGNITO_CLIENT_ID,
+    })
+    return true
+  } catch {
+    return false
+  }
+}
 
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl
 
-  // Create a response we can modify
-  let response = NextResponse.next({ request: { headers: request.headers } })
+  const response = NextResponse.next({ request: { headers: request.headers } })
 
-  // Create Supabase client for middleware (reads session from cookies)
-  const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
-      cookies: {
-        getAll() {
-          return request.cookies.getAll()
-        },
-        setAll(cookiesToSet) {
-          cookiesToSet.forEach(({ name, value, options }) => {
-            request.cookies.set(name, value)
-            response.cookies.set(name, value, options)
-          })
-        },
-      },
-    }
-  )
-
-  // Validate auth with Supabase server (getUser verifies the JWT, unlike getSession)
-  const { data: { user } } = await supabase.auth.getUser()
+  // Check Cognito ID token from cookie
+  const idToken = request.cookies.get('cognito-id-token')?.value
+  const isAuthenticated = idToken ? await verifyIdToken(idToken) : false
 
   // --- Existing view preference logic for root path ---
   if (pathname === '/') {
@@ -48,17 +65,15 @@ export async function middleware(request: NextRequest) {
       return redirectResponse
     }
 
-    // Show homepage (no redirect based on saved preference anymore — homepage is the new landing)
     return response
   }
 
   // --- Auth protection for non-public routes ---
   const isPublic = PUBLIC_ROUTES.some(route => pathname === route || pathname.startsWith(route + '/'))
-  // API routes and static assets should not be auth-gated
   const isApi = pathname.startsWith('/api/')
   const isStatic = pathname.startsWith('/_next/') || pathname.includes('.')
 
-  if (!isPublic && !isApi && !isStatic && !user) {
+  if (!isPublic && !isApi && !isStatic && !isAuthenticated) {
     const loginUrl = new URL('/login', request.url)
     loginUrl.searchParams.set('redirect', pathname)
     return NextResponse.redirect(loginUrl)
@@ -69,7 +84,6 @@ export async function middleware(request: NextRequest) {
 
 export const config = {
   matcher: [
-    // Match all routes except static files and Next.js internals
     '/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
   ],
 }

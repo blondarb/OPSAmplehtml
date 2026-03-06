@@ -1,6 +1,7 @@
-import { createClient } from '@/lib/supabase/server'
+import { getUser } from '@/lib/cognito/server'
 import { NextResponse } from 'next/server'
 import { getTenantServer } from '@/lib/tenant'
+import { from } from '@/lib/db-query'
 
 // Comprehensive neurology dot phrases library
 const DEFAULT_PHRASES = [
@@ -703,9 +704,8 @@ Last crisis: [date or never]. Recent infections/stressors: [describe]`,
 
 // POST /api/phrases/seed - Seed default phrases for current user
 export async function POST() {
-  const supabase = await createClient()
 
-  const { data: { user } } = await supabase.auth.getUser()
+  const user = await getUser()
   if (!user) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
@@ -713,8 +713,7 @@ export async function POST() {
   const tenant = getTenantServer()
 
   // Check if user already has phrases
-  const { data: existing } = await supabase
-    .from('dot_phrases')
+  const { data: existing } = await from('dot_phrases')
     .select('id')
     .eq('user_id', user.id)
     .eq('tenant_id', tenant)
@@ -734,8 +733,7 @@ export async function POST() {
     tenant_id: tenant,
   }))
 
-  const { data: phrases, error } = await supabase
-    .from('dot_phrases')
+  const { data: phrases, error } = await from('dot_phrases')
     .insert(phrasesToInsert)
     .select()
 

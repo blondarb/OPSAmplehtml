@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { createClient } from '@/lib/supabase/client'
+import { signOut as cognitoSignOut } from '@/lib/cognito/client'
 import { useRouter } from 'next/navigation'
 import TopNav from './TopNav'
 import LeftSidebar from './LeftSidebar'
@@ -29,7 +29,10 @@ import {
   type RecommendationItem,
 } from '@/lib/note-merge'
 import type { PatientMedication, PatientAllergy } from '@/lib/medicationTypes'
-import type { User } from '@supabase/supabase-js'
+interface User {
+  id: string
+  email?: string
+}
 
 interface ClinicalNoteProps {
   user: User
@@ -546,7 +549,6 @@ export default function ClinicalNote({
   }, [])
 
   const router = useRouter()
-  const supabase = createClient()
 
   useEffect(() => {
     // Check for saved dark mode preference from user settings
@@ -948,7 +950,7 @@ export default function ClinicalNote({
   }
 
   const handleSignOut = async () => {
-    await supabase.auth.signOut()
+    await cognitoSignOut()
     router.push('/login')
     router.refresh()
   }
@@ -1190,22 +1192,29 @@ export default function ClinicalNote({
   }
 
   const saveNote = async () => {
-    if (!currentVisit?.clinical_notes?.id) return
+    if (!currentVisit?.id) return
 
-    const { error } = await supabase
-      .from('clinical_notes')
-      .update({
-        hpi: noteData.hpi,
-        ros: noteData.ros,
-        allergies: noteData.allergies,
-        assessment: noteData.assessment,
-        plan: noteData.plan,
-        raw_dictation: rawDictation,
+    try {
+      const res = await fetch(`/api/visits/${currentVisit.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          clinicalNote: {
+            hpi: noteData.hpi,
+            ros: noteData.ros,
+            allergies: noteData.allergies,
+            assessment: noteData.assessment,
+            plan: noteData.plan,
+            rawDictation: rawDictation,
+          },
+        }),
       })
-      .eq('id', currentVisit.clinical_notes.id)
-
-    if (error) {
-      console.error('Error saving note:', error)
+      if (!res.ok) {
+        const data = await res.json()
+        console.error('Error saving note:', data.error)
+      }
+    } catch (err) {
+      console.error('Error saving note:', err)
     }
   }
 

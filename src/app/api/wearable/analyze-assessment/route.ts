@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
+import { getUser } from '@/lib/cognito/server'
+import { from } from '@/lib/db-query'
 
 export const maxDuration = 120  // Edge Function runs a 2-stage AI pipeline
 
@@ -18,14 +19,12 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'assessment_id is required for non-longitudinal analysis.' }, { status: 400 })
     }
 
-    const supabase = await createClient()
 
     // Fetch the assessment data from DB based on type
     let assessmentData: Record<string, unknown> = {}
 
     if (type === 'tremor') {
-      const { data, error } = await supabase
-        .from('wearable_tremor_assessments')
+      const { data, error } = await from('wearable_tremor_assessments')
         .select('*')
         .eq('id', assessment_id)
         .single()
@@ -38,8 +37,7 @@ export async function POST(request: Request) {
         composite_intensity: data.composite_intensity,
       }
     } else if (type === 'tapping') {
-      const { data, error } = await supabase
-        .from('wearable_tapping_assessments')
+      const { data, error } = await from('wearable_tapping_assessments')
         .select('*')
         .eq('id', assessment_id)
         .single()
@@ -52,8 +50,7 @@ export async function POST(request: Request) {
         asymmetry_index: data.asymmetry_index,
       }
     } else if (type === 'fluency') {
-      const { data, error } = await supabase
-        .from('wearable_fluency_assessments')
+      const { data, error } = await from('wearable_fluency_assessments')
         .select('*')
         .eq('id', assessment_id)
         .single()

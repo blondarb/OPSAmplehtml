@@ -1,14 +1,14 @@
-import { createClient } from '@/lib/supabase/server'
+import { getUser } from '@/lib/cognito/server'
 import { NextResponse } from 'next/server'
 import { getTenantServer } from '@/lib/tenant'
+import { from } from '@/lib/db-query'
 
 const MAX_SAVED_PLANS = 10
 
 // GET /api/saved-plans - List saved plans for current user
 export async function GET(request: Request) {
-  const supabase = await createClient()
 
-  const { data: { user } } = await supabase.auth.getUser()
+  const user = await getUser()
   if (!user) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
@@ -17,8 +17,7 @@ export async function GET(request: Request) {
   const { searchParams } = new URL(request.url)
   const sourcePlanKey = searchParams.get('source_plan_key')
 
-  let query = supabase
-    .from('saved_plans')
+  let query = from('saved_plans')
     .select('*')
     .eq('user_id', user.id)
     .eq('tenant_id', tenant)
@@ -39,9 +38,8 @@ export async function GET(request: Request) {
 
 // POST /api/saved-plans - Create a new saved plan
 export async function POST(request: Request) {
-  const supabase = await createClient()
 
-  const { data: { user } } = await supabase.auth.getUser()
+  const user = await getUser()
   if (!user) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
@@ -55,8 +53,7 @@ export async function POST(request: Request) {
   }
 
   // Enforce soft limit
-  const { count, error: countError } = await supabase
-    .from('saved_plans')
+  const { count, error: countError } = await from('saved_plans')
     .select('id', { count: 'exact', head: true })
     .eq('user_id', user.id)
     .eq('tenant_id', tenant)
@@ -72,8 +69,7 @@ export async function POST(request: Request) {
     )
   }
 
-  const { data: plan, error } = await supabase
-    .from('saved_plans')
+  const { data: plan, error } = await from('saved_plans')
     .insert({
       tenant_id: tenant,
       user_id: user.id,
