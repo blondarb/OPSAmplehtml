@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { buildHistorianSystemPrompt, getHistorianToolDefinition } from '@/lib/historianPrompts'
 import type { HistorianSessionType } from '@/lib/historianTypes'
+import { getOpenAIKey } from '@/lib/secrets'
 
 export async function POST(request: Request) {
   try {
@@ -10,7 +11,7 @@ export async function POST(request: Request) {
     const patientContext: string | undefined = body.patientContext
 
     // Get OpenAI API key
-    const apiKey = process.env.OPENAI_API_KEY
+    const apiKey = await getOpenAIKey()
     if (!apiKey) {
       return NextResponse.json(
         { error: 'OpenAI API key not configured.' },

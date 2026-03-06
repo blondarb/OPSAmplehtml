@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { getUser } from '@/lib/cognito/server'
 import { from } from '@/lib/db-query'
+import { getOpenAIKey } from '@/lib/secrets'
 
 export const maxDuration = 120  // Edge Function runs a 2-stage AI pipeline
 
@@ -78,7 +79,7 @@ export async function POST(request: Request) {
         headers: {
           'Authorization': `Bearer ${SUPABASE_KEY}`,
           'Content-Type': 'application/json',
-          'X-OpenAI-Key': process.env.OPENAI_API_KEY || '',
+          'X-OpenAI-Key': await getOpenAIKey(),
         },
         body: JSON.stringify({
           type,

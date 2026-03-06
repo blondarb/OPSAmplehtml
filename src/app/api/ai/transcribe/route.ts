@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { createClient as createDeepgramClient } from '@deepgram/sdk'
 import { getUser } from '@/lib/cognito/server'
 import { invokeBedrock } from '@/lib/bedrock'
+import { getDeepgramKey } from '@/lib/secrets'
 
 
 export async function POST(request: Request) {
@@ -38,7 +39,7 @@ export async function POST(request: Request) {
     }
 
     // Check for Deepgram API key
-    const deepgramKey = process.env.DEEPGRAM_API_KEY
+    const deepgramKey = await getDeepgramKey()
     if (!deepgramKey) {
       return NextResponse.json({
         error: 'Deepgram API key not configured. Please add DEEPGRAM_API_KEY to your environment variables.'
