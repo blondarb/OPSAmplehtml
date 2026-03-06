@@ -7,7 +7,7 @@
  * Returns { data, error } just like Supabase, so consuming code needs
  * minimal changes — only the import and initialization line.
  */
-import pool from './db'
+import { getPool } from './db'
 
 // ── public entry points ──────────────────────────────────────────────
 
@@ -19,6 +19,7 @@ export function from(table: string): QueryBuilder {
 /** Replace supabase.rpc('get_openai_key') — returns { data, error } like Supabase */
 export async function getOpenAIKey(): Promise<DbResult> {
   try {
+    const pool = await getPool()
     const { rows } = await pool.query(
       `SELECT value FROM app_settings WHERE key = 'openai_api_key' LIMIT 1`
     )
@@ -34,6 +35,7 @@ export async function rpc(
   params?: Record<string, unknown>
 ): Promise<DbResult> {
   try {
+    const pool = await getPool()
     const paramEntries = params ? Object.entries(params) : []
     const placeholders = paramEntries.map((_, i) => `$${i + 1}`).join(', ')
     const namedPlaceholders = paramEntries
@@ -237,6 +239,7 @@ class QueryBuilder implements PromiseLike<DbResult> {
 
   private async execute(): Promise<DbResult> {
     try {
+      const pool = await getPool()
       let sql = ''
       const allValues: unknown[] = []
 

@@ -1,9 +1,10 @@
 import { NextResponse } from 'next/server'
 import { INTAKE_VOICE_SYSTEM_PROMPT, getIntakeToolDefinition } from '@/lib/intakePrompts'
+import { getOpenAIKey } from '@/lib/secrets'
 
 export async function POST() {
   try {
-    const apiKey = process.env.OPENAI_API_KEY
+    const apiKey = await getOpenAIKey()
     if (!apiKey) {
       return NextResponse.json(
         { error: 'OpenAI API key not configured.' },
