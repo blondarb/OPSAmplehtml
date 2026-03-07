@@ -19,7 +19,7 @@ export async function POST(request: Request) {
     if (process.env.NODE_ENV === 'production') {
       const signature = request.headers.get('X-Twilio-Signature') || ''
       const webhookUrl = `${process.env.TWILIO_WEBHOOK_BASE_URL}/api/follow-up/twilio-sms`
-      if (!validateTwilioSignature(signature, webhookUrl, params)) {
+      if (!await validateTwilioSignature(signature, webhookUrl, params)) {
         return new Response('Forbidden', { status: 403 })
       }
     }
