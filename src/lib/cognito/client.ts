@@ -62,6 +62,7 @@ export async function signIn(
       Password: password,
     })
 
+    cognitoUser.setAuthenticationFlowType('USER_PASSWORD_AUTH')
     cognitoUser.authenticateUser(authDetails, {
       onSuccess: async (session) => {
         await storeSession(session)
