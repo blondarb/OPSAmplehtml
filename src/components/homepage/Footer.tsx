@@ -13,7 +13,6 @@ export default function Footer() {
         {/* Center */}
         <div className="flex flex-col gap-2 text-sm">
           <Link href="/" className="hover:text-white transition-colors">Home</Link>
-          <Link href="/about" className="hover:text-white transition-colors">About</Link>
           <Link href="/login" className="hover:text-white transition-colors">Sign In</Link>
         </div>
 

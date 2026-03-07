@@ -5,7 +5,6 @@ import HeroSection from '@/components/homepage/HeroSection'
 import JourneyTrack from '@/components/homepage/JourneyTrack'
 import { clinicianTrack, patientTrack, ongoingCareTrack } from '@/components/homepage/journeyData'
 import ByTheNumbers from '@/components/homepage/ByTheNumbers'
-import BuiltWith from '@/components/homepage/BuiltWith'
 import Footer from '@/components/homepage/Footer'
 
 export default function Home() {
@@ -20,7 +19,6 @@ export default function Home() {
       </div>
 
       <ByTheNumbers />
-      <BuiltWith />
       <Footer />
     </PlatformShell>
   )
