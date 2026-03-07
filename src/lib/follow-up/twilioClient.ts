@@ -1,16 +1,18 @@
 import twilio from 'twilio'
+import { getTwilioCredentials } from '../secrets'
 
 // Lazy-init Twilio client (avoid build-time env var access)
 let _client: twilio.Twilio | null = null
+let _cachedToken: string | null = null
 
-function getClient(): twilio.Twilio {
+async function getClient(): Promise<twilio.Twilio> {
   if (!_client) {
-    const sid = process.env.TWILIO_ACCOUNT_SID
-    const token = process.env.TWILIO_AUTH_TOKEN
-    if (!sid || !token) {
-      throw new Error('TWILIO_ACCOUNT_SID and TWILIO_AUTH_TOKEN must be set')
+    const creds = await getTwilioCredentials()
+    if (!creds.account_sid || !creds.auth_token) {
+      throw new Error('Twilio credentials not configured')
     }
-    _client = twilio(sid, token)
+    _client = twilio(creds.account_sid, creds.auth_token)
+    _cachedToken = creds.auth_token
   }
   return _client
 }
@@ -19,24 +21,25 @@ function getClient(): twilio.Twilio {
  * Send an SMS via Twilio.
  */
 export async function sendSms(to: string, body: string): Promise<string> {
-  const from = process.env.TWILIO_PHONE_NUMBER
-  if (!from) throw new Error('TWILIO_PHONE_NUMBER must be set')
+  const creds = await getTwilioCredentials()
+  if (!creds.phone_number) throw new Error('Twilio phone number not configured')
 
-  const message = await getClient().messages.create({ to, from, body })
+  const client = await getClient()
+  const message = await client.messages.create({ to, from: creds.phone_number, body })
   return message.sid
 }
 
 /**
  * Validate an inbound Twilio webhook signature.
  */
-export function validateTwilioSignature(
+export async function validateTwilioSignature(
   signature: string,
   url: string,
   params: Record<string, string>
-): boolean {
-  const token = process.env.TWILIO_AUTH_TOKEN
-  if (!token) return false
-  return twilio.validateRequest(token, signature, url, params)
+): Promise<boolean> {
+  const creds = await getTwilioCredentials()
+  if (!creds.auth_token) return false
+  return twilio.validateRequest(creds.auth_token, signature, url, params)
 }
 
 /**

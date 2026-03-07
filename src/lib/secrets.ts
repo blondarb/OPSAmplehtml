@@ -52,3 +52,21 @@ export async function getDeepgramKey(): Promise<string> {
     return process.env.DEEPGRAM_API_KEY || ''
   }
 }
+
+export interface TwilioCredentials {
+  account_sid: string
+  auth_token: string
+  phone_number: string
+}
+
+export async function getTwilioCredentials(): Promise<TwilioCredentials> {
+  try {
+    return await getSecret('sevaro/twilio')
+  } catch {
+    return {
+      account_sid: process.env.TWILIO_ACCOUNT_SID || '',
+      auth_token: process.env.TWILIO_AUTH_TOKEN || '',
+      phone_number: process.env.TWILIO_PHONE_NUMBER || '',
+    }
+  }
+}
