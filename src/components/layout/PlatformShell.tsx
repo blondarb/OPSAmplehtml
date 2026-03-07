@@ -53,7 +53,6 @@ export default function PlatformShell({ children }: { children: React.ReactNode 
         {/* Center: Nav Links */}
         <div className="hidden md:flex items-center gap-6 text-sm">
           <Link href="/" className="text-slate-300 hover:text-white transition-colors">Home</Link>
-          <Link href="/about" className="text-slate-300 hover:text-white transition-colors">About</Link>
         </div>
 
         {/* Right: Auth */}
