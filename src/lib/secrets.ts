@@ -23,10 +23,15 @@ export interface RdsCredentials {
 
 export async function getRdsCredentials(): Promise<RdsCredentials> {
   try {
-    return await getSecret('sevaro/rds/credentials')
-  } catch {
+    const creds = await getSecret('sevaro/rds/credentials')
+    console.log('[RDS] Using Secrets Manager credentials, host:', creds.host ? creds.host.substring(0, 15) + '...' : '(empty)')
+    return creds
+  } catch (err) {
+    const host = process.env.RDS_HOST || ''
+    console.log('[RDS] Secrets Manager failed:', (err as Error).message?.substring(0, 80))
+    console.log('[RDS] Falling back to env vars, RDS_HOST:', host ? host.substring(0, 15) + '...' : '(empty)')
     return {
-      host: process.env.RDS_HOST || '',
+      host,
       port: process.env.RDS_PORT || '5432',
       username: process.env.RDS_USER || '',
       password: process.env.RDS_PASSWORD || '',
