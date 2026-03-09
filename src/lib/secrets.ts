@@ -64,6 +64,15 @@ export interface TwilioCredentials {
   phone_number: string
 }
 
+export async function getMonitorApiKey(): Promise<string> {
+  try {
+    const secret = await getSecret('sevaro/monitor-api-key')
+    return secret.key
+  } catch {
+    return process.env.MONITOR_API_KEY || ''
+  }
+}
+
 export async function getTwilioCredentials(): Promise<TwilioCredentials> {
   try {
     return await getSecret('sevaro/twilio')
