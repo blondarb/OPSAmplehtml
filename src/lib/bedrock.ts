@@ -24,10 +24,6 @@ function getClient(): BedrockRuntimeClient {
     const accessKeyId = process.env.BEDROCK_ACCESS_KEY_ID
     const secretAccessKey = process.env.BEDROCK_SECRET_ACCESS_KEY
 
-    console.log('[Bedrock] Init client — region:', region,
-      'explicit creds:', !!accessKeyId,
-      'env keys available:', Object.keys(process.env).filter(k => k.startsWith('BEDROCK') || k.startsWith('AWS')).join(','))
-
     const config: Record<string, unknown> = { region }
     if (accessKeyId && secretAccessKey) {
       config.credentials = { accessKeyId, secretAccessKey }
