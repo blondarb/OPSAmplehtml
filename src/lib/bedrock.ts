@@ -20,15 +20,17 @@ let _client: BedrockRuntimeClient | null = null
 
 function getClient(): BedrockRuntimeClient {
   if (!_client) {
-    const config: Record<string, unknown> = {
-      region: process.env.BEDROCK_REGION || process.env.AWS_REGION || 'us-east-2',
-    }
-    // Amplify blocks AWS_-prefixed env vars, so we use BEDROCK_-prefixed ones
-    if (process.env.BEDROCK_ACCESS_KEY_ID && process.env.BEDROCK_SECRET_ACCESS_KEY) {
-      config.credentials = {
-        accessKeyId: process.env.BEDROCK_ACCESS_KEY_ID,
-        secretAccessKey: process.env.BEDROCK_SECRET_ACCESS_KEY,
-      }
+    const region = process.env.BEDROCK_REGION || process.env.AWS_REGION || 'us-east-2'
+    const accessKeyId = process.env.BEDROCK_ACCESS_KEY_ID
+    const secretAccessKey = process.env.BEDROCK_SECRET_ACCESS_KEY
+
+    console.log('[Bedrock] Init client — region:', region,
+      'explicit creds:', !!accessKeyId,
+      'env keys available:', Object.keys(process.env).filter(k => k.startsWith('BEDROCK') || k.startsWith('AWS')).join(','))
+
+    const config: Record<string, unknown> = { region }
+    if (accessKeyId && secretAccessKey) {
+      config.credentials = { accessKeyId, secretAccessKey }
     }
     _client = new BedrockRuntimeClient(config)
   }
