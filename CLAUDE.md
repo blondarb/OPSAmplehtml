@@ -1,5 +1,14 @@
 # Sevaro Clinical - AI-Powered Clinical Documentation
 
+## Deploy Workflow (OPSAmple)
+
+**Push-to-deploy is enabled.** After making code changes:
+1. Run the local dev server (`preview_start`) and verify changes work (no console errors, feature functions correctly)
+2. Commit and push to `main` — Amplify auto-deploys from `main`
+3. Do NOT wait for user approval to commit/push — test locally first, then ship it
+
+This applies to bug fixes, feature work, and infrastructure changes. Local testing is the safety gate, not a separate approval step.
+
 ## Project Overview
 
 Sevaro Clinical is a web application for AI-powered clinical documentation, specifically designed for neurology outpatient practices. It provides clinical note creation, AI assistance, voice dictation, dot phrases, clinical scales, and patient management.
