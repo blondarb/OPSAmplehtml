@@ -57,6 +57,8 @@ export interface BedrockInvokeOptions {
   jsonMode?: boolean
   /** AbortSignal for timeout control. */
   signal?: AbortSignal
+  /** Override the default model ID for this call. */
+  model?: string
 }
 
 export interface BedrockResponse {
@@ -96,7 +98,7 @@ export async function invokeBedrock(
   })
 
   const command = new InvokeModelCommand({
-    modelId: BEDROCK_MODEL,
+    modelId: opts.model || BEDROCK_MODEL,
     contentType: 'application/json',
     accept: 'application/json',
     body: new TextEncoder().encode(body),

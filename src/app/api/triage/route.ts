@@ -1,9 +1,11 @@
 import { NextResponse } from 'next/server'
-import { invokeBedrockJSON } from '@/lib/bedrock'
+import { invokeBedrockJSON, BEDROCK_MODEL } from '@/lib/bedrock'
 import { calculateTriageTier, validateAIResponse } from '@/lib/triage/scoring'
 import { TRIAGE_SYSTEM_PROMPT, buildTriageUserPrompt } from '@/lib/triage/systemPrompt'
 import { AITriageResponse, DISCLAIMER_TEXT } from '@/lib/triage/types'
 import { from } from '@/lib/db-query'
+
+const TRIAGE_MODEL = process.env.BEDROCK_TRIAGE_MODEL || BEDROCK_MODEL
 
 
 export const maxDuration = 60
@@ -58,18 +60,19 @@ export async function POST(request: Request) {
       referringProviderType: referring_provider_type,
     })
 
-    // Call Bedrock with 45-second timeout
+    // Call Bedrock with 25-second timeout (Amplify SSR compute limit is 30s)
     const controller = new AbortController()
-    const timeout = setTimeout(() => controller.abort(), 45000)
+    const timeout = setTimeout(() => controller.abort(), 25000)
 
     let parsed: Record<string, unknown>
     try {
       const result = await invokeBedrockJSON({
         system: TRIAGE_SYSTEM_PROMPT,
         messages: [{ role: 'user', content: userPrompt }],
-        maxTokens: 2000,
+        maxTokens: 1200,
         temperature,
         signal: controller.signal,
+        model: TRIAGE_MODEL,
       })
       parsed = result.parsed as Record<string, unknown>
     } finally {
@@ -111,7 +114,7 @@ export async function POST(request: Request) {
           missing_information: aiResponse.missing_information,
           subspecialty_recommendation: aiResponse.subspecialty_recommendation,
           subspecialty_rationale: aiResponse.subspecialty_rationale,
-          ai_model_used: 'bedrock-claude-sonnet-4.5',
+          ai_model_used: TRIAGE_MODEL,
           ai_raw_response: aiResponse,
           patient_id: patient_id || null,
           // Phase 2 fields
