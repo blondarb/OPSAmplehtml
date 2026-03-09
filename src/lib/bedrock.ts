@@ -13,7 +13,7 @@ import {
 // ── Model IDs ────────────────────────────────────────────────────────
 // Map legacy OpenAI model names to the single Bedrock model we use.
 // Every caller can just import BEDROCK_MODEL.
-export const BEDROCK_MODEL = 'anthropic.claude-sonnet-4-5-20251001-v1:0'
+export const BEDROCK_MODEL = 'us.anthropic.claude-sonnet-4-6'
 
 // ── Client singleton ─────────────────────────────────────────────────
 let _client: BedrockRuntimeClient | null = null
