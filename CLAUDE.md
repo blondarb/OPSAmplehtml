@@ -586,6 +586,33 @@ When redeploying after changes, use "Redeploy without cache" to ensure fresh bui
 
 Full changelog: [`docs/CHANGELOG.md`](docs/CHANGELOG.md)
 
+## Body of Work
+
+**Status**: Active
+
+### Recent
+- AI triage scoring with Bedrock Converse API (cross-region inference, truncated JSON handling)
+- RPM feature scaffolding and user profiles migration
+- Wearable narrative enhancements (30-day summaries, auto-generation, regenerate buttons)
+- AI clinical narrative pipeline (2-stage gpt-4o-mini extraction + gpt-5.2 narrative via Edge Function)
+- Wearable dashboard data fixes for real Apple Watch data (6 issues resolved)
+
+### In Progress
+- AWS Amplify migration (most infra migrated, Cognito auth active, RDS for new features)
+- Real-time transcription display (partial — post-recording only, not live streaming)
+- Diagnosis plan coverage expansion (98 plans in DB, 148/166 diagnoses covered)
+
+### Planned
+- Speaker diarization UI (P2)
+- Recommendation reconciliation engine (P2)
+- Inpatient clinical scales (GCS, mRS, FOUR Score, Hunt & Hess, ICH, CAM-ICU, RASS)
+- Real-time voice streaming during encounters
+
+### Known Issues
+- Supabase still used for database and auth (legacy) — eventual migration to RDS/Cognito
+- Bedrock Amplify SSR env var wiring requires `next.config` inline for runtime access
+- 18 neurology diagnoses still lack treatment plans in the database
+
 ## Documentation Update Policy
 
 **IMPORTANT: Every commit must include updates to relevant documentation.** Documentation is never "a follow-up task" — it ships with the code.
