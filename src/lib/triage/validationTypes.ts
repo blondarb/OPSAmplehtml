@@ -72,6 +72,7 @@ export interface ValidationAIRun {
   id: string
   case_id: string
   run_number: number            // 0 = baseline (temp=0), 1..N = standard (temp=0.2)
+  model: string                 // Bedrock model ID used for this run
   temperature: number
   ai_triage_tier: TriageTier | null
   ai_weighted_score: number | null
@@ -124,6 +125,29 @@ export interface PairwiseAgreement {
   cases_compared: number
 }
 
+export interface AIConsistencyData {
+  total_cases_with_runs: number
+  total_runs: number
+  perfect_agreement_rate: number
+  avg_distinct_tiers_per_case: number
+  overall_score_mean: number | null
+  overall_avg_duration_ms: number | null
+  case_consistency: Array<{
+    case_id: string
+    case_number: number
+    case_title: string
+    baseline_tier: TriageTier | null
+    baseline_score: number | null
+    run_tiers: TriageTier[]
+    run_scores: number[]
+    distinct_tiers: number
+    score_mean: number | null
+    score_std: number | null
+    all_agree: boolean
+    avg_duration_ms: number | null
+  }>
+}
+
 export interface ValidationResults {
   study_name: string
   total_cases: number
@@ -154,26 +178,20 @@ export interface ValidationResults {
     }>
   }
   // AI Self-Consistency (multi-run analysis)
-  ai_consistency?: {
-    total_cases_with_runs: number
-    total_runs: number
-    // How often all runs for a case agree on the same tier
-    perfect_agreement_rate: number
-    // Average number of distinct tiers per case across runs
-    avg_distinct_tiers_per_case: number
-    // Per-case detail
-    case_consistency: Array<{
+  ai_consistency?: AIConsistencyData
+  // Model comparison (present when multiple models have been tested)
+  model_comparison?: {
+    models: string[]
+    per_model: Record<string, AIConsistencyData>
+    cross_model_agreement_rate: number
+    cross_model_cases_compared: number
+    cross_model_details: Array<{
       case_id: string
       case_number: number
       case_title: string
-      baseline_tier: TriageTier | null       // temp=0 run
-      baseline_score: number | null
-      run_tiers: TriageTier[]                // temp=0.2 runs
-      run_scores: number[]
-      distinct_tiers: number                 // how many unique tiers across all runs
-      score_mean: number | null
-      score_std: number | null
-      all_agree: boolean
+      tiers_by_model: Record<string, TriageTier | null>
+      scores_by_model: Record<string, number | null>
+      agree: boolean
     }>
   }
   // Redirect agreement

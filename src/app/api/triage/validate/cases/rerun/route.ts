@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getUser } from '@/lib/cognito/server'
 import { runTriage } from '@/lib/triage/runTriage'
+import { BEDROCK_MODEL } from '@/lib/bedrock'
 import { from } from '@/lib/db-query'
 
 
@@ -19,6 +20,7 @@ import { from } from '@/lib/db-query'
  *     run_count: number           — how many standard (temp=0.2) runs (default 3)
  *     include_baseline: boolean   — also run once at temp=0 (default true)
  *     clear_previous: boolean     — delete previous runs for these cases first (default true)
+ *     model: string               — Bedrock model ID override (default: BEDROCK_MODEL)
  *   }
  *
  * Returns progress as results come in (non-streaming — waits for all).
@@ -38,7 +40,11 @@ export async function POST(req: NextRequest) {
     run_count = 3,
     include_baseline = true,
     clear_previous = true,
+    model,
   } = body
+
+  // Resolve the model ID: explicit override > env var > code default
+  const resolvedModel = model || process.env.BEDROCK_TRIAGE_MODEL || BEDROCK_MODEL
 
   if (!Array.isArray(case_ids) || case_ids.length === 0) {
     return NextResponse.json({ error: 'case_ids is required (array of UUIDs)' }, { status: 400 })
@@ -57,11 +63,12 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'No matching cases found' }, { status: 404 })
   }
 
-  // Optionally clear previous runs
+  // Optionally clear previous runs — scoped to the specific model
   if (clear_previous) {
     await from('validation_ai_runs')
       .delete()
       .in('case_id', case_ids)
+      .eq('model', resolvedModel)
   }
 
   const allResults: Array<{
@@ -105,6 +112,7 @@ export async function POST(req: NextRequest) {
             patient_age: c.patient_age,
             patient_sex: c.patient_sex,
             temperature: run.temperature,
+            model: resolvedModel,
           })
 
           const durationMs = Date.now() - startTime
@@ -112,6 +120,7 @@ export async function POST(req: NextRequest) {
           await from('validation_ai_runs').upsert({
             case_id: c.id,
             run_number: run.run_number,
+            model: resolvedModel,
             temperature: run.temperature,
             ai_triage_tier: data.triage_tier,
             ai_weighted_score: data.weighted_score,
@@ -124,7 +133,7 @@ export async function POST(req: NextRequest) {
             ai_raw_response: data,
             duration_ms: durationMs,
             error: null,
-          }, { onConflict: 'case_id,run_number' })
+          }, { onConflict: 'case_id,run_number,model' })
 
           return {
             run_number: run.run_number,
@@ -142,10 +151,11 @@ export async function POST(req: NextRequest) {
           await from('validation_ai_runs').upsert({
             case_id: c.id,
             run_number: run.run_number,
+            model: resolvedModel,
             temperature: run.temperature,
             duration_ms: durationMs,
             error: errorMsg,
-          }, { onConflict: 'case_id,run_number' })
+          }, { onConflict: 'case_id,run_number,model' })
 
           return {
             run_number: run.run_number,
@@ -180,6 +190,7 @@ export async function POST(req: NextRequest) {
   )
 
   return NextResponse.json({
+    model: resolvedModel,
     total_cases: allResults.length,
     total_runs: totalRuns,
     successful_runs: successfulRuns,

@@ -336,6 +336,147 @@ export default function ResultsPage() {
                 </div>
               )}
 
+              {/* Model Head-to-Head Comparison */}
+              {results.model_comparison && results.model_comparison.models.length > 1 && (
+                <div style={{
+                  background: 'rgba(30, 41, 59, 0.8)',
+                  border: '1px solid rgba(14, 165, 233, 0.3)',
+                  borderRadius: '12px',
+                  padding: '20px',
+                  marginBottom: '24px',
+                }}>
+                  <h3 style={{ color: '#e2e8f0', fontSize: '0.9rem', fontWeight: 600, margin: '0 0 4px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <BarChart3 size={16} color="#38BDF8" />
+                    Model Head-to-Head Comparison
+                  </h3>
+                  <p style={{ color: '#64748b', fontSize: '0.72rem', margin: '0 0 16px', lineHeight: 1.5 }}>
+                    Side-by-side comparison of {results.model_comparison.models.length} models across {results.model_comparison.cross_model_cases_compared} cases.
+                    Cross-model agreement: <strong style={{ color: '#e2e8f0' }}>{formatPct(results.model_comparison.cross_model_agreement_rate)}</strong>
+                  </p>
+
+                  {/* Summary cards per model */}
+                  <div style={{ display: 'grid', gridTemplateColumns: `repeat(${results.model_comparison.models.length}, 1fr)`, gap: '12px', marginBottom: '16px' }}>
+                    {results.model_comparison.models.map((modelId, mi) => {
+                      const stats = results.model_comparison!.per_model[modelId]
+                      const shortName = modelId.replace(/^us\.anthropic\./, '').replace(/-v\d.*$/, '').replace(/-\d{8,}.*$/, '')
+                      const colors = ['#38BDF8', '#A78BFA', '#34D399', '#FBBF24']
+                      const color = colors[mi % colors.length]
+                      return (
+                        <div key={modelId} style={{
+                          background: 'rgba(15, 23, 42, 0.6)',
+                          border: `1px solid ${color}33`,
+                          borderRadius: '10px',
+                          padding: '14px',
+                        }}>
+                          <div style={{ color, fontSize: '0.75rem', fontWeight: 700, marginBottom: '10px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                            {shortName}
+                          </div>
+                          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+                            <div>
+                              <div style={{ color: '#64748b', fontSize: '0.6rem', fontWeight: 600, textTransform: 'uppercase' }}>Consistency</div>
+                              <div style={{ color: '#e2e8f0', fontSize: '1.1rem', fontWeight: 700 }}>{formatPct(stats.perfect_agreement_rate)}</div>
+                            </div>
+                            <div>
+                              <div style={{ color: '#64748b', fontSize: '0.6rem', fontWeight: 600, textTransform: 'uppercase' }}>Runs</div>
+                              <div style={{ color: '#e2e8f0', fontSize: '1.1rem', fontWeight: 700 }}>{stats.total_runs}</div>
+                            </div>
+                            <div>
+                              <div style={{ color: '#64748b', fontSize: '0.6rem', fontWeight: 600, textTransform: 'uppercase' }}>Avg Score</div>
+                              <div style={{ color: '#e2e8f0', fontSize: '1.1rem', fontWeight: 700 }}>{stats.overall_score_mean?.toFixed(2) ?? '—'}</div>
+                            </div>
+                            <div>
+                              <div style={{ color: '#64748b', fontSize: '0.6rem', fontWeight: 600, textTransform: 'uppercase' }}>Avg Latency</div>
+                              <div style={{ color: '#e2e8f0', fontSize: '1.1rem', fontWeight: 700 }}>
+                                {stats.overall_avg_duration_ms ? `${(stats.overall_avg_duration_ms / 1000).toFixed(1)}s` : '—'}
+                              </div>
+                            </div>
+                            <div style={{ gridColumn: '1 / -1' }}>
+                              <div style={{ color: '#64748b', fontSize: '0.6rem', fontWeight: 600, textTransform: 'uppercase' }}>Distinct Tiers/Case</div>
+                              <div style={{ color: '#e2e8f0', fontSize: '1.1rem', fontWeight: 700 }}>{stats.avg_distinct_tiers_per_case}</div>
+                            </div>
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+
+                  {/* Case-by-case model comparison table */}
+                  <h4 style={{ color: '#cbd5e1', fontSize: '0.8rem', fontWeight: 600, margin: '0 0 10px' }}>
+                    Per-Case Model Comparison
+                  </h4>
+                  <div style={{ overflowX: 'auto', maxHeight: '500px', overflowY: 'auto' }}>
+                    <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                      <thead>
+                        <tr>
+                          <th style={{ padding: '8px 10px', textAlign: 'left', color: '#94a3b8', fontSize: '0.7rem', fontWeight: 600, textTransform: 'uppercase', borderBottom: '1px solid #334155', position: 'sticky', top: 0, background: 'rgba(30, 41, 59, 0.95)' }}>
+                            #
+                          </th>
+                          <th style={{ padding: '8px 10px', textAlign: 'left', color: '#94a3b8', fontSize: '0.7rem', fontWeight: 600, textTransform: 'uppercase', borderBottom: '1px solid #334155', position: 'sticky', top: 0, background: 'rgba(30, 41, 59, 0.95)' }}>
+                            Case
+                          </th>
+                          {results.model_comparison.models.map((modelId, mi) => {
+                            const shortName = modelId.replace(/^us\.anthropic\./, '').replace(/-v\d.*$/, '').replace(/-\d{8,}.*$/, '')
+                            const colors = ['#38BDF8', '#A78BFA', '#34D399', '#FBBF24']
+                            return (
+                              <th key={modelId} style={{ padding: '8px 10px', textAlign: 'center', color: colors[mi % colors.length], fontSize: '0.7rem', fontWeight: 600, textTransform: 'uppercase', borderBottom: '1px solid #334155', position: 'sticky', top: 0, background: 'rgba(30, 41, 59, 0.95)' }}>
+                                {shortName}
+                              </th>
+                            )
+                          })}
+                          <th style={{ padding: '8px 10px', textAlign: 'center', color: '#94a3b8', fontSize: '0.7rem', fontWeight: 600, textTransform: 'uppercase', borderBottom: '1px solid #334155', position: 'sticky', top: 0, background: 'rgba(30, 41, 59, 0.95)' }}>
+                            Agree?
+                          </th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {results.model_comparison.cross_model_details.map(cd => (
+                          <tr key={cd.case_id} style={{ background: cd.agree ? 'transparent' : 'rgba(234, 179, 8, 0.04)' }}>
+                            <td style={{ padding: '6px 10px', color: '#94a3b8', fontSize: '0.75rem', borderBottom: '1px solid rgba(51, 65, 85, 0.5)' }}>
+                              {cd.case_number}
+                            </td>
+                            <td style={{ padding: '6px 10px', color: '#cbd5e1', fontSize: '0.75rem', borderBottom: '1px solid rgba(51, 65, 85, 0.5)', maxWidth: '200px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                              {cd.case_title}
+                            </td>
+                            {results.model_comparison!.models.map(modelId => {
+                              const tier = cd.tiers_by_model[modelId] as TriageTier | null
+                              const score = cd.scores_by_model[modelId]
+                              return (
+                                <td key={modelId} style={{ padding: '6px 10px', textAlign: 'center', borderBottom: '1px solid rgba(51, 65, 85, 0.5)' }}>
+                                  {tier ? (
+                                    <div>
+                                      <span style={{
+                                        padding: '2px 6px', borderRadius: '3px', fontSize: '0.6rem', fontWeight: 700,
+                                        background: TIER_DISPLAY[tier]?.bgColor || '#6B7280', color: '#fff',
+                                      }}>
+                                        {TIER_DISPLAY[tier]?.label || tier}
+                                      </span>
+                                      {score !== null && (
+                                        <div style={{ color: '#64748b', fontSize: '0.6rem', marginTop: '2px' }}>
+                                          {score.toFixed(2)}
+                                        </div>
+                                      )}
+                                    </div>
+                                  ) : (
+                                    <span style={{ color: '#475569', fontSize: '0.7rem' }}>—</span>
+                                  )}
+                                </td>
+                              )
+                            })}
+                            <td style={{ padding: '6px 10px', textAlign: 'center', borderBottom: '1px solid rgba(51, 65, 85, 0.5)' }}>
+                              {cd.agree ? (
+                                <Check size={14} color="#16A34A" />
+                              ) : (
+                                <AlertCircle size={14} color="#EAB308" />
+                              )}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+
               {/* AI Self-Consistency (Multi-Run) */}
               {results.ai_consistency && results.ai_consistency.total_cases_with_runs > 0 && (
                 <div style={{

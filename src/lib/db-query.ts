@@ -399,9 +399,14 @@ class QueryBuilder implements PromiseLike<DbResult> {
       allValues.push(typeof val === 'object' && val !== null && !Array.isArray(val) ? JSON.stringify(val) : val)
       return `$${allValues.length}`
     })
-    const conflict = this.conflictCol ? `"${this.conflictCol}"` : keys.map(k => `"${k}"`).join(', ')
+    // Support comma-separated multi-column conflict keys (e.g. 'case_id,run_number,model')
+    const conflictCols = this.conflictCol
+      ? this.conflictCol.split(',').map(c => `"${c.trim()}"`)
+      : keys.map(k => `"${k}"`)
+    const conflict = conflictCols.join(', ')
+    const conflictSet = new Set(this.conflictCol ? this.conflictCol.split(',').map(c => c.trim()) : keys)
     const updates = keys
-      .filter(k => k !== this.conflictCol)
+      .filter(k => !conflictSet.has(k))
       .map(k => `"${k}" = EXCLUDED."${k}"`)
       .join(', ')
     const ret = this.doReturn ? ' RETURNING *' : ''

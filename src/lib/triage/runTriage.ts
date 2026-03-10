@@ -15,6 +15,8 @@ export interface TriageInput {
   patient_sex?: string | null
   referring_provider_type?: string | null
   temperature?: number
+  /** Override the default Bedrock model ID for this triage call. */
+  model?: string
 }
 
 export interface TriageResult {
@@ -70,6 +72,7 @@ export async function runTriage(input: TriageInput): Promise<TriageResult> {
       maxTokens: 2500,
       temperature,
       signal: controller.signal,
+      model: input.model,
     })
     parsed = result.parsed as Record<string, unknown>
   } finally {
