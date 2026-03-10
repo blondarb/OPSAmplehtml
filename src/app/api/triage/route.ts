@@ -60,16 +60,16 @@ export async function POST(request: Request) {
       referringProviderType: referring_provider_type,
     })
 
-    // Call Bedrock with 25-second timeout (Amplify SSR compute limit is 30s)
+    // Call Bedrock with 45-second timeout (Amplify SSR compute limit is 60s)
     const controller = new AbortController()
-    const timeout = setTimeout(() => controller.abort(), 25000)
+    const timeout = setTimeout(() => controller.abort(), 45000)
 
     let parsed: Record<string, unknown>
     try {
       const result = await invokeBedrockJSON({
         system: TRIAGE_SYSTEM_PROMPT,
         messages: [{ role: 'user', content: userPrompt }],
-        maxTokens: 1200,
+        maxTokens: 2500,
         temperature,
         signal: controller.signal,
         model: TRIAGE_MODEL,

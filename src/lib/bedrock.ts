@@ -26,7 +26,10 @@ function getClient(): BedrockRuntimeClient {
 
     const config: Record<string, unknown> = { region }
     if (accessKeyId && secretAccessKey) {
-      config.credentials = { accessKeyId, secretAccessKey }
+      const sessionToken = process.env.AWS_SESSION_TOKEN
+      config.credentials = sessionToken
+        ? { accessKeyId, secretAccessKey, sessionToken }
+        : { accessKeyId, secretAccessKey }
     }
     _client = new BedrockRuntimeClient(config)
   }
@@ -118,12 +121,73 @@ export async function invokeBedrock(
   }
 }
 
+// ── JSON repair for truncated responses ──────────────────────────────
+
+/**
+ * Attempt to repair truncated JSON from a model that hit max_tokens.
+ *
+ * Strategy: walk the string tracking open braces/brackets/strings,
+ * then close everything that was left open.
+ */
+function repairTruncatedJSON(text: string): string {
+  let inString = false
+  let escaped = false
+  const stack: ('{' | '[')[] = []
+
+  for (let i = 0; i < text.length; i++) {
+    const ch = text[i]
+
+    if (escaped) {
+      escaped = false
+      continue
+    }
+
+    if (ch === '\\' && inString) {
+      escaped = true
+      continue
+    }
+
+    if (ch === '"') {
+      inString = !inString
+      continue
+    }
+
+    if (inString) continue
+
+    if (ch === '{') stack.push('{')
+    else if (ch === '[') stack.push('[')
+    else if (ch === '}' && stack.length && stack[stack.length - 1] === '{') stack.pop()
+    else if (ch === ']' && stack.length && stack[stack.length - 1] === '[') stack.pop()
+  }
+
+  let repaired = text
+
+  // Close an unterminated string
+  if (inString) repaired += '"'
+
+  // If we ended mid-value after a colon or comma, add null to make it valid
+  const trimmed = repaired.trimEnd()
+  const lastChar = trimmed[trimmed.length - 1]
+  if (lastChar === ':' || lastChar === ',') {
+    repaired = trimmed.slice(0, -1)
+  }
+
+  // Close all open brackets/braces in reverse order
+  while (stack.length) {
+    const open = stack.pop()
+    repaired += open === '{' ? '}' : ']'
+  }
+
+  return repaired
+}
+
 // ── Convenience: invoke and parse JSON ───────────────────────────────
 
 /**
  * Invoke Bedrock with JSON mode and parse the response as JSON.
  *
- * Throws if the response is not valid JSON.
+ * If the model hits max_tokens and returns truncated JSON, this will
+ * attempt to repair it before throwing.
  */
 export async function invokeBedrockJSON<T = Record<string, unknown>>(
   opts: Omit<BedrockInvokeOptions, 'jsonMode'>
@@ -137,7 +201,31 @@ export async function invokeBedrockJSON<T = Record<string, unknown>>(
   if (cleaned.endsWith('```')) cleaned = cleaned.slice(0, -3)
   cleaned = cleaned.trim()
 
-  const parsed = JSON.parse(cleaned) as T
-
-  return { parsed, raw: result.text, stopReason: result.stopReason }
+  // Try direct parse first
+  try {
+    const parsed = JSON.parse(cleaned) as T
+    return { parsed, raw: result.text, stopReason: result.stopReason }
+  } catch {
+    // If the response was truncated (hit token limit), attempt repair
+    if (result.stopReason === 'max_tokens') {
+      console.warn(
+        `[bedrock] Response truncated (max_tokens). Attempting JSON repair. ` +
+        `Output tokens: ${result.outputTokens}, max requested: ${opts.maxTokens ?? 2000}`
+      )
+      const repaired = repairTruncatedJSON(cleaned)
+      try {
+        const parsed = JSON.parse(repaired) as T
+        return { parsed, raw: result.text, stopReason: result.stopReason }
+      } catch (repairErr) {
+        throw new Error(
+          `AI response was truncated at ${opts.maxTokens ?? 2000} tokens and could not be repaired. ` +
+          `Try again with a shorter document.`
+        )
+      }
+    }
+    // Not a truncation issue — re-throw the original parse error
+    throw new Error(
+      `Invalid JSON in AI response: ${cleaned.slice(0, 200)}...`
+    )
+  }
 }

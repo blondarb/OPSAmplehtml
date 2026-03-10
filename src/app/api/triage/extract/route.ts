@@ -64,9 +64,9 @@ export async function POST(request: Request) {
       sourceFilename,
     })
 
-    // Call Bedrock with 30-second timeout
+    // Call Bedrock with 45-second timeout (Amplify SSR compute limit is 60s)
     const controller = new AbortController()
-    const timeout = setTimeout(() => controller.abort(), 30000)
+    const timeout = setTimeout(() => controller.abort(), 45000)
 
     let aiResponse: {
       note_type_detected: string
@@ -78,7 +78,7 @@ export async function POST(request: Request) {
       const result = await invokeBedrockJSON<typeof aiResponse>({
         system: EXTRACTION_SYSTEM_PROMPT,
         messages: [{ role: 'user', content: userPrompt }],
-        maxTokens: 3000,
+        maxTokens: 4096,
         temperature: 0.2,
         signal: controller.signal,
       })
