@@ -69,7 +69,7 @@ export async function runTriage(input: TriageInput): Promise<TriageResult> {
     const result = await invokeBedrockJSON({
       system: TRIAGE_SYSTEM_PROMPT,
       messages: [{ role: 'user', content: userPrompt }],
-      maxTokens: 2500,
+      maxTokens: 4000,
       temperature,
       signal: controller.signal,
       model: input.model,
