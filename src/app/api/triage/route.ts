@@ -173,7 +173,16 @@ export async function POST(request: Request) {
       )
     }
 
-    const message = error instanceof Error ? error.message : 'An error occurred while processing your request'
+    // Sanitize infrastructure errors — never expose AWS SDK / credential details to client
+    let message = 'An error occurred while processing your request'
+    if (error instanceof Error) {
+      const raw = error.message
+      if (raw.includes('credential') || raw.includes('Could not load') || raw.includes('AWS') || raw.includes('Bedrock')) {
+        message = 'The triage service is temporarily unavailable. Please try again shortly or triage this patient manually.'
+      } else {
+        message = raw
+      }
+    }
     return NextResponse.json({ error: message }, { status: 500 })
   }
 }

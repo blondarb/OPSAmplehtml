@@ -323,9 +323,9 @@ export default function TriagePage() {
 
         {/* State machine rendering */}
 
-        {/* Input state */}
-        {(pageState === 'input' || pageState === 'extracting') && (
-          <>
+        {/* Input state — keep mounted during triaging to preserve textarea text */}
+        {(pageState === 'input' || pageState === 'extracting' || pageState === 'triaging') && (
+          <div style={{ display: pageState === 'triaging' ? 'none' : undefined }}>
             <TriageInputPanel
               onSubmit={handleSubmit}
               loading={isInputLoading}
@@ -360,7 +360,7 @@ export default function TriagePage() {
             )}
 
             <DisclaimerBanner />
-          </>
+          </div>
         )}
 
         {/* Review state */}
