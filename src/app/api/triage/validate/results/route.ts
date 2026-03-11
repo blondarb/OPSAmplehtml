@@ -463,8 +463,89 @@ export async function GET(req: NextRequest) {
   })
 
   // ── AI Self-Consistency (multi-run analysis, grouped by model) ──
-  let aiConsistency = undefined
+  let aiConsistency: ReturnType<typeof computeConsistency> | undefined = undefined
   let modelComparison = undefined
+  let _debugAiRuns: { count: number; error: string | null; models: string[] } | undefined = undefined
+
+  // Helper: compute consistency stats for a set of runs
+  function computeConsistency(modelRuns: any[], allCases: any[]) {
+    const runsByCase = new Map<string, any[]>()
+    for (const run of modelRuns) {
+      const list = runsByCase.get(run.case_id) || []
+      list.push(run)
+      runsByCase.set(run.case_id, list)
+    }
+
+    const caseConsistency = allCases
+      .filter((c: any) => runsByCase.has(c.id))
+      .map((c: any) => {
+        const runs = runsByCase.get(c.id) || []
+        const successRuns = runs.filter((r: any) => !r.error)
+        const baseline = successRuns.find((r: any) => r.run_number === 0)
+        const standardRuns = successRuns.filter((r: any) => r.run_number > 0)
+
+        const allTiers = successRuns.map((r: any) => r.ai_triage_tier as TriageTier).filter(Boolean)
+        const distinctTiers = [...new Set(allTiers)].length
+
+        const scores = successRuns
+          .map((r: any) => parseFloat(r.ai_weighted_score))
+          .filter((s: any) => !isNaN(s))
+        const scoreMean = scores.length > 0
+          ? scores.reduce((a: any, b: any) => a + b, 0) / scores.length
+          : null
+        const scoreStd = scores.length > 1
+          ? Math.sqrt(scores.reduce((sum: any, s: any) => sum + (s - scoreMean!) ** 2, 0) / (scores.length - 1))
+          : null
+
+        // Average duration
+        const durations = successRuns.map((r: any) => r.duration_ms).filter((d: any) => d != null)
+        const avgDuration = durations.length > 0
+          ? Math.round(durations.reduce((a: any, b: any) => a + b, 0) / durations.length)
+          : null
+
+        return {
+          case_id: c.id,
+          case_number: c.case_number,
+          case_title: c.title,
+          baseline_tier: baseline?.ai_triage_tier as TriageTier | null ?? null,
+          baseline_score: baseline?.ai_weighted_score ? parseFloat(baseline.ai_weighted_score) : null,
+          run_tiers: standardRuns.map((r: any) => r.ai_triage_tier as TriageTier).filter(Boolean),
+          run_scores: standardRuns.map((r: any) => parseFloat(r.ai_weighted_score)).filter((s: any) => !isNaN(s)),
+          distinct_tiers: distinctTiers,
+          score_mean: scoreMean !== null ? Math.round(scoreMean * 100) / 100 : null,
+          score_std: scoreStd !== null ? Math.round(scoreStd * 100) / 100 : null,
+          all_agree: distinctTiers <= 1,
+          avg_duration_ms: avgDuration,
+        }
+      })
+
+    const casesWithRuns = caseConsistency.length
+    const perfectAgreement = caseConsistency.filter((c: any) => c.all_agree).length
+    const avgDistinct = casesWithRuns > 0
+      ? caseConsistency.reduce((s: any, c: any) => s + c.distinct_tiers, 0) / casesWithRuns
+      : 0
+
+    // Overall average score and duration across all cases
+    const allScoreMeans = caseConsistency.map((c: any) => c.score_mean).filter((s: any) => s !== null) as number[]
+    const overallScoreMean = allScoreMeans.length > 0
+      ? Math.round((allScoreMeans.reduce((a, b) => a + b, 0) / allScoreMeans.length) * 100) / 100
+      : null
+    const allDurations = caseConsistency.map((c: any) => c.avg_duration_ms).filter((d: any) => d !== null) as number[]
+    const overallAvgDuration = allDurations.length > 0
+      ? Math.round(allDurations.reduce((a, b) => a + b, 0) / allDurations.length)
+      : null
+
+    return {
+      total_cases_with_runs: casesWithRuns,
+      total_runs: modelRuns.length,
+      perfect_agreement_rate: casesWithRuns > 0 ? Math.round((perfectAgreement / casesWithRuns) * 1000) / 1000 : 0,
+      avg_distinct_tiers_per_case: Math.round(avgDistinct * 100) / 100,
+      overall_score_mean: overallScoreMean,
+      overall_avg_duration_ms: overallAvgDuration,
+      case_consistency: caseConsistency,
+    }
+  }
+
   {
     // Select only needed columns — exclude ai_raw_response (large JSONB) to avoid timeout
     const { data: aiRuns, error: aiRunsError } = await from('validation_ai_runs')
@@ -474,6 +555,10 @@ export async function GET(req: NextRequest) {
 
     if (aiRunsError) {
       console.error('AI runs query error:', aiRunsError)
+      _debugAiRuns = { count: 0, error: aiRunsError.message, models: [] }
+    } else {
+      const models = aiRuns ? [...new Set(aiRuns.map((r: any) => r.model || 'unknown'))] : []
+      _debugAiRuns = { count: aiRuns?.length || 0, error: null, models: models as string[] }
     }
 
     if (aiRuns && aiRuns.length > 0) {
@@ -484,85 +569,6 @@ export async function GET(req: NextRequest) {
         const list = runsByModel.get(modelKey) || []
         list.push(run)
         runsByModel.set(modelKey, list)
-      }
-
-      // Helper: compute consistency stats for a set of runs
-      function computeConsistency(modelRuns: typeof aiRuns, allCases: typeof cases) {
-        const runsByCase = new Map<string, typeof aiRuns>()
-        for (const run of modelRuns) {
-          const list = runsByCase.get(run.case_id) || []
-          list.push(run)
-          runsByCase.set(run.case_id, list)
-        }
-
-        const caseConsistency = allCases
-          .filter((c: any) => runsByCase.has(c.id))
-          .map((c: any) => {
-            const runs = runsByCase.get(c.id) || []
-            const successRuns = runs.filter((r: any) => !r.error)
-            const baseline = successRuns.find((r: any) => r.run_number === 0)
-            const standardRuns = successRuns.filter((r: any) => r.run_number > 0)
-
-            const allTiers = successRuns.map((r: any) => r.ai_triage_tier as TriageTier).filter(Boolean)
-            const distinctTiers = [...new Set(allTiers)].length
-
-            const scores = successRuns
-              .map((r: any) => parseFloat(r.ai_weighted_score))
-              .filter((s: any) => !isNaN(s))
-            const scoreMean = scores.length > 0
-              ? scores.reduce((a: any, b: any) => a + b, 0) / scores.length
-              : null
-            const scoreStd = scores.length > 1
-              ? Math.sqrt(scores.reduce((sum: any, s: any) => sum + (s - scoreMean!) ** 2, 0) / (scores.length - 1))
-              : null
-
-            // Average duration
-            const durations = successRuns.map((r: any) => r.duration_ms).filter((d: any) => d != null)
-            const avgDuration = durations.length > 0
-              ? Math.round(durations.reduce((a: any, b: any) => a + b, 0) / durations.length)
-              : null
-
-            return {
-              case_id: c.id,
-              case_number: c.case_number,
-              case_title: c.title,
-              baseline_tier: baseline?.ai_triage_tier as TriageTier | null ?? null,
-              baseline_score: baseline?.ai_weighted_score ? parseFloat(baseline.ai_weighted_score) : null,
-              run_tiers: standardRuns.map((r: any) => r.ai_triage_tier as TriageTier).filter(Boolean),
-              run_scores: standardRuns.map((r: any) => parseFloat(r.ai_weighted_score)).filter((s: any) => !isNaN(s)),
-              distinct_tiers: distinctTiers,
-              score_mean: scoreMean !== null ? Math.round(scoreMean * 100) / 100 : null,
-              score_std: scoreStd !== null ? Math.round(scoreStd * 100) / 100 : null,
-              all_agree: distinctTiers <= 1,
-              avg_duration_ms: avgDuration,
-            }
-          })
-
-        const casesWithRuns = caseConsistency.length
-        const perfectAgreement = caseConsistency.filter((c: any) => c.all_agree).length
-        const avgDistinct = casesWithRuns > 0
-          ? caseConsistency.reduce((s: any, c: any) => s + c.distinct_tiers, 0) / casesWithRuns
-          : 0
-
-        // Overall average score and duration across all cases
-        const allScoreMeans = caseConsistency.map((c: any) => c.score_mean).filter((s: any) => s !== null) as number[]
-        const overallScoreMean = allScoreMeans.length > 0
-          ? Math.round((allScoreMeans.reduce((a, b) => a + b, 0) / allScoreMeans.length) * 100) / 100
-          : null
-        const allDurations = caseConsistency.map((c: any) => c.avg_duration_ms).filter((d: any) => d !== null) as number[]
-        const overallAvgDuration = allDurations.length > 0
-          ? Math.round(allDurations.reduce((a, b) => a + b, 0) / allDurations.length)
-          : null
-
-        return {
-          total_cases_with_runs: casesWithRuns,
-          total_runs: modelRuns.length,
-          perfect_agreement_rate: casesWithRuns > 0 ? Math.round((perfectAgreement / casesWithRuns) * 1000) / 1000 : 0,
-          avg_distinct_tiers_per_case: Math.round(avgDistinct * 100) / 100,
-          overall_score_mean: overallScoreMean,
-          overall_avg_duration_ms: overallAvgDuration,
-          case_consistency: caseConsistency,
-        }
       }
 
       // If there are multiple models, build a model comparison
@@ -650,8 +656,9 @@ export async function GET(req: NextRequest) {
     tier_agreement: tierAgreement,
     pairwise,
     ai_vs_consensus: aiVsConsensus,
-    ai_consistency: aiConsistency,
-    model_comparison: modelComparison,
+    ai_consistency: aiConsistency ?? null,
+    model_comparison: modelComparison ?? null,
+    _debug_ai_runs: _debugAiRuns,
     redirect_agreement: {
       agreement_rate: redirectTotalCount > 0 ? Math.round((redirectAgreeCount / redirectTotalCount) * 1000) / 1000 : 0,
       total_cases: redirectTotalCount,
