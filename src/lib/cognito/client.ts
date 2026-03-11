@@ -1,14 +1,15 @@
 /**
  * Cognito Browser-Side Auth
  *
- * Uses amazon-cognito-identity-js for signIn, signUp, confirmSignUp, etc.
+ * signIn uses direct Cognito API (USER_PASSWORD_AUTH) — the SDK's SRP flow
+ * fails on ESSENTIALS tier pools. Other flows (signUp, confirmSignUp, etc.)
+ * still use amazon-cognito-identity-js.
  * After successful auth, stores tokens in httpOnly cookies via /api/auth/session.
  */
 
 import {
   CognitoUserPool,
   CognitoUser,
-  AuthenticationDetails,
   CognitoUserAttribute,
   type CognitoUserSession,
 } from 'amazon-cognito-identity-js'
@@ -50,32 +51,76 @@ export async function signIn(
   email: string,
   password: string
 ): Promise<{ error: string | null }> {
-  return new Promise((resolve) => {
-    const cognitoUser = getCognitoUser(email)
-    if (!cognitoUser) {
-      resolve({ error: 'Auth not configured' })
-      return
+  const cognitoUser = getCognitoUser(email)
+  if (!cognitoUser) {
+    return { error: 'Auth not configured' }
+  }
+
+  try {
+    // Use direct Cognito API call with USER_PASSWORD_AUTH
+    // The SDK's SRP flow has issues with ESSENTIALS tier pools
+    const region = userPoolId.split('_')[0]
+    const endpoint = `https://cognito-idp.${region}.amazonaws.com/`
+
+    const res = await fetch(endpoint, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-amz-json-1.1',
+        'X-Amz-Target': 'AWSCognitoIdentityProviderService.InitiateAuth',
+      },
+      body: JSON.stringify({
+        AuthFlow: 'USER_PASSWORD_AUTH',
+        ClientId: clientId,
+        AuthParameters: {
+          USERNAME: email,
+          PASSWORD: password,
+        },
+      }),
+    })
+
+    const data = await res.json()
+
+    if (!res.ok) {
+      const msg = data.message || data.__type || 'Sign in failed'
+      return { error: msg }
     }
 
-    const authDetails = new AuthenticationDetails({
-      Username: email,
-      Password: password,
-    })
+    if (data.AuthenticationResult) {
+      // Store tokens in cookies
+      await fetch('/api/auth/session', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          idToken: data.AuthenticationResult.IdToken,
+          accessToken: data.AuthenticationResult.AccessToken,
+          refreshToken: data.AuthenticationResult.RefreshToken,
+        }),
+      })
 
-    cognitoUser.setAuthenticationFlowType('USER_PASSWORD_AUTH')
-    cognitoUser.authenticateUser(authDetails, {
-      onSuccess: async (session) => {
-        await storeSession(session)
-        resolve({ error: null })
-      },
-      onFailure: (err) => {
-        resolve({ error: err.message || 'Sign in failed' })
-      },
-      newPasswordRequired: () => {
-        resolve({ error: 'Password change required. Please reset your password.' })
-      },
-    })
-  })
+      // Also set tokens in the SDK's storage so getCurrentUser/getCurrentSession work
+      if (userPool) {
+        const keyPrefix = `CognitoIdentityServiceProvider.${clientId}`
+        const lastUser = email
+        const storage = typeof window !== 'undefined' ? window.localStorage : null
+        if (storage) {
+          storage.setItem(`${keyPrefix}.LastAuthUser`, lastUser)
+          storage.setItem(`${keyPrefix}.${lastUser}.idToken`, data.AuthenticationResult.IdToken)
+          storage.setItem(`${keyPrefix}.${lastUser}.accessToken`, data.AuthenticationResult.AccessToken)
+          storage.setItem(`${keyPrefix}.${lastUser}.refreshToken`, data.AuthenticationResult.RefreshToken)
+        }
+      }
+
+      return { error: null }
+    }
+
+    if (data.ChallengeName === 'NEW_PASSWORD_REQUIRED') {
+      return { error: 'Password change required. Please reset your password.' }
+    }
+
+    return { error: `Unexpected response: ${data.ChallengeName || 'unknown'}` }
+  } catch (err) {
+    return { error: err instanceof Error ? err.message : 'Sign in failed' }
+  }
 }
 
 export async function signUp(
