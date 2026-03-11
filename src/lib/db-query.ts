@@ -166,7 +166,7 @@ class QueryBuilder implements PromiseLike<DbResult> {
       return this
     }
     const placeholders = vals.map(() => '?').join(', ')
-    this.conditions.push({ sql: `"${col}" IN (${placeholders})`, values: vals })
+    this.conditions.push({ sql: `"${col}" IN (${placeholders})`, values: [...vals] })
     return this
   }
 

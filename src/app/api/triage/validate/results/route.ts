@@ -465,7 +465,6 @@ export async function GET(req: NextRequest) {
   // ── AI Self-Consistency (multi-run analysis, grouped by model) ──
   let aiConsistency: ReturnType<typeof computeConsistency> | undefined = undefined
   let modelComparison = undefined
-  let _debugAiRuns: { count: number; error: string | null; models: string[] } | undefined = undefined
 
   // Helper: compute consistency stats for a set of runs
   function computeConsistency(modelRuns: any[], allCases: any[]) {
@@ -555,10 +554,6 @@ export async function GET(req: NextRequest) {
 
     if (aiRunsError) {
       console.error('AI runs query error:', aiRunsError)
-      _debugAiRuns = { count: 0, error: aiRunsError.message, models: [] }
-    } else {
-      const models = aiRuns ? [...new Set(aiRuns.map((r: any) => r.model || 'unknown'))] : []
-      _debugAiRuns = { count: aiRuns?.length || 0, error: null, models: models as string[] }
     }
 
     if (aiRuns && aiRuns.length > 0) {
@@ -658,7 +653,6 @@ export async function GET(req: NextRequest) {
     ai_vs_consensus: aiVsConsensus,
     ai_consistency: aiConsistency ?? null,
     model_comparison: modelComparison ?? null,
-    _debug_ai_runs: _debugAiRuns,
     redirect_agreement: {
       agreement_rate: redirectTotalCount > 0 ? Math.round((redirectAgreeCount / redirectTotalCount) * 1000) / 1000 : 0,
       total_cases: redirectTotalCount,
