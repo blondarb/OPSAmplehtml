@@ -1,12 +1,14 @@
 import { NextResponse } from 'next/server'
 import { getUser } from '@/lib/cognito/server'
 import { getTenantServer } from '@/lib/tenant'
+import { getPool } from '@/lib/db'
 import { from } from '@/lib/db-query'
 
 // GET /api/incomplete-docs — Scan for unsigned/incomplete clinical notes
 export async function GET() {
   try {
     const tenant = getTenantServer()
+    const pool = await getPool()
 
     const incompleteItems: Array<{
       type: string
@@ -23,102 +25,71 @@ export async function GET() {
     //    and the visit was more than 24 hours ago
     const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
 
-    const { data: unsignedNotes } = await from('clinical_notes')
-      .select(`
-        id,
-        visit_id,
-        signed_at,
-        assessment,
-        plan,
-        hpi,
-        created_at,
-        visit:visits (
-          id,
-          visit_date,
-          patient_id,
-          patient:patients (
-            first_name,
-            last_name
-          )
-        )
-      `)
-      .is('signed_at', null)
-      .lt('created_at', twentyFourHoursAgo)
-      .limit(20)
+    const { rows: unsignedNotes } = await pool.query(`
+      SELECT
+        cn."id", cn."visit_id", cn."signed_at", cn."assessment", cn."plan", cn."hpi", cn."created_at",
+        v."id" AS v_id, v."visit_date", v."patient_id",
+        p."first_name", p."last_name"
+      FROM "clinical_notes" cn
+      LEFT JOIN "visits" v ON v."id" = cn."visit_id"
+      LEFT JOIN "patients" p ON p."id" = v."patient_id"
+      WHERE cn."signed_at" IS NULL
+        AND cn."created_at" < $1
+      LIMIT 20
+    `, [twentyFourHoursAgo])
 
-    if (unsignedNotes) {
-      for (const note of unsignedNotes) {
-        const visit = note.visit as any
-        const patient = visit?.patient
-        const patientName = patient
-          ? `${patient.first_name} ${patient.last_name}`
-          : 'Unknown Patient'
+    for (const note of unsignedNotes) {
+      const patientName = note.first_name
+        ? `${note.first_name} ${note.last_name}`
+        : 'Unknown Patient'
 
-        const missingSections: string[] = []
-        if (!note.assessment) missingSections.push('Assessment')
-        if (!note.plan) missingSections.push('Plan')
-        if (!note.hpi) missingSections.push('HPI')
+      const missingSections: string[] = []
+      if (!note.assessment) missingSections.push('Assessment')
+      if (!note.plan) missingSections.push('Plan')
+      if (!note.hpi) missingSections.push('HPI')
 
-        incompleteItems.push({
-          type: missingSections.length > 0 ? 'missing_sections' : 'unsigned',
-          patient_name: patientName,
-          patient_id: visit?.patient_id || null,
-          visit_id: visit?.id || null,
-          note_id: note.id,
-          description: missingSections.length > 0
-            ? `Unsigned note with missing sections: ${missingSections.join(', ')}`
-            : 'Note awaiting signature (>24 hours)',
-          visit_date: visit?.visit_date || null,
-          missing_sections: missingSections,
-        })
-      }
+      incompleteItems.push({
+        type: missingSections.length > 0 ? 'missing_sections' : 'unsigned',
+        patient_name: patientName,
+        patient_id: note.patient_id || null,
+        visit_id: note.v_id || null,
+        note_id: note.id,
+        description: missingSections.length > 0
+          ? `Unsigned note with missing sections: ${missingSections.join(', ')}`
+          : 'Note awaiting signature (>24 hours)',
+        visit_date: note.visit_date || null,
+        missing_sections: missingSections,
+      })
     }
 
-    // 2. Visits with no clinical note at all (visit > 24hrs ago, status completed or in-progress)
-    const { data: visitsWithoutNotes } = await from('visits')
-      .select(`
-        id,
-        visit_date,
-        visit_type,
-        patient_id,
-        patient:patients (
-          first_name,
-          last_name
-        )
-      `)
-      .lt('visit_date', twentyFourHoursAgo.split('T')[0])
-      .limit(20)
+    // 2. Visits with no clinical note at all (visit > 24hrs ago)
+    const { rows: visitsWithoutNotes } = await pool.query(`
+      SELECT
+        v."id", v."visit_date", v."visit_type", v."patient_id",
+        p."first_name", p."last_name"
+      FROM "visits" v
+      LEFT JOIN "patients" p ON p."id" = v."patient_id"
+      LEFT JOIN "clinical_notes" cn ON cn."visit_id" = v."id"
+      WHERE v."visit_date" < $1
+        AND cn."id" IS NULL
+      LIMIT 20
+    `, [twentyFourHoursAgo.split('T')[0]])
 
-    if (visitsWithoutNotes) {
-      // Check which of these visits have clinical notes
-      const visitIds = visitsWithoutNotes.map((v: any) => v.id)
-      if (visitIds.length > 0) {
-        const { data: existingNotes } = await from('clinical_notes')
-          .select('visit_id')
-          .in('visit_id', visitIds)
+    for (const visit of visitsWithoutNotes) {
+      const patientName = visit.first_name
+        ? `${visit.first_name} ${visit.last_name}`
+        : 'Unknown Patient'
 
-        const visitIdsWithNotes = new Set((existingNotes || []).map((n: any) => n.visit_id))
-
-        for (const visit of visitsWithoutNotes) {
-          if (!visitIdsWithNotes.has(visit.id)) {
-            const patient = visit.patient as any
-            const patientName = patient
-              ? `${patient.first_name} ${patient.last_name}`
-              : 'Unknown Patient'
-
-            incompleteItems.push({
-              type: 'no_note',
-              patient_name: patientName,
-              patient_id: visit.patient_id,
-              visit_id: visit.id,
-              note_id: null,
-              description: `Visit on ${visit.visit_date} has no clinical note`,
-              visit_date: visit.visit_date,
-              missing_sections: [],
-            })
-          }
-        }
-      }
+      incompleteItems.push({
+        type: 'no_note',
+        patient_name: patientName,
+        patient_id: visit.patient_id,
+        visit_id: visit.id,
+        note_id: null,
+        description: `Visit on ${visit.visit_date} has no clinical note`,
+        visit_date: visit.visit_date,
+        missing_sections: [],
+      })
     }
 
     return NextResponse.json({

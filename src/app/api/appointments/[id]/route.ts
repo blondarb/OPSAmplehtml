@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getUser } from '@/lib/cognito/server'
+import { getPool } from '@/lib/db'
 import { from } from '@/lib/db-query'
 
 // GET /api/appointments/[id] - Get a single appointment
@@ -16,30 +17,36 @@ export async function GET(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const { data, error } = await from('appointments')
-      .select(`
-        *,
-        patient:patients (
-          *
-        ),
-        visit:visits (
-          *,
-          clinical_notes (*)
-        ),
-        prior_visit:visits!appointments_prior_visit_id_fkey (
-          *,
-          clinical_notes (*)
-        )
-      `)
-      .eq('id', id)
-      .single()
+    const pool = await getPool()
+    const sql = `
+      SELECT
+        a.*,
+        row_to_json(p.*) AS patient,
+        row_to_json(v.*) AS visit,
+        row_to_json(pv.*) AS prior_visit,
+        (SELECT json_agg(cn.*) FROM "clinical_notes" cn WHERE cn."visit_id" = v."id") AS visit_clinical_notes,
+        (SELECT json_agg(cn.*) FROM "clinical_notes" cn WHERE cn."visit_id" = pv."id") AS prior_visit_clinical_notes
+      FROM "appointments" a
+      LEFT JOIN "patients" p ON p."id" = a."patient_id"
+      LEFT JOIN "visits" v ON v."id" = a."visit_id"
+      LEFT JOIN "visits" pv ON pv."id" = a."prior_visit_id"
+      WHERE a."id" = $1
+      LIMIT 1
+    `
+    const { rows } = await pool.query(sql, [id])
 
-    if (error) {
-      console.error('Error fetching appointment:', error)
+    if (!rows.length) {
       return NextResponse.json({ error: 'Appointment not found' }, { status: 404 })
     }
 
-    return NextResponse.json({ appointment: data })
+    const row = rows[0]
+    // Attach clinical_notes arrays to visit/prior_visit objects
+    if (row.visit) row.visit.clinical_notes = row.visit_clinical_notes || []
+    if (row.prior_visit) row.prior_visit.clinical_notes = row.prior_visit_clinical_notes || []
+    delete row.visit_clinical_notes
+    delete row.prior_visit_clinical_notes
+
+    return NextResponse.json({ appointment: row })
   } catch (error) {
     console.error('Error in appointment API:', error)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })

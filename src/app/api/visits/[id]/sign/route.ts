@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getUser } from '@/lib/cognito/server'
 import { getTenantServer } from '@/lib/tenant'
 import { invokeBedrock } from '@/lib/bedrock'
+import { getPool } from '@/lib/db'
 import { from } from '@/lib/db-query'
 
 // POST /api/visits/[id]/sign - Sign and complete a visit
@@ -19,19 +20,24 @@ export async function POST(
     }
 
     // Get the visit with clinical note and patient info
-    const { data: visit, error: visitError } = await from('visits')
-      .select(`
-        *,
-        clinical_notes (*),
-        patient:patients (first_name, last_name, date_of_birth, gender)
-      `)
-      .eq('id', id)
-      .single()
+    const pool = await getPool()
+    const { rows: visitRows } = await pool.query(`
+      SELECT
+        v.*,
+        (SELECT json_agg(cn.*) FROM "clinical_notes" cn WHERE cn."visit_id" = v."id") AS clinical_notes,
+        CASE WHEN p."id" IS NOT NULL THEN json_build_object(
+          'first_name', p."first_name", 'last_name', p."last_name",
+          'date_of_birth', p."date_of_birth", 'gender', p."gender"
+        ) ELSE NULL END AS patient
+      FROM "visits" v
+      LEFT JOIN "patients" p ON p."id" = v."patient_id"
+      WHERE v."id" = $1
+      LIMIT 1
+    `, [id])
 
-    if (visitError || !visit) {
-      console.error('Error fetching visit:', visitError)
-      const detail = visitError?.message || 'Unknown error'
-      return NextResponse.json({ error: 'Visit not found', detail }, { status: 404 })
+    const visit = visitRows[0]
+    if (!visit) {
+      return NextResponse.json({ error: 'Visit not found', detail: 'No visit found with that ID' }, { status: 404 })
     }
 
     let clinicalNote = visit.clinical_notes?.[0]
@@ -136,13 +142,15 @@ Generate a professional clinical summary:`
     }
 
     // Fetch the updated visit
-    const { data: updatedVisit } = await from('visits')
-      .select(`
-        *,
-        clinical_notes (*)
-      `)
-      .eq('id', id)
-      .single()
+    const { rows: updatedRows } = await pool.query(`
+      SELECT
+        v.*,
+        (SELECT json_agg(cn.*) FROM "clinical_notes" cn WHERE cn."visit_id" = v."id") AS clinical_notes
+      FROM "visits" v
+      WHERE v."id" = $1
+      LIMIT 1
+    `, [id])
+    const updatedVisit = updatedRows[0] || null
 
     return NextResponse.json({
       visit: updatedVisit,

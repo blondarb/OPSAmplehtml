@@ -51,23 +51,32 @@ export async function GET(request: Request) {
     const tenant = searchParams.get('tenant_id') || getTenantServer()
     const patientId = searchParams.get('patient_id')
 
+    const { getPool } = await import('@/lib/db')
+    const pool = await getPool()
 
-    let query = from('historian_sessions')
-      .select('*, patient:patients(id, first_name, last_name, mrn)')
-      .eq('tenant_id', tenant)
+    const conditions = ['hs."tenant_id" = $1']
+    const values: unknown[] = [tenant]
+
     if (patientId) {
-      query = query.eq('patient_id', patientId)
-    }
-    const { data, error } = await query
-      .order('created_at', { ascending: false })
-      .limit(10)
-
-    if (error) {
-      console.error('Error fetching historian sessions:', error)
-      return NextResponse.json({ error: error.message }, { status: 500 })
+      conditions.push(`hs."patient_id" = $2`)
+      values.push(patientId)
     }
 
-    return NextResponse.json({ sessions: data || [] })
+    const sql = `
+      SELECT
+        hs.*,
+        CASE WHEN p."id" IS NOT NULL THEN json_build_object(
+          'id', p."id", 'first_name', p."first_name", 'last_name', p."last_name", 'mrn', p."mrn"
+        ) ELSE NULL END AS patient
+      FROM "historian_sessions" hs
+      LEFT JOIN "patients" p ON p."id" = hs."patient_id"
+      WHERE ${conditions.join(' AND ')}
+      ORDER BY hs."created_at" DESC
+      LIMIT 10
+    `
+    const { rows } = await pool.query(sql, values)
+
+    return NextResponse.json({ sessions: rows || [] })
   } catch (error: any) {
     console.error('Historian list API error:', error)
     return NextResponse.json(

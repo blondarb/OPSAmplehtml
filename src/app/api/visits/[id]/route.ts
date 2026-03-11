@@ -1,7 +1,25 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getUser } from '@/lib/cognito/server'
 import { getTenantServer } from '@/lib/tenant'
+import { getPool } from '@/lib/db'
 import { from } from '@/lib/db-query'
+
+// Helper to fetch a visit with clinical_notes and patient via JOINs
+async function fetchVisitWithRelations(id: string) {
+  const pool = await getPool()
+  const sql = `
+    SELECT
+      v.*,
+      row_to_json(p.*) AS patient,
+      (SELECT json_agg(cn.*) FROM "clinical_notes" cn WHERE cn."visit_id" = v."id") AS clinical_notes
+    FROM "visits" v
+    LEFT JOIN "patients" p ON p."id" = v."patient_id"
+    WHERE v."id" = $1
+    LIMIT 1
+  `
+  const { rows } = await pool.query(sql, [id])
+  return rows[0] || null
+}
 
 // GET /api/visits/[id] - Get a visit with clinical note
 export async function GET(
@@ -17,21 +35,13 @@ export async function GET(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const { data, error } = await from('visits')
-      .select(`
-        *,
-        clinical_notes (*),
-        patient:patients (*)
-      `)
-      .eq('id', id)
-      .single()
+    const visit = await fetchVisitWithRelations(id)
 
-    if (error) {
-      console.error('Error fetching visit:', error)
+    if (!visit) {
       return NextResponse.json({ error: 'Visit not found' }, { status: 404 })
     }
 
-    return NextResponse.json({ visit: data })
+    return NextResponse.json({ visit })
   } catch (error) {
     console.error('Error in visit API:', error)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
@@ -118,13 +128,7 @@ export async function PATCH(
     }
 
     // Fetch updated visit with clinical note
-    const { data: updatedVisit } = await from('visits')
-      .select(`
-        *,
-        clinical_notes (*)
-      `)
-      .eq('id', id)
-      .single()
+    const updatedVisit = await fetchVisitWithRelations(id)
 
     return NextResponse.json({ visit: updatedVisit })
   } catch (error) {
