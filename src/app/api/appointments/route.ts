@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getUser } from '@/lib/cognito/server'
+import { getPool } from '@/lib/db'
 import { from } from '@/lib/db-query'
 
 // GET /api/appointments - Get appointments with optional filters
@@ -19,60 +20,55 @@ export async function GET(request: NextRequest) {
     const status = searchParams.get('status')
     const date = searchParams.get('date') // Single date query
 
-    // Build query
-    let query = from('appointments')
-      .select(`
-        *,
-        patient:patients (
-          id,
-          mrn,
-          first_name,
-          last_name,
-          date_of_birth,
-          gender,
-          phone,
-          email,
-          referring_physician,
-          referral_reason
-        ),
-        prior_visit:visits!prior_visit_id (
-          id,
-          visit_date,
-          visit_type,
-          clinical_notes (
-            ai_summary
-          )
-        )
-      `)
-      .order('appointment_date', { ascending: true })
-      .order('appointment_time', { ascending: true })
+    // Build SQL with JOINs (replaces Supabase nested relation syntax)
+    const conditions: string[] = []
+    const values: unknown[] = []
+    let paramIdx = 0
 
-    // Apply filters
     if (date) {
-      query = query.eq('appointment_date', date)
+      conditions.push(`a."appointment_date" = $${++paramIdx}`)
+      values.push(date)
     } else if (startDate && endDate) {
-      query = query.gte('appointment_date', startDate).lte('appointment_date', endDate)
+      conditions.push(`a."appointment_date" >= $${++paramIdx}`)
+      values.push(startDate)
+      conditions.push(`a."appointment_date" <= $${++paramIdx}`)
+      values.push(endDate)
     } else if (startDate) {
-      query = query.gte('appointment_date', startDate)
+      conditions.push(`a."appointment_date" >= $${++paramIdx}`)
+      values.push(startDate)
     }
 
     if (patientId) {
-      query = query.eq('patient_id', patientId)
+      conditions.push(`a."patient_id" = $${++paramIdx}`)
+      values.push(patientId)
     }
 
     if (status && status !== 'All') {
-      query = query.eq('status', status.toLowerCase())
+      conditions.push(`a."status" = $${++paramIdx}`)
+      values.push(status.toLowerCase())
     }
 
-    const { data, error } = await query
+    const whereClause = conditions.length ? ' WHERE ' + conditions.join(' AND ') : ''
 
-    if (error) {
-      console.error('Error fetching appointments:', error)
-      return NextResponse.json({ error: 'Failed to fetch appointments', details: error.message, code: error.code }, { status: 500 })
-    }
+    const sql = `
+      SELECT
+        a.*,
+        row_to_json(p.*) AS patient,
+        row_to_json(v.*) AS prior_visit,
+        cn."ai_summary" AS prior_visit_ai_summary
+      FROM "appointments" a
+      LEFT JOIN "patients" p ON p."id" = a."patient_id"
+      LEFT JOIN "visits" v ON v."id" = a."prior_visit_id"
+      LEFT JOIN "clinical_notes" cn ON cn."visit_id" = v."id"
+      ${whereClause}
+      ORDER BY a."appointment_date" ASC, a."appointment_time" ASC
+    `
+
+    const pool = await getPool()
+    const { rows } = await pool.query(sql, values)
 
     // Transform data to match frontend expectations
-    const appointments = (data || []).map((apt: any) => ({
+    const appointments = (rows || []).map((apt: any) => ({
       id: apt.id,
       appointmentDate: apt.appointment_date,
       appointmentTime: apt.appointment_time,
@@ -104,9 +100,7 @@ export async function GET(request: NextRequest) {
         id: apt.prior_visit.id,
         visitDate: apt.prior_visit.visit_date,
         visitType: apt.prior_visit.visit_type,
-        aiSummary: Array.isArray(apt.prior_visit.clinical_notes)
-          ? apt.prior_visit.clinical_notes?.[0]?.ai_summary || null
-          : apt.prior_visit.clinical_notes?.ai_summary || null,
+        aiSummary: apt.prior_visit_ai_summary || null,
       } : null,
     }))
 
