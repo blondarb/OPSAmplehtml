@@ -466,10 +466,15 @@ export async function GET(req: NextRequest) {
   let aiConsistency = undefined
   let modelComparison = undefined
   {
-    const { data: aiRuns } = await from('validation_ai_runs')
-      .select('*')
+    // Select only needed columns — exclude ai_raw_response (large JSONB) to avoid timeout
+    const { data: aiRuns, error: aiRunsError } = await from('validation_ai_runs')
+      .select('id, case_id, run_number, model, temperature, ai_triage_tier, ai_weighted_score, ai_dimension_scores, ai_subspecialty, ai_redirect_to_non_neuro, ai_redirect_specialty, ai_confidence, ai_session_id, duration_ms, error, created_at')
       .in('case_id', caseIds)
       .order('run_number', { ascending: true })
+
+    if (aiRunsError) {
+      console.error('AI runs query error:', aiRunsError)
+    }
 
     if (aiRuns && aiRuns.length > 0) {
       // Group runs by model first, then by case within each model
