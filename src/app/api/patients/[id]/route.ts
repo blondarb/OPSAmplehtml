@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getUser } from '@/lib/cognito/server'
+import { getPool } from '@/lib/db'
 import { from } from '@/lib/db-query'
 
 // GET /api/patients/[id] - Get patient with full history
@@ -41,15 +42,17 @@ export async function GET(
       .eq('is_active', true)
       .order('allergen')
 
-    // Fetch visits with clinical notes
-    const { data: visits } = await from('visits')
-      .select(`
-        *,
-        clinical_notes (*)
-      `)
-      .eq('patient_id', id)
-      .order('visit_date', { ascending: false })
-      .limit(10)
+    // Fetch visits with clinical notes via SQL JOIN
+    const pool = await getPool()
+    const { rows: visits } = await pool.query(`
+      SELECT
+        v.*,
+        (SELECT json_agg(cn.*) FROM "clinical_notes" cn WHERE cn."visit_id" = v."id") AS clinical_notes
+      FROM "visits" v
+      WHERE v."patient_id" = $1
+      ORDER BY v."visit_date" DESC
+      LIMIT 10
+    `, [id])
 
     // Fetch appointments
     const { data: appointments } = await from('appointments')
