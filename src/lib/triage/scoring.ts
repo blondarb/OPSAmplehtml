@@ -113,8 +113,13 @@ export function calculateTriageTier(aiResponse: AITriageResponse): ScoringResult
   // 3. Calculate weighted score
   const weightedScore = calculateWeightedScore(aiResponse.dimension_scores)
 
-  // 4. Check red flag override THIRD (escalates to Urgent, not Emergent)
-  if (aiResponse.red_flag_override) {
+  // 4. Deterministic red flag escalation: if red_flag_presence dimension ≥ 4
+  //    ("one or more major red flags identified"), auto-escalate to urgent.
+  //    This replaces the AI's subjective red_flag_override boolean, which was
+  //    inconsistent across runs even when dimension scores were identical.
+  const redFlagScore = aiResponse.dimension_scores.red_flag_presence.score
+  const scoreDerivedTier = mapScoreToTier(weightedScore)
+  if (redFlagScore >= 4 && scoreDerivedTier !== 'urgent' && scoreDerivedTier !== 'emergent') {
     return {
       tier: 'urgent',
       display: formatTierDisplay('urgent', true),
@@ -123,7 +128,7 @@ export function calculateTriageTier(aiResponse: AITriageResponse): ScoringResult
   }
 
   // 5. Map score to tier
-  const tier = mapScoreToTier(weightedScore)
+  const tier = scoreDerivedTier
   return {
     tier,
     display: formatTierDisplay(tier),

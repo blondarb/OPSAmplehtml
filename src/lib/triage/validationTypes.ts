@@ -151,7 +151,9 @@ export interface AIConsistencyData {
 export interface ValidationResults {
   study_name: string
   total_cases: number
+  total_cases_all?: number
   total_reviewers: number
+  insufficient_reviewers?: boolean
   reviewers: ReviewerSummary[]
   // Agreement metrics
   fleiss_kappa: number

@@ -641,7 +641,9 @@ export async function GET(req: NextRequest) {
   return NextResponse.json({
     study_name: studyName,
     total_cases: eligibleCases.length,
+    total_cases_all: cases.length,
     total_reviewers: reviewerIds.length,
+    insufficient_reviewers: reviewerIds.length < 2,
     reviewers: reviewerSummaries,
     fleiss_kappa: Math.round(fk * 1000) / 1000,
     fleiss_kappa_interpretation: interpretKappa(fk),

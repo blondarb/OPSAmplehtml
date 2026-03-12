@@ -122,6 +122,34 @@ export default function ResultsPage() {
           {results && (
             <>
               {/* Summary Cards */}
+              {results.insufficient_reviewers ? (
+                <div style={{
+                  background: 'rgba(30, 41, 59, 0.8)',
+                  border: '1px solid #334155',
+                  borderRadius: '12px',
+                  padding: '24px',
+                  marginBottom: '24px',
+                  textAlign: 'center',
+                }}>
+                  <div style={{ color: '#f59e0b', fontSize: '0.8rem', fontWeight: 600, marginBottom: '8px' }}>
+                    Awaiting Additional Reviewers
+                  </div>
+                  <p style={{ color: '#94a3b8', fontSize: '0.82rem', margin: '0 0 12px', lineHeight: 1.5 }}>
+                    Inter-rater reliability requires at least 2 reviewers per case. Currently {results.total_reviewers} reviewer has completed {results.total_cases_all || results.reviewers?.[0]?.cases_completed || 0} cases.
+                    Fleiss&apos; Kappa, Krippendorff&apos;s Alpha, and agreement rates will populate once a second reviewer submits ratings.
+                  </p>
+                  <div style={{ display: 'flex', justifyContent: 'center', gap: '24px' }}>
+                    <div>
+                      <span style={{ color: '#e2e8f0', fontSize: '1.5rem', fontWeight: 700 }}>{results.total_cases_all || results.reviewers?.[0]?.total_cases || 0}</span>
+                      <span style={{ color: '#64748b', fontSize: '0.75rem', marginLeft: '6px' }}>cases</span>
+                    </div>
+                    <div>
+                      <span style={{ color: '#e2e8f0', fontSize: '1.5rem', fontWeight: 700 }}>{results.total_reviewers}</span>
+                      <span style={{ color: '#64748b', fontSize: '0.75rem', marginLeft: '6px' }}>of 2+ reviewers needed</span>
+                    </div>
+                  </div>
+                </div>
+              ) : (
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '16px', marginBottom: '24px' }}>
                 {/* Fleiss' Kappa */}
                 <div style={{
@@ -199,6 +227,7 @@ export default function ResultsPage() {
                   </div>
                 </div>
               </div>
+              )}
 
               {/* Reviewer Progress */}
               <div style={{
