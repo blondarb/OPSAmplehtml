@@ -22,10 +22,10 @@ export async function POST(request: Request) {
       temperature: requestedTemp,
     } = body
 
-    // Clamp temperature to [0, 1] range
+    // Clamp temperature to [0, 1] range — default 0 for maximum consistency
     const temperature = typeof requestedTemp === 'number'
       ? Math.max(0, Math.min(1, requestedTemp))
-      : 0.2
+      : 0
 
     // Validate input
     if (!referral_text || typeof referral_text !== 'string') {
@@ -65,16 +65,20 @@ export async function POST(request: Request) {
     const timeout = setTimeout(() => controller.abort(), 45000)
 
     let parsed: Record<string, unknown>
+    let inputTokens: number | undefined
+    let outputTokens: number | undefined
     try {
       const result = await invokeBedrockJSON({
         system: TRIAGE_SYSTEM_PROMPT,
         messages: [{ role: 'user', content: userPrompt }],
-        maxTokens: 2500,
+        maxTokens: 3000,
         temperature,
         signal: controller.signal,
         model: TRIAGE_MODEL,
       })
       parsed = result.parsed as Record<string, unknown>
+      inputTokens = result.inputTokens
+      outputTokens = result.outputTokens
     } finally {
       clearTimeout(timeout)
     }
@@ -125,6 +129,9 @@ export async function POST(request: Request) {
           note_type_detected: note_type_detected || null,
           batch_id: batch_id || null,
           fusion_group_id: fusion_group_id || null,
+          // Token usage tracking
+          ai_input_tokens: inputTokens || null,
+          ai_output_tokens: outputTokens || null,
         })
         .select('id')
         .single()

@@ -561,6 +561,8 @@ When redeploying after changes, use "Redeploy without cache" to ensure fresh bui
 
 ## Recent Changes
 
+- **AI Triage Consistency Improvements (2026-03-12)**: Pushed triage scoring consistency from 96% toward 99%+ target. Added clinical anchoring examples (2-3 neurology-specific examples per score level for all 5 dimensions) and tie-breaking rules to the system prompt. Changed production defaults: temperature 0.2→0 (greedy decoding), aligned maxTokens to 3000 across both route.ts and runTriage.ts. Added token usage passthrough in `invokeBedrockJSON` and logging to `triage_sessions` table (new `ai_input_tokens`/`ai_output_tokens` columns). Updated playbook pseudocode to reflect deterministic red flag escalation, synced system prompt section, replaced OpenAI model references with Bedrock Sonnet 4.6. Added Triage section to `docs/AI_PROMPTS_AND_MODELS.md`.
+
 - **Wearable Narrative Enhancements (2026-03-05)**: Added "Generate 30-Day Summary" button to PatientTimeline header for longitudinal narrative generation. Added regenerate (refresh) buttons to ClinicalNarrativePanel and LongitudinalSummaryBanner. Added auto-generation logic that detects assessments without narratives on data load/poll/patient-switch and generates them sequentially with progress indicator.
 
 - **AI Clinical Narrative Pipeline (2026-03-04)**: Split DiseaseTrack into MotorTrack + CognitiveTrack. Built 2-stage AI pipeline (gpt-4o-mini extraction → gpt-5.2 narrative) via Supabase Edge Function `analyze-assessment`. "Generate AI Clinical Interpretation" buttons on each assessment card produce clinical narratives with severity-flagged findings. API key passed via `X-OpenAI-Key` header from Vercel. See `docs/HANDOFF_2026-03-04_clinical-narrative-pipeline.md`.

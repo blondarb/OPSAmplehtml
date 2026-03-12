@@ -50,7 +50,7 @@ export interface TriageResult {
 export async function runTriage(input: TriageInput): Promise<TriageResult> {
   const temperature = typeof input.temperature === 'number'
     ? Math.max(0, Math.min(1, input.temperature))
-    : 0.2
+    : 0
 
   const textForScoring = input.referral_text
 
@@ -69,7 +69,7 @@ export async function runTriage(input: TriageInput): Promise<TriageResult> {
     const result = await invokeBedrockJSON({
       system: TRIAGE_SYSTEM_PROMPT,
       messages: [{ role: 'user', content: userPrompt }],
-      maxTokens: 4000,
+      maxTokens: 3000,
       temperature,
       signal: controller.signal,
       model: input.model,

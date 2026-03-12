@@ -93,7 +93,7 @@ All patients referred to an outpatient neurology clinic, including:
 
 | Element | Details |
 |---|---|
-| AI model | OpenAI gpt-5.2 (production) / gpt-5-mini (simple tasks) — selected for clinical reasoning quality, structured JSON output, and existing API integration |
+| AI model | AWS Bedrock Claude Sonnet 4.6 (`us.anthropic.claude-sonnet-4-6`) — selected for clinical reasoning quality, structured JSON output, and AWS Bedrock integration |
 | Processing indicator | Animated progress bar with rotating clinical messages: "Analyzing clinical presentation...", "Evaluating red flags...", "Generating triage recommendation..." |
 | Timeout | 15-second maximum; if exceeded, display: "Processing is taking longer than expected. Please try again." |
 | Error handling | If API fails, display: "The triage system is temporarily unavailable. Please triage this patient manually and contact support." |
@@ -405,7 +405,7 @@ New optional fields in request body:
 
 | Service | Purpose |
 |---|---|
-| OpenAI API (gpt-5.2) | Primary AI engine for triage scoring, extraction, and fusion. Uses `response_format: { type: 'json_object' }`, `temperature: 0.2`, `max_completion_tokens: 2000` (triage) / `4000` (extraction/fusion) |
+| AWS Bedrock Claude Sonnet 4.6 (`us.anthropic.claude-sonnet-4-6`) | Primary AI engine for triage scoring, extraction, and fusion. Uses Bedrock Converse API with `temperature: 0`, `maxTokens: 3000` (triage) / `4000` (extraction/fusion) |
 | Supabase | Database storage, auth (future), real-time subscriptions (future) |
 | Vercel | Frontend hosting and serverless API routes |
 
@@ -422,7 +422,7 @@ POST /api/triage with referral text + optional metadata
         ↓
 API route constructs prompt using system prompt + user input
         ↓
-OpenAI gpt-5.2 API call → returns raw dimension scores + clinical analysis (NO tier calculation)
+AWS Bedrock Claude Sonnet 4.6 API call → returns raw dimension scores + clinical analysis (NO tier calculation)
         ↓
 APPLICATION CODE calculates weighted score deterministically:
   score = (acuity × 0.30) + (concern × 0.25) + (progression × 0.20) + (impairment × 0.15) + (red_flags × 0.10)
@@ -527,19 +527,18 @@ The AI reads a free-text referral note and performs five tasks:
 
 ### 6.2 Model Selection
 
-**Primary: OpenAI gpt-5.2** (triage scoring, extraction, fusion — complex clinical reasoning)
-**Secondary: OpenAI gpt-5-mini** (simple tasks if added later — e.g., summarization)
+**Primary: AWS Bedrock Claude Sonnet 4.6** (`us.anthropic.claude-sonnet-4-6`) — triage scoring, extraction, fusion (complex clinical reasoning)
 
 Rationale:
 - Strong performance on clinical reasoning and structured JSON output
-- Reliable `response_format: { type: 'json_object' }` for deterministic parsing
+- 96% tier consistency in validation study (N=50 runs, 10 cases) with temperature=0
 - Consistent adherence to safety guardrails and anti-bias instructions
 - Long context window handles detailed referral notes and full clinical documents
-- Existing integration with the project's OpenAI API infrastructure
+- AWS Bedrock integration aligns with platform-wide AWS migration (Converse API)
 
-> **Implementation note (February 2026):** The original playbook specified Claude/Anthropic. The current demo implementation uses OpenAI gpt-5.2 for all triage, extraction, and fusion tasks due to existing API infrastructure. The system prompt, scoring algorithm, and clinical logic are model-agnostic — they work identically with any capable LLM. Model swap requires only changing the API call in the route handlers.
+> **Implementation note (March 2026):** The original playbook specified Claude/Anthropic, then was updated to OpenAI gpt-5.2 during initial demo development. The current production implementation uses AWS Bedrock Claude Sonnet 4.6 via the Converse API, completing the migration to AWS infrastructure. The system prompt, scoring algorithm, and clinical logic are model-agnostic — they work identically with any capable LLM. Model swap requires only changing the model ID in the Bedrock invocation.
 
-> **🔄 AI Model Flexibility (Platform Policy):** The demo uses OpenAI models, but the production platform is designed to be **model-agnostic**. Production deployments may use different providers optimized for specific capabilities: **Deepgram** (Nova-3 Medical) for clinical speech recognition and transcription, **Anthropic Claude** for complex clinical reasoning and multi-step analysis, **specialized providers** (e.g., Snowflake, domain-specific models) for billing, coding, and diagnostic pattern matching. All AI integrations are abstracted behind API route handlers — model swaps require only changing the API call, not the clinical logic, system prompts, or frontend. BAA requirements apply to whichever provider handles PHI in production.
+> **AI Model Flexibility (Platform Policy):** The triage tool uses AWS Bedrock Claude Sonnet 4.6, but the production platform is designed to be **model-agnostic**. Production deployments may use different providers optimized for specific capabilities: **AWS Transcribe Medical** for HIPAA-compliant speech recognition, **Anthropic Claude** (via Bedrock) for complex clinical reasoning and multi-step analysis, **specialized providers** for billing, coding, and diagnostic pattern matching. All AI integrations are abstracted behind API route handlers — model swaps require only changing the model ID, not the clinical logic, system prompts, or frontend. BAA requirements apply to whichever provider handles PHI in production (AWS BAA already in place).
 
 ### 6.3 Triage Algorithm — Explicit Scoring Criteria
 
@@ -609,9 +608,9 @@ The AI does not "just triage." It applies a structured algorithm embedded in the
 
 > **Note:** Timeframes shown are defaults based on typical US neurology access patterns. Many health systems have internal SLAs requiring "Routine" to be seen within 14-30 days. All timeframes are **configurable per clinic** in the algorithm configuration.
 
-#### Application-Side Scoring Logic (JavaScript)
+#### Application-Side Scoring Logic (TypeScript)
 
-```javascript
+```typescript
 function calculateTriageTier(aiResponse) {
   // Check for emergent override FIRST
   if (aiResponse.emergent_override) {
@@ -632,19 +631,34 @@ function calculateTriageTier(aiResponse) {
     (scores.functional_impairment.score * 0.15) +
     (scores.red_flag_presence.score * 0.10);
 
-  // Check red flag override (escalate to Urgent, not Emergent)
-  if (aiResponse.red_flag_override) {
-    return { tier: 'urgent', display: 'URGENT — Within 1 Week (Red Flag Override)', weightedScore };
+  // Map score to tier using cutoffs
+  let scoreDerivedTier;
+  if (weightedScore >= 4.0) scoreDerivedTier = 'urgent';
+  else if (weightedScore >= 3.0) scoreDerivedTier = 'semi_urgent';
+  else if (weightedScore >= 2.5) scoreDerivedTier = 'routine_priority';
+  else if (weightedScore >= 1.5) scoreDerivedTier = 'routine';
+  else scoreDerivedTier = 'non_urgent';
+
+  // Deterministic red flag escalation — replaces the old subjective
+  // red_flag_override boolean. The AI still scores red_flag_presence
+  // as a dimension (1-5), and if it's >=4 we auto-escalate to urgent.
+  // This is more consistent than asking the AI for a binary override.
+  const redFlagScore = scores.red_flag_presence.score;
+  if (redFlagScore >= 4 && scoreDerivedTier !== 'urgent' && scoreDerivedTier !== 'emergent') {
+    return { tier: 'urgent', display: 'URGENT — Within 1 Week (Red Flag Escalation)', weightedScore };
   }
 
-  // Map score to tier
-  if (weightedScore >= 4.0) return { tier: 'urgent', weightedScore };
-  if (weightedScore >= 3.0) return { tier: 'semi_urgent', weightedScore };
-  if (weightedScore >= 2.5) return { tier: 'routine_priority', weightedScore };
-  if (weightedScore >= 1.5) return { tier: 'routine', weightedScore };
-  return { tier: 'non_urgent', weightedScore };
+  return { tier: scoreDerivedTier, weightedScore };
 }
 ```
+
+#### Validation Study Results (March 2026)
+
+- **96% tier consistency** achieved with Sonnet 4.6 in validation study (N=50 runs across 10 cases).
+- Deterministic red flag escalation replaced the subjective `red_flag_override` boolean, fixing 2 cases that previously oscillated between tiers across runs.
+- Production defaults: `temperature=0` (greedy decoding), `maxTokens=3000`.
+- Clinical anchoring examples added to every dimension score level in the system prompt to reduce borderline score oscillation (see Section 6.4).
+- Target: 99%+ consistency across all tier assignments.
 
 #### Emergent Override Rules (Redirect to ED — NOT Outpatient Triage)
 
@@ -671,77 +685,59 @@ The following red flags, if identified, automatically escalate to **Urgent** (wi
 - New-onset diplopia with ptosis (suspect myasthenia crisis or aneurysm)
 - Suicidal ideation in context of neurological symptoms (passive, without plan)
 
-### 6.4 System Prompt — Draft
+### 6.4 System Prompt
 
-```
-You are a neurology clinical decision support system designed to triage ADULT (≥18 years) outpatient referrals. You are NOT a physician and you do NOT make final clinical decisions. You provide structured clinical scoring that a human clinician will review.
+The system prompt is maintained in `src/lib/triage/systemPrompt.ts` (exported as `TRIAGE_SYSTEM_PROMPT`). Below is a structured description of its contents as of March 2026. The actual prompt contains clinical anchoring examples (2-3 neurology-specific examples per score level) for each dimension, which are summarized here rather than reproduced in full.
 
-## YOUR TASK
+#### Role and Task
 
-Read the referral note and output structured clinical scores and findings in JSON format. You score each clinical dimension 1-5. You do NOT calculate the final weighted score or determine the triage tier — that is done by application code.
+The AI is a neurology clinical decision support system for adult (18+) outpatient referrals. It provides structured clinical scoring — it does not make final clinical decisions. It scores each dimension 1-5 as integers. It does NOT calculate the final weighted score or determine the triage tier (that is done by application code).
 
-## CRITICAL: ANTI-BIAS INSTRUCTION
+#### Anti-Bias Instruction
 
-Evaluate symptoms strictly based on objective clinical descriptors. Do not down-weight severity based on patient demographics including age, sex, race, ethnicity, or insurance status. A headache described as "worst of my life" is equally concerning regardless of who reports it.
+Evaluate symptoms strictly based on objective clinical descriptors. Do not down-weight severity based on patient demographics (age, sex, race, ethnicity, insurance status).
 
-## STEP 1: CHECK FOR EMERGENT CONDITIONS
+#### STEP 1: Check for Emergent Conditions
 
-BEFORE scoring dimensions, check if the referral describes any of these conditions that require IMMEDIATE ED evaluation (not outpatient triage):
+Before scoring dimensions, check for conditions requiring immediate ED evaluation:
 
-- Active stroke symptoms (face droop, arm weakness, speech changes) not yet evaluated in ED
-- Thunderclap headache NOT yet evaluated in an ED (no CT/CTA/LP completed)
+- Active stroke symptoms not yet evaluated in ED
+- Thunderclap headache NOT yet ED-evaluated (no CT/CTA/LP completed)
 - Active status epilepticus or ongoing seizure clusters
 - Acute cord compression (rapidly progressive bilateral weakness + bladder/bowel dysfunction)
 - Acute increased intracranial pressure with altered mental status
 - Active suicidal ideation with plan or intent
 
-If ANY emergent condition is present, set "emergent_override": true and still complete all other scoring.
+If any emergent condition is present, set `emergent_override: true` and still complete all other scoring.
 
-## STEP 2: CHECK FOR INSUFFICIENT DATA
+#### STEP 2: Check for Insufficient Data
 
-If the referral is too vague to triage safely (e.g., "Eval for headache" with no other details), set "insufficient_data": true and list what specific information is missing.
+If the referral is too vague to triage safely, set `insufficient_data: true` and list what specific information is missing.
 
-## STEP 3: SCORE FIVE DIMENSIONS (1-5 integers only)
+#### STEP 3: Score Five Dimensions (1-5 integers only)
 
-1. **Symptom Acuity**
-   - 5: Acute onset (<24h), severe, potentially life-threatening
-   - 4: Subacute (days to 2 weeks), moderate, progressive
-   - 3: Gradual (2-8 weeks), moderate, non-progressive
-   - 2: Chronic (months), stable, mild-to-moderate
-   - 1: Chronic (years), stable, minimal impact
+Each dimension includes clinical anchoring examples at every score level and a rationale field. The prompt provides 2-3 neurology-specific examples per score level to reduce borderline score oscillation (e.g., for Symptom Acuity, score 5 examples include thunderclap headache, sudden hemiplegia, acute vision loss; score 2 examples include chronic stable migraines on preventive therapy, known essential tremor for 2 years).
 
-2. **Diagnostic Concern Level**
-   - 5: Possible life-threatening or rapidly progressive condition
-   - 4: Possible serious neurological condition requiring timely diagnosis
-   - 3: Likely neurological condition requiring specialist evaluation
-   - 2: Known condition, stable, needs management optimization
-   - 1: Likely non-neurological or self-limiting
+1. **Symptom Acuity** — 5: Acute onset (<24h), severe, life-threatening ... 1: Chronic (years), stable, minimal impact
+2. **Diagnostic Concern Level** — 5: Possible life-threatening or rapidly progressive condition ... 1: Likely non-neurological or self-limiting
+3. **Rate of Progression** — 5: Rapidly progressive (hours to days) ... 1: Stable, no progression
+4. **Functional Impairment** — 5: Unable to perform basic ADLs, bedbound, or unsafe ... 1: No functional impairment
+5. **Red Flag Presence** — 5: Multiple red flags present ... 1: No red flags
 
-3. **Rate of Progression**
-   - 5: Rapidly progressive (hours to days)
-   - 4: Progressive over days to weeks
-   - 3: Progressive over weeks to months
-   - 2: Stable or slowly progressive over months to years
-   - 1: Stable, no progression
+#### Tie-Breaking Rules
 
-4. **Functional Impairment**
-   - 5: Unable to perform basic ADLs, bedbound, or unsafe
-   - 4: Significant ADL impairment (cannot drive, work)
-   - 3: Moderate impairment affecting work/daily activities
-   - 2: Mild impairment, most activities preserved
-   - 1: No functional impairment
+When a presentation falls between two adjacent scores:
 
-5. **Red Flag Presence**
-   - 5: Multiple red flags present
-   - 4: One major red flag present
-   - 3: Possible red flag, needs clarification
-   - 2: No red flags, some concerning features
-   - 1: No red flags
+- **Prefer the higher score** if ANY red flag, progressive/worsening symptoms, failed prior treatments, or new neurological deficit is present.
+- **Prefer the lower score** ONLY when ALL of: documented clinical stability, normal neurological exam, no red flags, no failed treatments.
+- For **Functional Impairment**, anchor on the MOST limiting activity described (e.g., falls outweigh "can still work").
+- When in doubt, err toward the higher score. A clinician can always downgrade, but undertriaging is more harmful.
 
-## STEP 4: CHECK RED FLAG OVERRIDES
+#### STEP 4: Check Red Flag Overrides
 
-Set "red_flag_override": true if ANY of these are present (patient is medically stable but needs urgent outpatient evaluation):
-- Thunderclap headache (already ED-evaluated, workup incomplete)
+Set `red_flag_override: true` if any of these are present (patient is medically stable but needs urgent outpatient evaluation):
+
+- Thunderclap headache (ED-evaluated, workup incomplete)
 - New focal neurological deficit (subacute)
 - Rapidly progressive weakness (days), patient still ambulatory
 - Signs of increased intracranial pressure
@@ -749,65 +745,72 @@ Set "red_flag_override": true if ANY of these are present (patient is medically 
 - New diplopia with ptosis
 - Suicidal ideation (passive, without plan) in neurological context
 
-## STEP 5: EXTRACT FAILED THERAPIES
+> **Note on deterministic escalation:** In application code, red flag escalation is now handled deterministically based on the `red_flag_presence` dimension score (>=4 auto-escalates to urgent). The `red_flag_override` boolean in the AI output serves as a secondary signal and is preserved for backward compatibility but is no longer the primary escalation mechanism.
 
-If the referral mentions any previously tried treatments that were stopped or failed, extract them. This impacts routing and priority (e.g., a migraine patient who failed 3 preventives is higher priority than one who has tried none).
+#### STEP 5: Check for Non-Neurological Presentation
 
-## CONFIDENCE ASSESSMENT
+Evaluate whether the referral describes a condition better served by a different specialty. Set `redirect_to_non_neuro: true` if the presentation is clearly:
 
-- "high": Referral provides clear clinical details
+- **Musculoskeletal** (e.g., mechanical low back pain without radiculopathy) -> Orthopedics, Spine Surgery, or PM&R
+- **Peripheral vascular** (e.g., claudication without neuropathy) -> Vascular Surgery
+- **Psychiatric without neurological features** -> Psychiatry
+- **Isolated foot/ankle without neuropathy** -> Podiatry
+- **Autoimmune without CNS/PNS involvement** -> Rheumatology
+- **Pain syndrome without neurological deficit** -> Pain Management
+- **Vestibular/hearing without central features** -> ENT / Otolaryngology
+
+Still complete all scoring even if redirect is recommended. Only redirect when the presentation is clearly non-neurological — any neurological component (radiculopathy, neuropathy, myelopathy) keeps the referral appropriate for neurology. If redirecting, specify `redirect_specialty` and `redirect_rationale`.
+
+#### STEP 6: Extract Failed Therapies
+
+Extract all previously tried treatments that were stopped or failed. This impacts routing and priority.
+
+#### STEP 7: Suggest Pre-Visit Workup (Required)
+
+The AI must always provide at least 2-3 suggested workup items in `suggested_workup`. These are recommendations sent back to the referring provider to order BEFORE the neurology visit. The prompt covers four categories:
+
+- **Laboratory Studies**: CBC, CMP, TSH, B12, folate, HbA1c, ESR/CRP, ANA, CK, specialized panels as indicated
+- **Neuroimaging**: MRI brain/spine (with specific protocols — epilepsy, MS, pituitary, IAC), CT head, CTA/MRA
+- **Neurodiagnostic Studies**: EEG (routine/prolonged), EMG/NCS, VEP/SSEP/BAER, sleep study
+- **Clinical Screening**: MoCA/MMSE (cognitive), PHQ-9/GAD-7 (mood), headache/seizure diaries, MIDAS/HIT-6/Epworth
+
+Rules: note what has already been completed, be specific with imaging orders (include contrast and protocol names), frame as actionable orders the referring PCP can place, prioritize high-yield studies.
+
+#### Confidence Assessment
+
+- "high": Clear clinical details
 - "moderate": Some details missing but enough for reasonable assessment
-- "low": Referral is vague, contradictory, or missing critical information
+- "low": Vague, contradictory, or missing critical information
 
-## OUTPUT FORMAT
+#### Output Format
 
-Return ONLY valid JSON (no markdown, no backticks, no explanation outside JSON):
+Returns JSON with these fields:
 
-{
-  "emergent_override": false,
-  "emergent_reason": null,
-  "insufficient_data": false,
-  "missing_information": null,
-  "confidence": "high | moderate | low",
-  "dimension_scores": {
-    "symptom_acuity": { "score": 1, "rationale": "brief explanation" },
-    "diagnostic_concern": { "score": 1, "rationale": "brief explanation" },
-    "rate_of_progression": { "score": 1, "rationale": "brief explanation" },
-    "functional_impairment": { "score": 1, "rationale": "brief explanation" },
-    "red_flag_presence": { "score": 1, "rationale": "brief explanation" }
-  },
-  "red_flag_override": false,
-  "clinical_reasons": [
-    "Reason 1 (most important)",
-    "Reason 2",
-    "Reason 3"
-  ],
-  "red_flags": [
-    "Red flag description — clinical significance"
-  ],
-  "suggested_workup": [
-    "Test/order — rationale"
-  ],
-  "failed_therapies": [
-    { "therapy": "medication or treatment name", "reason_stopped": "reason if stated" }
-  ],
-  "subspecialty_recommendation": "General Neurology | Epilepsy | Movement Disorders | Headache | Neuromuscular | Cognitive/Memory | Stroke",
-  "subspecialty_rationale": "Why this subspecialty is the best fit"
-}
+- `emergent_override`, `emergent_reason`
+- `insufficient_data`, `missing_information`
+- `confidence`
+- `dimension_scores` (5 dimensions, each with `score` and `rationale`)
+- `red_flag_override`
+- `clinical_reasons` (array)
+- `red_flags` (array)
+- `suggested_workup` (array — minimum 2-3 items required)
+- `failed_therapies` (array of `{therapy, reason_stopped}`)
+- `subspecialty_recommendation`, `subspecialty_rationale`
+- `redirect_to_non_neuro`, `redirect_specialty`, `redirect_rationale`
 
-## RULES
+#### Rules Summary
 
-1. You MUST score all five dimensions as integers 1-5. Do NOT calculate weighted scores — the application handles that.
-2. You MUST check emergent conditions FIRST, before other scoring.
-3. You MUST check all red flag override conditions.
-4. Clinical reasons must be written in language a referring PCP would understand.
-5. Suggested workup must be specific (e.g., "MRI brain with and without contrast, epilepsy protocol if available" not just "MRI"). Frame as recommendations to send back to the referring provider for ordering.
-6. If the referral is too vague to triage, set insufficient_data to true and list the specific missing information (e.g., "Need: symptom onset date, severity description, current medications, functional impact").
-7. NEVER diagnose the patient. Use language like "evaluate for," "rule out," "consider."
-8. Extract ALL failed/tried therapies mentioned in the note.
-9. If you detect safety-critical information (suicidal ideation, abuse, etc.), include it in red_flags regardless of other scoring.
-10. Evaluate symptoms based on clinical descriptors only — do not adjust scoring based on patient demographics.
-```
+1. Score all five dimensions as integers 1-5. Do NOT calculate weighted scores.
+2. Check emergent conditions FIRST.
+3. Check all red flag override conditions.
+4. Clinical reasons in PCP-readable language.
+5. Suggested workup must be specific and actionable (minimum 2-3 items, never empty).
+6. Insufficient data triggers return to referring provider with specific missing items listed.
+7. Never diagnose — use "evaluate for," "rule out," "consider."
+8. Extract ALL failed/tried therapies.
+9. Safety-critical information (suicidal ideation, abuse) always goes in red_flags.
+10. No scoring adjustment based on demographics.
+11. If the referral is better suited for another specialty, set `redirect_to_non_neuro: true` and complete all scoring.
 
 > **Source:** `src/lib/triage/systemPrompt.ts` — exported as `TRIAGE_SYSTEM_PROMPT`
 
@@ -1036,7 +1039,7 @@ Referring provider: {type or "not provided"}
 
 ### 7.3 Regulatory Considerations
 
-- **HIPAA**: All referral text is transmitted via HTTPS to the API. Stored in Supabase with encryption at rest. For POC/demo, use only synthetic data. For clinical pilot, ensure BAA with Supabase and OpenAI (or whichever AI provider is used in production — see AI Model Flexibility note in Section 6.2).
+- **HIPAA**: All referral text is transmitted via HTTPS to the API. Stored in Supabase with encryption at rest. For POC/demo, use only synthetic data. For clinical pilot, ensure BAA with database provider and AI provider (AWS BAA already covers Bedrock — see AI Model Flexibility note in Section 6.2).
 - **FDA**: As a clinical decision support tool where a human clinician makes the final decision, this likely falls under FDA enforcement discretion for Clinical Decision Support (CDS) software per 21st Century Cures Act Section 3060(a). However, if the tool begins making autonomous scheduling decisions without human review, it may require FDA clearance as a Software as a Medical Device (SaMD). Consult regulatory counsel before Phase 2.
 - **State medical practice laws**: The AI does not practice medicine. It provides information to support a licensed clinician's decision. All outputs must include appropriate disclaimers.
 
@@ -1101,7 +1104,7 @@ Referring provider: {type or "not provided"}
 **Scope:**
 - Single-page triage tool with text input and AI output
 - 11 pre-loaded sample referral notes (including Emergent, Insufficient Data, and Failed Therapies examples)
-- OpenAI API integration for clinical scoring (AI scores dimensions; app code calculates tiers)
+- AWS Bedrock Claude Sonnet 4.6 integration for clinical scoring (AI scores dimensions; app code calculates tiers)
 - 6-tier output: Emergent, Urgent, Semi-urgent, Routine-priority, Routine, Non-urgent + Insufficient Data state
 - Subspecialty routing recommendation for every triage (7 subspecialties)
 - Failed therapies extraction from referral notes
@@ -1116,7 +1119,7 @@ Referring provider: {type or "not provided"}
 - Next.js page at `/triage`
 - Vercel serverless API route at `/api/triage` — includes deterministic tier calculation in JavaScript
 - Supabase `triage_sessions` table
-- OpenAI gpt-5.2 for clinical analysis (originally spec'd as Claude Sonnet; changed to OpenAI for API infrastructure alignment)
+- AWS Bedrock Claude Sonnet 4.6 for clinical analysis (via Converse API, cross-region inference profile `us.anthropic.claude-sonnet-4-6`)
 
 **Timeline:** 1-2 development sessions
 
@@ -1296,10 +1299,10 @@ Phase 2 adds the ability to process any clinical note type (not just referral su
 
 | # | Question | Resolution |
 |---|---|---|
-| 1 | **Model choice** | ✅ Originally spec'd as Claude Sonnet. **Production uses OpenAI gpt-5.2** due to existing API infrastructure. System prompts and scoring logic are model-agnostic. GPT-5-mini used for lightweight tasks. |
+| 1 | **Model choice** | ✅ Originally spec'd as Claude Sonnet, temporarily used OpenAI gpt-5.2, now **production uses AWS Bedrock Claude Sonnet 4.6** (`us.anthropic.claude-sonnet-4-6`) via Converse API. System prompts and scoring logic are model-agnostic. |
 | 2 | **Subspecialty routing granularity** | ✅ 7 subspecialties are sufficient for POC. Don't clutter the demo with Neuro-immunology yet. Expand in Phase 2 if needed. |
 | 5 | **Physician override workflow** | ✅ Use dropdown categories for POC (e.g., "Acuity higher than assessed", "Needs different subspecialty", "Disagree with tier") — not mandatory free-text. Doctors don't want to type explanations. |
-| 10 | **Supabase vs. HIPAA database** | ✅ Standard Supabase is fine for POC with synthetic data. Phase 2 requires: Supabase Pro/Enterprise with BAA, and OpenAI API enterprise agreement with BAA for clinical data. |
+| 10 | **Supabase vs. HIPAA database** | ✅ Standard Supabase is fine for POC with synthetic data. Phase 2 requires: HIPAA-compliant database with BAA, and AI provider BAA for clinical data (AWS BAA already covers Bedrock). |
 
 ### Still Open
 

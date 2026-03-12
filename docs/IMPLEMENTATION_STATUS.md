@@ -20,6 +20,14 @@ This document tracks implementation progress against the product requirements an
 
 ### Current Priority Focus
 
+**AI Triage Consistency Improvements (March 12, 2026):**
+- ✅ **Clinical Anchoring Examples** — 2-3 neurology-specific examples per score level for all 5 dimensions in system prompt
+- ✅ **Tie-Breaking Rules** — Explicit guidance for borderline cases (prefer higher with red flags/progression, lower only with documented stability)
+- ✅ **Temperature = 0** — Greedy decoding for production (was 0.2), callers can still override for validation
+- ✅ **maxTokens Aligned** — Standardized to 3000 across route.ts and runTriage.ts (was mismatched 2500/4000)
+- ✅ **Token Usage Logging** — `invokeBedrockJSON` now passes through inputTokens/outputTokens; logged to `triage_sessions` table
+- ✅ **Documentation Sync** — Playbook pseudocode, system prompt, and model references updated; AI_PROMPTS_AND_MODELS.md triage section added
+
 **Mobile Chart Enhancements (February 6, 2026):**
 - ✅ **FAB Menu** — Floating Action Button with Save Draft, Prepare Note, Sign & Complete actions; replaces bottom action bar
 - ✅ **Chart Prep AI (Mobile)** — MobileVoiceRecorder supports chart-prep mode; dictation → AI summary → HPI/Assessment/Plan suggestions
