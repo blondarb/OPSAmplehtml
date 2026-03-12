@@ -191,7 +191,7 @@ function repairTruncatedJSON(text: string): string {
  */
 export async function invokeBedrockJSON<T = Record<string, unknown>>(
   opts: Omit<BedrockInvokeOptions, 'jsonMode'>
-): Promise<{ parsed: T; raw: string; stopReason: string }> {
+): Promise<{ parsed: T; raw: string; stopReason: string; inputTokens?: number; outputTokens?: number }> {
   const result = await invokeBedrock({ ...opts, jsonMode: true })
 
   // Strip markdown code fences if the model wraps the JSON anyway
@@ -201,10 +201,12 @@ export async function invokeBedrockJSON<T = Record<string, unknown>>(
   if (cleaned.endsWith('```')) cleaned = cleaned.slice(0, -3)
   cleaned = cleaned.trim()
 
+  const tokenInfo = { inputTokens: result.inputTokens, outputTokens: result.outputTokens }
+
   // Try direct parse first
   try {
     const parsed = JSON.parse(cleaned) as T
-    return { parsed, raw: result.text, stopReason: result.stopReason }
+    return { parsed, raw: result.text, stopReason: result.stopReason, ...tokenInfo }
   } catch {
     // If the response was truncated (hit token limit), attempt repair
     if (result.stopReason === 'max_tokens') {
@@ -215,7 +217,7 @@ export async function invokeBedrockJSON<T = Record<string, unknown>>(
       const repaired = repairTruncatedJSON(cleaned)
       try {
         const parsed = JSON.parse(repaired) as T
-        return { parsed, raw: result.text, stopReason: result.stopReason }
+        return { parsed, raw: result.text, stopReason: result.stopReason, ...tokenInfo }
       } catch (repairErr) {
         throw new Error(
           `AI response was truncated at ${opts.maxTokens ?? 2000} tokens and could not be repaired. ` +

@@ -1,7 +1,7 @@
 # AI Prompts & Model Configuration
 
 > Complete reference for every AI endpoint in Sevaro Clinical.
-> Last updated: 2026-02-05
+> Last updated: 2026-03-12
 
 ---
 
@@ -20,6 +20,7 @@
    - [Visit AI](#visit-ai)
    - [Historian Session (Realtime)](#historian-session)
    - [Visit Sign Summary](#visit-sign-summary)
+   - [AI Triage](#ai-triage)
 3. [User Preference System](#3-user-preference-system)
 4. [Anti-Hallucination Guardrails](#4-anti-hallucination-guardrails)
 5. [Safety Protocol (Historian)](#5-safety-protocol-historian)
@@ -82,6 +83,37 @@ Sevaro Clinical uses a two-tier model strategy to balance cost, latency, and rea
 - `/api/ai/transcribe` -- Single-field dictation (response_format: `text`)
 - `/api/ai/visit-ai` -- Full visit recording (response_format: `verbose_json`, timestamp_granularities: `['segment']`)
 - Historian session -- Input audio transcription (model: `whisper-1`, configured in realtime session)
+
+### Tier 4 -- AI Triage: AWS Bedrock Claude Sonnet 4.6
+
+| Metric | Value |
+|--------|-------|
+| **Model ID** | `us.anthropic.claude-sonnet-4-6` (cross-region inference via AWS Bedrock) |
+| **Pricing** | $3.00 / $15.00 per 1M input / output tokens |
+| **Temperature** | 0 (greedy decoding for maximum consistency) |
+| **Max Tokens** | 3,000 |
+| **Use cases** | Neurology referral triage scoring |
+| **Why** | 96% tier consistency in validation study (N=50). Deterministic scoring architecture — AI scores 5 dimensions (1-5), application code calculates weighted score and maps to tier. |
+
+**Endpoints using Bedrock Sonnet 4.6:**
+- `/api/triage` -- Main triage scoring endpoint
+- `/api/extract` -- Clinical note extraction (Stage 1 of two-stage pipeline)
+- `/api/fuse` -- Multi-note fusion
+
+**Source files:**
+- System prompt: `src/lib/triage/systemPrompt.ts`
+- Scoring logic: `src/lib/triage/scoring.ts`
+- API route: `src/app/api/triage/route.ts`
+- Shared runner: `src/lib/triage/runTriage.ts`
+- Bedrock client: `src/lib/bedrock.ts`
+
+**Architecture notes:**
+- The AI never determines the triage tier — it only scores dimensions. Tier assignment is deterministic application code.
+- Weighted scoring formula: symptom_acuity × 0.30 + diagnostic_concern × 0.25 + rate_of_progression × 0.20 + functional_impairment × 0.15 + red_flag_presence × 0.10
+- If red_flag_presence dimension score ≥ 4 and tier is not already urgent/emergent, auto-escalate to urgent (deterministic, replaces old subjective boolean).
+- Anti-bias instruction embedded in system prompt prevents demographic-based score adjustments.
+- Clinical anchoring examples in the prompt reduce borderline score oscillation between adjacent levels.
+- Token usage is logged per triage call for cost monitoring.
 
 ---
 

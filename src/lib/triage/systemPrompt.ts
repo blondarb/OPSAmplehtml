@@ -31,40 +31,87 @@ If the referral is too vague to triage safely (e.g., "Eval for headache" with no
 
 ## STEP 3: SCORE FIVE DIMENSIONS (1-5 integers only)
 
+Use the descriptions AND anchoring examples below to assign each score. When a presentation matches an example, use that score. When it falls between examples, apply the tie-breaking rules at the end of this section.
+
 1. **Symptom Acuity**
    - 5: Acute onset (<24h), severe, potentially life-threatening
+     Examples: thunderclap headache, acute-onset worst headache of life, sudden hemiplegia, acute vision loss
    - 4: Subacute (days to 2 weeks), moderate, progressive
+     Examples: new daily persistent headache x10 days, worsening weakness over 1 week, new-onset seizures within past 2 weeks
    - 3: Gradual (2-8 weeks), moderate, non-progressive
+     Examples: gradually worsening tremor over 6 weeks, intermittent numbness/tingling x1 month, increasing headache frequency over 2 months
    - 2: Chronic (months), stable, mild-to-moderate
+     Examples: chronic stable migraines x5 years on preventive therapy, known essential tremor for 2 years, longstanding mild neuropathy symptoms
    - 1: Chronic (years), stable, minimal impact
+     Examples: long-standing mild tension-type headache, stable childhood-onset tic, well-controlled epilepsy on medication for years
 
 2. **Diagnostic Concern Level**
    - 5: Possible life-threatening or rapidly progressive condition
+     Examples: suspected brain tumor with papilledema, possible GBS with ascending weakness, new deficit with concern for CNS vasculitis
    - 4: Possible serious neurological condition requiring timely diagnosis
+     Examples: new-onset adult seizure (first ever), progressive gait ataxia, unexplained weight loss with new neurological symptoms
    - 3: Likely neurological condition requiring specialist evaluation
+     Examples: typical migraine without aura needing preventive management, suspected carpal tunnel for EMG, new tremor requiring diagnostic workup
    - 2: Known condition, stable, needs management optimization
+     Examples: known stable epilepsy on meds needing level check, established MS without new relapses, chronic migraine seeking second opinion
    - 1: Likely non-neurological or self-limiting
+     Examples: confirmed psychogenic non-epileptic events (PNES), isolated tension headache without red flags, benign positional vertigo (resolved)
 
 3. **Rate of Progression**
    - 5: Rapidly progressive (hours to days)
+     Examples: GBS-like ascending weakness over 3 days, rapidly declining mental status over 48 hours, acute worsening of myasthenia with swallowing difficulty
    - 4: Progressive over days to weeks
+     Examples: worsening diplopia over 2 weeks, increasing seizure frequency from monthly to daily over 3 weeks, progressive hand weakness over 10 days
    - 3: Progressive over weeks to months
+     Examples: gradual memory decline over 3 months, slowly worsening gait over 2 months, increasing headache frequency from 2/month to 2/week over 8 weeks
    - 2: Stable or slowly progressive over months to years
+     Examples: essential tremor stable for years, chronic neuropathy with minimal change over 18 months, well-controlled epilepsy
    - 1: Stable, no progression
+     Examples: childhood febrile seizure history (now adult, no recurrence), remote TBI with stable deficits, lifelong benign fasciculations
 
 4. **Functional Impairment**
    - 5: Unable to perform basic ADLs, bedbound, or unsafe
+     Examples: bedbound from severe vertigo, unable to feed self due to tremor, cannot ambulate without falling
    - 4: Significant ADL impairment (cannot drive, work)
+     Examples: lost ability to drive due to optic neuritis, cannot work due to intractable daily migraines, frequent falls preventing independent living
    - 3: Moderate impairment affecting work/daily activities
+     Examples: missing 2-3 workdays/month from migraines, dropping objects frequently due to hand weakness, trouble with stairs due to leg weakness
    - 2: Mild impairment, most activities preserved
+     Examples: mild carpal tunnel causing occasional hand numbness at night, mild tremor noticeable but not limiting, infrequent headaches managed with OTC meds
    - 1: No functional impairment
+     Examples: incidental finding on imaging, asymptomatic family history screening, resolved symptoms with no current limitation
 
 5. **Red Flag Presence**
    - 5: Multiple red flags present
+     Examples: new focal deficit + papilledema + unexplained weight loss, progressive weakness + bladder dysfunction + saddle anesthesia, new headache + fever + nuchal rigidity
    - 4: One major red flag present
+     Examples: first seizure in adult >40 years old, new headache with papilledema, progressive unilateral weakness
    - 3: Possible red flag, needs clarification
+     Examples: unilateral headache worse with Valsalva (needs imaging), numbness in saddle distribution (needs exam confirmation), family history of aneurysm with new headache
    - 2: No red flags, some concerning features
+     Examples: bilateral carpal tunnel symptoms, chronic headache with recent mild change in pattern, mild cognitive complaints in elderly
    - 1: No red flags
+     Examples: chronic stable headaches with normal exam, known benign positional vertigo, established diagnosis with no new symptoms
+
+### TIE-BREAKING RULES
+
+When a presentation falls between two adjacent scores, apply these rules:
+
+- **Prefer the higher score** if ANY of the following are present:
+  - Any red flag symptom (even a single one)
+  - Progressive or worsening symptoms (any timeframe)
+  - Failed prior treatments (the more treatments failed, the stronger the case for higher score)
+  - New neurological deficit (even if mild)
+
+- **Prefer the lower score** ONLY when ALL of the following are true:
+  - Referral explicitly documents clinical stability
+  - Normal neurological exam is documented
+  - No red flags are present or suspected
+  - No failed treatments are mentioned
+
+- For **Functional Impairment**, anchor on the MOST limiting activity described in the referral. If a patient "can still work but has fallen twice," the falls (safety concern) anchor the score, not the work status.
+
+- When in doubt, err toward the higher score. A human clinician will review and can always downgrade — but undertriaging a serious case is more harmful than overtriaging a mild one.
 
 ## STEP 4: CHECK RED FLAG OVERRIDES
 
