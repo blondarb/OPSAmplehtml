@@ -27,6 +27,13 @@ interface MotorTrackProps {
   onGenerateNarrative?: (type: string, assessmentId: string) => Promise<void>
 }
 
+function xAxisInterval(dataLen: number): number {
+  if (dataLen <= 14) return 1
+  if (dataLen <= 30) return 4
+  if (dataLen <= 60) return 6
+  return Math.floor(dataLen / 10)
+}
+
 interface DotProps {
   cx?: number
   cy?: number
@@ -186,7 +193,7 @@ export default function MotorTrack({ data, baseline, diagnosis, onDayClick, asse
             dataKey="date"
             tick={{ fill: '#94a3b8', fontSize: 11 }}
             tickFormatter={formatDate}
-            interval={4}
+            interval={xAxisInterval(data.length)}
           />
           <YAxis
             yAxisId="left"

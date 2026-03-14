@@ -68,6 +68,13 @@ function CustomLegend({ hasStages }: { hasStages: boolean }) {
   )
 }
 
+function xAxisInterval(dataLen: number): number {
+  if (dataLen <= 14) return 1
+  if (dataLen <= 30) return 4
+  if (dataLen <= 60) return 6
+  return Math.floor(dataLen / 10)
+}
+
 export default function SleepTrack({ data, baseline, onDayClick }: SleepTrackProps) {
   const baselineCenter = baseline.sleep_hours
   const bandLow = baselineCenter - 0.5
@@ -122,7 +129,7 @@ export default function SleepTrack({ data, baseline, onDayClick }: SleepTrackPro
             dataKey="date"
             tick={{ fill: '#94a3b8', fontSize: 11 }}
             tickFormatter={formatDate}
-            interval={4}
+            interval={xAxisInterval(data.length)}
           />
           <YAxis
             tick={{ fill: '#94a3b8', fontSize: 11 }}

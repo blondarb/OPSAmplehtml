@@ -64,6 +64,13 @@ function AnomalyDot({ cx, cy, payload, onDayClick }: DotProps) {
   )
 }
 
+function xAxisInterval(dataLen: number): number {
+  if (dataLen <= 14) return 1
+  if (dataLen <= 30) return 4
+  if (dataLen <= 60) return 6
+  return Math.floor(dataLen / 10)
+}
+
 export default function HeartRateTrack({ data, baseline, onDayClick }: HeartRateTrackProps) {
   const baselineCenter = baseline.resting_hr
   const bandLow = baselineCenter - 5
@@ -114,7 +121,7 @@ export default function HeartRateTrack({ data, baseline, onDayClick }: HeartRate
             dataKey="date"
             tick={{ fill: '#94a3b8', fontSize: 11 }}
             tickFormatter={formatDate}
-            interval={4}
+            interval={xAxisInterval(data.length)}
           />
           <YAxis
             tick={{ fill: '#94a3b8', fontSize: 11 }}

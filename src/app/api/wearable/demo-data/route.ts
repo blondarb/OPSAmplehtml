@@ -271,7 +271,8 @@ export async function GET(request: NextRequest) {
           }
         }
 
-        // Re-sort chronologically after appending older rows
+        // Normalize all date fields to YYYY-MM-DD and re-sort chronologically
+        rawSummaries = rawSummaries.map(s => ({ ...s, date: String(s.date).split('T')[0] }))
         rawSummaries.sort((a, b) => String(a.date).localeCompare(String(b.date)))
         console.log(`[demo-data] Final timeline: ${rawSummaries.length} days (${rawSummaries[0]?.date} → ${rawSummaries[rawSummaries.length - 1]?.date})`)
       }
@@ -280,9 +281,10 @@ export async function GET(request: NextRequest) {
       // Non-fatal — fall through with whatever daily summaries we have
     }
 
-    // Normalize metrics in each daily summary
+    // Normalize metrics and date fields in each daily summary
     const dailySummaries = rawSummaries.map((s: Record<string, unknown>) => ({
       ...s,
+      date: String(s.date).split('T')[0],  // ensure clean YYYY-MM-DD for chart X-axis
       metrics: normalizeMetrics(s.metrics as Record<string, unknown>),
     }))
 
