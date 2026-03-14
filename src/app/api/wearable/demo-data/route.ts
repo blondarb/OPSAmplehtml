@@ -207,7 +207,10 @@ export async function GET(request: NextRequest) {
     })
   } catch (error: unknown) {
     console.error('Wearable demo-data API Error:', error)
-    const message = error instanceof Error ? error.message : 'An error occurred loading demo data.'
+    const rawMessage = error instanceof Error ? error.message : String(error)
+    // Don't expose internal DB errors to the client
+    const isDbError = rawMessage.includes('authentication failed') || rawMessage.includes('ECONNREFUSED') || rawMessage.includes('timeout') || rawMessage.includes('getaddrinfo')
+    const message = isDbError ? 'Unable to connect to the data service. Please try again later.' : rawMessage
     return NextResponse.json({ error: message }, { status: 500 })
   }
 }
