@@ -1,6 +1,6 @@
 'use client';
 
-import { FeedbackWidget } from '@sevaro/feedback';
+import { FeedbackWidget } from './widget/FeedbackWidget';
 
 export default function FeedbackWidgetInner() {
   return (
