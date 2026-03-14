@@ -24,6 +24,7 @@ interface UseFeedbackApiReturn {
 export function useFeedbackApi(apiUrl: string, apiKey?: string): UseFeedbackApiReturn {
   const sessionIdRef = useRef<string | null>(null);
   const audioUploadUrlRef = useRef<string | null>(null);
+  const appIdRef = useRef<string | null>(null);
 
   const headers = useCallback((): Record<string, string> => {
     const h: Record<string, string> = { 'Content-Type': 'application/json' };
@@ -51,6 +52,7 @@ export function useFeedbackApi(apiUrl: string, apiKey?: string): UseFeedbackApiR
       const data: CreateSessionResponse = await res.json();
       sessionIdRef.current = data.sessionId;
       audioUploadUrlRef.current = data.audioUploadUrl;
+      appIdRef.current = appId;
 
       return data.sessionId;
     },
@@ -102,6 +104,7 @@ export function useFeedbackApi(apiUrl: string, apiKey?: string): UseFeedbackApiR
         method: 'PUT',
         headers: headers(),
         body: JSON.stringify({
+          appId: appIdRef.current,
           category: data.category,
           events: data.events,
           duration: data.duration,
