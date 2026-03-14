@@ -231,25 +231,17 @@ export async function GET(request: NextRequest) {
     if (tappingRes.error) { console.error('wearable_tapping_assessments query error:', tappingRes.error.message); warnings.push('tapping_assessments: ' + tappingRes.error.message) }
     if (narrativesRes.error) { console.error('wearable_clinical_narratives query error:', narrativesRes.error.message); warnings.push('clinical_narratives: ' + narrativesRes.error.message) }
 
-    // Back-fill missing metrics from hourly snapshots:
-    // 1. If no daily summaries exist at all, build them entirely from hourly data.
-    // 2. If daily summaries exist but recent ones have avg_hr=0 (HealthKit sync gap),
-    //    overlay hourly aggregates for those zero-metric days so the chart isn't empty.
+    // Merge daily summaries with hourly snapshot aggregates:
+    // 1. Always load hourly aggregates — they fill gaps and extend history.
+    // 2. For dates that have a daily summary: overlay hourly metrics if avg_hr is missing/zero.
+    // 3. For dates that only exist in hourly data (no daily summary): add as synthetic rows.
+    // This ensures the full historical range is visible, not just dates with daily summaries.
     let rawSummaries: Array<Record<string, unknown>> = summariesRes.data || []
     try {
+      const hourlyAgg = await aggregateHourlyToDaily(patient.id)
       const hourlyByDate = new Map<string, Record<string, unknown>>()
-      const needsHourly = rawSummaries.length === 0 ||
-        rawSummaries.some(s => {
-          const m = s.metrics as Record<string, unknown>
-          const hr = m?.avg_hr ?? m?.avgHr
-          return hr == null || Number(hr) === 0
-        })
-
-      if (needsHourly) {
-        const hourlyAgg = await aggregateHourlyToDaily(patient.id)
-        for (const h of hourlyAgg) {
-          hourlyByDate.set(String(h.date), h)
-        }
+      for (const h of hourlyAgg) {
+        hourlyByDate.set(String(h.date), h)
       }
 
       if (rawSummaries.length === 0 && hourlyByDate.size > 0) {
@@ -257,7 +249,10 @@ export async function GET(request: NextRequest) {
         rawSummaries = Array.from(hourlyByDate.values())
         console.log(`[demo-data] No daily summaries for patient ${patient.id} — aggregated ${rawSummaries.length} days from hourly snapshots`)
       } else if (hourlyByDate.size > 0) {
-        // Some daily summaries exist but may have zero metrics — back-fill from hourly where needed
+        // Build a set of dates already covered by daily summaries
+        const dailyDates = new Set(rawSummaries.map(s => String(s.date).split('T')[0]))
+
+        // Overlay hourly metrics for daily summaries missing avg_hr
         rawSummaries = rawSummaries.map(s => {
           const dateKey = String(s.date).split('T')[0]
           const m = s.metrics as Record<string, unknown>
@@ -268,6 +263,17 @@ export async function GET(request: NextRequest) {
           }
           return s
         })
+
+        // Append synthetic rows for hourly-only dates (older history with no daily summary)
+        for (const [date, hourly] of hourlyByDate) {
+          if (!dailyDates.has(date)) {
+            rawSummaries.push(hourly)
+          }
+        }
+
+        // Re-sort chronologically after appending older rows
+        rawSummaries.sort((a, b) => String(a.date).localeCompare(String(b.date)))
+        console.log(`[demo-data] Final timeline: ${rawSummaries.length} days (${rawSummaries[0]?.date} → ${rawSummaries[rawSummaries.length - 1]?.date})`)
       }
     } catch (aggErr) {
       console.error('Hourly snapshot aggregation error:', aggErr)
