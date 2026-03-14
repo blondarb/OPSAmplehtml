@@ -141,6 +141,7 @@ export default function HeartRateTrack({ data, baseline, onDayClick }: HeartRate
             dataKey="avg_hr"
             stroke="#FCA5A5"
             strokeWidth={2}
+            connectNulls={false}
             dot={<AnomalyDot onDayClick={onDayClick} />}
             activeDot={{ r: 5, fill: '#FCA5A5' }}
           />

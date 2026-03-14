@@ -1,11 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getUser } from '@/lib/cognito/server'
 import { from } from '@/lib/db-query'
+import { getPool } from '@/lib/db'
 
 
 // Normalize metrics from iOS app format to web dashboard format
 function normalizeMetrics(raw: Record<string, unknown>): Record<string, unknown> {
-  const avgHr = Number(raw.avg_hr) || 0
+  const rawAvgHr = Number(raw.avg_hr)
+  const avgHr = (rawAvgHr > 0) ? rawAvgHr : null  // 0 means HealthKit had no data
   const rawRestingHr = Number(raw.resting_hr)
   const restingHr = (rawRestingHr > 0) ? rawRestingHr : null  // 0 means HealthKit had no data
 
@@ -23,7 +25,7 @@ function normalizeMetrics(raw: Record<string, unknown>): Record<string, unknown>
   const totalSteps = Number(raw.total_steps) || Number(raw.daily_steps) || 0
 
   return {
-    avg_hr: avgHr,
+    avg_hr: avgHr,  // null when HealthKit has no data (avoids 0-bpm line on chart)
     resting_hr: restingHr,
     hrv_rmssd: Number(raw.hrv_rmssd) || 0,
     hrv_7day_avg: 0,       // placeholder — computed in rolling avg pass
@@ -134,6 +136,49 @@ function normalizeTappingAssessment(raw: Record<string, unknown>): Record<string
   }
 }
 
+// Aggregate hourly snapshots into synthetic daily summaries when no wearable_daily_summaries exist.
+// This handles live patients whose iPhone app sends hourly data but hasn't had daily rollup yet.
+async function aggregateHourlyToDaily(patientId: string): Promise<Array<Record<string, unknown>>> {
+  const pool = await getPool()
+  const { rows } = await pool.query(
+    `SELECT
+       DATE(hour_timestamp) AS date,
+       AVG(avg_hr) FILTER (WHERE avg_hr > 0)         AS avg_hr,
+       AVG(hrv_sdnn) FILTER (WHERE hrv_sdnn > 0)     AS hrv_rmssd,
+       AVG(spo2_avg) FILTER (WHERE spo2_avg > 0)     AS spo2_avg,
+       SUM(COALESCE(steps, 0))                        AS total_steps,
+       SUM(COALESCE(active_calories, 0))              AS active_calories,
+       COUNT(*)                                       AS snapshot_count
+     FROM wearable_hourly_snapshots
+     WHERE patient_id = $1
+     GROUP BY DATE(hour_timestamp)
+     ORDER BY date ASC`,
+    [patientId]
+  )
+
+  return rows.map((row: Record<string, unknown>) => {
+    const dateStr = row.date instanceof Date
+      ? row.date.toISOString().split('T')[0]
+      : String(row.date)
+    return {
+      id: `hourly-${patientId}-${dateStr}`,
+      patient_id: patientId,
+      date: dateStr,
+      metrics: {
+        avg_hr: row.avg_hr != null ? Math.round(Number(row.avg_hr)) : 0,
+        resting_hr: null,
+        hrv_rmssd: row.hrv_rmssd != null ? Math.round(Number(row.hrv_rmssd) * 10) / 10 : 0,
+        total_steps: Number(row.total_steps) || 0,
+        spo2_avg: row.spo2_avg != null ? Math.round(Number(row.spo2_avg) * 10) / 10 : undefined,
+        active_calories: row.active_calories != null ? Math.round(Number(row.active_calories)) : undefined,
+      },
+      anomalies_detected: [],
+      overall_status: 'normal',
+      ai_analysis: null,
+    }
+  })
+}
+
 export async function GET(request: NextRequest) {
   try {
     const patientId = request.nextUrl.searchParams.get('patient_id')
@@ -181,8 +226,46 @@ export async function GET(request: NextRequest) {
     if (tappingRes.error) { console.error('wearable_tapping_assessments query error:', tappingRes.error.message); warnings.push('tapping_assessments: ' + tappingRes.error.message) }
     if (narrativesRes.error) { console.error('wearable_clinical_narratives query error:', narrativesRes.error.message); warnings.push('clinical_narratives: ' + narrativesRes.error.message) }
 
+    // Back-fill missing metrics from hourly snapshots:
+    // 1. If no daily summaries exist at all, build them entirely from hourly data.
+    // 2. If daily summaries exist but recent ones have avg_hr=0 (HealthKit sync gap),
+    //    overlay hourly aggregates for those zero-metric days so the chart isn't empty.
+    let rawSummaries: Array<Record<string, unknown>> = summariesRes.data || []
+    try {
+      const hourlyByDate = new Map<string, Record<string, unknown>>()
+      const needsHourly = rawSummaries.length === 0 ||
+        rawSummaries.some(s => Number((s.metrics as Record<string, unknown>)?.avg_hr) === 0)
+
+      if (needsHourly) {
+        const hourlyAgg = await aggregateHourlyToDaily(patient.id)
+        for (const h of hourlyAgg) {
+          hourlyByDate.set(String(h.date), h)
+        }
+      }
+
+      if (rawSummaries.length === 0 && hourlyByDate.size > 0) {
+        // No daily summaries at all — use hourly aggregates directly
+        rawSummaries = Array.from(hourlyByDate.values())
+        console.log(`[demo-data] No daily summaries for patient ${patient.id} — aggregated ${rawSummaries.length} days from hourly snapshots`)
+      } else if (hourlyByDate.size > 0) {
+        // Some daily summaries exist but may have zero metrics — back-fill from hourly where needed
+        rawSummaries = rawSummaries.map(s => {
+          const dateKey = String(s.date).split('T')[0]
+          const m = s.metrics as Record<string, unknown>
+          if (Number(m?.avg_hr) === 0 && hourlyByDate.has(dateKey)) {
+            const hourly = hourlyByDate.get(dateKey)!
+            return { ...s, metrics: { ...m, ...(hourly.metrics as Record<string, unknown>) } }
+          }
+          return s
+        })
+      }
+    } catch (aggErr) {
+      console.error('Hourly snapshot aggregation error:', aggErr)
+      // Non-fatal — fall through with whatever daily summaries we have
+    }
+
     // Normalize metrics in each daily summary
-    const dailySummaries = (summariesRes.data || []).map((s: Record<string, unknown>) => ({
+    const dailySummaries = rawSummaries.map((s: Record<string, unknown>) => ({
       ...s,
       metrics: normalizeMetrics(s.metrics as Record<string, unknown>),
     }))

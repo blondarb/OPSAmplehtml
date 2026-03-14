@@ -23,7 +23,7 @@ interface PatientTimelineProps {
 
 export interface ChartDataPoint {
   date: string
-  avg_hr: number
+  avg_hr: number | null  // null when HealthKit has no data for that day
   resting_hr: number | null
   hrv_rmssd: number
   hrv_7day_avg: number
@@ -44,10 +44,14 @@ export interface ChartDataPoint {
   overall_status: string
 }
 
+function toDateOnly(dateStr: string): string {
+  return String(dateStr).split('T')[0]
+}
+
 function formatDateRange(summaries: DailySummary[]): string {
   if (summaries.length === 0) return ''
-  const first = new Date(summaries[0].date + 'T00:00:00')
-  const last = new Date(summaries[summaries.length - 1].date + 'T00:00:00')
+  const first = new Date(toDateOnly(summaries[0].date) + 'T00:00:00')
+  const last = new Date(toDateOnly(summaries[summaries.length - 1].date) + 'T00:00:00')
   const fmt = (d: Date) => d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
   return `${fmt(first)} to ${fmt(last)}`
 }
@@ -98,13 +102,16 @@ export default function PatientTimeline({ dailySummaries, anomalies, patient, as
     )
   }
 
-  const chartData: ChartDataPoint[] = dailySummaries.map(s => ({
-    date: s.date,
-    ...s.metrics,
-    hasAnomaly: anomalies.some(a => a.detected_at.startsWith(s.date)),
-    anomalySeverity: anomalies.find(a => a.detected_at.startsWith(s.date))?.severity || null,
-    overall_status: s.overall_status,
-  }))
+  const chartData: ChartDataPoint[] = dailySummaries.map(s => {
+    const dateStr = toDateOnly(s.date)
+    return {
+      date: dateStr,
+      ...s.metrics,
+      hasAnomaly: anomalies.some(a => a.detected_at.startsWith(dateStr)),
+      anomalySeverity: anomalies.find(a => a.detected_at.startsWith(dateStr))?.severity || null,
+      overall_status: s.overall_status,
+    }
+  })
 
   const handleDayClick = (date: string) => {
     setSelectedDay(prev => prev === date ? null : date)
