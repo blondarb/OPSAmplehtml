@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import "./globals.css";
 import { AuthProvider } from "@/contexts/AuthContext";
+import { FeedbackWidgetWrapper } from "@/components/feedback/FeedbackWidgetWrapper";
 
 export const metadata: Metadata = {
   title: "Sevaro Ambulatory - AI-Powered Outpatient Neurology",
@@ -36,7 +37,10 @@ export default function RootLayout({
         <script dangerouslySetInnerHTML={{ __html: fontSizeInitScript }} />
       </head>
       <body className="antialiased" style={{ fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif" }}>
-        <AuthProvider>{children}</AuthProvider>
+        <AuthProvider>
+          {children}
+          <FeedbackWidgetWrapper />
+        </AuthProvider>
       </body>
     </html>
   );
