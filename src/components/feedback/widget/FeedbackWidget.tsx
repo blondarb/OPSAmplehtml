@@ -1,4 +1,4 @@
-import React, { useCallback, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import type { FeedbackCategory, FeedbackWidgetConfig, WidgetState } from './types';
 import { useVoiceRecorder } from './useVoiceRecorder';
 import { useEventTracker } from './useEventTracker';
@@ -18,6 +18,8 @@ const POSITION_CLASSES: Record<string, React.CSSProperties> = {
   'top-left': { top: 24, left: 24 },
 };
 
+const INACTIVITY_TIMEOUT_MS = 5 * 60 * 1000; // 5 minutes
+
 function formatTime(ms: number): string {
   const secs = Math.floor(ms / 1000);
   const mins = Math.floor(secs / 60);
@@ -32,26 +34,59 @@ export function FeedbackWidget({ appId, apiUrl, user, position = 'bottom-right',
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const sessionStartRef = useRef<number>(0);
+  const inactivityTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const recorder = useVoiceRecorder();
   const tracker = useEventTracker();
   const api = useFeedbackApi(apiUrl, apiKey);
 
+  // Inactivity auto-stop: reset timer on any user interaction
+  const resetInactivityTimer = useCallback(() => {
+    if (inactivityTimerRef.current) clearTimeout(inactivityTimerRef.current);
+    inactivityTimerRef.current = setTimeout(() => {
+      // Auto-stop if still recording
+      if (widgetState === 'recording') {
+        handleStopRef.current();
+      }
+    }, INACTIVITY_TIMEOUT_MS);
+  }, [widgetState]);
+
+  // Keep a ref to handleStop so the timer callback always has the latest
+  const handleStopRef = useRef<() => void>(() => {});
+
+  useEffect(() => {
+    if (widgetState !== 'recording') return;
+
+    const onActivity = () => resetInactivityTimer();
+    window.addEventListener('click', onActivity, true);
+    window.addEventListener('scroll', onActivity, true);
+    window.addEventListener('keydown', onActivity, true);
+    window.addEventListener('mousemove', onActivity, true);
+
+    // Start the timer
+    resetInactivityTimer();
+
+    return () => {
+      window.removeEventListener('click', onActivity, true);
+      window.removeEventListener('scroll', onActivity, true);
+      window.removeEventListener('keydown', onActivity, true);
+      window.removeEventListener('mousemove', onActivity, true);
+      if (inactivityTimerRef.current) clearTimeout(inactivityTimerRef.current);
+    };
+  }, [widgetState, resetInactivityTimer]);
+
   const handleStart = useCallback(async () => {
     try {
       setErrorMessage(null);
 
-      // Create session on backend (gets pre-signed upload URL)
       await api.createSession(appId, user);
-
-      // Start voice recording
       await recorder.startRecording();
-
-      // Start event tracking
       tracker.startTracking();
 
       sessionStartRef.current = Date.now();
       setWidgetState('recording');
+      // Auto-minimize so the widget stays out of the way
+      setIsExpanded(false);
     } catch (err) {
       setErrorMessage(err instanceof Error ? err.message : 'Failed to start recording');
       setWidgetState('error');
@@ -61,21 +96,17 @@ export function FeedbackWidget({ appId, apiUrl, user, position = 'bottom-right',
   const handleStop = useCallback(async () => {
     try {
       setWidgetState('submitting');
+      setIsExpanded(true); // Show the submitting state
 
-      // Stop recording — returns the full audio blob
       const audioBlob = await recorder.stopRecording();
-
-      // Stop event tracking
       tracker.stopTracking();
 
       const duration = Math.round((Date.now() - sessionStartRef.current) / 1000);
 
-      // Upload audio to S3
       if (audioBlob && audioBlob.size > 0) {
         await api.uploadAudio(audioBlob);
       }
 
-      // Submit session with events and category
       await api.submitSession({
         category,
         events: tracker.getEvents(),
@@ -84,7 +115,6 @@ export function FeedbackWidget({ appId, apiUrl, user, position = 'bottom-right',
 
       setWidgetState('submitted');
 
-      // Reset after 3 seconds
       setTimeout(() => {
         setWidgetState('idle');
         setIsExpanded(false);
@@ -94,6 +124,9 @@ export function FeedbackWidget({ appId, apiUrl, user, position = 'bottom-right',
       setWidgetState('error');
     }
   }, [recorder, tracker, api, category]);
+
+  // Keep the ref updated
+  handleStopRef.current = handleStop;
 
   const handleReset = useCallback(() => {
     setWidgetState('idle');
@@ -105,39 +138,53 @@ export function FeedbackWidget({ appId, apiUrl, user, position = 'bottom-right',
 
   // --- Render ---
 
-  // Minimized recording indicator (when recording but panel is collapsed)
+  // Minimized recording indicator — small pill that stays out of the way
   if (widgetState === 'recording' && !isExpanded) {
     return (
-      <div
-        data-feedback-widget
-        style={{
-          ...positionStyle,
-          position: 'fixed',
-          zIndex: 99999,
-          display: 'flex',
-          alignItems: 'center',
-          gap: 8,
-          cursor: 'pointer',
-        }}
-        onClick={() => setIsExpanded(true)}
-      >
+      <div data-feedback-widget style={{ ...positionStyle, position: 'fixed', zIndex: 99999 }}>
         <div
           style={{
-            width: 48,
-            height: 48,
-            borderRadius: 24,
-            backgroundColor: '#EF4444',
             display: 'flex',
             alignItems: 'center',
-            justifyContent: 'center',
-            boxShadow: '0 4px 12px rgba(239, 68, 68, 0.4)',
+            gap: 8,
+            padding: '8px 14px',
+            borderRadius: 20,
+            backgroundColor: 'rgba(239, 68, 68, 0.95)',
+            color: '#fff',
+            fontFamily: 'system-ui, sans-serif',
+            fontSize: 13,
+            fontWeight: 600,
+            boxShadow: '0 2px 8px rgba(239, 68, 68, 0.3)',
+            cursor: 'pointer',
             animation: 'feedback-pulse 2s ease-in-out infinite',
           }}
+          onClick={() => setIsExpanded(true)}
         >
-          <span style={{ color: '#fff', fontSize: 14, fontWeight: 600, fontFamily: 'system-ui, sans-serif' }}>
-            {formatTime(recorder.elapsedMs)}
-          </span>
+          <span style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: '#fff' }} />
+          {formatTime(recorder.elapsedMs)}
+          <button
+            onClick={(e) => { e.stopPropagation(); handleStop(); }}
+            style={{
+              marginLeft: 4,
+              padding: '2px 8px',
+              borderRadius: 10,
+              border: '1px solid rgba(255,255,255,0.5)',
+              backgroundColor: 'rgba(255,255,255,0.2)',
+              color: '#fff',
+              fontSize: 11,
+              fontWeight: 600,
+              cursor: 'pointer',
+            }}
+          >
+            Stop
+          </button>
         </div>
+        <style>{`
+          @keyframes feedback-pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.85; }
+          }
+        `}</style>
       </div>
     );
   }
@@ -238,7 +285,6 @@ export function FeedbackWidget({ appId, apiUrl, user, position = 'bottom-right',
           <button
             onClick={() => {
               if (widgetState === 'recording') {
-                // Just minimize, don't stop
                 setIsExpanded(false);
               } else {
                 setIsExpanded(false);
@@ -315,8 +361,8 @@ export function FeedbackWidget({ appId, apiUrl, user, position = 'bottom-right',
         {widgetState === 'idle' && !recorder.error && !errorMessage && (
           <>
             <p style={{ fontSize: 13, color: '#6B7280', margin: '0 0 12px 0', lineHeight: 1.4 }}>
-              Start recording to narrate your feedback while you use the app. We&apos;ll track where you
-              navigate so your comments are tied to specific pages and elements.
+              Start recording to narrate your feedback while you use the app. The widget will minimize
+              so you can navigate freely. Stops automatically after 5 min of inactivity.
             </p>
 
             {/* Category pills */}
@@ -380,7 +426,6 @@ export function FeedbackWidget({ appId, apiUrl, user, position = 'bottom-right',
         {/* Recording: context display + stop */}
         {widgetState === 'recording' && (
           <>
-            {/* Current context */}
             <div
               style={{
                 padding: '8px 12px',
@@ -446,7 +491,7 @@ export function FeedbackWidget({ appId, apiUrl, user, position = 'bottom-right',
               <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
                 <rect x="6" y="6" width="12" height="12" rx="2" />
               </svg>
-              Stop & Submit
+              Stop &amp; Submit
             </button>
           </>
         )}
