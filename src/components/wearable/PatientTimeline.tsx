@@ -1,13 +1,15 @@
 'use client'
 
 import { useState } from 'react'
-import type { DailySummary, WearableAnomaly, WearablePatient, TremorAssessment, FluencyAssessment, TappingAssessment, ClinicalNarrative } from '@/lib/wearable/types'
+import type { DailySummary, WearableAnomaly, WearablePatient, TremorAssessment, FluencyAssessment, TappingAssessment, SpiralAssessment, GaitAssessment, ClinicalNarrative } from '@/lib/wearable/types'
 import HeartRateTrack from './HeartRateTrack'
 import HRVTrack from './HRVTrack'
 import SleepTrack from './SleepTrack'
 import ActivityTrack from './ActivityTrack'
 import MotorTrack from './MotorTrack'
 import CognitiveTrack from './CognitiveTrack'
+import SpiralTrack from './SpiralTrack'
+import GaitTrack from './GaitTrack'
 import LongitudinalSummaryBanner from './LongitudinalSummaryBanner'
 
 interface PatientTimelineProps {
@@ -17,6 +19,8 @@ interface PatientTimelineProps {
   assessments?: TremorAssessment[]
   fluencyAssessments?: FluencyAssessment[]
   tappingAssessments?: TappingAssessment[]
+  spiralAssessments?: SpiralAssessment[]
+  gaitAssessments?: GaitAssessment[]
   narratives?: ClinicalNarrative[]
   onGenerateNarrative?: (type: string, assessmentId: string) => Promise<void>
 }
@@ -56,7 +60,7 @@ function formatDateRange(summaries: DailySummary[]): string {
   return `${fmt(first)} to ${fmt(last)}`
 }
 
-export default function PatientTimeline({ dailySummaries, anomalies, patient, assessments, fluencyAssessments, tappingAssessments, narratives, onGenerateNarrative }: PatientTimelineProps) {
+export default function PatientTimeline({ dailySummaries, anomalies, patient, assessments, fluencyAssessments, tappingAssessments, spiralAssessments, gaitAssessments, narratives, onGenerateNarrative }: PatientTimelineProps) {
   const [selectedDay, setSelectedDay] = useState<string | null>(null)
   const [generatingLongitudinal, setGeneratingLongitudinal] = useState(false)
 
@@ -303,6 +307,16 @@ export default function PatientTimeline({ dailySummaries, anomalies, patient, as
         baseline={patient.baseline_metrics}
         onDayClick={handleDayClick}
         fluencyAssessments={fluencyAssessments}
+        narratives={narratives}
+        onGenerateNarrative={onGenerateNarrative}
+      />
+      <SpiralTrack
+        spiralAssessments={spiralAssessments}
+        narratives={narratives}
+        onGenerateNarrative={onGenerateNarrative}
+      />
+      <GaitTrack
+        gaitAssessments={gaitAssessments}
         narratives={narratives}
         onGenerateNarrative={onGenerateNarrative}
       />

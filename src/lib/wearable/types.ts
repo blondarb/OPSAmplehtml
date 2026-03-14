@@ -305,7 +305,7 @@ export interface StructuredSummary {
 export interface ClinicalNarrative {
   id: string
   patient_id: string
-  narrative_type: 'tremor' | 'tapping' | 'fluency' | 'longitudinal'
+  narrative_type: 'tremor' | 'tapping' | 'fluency' | 'spiral' | 'gait' | 'longitudinal'
   assessment_id: string | null
   structured_summary: StructuredSummary | null
   clinical_narrative: string

@@ -37,3 +37,23 @@ export function tappingScoreLabel(score: number): { label: string; color: string
   if (score >= 20) return { label: 'Below Average', color: '#F97316' }
   return { label: 'Poor', color: '#EF4444' }
 }
+
+// Spiral score is 0-1 (fractional), maps to clinical interpretation
+export function spiralScoreLabel(score: number): { label: string; color: string } {
+  const pct = score * 100
+  if (pct >= 80) return { label: 'Normal', color: '#22C55E' }
+  if (pct >= 60) return { label: 'Mild', color: '#3B82F6' }
+  if (pct >= 40) return { label: 'Moderate', color: '#EAB308' }
+  if (pct >= 20) return { label: 'Significant', color: '#F97316' }
+  return { label: 'Severe', color: '#EF4444' }
+}
+
+// Gait score is 0-1 (fractional), maps to clinical interpretation
+export function gaitScoreLabel(score: number): { label: string; color: string } {
+  const pct = score * 100
+  if (pct >= 80) return { label: 'Normal', color: '#22C55E' }
+  if (pct >= 60) return { label: 'Mild Impairment', color: '#3B82F6' }
+  if (pct >= 40) return { label: 'Moderate Impairment', color: '#EAB308' }
+  if (pct >= 20) return { label: 'Significant Impairment', color: '#F97316' }
+  return { label: 'Severe Impairment', color: '#EF4444' }
+}

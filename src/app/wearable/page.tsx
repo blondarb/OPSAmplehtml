@@ -420,6 +420,8 @@ export default function WearablePage() {
             assessments={data.assessments}
             fluencyAssessments={data.fluencyAssessments}
             tappingAssessments={data.tappingAssessments}
+            spiralAssessments={data.spiralAssessments}
+            gaitAssessments={data.gaitAssessments}
             narratives={data.narratives}
             onGenerateNarrative={handleGenerateNarrative}
           />
