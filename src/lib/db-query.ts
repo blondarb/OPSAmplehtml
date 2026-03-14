@@ -7,13 +7,18 @@
  * Returns { data, error } just like Supabase, so consuming code needs
  * minimal changes — only the import and initialization line.
  */
-import { getPool } from './db'
+import { getPool, getWearablePool } from './db'
 
 // ── public entry points ──────────────────────────────────────────────
 
 /** Start a query on a table — drop-in replacement for supabase.from() */
 export function from(table: string): QueryBuilder {
   return new QueryBuilder(table)
+}
+
+/** Start a query on a wearable table in sevaro_monitor (iOS app data) */
+export function wearableFrom(table: string): QueryBuilder {
+  return new QueryBuilder(table, getWearablePool)
 }
 
 /** Replace supabase.rpc('get_openai_key') — returns { data, error } like Supabase */
@@ -82,9 +87,11 @@ class QueryBuilder implements PromiseLike<DbResult> {
   private conflictCol?: string
   private countMode?: 'exact'
   private headMode = false
+  private poolGetter: () => Promise<import('pg').Pool>
 
-  constructor(table: string) {
+  constructor(table: string, poolGetter?: () => Promise<import('pg').Pool>) {
     this.table = table
+    this.poolGetter = poolGetter ?? getPool
   }
 
   // ── operation starters ──
@@ -239,7 +246,7 @@ class QueryBuilder implements PromiseLike<DbResult> {
 
   private async execute(): Promise<DbResult> {
     try {
-      const pool = await getPool()
+      const pool = await this.poolGetter()
       let sql = ''
       const allValues: unknown[] = []
 

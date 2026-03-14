@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getUser } from '@/lib/cognito/server'
-import { from } from '@/lib/db-query'
+import { wearableFrom as from } from '@/lib/db-query'
 
 /**
  * POST /api/wearable/hourly

@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { invokeBedrockJSON } from '@/lib/bedrock'
 import { WEARABLE_ANALYSIS_SYSTEM_PROMPT, buildAnalysisUserPrompt } from '@/lib/wearable/systemPrompt'
-import { from } from '@/lib/db-query'
+import { wearableFrom as from } from '@/lib/db-query'
 
 
 export const maxDuration = 60

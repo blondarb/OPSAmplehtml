@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getUser } from '@/lib/cognito/server'
-import { from } from '@/lib/db-query'
-import { getPool } from '@/lib/db'
+import { wearableFrom } from '@/lib/db-query'
+import { getWearablePool } from '@/lib/db'
 
 
 // Normalize metrics from iOS app format to web dashboard format.
@@ -144,7 +144,7 @@ function normalizeTappingAssessment(raw: Record<string, unknown>): Record<string
 // Aggregate hourly snapshots into synthetic daily summaries when no wearable_daily_summaries exist.
 // This handles live patients whose iPhone app sends hourly data but hasn't had daily rollup yet.
 async function aggregateHourlyToDaily(patientId: string): Promise<Array<Record<string, unknown>>> {
-  const pool = await getPool()
+  const pool = await getWearablePool()
   const { rows } = await pool.query(
     `SELECT
        DATE(hour_timestamp) AS date,
@@ -190,14 +190,14 @@ export async function GET(request: NextRequest) {
 
     let patient
     if (patientId) {
-      const { data, error } = await from('wearable_patients')
+      const { data, error } = await wearableFrom('wearable_patients')
         .select('*')
         .eq('id', patientId)
         .single()
       if (error) throw error
       patient = data
     } else {
-      const { data, error } = await from('wearable_patients')
+      const { data, error } = await wearableFrom('wearable_patients')
         .select('*')
         .eq('name', 'Linda Martinez')
         .limit(1)
@@ -212,13 +212,13 @@ export async function GET(request: NextRequest) {
     }
 
     const [summariesRes, anomaliesRes, alertsRes, assessmentsRes, fluencyRes, tappingRes, narrativesRes] = await Promise.all([
-      from('wearable_daily_summaries').select('*').eq('patient_id', patient.id).order('date', { ascending: true }),
-      from('wearable_anomalies').select('*').eq('patient_id', patient.id).order('detected_at', { ascending: true }),
-      from('wearable_alerts').select('*').eq('patient_id', patient.id).order('created_at', { ascending: true }),
-      from('wearable_tremor_assessments').select('*').eq('patient_id', patient.id).order('assessed_at', { ascending: true }),
-      from('wearable_fluency_assessments').select('*').eq('patient_id', patient.id).order('assessed_at', { ascending: true }),
-      from('wearable_tapping_assessments').select('*').eq('patient_id', patient.id).order('assessed_at', { ascending: true }),
-      from('wearable_clinical_narratives').select('*').eq('patient_id', patient.id).order('created_at', { ascending: false }),
+      wearableFrom('wearable_daily_summaries').select('*').eq('patient_id', patient.id).order('date', { ascending: true }),
+      wearableFrom('wearable_anomalies').select('*').eq('patient_id', patient.id).order('detected_at', { ascending: true }),
+      wearableFrom('wearable_alerts').select('*').eq('patient_id', patient.id).order('created_at', { ascending: true }),
+      wearableFrom('wearable_tremor_assessments').select('*').eq('patient_id', patient.id).order('assessed_at', { ascending: true }),
+      wearableFrom('wearable_fluency_assessments').select('*').eq('patient_id', patient.id).order('assessed_at', { ascending: true }),
+      wearableFrom('wearable_tapping_assessments').select('*').eq('patient_id', patient.id).order('assessed_at', { ascending: true }),
+      wearableFrom('wearable_clinical_narratives').select('*').eq('patient_id', patient.id).order('created_at', { ascending: false }),
     ])
 
     // Check for query errors and collect warnings
