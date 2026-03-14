@@ -315,7 +315,7 @@ export function FeedbackWidget({ appId, apiUrl, user, position = 'bottom-right',
         {widgetState === 'idle' && !recorder.error && !errorMessage && (
           <>
             <p style={{ fontSize: 13, color: '#6B7280', margin: '0 0 12px 0', lineHeight: 1.4 }}>
-              Start recording to narrate your feedback while you use the app. We'll track where you
+              Start recording to narrate your feedback while you use the app. We&apos;ll track where you
               navigate so your comments are tied to specific pages and elements.
             </p>
 
