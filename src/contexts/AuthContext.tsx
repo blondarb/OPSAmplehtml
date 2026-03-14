@@ -86,10 +86,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const result = await signIn(email, password)
 
     if (!result.error) {
-      const { getCurrentUser } = await import('@/lib/cognito/client')
-      const currentUser = await getCurrentUser()
-      setUser(currentUser)
-      if (currentUser) await fetchProfile()
+      // Hydrate user state in the background so navigation isn't blocked
+      import('@/lib/cognito/client').then(({ getCurrentUser }) =>
+        getCurrentUser().then((currentUser) => {
+          setUser(currentUser)
+          if (currentUser) fetchProfile()
+        })
+      )
     }
 
     return result

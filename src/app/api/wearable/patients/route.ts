@@ -8,7 +8,7 @@ export async function GET() {
       .select('id, name, age, sex, primary_diagnosis, wearable_devices, monitoring_start_date')
       .order('name')
 
-    if (error) throw error
+    if (error) throw new Error(error.message)
 
     // Tag each patient as 'demo' or 'live' based on whether they have
     // an Apple Watch with status 'connected' (from the iOS app)

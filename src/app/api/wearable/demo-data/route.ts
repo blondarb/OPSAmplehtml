@@ -194,14 +194,14 @@ export async function GET(request: NextRequest) {
         .select('*')
         .eq('id', patientId)
         .single()
-      if (error) throw error
+      if (error) throw new Error(error.message)
       patient = data
     } else {
       const { data, error } = await wearableFrom('wearable_patients')
         .select('*')
         .eq('name', 'Linda Martinez')
         .limit(1)
-      if (error) throw error
+      if (error) throw new Error(error.message)
       if (!data || data.length === 0) {
         return NextResponse.json(
           { error: 'Demo patient not found. Run npm run seed:wearable first.' },
