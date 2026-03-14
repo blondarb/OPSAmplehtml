@@ -32,6 +32,12 @@
     "twilio": "^5.12.2",
     "unpdf": "^1.4.0"
   },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "sharp",
+      "unrs-resolver"
+    ]
+  },
   "devDependencies": {
     "@eslint/eslintrc": "^3.2.0",
     "@types/node": "^20.19.30",
