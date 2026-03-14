@@ -4,30 +4,35 @@ import { from } from '@/lib/db-query'
 import { getPool } from '@/lib/db'
 
 
-// Normalize metrics from iOS app format to web dashboard format
+// Normalize metrics from iOS app format to web dashboard format.
+// iOS app stores daily summary metrics in camelCase (avgHr, dailySteps, etc.);
+// hourly snapshots and older records use snake_case. Support both.
 function normalizeMetrics(raw: Record<string, unknown>): Record<string, unknown> {
-  const rawAvgHr = Number(raw.avg_hr)
+  const rawAvgHr = Number(raw.avg_hr ?? raw.avgHr)
   const avgHr = (rawAvgHr > 0) ? rawAvgHr : null  // 0 means HealthKit had no data
-  const rawRestingHr = Number(raw.resting_hr)
-  const restingHr = (rawRestingHr > 0) ? rawRestingHr : null  // 0 means HealthKit had no data
+  const rawRestingHr = Number(raw.resting_hr ?? raw.restingHr)
+  const restingHr = (rawRestingHr > 0) ? rawRestingHr : null
 
-  const sleepHours = Number(raw.sleep_hours) || 0
-  const sleepEfficiency = Number(raw.sleep_efficiency) || 0
+  const sleepHours = Number(raw.sleep_hours ?? raw.sleepHours) || 0
+  const sleepEfficiency = Number(raw.sleep_efficiency ?? raw.sleepEfficiency) || 0
   const noSleepData = sleepHours === 0 && sleepEfficiency === 0
 
-  // Check if sleep stage breakdown is available
-  const sleepDeep = Number(raw.sleep_deep) || 0
-  const sleepRem = Number(raw.sleep_rem) || 0
-  const sleepLight = Number(raw.sleep_light) || 0
-  const sleepAwake = Number(raw.sleep_awake) || 0
+  const sleepDeep = Number(raw.sleep_deep ?? raw.sleepDeep) || 0
+  const sleepRem = Number(raw.sleep_rem ?? raw.sleepRem) || 0
+  const sleepLight = Number(raw.sleep_light ?? raw.sleepLight) || 0
+  const sleepAwake = Number(raw.sleep_awake ?? raw.sleepAwake) || 0
   const hasStages = (sleepDeep + sleepRem + sleepLight + sleepAwake) > 0
 
-  const totalSteps = Number(raw.total_steps) || Number(raw.daily_steps) || 0
+  const totalSteps = Number(raw.total_steps ?? raw.daily_steps ?? raw.dailySteps) || 0
+  const hrvRmssd = raw.hrv_rmssd ?? raw.hrvRmssd
+  const spo2Avg = raw.spo2_avg ?? raw.spo2Avg
+  const spo2Min = raw.spo2_min ?? raw.spo2Min
+  const activeCalories = raw.active_calories ?? raw.activeCalories
 
   return {
     avg_hr: avgHr,  // null when HealthKit has no data (avoids 0-bpm line on chart)
     resting_hr: restingHr,
-    hrv_rmssd: Number(raw.hrv_rmssd) || 0,
+    hrv_rmssd: Number(hrvRmssd) || 0,
     hrv_7day_avg: 0,       // placeholder — computed in rolling avg pass
     total_steps: totalSteps,
     steps_7day_avg: 0,     // placeholder — computed in rolling avg pass
@@ -44,9 +49,9 @@ function normalizeMetrics(raw: Record<string, unknown>): Record<string, unknown>
     tremor_pct: raw.tremor_pct != null ? Number(raw.tremor_pct) : undefined,
     dyskinetic_mins: raw.dyskinetic_mins != null ? Number(raw.dyskinetic_mins) : undefined,
     // iOS-specific
-    spo2_avg: raw.spo2_avg != null ? Number(raw.spo2_avg) : undefined,
-    spo2_min: raw.spo2_min != null ? Number(raw.spo2_min) : undefined,
-    active_calories: raw.active_calories != null ? Number(raw.active_calories) : undefined,
+    spo2_avg: spo2Avg != null ? Number(spo2Avg) : undefined,
+    spo2_min: spo2Min != null ? Number(spo2Min) : undefined,
+    active_calories: activeCalories != null ? Number(activeCalories) : undefined,
   }
 }
 
@@ -234,7 +239,11 @@ export async function GET(request: NextRequest) {
     try {
       const hourlyByDate = new Map<string, Record<string, unknown>>()
       const needsHourly = rawSummaries.length === 0 ||
-        rawSummaries.some(s => Number((s.metrics as Record<string, unknown>)?.avg_hr) === 0)
+        rawSummaries.some(s => {
+          const m = s.metrics as Record<string, unknown>
+          const hr = m?.avg_hr ?? m?.avgHr
+          return hr == null || Number(hr) === 0
+        })
 
       if (needsHourly) {
         const hourlyAgg = await aggregateHourlyToDaily(patient.id)
@@ -252,7 +261,8 @@ export async function GET(request: NextRequest) {
         rawSummaries = rawSummaries.map(s => {
           const dateKey = String(s.date).split('T')[0]
           const m = s.metrics as Record<string, unknown>
-          if (Number(m?.avg_hr) === 0 && hourlyByDate.has(dateKey)) {
+          const existingHr = m?.avg_hr ?? m?.avgHr
+          if ((existingHr == null || Number(existingHr) === 0) && hourlyByDate.has(dateKey)) {
             const hourly = hourlyByDate.get(dateKey)!
             return { ...s, metrics: { ...m, ...(hourly.metrics as Record<string, unknown>) } }
           }
