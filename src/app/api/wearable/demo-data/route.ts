@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getUser } from '@/lib/cognito/server'
-import { wearableFrom } from '@/lib/db-query'
+import { from, wearableFrom } from '@/lib/db-query'
 import { getWearablePool } from '@/lib/db'
 
 
@@ -188,16 +188,19 @@ export async function GET(request: NextRequest) {
   try {
     const patientId = request.nextUrl.searchParams.get('patient_id')
 
+    // Patient display info always comes from github_showcase (has name, age, diagnosis, etc.)
+    // Time-series data comes from sevaro_monitor (iOS app writes there).
+    // We look up the iOS patient ID dynamically so no hardcoding is needed.
     let patient
     if (patientId) {
-      const { data, error } = await wearableFrom('wearable_patients')
+      const { data, error } = await from('wearable_patients')
         .select('*')
         .eq('id', patientId)
         .single()
       if (error) throw new Error(error.message)
       patient = data
     } else {
-      const { data, error } = await wearableFrom('wearable_patients')
+      const { data, error } = await from('wearable_patients')
         .select('*')
         .eq('name', 'Linda Martinez')
         .limit(1)
@@ -211,14 +214,23 @@ export async function GET(request: NextRequest) {
       patient = data[0]
     }
 
+    // Find the iOS patient in sevaro_monitor (may differ from the github_showcase patient ID).
+    // Use the first patient found in sevaro_monitor; fall back to the display patient's ID
+    // so demo data still works when no iOS data exists.
+    let livePatientId: string = patient.id
+    const { data: livePatients } = await wearableFrom('wearable_patients').select('id').limit(1)
+    if (livePatients && livePatients.length > 0) {
+      livePatientId = livePatients[0].id
+    }
+
     const [summariesRes, anomaliesRes, alertsRes, assessmentsRes, fluencyRes, tappingRes, narrativesRes] = await Promise.all([
-      wearableFrom('wearable_daily_summaries').select('*').eq('patient_id', patient.id).order('date', { ascending: true }),
-      wearableFrom('wearable_anomalies').select('*').eq('patient_id', patient.id).order('detected_at', { ascending: true }),
-      wearableFrom('wearable_alerts').select('*').eq('patient_id', patient.id).order('created_at', { ascending: true }),
-      wearableFrom('wearable_tremor_assessments').select('*').eq('patient_id', patient.id).order('assessed_at', { ascending: true }),
-      wearableFrom('wearable_fluency_assessments').select('*').eq('patient_id', patient.id).order('assessed_at', { ascending: true }),
-      wearableFrom('wearable_tapping_assessments').select('*').eq('patient_id', patient.id).order('assessed_at', { ascending: true }),
-      wearableFrom('wearable_clinical_narratives').select('*').eq('patient_id', patient.id).order('created_at', { ascending: false }),
+      wearableFrom('wearable_daily_summaries').select('*').eq('patient_id', livePatientId).order('date', { ascending: true }),
+      wearableFrom('wearable_anomalies').select('*').eq('patient_id', livePatientId).order('detected_at', { ascending: true }),
+      wearableFrom('wearable_alerts').select('*').eq('patient_id', livePatientId).order('created_at', { ascending: true }),
+      wearableFrom('wearable_tremor_assessments').select('*').eq('patient_id', livePatientId).order('assessed_at', { ascending: true }),
+      wearableFrom('wearable_fluency_assessments').select('*').eq('patient_id', livePatientId).order('assessed_at', { ascending: true }),
+      wearableFrom('wearable_tapping_assessments').select('*').eq('patient_id', livePatientId).order('assessed_at', { ascending: true }),
+      wearableFrom('wearable_clinical_narratives').select('*').eq('patient_id', livePatientId).order('created_at', { ascending: false }),
     ])
 
     // Check for query errors and collect warnings
@@ -238,7 +250,7 @@ export async function GET(request: NextRequest) {
     // This ensures the full historical range is visible, not just dates with daily summaries.
     let rawSummaries: Array<Record<string, unknown>> = summariesRes.data || []
     try {
-      const hourlyAgg = await aggregateHourlyToDaily(patient.id)
+      const hourlyAgg = await aggregateHourlyToDaily(livePatientId)
       const hourlyByDate = new Map<string, Record<string, unknown>>()
       for (const h of hourlyAgg) {
         hourlyByDate.set(String(h.date), h)
