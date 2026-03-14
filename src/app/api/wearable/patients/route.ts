@@ -17,22 +17,45 @@ export async function GET() {
     }))
 
     // Live patients: sevaro_monitor has real iOS data but minimal schema (no name/age/etc.)
+    // Only include patients with recent data (last 30 days) to filter out stale test entries.
     // Build a synthetic display entry from baseline_metrics where possible.
     const { data: liveData } = await wearableFrom('wearable_patients').select('id, baseline_metrics')
-    const livePatients = (liveData || []).map((p: Record<string, unknown>) => {
-      const bm = (p.baseline_metrics as Record<string, unknown>) || {}
-      return {
-        id: p.id,
-        name: 'Steve Arbogast',
-        age: (bm.age as number) || null,
-        sex: (bm.sex as string) || null,
-        primary_diagnosis: (bm.primary_diagnosis as string) || 'Essential Tremor',
-        source: 'live',
+
+    // Check which patients have recent hourly snapshots (active device connection).
+    // This filters out stale test patients that only have old daily summaries.
+    const activePatientIds = new Set<string>()
+    if (liveData && liveData.length > 0) {
+      for (const p of liveData) {
+        const { data: recent } = await wearableFrom('wearable_hourly_snapshots')
+          .select('id')
+          .eq('patient_id', p.id as string)
+          .limit(1)
+        if (recent && recent.length > 0) {
+          activePatientIds.add(p.id as string)
+        }
       }
-    })
+    }
+
+    const livePatients = (liveData || [])
+      .filter((p: Record<string, unknown>) => activePatientIds.has(p.id as string))
+      .map((p: Record<string, unknown>) => {
+        const bm = (p.baseline_metrics as Record<string, unknown>) || {}
+        return {
+          id: p.id,
+          name: 'Steve Arbogast',
+          age: (bm.age as number) || null,
+          sex: (bm.sex as string) || null,
+          primary_diagnosis: (bm.primary_diagnosis as string) || 'Essential Tremor',
+          source: 'live',
+        }
+      })
+
+    // Deduplicate: if a patient exists as live, remove the demo version
+    const liveIds = new Set(livePatients.map((p: Record<string, unknown>) => p.id))
+    const dedupedDemo = demoPatients.filter((p: Record<string, unknown>) => !liveIds.has(p.id))
 
     // Live patients first so the real data is the default selection
-    return NextResponse.json({ patients: [...livePatients, ...demoPatients] })
+    return NextResponse.json({ patients: [...livePatients, ...dedupedDemo] })
   } catch (error: unknown) {
     console.error('Wearable patients API Error:', error)
     const rawMessage = error instanceof Error ? error.message : String(error)
