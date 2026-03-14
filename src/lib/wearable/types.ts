@@ -232,6 +232,58 @@ export interface FluencyAssessment {
   confidence_weighted_score?: number
 }
 
+// Spiral drawing assessment result (from SevaroMonitor iOS app)
+export interface SpiralHandResult {
+  hand: 'right' | 'left'
+  classification: string
+  classification_confidence: number
+  trials_completed: number
+  avg_tremor_amplitude_mm: number
+  avg_tremor_frequency_hz: number
+  avg_radial_deviation_mm: number
+  avg_drawing_speed_mm_per_sec: number
+  avg_smoothness_sparc: number
+  avg_spiral_tightness_ratio: number
+  avg_completion_ratio: number
+}
+
+export interface SpiralAssessment {
+  id: string
+  patient_id: string
+  assessed_at: string
+  composite_score: number
+  classification: string
+  classification_confidence: number
+  asymmetry_index: number
+  hands: SpiralHandResult[]
+  source_device: string
+}
+
+// Gait/ambulation assessment result (from SevaroMonitor iOS app)
+export interface GaitHandResult {
+  hand: 'left' | 'right'
+  cadence: number
+  step_count: number
+  freezing_count: number
+  step_regularity: number
+  duration_seconds: number
+  mean_acceleration_g: number
+  step_variability_cv: number
+  arm_swing_amplitude_g: number
+  dominant_frequency_hz: number
+}
+
+export interface GaitAssessment {
+  id: string
+  patient_id: string
+  assessed_at: string
+  composite_score: number
+  asymmetry_index: number
+  overall_cadence: number
+  hands: GaitHandResult[]
+  source_device: string
+}
+
 // Clinical narrative from two-stage AI analysis pipeline
 export interface SeverityFlag {
   metric: string
@@ -270,6 +322,8 @@ export interface WearableDemoData {
   assessments?: TremorAssessment[]
   fluencyAssessments?: FluencyAssessment[]
   tappingAssessments?: TappingAssessment[]
+  spiralAssessments?: SpiralAssessment[]
+  gaitAssessments?: GaitAssessment[]
   narratives?: ClinicalNarrative[]
   warnings?: string[]
 }

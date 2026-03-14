@@ -242,13 +242,15 @@ export async function GET(request: NextRequest) {
     // Use the right query function based on patient source
     const q = isLivePatient ? wearableFrom : from
 
-    const [summariesRes, anomaliesRes, alertsRes, assessmentsRes, fluencyRes, tappingRes, narrativesRes] = await Promise.all([
+    const [summariesRes, anomaliesRes, alertsRes, assessmentsRes, fluencyRes, tappingRes, spiralRes, gaitRes, narrativesRes] = await Promise.all([
       q('wearable_daily_summaries').select('*').eq('patient_id', patient.id).order('date', { ascending: true }),
       q('wearable_anomalies').select('*').eq('patient_id', patient.id).order('detected_at', { ascending: true }),
       q('wearable_alerts').select('*').eq('patient_id', patient.id).order('created_at', { ascending: true }),
       q('wearable_tremor_assessments').select('*').eq('patient_id', patient.id).order('assessed_at', { ascending: true }),
       q('wearable_fluency_assessments').select('*').eq('patient_id', patient.id).order('assessed_at', { ascending: true }),
       q('wearable_tapping_assessments').select('*').eq('patient_id', patient.id).order('assessed_at', { ascending: true }),
+      q('wearable_spiral_assessments').select('*').eq('patient_id', patient.id).order('assessed_at', { ascending: true }),
+      q('wearable_gait_assessments').select('*').eq('patient_id', patient.id).order('assessed_at', { ascending: true }),
       q('wearable_clinical_narratives').select('*').eq('patient_id', patient.id).order('created_at', { ascending: false }),
     ])
 
@@ -260,6 +262,8 @@ export async function GET(request: NextRequest) {
     if (assessmentsRes.error) { console.error('wearable_tremor_assessments query error:', assessmentsRes.error.message); warnings.push('tremor_assessments: ' + assessmentsRes.error.message) }
     if (fluencyRes.error) { console.error('wearable_fluency_assessments query error:', fluencyRes.error.message); warnings.push('fluency_assessments: ' + fluencyRes.error.message) }
     if (tappingRes.error) { console.error('wearable_tapping_assessments query error:', tappingRes.error.message); warnings.push('tapping_assessments: ' + tappingRes.error.message) }
+    if (spiralRes.error) { console.error('wearable_spiral_assessments query error:', spiralRes.error.message); warnings.push('spiral_assessments: ' + spiralRes.error.message) }
+    if (gaitRes.error) { console.error('wearable_gait_assessments query error:', gaitRes.error.message); warnings.push('gait_assessments: ' + gaitRes.error.message) }
     if (narrativesRes.error) { console.error('wearable_clinical_narratives query error:', narrativesRes.error.message); warnings.push('clinical_narratives: ' + narrativesRes.error.message) }
 
     // Merge daily summaries with hourly snapshot aggregates:
@@ -290,14 +294,25 @@ export async function GET(request: NextRequest) {
           const existingHr = m?.avg_hr ?? m?.avgHr
           if ((existingHr == null || Number(existingHr) === 0) && hourlyByDate.has(dateKey)) {
             const hourly = hourlyByDate.get(dateKey)!
-            return { ...s, metrics: { ...m, ...(hourly.metrics as Record<string, unknown>) } }
+            // Only overlay non-null hourly values — preserve sleep/other fields from daily summary
+            const hourlyMetrics = hourly.metrics as Record<string, unknown>
+            const merged = { ...m }
+            for (const [key, val] of Object.entries(hourlyMetrics)) {
+              if (val != null && val !== 0) merged[key] = val
+            }
+            return { ...s, metrics: merged }
           }
           return s
         })
 
-        // Append synthetic rows for hourly-only dates (older history with no daily summary)
+        // Append synthetic rows for hourly-only dates, but ONLY within the range
+        // of existing daily summaries. Without this limit, hourly data going back
+        // months creates hundreds of sleep-less rows that drown out the actual sleep bars.
+        const sortedDailyDates = [...dailyDates].sort()
+        const earliestDaily = sortedDailyDates[0]
+        const latestDaily = sortedDailyDates[sortedDailyDates.length - 1]
         for (const [date, hourly] of hourlyByDate) {
-          if (!dailyDates.has(date)) {
+          if (!dailyDates.has(date) && date >= earliestDaily && date <= latestDaily) {
             rawSummaries.push(hourly)
           }
         }
@@ -334,6 +349,8 @@ export async function GET(request: NextRequest) {
       assessments: assessmentsRes.data || [],
       fluencyAssessments: fluencyRes.data || [],
       tappingAssessments: (tappingRes.data || []).map((a: any) => normalizeTappingAssessment(a as Record<string, unknown>)),
+      spiralAssessments: spiralRes.data || [],
+      gaitAssessments: gaitRes.data || [],
       narratives: narrativesRes.data || [],
       ...(warnings.length > 0 ? { warnings } : {}),
     })
