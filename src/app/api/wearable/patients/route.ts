@@ -23,7 +23,9 @@ export async function GET() {
     return NextResponse.json({ patients })
   } catch (error: unknown) {
     console.error('Wearable patients API Error:', error)
-    const message = error instanceof Error ? error.message : 'Failed to load patients'
+    const rawMessage = error instanceof Error ? error.message : String(error)
+    const isDbError = rawMessage.includes('authentication failed') || rawMessage.includes('ECONNREFUSED') || rawMessage.includes('timeout') || rawMessage.includes('getaddrinfo')
+    const message = isDbError ? 'Unable to connect to the data service. Please try again later.' : rawMessage
     return NextResponse.json({ error: message }, { status: 500 })
   }
 }

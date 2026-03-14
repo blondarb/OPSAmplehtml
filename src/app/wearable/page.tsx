@@ -297,17 +297,36 @@ export default function WearablePage() {
             {error}
           </p>
           <button
-            onClick={() => {
+            onClick={async () => {
               setError(null)
               setLoading(true)
-              fetch(`/api/wearable/demo-data${selectedPatientId ? `?patient_id=${selectedPatientId}` : ''}`)
-                .then(res => {
-                  if (!res.ok) throw new Error('Failed to load')
-                  return res.json()
-                })
-                .then(json => setData(json))
-                .catch(err => setError(err instanceof Error ? err.message : 'Failed to load'))
-                .finally(() => setLoading(false))
+              try {
+                // Re-run full init: fetch patients, then data
+                const pRes = await fetch('/api/wearable/patients')
+                let patientId = selectedPatientId
+                if (pRes.ok) {
+                  const pJson = await pRes.json()
+                  const patientList = pJson.patients || []
+                  setPatients(patientList)
+                  if (!patientId && patientList.length > 0) {
+                    patientId = patientList[0].id
+                    setSelectedPatientId(patientId)
+                  }
+                }
+                const dRes = await fetch(`/api/wearable/demo-data${patientId ? `?patient_id=${patientId}` : ''}`)
+                if (!dRes.ok) {
+                  const body = await dRes.json().catch(() => ({}))
+                  throw new Error(body.error || 'Failed to load wearable data')
+                }
+                const json = await dRes.json()
+                setData(json)
+                setLastUpdated(new Date())
+                autoGenerateNarratives(json)
+              } catch (err) {
+                setError(err instanceof Error ? err.message : 'Failed to load')
+              } finally {
+                setLoading(false)
+              }
             }}
             style={{
               padding: '10px 28px',
