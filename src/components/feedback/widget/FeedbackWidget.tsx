@@ -189,44 +189,66 @@ export function FeedbackWidget({ appId, apiUrl, user, position = 'bottom-right',
     );
   }
 
-  // Idle state — floating button
+  // Idle state — compact floating icon that expands on hover
   if (widgetState === 'idle' && !isExpanded) {
     return (
       <div data-feedback-widget style={{ ...positionStyle, position: 'fixed', zIndex: 99999 }}>
         <button
           onClick={() => setIsExpanded(true)}
+          className="feedback-idle-btn"
           style={{
             display: 'flex',
             alignItems: 'center',
-            gap: 8,
-            padding: '10px 18px',
-            borderRadius: 24,
+            gap: 0,
+            padding: '10px',
+            borderRadius: 20,
             border: 'none',
             backgroundColor: '#0D9488',
             color: '#fff',
-            fontSize: 14,
+            fontSize: 13,
             fontWeight: 600,
             fontFamily: 'system-ui, sans-serif',
             cursor: 'pointer',
-            boxShadow: '0 4px 12px rgba(13, 148, 136, 0.3)',
-            transition: 'transform 0.15s, box-shadow 0.15s',
+            boxShadow: '0 3px 10px rgba(13, 148, 136, 0.25)',
+            transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
+            overflow: 'hidden',
+            whiteSpace: 'nowrap',
           }}
           onMouseEnter={(e) => {
-            e.currentTarget.style.transform = 'scale(1.05)';
-            e.currentTarget.style.boxShadow = '0 6px 16px rgba(13, 148, 136, 0.4)';
+            e.currentTarget.style.padding = '10px 16px';
+            e.currentTarget.style.gap = '7px';
+            e.currentTarget.style.boxShadow = '0 5px 14px rgba(13, 148, 136, 0.35)';
           }}
           onMouseLeave={(e) => {
-            e.currentTarget.style.transform = 'scale(1)';
-            e.currentTarget.style.boxShadow = '0 4px 12px rgba(13, 148, 136, 0.3)';
+            e.currentTarget.style.padding = '10px';
+            e.currentTarget.style.gap = '0px';
+            e.currentTarget.style.boxShadow = '0 3px 10px rgba(13, 148, 136, 0.25)';
           }}
         >
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <svg style={{ flexShrink: 0 }} width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z" />
             <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
             <line x1="12" y1="19" x2="12" y2="22" />
           </svg>
-          Give Feedback
+          <span
+            className="feedback-label"
+            style={{
+              maxWidth: 0,
+              opacity: 0,
+              transition: 'max-width 0.25s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.2s ease',
+              overflow: 'hidden',
+              display: 'inline-block',
+            }}
+          >
+            Feedback
+          </span>
         </button>
+        <style>{`
+          .feedback-idle-btn:hover .feedback-label {
+            max-width: 100px !important;
+            opacity: 1 !important;
+          }
+        `}</style>
       </div>
     );
   }
