@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation'
 import TopNav from './TopNav'
 import LeftSidebar from './LeftSidebar'
 import CenterPanel from './CenterPanel'
+import { AcuteIconNav, AcuteTopBar, AcuteActionBar, AcutePatientPanel, AcuteBreadcrumb } from './acute-care'
 import AiDrawer from './AiDrawer'
 import VoiceDrawer from './VoiceDrawer'
 import DotPhrasesDrawer from './DotPhrasesDrawer'
@@ -1396,144 +1397,104 @@ export default function ClinicalNote({
   }, [currentVisit])
 
   return (
-    <div className="app-container" style={{ display: 'flex', flexDirection: 'column', height: '100vh' }}>
-      <TopNav
-        user={user}
-        onSignOut={handleSignOut}
-        openAiDrawer={openAiDrawer}
+    <div className="app-container" style={{ display: 'flex', height: '100vh', background: '#f4f4f4' }}>
+      {/* Acute Care Icon Nav */}
+      <AcuteIconNav
+        activeIcon={activeIcon}
+        setActiveIcon={setActiveIcon}
+        viewMode={viewMode}
+        onViewModeChange={setViewMode}
         onOpenSettings={() => setSettingsOpen(true)}
-        onOpenIdeas={() => setIdeasDrawerOpen(true)}
-        onToggleSidebar={() => setMobileSidebarOpen(!mobileSidebarOpen)}
-        isSidebarOpen={mobileSidebarOpen}
-        onResetDemo={handleResetDemo}
-      />
-
-      {/* Urgency Banner - visible across all views when critical items exist */}
-      <UrgencyBanner
-        counts={{
+        notificationCounts={{
+          total: notifCounts.total,
           critical: notifCounts.critical,
-          wearableAlerts: notifCounts.wearableAlerts,
           patientMessages: notifCounts.patientMessages,
-          consultRequests: notifCounts.consultRequests,
+          providerMessages: 3,
           incompleteDocs: notifCounts.incompleteDocs,
         }}
-        onFilterCategory={(category) => {
-          setViewMode('cockpit')
-          setActiveIcon('home')
-        }}
       />
 
-      <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
-        {/* Icon Sidebar */}
-        <IconSidebar
-          activeIcon={activeIcon}
-          setActiveIcon={setActiveIcon}
-          viewMode={viewMode}
-          onViewModeChange={setViewMode}
+      {/* Main content area */}
+      <div style={{ display: 'flex', flex: 1, overflow: 'hidden', flexDirection: 'column' }}>
+        {/* Top Bar */}
+        <AcuteTopBar
+          user={user}
+          patient={patient}
+          onSignOut={handleSignOut}
           onOpenSettings={() => setSettingsOpen(true)}
-          notificationCounts={{
-            total: notifCounts.total,
-            critical: notifCounts.critical,
-            patientMessages: notifCounts.patientMessages,
-            providerMessages: 3, // Demo: 3 unread provider messages
-            incompleteDocs: notifCounts.incompleteDocs,
-          }}
+          onToggleSidebar={() => setMobileSidebarOpen(!mobileSidebarOpen)}
         />
 
-        {/* Main Content Area - Switch between Cockpit, Appointments, and Chart view */}
-        <div style={{ display: 'flex', flexDirection: 'column', flex: 1, overflow: 'hidden' }}>
-        {/* Breadcrumb bar: shown when navigated away from cockpit, only if cockpit was the landing view */}
-        {viewMode !== 'cockpit' && initialViewMode === 'cockpit' && (
-          <div style={{
-            padding: '8px 16px',
-            borderBottom: '1px solid var(--border)',
-            display: 'flex', alignItems: 'center', gap: '8px',
-            background: 'var(--bg-white)',
-          }}>
-            <button
-              onClick={() => setViewMode('cockpit')}
-              style={{
-                background: 'none', border: 'none', cursor: 'pointer',
-                color: 'var(--text-muted)', padding: '2px',
-                display: 'flex', alignItems: 'center',
-              }}
-              title="Back to Cockpit"
-            >
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <polyline points="15 18 9 12 15 6"/>
-              </svg>
-            </button>
-            <button
-              onClick={() => setViewMode('cockpit')}
-              style={{
-                background: 'none', border: 'none', cursor: 'pointer',
-                color: '#0D9488', fontSize: '13px', fontWeight: 500, padding: 0,
-              }}
-            >
-              Clinical Cockpit
-            </button>
-            <span style={{ color: 'var(--text-muted)', fontSize: '13px' }}>&gt;</span>
-            <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)' }}>
-              {patient ? `${patient.first_name || ''} ${patient.last_name || ''}`.trim() || patient.name || 'Patient' : 'Patient'}
-            </span>
-          </div>
-        )}
-        {viewMode === 'cockpit' ? (
-          <PhysicianHome
-            onSelectPatient={(aptId) => {
-              // From cockpit demo data, switch to appointments view to select
-              // In production, this would look up the appointment by ID
-              setViewMode('appointments')
-              setActiveIcon('home')
-            }}
-            onScheduleNew={() => setScheduleNewPatientOpen(true)}
-            onScheduleFollowup={() => setFollowupModalOpen(true)}
-          />
-        ) : viewMode === 'appointments' ? (
-          <PatientAppointments
-            onSelectPatient={handleSelectPatient}
-            onScheduleNew={() => setScheduleNewPatientOpen(true)}
-            demoHint={demoHint}
-            onDismissHint={() => setDemoHint(null)}
-            refreshKey={appointmentsRefreshKey}
-          />
-        ) : loadingPatient ? (
-          <div style={{
-            flex: 1,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            flexDirection: 'column',
-            gap: '16px',
-          }}>
-            <div style={{
-              width: '48px',
-              height: '48px',
-              border: '3px solid var(--border)',
-              borderTop: '3px solid var(--primary)',
-              borderRadius: '50%',
-              animation: 'spin 1s linear infinite',
-            }} />
-            <p style={{ color: 'var(--text-muted)', fontSize: '14px' }}>Loading patient chart...</p>
-          </div>
-        ) : (
-          <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
-            <LeftSidebar
+        <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
+          {/* Patient Panel (left) */}
+          {viewMode === 'chart' && !loadingPatient && (
+            <AcutePatientPanel
               patient={patient}
               priorVisits={priorVisits}
               scoreHistory={scoreHistory}
-              patientMessages={patientMessages}
-              patientIntakeForms={patientIntakeForms}
-              historianSessions={patientHistorianSessions}
-              onImportHistorian={handleImportHistorian}
-              onImportIntake={handleImportIntake}
-              isOpen={mobileSidebarOpen}
-              onClose={() => setMobileSidebarOpen(false)}
               medications={medications}
               allergies={allergies}
             />
+          )}
 
-            <CenterPanel
+          {/* Center content */}
+          <div style={{ display: 'flex', flexDirection: 'column', flex: 1, overflow: 'hidden' }}>
+            {/* Breadcrumb + Action Bar for chart view */}
+            {viewMode === 'chart' && !loadingPatient && (
+              <>
+                <AcuteBreadcrumb
+                  patient={patient}
+                  onBack={() => { setViewMode('cockpit'); setActiveIcon('home'); }}
+                />
+                <AcuteActionBar
+                  activeTab="history"
+                  onTabChange={() => {}}
+                  onPend={handlePend}
+                  onSignComplete={handleSignComplete}
+                  openAiDrawer={openAiDrawer}
+                />
+              </>
+            )}
+
+            {viewMode === 'cockpit' ? (
+              <PhysicianHome
+                onSelectPatient={(aptId) => {
+                  setViewMode('appointments')
+                  setActiveIcon('home')
+                }}
+                onScheduleNew={() => setScheduleNewPatientOpen(true)}
+                onScheduleFollowup={() => setFollowupModalOpen(true)}
+              />
+            ) : viewMode === 'appointments' ? (
+              <PatientAppointments
+                onSelectPatient={handleSelectPatient}
+                onScheduleNew={() => setScheduleNewPatientOpen(true)}
+                demoHint={demoHint}
+                onDismissHint={() => setDemoHint(null)}
+                refreshKey={appointmentsRefreshKey}
+              />
+            ) : loadingPatient ? (
+              <div style={{
+                flex: 1,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                flexDirection: 'column',
+                gap: '16px',
+              }}>
+                <div style={{
+                  width: '48px',
+                  height: '48px',
+                  border: '3px solid var(--border)',
+                  borderTop: '3px solid var(--primary)',
+                  borderRadius: '50%',
+                  animation: 'spin 1s linear infinite',
+                }} />
+                <p style={{ color: 'var(--text-muted)', fontSize: '14px' }}>Loading patient chart...</p>
+              </div>
+            ) : (
+              <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
+                <CenterPanel
               noteData={noteData}
               updateNote={updateNote}
               currentVisit={currentVisit}
@@ -1573,6 +1534,7 @@ export default function ClinicalNote({
             />
           </div>
         )}
+          </div>
         </div>
       </div>
 

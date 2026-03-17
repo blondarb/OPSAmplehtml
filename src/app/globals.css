@@ -3,19 +3,58 @@
 @tailwind utilities;
 
 :root {
-  /* Sevaro Color System */
-  --primary: #0D9488;
-  --primary-light: #14B8A6;
-  --primary-dark: #0F766E;
+  /* === Figma Acute Care Design Tokens === */
+
+  /* Surface tokens */
+  --surface-widget: #ffffff;
+  --surface-primary: #0c0f14;
+  --surface-2x-light: #f1f1f1;
+  --surface-x-light: #dedede;
+  --surface-input: #ffffff;
+  --surface-toggle-bg: #f1f1f1;
+  --surface-toggle-selected: #ffffff;
+  --surface-error-faint: rgba(239,68,68,0.08);
+  --surface-error-dark: #a91c1c;
+  --surface-success-faint: rgba(34,197,94,0.08);
+  --surface-info-faint: rgba(59,130,246,0.08);
+  --surface-neutral-faint: rgba(12,15,20,0.04);
+  --surface-link: #0c0f14;
+
+  /* Text tokens */
+  --text-heading: #0c0f14;
+  --text-body: #0c0f14;
+  --text-caption: #696a70;
+  --text-on-primary: #f1f1f1;
+  --text-input-label: #696a70;
+  --text-error: #7f1d1d;
+  --text-success: #14532b;
+  --text-info: #1e478a;
+  --text-avatar: #696a70;
+
+  /* Border tokens */
+  --border-x-light: #dedede;
+  --border-input: #cacaca;
+  --border-secondary: #cacaca;
+  --border-4x-light: #f9f9f9;
+
+  /* Radius tokens */
+  --radius-round: 80px;
+  --radius-2xs: 4px;
+  --radius-widget: 8px;
+
+  /* Legacy aliases (backward compat — used throughout existing components) */
+  --primary: #0c0f14;
+  --primary-light: #2d3748;
+  --primary-dark: #000000;
   --bg-white: #FFFFFF;
   --bg-gray: #F9FAFB;
   --bg-dark: #F3F4F6;
-  --text-primary: #111827;
-  --text-secondary: #6B7280;
+  --text-primary: #0c0f14;
+  --text-secondary: #696a70;
   --text-muted: #9CA3AF;
-  --border: #E5E7EB;
+  --border: #dedede;
   --error: #EF4444;
-  --success: #10B981;
+  --success: #22c55e;
   --warning: #F59E0B;
   --info: #3B82F6;
 
@@ -111,7 +150,7 @@
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: 'Inter', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+  font-family: var(--font-nunito-sans), 'Nunito Sans', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
   font-size: var(--base-font-size, 14px);
   line-height: 1.5;
 }
@@ -186,12 +225,285 @@ button {
 }
 
 a {
-  color: var(--primary);
+  color: var(--surface-primary);
   text-decoration: none;
 }
 
 a:hover {
   text-decoration: underline;
+}
+
+/* ============================================
+   FIGMA DESIGN SYSTEM — UTILITY CLASSES
+   ============================================ */
+
+/* Widget cards */
+.widget-card {
+  background: var(--surface-widget);
+  border-radius: var(--radius-widget);
+  padding: 16px;
+}
+
+/* Pill buttons */
+.pill-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 7px 12px;
+  border-radius: var(--radius-round);
+  font-family: inherit;
+  font-weight: 700;
+  font-size: 14px;
+  line-height: 18px;
+  cursor: pointer;
+  transition: opacity 0.15s;
+  border: none;
+}
+
+.pill-btn:hover { opacity: 0.85; }
+
+.pill-btn-primary {
+  background: var(--surface-primary);
+  color: var(--text-on-primary);
+}
+
+.pill-btn-outline {
+  background: transparent;
+  border: 0.5px solid var(--border-secondary);
+  color: var(--text-body);
+}
+
+.pill-btn-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border-radius: var(--radius-round);
+  border: 0.5px solid var(--border-secondary);
+  background: transparent;
+  color: var(--text-body);
+  cursor: pointer;
+  padding: 10px;
+}
+
+.pill-btn-icon:hover { background: var(--surface-2x-light); }
+
+/* Tags / badges */
+.tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 8px;
+  border-radius: var(--radius-2xs);
+  font-weight: 500;
+  font-size: 12px;
+  line-height: 16px;
+}
+
+.tag-error { background: var(--surface-error-faint); color: var(--text-error); }
+.tag-success { background: var(--surface-success-faint); color: var(--text-success); }
+.tag-info { background: var(--surface-info-faint); color: var(--text-info); }
+.tag-neutral { background: var(--surface-neutral-faint); color: var(--text-caption); }
+
+.badge-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 4px;
+  border-radius: var(--radius-round);
+  background: var(--surface-error-dark);
+  color: white;
+  font-weight: 700;
+  font-size: 12px;
+  line-height: 16px;
+}
+
+.badge-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: var(--radius-round);
+  background: var(--error);
+}
+
+/* Pill toggle group */
+.pill-toggle-group {
+  display: inline-flex;
+  align-items: center;
+  background: var(--surface-toggle-bg);
+  border-radius: var(--radius-round);
+  padding: 2px;
+}
+
+.pill-toggle-tab {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 8px 16px;
+  height: 40px;
+  border-radius: var(--radius-round);
+  font-weight: 500;
+  font-size: 16px;
+  line-height: 20px;
+  color: var(--text-body);
+  cursor: pointer;
+  background: transparent;
+  border: none;
+  transition: all 0.15s;
+}
+
+.pill-toggle-tab.active {
+  background: var(--surface-toggle-selected);
+  font-weight: 700;
+  box-shadow: 0px 1px 4px 0px rgba(12,15,20,0.08);
+}
+
+/* Separator */
+.separator-line {
+  width: 100%;
+  height: 0.5px;
+  background: var(--surface-x-light);
+}
+
+/* Avatar circle */
+.avatar-circle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-round);
+  font-weight: 700;
+  color: var(--text-avatar);
+  flex-shrink: 0;
+}
+
+.avatar-circle-sm { width: 32px; height: 32px; font-size: 12px; line-height: 16px; }
+.avatar-circle-md { width: 48px; height: 48px; font-size: 16px; line-height: 20px; }
+
+/* Section header (widget) */
+.widget-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 28px;
+}
+
+.widget-header-title {
+  flex: 1;
+  font-weight: 700;
+  font-size: 16px;
+  line-height: 20px;
+  color: var(--text-heading);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Floating label input */
+.input-figma {
+  position: relative;
+  width: 100%;
+}
+
+.input-figma input,
+.input-figma textarea {
+  width: 100%;
+  padding: 16px;
+  border: 0.5px solid var(--border-input);
+  border-radius: var(--radius-widget);
+  background: var(--surface-input);
+  font-size: 14px;
+  line-height: 18px;
+  color: var(--text-body);
+  font-family: inherit;
+  font-weight: 500;
+}
+
+.input-figma input:focus,
+.input-figma textarea:focus {
+  outline: none;
+  border-color: var(--surface-primary);
+}
+
+.input-figma label {
+  position: absolute;
+  top: -8px;
+  left: 12px;
+  padding: 0 4px;
+  background: var(--surface-input);
+  font-size: 12px;
+  line-height: 16px;
+  color: var(--text-input-label);
+  font-weight: 500;
+}
+
+/* Timeline item */
+.timeline-item {
+  display: flex;
+  gap: 8px;
+  padding: 8px;
+  align-items: flex-start;
+}
+
+.timeline-icon {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.timeline-icon-circle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: var(--radius-round);
+  padding: 11px;
+}
+
+.timeline-icon-circle.success { background: var(--surface-success-faint); }
+.timeline-icon-circle.neutral { background: var(--surface-neutral-faint); }
+
+.timeline-connector {
+  width: 0.5px;
+  height: 8px;
+  background: var(--surface-x-light);
+}
+
+.timeline-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  min-height: 40px;
+}
+
+.timeline-label {
+  font-weight: 500;
+  font-size: 12px;
+  line-height: 16px;
+  color: var(--text-caption);
+}
+
+.timeline-date {
+  font-weight: 500;
+  font-size: 14px;
+  line-height: 18px;
+  color: var(--text-body);
+}
+
+/* Circle separator (dot between items) */
+.dot-separator {
+  width: 4px;
+  height: 4px;
+  border-radius: 2px;
+  background: var(--surface-2x-light);
+  flex-shrink: 0;
 }
 
 /* ============================================
