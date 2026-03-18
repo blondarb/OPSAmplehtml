@@ -18,6 +18,7 @@
     "@aws-sdk/client-bedrock-runtime": "^3.1003.0",
     "@aws-sdk/client-secrets-manager": "^3.1003.0",
     "@aws-sdk/client-transcribe-streaming": "^3.1010.0",
+    "@aws-sdk/credential-providers": "^3.1011.0",
     "@deepgram/sdk": "^4.11.3",
     "@sevaro/feedback": "file:./packages/feedback",
     "amazon-cognito-identity-js": "^6.3.16",
