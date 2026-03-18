@@ -548,7 +548,7 @@ function useScreenshotAnnotation(uploadScreenshot) {
       boxShadow: "0 2px 8px rgba(0,0,0,0.2)",
       display: "none"
     });
-    tooltip.textContent = "Click to annotate this area";
+    tooltip.textContent = "Click to highlight what you\u2019re talking about";
     document.body.appendChild(tooltip);
     const highlight = document.createElement("div");
     Object.assign(highlight.style, {
