@@ -1,4 +1,15 @@
 # Figma design system URL (not a secret)
 2SvpMV4WE5CFjxvsxTRg1w
-# pnpm lockfile integrity hashes (not secrets)
+# Lockfile integrity hashes (not secrets)
 resolution:.*integrity:.*sha512-
+"integrity": "sha512-
+# Source file paths containing 40+ char strings
+src/components/neuroscribe/
+# Documentation URLs and references
+docs.aws.amazon.com
+docs/plans/
+docs/HANDOFF_
+docs/SEVARO_EVIDENCE_ENGINE_PLAYBOOK
+docs/NEUROSCRIBE_WORKFLOW_REDESIGN
+# Data file content
+data/plans.json

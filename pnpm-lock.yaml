@@ -21,8 +21,8 @@ importers:
         specifier: ^4.11.3
         version: 4.11.3
       '@sevaro/feedback':
-        specifier: link:../sevaro-feedback
-        version: link:../sevaro-feedback
+        specifier: file:./packages/feedback
+        version: file:packages/feedback(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
       amazon-cognito-identity-js:
         specifier: ^6.3.16
         version: 6.3.16
@@ -728,6 +728,12 @@ packages:
 
   '@rushstack/eslint-patch@1.16.1':
     resolution: {integrity: sha512-TvZbIpeKqGQQ7X0zSCvPH9riMSFQFSggnfBjFZ1mEoILW+UuXCKwOoPcgjMwiUtRqFZ8jWhPJc4um14vC6I4ag==}
+
+  '@sevaro/feedback@file:packages/feedback':
+    resolution: {directory: packages/feedback, type: directory}
+    peerDependencies:
+      react: '>=18.0.0'
+      react-dom: '>=18.0.0'
 
   '@smithy/abort-controller@4.2.12':
     resolution: {integrity: sha512-xolrFw6b+2iYGl6EcOL7IJY71vvyZ0DJ3mcKtpykqPe2uscwtzDZJa1uVQXyP7w9Dd+kGwYnPbMsJrGISKiY/Q==}
@@ -4133,6 +4139,11 @@ snapshots:
   '@rtsao/scc@1.1.0': {}
 
   '@rushstack/eslint-patch@1.16.1': {}
+
+  '@sevaro/feedback@file:packages/feedback(react-dom@18.3.1(react@18.3.1))(react@18.3.1)':
+    dependencies:
+      react: 18.3.1
+      react-dom: 18.3.1(react@18.3.1)
 
   '@smithy/abort-controller@4.2.12':
     dependencies:
