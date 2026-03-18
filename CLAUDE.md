@@ -598,22 +598,23 @@ Full changelog: [`docs/CHANGELOG.md`](docs/CHANGELOG.md)
 **Status**: Active
 
 ### Recent
+- Shared feedback widget integration with streaming dictation + AI historian PRD (PR #83)
+- Redesigned EHR page with Figma Acute Care design system (PR #82)
+- Bundled @sevaro/feedback locally for Amplify builds (PR #84)
+- Feedback icon shrink with hover expand and user identity wiring (PR #81)
 - Spiral and gait assessment display components with RDS queries
 - Live patient switcher with demo patients (Steve Arbogast + Linda Martinez)
-- Fixed sleep data visibility and assessment queries
 - Migrated from npm to pnpm
-- AI triage scoring with Bedrock Converse API (cross-region inference, truncated JSON handling)
 
 ### In Progress
 - AWS Amplify migration (most infra migrated, Cognito auth active, RDS for new features)
-- Real-time transcription display (partial — post-recording only, not live streaming)
 - Diagnosis plan coverage expansion (98 plans in DB, 148/166 diagnoses covered)
 
 ### Planned
+- Real-time voice streaming during encounters
 - Speaker diarization UI (P2)
 - Recommendation reconciliation engine (P2)
 - Inpatient clinical scales (GCS, mRS, FOUR Score, Hunt & Hess, ICH, CAM-ICU, RASS)
-- Real-time voice streaming during encounters
 
 ### Known Issues
 - Supabase still used for database and auth (legacy) — eventual migration to RDS/Cognito
