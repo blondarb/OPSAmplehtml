@@ -19,7 +19,7 @@
     "@aws-sdk/client-secrets-manager": "^3.1003.0",
     "@aws-sdk/client-transcribe-streaming": "^3.1010.0",
     "@deepgram/sdk": "^4.11.3",
-    "@sevaro/feedback": "link:../sevaro-feedback",
+    "@sevaro/feedback": "file:./packages/feedback",
     "amazon-cognito-identity-js": "^6.3.16",
     "framer-motion": "^12.34.3",
     "jose": "^6.2.0",
