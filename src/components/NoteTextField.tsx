@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect, useCallback } from 'react'
 import InlinePhrasePicker from './InlinePhrasePicker'
-import { useVoiceRecorder } from '@/hooks/useVoiceRecorder'
+import { useStreamingDictation } from '@/hooks/useStreamingDictation'
 
 type FieldActionType = 'improve' | 'expand' | 'summarize'
 
@@ -61,17 +61,19 @@ export default function NoteTextField({
   const [aiLoading, setAiLoading] = useState(false)
   const [aiError, setAiError] = useState<string | null>(null)
 
-  // Voice recording hook
+  // Voice recording hook — uses AWS Transcribe Streaming for real-time transcription
   const {
     isRecording,
     isTranscribing,
     error: recordingError,
     transcribedText,
     rawText,
+    streamingTranscript,
+    isStreaming,
     startRecording,
     stopRecording,
     clearTranscription,
-  } = useVoiceRecorder()
+  } = useStreamingDictation()
 
   // Insert transcribed text when available
   useEffect(() => {
@@ -320,16 +322,34 @@ export default function NoteTextField({
         }}
       />
 
-      {/* Recording Waveform Overlay */}
+      {/* Recording Waveform Overlay — shows live transcript when streaming */}
       {isRecording && (
-        <div className="recording-waveform active">
-          {[...Array(10)].map((_, i) => (
+        <div className="recording-waveform active" style={streamingTranscript ? {
+          flexDirection: 'column',
+          alignItems: 'flex-start',
+          padding: '8px 12px',
+          gap: '6px',
+        } : undefined}>
+          {!streamingTranscript && [...Array(10)].map((_, i) => (
             <div key={i} className="wave-bar" />
           ))}
-          <div className="recording-text">
+          <div className="recording-text" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
             <span className="rec-dot" />
-            Recording...
+            {isStreaming ? 'Live Transcribing...' : 'Recording...'}
           </div>
+          {streamingTranscript && (
+            <div style={{
+              fontSize: '13px',
+              lineHeight: 1.5,
+              color: 'var(--text-secondary, #374151)',
+              maxHeight: '80px',
+              overflowY: 'auto',
+              width: '100%',
+              opacity: 0.9,
+            }}>
+              {streamingTranscript}
+            </div>
+          )}
         </div>
       )}
 

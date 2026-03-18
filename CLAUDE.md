@@ -1,5 +1,10 @@
 # Sevaro Clinical - AI-Powered Clinical Documentation
 
+## Design System (MANDATORY)
+- **Reference:** `~/dev/repos/sevaro-design-system/DESIGN_SYSTEM.md` — all colors, typography, components
+- **Figma:** [Sevaro Design System](https://www.figma.com/design/2SvpMV4WE5CFjxvsxTRg1w/Sevaro-Design-System) (file key: `2SvpMV4WE5CFjxvsxTRg1w`)
+- All UI must match the design system 1:1. Read the reference doc before building any UI component.
+
 ## Deploy Workflow (OPSAmple)
 
 **Push-to-deploy is enabled.** After making code changes:
