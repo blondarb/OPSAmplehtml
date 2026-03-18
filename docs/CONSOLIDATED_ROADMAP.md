@@ -1,7 +1,7 @@
 # Consolidated Roadmap - Sevaro Clinical
 
-**Version:** 1.7
-**Last Updated:** February 3, 2026 (Follow-up visit workflow, plan sync, ICD-10 matching, Sign & Complete fixes)
+**Version:** 1.8
+**Last Updated:** March 17, 2026 (Phase 10: Advanced Clinical Workflows & Neuro OS Foundation — stakeholder feedback integration)
 **Purpose:** Single source of truth consolidating all phases across PRDs
 
 ---
@@ -571,6 +571,96 @@ From live testing session. Items organized by priority tier.
 | Run log template | ✅ COMPLETE | qa/runs/RUN_TEMPLATE.md |
 | First test run | ✅ COMPLETE | qa/runs/RUN-2026-01-30-001.md (GO) |
 | CLAUDE.md QA rules | ✅ COMPLETE | Rules-of-engagement section added |
+
+---
+
+## Phase 10: Advanced Clinical Workflows & Neuro OS Foundation
+
+**Source:** Stakeholder feedback session (March 17, 2026) during OPSAmple demo. Key themes: multimodal patient intake, post-discharge billing compliance, patient engagement automation, and Neuro OS SaaS positioning.
+
+### 10.1 Multimodal Patient Intake (Historian Enhancement)
+
+Extends the AI Neurologic Historian (Phase 8) with visual/interactive intake alongside voice.
+
+| Feature | Status | Priority | Notes |
+|---------|--------|----------|-------|
+| Interactive body diagram component (SVG) | ⏳ PENDING | P0 | Tap-to-locate pain/symptoms on head, spine, body |
+| Companion app model (phone + visual) | ⏳ PENDING | P1 | AI calls patient on phone, instructs them to open app for visual interaction |
+| Sequential descriptor questioning | ⏳ PENDING | P0 | One descriptor at a time: throbbing? pulsating? electric? radiating? |
+| Patient-adaptive pacing | ⏳ PENDING | P1 | Adjust question complexity/speed based on age, comorbidities, cognitive status |
+| Symptom location documentation | ⏳ PENDING | P0 | Store tap locations as structured data (body region, coordinates) |
+| Visual descriptor cards | ⏳ PENDING | P1 | Show images/animations for pain descriptors patients can select |
+| `patient_intake_diagrams` table | ⏳ PENDING | P0 | Schema for body map tap data linked to historian sessions |
+
+**Clinical rationale:** Patients often cannot verbalize symptoms in a doctor's office — they forget, they struggle with descriptors. Pain clinics have long used circle-the-area diagrams. This brings that paradigm into the AI historian flow.
+
+### 10.2 Post-Discharge Contact Tracking & TCM Compliance
+
+Extends the Follow-Up Agent with structured contact attempt tracking and billing compliance monitoring.
+
+| Feature | Status | Priority | Notes |
+|---------|--------|----------|-------|
+| Contact attempt tracking | ⏳ PENDING | P0 | `contact_attempts` JSONB: timestamp, method, outcome, notes |
+| Attempted vs. successful status column | ⏳ PENDING | P0 | Visual queue showing contact outcomes per patient |
+| TCM 2-day first-contact alert | ⏳ PENDING | P0 | Alert when window closing for initial post-discharge contact |
+| TCM 14-day F2F scheduling check | ⏳ PENDING | P0 | Track whether face-to-face follow-up is scheduled within window |
+| Auto-retry scheduling | ⏳ PENDING | P1 | `next_retry_scheduled_at` — don't lose track of unreachable patients |
+| CPT compliance dashboard | ⏳ PENDING | P1 | Per-patient view of TCM/CCM/RPM code requirements vs. status |
+| Discharge-triggered workflow | ⏳ PENDING | P1 | Auto-create follow-up tasks based on discharge date + diagnosis |
+| Revenue opportunity tracker | ⏳ PENDING | P2 | Summary of billable codes earned vs. missed across patient panel |
+
+**Billing context:**
+- **TCM** (Transition Care Management): First contact within 2 business days post-discharge; F2F appointment within 14 days
+- **CCM** (Chronic Care Management): 20+ minutes/month of care coordination
+- **RPM** (Remote Patient Monitoring): Device setup + 16 days/month of readings + 20 min clinical review
+- Each has separate CPT codes — meeting timing windows is critical for reimbursement
+
+### 10.3 Patient Engagement & "Love Taps"
+
+Inspired by ChenMed's wellness call model — automated patient outreach maintaining human connection.
+
+| Feature | Status | Priority | Notes |
+|---------|--------|----------|-------|
+| Wellness check-in queue | ⏳ PENDING | P1 | Separate from clinical follow-up — "How are you doing?" calls |
+| Appointment reminder + barrier detection | ⏳ PENDING | P1 | Identify why patients miss appointments (no ride, forgot, etc.) |
+| Engagement scoring | ⏳ PENDING | P2 | Track patient responsiveness over time |
+| Caregiver outreach | ⏳ PENDING | P2 | Contact designated caregiver when patient unreachable |
+| Proactive care gap detection | ⏳ PENDING | P2 | Flag patients overdue for follow-up, labs, imaging |
+
+### 10.4 RPM Dashboard Enhancements
+
+Extends the Wearable Monitoring dashboard (Phase 6/wearable) with clinical action automation.
+
+| Feature | Status | Priority | Notes |
+|---------|--------|----------|-------|
+| Fall detection → PT referral suggestion | ⏳ PENDING | P0 | "2 falls in past 2 weeks — consider physical therapy referral" |
+| Longitudinal trend dashboard | 🔧 PARTIAL | P1 | Component built (`LongitudinalSummaryBanner`), needs data wiring |
+| Risk stratification rules | ⏳ PENDING | P1 | Pattern-based risk scoring from anomaly frequency/severity |
+| Automated care suggestions | ⏳ PENDING | P1 | Based on RPM data patterns, suggest clinical actions |
+| Human-in-loop notification | ⏳ PENDING | P1 | Clinician reviews and approves/dismisses AI suggestions |
+| Comparative cohort analytics | ⏳ PENDING | P2 | Patient outcomes vs. similar patients |
+
+### 10.5 Neuro OS Platform Positioning
+
+Strategic features for SaaS overlay onto existing EHR systems (e.g., Epic).
+
+| Feature | Status | Priority | Notes |
+|---------|--------|----------|-------|
+| Epic overlay integration design | ⏳ PENDING | P1 | Architecture for FHIR-based data exchange |
+| Value-based care metrics dashboard | ⏳ PENDING | P1 | Track metrics that qualify organizations for certifications |
+| Specialty certification tracker | ⏳ PENDING | P2 | Map achieved metrics to certification requirements |
+| Multi-tenant billing analytics | ⏳ PENDING | P2 | Per-organization TCM/CCM/RPM revenue tracking |
+
+**Business model:** Sevaro doesn't bill directly — it's SaaS that customer organizations use to meet value-based care standards, earn specialty certifications, and capture billable code revenue. "Neuro OS" concept coined by Raj.
+
+### 10.6 Open Items (Requires Discussion)
+
+| Item | Owner | Notes |
+|------|-------|-------|
+| Legal review of AI-assisted clinical documentation | Raj / Legal | Liability, compliance, informed consent for AI historian |
+| Neuro OS brand positioning | Raj | Confirm naming, marketing, feature prioritization |
+| Which billable codes to prioritize first | Clinical team | TCM vs. CCM vs. RPM — customer demand signals |
+| Epic integration partnership | Business dev | FHIR API access, certification requirements |
 
 ---
 

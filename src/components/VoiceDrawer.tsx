@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { useVoiceRecorder } from '@/hooks/useVoiceRecorder'
+import { useStreamingDictation } from '@/hooks/useStreamingDictation'
 
 interface VisitAIOutput {
   hpiFromVisit?: string
@@ -68,7 +69,7 @@ export default function VoiceDrawer({
   const [visitAIError, setVisitAIError] = useState<string | null>(null)
   const lastVisitAudioBlobRef = useRef<Blob | null>(null)
 
-  // Separate voice recorder for Chart Prep dictation
+  // Separate voice recorder for Chart Prep dictation — uses AWS Transcribe Streaming
   const {
     isRecording: isPrepRecording,
     isPaused: isPrepPaused,
@@ -76,13 +77,12 @@ export default function VoiceDrawer({
     error: prepRecordingError,
     transcribedText: prepTranscribedText,
     recordingDuration: prepRecordingDuration,
+    streamingTranscript: prepStreamingTranscript,
+    isStreaming: isPrepStreaming,
     startRecording: startPrepRecording,
-    pauseRecording: pausePrepRecording,
-    resumeRecording: resumePrepRecording,
     stopRecording: stopPrepRecording,
-    restartRecording: restartPrepRecording,
     clearTranscription: clearPrepTranscription,
-  } = useVoiceRecorder()
+  } = useStreamingDictation()
 
   // Voice recorder for Visit AI (Document tab)
   // Uses callback to process audio through Visit AI endpoint instead of simple transcription
@@ -675,54 +675,26 @@ export default function VoiceDrawer({
                         {formatDuration(prepRecordingDuration)}
                       </div>
 
-                      <button
-                        onClick={isPrepPaused ? resumePrepRecording : pausePrepRecording}
-                        style={{
+                      {isPrepStreaming && (
+                        <div style={{
                           display: 'flex',
                           alignItems: 'center',
-                          justifyContent: 'center',
-                          width: '36px',
-                          height: '36px',
-                          borderRadius: '6px',
-                          border: 'none',
-                          background: 'var(--bg-gray)',
-                          color: 'var(--text-primary)',
-                          cursor: 'pointer',
-                        }}
-                        title={isPrepPaused ? 'Resume' : 'Pause'}
-                      >
-                        {isPrepPaused ? (
-                          <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-                            <polygon points="5 3 19 12 5 21 5 3"/>
-                          </svg>
-                        ) : (
-                          <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-                            <rect x="6" y="4" width="4" height="16"/>
-                            <rect x="14" y="4" width="4" height="16"/>
-                          </svg>
-                        )}
-                      </button>
-
-                      <button
-                        onClick={restartPrepRecording}
-                        style={{
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          width: '36px',
-                          height: '36px',
-                          borderRadius: '6px',
-                          border: 'none',
-                          background: 'var(--bg-gray)',
-                          color: 'var(--text-primary)',
-                          cursor: 'pointer',
-                        }}
-                        title="Restart"
-                      >
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                          <path d="M1 4v6h6"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/>
-                        </svg>
-                      </button>
+                          gap: '4px',
+                          padding: '0 8px',
+                          fontSize: '11px',
+                          color: '#10B981',
+                          fontWeight: 500,
+                        }}>
+                          <span style={{
+                            width: '6px',
+                            height: '6px',
+                            borderRadius: '50%',
+                            background: '#10B981',
+                            animation: 'pulse 1.5s infinite',
+                          }} />
+                          LIVE
+                        </div>
+                      )}
 
                       <button
                         onClick={stopPrepRecording}
@@ -774,6 +746,24 @@ export default function VoiceDrawer({
                         Adding notes and generating AI summary
                       </p>
                     </div>
+                  </div>
+                )}
+
+                {/* Live streaming transcript during recording */}
+                {isPrepRecording && prepStreamingTranscript && (
+                  <div style={{
+                    marginTop: '8px',
+                    padding: '10px',
+                    background: 'linear-gradient(135deg, #F0FDF4 0%, #ECFDF5 100%)',
+                    borderRadius: '6px',
+                    border: '1px solid #A7F3D0',
+                  }}>
+                    <div style={{ fontSize: '10px', fontWeight: 600, color: '#059669', marginBottom: '4px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                      Live Transcript
+                    </div>
+                    <p style={{ fontSize: '13px', color: 'var(--text-primary)', margin: 0, lineHeight: 1.5 }}>
+                      {prepStreamingTranscript}
+                    </p>
                   </div>
                 )}
 

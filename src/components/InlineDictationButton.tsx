@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { useVoiceRecorder } from '@/hooks/useVoiceRecorder'
+import { useStreamingDictation } from '@/hooks/useStreamingDictation'
 
 interface DictationEntry {
   text: string
@@ -40,10 +40,12 @@ export default function InlineDictationButton({
     error,
     transcribedText,
     rawText,
+    streamingTranscript,
+    isStreaming,
     startRecording,
     stopRecording,
     clearTranscription,
-  } = useVoiceRecorder()
+  } = useStreamingDictation()
 
   // When transcription completes, send it to parent and clear
   useEffect(() => {
@@ -73,7 +75,9 @@ export default function InlineDictationButton({
         disabled={disabled || isTranscribing}
         title={
           isRecording
-            ? 'Stop Recording'
+            ? isStreaming
+              ? `Live transcribing... (click to stop)${streamingTranscript ? '\n' + streamingTranscript.slice(-80) : ''}`
+              : 'Stop Recording'
             : isTranscribing
             ? 'Transcribing...'
             : error || 'Dictate into this field'

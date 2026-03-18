@@ -351,16 +351,50 @@ The interactive prototype is hosted at: `https://blondarb.github.io/OPSAmplehtml
 - Print/export full note functionality
 - Additional clinical scales
 
+### Phase 10: Advanced Clinical Workflows & Neuro OS Foundation (March 2026)
+
+Based on stakeholder feedback (March 17, 2026 demo session):
+
+**Multimodal Patient Intake:**
+- Interactive body diagrams (SVG tap-to-locate pain/symptoms) alongside AI Historian voice intake
+- Sequential one-at-a-time descriptor questioning (throbbing? pulsating? electric?)
+- Patient-adaptive pacing based on age and comorbidities
+- Companion app model: AI calls patient on phone + visual app simultaneously
+
+**Post-Discharge Billing Compliance:**
+- Contact attempt tracking (attempted vs. successful, with retry scheduling)
+- TCM compliance alerts (2-day first contact window, 14-day F2F scheduling)
+- CCM/RPM time tracking and CPT code compliance dashboards
+- Discharge-triggered automated workflow creation
+
+**Patient Engagement ("Love Taps"):**
+- Wellness check-in outreach (ChenMed model) separate from clinical follow-up
+- Appointment barrier detection (no ride, forgot, etc.)
+- Caregiver outreach when patient unreachable
+- Proactive care gap detection
+
+**RPM Dashboard Enhancements:**
+- Fall detection → automated PT referral suggestions
+- Risk stratification from anomaly patterns
+- Human-in-loop approval for AI-suggested clinical actions
+
+**Neuro OS SaaS Positioning:**
+- Epic overlay via FHIR integration
+- Value-based care metrics dashboard for organizational certifications
+- Multi-tenant billing analytics
+
+See `docs/CONSOLIDATED_ROADMAP.md` Phase 10 for full feature breakdown.
+
 ### Integration Opportunities
-- EHR integration (Epic, Cerner)
+- EHR integration (Epic, Cerner) — FHIR-based data exchange for Neuro OS overlay
 - PACS viewer embedding
-- Real voice recognition API
-- Actual AI model integration
+- Twilio voice + SMS for automated patient outreach (partially implemented in Follow-Up Agent)
 
 ### Analytics & Insights
 - Documentation time tracking
 - Feature usage metrics
 - Workflow optimization suggestions
+- TCM/CCM/RPM revenue opportunity tracking
 
 ---
 

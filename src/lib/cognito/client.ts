@@ -62,21 +62,31 @@ export async function signIn(
     const region = userPoolId.split('_')[0]
     const endpoint = `https://cognito-idp.${region}.amazonaws.com/`
 
-    const res = await fetch(endpoint, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/x-amz-json-1.1',
-        'X-Amz-Target': 'AWSCognitoIdentityProviderService.InitiateAuth',
-      },
-      body: JSON.stringify({
-        AuthFlow: 'USER_PASSWORD_AUTH',
-        ClientId: clientId,
-        AuthParameters: {
-          USERNAME: email,
-          PASSWORD: password,
+    // Timeout after 15s to prevent infinite spinner on network issues
+    const authController = new AbortController()
+    const authTimeout = setTimeout(() => authController.abort(), 15000)
+
+    let res: Response
+    try {
+      res = await fetch(endpoint, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-amz-json-1.1',
+          'X-Amz-Target': 'AWSCognitoIdentityProviderService.InitiateAuth',
         },
-      }),
-    })
+        body: JSON.stringify({
+          AuthFlow: 'USER_PASSWORD_AUTH',
+          ClientId: clientId,
+          AuthParameters: {
+            USERNAME: email,
+            PASSWORD: password,
+          },
+        }),
+        signal: authController.signal,
+      })
+    } finally {
+      clearTimeout(authTimeout)
+    }
 
     const data = await res.json()
 
@@ -86,16 +96,24 @@ export async function signIn(
     }
 
     if (data.AuthenticationResult) {
-      // Store tokens in cookies
-      await fetch('/api/auth/session', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          idToken: data.AuthenticationResult.IdToken,
-          accessToken: data.AuthenticationResult.AccessToken,
-          refreshToken: data.AuthenticationResult.RefreshToken,
-        }),
-      })
+      // Store tokens in cookies (timeout after 10s)
+      const sessionController = new AbortController()
+      const sessionTimeout = setTimeout(() => sessionController.abort(), 10000)
+
+      try {
+        await fetch('/api/auth/session', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            idToken: data.AuthenticationResult.IdToken,
+            accessToken: data.AuthenticationResult.AccessToken,
+            refreshToken: data.AuthenticationResult.RefreshToken,
+          }),
+          signal: sessionController.signal,
+        })
+      } finally {
+        clearTimeout(sessionTimeout)
+      }
 
       // Also set tokens in the SDK's storage so getCurrentUser/getCurrentSession work
       if (userPool) {
@@ -119,6 +137,9 @@ export async function signIn(
 
     return { error: `Unexpected response: ${data.ChallengeName || 'unknown'}` }
   } catch (err) {
+    if (err instanceof DOMException && err.name === 'AbortError') {
+      return { error: 'Sign in timed out. Please check your connection and try again.' }
+    }
     return { error: err instanceof Error ? err.message : 'Sign in failed' }
   }
 }

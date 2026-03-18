@@ -977,12 +977,18 @@ supabase/migrations/
 
 | Enhancement | Priority | Description |
 |-------------|----------|-------------|
+| **Multimodal body diagram intake** | **P0** | **Interactive SVG body maps — patient taps to locate pain/symptoms during voice interview. Stores coordinates as structured data. See Phase 10.1 in CONSOLIDATED_ROADMAP.md** |
+| **Sequential descriptor questioning** | **P0** | **Ask one pain descriptor at a time (throbbing? pulsating? electric? radiating?) rather than all at once. Especially important for elderly or cognitively impaired patients** |
+| **Patient-adaptive pacing** | **P1** | **Adjust interview speed, complexity, and question grouping based on patient age, comorbidities, and cognitive status** |
+| **Companion app model** | **P1** | **AI calls patient on phone + instructs them to open companion app for visual interaction simultaneously** |
 | Multi-language support | P1 | Conduct interviews in Spanish, Mandarin, etc. |
 | Session resume | P2 | Allow patients to pause and resume interviews |
 | Custom interview templates | P2 | Condition-specific interview flows |
 | Voice activity visualization | P3 | Waveform display during recording |
 | Interview recordings | P3 | Save audio for review |
 | Automated follow-up scheduling | P3 | Based on red flags detected |
+
+**Source:** Stakeholder feedback (March 17, 2026) — clinical expert noted that patients often cannot verbalize symptoms in a doctor's office. Pain clinics have long used circle-the-area diagrams. Sequential descriptor questioning prevents overwhelming patients who struggle to describe pain characteristics.
 
 ---
 
