@@ -4,7 +4,7 @@
 > **Multi-tenancy**: `tenant_id TEXT` column on data tables (default: `'default'`)
 > **Auth**: Supabase Auth (`auth.users` / `auth.uid()`)
 > **RLS**: Row Level Security enabled on every table
-> **Generated from**: All migrations in `supabase/migrations/` (001 through 018) and `FEEDBACK_TABLE.sql`
+> **Generated from**: Tables in AWS RDS PostgreSQL and `FEEDBACK_TABLE.sql`
 
 ---
 

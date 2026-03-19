@@ -494,7 +494,7 @@ Major upgrade to Smart Recommendations: 67 clinical plans synced from neuro-plan
 - Saved plans state and API integration
 
 **New Files (7):**
-- `supabase/migrations/013_clinical_plans_and_saved_plans.sql`
+- `RDS clinical_plans table`
 - `src/lib/recommendationOrdering.ts`
 - `src/lib/savedPlanTypes.ts`
 - `src/app/api/plans/seed/route.ts`
@@ -613,7 +613,7 @@ Voice-based patient intake interview system using OpenAI Realtime API over WebRT
 - `src/app/api/ai/historian/session/route.ts` - Ephemeral token endpoint
 - `src/app/api/ai/historian/save/route.ts` - Session save/list endpoint
 - `src/app/patient/historian/page.tsx` - Historian page route
-- `supabase/migrations/010_historian_sessions.sql` - Database migration
+- `RDS historian_sessions table` - Database migration
 
 **Modified Files (5):**
 - `src/components/PatientPortal.tsx` - Added AI Historian tab

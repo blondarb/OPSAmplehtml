@@ -23,11 +23,11 @@ Sevaro Clinical is a web application for AI-powered clinical documentation, spec
 - **Framework**: Next.js 15.1.x with App Router
 - **Language**: TypeScript
 - **Styling**: Tailwind CSS v3 + Inline Styles
-- **Database**: Supabase (PostgreSQL)
-- **Authentication**: Supabase Auth
-- **AI**: OpenAI GPT-5/GPT-4o-mini APIs + Whisper (transcription) + Realtime API (WebRTC)
+- **Database**: AWS RDS (PostgreSQL) via node-postgres
+- **Authentication**: AWS Cognito
+- **AI**: AWS Bedrock (Claude Sonnet 4.6) + OpenAI Whisper (transcription) + Realtime API (WebRTC)
 - **SMS/Voice**: Twilio (SDK v5) for live patient follow-up demos
-- **Deployment**: Vercel
+- **Deployment**: AWS Amplify (push-to-deploy from main)
 
 ## Project Structure
 
@@ -157,16 +157,16 @@ src/
 │   │   ├── escalationRules.ts   # Regex + merge escalation logic
 │   │   ├── conversationEngine.ts # Shared AI turn logic (browser + SMS)
 │   │   └── twilioClient.ts      # Twilio SMS send/validate helpers
-│   ├── supabase/
-│   │   ├── client.ts      # Browser Supabase client
-│   │   └── server.ts      # Server Supabase client
-│   └── database.types.ts  # TypeScript types for Supabase
+│   ├── bedrock.ts         # AWS Bedrock client (Claude Sonnet 4.6)
+│   ├── cognito/           # AWS Cognito auth helpers
+│   ├── db.ts              # RDS connection pools (node-postgres)
+│   ├── db-query.ts        # Query builder (Supabase-compatible API over RDS)
 └── middleware.ts          # Auth middleware
 ```
 
 ## Database Schema
 
-Located in `supabase/migrations/`:
+Tables in AWS RDS (PostgreSQL):
 
 - **patients**: Patient demographics
 - **visits**: Patient visit records
@@ -192,32 +192,41 @@ Located in `supabase/migrations/`:
 
 ## Environment Variables
 
-Required for deployment:
+Required for deployment (set in Amplify console):
 
 ```
-NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
-NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
+# Cognito Auth
+COGNITO_USER_POOL_ID=us-east-2_...
+COGNITO_CLIENT_ID=...
+COGNITO_REGION=us-east-2
+NEXT_PUBLIC_COGNITO_USER_POOL_ID=...
+NEXT_PUBLIC_COGNITO_CLIENT_ID=...
+NEXT_PUBLIC_COGNITO_REGION=us-east-2
+
+# RDS PostgreSQL
+RDS_HOST=sevaro-postgres.....us-east-2.rds.amazonaws.com
+RDS_PORT=5432
+RDS_USER=sevaro_admin
+RDS_PASSWORD=...
+RDS_DATABASE=ops_amplehtml
+
+# Bedrock AI
+BEDROCK_ACCESS_KEY_ID=...
+BEDROCK_SECRET_ACCESS_KEY=...
+BEDROCK_REGION=us-east-2
 ```
 
-Optional (can also be stored in Supabase `app_settings`):
+Optional:
 ```
-OPENAI_API_KEY=sk-...
-```
-
-Optional (for live follow-up agent demo — see `docs/plans/2026-02-25-live-followup-agent-design.md`):
-```
-TWILIO_ACCOUNT_SID=AC...
+OPENAI_API_KEY=sk-...           # Whisper transcription + Realtime API
+TWILIO_ACCOUNT_SID=AC...        # Live follow-up agent SMS demo
 TWILIO_AUTH_TOKEN=...
 TWILIO_PHONE_NUMBER=+1XXXXXXXXXX
-TWILIO_WEBHOOK_BASE_URL=https://ops-amplehtml.vercel.app
-VOICE_BRIDGE_WSS_URL=wss://sevaro-voice-bridge.up.railway.app
 ```
-
-The OpenAI API key can be stored securely in Supabase `app_settings` table or as an environment variable.
 
 ## Key Features
 
-1. **Authentication**: Email/password and magic link via Supabase Auth
+1. **Authentication**: Email/password via AWS Cognito
 
 2. **Clinical Notes**: Tabbed interface with four main tabs:
    - **History**: Reason for consult, HPI, ROS, allergies, medical history, clinical scales
@@ -408,20 +417,9 @@ All major text fields include inline action buttons:
 
 ## Development Notes
 
-### Supabase Client Creation
+### Database Access
 
-The Supabase client must be created lazily (inside event handlers) to avoid issues during static page generation. Never create the client at component level.
-
-```typescript
-// WRONG - causes build errors
-const supabase = createClient()
-
-// CORRECT - create only when needed
-const handleSubmit = () => {
-  const supabase = createClient()
-  // use supabase
-}
-```
+All database queries use the `from()` and `wearableFrom()` builders from `@/lib/db-query`, backed by node-postgres connection pools to AWS RDS. Auth uses AWS Cognito via `@/lib/cognito/server`.
 
 ### Middleware
 
@@ -489,7 +487,7 @@ The middleware (`src/middleware.ts`) handles session refresh. Uses a simplified 
 - **Source**: `blondarb/neuro-plans` GitHub repo (built by Steve Arbogast)
 - **Published**: https://blondarb.github.io/neuro-plans/clinical/
 - **127 clinical plans** with evidence-based treatment recommendations
-- **Sync command**: `npm run sync-plans` fetches JSON from GitHub and upserts to Supabase `clinical_plans` table
+- **Sync command**: `npm run sync-plans` fetches JSON from GitHub and upserts to RDS `clinical_plans` table
 - **Order sentences**: Medications can have multiple `doseOptions` with dropdown selection in UI
 - **ICD-10 matching**: Scored matching (exact=1000, category=1) links diagnoses to relevant plans
 
@@ -522,10 +520,10 @@ Comprehensive product playbooks for the 6-card Sevaro Ambulatory demo platform p
 | `playbooks/05_sdne.md` | Digital Neurological Exam | `/sdne` |
 | `playbooks/06_wearable_monitoring.md` | Continuous Wearable Monitoring | `/wearable` |
 
-Each playbook contains 10 sections: Executive Summary, How To Use, Clinical Context, Functional Requirements, Technical Architecture, AI & Algorithm Design, Safety & Guardrails, Demo Design, Phased Roadmap, and Open Questions. They include complete Supabase schemas, API contracts, system prompts, and 3-minute demo scripts. Demo patients overlap across cards for continuity.
+Each playbook contains 10 sections: Executive Summary, How To Use, Clinical Context, Functional Requirements, Technical Architecture, AI & Algorithm Design, Safety & Guardrails, Demo Design, Phased Roadmap, and Open Questions. They include complete database schemas, API contracts, system prompts, and 3-minute demo scripts. Demo patients overlap across cards for continuity.
 
 ### Engineering Handoff Docs (February 2026)
-- `docs/SCHEMA_REFERENCE.md` - Complete database schema for all Supabase tables
+- `docs/SCHEMA_REFERENCE.md` - Complete database schema for all RDS tables
 - `docs/AI_PROMPTS_AND_MODELS.md` - All AI system prompts and model configuration
 - `docs/API_CONTRACTS.md` - API reference with full request/response schemas
 - `docs/PRD_CLINICAL_NOTE_SYSTEM.md` - Clinical note system with tabs, diagnoses, recommendations
@@ -550,13 +548,9 @@ npm run lint     # Run ESLint
 
 ## Deployment
 
-Deployed on Vercel at: https://ops-amplehtml.vercel.app/
+Deployed on AWS Amplify. Push to `main` triggers auto-deploy.
 
-Environment variables must be set in Vercel project settings:
-- `NEXT_PUBLIC_SUPABASE_URL`
-- `NEXT_PUBLIC_SUPABASE_ANON_KEY`
-
-When redeploying after changes, use "Redeploy without cache" to ensure fresh builds.
+Environment variables are set in the Amplify console (see "Environment Variables" section above).
 
 ## Git Workflow
 
@@ -570,13 +564,13 @@ When redeploying after changes, use "Redeploy without cache" to ensure fresh bui
 
 - **Wearable Narrative Enhancements (2026-03-05)**: Added "Generate 30-Day Summary" button to PatientTimeline header for longitudinal narrative generation. Added regenerate (refresh) buttons to ClinicalNarrativePanel and LongitudinalSummaryBanner. Added auto-generation logic that detects assessments without narratives on data load/poll/patient-switch and generates them sequentially with progress indicator.
 
-- **AI Clinical Narrative Pipeline (2026-03-04)**: Split DiseaseTrack into MotorTrack + CognitiveTrack. Built 2-stage AI pipeline (gpt-4o-mini extraction → gpt-5.2 narrative) via Supabase Edge Function `analyze-assessment`. "Generate AI Clinical Interpretation" buttons on each assessment card produce clinical narratives with severity-flagged findings. API key passed via `X-OpenAI-Key` header from Vercel. See `docs/HANDOFF_2026-03-04_clinical-narrative-pipeline.md`.
+- **AI Clinical Narrative Pipeline (2026-03-04)**: Split DiseaseTrack into MotorTrack + CognitiveTrack. Built 2-stage AI pipeline (Bedrock extraction → narrative) for `analyze-assessment`. "Generate AI Clinical Interpretation" buttons on each assessment card produce clinical narratives with severity-flagged findings. See `docs/HANDOFF_2026-03-04_clinical-narrative-pipeline.md`.
 
 - **Wearable Dashboard Data Fixes (2026-03-02)**: Fixed 6 data display issues on `/wearable` for real Apple Watch data: resting HR 0 treated as null, sleep fallback to total bar when stages unavailable, server-side rolling 7-day averages, auto-computed baselines from actual data, diagnosis-aware Disease Track (ET vs PD), 15-minute auto-refresh polling. See `docs/HANDOFF_2026-03-02_wearable-dashboard-fixes.md`.
 
 - **SevaroMonitor iOS Sleep Fixes (2026-03-02)**: Fixed overnight sleep split (6 PM-to-6 PM window instead of midnight) and added per-stage sleep breakdown (Deep, Light, REM, Awake) to HealthKit collection. Changes in `blondarb/SevaroMonitor` repo.
 
-- **Live Follow-Up Agent Phase A: SMS (2026-02-25)**: Implemented real-phone SMS demo for Follow-Up Agent. User enters phone number on conversation page, receives a real Twilio text, replies via SMS, and the clinician dashboard updates in real-time via Supabase Realtime. New files: `twilioClient.ts` (send/validate), `conversationEngine.ts` (shared AI turn logic), `send-sms/route.ts` (initiate), `twilio-sms/route.ts` (webhook), `LiveDemoPanel.tsx` (UI). Migration 031 fixes schema mismatches and adds `followup_phone_sessions` table. Refactored `message/route.ts` to use shared engine. `ClinicianDashboard` now accepts `liveSessionId` prop for Realtime subscription. See `docs/plans/2026-02-25-live-followup-sms-plan.md` for implementation plan.
+- **Live Follow-Up Agent Phase A: SMS (2026-02-25)**: Implemented real-phone SMS demo for Follow-Up Agent. User enters phone number on conversation page, receives a real Twilio text, replies via SMS, and the clinician dashboard updates via polling. New files: `twilioClient.ts` (send/validate), `conversationEngine.ts` (shared AI turn logic), `send-sms/route.ts` (initiate), `twilio-sms/route.ts` (webhook), `LiveDemoPanel.tsx` (UI). Migration 031 fixes schema mismatches and adds `followup_phone_sessions` table. Refactored `message/route.ts` to use shared engine. `ClinicianDashboard` now accepts `liveSessionId` prop for Realtime subscription. See `docs/plans/2026-02-25-live-followup-sms-plan.md` for implementation plan.
 
 - **Cockpit/Dashboard Separation (2026-02-25)**: Separated Clinician Cockpit and Operations Dashboard into distinct tools. Cockpit (`/physician`) redesigned as a 2-column layout: Schedule (~380px, with week-strip nav, mini-month grid, prep badges) | Time-Phased Briefing (Morning/Midday/End of Day with phase-specific narratives, icons, gradients). Notifications moved to a bell-triggered 380px slide-over drawer with enhanced cards showing inline clinical data (vitals, wearable readings). Breadcrumb bar ("< Home | Clinician Cockpit | Demo") added for navigation. Dashboard (`/dashboard`) renamed to Operations Dashboard with new Zone 1 Operational Summary. Homepage rearranged to 4+3 layout. See `docs/plans/2026-02-25-cockpit-dashboard-separation-design.md`.
 
@@ -617,7 +611,7 @@ Full changelog: [`docs/CHANGELOG.md`](docs/CHANGELOG.md)
 - Inpatient clinical scales (GCS, mRS, FOUR Score, Hunt & Hess, ICH, CAM-ICU, RASS)
 
 ### Known Issues
-- Supabase still used for database and auth (legacy) — eventual migration to RDS/Cognito
+- Legacy Supabase env vars can be removed from Amplify (no longer referenced by code)
 - Bedrock Amplify SSR env var wiring requires `next.config` inline for runtime access
 - 18 neurology diagnoses still lack treatment plans in the database
 
