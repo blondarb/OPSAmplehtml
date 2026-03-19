@@ -38,7 +38,7 @@ export async function POST(request: Request) {
       dashboard_update: result.dashboard_update,
     }
 
-    // Supabase operations
+    // DB operations
     try {
 
       // Build transcript entry for this turn
@@ -86,7 +86,7 @@ export async function POST(request: Request) {
           .single()
 
         if (insertError) {
-          console.error('Supabase insert error (non-fatal):', insertError)
+          console.error('DB insert error (non-fatal):', insertError)
         } else if (inserted) {
           responsePayload.session_id = inserted.id
         }
@@ -116,7 +116,7 @@ export async function POST(request: Request) {
           .eq('id', session_id)
 
         if (updateError) {
-          console.error('Supabase update error (non-fatal):', updateError)
+          console.error('DB update error (non-fatal):', updateError)
         }
       }
 
@@ -136,7 +136,7 @@ export async function POST(request: Request) {
           })
 
         if (escError) {
-          console.error('Supabase escalation insert error (non-fatal):', escError)
+          console.error('DB escalation insert error (non-fatal):', escError)
         }
       }
 
@@ -174,7 +174,7 @@ export async function POST(request: Request) {
       }
     } catch (err) {
       // Non-fatal — follow-up still works without DB storage in demo mode
-      console.error('Supabase storage error (non-fatal):', err)
+      console.error('DB storage error (non-fatal):', err)
     }
 
     return NextResponse.json(responsePayload)

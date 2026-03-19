@@ -77,7 +77,7 @@ export async function GET(request: NextRequest) {
     const status = searchParams.get('status')
     const date = searchParams.get('date') // Single date query
 
-    // Build SQL with JOINs (replaces Supabase nested relation syntax)
+    // Build SQL with JOINs for nested appointment relations
     const conditions: string[] = []
     const values: unknown[] = []
     let paramIdx = 0

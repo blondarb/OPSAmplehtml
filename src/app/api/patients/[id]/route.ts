@@ -124,7 +124,7 @@ export async function GET(
     }))
 
     // Transform visits with clinical notes
-    // Supabase returns clinical_notes as object (unique FK on visit_id) not array
+    // clinical_notes is an object (unique FK on visit_id) not array
     const transformedVisits = (visits || []).map((visit: any) => {
       const note = Array.isArray(visit.clinical_notes)
         ? visit.clinical_notes[0]

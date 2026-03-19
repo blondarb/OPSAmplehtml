@@ -249,7 +249,7 @@ export default function DataSourceCards() {
             </svg>
           </div>
 
-          {/* Node 4: Supabase */}
+          {/* Node 4: AWS RDS */}
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px', minWidth: '90px' }}>
             <div style={{
               width: '48px', height: '48px', borderRadius: '50%',
@@ -262,7 +262,7 @@ export default function DataSourceCards() {
                 <path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5" />
               </svg>
             </div>
-            <span style={{ color: '#e2e8f0', fontSize: '0.72rem', fontWeight: 600, textAlign: 'center' }}>Supabase Cloud</span>
+            <span style={{ color: '#e2e8f0', fontSize: '0.72rem', fontWeight: 600, textAlign: 'center' }}>AWS RDS</span>
             <span style={{ color: '#64748b', fontSize: '0.65rem', textAlign: 'center', lineHeight: 1.3 }}>Stores summaries<br/>&amp; baselines</span>
           </div>
 

@@ -1,5 +1,5 @@
 export default function BuiltWith() {
-  const partners = ['Anthropic Claude', 'Samsung', 'Supabase', 'Vercel']
+  const partners = ['Anthropic Claude', 'Samsung', 'AWS', 'Vercel']
 
   return (
     <section className="py-12 px-6 bg-white">

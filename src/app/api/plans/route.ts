@@ -138,7 +138,7 @@ export async function GET(request: NextRequest) {
         .select('plan_key, title, icd10_codes')
         .order('title')
 
-      // Fallback to hardcoded data if Supabase query fails
+      // Fallback to hardcoded data if DB query fails
       const plansData = error ? getFallbackPlans() : (data || [])
       if (error) {
         console.warn('clinical_plans table query failed, using fallback:', error.message)
@@ -229,7 +229,7 @@ export async function GET(request: NextRequest) {
         .select('*')
         .order('title')
 
-      // Fallback to hardcoded data if Supabase query fails
+      // Fallback to hardcoded data if DB query fails
       const allPlansData = error ? getFallbackPlans() : (allPlans || [])
       if (error) {
         console.warn('clinical_plans table query failed, using fallback:', error.message)
@@ -277,7 +277,7 @@ export async function GET(request: NextRequest) {
       .select('*')
       .order('title')
 
-    // Fallback to hardcoded data if Supabase query fails
+    // Fallback to hardcoded data if DB query fails
     const allData = error ? getFallbackPlans() : (data || [])
     if (error) {
       console.warn('clinical_plans table query failed, using fallback:', error.message)

@@ -1,12 +1,42 @@
 import { NextResponse } from 'next/server'
-import { getUser } from '@/lib/cognito/server'
+import { invokeBedrockJSON, invokeBedrock, BEDROCK_MODEL } from '@/lib/bedrock'
 import { from } from '@/lib/db-query'
-import { getOpenAIKey } from '@/lib/secrets'
 
-export const maxDuration = 120  // Edge Function runs a 2-stage AI pipeline
+export const maxDuration = 120  // 2-stage AI pipeline
 
-const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!
-const SUPABASE_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+// ── System prompts for the 2-stage clinical narrative pipeline ──
+
+const STAGE1_SYSTEM = `You are a clinical data extraction AI. Analyze raw wearable assessment data and produce a structured clinical summary.
+
+For each assessment type, extract:
+- key_findings: Array of 3-5 concise clinical findings
+- pattern_analysis: What patterns are evident in the data
+- baseline_comparison: How results compare to expected norms
+- clinical_considerations: What a neurologist should consider
+- trend_context: How this fits into the patient's trajectory
+- severity_flags: Array of { metric, level, note } where level is "green" | "yellow" | "orange" | "red"
+
+Respond with ONLY valid JSON matching this schema:
+{
+  "key_findings": ["string"],
+  "pattern_analysis": "string",
+  "baseline_comparison": "string",
+  "clinical_considerations": "string",
+  "trend_context": "string",
+  "severity_flags": [{ "metric": "string", "level": "green|yellow|orange|red", "note": "string" }]
+}`
+
+const STAGE2_SYSTEM = `You are a clinical narrative generator for neurology. Given a structured summary of wearable assessment data, write a concise clinical narrative suitable for chart documentation.
+
+Requirements:
+- Write 2-4 sentences in clinical documentation style
+- Reference specific metrics and their clinical significance
+- Note any concerning patterns or severity flags
+- Use language appropriate for a neurology progress note
+- Do NOT diagnose or recommend specific medications
+- DO flag findings that warrant clinical attention
+
+Respond with ONLY the narrative text (no JSON, no markdown).`
 
 export async function POST(request: Request) {
   try {
@@ -19,7 +49,6 @@ export async function POST(request: Request) {
     if (type !== 'longitudinal' && !assessment_id) {
       return NextResponse.json({ error: 'assessment_id is required for non-longitudinal analysis.' }, { status: 400 })
     }
-
 
     // Fetch the assessment data from DB based on type
     let assessmentData: Record<string, unknown> = {}
@@ -64,50 +93,80 @@ export async function POST(request: Request) {
         word_list: data.word_list,
         quartile_words: data.quartile_words,
       }
-    } else if (type !== 'longitudinal') {
+    } else if (type === 'longitudinal') {
+      // Longitudinal: gather all recent assessments for the patient
+      const [tremors, tappings, fluencies] = await Promise.all([
+        from('wearable_tremor_assessments').select('*').eq('patient_id', patient_id).order('assessed_at', { ascending: false }).limit(5),
+        from('wearable_tapping_assessments').select('*').eq('patient_id', patient_id).order('assessed_at', { ascending: false }).limit(5),
+        from('wearable_fluency_assessments').select('*').eq('patient_id', patient_id).order('assessed_at', { ascending: false }).limit(5),
+      ])
+      assessmentData = {
+        tremor_assessments: tremors.data || [],
+        tapping_assessments: tappings.data || [],
+        fluency_assessments: fluencies.data || [],
+      }
+    } else {
       return NextResponse.json({ error: `Unknown type: ${type}` }, { status: 400 })
     }
 
-    // Call the Supabase Edge Function
+    // ── Stage 1: Structured extraction ──
     const controller = new AbortController()
-    const timeout = setTimeout(() => controller.abort(), 90000) // 90s timeout
+    const timeout = setTimeout(() => controller.abort(), 90000)
 
-    let edgeResult
+    let structuredSummary: Record<string, unknown>
+    let clinicalNarrative: string
+
     try {
-      const res = await fetch(`${SUPABASE_URL}/functions/v1/analyze-assessment`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${SUPABASE_KEY}`,
-          'Content-Type': 'application/json',
-          'X-OpenAI-Key': await getOpenAIKey(),
-        },
-        body: JSON.stringify({
-          type,
-          patient_id,
-          assessment_id: assessment_id || null,
-          data: assessmentData,
-        }),
+      const stage1 = await invokeBedrockJSON<Record<string, unknown>>({
+        system: STAGE1_SYSTEM,
+        messages: [{
+          role: 'user',
+          content: `Assessment type: ${type}\n\nRaw data:\n${JSON.stringify(assessmentData, null, 2)}`,
+        }],
+        maxTokens: 2000,
+        temperature: 0.2,
         signal: controller.signal,
       })
+      structuredSummary = stage1.parsed
 
-      if (!res.ok) {
-        const errBody = await res.text()
-        console.error('Edge Function error:', res.status, errBody)
-        return NextResponse.json(
-          { error: `AI analysis failed: ${errBody}` },
-          { status: res.status }
-        )
-      }
-
-      edgeResult = await res.json()
+      // ── Stage 2: Clinical narrative ──
+      const stage2 = await invokeBedrock({
+        system: STAGE2_SYSTEM,
+        messages: [{
+          role: 'user',
+          content: `Assessment type: ${type}\n\nStructured summary:\n${JSON.stringify(structuredSummary, null, 2)}`,
+        }],
+        maxTokens: 500,
+        temperature: 0.3,
+        signal: controller.signal,
+      })
+      clinicalNarrative = stage2.text.trim()
     } finally {
       clearTimeout(timeout)
+    }
+
+    // ── Store in wearable_clinical_narratives ──
+    const { error: insertError } = await from('wearable_clinical_narratives')
+      .insert({
+        patient_id,
+        narrative_type: type,
+        assessment_id: assessment_id || null,
+        structured_summary: structuredSummary,
+        clinical_narrative: clinicalNarrative,
+        model_versions: { stage1: BEDROCK_MODEL, stage2: BEDROCK_MODEL },
+      })
+
+    if (insertError) {
+      console.error('Failed to store narrative:', insertError)
+      // Non-fatal — still return the result even if storage fails
     }
 
     return NextResponse.json({
       success: true,
       type,
-      ...edgeResult,
+      structured_summary: structuredSummary,
+      clinical_narrative: clinicalNarrative,
+      model_versions: { stage1: BEDROCK_MODEL, stage2: BEDROCK_MODEL },
     })
 
   } catch (error: unknown) {

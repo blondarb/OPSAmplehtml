@@ -45,7 +45,7 @@ export interface TriageResult {
 
 /**
  * Run a single triage call against AWS Bedrock Claude and return structured results.
- * Does NOT persist to Supabase — callers handle storage.
+ * Does NOT persist to DB — callers handle storage.
  */
 export async function runTriage(input: TriageInput): Promise<TriageResult> {
   const temperature = typeof input.temperature === 'number'

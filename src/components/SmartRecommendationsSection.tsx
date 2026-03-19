@@ -111,7 +111,7 @@ export default function SmartRecommendationsSection({
     return () => observer.disconnect()
   }, [])
 
-  // State for Supabase data
+  // State for database data
   const [availablePlans, setAvailablePlans] = useState<{ plan_id: string; title: string; icd10_codes: string[]; linked_diagnoses: string[]; diagnosis_scores?: Record<string, number> }[]>([])
   const [currentPlan, setCurrentPlan] = useState<ClinicalPlan | null>(null)
   const [isLoading, setIsLoading] = useState(false)
