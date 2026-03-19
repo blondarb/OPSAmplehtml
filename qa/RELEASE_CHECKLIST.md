@@ -9,7 +9,7 @@
 ### Build & Code
 - [ ] **Build passes**: `npm run build` exits 0, no TS errors
 - [ ] **Branch pushed**: Feature branch pushed, Vercel preview created
-- [ ] **Migration reviewed**: Any new `supabase/migrations/` file reviewed and applied to staging
+- [ ] **Migration reviewed**: Any new RDS migration reviewed and applied to staging
 - [ ] **No secrets in code**: No `.env` values, API keys, or credentials committed
 - [ ] **No console errors**: Browser console clean on dashboard and portal pages
 - [ ] **PR created**: Feature branch has PR with summary of changes

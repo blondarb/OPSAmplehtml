@@ -7,7 +7,7 @@ AI-powered clinical documentation platform for neurology outpatient practices.
 ### Clinical Documentation
 - **Tabbed Interface**: History, Imaging/Results, Physical Exams, Recommendation
 - **Reason for Consult**: Two-tier selection with 9 categories and 100+ sub-options
-- **Differential Diagnosis**: Auto-population from chief complaint with ICD-10 codes (134 diagnoses)
+- **Differential Diagnosis**: Auto-population from chief complaint with ICD-10 codes (166 diagnoses)
 - **Neurological Exam**: Comprehensive checkbox-based exam with all cranial nerves, motor, sensory, coordination, gait
 
 ### Voice & Dictation (Red Theme)
@@ -29,27 +29,24 @@ AI-powered clinical documentation platform for neurology outpatient practices.
 - **Dot Phrases**: Text expansion with field scoping and categories
 - **Imaging/Results Tab**: Collapsible study cards for MRI, CT, EEG, labs
 - **Prior Visits**: Expandable visit cards with AI summaries
-- **Secure Authentication**: Email/password via Supabase Auth
+- **Secure Authentication**: Email/password via AWS Cognito
 
 ## Tech Stack
 
 - [Next.js 15](https://nextjs.org/) - React framework with App Router
-- [Supabase](https://supabase.com/) - Database & authentication
-- [OpenAI](https://openai.com/) - GPT-4 + Whisper for AI capabilities
+- [AWS RDS](https://aws.amazon.com/rds/) - PostgreSQL database
+- [AWS Cognito](https://aws.amazon.com/cognito/) - Authentication
+- [AWS Bedrock](https://aws.amazon.com/bedrock/) - AI (Claude Sonnet 4.6)
 - [Tailwind CSS](https://tailwindcss.com/) - Styling
-- [Vercel](https://vercel.com/) - Deployment
-
-## Live Demo
-
-https://ops-amplehtml.vercel.app/
+- [AWS Amplify](https://aws.amazon.com/amplify/) - Deployment
 
 ## Getting Started
 
 ### Prerequisites
 
 - Node.js 18+
-- Supabase account
-- OpenAI API key
+- AWS account with RDS, Cognito, and Bedrock configured
+- OpenAI API key (for Whisper transcription)
 
 ### Setup
 
@@ -61,30 +58,24 @@ cd OPSAmplehtml
 
 2. Install dependencies:
 ```bash
-npm install
+pnpm install
 ```
 
-3. Create `.env.local` with your Supabase credentials:
+3. Create `.env.local` with your AWS credentials (see CLAUDE.md for full list):
 ```
-NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
-NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
+COGNITO_USER_POOL_ID=us-east-2_...
+COGNITO_CLIENT_ID=...
+RDS_HOST=...
+RDS_USER=...
+RDS_PASSWORD=...
+RDS_DATABASE=ops_amplehtml
+BEDROCK_ACCESS_KEY_ID=...
+BEDROCK_SECRET_ACCESS_KEY=...
 ```
 
-4. Set up the database:
-   - Go to Supabase SQL Editor
-   - Run migrations in order:
-     - `supabase/migrations/001_initial_schema.sql`
-     - `supabase/migrations/002_seed_demo_data.sql`
-     - `supabase/migrations/003_dot_phrases.sql`
-     - `supabase/migrations/004_dot_phrases_scope.sql`
-
-5. Add your OpenAI API key (one of):
-   - In Supabase Table Editor, go to `app_settings`, insert row with `key: 'openai_api_key'`, `value: 'sk-your-key'`
-   - Or add `OPENAI_API_KEY=sk-your-key` to `.env.local`
-
-6. Start the development server:
+4. Start the development server:
 ```bash
-npm run dev
+pnpm run dev
 ```
 
 Open [http://localhost:3000](http://localhost:3000) to view the app.
@@ -107,28 +98,17 @@ src/
 │   └── signup/                    # Signup page
 ├── components/
 │   ├── AiDrawer.tsx               # AI Assistant (Ask AI, Summary, Handout) - teal theme
-│   ├── AiSuggestionPanel.tsx      # Inline AI suggestions for text fields
 │   ├── CenterPanel.tsx            # Main content with 4 tabs
 │   ├── ClinicalNote.tsx           # State management + Generate Note
-│   ├── DifferentialDiagnosisSection.tsx  # Diagnosis picker with ICD-10
-│   ├── DotPhrasesDrawer.tsx       # Dot phrases management
-│   ├── ImagingResultsTab.tsx      # Collapsible imaging/lab cards
 │   ├── LeftSidebar.tsx            # Patient info, prior visits, scores
-│   ├── NoteTextField.tsx          # Text field with action buttons
-│   ├── ReasonForConsultSection.tsx # Two-tier consult selection
-│   ├── SmartScalesSection.tsx     # Clinical scales with scoring
 │   ├── TopNav.tsx                 # Navigation header
 │   └── VoiceDrawer.tsx            # Voice (Chart Prep, Document) - red theme
-├── hooks/
-│   └── useVoiceRecorder.ts        # Pause/resume recording hook
 ├── lib/
-│   ├── diagnosisData.ts           # 134 diagnoses with ICD-10 codes
-│   ├── note-merge/                # Merge AI outputs with manual content
-│   │   ├── types.ts
-│   │   ├── merge-engine.ts
-│   │   └── index.ts
-│   ├── reasonForConsultData.ts    # 9 categories with sub-options
-│   └── supabase/                  # Supabase clients
+│   ├── bedrock.ts                 # AWS Bedrock AI client
+│   ├── cognito/                   # AWS Cognito auth helpers
+│   ├── db.ts                      # RDS connection pools
+│   ├── db-query.ts                # Query builder over node-postgres
+│   └── diagnosisData.ts           # 166 diagnoses with ICD-10 codes
 └── middleware.ts                  # Auth middleware
 ```
 
@@ -167,19 +147,10 @@ The application uses two separate slide-out drawers for different functionality:
 - [docs/IMPLEMENTATION_STATUS.md](./docs/IMPLEMENTATION_STATUS.md) - Feature tracking
 - [docs/Sevaro_Outpatient_MVP_PRD_v1.4.md](./docs/Sevaro_Outpatient_MVP_PRD_v1.4.md) - Product requirements
 - [docs/PRD_AI_Scribe.md](./docs/PRD_AI_Scribe.md) - AI feature specifications
-- [prototype/](./prototype/) - Original HTML wireframe
 
 ## Deployment
 
-Deploy to Vercel:
-
-1. Connect your GitHub repository to Vercel
-2. Add environment variables in Vercel project settings:
-   - `NEXT_PUBLIC_SUPABASE_URL`
-   - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
-3. Deploy
-
-When redeploying, use "Redeploy without cache" for fresh builds.
+Deployed on AWS Amplify with push-to-deploy from `main`. Environment variables are set in the Amplify console.
 
 ## License
 
