@@ -233,7 +233,7 @@ const STATUS_CONFIG: Record<FeedbackStatus, { label: string; color: string; bg: 
   declined: { label: 'Declined', color: '#6B7280', bg: '#F3F4F6', border: '#9CA3AF' },
 }
 
-// Feedback item interface (matches Supabase feedback table)
+// Feedback item interface (matches RDS feedback table)
 interface FeedbackItem {
   id: string
   text: string
@@ -2471,7 +2471,7 @@ export default function IdeasDrawer({ isOpen, onClose, initialTab, onStartTour }
                           System Prompts
                         </h4>
                         <p style={{ fontSize: '12px', color: 'var(--text-muted)', margin: '0 0 12px 0' }}>
-                          Read-only overview of AI system prompts. Editing via Supabase coming soon.
+                          Read-only overview of AI system prompts. Editing via admin panel coming soon.
                         </p>
 
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>

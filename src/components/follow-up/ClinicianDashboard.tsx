@@ -83,7 +83,7 @@ export default function ClinicianDashboard({
 }: ClinicianDashboardProps) {
   const [liveDashboard, setLiveDashboard] = useState<DashboardUpdate | null>(null)
 
-  // Poll for live session updates (replaces Supabase Realtime)
+  // Poll for live session updates 
   useEffect(() => {
     if (!liveSessionId) {
       setLiveDashboard(null)

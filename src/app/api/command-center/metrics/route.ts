@@ -77,7 +77,7 @@ export async function GET(request: NextRequest) {
     const viewMode = searchParams.get('view_mode') || 'my_patients'
     const timeRange = searchParams.get('time_range') || 'today'
 
-    // TODO: Replace demo data with live Supabase queries per data source.
+    // TODO: Replace demo data with live RDS queries per data source.
     //
     // Future query targets (all scoped by viewMode / timeRange):
     //   schedule   — visits WHERE visit_date = today

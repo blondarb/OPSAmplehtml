@@ -6,7 +6,7 @@ import { from } from '@/lib/db-query'
 export async function GET() {
   const diagnostics: Record<string, unknown> = {
     timestamp: new Date().toISOString(),
-    supabaseUrl: process.env.NEXT_PUBLIC_SUPABASE_URL || 'NOT SET',
+    database: 'AWS RDS (node-postgres)',
     checks: {}
   }
 

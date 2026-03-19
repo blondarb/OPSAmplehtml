@@ -230,7 +230,7 @@ export default function ConceptHero() {
           lineHeight: 1.7,
           margin: 0,
         }}>
-          This system now includes a live integration path: Apple Watch data flows through the Sevaro Monitor iOS companion app into Supabase, where the AI engine can analyze it against personal baselines. The demo patient shows 30 days of simulated Parkinson&apos;s data; live patients show real Apple Watch biometrics.
+          This system now includes a live integration path: Apple Watch data flows through the Sevaro Monitor iOS companion app into AWS RDS, where the AI engine (Bedrock) can analyze it against personal baselines. The demo patient shows 30 days of simulated Parkinson&apos;s data; live patients show real Apple Watch biometrics.
         </p>
       </div>
 
@@ -369,7 +369,7 @@ export default function ConceptHero() {
             </svg>
           </div>
 
-          {/* Supabase */}
+          {/* AWS RDS */}
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px', minWidth: '120px', maxWidth: '140px' }}>
             <div style={{
               width: '44px', height: '44px', borderRadius: '50%',
@@ -382,7 +382,7 @@ export default function ConceptHero() {
                 <path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5" />
               </svg>
             </div>
-            <span style={{ color: '#e2e8f0', fontSize: '0.72rem', fontWeight: 600 }}>Supabase</span>
+            <span style={{ color: '#e2e8f0', fontSize: '0.72rem', fontWeight: 600 }}>AWS RDS</span>
             <span style={{ color: '#64748b', fontSize: '0.65rem', textAlign: 'center', lineHeight: 1.3 }}>
               Patient profiles, daily summaries, baselines, anomalies
             </span>

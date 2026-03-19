@@ -90,7 +90,7 @@ export default function DotPhrasesDrawer({
         if (response.status === 401) {
           setLoadError('Please log in to use dot phrases.')
         } else if (data.error?.includes('does not exist')) {
-          setLoadError('Database not set up. Please run migrations: 003_dot_phrases.sql and 004_dot_phrases_scope.sql in Supabase SQL Editor.')
+          setLoadError('Database not set up. Dot phrases tables may be missing from RDS.')
         } else {
           setLoadError(data.error || 'Failed to load phrases')
         }

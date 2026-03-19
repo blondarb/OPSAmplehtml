@@ -53,7 +53,7 @@ export async function POST(request: NextRequest) {
 
     // ── TODO: Production flow ───────────────────────────────────────────────
     //
-    // 1. Build data snapshot by querying Supabase (scoped by physician_id,
+    // 1. Build data snapshot by querying RDS (scoped by physician_id,
     //    view_mode, and time_range):
     //      - visits:             scheduled for today
     //      - patient_messages:   unread inbound messages

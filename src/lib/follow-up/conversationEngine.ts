@@ -67,7 +67,7 @@ const FALLBACK_OUTPUT: ConversationTurnOutput = {
 /**
  * Core conversation turn logic — shared between browser chat and Twilio SMS webhook.
  * Takes a patient message + context, calls AWS Bedrock Claude, runs escalation detection,
- * returns structured output. Does NOT handle Supabase persistence (caller does that).
+ * returns structured output. Does NOT handle DB persistence (caller does that).
  *
  * Note: The `apiKey` parameter is kept for backward compatibility but is no longer used.
  * AWS credentials come from environment variables.

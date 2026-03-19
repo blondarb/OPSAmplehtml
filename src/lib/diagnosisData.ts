@@ -1,7 +1,7 @@
 // Neurology Diagnosis Data Structure
 // 166 diagnoses across 16 categories with ICD-10 codes
 // Based on neuro-plans clinical decision support templates
-// hasSmartPlan flag synced with 127 plans in Supabase clinical_plans table (Feb 2026)
+// hasSmartPlan flag synced with 127 plans in RDS clinical_plans table (Feb 2026)
 // 9 diagnoses intentionally excluded (no dedicated plan; would match wrong plan via ICD-10 prefix)
 
 export interface Diagnosis {

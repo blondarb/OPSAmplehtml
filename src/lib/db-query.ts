@@ -1,17 +1,16 @@
 /**
- * Lightweight Supabase-compatible query builder backed by node-postgres (pg).
+ * Query builder backed by node-postgres (pg) connecting to AWS RDS.
  *
- * Provides the same chaining API as Supabase client:
- *   db.from('table').select('*').eq('col', val).order('col').single()
+ * Chaining API:
+ *   from('table').select('*').eq('col', val).order('col').single()
  *
- * Returns { data, error } just like Supabase, so consuming code needs
- * minimal changes — only the import and initialization line.
+ * Returns { data, error } for consistent error handling.
  */
 import { getPool, getWearablePool } from './db'
 
 // ── public entry points ──────────────────────────────────────────────
 
-/** Start a query on a table — drop-in replacement for supabase.from() */
+/** Start a query on a table */
 export function from(table: string): QueryBuilder {
   return new QueryBuilder(table)
 }
@@ -21,7 +20,7 @@ export function wearableFrom(table: string): QueryBuilder {
   return new QueryBuilder(table, getWearablePool)
 }
 
-/** Replace supabase.rpc('get_openai_key') — returns { data, error } like Supabase */
+/** Fetch the OpenAI key from app_settings */
 export async function getOpenAIKey(): Promise<DbResult> {
   try {
     const pool = await getPool()
@@ -48,7 +47,7 @@ export async function rpc(
       .join(', ')
     const sql = `SELECT * FROM ${fnName}(${namedPlaceholders || ''})`
     const { rows } = await pool.query(sql, paramEntries.map(([, v]) => v))
-    // Supabase RPC returns the scalar if function returns a single value
+    // Return scalar if function returns a single value
     if (rows.length === 1 && Object.keys(rows[0]).length === 1) {
       return { data: Object.values(rows[0])[0], error: null }
     }
@@ -60,7 +59,7 @@ export async function rpc(
 
 // ── types ────────────────────────────────────────────────────────────
 
-/** Matches Supabase error shape so consuming code can access .message, .code */
+/** Standard result shape with .message, .code on errors */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export type DbResult = { data: any; error: { message: string; code?: string; details?: any; hint?: any } | null; count?: number | null }
 
@@ -193,9 +192,9 @@ class QueryBuilder implements PromiseLike<DbResult> {
   }
 
   not(col: string, operator: string, val: string): this {
-    // Supabase: .not('id', 'in', '(1,2,3)')
+    // .not('id', 'in', '(1,2,3)')
     if (operator === 'in') {
-      // Parse the Supabase format: "(val1,val2,...)"
+      // Parse the parenthesized format: "(val1,val2,...)"
       const inner = val.replace(/^\(|\)$/g, '')
       const items = inner.split(',').map(s => s.trim())
       const placeholders = items.map(() => '?').join(', ')

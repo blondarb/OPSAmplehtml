@@ -98,7 +98,7 @@ export async function POST(request: Request) {
     // Deterministic scoring — application code calculates tier
     const scoring = calculateTriageTier(aiResponse)
 
-    // Store in Supabase
+    // Store in RDS
     let sessionId = crypto.randomUUID()
     try {
       const { data: inserted, error: insertError } = await from('triage_sessions')
@@ -139,11 +139,11 @@ export async function POST(request: Request) {
       if (!insertError && inserted) {
         sessionId = inserted.id
       } else if (insertError) {
-        console.error('Supabase insert error (non-fatal):', insertError)
+        console.error('DB insert error (non-fatal):', insertError)
       }
     } catch (err) {
       // Non-fatal — triage still works without DB storage in demo mode
-      console.error('Supabase storage error (non-fatal):', err)
+      console.error('DB storage error (non-fatal):', err)
     }
 
     // Build response per playbook Section 5.3
