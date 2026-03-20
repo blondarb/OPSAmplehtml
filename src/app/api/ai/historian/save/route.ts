@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { getUser } from '@/lib/cognito/server'
 import { getTenantServer } from '@/lib/tenant'
 import { from } from '@/lib/db-query'
+import { linkHistorianToConsult } from '@/lib/consult/pipeline'
 
 export async function POST(request: Request) {
   try {
@@ -35,7 +36,25 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: error.message }, { status: 500 })
     }
 
-    return NextResponse.json({ session: data })
+    // Phase 1 pipeline: link the saved historian session back to the consult
+    const consultId: string | undefined = body.consult_id
+    if (consultId && data) {
+      try {
+        await linkHistorianToConsult(
+          consultId,
+          data.id,
+          body.narrative_summary || '',
+          body.structured_output || {},
+          body.red_flags || [],
+          body.safety_escalated || false,
+        )
+      } catch (pipelineErr) {
+        // Non-fatal — historian session is saved regardless
+        console.error('[historian/save] consult linkage error (non-fatal):', pipelineErr)
+      }
+    }
+
+    return NextResponse.json({ session: data, consult_id: consultId || null })
   } catch (error: any) {
     console.error('Historian save API error:', error)
     return NextResponse.json(

@@ -4,6 +4,8 @@ import { calculateTriageTier, validateAIResponse } from '@/lib/triage/scoring'
 import { TRIAGE_SYSTEM_PROMPT, buildTriageUserPrompt } from '@/lib/triage/systemPrompt'
 import { AITriageResponse, DISCLAIMER_TEXT } from '@/lib/triage/types'
 import { from } from '@/lib/db-query'
+import { createConsult, linkTriageToConsult } from '@/lib/consult/pipeline'
+import { deriveChiefComplaint, buildTriageSummaryForConsult } from '@/lib/consult/contextBuilder'
 
 const TRIAGE_MODEL = process.env.BEDROCK_TRIAGE_MODEL || BEDROCK_MODEL
 
@@ -20,6 +22,11 @@ export async function POST(request: Request) {
       note_type_detected, batch_id, fusion_group_id,
       // Validation: optional temperature override (default 0.2)
       temperature: requestedTemp,
+      // Phase 1 pipeline fields
+      // create_consult: true  → auto-create a neurology_consults row after triage
+      // consult_id: string    → link this triage result to an existing consult
+      create_consult: createConsultFlag,
+      consult_id: existingConsultId,
     } = body
 
     // Clamp temperature to [0, 1] range — default 0 for maximum consistency
@@ -146,6 +153,46 @@ export async function POST(request: Request) {
       console.error('DB storage error (non-fatal):', err)
     }
 
+    // ── Phase 1: Consult pipeline integration ───────────────────────────────
+    // Non-fatal — triage response is returned regardless of pipeline status.
+    let consultId: string | null = null
+    try {
+      // Build the data we'll write into the consult record
+      const chiefComplaint = deriveChiefComplaint(
+        aiResponse.clinical_reasons || [],
+        referral_text,
+        aiResponse.subspecialty_recommendation || '',
+      )
+      const triageSummary = buildTriageSummaryForConsult(
+        scoring.display,
+        aiResponse.clinical_reasons || [],
+        aiResponse.suggested_workup || [],
+        aiResponse.subspecialty_recommendation || '',
+        aiResponse.subspecialty_rationale || '',
+      )
+      const triageConsultData = {
+        triage_session_id: sessionId,
+        triage_urgency: scoring.tier,
+        triage_tier_display: scoring.display,
+        triage_summary: triageSummary,
+        triage_chief_complaint: chiefComplaint,
+        triage_red_flags: aiResponse.red_flags || [],
+        triage_subspecialty: aiResponse.subspecialty_recommendation || '',
+      }
+
+      if (existingConsultId) {
+        // Link this triage result to a pre-existing consult record
+        await linkTriageToConsult(existingConsultId, triageConsultData)
+        consultId = existingConsultId
+      } else if (createConsultFlag) {
+        // Auto-create a new consult record for this triage
+        const consult = await createConsult(referral_text, triageConsultData, patient_id || undefined)
+        consultId = consult?.id || null
+      }
+    } catch (consultErr) {
+      console.error('Consult pipeline integration error (non-fatal):', consultErr)
+    }
+
     // Build response per playbook Section 5.3
     return NextResponse.json({
       session_id: sessionId,
@@ -169,6 +216,8 @@ export async function POST(request: Request) {
       redirect_specialty: aiResponse.redirect_specialty || null,
       redirect_rationale: aiResponse.redirect_rationale || null,
       disclaimer: DISCLAIMER_TEXT,
+      // Phase 1 pipeline — present if create_consult or consult_id was provided
+      consult_id: consultId,
     })
   } catch (error: unknown) {
     console.error('Triage API Error:', error)

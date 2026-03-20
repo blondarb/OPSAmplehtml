@@ -13,3 +13,4 @@ docs/SEVARO_EVIDENCE_ENGINE_PLAYBOOK
 docs/NEUROSCRIBE_WORKFLOW_REDESIGN
 # Data file content
 data/plans.json
+src/app/api/ai/historian/localizer/route.ts
