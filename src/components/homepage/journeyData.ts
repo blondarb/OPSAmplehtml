@@ -33,6 +33,14 @@ export const clinicianTrack: JourneyTrackData = {
       description: 'A referral arrives. AI reads it, scores acuity, and routes to the right subspecialist.',
     },
     {
+      phase: 'Intake Pipeline',
+      name: 'Neuro Intake Engine',
+      route: '/consult',
+      icon: ClipboardList,
+      status: 'live',
+      description: 'End-to-end consult pipeline — triage, AI historian, patient tools, scales, and unified report.',
+    },
+    {
       phase: 'My Day',
       name: 'Clinician Cockpit',
       route: '/physician',
