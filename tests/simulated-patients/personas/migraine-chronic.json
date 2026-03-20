@@ -1,0 +1,122 @@
+{
+  "id": "migraine-chronic",
+  "name": "Chronic Migraine with Medication Overuse",
+  "description": "35F with chronic migraine with aura, medication overuse headache. Presents with increasing frequency and daily analgesic use.",
+
+  "demographics": {
+    "age": 35,
+    "sex": "F",
+    "name": "Sarah Mitchell",
+    "date_of_birth": "03/15/1991",
+    "email": "sarah.mitchell@example.com",
+    "phone": "555-0142"
+  },
+
+  "referralText": "35-year-old female with chronic daily headaches for the past 6 months. History of episodic migraine with visual aura since age 20. Reports 20+ headache days per month, up from 4-5 per month two years ago. Currently taking sumatriptan 100mg as needed (using 10-15 times per month) and ibuprofen 800mg daily. Previously tried topiramate 100mg but discontinued due to cognitive side effects (word-finding difficulty). No papilledema on exam. Normal neurological examination. BMI 28. Reports significant impact on work attendance and daily activities. Mother has history of migraines. No recent head trauma. Blood pressure 128/82. Requesting neurology consultation for headache management and medication overuse evaluation.",
+
+  "expectedTriage": {
+    "urgency": "routine",
+    "redFlags": [],
+    "subspecialty": "Headache"
+  },
+
+  "intakeData": {
+    "patient_name": "Sarah Mitchell",
+    "date_of_birth": "03/15/1991",
+    "email": "sarah.mitchell@example.com",
+    "phone": "555-0142",
+    "chief_complaint": "Chronic daily headaches that have been getting worse over the past 6 months. I used to get migraines a few times a month but now I have headaches almost every day.",
+    "current_medications": "Sumatriptan 100mg as needed (taking about 10-15 times per month), ibuprofen 800mg daily, oral contraceptive pills",
+    "allergies": "Sulfa drugs - causes rash. No food allergies.",
+    "medical_history": "Episodic migraine with aura since age 20. Anxiety disorder. Appendectomy at age 16.",
+    "family_history": "Mother has migraines. Father has hypertension. Maternal grandmother had stroke at age 72."
+  },
+
+  "historyResponses": [
+    {
+      "question_pattern": "What brings you in today?",
+      "response": "I've been having these terrible headaches almost every single day for the last six months. I used to get migraines maybe four or five times a month, but now it's like twenty days out of the month I have some kind of headache."
+    },
+    {
+      "question_pattern": "When did this start?",
+      "response": "The daily headaches started creeping up about six months ago. But I've had migraines since I was twenty. They used to be manageable but started getting worse about two years ago when I was going through a stressful time at work."
+    },
+    {
+      "question_pattern": "Where is the pain located?",
+      "response": "Usually on the right side of my head, around my temple and behind my eye. Sometimes it spreads to both sides, especially when it's been going on all day. The bad migraines are always on the right."
+    },
+    {
+      "question_pattern": "How long do your headaches last?",
+      "response": "The full-blown migraines last anywhere from 12 to 72 hours if I don't take anything. The daily background headache is pretty much constant - it's there when I wake up and there when I go to sleep. Some days are worse than others."
+    },
+    {
+      "question_pattern": "Can you describe what the pain feels like?",
+      "response": "The migraines are a throbbing, pounding pain that gets worse when I move around or bend over. The daily headache is more of a dull pressure, like a band around my head. Before the bad migraines I sometimes see zigzag lines and flashing lights in my vision for about 20 minutes."
+    },
+    {
+      "question_pattern": "What makes it worse?",
+      "response": "Stress, not sleeping well, bright lights, loud noises, certain smells like perfume, and my period - I always get a bad migraine right before my period. Physical activity makes the throbbing worse. Also skipping meals."
+    },
+    {
+      "question_pattern": "What makes it better?",
+      "response": "Lying down in a dark quiet room helps. Sumatriptan usually helps if I catch the migraine early, but lately it doesn't seem to work as well. Ibuprofen takes the edge off the daily headache. Cold compress on my forehead helps a little."
+    },
+    {
+      "question_pattern": "How severe is the pain?",
+      "response": "The daily headache is about a 4 or 5 out of 10. The full migraines are an 8 or 9 out of 10 - I can't function at all during those. I've missed about two days of work per month because of the bad ones."
+    },
+    {
+      "question_pattern": "Do you have any other symptoms with the headaches?",
+      "response": "With the migraines I get nausea, sometimes vomiting, sensitivity to light and sound, and the visual aura I mentioned - the zigzag lines. I also feel really tired and kind of foggy the day after a bad migraine. No numbness or weakness though."
+    },
+    {
+      "question_pattern": "What medications are you currently taking?",
+      "response": "Sumatriptan 100mg - I take it when I feel a migraine coming on, probably 10 to 15 times a month now. Ibuprofen 800mg every day, sometimes twice a day. And birth control pills. I tried topiramate before but I had to stop because I couldn't think of words and felt stupid on it."
+    },
+    {
+      "question_pattern": "Do you have any allergies?",
+      "response": "Yes, I'm allergic to sulfa drugs. I got a bad rash from them years ago. No food allergies."
+    },
+    {
+      "question_pattern": "Any other medical conditions?",
+      "response": "I have anxiety that I manage without medication. I had my appendix out when I was sixteen. No other major medical problems."
+    },
+    {
+      "question_pattern": "Any family history of neurological conditions?",
+      "response": "My mom gets migraines too - she's had them her whole life. My dad has high blood pressure. My grandma on my mom's side had a stroke when she was in her seventies."
+    },
+    {
+      "question_pattern": "Tell me about your daily life - work, sleep, habits.",
+      "response": "I work as a marketing manager - desk job, lots of screen time. I try to get 7 hours of sleep but the headaches wake me up sometimes. I drink two cups of coffee a day. I used to exercise regularly but I've stopped because it triggers headaches. No smoking, occasional glass of wine but I've mostly stopped because it triggers migraines. No recreational drugs."
+    }
+  ],
+
+  "structuredHistory": {
+    "chief_complaint": "Chronic daily headaches with 20+ headache days per month, worsening over 6 months on a background of episodic migraine with visual aura since age 20",
+    "onset": "Episodic migraine since age 20; chronic daily pattern escalating over the past 6 months, coinciding with increased analgesic use",
+    "location": "Right-sided (temple, retro-orbital) for migraines; bilateral band-like distribution for daily headache",
+    "duration": "Migraines 12-72 hours untreated; daily background headache essentially continuous",
+    "character": "Migraines: throbbing, pounding, worse with movement. Daily headache: dull pressure, band-like",
+    "aggravating_factors": "Stress, poor sleep, bright lights, loud noises, strong smells, menstruation, physical activity, skipping meals",
+    "relieving_factors": "Dark quiet room, sumatriptan (decreasing efficacy), ibuprofen (partial relief), cold compress",
+    "timing": "Daily background headache present upon waking; full migraines cluster around menses and times of stress",
+    "severity": "Daily headache 4-5/10; migraines 8-9/10 with functional impairment; missing ~2 work days/month",
+    "associated_symptoms": "Visual aura (zigzag lines, flashing lights) lasting 20 min preceding migraines; nausea, vomiting, photophobia, phonophobia; post-ictal fatigue and cognitive fog. No numbness, weakness, or focal deficits.",
+    "current_medications": "Sumatriptan 100mg PRN (10-15 doses/month); Ibuprofen 800mg daily; Oral contraceptive pills. Previously on topiramate 100mg - discontinued due to word-finding difficulty.",
+    "allergies": "Sulfa drugs (rash). No food allergies.",
+    "past_medical_history": "Episodic migraine with aura (age 20). Anxiety disorder (unmedicated). Appendectomy (age 16).",
+    "family_history": "Mother: migraines (lifelong). Father: hypertension. Maternal grandmother: stroke (age 72).",
+    "social_history": "Marketing manager, desk-based. 2 cups coffee/day. Former regular exerciser - stopped due to headache triggers. No tobacco. Rare alcohol (mostly stopped due to migraine trigger). No recreational drugs. Sleep 7 hours/night, occasionally disrupted by headache.",
+    "review_of_systems": "Negative for fever, weight loss, vision changes (beyond aura), numbness, weakness, seizures, syncope, neck stiffness. Positive for anxiety, fatigue."
+  },
+
+  "narrativeSummary": "Ms. Sarah Mitchell is a 35-year-old woman presenting with chronic daily headaches over the past 6 months, on a background of episodic migraine with visual aura since age 20. Her headache frequency has escalated from 4-5 to 20+ days per month, with a continuous dull pressure headache and superimposed right-sided throbbing migraines with visual aura (zigzag lines), nausea, photophobia, and phonophobia. Notably, she is using sumatriptan 10-15 times per month and daily ibuprofen 800mg, raising significant concern for medication overuse headache. Previous topiramate trial was limited by cognitive side effects. Her migraines are worsened by stress, menses, bright lights, and physical activity, and partially relieved by dark rooms and acute medications. Family history is positive for migraines (mother). No red flags identified: no thunderclap onset, no focal deficits, no papilledema, no fever or weight loss.",
+
+  "expectedScales": ["midas", "hit6", "phq9"],
+  "expectedDDx": [
+    { "diagnosis": "Chronic migraine with aura", "likelihood": "high" },
+    { "diagnosis": "Medication overuse headache", "likelihood": "high" },
+    { "diagnosis": "Tension-type headache", "likelihood": "medium" }
+  ],
+  "expectedRedFlags": []
+}

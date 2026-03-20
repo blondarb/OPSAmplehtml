@@ -1,0 +1,112 @@
+{
+  "id": "first-seizure",
+  "name": "First Unprovoked Generalized Tonic-Clonic Seizure",
+  "description": "22M with witnessed generalized tonic-clonic seizure, no prior seizure history. Tongue laceration, postictal confusion.",
+
+  "demographics": {
+    "age": 22,
+    "sex": "M",
+    "name": "Marcus Johnson",
+    "date_of_birth": "05/08/2003",
+    "email": "marcus.j@example.com",
+    "phone": "555-0456"
+  },
+
+  "referralText": "22-year-old male presenting to ED after witnessed generalized tonic-clonic seizure approximately 30 minutes ago. Patient's roommate reports he was sitting at his desk studying when he suddenly let out a cry, became stiff (tonic phase approximately 15-20 seconds), followed by rhythmic jerking of all four extremities lasting approximately 2 minutes. He was incontinent of urine during the episode. Postictally he was confused and combative for approximately 10 minutes and is now somnolent but arousable. Lateral tongue laceration noted. No prior history of seizures. Patient denies alcohol abuse, recreational drug use, or recent head trauma when interviewed after postictal confusion cleared. He reports getting about 4 hours of sleep per night for the past week due to finals preparation. No family history of epilepsy per patient. Vitals: BP 142/88, HR 96, Temp 98.8F, glucose 104. No focal neurological deficits on exam. CT head non-contrast is negative for acute intracranial pathology. Requesting neurology consultation for first seizure evaluation.",
+
+  "expectedTriage": {
+    "urgency": "urgent",
+    "redFlags": ["first seizure"],
+    "subspecialty": "Epilepsy"
+  },
+
+  "intakeData": {
+    "patient_name": "Marcus Johnson",
+    "date_of_birth": "05/08/2003",
+    "email": "marcus.j@example.com",
+    "phone": "555-0456",
+    "chief_complaint": "I had a seizure about 30 minutes ago. My roommate says I was shaking all over for about 2 minutes. I don't remember any of it.",
+    "current_medications": "None. I take a multivitamin sometimes but not regularly.",
+    "allergies": "No known allergies to anything",
+    "medical_history": "Generally healthy. No prior seizures. Had a concussion playing football in high school about 5 years ago but recovered fully.",
+    "family_history": "Not aware of any seizures or epilepsy in the family. Mom has high blood pressure. Dad is healthy."
+  },
+
+  "historyResponses": [
+    {
+      "question_pattern": "What happened today?",
+      "response": "I honestly don't remember much. I was sitting at my desk studying for finals and the next thing I know I'm on the floor and paramedics are there. My roommate said I made a weird noise and then started shaking all over. I bit my tongue too - it hurts really bad."
+    },
+    {
+      "question_pattern": "Did you feel anything unusual before it happened?",
+      "response": "Not that I remember. I was just studying and then... nothing. My roommate said it looked like I was fine one second and then my whole body went stiff and I fell out of my chair. I didn't feel any warning or anything weird before."
+    },
+    {
+      "question_pattern": "What did your roommate describe?",
+      "response": "He said first my body went rigid, like a board, for maybe 15 or 20 seconds. Then I started jerking - my arms and legs were shaking rhythmically. He said it lasted about two minutes. He said I also wet myself during it. He put me on my side and called 911."
+    },
+    {
+      "question_pattern": "How did you feel afterward?",
+      "response": "When I started to come around I was really confused. Apparently I was fighting the paramedics a little but I don't remember that at all. My whole body is sore now, like I ran a marathon. My tongue is cut on the side and my head hurts. I feel really tired and foggy."
+    },
+    {
+      "question_pattern": "Has anything like this ever happened before?",
+      "response": "No, never. I've never had a seizure before. I've never fainted or passed out either. This is the first time anything like this has happened."
+    },
+    {
+      "question_pattern": "Have you had any staring spells or brief episodes where you zone out?",
+      "response": "I don't think so. I mean, I space out sometimes when I'm bored in class, but nothing where people say I was unresponsive or acting weird. Just normal daydreaming, I think."
+    },
+    {
+      "question_pattern": "How has your sleep been?",
+      "response": "Terrible, honestly. I've been getting maybe 4 hours a night for the past week because of finals. I've been drinking a lot of coffee and energy drinks to stay up studying. Maybe 4 or 5 cups of coffee a day plus a couple of energy drinks."
+    },
+    {
+      "question_pattern": "Any alcohol or drug use?",
+      "response": "I had a couple beers last weekend at a party but nothing heavy. I don't do any drugs - no weed, no pills, nothing. I know some guys in my dorm use stuff but I stay away from that."
+    },
+    {
+      "question_pattern": "Any head injuries in the past?",
+      "response": "I got a concussion playing football in high school, maybe 5 years ago. I was out for a few days and had headaches for a couple weeks after, but I recovered completely. The doctor cleared me to play again after a month."
+    },
+    {
+      "question_pattern": "Any other medical conditions or medications?",
+      "response": "No, I'm generally pretty healthy. I don't take any medications regularly. Sometimes I take a multivitamin but not consistently. No surgeries, no hospitalizations before today."
+    },
+    {
+      "question_pattern": "Any seizures or epilepsy in your family?",
+      "response": "Not that I know of. My mom has high blood pressure and my dad is healthy. I don't think any of my grandparents had seizures. No one in my family that I know of has epilepsy."
+    }
+  ],
+
+  "structuredHistory": {
+    "chief_complaint": "First witnessed generalized tonic-clonic seizure 30 minutes ago, no prior seizure history",
+    "onset": "Sudden onset approximately 30 minutes ago while seated at desk studying. No prodromal symptoms or aura reported.",
+    "location": "Generalized - all four extremities involved in tonic-clonic activity. Lateral tongue laceration.",
+    "duration": "Tonic phase ~15-20 seconds, clonic phase ~2 minutes. Postictal confusion ~10 minutes. Currently somnolent but arousable.",
+    "character": "Witnessed generalized tonic-clonic seizure: initial cry, tonic stiffening, followed by bilateral rhythmic jerking. Urinary incontinence during episode. Postictal confusion and combativeness followed by somnolence.",
+    "aggravating_factors": "Severe sleep deprivation (4 hours/night for 1 week), excessive caffeine intake (4-5 coffees + energy drinks daily). Finals stress.",
+    "relieving_factors": "Seizure self-terminated. Postictal confusion resolved over ~10 minutes.",
+    "timing": "Single episode, no prior history of seizures or seizure-like episodes.",
+    "severity": "Generalized tonic-clonic seizure with incontinence, tongue bite, and postictal confusion. Currently has diffuse myalgia, headache, and fatigue.",
+    "associated_symptoms": "Postictal: confusion, combativeness, somnolence, diffuse myalgia, headache, tongue laceration. No fever. No focal deficits.",
+    "current_medications": "None (occasional multivitamin).",
+    "allergies": "No known allergies.",
+    "past_medical_history": "Concussion from football ~5 years ago with full recovery. No prior seizures, syncope, or staring spells. No hospitalizations or surgeries.",
+    "family_history": "No family history of epilepsy or seizures. Mother: hypertension. Father: healthy.",
+    "social_history": "College student (22M). Severe sleep deprivation due to finals (4 hrs/night x 1 week). Excessive caffeine (4-5 coffees + energy drinks daily). Social alcohol (few beers on weekends). Denies recreational drugs. Former high school football player.",
+    "review_of_systems": "Positive: postictal headache, diffuse myalgia, fatigue, somnolence, tongue laceration. Negative: no fever, no focal weakness, no vision changes, no prior seizures, no staring spells, no recent head trauma, no weight loss."
+  },
+
+  "narrativeSummary": "Mr. Marcus Johnson is a 22-year-old previously healthy college student presenting with a first witnessed generalized tonic-clonic seizure. His roommate observed a sudden cry, tonic stiffening (~15-20 seconds), bilateral rhythmic clonic jerking (~2 minutes), and urinary incontinence while the patient was seated studying. Postictal confusion lasted approximately 10 minutes with transient combativeness, now somnolent but arousable. Lateral tongue laceration is present. The patient has no prior history of seizures, staring spells, or loss of consciousness. Significant contributing factors include severe sleep deprivation (4 hours/night for the past week due to finals) and excessive caffeine consumption. He has a remote concussion history (5 years ago, full recovery). CT head is negative for acute pathology. No focal deficits on exam. No family history of epilepsy. No substance use. This presentation requires urgent neurology evaluation to determine seizure etiology (provoked vs. unprovoked), consideration of EEG, and MRI brain with epilepsy protocol.",
+
+  "expectedScales": [],
+  "expectedDDx": [
+    { "diagnosis": "Epilepsy (new onset)", "likelihood": "high" },
+    { "diagnosis": "Provoked seizure", "likelihood": "high" },
+    { "diagnosis": "Syncope with convulsive features", "likelihood": "low" }
+  ],
+  "expectedRedFlags": [
+    "first seizure"
+  ]
+}

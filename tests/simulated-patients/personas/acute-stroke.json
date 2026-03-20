@@ -1,0 +1,111 @@
+{
+  "id": "acute-stroke",
+  "name": "Acute Ischemic Stroke Presentation",
+  "description": "68M with sudden onset left-sided weakness and slurred speech 2 hours ago. Known HTN, A-fib on warfarin, DM2.",
+
+  "demographics": {
+    "age": 68,
+    "sex": "M",
+    "name": "Robert Williams",
+    "date_of_birth": "07/22/1957",
+    "email": "rwilliams@example.com",
+    "phone": "555-0287"
+  },
+
+  "referralText": "URGENT - 68-year-old male presenting to ED with sudden onset left-sided weakness and slurred speech approximately 2 hours ago. Wife reports patient was watching television when he suddenly dropped his coffee cup with his left hand and his speech became garbled. On arrival: left facial droop, left arm drift, dysarthria. GCS 14 (E4 V4 M6). Blood pressure 186/102. Heart rate irregular at 88. Blood glucose 210 mg/dL. Past medical history significant for atrial fibrillation on warfarin (last INR 2.1 two weeks ago), hypertension, type 2 diabetes mellitus, hyperlipidemia. Current medications: warfarin 5mg daily, metformin 1000mg BID, lisinopril 20mg daily, atorvastatin 40mg daily. NIHSS estimated at 8. CT head without contrast shows no acute hemorrhage. CTA head and neck pending. Requesting emergent neurology consultation for acute stroke evaluation and treatment decision.",
+
+  "expectedTriage": {
+    "urgency": "emergent",
+    "redFlags": ["acute focal deficit", "speech change", "sudden onset neurological symptoms"],
+    "subspecialty": "Stroke"
+  },
+
+  "intakeData": {
+    "patient_name": "Robert Williams",
+    "date_of_birth": "07/22/1957",
+    "email": "rwilliams@example.com",
+    "phone": "555-0287",
+    "chief_complaint": "Sudden left-sided weakness and difficulty speaking that started about 2 hours ago while watching TV",
+    "current_medications": "Warfarin 5mg daily, metformin 1000mg twice daily, lisinopril 20mg daily, atorvastatin 40mg daily",
+    "allergies": "No known drug allergies",
+    "medical_history": "Atrial fibrillation, hypertension, type 2 diabetes, high cholesterol",
+    "family_history": "Father died of heart attack at 62. Mother had diabetes and a stroke at 75. Brother has atrial fibrillation."
+  },
+
+  "historyResponses": [
+    {
+      "question_pattern": "What happened today?",
+      "response": "I was sitting in my chair watching the news and all of a sudden my left hand just stopped working. I dropped my coffee mug. Then my wife said my face looked funny and I was talking weird. She called 911 right away."
+    },
+    {
+      "question_pattern": "When exactly did this start?",
+      "response": "It was about two hours ago, maybe a little more. I was fine, and then boom, just like that it happened. There was no warning at all - it came on all at once."
+    },
+    {
+      "question_pattern": "Can you describe the weakness?",
+      "response": "My left arm feels heavy and I can't grip things with my left hand. My left leg feels a bit weak too but not as bad. My face feels droopy on the left side and I know I'm not talking right. The words are coming out slurred."
+    },
+    {
+      "question_pattern": "Have these symptoms changed since they started?",
+      "response": "They haven't really gotten better or worse. The arm is still weak and my speech is still off. I feel frustrated because I know what I want to say but it comes out garbled."
+    },
+    {
+      "question_pattern": "Any headache, vision changes, or dizziness?",
+      "response": "I have a mild headache, maybe a 3 out of 10. No changes in my vision that I've noticed. I don't feel dizzy but I feel a bit confused, like things are happening too fast."
+    },
+    {
+      "question_pattern": "Have you ever had symptoms like this before?",
+      "response": "Never. This is the first time anything like this has happened. I've never had a TIA or stroke that I know of."
+    },
+    {
+      "question_pattern": "Tell me about your medical history.",
+      "response": "I have A-fib and I take warfarin for it. I also have high blood pressure, diabetes type 2, and high cholesterol. I take metformin, lisinopril, and a statin. My doctor checks my blood thinner levels regularly - last one was about 2 weeks ago and they said it was fine."
+    },
+    {
+      "question_pattern": "Any allergies to medications?",
+      "response": "No, no allergies to any medications."
+    },
+    {
+      "question_pattern": "Family history of stroke or heart disease?",
+      "response": "My father died of a heart attack when he was 62. My mother had diabetes and she had a stroke when she was 75, she survived but had trouble walking after that. My brother also has A-fib."
+    },
+    {
+      "question_pattern": "Do you smoke, drink, or use any substances?",
+      "response": "I quit smoking about 10 years ago - I smoked a pack a day for 30 years before that. I have a beer or two on weekends, nothing heavy. No drugs or anything like that."
+    }
+  ],
+
+  "structuredHistory": {
+    "chief_complaint": "Sudden onset left-sided weakness and slurred speech approximately 2 hours ago",
+    "onset": "Sudden, approximately 2 hours prior to presentation. Patient was at rest watching television when symptoms began abruptly without warning.",
+    "location": "Left-sided: face (left facial droop), left upper extremity (unable to grip, heaviness), left lower extremity (mild weakness). Speech affected (dysarthria).",
+    "duration": "Continuous for 2 hours without improvement or fluctuation since onset.",
+    "character": "Motor weakness (heaviness, inability to grip), facial asymmetry, slurred speech. No sensory symptoms described.",
+    "aggravating_factors": "No specific aggravating factors identified - symptoms are constant.",
+    "relieving_factors": "No relieving factors identified - symptoms unchanged since onset.",
+    "timing": "Acute onset while at rest. No prodromal symptoms. No similar prior episodes.",
+    "severity": "Moderate - NIHSS 8. Able to communicate but speech is impaired. Left arm significantly weak, left leg mildly affected. Mild headache 3/10.",
+    "associated_symptoms": "Mild headache (3/10), mild confusion. No vision changes, no dizziness, no nausea/vomiting, no seizure activity.",
+    "current_medications": "Warfarin 5mg daily (INR 2.1 two weeks ago), metformin 1000mg BID, lisinopril 20mg daily, atorvastatin 40mg daily.",
+    "allergies": "No known drug allergies.",
+    "past_medical_history": "Atrial fibrillation (on warfarin). Hypertension. Type 2 diabetes mellitus. Hyperlipidemia. No prior stroke or TIA.",
+    "family_history": "Father: MI (fatal, age 62). Mother: DM2, CVA (age 75, survived with gait impairment). Brother: atrial fibrillation.",
+    "social_history": "Former smoker (30 pack-years, quit 10 years ago). Social alcohol (1-2 beers/weekend). No illicit drugs. Retired.",
+    "review_of_systems": "Positive: left-sided weakness, dysarthria, mild headache, mild confusion. Negative: no vision changes, no dizziness, no chest pain, no palpitations, no seizure, no loss of consciousness, no bowel/bladder incontinence."
+  },
+
+  "narrativeSummary": "Mr. Robert Williams is a 68-year-old man with a history of atrial fibrillation on warfarin (last INR 2.1), hypertension, type 2 diabetes, and hyperlipidemia who presents with sudden onset left-sided hemiparesis and dysarthria approximately 2 hours ago. He was at rest when symptoms began abruptly, with left arm weakness (unable to grip), left facial droop, and slurred speech. Symptoms have been constant without fluctuation. On presentation: BP 186/102, HR 88 irregular, glucose 210, GCS 14. CT head shows no hemorrhage. NIHSS estimated at 8. This presentation is highly concerning for acute ischemic stroke, likely cardioembolic given his atrial fibrillation. The time window and imaging findings need urgent evaluation for reperfusion therapy eligibility. Multiple vascular risk factors including A-fib, HTN, DM2, hyperlipidemia, and 30 pack-year smoking history.",
+
+  "expectedScales": ["nihss"],
+  "expectedDDx": [
+    { "diagnosis": "Acute ischemic stroke", "likelihood": "high" },
+    { "diagnosis": "Hemorrhagic stroke", "likelihood": "medium" },
+    { "diagnosis": "TIA", "likelihood": "low" },
+    { "diagnosis": "Todd's paralysis", "likelihood": "low" }
+  ],
+  "expectedRedFlags": [
+    "acute focal neurological deficit",
+    "sudden onset speech change",
+    "acute left-sided weakness"
+  ]
+}
