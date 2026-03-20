@@ -2,13 +2,37 @@ import { NextResponse } from 'next/server'
 import { buildHistorianSystemPrompt, getHistorianToolDefinition } from '@/lib/historianPrompts'
 import type { HistorianSessionType } from '@/lib/historianTypes'
 import { getOpenAIKey } from '@/lib/secrets'
+import { getConsult, markHistorianStarted } from '@/lib/consult/pipeline'
+import { buildHistorianContextFromConsult } from '@/lib/consult/contextBuilder'
 
 export async function POST(request: Request) {
   try {
     const body = await request.json()
     const sessionType: HistorianSessionType = body.sessionType || 'new_patient'
-    const referralReason: string | undefined = body.referralReason
-    const patientContext: string | undefined = body.patientContext
+    let referralReason: string | undefined = body.referralReason
+    let patientContext: string | undefined = body.patientContext
+
+    // Phase 1 pipeline: if a consult_id is provided, enrich the historian
+    // context with triage and intake data from the consult record.
+    // Caller-provided referralReason/patientContext are overridden when a
+    // consult is found — the pipeline data is more authoritative.
+    const consultId: string | undefined = body.consult_id
+    if (consultId) {
+      try {
+        const consult = await getConsult(consultId)
+        if (consult) {
+          const consultContext = buildHistorianContextFromConsult(consult)
+          referralReason = consultContext.referralReason
+          patientContext = consultContext.patientContext
+
+          // Mark the consult as historian in progress (non-fatal)
+          await markHistorianStarted(consultId)
+        }
+      } catch (pipelineErr) {
+        // Non-fatal — historian still starts with whatever context was passed
+        console.error('[historian/session] consult context build error (non-fatal):', pipelineErr)
+      }
+    }
 
     // Get OpenAI API key
     const apiKey = await getOpenAIKey()
@@ -62,6 +86,8 @@ export async function POST(request: Request) {
       ephemeralKey: data.client_secret?.value,
       sessionId: data.id,
       expiresAt: data.client_secret?.expires_at,
+      // Echo back the consult_id so the client can pass it to /historian/save
+      consult_id: consultId || null,
     })
   } catch (error: any) {
     console.error('Historian session API error:', error)

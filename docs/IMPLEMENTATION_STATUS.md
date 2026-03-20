@@ -1,6 +1,6 @@
 # Implementation Status - Sevaro Clinical
 
-**Last Updated:** February 6, 2026 (Mobile chart enhancements: FAB menu, Chart Prep AI, Note Preview, Smart Recommendations)
+**Last Updated:** March 20, 2026 (Integrated Neuro Intake Engine — all 7 phases complete)
 **Based on:** PRD_AI_Scribe.md v1.4, Sevaro_Outpatient_MVP_PRD_v1.4, PRD_Roadmap_Phase3.md, PRD_MOBILE_APP.md
 
 ---
@@ -19,6 +19,17 @@
 This document tracks implementation progress against the product requirements and notes current work, issues, and next steps.
 
 ### Current Priority Focus
+
+**Integrated Neuro Intake Engine — Phases 1–7 (March 20, 2026):**
+- ✅ **Phase 1 — Triage & Intake Enhancement** — ConsultStatus state machine (11 states), pipeline helpers, consult CRUD API
+- ✅ **Phase 2 — AI Historian Integration** — Localizer requests wired into useRealtimeSession with camelCase contract
+- ✅ **Phase 3 — Background Localizer** — Bedrock-powered differential generation, LocalizerPanel UI
+- ✅ **Phase 4 — Red Flag Escalation** — 20+ pattern detector, integrated into voice session, RedFlagAlert component
+- ✅ **Phase 5 — Patient Web Tools** — SVG body map (26 regions), finger tapping test, accelerometer tremor detector
+- ✅ **Phase 6 — SDNE Integration** — XR exam results linked to consults, context builder for reports
+- ✅ **Phase 7 — Unified Report Generator** — Pure-function builder, ConsultReportView with collapsible sections
+- ⏳ **Migrations 032–038** — Need to run against RDS before staging test
+- ⏳ **Visual verification** — Deploy to staging via Amplify, verify end-to-end
 
 **AI Triage Consistency Improvements (March 12, 2026):**
 - ✅ **Clinical Anchoring Examples** — 2-3 neurology-specific examples per score level for all 5 dimensions in system prompt

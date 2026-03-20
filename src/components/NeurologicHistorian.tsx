@@ -6,6 +6,7 @@ import { useRealtimeSession } from '@/hooks/useRealtimeSession'
 import { DEMO_SCENARIOS, type DemoScenario, type HistorianStructuredOutput, type HistorianRedFlag, type HistorianTranscriptEntry, type HistorianSessionType, type PatientContext } from '@/lib/historianTypes'
 import { getTenantClient } from '@/lib/tenant'
 import HistorianSessionComplete from './HistorianSessionComplete'
+import LocalizerPanel from './LocalizerPanel'
 import PlatformShell from '@/components/layout/PlatformShell'
 import FeatureSubHeader from '@/components/layout/FeatureSubHeader'
 import { Mic } from 'lucide-react'
@@ -47,7 +48,14 @@ export default function NeurologicHistorian() {
     questionCount: number
   } | null>(null)
 
+  const [showPhysicianPanel, setShowPhysicianPanel] = useState(false)
   const transcriptEndRef = useRef<HTMLDivElement>(null)
+  // Stable consult ID for localizer logging — generated once per component mount
+  const consultIdRef = useRef<string>(
+    typeof crypto !== 'undefined' && crypto.randomUUID
+      ? crypto.randomUUID()
+      : `session-${Date.now()}`
+  )
   const tenant = getTenantClient()
 
   // Derive active config from either real patient or demo scenario
@@ -102,6 +110,8 @@ export default function NeurologicHistorian() {
     isUserSpeaking,
     duration,
     error,
+    localizerData,
+    localizerLoading,
     startSession,
     endSession,
   } = useRealtimeSession({
@@ -109,6 +119,8 @@ export default function NeurologicHistorian() {
     referralReason: activeConfig.referralReason,
     patientName: activeConfig.patientName,
     patientContext: activeConfig.patientContext,
+    consultId: consultIdRef.current,
+    enableLocalizer: true,
     onComplete: handleComplete,
     onSafetyEscalation: handleSafetyEscalation,
   })
@@ -524,12 +536,19 @@ export default function NeurologicHistorian() {
           <div style={{
             flex: 1,
             display: 'flex',
-            flexDirection: 'column',
-            maxWidth: '640px',
-            margin: '0 auto',
-            width: '100%',
+            gap: '24px',
             padding: '0 24px',
+            justifyContent: 'center',
+            alignItems: 'flex-start',
           }}>
+            {/* Main interview column */}
+            <div style={{
+              flex: '0 0 auto',
+              width: '100%',
+              maxWidth: '640px',
+              display: 'flex',
+              flexDirection: 'column',
+            }}>
             {/* Timer */}
             <div style={{
               display: 'flex',
@@ -537,6 +556,7 @@ export default function NeurologicHistorian() {
               justifyContent: 'center',
               padding: '16px',
               gap: '12px',
+              position: 'relative',
             }}>
               <span style={{
                 color: '#64748b',
@@ -554,6 +574,41 @@ export default function NeurologicHistorian() {
               <span style={{ color: '#94a3b8', fontSize: '0.8rem' }}>
                 {phase === 'ending' ? 'Ending...' : isAiSpeaking ? 'AI Speaking' : isUserSpeaking ? 'Listening' : 'Ready'}
               </span>
+
+              {/* Physician panel toggle */}
+              <button
+                onClick={() => setShowPhysicianPanel(p => !p)}
+                title={showPhysicianPanel ? 'Hide physician view' : 'Show physician view'}
+                style={{
+                  position: 'absolute',
+                  right: 0,
+                  padding: '5px 10px',
+                  borderRadius: '6px',
+                  border: `1px solid ${showPhysicianPanel ? 'rgba(13,148,136,0.5)' : 'rgba(51,65,85,0.6)'}`,
+                  background: showPhysicianPanel ? 'rgba(13,148,136,0.1)' : 'transparent',
+                  color: showPhysicianPanel ? '#5eead4' : '#64748b',
+                  fontSize: '0.7rem',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '4px',
+                }}
+              >
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <circle cx="12" cy="12" r="3" />
+                  <path d="M12 1v4M12 19v4M4.22 4.22l2.83 2.83M16.95 16.95l2.83 2.83M1 12h4M19 12h4M4.22 19.78l2.83-2.83M16.95 7.05l2.83-2.83" />
+                </svg>
+                {showPhysicianPanel ? 'Hide' : 'MD View'}
+                {localizerLoading && (
+                  <span style={{
+                    width: 5, height: 5, borderRadius: '50%',
+                    background: '#0d9488',
+                    animation: 'blink 1s infinite',
+                    flexShrink: 0,
+                  }} />
+                )}
+              </button>
             </div>
 
             {/* Voice Orb */}
@@ -744,6 +799,14 @@ export default function NeurologicHistorian() {
                 50% { opacity: 0.3; }
               }
             `}</style>
+            </div>{/* end main interview column */}
+
+            {/* Physician panel — shown when toggle is active */}
+            {showPhysicianPanel && (
+              <div style={{ paddingTop: '16px' }}>
+                <LocalizerPanel data={localizerData} isLoading={localizerLoading} />
+              </div>
+            )}
           </div>
         )}
 

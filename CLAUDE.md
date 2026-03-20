@@ -40,11 +40,21 @@ src/
 │   │   │   ├── chart-prep/# Pre-visit chart preparation
 │   │   │   ├── historian/ # AI Neurologic Historian (Realtime API)
 │   │   │   │   ├── session/ # Ephemeral token for WebRTC
-│   │   │   │   └── save/    # Save/list historian sessions
+│   │   │   │   ├── save/    # Save/list historian sessions
+│   │   │   │   ├── localizer/ # Background localizer (Bedrock differential)
+│   │   │   │   ├── escalation/ # Historian escalation handling
+│   │   │   │   └── scales/  # Auto-administered clinical scales
 │   │   │   ├── transcribe/# Voice transcription (Whisper)
 │   │   │   └── visit-ai/  # Visit AI - full visit transcription & clinical extraction
 │   │   │   └── draft-response/ # AI draft for patient messages (GPT-5-mini)
 │   │   ├── allergies/     # Allergy CRUD API
+│   │   ├── neuro-consults/ # Neurology consult pipeline
+│   │   │   └── [id]/
+│   │   │       ├── route.ts  # Consult CRUD
+│   │   │       ├── sdne/     # SDNE integration (request/link/retrieve)
+│   │   │       └── report/   # Unified report generation
+│   │   ├── patient/
+│   │   │   └── tools/     # Patient web tools (body map, motor tests)
 │   │   ├── command-center/ # Command Center Revamp APIs
 │   │   │   ├── actions/   # Action queue (list + approve + batch-approve)
 │   │   │   ├── briefing/  # AI morning briefing (GPT-5.2)
@@ -189,6 +199,12 @@ Tables in AWS RDS (PostgreSQL):
 - **command_center_actions**: AI-suggested actions with confidence scoring, batch grouping, approval workflow
 - **command_center_briefings**: Cached AI morning briefings with reasoning chain
 - **followup_phone_sessions**: Ephemeral phone-to-session mapping for live Twilio demo (24hr auto-expiry)
+- **neurology_consults**: Consult records with triage, intake, historian, localizer, SDNE fields (11-state status machine)
+- **scale_results**: Clinical scale scores linked to consults
+- **red_flag_events**: Detected red flags with severity and confidence
+- **patient_body_map_markers**: Patient-reported symptom locations (26 body regions)
+- **patient_device_measurements**: Phone-based assessments (finger tapping, tremor detection)
+- **consult_reports**: Generated unified reports (draft/final/amended)
 
 ## Environment Variables
 
@@ -559,6 +575,8 @@ Environment variables are set in the Amplify console (see "Environment Variables
 - Push to feature branch, create PR, merge to main for deployment
 
 ## Recent Changes
+
+- **Integrated Neuro Intake Engine — Phases 1–7 (2026-03-20)**: Built the complete 7-phase clinical pipeline: (1) Triage & Intake with 11-state ConsultStatus machine, (2) AI Historian integration with camelCase LocalizerRequest contract, (3) Background Localizer with Bedrock-powered differential generation, (4) Red Flag Escalation with 20+ pattern detector wired into useRealtimeSession, (5) Patient Web Tools — interactive SVG body map (26 regions), finger tapping test, accelerometer tremor detector, (6) SDNE Integration linking XR exam results to consults, (7) Unified Report Generator with pure-function builder and physician-facing viewer. New tables: `patient_body_map_markers`, `patient_device_measurements`, `consult_reports`, plus SDNE columns on `neurology_consults`. Migrations 036–038 pending against RDS. See `docs/HANDOFF_2026-03-20_neuro-intake-engine.md`.
 
 - **AI Triage Consistency Improvements (2026-03-12)**: Pushed triage scoring consistency from 96% toward 99%+ target. Added clinical anchoring examples (2-3 neurology-specific examples per score level for all 5 dimensions) and tie-breaking rules to the system prompt. Changed production defaults: temperature 0.2→0 (greedy decoding), aligned maxTokens to 3000 across both route.ts and runTriage.ts. Added token usage passthrough in `invokeBedrockJSON` and logging to `triage_sessions` table (new `ai_input_tokens`/`ai_output_tokens` columns). Updated playbook pseudocode to reflect deterministic red flag escalation, synced system prompt section, replaced OpenAI model references with Bedrock Sonnet 4.6. Added Triage section to `docs/AI_PROMPTS_AND_MODELS.md`.
 

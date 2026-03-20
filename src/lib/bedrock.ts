@@ -1,14 +1,24 @@
 /**
- * Shared AWS Bedrock utility for invoking Claude models.
+ * Shared AWS Bedrock utility for invoking Claude models and querying Knowledge Bases.
  *
  * All non-Realtime AI calls route through these helpers so that
  * model IDs, region, and response parsing live in one place.
+ *
+ * Exports:
+ *   - invokeBedrock()      — raw text generation
+ *   - invokeBedrockJSON()  — JSON-mode generation with parse + repair
+ *   - retrieveFromKB()     — Evidence Engine Knowledge Base retrieval
  */
 
 import {
   BedrockRuntimeClient,
   InvokeModelCommand,
 } from '@aws-sdk/client-bedrock-runtime'
+import {
+  BedrockAgentRuntimeClient,
+  RetrieveAndGenerateCommand,
+  type RetrieveAndGenerateCommandInput,
+} from '@aws-sdk/client-bedrock-agent-runtime'
 
 // ── Model IDs ────────────────────────────────────────────────────────
 // Map legacy OpenAI model names to the single Bedrock model we use.
@@ -230,4 +240,103 @@ export async function invokeBedrockJSON<T = Record<string, unknown>>(
       `Invalid JSON in AI response: ${cleaned.slice(0, 200)}...`
     )
   }
+}
+
+// ── Bedrock Agent Runtime (Knowledge Base) ────────────────────────────────────
+
+let _agentClient: BedrockAgentRuntimeClient | null = null
+
+function getAgentClient(): BedrockAgentRuntimeClient {
+  if (!_agentClient) {
+    const region = process.env.BEDROCK_REGION || process.env.AWS_REGION || 'us-east-2'
+    const accessKeyId = process.env.BEDROCK_ACCESS_KEY_ID
+    const secretAccessKey = process.env.BEDROCK_SECRET_ACCESS_KEY
+
+    const config: Record<string, unknown> = { region }
+    if (accessKeyId && secretAccessKey) {
+      const sessionToken = process.env.AWS_SESSION_TOKEN
+      config.credentials = sessionToken
+        ? { accessKeyId, secretAccessKey, sessionToken }
+        : { accessKeyId, secretAccessKey }
+    }
+    _agentClient = new BedrockAgentRuntimeClient(config)
+  }
+  return _agentClient
+}
+
+export interface KBRetrievalOptions {
+  /** The Bedrock Knowledge Base ID (BEDROCK_KB_ID env var). */
+  knowledgeBaseId: string
+  /** Natural-language query to retrieve relevant guideline content for. */
+  query: string
+  /** Model to use for the RetrieveAndGenerate generation step. Defaults to Claude Sonnet 4.6. */
+  modelArn?: string
+  /** Number of KB results to retrieve. Defaults to 5. */
+  numberOfResults?: number
+  /** AbortSignal for timeout control. */
+  signal?: AbortSignal
+}
+
+export interface KBRetrievalResult {
+  /** Generated answer synthesized from the retrieved KB chunks. */
+  generatedText: string
+  /** Source document citations from the KB. */
+  citations: Array<{
+    text: string
+    sourceUri?: string
+    documentTitle?: string
+  }>
+}
+
+/**
+ * Query the Bedrock Evidence Engine Knowledge Base using RetrieveAndGenerate.
+ *
+ * Sends a natural-language query, retrieves relevant guideline chunks from
+ * OpenSearch Serverless, and generates a grounded clinical response. Returns
+ * both the generated answer and the source citations for auditability.
+ *
+ * Throws on network/auth/KB errors. Callers should wrap in try/catch.
+ */
+export async function retrieveFromKB(
+  opts: KBRetrievalOptions
+): Promise<KBRetrievalResult> {
+  const client = getAgentClient()
+
+  const region = process.env.BEDROCK_REGION || 'us-east-2'
+  const modelArn =
+    opts.modelArn ??
+    `arn:aws:bedrock:${region}::foundation-model/us.anthropic.claude-sonnet-4-6`
+
+  const input: RetrieveAndGenerateCommandInput = {
+    input: { text: opts.query },
+    retrieveAndGenerateConfiguration: {
+      type: 'KNOWLEDGE_BASE',
+      knowledgeBaseConfiguration: {
+        knowledgeBaseId: opts.knowledgeBaseId,
+        modelArn,
+        retrievalConfiguration: {
+          vectorSearchConfiguration: {
+            numberOfResults: opts.numberOfResults ?? 5,
+          },
+        },
+      },
+    },
+  }
+
+  const command = new RetrieveAndGenerateCommand(input)
+  const response = await client.send(command, {
+    abortSignal: opts.signal,
+  })
+
+  const generatedText = response.output?.text ?? ''
+
+  const citations = (response.citations ?? []).flatMap((citation) =>
+    (citation.retrievedReferences ?? []).map((ref) => ({
+      text: ref.content?.text ?? '',
+      sourceUri: ref.location?.s3Location?.uri,
+      documentTitle: ref.metadata?.['x-amz-bedrock-kb-source-uri'] as string | undefined,
+    }))
+  )
+
+  return { generatedText, citations }
 }

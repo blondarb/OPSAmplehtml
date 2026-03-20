@@ -15,6 +15,7 @@
     "seed:wearable": "npx tsx scripts/seed-wearable-demo.ts"
   },
   "dependencies": {
+    "@aws-sdk/client-bedrock-agent-runtime": "^3.1003.0",
     "@aws-sdk/client-bedrock-runtime": "^3.1003.0",
     "@aws-sdk/client-secrets-manager": "^3.1003.0",
     "@aws-sdk/client-transcribe-streaming": "^3.1010.0",

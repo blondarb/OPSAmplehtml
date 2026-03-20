@@ -4,14 +4,22 @@ import { processConversationTurn } from '@/lib/follow-up/conversationEngine'
 import type { FollowUpMessageRequest, FollowUpMessageResponse } from '@/lib/follow-up/types'
 import { suggestCptCode, CPT_CODES } from '@/lib/follow-up/cptCodes'
 import { from } from '@/lib/db-query'
+import { linkIntakeToConsult } from '@/lib/consult/pipeline'
 
 
 export const maxDuration = 30
 
 export async function POST(request: Request) {
   try {
-    const body: FollowUpMessageRequest = await request.json()
-    const { session_id, patient_message, patient_context, conversation_history } = body
+    const body = await request.json()
+    const {
+      session_id,
+      patient_message,
+      patient_context,
+      conversation_history,
+      // Phase 1 pipeline — optional consult linkage
+      consult_id,
+    } = body as FollowUpMessageRequest & { consult_id?: string }
 
     // Validate input
     if (!patient_context) {
@@ -137,6 +145,44 @@ export async function POST(request: Request) {
 
         if (escError) {
           console.error('DB escalation insert error (non-fatal):', escError)
+        }
+      }
+
+      // ── Phase 1: Link intake session to consult pipeline ──────────────────
+      // Non-fatal — follow-up still works without consult linkage.
+      if (consult_id) {
+        try {
+          const linkedSessionId = responsePayload.session_id
+          if (result.conversation_complete) {
+            // Build a brief intake summary from extracted data
+            const summaryParts: string[] = []
+            if (result.extracted_data?.functional_status) {
+              summaryParts.push(`Functional status: ${result.extracted_data.functional_status}`)
+            }
+            if (result.medication_status && result.medication_status.length > 0) {
+              const medSummary = result.medication_status
+                .map((m: { medication: string; taking: boolean | null; sideEffects: string[] }) =>
+                  `${m.medication}: ${m.taking ? 'taking' : 'not taking'}${m.sideEffects?.length ? ` (SE: ${m.sideEffects.join(', ')})` : ''}`,
+                )
+                .join('; ')
+              summaryParts.push(`Medications: ${medSummary}`)
+            }
+            if (result.extracted_data?.patient_questions?.length > 0) {
+              summaryParts.push(`Patient questions: ${result.extracted_data.patient_questions.join('; ')}`)
+            }
+            await linkIntakeToConsult(
+              consult_id,
+              linkedSessionId,
+              'intake_complete',
+              summaryParts.join('\n'),
+              result.highest_tier !== 'none' ? result.highest_tier : null,
+            )
+          } else if (!session_id) {
+            // First message — mark intake as in progress
+            await linkIntakeToConsult(consult_id, linkedSessionId, 'intake_in_progress')
+          }
+        } catch (pipelineErr) {
+          console.error('Consult pipeline linkage error (non-fatal):', pipelineErr)
         }
       }
 

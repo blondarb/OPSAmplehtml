@@ -1,0 +1,241 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: >
+  Sevaro Evidence Engine — Bedrock Knowledge Base + OpenSearch Serverless
+
+  Provisions the prerequisite infrastructure for the Background Localizer:
+    - S3 bucket for neurology guideline PDFs
+    - OpenSearch Serverless collection (vector search)
+    - IAM role for Bedrock Knowledge Base access
+
+  NOTE: The Bedrock Knowledge Base resource itself is NOT provisioned here because
+  CloudFormation support for AWS::Bedrock::KnowledgeBase has region/availability
+  constraints. Run setup.sh after deploying this stack to create the KB via CLI.
+
+Parameters:
+  Environment:
+    Type: String
+    Default: staging
+    AllowedValues: [staging, production]
+    Description: Deployment environment (controls resource naming and tagging)
+
+Metadata:
+  AWS::CloudFormation::Interface:
+    ParameterGroups:
+      - Label:
+          default: Environment
+        Parameters: [Environment]
+
+Resources:
+
+  # ── S3 Bucket for Guideline Documents ─────────────────────────────────────
+  GuidelinesBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub "sevaro-neuro-guidelines-${Environment}"
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+      VersioningConfiguration:
+        Status: Enabled
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      LifecycleConfiguration:
+        Rules:
+          - Id: DeleteOldVersions
+            Status: Enabled
+            NoncurrentVersionExpiration:
+              NoncurrentDays: 90
+      Tags:
+        - Key: Project
+          Value: sevaro-clinical
+        - Key: Component
+          Value: evidence-engine
+        - Key: Environment
+          Value: !Ref Environment
+
+  # ── OpenSearch Serverless Collection ──────────────────────────────────────
+  OpenSearchCollection:
+    Type: AWS::OpenSearchServerless::Collection
+    DependsOn:
+      - OpenSearchEncryptionPolicy
+      - OpenSearchNetworkPolicy
+    Properties:
+      Name: !Sub "sevaro-neuro-kb-${Environment}"
+      Type: VECTORSEARCH
+      Description: !Sub "Vector store for Sevaro neurology clinical guidelines (${Environment})"
+      Tags:
+        - Key: Project
+          Value: sevaro-clinical
+        - Key: Component
+          Value: evidence-engine
+        - Key: Environment
+          Value: !Ref Environment
+
+  # ── OpenSearch Security Policies ──────────────────────────────────────────
+  OpenSearchEncryptionPolicy:
+    Type: AWS::OpenSearchServerless::SecurityPolicy
+    Properties:
+      Name: !Sub "sevaro-neuro-enc-${Environment}"
+      Type: encryption
+      Description: !Sub "Encryption policy for Sevaro neuro KB collection (${Environment})"
+      Policy: !Sub |
+        {
+          "Rules": [
+            {
+              "ResourceType": "collection",
+              "Resource": ["collection/sevaro-neuro-kb-${Environment}"]
+            }
+          ],
+          "AWSOwnedKey": true
+        }
+
+  OpenSearchNetworkPolicy:
+    Type: AWS::OpenSearchServerless::SecurityPolicy
+    Properties:
+      Name: !Sub "sevaro-neuro-net-${Environment}"
+      Type: network
+      Description: !Sub "Network policy for Sevaro neuro KB collection (${Environment})"
+      # Private access only — Bedrock reaches the collection via VPC endpoint internally.
+      # AllowFromPublic: false prevents any direct external access.
+      Policy: !Sub |
+        [
+          {
+            "Rules": [
+              {
+                "ResourceType": "dashboard",
+                "Resource": ["collection/sevaro-neuro-kb-${Environment}"]
+              },
+              {
+                "ResourceType": "collection",
+                "Resource": ["collection/sevaro-neuro-kb-${Environment}"]
+              }
+            ],
+            "AllowFromPublic": false
+          }
+        ]
+
+  OpenSearchDataAccessPolicy:
+    Type: AWS::OpenSearchServerless::AccessPolicy
+    Properties:
+      Name: !Sub "sevaro-neuro-access-${Environment}"
+      Type: data
+      Description: !Sub "Data access policy granting Bedrock KB role full index access (${Environment})"
+      Policy: !Sub
+        - |
+          [
+            {
+              "Rules": [
+                {
+                  "ResourceType": "index",
+                  "Resource": ["index/sevaro-neuro-kb-${Environment}/*"],
+                  "Permission": ["aoss:*"]
+                },
+                {
+                  "ResourceType": "collection",
+                  "Resource": ["collection/sevaro-neuro-kb-${Environment}"],
+                  "Permission": ["aoss:*"]
+                }
+              ],
+              "Principal": ["${RoleArn}"]
+            }
+          ]
+        - RoleArn: !GetAtt BedrockKBRole.Arn
+
+  # ── IAM Role for Bedrock Knowledge Base ───────────────────────────────────
+  BedrockKBRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub "SevaroBedrockKBRole-${Environment}"
+      Description: Allows Bedrock Knowledge Base to read S3 guidelines and write to OpenSearch
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: bedrock.amazonaws.com
+            Action: sts:AssumeRole
+            Condition:
+              StringEquals:
+                aws:SourceAccount: !Ref AWS::AccountId
+      Policies:
+        - PolicyName: BedrockKBPolicy
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              # Read guideline documents from S3
+              - Sid: ReadGuidelineDocuments
+                Effect: Allow
+                Action:
+                  - s3:GetObject
+                  - s3:ListBucket
+                Resource:
+                  - !GetAtt GuidelinesBucket.Arn
+                  - !Sub "${GuidelinesBucket.Arn}/*"
+              # Write to and query the OpenSearch Serverless collection
+              - Sid: OpenSearchAccess
+                Effect: Allow
+                Action:
+                  - aoss:APIAccessAll
+                Resource:
+                  - !Sub "arn:aws:aoss:us-east-2:${AWS::AccountId}:collection/*"
+              # Invoke the Titan embedding model for chunking/indexing
+              - Sid: InvokeEmbeddingModel
+                Effect: Allow
+                Action:
+                  - bedrock:InvokeModel
+                Resource:
+                  - "arn:aws:bedrock:us-east-2::foundation-model/amazon.titan-embed-text-v2:0"
+      Tags:
+        - Key: Project
+          Value: sevaro-clinical
+        - Key: Component
+          Value: evidence-engine
+        - Key: Environment
+          Value: !Ref Environment
+
+# ── Outputs ───────────────────────────────────────────────────────────────────
+Outputs:
+  BucketName:
+    Description: S3 bucket name for uploading neurology guideline PDFs
+    Value: !Ref GuidelinesBucket
+    Export:
+      Name: !Sub "SevEvidenceEngine-${Environment}-BucketName"
+
+  BucketArn:
+    Description: ARN of the S3 guidelines bucket
+    Value: !GetAtt GuidelinesBucket.Arn
+    Export:
+      Name: !Sub "SevEvidenceEngine-${Environment}-BucketArn"
+
+  CollectionArn:
+    Description: ARN of the OpenSearch Serverless collection — needed for KB creation CLI command
+    Value: !GetAtt OpenSearchCollection.Arn
+    Export:
+      Name: !Sub "SevEvidenceEngine-${Environment}-CollectionArn"
+
+  CollectionEndpoint:
+    Description: OpenSearch Serverless collection endpoint
+    Value: !GetAtt OpenSearchCollection.CollectionEndpoint
+    Export:
+      Name: !Sub "SevEvidenceEngine-${Environment}-CollectionEndpoint"
+
+  KBRoleArn:
+    Description: IAM Role ARN for the Bedrock Knowledge Base — use in KB creation CLI command
+    Value: !GetAtt BedrockKBRole.Arn
+    Export:
+      Name: !Sub "SevEvidenceEngine-${Environment}-KBRoleArn"
+
+  # BEDROCK_KB_ID is NOT an output here because the KB is created via CLI after
+  # this stack deploys. The KB ID returned by `aws bedrock-agent create-knowledge-base`
+  # must be manually added to Amplify environment variables as BEDROCK_KB_ID.
+  NextStep:
+    Description: What to do after this stack deploys
+    Value: !Sub |
+      1. Upload guideline PDFs to s3://${GuidelinesBucket}
+      2. Run: aws bedrock-agent create-knowledge-base (see setup.sh for full command using CollectionArn and KBRoleArn above)
+      3. Add returned KB ID as BEDROCK_KB_ID in Amplify console (staging + production)

@@ -1,0 +1,168 @@
+import type { RedFlag } from './red-flag-types'
+
+export const RED_FLAG_DEFINITIONS: RedFlag[] = [
+  {
+    id: 'thunderclap_headache',
+    name: 'Thunderclap Headache',
+    patterns: [
+      'thunderclap', 'worst headache of my life', 'worst headache ever',
+      'hit like a thunderbolt', 'sudden severe headache', 'headache peaked in seconds',
+      'exploding headache', '10 out of 10 headache',
+    ],
+    severity: 'critical',
+    escalation_tier: 'immediate',
+    clinical_significance: 'Subarachnoid hemorrhage until proven otherwise. ~10% of sudden severe headaches have intracranial pathology.',
+    recommended_action: 'Emergent CT head non-contrast. If negative, LP for xanthochromia. Neurosurgery consult.',
+  },
+  {
+    id: 'acute_vision_loss',
+    name: 'Acute Vision Loss',
+    patterns: [
+      'sudden vision loss', 'lost my vision', 'can\'t see', 'went blind',
+      'curtain came down', 'half my vision gone', 'vision cut off', 'amaurosis fugax',
+      'transient vision loss', 'monocular blindness', 'visual field cut',
+    ],
+    severity: 'critical',
+    escalation_tier: 'immediate',
+    clinical_significance: 'May represent TIA/stroke, giant cell arteritis, or retinal artery occlusion. Time-sensitive for intervention.',
+    recommended_action: 'Emergent ophthalmology + neurology evaluation. ESR/CRP if ≥50yo. Stroke protocol if other neuro symptoms.',
+  },
+  {
+    id: 'ascending_weakness',
+    name: 'Ascending Weakness (GBS)',
+    patterns: [
+      'weakness starting in feet', 'weakness moving up', 'legs went weak first',
+      'ascending weakness', 'can\'t walk', 'progressive weakness',
+      'weakness after illness', 'weakness after infection', 'tingling in feet spreading up',
+      'bilateral leg weakness',
+    ],
+    severity: 'critical',
+    escalation_tier: 'immediate',
+    clinical_significance: 'Guillain-Barré syndrome. Respiratory failure risk — 25% require ventilation. Rapid progression expected.',
+    recommended_action: 'Emergent neurology consult. Monitor respiratory function (NIF, FVC). Lumbar puncture. ICU admission likely.',
+  },
+  {
+    id: 'new_seizure',
+    name: 'New-Onset Seizure',
+    patterns: [
+      'first seizure', 'never had a seizure before', 'new seizure', 'convulsion',
+      'shaking episode', 'blacked out and shook', 'tonic clonic', 'grand mal',
+      'woke up on the floor', 'bit my tongue', 'loss of consciousness with shaking',
+    ],
+    severity: 'high',
+    escalation_tier: 'urgent',
+    clinical_significance: 'New seizure warrants urgent workup to exclude structural, metabolic, or toxic causes.',
+    recommended_action: 'Brain MRI with and without contrast. EEG. Metabolic panel. Neurologist evaluation within 24 hours.',
+  },
+  {
+    id: 'cauda_equina',
+    name: 'Cauda Equina Syndrome',
+    patterns: [
+      'saddle anesthesia', 'can\'t feel between my legs', 'can\'t urinate', 'urinary retention',
+      'incontinence', 'bowel incontinence', 'bladder stopped working',
+      'loss of bowel control', 'perineal numbness', 'perianal numbness',
+      'weakness in both legs with bladder',
+    ],
+    severity: 'critical',
+    escalation_tier: 'immediate',
+    clinical_significance: 'Cauda equina syndrome is a surgical emergency. Delay in decompression leads to permanent sphincter dysfunction.',
+    recommended_action: 'Emergent MRI lumbar spine. Emergent neurosurgery consult. Do not delay imaging.',
+  },
+  {
+    id: 'increased_icp',
+    name: 'Increased Intracranial Pressure',
+    patterns: [
+      'headache worse lying down', 'headache wakes me up', 'morning headache',
+      'vomiting with headache', 'projectile vomiting', 'vision changes with headache',
+      'double vision', 'papilledema', 'pulsatile tinnitus', 'headache getting progressively worse',
+      'headache worse with cough', 'headache worse bending over',
+    ],
+    severity: 'high',
+    escalation_tier: 'urgent',
+    clinical_significance: 'Positional or progressive headache pattern suggests raised ICP. Causes include mass lesion, pseudotumor cerebri, hydrocephalus.',
+    recommended_action: 'MRI brain with contrast. Fundoscopic exam for papilledema. Urgent neurology referral.',
+  },
+  {
+    id: 'acute_mental_status_change',
+    name: 'Acute Mental Status Change',
+    patterns: [
+      'confused all of a sudden', 'suddenly confused', 'acute confusion', 'sudden behavior change',
+      'not acting like themselves', 'doesn\'t know where they are', 'acute delirium',
+      'sudden agitation', 'not making sense', 'disoriented suddenly',
+    ],
+    severity: 'critical',
+    escalation_tier: 'immediate',
+    clinical_significance: 'Acute encephalopathy. Broad differential: infection, metabolic, vascular, toxic, structural. Time-sensitive.',
+    recommended_action: 'Emergent evaluation. Basic metabolic panel, CBC, urinalysis, CT head. Consider LP if meningitis suspected.',
+  },
+  {
+    id: 'rapid_progressive_dementia',
+    name: 'Rapidly Progressive Dementia',
+    patterns: [
+      'rapidly getting worse', 'memory declining fast', 'weeks of memory loss',
+      'rapid decline', 'deteriorating quickly', 'months of confusion',
+      'cognitive decline over weeks', 'fast memory loss',
+    ],
+    severity: 'high',
+    escalation_tier: 'urgent',
+    clinical_significance: 'Rapidly progressive dementia requires exclusion of prion disease (CJD), autoimmune encephalitis, CNS vasculitis, paraneoplastic syndromes.',
+    recommended_action: 'Urgent MRI brain with DWI. CSF 14-3-3, tau, prion RT-QuIC. Autoimmune encephalitis panel. Neurology consult within days.',
+  },
+  {
+    id: 'new_focal_deficit',
+    name: 'New Focal Neurological Deficit',
+    patterns: [
+      'arm went weak', 'face drooping', 'facial droop', 'slurred speech suddenly',
+      'couldn\'t speak', 'arm numb suddenly', 'one side of body weak',
+      'hemiplegia', 'hemiparesis', 'sudden weakness one side', 'stroke symptoms',
+      'FAST', 'face arm speech time',
+    ],
+    severity: 'critical',
+    escalation_tier: 'immediate',
+    clinical_significance: 'Acute stroke until proven otherwise. Thrombolytics and thrombectomy are time-critical — door-to-needle <60 min.',
+    recommended_action: 'Activate stroke protocol immediately. Emergent CT head. Last known well time. Neurology/stroke team stat.',
+  },
+  {
+    id: 'status_epilepticus',
+    name: 'Status Epilepticus',
+    patterns: [
+      'seizure lasting more than 5 minutes', 'wouldn\'t stop seizing', 'continuous seizure',
+      'multiple seizures without waking up', 'back to back seizures', 'prolonged seizure',
+      'status epilepticus',
+    ],
+    severity: 'critical',
+    escalation_tier: 'immediate',
+    clinical_significance: 'Status epilepticus carries 20% mortality. Neuronal injury begins at 30 minutes. Requires immediate IV benzodiazepines.',
+    recommended_action: 'Emergency services immediately. IV/IM benzodiazepine. Continuous EEG monitoring. ICU admission.',
+  },
+  {
+    id: 'meningismus',
+    name: 'Neck Stiffness with Fever',
+    patterns: [
+      'stiff neck with fever', 'neck stiffness and fever', 'can\'t move neck', 'neck rigidity',
+      'meningismus', 'meningism', 'light sensitivity with fever', 'photophobia and fever',
+      'headache stiff neck fever', 'kernig', 'brudzinski',
+    ],
+    severity: 'critical',
+    escalation_tier: 'immediate',
+    clinical_significance: 'Bacterial meningitis. Mortality rises 10–20% per hour of delayed antibiotic treatment.',
+    recommended_action: 'Emergent CT head, then LP. IV antibiotics BEFORE LP if CT delays are expected. Dexamethasone. ICU monitoring.',
+  },
+  {
+    id: 'bilateral_disc_swelling',
+    name: 'Bilateral Disc Swelling (Papilledema)',
+    patterns: [
+      'papilledema', 'bilateral disc swelling', 'swollen optic discs', 'blurred disc margins',
+      'disc edema', 'pulsatile tinnitus and vision changes', 'whooshing sound in ears with vision',
+      'transient visual obscurations', 'graying out of vision',
+    ],
+    severity: 'high',
+    escalation_tier: 'urgent',
+    clinical_significance: 'Papilledema indicates raised ICP. Causes include IIH, mass lesion, venous sinus thrombosis.',
+    recommended_action: 'MRI/MRV brain. Urgent ophthalmology + neurology. Lumbar puncture with opening pressure if no mass lesion.',
+  },
+]
+
+export function getFlagById(id: string): RedFlag | undefined {
+  return RED_FLAG_DEFINITIONS.find(f => f.id === id)
+}
