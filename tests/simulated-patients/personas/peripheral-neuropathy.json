@@ -1,0 +1,114 @@
+{
+  "id": "peripheral-neuropathy",
+  "name": "Diabetic Peripheral Neuropathy",
+  "description": "55M with progressive numbness and tingling in feet over 6 months. Poorly controlled type 2 diabetes (A1c 9.2).",
+
+  "demographics": {
+    "age": 55,
+    "sex": "M",
+    "name": "David Park",
+    "date_of_birth": "09/12/1970",
+    "email": "david.park@example.com",
+    "phone": "555-0573"
+  },
+
+  "referralText": "55-year-old male with type 2 diabetes mellitus (diagnosed 8 years ago, current A1c 9.2%) presenting with progressive bilateral numbness and tingling in his feet over the past 6 months. Symptoms started in the toes and have gradually spread to involve the entire foot and now extending to the ankles. He describes a burning pain at night that interferes with sleep. He also reports occasional sharp, shooting pains in his feet. He has had two falls in the past month that he attributes to not being able to feel the ground properly. Physical examination shows decreased sensation to monofilament testing in a stocking distribution to mid-calf, absent ankle reflexes bilaterally, and decreased vibration sense at the great toes. No foot ulcers noted but skin is dry with some callus formation. Current medications: metformin 1000mg BID, glipizide 10mg BID, lisinopril 10mg daily, atorvastatin 20mg daily. BMI 32. He has not been compliant with his diabetic diet and admits to poor glucose monitoring. Requesting neurology consultation for evaluation and management of suspected diabetic neuropathy.",
+
+  "expectedTriage": {
+    "urgency": "routine",
+    "redFlags": [],
+    "subspecialty": "Neuromuscular"
+  },
+
+  "intakeData": {
+    "patient_name": "David Park",
+    "date_of_birth": "09/12/1970",
+    "email": "david.park@example.com",
+    "phone": "555-0573",
+    "chief_complaint": "Numbness and tingling in my feet that's been getting worse over the past 6 months. Also burning pain at night and I've fallen twice recently.",
+    "current_medications": "Metformin 1000mg twice daily, glipizide 10mg twice daily, lisinopril 10mg daily, atorvastatin 20mg daily",
+    "allergies": "Penicillin - causes hives. Shellfish allergy.",
+    "medical_history": "Type 2 diabetes for 8 years (A1c 9.2). High blood pressure. High cholesterol. Obesity. Gout - one episode 2 years ago.",
+    "family_history": "Father had diabetes and had a leg amputated. Mother has diabetes and neuropathy. Brother has diabetes."
+  },
+
+  "historyResponses": [
+    {
+      "question_pattern": "What brings you in today?",
+      "response": "My feet have been going numb. It started about 6 months ago in my toes and now it's spread up to my ankles on both sides. I also get this awful burning pain at night when I'm trying to sleep. I've fallen twice in the past month because I can't feel the ground right."
+    },
+    {
+      "question_pattern": "When did you first notice the symptoms?",
+      "response": "About 6 months ago I started noticing my big toes felt numb, kind of tingly. I thought my shoes were too tight at first, but it kept spreading. Over the weeks it got to all my toes, then the balls of my feet, then the whole foot. Now it goes up to about my ankles."
+    },
+    {
+      "question_pattern": "Can you describe the sensation?",
+      "response": "During the day it's mostly numbness - like my feet are wrapped in cotton. I can't feel textures on the ground. At night it changes to this burning, like my feet are on fire. Sometimes I get these sharp, electrical shooting pains randomly. It's really hard to sleep because of the burning."
+    },
+    {
+      "question_pattern": "Is it the same in both feet?",
+      "response": "Yes, pretty much identical on both sides. It started in both feet around the same time and it's progressed equally. If anything, the right foot might be slightly worse."
+    },
+    {
+      "question_pattern": "Any weakness in your legs or feet?",
+      "response": "I don't think my legs are weak, but I feel unsteady. I've fallen twice in the past month. Once I tripped going down the steps to my basement because I couldn't feel the edge of the step. The other time I stumbled walking on an uneven sidewalk. I'm scared of falling."
+    },
+    {
+      "question_pattern": "Any symptoms in your hands?",
+      "response": "Now that you mention it, my fingertips have been a little tingly sometimes, mostly in the last month or so. It's not nearly as bad as my feet though. I sometimes have trouble with small buttons."
+    },
+    {
+      "question_pattern": "Tell me about your diabetes management.",
+      "response": "I'll be honest, I haven't been great about it. My A1c is 9.2 - my doctor isn't happy about that. I take my metformin and glipizide but I don't watch my diet like I should. I don't check my blood sugar regularly - maybe once a week if I remember. I know I need to do better."
+    },
+    {
+      "question_pattern": "What other medical conditions do you have?",
+      "response": "Besides the diabetes, I have high blood pressure and high cholesterol. I had a gout attack in my big toe about two years ago but it hasn't come back. I'm overweight - I know I need to lose about 40 pounds."
+    },
+    {
+      "question_pattern": "What medications are you taking?",
+      "response": "Metformin 1000 twice a day, glipizide 10mg twice a day for my sugar. Lisinopril 10mg for blood pressure, and atorvastatin 20mg for cholesterol. That's everything."
+    },
+    {
+      "question_pattern": "Any allergies?",
+      "response": "Yes, I'm allergic to penicillin - I break out in hives. And I have a shellfish allergy - I get swelling and itching if I eat shrimp or crab."
+    },
+    {
+      "question_pattern": "Any family history of similar problems?",
+      "response": "My father had diabetes and his neuropathy got so bad he eventually had to have his leg amputated below the knee. That really scares me. My mother also has diabetes and neuropathy in her feet. My brother was just diagnosed with diabetes last year."
+    },
+    {
+      "question_pattern": "Tell me about your daily life and habits.",
+      "response": "I work as an accountant - desk job. I don't exercise much anymore because I'm afraid of falling. I don't smoke. I have a couple of beers on weekends. My wife cooks but we eat a lot of Korean food and rice. I know I eat too many carbs. I sleep poorly because of the burning pain - maybe 5 hours a night."
+    }
+  ],
+
+  "structuredHistory": {
+    "chief_complaint": "Progressive bilateral numbness, tingling, and burning pain in feet over 6 months with recent falls, in the context of poorly controlled type 2 diabetes (A1c 9.2)",
+    "onset": "Gradual onset approximately 6 months ago, starting in the great toes and progressively spreading proximally to ankles. Recent onset of mild fingertip tingling (~1 month).",
+    "location": "Bilateral, symmetric, stocking distribution: toes → feet → ankles. Early involvement of fingertips (glove distribution beginning). Right foot slightly worse than left.",
+    "duration": "6 months, continuously progressive without remission. Burning pain worse at night.",
+    "character": "Numbness (cotton-like), tingling (paresthesias), burning pain (especially nocturnal), intermittent sharp/shooting/electrical pains. Decreased ability to feel textures and surfaces.",
+    "aggravating_factors": "Nighttime (burning pain worse), standing/walking on uneven surfaces (instability). Poor glycemic control.",
+    "relieving_factors": "No specific relieving factors identified. Not tried neuropathic pain medications.",
+    "timing": "Numbness is constant and progressive. Burning pain predominantly nocturnal. Shooting pains intermittent/random.",
+    "severity": "Moderate-severe. Causing sleep disruption (~5 hrs/night), 2 falls in past month, impaired balance, fear of falling, difficulty with fine motor tasks (buttons). Significant impact on quality of life.",
+    "associated_symptoms": "Early fingertip paresthesias, gait unsteadiness, two falls in one month, difficulty with small buttons, sleep disruption from pain, dry skin with callus formation on feet.",
+    "current_medications": "Metformin 1000mg BID, glipizide 10mg BID, lisinopril 10mg daily, atorvastatin 20mg daily.",
+    "allergies": "Penicillin (hives). Shellfish (swelling, itching).",
+    "past_medical_history": "Type 2 diabetes mellitus (8 years, A1c 9.2%, poorly controlled). Hypertension. Hyperlipidemia. Gout (single episode, 2 years ago). Obesity (BMI 32).",
+    "family_history": "Father: DM2, peripheral neuropathy, below-knee amputation. Mother: DM2, peripheral neuropathy. Brother: DM2 (newly diagnosed).",
+    "social_history": "Accountant, sedentary work. Married. Reduced physical activity due to fall risk. Non-smoker. Social alcohol (couple beers on weekends). High-carbohydrate diet, poor dietary compliance. Poor glucose self-monitoring (~1x/week).",
+    "review_of_systems": "Positive: bilateral foot/ankle numbness, burning pain, shooting pains, tingling in fingertips, gait unsteadiness, falls, sleep disruption, dry skin on feet. Negative: no weakness (subjective), no bowel/bladder issues, no vision changes, no weight loss, no fever, no back pain."
+  },
+
+  "narrativeSummary": "Mr. David Park is a 55-year-old man with poorly controlled type 2 diabetes (A1c 9.2%, 8-year duration) presenting with a 6-month history of progressive bilateral symmetric numbness, tingling, and burning pain in a stocking distribution extending from toes to ankles, with early glove distribution involvement (fingertip paresthesias over 1 month). He describes classic neuropathic symptoms: constant numbness, nocturnal burning, and intermittent lancinating pains. He has had two falls in the past month due to impaired proprioception and reports difficulty with fine motor tasks. Exam shows decreased monofilament sensation in stocking pattern, absent ankle reflexes, and decreased vibration sense at great toes. His diabetes management is suboptimal with poor dietary compliance and infrequent glucose monitoring. Strong family history of diabetic neuropathy (father required amputation, mother also affected). No red flags for alternative etiologies, though B12 level should be checked given metformin use. The presentation is consistent with diabetic peripheral neuropathy. Assessment should include nerve conduction studies, B12/folate levels, and consideration of neuropathic pain management.",
+
+  "expectedScales": ["toronto_css", "dn4"],
+  "expectedDDx": [
+    { "diagnosis": "Diabetic peripheral neuropathy", "likelihood": "high" },
+    { "diagnosis": "B12 deficiency", "likelihood": "medium" },
+    { "diagnosis": "CIDP", "likelihood": "low" }
+  ],
+  "expectedRedFlags": []
+}

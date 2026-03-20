@@ -1,0 +1,117 @@
+{
+  "id": "ms-relapse",
+  "name": "MS Relapse — New Numbness in Legs",
+  "description": "28F with known relapsing-remitting MS on Ocrevus, presenting with new progressive numbness in both legs over 3 days. Prior history of optic neuritis.",
+
+  "demographics": {
+    "age": 28,
+    "sex": "F",
+    "name": "Emily Chen",
+    "date_of_birth": "11/03/1997",
+    "email": "emily.chen@example.com",
+    "phone": "555-0319"
+  },
+
+  "referralText": "28-year-old female with known relapsing-remitting multiple sclerosis (diagnosed 2022, currently on Ocrevus infusions every 6 months, last infusion 3 months ago) presenting with new onset progressive bilateral leg numbness over the past 3 days. She reports a tingling sensation that started in her toes and has progressed to mid-calf level. She also reports new urinary urgency with two episodes of near-incontinence. Prior MS history includes an episode of right optic neuritis (2022) that was treated with IV methylprednisolone with good recovery. MRI brain 6 months ago showed 4 periventricular lesions and 1 spinal cord lesion at C5. No new lesions at that time. Current medications: Ocrevus (ocrelizumab) infusions, vitamin D 2000 IU daily. She denies fever, recent illness, or vaccination. Neurological exam shows decreased sensation to light touch below the knees bilaterally. Strength intact. Reflexes 3+ at the knees. Gait slightly wide-based. Requesting urgent neurology evaluation for possible MS relapse.",
+
+  "expectedTriage": {
+    "urgency": "urgent",
+    "redFlags": ["new neurological deficit in known MS", "bladder dysfunction"],
+    "subspecialty": "General Neurology"
+  },
+
+  "intakeData": {
+    "patient_name": "Emily Chen",
+    "date_of_birth": "11/03/1997",
+    "email": "emily.chen@example.com",
+    "phone": "555-0319",
+    "chief_complaint": "New numbness and tingling in both legs that started 3 days ago and is getting worse. I also have new bladder urgency.",
+    "current_medications": "Ocrevus infusions every 6 months (last one 3 months ago), vitamin D 2000 IU daily",
+    "allergies": "No known allergies",
+    "medical_history": "Multiple sclerosis diagnosed in 2022 with right optic neuritis. Treated with IV steroids. One known spinal cord lesion and 4 brain lesions on last MRI.",
+    "family_history": "No family history of MS. Mother has hypothyroidism. Father is healthy. No autoimmune diseases in the family."
+  },
+
+  "historyResponses": [
+    {
+      "question_pattern": "What brings you in today?",
+      "response": "I've been getting this numbness and tingling in my legs that started about three days ago. It started in my toes and it's been creeping up. Now it's about up to my mid-calves on both sides. I'm worried it might be my MS acting up again."
+    },
+    {
+      "question_pattern": "When did this start?",
+      "response": "Three days ago. I noticed my toes felt tingly when I woke up on Monday morning. By that evening the numbness had spread to my feet. By Wednesday it was up to about my mid-calves. It seems to be getting a little worse each day."
+    },
+    {
+      "question_pattern": "Can you describe the sensation?",
+      "response": "It's like a pins-and-needles feeling, like when your foot falls asleep. But it doesn't go away. There's also areas where I can't feel things as well - like if I touch my shin, it feels muted, like there's a layer between my skin and my fingers."
+    },
+    {
+      "question_pattern": "Is it the same in both legs?",
+      "response": "Yes, pretty much equal on both sides. Both legs from the toes up to about mid-calf. It's not one side worse than the other."
+    },
+    {
+      "question_pattern": "Any weakness in your legs?",
+      "response": "I don't think my legs are weak exactly, but I feel a bit unsteady when I walk. My balance feels off. I haven't fallen but I'm being more careful, especially on stairs."
+    },
+    {
+      "question_pattern": "Any bladder or bowel issues?",
+      "response": "Actually yes - I've had this new urgency to urinate. Like, when I have to go, I REALLY have to go right now. I've almost had two accidents in the past two days, which has never happened to me before. No bowel issues though."
+    },
+    {
+      "question_pattern": "Have you been sick recently?",
+      "response": "No, I haven't been sick. No fever, no cold, no infections that I know of. I haven't had any vaccinations recently either."
+    },
+    {
+      "question_pattern": "Tell me about your MS history.",
+      "response": "I was diagnosed in 2022 when I had optic neuritis in my right eye - everything went blurry and it hurt to move my eye. They did an MRI and found lesions in my brain and one in my spinal cord. I was treated with IV steroids for the optic neuritis and recovered pretty well. I started Ocrevus infusions and I've been stable until now. My last infusion was about 3 months ago."
+    },
+    {
+      "question_pattern": "What about your last MRI?",
+      "response": "My last MRI was about 6 months ago. They said it showed 4 spots in my brain near the ventricles and one in my spinal cord at C5. They said there were no new lesions compared to the one before, so I was doing well."
+    },
+    {
+      "question_pattern": "Any other symptoms?",
+      "response": "I feel more tired than usual, but that's been a thing with my MS in general. I also notice that my legs feel stiffer, especially first thing in the morning. No vision changes, no pain, no headaches."
+    },
+    {
+      "question_pattern": "What medications are you on?",
+      "response": "Just the Ocrevus infusions and vitamin D supplements, 2000 units a day. That's it. I don't take anything else regularly."
+    },
+    {
+      "question_pattern": "Any family history of MS or autoimmune conditions?",
+      "response": "No one in my family has MS. My mom has thyroid problems - hypothyroidism - but that's the only autoimmune thing I know of. My dad is pretty healthy."
+    }
+  ],
+
+  "structuredHistory": {
+    "chief_complaint": "Progressive bilateral leg numbness and tingling over 3 days with new urinary urgency, in a patient with known relapsing-remitting MS on Ocrevus",
+    "onset": "3 days ago, starting in toes upon waking, with daily proximal progression to mid-calf level",
+    "location": "Bilateral lower extremities, symmetric, from toes to mid-calves. Also bladder (urgency).",
+    "duration": "3 days and progressive; symptoms worsening daily without remission",
+    "character": "Pins-and-needles paresthesias, reduced sensation to touch (hypesthesia), stiffness in legs",
+    "aggravating_factors": "Symptoms are constant and progressively worsening. No specific aggravating factors identified.",
+    "relieving_factors": "No relieving factors identified.",
+    "timing": "Progressive daily worsening. Morning stiffness noted. Constant background paresthesia.",
+    "severity": "Moderate - affecting gait stability, near-incontinence episodes. Patient is ambulatory but unsteady.",
+    "associated_symptoms": "Urinary urgency (new, 2 near-incontinence episodes), gait unsteadiness, leg stiffness, fatigue. No pain, no vision changes, no weakness per patient report.",
+    "current_medications": "Ocrevus (ocrelizumab) infusions q6 months (last 3 months ago). Vitamin D 2000 IU daily.",
+    "allergies": "No known drug allergies.",
+    "past_medical_history": "Relapsing-remitting MS diagnosed 2022. Right optic neuritis (2022) treated with IV methylprednisolone, good recovery. MRI brain: 4 periventricular lesions, 1 spinal cord lesion (C5). No new lesions on scan 6 months ago.",
+    "family_history": "No family history of MS or other neurological conditions. Mother: hypothyroidism. Father: healthy.",
+    "social_history": "Works in software development. Lives alone. Active lifestyle. No tobacco, no alcohol, no drugs.",
+    "review_of_systems": "Positive: bilateral leg paresthesias, leg stiffness, urinary urgency, fatigue, gait unsteadiness. Negative: no vision changes, no pain, no headache, no fever, no recent illness, no bowel dysfunction, no upper extremity symptoms."
+  },
+
+  "narrativeSummary": "Ms. Emily Chen is a 28-year-old woman with relapsing-remitting multiple sclerosis (diagnosed 2022, on Ocrevus infusions) presenting with a 3-day history of progressive bilateral lower extremity numbness and tingling, ascending from toes to mid-calves, accompanied by new urinary urgency with two near-incontinence episodes. Her MS history includes right optic neuritis (2022, treated with IV steroids, good recovery) and known brain (4 periventricular) and spinal cord (C5) lesions. She has been stable on Ocrevus with last infusion 3 months ago and no new lesions on MRI 6 months ago. The progressive symmetric myelopathic pattern (ascending sensory level, bladder urgency, leg stiffness, gait unsteadiness) is highly suggestive of a new spinal cord relapse. No recent infection or fever to suggest pseudorelapse. Urgent MRI spine with contrast is indicated to evaluate for new or enhancing lesions.",
+
+  "expectedScales": ["edss"],
+  "expectedDDx": [
+    { "diagnosis": "MS relapse", "likelihood": "high" },
+    { "diagnosis": "Spinal cord compression", "likelihood": "medium" },
+    { "diagnosis": "B12 deficiency", "likelihood": "low" }
+  ],
+  "expectedRedFlags": [
+    "new neurological deficit in known MS",
+    "bladder dysfunction"
+  ]
+}
