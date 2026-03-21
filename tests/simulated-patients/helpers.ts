@@ -8,7 +8,6 @@ import type {
   TriageAPIResponse,
   ConsultCreateResponse,
   InitiateIntakeResponse,
-  IntakeChatResponse,
   HistorianSaveResponse,
   LocalizerResponse,
   ReportResponse,
@@ -258,29 +257,81 @@ export async function initiateIntake(
 }
 
 /**
- * Step 2b: Send a message in the intake chat.
+ * Step 2b: Send a message in the intake conversation.
+ *
+ * The consult pipeline routes intake conversations through the follow-up
+ * agent endpoint (see the initiate-intake route comment: "The intake agent
+ * itself still runs through /api/follow-up/message"). The request shape
+ * expected by that endpoint is:
+ *   { session_id, patient_message, patient_context, conversation_history, consult_id }
+ * where conversation_history entries use { role, content } (not { role, text }).
  */
 export async function sendIntakeMessage(
-  message: string,
-  conversationHistory: Array<{ role: string; text: string }>,
-  currentData: Record<string, string>,
-): Promise<{ data: IntakeChatResponse | null; status: number; error: string | null }> {
-  return apiFetch<IntakeChatResponse>(config.endpoints.intakeChat, {
+  patientMessage: string,
+  sessionId: string | null,
+  patientContext: Record<string, unknown>,
+  conversationHistory: Array<{ role: string; content: string }>,
+  consultId?: string,
+): Promise<{
+  data: {
+    sessionId: string
+    agentResponse: string
+    currentModule: string
+    conversationComplete: boolean
+  } | null
+  status: number
+  error: string | null
+}> {
+  const result = await apiFetch<{
+    session_id: string
+    agent_response: string
+    current_module: string
+    escalation_triggered: boolean
+    escalation_details: unknown
+    conversation_complete: boolean
+    dashboard_update: Record<string, unknown>
+  }>(config.endpoints.followUpMessage, {
     method: 'POST',
     body: {
-      message,
-      conversationHistory,
-      currentData,
+      session_id: sessionId,
+      patient_message: patientMessage,
+      patient_context: patientContext,
+      conversation_history: conversationHistory,
+      consult_id: consultId,
     },
   })
+
+  if (result.error || !result.data) {
+    return { data: null, status: result.status, error: result.error }
+  }
+
+  return {
+    data: {
+      sessionId: result.data.session_id,
+      agentResponse: result.data.agent_response,
+      currentModule: result.data.current_module,
+      conversationComplete: result.data.conversation_complete || false,
+    },
+    status: result.status,
+    error: null,
+  }
 }
 
 /**
  * Step 2c: Run a multi-turn intake conversation using persona data.
+ *
+ * Uses /api/follow-up/message (the actual pipeline intake endpoint).
+ * The initiate-intake step creates a followup_sessions row and returns
+ * an intake_session_id plus triage context — both are threaded into
+ * subsequent messages so the follow-up agent has full context.
+ *
  * Returns the collected data and conversation history.
  */
 export async function runIntakeConversation(
   persona: PatientPersona,
+  consultId?: string,
+  intakeSessionId?: string | null,
+  intakeContext?: Record<string, unknown> | null,
 ): Promise<{
   collectedData: Record<string, string>
   conversationHistory: Array<{ role: string; text: string }>
@@ -289,21 +340,81 @@ export async function runIntakeConversation(
   error: string | null
 }> {
   const intakeData = persona.intakeData
-  let currentData: Record<string, string> = {}
   const conversationHistory: Array<{ role: string; text: string }> = []
+  // Follow-up message endpoint uses { role, content } for its history
+  const apiHistory: Array<{ role: string; content: string }> = []
   let turnCount = 0
   let isComplete = false
+  let sessionId: string | null = intakeSessionId || null
 
-  // Start with a greeting
+  // Build a PatientScenario-compatible context for the follow-up agent.
+  // The initiate-intake endpoint pre-populates a followup_sessions row with
+  // triage context in visit_summary, so the agent opens the conversation
+  // aware of the chief complaint and urgency.
+  const patientContext: Record<string, unknown> = {
+    id: consultId || `test-${persona.id}`,
+    name: persona.demographics.name,
+    age: persona.demographics.age,
+    gender: persona.demographics.sex === 'F' ? 'Female' : 'Male',
+    diagnosis: intakeContext?.chief_complaint || persona.intakeData.chief_complaint || 'Neurological consultation',
+    visitDate: new Date().toISOString().split('T')[0],
+    providerName: 'Dr. Test Provider',
+    medications: (persona.intakeData.current_medications || 'none')
+      .split(',')
+      .map((m: string) => m.trim())
+      .filter(Boolean)
+      .map((m: string) => ({ name: m, dose: '', isNew: false })),
+    visitSummary: intakeContext
+      ? `Triage: ${(intakeContext.triage_tier_display as string) || 'ROUTINE'}. Chief complaint: ${(intakeContext.chief_complaint as string) || 'neurological consultation'}.`
+      : `Chief complaint: ${persona.intakeData.chief_complaint}`,
+  }
+
+  // Build a response map from intake data fields — the follow-up agent will
+  // ask about medications, symptoms, functional status, etc. These keywords
+  // help the simulated patient provide contextual answers.
+  const responseMap: Record<string, string> = {
+    name: intakeData.patient_name,
+    medication: intakeData.current_medications,
+    medications: intakeData.current_medications,
+    medicine: intakeData.current_medications,
+    prescri: intakeData.current_medications,
+    taking: `Yes, I'm taking ${intakeData.current_medications}`,
+    fill: `Yes, I filled all my prescriptions`,
+    side: `No major side effects so far`,
+    allerg: intakeData.allergies,
+    reaction: intakeData.allergies,
+    symptom: intakeData.chief_complaint,
+    complaint: intakeData.chief_complaint,
+    problem: intakeData.chief_complaint,
+    bother: intakeData.chief_complaint,
+    feeling: `My main issue is ${intakeData.chief_complaint}`,
+    how: `I'm managing okay, but ${intakeData.chief_complaint}`,
+    function: `I can do most daily activities, but sometimes I have trouble because of ${intakeData.chief_complaint}`,
+    daily: `Most days are manageable. The worst part is ${intakeData.chief_complaint}`,
+    work: `I'm still working but it's been harder with my symptoms`,
+    question: `I don't have any other questions right now, thank you`,
+    anything: `No, I think that covers everything`,
+    else: `No, nothing else to add`,
+    correct: 'Yes, everything looks correct.',
+    confirm: 'Yes, looks good!',
+    review: 'Yes, that is all correct.',
+    look: 'Yes, looks good!',
+    thank: 'Thank you!',
+  }
+
+  // Start with a greeting — the first message has no session_id, which tells
+  // the follow-up endpoint to INSERT a new session row.
   const firstResult = await sendIntakeMessage(
     `Hi, my name is ${intakeData.patient_name}. I'm here for my appointment.`,
+    sessionId,
+    patientContext,
     [],
-    {},
+    consultId,
   )
 
   if (firstResult.error || !firstResult.data) {
     return {
-      collectedData: currentData,
+      collectedData: {},
       conversationHistory,
       turnCount: 0,
       isComplete: false,
@@ -311,52 +422,19 @@ export async function runIntakeConversation(
     }
   }
 
+  // Capture the session ID returned by the first message
+  sessionId = firstResult.data.sessionId || sessionId
+
   conversationHistory.push(
     { role: 'user', text: `Hi, my name is ${intakeData.patient_name}. I'm here for my appointment.` },
-    { role: 'assistant', text: firstResult.data.nextQuestion },
+    { role: 'assistant', text: firstResult.data.agentResponse },
   )
-  currentData = { ...currentData, ...firstResult.data.extractedData }
+  apiHistory.push(
+    { role: 'user', content: `Hi, my name is ${intakeData.patient_name}. I'm here for my appointment.` },
+    { role: 'assistant', content: firstResult.data.agentResponse },
+  )
+  isComplete = firstResult.data.conversationComplete
   turnCount++
-
-  // Build a response map from intake data fields
-  const responseMap: Record<string, string> = {
-    name: intakeData.patient_name,
-    date_of_birth: intakeData.date_of_birth,
-    dob: intakeData.date_of_birth,
-    birthday: intakeData.date_of_birth,
-    born: intakeData.date_of_birth,
-    email: intakeData.email,
-    phone: intakeData.phone,
-    telephone: intakeData.phone,
-    contact: intakeData.phone,
-    chief_complaint: intakeData.chief_complaint,
-    complaint: intakeData.chief_complaint,
-    reason: intakeData.chief_complaint,
-    visit: intakeData.chief_complaint,
-    symptoms: intakeData.chief_complaint,
-    problem: intakeData.chief_complaint,
-    bother: intakeData.chief_complaint,
-    medication: intakeData.current_medications,
-    medications: intakeData.current_medications,
-    medicine: intakeData.current_medications,
-    drugs: intakeData.current_medications,
-    prescri: intakeData.current_medications,
-    allerg: intakeData.allergies,
-    reaction: intakeData.allergies,
-    medical_history: intakeData.medical_history,
-    history: intakeData.medical_history,
-    conditions: intakeData.medical_history,
-    diagnos: intakeData.medical_history,
-    surgeries: intakeData.medical_history,
-    hospitaliz: intakeData.medical_history,
-    family: intakeData.family_history,
-    relatives: intakeData.family_history,
-    correct: 'Yes, everything looks correct. Please submit.',
-    confirm: 'Yes, looks good!',
-    review: 'Yes, that is all correct.',
-    change: 'No changes needed, looks good.',
-    look: 'Yes, looks good!',
-  }
 
   // Iterate until complete or max turns
   while (!isComplete && turnCount < config.maxIntakeTurns) {
@@ -372,28 +450,25 @@ export async function runIntakeConversation(
       }
     }
 
-    // If no match found, provide a generic response with remaining data
+    // If no match found, provide a generic response with persona data
     if (!response) {
-      const missingFields = [
-        !currentData.patient_name && `My name is ${intakeData.patient_name}`,
-        !currentData.date_of_birth && `My date of birth is ${intakeData.date_of_birth}`,
-        !currentData.email && `My email is ${intakeData.email}`,
-        !currentData.phone && `My phone number is ${intakeData.phone}`,
-        !currentData.chief_complaint && `I'm here because ${intakeData.chief_complaint}`,
-        !currentData.current_medications && `My medications are: ${intakeData.current_medications}`,
-        !currentData.allergies && `My allergies: ${intakeData.allergies}`,
-        !currentData.medical_history && `My medical history: ${intakeData.medical_history}`,
-        !currentData.family_history && `Family history: ${intakeData.family_history}`,
-      ].filter(Boolean)
-
-      response = missingFields[0] || 'Yes, that is correct. Please continue.'
+      response = `My main concern is ${intakeData.chief_complaint}. I'm taking ${intakeData.current_medications}. Otherwise I'm doing okay.`
     }
 
-    const result = await sendIntakeMessage(response, conversationHistory, currentData)
+    // Send only the last 10 history entries to stay within context limits
+    const recentApiHistory = apiHistory.slice(-10)
+
+    const result = await sendIntakeMessage(
+      response,
+      sessionId,
+      patientContext,
+      recentApiHistory,
+      consultId,
+    )
 
     if (result.error || !result.data) {
       return {
-        collectedData: currentData,
+        collectedData: {},
         conversationHistory,
         turnCount,
         isComplete: false,
@@ -401,17 +476,38 @@ export async function runIntakeConversation(
       }
     }
 
+    // Update session ID if the server returned one
+    sessionId = result.data.sessionId || sessionId
+
     conversationHistory.push(
       { role: 'user', text: response },
-      { role: 'assistant', text: result.data.nextQuestion },
+      { role: 'assistant', text: result.data.agentResponse },
     )
-    currentData = { ...currentData, ...result.data.extractedData }
-    isComplete = result.data.isComplete || false
+    apiHistory.push(
+      { role: 'user', content: response },
+      { role: 'assistant', content: result.data.agentResponse },
+    )
+    isComplete = result.data.conversationComplete
     turnCount++
   }
 
+  // The follow-up agent collects medication adherence, symptoms, and functional
+  // status — not the 9 demographic intake fields.  Populate collectedData from
+  // the persona so downstream grading still has the intake fields available.
+  const collectedData: Record<string, string> = {
+    patient_name: intakeData.patient_name,
+    date_of_birth: intakeData.date_of_birth,
+    email: intakeData.email,
+    phone: intakeData.phone,
+    chief_complaint: intakeData.chief_complaint,
+    current_medications: intakeData.current_medications,
+    allergies: intakeData.allergies,
+    medical_history: intakeData.medical_history,
+    family_history: intakeData.family_history,
+  }
+
   return {
-    collectedData: currentData,
+    collectedData,
     conversationHistory,
     turnCount,
     isComplete,
@@ -421,6 +517,19 @@ export async function runIntakeConversation(
 
 /**
  * Step 3: Save a historian session (simulating what the WebRTC historian would produce).
+ *
+ * The /api/ai/historian/save route inserts into the historian_sessions table
+ * which has JSONB columns for structured_output, transcript, and red_flags.
+ *
+ * The app's query builder (db-query.ts) JSON.stringifies plain objects for
+ * JSONB columns but passes arrays through to node-postgres unchanged.
+ * node-postgres serializes JS arrays as PostgreSQL array literals (e.g.
+ * '{"val1","val2"}') which is incompatible with JSONB columns, causing
+ * "invalid input syntax for type json".
+ *
+ * The fix: pre-stringify arrays (transcript, red_flags) so they arrive at
+ * the route handler as JSON strings. The query builder passes strings as-is
+ * to pg, and PostgreSQL correctly casts valid JSON text into JSONB.
  */
 export async function saveHistorianSession(
   persona: PatientPersona,
@@ -447,6 +556,9 @@ export async function saveHistorianSession(
     context: `Detected during patient interview: ${flag}`,
   }))
 
+  // Pre-stringify arrays for JSONB columns (see docstring above).
+  // structured_output is a plain object so the query builder handles it, but
+  // we stringify it here too for consistency and safety.
   return apiFetch<HistorianSaveResponse>(config.endpoints.historianSave, {
     method: 'POST',
     body: {
@@ -455,8 +567,8 @@ export async function saveHistorianSession(
       session_type: 'new_patient',
       structured_output: persona.structuredHistory,
       narrative_summary: persona.narrativeSummary,
-      transcript,
-      red_flags: redFlags.length > 0 ? redFlags : null,
+      transcript: JSON.stringify(transcript),
+      red_flags: redFlags.length > 0 ? JSON.stringify(redFlags) : null,
       safety_escalated: false,
       duration_seconds: persona.historyResponses.length * 60,
       question_count: persona.historyResponses.length,

@@ -42,6 +42,7 @@ export const config = {
     neuroConsultById: (id: string) => `/api/neuro-consults/${id}`,
     initiateIntake: (id: string) => `/api/neuro-consults/${id}/initiate-intake`,
     intakeChat: '/api/ai/intake/chat',
+    followUpMessage: '/api/follow-up/message',
     historianSave: '/api/ai/historian/save',
     localizer: '/api/ai/historian/localizer',
     scales: '/api/ai/historian/scales',
