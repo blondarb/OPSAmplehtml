@@ -12,7 +12,7 @@
     "phone": "555-0287"
   },
 
-  "referralText": "URGENT - 68-year-old male presenting to ED with sudden onset left-sided weakness and slurred speech approximately 2 hours ago. Wife reports patient was watching television when he suddenly dropped his coffee cup with his left hand and his speech became garbled. On arrival: left facial droop, left arm drift, dysarthria. GCS 14 (E4 V4 M6). Blood pressure 186/102. Heart rate irregular at 88. Blood glucose 210 mg/dL. Past medical history significant for atrial fibrillation on warfarin (last INR 2.1 two weeks ago), hypertension, type 2 diabetes mellitus, hyperlipidemia. Current medications: warfarin 5mg daily, metformin 1000mg BID, lisinopril 20mg daily, atorvastatin 40mg daily. NIHSS estimated at 8. CT head without contrast shows no acute hemorrhage. CTA head and neck pending. Requesting emergent neurology consultation for acute stroke evaluation and treatment decision.",
+  "referralText": "68-year-old male called his PCP office reporting sudden onset left-sided weakness and slurred speech that began approximately 2 hours ago while watching television. His wife states he dropped his coffee cup with his left hand and his speech became garbled. Symptoms have not improved since onset. Past medical history significant for atrial fibrillation on warfarin (last INR 2.1 two weeks ago), hypertension, type 2 diabetes mellitus, hyperlipidemia. Current medications: warfarin 5mg daily, metformin 1000mg BID, lisinopril 20mg daily, atorvastatin 40mg daily. No prior stroke or TIA. Patient has NOT been evaluated in an emergency department. Requesting neurology guidance on this acute presentation.",
 
   "expectedTriage": {
     "urgency": "emergent",

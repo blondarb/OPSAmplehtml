@@ -175,16 +175,28 @@ describe('Simulated Patient E2E', () => {
       it('Intake collects all fields', async () => {
         const start = Date.now()
 
-        // If triage created a consult, initiate intake on it
+        // If triage created a consult, initiate intake on it.
+        // The initiate-intake endpoint creates a followup_sessions row and
+        // returns context + session_id that runIntakeConversation needs.
+        let intakeSessionId: string | null = null
+        let intakeContext: Record<string, unknown> | null = null
         if (consultId) {
           const intakeInit = await initiateIntake(consultId)
           if (intakeInit.error) {
             console.warn(`[${persona.id}] Intake initiation warning: ${intakeInit.error}`)
+          } else if (intakeInit.data) {
+            intakeSessionId = intakeInit.data.intake_session_id
+            intakeContext = intakeInit.data.context as Record<string, unknown>
           }
         }
 
-        // Run the multi-turn intake conversation
-        const intakeResult = await runIntakeConversation(persona)
+        // Run the multi-turn intake conversation via /api/follow-up/message
+        const intakeResult = await runIntakeConversation(
+          persona,
+          consultId || undefined,
+          intakeSessionId,
+          intakeContext,
+        )
 
         expect(intakeResult.error).toBeNull()
 
