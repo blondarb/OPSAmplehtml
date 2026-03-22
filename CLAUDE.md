@@ -610,16 +610,15 @@ Full changelog: [`docs/CHANGELOG.md`](docs/CHANGELOG.md)
 **Status**: Active
 
 ### Recent
+- **Integrated Neuro Intake Engine Phases 1-7** — structured neuro intake pipeline with /consult page (PRs #87-88)
+- **Simulated patient E2E test agent** — tests full intake pipeline with stroke/migraine personas; API format fixes (PRs #89-90)
+- **Complete Supabase removal** — fully migrated to AWS (Cognito auth, RDS data); zero Supabase imports (PRs #85-86)
 - Shared feedback widget integration with streaming dictation + AI historian PRD (PR #83)
 - Redesigned EHR page with Figma Acute Care design system (PR #82)
 - Bundled @sevaro/feedback locally for Amplify builds (PR #84)
 - Feedback icon shrink with hover expand and user identity wiring (PR #81)
-- Spiral and gait assessment display components with RDS queries
-- Live patient switcher with demo patients (Steve Arbogast + Linda Martinez)
-- Migrated from npm to pnpm
 
 ### In Progress
-- AWS Amplify migration (most infra migrated, Cognito auth active, RDS for new features)
 - Diagnosis plan coverage expansion (98 plans in DB, 148/166 diagnoses covered)
 
 ### Planned
@@ -629,7 +628,6 @@ Full changelog: [`docs/CHANGELOG.md`](docs/CHANGELOG.md)
 - Inpatient clinical scales (GCS, mRS, FOUR Score, Hunt & Hess, ICH, CAM-ICU, RASS)
 
 ### Known Issues
-- Legacy Supabase env vars can be removed from Amplify (no longer referenced by code)
 - Bedrock Amplify SSR env var wiring requires `next.config` inline for runtime access
 - 18 neurology diagnoses still lack treatment plans in the database
 
