@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getUser } from '@/lib/cognito/server'
 import { DEMO_SCENARIOS } from '@/lib/triage/demoScenarios'
 import { from } from '@/lib/db-query'
+import { isDemoEndpointsEnabled } from '@/lib/appMode'
 
 /**
  * POST /api/triage/validate/cases/seed
@@ -20,6 +21,10 @@ import { from } from '@/lib/db-query'
 export const maxDuration = 300
 
 export async function POST(req: NextRequest) {
+
+  if (!isDemoEndpointsEnabled()) {
+    return NextResponse.json({ error: 'Demo endpoints are disabled' }, { status: 403 })
+  }
 
   const user = await getUser()
   if (!user) {

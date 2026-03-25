@@ -27,6 +27,10 @@ export async function getRdsCredentials(): Promise<RdsCredentials> {
     console.log('[RDS] Using Secrets Manager credentials, host:', creds.host ? creds.host.substring(0, 15) + '...' : '(empty)')
     return creds
   } catch (err) {
+    if (process.env.NODE_ENV === 'production' && !process.env.RDS_HOST) {
+      console.error('[RDS] Secrets Manager failed in production with no env fallback:', (err as Error).message?.substring(0, 80))
+      throw new Error('RDS credentials unavailable — Secrets Manager failed and no env vars configured')
+    }
     const host = process.env.RDS_HOST || ''
     console.log('[RDS] Secrets Manager failed:', (err as Error).message?.substring(0, 80))
     console.log('[RDS] Falling back to env vars, RDS_HOST:', host ? host.substring(0, 15) + '...' : '(empty)')

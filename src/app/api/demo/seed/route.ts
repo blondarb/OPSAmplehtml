@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { getUser } from '@/lib/cognito/server'
 import { getTenantServer } from '@/lib/tenant'
 import { from } from '@/lib/db-query'
+import { isDemoEndpointsEnabled } from '@/lib/appMode'
 
 
 // TypeScript interfaces for the seed payload
@@ -95,6 +96,11 @@ interface SeedPayload {
 // POST /api/demo/seed - Create demo patients with full clinical histories
 export async function POST(request: Request) {
   try {
+    // Block in production unless explicitly enabled
+    if (!isDemoEndpointsEnabled()) {
+      return NextResponse.json({ error: 'Demo endpoints are disabled' }, { status: 403 })
+    }
+
     const tenant_id = getTenantServer()
 
     // Check authentication

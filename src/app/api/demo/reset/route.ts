@@ -1,11 +1,17 @@
 import { NextResponse } from 'next/server'
 import { getUser } from '@/lib/cognito/server'
 import { from } from '@/lib/db-query'
+import { isDemoEndpointsEnabled } from '@/lib/appMode'
 
 
 // POST /api/demo/reset - Reset demo data for a fresh walkthrough
 export async function POST() {
   try {
+
+    // Block in production unless explicitly enabled
+    if (!isDemoEndpointsEnabled()) {
+      return NextResponse.json({ error: 'Demo endpoints are disabled' }, { status: 403 })
+    }
 
     // Check authentication
     const user = await getUser()

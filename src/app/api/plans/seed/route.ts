@@ -2,9 +2,14 @@ import { getUser } from '@/lib/cognito/server'
 import { NextResponse } from 'next/server'
 import { OUTPATIENT_PLANS } from '@/lib/recommendationPlans'
 import { from } from '@/lib/db-query'
+import { isDemoEndpointsEnabled } from '@/lib/appMode'
 
 // POST /api/plans/seed - Seed clinical_plans table from OUTPATIENT_PLANS
 export async function POST() {
+
+  if (!isDemoEndpointsEnabled()) {
+    return NextResponse.json({ error: 'Demo endpoints are disabled' }, { status: 403 })
+  }
 
   const user = await getUser()
   if (!user) {

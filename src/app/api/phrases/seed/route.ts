@@ -2,6 +2,7 @@ import { getUser } from '@/lib/cognito/server'
 import { NextResponse } from 'next/server'
 import { getTenantServer } from '@/lib/tenant'
 import { from } from '@/lib/db-query'
+import { isDemoEndpointsEnabled } from '@/lib/appMode'
 
 // Comprehensive neurology dot phrases library
 const DEFAULT_PHRASES = [
@@ -704,6 +705,10 @@ Last crisis: [date or never]. Recent infections/stressors: [describe]`,
 
 // POST /api/phrases/seed - Seed default phrases for current user
 export async function POST() {
+
+  if (!isDemoEndpointsEnabled()) {
+    return NextResponse.json({ error: 'Demo endpoints are disabled' }, { status: 403 })
+  }
 
   const user = await getUser()
   if (!user) {
