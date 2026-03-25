@@ -40,6 +40,22 @@ export async function GET(
  * Permitted fields: notes, status (advance only — the pipeline helpers
  * handle status transitions, but this allows manual corrections).
  */
+
+// Valid status progression — each status can only advance to the next
+const STATUS_ORDER = [
+  'triage_pending', 'triage_complete',
+  'intake_pending', 'intake_in_progress', 'intake_complete',
+  'historian_pending', 'historian_in_progress', 'historian_complete',
+  'complete',
+] as const
+
+function isValidStatusTransition(current: string, next: string): boolean {
+  const currentIdx = STATUS_ORDER.indexOf(current as typeof STATUS_ORDER[number])
+  const nextIdx = STATUS_ORDER.indexOf(next as typeof STATUS_ORDER[number])
+  // Allow advancing forward only (not skipping more than one step or going backward)
+  return currentIdx >= 0 && nextIdx >= 0 && nextIdx > currentIdx
+}
+
 export async function PUT(
   request: Request,
   { params }: { params: Promise<{ id: string }> },
@@ -68,6 +84,20 @@ export async function PUT(
         { error: 'No valid fields provided for update' },
         { status: 400 },
       )
+    }
+
+    // Validate status transitions if status is being changed
+    if ('status' in updateData) {
+      const consult = await getConsult(id)
+      if (!consult) {
+        return NextResponse.json({ error: 'Consult not found' }, { status: 404 })
+      }
+      if (!isValidStatusTransition(consult.status, updateData.status as string)) {
+        return NextResponse.json(
+          { error: `Invalid status transition: ${consult.status} → ${updateData.status}` },
+          { status: 400 },
+        )
+      }
     }
 
     const { data, error } = await from('neurology_consults')

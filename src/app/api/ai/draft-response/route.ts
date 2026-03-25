@@ -61,12 +61,10 @@ Draft a response to the following patient message. The physician will review and
 
     const draft = result.text || ''
 
-    // If message_id provided, store the draft on the message record
-    if (message_id && draft) {
-      await from('patient_messages')
-        .update({ ai_draft: draft, draft_status: 'pending' })
-        .eq('id', message_id)
-    }
+    // NOTE: Storing draft on the message record is deferred until
+    // patient_messages table schema is updated with ai_draft and
+    // draft_status columns. For now, the draft is returned in the
+    // response for the client to use directly.
 
     return NextResponse.json({ draft })
   } catch (error: any) {

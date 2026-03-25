@@ -4,7 +4,8 @@ import { getTenantServer } from '@/lib/tenant'
 import { from } from '@/lib/db-query'
 
 // GET /api/phrases - List all phrases for current user
-export async function GET() {
+// Optional query param: ?scope=hpi|assessment|plan|ros|allergies (returns global + scoped)
+export async function GET(request: Request) {
 
   const user = await getUser()
   if (!user) {
@@ -13,12 +14,22 @@ export async function GET() {
 
   const tenant = getTenantServer()
 
-  const { data: phrases, error } = await from('dot_phrases')
+  const { searchParams } = new URL(request.url)
+  const scope = searchParams.get('scope')
+
+  let query = from('dot_phrases')
     .select('*')
     .eq('user_id', user.id)
     .eq('tenant_id', tenant)
     .eq('is_active', true)
     .order('use_count', { ascending: false })
+
+  // If a scope is provided, return only global phrases and those matching the scope
+  if (scope) {
+    query = query.in('scope', ['global', scope])
+  }
+
+  const { data: phrases, error } = await query
 
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 })
