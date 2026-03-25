@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getUser } from '@/lib/cognito/server'
 import { from } from '@/lib/db-query'
+import { isDemoEndpointsEnabled } from '@/lib/appMode'
 
 /**
  * POST /api/admin/reset-demo
@@ -19,6 +20,11 @@ import { from } from '@/lib/db-query'
  *   visits, dot_phrases, patients
  */
 export async function POST(request: NextRequest) {
+  // 0. Block unless demo endpoints are explicitly enabled
+  if (!isDemoEndpointsEnabled()) {
+    return NextResponse.json({ error: 'Demo endpoints are disabled' }, { status: 403 })
+  }
+
   // 1. Verify admin secret
   const secret = process.env.ADMIN_RESET_SECRET
   if (!secret) {

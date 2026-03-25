@@ -16,3 +16,13 @@ export function getAppMode(): AppMode {
   if (raw === 'full_demo') return 'full_demo'
   return 'physician_only'
 }
+
+/**
+ * Server-side check: are demo/seed/reset endpoints allowed?
+ *
+ * Set DEMO_ENDPOINTS_ENABLED=true in environment to allow demo data operations.
+ * Defaults to false in production to prevent accidental data manipulation.
+ */
+export function isDemoEndpointsEnabled(): boolean {
+  return process.env.DEMO_ENDPOINTS_ENABLED === 'true'
+}

@@ -7,7 +7,7 @@ import { Activity } from 'lucide-react'
 // The SDNE dashboard is deployed and maintained in the SDNE repo.
 // We embed it here via iframe so OPSAmplehtml always shows the latest
 // without duplicating code or data across repos.
-const SDNE_DASHBOARD_URL = 'https://main.d1ld38tyw8bl1b.amplifyapp.com'
+const SDNE_DASHBOARD_URL = process.env.NEXT_PUBLIC_SDNE_URL || 'https://main.d1ld38tyw8bl1b.amplifyapp.com'
 
 export default function SDNEPage() {
   return (
