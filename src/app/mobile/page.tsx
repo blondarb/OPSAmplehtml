@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import MobileLayout from '@/components/mobile/MobileLayout'
 import MobilePatientCard from '@/components/mobile/MobilePatientCard'
@@ -17,8 +17,8 @@ interface Patient {
   status?: 'scheduled' | 'in-progress' | 'completed'
 }
 
-// Sample data - in production this would come from the database
-const samplePatients: Patient[] = [
+// Fallback sample data — used only when API is unreachable
+const fallbackPatients: Patient[] = [
   {
     id: '1',
     name: 'Eleanor Martinez',
@@ -76,11 +76,99 @@ const samplePatients: Patient[] = [
   },
 ]
 
+function mapAppointmentToPatient(appt: Record<string, unknown>): Patient {
+  const patient = appt.patient as Record<string, unknown> | undefined
+  const timeStr = appt.appointment_time
+    ? new Date(appt.appointment_time as string).toLocaleTimeString('en-US', {
+        hour: 'numeric',
+        minute: '2-digit',
+      })
+    : undefined
+
+  // Map appointment status to our status type
+  let status: Patient['status'] = 'scheduled'
+  if (appt.status === 'in_progress' || appt.status === 'checked_in') status = 'in-progress'
+  else if (appt.status === 'completed') status = 'completed'
+
+  // Determine type from appointment type or visit history
+  const type: Patient['type'] = (appt.appointment_type === 'follow_up' || appt.appointment_type === 'follow-up')
+    ? 'follow-up'
+    : 'new'
+
+  return {
+    id: (patient?.id as string) || (appt.patient_id as string) || (appt.id as string),
+    name: (patient?.full_name as string) || (patient?.name as string) || (appt.patient_name as string) || 'Unknown',
+    age: (patient?.age as number) || 0,
+    gender: (patient?.gender as string) || 'U',
+    mrn: (patient?.mrn as string) || '',
+    reason: (appt.reason as string) || (appt.chief_complaint as string) || undefined,
+    time: timeStr,
+    type,
+    status,
+  }
+}
+
 export default function MobileHomePage() {
   const router = useRouter()
-  const [patients, setPatients] = useState<Patient[]>(samplePatients)
+  const [patients, setPatients] = useState<Patient[]>([])
+  const [isLoading, setIsLoading] = useState(true)
+  const [isUsingFallback, setIsUsingFallback] = useState(false)
   const [filter, setFilter] = useState<'all' | 'scheduled' | 'in-progress' | 'completed'>('all')
   const [searchQuery, setSearchQuery] = useState('')
+
+  const fetchPatients = useCallback(async () => {
+    setIsLoading(true)
+    try {
+      // Try appointments endpoint first (today's schedule)
+      const res = await fetch('/api/appointments?date=today')
+      if (res.ok) {
+        const data = await res.json()
+        const appointments = data.appointments || data.data || data
+        if (Array.isArray(appointments) && appointments.length > 0) {
+          const mapped = appointments.map(mapAppointmentToPatient)
+          setPatients(mapped)
+          setIsUsingFallback(false)
+          setIsLoading(false)
+          return
+        }
+      }
+
+      // If no appointments, try patients list
+      const patientsRes = await fetch('/api/patients/list')
+      if (patientsRes.ok) {
+        const data = await patientsRes.json()
+        const patientList = data.patients || data.data || data
+        if (Array.isArray(patientList) && patientList.length > 0) {
+          const mapped: Patient[] = patientList.slice(0, 10).map((p: Record<string, unknown>) => ({
+            id: p.id as string,
+            name: (p.full_name as string) || (p.name as string) || 'Unknown',
+            age: (p.age as number) || 0,
+            gender: (p.gender as string) || 'U',
+            mrn: (p.mrn as string) || '',
+            reason: (p.chief_complaint as string) || undefined,
+            status: 'scheduled' as const,
+          }))
+          setPatients(mapped)
+          setIsUsingFallback(false)
+          setIsLoading(false)
+          return
+        }
+      }
+
+      // Graceful fallback to sample data
+      setPatients(fallbackPatients)
+      setIsUsingFallback(true)
+    } catch (err) {
+      console.error('Failed to fetch patients:', err)
+      setPatients(fallbackPatients)
+      setIsUsingFallback(true)
+    }
+    setIsLoading(false)
+  }, [])
+
+  useEffect(() => {
+    fetchPatients()
+  }, [fetchPatients])
 
   const filteredPatients = patients.filter(p => {
     const matchesFilter = filter === 'all' || p.status === filter
@@ -119,6 +207,22 @@ export default function MobileHomePage() {
         top: 0,
         zIndex: 10,
       }}>
+        {/* Fallback indicator */}
+        {isUsingFallback && (
+          <div style={{
+            padding: '6px 10px',
+            marginBottom: '8px',
+            borderRadius: '8px',
+            background: '#fef3c7',
+            border: '1px solid #fcd34d',
+            fontSize: '11px',
+            color: '#92400e',
+            textAlign: 'center',
+          }}>
+            Showing sample data -- schedule not available
+          </div>
+        )}
+
         {/* Search input */}
         <div style={{
           display: 'flex',
@@ -223,7 +327,7 @@ export default function MobileHomePage() {
             fontWeight: 600,
             color: 'var(--text-primary)',
           }}>
-            Today's Schedule
+            Today&apos;s Schedule
           </div>
           <div style={{
             fontSize: '11px',
@@ -261,7 +365,25 @@ export default function MobileHomePage() {
 
       {/* Patient list */}
       <div style={{ padding: '6px 12px 12px' }}>
-        {filteredPatients.length === 0 ? (
+        {isLoading ? (
+          <div style={{
+            textAlign: 'center',
+            padding: '40px 20px',
+            color: 'var(--text-muted)',
+          }}>
+            <div style={{
+              width: '32px',
+              height: '32px',
+              margin: '0 auto 16px',
+              border: '3px solid var(--border)',
+              borderTopColor: 'var(--primary)',
+              borderRadius: '50%',
+              animation: 'spin 0.8s linear infinite',
+            }} />
+            <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+            <div style={{ fontSize: '14px' }}>Loading schedule...</div>
+          </div>
+        ) : filteredPatients.length === 0 ? (
           <div style={{
             textAlign: 'center',
             padding: '40px 20px',

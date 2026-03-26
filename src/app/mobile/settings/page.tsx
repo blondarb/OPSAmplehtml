@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import MobileLayout from '@/components/mobile/MobileLayout'
+import { useAuth } from '@/contexts/AuthContext'
 
 interface SettingToggle {
   id: string
@@ -13,6 +14,8 @@ interface SettingToggle {
 
 export default function MobileSettingsPage() {
   const router = useRouter()
+  const { user, userProfile, loading, signOut } = useAuth()
+  const [isSigningOut, setIsSigningOut] = useState(false)
 
   const [settings, setSettings] = useState<SettingToggle[]>([
     {
@@ -54,6 +57,29 @@ export default function MobileSettingsPage() {
     if ('vibrate' in navigator) {
       navigator.vibrate(30)
     }
+  }
+
+  // Derive display name and email from auth context
+  const displayName = userProfile?.display_name || (user?.email ? `Dr. ${user.email.split('@')[0]}` : 'Dr. Demo User')
+  const displayEmail = user?.email || 'demo@sevaro.health'
+  const initials = displayName
+    .split(' ')
+    .filter(Boolean)
+    .slice(0, 2)
+    .map(w => w[0]?.toUpperCase() || '')
+    .join('')
+
+  const handleSignOut = async () => {
+    setIsSigningOut(true)
+    try {
+      await signOut()
+      router.push('/login')
+    } catch (err) {
+      console.error('Sign out failed:', err)
+      // Fallback: navigate to login anyway
+      router.push('/login')
+    }
+    setIsSigningOut(false)
   }
 
   return (
@@ -100,7 +126,7 @@ export default function MobileSettingsPage() {
             fontSize: '20px',
             fontWeight: 600,
           }}>
-            DR
+            {loading ? '...' : initials}
           </div>
           <div style={{ flex: 1 }}>
             <div style={{
@@ -108,14 +134,24 @@ export default function MobileSettingsPage() {
               fontWeight: 600,
               color: 'var(--text-primary)',
             }}>
-              Dr. Demo User
+              {loading ? 'Loading...' : displayName}
             </div>
             <div style={{
               fontSize: '13px',
               color: 'var(--text-muted)',
             }}>
-              demo@sevaro.health
+              {loading ? '' : displayEmail}
             </div>
+            {userProfile?.specialty && (
+              <div style={{
+                fontSize: '12px',
+                color: 'var(--text-muted)',
+                marginTop: '2px',
+              }}>
+                {userProfile.specialty}
+                {userProfile.organization && ` \u00b7 ${userProfile.organization}`}
+              </div>
+            )}
           </div>
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--text-muted)" strokeWidth="2">
             <polyline points="9 18 15 12 9 6" />
@@ -329,7 +365,8 @@ export default function MobileSettingsPage() {
 
         {/* Sign out */}
         <button
-          onClick={() => router.push('/login')}
+          onClick={handleSignOut}
+          disabled={isSigningOut}
           style={{
             width: '100%',
             padding: '16px',
@@ -339,7 +376,8 @@ export default function MobileSettingsPage() {
             fontSize: '15px',
             fontWeight: 600,
             color: '#EF4444',
-            cursor: 'pointer',
+            cursor: isSigningOut ? 'not-allowed' : 'pointer',
+            opacity: isSigningOut ? 0.7 : 1,
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
@@ -351,7 +389,7 @@ export default function MobileSettingsPage() {
             <polyline points="16 17 21 12 16 7" />
             <line x1="21" y1="12" x2="9" y2="12" />
           </svg>
-          Sign Out
+          {isSigningOut ? 'Signing out...' : 'Sign Out'}
         </button>
 
         {/* Version info */}

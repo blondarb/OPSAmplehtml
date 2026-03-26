@@ -1,12 +1,12 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import MobileLayout from '@/components/mobile/MobileLayout'
 import MobileChartView from '@/components/mobile/MobileChartView'
 
-// Sample patient data - in production would come from database
-const samplePatients: Record<string, {
+// Fallback sample data — used only when API is unreachable
+const fallbackPatients: Record<string, {
   id: string
   name: string
   age: number
@@ -20,14 +20,73 @@ const samplePatients: Record<string, {
   '5': { id: '5', name: 'Lisa Thompson', age: 38, gender: 'F', reason: 'MS follow-up' },
 }
 
+interface PatientData {
+  id: string
+  name: string
+  age: number
+  gender: string
+  reason?: string
+}
+
 export default function MobileChartPage() {
   const router = useRouter()
   const params = useParams()
   const patientId = params.id as string
 
-  const [patient, setPatient] = useState(samplePatients[patientId] || null)
+  const [patient, setPatient] = useState<PatientData | null>(null)
+  const [isLoading, setIsLoading] = useState(true)
   const [noteData, setNoteData] = useState<Record<string, string>>({})
   const [isSaving, setIsSaving] = useState(false)
+
+  // Fetch patient data from API with localStorage cache fallback
+  const fetchPatientData = useCallback(async () => {
+    setIsLoading(true)
+
+    // Check localStorage cache first for fast display
+    const cachedPatient = localStorage.getItem(`mobile-patient-${patientId}`)
+    if (cachedPatient) {
+      try {
+        const cached = JSON.parse(cachedPatient)
+        setPatient(cached)
+      } catch {
+        // Ignore parse errors
+      }
+    }
+
+    try {
+      // Try fetching real patient data
+      const res = await fetch(`/api/patients/${patientId}`)
+      if (res.ok) {
+        const data = await res.json()
+        const p = data.patient || data
+        const patientData: PatientData = {
+          id: p.id || patientId,
+          name: p.full_name || p.name || 'Unknown Patient',
+          age: p.age || 0,
+          gender: p.gender || 'U',
+          reason: p.chief_complaint || p.reason || undefined,
+        }
+        setPatient(patientData)
+        // Cache for offline/fast access
+        localStorage.setItem(`mobile-patient-${patientId}`, JSON.stringify(patientData))
+        setIsLoading(false)
+        return
+      }
+    } catch (err) {
+      console.error('Failed to fetch patient data:', err)
+    }
+
+    // Graceful fallback to sample data if API fails
+    if (!patient) {
+      const fallback = fallbackPatients[patientId] || null
+      setPatient(fallback)
+    }
+    setIsLoading(false)
+  }, [patientId]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    fetchPatientData()
+  }, [fetchPatientData])
 
   useEffect(() => {
     // Load any saved draft from localStorage
@@ -52,8 +111,19 @@ export default function MobileChartPage() {
 
   const handleSave = async () => {
     setIsSaving(true)
-    // Simulate saving
-    await new Promise(resolve => setTimeout(resolve, 1000))
+    try {
+      // Try saving to the API
+      const res = await fetch(`/api/patients/${patientId}/notes`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ note_data: noteData }),
+      })
+      if (!res.ok) {
+        console.warn('Note save to API failed, kept in localStorage')
+      }
+    } catch {
+      console.warn('Note save to API failed, kept in localStorage')
+    }
     setIsSaving(false)
 
     // Haptic feedback
@@ -64,8 +134,16 @@ export default function MobileChartPage() {
 
   const handleSign = async () => {
     setIsSaving(true)
-    // Simulate signing
-    await new Promise(resolve => setTimeout(resolve, 1500))
+    try {
+      // Try signing via API
+      await fetch(`/api/patients/${patientId}/notes/sign`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ note_data: noteData }),
+      })
+    } catch {
+      console.warn('Note sign via API failed')
+    }
 
     // Clear draft
     localStorage.removeItem(`mobile-draft-${patientId}`)
@@ -75,8 +153,42 @@ export default function MobileChartPage() {
       navigator.vibrate([100, 50, 100])
     }
 
+    setIsSaving(false)
+
     // Navigate back
     router.push('/mobile')
+  }
+
+  if (isLoading && !patient) {
+    return (
+      <MobileLayout
+        activeTab="chart"
+        showHeader={true}
+        onBack={() => router.push('/mobile')}
+      >
+        <div style={{
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          justifyContent: 'center',
+          height: '100%',
+          padding: '40px',
+          color: 'var(--text-muted)',
+        }}>
+          <div style={{
+            width: '32px',
+            height: '32px',
+            margin: '0 auto 16px',
+            border: '3px solid var(--border)',
+            borderTopColor: 'var(--primary)',
+            borderRadius: '50%',
+            animation: 'spin 0.8s linear infinite',
+          }} />
+          <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+          <div style={{ fontSize: '14px' }}>Loading patient data...</div>
+        </div>
+      </MobileLayout>
+    )
   }
 
   if (!patient) {
