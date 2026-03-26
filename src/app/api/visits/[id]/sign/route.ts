@@ -4,6 +4,7 @@ import { getTenantServer } from '@/lib/tenant'
 import { invokeBedrock } from '@/lib/bedrock'
 import { getPool } from '@/lib/db'
 import { from } from '@/lib/db-query'
+import { notifyVisitSigned } from '@/lib/notifications'
 
 // POST /api/visits/[id]/sign - Sign and complete a visit
 export async function POST(
@@ -140,6 +141,13 @@ Generate a professional clinical summary:`
         })
         .eq('id', visit.appointment_id)
     }
+
+    // Fire visit-signed notification (non-blocking)
+    const patientName = visit.patient
+      ? `${visit.patient.first_name} ${visit.patient.last_name}`
+      : 'Unknown Patient'
+    notifyVisitSigned(id, patientName, user.email || 'Provider', visit.patient_id || null)
+      .catch(err => console.error('[sign] notification error:', err))
 
     // Fetch the updated visit
     const { rows: updatedRows } = await pool.query(`

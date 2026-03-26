@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getUser } from '@/lib/cognito/server'
 import { wearableFrom as from } from '@/lib/db-query'
+import { notifyWearableAlert } from '@/lib/notifications'
 
 /**
  * POST /api/wearable/events
@@ -80,6 +81,19 @@ export async function POST(request: NextRequest) {
     if (error) {
       console.error('Wearable events insert error:', error)
       return NextResponse.json({ error: error.message }, { status: 500 })
+    }
+
+    // Fire wearable alert notifications (non-blocking)
+    if (data && data.length > 0) {
+      for (const anomaly of data) {
+        notifyWearableAlert(
+          anomaly.id,
+          `Patient ${anomaly.patient_id.substring(0, 8)}`,
+          anomaly.anomaly_type,
+          anomaly.severity,
+          anomaly.patient_id,
+        ).catch(err => console.error('[wearable-events] notification error:', err))
+      }
     }
 
     return NextResponse.json(

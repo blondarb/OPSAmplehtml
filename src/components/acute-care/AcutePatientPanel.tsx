@@ -3,6 +3,7 @@
 import React from 'react';
 import { Phone, Video, CheckCircle, MapPin, Clock, Stethoscope, FileText, Activity } from 'lucide-react';
 import { WidgetCard, Avatar, Tag, Timeline, PillButton } from '@/components/ui';
+import PatientToolsPanel from '@/components/PatientToolsPanel';
 
 interface AcutePatientPanelProps {
   patient: any;
@@ -200,6 +201,13 @@ export default function AcutePatientPanel({
           ]}
         />
       </WidgetCard>
+
+      {/* Patient-Reported Data (Body Map & Motor Tests) */}
+      {patient?.id && (
+        <WidgetCard title="Patient-Reported Data" collapsible defaultOpen={true}>
+          <PatientToolsPanel patientId={patient.id} />
+        </WidgetCard>
+      )}
 
       {/* Triager */}
       <WidgetCard title="Triager" collapsible defaultOpen={false}>

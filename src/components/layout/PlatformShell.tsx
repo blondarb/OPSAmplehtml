@@ -4,12 +4,14 @@ import Link from 'next/link'
 import { useAuth } from '@/contexts/AuthContext'
 import { useState, useRef, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
+import { useNotificationCounts } from '@/hooks/useNotificationCounts'
 
 export default function PlatformShell({ children }: { children: React.ReactNode }) {
   const { user, userProfile, loading, signOut } = useAuth()
   const [dropdownOpen, setDropdownOpen] = useState(false)
   const dropdownRef = useRef<HTMLDivElement>(null)
   const router = useRouter()
+  const { counts: notifCounts } = useNotificationCounts()
 
   // Close dropdown on outside click or Escape key
   useEffect(() => {
@@ -55,8 +57,22 @@ export default function PlatformShell({ children }: { children: React.ReactNode 
           <Link href="/" className="text-slate-300 hover:text-white transition-colors">Home</Link>
         </div>
 
-        {/* Right: Auth */}
+        {/* Right: Notifications + Auth */}
         <div className="flex items-center gap-4">
+          {/* Notification count badge */}
+          {notifCounts.total > 0 && (
+            <div className="relative" title={`${notifCounts.total} unread notification${notifCounts.total !== 1 ? 's' : ''}`}>
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-slate-300">
+                <path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9" />
+                <path d="M13.73 21a2 2 0 01-3.46 0" />
+              </svg>
+              <span
+                className="absolute -top-1.5 -right-1.5 min-w-[18px] h-[18px] rounded-full bg-red-500 text-white text-[10px] font-bold flex items-center justify-center px-1"
+              >
+                {notifCounts.total > 99 ? '99+' : notifCounts.total}
+              </span>
+            </div>
+          )}
           {loading ? (
             <div className="w-8 h-8 rounded-full bg-slate-700 animate-pulse" />
           ) : user ? (

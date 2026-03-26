@@ -24,6 +24,7 @@ export type NotificationSourceType =
   | 'wearable_alert'
   | 'incomplete_doc'
   | 'intake_received'
+  | 'visit_signed'
   | 'system'
 
 export interface CreateNotificationParams {
@@ -162,5 +163,87 @@ export async function notifyHistorianRedFlag(
     sourceId: sessionId,
     patientId: patientId || null,
     metadata: { redFlagCount: redFlags.length, flags: redFlags },
+  })
+}
+
+/**
+ * Notify when a visit is signed and completed.
+ */
+export async function notifyVisitSigned(
+  visitId: string,
+  patientName: string,
+  providerName: string,
+  patientId?: string | null,
+): Promise<NotificationRecord | null> {
+  return createNotification({
+    sourceType: 'visit_signed',
+    title: `Visit signed for ${patientName}`,
+    body: `${providerName} signed the clinical note`,
+    priority: 'low',
+    sourceId: visitId,
+    patientId: patientId || null,
+    metadata: { providerName },
+  })
+}
+
+/**
+ * Create notifications for incomplete/unsigned notes.
+ * Non-throwing — logs errors and returns results.
+ */
+export async function notifyIncompleteNotes(
+  incompleteDocs: Array<{
+    patient_name: string
+    patient_id: string | null
+    visit_id: string | null
+    note_id: string | null
+    description: string
+  }>,
+): Promise<NotificationRecord[]> {
+  const results: NotificationRecord[] = []
+
+  for (const doc of incompleteDocs) {
+    try {
+      const record = await createNotification({
+        sourceType: 'incomplete_doc',
+        title: `Unsigned note: ${doc.patient_name}`,
+        body: doc.description,
+        priority: 'normal',
+        sourceId: doc.note_id || doc.visit_id || null,
+        patientId: doc.patient_id || null,
+        metadata: {
+          visit_id: doc.visit_id,
+          note_id: doc.note_id,
+        },
+      })
+      if (record) results.push(record)
+    } catch (err) {
+      console.error('[notifications] notifyIncompleteNotes item error:', err)
+    }
+  }
+
+  return results
+}
+
+/**
+ * Notify when a wearable alert is detected.
+ */
+export async function notifyWearableAlert(
+  alertId: string,
+  patientName: string,
+  alertType: string,
+  severity: string,
+  patientId?: string | null,
+  metadata?: Record<string, unknown>,
+): Promise<NotificationRecord | null> {
+  const isCritical = severity === 'critical' || severity === 'high'
+
+  return createNotification({
+    sourceType: 'wearable_alert',
+    title: `Wearable alert: ${patientName}`,
+    body: `${alertType} — ${severity}`,
+    priority: isCritical ? 'critical' : 'high',
+    sourceId: alertId,
+    patientId: patientId || null,
+    metadata: { alertType, severity, ...metadata },
   })
 }
