@@ -5,6 +5,7 @@ import { invokeBedrock } from '@/lib/bedrock'
 import { getPool } from '@/lib/db'
 import { from } from '@/lib/db-query'
 import { notifyVisitSigned } from '@/lib/notifications'
+import { triggerFollowUpFromVisit } from '@/lib/follow-up/visitTrigger'
 
 // POST /api/visits/[id]/sign - Sign and complete a visit
 export async function POST(
@@ -148,6 +149,10 @@ Generate a professional clinical summary:`
       : 'Unknown Patient'
     notifyVisitSigned(id, patientName, user.email || 'Provider', visit.patient_id || null)
       .catch(err => console.error('[sign] notification error:', err))
+
+    // Auto-trigger follow-up session from this visit (non-blocking)
+    triggerFollowUpFromVisit(id)
+      .catch(err => console.error('[sign] follow-up trigger error:', err))
 
     // Fetch the updated visit
     const { rows: updatedRows } = await pool.query(`

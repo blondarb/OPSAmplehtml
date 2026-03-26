@@ -8,9 +8,9 @@ export async function GET(request: Request) {
     const { searchParams } = new URL(request.url)
     const fromDate = searchParams.get('from') || new Date(Date.now() - 30 * 86400000).toISOString()
     const toDate = searchParams.get('to') || new Date().toISOString()
+    const sourceFilter = searchParams.get('source') // 'visit' | 'demo' | null (all)
 
-
-    // Fetch all sessions in range
+    // Fetch all sessions in range (including visit-linked ones)
     const { data: sessions, error: sessionsError } = await from('followup_sessions')
       .select('*')
       .gte('created_at', fromDate)
@@ -22,7 +22,26 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: 'Failed to fetch analytics data' }, { status: 500 })
     }
 
-    const allSessions = sessions || []
+    const rawSessions = sessions || []
+
+    // Compute visit-linked metrics before filtering
+    const sessionsFromVisits = rawSessions.filter(
+      (s: Record<string, unknown>) => s.visit_id != null,
+    )
+    const sessionsFromDemo = rawSessions.filter(
+      (s: Record<string, unknown>) => s.visit_id == null,
+    )
+
+    // Apply source filter if provided
+    let allSessions: Record<string, unknown>[]
+    if (sourceFilter === 'visit') {
+      allSessions = sessionsFromVisits
+    } else if (sourceFilter === 'demo') {
+      allSessions = sessionsFromDemo
+    } else {
+      allSessions = rawSessions
+    }
+
     const completedSessions = allSessions.filter(
       (s: Record<string, unknown>) => s.conversation_complete === true || s.status === 'completed'
     )
@@ -153,7 +172,14 @@ export async function GET(request: Request) {
       }
     })
 
-    const analyticsData: AnalyticsData = {
+    // Source distribution: visit-linked vs demo-initiated
+    const sourceDistribution = {
+      fromVisits: sessionsFromVisits.length,
+      fromDemo: sessionsFromDemo.length,
+      total: rawSessions.length,
+    }
+
+    const analyticsData: AnalyticsData & { sourceDistribution: typeof sourceDistribution } = {
       summary: { totalCalls, completionRate, avgDuration, estimatedRevenue },
       volumeByPeriod,
       completionTrend,
@@ -162,6 +188,7 @@ export async function GET(request: Request) {
       functionalStatus,
       modeDistribution,
       recentEscalations,
+      sourceDistribution,
     }
 
     return NextResponse.json(analyticsData)
