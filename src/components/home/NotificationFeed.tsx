@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 
 interface NotificationFeedProps {
   activeFilter: string
@@ -9,7 +9,7 @@ interface NotificationFeedProps {
   onNavigateToPatient: (patientId: string) => void
 }
 
-interface DemoNotification {
+interface Notification {
   id: string
   sourceType: string
   priority: 'critical' | 'high' | 'normal' | 'low'
@@ -25,7 +25,7 @@ interface DemoNotification {
   filterGroup: string
 }
 
-const DEMO_NOTIFICATIONS: DemoNotification[] = [
+const DEMO_NOTIFICATIONS: Notification[] = [
   { id: 'n1', sourceType: 'wearable_alert', priority: 'critical', title: 'Fall detected', body: '2 fall events in 4 hours. Last event 22 min ago.', time: '22 min ago', patientName: 'Linda Martinez', clinicalSnippet: 'BP: 142/88 · HR: 92 · Last fall: 4h ago', detailText: 'Wearable detected 2 fall events in 4 hours. First event at 5:48 AM (moderate impact), second at 9:32 AM (high impact). Patient heart rate elevated post-event at 92 bpm. Automated check-in prompt sent — no response after 5 minutes. Baseline tremor score has increased from 2.1 to 3.4 over the past 9 days.', actionLabel: 'View Details', filterGroup: 'urgent' },
   { id: 'n2', sourceType: 'wearable_alert', priority: 'critical', title: 'Seizure-like activity cluster', body: 'HR spike + accelerometer pattern at 6:14 AM and 7:02 AM.', time: '1 hr ago', patientName: 'James Wilson', clinicalSnippet: 'HR spike: 145 bpm · Duration: 2m 14s', detailText: 'Accelerometer pattern consistent with tonic-clonic activity detected at 6:14 AM and 7:02 AM. Heart rate peak 145 bpm during first event, 138 bpm during second. Events lasted 2m14s and 1m48s respectively. SpO2 dipped to 91% briefly during first event.', actionLabel: 'View Details', filterGroup: 'urgent' },
   { id: 'n3', sourceType: 'patient_message', priority: 'high', title: 'Question about medication side effects', body: '"I\'ve been experiencing dizziness since starting the new dosage. Should I..."', time: '45 min ago', patientName: 'Maria Garcia', clinicalSnippet: 'Re: Topiramate 100mg dosage change', aiDraft: 'Thank you for reaching out about the dizziness. This can be a common side effect when adjusting Topiramate dosage...', actionLabel: 'Review & Send', filterGroup: 'messages' },
@@ -39,6 +39,62 @@ const DEMO_NOTIFICATIONS: DemoNotification[] = [
   { id: 'n11', sourceType: 'care_gap', priority: 'normal', title: 'PHQ-9 reassessment overdue', body: 'Last completed Sep 2025 (3 months overdue). Score was 12 (moderate).', time: 'Overdue', patientName: 'Maria Garcia', clinicalSnippet: 'PHQ-9 · Last: Sep 2025 (score: 12) · 90d overdue', actionLabel: 'Address', filterGroup: 'tasks' },
   { id: 'n12', sourceType: 'incomplete_doc', priority: 'low', title: 'Follow-up not scheduled', body: 'Treatment plan recommended 3-month follow-up but no appointment exists.', time: '5 days', patientName: 'Frank Russo', clinicalSnippet: '3-month follow-up recommended · None scheduled', actionLabel: 'Schedule', filterGroup: 'tasks' },
 ]
+
+// Map source_type to filter group
+function getFilterGroup(sourceType: string, priority: string): string {
+  if (priority === 'critical' || priority === 'high') return 'urgent'
+  if (sourceType === 'patient_message') return 'messages'
+  return 'tasks'
+}
+
+// Map source_type to default action label
+function getActionLabel(sourceType: string): string {
+  switch (sourceType) {
+    case 'wearable_alert': return 'View Details'
+    case 'patient_message': return 'Review & Send'
+    case 'consult_request': return 'Respond'
+    case 'incomplete_doc': return 'Complete Now'
+    case 'lab_result': return 'Review'
+    case 'refill_request': return 'Approve'
+    case 'care_gap': return 'Address'
+    default: return 'View'
+  }
+}
+
+// Format relative time from ISO timestamp
+function formatRelativeTime(isoDate: string): string {
+  const now = Date.now()
+  const then = new Date(isoDate).getTime()
+  const diffMs = now - then
+  const diffMins = Math.floor(diffMs / 60000)
+  if (diffMins < 1) return 'Just now'
+  if (diffMins < 60) return `${diffMins} min ago`
+  const diffHrs = Math.floor(diffMins / 60)
+  if (diffHrs < 24) return `${diffHrs} hr${diffHrs > 1 ? 's' : ''} ago`
+  const diffDays = Math.floor(diffHrs / 24)
+  return `${diffDays} day${diffDays > 1 ? 's' : ''}`
+}
+
+// Transform API notification to display format
+function mapApiNotification(n: any): Notification {
+  const sourceType = n.source_type || 'system'
+  const priority = n.priority || 'normal'
+  return {
+    id: n.id,
+    sourceType,
+    priority,
+    title: n.title,
+    body: n.body || '',
+    time: n.created_at ? formatRelativeTime(n.created_at) : '',
+    patientName: n.metadata?.patient_name || undefined,
+    aiDraft: n.metadata?.ai_draft || undefined,
+    clinicalSnippet: n.metadata?.clinical_snippet || undefined,
+    detailText: n.metadata?.detail_text || undefined,
+    actionLabel: n.metadata?.action_label || getActionLabel(sourceType),
+    secondaryAction: sourceType === 'refill_request' ? 'Deny' : undefined,
+    filterGroup: getFilterGroup(sourceType, priority),
+  }
+}
 
 const FILTER_TABS = [
   { key: 'all', label: 'All' },
@@ -80,18 +136,61 @@ export default function NotificationFeed({ activeFilter, onFilterChange, onActio
   const [expandedDraft, setExpandedDraft] = useState<string | null>(null)
   const [expandedDetail, setExpandedDetail] = useState<string | null>(null)
   const [hoveredTab, setHoveredTab] = useState<string | null>(null)
+  const [notifications, setNotifications] = useState<Notification[]>(DEMO_NOTIFICATIONS)
+  const [isLive, setIsLive] = useState(false)
+
+  const fetchNotifications = useCallback(async () => {
+    try {
+      const res = await fetch('/api/notifications?status=unread&limit=50')
+      if (!res.ok) return
+
+      const { notifications: apiNotifications } = await res.json()
+      if (apiNotifications && apiNotifications.length > 0) {
+        setNotifications(apiNotifications.map(mapApiNotification))
+        setIsLive(true)
+      }
+      // If no real notifications, keep demo data (already set as default)
+    } catch {
+      // Network error — keep current data
+    }
+  }, [])
+
+  useEffect(() => {
+    fetchNotifications()
+    const interval = setInterval(fetchNotifications, 30000)
+    return () => clearInterval(interval)
+  }, [fetchNotifications])
+
+  const handleAction = useCallback(async (notificationId: string, action: string) => {
+    onAction(notificationId, action)
+
+    // If live data, mark notification as actioned
+    if (isLive) {
+      try {
+        await fetch('/api/notifications', {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ id: notificationId, status: 'actioned' }),
+        })
+        // Remove from list
+        setNotifications(prev => prev.filter(n => n.id !== notificationId))
+      } catch {
+        // Silently fail — notification stays in list
+      }
+    }
+  }, [isLive, onAction])
 
   const filtered = activeFilter === 'all'
-    ? DEMO_NOTIFICATIONS
-    : DEMO_NOTIFICATIONS.filter(n => n.filterGroup === activeFilter)
+    ? notifications
+    : notifications.filter(n => n.filterGroup === activeFilter)
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', background: 'var(--bg-white)', height: '100%' }}>
       {/* Filter tabs */}
-      <div style={{ display: 'flex', gap: '4px', padding: '12px 16px', borderBottom: '1px solid var(--border)' }}>
+      <div style={{ display: 'flex', gap: '4px', padding: '12px 16px', borderBottom: '1px solid var(--border)', alignItems: 'center' }}>
         {FILTER_TABS.map(tab => {
           const isActive = activeFilter === tab.key
-          const count = tab.key === 'all' ? DEMO_NOTIFICATIONS.length : DEMO_NOTIFICATIONS.filter(n => n.filterGroup === tab.key).length
+          const count = tab.key === 'all' ? notifications.length : notifications.filter(n => n.filterGroup === tab.key).length
           return (
             <button
               key={tab.key}
@@ -116,6 +215,12 @@ export default function NotificationFeed({ activeFilter, onFilterChange, onActio
             </button>
           )
         })}
+        {isLive && (
+          <span style={{ marginLeft: 'auto', fontSize: '10px', color: '#22C55E', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '4px' }}>
+            <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#22C55E', display: 'inline-block' }} />
+            Live
+          </span>
+        )}
       </div>
 
       {/* Notification list */}
@@ -187,7 +292,7 @@ export default function NotificationFeed({ activeFilter, onFilterChange, onActio
                       <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                         <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>
                       </svg>
-                      AI Draft {expandedDraft === notif.id ? '▴' : '▾'}
+                      AI Draft {expandedDraft === notif.id ? '\u25B4' : '\u25BE'}
                     </button>
                     {expandedDraft === notif.id && (
                       <div style={{
@@ -229,7 +334,7 @@ export default function NotificationFeed({ activeFilter, onFilterChange, onActio
                 {/* Actions row */}
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '8px' }}>
                   <button
-                    onClick={() => onAction(notif.id, 'primary')}
+                    onClick={() => handleAction(notif.id, 'primary')}
                     style={{
                       fontSize: '11px', fontWeight: 600, padding: '4px 12px', borderRadius: '6px',
                       background: accent, color: 'white', border: 'none', cursor: 'pointer',
@@ -240,7 +345,7 @@ export default function NotificationFeed({ activeFilter, onFilterChange, onActio
                   </button>
                   {notif.secondaryAction && (
                     <button
-                      onClick={() => onAction(notif.id, 'secondary')}
+                      onClick={() => handleAction(notif.id, 'secondary')}
                       style={{
                         fontSize: '11px', fontWeight: 600, padding: '4px 12px', borderRadius: '6px',
                         background: 'transparent', color: accent, border: `1px solid ${accent}`,
