@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { Bell, X } from 'lucide-react'
 import ScheduleColumn from './home/ScheduleColumn'
+import HistorianSessionsList from './home/HistorianSessionsList'
 import NotificationFeed from './home/NotificationFeed'
 import MorningBriefing from './command-center/MorningBriefing'
 
@@ -100,14 +101,47 @@ export default function PhysicianHome({ onSelectPatient, onScheduleNew, onSchedu
         </div>
       </div>
 
-      {/* Two-column layout: Schedule | Morning Briefing + Notification Drawer overlay */}
+      {/* Two-column layout: Schedule + Historian | Morning Briefing + Notification Drawer overlay */}
       <div style={{ flex: 1, display: 'flex', overflow: 'hidden', position: 'relative' }}>
-        <ScheduleColumn
-          onSelectPatient={onSelectPatient}
-          onScheduleNew={onScheduleNew}
-          onScheduleFollowup={onScheduleFollowup}
-          onPrepPatient={(id) => onSelectPatient(id)}
-        />
+        <div style={{ minWidth: '260px', maxWidth: '320px', width: '280px', flexShrink: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+          <div style={{ flex: 1, overflow: 'hidden' }}>
+            <ScheduleColumn
+              onSelectPatient={onSelectPatient}
+              onScheduleNew={onScheduleNew}
+              onScheduleFollowup={onScheduleFollowup}
+              onPrepPatient={(id) => onSelectPatient(id)}
+            />
+          </div>
+          {/* Historian Sessions */}
+          <div style={{
+            borderTop: '1px solid var(--border)',
+            background: 'var(--bg-white)',
+            maxHeight: '280px',
+            overflow: 'auto',
+            flexShrink: 0,
+          }}>
+            <div style={{
+              padding: '10px 16px 6px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              position: 'sticky',
+              top: 0,
+              background: 'var(--bg-white)',
+              zIndex: 1,
+            }}>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#0d9488" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M9.5 2A5.5 5.5 0 005 7.5c0 .88.21 1.71.58 2.45" />
+                <path d="M14.5 2A5.5 5.5 0 0120 7.5c0 .88-.21 1.71-.58 2.45" />
+                <path d="M12 2v20" />
+              </svg>
+              <span style={{ fontWeight: 700, fontSize: '13px', color: 'var(--text-primary)' }}>
+                Historian Sessions
+              </span>
+            </div>
+            <HistorianSessionsList />
+          </div>
+        </div>
         <div style={{
           flex: 1,
           borderLeft: '1px solid var(--border)',

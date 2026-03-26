@@ -3,6 +3,7 @@ import { getUser } from '@/lib/cognito/server'
 import { getTenantServer } from '@/lib/tenant'
 import { getPool } from '@/lib/db'
 import { from } from '@/lib/db-query'
+import { notifyIncompleteNotes } from '@/lib/notifications'
 
 // GET /api/incomplete-docs — Scan for unsigned/incomplete clinical notes
 export async function GET() {
@@ -90,6 +91,12 @@ export async function GET() {
         visit_date: visit.visit_date,
         missing_sections: [],
       })
+    }
+
+    // Fire incomplete-doc notifications (non-blocking, best-effort)
+    if (incompleteItems.length > 0) {
+      notifyIncompleteNotes(incompleteItems)
+        .catch(err => console.error('[incomplete-docs] notification error:', err))
     }
 
     return NextResponse.json({

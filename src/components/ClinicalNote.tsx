@@ -983,12 +983,52 @@ export default function ClinicalNote({
     }
   }
 
-  const handleImportHistorian = (session: any) => {
+  const handleImportHistorian = async (session: any) => {
     if (!session?.structured_output) return
     if (isSwitchingPatientRef.current) {
       console.warn('Ignoring historian import - patient switch in progress')
       return
     }
+
+    // If we have a visit, call the server-side import API for full merge + persistence
+    if (currentVisit?.id) {
+      try {
+        const res = await fetch(`/api/visits/${currentVisit.id}/import-historian`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ historian_session_id: session.id }),
+        })
+        if (res.ok) {
+          const { clinical_note } = await res.json()
+          // Update local note state from persisted merged note
+          setNoteData(prev => ({
+            ...prev,
+            hpi: clinical_note.hpi || prev.hpi,
+            allergies: clinical_note.allergies || prev.allergies,
+            ros: clinical_note.ros || prev.ros,
+            historyDetails: clinical_note.history_details || prev.historyDetails,
+            historyAvailable: clinical_note.history_available || prev.historyAvailable,
+          }))
+          // Mark session as imported in local state
+          setPatientHistorianSessions(prev =>
+            prev.map((s: any) => s.id === session.id ? { ...s, imported_to_note: true } : s)
+          )
+          return
+        }
+        // If 409 conflict (already imported), still update local state
+        if (res.status === 409) {
+          setPatientHistorianSessions(prev =>
+            prev.map((s: any) => s.id === session.id ? { ...s, imported_to_note: true } : s)
+          )
+          return
+        }
+        console.error('[import-historian] API error:', await res.text())
+      } catch (err) {
+        console.error('[import-historian] Network error:', err)
+      }
+    }
+
+    // Fallback: client-side merge (no visit yet)
     const so = session.structured_output
     setNoteData(prev => ({
       ...prev,
