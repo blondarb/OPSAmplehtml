@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getUser } from '@/lib/cognito/server'
-import { wearableFrom as from } from '@/lib/db-query'
+import { from as mainFrom, wearableFrom as from } from '@/lib/db-query'
 import { notifyWearableAlert } from '@/lib/notifications'
 
 /**
@@ -83,15 +83,47 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: error.message }, { status: 500 })
     }
 
-    // Fire wearable alert notifications (non-blocking)
+    // Fire wearable alert notifications with OPSAmple patient context (non-blocking)
     if (data && data.length > 0) {
+      // Look up linked OPSAmple patients for richer notifications
+      const wearableIds = Array.from(new Set((data as any[]).map(a => String(a.patient_id))))
+      const linkMap = new Map<string, { opsPatientId: string; patientName: string }>()
+
+      try {
+        for (const wId of wearableIds) {
+          const { data: linkRows } = await mainFrom('patient_wearable_links')
+            .select('patient_id')
+            .eq('wearable_patient_id', wId)
+
+          if (linkRows && linkRows.length > 0) {
+            const opsPatientId = (linkRows[0] as any).patient_id
+            // Look up patient name from ops_amplehtml
+            const { data: patientRow } = await mainFrom('patients')
+              .select('first_name, last_name')
+              .eq('id', opsPatientId)
+              .maybeSingle()
+            const name = patientRow
+              ? `${(patientRow as any).first_name || ''} ${(patientRow as any).last_name || ''}`.trim()
+              : `Patient ${wId.substring(0, 8)}`
+            linkMap.set(wId, { opsPatientId, patientName: name })
+          }
+        }
+      } catch (linkErr) {
+        console.error('[wearable-events] link lookup error (non-fatal):', linkErr)
+      }
+
       for (const anomaly of data) {
+        const linked = linkMap.get(anomaly.patient_id)
+        const patientName = linked?.patientName || `Patient ${anomaly.patient_id.substring(0, 8)}`
+        const opsPatientId = linked?.opsPatientId || anomaly.patient_id
+
         notifyWearableAlert(
           anomaly.id,
-          `Patient ${anomaly.patient_id.substring(0, 8)}`,
+          patientName,
           anomaly.anomaly_type,
           anomaly.severity,
-          anomaly.patient_id,
+          opsPatientId,
+          linked ? { wearable_patient_id: anomaly.patient_id, source: 'sevaro_monitor' } : undefined,
         ).catch(err => console.error('[wearable-events] notification error:', err))
       }
     }

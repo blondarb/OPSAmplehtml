@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getUser } from '@/lib/cognito/server'
+import { getPool } from '@/lib/db'
 
 // ─── Demo metrics ───────────────────────────────────────────────────────────
 // Hardcoded aggregate counts used as the primary data source for the prototype.
@@ -77,19 +78,43 @@ export async function GET(request: NextRequest) {
     const viewMode = searchParams.get('view_mode') || 'my_patients'
     const timeRange = searchParams.get('time_range') || 'today'
 
-    // TODO: Replace demo data with live RDS queries per data source.
+    // TODO: Replace remaining demo data with live RDS queries per data source.
     //
     // Future query targets (all scoped by viewMode / timeRange):
     //   schedule   — visits WHERE visit_date = today
     //   messages   — patient_messages WHERE is_read = false AND direction = 'inbound'
     //   refills    — patient_medications WHERE refill approaching
     //   results    — imaging_studies WHERE ordered but no impression
-    //   wearables  — wearable_alerts WHERE acknowledged = false
     //   followups  — followup_sessions WHERE escalation_level IN ('same_day','urgent')
     //   triage     — triage_sessions WHERE status = 'pending_review'
     //   ehr        — always demo data (simulated EHR integration)
 
     const metrics = { ...DEMO_METRICS }
+
+    // Wire wearable_alerts to real data from the notifications table
+    try {
+      const pool = await getPool()
+      const { rows } = await pool.query(
+        `SELECT
+           COUNT(*)::int AS count,
+           COUNT(*) FILTER (WHERE priority IN ('critical', 'high'))::int AS urgent
+         FROM notifications
+         WHERE source_type = 'wearable_alert' AND status = 'unread'`
+      )
+      const total = rows[0]?.count ?? 0
+      const urgent = rows[0]?.urgent ?? 0
+      if (total > 0) {
+        metrics.wearables = {
+          total,
+          sublabel: urgent > 0 ? `${urgent} urgent` : `${total} alert${total === 1 ? '' : 's'}`,
+          urgent,
+          trend: 'up' as const,
+        }
+      }
+    } catch (err) {
+      // Non-fatal: fall back to demo wearable metrics
+      console.warn('Command Center wearable alerts query failed:', (err as Error).message)
+    }
 
     return NextResponse.json(metrics)
   } catch (error: unknown) {
