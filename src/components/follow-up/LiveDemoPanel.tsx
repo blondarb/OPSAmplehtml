@@ -1,8 +1,8 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { DEMO_SCENARIOS } from '@/lib/follow-up/demoScenarios'
-import { Smartphone, Send, Shield } from 'lucide-react'
+import { Smartphone, Send, Shield, AlertCircle } from 'lucide-react'
 
 interface LiveDemoPanelProps {
   onSessionStarted: (sessionId: string) => void
@@ -13,6 +13,25 @@ export default function LiveDemoPanel({ onSessionStarted }: LiveDemoPanelProps) 
   const [scenarioId, setScenarioId] = useState(DEMO_SCENARIOS[0].id)
   const [status, setStatus] = useState<'idle' | 'sending' | 'sent' | 'error'>('idle')
   const [errorMsg, setErrorMsg] = useState('')
+  const [twilioConfigured, setTwilioConfigured] = useState<boolean | null>(null)
+
+  // Check Twilio readiness on mount
+  useEffect(() => {
+    async function checkTwilio() {
+      try {
+        const res = await fetch('/api/follow-up/twilio-status')
+        if (res.ok) {
+          const data = await res.json()
+          setTwilioConfigured(data.configured)
+        } else {
+          setTwilioConfigured(false)
+        }
+      } catch {
+        setTwilioConfigured(false)
+      }
+    }
+    checkTwilio()
+  }, [])
 
   async function handleSend() {
     if (!phone.trim()) return
@@ -66,7 +85,33 @@ export default function LiveDemoPanel({ onSessionStarted }: LiveDemoPanelProps) 
         </div>
       </div>
 
-      {status !== 'sent' ? (
+      {/* Show unavailable message when Twilio is not configured */}
+      {twilioConfigured === false ? (
+        <div style={{
+          padding: '16px',
+          borderRadius: 8,
+          background: 'rgba(234, 179, 8, 0.1)',
+          border: '1px solid rgba(234, 179, 8, 0.2)',
+          display: 'flex',
+          alignItems: 'flex-start',
+          gap: 10,
+        }}>
+          <AlertCircle size={18} color="#eab308" style={{ flexShrink: 0, marginTop: 1 }} />
+          <div>
+            <div style={{ fontSize: 13, fontWeight: 600, color: '#eab308', marginBottom: 4 }}>
+              Live SMS Unavailable
+            </div>
+            <div style={{ fontSize: 12, color: '#94a3b8', lineHeight: 1.5 }}>
+              Twilio credentials are not configured yet. The live SMS demo will be available once
+              credentials are added to AWS Secrets Manager. Use the chat or voice modes in the meantime.
+            </div>
+          </div>
+        </div>
+      ) : twilioConfigured === null ? (
+        <div style={{ textAlign: 'center', padding: '16px 0', color: '#64748b', fontSize: 13 }}>
+          Checking SMS availability...
+        </div>
+      ) : status !== 'sent' ? (
         <>
           <label style={{ display: 'block', marginBottom: 12 }}>
             <span style={{ fontSize: 12, color: '#94a3b8', display: 'block', marginBottom: 4 }}>Scenario</span>

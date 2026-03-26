@@ -3,9 +3,19 @@ import { getUser } from '@/lib/cognito/server'
 import { sendSms, normalizePhoneNumber } from '@/lib/follow-up/twilioClient'
 import { DEMO_SCENARIOS } from '@/lib/follow-up/demoScenarios'
 import { from } from '@/lib/db-query'
+import { getTwilioCredentials } from '@/lib/secrets'
 
 export async function POST(request: Request) {
   try {
+    // Pre-flight check: verify Twilio credentials are configured
+    const creds = await getTwilioCredentials()
+    if (!creds.account_sid || !creds.auth_token || !creds.phone_number) {
+      return NextResponse.json({
+        error: 'Twilio is not configured. SMS sending is unavailable until Twilio credentials are added to AWS Secrets Manager (sevaro/twilio) or environment variables.',
+        twilio_configured: false,
+      }, { status: 503 })
+    }
+
     const { phone_number, scenario_id } = await request.json()
 
     // Validate phone
@@ -20,10 +30,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Unknown scenario' }, { status: 400 })
     }
 
-    const twilioNumber = process.env.TWILIO_PHONE_NUMBER
-    if (!twilioNumber) {
-      return NextResponse.json({ error: 'Twilio not configured' }, { status: 500 })
-    }
+    const twilioNumber = creds.phone_number
 
 
     // Rate limit: max 1 active session per phone

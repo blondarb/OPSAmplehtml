@@ -4,12 +4,19 @@ import { processConversationTurn } from '@/lib/follow-up/conversationEngine'
 import { DEMO_SCENARIOS } from '@/lib/follow-up/demoScenarios'
 import { suggestCptCode, CPT_CODES } from '@/lib/follow-up/cptCodes'
 import { from } from '@/lib/db-query'
+import { getTwilioCredentials } from '@/lib/secrets'
 
 
 export const maxDuration = 30
 
 export async function POST(request: Request) {
   try {
+    // Pre-flight: verify Twilio is configured before processing webhook
+    const creds = await getTwilioCredentials()
+    if (!creds.account_sid || !creds.auth_token) {
+      return twimlResponse('SMS service is not configured. Please contact your administrator.')
+    }
+
     // Parse Twilio form-encoded body
     const formData = await request.formData()
     const params: Record<string, string> = {}
