@@ -6,6 +6,7 @@ import { AITriageResponse, DISCLAIMER_TEXT } from '@/lib/triage/types'
 import { from } from '@/lib/db-query'
 import { createConsult, linkTriageToConsult } from '@/lib/consult/pipeline'
 import { deriveChiefComplaint, buildTriageSummaryForConsult } from '@/lib/consult/contextBuilder'
+import { notifyTriageUrgent } from '@/lib/notifications'
 
 const TRIAGE_MODEL = process.env.BEDROCK_TRIAGE_MODEL || BEDROCK_MODEL
 
@@ -191,6 +192,23 @@ export async function POST(request: Request) {
       }
     } catch (consultErr) {
       console.error('Consult pipeline integration error (non-fatal):', consultErr)
+    }
+
+    // ── Notification: alert staff for urgent+ triage results ─────────────
+    try {
+      await notifyTriageUrgent(
+        sessionId,
+        scoring.tier,
+        scoring.display,
+        deriveChiefComplaint(
+          aiResponse.clinical_reasons || [],
+          referral_text,
+          aiResponse.subspecialty_recommendation || '',
+        ),
+        patient_id || null,
+      )
+    } catch (notifErr) {
+      console.error('Triage notification error (non-fatal):', notifErr)
     }
 
     // Build response per playbook Section 5.3
