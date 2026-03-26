@@ -4,6 +4,7 @@ import React from 'react';
 import { Phone, Video, CheckCircle, MapPin, Clock, Stethoscope, FileText, Activity } from 'lucide-react';
 import { WidgetCard, Avatar, Tag, Timeline, PillButton } from '@/components/ui';
 import PatientToolsPanel from '@/components/PatientToolsPanel';
+import WearableSummaryPanel from '@/components/WearableSummaryPanel';
 
 interface AcutePatientPanelProps {
   patient: any;
@@ -201,6 +202,13 @@ export default function AcutePatientPanel({
           ]}
         />
       </WidgetCard>
+
+      {/* Wearable Monitoring Data */}
+      {patient?.id && (
+        <WidgetCard title="Wearable Monitoring" collapsible defaultOpen={true}>
+          <WearableSummaryPanel patientId={patient.id} />
+        </WidgetCard>
+      )}
 
       {/* Patient-Reported Data (Body Map & Motor Tests) */}
       {patient?.id && (
