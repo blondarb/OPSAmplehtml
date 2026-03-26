@@ -2,6 +2,8 @@ import { NextResponse } from 'next/server'
 import { getUser } from '@/lib/cognito/server'
 import { getTenantServer } from '@/lib/tenant'
 import { from } from '@/lib/db-query'
+import { createConsult } from '@/lib/consult/pipeline'
+import { createNotification } from '@/lib/notifications'
 
 // POST /api/patient/intake — Submit a patient intake form
 export async function POST(request: Request) {
@@ -47,7 +49,51 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: error.message }, { status: 500 })
     }
 
-    return NextResponse.json({ intake: data }, { status: 201 })
+    // Auto-create a consult pipeline record so the intake feeds into the
+    // clinical workflow (triage -> historian -> physician review).
+    let consultId: string | null = null
+    try {
+      const referralText = `Patient intake: ${body.chief_complaint}${body.medical_history ? ` | History: ${body.medical_history}` : ''}`
+      const consult = await createConsult(
+        referralText,
+        undefined, // No triage data yet — consult starts in 'triage_pending'
+        body.patient_id || undefined,
+      )
+      consultId = consult?.id || null
+
+      if (consultId && data?.id) {
+        // Link the intake form to the consult record
+        await from('neurology_consults')
+          .update({
+            intake_session_id: data.id.toString(),
+            intake_status: 'completed',
+            intake_summary: body.chief_complaint,
+            intake_completed_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', consultId)
+      }
+    } catch (consultErr) {
+      // Non-fatal — the intake is saved regardless
+      console.error('[intake] Consult pipeline creation error (non-fatal):', consultErr)
+    }
+
+    // Generate a notification for the clinical team
+    try {
+      await createNotification({
+        sourceType: 'intake_received',
+        title: `New intake from ${body.patient_name}`,
+        body: body.chief_complaint,
+        priority: 'normal',
+        sourceId: data?.id?.toString() || null,
+        patientId: body.patient_id || null,
+      })
+    } catch (notifErr) {
+      // Non-fatal
+      console.error('[intake] Notification error (non-fatal):', notifErr)
+    }
+
+    return NextResponse.json({ intake: data, consult_id: consultId }, { status: 201 })
   } catch (err: any) {
     console.error('Intake API error:', err)
     return NextResponse.json({ error: err.message }, { status: 500 })

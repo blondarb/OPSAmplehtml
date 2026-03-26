@@ -1,9 +1,127 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import HistorianSessionPanel from './HistorianSessionPanel'
 import IntakeFormPanel from './IntakeFormPanel'
 import type { PatientMedication, PatientAllergy } from '@/lib/medicationTypes'
+
+/** Inline draft review panel for AI-generated message responses */
+function DraftReviewPanel({ messageId, draft }: { messageId: string; draft: string }) {
+  const [expanded, setExpanded] = useState(false)
+  const [editedDraft, setEditedDraft] = useState(draft)
+  const [status, setStatus] = useState<'idle' | 'loading' | 'done'>('idle')
+  const [result, setResult] = useState<string | null>(null)
+
+  const handleAction = useCallback(async (action: 'approve' | 'reject' | 'send') => {
+    setStatus('loading')
+    try {
+      const res = await fetch('/api/patient/messages/draft', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          message_id: messageId,
+          action,
+          edited_draft: action !== 'reject' ? editedDraft : undefined,
+        }),
+      })
+      if (!res.ok) throw new Error('Failed')
+      setStatus('done')
+      setResult(action === 'send' ? 'Sent' : action === 'approve' ? 'Approved' : 'Rejected')
+    } catch {
+      setStatus('idle')
+    }
+  }, [messageId, editedDraft])
+
+  if (status === 'done') {
+    return (
+      <div style={{ marginTop: '6px', fontSize: '11px', color: '#22c55e', fontWeight: 500 }}>
+        {result}
+      </div>
+    )
+  }
+
+  return (
+    <div style={{
+      marginTop: '8px',
+      padding: '8px',
+      background: 'rgba(59,130,246,0.06)',
+      border: '1px solid rgba(59,130,246,0.15)',
+      borderRadius: '6px',
+    }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '4px' }}>
+        <span style={{ fontSize: '11px', fontWeight: 600, color: '#3B82F6' }}>AI Draft</span>
+        <button
+          onClick={() => setExpanded(!expanded)}
+          style={{
+            background: 'none', border: 'none', cursor: 'pointer',
+            fontSize: '10px', color: '#3B82F6', fontWeight: 500,
+          }}
+        >
+          {expanded ? 'Collapse' : 'Review'}
+        </button>
+      </div>
+      {!expanded ? (
+        <div style={{
+          fontSize: '11px', color: 'var(--text-muted)',
+          overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+        }}>
+          {draft.substring(0, 80)}...
+        </div>
+      ) : (
+        <>
+          <textarea
+            value={editedDraft}
+            onChange={(e) => setEditedDraft(e.target.value)}
+            style={{
+              width: '100%', minHeight: '80px', padding: '6px',
+              fontSize: '11px', borderRadius: '4px',
+              border: '1px solid var(--border)',
+              background: 'var(--bg-white)',
+              color: 'var(--text-primary)',
+              resize: 'vertical',
+              boxSizing: 'border-box',
+            }}
+          />
+          <div style={{ display: 'flex', gap: '4px', marginTop: '6px' }}>
+            <button
+              onClick={() => handleAction('send')}
+              disabled={status === 'loading'}
+              style={{
+                flex: 1, padding: '4px 8px', borderRadius: '4px',
+                background: '#0D9488', color: 'white', border: 'none',
+                fontSize: '10px', fontWeight: 600, cursor: 'pointer',
+              }}
+            >
+              {status === 'loading' ? '...' : 'Send'}
+            </button>
+            <button
+              onClick={() => handleAction('approve')}
+              disabled={status === 'loading'}
+              style={{
+                flex: 1, padding: '4px 8px', borderRadius: '4px',
+                background: '#DBEAFE', color: '#2563EB', border: 'none',
+                fontSize: '10px', fontWeight: 600, cursor: 'pointer',
+              }}
+            >
+              Approve
+            </button>
+            <button
+              onClick={() => handleAction('reject')}
+              disabled={status === 'loading'}
+              style={{
+                flex: 1, padding: '4px 8px', borderRadius: '4px',
+                background: '#FEE2E2', color: '#DC2626', border: 'none',
+                fontSize: '10px', fontWeight: 600, cursor: 'pointer',
+              }}
+            >
+              Reject
+            </button>
+          </div>
+        </>
+      )}
+    </div>
+  )
+}
 
 interface LeftSidebarProps {
   patient: any
@@ -706,6 +824,20 @@ export default function LeftSidebar({ patient, priorVisits, scoreHistory, patien
                 }}>
                   {msg.body}
                 </div>
+                {/* AI Draft Review Panel */}
+                {msg.ai_draft && msg.draft_status === 'pending' && (
+                  <DraftReviewPanel messageId={msg.id} draft={msg.ai_draft} />
+                )}
+                {msg.draft_status === 'sent' && (
+                  <div style={{
+                    marginTop: '6px',
+                    fontSize: '11px',
+                    color: '#22c55e',
+                    fontWeight: 500,
+                  }}>
+                    Draft sent
+                  </div>
+                )}
               </div>
             ))}
           </div>

@@ -3,6 +3,7 @@ import { getUser } from '@/lib/cognito/server'
 import { getTenantServer } from '@/lib/tenant'
 import { from } from '@/lib/db-query'
 import { linkHistorianToConsult } from '@/lib/consult/pipeline'
+import { notifyHistorianRedFlag } from '@/lib/notifications'
 
 export async function POST(request: Request) {
   try {
@@ -52,6 +53,21 @@ export async function POST(request: Request) {
         // Non-fatal — historian session is saved regardless
         console.error('[historian/save] consult linkage error (non-fatal):', pipelineErr)
       }
+    }
+
+    // ── Notification: alert staff if red flags were detected ──────────
+    try {
+      const redFlags = body.red_flags || []
+      if (redFlags.length > 0 && data) {
+        await notifyHistorianRedFlag(
+          data.id,
+          body.patient_name || 'Unknown patient',
+          redFlags,
+          body.patient_id || null,
+        )
+      }
+    } catch (notifErr) {
+      console.error('[historian/save] Notification error (non-fatal):', notifErr)
     }
 
     return NextResponse.json({ session: data, consult_id: consultId || null })

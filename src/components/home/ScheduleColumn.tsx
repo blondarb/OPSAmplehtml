@@ -1,7 +1,8 @@
 'use client'
 
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect, useCallback } from 'react'
 import { Calendar } from 'lucide-react'
+import { useRouter } from 'next/navigation'
 
 interface ScheduleColumnProps {
   onSelectPatient: (appointmentId: string) => void
@@ -10,17 +11,57 @@ interface ScheduleColumnProps {
   onPrepPatient?: (appointmentId: string) => void
 }
 
-// Demo data for today's schedule
+// Shape returned by GET /api/appointments
+interface ScheduleAppointment {
+  id: string
+  appointmentDate: string
+  appointmentTime: string
+  durationMinutes: number
+  appointmentType: string
+  status: string
+  hospitalSite: string
+  reasonForVisit: string | null
+  patient: {
+    id: string
+    mrn: string
+    firstName: string
+    lastName: string
+    name: string
+  } | null
+}
+
+// Demo fallback for when the API returns demo-prefixed IDs
 const DEMO_APPOINTMENTS = [
-  { id: 'apt-1', time: '8:30 AM', name: 'Linda Martinez', type: 'Follow-up', reason: 'Parkinson\'s tremor assessment', prepStatus: 'done', incompletePrior: false },
-  { id: 'apt-2', time: '9:00 AM', name: 'Robert Chen', type: 'New', reason: 'Headache evaluation', prepStatus: 'needs-review', incompletePrior: true },
-  { id: 'apt-3', time: '9:30 AM', name: 'Sarah Kim', type: 'Follow-up', reason: 'MS follow-up', prepStatus: 'done', incompletePrior: false },
-  { id: 'apt-4', time: '10:15 AM', name: 'James Wilson', type: 'Urgent', reason: 'Seizure breakthrough', prepStatus: 'none', incompletePrior: false },
-  { id: 'apt-5', time: '11:00 AM', name: 'Maria Garcia', type: 'Follow-up', reason: 'Migraine management', prepStatus: 'done', incompletePrior: false },
-  { id: 'apt-6', time: '1:30 PM', name: 'David Thompson', type: 'New', reason: 'Memory concerns', prepStatus: 'needs-review', incompletePrior: false },
-  { id: 'apt-7', time: '2:15 PM', name: 'Helen Park', type: 'Follow-up', reason: 'Epilepsy med review', prepStatus: 'none', incompletePrior: true },
-  { id: 'apt-8', time: '3:00 PM', name: 'Frank Russo', type: 'Follow-up', reason: 'Essential tremor', prepStatus: 'done', incompletePrior: false },
+  { id: 'apt-1', time: '8:30 AM', name: 'Linda Martinez', type: 'Follow-up', reason: "Parkinson's tremor assessment", prepStatus: 'done', incompletePrior: false, patientId: null as string | null },
+  { id: 'apt-2', time: '9:00 AM', name: 'Robert Chen', type: 'New', reason: 'Headache evaluation', prepStatus: 'needs-review', incompletePrior: true, patientId: null as string | null },
+  { id: 'apt-3', time: '9:30 AM', name: 'Sarah Kim', type: 'Follow-up', reason: 'MS follow-up', prepStatus: 'done', incompletePrior: false, patientId: null as string | null },
+  { id: 'apt-4', time: '10:15 AM', name: 'James Wilson', type: 'Urgent', reason: 'Seizure breakthrough', prepStatus: 'none', incompletePrior: false, patientId: null as string | null },
+  { id: 'apt-5', time: '11:00 AM', name: 'Maria Garcia', type: 'Follow-up', reason: 'Migraine management', prepStatus: 'done', incompletePrior: false, patientId: null as string | null },
+  { id: 'apt-6', time: '1:30 PM', name: 'David Thompson', type: 'New', reason: 'Memory concerns', prepStatus: 'needs-review', incompletePrior: false, patientId: null as string | null },
+  { id: 'apt-7', time: '2:15 PM', name: 'Helen Park', type: 'Follow-up', reason: 'Epilepsy med review', prepStatus: 'none', incompletePrior: true, patientId: null as string | null },
+  { id: 'apt-8', time: '3:00 PM', name: 'Frank Russo', type: 'Follow-up', reason: 'Essential tremor', prepStatus: 'done', incompletePrior: false, patientId: null as string | null },
 ]
+
+/** Format "HH:MM" or "HH:MM:SS" to "h:mm AM/PM" */
+function formatTime(timeStr: string): string {
+  const [h, m] = timeStr.split(':').map(Number)
+  const ampm = h >= 12 ? 'PM' : 'AM'
+  const h12 = h === 0 ? 12 : h > 12 ? h - 12 : h
+  return `${h12}:${String(m).padStart(2, '0')} ${ampm}`
+}
+
+/** Map appointment_type to display label */
+function formatType(type: string): string {
+  switch (type) {
+    case 'new-consult': return 'New'
+    case 'follow-up':
+    case '3-month-follow-up':
+    case '6-month-follow-up':
+    case '12-month-follow-up':
+      return 'Follow-up'
+    default: return type.charAt(0).toUpperCase() + type.slice(1)
+  }
+}
 
 function getTypeBadgeStyle(type: string) {
   switch (type) {
@@ -78,10 +119,24 @@ const DAY_LABELS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri']
 const MONTH_NAMES = ['January', 'February', 'March', 'April', 'May', 'June',
   'July', 'August', 'September', 'October', 'November', 'December']
 
+interface ScheduleItem {
+  id: string
+  time: string
+  name: string
+  type: string
+  reason: string
+  prepStatus: string
+  incompletePrior: boolean
+  patientId: string | null
+}
+
 export default function ScheduleColumn({ onSelectPatient, onScheduleNew, onScheduleFollowup, onPrepPatient }: ScheduleColumnProps) {
+  const router = useRouter()
   const [hoveredId, setHoveredId] = useState<string | null>(null)
   const [weekOffset, setWeekOffset] = useState(0)
   const [showMonthGrid, setShowMonthGrid] = useState(false)
+  const [appointments, setAppointments] = useState<ScheduleItem[]>(DEMO_APPOINTMENTS)
+  const [loading, setLoading] = useState(false)
 
   const today = useMemo(() => {
     const d = new Date()
@@ -101,6 +156,45 @@ export default function ScheduleColumn({ onSelectPatient, onScheduleNew, onSched
     return d
   }, [currentMonday, weekOffset])
 
+  // Fetch appointments for the current day from the API
+  const fetchAppointments = useCallback(async () => {
+    setLoading(true)
+    try {
+      const dateStr = today.toISOString().split('T')[0]
+      const res = await fetch(`/api/appointments?date=${dateStr}`)
+      if (!res.ok) throw new Error('Failed to fetch')
+      const data = await res.json()
+      const rawAppointments: ScheduleAppointment[] = data.appointments || []
+
+      // Transform API appointments to schedule items
+      const items: ScheduleItem[] = rawAppointments.map((apt) => {
+        const isDemo = apt.id.startsWith('demo-')
+        const typeLabel = formatType(apt.appointmentType)
+        return {
+          id: apt.id,
+          time: formatTime(apt.appointmentTime),
+          name: apt.patient ? `${apt.patient.firstName} ${apt.patient.lastName}` : 'Unknown',
+          type: typeLabel,
+          reason: apt.reasonForVisit || '',
+          prepStatus: apt.status === 'completed' ? 'done' : apt.status === 'in-progress' ? 'needs-review' : 'none',
+          incompletePrior: false,
+          patientId: isDemo ? null : (apt.patient?.id || null),
+        }
+      })
+
+      setAppointments(items.length > 0 ? items : DEMO_APPOINTMENTS)
+    } catch {
+      // Fallback to demo data on error
+      setAppointments(DEMO_APPOINTMENTS)
+    } finally {
+      setLoading(false)
+    }
+  }, [today])
+
+  useEffect(() => {
+    fetchAppointments()
+  }, [fetchAppointments])
+
   // Build weekDays array (Mon-Fri)
   const weekDays = useMemo(() => Array.from({ length: 5 }, (_, i) => {
     const d = new Date(displayMonday)
@@ -119,8 +213,8 @@ export default function ScheduleColumn({ onSelectPatient, onScheduleNew, onSched
   weekFriday.setDate(weekFriday.getDate() + 4)
 
   const weekLabel = isCurrentWeek
-    ? `Today \u00B7 ${DEMO_APPOINTMENTS.length} patients`
-    : `${shortDate(displayMonday)} week \u00B7 ${DEMO_APPOINTMENTS.length} patients`
+    ? `Today \u00B7 ${appointments.length} patients`
+    : `${shortDate(displayMonday)} week \u00B7 ${appointments.length} patients`
 
   const weekSublabel = isCurrentWeek
     ? today.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
@@ -169,6 +263,17 @@ export default function ScheduleColumn({ onSelectPatient, onScheduleNew, onSched
   function isWeekday(dayNum: number): boolean {
     const d = new Date(displayYear, displayMonth, dayNum).getDay()
     return d >= 1 && d <= 5
+  }
+
+  /** Handle clicking an appointment: navigate to /ehr?patient={id} if real, or fire callback */
+  function handleAppointmentClick(apt: ScheduleItem) {
+    if (apt.patientId) {
+      // Real patient — navigate to EHR with patient context
+      router.push(`/ehr?patient=${apt.patientId}`)
+    } else {
+      // Demo appointment — use the existing callback
+      onSelectPatient(apt.id)
+    }
   }
 
   return (
@@ -357,10 +462,14 @@ export default function ScheduleColumn({ onSelectPatient, onScheduleNew, onSched
 
       {/* Appointment list */}
       <div style={{ flex: 1, overflowY: 'auto', padding: '4px 8px' }}>
-        {DEMO_APPOINTMENTS.map((apt) => (
+        {loading ? (
+          <div style={{ padding: '20px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '12px' }}>
+            Loading schedule...
+          </div>
+        ) : appointments.map((apt) => (
           <button
             key={apt.id}
-            onClick={() => onSelectPatient(apt.id)}
+            onClick={() => handleAppointmentClick(apt)}
             onMouseEnter={() => setHoveredId(apt.id)}
             onMouseLeave={() => setHoveredId(null)}
             style={{
@@ -380,6 +489,14 @@ export default function ScheduleColumn({ onSelectPatient, onScheduleNew, onSched
               <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)', flex: 1 }}>
                 {apt.name}
               </span>
+              {/* Patient link indicator for real patients */}
+              {apt.patientId && (
+                <span title="Click to open chart" style={{
+                  fontSize: '10px', color: '#0D9488', fontWeight: 600, flexShrink: 0,
+                }}>
+                  EHR
+                </span>
+              )}
               {/* Quick Prep button: visible on hover when prep is not done */}
               {apt.prepStatus !== 'done' && hoveredId === apt.id && onPrepPatient && (
                 <span

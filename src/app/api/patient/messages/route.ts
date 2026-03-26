@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { getUser } from '@/lib/cognito/server'
 import { getTenantServer } from '@/lib/tenant'
 import { from } from '@/lib/db-query'
+import { notifyPatientMessage } from '@/lib/notifications'
 
 // POST /api/patient/messages — Send a patient message
 export async function POST(request: Request) {
@@ -39,6 +40,19 @@ export async function POST(request: Request) {
     if (error) {
       console.error('Message insert error:', error)
       return NextResponse.json({ error: error.message }, { status: 500 })
+    }
+
+    // Generate notification for the clinical team
+    try {
+      await notifyPatientMessage(
+        data?.id || '',
+        body.patient_name,
+        body.subject || msgBody.substring(0, 100),
+        body.patient_id || null,
+      )
+    } catch (notifErr) {
+      // Non-fatal — the message is saved regardless
+      console.error('[messages] Notification error (non-fatal):', notifErr)
     }
 
     return NextResponse.json({ message: data }, { status: 201 })

@@ -61,12 +61,30 @@ Draft a response to the following patient message. The physician will review and
 
     const draft = result.text || ''
 
-    // NOTE: Storing draft on the message record is deferred until
-    // patient_messages table schema is updated with ai_draft and
-    // draft_status columns. For now, the draft is returned in the
-    // response for the client to use directly.
+    // Persist draft on the message record if message_id is provided.
+    // Requires migration 042_patient_messages_ai_draft.sql to have run.
+    let draftSaved = false
+    if (message_id && draft) {
+      try {
+        const { error: updateError } = await from('patient_messages')
+          .update({
+            ai_draft: draft,
+            draft_status: 'pending',
+          })
+          .eq('id', message_id)
 
-    return NextResponse.json({ draft })
+        if (updateError) {
+          // Non-fatal: columns may not exist yet if migration hasn't run
+          console.warn('[draft-response] Failed to save draft to DB (migration may be pending):', updateError.message)
+        } else {
+          draftSaved = true
+        }
+      } catch (saveErr) {
+        console.warn('[draft-response] Draft save exception (non-fatal):', saveErr)
+      }
+    }
+
+    return NextResponse.json({ draft, draft_saved: draftSaved, message_id: message_id || null })
   } catch (error: any) {
     console.error('AI Draft Response Error:', error)
     return NextResponse.json({
