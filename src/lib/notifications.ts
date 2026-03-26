@@ -225,6 +225,35 @@ export async function notifyIncompleteNotes(
 }
 
 /**
+ * Notify when the follow-up agent detects an escalation during a conversation.
+ */
+export async function notifyFollowUpEscalation(
+  sessionId: string,
+  patientName: string,
+  escalationType: string,
+  severity: string,
+  category: string,
+  patientId?: string | null,
+): Promise<NotificationRecord | null> {
+  const isCritical = severity === 'urgent' || severity === 'same_day'
+
+  return createNotification({
+    sourceType: 'followup_escalation',
+    title: `Follow-up escalation: ${patientName}`,
+    body: `${category} — ${severity}. Review the follow-up conversation.`,
+    priority: isCritical ? 'critical' : 'high',
+    sourceId: sessionId,
+    patientId: patientId || null,
+    metadata: {
+      escalationType,
+      severity,
+      category,
+      conversationLink: `/follow-up?session=${sessionId}`,
+    },
+  })
+}
+
+/**
  * Notify when a wearable alert is detected.
  */
 export async function notifyWearableAlert(

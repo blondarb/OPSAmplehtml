@@ -5,6 +5,7 @@ import type { FollowUpMessageRequest, FollowUpMessageResponse } from '@/lib/foll
 import { suggestCptCode, CPT_CODES } from '@/lib/follow-up/cptCodes'
 import { from } from '@/lib/db-query'
 import { linkIntakeToConsult } from '@/lib/consult/pipeline'
+import { notifyFollowUpEscalation } from '@/lib/notifications'
 
 
 export const maxDuration = 30
@@ -146,6 +147,16 @@ export async function POST(request: Request) {
         if (escError) {
           console.error('DB escalation insert error (non-fatal):', escError)
         }
+
+        // Fire escalation notification (non-blocking)
+        notifyFollowUpEscalation(
+          responsePayload.session_id,
+          patient_context.name || 'Unknown Patient',
+          topFlag.tier,
+          topFlag.tier,
+          topFlag.category,
+          patient_context.id || null,
+        ).catch(err => console.error('Follow-up escalation notification error (non-fatal):', err))
       }
 
       // ── Phase 1: Link intake session to consult pipeline ──────────────────

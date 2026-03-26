@@ -7,6 +7,7 @@ import { from } from '@/lib/db-query'
 import { createConsult, linkTriageToConsult } from '@/lib/consult/pipeline'
 import { deriveChiefComplaint, buildTriageSummaryForConsult } from '@/lib/consult/contextBuilder'
 import { notifyTriageUrgent } from '@/lib/notifications'
+import { autoScheduleFromTriage } from '@/lib/triage/autoSchedule'
 
 const TRIAGE_MODEL = process.env.BEDROCK_TRIAGE_MODEL || BEDROCK_MODEL
 
@@ -211,6 +212,23 @@ export async function POST(request: Request) {
       console.error('Triage notification error (non-fatal):', notifErr)
     }
 
+    // Auto-schedule appointment for urgent+ triage results (non-blocking)
+    let scheduledAppointmentId: string | null = null
+    if (patient_id) {
+      try {
+        const appt = await autoScheduleFromTriage(
+          sessionId,
+          scoring.tier,
+          patient_id,
+          aiResponse.clinical_reasons || [],
+          aiResponse.subspecialty_recommendation || '',
+        )
+        scheduledAppointmentId = appt?.id || null
+      } catch (schedErr) {
+        console.error('Triage auto-schedule error (non-fatal):', schedErr)
+      }
+    }
+
     // Build response per playbook Section 5.3
     return NextResponse.json({
       session_id: sessionId,
@@ -236,6 +254,8 @@ export async function POST(request: Request) {
       disclaimer: DISCLAIMER_TEXT,
       // Phase 1 pipeline — present if create_consult or consult_id was provided
       consult_id: consultId,
+      // Phase 3 — AI-suggested appointment for urgent+ results
+      scheduled_appointment_id: scheduledAppointmentId,
     })
   } catch (error: unknown) {
     console.error('Triage API Error:', error)
