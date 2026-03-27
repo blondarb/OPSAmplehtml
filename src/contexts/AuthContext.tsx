@@ -19,13 +19,7 @@ interface AuthContextType {
   user: AuthUser | null
   userProfile: UserProfile | null
   loading: boolean
-  signIn: (email: string, password: string) => Promise<{ error: string | null }>
-  signUp: (email: string, password: string) => Promise<{ error: string | null; needsConfirmation: boolean }>
-  confirmSignUp: (email: string, code: string) => Promise<{ error: string | null }>
-  resendCode: (email: string) => Promise<{ error: string | null }>
-  forgotPassword: (email: string) => Promise<{ error: string | null }>
-  confirmForgotPassword: (email: string, code: string, newPassword: string) => Promise<{ error: string | null }>
-  signOut: () => Promise<void>
+  signOut: () => void
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
@@ -51,83 +45,45 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     let mounted = true
 
     const init = async () => {
-      const { getCurrentUser, getCurrentSession } = await import('@/lib/cognito/client')
-      const currentUser = await getCurrentUser()
-
-      if (mounted) {
-        setUser(currentUser)
-        if (currentUser) {
-          // Refresh the cookie in case the token was refreshed by the SDK
-          const session = await getCurrentSession()
-          if (session) {
-            await fetch('/api/auth/session', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                idToken: session.getIdToken().getJwtToken(),
-                accessToken: session.getAccessToken().getJwtToken(),
-                refreshToken: session.getRefreshToken().getToken(),
-              }),
-            })
-          }
+      try {
+        const res = await fetch('/api/auth/me', { credentials: 'same-origin' })
+        if (res.ok && mounted) {
+          const currentUser = await res.json()
+          setUser(currentUser)
           await fetchProfile()
         }
-        setLoading(false)
+      } catch {
+        // Not authenticated
       }
+      if (mounted) setLoading(false)
     }
 
     init()
 
-    return () => { mounted = false }
+    // Proactive token refresh every 50 minutes (tokens expire in 1 hour)
+    const refreshInterval = setInterval(async () => {
+      try {
+        const res = await fetch('/api/auth/refresh', {
+          method: 'POST',
+          credentials: 'same-origin',
+        })
+        if (res.ok) {
+          const refreshedUser = await res.json()
+          setUser(refreshedUser)
+        }
+      } catch {
+        // Refresh failed — user will need to re-login when token expires
+      }
+    }, 50 * 60 * 1000)
+
+    return () => {
+      mounted = false
+      clearInterval(refreshInterval)
+    }
   }, [fetchProfile])
 
-  const handleSignIn = async (email: string, password: string) => {
-    const { signIn } = await import('@/lib/cognito/client')
-    const result = await signIn(email, password)
-
-    if (!result.error) {
-      // Hydrate user state in the background so navigation isn't blocked
-      import('@/lib/cognito/client').then(({ getCurrentUser }) =>
-        getCurrentUser().then((currentUser) => {
-          setUser(currentUser)
-          if (currentUser) fetchProfile()
-        })
-      )
-    }
-
-    return result
-  }
-
-  const handleSignUp = async (email: string, password: string) => {
-    const { signUp } = await import('@/lib/cognito/client')
-    return signUp(email, password)
-  }
-
-  const handleConfirmSignUp = async (email: string, code: string) => {
-    const mod = await import('@/lib/cognito/client')
-    return mod.confirmSignUp(email, code)
-  }
-
-  const handleResendCode = async (email: string) => {
-    const { resendConfirmationCode } = await import('@/lib/cognito/client')
-    return resendConfirmationCode(email)
-  }
-
-  const handleForgotPassword = async (email: string) => {
-    const mod = await import('@/lib/cognito/client')
-    return mod.forgotPassword(email)
-  }
-
-  const handleConfirmForgotPassword = async (email: string, code: string, newPassword: string) => {
-    const mod = await import('@/lib/cognito/client')
-    return mod.confirmForgotPassword(email, code, newPassword)
-  }
-
-  const handleSignOut = async () => {
-    const { signOut } = await import('@/lib/cognito/client')
-    await signOut()
-    setUser(null)
-    setUserProfile(null)
+  const handleSignOut = () => {
+    window.location.href = '/api/auth/logout'
   }
 
   return (
@@ -135,12 +91,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       user,
       userProfile,
       loading,
-      signIn: handleSignIn,
-      signUp: handleSignUp,
-      confirmSignUp: handleConfirmSignUp,
-      resendCode: handleResendCode,
-      forgotPassword: handleForgotPassword,
-      confirmForgotPassword: handleConfirmForgotPassword,
       signOut: handleSignOut,
     }}>
       {children}

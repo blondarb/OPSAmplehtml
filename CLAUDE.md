@@ -24,7 +24,7 @@ Sevaro Clinical is a web application for AI-powered clinical documentation, spec
 - **Language**: TypeScript
 - **Styling**: Tailwind CSS v3 + Inline Styles
 - **Database**: AWS RDS (PostgreSQL) via node-postgres
-- **Authentication**: AWS Cognito
+- **Authentication**: AWS Cognito OAuth + PKCE via Hosted UI at `auth.neuroplans.app` (pool `us-east-2_9y6XyJnXC`, client `6rahc3cs4846f05gf7fbucqi4d`)
 - **AI**: AWS Bedrock (Claude Sonnet 4.6) + OpenAI Whisper (transcription) + Realtime API (WebRTC)
 - **SMS/Voice**: Twilio (SDK v5) for live patient follow-up demos
 - **Deployment**: AWS Amplify (push-to-deploy from main)
@@ -211,13 +211,12 @@ Tables in AWS RDS (PostgreSQL):
 Required for deployment (set in Amplify console):
 
 ```
-# Cognito Auth
-COGNITO_USER_POOL_ID=us-east-2_...
-COGNITO_CLIENT_ID=...
-COGNITO_REGION=us-east-2
-NEXT_PUBLIC_COGNITO_USER_POOL_ID=...
-NEXT_PUBLIC_COGNITO_CLIENT_ID=...
+# Cognito Auth (OAuth + PKCE via Hosted UI SSO)
+NEXT_PUBLIC_COGNITO_USER_POOL_ID=us-east-2_9y6XyJnXC
+NEXT_PUBLIC_COGNITO_CLIENT_ID=6rahc3cs4846f05gf7fbucqi4d
 NEXT_PUBLIC_COGNITO_REGION=us-east-2
+NEXT_PUBLIC_COGNITO_DOMAIN=auth.neuroplans.app
+COGNITO_CLIENT_SECRET=<stored in Amplify>
 
 # RDS PostgreSQL
 RDS_HOST=sevaro-postgres.....us-east-2.rds.amazonaws.com
@@ -242,7 +241,7 @@ TWILIO_PHONE_NUMBER=+1XXXXXXXXXX
 
 ## Key Features
 
-1. **Authentication**: Email/password via AWS Cognito
+1. **Authentication**: OAuth + PKCE via Cognito Hosted UI SSO at `auth.neuroplans.app` (shared Evidence Engine pool). Login redirects to Hosted UI; tokens stored in httpOnly cookies (id_token 1h, refresh_token 30d). Proactive refresh every 50 minutes.
 
 2. **Clinical Notes**: Tabbed interface with four main tabs:
    - **History**: Reason for consult, HPI, ROS, allergies, medical history, clinical scales
@@ -575,6 +574,8 @@ Environment variables are set in the Amplify console (see "Environment Variables
 - Push to feature branch, create PR, merge to main for deployment
 
 ## Recent Changes
+
+- **OAuth SSO Migration (2026-03-27)**: Migrated auth from direct Cognito SDK (USER_PASSWORD_AUTH) to OAuth + PKCE via Cognito Hosted UI at `auth.neuroplans.app`. Removed `amazon-cognito-identity-js` dependency. Created new OAuth API routes (login, callback, logout, refresh, me). Replaced AuthContext with cookie-based auth (httpOnly cookies, proactive 50-min refresh). All 80+ API routes work unchanged via `getUser()`. Login page now redirects to SSO. Signup handled by Hosted UI. Evidence Engine pool `us-east-2_9y6XyJnXC`, client `6rahc3cs4846f05gf7fbucqi4d`.
 
 - **Integrated Neuro Intake Engine — Phases 1–7 (2026-03-20)**: Built the complete 7-phase clinical pipeline: (1) Triage & Intake with 11-state ConsultStatus machine, (2) AI Historian integration with camelCase LocalizerRequest contract, (3) Background Localizer with Bedrock-powered differential generation, (4) Red Flag Escalation with 20+ pattern detector wired into useRealtimeSession, (5) Patient Web Tools — interactive SVG body map (26 regions), finger tapping test, accelerometer tremor detector, (6) SDNE Integration linking XR exam results to consults, (7) Unified Report Generator with pure-function builder and physician-facing viewer. New tables: `patient_body_map_markers`, `patient_device_measurements`, `consult_reports`, plus SDNE columns on `neurology_consults`. Migrations 036–038 pending against RDS. See `docs/HANDOFF_2026-03-20_neuro-intake-engine.md`.
 

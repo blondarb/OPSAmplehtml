@@ -1,38 +1,26 @@
 import { NextResponse, type NextRequest } from 'next/server'
 import { createRemoteJWKSet, jwtVerify } from 'jose'
 
-const PUBLIC_ROUTES = ['/', '/login', '/signup', '/about', '/auth/confirm', '/patient', '/triage']
+const PUBLIC_ROUTES = ['/', '/login', '/about', '/patient', '/triage']
 
-const COGNITO_USER_POOL_ID = process.env.COGNITO_USER_POOL_ID || process.env.NEXT_PUBLIC_COGNITO_USER_POOL_ID
-const COGNITO_REGION = process.env.COGNITO_REGION || process.env.NEXT_PUBLIC_COGNITO_REGION || 'us-east-2'
-const COGNITO_CLIENT_ID = process.env.COGNITO_CLIENT_ID || process.env.NEXT_PUBLIC_COGNITO_CLIENT_ID
-
-const ISSUER = COGNITO_USER_POOL_ID
-  ? `https://cognito-idp.${COGNITO_REGION}.amazonaws.com/${COGNITO_USER_POOL_ID}`
-  : ''
-
-const JWKS_URL = ISSUER ? `${ISSUER}/.well-known/jwks.json` : ''
+const COGNITO_REGION = process.env.NEXT_PUBLIC_COGNITO_REGION || 'us-east-2'
+const COGNITO_POOL_ID = process.env.NEXT_PUBLIC_COGNITO_USER_POOL_ID || 'us-east-2_9y6XyJnXC'
+const ISSUER = `https://cognito-idp.${COGNITO_REGION}.amazonaws.com/${COGNITO_POOL_ID}`
+const JWKS_URL = `${ISSUER}/.well-known/jwks.json`
 
 let cachedJWKS: ReturnType<typeof createRemoteJWKSet> | null = null
 
 function getJWKS() {
-  if (!cachedJWKS && JWKS_URL) {
+  if (!cachedJWKS) {
     cachedJWKS = createRemoteJWKSet(new URL(JWKS_URL))
   }
   return cachedJWKS
 }
 
 async function verifyIdToken(token: string): Promise<boolean> {
-  if (!COGNITO_USER_POOL_ID || !COGNITO_CLIENT_ID) return false
-
   try {
     const jwks = getJWKS()
-    if (!jwks) return false
-
-    await jwtVerify(token, jwks, {
-      issuer: ISSUER,
-      audience: COGNITO_CLIENT_ID,
-    })
+    await jwtVerify(token, jwks, { issuer: ISSUER })
     return true
   } catch {
     return false
@@ -44,11 +32,11 @@ export async function middleware(request: NextRequest) {
 
   const response = NextResponse.next({ request: { headers: request.headers } })
 
-  // Check Cognito ID token from cookie
-  const idToken = request.cookies.get('cognito-id-token')?.value
+  // Check ID token from cookie (new OAuth cookie name)
+  const idToken = request.cookies.get('id_token')?.value
   const isAuthenticated = idToken ? await verifyIdToken(idToken) : false
 
-  // --- Existing view preference logic for root path ---
+  // --- View preference logic for root path ---
   if (pathname === '/') {
     const switchApp = request.nextUrl.searchParams.get('switch_app')
     if (switchApp === 'true') {

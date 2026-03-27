@@ -22,7 +22,7 @@
     "@aws-sdk/credential-providers": "^3.1011.0",
     "@deepgram/sdk": "^4.11.3",
     "@sevaro/feedback": "file:./packages/feedback",
-    "amazon-cognito-identity-js": "^6.3.16",
+
     "framer-motion": "^12.34.3",
     "jose": "^6.2.0",
     "lucide-react": "^0.575.0",
