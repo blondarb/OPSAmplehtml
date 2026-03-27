@@ -5,7 +5,10 @@ const COGNITO_DOMAIN = process.env.NEXT_PUBLIC_COGNITO_DOMAIN || 'auth.neuroplan
 const CLIENT_ID = process.env.NEXT_PUBLIC_COGNITO_CLIENT_ID || ''
 const CLIENT_SECRET = process.env.COGNITO_CLIENT_SECRET || ''
 
+const APP_URL = process.env.NEXT_PUBLIC_APP_URL || ''
+
 function getOrigin(request: NextRequest): string {
+  if (APP_URL) return APP_URL
   const forwardedHost = request.headers.get('x-forwarded-host')
   const forwardedProto = request.headers.get('x-forwarded-proto') || 'https'
   return forwardedHost
