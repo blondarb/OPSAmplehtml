@@ -57,6 +57,11 @@ export async function GET(request: NextRequest) {
   })
 
   if (!tokenRes.ok) {
+    const errBody = await tokenRes.text()
+    console.error('Cognito token exchange failed:', tokenRes.status, errBody)
+    console.error('redirect_uri used:', redirectUri)
+    console.error('client_id:', CLIENT_ID)
+    console.error('client_secret present:', !!CLIENT_SECRET)
     return NextResponse.redirect(new URL('/login?error=token_exchange', origin))
   }
 
