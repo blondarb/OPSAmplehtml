@@ -20,8 +20,10 @@ export async function GET(request: NextRequest) {
   const code = request.nextUrl.searchParams.get('code')
   const state = request.nextUrl.searchParams.get('state')
 
+  const origin = getOrigin(request)
+
   if (!code) {
-    return NextResponse.redirect(new URL('/login?error=no_code', request.url))
+    return NextResponse.redirect(new URL('/login?error=no_code', origin))
   }
 
   let returnTo = '/'
@@ -34,7 +36,6 @@ export async function GET(request: NextRequest) {
     }
   }
 
-  const origin = getOrigin(request)
   const redirectUri = `${origin}/api/auth/callback`
 
   // Exchange authorization code for tokens
@@ -56,13 +57,13 @@ export async function GET(request: NextRequest) {
   })
 
   if (!tokenRes.ok) {
-    return NextResponse.redirect(new URL('/login?error=token_exchange', request.url))
+    return NextResponse.redirect(new URL('/login?error=token_exchange', origin))
   }
 
   const tokens = await tokenRes.json()
   const { id_token, access_token, refresh_token } = tokens
 
-  const response = NextResponse.redirect(new URL(returnTo, request.url))
+  const response = NextResponse.redirect(new URL(returnTo, origin))
   const isSecure = origin.startsWith('https')
 
   const cookieOpts = {

@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from 'next/server'
 import { createRemoteJWKSet, jwtVerify } from 'jose'
 
+const APP_URL = process.env.NEXT_PUBLIC_APP_URL || ''
 const PUBLIC_ROUTES = ['/', '/login', '/about', '/patient', '/triage']
 
 const COGNITO_REGION = process.env.NEXT_PUBLIC_COGNITO_REGION || 'us-east-2'
@@ -46,8 +47,9 @@ export async function middleware(request: NextRequest) {
 
     const viewOverride = request.nextUrl.searchParams.get('view')
     if (viewOverride === 'desktop' || viewOverride === 'mobile') {
+      const base = APP_URL || request.url
       const redirectResponse = NextResponse.redirect(
-        new URL(viewOverride === 'mobile' ? '/mobile' : '/dashboard', request.url)
+        new URL(viewOverride === 'mobile' ? '/mobile' : '/dashboard', base)
       )
       redirectResponse.cookies.set('preferred_view', viewOverride, { maxAge: 60 * 60 * 24 * 30, path: '/' })
       return redirectResponse
@@ -62,7 +64,8 @@ export async function middleware(request: NextRequest) {
   const isStatic = pathname.startsWith('/_next/') || pathname.includes('.')
 
   if (!isPublic && !isApi && !isStatic && !isAuthenticated) {
-    const loginUrl = new URL('/login', request.url)
+    const loginBase = APP_URL || request.url
+    const loginUrl = new URL('/login', loginBase)
     loginUrl.searchParams.set('redirect', pathname)
     return NextResponse.redirect(loginUrl)
   }
