@@ -5,7 +5,7 @@ const COGNITO_DOMAIN = process.env.NEXT_PUBLIC_COGNITO_DOMAIN || 'auth.neuroplan
 const CLIENT_ID = process.env.NEXT_PUBLIC_COGNITO_CLIENT_ID || ''
 
 function getRedirectUri(request: NextRequest): string {
-  const host = request.headers.get('host') || 'localhost:3000'
+  const host = request.headers.get('x-forwarded-host') || request.headers.get('host') || 'localhost:3000'
   const protocol = host.startsWith('localhost') ? 'http' : 'https'
   return `${protocol}://${host}/api/auth/callback`
 }
