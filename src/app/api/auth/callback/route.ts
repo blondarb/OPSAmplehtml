@@ -3,7 +3,6 @@ import type { NextRequest } from 'next/server'
 
 const COGNITO_DOMAIN = process.env.NEXT_PUBLIC_COGNITO_DOMAIN || 'auth.neuroplans.app'
 const CLIENT_ID = process.env.NEXT_PUBLIC_COGNITO_CLIENT_ID || ''
-const CLIENT_SECRET = process.env.COGNITO_CLIENT_SECRET || ''
 
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL || ''
 
@@ -38,30 +37,21 @@ export async function GET(request: NextRequest) {
 
   const redirectUri = `${origin}/api/auth/callback`
 
-  // Exchange authorization code for tokens
-  const body: Record<string, string> = {
-    grant_type: 'authorization_code',
-    client_id: CLIENT_ID,
-    code,
-    redirect_uri: redirectUri,
-  }
-
-  if (CLIENT_SECRET) {
-    body.client_secret = CLIENT_SECRET
-  }
-
+  // Exchange authorization code for tokens (public client — no client_secret)
   const tokenRes = await fetch(`https://${COGNITO_DOMAIN}/oauth2/token`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: new URLSearchParams(body),
+    body: new URLSearchParams({
+      grant_type: 'authorization_code',
+      client_id: CLIENT_ID,
+      code,
+      redirect_uri: redirectUri,
+    }),
   })
 
   if (!tokenRes.ok) {
     const errBody = await tokenRes.text()
     console.error('Cognito token exchange failed:', tokenRes.status, errBody)
-    console.error('redirect_uri used:', redirectUri)
-    console.error('client_id:', CLIENT_ID)
-    console.error('client_secret present:', !!CLIENT_SECRET)
     return NextResponse.redirect(new URL('/login?error=token_exchange', origin))
   }
 
