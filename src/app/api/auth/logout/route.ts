@@ -4,18 +4,24 @@ import type { NextRequest } from 'next/server'
 const COGNITO_DOMAIN = process.env.NEXT_PUBLIC_COGNITO_DOMAIN || 'auth.neuroplans.app'
 const CLIENT_ID = process.env.NEXT_PUBLIC_COGNITO_CLIENT_ID || ''
 
+function getOrigin(request: NextRequest): string {
+  const forwardedHost = request.headers.get('x-forwarded-host')
+  const forwardedProto = request.headers.get('x-forwarded-proto') || 'https'
+  return forwardedHost
+    ? `${forwardedProto}://${forwardedHost}`
+    : new URL(request.url).origin
+}
+
 export async function GET(request: NextRequest) {
-  const host = request.headers.get('x-forwarded-host') || request.headers.get('host') || 'localhost:3000'
-  const protocol = host.startsWith('localhost') ? 'http' : 'https'
-  const logoutUri = `${protocol}://${host}`
+  const origin = getOrigin(request)
 
   const response = NextResponse.redirect(
-    `https://${COGNITO_DOMAIN}/logout?client_id=${CLIENT_ID}&logout_uri=${encodeURIComponent(logoutUri)}`
+    `https://${COGNITO_DOMAIN}/logout?client_id=${CLIENT_ID}&logout_uri=${encodeURIComponent(origin)}`
   )
 
   const cookieOpts = {
     httpOnly: true,
-    secure: !host.startsWith('localhost'),
+    secure: origin.startsWith('https'),
     sameSite: 'lax' as const,
     path: '/',
     maxAge: 0,

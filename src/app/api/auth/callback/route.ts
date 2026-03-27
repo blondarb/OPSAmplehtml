@@ -5,10 +5,12 @@ const COGNITO_DOMAIN = process.env.NEXT_PUBLIC_COGNITO_DOMAIN || 'auth.neuroplan
 const CLIENT_ID = process.env.NEXT_PUBLIC_COGNITO_CLIENT_ID || ''
 const CLIENT_SECRET = process.env.COGNITO_CLIENT_SECRET || ''
 
-function getRedirectUri(request: NextRequest): string {
-  const host = request.headers.get('x-forwarded-host') || request.headers.get('host') || 'localhost:3000'
-  const protocol = host.startsWith('localhost') ? 'http' : 'https'
-  return `${protocol}://${host}/api/auth/callback`
+function getOrigin(request: NextRequest): string {
+  const forwardedHost = request.headers.get('x-forwarded-host')
+  const forwardedProto = request.headers.get('x-forwarded-proto') || 'https'
+  return forwardedHost
+    ? `${forwardedProto}://${forwardedHost}`
+    : new URL(request.url).origin
 }
 
 export async function GET(request: NextRequest) {
@@ -29,7 +31,8 @@ export async function GET(request: NextRequest) {
     }
   }
 
-  const redirectUri = getRedirectUri(request)
+  const origin = getOrigin(request)
+  const redirectUri = `${origin}/api/auth/callback`
 
   // Exchange authorization code for tokens
   const body: Record<string, string> = {
@@ -57,7 +60,7 @@ export async function GET(request: NextRequest) {
   const { id_token, access_token, refresh_token } = tokens
 
   const response = NextResponse.redirect(new URL(returnTo, request.url))
-  const isSecure = !request.headers.get('host')?.startsWith('localhost')
+  const isSecure = origin.startsWith('https')
 
   const cookieOpts = {
     httpOnly: true,
