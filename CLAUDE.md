@@ -611,19 +611,19 @@ Full changelog: [`docs/CHANGELOG.md`](docs/CHANGELOG.md)
 **Status**: Active
 
 ### Recent
+- **OAuth SSO migration** to Cognito Hosted UI + PKCE with Amplify redirect fixes (PRs #100-101, Mar 27)
+- **EHR Integration Phases 1-5** — patient flow, historian import, follow-up triggers, wearable unification, SDNE bridge, Twilio prep (PRs #94-99, Mar 26)
+- **Notification feed wiring** to live API data with demo fallback (PR #93, Mar 26)
+- **Consult state fixes** — validation, phrase scope filtering, draft column fix (PR #92, Mar 25)
+- **Security hardening** — gate demo endpoints, harden secrets, remove dead code (PR #91, Mar 25)
+- **Simulated patient E2E test agent** — tests full intake pipeline with stroke/migraine personas (PRs #89-90)
 - **Integrated Neuro Intake Engine Phases 1-7** — structured neuro intake pipeline with /consult page (PRs #87-88)
-- **Simulated patient E2E test agent** — tests full intake pipeline with stroke/migraine personas; API format fixes (PRs #89-90)
-- **Complete Supabase removal** — fully migrated to AWS (Cognito auth, RDS data); zero Supabase imports (PRs #85-86)
-- Shared feedback widget integration with streaming dictation + AI historian PRD (PR #83)
-- Redesigned EHR page with Figma Acute Care design system (PR #82)
-- Bundled @sevaro/feedback locally for Amplify builds (PR #84)
-- Feedback icon shrink with hover expand and user identity wiring (PR #81)
 
 ### In Progress
 - Diagnosis plan coverage expansion (98 plans in DB, 148/166 diagnoses covered)
+- Real-time voice streaming during encounters
 
 ### Planned
-- Real-time voice streaming during encounters
 - Speaker diarization UI (P2)
 - Recommendation reconciliation engine (P2)
 - Inpatient clinical scales (GCS, mRS, FOUR Score, Hunt & Hess, ICH, CAM-ICU, RASS)
