@@ -617,8 +617,6 @@ Full changelog: [`docs/CHANGELOG.md`](docs/CHANGELOG.md)
 - **Notification feed wiring** to live API data with demo fallback (PR #93, Mar 26)
 - **Consult state fixes** — validation, phrase scope filtering, draft column fix (PR #92, Mar 25)
 - **Security hardening** — gate demo endpoints, harden secrets, remove dead code (PR #91, Mar 25)
-- **Simulated patient E2E test agent** — tests full intake pipeline with stroke/migraine personas (PRs #89-90)
-- **Integrated Neuro Intake Engine Phases 1-7** — structured neuro intake pipeline with /consult page (PRs #87-88)
 
 ### In Progress
 - Diagnosis plan coverage expansion (98 plans in DB, 148/166 diagnoses covered)
