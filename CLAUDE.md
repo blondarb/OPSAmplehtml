@@ -611,6 +611,7 @@ Full changelog: [`docs/CHANGELOG.md`](docs/CHANGELOG.md)
 **Status**: Active
 
 ### Recent
+- **SSO client_secret fix (Mar 31)** — Added `COGNITO_CLIENT_SECRET` to `next.config` env inline for Amplify SSR runtime access; wired to OAuth token exchange flow to fix SSO login failure on Amplify.
 - **OAuth SSO migration** to Cognito Hosted UI + PKCE with Amplify redirect fixes (PRs #100-101, Mar 27)
 - **EHR Integration Phases 1-5** — patient flow, historian import, follow-up triggers, wearable unification, SDNE bridge, Twilio prep (PRs #94-99, Mar 26)
 - **Notification feed wiring** to live API data with demo fallback (PR #93, Mar 26)
