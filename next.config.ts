@@ -24,6 +24,7 @@ const nextConfig: NextConfig = {
     BEDROCK_SECRET_ACCESS_KEY: process.env.BEDROCK_SECRET_ACCESS_KEY,
     BEDROCK_REGION: process.env.BEDROCK_REGION,
     BEDROCK_TRIAGE_MODEL: process.env.BEDROCK_TRIAGE_MODEL,
+    COGNITO_CLIENT_SECRET: process.env.COGNITO_CLIENT_SECRET,
   },
 };
 
