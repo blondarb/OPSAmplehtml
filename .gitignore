@@ -50,3 +50,6 @@ next-env.d.ts
 # Claude Code
 .claude/
 .worktrees/
+
+# Claude Code local config
+.claire/
