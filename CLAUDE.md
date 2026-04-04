@@ -611,6 +611,7 @@ Full changelog: [`docs/CHANGELOG.md`](docs/CHANGELOG.md)
 **Status**: Active
 
 ### Recent
+- **Feedback widget security hardening + API key (PRs #102-104, Apr 4)** — Prevented submission freeze on Edge/Windows (PR #102); HIPAA click redaction, CORS origin allowlist, input validation, AbortController timeouts (PR #103); added feedback API key to widget config (PR #104).
 - **SSO client_secret fix (Mar 31)** — Added `COGNITO_CLIENT_SECRET` to `next.config` env inline for Amplify SSR runtime access; wired to OAuth token exchange flow to fix SSO login failure on Amplify.
 - **OAuth SSO migration** to Cognito Hosted UI + PKCE with Amplify redirect fixes (PRs #100-101, Mar 27)
 - **EHR Integration Phases 1-5** — patient flow, historian import, follow-up triggers, wearable unification, SDNE bridge, Twilio prep (PRs #94-99, Mar 26)
