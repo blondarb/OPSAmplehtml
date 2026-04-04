@@ -68,17 +68,41 @@ function useVoiceRecorder() {
   const stopRecording = useCallback(async () => {
     const recorder = mediaRecorderRef.current;
     if (!recorder || recorder.state === "inactive") {
+      const mimeType = recorder?.mimeType || "audio/webm";
+      const blob = chunksRef.current.length > 0 ? new Blob(chunksRef.current, { type: mimeType }) : null;
       cleanup();
       setState((prev) => ({ ...prev, isRecording: false }));
-      return null;
+      return blob;
     }
     return new Promise((resolve) => {
-      recorder.onstop = () => {
-        const mimeType = recorder.mimeType;
-        const fullBlob = new Blob(chunksRef.current, { type: mimeType });
+      let settled = false;
+      const finish = (blob) => {
+        if (settled) return;
+        settled = true;
         cleanup();
         setState((prev) => ({ ...prev, isRecording: false }));
-        resolve(fullBlob);
+        resolve(blob);
+      };
+      const timeout = setTimeout(() => {
+        console.warn("MediaRecorder.onstop did not fire within 5s \u2014 resolving with available chunks");
+        const mimeType = recorder.mimeType || "audio/webm";
+        const blob = chunksRef.current.length > 0 ? new Blob(chunksRef.current, { type: mimeType }) : null;
+        finish(blob);
+      }, 5e3);
+      recorder.onstop = () => {
+        clearTimeout(timeout);
+        const mimeType = recorder.mimeType;
+        const fullBlob = new Blob(chunksRef.current, { type: mimeType });
+        finish(fullBlob);
+      };
+      const prevOnError = recorder.onerror;
+      recorder.onerror = (ev) => {
+        clearTimeout(timeout);
+        console.warn("MediaRecorder error during stop:", ev);
+        const mimeType = recorder.mimeType || "audio/webm";
+        const blob = chunksRef.current.length > 0 ? new Blob(chunksRef.current, { type: mimeType }) : null;
+        finish(blob);
+        if (prevOnError) prevOnError.call(recorder, ev);
       };
       recorder.stop();
     });
@@ -288,12 +312,19 @@ function useFeedbackApi(apiUrl, apiKey) {
   const uploadAudio = useCallback(async (blob) => {
     const url = audioUploadUrlRef.current;
     if (!url) throw new Error("No upload URL \u2014 create session first");
-    const res = await fetch(url, {
-      method: "PUT",
-      headers: { "Content-Type": blob.type },
-      body: blob
-    });
-    if (!res.ok) throw new Error(`Failed to upload audio: ${res.status}`);
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 3e4);
+    try {
+      const res = await fetch(url, {
+        method: "PUT",
+        headers: { "Content-Type": blob.type },
+        body: blob,
+        signal: controller.signal
+      });
+      if (!res.ok) throw new Error(`Failed to upload audio: ${res.status}`);
+    } finally {
+      clearTimeout(timeout);
+    }
   }, []);
   const getUploadUrl = useCallback(
     async (type, index) => {
@@ -330,12 +361,19 @@ function useFeedbackApi(apiUrl, apiKey) {
       if (data.chatSummary) {
         payload.chatSummary = data.chatSummary;
       }
-      const res = await fetch(`${apiUrl}/sessions/${sessionId}`, {
-        method: "PUT",
-        headers: headers(),
-        body: JSON.stringify(payload)
-      });
-      if (!res.ok) throw new Error(`Failed to submit session: ${res.status}`);
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 15e3);
+      try {
+        const res = await fetch(`${apiUrl}/sessions/${sessionId}`, {
+          method: "PUT",
+          headers: headers(),
+          body: JSON.stringify(payload),
+          signal: controller.signal
+        });
+        if (!res.ok) throw new Error(`Failed to submit session: ${res.status}`);
+      } finally {
+        clearTimeout(timeout);
+      }
     },
     [apiUrl, headers]
   );
@@ -378,22 +416,30 @@ function useChatApi(chatApiUrl, sessionId, appId, apiKey) {
     try {
       const chatHeaders = { "Content-Type": "application/json" };
       if (apiKey) chatHeaders["x-api-key"] = apiKey;
-      const res = await fetch(`${chatApiUrl}/chat`, {
-        method: "POST",
-        headers: chatHeaders,
-        body: JSON.stringify({
-          sessionId: sessionIdRef.current,
-          appId,
-          message: content,
-          attachments,
-          history: messagesRef.current.map((m) => ({ role: m.role, content: m.content })),
-          context: {
-            pageUrl: window.location.href,
-            pageTitle: document.title,
-            viewport: { width: window.innerWidth, height: window.innerHeight }
-          }
-        })
-      });
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 3e4);
+      let res;
+      try {
+        res = await fetch(`${chatApiUrl}/chat`, {
+          method: "POST",
+          headers: chatHeaders,
+          body: JSON.stringify({
+            sessionId: sessionIdRef.current,
+            appId,
+            message: content,
+            attachments,
+            history: messagesRef.current.map((m) => ({ role: m.role, content: m.content })),
+            context: {
+              pageUrl: window.location.href,
+              pageTitle: document.title,
+              viewport: { width: window.innerWidth, height: window.innerHeight }
+            }
+          }),
+          signal: controller.signal
+        });
+      } finally {
+        clearTimeout(timeout);
+      }
       if (!res.ok) {
         const errBody = await res.json().catch(() => ({ error: `HTTP ${res.status}` }));
         throw new Error(errBody.error || `Chat request failed: ${res.status}`);
@@ -419,19 +465,27 @@ function useChatApi(chatApiUrl, sessionId, appId, apiKey) {
     try {
       const sumHeaders = { "Content-Type": "application/json" };
       if (apiKey) sumHeaders["x-api-key"] = apiKey;
-      const res = await fetch(`${chatApiUrl}/chat/summarize`, {
-        method: "POST",
-        headers: sumHeaders,
-        body: JSON.stringify({
-          sessionId: sessionIdRef.current,
-          appId,
-          messages: messagesRef.current.map((m) => ({
-            role: m.role,
-            content: m.content,
-            attachments: m.attachments
-          }))
-        })
-      });
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 3e4);
+      let res;
+      try {
+        res = await fetch(`${chatApiUrl}/chat/summarize`, {
+          method: "POST",
+          headers: sumHeaders,
+          body: JSON.stringify({
+            sessionId: sessionIdRef.current,
+            appId,
+            messages: messagesRef.current.map((m) => ({
+              role: m.role,
+              content: m.content,
+              attachments: m.attachments
+            }))
+          }),
+          signal: controller.signal
+        });
+      } finally {
+        clearTimeout(timeout);
+      }
       if (!res.ok) return null;
       return await res.json();
     } catch {
@@ -521,6 +575,7 @@ function useScreenshotAnnotation(uploadScreenshot) {
     }
   }, []);
   const startAnnotation = useCallback(() => {
+    cleanupRef.current?.();
     setIsAnnotating(true);
     setLastAnnotation(null);
     const overlay = document.createElement("div");
@@ -591,33 +646,65 @@ function useScreenshotAnnotation(uploadScreenshot) {
         cleanup();
         return;
       }
-      const selector = getElementSelector(elementUnder);
-      const text = (elementUnder.textContent || "").trim().slice(0, 200);
-      const tag = elementUnder.tagName.toLowerCase();
-      const screenshotBlob = await captureScreenshot();
-      let screenshotKey = "";
-      if (screenshotBlob) {
+      try {
+        const selector = getElementSelector(elementUnder);
+        const text = (elementUnder.textContent || "").trim().slice(0, 200);
+        const tag = elementUnder.tagName.toLowerCase();
+        let screenshotBlob = null;
         try {
-          screenshotKey = await uploadScreenshot(screenshotBlob, annotations.length);
+          screenshotBlob = await captureScreenshot();
         } catch {
         }
+        let screenshotKey = "";
+        if (screenshotBlob) {
+          try {
+            screenshotKey = await uploadScreenshot(screenshotBlob, annotations.length);
+          } catch {
+          }
+        }
+        const annotation = {
+          screenshotKey,
+          coordinates: { x: e.clientX, y: e.clientY },
+          elementInfo: {
+            selector,
+            tag,
+            text,
+            id: elementUnder.id || void 0,
+            className: elementUnder.className?.toString().slice(0, 200) || void 0
+          },
+          pageUrl: window.location.href,
+          viewport: { width: window.innerWidth, height: window.innerHeight }
+        };
+        setLastAnnotation(annotation);
+        setAnnotations((prev) => [...prev, annotation]);
+        const flash = document.createElement("div");
+        Object.assign(flash.style, {
+          position: "fixed",
+          bottom: "80px",
+          left: "50%",
+          transform: "translateX(-50%)",
+          padding: "8px 16px",
+          borderRadius: "8px",
+          backgroundColor: "rgba(13, 148, 136, 0.95)",
+          color: "#fff",
+          fontSize: "13px",
+          fontWeight: "600",
+          fontFamily: "system-ui, sans-serif",
+          zIndex: "100002",
+          boxShadow: "0 4px 12px rgba(0,0,0,0.3)",
+          transition: "opacity 0.3s"
+        });
+        flash.textContent = `\u2713 Captured \u2014 ${tag}${text ? ': "' + text.slice(0, 40) + '"' : ""}`;
+        document.body.appendChild(flash);
+        setTimeout(() => {
+          flash.style.opacity = "0";
+        }, 1500);
+        setTimeout(() => {
+          flash.remove();
+        }, 1800);
+      } finally {
+        cleanup();
       }
-      const annotation = {
-        screenshotKey,
-        coordinates: { x: e.clientX, y: e.clientY },
-        elementInfo: {
-          selector,
-          tag,
-          text,
-          id: elementUnder.id || void 0,
-          className: elementUnder.className?.toString().slice(0, 200) || void 0
-        },
-        pageUrl: window.location.href,
-        viewport: { width: window.innerWidth, height: window.innerHeight }
-      };
-      setLastAnnotation(annotation);
-      setAnnotations((prev) => [...prev, annotation]);
-      cleanup();
     };
     const onKeyDown = (e) => {
       if (e.key === "Escape") {
@@ -690,6 +777,8 @@ function FeedbackWidget({ appId, apiUrl, user, position = "bottom-right", apiKey
   const [errorMessage, setErrorMessage] = useState(null);
   const [chatInput, setChatInput] = useState("");
   const [isVoiceRecordingInChat, setIsVoiceRecordingInChat] = useState(false);
+  const [submittingTooLong, setSubmittingTooLong] = useState(false);
+  const submittingTimerRef = useRef(null);
   const sessionStartRef = useRef(0);
   const sessionIdRef = useRef(null);
   const inactivityTimerRef = useRef(null);
@@ -706,6 +795,21 @@ function FeedbackWidget({ appId, apiUrl, user, position = "bottom-right", apiKey
     return key;
   }, [api]);
   const annotation = useScreenshotAnnotation(uploadScreenshotForAnnotation);
+  useEffect(() => {
+    if (widgetState === "submitting") {
+      setSubmittingTooLong(false);
+      submittingTimerRef.current = setTimeout(() => setSubmittingTooLong(true), 1e4);
+    } else {
+      setSubmittingTooLong(false);
+      if (submittingTimerRef.current) {
+        clearTimeout(submittingTimerRef.current);
+        submittingTimerRef.current = null;
+      }
+    }
+    return () => {
+      if (submittingTimerRef.current) clearTimeout(submittingTimerRef.current);
+    };
+  }, [widgetState]);
   useEffect(() => {
     chatMessagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [chat.messages]);
@@ -975,7 +1079,7 @@ function FeedbackWidget({ appId, apiUrl, user, position = "bottom-right", apiKey
           outline: "none",
           fontFamily: "inherit"
         },
-        disabled: chat.isLoading
+        disabled: false
       }
     ),
     /* @__PURE__ */ jsx(
@@ -1222,7 +1326,22 @@ function FeedbackWidget({ appId, apiUrl, user, position = "bottom-right", apiKey
             }, children: "Try Again" })
           ] }),
           widgetState === "submitted" && /* @__PURE__ */ jsx("div", { style: { textAlign: "center", padding: "8px 0" }, children: /* @__PURE__ */ jsx("p", { style: { fontSize: 14, color: "#374151", margin: 0 }, children: "Your feedback has been recorded and will be reviewed." }) }),
-          widgetState === "submitting" && /* @__PURE__ */ jsx("div", { style: { textAlign: "center", padding: "8px 0" }, children: /* @__PURE__ */ jsx("p", { style: { fontSize: 14, color: "#6B7280", margin: 0 }, children: "Uploading your feedback..." }) }),
+          widgetState === "submitting" && /* @__PURE__ */ jsxs("div", { style: { textAlign: "center", padding: "8px 0" }, children: [
+            /* @__PURE__ */ jsx("p", { style: { fontSize: 14, color: "#6B7280", margin: 0 }, children: "Uploading your feedback..." }),
+            submittingTooLong && /* @__PURE__ */ jsxs(Fragment, { children: [
+              /* @__PURE__ */ jsx("p", { style: { fontSize: 12, color: "#9CA3AF", margin: "8px 0 4px 0" }, children: "This is taking longer than expected." }),
+              /* @__PURE__ */ jsx("button", { onClick: handleReset, style: {
+                marginTop: 4,
+                padding: "6px 14px",
+                borderRadius: 6,
+                border: "1px solid #D1D5DB",
+                backgroundColor: "#fff",
+                color: "#374151",
+                fontSize: 13,
+                cursor: "pointer"
+              }, children: "Cancel" })
+            ] })
+          ] }),
           widgetState === "idle" && !recorder.error && !errorMessage && /* @__PURE__ */ jsxs(Fragment, { children: [
             /* @__PURE__ */ jsx("p", { style: { fontSize: 13, color: "#6B7280", margin: "0 0 12px 0", lineHeight: 1.4 }, children: chatEnabled ? "Chat or record while you navigate \u2014 we track which page you're on automatically. Click around the app to show us exactly where something needs attention." : "Hit record and navigate the app \u2014 we'll track which page you're on. Talk through what you see as you click around." }),
             /* @__PURE__ */ jsxs("div", { style: { marginBottom: 14 }, children: [
