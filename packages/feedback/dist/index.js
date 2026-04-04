@@ -127,7 +127,7 @@ function useEventTracker() {
     route: typeof window !== "undefined" ? window.location.pathname : "/",
     scrollPercent: 0,
     lastClickedElement: null,
-    lastClickedText: null,
+    lastClickedHasText: false,
     viewportSection: null
   });
   const cleanupRef = react.useRef(null);
@@ -201,16 +201,29 @@ function useEventTracker() {
       const target = e.target;
       if (!target) return;
       if (target.closest("[data-feedback-widget]")) return;
+      if (target.closest("[data-feedback-ignore]")) return;
       const selector = getElementSelector2(target);
-      const text = (target.textContent || "").trim().slice(0, 100);
       const tag = target.tagName.toLowerCase();
+      const hasText = Boolean((target.textContent || "").trim());
+      const testId = target.getAttribute("data-testid") || target.closest("[data-testid]")?.getAttribute("data-testid") || void 0;
+      const ariaLabel = target.getAttribute("aria-label") || void 0;
+      let safePath;
+      if (target instanceof HTMLAnchorElement && target.href) {
+        try {
+          safePath = new URL(target.href).pathname;
+        } catch {
+          safePath = void 0;
+        }
+      }
       contextRef.current.lastClickedElement = selector;
-      contextRef.current.lastClickedText = text || null;
+      contextRef.current.lastClickedHasText = hasText;
       pushEvent("click", {
         selector,
         tag,
-        text,
-        href: target instanceof HTMLAnchorElement ? target.href : void 0
+        hasText,
+        testId,
+        ariaLabel,
+        hrefPath: safePath
       });
     };
     document.addEventListener("click", onClick, { capture: true });
@@ -785,6 +798,7 @@ function FeedbackWidget({ appId, apiUrl, user, position = "bottom-right", apiKey
   const sessionIdRef = react.useRef(null);
   const inactivityTimerRef = react.useRef(null);
   const chatMessagesEndRef = react.useRef(null);
+  const initTimerRef = react.useRef(null);
   const recorder = useVoiceRecorder();
   const chatVoiceRecorder = useVoiceRecorder();
   const tracker = useEventTracker();
@@ -875,7 +889,8 @@ function FeedbackWidget({ appId, apiUrl, user, position = "bottom-right", apiKey
       sessionStartRef.current = Date.now();
       chat.reset();
       setWidgetState("chatting");
-      setTimeout(() => {
+      initTimerRef.current = setTimeout(() => {
+        initTimerRef.current = null;
         chat.sendMessage("__init__");
       }, 300);
     } catch (err) {
@@ -961,12 +976,23 @@ function FeedbackWidget({ appId, apiUrl, user, position = "bottom-right", apiKey
     annotation.startAnnotation();
   }, [annotation]);
   const handleReset = react.useCallback(() => {
+    if (initTimerRef.current) {
+      clearTimeout(initTimerRef.current);
+      initTimerRef.current = null;
+    }
+    if (recorder.isRecording) {
+      recorder.stopRecording();
+    }
+    if (isVoiceRecordingInChat) {
+      chatVoiceRecorder.stopRecording();
+      setIsVoiceRecordingInChat(false);
+    }
     setWidgetState("idle");
     setErrorMessage(null);
     setIsExpanded(false);
     setChatInput("");
     chat.reset();
-  }, [chat]);
+  }, [chat, recorder, chatVoiceRecorder, isVoiceRecordingInChat]);
   const positionStyle = POSITION_CLASSES[position] || POSITION_CLASSES["bottom-right"];
   const renderChatMessages = () => /* @__PURE__ */ jsxRuntime.jsxs("div", { style: {
     flex: 1,

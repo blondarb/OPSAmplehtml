@@ -152,7 +152,8 @@ interface EventContext {
     route: string;
     scrollPercent: number;
     lastClickedElement: string | null;
-    lastClickedText: string | null;
+    /** Whether the last clicked element had text content (boolean only — actual text is never captured for HIPAA/PHI safety) */
+    lastClickedHasText: boolean;
     viewportSection: string | null;
 }
 /**
