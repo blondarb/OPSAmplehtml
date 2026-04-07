@@ -18,7 +18,7 @@ type StepId = 'triage' | 'historian' | 'patient_tools' | 'report'
 const PIPELINE_STEPS: Array<{ id: StepId; label: string; statuses: string[] }> = [
   { id: 'triage', label: 'Triage', statuses: ['triage_pending'] },
   { id: 'historian', label: 'AI Historian', statuses: ['triage_complete', 'intake_pending', 'intake_in_progress', 'intake_complete', 'historian_pending', 'historian_in_progress'] },
-  { id: 'patient_tools', label: 'Patient Tools', statuses: ['historian_complete'] },
+  { id: 'patient_tools', label: 'Review & Tools', statuses: ['historian_complete'] },
   { id: 'report', label: 'Report', statuses: ['sdne_pending', 'sdne_complete', 'complete'] },
 ]
 
@@ -227,6 +227,7 @@ export default function ConsultPipelineView({ consultId, onConsultCreated }: Con
       {!loading && activeStep === 'patient_tools' && consultId && (
         <PatientToolsStepPanel
           consultId={consultId}
+          consult={consult}
           onComplete={handlePatientToolsComplete}
           onSkip={handlePatientToolsComplete}
           onError={setError}
