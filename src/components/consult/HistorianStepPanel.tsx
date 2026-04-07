@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import type { NeurologyConsult } from '@/lib/consult/types'
 
 interface HistorianStepPanelProps {
@@ -12,6 +12,28 @@ interface HistorianStepPanelProps {
 
 export default function HistorianStepPanel({ consultId, consult, onComplete, onError }: HistorianStepPanelProps) {
   const [skipping, setSkipping] = useState(false)
+  const [polling, setPolling] = useState(false)
+  const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null)
+
+  // Poll consult status every 5s after historian tab opens
+  useEffect(() => {
+    if (!polling) return
+    pollingRef.current = setInterval(async () => {
+      try {
+        const r = await fetch(`/api/neuro-consults/${consultId}`)
+        const data = await r.json()
+        if (data.consult?.status === 'historian_complete' || data.consult?.historian_completed_at) {
+          setPolling(false)
+          onComplete()
+        }
+      } catch {
+        // Silently retry on next interval
+      }
+    }, 5000)
+    return () => {
+      if (pollingRef.current) clearInterval(pollingRef.current)
+    }
+  }, [polling, consultId, onComplete])
 
   // If historian already complete, show summary
   if (consult?.historian_completed_at) {
@@ -133,6 +155,7 @@ export default function HistorianStepPanel({ consultId, consult, onComplete, onE
           href={historianUrl}
           target="_blank"
           rel="noopener noreferrer"
+          onClick={() => setPolling(true)}
           style={{
             padding: '10px 24px',
             borderRadius: 8,
@@ -180,9 +203,18 @@ export default function HistorianStepPanel({ consultId, consult, onComplete, onE
         </button>
       </div>
 
-      <p style={{ color: '#64748B', fontSize: 12, marginTop: 12, fontStyle: 'italic' }}>
-        The historian interview opens in a new tab. Return here once the patient finishes.
-      </p>
+      {polling ? (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 12 }}>
+          <span style={{ display: 'inline-block', width: 8, height: 8, borderRadius: '50%', background: '#8B5CF6', animation: 'pulse 1.5s infinite' }} />
+          <p style={{ color: '#A78BFA', fontSize: 12, margin: 0 }}>
+            Waiting for historian interview to complete… This page will auto-advance.
+          </p>
+        </div>
+      ) : (
+        <p style={{ color: '#64748B', fontSize: 12, marginTop: 12, fontStyle: 'italic' }}>
+          The historian interview opens in a new tab. This page will auto-advance when complete.
+        </p>
+      )}
     </div>
   )
 }
