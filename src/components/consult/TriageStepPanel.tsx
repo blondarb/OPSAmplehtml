@@ -86,7 +86,18 @@ export default function TriageStepPanel({ consult, onTriageComplete, onError }: 
       const triageData = await triageRes.json()
 
       // Step 2: Create consult with triage results
-      const result = triageData.result || {}
+      // Build a clinical summary from the triage response fields
+      const reasons = triageData.clinical_reasons || []
+      const workup = triageData.suggested_workup || []
+      const summaryParts: string[] = []
+      if (reasons.length) summaryParts.push('Clinical Reasons:\n' + reasons.map((r: string) => `• ${r}`).join('\n'))
+      if (workup.length) summaryParts.push('Suggested Workup:\n' + workup.map((w: string) => `• ${w}`).join('\n'))
+      if (triageData.subspecialty_rationale) summaryParts.push('Subspecialty Rationale:\n' + triageData.subspecialty_rationale)
+      const triageSummary = summaryParts.join('\n\n')
+
+      // Derive chief complaint from first clinical reason or referral text
+      const chiefComplaint = reasons[0]?.slice(0, 200) || referralText.slice(0, 200)
+
       const consultRes = await fetch('/api/neuro-consults', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -94,12 +105,12 @@ export default function TriageStepPanel({ consult, onTriageComplete, onError }: 
           referral_text: referralText,
           triage_data: {
             triage_session_id: triageData.session_id || '',
-            triage_urgency: result.overall_tier || result.triage_tier || 'routine',
-            triage_tier_display: (result.overall_tier || result.triage_tier || 'ROUTINE').toUpperCase(),
-            triage_summary: result.clinical_summary || '',
-            triage_chief_complaint: result.chief_complaint || referralText.slice(0, 200),
-            triage_red_flags: result.red_flags || [],
-            triage_subspecialty: result.recommended_subspecialty || '',
+            triage_urgency: triageData.triage_tier || 'routine',
+            triage_tier_display: triageData.triage_tier_display || (triageData.triage_tier || 'ROUTINE').toUpperCase(),
+            triage_summary: triageSummary,
+            triage_chief_complaint: chiefComplaint,
+            triage_red_flags: triageData.red_flags || [],
+            triage_subspecialty: triageData.subspecialty_recommendation || '',
           },
         }),
       })
