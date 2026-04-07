@@ -69,6 +69,8 @@ export async function createConsult(
       userMessage = 'Invalid consult data — a database constraint was violated. Please retry.'
     } else if (pgCode === '08006' || pgCode === '08001' || pgCode === '57P01') {
       userMessage = 'Database connection issue. Please wait a moment and try again.'
+    } else if (pgCode === '42P01') {
+      userMessage = 'A required database table is missing. Please contact support.'
     }
     return { data: null, error: userMessage }
   }
