@@ -69,9 +69,9 @@ export async function POST(request: Request) {
       referringProviderType: referring_provider_type,
     })
 
-    // Call Bedrock with 25-second timeout (CloudFront origin timeout is ~30s)
+    // Call Bedrock with 45-second timeout (Amplify SSR compute limit is 60s)
     const controller = new AbortController()
-    const timeout = setTimeout(() => controller.abort(), 25000)
+    const timeout = setTimeout(() => controller.abort(), 45000)
 
     let parsed: Record<string, unknown>
     let inputTokens: number | undefined
