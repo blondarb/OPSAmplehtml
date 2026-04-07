@@ -110,6 +110,10 @@ export async function POST(request: Request) {
     // Store in RDS
     let sessionId = crypto.randomUUID()
     try {
+      // Stringify jsonb array/object fields — the query builder passes raw
+      // arrays through for text[] compat, but triage_sessions uses jsonb.
+      const toJSON = (v: unknown) => v != null ? JSON.stringify(v) : null
+
       const { data: inserted, error: insertError } = await from('triage_sessions')
         .insert({
           referral_text,
@@ -118,17 +122,17 @@ export async function POST(request: Request) {
           referring_provider_type: referring_provider_type || null,
           triage_tier: scoring.tier,
           confidence: aiResponse.confidence,
-          dimension_scores: aiResponse.dimension_scores,
+          dimension_scores: toJSON(aiResponse.dimension_scores),
           weighted_score: scoring.weightedScore,
-          clinical_reasons: aiResponse.clinical_reasons,
-          red_flags: aiResponse.red_flags,
-          suggested_workup: aiResponse.suggested_workup,
-          failed_therapies: aiResponse.failed_therapies,
-          missing_information: aiResponse.missing_information,
+          clinical_reasons: toJSON(aiResponse.clinical_reasons),
+          red_flags: toJSON(aiResponse.red_flags),
+          suggested_workup: toJSON(aiResponse.suggested_workup),
+          failed_therapies: toJSON(aiResponse.failed_therapies),
+          missing_information: toJSON(aiResponse.missing_information),
           subspecialty_recommendation: aiResponse.subspecialty_recommendation,
           subspecialty_rationale: aiResponse.subspecialty_rationale,
           ai_model_used: TRIAGE_MODEL,
-          ai_raw_response: aiResponse,
+          ai_raw_response: toJSON(aiResponse),
           patient_id: patient_id || null,
           // Phase 2 fields
           source_type: source_type || 'paste',
