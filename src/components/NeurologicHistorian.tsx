@@ -33,6 +33,7 @@ export default function NeurologicHistorian() {
   const router = useRouter()
   const scenarioParam = searchParams.get('scenario')
   const patientIdParam = searchParams.get('patient_id')
+  const consultIdParam = searchParams.get('consult_id')
 
   const [phase, setPhase] = useState<Phase>(patientIdParam ? 'loading_context' : 'scenario_select')
   const [selectedScenario, setSelectedScenario] = useState<DemoScenario | null>(null)
@@ -90,6 +91,7 @@ export default function NeurologicHistorian() {
           duration_seconds: data.duration,
           question_count: data.questionCount,
           status: 'completed',
+          consult_id: consultIdParam || null,
         }),
       })
     } catch (err) {
