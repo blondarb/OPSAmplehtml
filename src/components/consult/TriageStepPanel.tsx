@@ -55,8 +55,15 @@ export default function TriageStepPanel({ consult, onTriageComplete, onError }: 
     )
   }
 
+  const trimmedLength = referralText.trim().length
+  const isTooShort = trimmedLength > 0 && trimmedLength < 50
+
   async function handleSubmit() {
     if (!referralText.trim()) return
+    if (trimmedLength < 50) {
+      onError(`Referral text must be at least 50 characters for meaningful triage (currently ${trimmedLength}). Please provide more clinical detail — e.g., age, symptoms, duration, and relevant history.`)
+      return
+    }
     setSubmitting(true)
     onError('')
 
@@ -69,8 +76,11 @@ export default function TriageStepPanel({ consult, onTriageComplete, onError }: 
       })
 
       if (!triageRes.ok) {
-        const err = await triageRes.json().catch(() => ({ error: 'Triage failed' }))
-        throw new Error(err.error || 'Triage failed')
+        const err = await triageRes.json().catch(() => ({}))
+        const msg = err.error || 'Triage failed'
+        throw new Error(triageRes.status === 400
+          ? msg
+          : `Triage error: ${msg}. Please check the referral text and try again.`)
       }
 
       const triageData = await triageRes.json()
@@ -95,14 +105,14 @@ export default function TriageStepPanel({ consult, onTriageComplete, onError }: 
       })
 
       if (!consultRes.ok) {
-        const err = await consultRes.json().catch(() => ({ error: 'Failed to create consult' }))
-        throw new Error(err.error || 'Failed to create consult')
+        const err = await consultRes.json().catch(() => ({}))
+        throw new Error(err.error || 'Failed to save the consult record. Please try again.')
       }
 
       const consultData = await consultRes.json()
       onTriageComplete(consultData.consult.id, consultData.consult)
     } catch (e) {
-      onError(e instanceof Error ? e.message : 'Unknown error')
+      onError(e instanceof Error ? e.message : 'An unexpected error occurred. Please try again.')
     } finally {
       setSubmitting(false)
     }
@@ -137,6 +147,19 @@ export default function TriageStepPanel({ consult, onTriageComplete, onError }: 
           outline: 'none',
         }}
       />
+
+      {/* Character count hint */}
+      {referralText.trim().length > 0 && (
+        <p style={{
+          fontSize: 12,
+          margin: '6px 0 0',
+          color: isTooShort ? '#F59E0B' : '#64748B',
+        }}>
+          {isTooShort
+            ? `${trimmedLength}/50 characters minimum — add more clinical detail (age, symptoms, duration, history)`
+            : `${trimmedLength} characters`}
+        </p>
+      )}
 
       <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 12 }}>
         <button

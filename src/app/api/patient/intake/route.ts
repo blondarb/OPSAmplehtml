@@ -54,12 +54,12 @@ export async function POST(request: Request) {
     let consultId: string | null = null
     try {
       const referralText = `Patient intake: ${body.chief_complaint}${body.medical_history ? ` | History: ${body.medical_history}` : ''}`
-      const consult = await createConsult(
+      const consultResult = await createConsult(
         referralText,
         undefined, // No triage data yet — consult starts in 'triage_pending'
         body.patient_id || undefined,
       )
-      consultId = consult?.id || null
+      consultId = consultResult.data?.id || null
 
       if (consultId && data?.id) {
         // Link the intake form to the consult record

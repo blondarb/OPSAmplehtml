@@ -15,16 +15,23 @@ import type { NeurologyConsult, TriageConsultUpdate } from './types'
 // Create
 // ─────────────────────────────────────────────────────────────────────────────
 
+export interface CreateConsultResult {
+  data: NeurologyConsult | null
+  error?: string
+}
+
 /**
  * Create a new consult record. If triage data is already available (because
  * the caller passes a TriageConsultUpdate), the record is created in state
  * 'triage_complete'; otherwise it starts in 'triage_pending'.
+ *
+ * Returns { data, error } so callers can surface specific failure reasons.
  */
 export async function createConsult(
   referralText?: string,
   triageUpdate?: TriageConsultUpdate,
   patientId?: string,
-): Promise<NeurologyConsult | null> {
+): Promise<CreateConsultResult> {
   const now = new Date().toISOString()
   const status = triageUpdate ? 'triage_complete' : 'triage_pending'
 
@@ -51,10 +58,22 @@ export async function createConsult(
 
   if (error) {
     console.error('[pipeline] createConsult error:', error)
-    return null
+    // Map DB error codes to actionable messages
+    const pgCode = (error as { code?: string }).code
+    let userMessage = 'Failed to save the consult record to the database.'
+    if (pgCode === '23503') {
+      userMessage = 'A linked record (patient or triage session) could not be found. Please retry the triage step.'
+    } else if (pgCode === '23505') {
+      userMessage = 'A consult record for this triage session already exists.'
+    } else if (pgCode === '23514') {
+      userMessage = 'Invalid consult data — a database constraint was violated. Please retry.'
+    } else if (pgCode === '08006' || pgCode === '08001' || pgCode === '57P01') {
+      userMessage = 'Database connection issue. Please wait a moment and try again.'
+    }
+    return { data: null, error: userMessage }
   }
 
-  return data as NeurologyConsult
+  return { data: data as NeurologyConsult }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

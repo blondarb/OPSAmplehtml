@@ -188,8 +188,8 @@ export async function POST(request: Request) {
         consultId = existingConsultId
       } else if (createConsultFlag) {
         // Auto-create a new consult record for this triage
-        const consult = await createConsult(referral_text, triageConsultData, patient_id || undefined)
-        consultId = consult?.id || null
+        const consultResult = await createConsult(referral_text, triageConsultData, patient_id || undefined)
+        consultId = consultResult.data?.id || null
       }
     } catch (consultErr) {
       console.error('Consult pipeline integration error (non-fatal):', consultErr)

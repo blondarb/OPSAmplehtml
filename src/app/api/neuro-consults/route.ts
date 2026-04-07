@@ -26,19 +26,19 @@ export async function POST(request: Request) {
       triage_data?: TriageConsultUpdate
     }
 
-    const consult = await createConsult(referral_text, triage_data, patient_id)
+    const result = await createConsult(referral_text, triage_data, patient_id)
 
-    if (!consult) {
+    if (!result.data) {
       return NextResponse.json(
-        { error: 'Failed to create consult record' },
+        { error: result.error || 'Failed to create consult record. Please try again.' },
         { status: 500 },
       )
     }
 
-    return NextResponse.json({ consult }, { status: 201 })
+    return NextResponse.json({ consult: result.data }, { status: 201 })
   } catch (error: unknown) {
     console.error('POST /api/neuro-consults error:', error)
-    const message = error instanceof Error ? error.message : 'Failed to create consult'
+    const message = error instanceof Error ? error.message : 'Failed to create consult record. Please try again.'
     return NextResponse.json({ error: message }, { status: 500 })
   }
 }
