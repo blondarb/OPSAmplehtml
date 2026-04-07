@@ -21,7 +21,6 @@ import {
 } from '@aws-sdk/client-bedrock-agent-runtime'
 
 // ── Model IDs ────────────────────────────────────────────────────────
-// Map legacy OpenAI model names to the single Bedrock model we use.
 // Every caller can just import BEDROCK_MODEL.
 export const BEDROCK_MODEL = 'us.anthropic.claude-sonnet-4-6'
 
