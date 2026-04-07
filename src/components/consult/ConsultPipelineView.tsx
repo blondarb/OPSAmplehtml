@@ -84,13 +84,13 @@ export default function ConsultPipelineView({ consultId, onConsultCreated }: Con
     [onConsultCreated],
   )
 
-  const handleHistorianComplete = useCallback(() => {
-    refreshConsult()
+  const handleHistorianComplete = useCallback(async () => {
+    await refreshConsult()
     setActiveStep('patient_tools')
   }, [refreshConsult])
 
-  const handlePatientToolsComplete = useCallback(() => {
-    refreshConsult()
+  const handlePatientToolsComplete = useCallback(async () => {
+    await refreshConsult()
     setActiveStep('report')
   }, [refreshConsult])
 

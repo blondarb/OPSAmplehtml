@@ -42,16 +42,46 @@ export default function IntakeReviewSection({ consult }: IntakeReviewSectionProp
   const [expandedCorrection, setExpandedCorrection] = useState<string | null>(null)
 
   const structured = consult?.historian_structured_output as HistorianStructuredOutput | null | undefined
+  const narrativeSummary = consult?.historian_summary
 
-  if (!structured) {
+  // No structured data AND no narrative — truly empty
+  if (!structured && !narrativeSummary) {
     return (
       <div style={{
         background: '#0F172A', border: '1px solid #334155', borderRadius: 8,
         padding: 20, textAlign: 'center',
       }}>
-        <p style={{ color: '#64748B', fontSize: 13, margin: 0 }}>
-          No interview data available. Complete the AI Historian interview to see your intake summary here.
+        <p style={{ color: '#64748B', fontSize: 13, margin: '0 0 8px' }}>
+          No interview data available.
         </p>
+        <p style={{ color: '#475569', fontSize: 12, margin: 0 }}>
+          The interview may have ended too early to capture structured data. You can go back to step 2 and run the interview again, or proceed to the report.
+        </p>
+      </div>
+    )
+  }
+
+  // Narrative-only fallback — structured output is empty but we have a summary
+  if (!structured) {
+    return (
+      <div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#0D9488" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" />
+            <polyline points="14 2 14 8 20 8" />
+          </svg>
+          <h4 style={{ color: '#E2E8F0', fontSize: 14, fontWeight: 700, margin: 0 }}>
+            Interview Summary
+          </h4>
+        </div>
+        <div style={{ background: '#0F172A', border: '1px solid #334155', borderRadius: 8, padding: 14 }}>
+          <span style={{ color: '#64748B', fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+            Narrative Summary
+          </span>
+          <p style={{ color: '#CBD5E1', fontSize: 13, margin: '6px 0 0', lineHeight: 1.5, whiteSpace: 'pre-wrap' }}>
+            {narrativeSummary}
+          </p>
+        </div>
       </div>
     )
   }
@@ -92,6 +122,18 @@ export default function IntakeReviewSection({ consult }: IntakeReviewSectionProp
       </div>
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+        {/* Narrative summary if available */}
+        {narrativeSummary && (
+          <div style={{ background: '#0F172A', border: '1px solid rgba(13,148,136,0.3)', borderRadius: 8, padding: 14, marginBottom: 4 }}>
+            <span style={{ color: '#0D9488', fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+              Interview Summary
+            </span>
+            <p style={{ color: '#CBD5E1', fontSize: 13, margin: '6px 0 0', lineHeight: 1.5, whiteSpace: 'pre-wrap' }}>
+              {narrativeSummary}
+            </p>
+          </div>
+        )}
+
         {/* Chief Complaint */}
         {structured.chief_complaint && (
           <SectionCard
