@@ -28,7 +28,7 @@ import type {
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
-const LOCALIZER_TIMEOUT_MS = 2000
+const LOCALIZER_TIMEOUT_MS = 15000
 const KB_RESULTS = 5
 
 // ── Prompts ───────────────────────────────────────────────────────────────────
