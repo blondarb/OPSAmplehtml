@@ -3,11 +3,13 @@
 import { useState, useCallback, useEffect } from 'react'
 import type { NeurologyConsult, ConsultStatus } from '@/lib/consult/types'
 import type { ConsultReport } from '@/lib/consult/report'
+import type { SamplePersona } from '@/lib/consult/samplePersonas'
 import ConsultReportView from '@/components/ConsultReportView'
 import TriageStepPanel from './TriageStepPanel'
 import HistorianStepPanel from './HistorianStepPanel'
 import PatientToolsStepPanel from './PatientToolsStepPanel'
 import ReportStepPanel from './ReportStepPanel'
+import DemoActorCard from './DemoActorCard'
 
 /**
  * Pipeline steps in display order.
@@ -49,6 +51,9 @@ export default function ConsultPipelineView({ consultId, onConsultCreated }: Con
   const [report, setReport] = useState<ConsultReport | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  const [persona, setPersona] = useState<SamplePersona | null>(null)
+
+  const showActorCard = persona !== null
 
   // Load consult when ID changes
   useEffect(() => {
@@ -100,7 +105,7 @@ export default function ConsultPipelineView({ consultId, onConsultCreated }: Con
   }, [refreshConsult])
 
   return (
-    <div style={{ maxWidth: 960, margin: '0 auto' }}>
+    <div style={{ maxWidth: showActorCard ? 1280 : 960, margin: '0 auto', transition: 'max-width 0.25s' }}>
       {/* Pipeline Progress Bar */}
       <div
         style={{
@@ -206,43 +211,62 @@ export default function ConsultPipelineView({ consultId, onConsultCreated }: Con
         </div>
       )}
 
-      {/* Step panels */}
-      {!loading && activeStep === 'triage' && (
-        <TriageStepPanel
-          consult={consult}
-          onTriageComplete={handleTriageComplete}
-          onError={setError}
-        />
-      )}
+      {/* Main + optional actor briefing side panel */}
+      <div
+        style={{
+          display: 'grid',
+          gridTemplateColumns: showActorCard ? 'minmax(0, 1fr) 340px' : 'minmax(0, 1fr)',
+          gap: 20,
+          alignItems: 'start',
+        }}
+      >
+        <div style={{ minWidth: 0 }}>
+          {!loading && activeStep === 'triage' && (
+            <TriageStepPanel
+              consult={consult}
+              onTriageComplete={handleTriageComplete}
+              onError={setError}
+              selectedPersonaId={persona?.id ?? null}
+              onPersonaSelected={setPersona}
+            />
+          )}
 
-      {!loading && activeStep === 'historian' && consultId && (
-        <HistorianStepPanel
-          consultId={consultId}
-          consult={consult}
-          onComplete={handleHistorianComplete}
-          onError={setError}
-        />
-      )}
+          {!loading && activeStep === 'historian' && consultId && (
+            <HistorianStepPanel
+              consultId={consultId}
+              consult={consult}
+              onComplete={handleHistorianComplete}
+              onError={setError}
+            />
+          )}
 
-      {!loading && activeStep === 'patient_tools' && consultId && (
-        <PatientToolsStepPanel
-          consultId={consultId}
-          consult={consult}
-          onComplete={handlePatientToolsComplete}
-          onSkip={handlePatientToolsComplete}
-          onError={setError}
-        />
-      )}
+          {!loading && activeStep === 'patient_tools' && consultId && (
+            <PatientToolsStepPanel
+              consultId={consultId}
+              consult={consult}
+              onComplete={handlePatientToolsComplete}
+              onSkip={handlePatientToolsComplete}
+              onError={setError}
+            />
+          )}
 
-      {!loading && activeStep === 'report' && consultId && (
-        <ReportStepPanel
-          consultId={consultId}
-          consult={consult}
-          report={report}
-          onReportGenerated={handleReportGenerated}
-          onError={setError}
-        />
-      )}
+          {!loading && activeStep === 'report' && consultId && (
+            <ReportStepPanel
+              consultId={consultId}
+              consult={consult}
+              report={report}
+              onReportGenerated={handleReportGenerated}
+              onError={setError}
+            />
+          )}
+        </div>
+
+        {showActorCard && persona && (
+          <div style={{ minWidth: 0 }}>
+            <DemoActorCard persona={persona} />
+          </div>
+        )}
+      </div>
     </div>
   )
 }

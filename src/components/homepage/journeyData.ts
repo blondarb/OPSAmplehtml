@@ -38,7 +38,7 @@ export const clinicianTrack: JourneyTrackData = {
       route: '/consult',
       icon: ClipboardList,
       status: 'live',
-      description: 'End-to-end consult pipeline — triage, AI historian, patient tools, scales, and unified report.',
+      description: 'Referral → AI triage → AI voice historian → patient tools → unified report. Five sample patients ready to demo.',
     },
     {
       phase: 'My Day',

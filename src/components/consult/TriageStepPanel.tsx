@@ -2,16 +2,37 @@
 
 import { useState } from 'react'
 import type { NeurologyConsult } from '@/lib/consult/types'
+import type { SamplePersona } from '@/lib/consult/samplePersonas'
+import SamplePatientSelector from './SamplePatientSelector'
 
 interface TriageStepPanelProps {
   consult: NeurologyConsult | null
   onTriageComplete: (consultId: string, consult: NeurologyConsult) => void
   onError: (msg: string) => void
+  selectedPersonaId: string | null
+  onPersonaSelected: (persona: SamplePersona | null) => void
 }
 
-export default function TriageStepPanel({ consult, onTriageComplete, onError }: TriageStepPanelProps) {
+export default function TriageStepPanel({
+  consult,
+  onTriageComplete,
+  onError,
+  selectedPersonaId,
+  onPersonaSelected,
+}: TriageStepPanelProps) {
   const [referralText, setReferralText] = useState('')
   const [submitting, setSubmitting] = useState(false)
+
+  function handleSelectPersona(persona: SamplePersona) {
+    setReferralText(persona.referralText)
+    onPersonaSelected(persona)
+  }
+
+  function handleReferralChange(value: string) {
+    setReferralText(value)
+    // If the user edits the referral, they've diverged from the canned persona.
+    if (selectedPersonaId) onPersonaSelected(null)
+  }
 
   // If consult already has triage, show summary
   if (consult && consult.triage_completed_at) {
@@ -138,10 +159,16 @@ export default function TriageStepPanel({ consult, onTriageComplete, onError }: 
         Paste the referral note or chief complaint. The AI will score urgency, identify red flags, and recommend a subspecialty.
       </p>
 
+      <SamplePatientSelector
+        selectedId={selectedPersonaId}
+        onSelect={handleSelectPersona}
+        disabled={submitting}
+      />
+
       <textarea
         value={referralText}
-        onChange={(e) => setReferralText(e.target.value)}
-        placeholder="Paste referral note here…&#10;&#10;Example: 42-year-old female with 3-month history of progressive bilateral hand tremor, worse at rest. No family history of movement disorders. Currently on no medications."
+        onChange={(e) => handleReferralChange(e.target.value)}
+        placeholder="Paste referral note here, or pick a sample patient above.&#10;&#10;Example: 42-year-old female with 3-month history of progressive bilateral hand tremor, worse at rest. No family history of movement disorders. Currently on no medications."
         disabled={submitting}
         style={{
           width: '100%',
