@@ -10,12 +10,13 @@ import { Activity } from 'lucide-react'
 // The SDNE dashboard is deployed and maintained in the SDNE repo.
 // We embed it here via iframe so OPSAmplehtml always shows the latest
 // without duplicating code or data across repos.
-const SDNE_DASHBOARD_URL = process.env.NEXT_PUBLIC_SDNE_URL || 'https://main.d1ld38tyw8bl1b.amplifyapp.com'
+const SDNE_DASHBOARD_URL = process.env.NEXT_PUBLIC_SDNE_URL || 'https://sense.neuroplans.app'
 
 // Allowed origins for postMessage validation
 const ALLOWED_ORIGINS = [
   new URL(SDNE_DASHBOARD_URL).origin,
-  'https://main.d1ld38tyw8bl1b.amplifyapp.com',
+  'https://sense.neuroplans.app',
+  'https://main.d2u0sx0dbnbnf2.amplifyapp.com',
 ]
 
 interface SDNESessionResult {
