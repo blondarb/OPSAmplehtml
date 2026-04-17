@@ -80,14 +80,30 @@ export default function HistorianStepPanel({ consultId, consult, onComplete, onE
   }
 
   return (
-    <div style={{ background: '#1E293B', border: '1px solid #334155', borderRadius: 12, padding: 24 }}>
+    <div
+      className="historian-step-panel"
+      style={{ background: '#1E293B', border: '1px solid #334155', borderRadius: 12, padding: 24 }}
+    >
       <h3 style={{ color: '#E2E8F0', fontSize: 16, fontWeight: 700, margin: '0 0 8px' }}>
         Step 2: AI Historian Interview
       </h3>
-      <p style={{ color: '#94A3B8', fontSize: 13, margin: '0 0 16px' }}>
+      <p style={{
+        color: '#94A3B8',
+        fontSize: 13,
+        margin: '0 0 16px',
+        overflowWrap: 'anywhere',
+        wordBreak: 'break-word',
+      }}>
         The patient completes a voice interview with the AI Historian. The AI gathers HPI, medications,
         allergies, medical history, and review of systems using the OLDCARTS framework.
       </p>
+      <style jsx>{`
+        @media (max-width: 640px) {
+          .historian-step-panel {
+            padding: 16px !important;
+          }
+        }
+      `}</style>
 
       {interviewStarted ? (
         <EmbeddedHistorian

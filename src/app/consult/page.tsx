@@ -20,6 +20,7 @@ export default function ConsultPage() {
         badgeText="Pipeline"
       />
       <div
+        className="consult-page-container"
         style={{
           minHeight: 'calc(100vh - 112px)',
           background: 'linear-gradient(180deg, #0F172A 0%, #1E293B 100%)',
@@ -31,6 +32,13 @@ export default function ConsultPage() {
           onConsultCreated={setConsultId}
         />
       </div>
+      <style jsx>{`
+        @media (max-width: 640px) {
+          .consult-page-container {
+            padding: 12px !important;
+          }
+        }
+      `}</style>
     </PlatformShell>
   )
 }

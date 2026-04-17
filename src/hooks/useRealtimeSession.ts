@@ -67,6 +67,12 @@ interface UseRealtimeSessionResult {
   administeredScaleIds: Set<string>
   /** Red flags detected in the current session transcript. */
   detectedRedFlags: DetectedFlag[]
+  /**
+   * True once the AI Historian has signaled completion by calling
+   * save_interview_output. Consumers can use this to auto-end the session
+   * after the AI finishes its closing message.
+   */
+  interviewCompleted: boolean
 }
 
 const SAFETY_KEYWORDS = [
@@ -91,6 +97,7 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
   const [localizerLoading, setLocalizerLoading] = useState(false)
   const [administeredScaleIds, setAdministeredScaleIds] = useState<Set<string>>(new Set())
   const [detectedRedFlags, setDetectedRedFlags] = useState<DetectedFlag[]>([])
+  const [interviewCompleted, setInterviewCompleted] = useState(false)
 
   const pcRef = useRef<RTCPeerConnection | null>(null)
   const dcRef = useRef<RTCDataChannel | null>(null)
@@ -147,6 +154,9 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
     }
     if (audioElRef.current) {
       audioElRef.current.srcObject = null
+      if (audioElRef.current.parentNode) {
+        audioElRef.current.parentNode.removeChild(audioElRef.current)
+      }
       audioElRef.current = null
     }
   }, [])
@@ -236,6 +246,7 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
     administeredScaleIdsRef.current = new Set()
     setAdministeredScaleIds(new Set())
     setDetectedRedFlags([])
+    setInterviewCompleted(false)
 
     try {
       // 1. Get ephemeral token
@@ -262,18 +273,36 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
       pcRef.current = pc
 
       // 3. Set up remote audio playback
+      // iOS Safari requires the element to be attached to the DOM for audio
+      // to route correctly (including to the phone's speaker). We hide it
+      // visually but keep it in the tree.
       const audioEl = document.createElement('audio')
       audioEl.autoplay = true
+      audioEl.controls = false
       // @ts-expect-error - playsinline is valid for iOS Safari
       audioEl.playsInline = true
+      audioEl.style.display = 'none'
+      audioEl.setAttribute('aria-hidden', 'true')
+      document.body.appendChild(audioEl)
       audioElRef.current = audioEl
 
       pc.ontrack = (event) => {
         audioEl.srcObject = event.streams[0]
+        // Ensure playback resumes if the browser paused after srcObject change.
+        audioEl.play().catch(() => {})
       }
 
       // 4. Get user mic
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+      // Explicit constraints give the best behavior when users listen on
+      // speakerphone — the mic will suppress the speaker bleed rather than
+      // canceling the AI audio outright.
+      const stream = await navigator.mediaDevices.getUserMedia({
+        audio: {
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true,
+        },
+      })
       streamRef.current = stream
       stream.getTracks().forEach(track => pc.addTrack(track, stream))
 
@@ -433,6 +462,9 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
                 if (safety_escalated) {
                   safetyEscalatedRef.current = true
                 }
+                // Signal to consumers that the interview has concluded so
+                // they can auto-end the session after the AI's closing line.
+                setInterviewCompleted(true)
 
                 if (dcRef.current?.readyState === 'open') {
                   dcRef.current.send(JSON.stringify({
@@ -586,5 +618,6 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
     injectScaleAdministration,
     administeredScaleIds,
     detectedRedFlags,
+    interviewCompleted,
   }
 }
