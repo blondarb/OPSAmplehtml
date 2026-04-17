@@ -121,13 +121,12 @@ Full changelog: [`docs/CHANGELOG.md`](docs/CHANGELOG.md)
 **Status**: Active
 
 ### Recent
+- **Consult tester feedback fixes + sample personas + actor briefing + SDNE iframe (PR #105, Apr 17)** — Addressed 5 tester feedback items on /consult page (layout, validation, flow); added sample patient personas and actor briefing section for demo flow; pointed SDNE iframe to sense.neuroplans.app production URL.
 - **Neuro Intake + Consult Pipeline hardening (Apr 5-7)** — Historian embedded inline in patient tools; intake review added to patient page; auto-advance after historian completes in new tab; consult_id propagated from historian to save endpoint; KB IAM permissions + env vars wired; triage timeouts tuned for CloudFront (25-45s); JSONB array fields stringified; 42P01 (undefined table) error mapping added; actionable error messages surfaced from consult pipeline.
 - **Feedback widget security hardening + API key (PRs #102-104, Apr 4)** — Prevented submission freeze on Edge/Windows (PR #102); HIPAA click redaction, CORS origin allowlist, input validation, AbortController timeouts (PR #103); added feedback API key to widget config (PR #104).
 - **SSO client_secret fix (Mar 31)** — Added `COGNITO_CLIENT_SECRET` to `next.config` env inline for Amplify SSR runtime access; wired to OAuth token exchange flow to fix SSO login failure on Amplify.
 - **OAuth SSO migration** to Cognito Hosted UI + PKCE with Amplify redirect fixes (PRs #100-101, Mar 27)
 - **EHR Integration Phases 1-5** — patient flow, historian import, follow-up triggers, wearable unification, SDNE bridge, Twilio prep (PRs #94-99, Mar 26)
-- **Notification feed wiring** to live API data with demo fallback (PR #93, Mar 26)
-- **Consult state fixes** — validation, phrase scope filtering, draft column fix (PR #92, Mar 25)
 
 ### In Progress
 - Diagnosis plan coverage expansion (98 plans in DB, 148/166 diagnoses covered)
