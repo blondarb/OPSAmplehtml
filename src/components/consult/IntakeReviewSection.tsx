@@ -43,20 +43,54 @@ export default function IntakeReviewSection({ consult }: IntakeReviewSectionProp
 
   const structured = consult?.historian_structured_output as HistorianStructuredOutput | null | undefined
   const narrativeSummary = consult?.historian_summary
+  const endedEarly = consult?.interview_completion_status === 'ended_early'
+
+  const earlyEndBanner = endedEarly ? (
+    <div
+      role="status"
+      style={{
+        background: 'rgba(245, 158, 11, 0.1)',
+        border: '1px solid rgba(245, 158, 11, 0.4)',
+        borderRadius: 8,
+        padding: '10px 14px',
+        marginBottom: 12,
+        display: 'flex',
+        alignItems: 'flex-start',
+        gap: 10,
+      }}
+    >
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#F59E0B" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0, marginTop: 2 }}>
+        <path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
+        <line x1="12" y1="9" x2="12" y2="13" />
+        <line x1="12" y1="17" x2="12.01" y2="17" />
+      </svg>
+      <div>
+        <div style={{ color: '#F59E0B', fontSize: 12, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+          Partial intake — interview ended early
+        </div>
+        <div style={{ color: '#FCD34D', fontSize: 12, marginTop: 2, lineHeight: 1.4 }}>
+          The patient ended before the AI completed the full history. Review what was captured and consider finishing any gaps during the visit.
+        </div>
+      </div>
+    </div>
+  ) : null
 
   // No structured data AND no narrative — truly empty
   if (!structured && !narrativeSummary) {
     return (
-      <div style={{
-        background: '#0F172A', border: '1px solid #334155', borderRadius: 8,
-        padding: 20, textAlign: 'center',
-      }}>
-        <p style={{ color: '#64748B', fontSize: 13, margin: '0 0 8px' }}>
-          No interview data available.
-        </p>
-        <p style={{ color: '#475569', fontSize: 12, margin: 0 }}>
-          The interview may have ended too early to capture structured data. You can go back to step 2 and run the interview again, or proceed to the report.
-        </p>
+      <div>
+        {earlyEndBanner}
+        <div style={{
+          background: '#0F172A', border: '1px solid #334155', borderRadius: 8,
+          padding: 20, textAlign: 'center',
+        }}>
+          <p style={{ color: '#64748B', fontSize: 13, margin: '0 0 8px' }}>
+            No interview data available.
+          </p>
+          <p style={{ color: '#475569', fontSize: 12, margin: 0 }}>
+            The interview may have ended too early to capture structured data. You can go back to step 2 and run the interview again, or proceed to the report.
+          </p>
+        </div>
       </div>
     )
   }
@@ -65,6 +99,7 @@ export default function IntakeReviewSection({ consult }: IntakeReviewSectionProp
   if (!structured) {
     return (
       <div>
+        {earlyEndBanner}
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#0D9488" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" />
@@ -105,6 +140,7 @@ export default function IntakeReviewSection({ consult }: IntakeReviewSectionProp
 
   return (
     <div>
+      {earlyEndBanner}
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#0D9488" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
           <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" />

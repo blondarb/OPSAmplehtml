@@ -178,6 +178,9 @@ export async function markHistorianStarted(consultId: string): Promise<boolean> 
 /**
  * Link a completed historian session to a consult.
  * Advances status to 'historian_complete'.
+ *
+ * `interviewCompletionStatus` distinguishes natural completion from early
+ * end so downstream consumers can treat partial intakes differently.
  */
 export async function linkHistorianToConsult(
   consultId: string,
@@ -186,6 +189,7 @@ export async function linkHistorianToConsult(
   structuredOutput: Record<string, unknown>,
   redFlags: Array<{ flag: string; severity: string; context: string }>,
   safetyEscalated: boolean,
+  interviewCompletionStatus: 'complete' | 'ended_early' | null = null,
 ): Promise<boolean> {
   const { error } = await from('neurology_consults')
     .update({
@@ -195,6 +199,7 @@ export async function linkHistorianToConsult(
       historian_red_flags: redFlags,
       historian_safety_escalated: safetyEscalated,
       historian_completed_at: new Date().toISOString(),
+      interview_completion_status: interviewCompletionStatus,
       status: 'historian_complete',
       updated_at: new Date().toISOString(),
     })

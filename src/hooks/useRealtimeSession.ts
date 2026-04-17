@@ -37,6 +37,12 @@ interface UseRealtimeSessionOptions {
     transcript: HistorianTranscriptEntry[]
     duration: number
     questionCount: number
+    /**
+     * True when the patient ended the interview before the AI naturally
+     * called save_interview_output. Consumers should flag the intake as
+     * partial in downstream UIs and reports.
+     */
+    endedEarly: boolean
   }) => void
   /** Called when the historian AI completes a scale administration via save_scale_responses tool */
   onScaleComplete?: (args: SaveScaleResponsesArgs) => void
@@ -56,7 +62,7 @@ interface UseRealtimeSessionResult {
   /** True while a localizer run is in flight. */
   localizerLoading: boolean
   startSession: () => Promise<void>
-  endSession: () => void
+  endSession: () => Promise<void>
   /**
    * Injects scale administration instructions into the live session by sending
    * a session.update event on the data channel, then triggering a new response.
@@ -573,15 +579,74 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
     }))
   }, [])
 
-  const endSession = useCallback(() => {
+  const endSession = useCallback(async () => {
     setStatus('ending')
 
     const finalDuration = Math.floor((Date.now() - startTimeRef.current) / 1000)
     setDuration(finalDuration)
 
+    // If the AI never called save_interview_output but the patient has had a
+    // real conversation, nudge it to save before we tear down the WebRTC
+    // connection. Without this, ending early (manual "End Interview" click)
+    // silently drops the entire intake — both the structured output and the
+    // narrative summary — and the review step shows "No interview data
+    // available" despite the patient answering questions.
+    const needsFlush =
+      !structuredOutputRef.current &&
+      transcriptRef.current.length >= 2 &&
+      dcRef.current?.readyState === 'open'
+
+    if (needsFlush) {
+      try {
+        dcRef.current!.send(JSON.stringify({
+          type: 'conversation.item.create',
+          item: {
+            type: 'message',
+            role: 'system',
+            content: [{
+              type: 'input_text',
+              text: 'The patient has ended the interview early. Immediately call the save_interview_output tool with whatever information has been gathered so far. Populate narrative_summary with a concise summary of the conversation. Do not ask any more questions and do not speak — just call the tool.',
+            }],
+          },
+        }))
+        dcRef.current!.send(JSON.stringify({
+          type: 'response.create',
+          response: { modalities: ['text'] },
+        }))
+
+        const deadline = Date.now() + 4000
+        while (!structuredOutputRef.current && Date.now() < deadline) {
+          await new Promise(r => setTimeout(r, 100))
+        }
+      } catch (err) {
+        console.warn('[useRealtimeSession] flush save prompt failed:', err)
+      }
+    }
+
+    // Last-resort fallback: if the AI still hasn't produced a narrative (tool
+    // didn't fire, channel dropped, model refused, etc.), preserve the raw
+    // transcript as the narrative summary so the physician can still see what
+    // the patient said.
+    if (!narrativeSummaryRef.current && transcriptRef.current.length > 0) {
+      const hasPatientSpeech = transcriptRef.current.some(
+        t => t.role === 'user' && t.text.trim().length > 0,
+      )
+      if (hasPatientSpeech) {
+        narrativeSummaryRef.current =
+          'Interview ended before AI generated a structured summary. Raw transcript:\n\n' +
+          transcriptRef.current
+            .map(t => `${t.role === 'assistant' ? 'AI' : 'Patient'}: ${t.text}`)
+            .join('\n\n')
+      }
+    }
+
     cleanup()
 
-    // Fire completion callback
+    // `interviewCompleted` flips to true only when the AI called
+    // save_interview_output. If it never fired, the patient ended before the
+    // AI judged the intake complete — flag it as partial.
+    const endedEarly = !interviewCompleted
+
     options.onComplete?.({
       structuredOutput: structuredOutputRef.current,
       narrativeSummary: narrativeSummaryRef.current,
@@ -590,10 +655,11 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
       transcript: transcriptRef.current,
       duration: finalDuration,
       questionCount: questionCountRef.current,
+      endedEarly,
     })
 
     setStatus('complete')
-  }, [cleanup, options])
+  }, [cleanup, options, interviewCompleted])
 
   // Clean up on unmount
   useEffect(() => {
