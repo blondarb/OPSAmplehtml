@@ -30,17 +30,20 @@ export default function FeatureSubHeader({
 }: FeatureSubHeaderProps) {
   return (
     <div
+      className="feature-sub-header"
       style={{
         background: accentColor,
         padding: '10px 24px',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'space-between',
+        gap: 8,
         minHeight: 48,
       }}
     >
       <Link
         href={homeLink}
+        className="fsh-link"
         style={{
           color: 'white',
           textDecoration: 'none',
@@ -50,15 +53,36 @@ export default function FeatureSubHeader({
           fontSize: 14,
           fontWeight: 500,
           opacity: 0.9,
+          flexShrink: 0,
         }}
       >
         <ChevronLeft size={16} />
-        Home
+        <span className="fsh-link-label">Home</span>
       </Link>
 
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+      <div
+        className="fsh-title"
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: 8,
+          minWidth: 0,
+          flex: '1 1 auto',
+          justifyContent: 'center',
+        }}
+      >
         <Icon size={18} color="white" />
-        <span style={{ color: 'white', fontWeight: 600, fontSize: 15 }}>
+        <span
+          style={{
+            color: 'white',
+            fontWeight: 600,
+            fontSize: 15,
+            whiteSpace: 'nowrap',
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            minWidth: 0,
+          }}
+        >
           {title}
         </span>
         {(showDemo || badgeText) && (
@@ -71,6 +95,7 @@ export default function FeatureSubHeader({
               padding: '2px 8px',
               borderRadius: 4,
               letterSpacing: 0.5,
+              flexShrink: 0,
             }}
           >
             {badgeText || 'Demo'}
@@ -81,6 +106,7 @@ export default function FeatureSubHeader({
       {nextStep ? (
         <Link
           href={nextStep.route}
+          className="fsh-link"
           style={{
             color: 'white',
             textDecoration: 'none',
@@ -90,14 +116,26 @@ export default function FeatureSubHeader({
             fontSize: 14,
             fontWeight: 500,
             opacity: 0.9,
+            flexShrink: 0,
           }}
         >
-          {nextStep.label}
+          <span className="fsh-link-label">{nextStep.label}</span>
           <ChevronRight size={16} />
         </Link>
       ) : (
-        <div style={{ width: 60 }} />
+        <div style={{ width: 32, flexShrink: 0 }} />
       )}
+
+      <style jsx>{`
+        @media (max-width: 640px) {
+          .feature-sub-header {
+            padding: 8px 10px !important;
+          }
+          :global(.fsh-link-label) {
+            display: none;
+          }
+        }
+      `}</style>
     </div>
   )
 }

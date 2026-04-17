@@ -61,11 +61,14 @@ export async function POST(request: Request) {
         input_audio_transcription: {
           model: 'whisper-1',
         },
+        // Tuned to reduce mid-sentence interruptions when users listen on
+        // speakerphone (AI voice bleeds back into the mic) and to prevent
+        // short pauses from being treated as end-of-turn.
         turn_detection: {
           type: 'server_vad',
-          threshold: 0.5,
-          prefix_padding_ms: 300,
-          silence_duration_ms: 700,
+          threshold: 0.65,
+          prefix_padding_ms: 400,
+          silence_duration_ms: 1200,
         },
         tools: [tool],
       }),

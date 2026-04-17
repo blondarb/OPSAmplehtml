@@ -2,6 +2,18 @@
 
 Full history of notable changes. For project overview and architecture, see [CLAUDE.md](../CLAUDE.md).
 
+## April 2026
+
+### Consult page feedback fixes (April 17, 2026)
+Resolved 5 action items from tester feedback session `18250867-ca49-460c-bd85-df91dbdb3f55` (all reported on `/consult`).
+
+- **Speaker phone audio cut-out (critical)**: AI voice was being cancelled when the user listened on speakerphone. Root cause was echo bleeding back into the mic and tripping server VAD into "user is speaking" interrupts. Raised `turn_detection.threshold` 0.5→0.65 and `silence_duration_ms` 700→1200 in `src/app/api/ai/historian/session/route.ts`. Added explicit `echoCancellation`/`noiseSuppression`/`autoGainControl` mic constraints and attached the remote `<audio>` element to the DOM (iOS Safari routing requirement) in `src/hooks/useRealtimeSession.ts`.
+- **TTS cuts off mid-sentence (major)**: Same VAD tuning above — shorter pauses no longer trigger false end-of-turn, and echo bleed no longer interrupts the AI.
+- **Mobile layout not optimized (major)**: Responsive padding on `/consult` container (24px → 12px <640px), compact `FeatureSubHeader` on mobile (hide "Home"/next-step labels <640px, title ellipsis, smaller padding), pipeline bar labels shrink <640px then hide <380px, actor side panel stacks below main <900px instead of crushing into a sidebar.
+- **Questions/text cut off on mobile (major)**: Added `overflow-wrap: anywhere` + `word-break: break-word` to `EmbeddedHistorian` streaming text and transcript entries; responsive padding on `HistorianStepPanel`.
+- **Auto-end chat session (minor)**: `useRealtimeSession` now exposes `interviewCompleted`, flipped when the AI calls `save_interview_output`. `EmbeddedHistorian` auto-calls `endSession()` 1.5s after the AI stops speaking post-completion, removing the need to press "End Interview".
+- **Verification**: `tsc --noEmit` clean, `next build` clean. Live speakerphone/mobile verification deferred to production (Cognito OAuth doesn't allow localhost callbacks).
+
 ## March 2026
 
 ### Wearable Narrative Enhancements (March 5, 2026)

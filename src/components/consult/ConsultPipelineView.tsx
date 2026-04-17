@@ -108,6 +108,7 @@ export default function ConsultPipelineView({ consultId, onConsultCreated }: Con
     <div style={{ maxWidth: showActorCard ? 1280 : 960, margin: '0 auto', transition: 'max-width 0.25s' }}>
       {/* Pipeline Progress Bar */}
       <div
+        className="consult-pipeline-bar"
         style={{
           display: 'flex',
           gap: 0,
@@ -128,6 +129,7 @@ export default function ConsultPipelineView({ consultId, onConsultCreated }: Con
               key={step.id}
               onClick={() => isClickable && setActiveStep(step.id)}
               disabled={!isClickable}
+              className="consult-pipeline-step"
               style={{
                 flex: 1,
                 padding: '14px 12px',
@@ -143,6 +145,7 @@ export default function ConsultPipelineView({ consultId, onConsultCreated }: Con
                 alignItems: 'center',
                 justifyContent: 'center',
                 gap: 8,
+                minWidth: 0,
                 transition: 'background 0.2s',
               }}
             >
@@ -151,6 +154,7 @@ export default function ConsultPipelineView({ consultId, onConsultCreated }: Con
                 style={{
                   width: 24,
                   height: 24,
+                  flexShrink: 0,
                   borderRadius: '50%',
                   display: 'flex',
                   alignItems: 'center',
@@ -168,10 +172,15 @@ export default function ConsultPipelineView({ consultId, onConsultCreated }: Con
                 {isDone ? '✓' : i + 1}
               </span>
               <span
+                className="consult-pipeline-step-label"
                 style={{
                   fontSize: 13,
                   fontWeight: isActive ? 700 : 500,
                   color: isActive ? '#0D9488' : isDone ? '#22C55E' : '#94A3B8',
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                  whiteSpace: 'nowrap',
+                  minWidth: 0,
                 }}
               >
                 {step.label}
@@ -180,6 +189,29 @@ export default function ConsultPipelineView({ consultId, onConsultCreated }: Con
           )
         })}
       </div>
+      <style jsx>{`
+        @media (max-width: 640px) {
+          :global(.consult-pipeline-step) {
+            padding: 10px 6px !important;
+            gap: 4px !important;
+          }
+          :global(.consult-pipeline-step-label) {
+            font-size: 11px !important;
+          }
+          /* Hide label on the smallest viewports; keep number circle only
+             for non-active steps so the active step remains readable. */
+        }
+        @media (max-width: 380px) {
+          :global(.consult-pipeline-step-label) {
+            display: none !important;
+          }
+        }
+        @media (max-width: 900px) {
+          :global(.consult-main-grid[data-has-actor="true"]) {
+            grid-template-columns: minmax(0, 1fr) !important;
+          }
+        }
+      `}</style>
 
       {/* Error display */}
       {error && (
@@ -213,6 +245,8 @@ export default function ConsultPipelineView({ consultId, onConsultCreated }: Con
 
       {/* Main + optional actor briefing side panel */}
       <div
+        className="consult-main-grid"
+        data-has-actor={showActorCard ? 'true' : 'false'}
         style={{
           display: 'grid',
           gridTemplateColumns: showActorCard ? 'minmax(0, 1fr) 340px' : 'minmax(0, 1fr)',

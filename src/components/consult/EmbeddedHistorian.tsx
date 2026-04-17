@@ -98,6 +98,7 @@ export default function EmbeddedHistorian({
     error,
     localizerData,
     localizerLoading,
+    interviewCompleted,
     startSession,
     endSession,
   } = useRealtimeSession({
@@ -127,10 +128,23 @@ export default function EmbeddedHistorian({
     await startSession()
   }
 
-  const handleEnd = () => {
+  const handleEnd = useCallback(() => {
     setPhase('ending')
     endSession()
-  }
+  }, [endSession])
+
+  // Auto-end the session once the AI Historian has signaled completion
+  // (via save_interview_output) and finished speaking its closing message.
+  // Small delay prevents clipping the tail of the final audio.
+  useEffect(() => {
+    if (!interviewCompleted) return
+    if (phase !== 'active') return
+    if (isAiSpeaking) return
+    const t = setTimeout(() => {
+      handleEnd()
+    }, 1500)
+    return () => clearTimeout(t)
+  }, [interviewCompleted, isAiSpeaking, phase, handleEnd])
 
   // ── Safety Escalation ──
   if (phase === 'safety_escalation') {
@@ -391,7 +405,14 @@ export default function EmbeddedHistorian({
           }}>
             {currentAssistantText ? 'AI Historian' : 'You'}
           </div>
-          <div style={{ color: '#e2e8f0', fontSize: '0.9rem', lineHeight: 1.5 }}>
+          <div style={{
+            color: '#e2e8f0',
+            fontSize: '0.9rem',
+            lineHeight: 1.5,
+            // Preserve long words / URLs on small screens.
+            overflowWrap: 'anywhere',
+            wordBreak: 'break-word',
+          }}>
             {currentAssistantText || currentUserText}
           </div>
         </div>
@@ -425,7 +446,13 @@ export default function EmbeddedHistorian({
               <div style={{ fontSize: '0.7rem', color: entry.role === 'assistant' ? '#5eead4' : '#c4b5fd', fontWeight: 600, marginBottom: 2 }}>
                 {entry.role === 'assistant' ? 'AI Historian' : 'Patient'} - {formatTime(entry.timestamp)}
               </div>
-              <div style={{ color: '#cbd5e1', fontSize: '0.85rem', lineHeight: 1.4 }}>{entry.text}</div>
+              <div style={{
+                color: '#cbd5e1',
+                fontSize: '0.85rem',
+                lineHeight: 1.4,
+                overflowWrap: 'anywhere',
+                wordBreak: 'break-word',
+              }}>{entry.text}</div>
             </div>
           ))}
           <div ref={transcriptEndRef} />
