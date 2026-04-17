@@ -59,6 +59,10 @@ export interface NeurologyConsult {
   historian_red_flags: Array<{ flag: string; severity: string; context: string }> | null
   historian_safety_escalated: boolean
   historian_completed_at: string | null
+  // 'complete' when AI fired save_interview_output naturally; 'ended_early'
+  // when the patient clicked End Interview before the AI finished. null for
+  // legacy rows or consults that never reached the historian step.
+  interview_completion_status: 'complete' | 'ended_early' | null
 
   // ── SDNE (Standardized Digital Neurologic Exam) phase ─────────────
   sdne_session_id: string | null

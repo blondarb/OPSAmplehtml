@@ -11,6 +11,12 @@ export async function POST(request: Request) {
     const tenant = body.tenant_id || getTenantServer()
 
 
+    const completionStatus: 'complete' | 'ended_early' | null =
+      body.interview_completion_status === 'complete' ||
+      body.interview_completion_status === 'ended_early'
+        ? body.interview_completion_status
+        : null
+
     const { data, error } = await from('historian_sessions')
       .insert({
         tenant_id: tenant,
@@ -26,6 +32,7 @@ export async function POST(request: Request) {
         duration_seconds: body.duration_seconds || 0,
         question_count: body.question_count || 0,
         status: body.status || 'completed',
+        interview_completion_status: completionStatus,
         reviewed: false,
         imported_to_note: false,
       })
@@ -48,6 +55,7 @@ export async function POST(request: Request) {
           body.structured_output || {},
           body.red_flags || [],
           body.safety_escalated || false,
+          completionStatus,
         )
       } catch (pipelineErr) {
         // Non-fatal — historian session is saved regardless

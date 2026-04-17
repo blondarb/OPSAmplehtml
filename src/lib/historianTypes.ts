@@ -63,6 +63,7 @@ export interface HistorianSession {
   reviewed: boolean
   imported_to_note: boolean
   session_source?: string
+  interview_completion_status?: 'complete' | 'ended_early' | null
   created_at: string
   updated_at: string
   // Joined patient data (from dashboardData query)

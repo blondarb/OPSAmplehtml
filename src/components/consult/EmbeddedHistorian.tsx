@@ -42,6 +42,7 @@ export default function EmbeddedHistorian({
     transcript: HistorianTranscriptEntry[]
     duration: number
     questionCount: number
+    endedEarly: boolean
   } | null>(null)
 
   const transcriptEndRef = useRef<HTMLDivElement>(null)
@@ -53,7 +54,7 @@ export default function EmbeddedHistorian({
     setPhase('saving')
 
     try {
-      await fetch('/api/ai/historian/save', {
+      const res = await fetch('/api/ai/historian/save', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -70,9 +71,14 @@ export default function EmbeddedHistorian({
           duration_seconds: data.duration,
           question_count: data.questionCount,
           status: 'completed',
+          interview_completion_status: data.endedEarly ? 'ended_early' : 'complete',
           consult_id: consultId,
         }),
       })
+      if (!res.ok) {
+        const body = await res.text().catch(() => '')
+        throw new Error(`Save failed (${res.status}): ${body.slice(0, 200)}`)
+      }
       setPhase('complete')
       onComplete()
     } catch (err) {
