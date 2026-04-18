@@ -34,6 +34,7 @@ export default function EmbeddedHistorian({
   const [phase, setPhase] = useState<Phase>('ready')
   const [showTranscript, setShowTranscript] = useState(false)
   const [showPhysicianPanel, setShowPhysicianPanel] = useState(false)
+  const [autoShownPhysicianPanel, setAutoShownPhysicianPanel] = useState(false)
   const [completionData, setCompletionData] = useState<{
     structuredOutput: HistorianStructuredOutput | null
     narrativeSummary: string | null
@@ -129,6 +130,21 @@ export default function EmbeddedHistorian({
   useEffect(() => {
     transcriptEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [transcript, currentAssistantText])
+
+  // Auto-open the physician differential panel the first time localizer
+  // results arrive, so mobile users (who otherwise might never find the
+  // "MD View" toggle in the timer-bar corner) can actually see the
+  // running differential during the interview. Only fires once — after
+  // that the user is in control of the toggle.
+  useEffect(() => {
+    if (autoShownPhysicianPanel) return
+    if (!localizerData) return
+    const hasContent =
+      localizerData.differential.length > 0 || !!localizerData.localizationHypothesis
+    if (!hasContent) return
+    setShowPhysicianPanel(true)
+    setAutoShownPhysicianPanel(true)
+  }, [localizerData, autoShownPhysicianPanel])
 
   const handleStart = async () => {
     await startSession()
@@ -324,10 +340,13 @@ export default function EmbeddedHistorian({
           {phase === 'ending' ? 'Ending...' : isAiSpeaking ? 'AI Speaking' : isUserSpeaking ? 'Listening' : 'Ready'}
         </span>
 
-        {/* MD View toggle */}
+        {/* Physician differential toggle */}
         <button
-          onClick={() => setShowPhysicianPanel(p => !p)}
-          title={showPhysicianPanel ? 'Hide physician view' : 'Show physician view'}
+          onClick={() => {
+            setShowPhysicianPanel(p => !p)
+            setAutoShownPhysicianPanel(true)
+          }}
+          title={showPhysicianPanel ? 'Hide physician differential' : 'Show physician differential'}
           style={{
             position: 'absolute', right: 0,
             padding: '5px 10px', borderRadius: 6,
@@ -342,7 +361,7 @@ export default function EmbeddedHistorian({
             <circle cx="12" cy="12" r="3" />
             <path d="M12 1v4M12 19v4M4.22 4.22l2.83 2.83M16.95 16.95l2.83 2.83M1 12h4M19 12h4M4.22 19.78l2.83-2.83M16.95 7.05l2.83-2.83" />
           </svg>
-          {showPhysicianPanel ? 'Hide' : 'MD View'}
+          {showPhysicianPanel ? 'Hide Dx' : 'Differential'}
           {localizerLoading && (
             <span style={{ width: 5, height: 5, borderRadius: '50%', background: '#0d9488', animation: 'embHistBlink 1s infinite', flexShrink: 0 }} />
           )}

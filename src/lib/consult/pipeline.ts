@@ -191,12 +191,18 @@ export async function linkHistorianToConsult(
   safetyEscalated: boolean,
   interviewCompletionStatus: 'complete' | 'ended_early' | null = null,
 ): Promise<boolean> {
+  // Pre-stringify jsonb fields. The shared query builder auto-stringifies
+  // plain objects but passes arrays through raw; historian_red_flags is a
+  // jsonb array, so without this the update fails and the consult never
+  // advances to 'historian_complete'.
+  const toJSON = (v: unknown) => (v != null ? JSON.stringify(v) : null)
+
   const { error } = await from('neurology_consults')
     .update({
       historian_session_id: historianSessionId,
       historian_summary: summary,
-      historian_structured_output: structuredOutput,
-      historian_red_flags: redFlags,
+      historian_structured_output: toJSON(structuredOutput),
+      historian_red_flags: toJSON(redFlags),
       historian_safety_escalated: safetyEscalated,
       historian_completed_at: new Date().toISOString(),
       interview_completion_status: interviewCompletionStatus,

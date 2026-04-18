@@ -17,6 +17,12 @@ export async function POST(request: Request) {
         ? body.interview_completion_status
         : null
 
+    // Pre-stringify jsonb array/object fields. The shared query builder
+    // auto-stringifies plain objects but passes arrays through raw (for
+    // text[] compat), which breaks jsonb inserts of transcript/red_flags
+    // — same root cause as the triage_sessions fix (2d1e445).
+    const toJSON = (v: unknown) => (v != null ? JSON.stringify(v) : null)
+
     const { data, error } = await from('historian_sessions')
       .insert({
         tenant_id: tenant,
@@ -24,10 +30,10 @@ export async function POST(request: Request) {
         session_type: body.session_type || 'new_patient',
         patient_name: body.patient_name || '',
         referral_reason: body.referral_reason || null,
-        structured_output: body.structured_output || null,
+        structured_output: toJSON(body.structured_output),
         narrative_summary: body.narrative_summary || null,
-        transcript: body.transcript || null,
-        red_flags: body.red_flags || null,
+        transcript: toJSON(body.transcript),
+        red_flags: toJSON(body.red_flags),
         safety_escalated: body.safety_escalated || false,
         duration_seconds: body.duration_seconds || 0,
         question_count: body.question_count || 0,

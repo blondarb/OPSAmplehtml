@@ -37,16 +37,20 @@ export default function LocalizerPanel({ data, isLoading }: LocalizerPanelProps)
   const isEmpty = hasData && data.differential.length === 0 && !data.localizationHypothesis
 
   return (
-    <div style={{
-      width: '340px',
-      flexShrink: 0,
-      background: 'rgba(15,23,42,0.8)',
-      border: '1px solid rgba(51,65,85,0.8)',
-      borderRadius: '12px',
-      overflow: 'hidden',
-      display: 'flex',
-      flexDirection: 'column',
-    }}>
+    <div
+      className="localizer-panel-root"
+      style={{
+        width: '100%',
+        maxWidth: '340px',
+        flexShrink: 0,
+        background: 'rgba(15,23,42,0.8)',
+        border: '1px solid rgba(51,65,85,0.8)',
+        borderRadius: '12px',
+        overflow: 'hidden',
+        display: 'flex',
+        flexDirection: 'column',
+      }}
+    >
       {/* Header */}
       <div style={{
         display: 'flex',
