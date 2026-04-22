@@ -16,14 +16,31 @@ function getOrigin(request: NextRequest): string {
     : new URL(request.url).origin
 }
 
+function redirectWithError(
+  origin: string,
+  error: string,
+  description?: string | null,
+) {
+  const params = new URLSearchParams({ error })
+  if (description) params.set('error_description', description)
+  return NextResponse.redirect(new URL(`/login?${params}`, origin))
+}
+
 export async function GET(request: NextRequest) {
   const code = request.nextUrl.searchParams.get('code')
   const state = request.nextUrl.searchParams.get('state')
+  const cognitoError = request.nextUrl.searchParams.get('error')
+  const cognitoErrorDescription = request.nextUrl.searchParams.get('error_description')
 
   const origin = getOrigin(request)
 
+  if (cognitoError) {
+    console.error('Cognito returned error on callback:', cognitoError, cognitoErrorDescription)
+    return redirectWithError(origin, cognitoError, cognitoErrorDescription)
+  }
+
   if (!code) {
-    return NextResponse.redirect(new URL('/login?error=no_code', origin))
+    return redirectWithError(origin, 'no_code')
   }
 
   let returnTo = '/'
@@ -54,7 +71,14 @@ export async function GET(request: NextRequest) {
   if (!tokenRes.ok) {
     const errBody = await tokenRes.text()
     console.error('Cognito token exchange failed:', tokenRes.status, errBody)
-    return NextResponse.redirect(new URL('/login?error=token_exchange', origin))
+    let description: string | null = null
+    try {
+      const parsed = JSON.parse(errBody)
+      description = parsed.error_description || parsed.error || null
+    } catch {
+      description = errBody ? errBody.slice(0, 200) : null
+    }
+    return redirectWithError(origin, 'token_exchange', description)
   }
 
   const tokens = await tokenRes.json()

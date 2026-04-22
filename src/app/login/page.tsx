@@ -11,6 +11,14 @@ function LoginContent() {
   const returnTo = rawRedirect && rawRedirect.startsWith('/') && !rawRedirect.startsWith('//') ? rawRedirect : undefined
 
   const error = searchParams.get('error')
+  const errorDescription = searchParams.get('error_description')
+
+  const errorHeadline =
+    error === 'no_code' ? 'Authorization failed.'
+    : error === 'token_exchange' ? 'Authentication failed.'
+    : error === 'access_denied' ? 'Sign-in was cancelled.'
+    : error ? 'Sign-in error.'
+    : null
 
   return (
     <div className="min-h-[calc(100vh-64px)] flex items-center justify-center px-4" style={{ background: '#F8FAFC' }}>
@@ -26,11 +34,13 @@ function LoginContent() {
             <p className="mt-1 text-sm text-slate-500">Sign in to your account to continue</p>
           </div>
 
-          {error && (
+          {errorHeadline && (
             <div className="mb-4 p-3 rounded-lg text-sm bg-red-50 border border-red-200 text-red-700">
-              {error === 'no_code' && 'Authorization failed. Please try again.'}
-              {error === 'token_exchange' && 'Authentication failed. Please try again.'}
-              {!['no_code', 'token_exchange'].includes(error) && 'An error occurred. Please try again.'}
+              <p className="font-medium">{errorHeadline}</p>
+              {errorDescription && <p className="mt-1 text-red-600">{errorDescription}</p>}
+              <p className="mt-2 text-xs text-red-600">
+                If this keeps happening, contact your Sevaro administrator for access.
+              </p>
             </div>
           )}
 
