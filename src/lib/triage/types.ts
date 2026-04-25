@@ -116,6 +116,17 @@ export interface AITriageResponse {
   redirect_to_non_neuro?: boolean
   redirect_specialty?: string
   redirect_rationale?: string
+  // Safety-critical history extraction. Each field is verbatim from the
+  // referral when stated, or null when not mentioned. The AI does NOT
+  // fabricate values — missing-but-clinically-critical items are flagged
+  // via missing_information with a "SAFETY: " prefix instead.
+  safety_anticoagulation?: string | null
+  safety_symptom_onset_time?: string | null
+  safety_allergies?: string | null
+  safety_implanted_devices?: string | null
+  safety_pregnancy_status?: string | null
+  safety_recent_procedures?: string | null
+  safety_renal_function?: string | null
 }
 
 // Full result after app-side scoring
