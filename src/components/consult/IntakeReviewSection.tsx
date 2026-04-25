@@ -1,11 +1,17 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import type { NeurologyConsult } from '@/lib/consult/types'
 import type { HistorianStructuredOutput } from '@/lib/historianTypes'
 
 interface IntakeReviewSectionProps {
   consult: NeurologyConsult | null
+  /**
+   * Called whenever the physician adds, edits, or clears a correction note
+   * on any section. Receives the full corrections map keyed by section id.
+   * The parent panel persists these on "Confirm & Continue".
+   */
+  onCorrectionsChange?: (corrections: Record<string, string>) => void
 }
 
 /** Sections to display from the historian structured output */
@@ -37,9 +43,14 @@ const SECTIONS: Array<{ key: keyof HistorianStructuredOutput; label: string }> =
   { key: 'side_effects', label: 'Side Effects' },
 ]
 
-export default function IntakeReviewSection({ consult }: IntakeReviewSectionProps) {
+export default function IntakeReviewSection({ consult, onCorrectionsChange }: IntakeReviewSectionProps) {
   const [corrections, setCorrections] = useState<Record<string, string>>({})
   const [expandedCorrection, setExpandedCorrection] = useState<string | null>(null)
+
+  // Push the latest corrections up so the parent can persist them on Continue.
+  useEffect(() => {
+    onCorrectionsChange?.(corrections)
+  }, [corrections, onCorrectionsChange])
 
   const structured = consult?.historian_structured_output as HistorianStructuredOutput | null | undefined
   const narrativeSummary = consult?.historian_summary

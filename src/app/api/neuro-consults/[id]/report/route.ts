@@ -11,7 +11,11 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getPool } from '@/lib/db'
 import { getConsult } from '@/lib/consult/pipeline'
-import { buildConsultReport } from '@/lib/consult/report'
+import {
+  buildConsultReport,
+  generateAssessmentAndPlan,
+  appendAssessmentAndPlan,
+} from '@/lib/consult/report'
 
 export async function POST(
   _req: NextRequest,
@@ -62,8 +66,8 @@ export async function POST(
       }
     }
 
-    // 4. Build the report
-    const report = buildConsultReport({
+    // 4. Build the report (pure assembly)
+    const baseReport = buildConsultReport({
       consult,
       scaleResults: scalesResult.rows.map((r: Record<string, unknown>) => ({
         scale_id: r.scale_id as string,
@@ -90,6 +94,20 @@ export async function POST(
         confidence: r.confidence as number,
       })),
     })
+
+    // 4b. Generate Assessment + Plan via Bedrock (AI synthesis).
+    //     Non-fatal: if generation fails (timeout, KB outage, parse error)
+    //     we still persist the structured report so the physician has the
+    //     data dump to work from.
+    let report = baseReport
+    try {
+      const ap = await generateAssessmentAndPlan(baseReport, { timeoutMs: 30000 })
+      if (ap.assessment.trim()) {
+        report = appendAssessmentAndPlan(baseReport, ap)
+      }
+    } catch (err) {
+      console.warn('[report] Assessment/Plan generation failed; persisting report without them:', err)
+    }
 
     // 5. Persist the report
     const { rows } = await pool.query(

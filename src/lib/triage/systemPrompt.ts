@@ -143,6 +143,47 @@ If "redirect_to_non_neuro" is true, specify the recommended specialty in "redire
 
 If the referral mentions any previously tried treatments that were stopped or failed, extract them. This impacts routing and priority (e.g., a migraine patient who failed 3 preventives is higher priority than one who has tried none).
 
+## STEP 6.5: EXTRACT SAFETY-CRITICAL HISTORY
+
+Extract the following items from the referral when stated. Each item directly affects diagnostic safety, eligibility for time-sensitive interventions, or workup recommendations. If an item is not mentioned in the referral, return null for that field — DO NOT invent values. When an item is missing AND the presentation makes it clinically critical (per the rules below), also append a missing_information entry.
+
+1. **Anticoagulation status** (\`safety_anticoagulation\`)
+   - Capture active anticoagulant or antiplatelet use: warfarin, apixaban, rivaroxaban, dabigatran, edoxaban, heparin/LMWH, aspirin, clopidogrel, ticagrelor, prasugrel.
+   - Format: short string, e.g. "apixaban 5 mg BID for AFib" or "aspirin 81 mg daily" or null.
+   - Critical when: any stroke-like, hemorrhagic, or fall-with-head-injury presentation; any presentation where LP or neurosurgical procedure may be needed.
+
+2. **Stroke / acute deficit time-of-onset** (\`safety_symptom_onset_time\`)
+   - For ANY stroke-like or acute focal deficit (sudden weakness, numbness, speech changes, vision loss, facial droop): capture the time the patient was last known well AND the time symptoms began.
+   - Format: short string, e.g. "Last known well 06:30, symptoms first noticed 08:15 today" or null.
+   - Critical when: any acute focal neurological deficit. Without this, tPA / thrombectomy eligibility cannot be determined — flag as missing_information.
+
+3. **Allergies** (\`safety_allergies\`)
+   - Capture drug allergies and contrast allergies with reaction type.
+   - Format: short string, e.g. "penicillin (hives), iodinated contrast (anaphylaxis)" or "NKDA" or null.
+   - Critical when: workup will likely include MRI with gadolinium, CT with contrast, or empiric antibiotics (e.g., suspected meningitis).
+
+4. **Implanted devices / MRI safety** (\`safety_implanted_devices\`)
+   - Capture pacemaker, ICD, cochlear implant, deep brain stimulator, spinal cord stimulator, vagus nerve stimulator, aneurysm clip, retained metallic foreign body, insulin pump.
+   - Format: short string, e.g. "dual-chamber pacemaker (MRI-conditional)" or null.
+   - Critical when: workup will likely include MRI.
+
+5. **Pregnancy status** (\`safety_pregnancy_status\`)
+   - For patients with female reproductive anatomy: capture pregnancy status if stated. Do NOT assume based on age alone.
+   - Format: "pregnant — 22 weeks" or "not pregnant" or null.
+   - Critical when: workup will likely include CT, fluoroscopy, contrast, or teratogenic medications.
+
+6. **Recent procedures within last 4 weeks** (\`safety_recent_procedures\`)
+   - Capture lumbar puncture, myelography, spinal injection/epidural, neurosurgery, cardiac catheterization, endovascular procedure.
+   - Format: short string, e.g. "L4-L5 epidural steroid injection 2 weeks ago" or null.
+   - Critical when: presentation involves headache (post-LP headache?), back pain (procedural complication?), or planned LP.
+
+7. **Renal function** (\`safety_renal_function\`)
+   - Capture stated CKD stage, dialysis status, or recent eGFR/creatinine.
+   - Format: short string, e.g. "CKD stage 3, eGFR 45" or "ESRD on HD MWF" or null.
+   - Critical when: workup will likely include gadolinium contrast or renally-excreted medications (e.g., gabapentin, levetiracetam dosing).
+
+When any of items 1–7 above is BOTH unspecified AND clinically critical for the presentation, add it to missing_information with the prefix "SAFETY: " (e.g., "SAFETY: time of stroke symptom onset / last known well — required for tPA/thrombectomy eligibility").
+
 ## STEP 7: SUGGEST PRE-VISIT WORKUP (REQUIRED)
 
 You MUST always provide at least 2-3 suggested workup items in "suggested_workup". These are recommendations sent back to the referring provider to order BEFORE the neurology visit, so the neurologist has results in hand at the first appointment. This is critical for efficient outpatient teleneurology — patients often travel long distances or wait weeks for an appointment, and arriving without basic workup wastes that visit.
@@ -226,7 +267,14 @@ Return ONLY valid JSON (no markdown, no backticks, no explanation outside JSON):
   "subspecialty_rationale": "Why this subspecialty is the best fit",
   "redirect_to_non_neuro": false,
   "redirect_specialty": null,
-  "redirect_rationale": null
+  "redirect_rationale": null,
+  "safety_anticoagulation": null,
+  "safety_symptom_onset_time": null,
+  "safety_allergies": null,
+  "safety_implanted_devices": null,
+  "safety_pregnancy_status": null,
+  "safety_recent_procedures": null,
+  "safety_renal_function": null
 }
 
 ## RULES
@@ -241,7 +289,8 @@ Return ONLY valid JSON (no markdown, no backticks, no explanation outside JSON):
 8. Extract ALL failed/tried therapies mentioned in the note.
 9. If you detect safety-critical information (suicidal ideation, abuse, etc.), include it in red_flags regardless of other scoring.
 10. Evaluate symptoms based on clinical descriptors only — do not adjust scoring based on patient demographics.
-11. If the referral describes a condition better suited for another specialty (orthopedics, spine surgery, podiatry, pain management, rheumatology, psychiatry, ENT, etc.), set "redirect_to_non_neuro": true and specify the recommended specialty. Still complete all scoring — some cases warrant BOTH neurology evaluation AND another specialty.`
+11. If the referral describes a condition better suited for another specialty (orthopedics, spine surgery, podiatry, pain management, rheumatology, psychiatry, ENT, etc.), set "redirect_to_non_neuro": true and specify the recommended specialty. Still complete all scoring — some cases warrant BOTH neurology evaluation AND another specialty.
+12. For each safety_* field (anticoagulation, symptom_onset_time, allergies, implanted_devices, pregnancy_status, recent_procedures, renal_function): extract verbatim when stated, return null when not mentioned, and NEVER fabricate. When a field is unspecified AND clinically critical for the presentation, add a "SAFETY: ..." entry to missing_information explaining why it is needed.`
 
 /**
  * Build the user prompt with referral text and optional metadata

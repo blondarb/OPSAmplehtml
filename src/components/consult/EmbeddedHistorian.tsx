@@ -3,6 +3,8 @@
 import { useState, useCallback, useRef, useEffect } from 'react'
 import { useRealtimeSession } from '@/hooks/useRealtimeSession'
 import type { HistorianStructuredOutput, HistorianRedFlag, HistorianTranscriptEntry, HistorianSessionType } from '@/lib/historianTypes'
+import type { LocalizerResponse } from '@/lib/consult/localizer-types'
+import type { SaveScaleResponsesArgs, LocalizerSnapshot, TriggeredScale } from '@/lib/consult/scales'
 import { getTenantClient } from '@/lib/tenant'
 import LocalizerPanel from '@/components/LocalizerPanel'
 
@@ -49,6 +51,13 @@ export default function EmbeddedHistorian({
   const transcriptEndRef = useRef<HTMLDivElement>(null)
   const tenant = getTenantClient()
 
+  // Scales that have been injected into the live session (by us, not the AI's choice).
+  // Used to deduplicate trigger evaluations so we never re-inject the same scale
+  // mid-administration. Completed scales are tracked separately in the hook.
+  const injectedScaleIdsRef = useRef<Set<string>>(new Set())
+  const scaleAdminInProgressRef = useRef<boolean>(false)
+  const [activeScale, setActiveScale] = useState<{ id: string; abbreviation: string } | null>(null)
+
   const handleSessionComplete = useCallback(async (data: typeof completionData) => {
     if (!data) return
     setCompletionData(data)
@@ -94,6 +103,83 @@ export default function EmbeddedHistorian({
     setPhase('safety_escalation')
   }, [])
 
+  // Forward declaration so `onLocalizerUpdate` (which lives in the hook
+  // options) can reach `injectScaleAdministration` (which lives on the hook
+  // result). The ref is populated in an effect once the hook returns.
+  const injectScaleAdministrationRef = useRef<((block: string) => void) | null>(null)
+
+  const buildSnapshotFromLocalizer = useCallback((data: LocalizerResponse): LocalizerSnapshot => {
+    const diagnoses = data.differential.map((d) => d.diagnosis)
+    const symptomSummary = [
+      data.localizationHypothesis,
+      data.contextHint,
+      diagnoses.join(' '),
+      referralReason ?? '',
+    ].filter(Boolean).join(' ')
+    return {
+      differentialCategories: diagnoses,
+      symptomSummary,
+      completedScaleIds: Array.from(injectedScaleIdsRef.current),
+    }
+  }, [referralReason])
+
+  const handleLocalizerUpdate = useCallback(async (data: LocalizerResponse) => {
+    // Don't queue another scale while one is in progress
+    if (scaleAdminInProgressRef.current) return
+    if (data.differential.length === 0) return
+
+    try {
+      const snapshot = buildSnapshotFromLocalizer(data)
+      const triggerRes = await fetch('/api/ai/historian/scales?action=trigger', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ snapshot, mode: 'broad' }),
+      })
+      if (!triggerRes.ok) return
+      const triggerJson: { enabled: boolean; voiceAdministrable: TriggeredScale[] } = await triggerRes.json()
+      if (!triggerJson.enabled) return
+
+      const next = triggerJson.voiceAdministrable.find(
+        (s) => !injectedScaleIdsRef.current.has(s.scaleId),
+      )
+      if (!next) return
+
+      const adminRes = await fetch('/api/ai/historian/scales?action=administer', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ scale_id: next.scaleId }),
+      })
+      if (!adminRes.ok) return
+      const adminJson: { instruction_block: string; scale_abbreviation: string } = await adminRes.json()
+
+      injectedScaleIdsRef.current.add(next.scaleId)
+      scaleAdminInProgressRef.current = true
+      setActiveScale({ id: next.scaleId, abbreviation: next.scaleAbbreviation })
+      injectScaleAdministrationRef.current?.(adminJson.instruction_block)
+    } catch (err) {
+      console.warn('[EmbeddedHistorian] Scale trigger evaluation failed (session continues):', err)
+    }
+  }, [buildSnapshotFromLocalizer])
+
+  const handleScaleComplete = useCallback(async (args: SaveScaleResponsesArgs) => {
+    scaleAdminInProgressRef.current = false
+    setActiveScale(null)
+    try {
+      await fetch('/api/ai/historian/scales?action=submit', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          scale_id: args.scale_id,
+          responses: args.responses,
+          consult_id: consultId,
+          admin_mode: 'voice_administrable',
+        }),
+      })
+    } catch (err) {
+      console.warn('[EmbeddedHistorian] Scale submit failed (continuing):', err)
+    }
+  }, [consultId])
+
   const {
     status,
     transcript,
@@ -108,6 +194,7 @@ export default function EmbeddedHistorian({
     interviewCompleted,
     startSession,
     endSession,
+    injectScaleAdministration,
   } = useRealtimeSession({
     sessionType,
     referralReason,
@@ -116,7 +203,15 @@ export default function EmbeddedHistorian({
     enableLocalizer: true,
     onComplete: handleSessionComplete,
     onSafetyEscalation: handleSafetyEscalation,
+    onLocalizerUpdate: handleLocalizerUpdate,
+    onScaleComplete: handleScaleComplete,
   })
+
+  // Wire the hook's injection function into the ref so onLocalizerUpdate
+  // (defined before the hook returns) can call it.
+  useEffect(() => {
+    injectScaleAdministrationRef.current = injectScaleAdministration
+  }, [injectScaleAdministration])
 
   // Sync hook status to phase
   useEffect(() => {
@@ -339,6 +434,20 @@ export default function EmbeddedHistorian({
         <span style={{ color: '#94a3b8', fontSize: '0.8rem' }}>
           {phase === 'ending' ? 'Ending...' : isAiSpeaking ? 'AI Speaking' : isUserSpeaking ? 'Listening' : 'Ready'}
         </span>
+        {activeScale && (
+          <span
+            title={`Administering ${activeScale.abbreviation}`}
+            style={{
+              padding: '2px 8px', borderRadius: 4,
+              background: 'rgba(99,102,241,0.15)',
+              border: '1px solid rgba(99,102,241,0.4)',
+              color: '#a5b4fc',
+              fontSize: '0.65rem', fontWeight: 600, letterSpacing: '0.04em',
+            }}
+          >
+            {activeScale.abbreviation}
+          </span>
+        )}
 
         {/* Physician differential toggle */}
         <button

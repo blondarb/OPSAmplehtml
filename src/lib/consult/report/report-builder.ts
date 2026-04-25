@@ -292,6 +292,18 @@ export function buildConsultReport(input: ReportBuilderInput): ConsultReport {
     )
   }
 
+  // ── Physician Corrections (from review step) ────────────────────────────
+  if (consult.notes && consult.notes.trim().length > 0) {
+    sections.push(
+      section(
+        'physician_corrections',
+        'Physician Corrections & Notes',
+        consult.notes.trim(),
+        'physician',
+      ),
+    )
+  }
+
   // ── Historian Red Flags (from historian session) ────────────────────────
   if (consult.historian_red_flags && consult.historian_red_flags.length > 0) {
     const lines = consult.historian_red_flags.map(

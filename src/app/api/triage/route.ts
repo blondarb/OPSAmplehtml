@@ -255,6 +255,13 @@ export async function POST(request: Request) {
       redirect_to_non_neuro: aiResponse.redirect_to_non_neuro || false,
       redirect_specialty: aiResponse.redirect_specialty || null,
       redirect_rationale: aiResponse.redirect_rationale || null,
+      safety_anticoagulation: aiResponse.safety_anticoagulation ?? null,
+      safety_symptom_onset_time: aiResponse.safety_symptom_onset_time ?? null,
+      safety_allergies: aiResponse.safety_allergies ?? null,
+      safety_implanted_devices: aiResponse.safety_implanted_devices ?? null,
+      safety_pregnancy_status: aiResponse.safety_pregnancy_status ?? null,
+      safety_recent_procedures: aiResponse.safety_recent_procedures ?? null,
+      safety_renal_function: aiResponse.safety_renal_function ?? null,
       disclaimer: DISCLAIMER_TEXT,
       // Phase 1 pipeline — present if create_consult or consult_id was provided
       consult_id: consultId,
