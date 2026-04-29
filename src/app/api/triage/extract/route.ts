@@ -1,26 +1,24 @@
 import { NextResponse } from 'next/server'
-import { invokeBedrockJSON } from '@/lib/bedrock'
-import { getUser } from '@/lib/cognito/server'
+import { invokeBedrockJSONStreaming } from '@/lib/bedrock'
 import { parseUploadedFile } from '@/lib/triage/fileParser'
 import { EXTRACTION_SYSTEM_PROMPT, buildExtractionUserPrompt } from '@/lib/triage/extractionPrompt'
 import { FILE_CONSTRAINTS } from '@/lib/triage/types'
 import type { ClinicalExtraction, ExtractionKeyFindings } from '@/lib/triage/types'
 
-
-export const maxDuration = 60
+// Streaming response avoids the ~28s Amplify Hosting Compute / CloudFront
+// gateway timeout. Long PDFs with maxTokens 4096 frequently exceed it.
+export const maxDuration = 120
 
 export async function POST(request: Request) {
+  const contentType = request.headers.get('content-type') || ''
+
+  let text: string
+  let sourceFilename: string | undefined
+  let patientAge: number | undefined
+  let patientSex: string | undefined
+
   try {
-    // Determine input type from Content-Type header
-    const contentType = request.headers.get('content-type') || ''
-
-    let text: string
-    let sourceFilename: string | undefined
-    let patientAge: number | undefined
-    let patientSex: string | undefined
-
     if (contentType.includes('multipart/form-data')) {
-      // File upload
       const formData = await request.formData()
       const file = formData.get('file') as File | null
       if (!file) {
@@ -30,13 +28,11 @@ export async function POST(request: Request) {
       text = parsed.text
       sourceFilename = parsed.filename
 
-      // Optional metadata from form fields
       const ageField = formData.get('patient_age')
       if (ageField) patientAge = Number(ageField)
       const sexField = formData.get('patient_sex')
       if (sexField) patientSex = String(sexField)
     } else {
-      // JSON body
       const body = await request.json()
       text = body.text
       patientAge = body.patient_age
@@ -45,87 +41,112 @@ export async function POST(request: Request) {
       if (!text || typeof text !== 'string') {
         return NextResponse.json({ error: 'text is required' }, { status: 400 })
       }
-
       if (text.length > FILE_CONSTRAINTS.MAX_TEXT_LENGTH) {
         text = text.substring(0, FILE_CONSTRAINTS.MAX_TEXT_LENGTH)
       }
     }
-
-    if (text.trim().length < 50) {
-      return NextResponse.json(
-        { error: 'Text must be at least 50 characters for meaningful extraction.' },
-        { status: 400 }
-      )
+  } catch (parseErr) {
+    if (parseErr instanceof Error && parseErr.name === 'FileParseError') {
+      return NextResponse.json({ error: parseErr.message }, { status: 400 })
     }
-
-    const userPrompt = buildExtractionUserPrompt(text, {
-      patientAge,
-      patientSex,
-      sourceFilename,
-    })
-
-    // Call Bedrock with 45-second timeout (Amplify SSR compute limit is 60s)
-    const controller = new AbortController()
-    const timeout = setTimeout(() => controller.abort(), 45000)
-
-    let aiResponse: {
-      note_type_detected: string
-      extraction_confidence: string
-      extracted_summary: string
-      key_findings: ExtractionKeyFindings
-    }
-    try {
-      const result = await invokeBedrockJSON<typeof aiResponse>({
-        system: EXTRACTION_SYSTEM_PROMPT,
-        messages: [{ role: 'user', content: userPrompt }],
-        maxTokens: 4096,
-        temperature: 0.2,
-        signal: controller.signal,
-      })
-      aiResponse = result.parsed
-    } catch (parseErr) {
-      if (parseErr instanceof Error && parseErr.name === 'AbortError') {
-        return NextResponse.json(
-          { error: 'Extraction is taking longer than expected. Please try again.' },
-          { status: 504 }
-        )
-      }
-      console.error('Failed to parse extraction response:', parseErr)
-      return NextResponse.json(
-        { error: 'The extraction system returned an invalid response. Please try again.' },
-        { status: 500 }
-      )
-    } finally {
-      clearTimeout(timeout)
-    }
-
-    const extraction: ClinicalExtraction = {
-      extraction_id: crypto.randomUUID(),
-      note_type_detected: aiResponse.note_type_detected as ClinicalExtraction['note_type_detected'],
-      extraction_confidence: aiResponse.extraction_confidence as ClinicalExtraction['extraction_confidence'],
-      extracted_summary: aiResponse.extracted_summary,
-      key_findings: aiResponse.key_findings,
-      original_text_length: text.length,
-      source_filename: sourceFilename,
-    }
-
-    return NextResponse.json(extraction)
-  } catch (error: unknown) {
-    console.error('Extraction API Error:', error)
-
-    if (error instanceof Error && error.name === 'AbortError') {
-      return NextResponse.json(
-        { error: 'Extraction is taking longer than expected. Please try again.' },
-        { status: 504 }
-      )
-    }
-
-    // Handle file parse errors specifically
-    if (error instanceof Error && error.name === 'FileParseError') {
-      return NextResponse.json({ error: error.message }, { status: 400 })
-    }
-
-    const message = error instanceof Error ? error.message : 'An error occurred during extraction'
-    return NextResponse.json({ error: message }, { status: 500 })
+    const message = parseErr instanceof Error ? parseErr.message : 'Failed to parse request'
+    return NextResponse.json({ error: message }, { status: 400 })
   }
+
+  if (text.trim().length < 50) {
+    return NextResponse.json(
+      { error: 'Text must be at least 50 characters for meaningful extraction.' },
+      { status: 400 },
+    )
+  }
+
+  const userPrompt = buildExtractionUserPrompt(text, {
+    patientAge,
+    patientSex,
+    sourceFilename,
+  })
+  const originalTextLength = text.length
+
+  const stream = new ReadableStream<Uint8Array>({
+    async start(controller) {
+      const encoder = new TextEncoder()
+      let closed = false
+
+      const sendEvent = (event: string, data: unknown) => {
+        if (closed) return
+        controller.enqueue(encoder.encode(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`))
+      }
+      const sendComment = (msg: string) => {
+        if (closed) return
+        controller.enqueue(encoder.encode(`: ${msg}\n\n`))
+      }
+
+      const heartbeat = setInterval(() => sendComment(`hb ${Date.now()}`), 5000)
+
+      const bedrockAbort = new AbortController()
+      const onClientAbort = () => bedrockAbort.abort()
+      request.signal.addEventListener('abort', onClientAbort)
+
+      try {
+        sendEvent('progress', { stage: 'started' })
+
+        const result = await invokeBedrockJSONStreaming<{
+          note_type_detected: string
+          extraction_confidence: string
+          extracted_summary: string
+          key_findings: ExtractionKeyFindings
+        }>({
+          system: EXTRACTION_SYSTEM_PROMPT,
+          messages: [{ role: 'user', content: userPrompt }],
+          maxTokens: 4096,
+          temperature: 0.2,
+          signal: bedrockAbort.signal,
+        })
+        const aiResponse = result.parsed
+
+        const extraction: ClinicalExtraction = {
+          extraction_id: crypto.randomUUID(),
+          note_type_detected: aiResponse.note_type_detected as ClinicalExtraction['note_type_detected'],
+          extraction_confidence: aiResponse.extraction_confidence as ClinicalExtraction['extraction_confidence'],
+          extracted_summary: aiResponse.extracted_summary,
+          key_findings: aiResponse.key_findings,
+          original_text_length: originalTextLength,
+          source_filename: sourceFilename,
+        }
+
+        sendEvent('result', extraction)
+      } catch (error: unknown) {
+        console.error('Extraction API Error:', error)
+
+        let message = 'An error occurred during extraction'
+        if (error instanceof Error) {
+          if (error.name === 'AbortError') {
+            message = 'Extraction was cancelled.'
+          } else {
+            message = error.message
+          }
+        }
+        sendEvent('error', { error: message })
+      } finally {
+        clearInterval(heartbeat)
+        request.signal.removeEventListener('abort', onClientAbort)
+        closed = true
+        try {
+          controller.close()
+        } catch {
+          /* already closed */
+        }
+      }
+    },
+  })
+
+  return new Response(stream, {
+    status: 200,
+    headers: {
+      'Content-Type': 'text/event-stream; charset=utf-8',
+      'Cache-Control': 'no-cache, no-transform',
+      Connection: 'keep-alive',
+      'X-Accel-Buffering': 'no',
+    },
+  })
 }
