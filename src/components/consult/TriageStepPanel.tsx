@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import type { NeurologyConsult } from '@/lib/consult/types'
 import type { SamplePersona } from '@/lib/consult/samplePersonas'
+import { streamPostJSON } from '@/lib/triage/streamClient'
 import SamplePatientSelector from './SamplePatientSelector'
 
 interface TriageStepPanelProps {
@@ -89,22 +90,17 @@ export default function TriageStepPanel({
     onError('')
 
     try {
-      // Step 1: Run triage
-      const triageRes = await fetch('/api/triage', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ referral_text: referralText }),
-      })
-
-      if (!triageRes.ok) {
-        const err = await triageRes.json().catch(() => ({}))
-        const msg = err.error || 'Triage failed'
-        throw new Error(triageRes.status === 400
-          ? msg
-          : `Triage error: ${msg}. Please check the referral text and try again.`)
-      }
-
-      const triageData = await triageRes.json()
+      // Step 1: Run triage (streaming SSE — see streamClient.ts)
+      const triageData = await streamPostJSON<{
+        session_id?: string
+        clinical_reasons?: string[]
+        suggested_workup?: string[]
+        subspecialty_rationale?: string
+        subspecialty_recommendation?: string
+        red_flags?: string[]
+        triage_tier?: string
+        triage_tier_display?: string
+      }>('/api/triage', { referral_text: referralText })
 
       // Step 2: Create consult with triage results
       // Build a clinical summary from the triage response fields

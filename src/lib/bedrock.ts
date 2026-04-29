@@ -13,6 +13,7 @@
 import {
   BedrockRuntimeClient,
   InvokeModelCommand,
+  InvokeModelWithResponseStreamCommand,
 } from '@aws-sdk/client-bedrock-runtime'
 import {
   BedrockAgentRuntimeClient,
@@ -238,6 +239,115 @@ export async function invokeBedrockJSON<T = Record<string, unknown>>(
     throw new Error(
       `Invalid JSON in AI response: ${cleaned.slice(0, 200)}...`
     )
+  }
+}
+
+// ── Streaming invoke for long-running calls behind a 28s gateway ─────
+//
+// Amplify Hosting Compute caps buffered responses at ~28s (CloudFront
+// read timeout). For Bedrock calls that can exceed that — triage,
+// extraction — we stream the model response. Bytes start flowing
+// within a second, so the gateway never times out, and we can
+// optionally surface progress via the onChunk callback.
+//
+// The JSON parse + repair logic mirrors invokeBedrockJSON.
+
+export async function invokeBedrockJSONStreaming<T = Record<string, unknown>>(
+  opts: Omit<BedrockInvokeOptions, 'jsonMode'> & { onChunk?: (textSoFar: string) => void }
+): Promise<{ parsed: T; raw: string; stopReason: string; inputTokens?: number; outputTokens?: number }> {
+  const client = getClient()
+
+  const systemPrompt =
+    opts.system + '\n\nRespond with ONLY valid JSON. Do not wrap in markdown code blocks.'
+
+  const body = JSON.stringify({
+    anthropic_version: 'bedrock-2023-05-31',
+    max_tokens: opts.maxTokens ?? 2000,
+    system: systemPrompt,
+    messages: opts.messages,
+    temperature: opts.temperature ?? 0.2,
+  })
+
+  const command = new InvokeModelWithResponseStreamCommand({
+    modelId: opts.model || BEDROCK_MODEL,
+    contentType: 'application/json',
+    accept: 'application/json',
+    body: new TextEncoder().encode(body),
+  })
+
+  const response = await client.send(command, { abortSignal: opts.signal })
+  if (!response.body) throw new Error('Bedrock streaming response had no body')
+
+  let text = ''
+  let stopReason = 'unknown'
+  let inputTokens: number | undefined
+  let outputTokens: number | undefined
+  const decoder = new TextDecoder()
+
+  for await (const event of response.body) {
+    if (opts.signal?.aborted) {
+      throw Object.assign(new Error('Aborted'), { name: 'AbortError' })
+    }
+    if (!event.chunk?.bytes) continue
+
+    const decoded = JSON.parse(decoder.decode(event.chunk.bytes)) as {
+      type?: string
+      delta?: { type?: string; text?: string; stop_reason?: string }
+      message?: { usage?: { input_tokens?: number } }
+      usage?: { output_tokens?: number }
+    }
+
+    switch (decoded.type) {
+      case 'message_start':
+        if (decoded.message?.usage?.input_tokens !== undefined) {
+          inputTokens = decoded.message.usage.input_tokens
+        }
+        break
+      case 'content_block_delta':
+        if (decoded.delta?.type === 'text_delta' && decoded.delta.text) {
+          text += decoded.delta.text
+          opts.onChunk?.(text)
+        }
+        break
+      case 'message_delta':
+        if (decoded.delta?.stop_reason) stopReason = decoded.delta.stop_reason
+        if (decoded.usage?.output_tokens !== undefined) {
+          outputTokens = decoded.usage.output_tokens
+        }
+        break
+    }
+  }
+
+  // Strip markdown fences if the model wraps despite instructions
+  let cleaned = text.trim()
+  if (cleaned.startsWith('```json')) cleaned = cleaned.slice(7)
+  else if (cleaned.startsWith('```')) cleaned = cleaned.slice(3)
+  if (cleaned.endsWith('```')) cleaned = cleaned.slice(0, -3)
+  cleaned = cleaned.trim()
+
+  const tokenInfo = { inputTokens, outputTokens }
+
+  try {
+    const parsed = JSON.parse(cleaned) as T
+    return { parsed, raw: text, stopReason, ...tokenInfo }
+  } catch {
+    if (stopReason === 'max_tokens') {
+      console.warn(
+        `[bedrock] Streaming response truncated (max_tokens). Attempting JSON repair. ` +
+        `Output tokens: ${outputTokens}, max requested: ${opts.maxTokens ?? 2000}`
+      )
+      const repaired = repairTruncatedJSON(cleaned)
+      try {
+        const parsed = JSON.parse(repaired) as T
+        return { parsed, raw: text, stopReason, ...tokenInfo }
+      } catch {
+        throw new Error(
+          `AI response was truncated at ${opts.maxTokens ?? 2000} tokens and could not be repaired. ` +
+          `Try again with a shorter document.`
+        )
+      }
+    }
+    throw new Error(`Invalid JSON in AI response: ${cleaned.slice(0, 200)}...`)
   }
 }
 
