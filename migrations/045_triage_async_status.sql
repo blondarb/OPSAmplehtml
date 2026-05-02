@@ -14,11 +14,14 @@
 -- pre-step (which previously was not persisted at all).
 
 -- ── triage_sessions ─────────────────────────────────────────────────
--- Existing rows are all completed, synchronous results — default to 'complete'
--- so they remain queryable. New POSTs explicitly insert 'pending'.
+-- The pre-existing `status` column drives the physician-override workflow
+-- (values like 'pending_review'). We keep it untouched and add a
+-- distinct `processing_status` column for the async pipeline state.
+-- Existing rows are completed, synchronous results — default to 'complete'
+-- so reads keep working. New POSTs explicitly insert 'pending'.
 
 ALTER TABLE triage_sessions
-  ADD COLUMN IF NOT EXISTS status text NOT NULL DEFAULT 'complete',
+  ADD COLUMN IF NOT EXISTS processing_status text NOT NULL DEFAULT 'complete',
   ADD COLUMN IF NOT EXISTS error_message text,
   ADD COLUMN IF NOT EXISTS completed_at timestamptz,
   -- Derived results that the original POST returned but didn't persist:
@@ -28,17 +31,17 @@ ALTER TABLE triage_sessions
 -- Backfill completed_at for existing rows (use created_at as best estimate).
 UPDATE triage_sessions
    SET completed_at = created_at
- WHERE status = 'complete' AND completed_at IS NULL;
+ WHERE processing_status = 'complete' AND completed_at IS NULL;
 
 ALTER TABLE triage_sessions
-  DROP CONSTRAINT IF EXISTS triage_sessions_status_check;
+  DROP CONSTRAINT IF EXISTS triage_sessions_processing_status_check;
 ALTER TABLE triage_sessions
-  ADD CONSTRAINT triage_sessions_status_check
-    CHECK (status IN ('pending', 'complete', 'error'));
+  ADD CONSTRAINT triage_sessions_processing_status_check
+    CHECK (processing_status IN ('pending', 'complete', 'error'));
 
-CREATE INDEX IF NOT EXISTS idx_triage_sessions_status
-  ON triage_sessions (status)
-  WHERE status = 'pending';
+CREATE INDEX IF NOT EXISTS idx_triage_sessions_processing_status
+  ON triage_sessions (processing_status)
+  WHERE processing_status = 'pending';
 
 
 -- ── triage_extractions ──────────────────────────────────────────────

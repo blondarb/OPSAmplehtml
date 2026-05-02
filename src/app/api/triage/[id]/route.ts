@@ -38,16 +38,19 @@ export async function GET(
     )
   }
 
-  const status = (data.status as string | undefined) ?? 'complete'
+  // Note: triage_sessions has a pre-existing `status` column for the
+  // physician-override workflow ('pending_review' etc). The async pipeline
+  // uses a distinct `processing_status` column.
+  const processingStatus = (data.processing_status as string | undefined) ?? 'complete'
 
-  if (status === 'pending') {
+  if (processingStatus === 'pending') {
     return NextResponse.json({
       session_id: id,
       status: 'pending',
     })
   }
 
-  if (status === 'error') {
+  if (processingStatus === 'error') {
     return NextResponse.json({
       session_id: id,
       status: 'error',

@@ -91,7 +91,7 @@ export async function POST(request: Request) {
       batch_id: batch_id ?? null,
       fusion_group_id: fusion_group_id ?? null,
       ai_model_used: TRIAGE_MODEL,
-      status: 'pending',
+      processing_status: 'pending',
     })
     .select('id')
     .single()
@@ -178,7 +178,7 @@ async function processTriageInBackground(
         ai_raw_response: toJSON(aiResponse),
         ai_input_tokens: result.inputTokens ?? null,
         ai_output_tokens: result.outputTokens ?? null,
-        status: 'complete',
+        processing_status: 'complete',
         completed_at: new Date(),
       })
       .eq('id', sessionId)
@@ -295,7 +295,7 @@ async function markError(sessionId: string, message: string): Promise<void> {
   try {
     await from('triage_sessions')
       .update({
-        status: 'error',
+        processing_status: 'error',
         error_message: message,
         completed_at: new Date(),
       })
