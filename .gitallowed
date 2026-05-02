@@ -5,6 +5,8 @@ resolution:.*integrity:.*sha512-
 "integrity": "sha512-
 # Source file paths containing 40+ char strings
 src/components/neuroscribe/
+src/components/triage/
+@/components/triage/
 # Documentation URLs and references
 docs.aws.amazon.com
 docs/plans/

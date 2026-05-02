@@ -1,26 +1,26 @@
 import { NextResponse } from 'next/server'
-import { invokeBedrockJSON } from '@/lib/bedrock'
-import { getUser } from '@/lib/cognito/server'
+import { invokeBedrockJSON, BEDROCK_MODEL } from '@/lib/bedrock'
 import { parseUploadedFile } from '@/lib/triage/fileParser'
 import { EXTRACTION_SYSTEM_PROMPT, buildExtractionUserPrompt } from '@/lib/triage/extractionPrompt'
 import { FILE_CONSTRAINTS } from '@/lib/triage/types'
-import type { ClinicalExtraction, ExtractionKeyFindings } from '@/lib/triage/types'
+import type { ExtractionKeyFindings } from '@/lib/triage/types'
+import { from } from '@/lib/db-query'
+import { runInBackground } from '@/lib/triage/asyncRunner'
 
+const EXTRACTION_MODEL = process.env.BEDROCK_EXTRACTION_MODEL || BEDROCK_MODEL
 
-export const maxDuration = 60
+export const maxDuration = 120
 
 export async function POST(request: Request) {
+  const contentType = request.headers.get('content-type') || ''
+
+  let text: string
+  let sourceFilename: string | null = null
+  let patientAge: number | null = null
+  let patientSex: string | null = null
+
   try {
-    // Determine input type from Content-Type header
-    const contentType = request.headers.get('content-type') || ''
-
-    let text: string
-    let sourceFilename: string | undefined
-    let patientAge: number | undefined
-    let patientSex: string | undefined
-
     if (contentType.includes('multipart/form-data')) {
-      // File upload
       const formData = await request.formData()
       const file = formData.get('file') as File | null
       if (!file) {
@@ -28,104 +28,147 @@ export async function POST(request: Request) {
       }
       const parsed = await parseUploadedFile(file)
       text = parsed.text
-      sourceFilename = parsed.filename
+      sourceFilename = parsed.filename ?? null
 
-      // Optional metadata from form fields
       const ageField = formData.get('patient_age')
       if (ageField) patientAge = Number(ageField)
       const sexField = formData.get('patient_sex')
       if (sexField) patientSex = String(sexField)
     } else {
-      // JSON body
       const body = await request.json()
       text = body.text
-      patientAge = body.patient_age
-      patientSex = body.patient_sex
+      patientAge = body.patient_age ?? null
+      patientSex = body.patient_sex ?? null
 
       if (!text || typeof text !== 'string') {
         return NextResponse.json({ error: 'text is required' }, { status: 400 })
       }
-
       if (text.length > FILE_CONSTRAINTS.MAX_TEXT_LENGTH) {
         text = text.substring(0, FILE_CONSTRAINTS.MAX_TEXT_LENGTH)
       }
     }
-
-    if (text.trim().length < 50) {
-      return NextResponse.json(
-        { error: 'Text must be at least 50 characters for meaningful extraction.' },
-        { status: 400 }
-      )
+  } catch (parseErr) {
+    if (parseErr instanceof Error && parseErr.name === 'FileParseError') {
+      return NextResponse.json({ error: parseErr.message }, { status: 400 })
     }
+    const message = parseErr instanceof Error ? parseErr.message : 'Failed to parse request'
+    return NextResponse.json({ error: message }, { status: 400 })
+  }
 
-    const userPrompt = buildExtractionUserPrompt(text, {
-      patientAge,
-      patientSex,
-      sourceFilename,
+  if (text.trim().length < 50) {
+    return NextResponse.json(
+      { error: 'Text must be at least 50 characters for meaningful extraction.' },
+      { status: 400 },
+    )
+  }
+
+  const originalTextLength = text.length
+
+  // Insert pending extraction row.
+  const { data: inserted, error: insertError } = await from('triage_extractions')
+    .insert({
+      text_input: text,
+      source_filename: sourceFilename,
+      patient_age: patientAge,
+      patient_sex: patientSex,
+      original_text_length: originalTextLength,
+      ai_model_used: EXTRACTION_MODEL,
+      status: 'pending',
     })
+    .select('id')
+    .single()
 
-    // Call Bedrock with 45-second timeout (Amplify SSR compute limit is 60s)
-    const controller = new AbortController()
-    const timeout = setTimeout(() => controller.abort(), 45000)
+  if (insertError || !inserted?.id) {
+    console.error('Extract init insert failed:', insertError)
+    return NextResponse.json(
+      { error: 'Could not start extraction. Please try again.' },
+      { status: 500 },
+    )
+  }
 
-    let aiResponse: {
+  const extractionId = inserted.id as string
+
+  runInBackground(() =>
+    processExtractionInBackground(extractionId, text, {
+      patientAge: patientAge ?? undefined,
+      patientSex: patientSex ?? undefined,
+      sourceFilename: sourceFilename ?? undefined,
+    }),
+  )
+
+  return NextResponse.json(
+    { extraction_id: extractionId, status: 'pending' },
+    { status: 202 },
+  )
+}
+
+async function processExtractionInBackground(
+  extractionId: string,
+  text: string,
+  meta: { patientAge?: number; patientSex?: string; sourceFilename?: string },
+): Promise<void> {
+  try {
+    const userPrompt = buildExtractionUserPrompt(text, meta)
+
+    const result = await invokeBedrockJSON<{
       note_type_detected: string
       extraction_confidence: string
       extracted_summary: string
       key_findings: ExtractionKeyFindings
-    }
-    try {
-      const result = await invokeBedrockJSON<typeof aiResponse>({
-        system: EXTRACTION_SYSTEM_PROMPT,
-        messages: [{ role: 'user', content: userPrompt }],
-        maxTokens: 4096,
-        temperature: 0.2,
-        signal: controller.signal,
+    }>({
+      system: EXTRACTION_SYSTEM_PROMPT,
+      messages: [{ role: 'user', content: userPrompt }],
+      maxTokens: 4096,
+      temperature: 0.2,
+      model: EXTRACTION_MODEL,
+    })
+
+    const aiResponse = result.parsed
+    const toJSON = (v: unknown) => (v != null ? JSON.stringify(v) : null)
+
+    await from('triage_extractions')
+      .update({
+        note_type_detected: aiResponse.note_type_detected,
+        extraction_confidence: aiResponse.extraction_confidence,
+        extracted_summary: aiResponse.extracted_summary,
+        key_findings: toJSON(aiResponse.key_findings),
+        ai_input_tokens: result.inputTokens ?? null,
+        ai_output_tokens: result.outputTokens ?? null,
+        status: 'complete',
+        completed_at: new Date(),
       })
-      aiResponse = result.parsed
-    } catch (parseErr) {
-      if (parseErr instanceof Error && parseErr.name === 'AbortError') {
-        return NextResponse.json(
-          { error: 'Extraction is taking longer than expected. Please try again.' },
-          { status: 504 }
-        )
-      }
-      console.error('Failed to parse extraction response:', parseErr)
-      return NextResponse.json(
-        { error: 'The extraction system returned an invalid response. Please try again.' },
-        { status: 500 }
-      )
-    } finally {
-      clearTimeout(timeout)
-    }
-
-    const extraction: ClinicalExtraction = {
-      extraction_id: crypto.randomUUID(),
-      note_type_detected: aiResponse.note_type_detected as ClinicalExtraction['note_type_detected'],
-      extraction_confidence: aiResponse.extraction_confidence as ClinicalExtraction['extraction_confidence'],
-      extracted_summary: aiResponse.extracted_summary,
-      key_findings: aiResponse.key_findings,
-      original_text_length: text.length,
-      source_filename: sourceFilename,
-    }
-
-    return NextResponse.json(extraction)
+      .eq('id', extractionId)
   } catch (error: unknown) {
-    console.error('Extraction API Error:', error)
-
-    if (error instanceof Error && error.name === 'AbortError') {
-      return NextResponse.json(
-        { error: 'Extraction is taking longer than expected. Please try again.' },
-        { status: 504 }
-      )
+    console.error('Background extraction failed:', error)
+    let message = 'Extraction failed'
+    if (error instanceof Error) {
+      const raw = error.message
+      if (
+        raw.includes('credential') ||
+        raw.includes('Could not load') ||
+        raw.includes('AWS') ||
+        raw.includes('Bedrock')
+      ) {
+        message =
+          'The extraction service is temporarily unavailable. Please try again shortly.'
+      } else {
+        message = raw
+      }
     }
+    await markError(extractionId, message)
+  }
+}
 
-    // Handle file parse errors specifically
-    if (error instanceof Error && error.name === 'FileParseError') {
-      return NextResponse.json({ error: error.message }, { status: 400 })
-    }
-
-    const message = error instanceof Error ? error.message : 'An error occurred during extraction'
-    return NextResponse.json({ error: message }, { status: 500 })
+async function markError(extractionId: string, message: string): Promise<void> {
+  try {
+    await from('triage_extractions')
+      .update({
+        status: 'error',
+        error_message: message,
+        completed_at: new Date(),
+      })
+      .eq('id', extractionId)
+  } catch (e) {
+    console.error('Failed to mark triage_extractions row as error:', e)
   }
 }
