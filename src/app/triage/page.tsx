@@ -2,7 +2,6 @@
 
 import { useState, useRef } from 'react'
 import { TriageResult, ClinicalExtraction, TriagePageState, FILE_CONSTRAINTS, BatchItem } from '@/lib/triage/types'
-import { streamPostJSON, streamPostFormData } from '@/lib/triage/streamClient'
 import PlatformShell from '@/components/layout/PlatformShell'
 import FeatureSubHeader from '@/components/layout/FeatureSubHeader'
 import { Brain, ClipboardCheck } from 'lucide-react'
@@ -58,11 +57,19 @@ export default function TriagePage() {
     abortControllerRef.current = controller
 
     try {
-      const data = await streamPostJSON<TriageResult>(
-        '/api/triage',
-        { referral_text: referralText, ...metadata },
-        controller.signal,
-      )
+      const res = await fetch('/api/triage', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ referral_text: referralText, ...metadata }),
+        signal: controller.signal,
+      })
+
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}))
+        throw new Error(data.error || 'The triage system is temporarily unavailable. Please triage this patient manually and contact support.')
+      }
+
+      const data: TriageResult = await res.json()
       setResult(data)
       setPageState('result')
     } catch (err: unknown) {
@@ -84,15 +91,23 @@ export default function TriagePage() {
     abortControllerRef.current = controller
 
     try {
-      const extractionResult = await streamPostJSON<ClinicalExtraction>(
-        '/api/triage/extract',
-        {
+      const res = await fetch('/api/triage/extract', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
           text,
           patient_age: metadata?.patient_age,
           patient_sex: metadata?.patient_sex,
-        },
-        controller.signal,
-      )
+        }),
+        signal: controller.signal,
+      })
+
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}))
+        throw new Error(data.error || 'Extraction failed. Please try again.')
+      }
+
+      const extractionResult: ClinicalExtraction = await res.json()
       setExtraction(extractionResult)
       setPageState('review')
     } catch (err: unknown) {
@@ -138,29 +153,44 @@ export default function TriagePage() {
         const formData = new FormData()
         formData.append('file', file)
 
-        const extraction = await streamPostFormData<ClinicalExtraction>(
-          '/api/triage/extract',
-          formData,
-          controller.signal,
-        )
+        const extractRes = await fetch('/api/triage/extract', {
+          method: 'POST',
+          body: formData,
+          signal: controller.signal,
+        })
+
+        if (!extractRes.ok) {
+          const data = await extractRes.json().catch(() => ({}))
+          throw new Error(data.error || 'Extraction failed')
+        }
+
+        const extraction: ClinicalExtraction = await extractRes.json()
 
         setBatchItems(prev => prev.map(b =>
           b.id === item.id ? { ...b, status: 'triaging', extraction } : b
         ))
 
         // --- Stage 2: Triage the extracted summary ---
-        const triageResult = await streamPostJSON<TriageResult>(
-          '/api/triage',
-          {
+        const triageRes = await fetch('/api/triage', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
             referral_text: extraction.extracted_summary,
             extracted_summary: extraction.extracted_summary,
             source_type: file.name.toLowerCase().endsWith('.docx') ? 'docx' : file.name.toLowerCase().endsWith('.txt') ? 'txt' : 'pdf',
             source_filename: file.name,
             extraction_confidence: extraction.extraction_confidence,
             note_type_detected: extraction.note_type_detected,
-          },
-          controller.signal,
-        )
+          }),
+          signal: controller.signal,
+        })
+
+        if (!triageRes.ok) {
+          const data = await triageRes.json().catch(() => ({}))
+          throw new Error(data.error || 'Triage failed')
+        }
+
+        const triageResult: TriageResult = await triageRes.json()
 
         setBatchItems(prev => prev.map(b =>
           b.id === item.id ? { ...b, status: 'completed', triageResult } : b
@@ -183,18 +213,26 @@ export default function TriagePage() {
     abortControllerRef.current = controller
 
     try {
-      const data = await streamPostJSON<TriageResult>(
-        '/api/triage',
-        {
+      const res = await fetch('/api/triage', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
           referral_text: editedSummary,
           extracted_summary: editedSummary,
           source_type: inputMode === 'upload' ? (extraction?.source_filename?.toLowerCase().endsWith('.docx') ? 'docx' : extraction?.source_filename?.toLowerCase().endsWith('.txt') ? 'txt' : 'pdf') : 'paste',
           source_filename: extraction?.source_filename,
           extraction_confidence: extraction?.extraction_confidence,
           note_type_detected: extraction?.note_type_detected,
-        },
-        controller.signal,
-      )
+        }),
+        signal: controller.signal,
+      })
+
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}))
+        throw new Error(data.error || 'The triage system is temporarily unavailable. Please triage this patient manually and contact support.')
+      }
+
+      const data: TriageResult = await res.json()
       setResult(data)
       setPageState('result')
     } catch (err: unknown) {
