@@ -2,171 +2,193 @@ import { NextResponse } from 'next/server'
 import { invokeBedrockJSON, BEDROCK_MODEL } from '@/lib/bedrock'
 import { calculateTriageTier, validateAIResponse } from '@/lib/triage/scoring'
 import { TRIAGE_SYSTEM_PROMPT, buildTriageUserPrompt } from '@/lib/triage/systemPrompt'
-import { AITriageResponse, DISCLAIMER_TEXT } from '@/lib/triage/types'
+import { AITriageResponse } from '@/lib/triage/types'
 import { from } from '@/lib/db-query'
 import { createConsult, linkTriageToConsult } from '@/lib/consult/pipeline'
 import { deriveChiefComplaint, buildTriageSummaryForConsult } from '@/lib/consult/contextBuilder'
 import { notifyTriageUrgent } from '@/lib/notifications'
 import { autoScheduleFromTriage } from '@/lib/triage/autoSchedule'
+import { runInBackground } from '@/lib/triage/asyncRunner'
 
 const TRIAGE_MODEL = process.env.BEDROCK_TRIAGE_MODEL || BEDROCK_MODEL
 
+// Lambda must stay alive for Bedrock + DB writes after the 202 is sent.
+// 120s gives plenty of headroom for the typical 25-40s total work.
+export const maxDuration = 120
 
-export const maxDuration = 60
+interface TriageBackgroundParams {
+  textForScoring: string
+  patient_age?: number
+  patient_sex?: string
+  referring_provider_type?: string
+  patient_id?: string
+  referral_text: string
+  temperature: number
+  createConsultFlag: boolean
+  existingConsultId?: string
+}
 
 export async function POST(request: Request) {
+  let body: Record<string, unknown>
   try {
-    const body = await request.json()
-    const {
-      referral_text, patient_age, patient_sex, referring_provider_type, patient_id,
-      // Phase 2 optional fields
-      extracted_summary, source_type, source_filename, extraction_confidence,
-      note_type_detected, batch_id, fusion_group_id,
-      // Validation: optional temperature override (default 0.2)
-      temperature: requestedTemp,
-      // Phase 1 pipeline fields
-      // create_consult: true  → auto-create a neurology_consults row after triage
-      // consult_id: string    → link this triage result to an existing consult
-      create_consult: createConsultFlag,
-      consult_id: existingConsultId,
-    } = body
+    body = await request.json()
+  } catch {
+    return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 })
+  }
 
-    // Clamp temperature to [0, 1] range — default 0 for maximum consistency
-    const temperature = typeof requestedTemp === 'number'
-      ? Math.max(0, Math.min(1, requestedTemp))
-      : 0
+  const referral_text = body.referral_text as string | undefined
+  const patient_age = body.patient_age as number | undefined
+  const patient_sex = body.patient_sex as string | undefined
+  const referring_provider_type = body.referring_provider_type as string | undefined
+  const patient_id = body.patient_id as string | undefined
+  const extracted_summary = body.extracted_summary as string | undefined
+  const source_type = body.source_type as string | undefined
+  const source_filename = body.source_filename as string | undefined
+  const extraction_confidence = body.extraction_confidence as string | undefined
+  const note_type_detected = body.note_type_detected as string | undefined
+  const batch_id = body.batch_id as string | undefined
+  const fusion_group_id = body.fusion_group_id as string | undefined
+  const requestedTemp = body.temperature as number | undefined
+  const createConsultFlag = (body.create_consult as boolean | undefined) ?? false
+  const existingConsultId = body.consult_id as string | undefined
 
-    // Validate input
-    if (!referral_text || typeof referral_text !== 'string') {
-      return NextResponse.json(
-        { error: 'referral_text is required' },
-        { status: 400 }
-      )
-    }
+  // Synchronous input validation — return 400 JSON for client errors.
+  if (!referral_text || typeof referral_text !== 'string') {
+    return NextResponse.json({ error: 'referral_text is required' }, { status: 400 })
+  }
+  if (referral_text.trim().length < 50) {
+    return NextResponse.json(
+      { error: 'Referral text must be at least 50 characters for meaningful triage.' },
+      { status: 400 },
+    )
+  }
+  if (referral_text.length > 50000) {
+    return NextResponse.json(
+      {
+        error:
+          'Referral text exceeds the maximum length of 50,000 characters. Please shorten the text or use the extraction pipeline for long documents.',
+      },
+      { status: 400 },
+    )
+  }
 
-    if (referral_text.trim().length < 50) {
-      return NextResponse.json(
-        { error: 'Referral text must be at least 50 characters for meaningful triage.' },
-        { status: 400 }
-      )
-    }
+  const temperature =
+    typeof requestedTemp === 'number' ? Math.max(0, Math.min(1, requestedTemp)) : 0
 
-    // Cap input length to prevent excessive token usage
-    if (referral_text.length > 50000) {
-      return NextResponse.json(
-        { error: 'Referral text exceeds the maximum length of 50,000 characters. Please shorten the text or use the extraction pipeline for long documents.' },
-        { status: 400 }
-      )
-    }
+  // Insert pending session row. The id is the polling handle.
+  const { data: inserted, error: insertError } = await from('triage_sessions')
+    .insert({
+      referral_text,
+      patient_age: patient_age ?? null,
+      patient_sex: patient_sex ?? null,
+      referring_provider_type: referring_provider_type ?? null,
+      patient_id: patient_id ?? null,
+      source_type: source_type ?? 'paste',
+      source_filename: source_filename ?? null,
+      extracted_summary: extracted_summary ?? null,
+      extraction_confidence: extraction_confidence ?? null,
+      note_type_detected: note_type_detected ?? null,
+      batch_id: batch_id ?? null,
+      fusion_group_id: fusion_group_id ?? null,
+      ai_model_used: TRIAGE_MODEL,
+      processing_status: 'pending',
+    })
+    .select('id')
+    .single()
 
-    // Use extracted summary for scoring if provided (Phase 2 two-stage pipeline)
-    const textForScoring = extracted_summary || referral_text
+  if (insertError || !inserted?.id) {
+    console.error('Triage init insert failed:', insertError)
+    return NextResponse.json(
+      { error: 'Could not start triage. Please try again.' },
+      { status: 500 },
+    )
+  }
 
-    // Build prompt
-    const userPrompt = buildTriageUserPrompt(textForScoring, {
-      patientAge: patient_age,
-      patientSex: patient_sex,
-      referringProviderType: referring_provider_type,
+  const sessionId = inserted.id as string
+
+  // Fire-and-forget. Lambda keeps running until this resolves (or hits maxDuration).
+  runInBackground(() =>
+    processTriageInBackground(sessionId, {
+      referral_text,
+      textForScoring: extracted_summary || referral_text,
+      patient_age,
+      patient_sex,
+      referring_provider_type,
+      patient_id,
+      temperature,
+      createConsultFlag,
+      existingConsultId,
+    }),
+  )
+
+  return NextResponse.json(
+    { session_id: sessionId, status: 'pending' },
+    { status: 202 },
+  )
+}
+
+async function processTriageInBackground(
+  sessionId: string,
+  params: TriageBackgroundParams,
+): Promise<void> {
+  try {
+    const userPrompt = buildTriageUserPrompt(params.textForScoring, {
+      patientAge: params.patient_age,
+      patientSex: params.patient_sex,
+      referringProviderType: params.referring_provider_type,
     })
 
-    // Call Bedrock with 45-second timeout (Amplify SSR compute limit is 60s)
-    const controller = new AbortController()
-    const timeout = setTimeout(() => controller.abort(), 45000)
+    const result = await invokeBedrockJSON({
+      system: TRIAGE_SYSTEM_PROMPT,
+      messages: [{ role: 'user', content: userPrompt }],
+      maxTokens: 3000,
+      temperature: params.temperature,
+      model: TRIAGE_MODEL,
+    })
 
-    let parsed: Record<string, unknown>
-    let inputTokens: number | undefined
-    let outputTokens: number | undefined
-    try {
-      const result = await invokeBedrockJSON({
-        system: TRIAGE_SYSTEM_PROMPT,
-        messages: [{ role: 'user', content: userPrompt }],
-        maxTokens: 3000,
-        temperature,
-        signal: controller.signal,
-        model: TRIAGE_MODEL,
-      })
-      parsed = result.parsed as Record<string, unknown>
-      inputTokens = result.inputTokens
-      outputTokens = result.outputTokens
-    } finally {
-      clearTimeout(timeout)
-    }
-
-    // Validate structure before trusting the cast
-    const validationError = validateAIResponse(parsed)
+    const validationError = validateAIResponse(result.parsed as Record<string, unknown>)
     if (validationError) {
-      console.error('AI response validation failed:', validationError, parsed)
-      return NextResponse.json(
-        { error: 'The triage system returned an unexpected response format. Please try again.' },
-        { status: 500 }
+      console.error('AI response validation failed:', validationError, result.parsed)
+      await markError(
+        sessionId,
+        'The triage system returned an unexpected response format. Please try again.',
       )
+      return
     }
 
-    const aiResponse = parsed as unknown as AITriageResponse
-
-    // Deterministic scoring — application code calculates tier
+    const aiResponse = result.parsed as unknown as AITriageResponse
     const scoring = calculateTriageTier(aiResponse)
+    const toJSON = (v: unknown) => (v != null ? JSON.stringify(v) : null)
 
-    // Store in RDS
-    let sessionId = crypto.randomUUID()
-    try {
-      // Stringify jsonb array/object fields — the query builder passes raw
-      // arrays through for text[] compat, but triage_sessions uses jsonb.
-      const toJSON = (v: unknown) => v != null ? JSON.stringify(v) : null
+    // Write the AI result + scoring before kicking off downstream pipeline steps,
+    // so the client can poll and read a complete row even if pipeline steps fail.
+    await from('triage_sessions')
+      .update({
+        triage_tier: scoring.tier,
+        confidence: aiResponse.confidence,
+        dimension_scores: toJSON(aiResponse.dimension_scores),
+        weighted_score: scoring.weightedScore,
+        clinical_reasons: toJSON(aiResponse.clinical_reasons),
+        red_flags: toJSON(aiResponse.red_flags),
+        suggested_workup: toJSON(aiResponse.suggested_workup),
+        failed_therapies: toJSON(aiResponse.failed_therapies),
+        missing_information: toJSON(aiResponse.missing_information),
+        subspecialty_recommendation: aiResponse.subspecialty_recommendation,
+        subspecialty_rationale: aiResponse.subspecialty_rationale,
+        ai_raw_response: toJSON(aiResponse),
+        ai_input_tokens: result.inputTokens ?? null,
+        ai_output_tokens: result.outputTokens ?? null,
+        processing_status: 'complete',
+        completed_at: new Date(),
+      })
+      .eq('id', sessionId)
 
-      const { data: inserted, error: insertError } = await from('triage_sessions')
-        .insert({
-          referral_text,
-          patient_age: patient_age || null,
-          patient_sex: patient_sex || null,
-          referring_provider_type: referring_provider_type || null,
-          triage_tier: scoring.tier,
-          confidence: aiResponse.confidence,
-          dimension_scores: toJSON(aiResponse.dimension_scores),
-          weighted_score: scoring.weightedScore,
-          clinical_reasons: toJSON(aiResponse.clinical_reasons),
-          red_flags: toJSON(aiResponse.red_flags),
-          suggested_workup: toJSON(aiResponse.suggested_workup),
-          failed_therapies: toJSON(aiResponse.failed_therapies),
-          missing_information: toJSON(aiResponse.missing_information),
-          subspecialty_recommendation: aiResponse.subspecialty_recommendation,
-          subspecialty_rationale: aiResponse.subspecialty_rationale,
-          ai_model_used: TRIAGE_MODEL,
-          ai_raw_response: toJSON(aiResponse),
-          patient_id: patient_id || null,
-          // Phase 2 fields
-          source_type: source_type || 'paste',
-          source_filename: source_filename || null,
-          extracted_summary: extracted_summary || null,
-          extraction_confidence: extraction_confidence || null,
-          note_type_detected: note_type_detected || null,
-          batch_id: batch_id || null,
-          fusion_group_id: fusion_group_id || null,
-          // Token usage tracking
-          ai_input_tokens: inputTokens || null,
-          ai_output_tokens: outputTokens || null,
-        })
-        .select('id')
-        .single()
-
-      if (!insertError && inserted) {
-        sessionId = inserted.id
-      } else if (insertError) {
-        console.error('DB insert error (non-fatal):', insertError)
-      }
-    } catch (err) {
-      // Non-fatal — triage still works without DB storage in demo mode
-      console.error('DB storage error (non-fatal):', err)
-    }
-
-    // ── Phase 1: Consult pipeline integration ───────────────────────────────
-    // Non-fatal — triage response is returned regardless of pipeline status.
+    // ── Consult pipeline integration (non-fatal) ──────────────────
     let consultId: string | null = null
     try {
-      // Build the data we'll write into the consult record
       const chiefComplaint = deriveChiefComplaint(
         aiResponse.clinical_reasons || [],
-        referral_text,
+        params.referral_text,
         aiResponse.subspecialty_recommendation || '',
       )
       const triageSummary = buildTriageSummaryForConsult(
@@ -186,20 +208,22 @@ export async function POST(request: Request) {
         triage_subspecialty: aiResponse.subspecialty_recommendation || '',
       }
 
-      if (existingConsultId) {
-        // Link this triage result to a pre-existing consult record
-        await linkTriageToConsult(existingConsultId, triageConsultData)
-        consultId = existingConsultId
-      } else if (createConsultFlag) {
-        // Auto-create a new consult record for this triage
-        const consultResult = await createConsult(referral_text, triageConsultData, patient_id || undefined)
+      if (params.existingConsultId) {
+        await linkTriageToConsult(params.existingConsultId, triageConsultData)
+        consultId = params.existingConsultId
+      } else if (params.createConsultFlag) {
+        const consultResult = await createConsult(
+          params.referral_text,
+          triageConsultData,
+          params.patient_id || undefined,
+        )
         consultId = consultResult.data?.id || null
       }
     } catch (consultErr) {
       console.error('Consult pipeline integration error (non-fatal):', consultErr)
     }
 
-    // ── Notification: alert staff for urgent+ triage results ─────────────
+    // ── Urgent triage notification (non-fatal) ────────────────────
     try {
       await notifyTriageUrgent(
         sessionId,
@@ -207,23 +231,23 @@ export async function POST(request: Request) {
         scoring.display,
         deriveChiefComplaint(
           aiResponse.clinical_reasons || [],
-          referral_text,
+          params.referral_text,
           aiResponse.subspecialty_recommendation || '',
         ),
-        patient_id || null,
+        params.patient_id || null,
       )
     } catch (notifErr) {
       console.error('Triage notification error (non-fatal):', notifErr)
     }
 
-    // Auto-schedule appointment for urgent+ triage results (non-blocking)
+    // ── Auto-schedule appointment (non-fatal) ─────────────────────
     let scheduledAppointmentId: string | null = null
-    if (patient_id) {
+    if (params.patient_id) {
       try {
         const appt = await autoScheduleFromTriage(
           sessionId,
           scoring.tier,
-          patient_id,
+          params.patient_id,
           aiResponse.clinical_reasons || [],
           aiResponse.subspecialty_recommendation || '',
         )
@@ -233,61 +257,50 @@ export async function POST(request: Request) {
       }
     }
 
-    // Build response per playbook Section 5.3
-    return NextResponse.json({
-      session_id: sessionId,
-      triage_tier: scoring.tier,
-      triage_tier_display: scoring.display,
-      confidence: aiResponse.confidence,
-      dimension_scores: aiResponse.dimension_scores,
-      weighted_score: scoring.weightedScore,
-      red_flag_override: aiResponse.red_flag_override,
-      emergent_override: aiResponse.emergent_override,
-      emergent_reason: aiResponse.emergent_reason,
-      insufficient_data: aiResponse.insufficient_data,
-      missing_information: aiResponse.missing_information,
-      clinical_reasons: aiResponse.clinical_reasons,
-      red_flags: aiResponse.red_flags,
-      suggested_workup: aiResponse.suggested_workup,
-      failed_therapies: aiResponse.failed_therapies,
-      subspecialty_recommendation: aiResponse.subspecialty_recommendation,
-      subspecialty_rationale: aiResponse.subspecialty_rationale,
-      redirect_to_non_neuro: aiResponse.redirect_to_non_neuro || false,
-      redirect_specialty: aiResponse.redirect_specialty || null,
-      redirect_rationale: aiResponse.redirect_rationale || null,
-      safety_anticoagulation: aiResponse.safety_anticoagulation ?? null,
-      safety_symptom_onset_time: aiResponse.safety_symptom_onset_time ?? null,
-      safety_allergies: aiResponse.safety_allergies ?? null,
-      safety_implanted_devices: aiResponse.safety_implanted_devices ?? null,
-      safety_pregnancy_status: aiResponse.safety_pregnancy_status ?? null,
-      safety_recent_procedures: aiResponse.safety_recent_procedures ?? null,
-      safety_renal_function: aiResponse.safety_renal_function ?? null,
-      disclaimer: DISCLAIMER_TEXT,
-      // Phase 1 pipeline — present if create_consult or consult_id was provided
-      consult_id: consultId,
-      // Phase 3 — AI-suggested appointment for urgent+ results
-      scheduled_appointment_id: scheduledAppointmentId,
-    })
-  } catch (error: unknown) {
-    console.error('Triage API Error:', error)
-
-    if (error instanceof Error && error.name === 'AbortError') {
-      return NextResponse.json(
-        { error: 'Processing is taking longer than expected. Please try again.' },
-        { status: 504 }
-      )
+    // Persist the derived ids so the polling GET can return them.
+    if (consultId || scheduledAppointmentId) {
+      try {
+        await from('triage_sessions')
+          .update({
+            consult_id: consultId,
+            scheduled_appointment_id: scheduledAppointmentId,
+          })
+          .eq('id', sessionId)
+      } catch (e) {
+        console.error('Failed to persist consult_id/scheduled_appointment_id:', e)
+      }
     }
-
-    // Sanitize infrastructure errors — never expose AWS SDK / credential details to client
+  } catch (error: unknown) {
+    console.error('Background triage failed:', error)
     let message = 'An error occurred while processing your request'
     if (error instanceof Error) {
       const raw = error.message
-      if (raw.includes('credential') || raw.includes('Could not load') || raw.includes('AWS') || raw.includes('Bedrock')) {
-        message = 'The triage service is temporarily unavailable. Please try again shortly or triage this patient manually.'
+      if (
+        raw.includes('credential') ||
+        raw.includes('Could not load') ||
+        raw.includes('AWS') ||
+        raw.includes('Bedrock')
+      ) {
+        message =
+          'The triage service is temporarily unavailable. Please try again shortly or triage this patient manually.'
       } else {
         message = raw
       }
     }
-    return NextResponse.json({ error: message }, { status: 500 })
+    await markError(sessionId, message)
+  }
+}
+
+async function markError(sessionId: string, message: string): Promise<void> {
+  try {
+    await from('triage_sessions')
+      .update({
+        processing_status: 'error',
+        error_message: message,
+        completed_at: new Date(),
+      })
+      .eq('id', sessionId)
+  } catch (e) {
+    console.error('Failed to mark triage_sessions row as error:', e)
   }
 }
