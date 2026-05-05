@@ -144,10 +144,10 @@ Full changelog: [`docs/CHANGELOG.md`](docs/CHANGELOG.md)
 - **Consult tester feedback fixes + sample personas + actor briefing + SDNE iframe (PR #105, Apr 17)** — Addressed 5 tester feedback items on /consult page (layout, validation, flow); added sample patient personas and actor briefing section for demo flow; pointed SDNE iframe to sense.neuroplans.app production URL.
 
 ### In Progress
-- Diagnosis plan coverage expansion (98 plans in DB, 148/166 diagnoses covered)
 - Real-time voice streaming during encounters
 
 ### Planned
+- Diagnosis plan coverage expansion (98 plans in DB, 148/166 diagnoses covered — 18 diagnoses still missing)
 - Speaker diarization UI (P2)
 - Recommendation reconciliation engine (P2)
 - Inpatient clinical scales (GCS, mRS, FOUR Score, Hunt & Hess, ICH, CAM-ICU, RASS)
