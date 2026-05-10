@@ -32,7 +32,7 @@ Neurology outpatient web app: clinical notes, AI assistance, voice dictation, do
 ## Key Routes
 
 | Route | Purpose |
-|-------|---------|
+|-------|--------|
 | `/` | Homepage — 6-card demo platform |
 | `/physician` | Clinical Cockpit (schedule + time-phased briefing) |
 | `/ehr` | Documentation (direct chart access) |
@@ -43,7 +43,7 @@ Neurology outpatient web app: clinical notes, AI assistance, voice dictation, do
 ## On-Demand Reference (read before touching these areas)
 
 | Area | Read first |
-|------|-----------|
+|------|----------|
 | Database schema | `docs/SCHEMA_REFERENCE.md` |
 | API endpoints | `docs/API_CONTRACTS.md` |
 | AI prompts & models | `docs/AI_PROMPTS_AND_MODELS.md` |
@@ -132,7 +132,7 @@ Full changelog: [`docs/CHANGELOG.md`](docs/CHANGELOG.md)
 
 ## Body of Work
 
-**Status**: Active
+**Status**: Active — verified May 10, 2026
 
 ### Recent
 - **Triage migration 046: drop NOT NULL on result columns (PR #113, May 2)** — Dropped NOT NULL constraints on triage result columns so pending rows can be inserted before AI populates results; migration 046 applied to `ops_amplehtml`; fixes the root cause that required the async+polling rework.
@@ -177,7 +177,7 @@ Full changelog: [`docs/CHANGELOG.md`](docs/CHANGELOG.md)
 All test artifacts live in `qa/`. See those files for full details — this section is the short reference.
 
 | File | Purpose |
-|------|---------|
+|------|--------|
 | `qa/TEST_RUNBOOK.md` | Stable baseline test plan (smoke + regression + mobile + role-based) |
 | `qa/TEST_CASES.yaml` | Structured test cases with IDs, preconditions, steps, expected results |
 | `qa/BUG_TEMPLATE.md` | Bug report template (repro, expected/actual, env, logs) |
