@@ -35,62 +35,38 @@ Neurology outpatient web app: clinical notes, AI assistance, voice dictation, do
 |-------|--------|
 | `/` | Homepage — 6-card demo platform |
 | `/physician` | Clinical Cockpit (schedule + time-phased briefing) |
-| `/ehr` | Documentation (direct chart access) |
-| `/dashboard` | Command Center (5-zone AI operations dashboard) |
-| `/patient/historian` | AI Neurologic Historian (WebRTC voice interview) |
-| `/mobile` | Mobile-optimized clinical interface |
-
-## On-Demand Reference (read before touching these areas)
-
-| Area | Read first |
-|------|----------|
-| Database schema | `docs/SCHEMA_REFERENCE.md` |
-| API endpoints | `docs/API_CONTRACTS.md` |
-| AI prompts & models | `docs/AI_PROMPTS_AND_MODELS.md` |
-| Feature status | `docs/IMPLEMENTATION_STATUS.md` |
-| Full changelog | `docs/CHANGELOG.md` |
-| Product playbooks | `playbooks/00-06` (read relevant playbook before modifying any card) |
-| PRDs | `docs/PRD_*.md` |
-| Roadmap | `docs/CONSOLIDATED_ROADMAP.md` |
-
-## Environment Variables
-
-Required in Amplify console: `NEXT_PUBLIC_COGNITO_*` (4), `COGNITO_CLIENT_SECRET`, `RDS_*` (5), `BEDROCK_*` (3). Optional: `OPENAI_API_KEY`, `TWILIO_*` (3).
-
-## QA
-
-All test artifacts in `qa/`. Stable runbook + per-release mission briefs in `qa/runs/`. Every deploy runs smoke suite (S1-S5). Claude Code = planner, Chrome = executor.
+| `/dashboard` | Operations Dashboard (5-zone command center) |
+| `/ehr` | Patient chart workspace |
+| `/wearable` | Wearable monitoring dashboard |
+| `/triage` | AI-assisted referral triage |
+| `/consult` | Neuro Intake with AI Historian |
+| `/follow-up` | Patient Follow-Up Agent (SMS + voice) |
+| `/sdne` | SDNE XR assessment integration iframe |
 
 ## Commands
 
 ```bash
-npm run dev          # Dev server
-npm run build        # Production build
-npm run sync-plans   # Sync neuro-plans JSON to RDS
+# Local dev
+npm run dev
+
+# Type check
+npx tsc --noEmit
+
+# Build
+npm run build
 ```
 
-## Deployment
+## Known Gotchas
 
-Deployed on AWS Amplify. Push to `main` triggers auto-deploy.
+- `@/lib/db-query` `from()` auto-stringifies plain objects but passes arrays through raw — JSONB array columns (e.g. `transcript`, `red_flags`) must be `JSON.stringify()`'d at the call site before insert.
+- Amplify SSR env vars require `next.config` inline block for runtime access (not just `process.env`).
+- Triage route uses 202+poll pattern — do not attempt SSE streaming (reverted in PR #111 due to ~28s Amplify gateway timeout).
+- `/consult` Historian uses WebRTC Realtime API — requires HTTPS and browser mic permission.
 
-Environment variables are set in the Amplify console (see "Environment Variables" section above).
+## Recent Changes (Summary)
 
-## Git Workflow
-
-- Main branch: `main` (production)
-- Feature branches: `claude/review-repo-design-*`
-- Push to feature branch, create PR, merge to main for deployment
-
-## Recent Changes
-
-- **Neuro Intake pipeline depth pass (2026-04-25)**: Five-part hardening of the `/consult` flow.
-  (1) **Scale-trigger pipeline wired**: `EmbeddedHistorian` now consumes `onLocalizerUpdate` from `useRealtimeSession`, evaluates triggers via `/api/ai/historian/scales?action=trigger`, fetches the instruction block via `?action=administer`, and calls `injectScaleAdministration` so the AI formally administers PHQ-9 / GAD-7 / HIT-6 / MIDAS / ESS / MoCA in the live session. On `save_scale_responses`, results POST to `?action=submit` for scoring + persistence in `scale_results`. Trigger and admin endpoints were fully built (Phase 3) but had no consumer; this closes that loop. Deduplication via `injectedScaleIdsRef` prevents re-administering an in-flight scale.
-  (2) **Assessment + Plan added to consult report**: New `assessment-generator.ts` module calls Bedrock Sonnet 4.6 with the entire built report (CC, HPI, OLDCARTS, differential, scales, red flags, SDNE, body map, devices) as context. Returns `{ assessment, plan[], confidence, uncertainty_notes }` JSON. `appendAssessmentAndPlan` adds them as `source: 'ai_synthesis'` sections at the end of `report.sections`. The report-builder remains a pure function — the AI call lives only in the route. Failure is non-fatal: if Bedrock errors out, the structured report still saves.
-  (3) **Review corrections persisted**: `IntakeReviewSection` now lifts its `corrections` state up to `PatientToolsStepPanel` via `onCorrectionsChange`. On "Confirm & Continue → Report", corrections are formatted as a labeled note and PUT to `/api/neuro-consults/[id]` (`notes` field). The report builder renders a "Physician Corrections & Notes" section if `consult.notes` is non-empty.
-  (4) **Triage safety-critical extraction**: New STEP 6.5 in `systemPrompt.ts` extracts seven safety fields from referrals: `safety_anticoagulation`, `safety_symptom_onset_time` (last known well, critical for tPA/thrombectomy windows), `safety_allergies`, `safety_implanted_devices`, `safety_pregnancy_status`, `safety_recent_procedures`, `safety_renal_function`. AI returns null when unstated and prepends `SAFETY:` to `missing_information` when a field is unstated AND clinically critical (e.g., stroke-like presentation without onset time). Fields surface in the API response and are included in the persisted `ai_raw_response`.
-  (5) **Diagnosis correction**: Earlier subagent claim that `HistorianStepPanel` opens via `target="_blank"` was wrong — historian is fully embedded inline. Real "review doesn't work" failure mode was lost corrections (now fixed).
-  Scope of this commit: `EmbeddedHistorian.tsx`, `IntakeReviewSection.tsx`, `PatientToolsStepPanel.tsx`, `report-builder.ts`, new `assessment-generator.ts`, `report/index.ts`, `report/route.ts`, `triage/systemPrompt.ts`, `triage/types.ts`, `triage/route.ts`. No schema migrations required (corrections reuse existing `notes` column; safety fields ride in existing `ai_raw_response` JSONB).
-
+- **Triage async+polling (PRs #112-113, May 2)**: `/api/triage` + `/api/triage/extract` now return 202 immediately and clients poll `/api/triage/[id]/result`; migration 046 dropped NOT NULL on result columns so pending rows insert cleanly.
+- **Neuro Intake depth pass (PR #109, Apr 25)**: Scale-trigger pipeline wired in `EmbeddedHistorian`; AI Assessment+Plan synthesis via `assessment-generator.ts`; physician corrections persisted; 7 safety fields extracted from referrals; historian fully embedded inline.
 - **SSO error surfacing on `/login` (2026-04-22)**: Tester reported "I click the sign in with Sevaro SSO and it gives me an error" with no further detail — because the app was showing none. The callback route (`src/app/api/auth/callback/route.ts`) was collapsing every Cognito failure into generic `no_code` / `token_exchange` codes, discarding the `error` + `error_description` params Cognito sends back. The login page (`src/app/login/page.tsx`) then rendered one of three canned strings. Fix: callback now (a) checks for Cognito's `error` param before `code` and propagates both `error` and `error_description` to `/login`, and (b) on token-exchange failure, parses the error body for `error_description` (falling back to the raw body truncated to 200 chars). Login page now shows a specific headline per code (including `access_denied` → "Sign-in was cancelled.") plus the actual description, and a hint to contact the administrator. Feedback session `ad9e5708-476a-470c-a38f-b0f209526dae` marked addressed.
 
 - **Consult save + mobile differential fixes (2026-04-17)**: Fixed "Failed to save interview data" error on `/consult` — root cause identical to the triage `2d1e445` fix: the shared `buildInsert` in `src/lib/db-query.ts` auto-stringifies plain objects but passes arrays through raw (for `text[]` compat), so `historian_sessions.transcript` and `red_flags` (both JSONB arrays) hit node-postgres as JS arrays-of-objects and the insert 500'd. Pre-stringified those fields at the call site in `src/app/api/ai/historian/save/route.ts`, and applied the same fix to `historian_red_flags` inside `linkHistorianToConsult` (`src/lib/consult/pipeline.ts`) so the consult advances to `historian_complete`. Also addressed mobile physician differential visibility: `LocalizerPanel` was a fixed 340px wide (clipped on 322px viewports) → now `width: 100%` with `maxWidth: 340px`; `EmbeddedHistorian` auto-opens the panel once the first localizer result arrives, and the toggle label changed from "MD View"/"Hide" to "Differential"/"Hide Dx" so mobile users can actually find it. Feedback session `9f2a87dc-ac02-42f9-b1ba-34ac161e0403` marked addressed.
@@ -132,7 +108,7 @@ Full changelog: [`docs/CHANGELOG.md`](docs/CHANGELOG.md)
 
 ## Body of Work
 
-**Status**: Active — verified May 11, 2026
+**Status**: Active — verified May 12, 2026
 
 ### Recent
 - **Triage migration 046: drop NOT NULL on result columns (PR #113, May 2)** — Dropped NOT NULL constraints on triage result columns so pending rows can be inserted before AI populates results; migration 046 applied to `ops_amplehtml`; fixes the root cause that required the async+polling rework.
