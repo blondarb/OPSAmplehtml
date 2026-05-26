@@ -108,7 +108,7 @@ Full changelog: [`docs/CHANGELOG.md`](docs/CHANGELOG.md)
 
 ## Body of Work
 
-**Status**: Active — verified May 25, 2026
+**Status**: Active — verified May 26, 2026
 
 ### Recent
 - **Triage migration 046: drop NOT NULL on result columns (PR #113, May 2)** — Dropped NOT NULL constraints on triage result columns so pending rows can be inserted before AI populates results; migration 046 applied to `ops_amplehtml`; fixes the root cause that required the async+polling rework.
