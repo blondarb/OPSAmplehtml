@@ -1057,3 +1057,20 @@ Called on:
 - Component unmount
 - Session end
 - Error during connection
+
+
+## 2026-05-27 — Realtime API + Harness Upgrade
+
+- **API migration:** `/v1/realtime/sessions` (deprecated) → `/v1/realtime/client_secrets` + `/v1/realtime/calls`. Nested `session.update` schema with `audio.input`/`audio.output` grouping.
+- **Model:** `gpt-realtime` → `gpt-realtime-2` (flagship GPT-5-class). Env-flag reversible via `OPENAI_HISTORIAN_REALTIME_MODEL`.
+- **Turn detection:** `server_vad` (PR #105 hand-tuned) → `semantic_vad` (default). Env-flag reversible via `HISTORIAN_TURN_DETECTION_MODE`.
+- **Tools:** Consolidated from 4 (save_interview_output, save_scale_responses, request_scale_administration, plus the prior bulk-style) to **3** (save_interview_output, query_evidence, scale_step). `query_evidence` is a new model-callable Evidence Engine query (Retrieve-only via Bedrock KB, 5s timeout, filler-line UX). `scale_step` is paginated — one item per call, instrument validity preserved via STRICT VERBATIM RULE in the tool description.
+- **Prompt:** Phased structure (turns 1-3 open exploration, turns 4+ tool-augmented), 15-25 turn soft budget, neurology focus list (headache / seizure / movement / MS / neuropathy / cognitive / stroke / NMD).
+- **Localizer push channel:** After each Localizer run (every 3 turns), client re-serializes `BASE_PROMPT + [LATEST PUSH]` and emits `session.update` to refresh the model's working instructions. Preserves base prompt + safety block AND avoids timeline pollution.
+- **Migration 047:** paginated `scale_results` (`status`, `current_index`) + `patient_id`/`responses`/`raw_score` NOT NULL relaxations for schema-drift compatibility with the legacy submit path.
+- **Scope guards:** Demo-only (no PHI through OpenAI). First-encounter history-taking only. Multi-modal / prior-visits remain out of scope as future agents.
+
+See:
+- Spec: `docs/superpowers/specs/2026-05-27-ai-historian-realtime-upgrade-design.md`
+- Plan: `docs/superpowers/plans/2026-05-27-ai-historian-realtime-upgrade.md`
+- Pre/post baselines: `qa/historian-baselines/`

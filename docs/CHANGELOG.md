@@ -305,3 +305,17 @@ Resolved 5 action items from tester feedback session `18250867-ca49-460c-bd85-df
   - Conservative extraction - never hallucinates missing data
 - **UI Integration**: "AI Auto-fill from Notes" button in ScaleForm
 - **Visual Feedback**: AI-filled fields highlighted, expandable confidence details
+
+## 2026-05-27 — AI Historian Realtime API + Harness Upgrade
+
+Demo-only (no PHI). First-encounter history-taking flow at `/consult` Step 2.
+
+- Migrated OpenAI Realtime API: `/v1/realtime/sessions` → `/v1/realtime/client_secrets` + `/v1/realtime/calls`; model `gpt-realtime` → `gpt-realtime-2`; nested session schema; `semantic_vad` default.
+- New model-callable tools: `query_evidence` (Bedrock KB Retrieve-only, 5s timeout), `scale_step` (paginated, replaces `request_scale_administration` + `save_scale_responses`).
+- New Localizer push channel: re-serialized BASE_PROMPT + delta via `session.update` every 3 turns. Preserves base prompt + safety block; avoids timeline pollution (cross-check round 2 finding).
+- Phased system prompt (turns 1-3 open, turns 4+ tool-augmented); 15-25 turn soft budget; neurology focus list.
+- Migration 047: `scale_results.status` + `scale_results.current_index` for paginated state; relaxed NOT NULL on `patient_id`, `responses`, `raw_score` (schema-drift compatibility — legacy submit flow had been silently failing).
+- Env flags for hot-revert: `OPENAI_HISTORIAN_REALTIME_MODEL`, `HISTORIAN_TURN_DETECTION_MODE`.
+- Pre/post baselines + side-by-side rubric in `qa/historian-baselines/`.
+
+PR: <will be filled in after Task 6.4>
