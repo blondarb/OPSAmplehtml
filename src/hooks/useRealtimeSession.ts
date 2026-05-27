@@ -533,6 +533,56 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
                 console.error('Error parsing save_scale_responses:', e)
               }
             }
+
+            // ── query_evidence (Phase 3) ──
+            if (item.name === 'query_evidence') {
+              // handleServerEvent is sync; run fetch in a fire-and-forget async IIFE
+              ;(async () => {
+                try {
+                  const args = JSON.parse(item.arguments || '{}')
+                  const res = await fetch('/api/ai/historian/evidence-query', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                      question: args.question,
+                      focus_diagnoses: args.focus_diagnoses,
+                    }),
+                  })
+                  const result = await res.json()
+
+                  if (dcRef.current?.readyState === 'open') {
+                    // Send the tool result back to the model over the data channel
+                    dcRef.current.send(
+                      JSON.stringify({
+                        type: 'conversation.item.create',
+                        item: {
+                          type: 'function_call_output',
+                          call_id: item.call_id,
+                          output: JSON.stringify(result),
+                        },
+                      }),
+                    )
+                    // Prompt the model to continue speaking
+                    dcRef.current.send(JSON.stringify({ type: 'response.create' }))
+                  }
+                } catch (err) {
+                  console.error('[useRealtimeSession] query_evidence handler error:', err)
+                  if (dcRef.current?.readyState === 'open') {
+                    dcRef.current.send(
+                      JSON.stringify({
+                        type: 'conversation.item.create',
+                        item: {
+                          type: 'function_call_output',
+                          call_id: item.call_id,
+                          output: JSON.stringify({ status: 'error', chunks: [], message: 'client error' }),
+                        },
+                      }),
+                    )
+                    dcRef.current.send(JSON.stringify({ type: 'response.create' }))
+                  }
+                }
+              })()
+            }
           }
         }
         break
