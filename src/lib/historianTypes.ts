@@ -107,19 +107,6 @@ export interface DemoScenario {
   description: string
 }
 
-// ─── query_evidence tool types ───────────────────────────────────────────────
-
-export interface QueryEvidenceArgs {
-  question: string
-  focus_diagnoses?: string[]
-}
-
-export interface QueryEvidenceResponse {
-  status: 'ok' | 'timeout' | 'error'
-  chunks: import('@/lib/bedrock').KBChunk[]
-  message?: string
-}
-
 export const DEMO_SCENARIOS: DemoScenario[] = [
   {
     id: 'headache_new',
