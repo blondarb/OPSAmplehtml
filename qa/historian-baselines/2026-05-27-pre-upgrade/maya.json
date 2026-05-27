@@ -1,0 +1,23 @@
+{
+  "persona": "maya-torres",
+  "date": "2026-05-27",
+  "phase": "pre-upgrade-baseline",
+  "site_state": "step2_400_banner",
+  "actor_briefing_source": "src/lib/consult/samplePersonas.ts (id: maya-torres, lines ~45-75)",
+  "presenting_complaint": "34F, episodic migraine with aura; headache subspecialty",
+  "triage_output": {
+    "reachable": true,
+    "notes": "Step 1 Triage routes to Headache subspecialty."
+  },
+  "historian_session": {
+    "started": false,
+    "duration_seconds": null,
+    "transcript": [],
+    "structured_output": null,
+    "localizer_findings_at_end": null,
+    "scales_administered": [],
+    "red_flags_surfaced": [],
+    "completion_status": "n/a"
+  },
+  "notes": "Pre-upgrade state: Step 2 voice flow fails with the 400 banner. Post-upgrade target: model should administer MIDAS or HIT-6 via scale_step; aura description should surface in red_flags array. Compare in Phase 6 rubric."
+}
