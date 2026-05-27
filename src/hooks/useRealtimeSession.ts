@@ -271,7 +271,7 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
         throw new Error(errData.error || `Failed to get session token (${tokenRes.status})`)
       }
 
-      const { ephemeralKey } = await tokenRes.json()
+      const { ephemeralKey, model: sessionModel } = await tokenRes.json()
       if (!ephemeralKey) throw new Error('No ephemeral key returned')
 
       // 2. Create RTCPeerConnection
@@ -338,21 +338,30 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
       await pc.setLocalDescription(offer)
 
       // 7. Send offer to OpenAI, get answer
-      const sdpRes = await fetch('https://api.openai.com/v1/realtime?model=gpt-realtime', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${ephemeralKey}`,
-          'Content-Type': 'application/sdp',
+      // Current GA endpoint per platform.openai.com (2026-05). Model passed as
+      // query param. Ephemeral key is the bearer.
+      const realtimeModel = sessionModel ?? 'gpt-realtime-2'
+
+      const sdpRes = await fetch(
+        `https://api.openai.com/v1/realtime/calls?model=${encodeURIComponent(realtimeModel)}`,
+        {
+          method: 'POST',
+          body: offer.sdp,
+          headers: {
+            Authorization: `Bearer ${ephemeralKey}`,
+            'Content-Type': 'application/sdp',
+          },
         },
-        body: offer.sdp,
-      })
+      )
 
       if (!sdpRes.ok) {
-        throw new Error(`WebRTC SDP exchange failed (${sdpRes.status})`)
+        const errorBody = await sdpRes.text()
+        console.error('[useRealtimeSession] SDP exchange failed:', sdpRes.status, errorBody)
+        throw new Error(`OpenAI Realtime SDP exchange returned ${sdpRes.status}: ${errorBody}`)
       }
 
-      const answerSdp = await sdpRes.text()
-      await pc.setRemoteDescription({ type: 'answer', sdp: answerSdp })
+      const sdpAnswer = await sdpRes.text()
+      await pc.setRemoteDescription({ type: 'answer', sdp: sdpAnswer })
 
       // 8. Start timer
       startTimeRef.current = Date.now()
