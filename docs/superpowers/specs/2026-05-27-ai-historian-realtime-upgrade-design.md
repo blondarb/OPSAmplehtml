@@ -38,10 +38,11 @@ The `/consult` AI Historian was failing with `Failed to create realtime session:
                                                   └──────────────┬─────────────────┘
                                                                  │
                                                                  ▼  (NEW: push channel)
-                                                       session.update event
-                                                       {current_differential,
-                                                        suggested_question,
-                                                        suggested_scale_id}
+                                                       conversation.item.create
+                                                       {item: {type:"message",
+                                                               role:"system",
+                                                               content:[{type:"input_text",
+                                                                         text:"[AMBIENT PUSH] …"}]}}
                                                                  │
                                                                  ▼
    Browser (WebRTC)                                       OpenAI Realtime
@@ -61,8 +62,9 @@ The `/consult` AI Historian was failing with `Failed to create realtime session:
    │    tools: [save_interview_output, save_scale_responses,                │
    │            query_evidence, request_scale_administration]               │
    │                                                                        │
-   │  session.update (every 3 turns from Localizer) — same channel:         │
-   │    instructions delta: "Differential leaders: X, Y, Z. Consider asking…"│
+   │  conversation.item.create (every 3 turns from Localizer):              │
+   │    role:"system" message — "[AMBIENT PUSH] Differential leaders: …"    │
+   │    (NOT session.update — that would OVERWRITE base instructions)       │
    │                                                                        │
    │  Tool calls from model:                                                │
    │    query_evidence(question, focus_diagnoses?) → server hits Bedrock    │
@@ -117,42 +119,83 @@ Where `turnDetectionConfig` is read from `HISTORIAN_TURN_DETECTION_MODE`:
 - `server_vad` (fallback): `{ type: "server_vad", threshold: 0.65, prefix_padding_ms: 400, silence_duration_ms: 1200 }` (PR #105 tuning preserved as a named const, not deleted)
 
 ### 4. Localizer push channel (`src/app/api/ai/historian/localizer/route.ts` + client)
-Today the Localizer returns its findings as an HTTP response; `EmbeddedHistorian` consumes them for UI. **Add a parallel channel:** after Localizer completes, the client emits a `session.update` event on the data channel with an instructions delta:
+Today the Localizer returns its findings as an HTTP response; `EmbeddedHistorian` consumes them for UI. **Add a parallel channel:** after Localizer completes, the client emits a `conversation.item.create` event on the data channel — injecting a system-role message into the conversation timeline. **NOT** `session.update` — that event overwrites the entire `instructions` field and would wipe out the Phase 1/2 structure, neurology focus list, and safety block (cross-check finding from Gemini-3.1-pro, 2026-05-27).
 
-```
-Latest clinical context (from Localizer):
+```ts
+{
+  type: "conversation.item.create",
+  item: {
+    type: "message",
+    role: "system",
+    content: [{
+      type: "input_text",
+      text: `[AMBIENT PUSH] Latest clinical context (Localizer):
 - Top differentials: <comma list>
 - Suggested next question: <one line>
-- Suggested scale to consider: <scale_id or "none">
+- Suggested scale to consider: <scale_id or "none">`
+    }]
+  }
+}
 ```
 
+After the event is sent on the data channel, the client does NOT emit `response.create` — the new context sits in the conversation timeline and is incorporated naturally on the patient's next turn, avoiding model interruption mid-response.
+
 This is **additive context**, not load-bearing. If the push fails, the interview continues on initial context.
+
+**Cadence guard:** at most one push per Localizer completion (already throttled to every 3 turns server-side). No retries on failure.
 
 ### 5. New tool: `query_evidence`
 **Definition (added in `src/lib/historianPrompts.ts`):**
 ```
 name: query_evidence
-description: When you are uncertain about clinical guidance, red flags, or how to differentiate
-             two diagnoses you are weighing, query the Sevaro Evidence Engine. Use sparingly —
-             prefer continuing the conversation when the Localizer's pushed context is enough.
+description: |
+  Query the Sevaro Evidence Engine for clinical guidance you don't already know.
+
+  DO NOT call this tool to ask about the differentials, suggested questions, or
+  suggested scales pushed by the Localizer — those come from this same KB and
+  re-querying wastes time. Rely on your base knowledge for standard clinical
+  criteria (e.g., OLDCARTS, common ICD-10 features, well-known drug classes).
+
+  ONLY call query_evidence when:
+    - the patient describes a symptom you'd flag as a Red Flag and you're
+      uncertain how to triage it (e.g., thunderclap onset, focal deficit,
+      atypical aura pattern)
+    - a rare neurology edge case appears (e.g., a specific drug-drug interaction,
+      a syndrome variant you'd want to look up before continuing)
+
+  When you call this tool, say one brief conversational filler line to the
+  patient FIRST (e.g., "Let me check my reference on that — one second.")
+  before issuing the call. This masks the round-trip latency.
+
 parameters:
-  question (string, required)
-  focus_diagnoses (string[], optional)
+  question (string, required) — natural-language clinical question
+  focus_diagnoses (string[], optional) — diagnoses currently weighed
 ```
 
 **Server handler (`src/app/api/ai/historian/evidence-query/route.ts`, NEW):**
 - Auth: `getUser()` (consult must belong to caller's tenant).
 - Calls a NEW helper `retrieveChunksFromKB()` in `src/lib/bedrock.ts` that uses Bedrock Agents `RetrieveCommand` (NOT `RetrieveAndGenerateCommand` like the existing `retrieveFromKB`). Skipping the generation step cuts latency ~5× because the realtime model synthesizes in-context. Existing `retrieveFromKB()` is left in place — the Localizer keeps using it.
 - Returns up to 5 chunks (matching `KB_RESULTS` in `src/app/api/ai/historian/localizer/route.ts` for consistency): `{ chunks: [{ content, source, score }], status: "ok" | "timeout" }`.
-- 3-second AbortController timeout. On timeout: `{ chunks: [], status: "timeout" }`. Model is prompted to gracefully recover ("let me come back to that").
+- **5-second** AbortController timeout (bumped from initial 3s after cross-check feedback — accounts for Browser→Next.js→Bedrock→Next.js→Browser→OpenAI round-trip plus possible cold start). On timeout: `{ chunks: [], status: "timeout" }`. Model is prompted to gracefully recover ("let me come back to that").
 
 ### 6. New tool: `request_scale_administration`
 **Definition:**
 ```
 name: request_scale_administration
-description: When the differential and history suggest a standardized scale would quantify
-             clinical outcome, request it. The server returns the EXACT scale wording — you
-             MUST recite it verbatim to preserve instrument validity. Do NOT paraphrase.
+description: |
+  When the differential and history suggest a standardized scale would quantify
+  the clinical outcome, request it. The server returns the EXACT scale wording.
+
+  STRICT VERBATIM RULE — instrument validity depends on this:
+    - Output ONLY the exact string returned by the server.
+    - Do NOT prefix with "Okay," "Alright," "Here's the next question," or
+      similar conversational filler.
+    - Do NOT paraphrase, summarize, or "rephrase to be friendlier."
+    - Yield the floor IMMEDIATELY after reciting each scale item — do not
+      append your own commentary.
+    - Between items, you may insert ONLY the patient's response in their own
+      words, then proceed to the next exact item.
+
 parameters:
   scale_id (string, required) — one of: PHQ9, GAD7, MoCA, MiniCog, MIDAS, HIT6, ESS
   reason (string, required) — one sentence why this scale fits the current presentation
@@ -194,8 +237,8 @@ Add to Amplify branch env (remember: `aws amplify update-branch` REPLACES all 19
 | OpenAI session create non-2xx | `session/route.ts` checks `response.ok` | Pass through raw OpenAI error body to client (no swallow) |
 | `gpt-realtime-2` regression | Manual demo + eval transcripts | Flip `OPENAI_HISTORIAN_REALTIME_MODEL=gpt-realtime`, redeploy |
 | `semantic_vad` regression (over-eager or over-patient) | Live demo feedback | Flip `HISTORIAN_TURN_DETECTION_MODE=server_vad`, redeploy. Restores PR #105 tuning. |
-| Localizer push (session.update) fails | API catches, logs | Non-fatal. Interview continues on initial context. |
-| `query_evidence` exceeds 3s | AbortController | Return `{ chunks: [], status: "timeout" }`. Model prompted to gracefully recover. |
+| Localizer push (`conversation.item.create`) fails | API catches, logs | Non-fatal. Interview continues on initial context. No retry. |
+| `query_evidence` exceeds 5s | AbortController | Return `{ chunks: [], status: "timeout" }`. Model prompted to gracefully recover. |
 | `request_scale_administration` unknown id | Server 400 | Return `{ status: "unknown_scale", available: […] }`. Model picks again. |
 
 **Reversibility summary.** All changes are env-flag-gated or feature-additive. Rollback = one `aws amplify update-branch` + redeploy. No DB migrations, no schema breaks.
@@ -244,9 +287,10 @@ Same five personas, same actor briefings, same starting referrals. Capture ident
 |---|---|---|
 | `gpt-realtime-2` worse than `gpt-realtime` at clinical conversation | Low–Med | Model env flag, baseline transcripts |
 | `semantic_vad` interrupts patients mid-thought in clinic acoustic | Med | VAD env flag, eagerness=low, PR #105 tuning kept as fallback |
-| Model overuses `query_evidence` → cost spike + dead-air UX | Med | Prompt explicitly says "sparingly"; eval tracks tool-use count; 3s timeout caps per-call latency |
-| Model paraphrases scale wording → instrument validity broken | High if not guarded | Explicit prompt clause "recite verbatim"; S3 smoke test checks |
-| Localizer push spams session.update too often | Low | Push only on Localizer completion (already throttled to every-3-turns) |
+| Model overuses `query_evidence` → cost spike + dead-air UX | Med | Tool description explicitly enumerates WHEN to call (red flags / rare edge cases only) and forbids re-querying Localizer pushes; eval tracks tool-use count; 5s timeout + filler-line instruction caps per-call UX impact |
+| Model paraphrases scale wording → instrument validity broken | High if not guarded | Multi-layer guard: (a) tool description has STRICT VERBATIM RULE block with explicit prohibitions on "Okay" / "Here's the next question" prefixes, (b) S3 smoke test does string-compare on transcript vs `scale-library.ts` source |
+| Localizer push (`conversation.item.create`) spams the timeline | Low | Push only on Localizer completion (already throttled to every-3-turns server-side); at most one event per completion; no retries |
+| Model re-greets or loses thread when Localizer push lands | Low (mitigated) | Using `conversation.item.create` with `role:"system"` keeps base `instructions` intact (would NOT be true if we used `session.update` — cross-check finding) |
 | `query_evidence` returns irrelevant chunks (KB has gaps) | Med | Chunks include source citation; model prompted to ignore irrelevant returns; eval rubric tracks question quality |
 
 ## Files touched
@@ -287,3 +331,17 @@ Same five personas, same actor briefings, same starting referrals. Capture ident
 - ~~Multi-modal grounding?~~ Out of scope — first-encounter history-taking only.
 - ~~Prior-visits tool?~~ Out of scope — separate future agent.
 - ~~Follow-up agent in scope?~~ No — different flow, untouched.
+
+## Cross-check revisions (2026-05-27)
+
+Reviewed via `cross-check` skill: DeepSeek-R1 + Gemini-3.1-pro (GPT-5 attempted but auth failed — `OPENAI_API_KEY` not in env; run `codex login --with-api-key` to enable for future runs). Both reviewers converged on the following changes, applied to this spec before implementation:
+
+1. **`session.update` → `conversation.item.create`.** Gemini flagged that `session.update` OVERWRITES the `instructions` field rather than appending a delta — would wipe the Phase 1/2 structure, neurology focus, and safety block on every push. Switched to `conversation.item.create` with `role:"system"` per Realtime API patterns. (Section 4, architecture diagram.)
+2. **`query_evidence` timeout 3s → 5s.** Gemini noted 3s is too tight for the Browser→Next.js→Bedrock→Next.js→Browser→OpenAI round-trip, especially with cold starts. Bumped to 5s. (Section 5, error-handling table, risks table.)
+3. **Sharper `query_evidence` tool description.** Both reviewers noted "use sparingly" is unactionable for LLMs. Replaced with explicit enumeration: forbid re-querying Localizer pushes; only call for red-flag triage uncertainty or rare neurology edge cases; require one filler line before the call to mask latency. (Section 5.)
+4. **STRICT VERBATIM RULE on scale recitation.** Gemini noted audio-native models inject conversational filler ("Okay,", "Here's the next question") even with paraphrase prohibitions. Added explicit negative constraints to the tool description: no prefixes, no commentary, yield floor immediately after each item. (Section 6.)
+
+Reviewers' non-actioned suggestions (with reasoning for declining):
+- DeepSeek's "tiered tool priority system" — over-engineered for 4 well-scoped tools. Gemini explicitly disagreed and concluded 4 tools is fine for `gpt-realtime-2`.
+- DeepSeek's "output validator with pre-approved clinical lexicon" — much heavier than needed. Gemini's prompt-level negative constraints + smoke test S3 are sufficient.
+- DeepSeek's "ACK/retry protocol for WebRTC packet loss during tool execution" — defer to v2 if observed in practice. Adding now without evidence of need would bloat scope.
