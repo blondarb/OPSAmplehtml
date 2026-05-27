@@ -318,4 +318,4 @@ Demo-only (no PHI). First-encounter history-taking flow at `/consult` Step 2.
 - Env flags for hot-revert: `OPENAI_HISTORIAN_REALTIME_MODEL`, `HISTORIAN_TURN_DETECTION_MODE`.
 - Pre/post baselines + side-by-side rubric in `qa/historian-baselines/`.
 
-PR: <will be filled in after Task 6.4>
+PR: https://github.com/blondarb/OPSAmplehtml/pull/114
