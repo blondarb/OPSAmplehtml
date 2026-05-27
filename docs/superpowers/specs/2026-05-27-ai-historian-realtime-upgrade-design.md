@@ -16,7 +16,7 @@ The `/consult` AI Historian was failing with `Failed to create realtime session:
 
 ## Scope (and explicit non-scope)
 
-**In scope.** Upgrade the AI Historian voice interview on `/consult` to OpenAI Realtime API's current GA surface (`/v1/realtime/client_secrets` + `/v1/realtime/calls`, `gpt-realtime-2`, nested session schema, `semantic_vad`). Add two model-callable tools (`query_evidence`, `request_scale_administration`). Refresh the system prompt to enforce a phased interview structure with explicit neurology focus. Push Localizer findings into the live session as ambient context (new channel). Establish a pre/post-upgrade eval against the existing five sample personas.
+**In scope.** Upgrade the AI Historian voice interview on `/consult` to OpenAI Realtime API's current GA surface (`/v1/realtime/client_secrets` + `/v1/realtime/calls`, `gpt-realtime-2`, nested session schema, `semantic_vad`). Add two model-callable tools (`query_evidence`, `scale_step`) and consolidate the existing `request_scale_administration` + `save_scale_responses` pair into the single paginated `scale_step`. Refresh the system prompt to enforce a phased interview structure with explicit neurology focus. Push Localizer findings into the live session as ambient context (new channel). Establish a pre/post-upgrade eval against the existing five sample personas.
 
 **Out of scope — explicit guards:**
 - **HIPAA / real-patient use.** `/consult` stays demo-only with the five sample personas. Real-patient voice flows are tracked separately (workspace roadmap line: "AWS Transcribe Medical, HIPAA-eligible"). No PHI flows through OpenAI in this work.
@@ -61,8 +61,7 @@ The `/consult` AI Historian was failing with `Failed to create realtime session:
    │    audio.input.turn_detection: {type:"semantic_vad", eagerness:"low"}  │
    │    audio.input.transcription:  {model:"whisper-1"}                     │
    │    audio.output.voice:         "verse"                                 │
-   │    tools: [save_interview_output, save_scale_responses,                │
-   │            query_evidence, request_scale_administration]               │
+   │    tools: [save_interview_output, query_evidence, scale_step]          │
    │                                                                        │
    │  session.update (every 3 turns from Localizer):                        │
    │    instructions: <full re-serialized BASE_PROMPT + delta>              │
@@ -75,13 +74,13 @@ The `/consult` AI Historian was failing with `Failed to create realtime session:
    │                                                  only, no synth) →     │
    │                                                  up to 5 chunks back   │
    │                                                                        │
-   │    request_scale_administration(scale_id, reason) → server returns     │
-   │                                                       verbatim scale   │
-   │                                                       block → model    │
-   │                                                       recites          │
+   │    scale_step(scale_id, [prev_index, prev_response]) → server returns  │
+   │                  ONE item at a time. Model speaks it, awaits patient   │
+   │                  response, then calls again with prev_response. Loops  │
+   │                  until server returns {done:true, score}. Pagination   │
+   │                  prevents bulk burst-reads.                            │
    │                                                                        │
-   │    save_scale_responses(…) — existing flow                             │
-   │    save_interview_output(…) — existing flow                            │
+   │    save_interview_output(…) — existing flow (unchanged)                │
    └────────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -111,8 +110,7 @@ Nested schema per current API:
       },
       output: { voice: "verse" }
     },
-    tools: [save_interview_output, save_scale_responses,
-            query_evidence, request_scale_administration]
+    tools: [save_interview_output, query_evidence, scale_step]
   }
 }
 ```
@@ -182,40 +180,65 @@ parameters:
 - Returns up to 5 chunks (matching `KB_RESULTS` in `src/app/api/ai/historian/localizer/route.ts` for consistency): `{ chunks: [{ content, source, score }], status: "ok" | "timeout" }`.
 - **5-second** AbortController timeout (bumped from initial 3s after cross-check feedback — accounts for Browser→Next.js→Bedrock→Next.js→Browser→OpenAI round-trip plus possible cold start). On timeout: `{ chunks: [], status: "timeout" }`. Model is prompted to gracefully recover ("let me come back to that").
 
-### 6. New tool: `request_scale_administration`
+### 6. New tool: `scale_step` (paginated — replaces `request_scale_administration` AND `save_scale_responses`)
 **Definition:**
 ```
-name: request_scale_administration
+name: scale_step
 description: |
-  When the differential and history suggest a standardized scale would quantify
-  the clinical outcome, request it. The server returns the EXACT scale wording.
+  Step through a clinical scale one item at a time. The server enforces
+  single-item pacing — you receive ONE item per call, making it impossible
+  to bulk-read multiple items in one breath.
 
-  STRICT VERBATIM RULE — instrument validity depends on this:
-    - Output ONLY the exact string returned by the server.
+  Flow:
+    - First call: pass {scale_id, reason}. Server returns first item.
+    - Subsequent calls: pass {scale_id, prev_index, prev_response}. Server
+      records the previous answer in the DB AND returns the next item.
+    - Server signals completion: {done: true, total_score, interpretation}.
+      On done, call save_interview_output at the appropriate point.
+
+  STRICT VERBATIM RULE on the returned item.text — instrument validity
+  depends on this:
+    - Output ONLY the exact item.text string from the server.
     - Do NOT prefix with "Okay," "Alright," "Here's the next question," or
-      similar conversational filler.
+      any other filler.
     - Do NOT paraphrase, summarize, or "rephrase to be friendlier."
-    - Yield the floor IMMEDIATELY after reciting each scale item — do not
-      append your own commentary.
-    - Between items, you may insert ONLY the patient's response in their own
-      words, then proceed to the next exact item.
+    - Yield the floor IMMEDIATELY after reciting — wait for the patient
+      response, then call scale_step again.
+    - Between items, you may insert ONLY the patient's response in their
+      own words (for the prev_response field), then proceed.
 
 parameters:
   scale_id (string, required) — one of: PHQ9, GAD7, MoCA, MiniCog, MIDAS, HIT6, ESS
-  reason (string, required) — one sentence why this scale fits the current presentation
+  reason (string, required on first call) — one sentence why this scale fits
+  prev_index (int, optional) — index of the item just answered
+  prev_response (string|int, optional) — the patient's verbatim answer (or
+                 coded value if the scale uses Likert/multiple-choice)
 ```
 
-**Server handler (extend `src/app/api/ai/historian/scales/route.ts` with `?action=request`):**
+**Server handler (rewrite `src/app/api/ai/historian/scales/route.ts`):**
 - Lookup `scale_id` in `src/lib/consult/scales/scale-library.ts`.
-- Return the scale's verbatim administration block + answer schema for `save_scale_responses`.
-- Existing `save_scale_responses` handler unchanged — the existing capture/persist flow handles results.
+- On first call: insert a new `consult_scales` row with `status="in_progress"`, return item index 0.
+- On subsequent calls: append `prev_response` to the row's `responses` JSONB array (by `prev_index`), return item at `prev_index + 1`.
+- On final call (next index > items.length - 1): mark row `status="complete"`, compute total_score + interpretation per scale's scoring function, return `{done: true, total_score, interpretation}`.
+- Returns: `{ done: false, index, item: { text, choices?, scoring_hint? } }` or `{ done: true, total_score, interpretation }`.
+
+**Why paginated over block-style:**
+- **Server-enforced pacing.** The model literally cannot recite item N+1 before the patient has answered item N — it doesn't have item N+1 in context.
+- **Per-item persistence.** If the patient quits mid-scale, the partial response set is already in `consult_scales.responses`. The block-style design lost partial data on early termination.
+- **Instrument validity.** Items returned by the server are guaranteed verbatim from `scale-library.ts`; no model paraphrasing risk on bulk text.
+- **Existing tooling subsumed.** `request_scale_administration` and `save_scale_responses` are replaced by this single tool — tool count drops from 4 to 3 in the model's surface, reducing dispatch confusion.
+
+**Migration impact on existing client code:**
+- `useRealtimeSession.ts` currently has a `save_scale_responses` tool-call handler (around line 495). That handler is **replaced** with a `scale_step` handler that does no client-side bookkeeping — it just forwards `prev_index` + `prev_response` to the server. All state lives server-side now.
+- `EmbeddedHistorian` currently calls `/api/ai/historian/scales?action=submit` on bulk-save; this path is removed. The component will subscribe to `scale_step` `{done: true}` events instead for UI completion signaling.
+- Existing scale-trigger pipeline (`scale-trigger.ts`) keeps firing — it sets `suggested_scale_id` in the Localizer push, the model then chooses whether to call `scale_step`.
 
 ### 7. System prompt (`src/lib/historianPrompts.ts`)
 Replace `CORE_PROMPT + NEW_PATIENT_PROMPT`/`FOLLOW_UP_PROMPT` with a phased structure:
 
 **Phase 1 (turns 1–3): Open exploration.** No tools. Warm greeting + chief complaint + OLDCARTS basics. Goal: enough signal for the Localizer to form a real differential.
 
-**Phase 2 (turns 4 to budget): Tool-augmented refinement.** Targeted follow-ups informed by Localizer pushes. Use `query_evidence` sparingly when uncertain. Use `request_scale_administration` when the differential meaningfully implicates a scale (e.g., headache → MIDAS/HIT-6; cognitive complaint → MoCA/Mini-Cog; mood → PHQ-9/GAD-7; sleep → ESS). Recite scale items verbatim from server response. Continue refining until you have enough to write a clinically useful HPI.
+**Phase 2 (turns 4 to budget): Tool-augmented refinement.** Targeted follow-ups informed by Localizer pushes. Use `query_evidence` sparingly when uncertain. Use `scale_step` when the differential meaningfully implicates a scale (e.g., headache → MIDAS/HIT-6; cognitive complaint → MoCA/Mini-Cog; mood → PHQ-9/GAD-7; sleep → ESS). The tool returns one item at a time — recite it verbatim, wait for the patient response, then call again with `prev_response`. Continue refining until you have enough to write a clinically useful HPI.
 
 **Budget:** Soft 15–25 turns. Quality over coverage. Call `save_interview_output` when you have sufficient clarity — not when you've ticked every box.
 
@@ -243,7 +266,9 @@ Add to Amplify branch env (remember: `aws amplify update-branch` REPLACES all 19
 | `semantic_vad` regression (over-eager or over-patient) | Live demo feedback | Flip `HISTORIAN_TURN_DETECTION_MODE=server_vad`, redeploy. Restores PR #105 tuning. |
 | Localizer push (`session.update` w/ re-serialized instructions) fails | API catches, logs | Non-fatal. Interview continues on the prior instructions. No retry. |
 | `query_evidence` exceeds 5s | AbortController | Return `{ chunks: [], status: "timeout" }`. Model prompted to gracefully recover. |
-| `request_scale_administration` unknown id | Server 400 | Return `{ status: "unknown_scale", available: […] }`. Model picks again. |
+| `scale_step` unknown scale_id (first call) | Server 400 | Return `{ status: "unknown_scale", available: […] }`. Model picks again. |
+| `scale_step` prev_index out of range (subsequent call) | Server 400 | Return `{ status: "bad_index", expected_index }`. Model retries with correct index. |
+| `scale_step` invoked for a scale already complete | Server 200 | Return `{ done: true, total_score, interpretation }` again (idempotent). Model recognizes scale finished. |
 
 **Reversibility summary.** All changes are env-flag-gated or feature-additive. Rollback = one `aws amplify update-branch` + redeploy. No DB migrations, no schema breaks.
 
@@ -273,13 +298,14 @@ Same five personas, same actor briefings, same starting referrals. Capture ident
 | Red flags surfaced (Walter: none. Maya: aura → should surface. Rachel: spells → should surface) | | |
 | Redundant questions (count) | | |
 | Average turn latency | | |
-| Tool-use counts (query_evidence, request_scale_administration) | | |
+| Tool-use counts (query_evidence calls, scale_step item counts per scale) | | |
+| Scale completion rate (% of started scales reaching `{done:true}` vs abandoned) | | |
 | Scale-item pacing: did model pause between items, or burst-read multiple? | | |
 
 ### Smoke tests (per `qa/TEST_RUNBOOK.md` conventions)
 - **S1 (existing):** `/consult` loads, mic prompts, voice starts on Walter persona.
 - **S2 (NEW):** In a 10-min Walter session, `query_evidence` fires at least once. Verifies model uses the tool.
-- **S3 (NEW):** A scale gets administered, and recited wording matches `scale-library.ts` verbatim (string compare on captured transcript vs source).
+- **S3 (NEW):** A scale (e.g., PHQ-9) gets fully administered via `scale_step` with pagination. Verify in transcript: (a) recited item wording matches `scale-library.ts` verbatim for each item, (b) each item is followed by a patient response before the next item appears (no burst-reads), (c) final `{done: true, total_score, interpretation}` is recorded.
 - **S4 (NEW):** Hot-revert works — set `HISTORIAN_TURN_DETECTION_MODE=server_vad`, redeploy, verify VAD behavior returns to PR #105 tuning (look for `silence_duration_ms: 1200` in the WebRTC trace).
 
 ### Out of scope for testing
@@ -296,7 +322,9 @@ Same five personas, same actor briefings, same starting referrals. Capture ident
 | Model paraphrases scale wording → instrument validity broken | High if not guarded | Multi-layer guard: (a) tool description has STRICT VERBATIM RULE block with explicit prohibitions on "Okay" / "Here's the next question" prefixes, (b) S3 smoke test does string-compare on transcript vs `scale-library.ts` source |
 | Localizer push spams or bloats model context | Low | Push uses `session.update` with full re-serialized instructions — each push REPLACES the prior delta (idempotent). No timeline accumulation. Throttled to every-3-turns server-side. |
 | Model re-greets or loses thread when Localizer push lands | Low (mitigated) | Re-serialized instructions retain the full base prompt + safety block + Phase 1/2 structure unchanged; only the `[LATEST LOCALIZER PUSH]` suffix varies between updates. Base context never changes mid-session. |
-| Model burst-reads multiple scale items in one breath (Gemini round-2 concern) | Med | Tracked in eval rubric (S3 smoke test verifies pause between items). Existing PR #105 block-style admin reportedly works in practice. If burst-reading observed in eval, follow-up redesign: paginate scale tool as `request_scale_item(scale_id, index)`. **Watch-item, not blocker.** |
+| Model burst-reads multiple scale items in one breath | Low (addressed by design) | `scale_step` is paginated — model only receives ONE item per call, making bulk-read impossible by construction. Decision elevated from "watch-item" to "design fix" after Steve's round-3 pushback noted existing block-style admin had not been verified to actually complete scales reliably. |
+| Patient quits mid-scale; partial responses lost | Low (addressed by design) | `scale_step` persists each item to `consult_scales.responses` on the same call that records prev_response. Even if session ends abruptly, the partial scale is in DB. |
+| Pagination round-trip overhead adds latency per scale | Low–Med | ~7–12 round-trips per scale at ~2s each = ~14–24s of tool-call overhead. Patient response time per item dwarfs this; wall-clock impact is small. Tracked in eval rubric. |
 | `query_evidence` returns irrelevant chunks (KB has gaps) | Med | Chunks include source citation; model prompted to ignore irrelevant returns; eval rubric tracks question quality |
 
 ## Files touched
@@ -307,7 +335,9 @@ Same five personas, same actor briefings, same starting referrals. Capture ident
 | `src/app/api/ai/historian/session/route.ts` | Endpoint swap, nested schema, register new tools | ~30 changed |
 | `src/app/api/ai/historian/evidence-query/route.ts` | NEW | ~60 |
 | `src/lib/bedrock.ts` | Add `retrieveChunksFromKB()` (Retrieve-only sibling of `retrieveFromKB`) | ~40 added |
-| `src/app/api/ai/historian/scales/route.ts` | Add `?action=request` handler | ~40 added |
+| `src/app/api/ai/historian/scales/route.ts` | **Rewrite** for paginated `scale_step` semantics — remove `?action=request`/`?action=submit`, replace with single handler accepting `{scale_id, prev_index?, prev_response?}`. May need new `consult_scales` row insert for first call. | ~120 changed |
+| `src/lib/consult/scales/scale-library.ts` | No structural change. Verify each scale exposes items as ordered list (likely already true). | n/a (audit only) |
+| **Migration: `consult_scales` table** | Likely already exists per PR #105; verify schema supports per-item response storage + status enum. If not, new migration. | TBD on audit |
 | `src/app/api/ai/historian/localizer/route.ts` | Surface findings to client for push (return shape additive only) | ~10 added |
 | `src/hooks/useRealtimeSession.ts` | Nested session.update + 2 new tool-call handlers + push channel emit + env-driven TurnDetectionConfig | ~80 changed |
 | `src/components/consult/EmbeddedHistorian.tsx` | Call client-side push after Localizer completes | ~15 added |
@@ -369,3 +399,17 @@ After applying the 4 fixes above, ran cross-check again. Mixed signal worth noti
 - **Scale-item burst reading.** Gemini Round 2 cautioned that audio-native models may read multiple scale items in one continuous burst from a bulk-block payload, violating instrument validity. Proposed pagination: `request_scale_item(scale_id, index)` with one item per round-trip. **Decision: defer.** Reasoning: existing PR #105 implementation already does bulk-block-style admin in production demos and apparently works. Added to eval rubric as an explicit observation criterion ("Scale-item pacing: did model pause between items, or burst-read multiple?"). If burst-reading is observed in post-upgrade eval, follow-up redesign with pagination is the fallback. Risks table updated.
 
 - **Phase split (Phase 1: API migration + query_evidence; Phase 2: Localizer push + scale tool).** Gemini suggested splitting the implementation into two phases to de-risk. **Decision: defer to writing-plans skill.** Phase structuring is implementation-plan territory, not spec-design territory. The spec defines what gets built; the plan decides the order.
+
+### Round 3: Steve's pushback on scale completion (2026-05-27)
+
+After Round 2 deferred the scale-pagination concern as a "watch-item" on the assumption that PR #105's existing block-style admin "apparently works in practice," Steve corrected me: he has been using the current admin a little, but has **not** verified that scales actually complete reliably. The "works in practice" claim was unsupported.
+
+**Decision: redesign scale admin to paginated from the start.** Don't defer behind a watch-item when the existing behavior isn't proven out.
+
+**Change applied:**
+
+6. **`request_scale_administration` + `save_scale_responses` → single paginated `scale_step` tool.** Server returns one scale item per call; model speaks it, awaits patient response, calls again with `prev_response`. Server records each response into `consult_scales.responses` as it arrives. On final call, server returns `{done: true, total_score, interpretation}`. Server-enforced pacing means the model cannot bulk-read — the tool can only ever give it one item to recite. Tools count drops from 4 to 3 on the model surface. Section 6 fully rewritten; risks table updated (burst-read elevated from "watch-item" to "addressed by design"); smoke test S3 expanded to verify per-item pacing in transcript; files-touched updated to reflect rewrite of `/api/ai/historian/scales/route.ts` and possible `consult_scales` schema audit.
+
+**Side benefit surfaced by this change:** if a patient quits mid-scale, the partial response set is already persisted server-side. Block-style admin would have lost the partial scale on early termination.
+
+**Honest note on prior over-confidence:** I had assumed PR #105's bulk-block scale admin worked because the PR description said it was wired and shipped. That's not the same as having eval data showing scales complete reliably. When a reviewer (Gemini round 2) flagged a theoretical risk and I responded with an assertion of "works in practice," I should have asked Steve for evidence first instead. Acknowledged here so the audit trail is honest.
