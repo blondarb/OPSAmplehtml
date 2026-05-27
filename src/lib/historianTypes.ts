@@ -174,3 +174,47 @@ export function getTurnDetectionConfig(mode: string | undefined): TurnDetectionC
   // Default: semantic_vad with low eagerness (least likely to cut off patient)
   return { type: 'semantic_vad', eagerness: 'low' }
 }
+
+// ─── Tool: query_evidence ───────────────────────────────────────────────────
+
+export type QueryEvidenceArgs = {
+  question: string
+  focus_diagnoses?: string[]
+}
+
+export type QueryEvidenceResponse =
+  | {
+      status: 'ok'
+      chunks: Array<{ content: string; source: string; score?: number }>
+    }
+  | { status: 'timeout'; chunks: [] }
+  | { status: 'error'; chunks: []; message: string }
+
+// ─── Tool: scale_step (paginated) ───────────────────────────────────────────
+
+export type ScaleStepArgs =
+  | { scale_id: string; reason: string } // First call
+  | {
+      scale_id: string
+      prev_index: number
+      prev_response: string | number
+    }
+
+export type ScaleStepResponse =
+  | {
+      done: false
+      index: number
+      item: {
+        text: string
+        choices?: Array<{ label: string; value: string | number }>
+        scoring_hint?: string
+      }
+    }
+  | {
+      done: true
+      total_score: number
+      interpretation: string
+      severity_level: 'none' | 'minimal' | 'mild' | 'moderate' | 'moderately_severe' | 'severe'
+    }
+  | { status: 'unknown_scale'; available: string[] }
+  | { status: 'bad_index'; expected_index: number }
