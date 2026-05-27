@@ -372,10 +372,15 @@ async function handleStep(body: {
     )
   }
 
-  const sessionId = body.historian_session_id
-  if (!sessionId) {
+  // Use consult_id as the primary session-scope key (it's always present in
+  // the demo flow). historian_session_id has a strict FK to historian_sessions
+  // and is not always populated at scale-admin time; we only store it if it
+  // refers to a real row (we'd need a separate lookup to verify, so we
+  // currently pass null and rely on consult_id).
+  const consultId = body.consult_id ?? body.historian_session_id // tolerate either
+  if (!consultId) {
     return NextResponse.json(
-      { error: 'historian_session_id is required' },
+      { error: 'consult_id (or historian_session_id) is required' },
       { status: 400 },
     )
   }
@@ -383,7 +388,13 @@ async function handleStep(body: {
   const isFirstCall = body.prev_index == null
 
   if (isFirstCall) {
-    // INSERT new in-progress row, return item 0
+    // INSERT new in-progress row, return item 0.
+    // Populate BOTH the legacy `responses` + `raw_score` columns (NOT NULL
+    // in the actual schema — pre-existing drift from migration 034) AND the
+    // newer `raw_responses` + `total_score` columns used by the modern
+    // submit/step paths. On completion we'll mirror the same data into both.
+    // historian_session_id passed as NULL — populated only by a separate
+    // backfill if/when the consult row maps to a historian_sessions row.
     const pool = await getPool()
     await pool.query(
       `INSERT INTO scale_results (
@@ -392,19 +403,23 @@ async function handleStep(body: {
         scale_id,
         scale_name,
         scale_abbreviation,
+        responses,
         raw_responses,
+        raw_score,
         status,
         current_index,
         admin_mode,
         administered_at
-      ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,NOW())`,
+      ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,NOW())`,
       [
-        sessionId,
-        body.consult_id ?? null,
+        null,
+        consultId,
         scaleDef.id,
         scaleDef.name,
         scaleDef.abbreviation,
         JSON.stringify({}),
+        JSON.stringify({}),
+        0,
         'in_progress',
         0,
         'voice_administrable',
@@ -433,10 +448,10 @@ async function handleStep(body: {
   const { rows } = await pool.query(
     `SELECT id, current_index, raw_responses
      FROM scale_results
-     WHERE historian_session_id = $1 AND scale_id = $2 AND status = 'in_progress'
+     WHERE consult_id = $1 AND scale_id = $2 AND status = 'in_progress'
      ORDER BY administered_at DESC
      LIMIT 1`,
-    [sessionId, scaleDef.id],
+    [consultId, scaleDef.id],
   )
 
   if (rows.length === 0) {
@@ -468,7 +483,7 @@ async function handleStep(body: {
   if (!isLast) {
     await pool.query(
       `UPDATE scale_results
-       SET raw_responses = $1, current_index = $2
+       SET raw_responses = $1, responses = $1, current_index = $2
        WHERE id = $3`,
       [JSON.stringify(existingResponses), nextIndex, row.id],
     )
@@ -492,11 +507,15 @@ async function handleStep(body: {
   const subscaleScores = computeSubscaleScores(scaleDef.id, existingResponses)
   const severityLevel: SeverityLevel = calculation.severity ?? 'none'
 
+  // Mirror score into both `raw_score` (NOT NULL legacy) and `total_score`
+  // (modern). Same for `responses`/`raw_responses` JSONB columns.
   await pool.query(
     `UPDATE scale_results
      SET raw_responses = $1,
+         responses = $1,
          current_index = $2,
          total_score = $3,
+         raw_score = $3,
          subscale_scores = $4,
          interpretation = $5,
          severity_level = $6,

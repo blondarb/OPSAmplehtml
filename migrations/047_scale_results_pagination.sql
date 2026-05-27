@@ -26,6 +26,12 @@ ALTER TABLE scale_results ALTER COLUMN total_score    DROP NOT NULL;
 ALTER TABLE scale_results ALTER COLUMN interpretation DROP NOT NULL;
 ALTER TABLE scale_results ALTER COLUMN severity_level DROP NOT NULL;
 
+-- patient_id was added NOT NULL out-of-band after migration 034. The demo
+-- /consult flow has no patient row to reference, and the legacy
+-- ?action=submit handler also did not populate this column — relaxing it
+-- to keep both flows working.
+ALTER TABLE scale_results ALTER COLUMN patient_id DROP NOT NULL;
+
 -- completed_at already has DEFAULT NOW() — drop the default + NOT NULL so
 -- in-progress rows don't get an artificial timestamp
 ALTER TABLE scale_results ALTER COLUMN completed_at DROP DEFAULT;

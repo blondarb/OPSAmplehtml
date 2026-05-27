@@ -551,10 +551,10 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
                       reason: args.reason,
                       prev_index: args.prev_index,
                       prev_response: args.prev_response,
-                      // Use consultId as the session-scope key for in-progress
-                      // scale_results lookups. In demo flow, consult ↔ historian
-                      // session is 1:1.
-                      historian_session_id: options.consultId ?? undefined,
+                      // consult_id is the session-scope key for in-progress
+                      // scale_results lookups. historian_session_id has a strict
+                      // FK to historian_sessions and is populated server-side
+                      // when the in-progress row gets backfilled.
                       consult_id: options.consultId ?? undefined,
                     }),
                   })
