@@ -40,9 +40,7 @@ export async function POST(request: Request) {
     }
 
     const instructions = buildHistorianSystemPrompt(sessionType, referralReason, patientContext)
-    // Temporary wrapper — Phase 2 Task 2.3 changes getHistorianToolDefinition to
-    // return an array of 3 tools, at which point this wrapper is dropped.
-    const tools = [getHistorianToolDefinition()]
+    const tools = getHistorianToolDefinition()
     const model = process.env.OPENAI_HISTORIAN_REALTIME_MODEL || 'gpt-realtime-2'
     const turnDetection = getTurnDetectionConfig(process.env.HISTORIAN_TURN_DETECTION_MODE)
 
