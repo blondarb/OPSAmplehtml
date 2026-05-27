@@ -107,6 +107,10 @@ export default function EmbeddedHistorian({
   // options) can reach `injectScaleAdministration` (which lives on the hook
   // result). The ref is populated in an effect once the hook returns.
   const injectScaleAdministrationRef = useRef<((block: string) => void) | null>(null)
+  // Phase 5 of 2026-05-27 historian upgrade: ref to the hook's pushLocalizerContext.
+  // Same forward-declaration pattern as injectScaleAdministrationRef.
+  const pushLocalizerContextRef = useRef<((payload: any) => void) | null>(null)
+  const turnCountRef = useRef(0)
 
   const buildSnapshotFromLocalizer = useCallback((data: LocalizerResponse): LocalizerSnapshot => {
     const diagnoses = data.differential.map((d) => d.diagnosis)
@@ -123,7 +127,18 @@ export default function EmbeddedHistorian({
     }
   }, [referralReason])
 
-  const handleLocalizerUpdate = useCallback(async (data: LocalizerResponse) => {
+  const handleLocalizerUpdate = useCallback(async (data: LocalizerResponse & { push_payload?: any }) => {
+    // Phase 5 of 2026-05-27 historian upgrade: push Localizer findings into
+    // the live OpenAI session via the new pushLocalizerContext channel.
+    // Additive — not load-bearing if the helper isn't ready yet.
+    turnCountRef.current += 1
+    if (data.push_payload && pushLocalizerContextRef.current) {
+      pushLocalizerContextRef.current({
+        ...data.push_payload,
+        turn_count: turnCountRef.current,
+      })
+    }
+
     // Don't queue another scale while one is in progress
     if (scaleAdminInProgressRef.current) return
     if (data.differential.length === 0) return
@@ -192,6 +207,7 @@ export default function EmbeddedHistorian({
     startSession,
     endSession,
     injectScaleAdministration,
+    pushLocalizerContext,
   } = useRealtimeSession({
     sessionType,
     referralReason,
@@ -208,7 +224,8 @@ export default function EmbeddedHistorian({
   // (defined before the hook returns) can call it.
   useEffect(() => {
     injectScaleAdministrationRef.current = injectScaleAdministration
-  }, [injectScaleAdministration])
+    pushLocalizerContextRef.current = pushLocalizerContext
+  }, [injectScaleAdministration, pushLocalizerContext])
 
   // Sync hook status to phase
   useEffect(() => {

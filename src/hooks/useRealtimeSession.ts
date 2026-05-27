@@ -69,6 +69,18 @@ interface UseRealtimeSessionResult {
    * No-op if the session is not active or the data channel is closed.
    */
   injectScaleAdministration: (instructionBlock: string) => void
+  /**
+   * Phase 5 of 2026-05-27 historian upgrade — push Localizer findings into
+   * the live session as a re-serialized instructions delta. Called by
+   * EmbeddedHistorian after each Localizer run completes. Non-fatal if push
+   * fails.
+   */
+  pushLocalizerContext: (payload: {
+    top_differentials?: string[]
+    suggested_next_question?: string | null
+    suggested_scale_id?: string | null
+    turn_count?: number
+  }) => void
   /** Set of scale IDs that have been completed in this session */
   administeredScaleIds: Set<string>
   /** Red flags detected in the current session transcript. */
@@ -118,6 +130,10 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
   const safetyEscalatedRef = useRef<boolean>(false)
   const transcriptRef = useRef<HistorianTranscriptEntry[]>([])
   const administeredScaleIdsRef = useRef<Set<string>>(new Set())
+  // Phase 5: holds the base instructions returned by /api/ai/historian/session.
+  // Used by pushLocalizerContext to re-serialize BASE_PROMPT + delta when
+  // emitting session.update on the data channel every ~3 turns.
+  const baseInstructionsRef = useRef<string>('')
   // Keep stable reference to options callbacks to avoid stale closures
   const onScaleCompleteRef = useRef(options.onScaleComplete)
   useEffect(() => { onScaleCompleteRef.current = options.onScaleComplete }, [options.onScaleComplete])
@@ -271,8 +287,17 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
         throw new Error(errData.error || `Failed to get session token (${tokenRes.status})`)
       }
 
-      const { ephemeralKey, model: sessionModel } = await tokenRes.json()
+      const {
+        ephemeralKey,
+        model: sessionModel,
+        base_instructions: sessionBaseInstructions,
+      } = await tokenRes.json()
       if (!ephemeralKey) throw new Error('No ephemeral key returned')
+
+      // Phase 5 of 2026-05-27 historian upgrade: store the resolved base
+      // instructions so pushLocalizerContext can re-serialize BASE_PROMPT +
+      // delta and emit session.update on the data channel every 3 turns.
+      baseInstructionsRef.current = sessionBaseInstructions ?? ''
 
       // 2. Create RTCPeerConnection
       const pc = new RTCPeerConnection()
@@ -678,6 +703,57 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
    *
    * @param instructionBlock - The instruction text built by buildScaleAdministrationInstructions()
    */
+  /**
+   * Phase 5 of 2026-05-27 historian upgrade — Localizer push channel.
+   *
+   * Called after each Localizer pipeline run completes (every ~3 turns).
+   * Re-serializes BASE_PROMPT + latest delta into the full instructions
+   * string and emits session.update on the data channel.
+   *
+   * Why this pattern (vs conversation.item.create with a role:"system"
+   * message): see spec section 4 + Cross-check round 2.
+   *   - session.update OVERWRITES the instructions field — by passing the
+   *     full re-serialized BASE + delta, we preserve the base prompt + safety
+   *     block (no loss) AND keep only the latest delta active (no timeline
+   *     pollution from accumulating role:"system" messages).
+   *
+   * Non-fatal: if the push fails, the interview continues on the prior
+   * instructions. No retries.
+   */
+  const pushLocalizerContext = useCallback(
+    (pushPayload: {
+      top_differentials?: string[]
+      suggested_next_question?: string | null
+      suggested_scale_id?: string | null
+      turn_count?: number
+    }) => {
+      if (dcRef.current?.readyState !== 'open') return
+      if (!baseInstructionsRef.current) return
+
+      const delta = [
+        `[LATEST LOCALIZER PUSH${pushPayload.turn_count != null ? ` @ turn ${pushPayload.turn_count}` : ''}]`,
+        `- Top differentials: ${(pushPayload.top_differentials ?? []).join(', ') || '(none yet)'}`,
+        `- Suggested next question: ${pushPayload.suggested_next_question ?? '(none)'}`,
+        `- Suggested scale to consider: ${pushPayload.suggested_scale_id ?? '(none)'}`,
+      ].join('\n')
+
+      const updatedInstructions = baseInstructionsRef.current + '\n\n' + delta
+
+      try {
+        dcRef.current.send(
+          JSON.stringify({
+            type: 'session.update',
+            session: { instructions: updatedInstructions },
+          }),
+        )
+      } catch (err) {
+        console.error('[useRealtimeSession] pushLocalizerContext failed:', err)
+        // Non-fatal — interview continues on previous instructions
+      }
+    },
+    [],
+  )
+
   const injectScaleAdministration = useCallback((instructionBlock: string) => {
     if (dcRef.current?.readyState !== 'open') {
       console.warn('[useRealtimeSession] injectScaleAdministration: data channel not open')
@@ -816,6 +892,7 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
     startSession,
     endSession,
     injectScaleAdministration,
+    pushLocalizerContext,
     administeredScaleIds,
     detectedRedFlags,
     interviewCompleted,

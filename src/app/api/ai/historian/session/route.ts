@@ -96,6 +96,10 @@ export async function POST(request: Request) {
       // exactly which configuration is active (for debugging + analytics)
       model,
       turn_detection_mode: turnDetection.type,
+      // Phase 5 of 2026-05-27 historian upgrade: expose the resolved
+      // instructions so the client can re-serialize them when pushing
+      // Localizer context updates (BASE_PROMPT + delta).
+      base_instructions: instructions,
     })
   } catch (error: any) {
     console.error('[historian/session] API error:', error)
