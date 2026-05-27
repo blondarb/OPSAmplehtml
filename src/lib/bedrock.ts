@@ -17,6 +17,7 @@ import {
 import {
   BedrockAgentRuntimeClient,
   RetrieveAndGenerateCommand,
+  RetrieveCommand,
   type RetrieveAndGenerateCommandInput,
 } from '@aws-sdk/client-bedrock-agent-runtime'
 
@@ -338,4 +339,51 @@ export async function retrieveFromKB(
   )
 
   return { generatedText, citations }
+}
+
+// ─── Retrieve-only KB query (no synthesis) ──────────────────────────────────
+// Sibling of retrieveFromKB(). Skips the RetrieveAndGenerate step — returns
+// raw chunks for the caller to synthesize in-context. ~5× faster than the
+// full RetrieveAndGenerate flow because no generation step is invoked.
+// Used by the AI Historian's query_evidence tool where latency matters.
+
+export interface KBChunkRetrievalOptions {
+  knowledgeBaseId: string
+  query: string
+  /** Default 5 (matches KB_RESULTS in localizer route for consistency) */
+  maxResults?: number
+}
+
+export interface KBChunk {
+  content: string
+  source: string
+  score?: number
+}
+
+export interface KBChunkRetrievalResult {
+  chunks: KBChunk[]
+}
+
+export async function retrieveChunksFromKB(
+  opts: KBChunkRetrievalOptions,
+): Promise<KBChunkRetrievalResult> {
+  const region = process.env.BEDROCK_REGION || 'us-east-2'
+  const client = new BedrockAgentRuntimeClient({ region })
+
+  const cmd = new RetrieveCommand({
+    knowledgeBaseId: opts.knowledgeBaseId,
+    retrievalQuery: { text: opts.query },
+    retrievalConfiguration: {
+      vectorSearchConfiguration: { numberOfResults: opts.maxResults ?? 5 },
+    },
+  })
+
+  const response: any = await client.send(cmd as any)
+  const chunks: KBChunk[] = (response.retrievalResults ?? []).map((r: any) => ({
+    content: r.content?.text ?? '',
+    source: r.location?.s3Location?.uri ?? r.location?.webLocation?.url ?? 'unknown',
+    score: r.score,
+  }))
+
+  return { chunks }
 }
