@@ -144,18 +144,15 @@ export default function EmbeddedHistorian({
       )
       if (!next) return
 
-      const adminRes = await fetch('/api/ai/historian/scales?action=administer', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ scale_id: next.scaleId }),
-      })
-      if (!adminRes.ok) return
-      const adminJson: { instruction_block: string; scale_abbreviation: string } = await adminRes.json()
-
+      // Phase 4 of 2026-05-27 historian upgrade: scale admin is now driven by
+      // the model via the paginated scale_step tool, not by client-side bulk
+      // injection. We still mark the scale as "indicated" so the UI can hint
+      // at activity, but we don't fetch the instruction_block or call
+      // injectScaleAdministration anymore. Phase 5's Localizer push delivers
+      // suggested_scale_id to the model, which then self-initiates scale_step.
       injectedScaleIdsRef.current.add(next.scaleId)
       scaleAdminInProgressRef.current = true
       setActiveScale({ id: next.scaleId, abbreviation: next.scaleAbbreviation })
-      injectScaleAdministrationRef.current?.(adminJson.instruction_block)
     } catch (err) {
       console.warn('[EmbeddedHistorian] Scale trigger evaluation failed (session continues):', err)
     }

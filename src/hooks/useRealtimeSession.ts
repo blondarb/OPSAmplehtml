@@ -534,6 +534,81 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
               }
             }
 
+            // ── scale_step (Phase 4 — paginated single-item admin) ──
+            // Replaces the legacy save_scale_responses tool. Each call returns
+            // exactly one scale item from the server; the model recites it
+            // verbatim, awaits patient response, then calls scale_step again
+            // with prev_response. Final call returns {done:true, total_score, ...}.
+            if (item.name === 'scale_step') {
+              ;(async () => {
+                try {
+                  const args = JSON.parse(item.arguments || '{}')
+                  const res = await fetch('/api/ai/historian/scales?action=step', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                      scale_id: args.scale_id,
+                      reason: args.reason,
+                      prev_index: args.prev_index,
+                      prev_response: args.prev_response,
+                      // Use consultId as the session-scope key for in-progress
+                      // scale_results lookups. In demo flow, consult ↔ historian
+                      // session is 1:1.
+                      historian_session_id: options.consultId ?? undefined,
+                      consult_id: options.consultId ?? undefined,
+                    }),
+                  })
+                  const result = await res.json()
+
+                  // If the scale just completed, mark it administered and
+                  // notify the parent (replaces the old save_scale_responses
+                  // notify path).
+                  if (result?.done === true && typeof args.scale_id === 'string') {
+                    const updatedSet = new Set(administeredScaleIdsRef.current)
+                    updatedSet.add(args.scale_id)
+                    administeredScaleIdsRef.current = updatedSet
+                    setAdministeredScaleIds(new Set(updatedSet))
+                    onScaleCompleteRef.current?.({
+                      scale_id: args.scale_id,
+                      responses: {}, // raw_responses live server-side now
+                      total_score: result.total_score,
+                      interpretation: result.interpretation,
+                      severity_level: result.severity_level,
+                    } as any)
+                  }
+
+                  if (dcRef.current?.readyState === 'open') {
+                    dcRef.current.send(
+                      JSON.stringify({
+                        type: 'conversation.item.create',
+                        item: {
+                          type: 'function_call_output',
+                          call_id: item.call_id,
+                          output: JSON.stringify(result),
+                        },
+                      }),
+                    )
+                    dcRef.current.send(JSON.stringify({ type: 'response.create' }))
+                  }
+                } catch (err) {
+                  console.error('[useRealtimeSession] scale_step handler error:', err)
+                  if (dcRef.current?.readyState === 'open') {
+                    dcRef.current.send(
+                      JSON.stringify({
+                        type: 'conversation.item.create',
+                        item: {
+                          type: 'function_call_output',
+                          call_id: item.call_id,
+                          output: JSON.stringify({ status: 'error', message: 'client error' }),
+                        },
+                      }),
+                    )
+                    dcRef.current.send(JSON.stringify({ type: 'response.create' }))
+                  }
+                }
+              })()
+            }
+
             // ── query_evidence (Phase 3) ──
             if (item.name === 'query_evidence') {
               // handleServerEvent is sync; run fetch in a fire-and-forget async IIFE
