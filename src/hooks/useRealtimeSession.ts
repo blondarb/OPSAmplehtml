@@ -743,7 +743,14 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
         dcRef.current.send(
           JSON.stringify({
             type: 'session.update',
-            session: { instructions: updatedInstructions },
+            session: {
+              // OpenAI's new Realtime API requires session.type on every
+              // session.update, not just at session create. Without it the
+              // push gets rejected with HTTP 400 missing_required_parameter.
+              // Caught by /tmp/historian-play.py WSS smoke 2026-05-27.
+              type: 'realtime',
+              instructions: updatedInstructions,
+            },
           }),
         )
       } catch (err) {
