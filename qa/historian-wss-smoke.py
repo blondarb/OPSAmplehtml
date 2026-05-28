@@ -60,12 +60,12 @@ PERSONAS = {
             3: {
                 "top_differentials": ["essential tremor (medium)", "early parkinsonism (medium)", "vascular cognitive impairment (low)"],
                 "suggested_next_question": "Has the patient noticed REM-sleep behavior disorder symptoms (acting out dreams)?",
-                "suggested_scale_id": "moca",
+                "suggested_scale_id": "mini_cog",
             },
             6: {
                 "top_differentials": ["Lewy body dementia (medium)", "essential tremor + MCI (medium)", "Parkinson disease dementia (low)"],
                 "suggested_next_question": "Has the patient or wife noticed visual hallucinations or fluctuating attention?",
-                "suggested_scale_id": "moca",
+                "suggested_scale_id": "mini_cog",
             },
         },
     },
