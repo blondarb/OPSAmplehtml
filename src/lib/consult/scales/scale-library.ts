@@ -17,6 +17,7 @@ import {
   HIT6,
   MOCA,
   ESS,
+  MINI_COG,
 } from '@/lib/scales/scale-definitions'
 import type {
   ScaleTrigger,
@@ -602,7 +603,26 @@ export const SCALE_TRIGGERS: ScaleTrigger[] = [
     requiresPhysician: false,
   },
 
-  // MoCA — cognitive screening (exam required for visuospatial subtests)
+  // Mini-Cog — brief 3-item cognitive screen (voice-administrable).
+  // Preferred over MoCA in the voice historian path because MoCA requires
+  // visuospatial subtests (drawing cube, clock) that don't translate to voice.
+  // Higher priority (7) than MoCA (8) so getVoiceAdministrableScales picks it
+  // first for cognitive complaints.
+  {
+    scaleId: 'mini_cog',
+    triggerCategories: ['cognitive_impairment', 'dementia', 'mild_cognitive_impairment', 'memory'],
+    triggerKeywords: [
+      'memory loss', 'forgetful', 'dementia', 'cognitive decline', 'confusion',
+      'alzheimer', 'mci', 'mild cognitive', 'word finding', 'getting lost',
+    ],
+    adminMode: 'voice_administrable',
+    priority: 7,
+    requiresPhysician: false,
+  },
+
+  // MoCA — comprehensive cognitive screening (exam required — visuospatial subtests
+  // can't be voice-administered). Kept in the trigger list so physicians get the
+  // recommendation in their UI; not surfaced to the voice historian.
   {
     scaleId: 'moca',
     triggerCategories: ['cognitive_impairment', 'dementia', 'mild_cognitive_impairment', 'memory'],
@@ -611,7 +631,7 @@ export const SCALE_TRIGGERS: ScaleTrigger[] = [
       'alzheimer', 'mci', 'mild cognitive', 'word finding', 'getting lost',
     ],
     adminMode: 'exam_required',
-    priority: 7,
+    priority: 8,
     requiresPhysician: true,
   },
 
@@ -670,6 +690,7 @@ export const CONSULT_SCALE_DEFINITIONS: Record<string, ScaleDefinition> = {
   midas: MIDAS,
   hit6: HIT6,
   moca: MOCA,
+  mini_cog: MINI_COG,
   ess: ESS,
   nihss: NIHSS,
   alsfrs_r: ALSFRS_R,

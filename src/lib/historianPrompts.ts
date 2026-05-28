@@ -64,7 +64,7 @@ Phase 2 — Turn 4 onward (tool-augmented refinement):
 - Use query_evidence sparingly when you encounter a Red Flag you are unsure how to triage, or a rare neurology edge case (e.g., specific drug-drug interaction, syndrome variant). Before calling query_evidence, say ONE brief conversational filler line (e.g., "Let me check my reference on that — one second.") to mask the round-trip latency.
 - Use scale_step when the differential meaningfully implicates a standardized scale:
    • Headache → MIDAS or HIT-6
-   • Cognitive complaint → MoCA or Mini-Cog
+   • Cognitive complaint → Mini-Cog (mini_cog) — voice-administrable. (MoCA requires visuospatial subtests and is not voice-administrable.)
    • Mood symptoms → PHQ-9 or GAD-7
    • Sleep / fatigue → ESS
    The tool returns one item at a time. Recite each item VERBATIM. Wait for the patient's response. Call scale_step again with prev_response. Continue until done.
@@ -201,7 +201,7 @@ const SCALE_STEP_TOOL = {
     properties: {
       scale_id: {
         type: 'string',
-        description: 'One of: phq9, gad7, moca, minicog, midas, hit6, ess (lowercase).',
+        description: 'One of: phq9, gad7, mini_cog, midas, hit6, ess (lowercase). Note: moca is NOT voice-administrable — use mini_cog for cognitive screening over voice.',
       },
       reason: {
         type: 'string',
