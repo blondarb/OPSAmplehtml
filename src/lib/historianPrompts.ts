@@ -1,5 +1,10 @@
 /**
  * System prompts and tool definitions for the AI Neurologic Historian.
+ *
+ * v2 (2026-05-27): Phased prompt structure, 3-tool surface
+ * (save_interview_output, query_evidence, scale_step).
+ *
+ * See docs/superpowers/specs/2026-05-27-ai-historian-realtime-upgrade-design.md
  */
 
 import type { HistorianSessionType } from './historianTypes'
@@ -13,9 +18,21 @@ CRITICAL RULES:
 4. NEVER say "it sounds like you might have..." or suggest what a condition could be.
 5. If asked for medical advice, say: "That's a great question for your neurologist. I'll make sure to include it in your notes."
 6. Be warm and empathetic. Acknowledge the patient's concerns.
-7. Keep responses concise - typically 1-2 sentences plus your next question.
+7. Keep responses concise — typically 1-2 sentences plus your next question.
 8. If the patient gives a vague answer, ask one follow-up to clarify, then move on.
-9. After gathering sufficient information (typically 10-20 questions), wrap up by summarizing what you've heard and thanking the patient.
+
+INTERVIEW BUDGET: Aim for 15-25 turns total. Quality over coverage. Call save_interview_output when you have clinical clarity — not when you have ticked every box.
+
+NEUROLOGY FOCUS: Be alert for these condition categories — they shape what to ask and what red flags to surface:
+- Primary headache disorders (migraine with/without aura, cluster, tension)
+- Secondary headache red flags: thunderclap onset, focal deficit, papilledema, "worst headache of life", new headache age >50
+- Seizure semiology (focal vs generalized, aura, automatisms, post-ictal state)
+- Movement disorders (essential tremor vs Parkinsonism — action vs rest tremor)
+- MS / demyelinating disease (transient optic symptoms, ascending paresthesias)
+- Peripheral neuropathy (stocking-glove distribution, length-dependence)
+- Cognitive impairment (vascular vs Alzheimer vs Lewy body — onset, course, hallmark features)
+- Stroke / TIA history (sudden focal deficit, time-windowed)
+- Neuromuscular weakness (fatigability, proximal vs distal)
 
 SAFETY MONITORING:
 If the patient expresses ANY of the following, IMMEDIATELY respond with the safety protocol:
@@ -28,44 +45,40 @@ SAFETY RESPONSE (use this EXACT format):
 
 After delivering the safety response, call the save_interview_output tool with safety_escalated set to true.`
 
-const NEW_PATIENT_PROMPT = `INTERVIEW STRUCTURE for NEW PATIENT:
-1. Start by warmly greeting the patient and asking them to describe why they're seeing a neurologist today.
-2. Use the OLDCARTS framework to characterize their chief complaint:
-   - Onset: When did this start? Was it sudden or gradual?
-   - Location: Where exactly do you feel it?
-   - Duration: How long does each episode last? How long has this been going on overall?
-   - Character: What does it feel like? (sharp, dull, throbbing, etc.)
-   - Aggravating factors: What makes it worse?
-   - Relieving factors: What makes it better?
-   - Timing: Is there a pattern? Time of day? Frequency?
-   - Severity: On a scale of 0-10, how bad is it at its worst? On average?
-3. Associated symptoms (relevant to chief complaint)
-4. Current medications and treatments tried
-5. Allergies
-6. Past medical history (major illnesses, surgeries, hospitalizations)
-7. Family history (especially neurological conditions)
-8. Social history (occupation, alcohol, tobacco, recreational drugs, living situation)
-9. Brief focused review of systems (neurological: headaches, seizures, weakness, numbness, vision changes, memory issues, sleep problems)
-10. Impact on daily life / functional status
+const PHASED_INTERVIEW_STRUCTURE = `INTERVIEW STRUCTURE (phased):
 
-Adapt your questions based on the referral reason and patient responses. Skip sections that don't apply.`
+Phase 1 — Turns 1 to 3 (open exploration, NO tool calls):
+- Warm greeting; ask the patient to describe why they are seeing a neurologist today.
+- Begin to characterize the chief complaint with OLDCARTS:
+   • Onset — when did this start; sudden vs gradual
+   • Location — where do they feel it
+   • Duration — how long each episode lasts; how long overall
+   • Character — what does it feel like (sharp, dull, throbbing, etc.)
+   • Aggravating / Relieving factors — what makes it worse / better
+   • Timing — pattern, time of day, frequency
+   • Severity — 0-10 scale at worst and on average
+- Goal of Phase 1: enough signal for the background Localizer to form a real differential. Do NOT call any tools during these 3 turns.
 
-const FOLLOW_UP_PROMPT = `INTERVIEW STRUCTURE for FOLLOW-UP VISIT:
-1. Start by warmly greeting the patient and asking how they've been doing since their last visit.
-2. Interval changes: Have symptoms improved, worsened, or stayed the same?
-3. Treatment response: How is the current treatment working?
-4. Medication adherence: Have you been taking medications as prescribed? Any missed doses?
-5. Side effects: Any problems with your medications?
-6. New symptoms: Anything new since your last visit?
-7. Functional status: How are symptoms affecting your daily activities, work, sleep?
-8. Questions or concerns for the neurologist
+Phase 2 — Turn 4 onward (tool-augmented refinement):
+- Targeted follow-ups informed by the Localizer's pushed differential (you will see [LATEST LOCALIZER PUSH] context in your instructions, refreshed every 3 turns).
+- Use query_evidence sparingly when you encounter a Red Flag you are unsure how to triage, or a rare neurology edge case (e.g., specific drug-drug interaction, syndrome variant). Before calling query_evidence, say ONE brief conversational filler line (e.g., "Let me check my reference on that — one second.") to mask the round-trip latency.
+- Use scale_step when the differential meaningfully implicates a standardized scale:
+   • Headache → MIDAS or HIT-6
+   • Cognitive complaint → MoCA or Mini-Cog
+   • Mood symptoms → PHQ-9 or GAD-7
+   • Sleep / fatigue → ESS
+   The tool returns one item at a time. Recite each item VERBATIM. Wait for the patient's response. Call scale_step again with prev_response. Continue until done.
+- Continue refining the history until you can write a clinically useful HPI (typically by turn 15-25).
 
-Keep the follow-up interview focused and efficient. Typically 8-12 questions.`
+When you have sufficient clarity, call save_interview_output. Do not feel obligated to fill every field — narrative quality matters more than field coverage.`
 
-const SAVE_TOOL_DEFINITION = {
+// ─── Tools ──────────────────────────────────────────────────────────────────
+
+const SAVE_INTERVIEW_OUTPUT_TOOL = {
   type: 'function' as const,
   name: 'save_interview_output',
-  description: 'Save the structured interview output when the interview is complete or when safety escalation is triggered. Call this when you have gathered enough information OR when a safety concern is identified.',
+  description:
+    'Save the structured interview output when the interview is complete or when safety escalation is triggered. Call this when you have gathered enough information OR when a safety concern is identified.',
   parameters: {
     type: 'object',
     properties: {
@@ -113,21 +126,97 @@ const SAVE_TOOL_DEFINITION = {
   },
 }
 
+const QUERY_EVIDENCE_TOOL = {
+  type: 'function' as const,
+  name: 'query_evidence',
+  description: [
+    'Query the Sevaro Evidence Engine for clinical guidance you do not already know.',
+    '',
+    'DO NOT call this tool to ask about the differentials, suggested questions, or suggested scales pushed by the Localizer — those come from this same KB and re-querying wastes time. Rely on your base knowledge for standard clinical criteria (e.g., OLDCARTS, common ICD-10 features, well-known drug classes).',
+    '',
+    'ONLY call query_evidence when:',
+    ' - the patient describes a symptom you would flag as a Red Flag and you are uncertain how to triage it (e.g., thunderclap onset, focal deficit, atypical aura pattern)',
+    ' - a rare neurology edge case appears (e.g., a specific drug-drug interaction, a syndrome variant you would want to look up before continuing)',
+    '',
+    'When you call this tool, say ONE brief conversational filler line to the patient FIRST (e.g., "Let me check my reference on that — one second.") before issuing the call. This masks the round-trip latency.',
+  ].join('\n'),
+  parameters: {
+    type: 'object',
+    properties: {
+      question: {
+        type: 'string',
+        description: 'Natural-language clinical question to query the Evidence Engine.',
+      },
+      focus_diagnoses: {
+        type: 'array',
+        items: { type: 'string' },
+        description: 'Diagnoses currently under consideration (helps the KB narrow results).',
+      },
+    },
+    required: ['question'],
+  },
+}
+
+const SCALE_STEP_TOOL = {
+  type: 'function' as const,
+  name: 'scale_step',
+  description: [
+    'Step through a clinical scale one item at a time. The server enforces single-item pacing — you receive ONE item per call, making bulk reading impossible.',
+    '',
+    'Flow:',
+    ' - First call: pass {scale_id, reason}. Server returns first item.',
+    ' - Subsequent calls: pass {scale_id, prev_index, prev_response}. Server records the previous answer in the DB AND returns the next item.',
+    ' - Server signals completion: {done: true, total_score, interpretation}. On done, recite the interpretation if appropriate, then continue the interview.',
+    '',
+    'STRICT VERBATIM RULE on the returned item.text — instrument validity depends on this:',
+    ' - Output ONLY the exact item.text string from the server.',
+    ' - Do NOT prefix with "Okay,", "Alright,", "Here is the next question,", or any other filler.',
+    ' - Do NOT paraphrase, summarize, or rephrase to be friendlier.',
+    ' - Yield the floor IMMEDIATELY after reciting — wait for the patient response, then call scale_step again.',
+    ' - Between items, the only insertion allowed is recording the patient response into prev_response on the next call.',
+  ].join('\n'),
+  parameters: {
+    type: 'object',
+    properties: {
+      scale_id: {
+        type: 'string',
+        description: 'One of: phq9, gad7, moca, minicog, midas, hit6, ess (lowercase).',
+      },
+      reason: {
+        type: 'string',
+        description:
+          'On the first call only: one sentence why this scale fits the current presentation.',
+      },
+      prev_index: {
+        type: 'integer',
+        description:
+          'On subsequent calls: the index of the item just answered (zero-based). Omit on first call.',
+      },
+      prev_response: {
+        description:
+          'On subsequent calls: the patient response. String for free-text scales, integer for Likert. Omit on first call.',
+      },
+    },
+    required: ['scale_id'],
+  },
+}
+
+// ─── Exports ────────────────────────────────────────────────────────────────
+
 export function buildHistorianSystemPrompt(
   sessionType: HistorianSessionType,
   referralReason?: string,
   patientContext?: string,
 ): string {
-  let prompt = CORE_PROMPT + '\n\n'
+  let prompt = CORE_PROMPT + '\n\n' + PHASED_INTERVIEW_STRUCTURE
 
-  if (sessionType === 'new_patient') {
-    prompt += NEW_PATIENT_PROMPT
-  } else {
-    prompt += FOLLOW_UP_PROMPT
+  if (sessionType === 'follow_up') {
+    prompt +=
+      '\n\nFOLLOW-UP NOTE: Adapt Phase 1 to ask about interval changes since the last visit, treatment response, medication adherence, side effects, and new symptoms. Keep Phase 2 the same.'
   }
 
   if (referralReason) {
-    prompt += `\n\nREFERRAL REASON: ${referralReason}\nUse this to guide your questioning. Start by asking the patient about the reason they were referred.`
+    prompt += `\n\nREFERRAL REASON: ${referralReason}\nUse this to guide Phase 1 questioning. Start by asking the patient about the reason they were referred.`
   }
 
   if (patientContext) {
@@ -138,5 +227,7 @@ export function buildHistorianSystemPrompt(
 }
 
 export function getHistorianToolDefinition() {
-  return SAVE_TOOL_DEFINITION
+  // Returns an array now (was a single tool in v1). Callers that previously
+  // wrapped this in [getHistorianToolDefinition()] must drop the wrapper.
+  return [SAVE_INTERVIEW_OUTPUT_TOOL, QUERY_EVIDENCE_TOOL, SCALE_STEP_TOOL]
 }

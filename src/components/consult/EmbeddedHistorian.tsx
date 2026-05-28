@@ -107,6 +107,10 @@ export default function EmbeddedHistorian({
   // options) can reach `injectScaleAdministration` (which lives on the hook
   // result). The ref is populated in an effect once the hook returns.
   const injectScaleAdministrationRef = useRef<((block: string) => void) | null>(null)
+  // Phase 5 of 2026-05-27 historian upgrade: ref to the hook's pushLocalizerContext.
+  // Same forward-declaration pattern as injectScaleAdministrationRef.
+  const pushLocalizerContextRef = useRef<((payload: any) => void) | null>(null)
+  const turnCountRef = useRef(0)
 
   const buildSnapshotFromLocalizer = useCallback((data: LocalizerResponse): LocalizerSnapshot => {
     const diagnoses = data.differential.map((d) => d.diagnosis)
@@ -123,7 +127,18 @@ export default function EmbeddedHistorian({
     }
   }, [referralReason])
 
-  const handleLocalizerUpdate = useCallback(async (data: LocalizerResponse) => {
+  const handleLocalizerUpdate = useCallback(async (data: LocalizerResponse & { push_payload?: any }) => {
+    // Phase 5 of 2026-05-27 historian upgrade: push Localizer findings into
+    // the live OpenAI session via the new pushLocalizerContext channel.
+    // Additive — not load-bearing if the helper isn't ready yet.
+    turnCountRef.current += 1
+    if (data.push_payload && pushLocalizerContextRef.current) {
+      pushLocalizerContextRef.current({
+        ...data.push_payload,
+        turn_count: turnCountRef.current,
+      })
+    }
+
     // Don't queue another scale while one is in progress
     if (scaleAdminInProgressRef.current) return
     if (data.differential.length === 0) return
@@ -144,18 +159,15 @@ export default function EmbeddedHistorian({
       )
       if (!next) return
 
-      const adminRes = await fetch('/api/ai/historian/scales?action=administer', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ scale_id: next.scaleId }),
-      })
-      if (!adminRes.ok) return
-      const adminJson: { instruction_block: string; scale_abbreviation: string } = await adminRes.json()
-
+      // Phase 4 of 2026-05-27 historian upgrade: scale admin is now driven by
+      // the model via the paginated scale_step tool, not by client-side bulk
+      // injection. We still mark the scale as "indicated" so the UI can hint
+      // at activity, but we don't fetch the instruction_block or call
+      // injectScaleAdministration anymore. Phase 5's Localizer push delivers
+      // suggested_scale_id to the model, which then self-initiates scale_step.
       injectedScaleIdsRef.current.add(next.scaleId)
       scaleAdminInProgressRef.current = true
       setActiveScale({ id: next.scaleId, abbreviation: next.scaleAbbreviation })
-      injectScaleAdministrationRef.current?.(adminJson.instruction_block)
     } catch (err) {
       console.warn('[EmbeddedHistorian] Scale trigger evaluation failed (session continues):', err)
     }
@@ -195,6 +207,7 @@ export default function EmbeddedHistorian({
     startSession,
     endSession,
     injectScaleAdministration,
+    pushLocalizerContext,
   } = useRealtimeSession({
     sessionType,
     referralReason,
@@ -211,7 +224,8 @@ export default function EmbeddedHistorian({
   // (defined before the hook returns) can call it.
   useEffect(() => {
     injectScaleAdministrationRef.current = injectScaleAdministration
-  }, [injectScaleAdministration])
+    pushLocalizerContextRef.current = pushLocalizerContext
+  }, [injectScaleAdministration, pushLocalizerContext])
 
   // Sync hook status to phase
   useEffect(() => {

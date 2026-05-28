@@ -69,6 +69,18 @@ interface UseRealtimeSessionResult {
    * No-op if the session is not active or the data channel is closed.
    */
   injectScaleAdministration: (instructionBlock: string) => void
+  /**
+   * Phase 5 of 2026-05-27 historian upgrade — push Localizer findings into
+   * the live session as a re-serialized instructions delta. Called by
+   * EmbeddedHistorian after each Localizer run completes. Non-fatal if push
+   * fails.
+   */
+  pushLocalizerContext: (payload: {
+    top_differentials?: string[]
+    suggested_next_question?: string | null
+    suggested_scale_id?: string | null
+    turn_count?: number
+  }) => void
   /** Set of scale IDs that have been completed in this session */
   administeredScaleIds: Set<string>
   /** Red flags detected in the current session transcript. */
@@ -118,6 +130,10 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
   const safetyEscalatedRef = useRef<boolean>(false)
   const transcriptRef = useRef<HistorianTranscriptEntry[]>([])
   const administeredScaleIdsRef = useRef<Set<string>>(new Set())
+  // Phase 5: holds the base instructions returned by /api/ai/historian/session.
+  // Used by pushLocalizerContext to re-serialize BASE_PROMPT + delta when
+  // emitting session.update on the data channel every ~3 turns.
+  const baseInstructionsRef = useRef<string>('')
   // Keep stable reference to options callbacks to avoid stale closures
   const onScaleCompleteRef = useRef(options.onScaleComplete)
   useEffect(() => { onScaleCompleteRef.current = options.onScaleComplete }, [options.onScaleComplete])
@@ -271,8 +287,17 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
         throw new Error(errData.error || `Failed to get session token (${tokenRes.status})`)
       }
 
-      const { ephemeralKey } = await tokenRes.json()
+      const {
+        ephemeralKey,
+        model: sessionModel,
+        base_instructions: sessionBaseInstructions,
+      } = await tokenRes.json()
       if (!ephemeralKey) throw new Error('No ephemeral key returned')
+
+      // Phase 5 of 2026-05-27 historian upgrade: store the resolved base
+      // instructions so pushLocalizerContext can re-serialize BASE_PROMPT +
+      // delta and emit session.update on the data channel every 3 turns.
+      baseInstructionsRef.current = sessionBaseInstructions ?? ''
 
       // 2. Create RTCPeerConnection
       const pc = new RTCPeerConnection()
@@ -338,21 +363,30 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
       await pc.setLocalDescription(offer)
 
       // 7. Send offer to OpenAI, get answer
-      const sdpRes = await fetch('https://api.openai.com/v1/realtime?model=gpt-realtime', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${ephemeralKey}`,
-          'Content-Type': 'application/sdp',
+      // Current GA endpoint per platform.openai.com (2026-05). Model passed as
+      // query param. Ephemeral key is the bearer.
+      const realtimeModel = sessionModel ?? 'gpt-realtime-2'
+
+      const sdpRes = await fetch(
+        `https://api.openai.com/v1/realtime/calls?model=${encodeURIComponent(realtimeModel)}`,
+        {
+          method: 'POST',
+          body: offer.sdp,
+          headers: {
+            Authorization: `Bearer ${ephemeralKey}`,
+            'Content-Type': 'application/sdp',
+          },
         },
-        body: offer.sdp,
-      })
+      )
 
       if (!sdpRes.ok) {
-        throw new Error(`WebRTC SDP exchange failed (${sdpRes.status})`)
+        const errorBody = await sdpRes.text()
+        console.error('[useRealtimeSession] SDP exchange failed:', sdpRes.status, errorBody)
+        throw new Error(`OpenAI Realtime SDP exchange returned ${sdpRes.status}: ${errorBody}`)
       }
 
-      const answerSdp = await sdpRes.text()
-      await pc.setRemoteDescription({ type: 'answer', sdp: answerSdp })
+      const sdpAnswer = await sdpRes.text()
+      await pc.setRemoteDescription({ type: 'answer', sdp: sdpAnswer })
 
       // 8. Start timer
       startTimeRef.current = Date.now()
@@ -524,6 +558,131 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
                 console.error('Error parsing save_scale_responses:', e)
               }
             }
+
+            // ── scale_step (Phase 4 — paginated single-item admin) ──
+            // Replaces the legacy save_scale_responses tool. Each call returns
+            // exactly one scale item from the server; the model recites it
+            // verbatim, awaits patient response, then calls scale_step again
+            // with prev_response. Final call returns {done:true, total_score, ...}.
+            if (item.name === 'scale_step') {
+              ;(async () => {
+                try {
+                  const args = JSON.parse(item.arguments || '{}')
+                  const res = await fetch('/api/ai/historian/scales?action=step', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                      scale_id: args.scale_id,
+                      reason: args.reason,
+                      prev_index: args.prev_index,
+                      prev_response: args.prev_response,
+                      // consult_id is the session-scope key for in-progress
+                      // scale_results lookups. historian_session_id has a strict
+                      // FK to historian_sessions and is populated server-side
+                      // when the in-progress row gets backfilled.
+                      consult_id: options.consultId ?? undefined,
+                    }),
+                  })
+                  const result = await res.json()
+
+                  // If the scale just completed, mark it administered and
+                  // notify the parent (replaces the old save_scale_responses
+                  // notify path).
+                  if (result?.done === true && typeof args.scale_id === 'string') {
+                    const updatedSet = new Set(administeredScaleIdsRef.current)
+                    updatedSet.add(args.scale_id)
+                    administeredScaleIdsRef.current = updatedSet
+                    setAdministeredScaleIds(new Set(updatedSet))
+                    onScaleCompleteRef.current?.({
+                      scale_id: args.scale_id,
+                      responses: {}, // raw_responses live server-side now
+                      total_score: result.total_score,
+                      interpretation: result.interpretation,
+                      severity_level: result.severity_level,
+                    } as any)
+                  }
+
+                  if (dcRef.current?.readyState === 'open') {
+                    dcRef.current.send(
+                      JSON.stringify({
+                        type: 'conversation.item.create',
+                        item: {
+                          type: 'function_call_output',
+                          call_id: item.call_id,
+                          output: JSON.stringify(result),
+                        },
+                      }),
+                    )
+                    dcRef.current.send(JSON.stringify({ type: 'response.create' }))
+                  }
+                } catch (err) {
+                  console.error('[useRealtimeSession] scale_step handler error:', err)
+                  if (dcRef.current?.readyState === 'open') {
+                    dcRef.current.send(
+                      JSON.stringify({
+                        type: 'conversation.item.create',
+                        item: {
+                          type: 'function_call_output',
+                          call_id: item.call_id,
+                          output: JSON.stringify({ status: 'error', message: 'client error' }),
+                        },
+                      }),
+                    )
+                    dcRef.current.send(JSON.stringify({ type: 'response.create' }))
+                  }
+                }
+              })()
+            }
+
+            // ── query_evidence (Phase 3) ──
+            if (item.name === 'query_evidence') {
+              // handleServerEvent is sync; run fetch in a fire-and-forget async IIFE
+              ;(async () => {
+                try {
+                  const args = JSON.parse(item.arguments || '{}')
+                  const res = await fetch('/api/ai/historian/evidence-query', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                      question: args.question,
+                      focus_diagnoses: args.focus_diagnoses,
+                    }),
+                  })
+                  const result = await res.json()
+
+                  if (dcRef.current?.readyState === 'open') {
+                    // Send the tool result back to the model over the data channel
+                    dcRef.current.send(
+                      JSON.stringify({
+                        type: 'conversation.item.create',
+                        item: {
+                          type: 'function_call_output',
+                          call_id: item.call_id,
+                          output: JSON.stringify(result),
+                        },
+                      }),
+                    )
+                    // Prompt the model to continue speaking
+                    dcRef.current.send(JSON.stringify({ type: 'response.create' }))
+                  }
+                } catch (err) {
+                  console.error('[useRealtimeSession] query_evidence handler error:', err)
+                  if (dcRef.current?.readyState === 'open') {
+                    dcRef.current.send(
+                      JSON.stringify({
+                        type: 'conversation.item.create',
+                        item: {
+                          type: 'function_call_output',
+                          call_id: item.call_id,
+                          output: JSON.stringify({ status: 'error', chunks: [], message: 'client error' }),
+                        },
+                      }),
+                    )
+                    dcRef.current.send(JSON.stringify({ type: 'response.create' }))
+                  }
+                }
+              })()
+            }
           }
         }
         break
@@ -544,6 +703,57 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
    *
    * @param instructionBlock - The instruction text built by buildScaleAdministrationInstructions()
    */
+  /**
+   * Phase 5 of 2026-05-27 historian upgrade — Localizer push channel.
+   *
+   * Called after each Localizer pipeline run completes (every ~3 turns).
+   * Re-serializes BASE_PROMPT + latest delta into the full instructions
+   * string and emits session.update on the data channel.
+   *
+   * Why this pattern (vs conversation.item.create with a role:"system"
+   * message): see spec section 4 + Cross-check round 2.
+   *   - session.update OVERWRITES the instructions field — by passing the
+   *     full re-serialized BASE + delta, we preserve the base prompt + safety
+   *     block (no loss) AND keep only the latest delta active (no timeline
+   *     pollution from accumulating role:"system" messages).
+   *
+   * Non-fatal: if the push fails, the interview continues on the prior
+   * instructions. No retries.
+   */
+  const pushLocalizerContext = useCallback(
+    (pushPayload: {
+      top_differentials?: string[]
+      suggested_next_question?: string | null
+      suggested_scale_id?: string | null
+      turn_count?: number
+    }) => {
+      if (dcRef.current?.readyState !== 'open') return
+      if (!baseInstructionsRef.current) return
+
+      const delta = [
+        `[LATEST LOCALIZER PUSH${pushPayload.turn_count != null ? ` @ turn ${pushPayload.turn_count}` : ''}]`,
+        `- Top differentials: ${(pushPayload.top_differentials ?? []).join(', ') || '(none yet)'}`,
+        `- Suggested next question: ${pushPayload.suggested_next_question ?? '(none)'}`,
+        `- Suggested scale to consider: ${pushPayload.suggested_scale_id ?? '(none)'}`,
+      ].join('\n')
+
+      const updatedInstructions = baseInstructionsRef.current + '\n\n' + delta
+
+      try {
+        dcRef.current.send(
+          JSON.stringify({
+            type: 'session.update',
+            session: { instructions: updatedInstructions },
+          }),
+        )
+      } catch (err) {
+        console.error('[useRealtimeSession] pushLocalizerContext failed:', err)
+        // Non-fatal — interview continues on previous instructions
+      }
+    },
+    [],
+  )
+
   const injectScaleAdministration = useCallback((instructionBlock: string) => {
     if (dcRef.current?.readyState !== 'open') {
       console.warn('[useRealtimeSession] injectScaleAdministration: data channel not open')
@@ -682,6 +892,7 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
     startSession,
     endSession,
     injectScaleAdministration,
+    pushLocalizerContext,
     administeredScaleIds,
     detectedRedFlags,
     interviewCompleted,

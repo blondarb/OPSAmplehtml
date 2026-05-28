@@ -141,3 +141,80 @@ export const DEMO_SCENARIOS: DemoScenario[] = [
     description: 'Return visit for MS monitoring. AI will screen for new symptoms and treatment tolerability.',
   },
 ]
+
+// ─── Turn detection config (env-driven, with PR #105 fallback) ──────────────
+
+export type TurnDetectionMode = 'semantic_vad' | 'server_vad'
+
+export type TurnDetectionConfig =
+  | { type: 'semantic_vad'; eagerness: 'low' | 'medium' | 'high' }
+  | {
+      type: 'server_vad'
+      threshold: number
+      prefix_padding_ms: number
+      silence_duration_ms: number
+    }
+
+/**
+ * Resolve TurnDetectionConfig from a mode string (typically from
+ * HISTORIAN_TURN_DETECTION_MODE env var or NEXT_PUBLIC_HISTORIAN_TURN_DETECTION_MODE
+ * on the client). Falls back to semantic_vad on unknown input.
+ *
+ * server_vad params are the PR #105 tuning (speakerphone-echo-resistant).
+ */
+export function getTurnDetectionConfig(mode: string | undefined): TurnDetectionConfig {
+  if (mode === 'server_vad') {
+    return {
+      type: 'server_vad',
+      threshold: 0.65,
+      prefix_padding_ms: 400,
+      silence_duration_ms: 1200,
+    }
+  }
+  // Default: semantic_vad with low eagerness (least likely to cut off patient)
+  return { type: 'semantic_vad', eagerness: 'low' }
+}
+
+// ─── Tool: query_evidence ───────────────────────────────────────────────────
+
+export type QueryEvidenceArgs = {
+  question: string
+  focus_diagnoses?: string[]
+}
+
+export type QueryEvidenceResponse =
+  | {
+      status: 'ok'
+      chunks: Array<{ content: string; source: string; score?: number }>
+    }
+  | { status: 'timeout'; chunks: [] }
+  | { status: 'error'; chunks: []; message: string }
+
+// ─── Tool: scale_step (paginated) ───────────────────────────────────────────
+
+export type ScaleStepArgs =
+  | { scale_id: string; reason: string } // First call
+  | {
+      scale_id: string
+      prev_index: number
+      prev_response: string | number
+    }
+
+export type ScaleStepResponse =
+  | {
+      done: false
+      index: number
+      item: {
+        text: string
+        choices?: Array<{ label: string; value: string | number }>
+        scoring_hint?: string
+      }
+    }
+  | {
+      done: true
+      total_score: number
+      interpretation: string
+      severity_level: 'none' | 'minimal' | 'mild' | 'moderate' | 'moderately_severe' | 'severe'
+    }
+  | { status: 'unknown_scale'; available: string[] }
+  | { status: 'bad_index'; expected_index: number }

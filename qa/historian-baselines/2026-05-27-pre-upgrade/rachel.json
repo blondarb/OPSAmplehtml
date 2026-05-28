@@ -1,0 +1,23 @@
+{
+  "persona": "rachel-cho",
+  "date": "2026-05-27",
+  "phase": "pre-upgrade-baseline",
+  "site_state": "step2_400_banner",
+  "actor_briefing_source": "src/lib/consult/samplePersonas.ts (id: rachel-cho, lines ~173-203)",
+  "presenting_complaint": "22F, witnessed spells — possible new-onset seizures; Epilepsy subspecialty",
+  "triage_output": {
+    "reachable": true,
+    "notes": "Step 1 Triage routes to Epilepsy. Witnessed spells trigger appropriate triage urgency."
+  },
+  "historian_session": {
+    "started": false,
+    "duration_seconds": null,
+    "transcript": [],
+    "structured_output": null,
+    "localizer_findings_at_end": null,
+    "scales_administered": [],
+    "red_flags_surfaced": [],
+    "completion_status": "n/a"
+  },
+  "notes": "Pre-upgrade state: Step 2 voice flow fails with the 400 banner. Post-upgrade target: 'spells' description should trigger detailed seizure-semiology questioning (focal vs generalized, aura, automatisms, post-ictal); witnessed nature should appear in red_flags. Compare in Phase 6 rubric."
+}

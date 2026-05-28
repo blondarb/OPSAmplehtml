@@ -1,0 +1,23 @@
+{
+  "persona": "walter-henderson",
+  "date": "2026-05-27",
+  "phase": "pre-upgrade-baseline",
+  "site_state": "step2_400_banner",
+  "actor_briefing_source": "src/lib/consult/samplePersonas.ts (id: walter-henderson, lines ~77-107)",
+  "presenting_complaint": "72M, progressive bilateral hand tremor over 2-3 years; ET vs early Parkinsonism workup",
+  "triage_output": {
+    "reachable": true,
+    "notes": "Step 1 Triage succeeds after the Bedrock token rotation shipped earlier on 2026-05-27. Sub-specialty correctly routes to Movement Disorders."
+  },
+  "historian_session": {
+    "started": false,
+    "duration_seconds": null,
+    "transcript": [],
+    "structured_output": null,
+    "localizer_findings_at_end": null,
+    "scales_administered": [],
+    "red_flags_surfaced": [],
+    "completion_status": "n/a"
+  },
+  "notes": "Pre-upgrade state: clicking 'Start Voice Interview' on Step 2 returns 'Failed to create realtime session: 400'. Root cause: OpenAI deprecated POST /v1/realtime/sessions + the gpt-realtime model. Phase 1 of the upgrade plan resolves this. Use this baseline only for the actor briefing copy + triage output comparison — historian session data is unavailable until Phase 1 ships."
+}

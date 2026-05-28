@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { buildHistorianSystemPrompt, getHistorianToolDefinition } from '@/lib/historianPrompts'
 import type { HistorianSessionType } from '@/lib/historianTypes'
+import { getTurnDetectionConfig } from '@/lib/historianTypes'
 import { getOpenAIKey } from '@/lib/secrets'
 import { getConsult, markHistorianStarted } from '@/lib/consult/pipeline'
 import { buildHistorianContextFromConsult } from '@/lib/consult/contextBuilder'
@@ -12,10 +13,9 @@ export async function POST(request: Request) {
     let referralReason: string | undefined = body.referralReason
     let patientContext: string | undefined = body.patientContext
 
-    // Phase 1 pipeline: if a consult_id is provided, enrich the historian
-    // context with triage and intake data from the consult record.
-    // Caller-provided referralReason/patientContext are overridden when a
-    // consult is found — the pipeline data is more authoritative.
+    // Phase 1 pipeline: enrich the historian context with triage + intake from
+    // the consult record. Caller-provided values are overridden when a consult
+    // is found — the pipeline data is more authoritative.
     const consultId: string | undefined = body.consult_id
     if (consultId) {
       try {
@@ -24,17 +24,13 @@ export async function POST(request: Request) {
           const consultContext = buildHistorianContextFromConsult(consult)
           referralReason = consultContext.referralReason
           patientContext = consultContext.patientContext
-
-          // Mark the consult as historian in progress (non-fatal)
           await markHistorianStarted(consultId)
         }
       } catch (pipelineErr) {
-        // Non-fatal — historian still starts with whatever context was passed
         console.error('[historian/session] consult context build error (non-fatal):', pipelineErr)
       }
     }
 
-    // Get OpenAI API key
     const apiKey = await getOpenAIKey()
     if (!apiKey) {
       return NextResponse.json(
@@ -43,42 +39,47 @@ export async function POST(request: Request) {
       )
     }
 
-    // Build the system prompt
     const instructions = buildHistorianSystemPrompt(sessionType, referralReason, patientContext)
-    const tool = getHistorianToolDefinition()
+    const tools = getHistorianToolDefinition()
+    const model = process.env.OPENAI_HISTORIAN_REALTIME_MODEL || 'gpt-realtime-2'
+    const turnDetection = getTurnDetectionConfig(process.env.HISTORIAN_TURN_DETECTION_MODE)
 
-    // Request ephemeral token from OpenAI Realtime API
-    const response = await fetch('https://api.openai.com/v1/realtime/sessions', {
+    // Request an ephemeral client_secret from OpenAI's current GA endpoint.
+    // Replaces the deprecated POST /v1/realtime/sessions flow.
+    const response = await fetch('https://api.openai.com/v1/realtime/client_secrets', {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${apiKey}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'gpt-realtime',
-        voice: 'verse',
-        instructions,
-        input_audio_transcription: {
-          model: 'whisper-1',
+        session: {
+          type: 'realtime',
+          model,
+          instructions,
+          audio: {
+            input: {
+              turn_detection: turnDetection,
+              transcription: { model: 'whisper-1' },
+            },
+            output: { voice: 'verse' },
+          },
+          tools,
         },
-        // Tuned to reduce mid-sentence interruptions when users listen on
-        // speakerphone (AI voice bleeds back into the mic) and to prevent
-        // short pauses from being treated as end-of-turn.
-        turn_detection: {
-          type: 'server_vad',
-          threshold: 0.65,
-          prefix_padding_ms: 400,
-          silence_duration_ms: 1200,
-        },
-        tools: [tool],
       }),
     })
 
     if (!response.ok) {
       const errorBody = await response.text()
-      console.error('OpenAI Realtime session error:', response.status, errorBody)
+      console.error('[historian/session] OpenAI client_secrets error:', response.status, errorBody)
+      // Pass the raw OpenAI error body through — do NOT collapse to a generic
+      // string. Today's "Failed to create realtime session: 400" hides root causes.
       return NextResponse.json(
-        { error: `Failed to create realtime session: ${response.status}` },
+        {
+          error: `OpenAI Realtime API returned ${response.status}`,
+          openai_error: errorBody,
+          status: response.status,
+        },
         { status: response.status },
       )
     }
@@ -86,14 +87,22 @@ export async function POST(request: Request) {
     const data = await response.json()
 
     return NextResponse.json({
-      ephemeralKey: data.client_secret?.value,
-      sessionId: data.id,
-      expiresAt: data.client_secret?.expires_at,
-      // Echo back the consult_id so the client can pass it to /historian/save
+      // Shape unchanged from client's perspective
+      ephemeralKey: data.value ?? data.client_secret?.value,
+      sessionId: data.session_id ?? data.id,
+      expiresAt: data.expires_at ?? data.client_secret?.expires_at,
       consult_id: consultId || null,
+      // Pass the resolved model + turn detection mode back so the client knows
+      // exactly which configuration is active (for debugging + analytics)
+      model,
+      turn_detection_mode: turnDetection.type,
+      // Phase 5 of 2026-05-27 historian upgrade: expose the resolved
+      // instructions so the client can re-serialize them when pushing
+      // Localizer context updates (BASE_PROMPT + delta).
+      base_instructions: instructions,
     })
   } catch (error: any) {
-    console.error('Historian session API error:', error)
+    console.error('[historian/session] API error:', error)
     return NextResponse.json(
       { error: error?.message || 'Failed to create historian session' },
       { status: 500 },

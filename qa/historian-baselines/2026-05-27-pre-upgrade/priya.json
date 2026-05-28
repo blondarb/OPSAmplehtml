@@ -1,0 +1,23 @@
+{
+  "persona": "priya-ramanathan",
+  "date": "2026-05-27",
+  "phase": "pre-upgrade-baseline",
+  "site_state": "step2_400_banner",
+  "actor_briefing_source": "src/lib/consult/samplePersonas.ts (id: priya-ramanathan, lines ~109-139)",
+  "presenting_complaint": "28F, transient optic symptoms + ascending numbness; MS / demyelinating workup",
+  "triage_output": {
+    "reachable": true,
+    "notes": "Step 1 Triage routes to General Neurology with MS as a differential consideration."
+  },
+  "historian_session": {
+    "started": false,
+    "duration_seconds": null,
+    "transcript": [],
+    "structured_output": null,
+    "localizer_findings_at_end": null,
+    "scales_administered": [],
+    "red_flags_surfaced": [],
+    "completion_status": "n/a"
+  },
+  "notes": "Pre-upgrade state: Step 2 voice flow fails with the 400 banner. Post-upgrade target: model should query_evidence on MS criteria (rare-edge-case path); transient optic + ascending paresthesias should surface as red_flags. Compare in Phase 6 rubric."
+}

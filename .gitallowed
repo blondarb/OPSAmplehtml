@@ -16,3 +16,6 @@ docs/NEUROSCRIBE_WORKFLOW_REDESIGN
 # Data file content
 data/plans.json
 src/app/api/ai/historian/localizer/route.ts
+src/app/api/ai/historian/evidence-query/route.ts
+src/components/consult/EmbeddedHistorian
+docs/superpowers/specs/

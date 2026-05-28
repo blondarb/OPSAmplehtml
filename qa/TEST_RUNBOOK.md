@@ -306,3 +306,28 @@ Before running tests, confirm:
 | Mobile changes | S1-S7 + M1-M6, N1-N6, O1-O8, P1-P4, Q1-Q7, R1-R7, S1-S7, T1-T8, E5 |
 | AI changes | S1-S7 + B1-B8, C1-C7, I1-I14 + AI verification checklist |
 | Historian changes | S1-S7 + C1-C7, H1-H8, I1-I14 |
+
+
+## Historian Realtime API Upgrade — Smoke Cases (added 2026-05-27)
+
+### S1 — Historian voice flow starts (replaces prior 400-banner failure)
+- Open `/consult`, pick Walter persona.
+- Advance through Step 1 Triage.
+- Advance to Step 2 Historian. Click Start Voice Interview.
+- **Pass:** Mic prompts, voice greeting plays, no error banner.
+- **Fail:** Banner shows OpenAI error body (now surfaced via `openai_error` field) — read it, fix accordingly.
+
+### S2 — `query_evidence` fires
+- Run Walter for ~10 min asking ambiguous neurology questions (e.g., "what counts as a thunderclap headache vs migraine?").
+- **Pass:** DevTools Network shows at least one POST to `/api/ai/historian/evidence-query` returning `{status:'ok', chunks:[...]}`.
+- **Fail:** Tool never fires (prompt too restrictive) OR fires too often (prompt not restrictive enough).
+
+### S3 — `scale_step` administers a scale with per-item pacing
+- Run Maya persona; steer to mood symptoms to trigger PHQ-9 — OR ask about headache impact for MIDAS/HIT-6.
+- **Pass:** Transcript shows: each item recited verbatim (string-compare against `src/lib/consult/scales/scale-library.ts`), each item followed by a patient response before the next item appears, final `{done:true, total_score, interpretation}` recorded in `scale_results` with `status='complete'`.
+- **Fail:** Model burst-reads multiple items (instrument validity broken) OR scale never reaches `done:true`.
+
+### S4 — Hot-revert flag works
+- Set `HISTORIAN_TURN_DETECTION_MODE=server_vad` in Amplify branch env. Redeploy.
+- **Pass:** New session-create response shows `turn_detection_mode: "server_vad"`. Turn-end behavior matches PR #105 tuning (longer silence threshold).
+- **Fail:** Flag has no effect — check env propagation, redeploy, retry.

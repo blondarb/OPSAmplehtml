@@ -360,7 +360,21 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     degradedReason,
   }
 
-  return NextResponse.json<LocalizerResponse>(response)
+  // ── push_payload: Phase 5 of 2026-05-27 historian upgrade ─────────────────
+  // Lightweight summary the client re-serializes into session.update
+  // instructions every 3 turns. Additive field — older clients ignore it.
+  const pushPayload = {
+    top_differentials: (questions?.differential ?? [])
+      .slice(0, 3)
+      .map((d: any) => `${d.diagnosis ?? d.name ?? 'unknown'} (${d.confidence ?? 'medium'})`),
+    suggested_next_question: questions?.followUpQuestions?.[0] ?? null,
+    suggested_scale_id: null as string | null,
+  }
+
+  return NextResponse.json({
+    ...response,
+    push_payload: pushPayload,
+  })
 }
 
 // ── GET /api/ai/historian/localizer — health check ────────────────────────────
