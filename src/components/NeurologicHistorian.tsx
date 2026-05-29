@@ -306,7 +306,7 @@ export default function NeurologicHistorian() {
     <FeatureSubHeader
       title="AI Health Interview"
       icon={Mic}
-      accentColor="#0D9488"
+      accentColor="#23C5B7"
       nextStep={{ label: 'Patient Messaging', route: '/patient/messages' }}
     />
     <div style={{
@@ -332,7 +332,7 @@ export default function NeurologicHistorian() {
           }}>
             <div style={{
               width: 48, height: 48, borderRadius: '50%',
-              border: '3px solid #334155', borderTopColor: '#0d9488',
+              border: '3px solid #334155', borderTopColor: '#23C5B7',
               animation: 'spin 1s linear infinite',
               marginBottom: '16px',
             }} />
@@ -344,6 +344,23 @@ export default function NeurologicHistorian() {
         {/* ====== SCENARIO SELECT ====== */}
         {phase === 'scenario_select' && (
           <div style={{ maxWidth: '640px', margin: '0 auto', padding: '32px 24px', width: '100%' }}>
+            {/* Sevaro brand logo */}
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              padding: '8px 16px',
+              marginBottom: '20px',
+              borderRadius: '10px',
+              background: '#fff',
+              alignSelf: 'center',
+              width: 'fit-content',
+              marginLeft: 'auto',
+              marginRight: 'auto',
+            }}>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src="/brand/sevaro-logo-hor.svg" alt="Sevaro" height={24} style={{ display: 'block', height: 24 }} />
+            </div>
             <h2 style={{ color: '#fff', margin: '0 0 4px', fontSize: '1.25rem' }}>
               Start an AI Interview
             </h2>
@@ -372,14 +389,14 @@ export default function NeurologicHistorian() {
               <div style={{
                 padding: '20px',
                 borderRadius: '12px',
-                border: '2px solid #0d9488',
+                border: '2px solid #23C5B7',
                 background: 'rgba(13, 148, 136, 0.1)',
                 marginBottom: '24px',
               }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px' }}>
                   <div style={{
                     width: 36, height: 36, borderRadius: '50%',
-                    background: 'linear-gradient(135deg, #0d9488, #14b8a6)',
+                    background: 'linear-gradient(135deg, #23C5B7, #14b8a6)',
                     display: 'flex', alignItems: 'center', justifyContent: 'center',
                     color: '#fff', fontWeight: 700, fontSize: '0.9rem',
                   }}>
@@ -432,7 +449,7 @@ export default function NeurologicHistorian() {
                       padding: '16px 20px',
                       borderRadius: '12px',
                       border: selectedScenario?.id === scenario.id
-                        ? '2px solid #0d9488'
+                        ? '2px solid #23C5B7'
                         : '1px solid #334155',
                       background: selectedScenario?.id === scenario.id
                         ? 'rgba(13, 148, 136, 0.1)'
@@ -473,7 +490,7 @@ export default function NeurologicHistorian() {
                 width: '100%',
                 padding: '14px',
                 borderRadius: '10px',
-                background: (selectedScenario || sessionConfig) ? '#0d9488' : '#334155',
+                background: (selectedScenario || sessionConfig) ? '#23C5B7' : '#334155',
                 color: (selectedScenario || sessionConfig) ? '#fff' : '#64748b',
                 border: 'none',
                 fontWeight: 700,
@@ -517,7 +534,7 @@ export default function NeurologicHistorian() {
               marginBottom: '24px',
               animation: 'pulse 2s infinite',
             }}>
-              <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#0d9488" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#23C5B7" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M12 1a3 3 0 00-3 3v8a3 3 0 006 0V4a3 3 0 00-3-3z" />
                 <path d="M19 10v2a7 7 0 01-14 0v-2" />
               </svg>
@@ -605,7 +622,7 @@ export default function NeurologicHistorian() {
                 {localizerLoading && (
                   <span style={{
                     width: 5, height: 5, borderRadius: '50%',
-                    background: '#0d9488',
+                    background: '#23C5B7',
                     animation: 'blink 1s infinite',
                     flexShrink: 0,
                   }} />
@@ -645,7 +662,7 @@ export default function NeurologicHistorian() {
                   height: 64,
                   borderRadius: '50%',
                   background: isAiSpeaking
-                    ? 'linear-gradient(135deg, #0d9488, #14b8a6)'
+                    ? 'linear-gradient(135deg, #23C5B7, #14b8a6)'
                     : isUserSpeaking
                       ? 'linear-gradient(135deg, #8B5CF6, #A78BFA)'
                       : '#334155',
@@ -739,7 +756,7 @@ export default function NeurologicHistorian() {
                       padding: '10px 14px',
                       borderRadius: '10px',
                       background: entry.role === 'assistant' ? 'rgba(13,148,136,0.08)' : 'rgba(139,92,246,0.08)',
-                      borderLeft: `3px solid ${entry.role === 'assistant' ? '#0d9488' : '#8B5CF6'}`,
+                      borderLeft: `3px solid ${entry.role === 'assistant' ? '#23C5B7' : '#8B5CF6'}`,
                     }}
                   >
                     <div style={{
