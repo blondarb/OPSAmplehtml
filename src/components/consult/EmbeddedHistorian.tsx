@@ -338,7 +338,7 @@ export default function EmbeddedHistorian({
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
             <div style={{
               width: 36, height: 36, borderRadius: '50%',
-              background: 'linear-gradient(135deg, #23C5B7, #14b8a6)',
+              background: 'linear-gradient(135deg, #23C5B7, #1a7d79)',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
               color: '#fff', fontWeight: 700, fontSize: '0.9rem',
             }}>
@@ -512,7 +512,7 @@ export default function EmbeddedHistorian({
           <div style={{
             width: 64, height: 64, borderRadius: '50%',
             background: isAiSpeaking
-              ? 'linear-gradient(135deg, #23C5B7, #14b8a6)'
+              ? 'linear-gradient(135deg, #23C5B7, #1a7d79)'
               : isUserSpeaking
                 ? 'linear-gradient(135deg, #8B5CF6, #A78BFA)'
                 : '#334155',
