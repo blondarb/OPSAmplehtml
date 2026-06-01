@@ -110,7 +110,7 @@ Full changelog: [`docs/CHANGELOG.md`](docs/CHANGELOG.md)
 
 ## Body of Work
 
-**Status**: Active — verified May 31, 2026
+**Status**: Active — verified June 1, 2026
 
 ### Recent
 - **AI Historian Realtime API upgrade — 3-tool surface, Localizer push channel, paginated scale_step (PR #114, May 27)** — Migrated `/consult` demo historian to OpenAI GA Realtime API (`client_secrets` + `/v1/realtime/calls` + `gpt-realtime-2` + `semantic_vad`). Tool surface consolidated to 3: `save_interview_output`, `query_evidence`, `scale_step` (paginated). New Localizer push channel via re-serialized `session.update` every 3 turns (base prompt + delta). Phased prompt structure (turns 1–3 open, turns 4+ tool-augmented), 15–25 turn budget with explicit neurology focus. Migration 047: paginated state on `scale_results`, relaxed NOT NULL on `patient_id`/`responses`/`raw_score`. Smoke test `qa/historian-wss-smoke.py` added; Mini-Cog added as voice-administrable screen. Env flags `OPENAI_HISTORIAN_REALTIME_MODEL`/`HISTORIAN_TURN_DETECTION_MODE` for hot-revert.
