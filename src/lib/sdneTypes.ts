@@ -134,6 +134,41 @@ export const SDNE_TASK_INFO: Record<string, { name: string; domain: SDNEDomain }
   T17: { name: '3-Word Delayed Recall', domain: 'Cognition' },
 }
 
+// ─── Facial Asymmetry Index (AsI) thresholds — Task T07 ─────────────
+//
+// The AsI is the mean normalized left/right deviation of paired facial
+// landmarks from the facial midline (Vrchoticky asymmetry index):
+//
+//     AsI = (1/n) · Σ | d_Rᵢ − d_Lᵢ |
+//
+// where d_Rᵢ / d_Lᵢ are the distances of the i-th right/left landmark
+// pair from the midline. Lower = more symmetric; 0 = perfectly symmetric.
+//
+// Screening cutoffs (NOT diagnostic), calibrated against:
+//  - Normative demo baselines ............ healthy 0.04–0.06   → GREEN
+//  - Reduced expressivity / hypomimia .... ≈0.12               → YELLOW
+//  - Resolving central facial weakness ... ≈0.12               → YELLOW
+//  - Central facial weakness (stroke) .... ≈0.28               → RED
+//  - Reference: hand-held CV AsI device (UT Arlington, Bell's palsy
+//    cohort) — "balanced" outcomes ≈0.02–0.04, untreated ≈0.17+.
+//
+// Caveat: subtle CENTRAL facial weakness can sit below the RED cutoff on
+// overall AsI alone. The upper-vs-lower-face ratio is the discriminating
+// feature and should be evaluated alongside the overall index where the
+// landmark capture supports it.
+export const FACIAL_ASYMMETRY_AsI = {
+  greenMax: 0.08,  // AsI < 0.08          → within normal limits
+  yellowMax: 0.15, // 0.08 ≤ AsI < 0.15   → borderline asymmetry
+  //                  AsI ≥ 0.15          → abnormal asymmetry
+} as const
+
+/** Classify a facial Asymmetry Index value into a screening flag. */
+export function classifyFacialAsymmetry(asi: number): SDNEFlag {
+  if (asi < FACIAL_ASYMMETRY_AsI.greenMax) return 'GREEN'
+  if (asi < FACIAL_ASYMMETRY_AsI.yellowMax) return 'YELLOW'
+  return 'RED'
+}
+
 // Clinical profile types for mapping referral reasons
 export type SDNEClinicalProfile =
   | 'healthy_normal'      // All GREEN baseline

@@ -1,6 +1,6 @@
 'use client'
 
-import { SDNESessionResult, SDNEDomain, SDNE_FLAG_THEME } from '@/lib/sdneTypes'
+import { SDNESessionResult, SDNEDomain, SDNE_FLAG_THEME, classifyFacialAsymmetry } from '@/lib/sdneTypes'
 
 interface SDNEInterpretationProps {
   session: SDNESessionResult
@@ -93,16 +93,25 @@ function generateObservations(session: SDNESessionResult): Observation[] {
     })
   }
 
-  // Facial observations
-  if (df.Facial === 'RED') {
+  // Facial observations — severity derived from the Asymmetry Index (AsI)
+  // thresholds when a measured index is available, falling back to the
+  // domain flag otherwise.
+  if (df.Facial === 'RED' || df.Facial === 'YELLOW') {
     const t07 = tasks.get('T07')
     const asym = t07?.metrics?.asymmetry_index as number | undefined
-    observations.push({
-      text: `Facial asymmetry findings${asym ? ` (index: ${asym.toFixed(2)})` : ''} may be consistent with a facial nerve or central nervous system process. Clinical correlation is recommended.`,
-      domain: 'Facial',
-      severity: 'concern',
-      supportingTasks: ['T07', 'T08'].filter((id) => tasks.has(id)),
-    })
+    const flag = asym != null ? classifyFacialAsymmetry(asym) : df.Facial
+    if (flag !== 'GREEN') {
+      observations.push({
+        text:
+          `Facial asymmetry findings${asym != null ? ` (AsI ${asym.toFixed(2)})` : ''} ` +
+          (flag === 'RED'
+            ? 'may be consistent with a facial nerve or central nervous system process. Clinical correlation is recommended.'
+            : 'are borderline; consider re-assessment and correlation with the upper- vs lower-face pattern.'),
+        domain: 'Facial',
+        severity: flag === 'RED' ? 'concern' : 'caution',
+        supportingTasks: ['T07', 'T08'].filter((id) => tasks.has(id)),
+      })
+    }
   }
 
   // Language observations

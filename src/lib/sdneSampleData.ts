@@ -800,6 +800,13 @@ const jamesMorrisonHistory: SDNEPatientHistory = {
           Language: 'GREEN',
           Gait: 'GREEN',
         },
+        // Resolving central facial weakness — align the T07 AsI metric with
+        // the YELLOW flag (acute base profile carries 0.28 → would read RED).
+        taskResults: SDNE_PROFILES.post_stroke.taskResults.map((t) =>
+          t.taskId === 'T07'
+            ? { ...t, flag: 'YELLOW', metrics: { ...t.metrics, asymmetry_index: 0.12 } }
+            : t
+        ),
         detectedPatterns: [
           {
             patternId: 'PATTERN_CENTRAL_FACIAL_RESOLVING',

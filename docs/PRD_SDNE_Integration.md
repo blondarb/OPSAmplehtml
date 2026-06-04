@@ -71,6 +71,46 @@ The full SDNE specification lives in a separate repository:
 | 🔴 RED | Abnormal | Significant finding, investigate |
 | ⚫ GRAY | Invalid/Skipped | Data quality issue or task not performed |
 
+### 2.4 Facial Asymmetry Index (AsI) — Task T07
+
+The Facial domain (Task T07, Facial Activation) is scored by an **Asymmetry
+Index (AsI)** — the mean normalized left/right deviation of paired facial
+landmarks from the facial midline (Vrchoticky asymmetry index):
+
+```
+AsI = (1/n) · Σ | d_Rᵢ − d_Lᵢ |
+```
+
+where `d_Rᵢ` / `d_Lᵢ` are the distances of the *i*-th right/left landmark
+pair from the midline. Lower = more symmetric (0 = perfectly symmetric).
+
+**Screening thresholds** (defined in `src/lib/sdneTypes.ts` as
+`FACIAL_ASYMMETRY_AsI`, applied via `classifyFacialAsymmetry()`):
+
+| AsI range | Flag | Interpretation |
+|-----------|------|----------------|
+| `< 0.08` | 🟢 GREEN | Within normal limits |
+| `0.08 – 0.15` | 🟡 YELLOW | Borderline asymmetry (e.g. hypomimia, resolving weakness) |
+| `≥ 0.15` | 🔴 RED | Abnormal asymmetry (e.g. central facial weakness) |
+
+**Calibration basis:** our normative demo baselines (healthy 0.04–0.06),
+reduced facial expressivity / hypomimia (~0.12), central facial weakness
+post-stroke (~0.28) and resolving (~0.12); cross-referenced against a
+hand-held computer-vision AsI device (UT Arlington bioengineering capstone,
+Bell's palsy cohort) where "balanced" outcomes measured ~0.02–0.04 and
+untreated asymmetry ~0.17+.
+
+> **Sensitivity caveat:** these cutoffs reliably capture *gross* asymmetry
+> (peripheral palsy, marked central weakness). *Subtle* central facial
+> weakness — lower face affected, upper face spared — can sit below the RED
+> cutoff on overall AsI alone. The discriminating feature is the
+> **upper-vs-lower-face ratio**, which requires (a) sub-mm landmark precision
+> and (b) an unoccluded view of the upper face. For XR-headset capture in
+> particular, upper-face occlusion is a known limitation; the overall AsI
+> should be treated as a screen, with the regional ratio evaluated wherever
+> the capture geometry supports it. (The reference device's own authors note
+> upper-face landmark accuracy as their primary refinement target.)
+
 ---
 
 ## 3. File Structure
@@ -151,3 +191,4 @@ The SDNE panel is rendered in `CenterPanel.tsx` within the Physical Exams tab:
 | Version | Date | Author | Changes |
 |---------|------|--------|---------|
 | 1.0.0 | Feb 5, 2026 | Claude | Initial PRD |
+| 1.1.0 | Jun 4, 2026 | Claude | Added §2.4 Facial Asymmetry Index (AsI) formula, threshold constants, and sensitivity caveat |
