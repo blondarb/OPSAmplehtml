@@ -136,26 +136,33 @@ export const SDNE_TASK_INFO: Record<string, { name: string; domain: SDNEDomain }
 
 // ─── Facial Asymmetry Index (AsI) thresholds — Task T07 ─────────────
 //
-// The AsI is the mean normalized left/right deviation of paired facial
-// landmarks from the facial midline (Vrchoticky asymmetry index):
+// The AsI is the Vrochidou facial asymmetry index — the mean normalized
+// left/right deviation of paired facial landmarks from the midline:
 //
-//     AsI = (1/n) · Σ | d_Rᵢ − d_Lᵢ |
+//             1    l    | d_Rᵢ − d_Lᵢ |
+//     AsI  = ─── ·  Σ   ───────────────      (range 0–1; lower = more symmetric)
+//             l   i=1    d_Rᵢ + d_Lᵢ
 //
-// where d_Rᵢ / d_Lᵢ are the distances of the i-th right/left landmark
-// pair from the midline. Lower = more symmetric; 0 = perfectly symmetric.
+// where d_Rᵢ / d_Lᵢ are the i-th right/left landmark distances from the
+// midline, each pair normalized by its sum (d_Rᵢ + d_Lᵢ).
+//
+// What this app consumes: t07.metrics.asymmetry_index is produced by the SDNE
+// headset capture pipeline, which computes a DENOMINATOR-FREE blendshape variant
+// (mean |peakL − peakR|, no /(L+R)) because the headset exposes 0–1 blendshape
+// activations, not landmark distances. The cutoffs below are calibrated on the
+// reference's normalized scale and remain VALIDATION-PENDING on the headset's
+// blendshape AsI — see the SDNE repo's docs/T07_FACIAL_ASYMMETRY_AsI.md.
 //
 // Screening cutoffs (NOT diagnostic), calibrated against:
-//  - Normative demo baselines ............ healthy 0.04–0.06   → GREEN
-//  - Reduced expressivity / hypomimia .... ≈0.12               → YELLOW
-//  - Resolving central facial weakness ... ≈0.12               → YELLOW
-//  - Central facial weakness (stroke) .... ≈0.28               → RED
-//  - Reference: hand-held CV AsI device (UT Arlington, Bell's palsy
-//    cohort) — "balanced" outcomes ≈0.02–0.04, untreated ≈0.17+.
+//  - Hand-held CV reference device (UT Arlington, Bell's-palsy cohort):
+//    balanced ≈0.02–0.04, untreated ≈0.17+ (e.g. before 0.170 → after 0.042).
+//  - Demo baselines: healthy 0.04–0.06 → GREEN; hypomimia / resolving ≈0.12
+//    → YELLOW; central facial weakness (stroke) ≈0.28 → RED.
 //
 // Caveat: subtle CENTRAL facial weakness can sit below the RED cutoff on
 // overall AsI alone. The upper-vs-lower-face ratio is the discriminating
 // feature and should be evaluated alongside the overall index where the
-// landmark capture supports it.
+// landmark capture supports it (the XR headset occludes the upper face).
 export const FACIAL_ASYMMETRY_AsI = {
   greenMax: 0.08,  // AsI < 0.08          → within normal limits
   yellowMax: 0.15, // 0.08 ≤ AsI < 0.15   → borderline asymmetry

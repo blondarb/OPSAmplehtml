@@ -74,15 +74,26 @@ The full SDNE specification lives in a separate repository:
 ### 2.4 Facial Asymmetry Index (AsI) — Task T07
 
 The Facial domain (Task T07, Facial Activation) is scored by an **Asymmetry
-Index (AsI)** — the mean normalized left/right deviation of paired facial
-landmarks from the facial midline (Vrchoticky asymmetry index):
+Index (AsI)** — the **Vrochidou** facial asymmetry index, the mean normalized
+left/right deviation of paired facial landmarks from the midline:
 
 ```
-AsI = (1/n) · Σ | d_Rᵢ − d_Lᵢ |
+        1    l    | d_Rᵢ − d_Lᵢ |
+AsI  = ─── ·  Σ   ───────────────
+        l   i=1    d_Rᵢ + d_Lᵢ
 ```
 
-where `d_Rᵢ` / `d_Lᵢ` are the distances of the *i*-th right/left landmark
-pair from the midline. Lower = more symmetric (0 = perfectly symmetric).
+where `d_Rᵢ` / `d_Lᵢ` are the *i*-th right/left landmark distances from the
+midline, each pair **normalized by its sum** `(d_Rᵢ + d_Lᵢ)`. Range 0–1, lower
+= more symmetric (0 = perfectly symmetric).
+
+> **What this app consumes:** `t07.metrics.asymmetry_index` comes from the SDNE
+> headset capture pipeline, which computes a **denominator-free blendshape
+> variant** (mean `|peakL − peakR|`, no `/(L+R)`) because the headset exposes
+> 0–1 blendshape activations rather than landmark distances. The thresholds
+> below are calibrated on the reference's normalized scale and are
+> **VALIDATION-PENDING** on the headset's blendshape AsI (see the SDNE repo's
+> `docs/T07_FACIAL_ASYMMETRY_AsI.md`).
 
 **Screening thresholds** (defined in `src/lib/sdneTypes.ts` as
 `FACIAL_ASYMMETRY_AsI`, applied via `classifyFacialAsymmetry()`):
