@@ -1254,3 +1254,24 @@ voice_provider:
       - AI does NOT open with a generic "Why are you seeing a neurologist today?" question
     data_verification: |
       Transcript first AI turn contains the referral reason text verbatim or paraphrased
+
+  - id: VP5
+    title: AI-driven escalation reaches the clinician dashboard (voice follow-up)
+    preconditions:
+      - logged in, on /follow-up, voice mode
+      - VOICE_PROVIDER=nova with relay running (or ?voice=openai with key), mic granted
+      - Bedrock model access granted for amazon.nova-2-sonic-v1:0 in us-east-1 (Nova path)
+    steps:
+      - Start a voice follow-up session
+      - As the patient, report a clearly urgent symptom (e.g. "new weakness in my left arm and my speech is slurred")
+      - Let the AI conclude and call save_followup_output with escalation_triggered=true
+    expected: |
+      - The red EscalationAlert banner appears on the page with the AI's tier + reason
+        (tier urgent → "URGENT ESCALATION"; reason shown under "AI Assessment")
+      - The ClinicianDashboard "Escalation Flags" section lists the same flag
+      - Escalation fires from the AI's own assessment, not only the client-side regex net
+    data_verification: |
+      Regression guard for the pre-Nova bug where the hook read a non-existent
+      args.escalation_flags array (schema emits escalation_triggered/_tier/_reason),
+      so AI escalations were silently dropped. Unit coverage:
+      src/lib/follow-up/__tests__/escalationRules.test.ts (escalationFlagFromToolOutput).

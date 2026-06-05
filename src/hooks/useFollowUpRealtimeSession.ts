@@ -2,7 +2,7 @@
 
 import { useState, useRef, useCallback, useEffect } from 'react'
 import type { TranscriptEntry, PatientScenario, EscalationFlag } from '@/lib/follow-up/types'
-import { scanForEscalationTriggers } from '@/lib/follow-up/escalationRules'
+import { scanForEscalationTriggers, escalationFlagFromToolOutput } from '@/lib/follow-up/escalationRules'
 import type { VoiceEvent, VoiceProvider } from '@/lib/voice/types'
 import { selectProvider, makeProvider } from '@/lib/voice/selectProvider'
 
@@ -130,24 +130,22 @@ export function useFollowUpRealtimeSession(
   // function_call_output to the data channel.
   const handleToolCall = useCallback((toolName: string, toolUseId: string, input: unknown) => {
     const provider = providerRef.current
-    const args: any = (input && typeof input === 'object') ? input : {}
+    const args: unknown = (input && typeof input === 'object') ? input : {}
 
     if (toolName === 'save_followup_output') {
       try {
-        // Extract any escalation flags from the AI output
-        if (args.escalation_flags && Array.isArray(args.escalation_flags)) {
-          for (const flag of args.escalation_flags) {
-            const escalation: EscalationFlag = {
-              tier: flag.tier || 'informational',
-              triggerText: flag.trigger_text || '',
-              category: flag.category || 'ai_detected',
-              aiAssessment: flag.ai_assessment || '',
-              recommendedAction: flag.recommended_action || '',
-              timestamp: new Date().toISOString(),
-            }
-            escalationFlagsRef.current = [...escalationFlagsRef.current, escalation]
-            onEscalationRef.current?.(escalation)
-          }
+        // Surface the AI's own escalation assessment. The save_followup_output
+        // tool reports it via the flat escalation_triggered / escalation_tier /
+        // escalation_reason fields (see FOLLOWUP_TOOL in the realtime-session
+        // route) — NOT a structured `escalation_flags` array, which this hook
+        // used to read and which the schema never declares. Convert those
+        // fields into an EscalationFlag so the AI-detected tier/reason reaches
+        // the clinician dashboard via onEscalation, alongside the client-side
+        // regex net in checkEscalation.
+        const aiFlag = escalationFlagFromToolOutput(args)
+        if (aiFlag) {
+          escalationFlagsRef.current = [...escalationFlagsRef.current, aiFlag]
+          onEscalationRef.current?.(aiFlag)
         }
 
         // Acknowledge the tool call so the model can respond. The provider owns
