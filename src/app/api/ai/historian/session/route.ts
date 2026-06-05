@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { buildHistorianSystemPrompt, getHistorianToolDefinition } from '@/lib/historianPrompts'
+import { buildHistorianSystemPrompt, getHistorianToolsForProvider } from '@/lib/historianPrompts'
 import type { HistorianSessionType } from '@/lib/historianTypes'
 import { getTurnDetectionConfig } from '@/lib/historianTypes'
 import { getOpenAIKey } from '@/lib/secrets'
@@ -12,6 +12,12 @@ export async function POST(request: Request) {
     const sessionType: HistorianSessionType = body.sessionType || 'new_patient'
     let referralReason: string | undefined = body.referralReason
     let patientContext: string | undefined = body.patientContext
+
+    // Provider selection: explicit client `provider` field wins, else the
+    // server-side VOICE_PROVIDER env var, else default to Nova (the migration
+    // target). Only 'openai' opts back into the legacy WebRTC/client_secrets path.
+    const requestedProvider = (body.provider ?? process.env.VOICE_PROVIDER ?? 'nova') as string
+    const provider: 'nova' | 'openai' = requestedProvider === 'openai' ? 'openai' : 'nova'
 
     // Phase 1 pipeline: enrich the historian context with triage + intake from
     // the consult record. Caller-provided values are overridden when a consult
@@ -31,6 +37,26 @@ export async function POST(request: Request) {
       }
     }
 
+    const instructions = buildHistorianSystemPrompt(sessionType, referralReason, patientContext)
+    const model = process.env.OPENAI_HISTORIAN_REALTIME_MODEL || 'gpt-realtime-2'
+    const turnDetection = getTurnDetectionConfig(process.env.HISTORIAN_TURN_DETECTION_MODE)
+
+    // ── Nova path: no OpenAI client_secrets call. Return relay config + the
+    // Nova-native tool specs. The hook builds a NovaSonicWsProvider from this.
+    if (provider === 'nova') {
+      return NextResponse.json({
+        provider: 'nova',
+        instructions,
+        tools: getHistorianToolsForProvider('nova'),
+        relayUrl: process.env.NOVA_SONIC_RELAY_URL,
+        voiceId: process.env.NOVA_SONIC_VOICE_ID,
+        // base_instructions kept for client parity (localizer push channel).
+        base_instructions: instructions,
+        consult_id: consultId || null,
+      })
+    }
+
+    // ── OpenAI path (unchanged client_secrets flow, plus tools/provider hints).
     const apiKey = await getOpenAIKey()
     if (!apiKey) {
       return NextResponse.json(
@@ -39,10 +65,7 @@ export async function POST(request: Request) {
       )
     }
 
-    const instructions = buildHistorianSystemPrompt(sessionType, referralReason, patientContext)
-    const tools = getHistorianToolDefinition()
-    const model = process.env.OPENAI_HISTORIAN_REALTIME_MODEL || 'gpt-realtime-2'
-    const turnDetection = getTurnDetectionConfig(process.env.HISTORIAN_TURN_DETECTION_MODE)
+    const tools = getHistorianToolsForProvider('openai')
 
     // Request an ephemeral client_secret from OpenAI's current GA endpoint.
     // Replaces the deprecated POST /v1/realtime/sessions flow.
@@ -87,6 +110,10 @@ export async function POST(request: Request) {
     const data = await response.json()
 
     return NextResponse.json({
+      // Tell the client which provider/tools are active so the hook picks the
+      // matching VoiceProvider and passes provider-native tools into start().
+      provider: 'openai',
+      tools,
       // Shape unchanged from client's perspective
       ephemeralKey: data.value ?? data.client_secret?.value,
       sessionId: data.session_id ?? data.id,

@@ -69,4 +69,7 @@ export interface VoiceProvider {
   sendToolResult(toolUseId: string, output: unknown): void
   /** Inject advisory system text mid-session (localizer / scale guidance). */
   injectSystemText(text: string): void
+  /** Force the model to produce a response now (e.g. to kick off scale administration).
+   *  OpenAI → response.create; Nova → no-op (Nova self-triggers turns). */
+  requestResponse(): void
 }

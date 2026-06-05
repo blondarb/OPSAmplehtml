@@ -48,8 +48,10 @@ export class NovaSonicWsProvider implements VoiceProvider {
   async start(opts: VoiceStartOptions): Promise<void> {
     if (this.ws) return // already started — idempotent guard
     if (!opts.relayUrl) {
-      this.emit({ type: 'error', message: 'novaSonicWsProvider: relayUrl is required' })
-      return
+      // Throw (not emit+return) so the hook's start() catch surfaces this as an
+      // error state. Emitting and returning would let the caller fall through to
+      // status:'active' with no transport — a silent failure on the default path.
+      throw new Error('novaSonicWsProvider: relayUrl is required (set NOVA_SONIC_RELAY_URL)')
     }
 
     this.closing = false
@@ -183,6 +185,11 @@ export class NovaSonicWsProvider implements VoiceProvider {
 
   injectSystemText(text: string): void {
     this.send({ t: 'systemText', text })
+  }
+
+  requestResponse(): void {
+    // No-op: Nova drives its own turn-taking; the injected system text is acted
+    // on as it continues. There is no relay frame to force a turn.
   }
 
   async stop(): Promise<void> {

@@ -256,6 +256,16 @@ export class OpenAiWebrtcProvider implements VoiceProvider {
     })
   }
 
+  requestResponse(): void {
+    // Force the model to produce a response now. Used by the hook to compose
+    // injectSystemText(x) + requestResponse() where a forced turn is required
+    // (e.g. scale-administration kick-off, early-end flush nudge).
+    this.dcSend({
+      type: 'response.create',
+      response: { modalities: ['text', 'audio'] },
+    })
+  }
+
   async stop(): Promise<void> {
     if (this.stopped) return // idempotent
     this.stopped = true

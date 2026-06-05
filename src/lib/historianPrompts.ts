@@ -252,3 +252,21 @@ export function getHistorianToolDefinition() {
   // wrapped this in [getHistorianToolDefinition()] must drop the wrapper.
   return [SAVE_INTERVIEW_OUTPUT_TOOL, QUERY_EVIDENCE_TOOL, SCALE_STEP_TOOL]
 }
+
+// ─── Nova tool adapter (Nova 2 Sonic voice migration, Task 8) ─────────────────
+
+// OpenAI realtime tool spec → Nova Sonic toolSpec
+export function toNovaToolSpec(openAiTool: { name: string; description?: string; parameters: unknown }) {
+  return {
+    toolSpec: {
+      name: openAiTool.name,
+      description: openAiTool.description ?? '',
+      inputSchema: { json: JSON.stringify(openAiTool.parameters) },
+    },
+  }
+}
+
+export function getHistorianToolsForProvider(provider: 'nova' | 'openai') {
+  const tools = getHistorianToolDefinition() // existing OpenAI-style array
+  return provider === 'openai' ? tools : tools.map((t) => toNovaToolSpec(t as any))
+}
