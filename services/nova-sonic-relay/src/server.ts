@@ -89,7 +89,20 @@ wss.on('connection', (ws) => {
     },
 
     onError(err) {
-      const message = err instanceof Error ? err.message : String(err)
+      // Nova's bidi exceptions (modelStreamErrorException / internalServerException)
+      // arrive as PLAIN OBJECTS, so a bare String(err) collapses to "[object
+      // Object]" and the real cause is lost. Extract a meaningful message and log
+      // the full error server-side so the relay log captures the actual failure.
+      const anyErr = err as { name?: string; message?: string } | null
+      let message: string
+      if (err instanceof Error) {
+        message = err.message
+      } else if (anyErr && typeof anyErr === 'object' && (anyErr.message || anyErr.name)) {
+        message = [anyErr.name, anyErr.message].filter(Boolean).join(': ')
+      } else {
+        try { message = JSON.stringify(err) } catch { message = String(err) }
+      }
+      console.error('[nova-session] stream error:', message, err)
       send(ws, { t: 'error', message })
     },
   })
