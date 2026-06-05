@@ -7,6 +7,8 @@ import type { LocalizerResponse } from '@/lib/consult/localizer-types'
 import type { SaveScaleResponsesArgs, LocalizerSnapshot, TriggeredScale } from '@/lib/consult/scales'
 import { getTenantClient } from '@/lib/tenant'
 import LocalizerPanel from '@/components/LocalizerPanel'
+import { useVoiceProviderPreference } from '@/lib/voice/useVoiceProviderPreference'
+import VoiceProviderToggle from '@/components/voice/VoiceProviderToggle'
 
 type Phase = 'ready' | 'connecting' | 'active' | 'ending' | 'saving' | 'complete' | 'safety_escalation'
 
@@ -50,6 +52,9 @@ export default function EmbeddedHistorian({
 
   const transcriptEndRef = useRef<HTMLDivElement>(null)
   const tenant = getTenantClient()
+
+  // Voice provider preference: URL param > localStorage > 'nova' (SSR-safe).
+  const [voiceProvider, setVoiceProvider] = useVoiceProviderPreference()
 
   // Scales that have been injected into the live session (by us, not the AI's choice).
   // Used to deduplicate trigger evaluations so we never re-inject the same scale
@@ -213,6 +218,7 @@ export default function EmbeddedHistorian({
     referralReason,
     patientName,
     consultId,
+    provider: voiceProvider,
     enableLocalizer: true,
     onComplete: handleSessionComplete,
     onSafetyEscalation: handleSafetyEscalation,
@@ -384,6 +390,15 @@ export default function EmbeddedHistorian({
         <p style={{ color: '#64748b', fontSize: '0.75rem', textAlign: 'center', marginTop: 10 }}>
           Requires microphone access. Interview is conducted entirely by voice.
         </p>
+
+        {/* Voice engine picker — visible before the session starts */}
+        <div style={{ display: 'flex', justifyContent: 'center', marginTop: 16 }}>
+          <VoiceProviderToggle
+            value={voiceProvider}
+            onChange={setVoiceProvider}
+            disabled={false}
+          />
+        </div>
       </div>
     )
   }
@@ -437,6 +452,14 @@ export default function EmbeddedHistorian({
         display: 'flex', alignItems: 'center', justifyContent: 'center',
         padding: '12px 0', gap: 12, position: 'relative',
       }}>
+        {/* Voice engine toggle — left anchor; greyed while session is live */}
+        <div style={{ position: 'absolute', left: 0 }}>
+          <VoiceProviderToggle
+            value={voiceProvider}
+            onChange={setVoiceProvider}
+            disabled={status === 'connecting' || status === 'active' || status === 'ending'}
+          />
+        </div>
         <span style={{ color: '#64748b', fontSize: '0.8rem', fontFamily: 'monospace' }}>
           {formatTime(duration)}
         </span>
