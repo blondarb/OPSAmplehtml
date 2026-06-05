@@ -47,6 +47,25 @@ interface ContentEndEvent {
   event: { contentEnd: { promptName: string; contentName: string } }
 }
 
+interface TextContentStartEvent {
+  event: {
+    contentStart: {
+      promptName: string
+      contentName: string
+      type: 'TEXT'
+      interactive: boolean
+      role: 'SYSTEM' | 'USER'
+      textInputConfiguration: { mediaType: string }
+    }
+  }
+}
+
+interface TextInputEvent {
+  event: { textInput: { promptName: string; contentName: string; content: string } }
+}
+
+type TextContentEvents = [TextContentStartEvent, TextInputEvent, ContentEndEvent]
+
 // ---------------------------------------------------------------------------
 // 1. sessionStart
 // ---------------------------------------------------------------------------
@@ -105,7 +124,7 @@ export function systemContent(
   promptName: string,
   instructions: string,
   contentName?: string,
-) {
+): TextContentEvents {
   const name = contentName ?? uuidv4()
   return [
     {
@@ -155,7 +174,7 @@ export function userText(
   promptName: string,
   text: string,
   contentName?: string,
-) {
+): TextContentEvents {
   const name = contentName ?? uuidv4()
   return [
     {

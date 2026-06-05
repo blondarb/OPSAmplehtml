@@ -32,6 +32,11 @@ function send(ws: WebSocket, msg: ServerMsg): void {
   }
 }
 
+// Opt-in event-flow trace (RELAY_TRACE=1) for diagnosing stalls. No-op unless set.
+const TRACE: (m: string) => void = process.env.RELAY_TRACE
+  ? (m: string) => console.log(`[trace ${new Date().toISOString().slice(11, 23)}] ${m}`)
+  : () => {}
+
 wss.on('connection', (ws) => {
   // Track whether the AI is currently speaking so we can wrap turns with
   // aiSpeechStart / aiSpeechStop. This is an approximation: we emit
@@ -43,6 +48,7 @@ wss.on('connection', (ws) => {
   function startAiSpeech(): void {
     if (!aiSpeaking) {
       aiSpeaking = true
+      TRACE('-> aiSpeechStart')
       send(ws, { t: 'aiSpeechStart' })
     }
   }
@@ -50,12 +56,14 @@ wss.on('connection', (ws) => {
   function stopAiSpeech(): void {
     if (aiSpeaking) {
       aiSpeaking = false
+      TRACE('-> aiSpeechStop')
       send(ws, { t: 'aiSpeechStop' })
     }
   }
 
   const session = new NovaSonicSession({
     onTextOutput(role, content) {
+      TRACE(`-> text[${role}] ${JSON.stringify(content.slice(0, 60))}`)
       if (role.toUpperCase() === 'USER') {
         send(ws, { t: 'userTranscript', text: content })
       } else {
@@ -69,6 +77,7 @@ wss.on('connection', (ws) => {
     },
 
     onToolUse({ toolName, toolUseId, content }) {
+      TRACE(`-> toolUse ${toolName} id=${toolUseId} content=${JSON.stringify(String(content).slice(0, 80))}`)
       let input: unknown = content
       try {
         input = JSON.parse(content)
@@ -79,11 +88,13 @@ wss.on('connection', (ws) => {
     },
 
     onCompletionEnd() {
+      TRACE('-> completionEnd')
       stopAiSpeech()
       send(ws, { t: 'completion' })
     },
 
     onBargeIn() {
+      TRACE('-> bargeIn')
       stopAiSpeech()
       send(ws, { t: 'bargeIn' })
     },
@@ -116,9 +127,12 @@ wss.on('connection', (ws) => {
       return
     }
 
+    if (msg.t !== 'audio') TRACE(`<- ${msg.t}`)
+
     try {
       switch (msg.t) {
         case 'start':
+          TRACE(`<- start (tools=${(msg.tools as unknown[] | undefined)?.length ?? 0})`)
           // start() surfaces any stream-open failure via the session's onError
           // callback (mapped to {t:'error'} above). This .catch only prevents an
           // unhandled rejection from the un-awaited promise — it must NOT send a
@@ -138,10 +152,12 @@ wss.on('connection', (ws) => {
           break
 
         case 'toolResult':
+          TRACE(`<- toolResult id=${msg.toolUseId} output=${JSON.stringify(String(msg.output).slice(0, 80))}`)
           session.pushToolResult(msg.toolUseId, msg.output)
           break
 
         case 'systemText':
+          TRACE(`<- systemText (injected as USER) ${JSON.stringify(msg.text.slice(0, 80))}`)
           session.pushSystemText(msg.text)
           break
 
