@@ -17,7 +17,7 @@ Neurology outpatient web app: clinical notes, AI assistance, voice dictation, do
 | Styling | Tailwind CSS v3 + Inline Styles |
 | Database | AWS RDS (PostgreSQL) via node-postgres |
 | Auth | AWS Cognito OAuth + PKCE via Hosted UI at `auth.neuroplans.app` |
-| AI | AWS Bedrock (Claude Sonnet 4.6) + OpenAI Whisper + Realtime API (WebRTC) |
+| AI | AWS Bedrock (Claude Sonnet 4.6 + Nova 2 Sonic via Bedrock Bidirectional Stream) + OpenAI Whisper + Realtime API (WebRTC fallback) |
 | SMS/Voice | Twilio (SDK v5) for live patient follow-up demos |
 | Deployment | AWS Amplify (push-to-deploy from main) |
 
@@ -25,8 +25,9 @@ Neurology outpatient web app: clinical notes, AI assistance, voice dictation, do
 
 - **Database:** All queries use `from()` / `wearableFrom()` from `@/lib/db-query` (node-postgres pools to RDS). Auth via `@/lib/cognito/server`.
 - **Middleware:** `src/middleware.ts` — session refresh, simplified pass-through (avoids edge function issues).
-- **AI Models:** gpt-5-mini (Q&A, chart prep, field actions), gpt-5.2 (visit extraction, assessment, briefings), Bedrock Sonnet 4.6 (triage, localizer), Realtime API (historian).
+- **AI Models:** gpt-5-mini (Q&A, chart prep, field actions), gpt-5.2 (visit extraction, assessment, briefings), Bedrock Sonnet 4.6 (triage, localizer), **Nova 2 Sonic** (`amazon.nova-2-sonic-v1:0`, default voice engine for `/consult` historian + `/follow-up` agent via `services/nova-sonic-relay/`), OpenAI Realtime `gpt-realtime-2` (switchable fallback; `VOICE_PROVIDER=openai` or `?voice=openai`).
 - **Auth:** Cognito pool `us-east-2_9y6XyJnXC`, client `6rahc3cs4846f05gf7fbucqi4d`. httpOnly cookies (id_token 1h, refresh_token 30d, 50-min proactive refresh).
+- **Voice env vars:** `VOICE_PROVIDER` (default `nova`; set to `openai` for fallback), `NOVA_SONIC_RELAY_URL` + `NEXT_PUBLIC_NOVA_SONIC_RELAY_URL` (relay WSS URL), `NOVA_SONIC_VOICE_ID` (optional), `OPENAI_FOLLOWUP_REALTIME_MODEL` (default `gpt-realtime-2`). Relay-side: `NOVA_SONIC_REGION` (`us-east-1`), `NOVA_SONIC_MODEL_ID` (`amazon.nova-2-sonic-v1:0`), `PORT` (8081).
 - **Smart Recommendations:** 127 clinical plans synced from `blondarb/neuro-plans` via `npm run sync-plans`. ICD-10 scored matching links diagnoses to plans.
 
 ## Key Routes
@@ -62,8 +63,13 @@ npm run build
 - Amplify SSR env vars require `next.config` inline block for runtime access (not just `process.env`).
 - Triage route uses 202+poll pattern — do not attempt SSE streaming (reverted in PR #111 due to ~28s Amplify gateway timeout).
 - `/consult` Historian uses WebRTC Realtime API — requires HTTPS and browser mic permission.
+- **Nova Sonic path requires the relay running** (`services/nova-sonic-relay/` — standalone Node WebSocket container). Set `NOVA_SONIC_RELAY_URL` + `NEXT_PUBLIC_NOVA_SONIC_RELAY_URL` to the relay WSS URL; the browser connects there, not directly to Bedrock. Without the relay, Nova voice will fail silently on connect.
+- **Nova Sonic is us-east-1 only** (Bedrock `InvokeModelWithBidirectionalStream` is not yet available in us-east-2). Relay env var `NOVA_SONIC_REGION=us-east-1`; the rest of the app's Bedrock calls remain in us-east-2.
+- Nova's `requestResponse` tool-call pattern is a no-op (the relay ignores it); the early-end save flush is best-effort on the Nova path — raw transcript is always preserved, but structured `save_interview_output` may not fire if the user hard-ends the session.
 
 ## Recent Changes (Summary)
+
+- **Nova 2 Sonic voice migration (2026-06-05)**: Demo-only. Both voice surfaces (`/consult` AI Historian and `/follow-up` voice agent) migrated from OpenAI Realtime (WebRTC) to Amazon Nova 2 Sonic (`amazon.nova-2-sonic-v1:0`, us-east-1, Bedrock `InvokeModelWithBidirectionalStream`) behind a switchable `VoiceProvider` abstraction. New standalone Node WebSocket relay (`services/nova-sonic-relay/`) bridges browser ⇄ relay ⇄ Bedrock (IAM-role auth, containerized for App Runner) — required because Nova Sonic has no browser/WebRTC path and the Amplify Lambda timeout is incompatible with a long-lived WS. Audio pipeline: `src/lib/voice/` with PCM16↔base64 encoding, 16 kHz mic capture (AudioWorklet), and gapless 24 kHz PCM playback with barge-in. Both hooks (`useRealtimeSession`, `useFollowUpRealtimeSession`) refactored onto the provider; public APIs and all clinical-harness logic (safety keywords, red-flag detection, localizer cadence, paginated scales, escalation, structured save) unchanged. Provider toggle: `VOICE_PROVIDER` env (default `nova`) + in-app `VoiceProviderToggle` on both routes (localStorage-persisted; `?voice=nova|openai` deep-link). Directive referral-anchored historian opening added: when a referral reason is known the AI opens by stating it back to the patient instead of asking open-ended. Moves patient-facing voice onto the BAA-covered AWS/Bedrock stack (HIPAA-eligible). Validation pending (requires Bedrock model-access grant for `amazon.nova-2-sonic-v1:0` in us-east-1 + A/B listen test).
 
 - **AI Historian Realtime API + Harness Upgrade (2026-05-27)**: Demo-only `/consult` Step 2 historian migrated to OpenAI's current GA Realtime API (`client_secrets` + `/v1/realtime/calls` + `gpt-realtime-2` + `semantic_vad`). Tool surface consolidated to 3 (save_interview_output, query_evidence, scale_step — paginated). New Localizer push channel via re-serialized `session.update` (base prompt + delta, every 3 turns). Phased prompt structure (turns 1-3 open, turns 4+ tool-augmented) with explicit neurology focus + 15-25 turn budget. Migration 047 added paginated state to `scale_results` + relaxed NOT NULL on `patient_id`/`responses`/`raw_score` (legacy submit flow had been silently failing). Env flags `OPENAI_HISTORIAN_REALTIME_MODEL` / `HISTORIAN_TURN_DETECTION_MODE` for hot-revert. Spec + plan + 2-round cross-check audit trail + pre/post eval rubric in `docs/superpowers/` and `qa/historian-baselines/`. (Demo-only; multi-modal + prior-visits explicitly future agents.)
 
@@ -113,6 +119,7 @@ Full changelog: [`docs/CHANGELOG.md`](docs/CHANGELOG.md)
 **Status**: Active — verified May 27, 2026
 
 ### Recent
+- **Nova 2 Sonic voice migration (2026-06-05, branch feat/nova-sonic-voice)** — Migrated `/consult` historian + `/follow-up` agent from OpenAI Realtime (WebRTC) to Amazon Nova 2 Sonic via a new WebSocket relay service (`services/nova-sonic-relay/`). VoiceProvider abstraction added with in-app toggle and env-driven provider switch. Moves voice onto the BAA-covered Bedrock stack. Validation pending (model-access grant + A/B listen test required).
 - **Triage migration 046: drop NOT NULL on result columns (PR #113, May 2)** — Dropped NOT NULL constraints on triage result columns so pending rows can be inserted before AI populates results; migration 046 applied to `ops_amplehtml`; fixes the root cause that required the async+polling rework.
 - **Triage async + polling pattern (PR #112, May 2)** — Replaced the reverted SSE streaming approach (PR #110 was reverted by PR #111 due to persistent Amplify ~28s gateway timeout failures); `/api/triage` and `/api/triage/extract` now use a 202 Accept + poll pattern consistent with other heavy Lambda endpoints; eliminates the gateway timeout without fragile streaming.
 - **Neuro Intake pipeline depth pass (PR #109, Apr 25)** — (1) Scale-trigger pipeline wired: `EmbeddedHistorian` now evaluates triggers, fetches instruction blocks, and formally administers PHQ-9/GAD-7/HIT-6/MIDAS/ESS/MoCA in live session; deduplication via `injectedScaleIdsRef`. (2) AI Assessment+Plan synthesis: new `assessment-generator.ts` calls Bedrock Sonnet 4.6 with full report as context, appends `{ assessment, plan[], confidence }` sections. (3) Corrections persisted: physician corrections lifted to `PatientToolsStepPanel`, PUT to `/api/neuro-consults/[id]` notes field. (4) Triage safety extraction: 7 safety fields extracted from referrals including `safety_symptom_onset_time` (critical for tPA window). (5) Diagnosis correction: historian is fully embedded inline.

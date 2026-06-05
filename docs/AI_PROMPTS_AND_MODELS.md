@@ -1,7 +1,7 @@
 # AI Prompts & Model Configuration
 
 > Complete reference for every AI endpoint in Sevaro Clinical.
-> Last updated: 2026-03-12
+> Last updated: 2026-06-05
 
 ---
 
@@ -61,16 +61,32 @@ Sevaro Clinical uses a two-tier model strategy to balance cost, latency, and rea
 - `/api/ai/generate-assessment` -- Clinical assessment from diagnoses
 - `/api/ai/scale-autofill` -- Structured data extraction for clinical scales
 
-### Tier 3 -- Real-Time Voice: `gpt-realtime`
+### Tier 3 -- Real-Time Voice: Nova 2 Sonic (default) + `gpt-realtime` (fallback)
+
+#### Default: Amazon Nova 2 Sonic
+
+| Metric | Value |
+|--------|-------|
+| **Model ID** | `amazon.nova-2-sonic-v1:0` |
+| **Region** | `us-east-1` (Bedrock Bidirectional Stream; not available in us-east-2) |
+| **Transport** | Browser ⇄ `services/nova-sonic-relay/` (Node WebSocket relay) ⇄ Bedrock `InvokeModelWithBidirectionalStream` |
+| **Auth** | IAM role on the relay container (App Runner); no access keys |
+| **Use cases** | Live patient historian interviews (`/consult`) and follow-up voice agent (`/follow-up`) |
+| **Why** | BAA-covered AWS/Bedrock stack (HIPAA-eligible); removes OpenAI billing dependency; sub-second latency via relay |
+
+#### Fallback: OpenAI Realtime API (`gpt-realtime-2`)
 
 | Metric | Value |
 |--------|-------|
 | **Pricing** | $32 / $64 per 1M audio input / output tokens |
-| **Use cases** | Live patient historian interviews via WebRTC |
-| **Why** | Sub-second latency required for natural voice conversation |
+| **Transport** | WebRTC directly from browser |
+| **How to activate** | Set `VOICE_PROVIDER=openai`, use `?voice=openai` deep-link, or toggle `VoiceProviderToggle` in the UI |
 
-**Endpoints using gpt-realtime:**
-- `/api/ai/historian/session` -- Ephemeral WebRTC token for patient intake interviews
+**Endpoints using voice (both providers routed through the same hook interface):**
+- `/api/ai/historian/session` -- Nova: relay WSS connection; OpenAI: ephemeral WebRTC token via `client_secrets` + `/v1/realtime/calls`
+- `/api/ai/follow-up/session` -- Same provider abstraction as historian
+
+**Provider toggle:** `VOICE_PROVIDER` env var (default `nova`). In-app `VoiceProviderToggle` component on both `/consult` and `/follow-up` (persisted via localStorage; `?voice=nova|openai` deep-link for A/B testing).
 
 ### Audio Transcription: `whisper-1`
 
@@ -680,16 +696,21 @@ IMPORTANT GUARDRAILS:
 | Setting | Value |
 |---------|-------|
 | **Route** | `/api/ai/historian/session` |
-| **Model** | `gpt-realtime` |
-| **Voice** | `verse` |
+| **Default model** | `amazon.nova-2-sonic-v1:0` (Bedrock, us-east-1, via relay) |
+| **Fallback model** | `gpt-realtime-2` (OpenAI Realtime, WebRTC; `VOICE_PROVIDER=openai`) |
+| **Voice (OpenAI path)** | `verse` |
 | **VAD type** | `server_vad` |
 | **VAD threshold** | 0.5 |
 | **VAD prefix_padding_ms** | 300 |
 | **VAD silence_duration_ms** | 700 |
-| **Input transcription model** | `whisper-1` |
-| **Source files** | `src/app/api/ai/historian/session/route.ts`, `src/lib/historianPrompts.ts` |
+| **Input transcription model** | `whisper-1` (OpenAI path); Nova Sonic handles ASR natively |
+| **Source files** | `src/app/api/ai/historian/session/route.ts`, `src/lib/historianPrompts.ts`, `src/lib/voice/` |
 
-The session route does not call OpenAI's Chat API. Instead, it creates an ephemeral WebRTC token via the Realtime API (`POST https://api.openai.com/v1/realtime/sessions`). The client connects directly to OpenAI via WebRTC using this token.
+**Nova path:** The session route returns a relay WSS URL and session config; the browser opens a WebSocket to `services/nova-sonic-relay/` which bridges to Bedrock `InvokeModelWithBidirectionalStream`. Audio is streamed as PCM16 frames (16 kHz capture via AudioWorklet, 24 kHz playback).
+
+**OpenAI path:** The session route creates an ephemeral WebRTC token via the Realtime API (`POST https://api.openai.com/v1/realtime/client_secrets` → `/v1/realtime/calls`). The client connects directly to OpenAI via WebRTC.
+
+**Provider selection:** Controlled by `VOICE_PROVIDER` env var (default `nova`) and overridable per-session via the `VoiceProviderToggle` UI or `?voice=` query param.
 
 #### Core System Prompt (always included)
 
@@ -763,10 +784,11 @@ Keep the follow-up interview focused and efficient. Typically 8-12 questions.
 
 #### Optional Context
 
-If a referral reason is provided:
+If a referral reason is provided, the historian uses a **directive referral-anchored opening**: the AI states the referral reason back to the patient and invites them to discuss it, rather than asking open-ended ("why are you seeing a neurologist today?"). Falls back to open-ended when no referral reason is available.
+
 ```
 REFERRAL REASON: ${referralReason}
-Use this to guide your questioning. Start by asking the patient about the reason they were referred.
+Open the interview by stating back to the patient why they are being seen today (e.g., "I understand you're here because of ${referralReason} — can we talk about that?") and then explore from there. Use this to guide your questioning throughout.
 ```
 
 If patient context is provided (prior visit data, diagnoses, allergies, medications):

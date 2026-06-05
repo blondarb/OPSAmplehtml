@@ -1,6 +1,6 @@
 # Test Cases - Sevaro Clinical
-# test_cases_version: 2.0
-# Last updated: 2026-02-06
+# test_cases_version: 2.1
+# Last updated: 2026-06-05
 #
 # Structure: Each case has id, title, preconditions, steps, expected, data_verification (optional).
 # Organized by suite matching TEST_RUNBOOK.md sections.
@@ -1171,3 +1171,86 @@ cross_platform:
     steps:
       - Run through smoke suite on Firefox
     expected: Core features work
+
+---
+voice_provider:
+  # Nova 2 Sonic migration (2026-06-05) — DEMO-ONLY; requires Bedrock model access for
+  # amazon.nova-2-sonic-v1:0 in us-east-1 AND the nova-sonic-relay service running.
+
+  - id: VP1
+    title: Provider toggle switches Nova→OpenAI on /consult
+    preconditions:
+      - logged in, on /consult
+      - VOICE_PROVIDER=nova (default) or relay running with nova provider
+      - OpenAI Realtime API key configured
+    steps:
+      - Observe VoiceProviderToggle shows "Nova" selected
+      - Click toggle to switch to "OpenAI"
+      - Start a historian interview
+    expected: |
+      - Toggle persists selection in localStorage
+      - Interview connects via OpenAI WebRTC path (not relay WebSocket)
+      - AI historian greets normally
+    data_verification: |
+      Browser network tab shows WebRTC negotiation (no WSS to relay URL);
+      ?voice=openai deep-link produces same provider state
+
+  - id: VP2
+    title: Provider toggle switches Nova→OpenAI on /follow-up
+    preconditions:
+      - logged in, on /follow-up
+      - Both VOICE_PROVIDER env and toggle default to nova
+      - OpenAI Realtime API key configured
+    steps:
+      - Observe VoiceProviderToggle shows "Nova" selected
+      - Click toggle to switch to "OpenAI"
+      - Start a follow-up voice session
+    expected: |
+      - Session connects via OpenAI Realtime path
+      - Follow-up agent responds with appropriate follow-up prompts
+      - Toggle state persists on page refresh (localStorage)
+    data_verification: |
+      Network tab shows no relay WSS connection; WebRTC SDP negotiation visible
+
+  - id: VP3
+    title: Nova historian intake happy-path
+    preconditions:
+      - VOICE_PROVIDER=nova (default)
+      - services/nova-sonic-relay running and NOVA_SONIC_RELAY_URL set
+      - Bedrock model access granted for amazon.nova-2-sonic-v1:0 in us-east-1
+      - logged in, on /consult, mic permission granted
+    steps:
+      - Navigate to /consult
+      - Advance to historian step (Step 2)
+      - Start voice interview
+      - Answer AI questions for 3-5 turns (symptoms, duration, medications)
+      - End interview via "End Interview" button
+    expected: |
+      - Browser connects to relay WSS (not OpenAI WebRTC)
+      - AI historian greets patient and asks opening question
+      - AI questions are natural with sub-second latency
+      - Barge-in works (speaking interrupts the AI)
+      - After end: session saves successfully (no "Failed to save" error)
+      - Structured output visible in historian session panel
+    data_verification: |
+      historian_sessions table row exists with:
+        - structured_output JSON populated (chief_complaint, hpi, etc.)
+        - transcript text present
+        - interview_completion_status = 'complete' or 'ended_early'
+
+  - id: VP4
+    title: Directive referral-anchored historian opening
+    preconditions:
+      - VOICE_PROVIDER=nova (or openai — behavior is provider-agnostic)
+      - /consult with a consult that has a referral_reason populated
+      - Historian interview started
+    steps:
+      - Load /consult with a patient whose referral reason is set (e.g. "new onset headaches")
+      - Start voice interview
+      - Listen to AI opening statement
+    expected: |
+      - AI opens by stating the referral reason back to the patient
+        (e.g. "I understand you're being seen today because of new onset headaches — can we talk about that?")
+      - AI does NOT open with a generic "Why are you seeing a neurologist today?" question
+    data_verification: |
+      Transcript first AI turn contains the referral reason text verbatim or paraphrased
