@@ -141,6 +141,56 @@ export function systemContent(
 }
 
 // ---------------------------------------------------------------------------
+// 3b. userText — returns [contentStart, textInput, contentEnd] with role USER
+// ---------------------------------------------------------------------------
+//
+// Nova Sonic allows the SYSTEM role content ONCE per prompt (the init system
+// prompt). Any second SYSTEM content block fails the whole stream with
+// "Duplicate SYSTEM content. SYSTEM content can only be provided once per
+// prompt." Mid-conversation context injections (localizer pushes, scale
+// instructions, early-end save nudges) must therefore be delivered as USER
+// text turns, which Nova accepts repeatedly. Structurally identical to
+// systemContent(); only the role differs.
+export function userText(
+  promptName: string,
+  text: string,
+  contentName?: string,
+) {
+  const name = contentName ?? uuidv4()
+  return [
+    {
+      event: {
+        contentStart: {
+          promptName,
+          contentName: name,
+          type: 'TEXT',
+          interactive: true,
+          role: 'USER',
+          textInputConfiguration: { mediaType: 'text/plain' },
+        },
+      },
+    },
+    {
+      event: {
+        textInput: {
+          promptName,
+          contentName: name,
+          content: text,
+        },
+      },
+    },
+    {
+      event: {
+        contentEnd: {
+          promptName,
+          contentName: name,
+        },
+      },
+    },
+  ]
+}
+
+// ---------------------------------------------------------------------------
 // 4. Audio content events
 // ---------------------------------------------------------------------------
 

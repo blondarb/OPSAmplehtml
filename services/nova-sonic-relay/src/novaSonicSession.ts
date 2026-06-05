@@ -14,6 +14,7 @@ import {
   sessionStart,
   promptStart,
   systemContent,
+  userText,
   audioContentStart,
   audioInput,
   audioContentEnd,
@@ -208,15 +209,22 @@ export class NovaSonicSession {
   }
 
   /**
-   * Enqueue a fresh SYSTEM text turn (contentStart → textInput → contentEnd),
-   * each call minting its own contentName. Used for localizer pushes, scale
-   * injection, and early-end flushes.
+   * Enqueue a fresh mid-conversation text turn (contentStart → textInput →
+   * contentEnd), each call minting its own contentName. Used for localizer
+   * pushes, scale injection, and early-end flushes.
+   *
+   * Delivered with role USER, NOT SYSTEM: Nova Sonic permits SYSTEM content
+   * only once per prompt (the init system prompt), and a second SYSTEM block
+   * fails the entire stream with "Duplicate SYSTEM content". USER text turns
+   * can be sent repeatedly, so this is the supported channel for dynamic
+   * context. The historian system prompt already tells the model how to treat
+   * this injected guidance (localizer differential, scale administration).
    */
   pushSystemText(text: string): void {
     if (!this.active) {
       return
     }
-    const [start, input, end] = systemContent(this.promptName, text)
+    const [start, input, end] = userText(this.promptName, text)
     this.enqueue(start)
     this.enqueue(input)
     this.enqueue(end)
