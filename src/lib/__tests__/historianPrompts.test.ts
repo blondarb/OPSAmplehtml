@@ -54,6 +54,17 @@ describe('buildHistorianSystemPrompt', () => {
     const prompt = buildHistorianSystemPrompt('new_patient', undefined, '72M, retired machinist')
     expect(prompt).toContain('72M, retired machinist')
   })
+
+  it('leads with the referral reason directively when present', () => {
+    const p = buildHistorianSystemPrompt('new_patient', 'tremors reported to PCP', undefined)
+    expect(p).toMatch(/state .*reason .*as a statement/i)
+    expect(p).toContain('tremors reported to PCP')
+  })
+
+  it('falls back to open-ended opening when no referral reason', () => {
+    const p = buildHistorianSystemPrompt('new_patient', undefined, undefined)
+    expect(p).toMatch(/describe why they are seeing a neurologist/i)
+  })
 })
 
 describe('getHistorianToolDefinition', () => {

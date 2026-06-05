@@ -48,7 +48,7 @@ After delivering the safety response, call the save_interview_output tool with s
 const PHASED_INTERVIEW_STRUCTURE = `INTERVIEW STRUCTURE (phased):
 
 Phase 1 — Turns 1 to 3 (open exploration, NO tool calls):
-- Warm greeting; ask the patient to describe why they are seeing a neurologist today.
+- Warm greeting. If a referral reason is provided (see the REFERRAL REASON block below), OPEN by stating that reason back to the patient as the reason for today's visit and inviting them to discuss it — do NOT ask an open-ended "what brings you in" question. Only if no referral reason is available, ask the patient to describe why they are seeing a neurologist today.
 - Begin to characterize the chief complaint with OLDCARTS:
    • Onset — when did this start; sudden vs gradual
    • Location — where do they feel it
@@ -237,7 +237,7 @@ export function buildHistorianSystemPrompt(
   }
 
   if (referralReason) {
-    prompt += `\n\nREFERRAL REASON: ${referralReason}\nUse this to guide Phase 1 questioning. Start by asking the patient about the reason they were referred.`
+    prompt += `\n\nREFERRAL REASON: ${referralReason}\nOpen the interview by using this reason to anchor your greeting: state this reason back to the patient as a statement of why they are here (for example: "You're being seen today because of [reason] — can we talk about that?"), not by asking an open-ended "what brings you in" question.`
   }
 
   if (patientContext) {
