@@ -3,6 +3,8 @@
 import { useRef, useEffect, useCallback } from 'react'
 import { useFollowUpRealtimeSession } from '@/hooks/useFollowUpRealtimeSession'
 import MessageBubble from './MessageBubble'
+import VoiceProviderToggle from '@/components/voice/VoiceProviderToggle'
+import { useVoiceProviderPreference } from '@/lib/voice/useVoiceProviderPreference'
 import type { PatientScenario, DashboardUpdate, EscalationFlag } from '@/lib/follow-up/types'
 
 interface VoiceConversationProps {
@@ -19,6 +21,7 @@ export default function VoiceConversation({
   onEscalation,
 }: VoiceConversationProps) {
   const scrollRef = useRef<HTMLDivElement>(null)
+  const [voiceProvider, setVoiceProvider] = useVoiceProviderPreference()
 
   const handleEscalation = useCallback((flag: EscalationFlag) => {
     onEscalation(flag)
@@ -71,6 +74,7 @@ export default function VoiceConversation({
     endSession,
   } = useFollowUpRealtimeSession({
     scenario,
+    provider: voiceProvider,
     onSafetyEscalation: () => {
       onEscalation({
         tier: 'urgent',
@@ -386,8 +390,13 @@ export default function VoiceConversation({
           )}
         </div>
 
-        {/* Action buttons */}
-        <div style={{ display: 'flex', gap: '8px' }}>
+        {/* Voice engine toggle + action buttons */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+          <VoiceProviderToggle
+            value={voiceProvider}
+            onChange={setVoiceProvider}
+            disabled={status === 'connecting' || status === 'active' || status === 'ending'}
+          />
           {(status === 'idle' || status === 'error') && (
             <button
               onClick={startSession}
