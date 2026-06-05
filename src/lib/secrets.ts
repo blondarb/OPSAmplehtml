@@ -24,7 +24,17 @@ export interface RdsCredentials {
 export async function getRdsCredentials(): Promise<RdsCredentials> {
   try {
     const creds = await getSecret('sevaro/rds/credentials')
-    console.log('[RDS] Using Secrets Manager credentials, host:', creds.host ? creds.host.substring(0, 15) + '...' : '(empty)')
+    // The shared `sevaro/rds/credentials` secret's `database` field is a stale
+    // default (`github_showcase`, a different app's 21-table DB). This app's full
+    // schema (neurology_consults, notifications, historian_sessions, scale_results,
+    // consult_reports, …) lives in `ops_amplehtml` on the same RDS instance, and
+    // RDS_DATABASE is set to it in every environment (Amplify prod + .env.local).
+    // Honor RDS_DATABASE in ALL envs so the app stays on the correct DB even if the
+    // Secrets Manager fetch succeeds — e.g. if a compute role is later attached to
+    // the Amplify app, which would otherwise make this path return github_showcase
+    // and silently break /consult + notifications in prod.
+    if (process.env.RDS_DATABASE) creds.database = process.env.RDS_DATABASE
+    console.log('[RDS] Using Secrets Manager credentials, host:', creds.host ? creds.host.substring(0, 15) + '...' : '(empty)', 'db:', creds.database)
     return creds
   } catch (err) {
     if (process.env.NODE_ENV === 'production' && !process.env.RDS_HOST) {
