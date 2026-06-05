@@ -60,6 +60,7 @@ npm run build
 ## Known Gotchas
 
 - `@/lib/db-query` `from()` auto-stringifies plain objects but passes arrays through raw — JSONB array columns (e.g. `transcript`, `red_flags`) must be `JSON.stringify()`'d at the call site before insert.
+- **DB target: the `sevaro/rds/credentials` secret points at `github_showcase` (a stale 21-table DB), but the full schema (`neurology_consults`, `notifications`, `historian_sessions`, `scale_results`, `consult_reports`, …) lives in `ops_amplehtml` (57 tables) on the same RDS instance.** `getRdsCredentials()` prefers Secrets Manager, so when AWS creds are valid the app hits `github_showcase` and `/consult`/notifications 500 with `relation … does not exist`. Local dev now overrides this: set `RDS_DATABASE=ops_amplehtml` in `.env.local` and `getRdsCredentials()` repoints the DB in non-prod only (`NODE_ENV !== 'production'`). Prod still uses the secret verbatim — the secret→`github_showcase` mismatch is a separate, unresolved prod question.
 - Amplify SSR env vars require `next.config` inline block for runtime access (not just `process.env`).
 - Triage route uses 202+poll pattern — do not attempt SSE streaming (reverted in PR #111 due to ~28s Amplify gateway timeout).
 - `/consult` Historian uses WebRTC Realtime API — requires HTTPS and browser mic permission.

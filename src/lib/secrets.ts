@@ -25,6 +25,13 @@ export async function getRdsCredentials(): Promise<RdsCredentials> {
   try {
     const creds = await getSecret('sevaro/rds/credentials')
     console.log('[RDS] Using Secrets Manager credentials, host:', creds.host ? creds.host.substring(0, 15) + '...' : '(empty)')
+    // Local dev override: the shared secret targets github_showcase, but the
+    // full schema (neurology_consults, notifications, historian_sessions, …)
+    // lives in ops_amplehtml. Let RDS_DATABASE repoint the DB in non-prod only,
+    // so local dev hits the complete schema without affecting production.
+    if (process.env.NODE_ENV !== 'production' && process.env.RDS_DATABASE) {
+      creds.database = process.env.RDS_DATABASE
+    }
     return creds
   } catch (err) {
     if (process.env.NODE_ENV === 'production' && !process.env.RDS_HOST) {
