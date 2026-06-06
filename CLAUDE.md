@@ -59,6 +59,7 @@ npm run build
 ## Known Gotchas
 
 - `@/lib/db-query` `from()` auto-stringifies plain objects but passes arrays through raw — JSONB array columns (e.g. `transcript`, `red_flags`) must be `JSON.stringify()`'d at the call site before insert.
+- **DB target = `ops_amplehtml` (57 tables), set via `RDS_DATABASE`.** The shared `sevaro/rds/credentials` secret's `database` field is a stale default (`github_showcase`, a *different* app's 21-table DB missing `neurology_consults`/`notifications`/`historian_sessions`/`scale_results`/`consult_reports`). `getRdsCredentials()` now honors `RDS_DATABASE` in **all** environments so the app stays on `ops_amplehtml`. Prod (Amplify `main`) sets `RDS_DATABASE=ops_amplehtml`; historically it only stayed correct because the SSR Lambda has no compute role, so the Secrets Manager fetch *fails* and the env-var fallback wins — meaning **if a compute role is ever attached to this Amplify app, the secret fetch would start succeeding and (pre-fix) flip prod to `github_showcase`.** The override defuses that. Do NOT repoint the shared secret to fix this — it's consumed by many apps (SDNE, SevaroMonitor, neurocrit-care-v2, evidence-engine, …); they all override the DB field, but it's a cross-app blast radius.
 - Amplify SSR env vars require `next.config` inline block for runtime access (not just `process.env`).
 - Triage route uses 202+poll pattern — do not attempt SSE streaming (reverted in PR #111 due to ~28s Amplify gateway timeout).
 - `/consult` Historian uses WebRTC Realtime API — requires HTTPS and browser mic permission.
