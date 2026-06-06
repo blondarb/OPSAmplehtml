@@ -63,6 +63,7 @@ npm run build
 - Amplify SSR env vars require `next.config` inline block for runtime access (not just `process.env`).
 - Triage route uses 202+poll pattern — do not attempt SSE streaming (reverted in PR #111 due to ~28s Amplify gateway timeout).
 - `/consult` Historian uses WebRTC Realtime API — requires HTTPS and browser mic permission.
+- **RDS connections validate TLS** against the vendored AWS RDS CA bundle (`src/lib/rds-ca-bundle.ts`, the full `global-bundle.pem` embedded as a string so it survives Amplify SSR Lambda bundling — loose `.pem` files get dropped). Both pools in `src/lib/db.ts` use `ssl: { ca: RDS_CA_BUNDLE, rejectUnauthorized: true }` (replacing the old `rejectUnauthorized: false`). **Emergency escape hatch:** set `RDS_SSL_INSECURE=true` to fall back to no-validation without a code revert (e.g. if AWS rotates the root CA before the bundle is refreshed). NOTE: Amplify env vars **REPLACE** the whole map on update — adding `RDS_SSL_INSECURE` means re-supplying the **full** existing env map, not just the one var. Refresh the bundle by re-downloading `https://truststore.pki.rds.amazonaws.com/global/global-bundle.pem` and replacing the template literal.
 
 ## Recent Changes (Summary)
 

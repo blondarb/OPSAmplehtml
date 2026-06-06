@@ -1,8 +1,18 @@
 import { Pool } from 'pg'
 import { getRdsCredentials } from './secrets'
+import { RDS_CA_BUNDLE } from './rds-ca-bundle'
 
 let pool: Pool | null = null
 let wearablePool: Pool | null = null
+
+// Validate the RDS server cert against the vendored AWS RDS CA bundle (prevents MITM).
+// RDS_SSL_INSECURE=true is an emergency escape hatch to disable validation without a
+// code revert if the CA ever mismatches (e.g. AWS rotates the root CA before we refresh
+// the bundle). Default is strict validation.
+const rdsSsl = {
+  ca: RDS_CA_BUNDLE,
+  rejectUnauthorized: process.env.RDS_SSL_INSECURE === 'true' ? false : true,
+}
 
 export async function getPool(): Promise<Pool> {
   if (pool) return pool
@@ -14,7 +24,7 @@ export async function getPool(): Promise<Pool> {
     password: creds.password,
     database: creds.database,
     max: 5,
-    ssl: { rejectUnauthorized: false },
+    ssl: rdsSsl,
   })
   return pool
 }
@@ -32,7 +42,7 @@ export async function getWearablePool(): Promise<Pool> {
     password: creds.password,
     database: 'sevaro_monitor',
     max: 5,
-    ssl: { rejectUnauthorized: false },
+    ssl: rdsSsl,
   })
   return wearablePool
 }
