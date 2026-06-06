@@ -608,11 +608,16 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
     }) => {
       if (!providerRef.current) return
 
+      // IMPORTANT: on the Nova path this is delivered as a USER text turn (Nova
+      // forbids a second SYSTEM block), so it can read like patient speech. Frame
+      // it explicitly as private, physician-only context the model must NOT speak
+      // aloud or name to the patient — it only steers which symptoms to ask about.
       const delta = [
-        `[LATEST LOCALIZER PUSH${pushPayload.turn_count != null ? ` @ turn ${pushPayload.turn_count}` : ''}]`,
-        `- Top differentials: ${(pushPayload.top_differentials ?? []).join(', ') || '(none yet)'}`,
-        `- Suggested next question: ${pushPayload.suggested_next_question ?? '(none)'}`,
-        `- Suggested scale to consider: ${pushPayload.suggested_scale_id ?? '(none)'}`,
+        `[INTERNAL CLINICAL NOTE — system-generated, NOT spoken by the patient. Do NOT read this aloud, do NOT mention these possible diagnoses, and do NOT name any condition to the patient. Use it ONLY to choose which symptoms to ask about next, phrased in plain everyday language.]`,
+        `[Localizer update${pushPayload.turn_count != null ? ` @ turn ${pushPayload.turn_count}` : ''}]`,
+        `- Differentials under consideration (physician-facing — keep private): ${(pushPayload.top_differentials ?? []).join(', ') || '(none yet)'}`,
+        `- Suggested angle for your next plain-language question: ${pushPayload.suggested_next_question ?? '(none)'}`,
+        `- Suggested scale to consider (do not name it to the patient): ${pushPayload.suggested_scale_id ?? '(none)'}`,
       ].join('\n')
 
       try {
