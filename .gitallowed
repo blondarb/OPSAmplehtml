@@ -13,6 +13,8 @@ docs/plans/
 docs/HANDOFF_
 docs/SEVARO_EVIDENCE_ENGINE_PLAYBOOK
 docs/NEUROSCRIBE_WORKFLOW_REDESIGN
+# Vendored AWS RDS public CA bundle (PEM base64 trips the 40-char entropy pattern; not a secret)
+src/lib/rds-ca-bundle.ts
 # Data file content
 data/plans.json
 src/app/api/ai/historian/localizer/route.ts
