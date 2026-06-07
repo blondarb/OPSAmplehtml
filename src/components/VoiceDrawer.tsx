@@ -174,7 +174,7 @@ export default function VoiceDrawer({
     setVisitAIOutput(null)
     setVisitTranscript('')
 
-    // File size validation (Vercel body limit is ~4.5MB by default, Whisper limit is 25MB)
+    // File size validation (serverless request body limits run well under Whisper's 25MB limit)
     const MAX_SIZE_MB = 25
     const blobSizeMB = audioBlob.size / (1024 * 1024)
     if (blobSizeMB > MAX_SIZE_MB) {

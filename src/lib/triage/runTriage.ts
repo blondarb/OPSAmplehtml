@@ -1,7 +1,7 @@
 /**
  * Core triage execution — shared between the main triage API and the
  * consistency-test rerun route. Calls AWS Bedrock directly without HTTP
- * self-fetch so it works reliably on Vercel serverless.
+ * self-fetch so it works reliably on serverless (AWS Amplify / Lambda).
  */
 
 import { invokeBedrockJSON } from '@/lib/bedrock'

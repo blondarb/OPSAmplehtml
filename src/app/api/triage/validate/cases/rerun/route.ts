@@ -12,7 +12,7 @@ import { from } from '@/lib/db-query'
  * multiple times to measure consistency. Stores each run in validation_ai_runs.
  *
  * Uses the shared runTriage() function directly instead of HTTP self-fetch
- * to avoid serverless deadlocks on Vercel.
+ * to avoid serverless deadlocks (AWS Amplify / Lambda).
  *
  * Body:
  *   {
