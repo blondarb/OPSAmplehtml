@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { buildFollowUpVoicePrompt } from '@/lib/follow-up/systemPrompt'
 import type { PatientScenario } from '@/lib/follow-up/types'
 import { getOpenAIKey } from '@/lib/secrets'
+import { buildWhisperBiasPrompt, isAsrBiasingEnabled } from '@/lib/asr/clinical-lexicon'
 
 export async function POST(request: Request) {
   try {
@@ -26,6 +27,19 @@ export async function POST(request: Request) {
 
     // Build voice prompt
     const voicePrompt = buildFollowUpVoicePrompt(patientContext)
+
+    // Bias ASR toward neurology vocabulary, prioritizing this patient's own
+    // high-stakes words (their name, provider, and medications) so they survive
+    // the prompt token budget. Hot-revertable via ASR_VOCAB_BIASING.
+    const transcription: { model: string; prompt?: string } = { model: 'whisper-1' }
+    if (isAsrBiasingEnabled()) {
+      const sessionTerms = [
+        patientContext.name,
+        patientContext.providerName,
+        ...(patientContext.medications ?? []).map((m) => m.name),
+      ].filter(Boolean)
+      transcription.prompt = buildWhisperBiasPrompt(sessionTerms)
+    }
 
     // Follow-up tool definition for voice mode
     const followUpToolDefinition = {
@@ -80,9 +94,7 @@ export async function POST(request: Request) {
         model: 'gpt-realtime',
         voice: 'verse',
         instructions: voicePrompt,
-        input_audio_transcription: {
-          model: 'whisper-1',
-        },
+        input_audio_transcription: transcription,
         turn_detection: {
           type: 'server_vad',
           threshold: 0.7,

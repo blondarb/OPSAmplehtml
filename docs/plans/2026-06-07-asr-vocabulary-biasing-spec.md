@@ -4,9 +4,9 @@
 
 | Field | Value |
 |-------|-------|
-| Type | Spec / scoping doc (no code yet) |
+| Type | Spec / scoping doc |
 | Created | 2026-06-07 |
-| Status | Proposed |
+| Status | Implemented (2026-06-07) — static lexicon + all four surfaces wired behind `ASR_VOCAB_BIASING` |
 | Motivation | `docs/references/voice-agent-field-lessons.md` lesson #2 ("ASR falls apart on the words that matter most") |
 | Owner | Sevaro Clinical Engineering |
 
@@ -104,3 +104,39 @@ AWS Transcribe Medical custom-vocabulary is the cleanest fit since it's HIPAA-el
 - Does the GA Realtime API surface accept transcription biasing today, or do we need
   `gpt-4o-transcribe` / the post-recording path? (Confirm at implementation.)
 - Size/refresh cadence of the dynamic roster — per-session only, or a cached provider list?
+
+## Implementation (2026-06-07)
+
+Shipped the static-lexicon pass with per-session dynamic terms where available.
+
+**New module:** `src/lib/asr/clinical-lexicon.ts`
+- `getStaticClinicalTerms()` — interleaves the curated `NEURO_TERMS` (scales, cardinal
+  symptoms, conditions, anatomy — ordered most-valuable-first) with every `NEURO_FORMULARY`
+  drug (brand + generic), de-duped. Interleaving keeps a balanced mix under a budget so
+  neither symptoms nor drug names crowd the other out.
+- `buildWhisperBiasPrompt(extraTerms?)` — framed, comma-joined prompt trimmed to a ~220-token
+  budget (Whisper's prompt cap). `extraTerms` are hoisted first so session-specific
+  high-stakes words (patient/provider names, the patient's own meds) always survive truncation.
+- `buildDeepgramKeyterms(extraTerms?, max=100)` — Nova-3 Keyterm Prompting array.
+- `isAsrBiasingEnabled()` — reads `ASR_VOCAB_BIASING` (default ON; `false`/`0`/`off` to revert).
+
+**Surfaces wired:**
+- `src/app/api/ai/historian/session/route.ts` — GA `audio.input.transcription.prompt` (static).
+- `src/app/api/ai/intake/session/route.ts` — `input_audio_transcription.prompt` (static).
+- `src/app/api/follow-up/realtime-session/route.ts` — `input_audio_transcription.prompt` with
+  dynamic terms (patient name, provider, medication names from `PatientScenario`).
+- `src/app/api/ai/transcribe/route.ts` — Deepgram `keyterm` (static).
+
+**Tests:** `src/lib/__tests__/clinical-lexicon.test.ts` (13 cases — term sourcing, de-dupe,
+ordering, budget cap, extra-term priority, env flag).
+
+**Open-question resolutions:**
+- The biasing field is sent as `prompt` on the transcription config for all three Realtime
+  routes. It's fully behind `ASR_VOCAB_BIASING`; the historian route already passes raw OpenAI
+  error bodies through, so if a model/endpoint ever rejects the field, flip the flag to revert
+  instantly (no deploy) while we evaluate `gpt-4o-transcribe` as the prompt-bearing model.
+- Dynamic roster is per-session only for now (Follow-Up). Historian/Intake use the static
+  lexicon; extracting structured patient/provider names there is a future enhancement.
+
+**Not yet done (future):** AWS Transcribe Medical custom vocabulary (pending that streaming
+path going live); structured name extraction for Historian/Intake; WER measurement harness.

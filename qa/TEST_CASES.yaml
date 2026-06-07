@@ -266,6 +266,25 @@ ai_features:
       - Each suggestion has type badge (consistency/completeness/quality)
       - "Go to section" links work
 
+  - id: B9
+    title: ASR vocabulary biasing on voice surfaces
+    preconditions: [logged in, ASR_VOCAB_BIASING unset or not "false"]
+    steps:
+      - Start a /consult Historian session and speak a neurology medication
+        (e.g. "levetiracetam") and a scale name (e.g. "MoCA")
+      - Dictate via VoiceDrawer using a drug name (e.g. "Nurtec ODT")
+      - For Follow-Up voice, confirm the patient's own name + medications are
+        passed as bias terms
+    expected: |
+      - High-stakes neurology terms (drug names, scales, anatomy) transcribe
+        correctly more often than with bare whisper-1/nova-3
+      - Session-specific terms (patient name, provider, their meds) are biased first
+      - Setting ASR_VOCAB_BIASING=false cleanly reverts to no biasing (no errors)
+    data_verification: |
+      - historian/intake/follow-up session routes send input transcription
+        config with a `prompt`; /api/ai/transcribe sends Deepgram `keyterm`
+      - src/lib/__tests__/clinical-lexicon.test.ts passes (lexicon unit coverage)
+
 ---
 historian_physician:
   - id: C1
