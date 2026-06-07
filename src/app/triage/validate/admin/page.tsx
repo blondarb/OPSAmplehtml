@@ -254,7 +254,7 @@ export default function AdminPage() {
     }
   }
 
-  // Run consistency test — batches cases to stay within Vercel function timeout
+  // Run consistency test — batches cases to stay within the serverless function timeout
   async function handleConsistencyRun() {
     const caseIds = selectedCaseIds.size > 0
       ? Array.from(selectedCaseIds)
