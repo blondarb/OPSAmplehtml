@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { INTAKE_VOICE_SYSTEM_PROMPT, getIntakeToolDefinition } from '@/lib/intakePrompts'
 import { getOpenAIKey } from '@/lib/secrets'
+import { buildWhisperBiasPrompt, isAsrBiasingEnabled } from '@/lib/asr/clinical-lexicon'
 
 export async function POST() {
   try {
@@ -15,6 +16,12 @@ export async function POST() {
     const instructions = INTAKE_VOICE_SYSTEM_PROMPT
     const tool = getIntakeToolDefinition()
 
+    // Bias ASR toward neurology vocabulary (hot-revertable via ASR_VOCAB_BIASING).
+    const transcription: { model: string; prompt?: string } = { model: 'whisper-1' }
+    if (isAsrBiasingEnabled()) {
+      transcription.prompt = buildWhisperBiasPrompt()
+    }
+
     // Request ephemeral token from OpenAI Realtime API
     const response = await fetch('https://api.openai.com/v1/realtime/sessions', {
       method: 'POST',
@@ -26,9 +33,7 @@ export async function POST() {
         model: 'gpt-realtime',
         voice: 'verse',
         instructions,
-        input_audio_transcription: {
-          model: 'whisper-1',
-        },
+        input_audio_transcription: transcription,
         turn_detection: {
           type: 'server_vad',
           threshold: 0.5,

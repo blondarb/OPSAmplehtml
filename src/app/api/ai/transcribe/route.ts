@@ -3,6 +3,7 @@ import { createClient as createDeepgramClient } from '@deepgram/sdk'
 import { getUser } from '@/lib/cognito/server'
 import { invokeBedrock } from '@/lib/bedrock'
 import { getDeepgramKey } from '@/lib/secrets'
+import { buildDeepgramKeyterms, isAsrBiasingEnabled } from '@/lib/asr/clinical-lexicon'
 
 
 export async function POST(request: Request) {
@@ -50,16 +51,22 @@ export async function POST(request: Request) {
     const arrayBuffer = await audioFile.arrayBuffer()
     const audioBuffer = Buffer.from(arrayBuffer)
 
-    // Call Deepgram Nova for transcription
+    // Call Deepgram Nova for transcription. Bias toward neurology vocabulary via
+    // Nova-3 Keyterm Prompting (hot-revertable via ASR_VOCAB_BIASING) so drug
+    // names and clinical terms in dictation transcribe correctly.
     const deepgram = createDeepgramClient(deepgramKey)
+    const deepgramOptions: Record<string, unknown> = {
+      model: 'nova-3',
+      smart_format: true,
+      language: 'en',
+      punctuate: true,
+    }
+    if (isAsrBiasingEnabled()) {
+      deepgramOptions.keyterm = buildDeepgramKeyterms()
+    }
     const { result, error: dgError } = await deepgram.listen.prerecorded.transcribeFile(
       audioBuffer,
-      {
-        model: 'nova-3',
-        smart_format: true,
-        language: 'en',
-        punctuate: true,
-      }
+      deepgramOptions
     )
 
     if (dgError) {

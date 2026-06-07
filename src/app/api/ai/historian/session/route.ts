@@ -5,6 +5,7 @@ import { getTurnDetectionConfig } from '@/lib/historianTypes'
 import { getOpenAIKey } from '@/lib/secrets'
 import { getConsult, markHistorianStarted } from '@/lib/consult/pipeline'
 import { buildHistorianContextFromConsult } from '@/lib/consult/contextBuilder'
+import { buildWhisperBiasPrompt, isAsrBiasingEnabled } from '@/lib/asr/clinical-lexicon'
 
 export async function POST(request: Request) {
   try {
@@ -44,6 +45,14 @@ export async function POST(request: Request) {
     const model = process.env.OPENAI_HISTORIAN_REALTIME_MODEL || 'gpt-realtime-2'
     const turnDetection = getTurnDetectionConfig(process.env.HISTORIAN_TURN_DETECTION_MODE)
 
+    // Bias ASR toward neurology vocabulary (drug names, anatomy, scales) so the
+    // high-stakes words general ASR misses transcribe correctly. Hot-revertable
+    // via ASR_VOCAB_BIASING. See docs/plans/2026-06-07-asr-vocabulary-biasing-spec.md
+    const transcription: { model: string; prompt?: string } = { model: 'whisper-1' }
+    if (isAsrBiasingEnabled()) {
+      transcription.prompt = buildWhisperBiasPrompt()
+    }
+
     // Request an ephemeral client_secret from OpenAI's current GA endpoint.
     // Replaces the deprecated POST /v1/realtime/sessions flow.
     const response = await fetch('https://api.openai.com/v1/realtime/client_secrets', {
@@ -60,7 +69,7 @@ export async function POST(request: Request) {
           audio: {
             input: {
               turn_detection: turnDetection,
-              transcription: { model: 'whisper-1' },
+              transcription,
             },
             output: { voice: 'verse' },
           },

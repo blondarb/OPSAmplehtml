@@ -56,9 +56,12 @@ anatomy terms, and patient/provider names — precisely the long-tail tokens gen
 - Whisper and the Realtime transcription model both support prompt/vocabulary biasing — we should
   evaluate feeding a domain lexicon.
 - Errors here are a **clinical safety issue**, not just a quality one (a misheard med or dose).
-- **Current state (verified 2026-06-07): we pass NO ASR biasing on any surface** (Historian, Intake,
-  Follow-Up voice all use bare `whisper-1`; Deepgram fallback has no keyterms). Scoped fix in
-  `docs/plans/2026-06-07-asr-vocabulary-biasing-spec.md`.
+- **Status (2026-06-07): ASR biasing is now implemented.** A neurology lexicon
+  (`src/lib/asr/clinical-lexicon.ts`) biases all four surfaces — Historian/Intake/Follow-Up
+  Realtime transcription via a `prompt`, dictation via Deepgram `keyterm` — with the patient's own
+  name/provider/meds hoisted first on Follow-Up. Gated by `ASR_VOCAB_BIASING` (default on). See
+  `docs/plans/2026-06-07-asr-vocabulary-biasing-spec.md`. Future: AWS Transcribe Medical custom
+  vocabulary + structured name extraction for Historian/Intake.
 
 ### 3. The AI is the easy 20%. The integration is the hard 80%.
 
