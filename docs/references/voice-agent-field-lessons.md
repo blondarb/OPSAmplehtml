@@ -57,8 +57,8 @@ anatomy terms, and patient/provider names — precisely the long-tail tokens gen
   evaluate feeding a domain lexicon.
 - Errors here are a **clinical safety issue**, not just a quality one (a misheard med or dose).
 - **Status (2026-06-07): ASR biasing is now implemented.** A neurology lexicon
-  (`src/lib/asr/clinical-lexicon.ts`) biases all four surfaces — Historian/Intake/Follow-Up
-  Realtime transcription via a `prompt`, dictation via Deepgram `keyterm` — with the patient's own
+  (`src/lib/asr/clinical-lexicon.ts`) biases all five transcription surfaces — Historian/Intake/Follow-Up
+  Realtime transcription via a `prompt`, dictation + visit-recording via Deepgram Nova-3 `keyterm` — with the patient's own
   name/provider/meds hoisted first on Follow-Up. Gated by `ASR_VOCAB_BIASING` (default on). See
   `docs/plans/2026-06-07-asr-vocabulary-biasing-spec.md`. Future: AWS Transcribe Medical custom
   vocabulary + structured name extraction for Historian/Intake.
