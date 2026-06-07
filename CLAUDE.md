@@ -9,6 +9,14 @@ Neurology outpatient web app: clinical notes, AI assistance, voice dictation, do
 2. Commit and push to `main` — Amplify auto-deploys
 3. Do NOT wait for user approval — test locally first, then ship it
 
+**AWS Amplify is the sole deploy target.** Do not add Vercel (or other host) build
+config to this repo. A stray `vercel.json` was removed on 2026-05-29 after a Vercel GitHub
+integration started posting deploy checks on PRs, contradicting the Amplify-only setup.
+Note: removing `vercel.json` stops Vercel from reading repo build config but does **not**
+disconnect the Vercel↔GitHub integration — that must be removed in the Vercel/GitHub
+dashboard (Vercel project settings → Git, or the GitHub Vercel app's repo access). If you
+still see a "Vercel" status check on PRs, the integration is still connected.
+
 ## Tech Stack
 
 | Component | Technology |
@@ -64,6 +72,8 @@ npm run build
 - `/consult` Historian uses WebRTC Realtime API — requires HTTPS and browser mic permission.
 
 ## Recent Changes (Summary)
+
+- **Deploy hygiene + ASR biasing spec (2026-06-07)**: Removed a stray `vercel.json` and documented that **AWS Amplify is the sole deploy target** (a Vercel GitHub integration had been posting deploy checks on PRs — the integration itself must be disconnected in the Vercel/GitHub dashboard, not just the repo). Investigated ASR vocabulary biasing across all voice surfaces and confirmed **we pass zero domain biasing today** (Historian/Intake/Follow-Up all bare `whisper-1`); wrote a scoping spec at `docs/plans/2026-06-07-asr-vocabulary-biasing-spec.md`. Also audited the crisis-handoff path — confirmed a clean patient-facing handoff exists for active emergencies (scripted 911/988/Crisis-Text message + interview stop), while historical clinical red flags remain clinician-review-only by design.
 
 - **Reference doc: voice AI agent field lessons (2026-05-29)**: Captured a practitioner's six hard-won lessons from shipping a production phone-based voice scheduling agent (latency as the product, ASR failing on high-stakes words like names/meds, integration being the hard 80%, barge-in handling, graceful human handoff, compliance-first architecture) in `docs/references/voice-agent-field-lessons.md`. Annotated each point with relevance to our voice surfaces — AI Historian (`/consult`) and Live Follow-Up Agent (`/follow-up`). Reference only, not a spec; use as a pre-mortem checklist when scoping phone/voice work.
 
