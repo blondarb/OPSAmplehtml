@@ -9,6 +9,14 @@ Neurology outpatient web app: clinical notes, AI assistance, voice dictation, do
 2. Commit and push to `main` — Amplify auto-deploys
 3. Do NOT wait for user approval — test locally first, then ship it
 
+**AWS Amplify is the sole deploy target.** Do not add Vercel (or other host) build
+config to this repo. A stray `vercel.json` was removed on 2026-05-29 after a Vercel GitHub
+integration started posting deploy checks on PRs, contradicting the Amplify-only setup.
+Note: removing `vercel.json` stops Vercel from reading repo build config but does **not**
+disconnect the Vercel↔GitHub integration — that must be removed in the Vercel/GitHub
+dashboard (Vercel project settings → Git, or the GitHub Vercel app's repo access). If you
+still see a "Vercel" status check on PRs, the integration is still connected.
+
 ## Tech Stack
 
 | Component | Technology |
@@ -66,6 +74,10 @@ npm run build
 - **RDS connections validate TLS** against the vendored AWS RDS CA bundle (`src/lib/rds-ca-bundle.ts`, the full `global-bundle.pem` embedded as a string so it survives Amplify SSR Lambda bundling — loose `.pem` files get dropped). Both pools in `src/lib/db.ts` use `ssl: { ca: RDS_CA_BUNDLE, rejectUnauthorized: true }` (replacing the old `rejectUnauthorized: false`). **Emergency escape hatch:** set `RDS_SSL_INSECURE=true` to fall back to no-validation without a code revert (e.g. if AWS rotates the root CA before the bundle is refreshed). NOTE: Amplify env vars **REPLACE** the whole map on update — adding `RDS_SSL_INSECURE` means re-supplying the **full** existing env map, not just the one var. Refresh the bundle by re-downloading `https://truststore.pki.rds.amazonaws.com/global/global-bundle.pem` and replacing the template literal.
 
 ## Recent Changes (Summary)
+
+- **Deploy hygiene + ASR biasing spec (2026-06-07)**: Removed a stray `vercel.json` and documented that **AWS Amplify is the sole deploy target** (a Vercel GitHub integration had been posting deploy checks on PRs — the integration itself must be disconnected in the Vercel/GitHub dashboard, not just the repo). Investigated ASR vocabulary biasing across all voice surfaces and confirmed **we pass zero domain biasing today** (Historian/Intake/Follow-Up all bare `whisper-1`); wrote a scoping spec at `docs/plans/2026-06-07-asr-vocabulary-biasing-spec.md`. Also audited the crisis-handoff path — confirmed a clean patient-facing handoff exists for active emergencies (scripted 911/988/Crisis-Text message + interview stop), while historical clinical red flags remain clinician-review-only by design.
+
+- **Reference doc: voice AI agent field lessons (2026-05-29)**: Captured a practitioner's six hard-won lessons from shipping a production phone-based voice scheduling agent (latency as the product, ASR failing on high-stakes words like names/meds, integration being the hard 80%, barge-in handling, graceful human handoff, compliance-first architecture) in `docs/references/voice-agent-field-lessons.md`. Annotated each point with relevance to our voice surfaces — AI Historian (`/consult`) and Live Follow-Up Agent (`/follow-up`). Reference only, not a spec; use as a pre-mortem checklist when scoping phone/voice work.
 
 - **AI Historian Realtime API + Harness Upgrade (2026-05-27)**: Demo-only `/consult` Step 2 historian migrated to OpenAI's current GA Realtime API (`client_secrets` + `/v1/realtime/calls` + `gpt-realtime-2` + `semantic_vad`). Tool surface consolidated to 3 (save_interview_output, query_evidence, scale_step — paginated). New Localizer push channel via re-serialized `session.update` (base prompt + delta, every 3 turns). Phased prompt structure (turns 1-3 open, turns 4+ tool-augmented) with explicit neurology focus + 15-25 turn budget. Migration 047 added paginated state to `scale_results` + relaxed NOT NULL on `patient_id`/`responses`/`raw_score` (legacy submit flow had been silently failing). Env flags `OPENAI_HISTORIAN_REALTIME_MODEL` / `HISTORIAN_TURN_DETECTION_MODE` for hot-revert. Spec + plan + 2-round cross-check audit trail + pre/post eval rubric in `docs/superpowers/` and `qa/historian-baselines/`. (Demo-only; multi-modal + prior-visits explicitly future agents.)
 
