@@ -6,7 +6,7 @@
 |-------|-------|
 | Type | Spec / scoping doc |
 | Created | 2026-06-07 |
-| Status | Implemented (2026-06-07) — static lexicon + all four surfaces wired behind `ASR_VOCAB_BIASING` |
+| Status | Implemented (2026-06-07) — static lexicon + all five transcription surfaces wired behind `ASR_VOCAB_BIASING` |
 | Motivation | `docs/references/voice-agent-field-lessons.md` lesson #2 ("ASR falls apart on the words that matter most") |
 | Owner | Sevaro Clinical Engineering |
 
@@ -125,7 +125,8 @@ Shipped the static-lexicon pass with per-session dynamic terms where available.
 - `src/app/api/ai/intake/session/route.ts` — `input_audio_transcription.prompt` (static).
 - `src/app/api/follow-up/realtime-session/route.ts` — `input_audio_transcription.prompt` with
   dynamic terms (patient name, provider, medication names from `PatientScenario`).
-- `src/app/api/ai/transcribe/route.ts` — Deepgram `keyterm` (static).
+- `src/app/api/ai/transcribe/route.ts` — Deepgram `keyterm` (static, dictation).
+- `src/app/api/ai/visit-ai/route.ts` — Deepgram `keyterm` (static, visit recording + diarization).
 
 **Tests:** `src/lib/__tests__/clinical-lexicon.test.ts` (13 cases — term sourcing, de-dupe,
 ordering, budget cap, extra-term priority, env flag).
