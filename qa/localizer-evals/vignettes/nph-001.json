@@ -1,0 +1,27 @@
+{
+  "id": "nph-001",
+  "source": "seed",
+  "description": "Normal pressure hydrocephalus — classic triad (gait apraxia, urinary incontinence, cognitive decline). A reversible cause that must not be dismissed as Alzheimer's.",
+  "input": {
+    "sessionType": "new_patient",
+    "chiefComplaint": "walking trouble and memory changes",
+    "exam": "magnetic/shuffling gait, urinary incontinence, mild cognitive slowing",
+    "transcript": [
+      { "role": "assistant", "text": "What's been going on?" },
+      { "role": "user", "text": "Over the past year my walking has gotten worse — my feet feel stuck to the floor — and I've started having accidents with my bladder." },
+      { "role": "assistant", "text": "How about your thinking or memory?" },
+      { "role": "user", "text": "I'm a little slower and more forgetful, but it's the walking and bladder that bother me most." }
+    ]
+  },
+  "gold": {
+    "localization": ["periventricular", "frontal", "subcortical", "ventricul"],
+    "mustIncludeDx": [
+      { "label": "NPH", "patterns": ["normal pressure hydrocephalus", "nph", "hydrocephalus"] }
+    ],
+    "mustRankTopN": [
+      { "dx": { "label": "NPH", "patterns": ["normal pressure hydrocephalus", "nph", "hydrocephalus"] }, "n": 3 }
+    ],
+    "mustScreen": ["lumbar puncture|large-volume lp|csf|tap test", "mri"],
+    "mustNotInclude": []
+  }
+}
