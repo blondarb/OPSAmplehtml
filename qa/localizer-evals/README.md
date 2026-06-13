@@ -13,6 +13,9 @@ Spec: [`docs/plans/2026-06-13-localizer-differential-hardening-spec.md`](../../d
 | `score.test.ts` | Vitest unit tests for the scorer (always-on CI signal) |
 | `vignettes/*.json` | Clinical scenarios + gold expectations |
 | `run.ts` | Runner — sends vignettes to the live engine via adapter, scores, reports |
+| `grader.ts` | **Independent grader (LLM-as-judge)** — pure prompt builders + parsers + injectable judge |
+| `grader.test.ts` | Vitest unit tests for the grader (prompts, parsing, position debiasing) |
+| `grade.ts` | Grader CLI — wires a Bedrock judge; pairwise A/B + quality grade; skips without creds |
 
 ## What gets scored
 
@@ -32,6 +35,23 @@ LOCALIZER_EVAL_COOKIE="id_token=..." \
 npx tsx qa/localizer-evals/run.ts
 ```
 With no endpoint set, the runner skips (exit 0) and lists loaded vignettes.
+
+## Independent grader (LLM-as-judge)
+
+Two complementary signals: the **deterministic scorer** (`score.ts`) checks hard gold criteria; the **grader** (`grader.ts`) is an independent model giving a holistic clinical opinion — and a **pairwise** verdict on which of two differentials is *better*. That pairwise mode is the A/B engine: current vs. hardened, single-axis vs. dual-axis, or KB-RAG vs. frontier.
+
+```bash
+# Unit tests (no creds; runs in CI)
+npx vitest run qa/localizer-evals/grader.test.ts
+
+# Live: compare a hardened vs. regressed B12 differential (demo fixtures)
+GRADER_MODEL=<independent model id> npx tsx qa/localizer-evals/grade.ts --demo
+
+# Live: A/B two saved engine outputs
+npx tsx qa/localizer-evals/grade.ts --pairwise a.json b.json [vignetteId]
+```
+
+Independence safeguards: use a **different model** for the judge than the generator (`GRADER_MODEL`), the prompt forbids length bias and hides which tool produced which, and `gradePairwiseDebiased` runs both A/B orderings and collapses to a tie if the verdict flips with position.
 
 ## Seed set
 
