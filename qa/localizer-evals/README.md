@@ -23,9 +23,9 @@ Per vignette (`gold` block): **localization** match, **must-include** diagnoses,
 
 ## Run
 
-Scorer unit tests (no creds needed; runs in CI):
+Scorer + grader unit tests (no creds needed; **gated in CI** via `.github/workflows/localizer-evals.yml` on every PR):
 ```bash
-npx vitest run qa/localizer-evals/score.test.ts
+npm run test:evals          # = vitest run qa/localizer-evals/
 ```
 
 Live eval against the deployed engine:

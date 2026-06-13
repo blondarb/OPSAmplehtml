@@ -10,6 +10,7 @@
     "sync-plans": "npx ts-node --project tsconfig.scripts.json scripts/sync-plans.ts",
     "test": "vitest run",
     "test:watch": "vitest",
+    "test:evals": "vitest run qa/localizer-evals/",
     "test:audio": "npx tsx tests/audio/run-pipeline-test.ts",
     "test:audio:generate": "bash tests/audio/scripts/generate-visit-audio.sh",
     "seed:wearable": "npx tsx scripts/seed-wearable-demo.ts"
