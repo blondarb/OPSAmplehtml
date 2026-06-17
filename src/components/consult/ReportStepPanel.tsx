@@ -139,7 +139,7 @@ export default function ReportStepPanel({ consultId, consult, report, onReportGe
           padding: '12px 32px',
           borderRadius: 8,
           border: 'none',
-          background: generating ? '#475569' : '#0D9488',
+          background: generating ? '#475569' : '#23C5B7',
           color: '#FFFFFF',
           fontSize: 14,
           fontWeight: 600,

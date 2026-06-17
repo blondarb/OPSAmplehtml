@@ -137,7 +137,7 @@ export default function HistorianSessionsList() {
                   </svg>
                 )}
                 {!hasRedFlags && (
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#0d9488" strokeWidth="2">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#23C5B7" strokeWidth="2">
                     <path d="M9.5 2A5.5 5.5 0 005 7.5c0 .88.21 1.71.58 2.45" />
                     <path d="M14.5 2A5.5 5.5 0 0120 7.5c0 .88-.21 1.71-.58 2.45" />
                     <path d="M12 2v20" />
@@ -158,7 +158,7 @@ export default function HistorianSessionsList() {
                     fontWeight: 600,
                     textTransform: 'uppercase',
                     background: session.session_type === 'new_patient' ? 'rgba(139,92,246,0.12)' : 'rgba(13,148,136,0.12)',
-                    color: session.session_type === 'new_patient' ? '#7c3aed' : '#0d9488',
+                    color: session.session_type === 'new_patient' ? '#7c3aed' : '#23C5B7',
                   }}>
                     {session.session_type === 'new_patient' ? 'New' : 'F/U'}
                   </span>
@@ -245,7 +245,7 @@ export default function HistorianSessionsList() {
                     style={{
                       padding: '5px 12px',
                       borderRadius: '6px',
-                      background: '#0d9488',
+                      background: '#23C5B7',
                       color: '#fff',
                       border: 'none',
                       fontWeight: 600,

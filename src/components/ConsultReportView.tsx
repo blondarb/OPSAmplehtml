@@ -11,7 +11,7 @@ interface ConsultReportViewProps {
 const SOURCE_BADGES: Record<string, { label: string; color: string }> = {
   triage: { label: 'Triage', color: '#F59E0B' },
   intake: { label: 'Intake', color: '#8B5CF6' },
-  historian: { label: 'Historian', color: '#0D9488' },
+  historian: { label: 'Historian', color: '#23C5B7' },
   localizer: { label: 'Localizer', color: '#3B82F6' },
   scales: { label: 'Scales', color: '#06B6D4' },
   red_flags: { label: 'Red Flags', color: '#EF4444' },
@@ -258,7 +258,7 @@ export default function ConsultReportView({ report, onFinalize }: ConsultReportV
               padding: '12px',
               borderRadius: '8px',
               border: 'none',
-              background: '#0D9488',
+              background: '#23C5B7',
               color: '#FFFFFF',
               fontSize: '0.85rem',
               fontWeight: 600,

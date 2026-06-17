@@ -29,6 +29,20 @@ export default function HistorianSessionComplete({
       padding: '32px 24px',
       textAlign: 'center',
     }}>
+      {/* Sevaro brand logo */}
+      <div style={{
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: '8px 16px',
+        marginBottom: '24px',
+        borderRadius: '10px',
+        background: '#fff',
+      }}>
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src="/brand/sevaro-logo-hor.svg" alt="Sevaro" height={24} style={{ display: 'block', height: 24 }} />
+      </div>
+
       {/* Success checkmark */}
       <div style={{
         width: 80,
@@ -55,7 +69,7 @@ export default function HistorianSessionComplete({
       {/* Stats */}
       <div style={{ display: 'flex', gap: '32px', marginBottom: '40px' }}>
         <div>
-          <div style={{ color: '#0d9488', fontSize: '1.5rem', fontWeight: 700 }}>
+          <div style={{ color: '#23C5B7', fontSize: '1.5rem', fontWeight: 700 }}>
             {formatDuration(duration)}
           </div>
           <div style={{ color: '#64748b', fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
@@ -63,7 +77,7 @@ export default function HistorianSessionComplete({
           </div>
         </div>
         <div>
-          <div style={{ color: '#0d9488', fontSize: '1.5rem', fontWeight: 700 }}>
+          <div style={{ color: '#23C5B7', fontSize: '1.5rem', fontWeight: 700 }}>
             {questionCount}
           </div>
           <div style={{ color: '#64748b', fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
@@ -94,7 +108,7 @@ export default function HistorianSessionComplete({
           style={{
             padding: '12px 24px',
             borderRadius: '8px',
-            background: '#0d9488',
+            background: '#23C5B7',
             border: 'none',
             color: '#fff',
             fontWeight: 600,

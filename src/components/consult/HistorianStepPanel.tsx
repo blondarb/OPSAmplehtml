@@ -49,7 +49,7 @@ export default function HistorianStepPanel({ consultId, consult, onComplete, onE
             padding: '10px 24px',
             borderRadius: 8,
             border: 'none',
-            background: '#0D9488',
+            background: '#23C5B7',
             color: '#FFFFFF',
             fontSize: 14,
             fontWeight: 600,

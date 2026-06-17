@@ -983,17 +983,7 @@ export default function SmartRecommendationsSection({
             <path d="M9 16h6" />
           </svg>
           <span style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text-primary)' }}>
-            Smart Recommendations
-          </span>
-          <span style={{
-            padding: '2px 8px',
-            borderRadius: '4px',
-            fontSize: '10px',
-            fontWeight: 500,
-            background: 'linear-gradient(135deg, #8B5CF6 0%, #A78BFA 100%)',
-            color: 'white',
-          }}>
-            AI-Powered
+            Sevaro Engine
           </span>
           {/* Legend toggle */}
           <button

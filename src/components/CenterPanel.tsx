@@ -3522,7 +3522,7 @@ ${noteData.plan || 'Not documented'}`.trim()
                   value={noteData.plan}
                   onChange={(value) => updateNote('plan', value)}
                   fieldName="plan"
-                  placeholder="Add recommendations from Smart Recommendations above, or enter free-text plan..."
+                  placeholder="Add recommendations from Sevaro Engine above, or enter free-text plan..."
                   minHeight="150px"
                   showDictate={true}
                   showAiAction={true}

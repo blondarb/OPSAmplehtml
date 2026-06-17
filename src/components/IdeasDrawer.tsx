@@ -92,9 +92,9 @@ const WORKFLOWS = [
       'Navigate tabs and review AI-generated content',
       'Use field-level AI actions (Improve, Expand, Summarize)',
       'Accept AI for some sections, override for others',
-      'Smart Recommendations for treatment planning',
+      'Sevaro Engine for treatment planning',
     ],
-    keyButtons: ['🎤 Mic', '⭐ AI Actions', '💡 Smart Recs', '✨ Generate Note'],
+    keyButtons: ['🎤 Mic', '⭐ AI Actions', '💡 Sevaro Engine', '✨ Generate Note'],
     timeToComplete: '5-8 min',
     aiUsage: 'Selective',
     userClicks: 'Moderate',
@@ -117,7 +117,7 @@ const FEATURES = [
     items: [
       { name: 'Ask AI', description: 'Query clinical guidelines and get context-aware answers' },
       { name: 'Field Actions', description: 'Improve, Expand, or Summarize any text field' },
-      { name: 'Smart Recommendations', description: 'Treatment suggestions based on diagnosis' },
+      { name: 'Sevaro Engine', description: 'Treatment suggestions based on diagnosis' },
       { name: 'Patient Summary', description: 'Generate plain-language visit summaries' },
       { name: 'Patient Handouts', description: 'Create educational materials for patients' },
     ],
@@ -155,8 +155,8 @@ const INSPIRATION = [
     type: 'info',
   },
   {
-    title: 'Pro Tip: Smart Recommendations',
-    content: 'After selecting diagnoses, check the Smart Recommendations section for evidence-based treatment suggestions you can add to your plan with one click.',
+    title: 'Pro Tip: Sevaro Engine',
+    content: 'After selecting diagnoses, check the Sevaro Engine section for evidence-based treatment suggestions you can add to your plan with one click.',
     type: 'tip',
   },
   {

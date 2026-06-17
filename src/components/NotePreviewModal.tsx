@@ -159,7 +159,7 @@ export default function NotePreviewModal({
 
       if (selectedRecItems.length > 0) {
         const existingPlan = finalNote.plan || ''
-        const recSection = '\n\n--- Smart Recommendations ---\n' + selectedRecItems.join('\n')
+        const recSection = '\n\n--- Sevaro Engine ---\n' + selectedRecItems.join('\n')
         finalNote.plan = existingPlan + recSection
       }
     }
@@ -184,7 +184,7 @@ export default function NotePreviewModal({
 
       if (selectedRecItems.length > 0) {
         const existingPlan = finalNote.plan || ''
-        const recSection = '\n\n--- Smart Recommendations ---\n' + selectedRecItems.join('\n')
+        const recSection = '\n\n--- Sevaro Engine ---\n' + selectedRecItems.join('\n')
         finalNote.plan = existingPlan + recSection
       }
     }
@@ -532,7 +532,7 @@ export default function NotePreviewModal({
                     <path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11" />
                   </svg>
                   <span style={{ fontWeight: 600, fontSize: '14px', color: '#7C3AED' }}>
-                    Smart Recommendations Review
+                    Sevaro Engine Review
                   </span>
                   <span style={{
                     padding: '2px 8px',
