@@ -1,0 +1,26 @@
+name: Localizer Evals
+
+# Gates the differential-engine eval harness (incl. the B12/SCD regression seed)
+# on every PR. Scoped to qa/localizer-evals so it stays green and meaningful —
+# the full vitest suite has pre-existing unrelated failures (tests/triage,
+# tests/simulated-patients) that should be fixed before broadening this scope.
+#
+# This is a TEST gate only; AWS Amplify remains the sole deploy target.
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  localizer-evals:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Install dependencies
+        run: npm install --no-audit --no-fund
+      - name: Run localizer eval tests (scorer + grader)
+        run: npm run test:evals

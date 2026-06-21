@@ -1,0 +1,29 @@
+{
+  "id": "scd-b12-001",
+  "source": "Adam Cohen, 2026-04-24 (Re: Next steps — Exam Interpreter)",
+  "description": "Subacute combined degeneration from B12 deficiency. Regression seed: the engine ranked B12 too low and missed the dorsal-column/corticospinal localization.",
+  "input": {
+    "sessionType": "new_patient",
+    "chiefComplaint": "memory trouble and unsteady walking",
+    "exam": "memory loss, increased deep tendon reflexes, loss of vibration sense",
+    "transcript": [
+      { "role": "assistant", "text": "What brings you in to see neurology today?" },
+      { "role": "user", "text": "My memory's been slipping the last few months, and I feel unsteady on my feet, especially in the dark." },
+      { "role": "assistant", "text": "Have you noticed any numbness or tingling?" },
+      { "role": "user", "text": "Yes, my feet feel numb and I can't really feel vibrations. My doctor said my reflexes were really brisk." },
+      { "role": "assistant", "text": "Any changes in your diet, or stomach problems?" },
+      { "role": "user", "text": "I went mostly vegan a couple years ago and I take omeprazole for reflux." }
+    ]
+  },
+  "gold": {
+    "localization": ["dorsal column", "posterior column", "corticospinal", "spinal cord", "myelopathy"],
+    "mustIncludeDx": [
+      { "label": "B12 deficiency / SCD", "patterns": ["b12", "b-12", "cobalamin", "subacute combined"] }
+    ],
+    "mustRankTopN": [
+      { "dx": { "label": "B12 deficiency / SCD", "patterns": ["b12", "b-12", "cobalamin", "subacute combined"] }, "n": 3 }
+    ],
+    "mustScreen": ["b12|cobalamin", "mma|methylmalonic"],
+    "mustNotInclude": []
+  }
+}

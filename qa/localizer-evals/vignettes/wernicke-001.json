@@ -1,0 +1,27 @@
+{
+  "id": "wernicke-001",
+  "source": "seed",
+  "description": "Wernicke encephalopathy — confusion + ataxia + ophthalmoplegia in alcohol use. Time-critical reversible cause; thiamine before glucose.",
+  "input": {
+    "sessionType": "new_patient",
+    "chiefComplaint": "confusion and unsteadiness",
+    "exam": "confusion, gait ataxia, horizontal nystagmus / lateral gaze palsy",
+    "transcript": [
+      { "role": "assistant", "text": "Can you tell me what's been happening?" },
+      { "role": "user", "text": "He's been really confused the last few days, can barely walk straight, and his eyes look like they're not moving right." },
+      { "role": "assistant", "text": "Any history of heavy alcohol use or poor nutrition?" },
+      { "role": "user", "text": "Yes, he drinks heavily and hasn't been eating much at all lately." }
+    ]
+  },
+  "gold": {
+    "localization": ["mammillary", "periaqueductal", "thalam", "brainstem", "dorsomedial"],
+    "mustIncludeDx": [
+      { "label": "Wernicke", "patterns": ["wernicke", "thiamine deficiency"] }
+    ],
+    "mustRankTopN": [
+      { "dx": { "label": "Wernicke", "patterns": ["wernicke", "thiamine deficiency"] }, "n": 3 }
+    ],
+    "mustScreen": ["thiamine|b1"],
+    "mustNotInclude": []
+  }
+}

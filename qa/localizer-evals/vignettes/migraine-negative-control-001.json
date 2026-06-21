@@ -1,0 +1,28 @@
+{
+  "id": "migraine-negative-control-001",
+  "source": "seed (specificity / over-firing guard)",
+  "description": "Textbook migraine with aura in a healthy young woman, no red flags. Specificity control: the engine must NOT escalate to rare/dangerous zebra workups.",
+  "input": {
+    "sessionType": "new_patient",
+    "chiefComplaint": "recurrent headaches with visual changes",
+    "exam": "normal neurologic exam",
+    "transcript": [
+      { "role": "assistant", "text": "Tell me about your headaches." },
+      { "role": "user", "text": "Once or twice a month I get a throbbing headache on one side, with nausea, and bright lights bother me. I have to lie down in the dark." },
+      { "role": "assistant", "text": "Anything happen before the headache starts?" },
+      { "role": "user", "text": "Yes, about 20 minutes before, I see zigzag shimmering lines that drift across my vision, then they fade and the headache comes." },
+      { "role": "assistant", "text": "Any weakness, fever, or worst-headache-of-your-life onset?" },
+      { "role": "user", "text": "No, nothing like that. I'm healthy otherwise and they've been like this for years." }
+    ]
+  },
+  "gold": {
+    "mustIncludeDx": [
+      { "label": "Migraine with aura", "patterns": ["migraine"] }
+    ],
+    "mustNotInclude": [
+      { "label": "paraneoplastic", "patterns": ["paraneoplastic"] },
+      { "label": "CNS vasculitis", "patterns": ["vasculitis"] },
+      { "label": "CNS malignancy", "patterns": ["glioma", "metastas", "malignancy", "neoplasm"] }
+    ]
+  }
+}
