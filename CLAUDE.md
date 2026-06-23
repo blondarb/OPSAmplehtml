@@ -127,7 +127,7 @@ Full changelog: [`docs/CHANGELOG.md`](docs/CHANGELOG.md)
 
 ## Body of Work
 
-**Status**: Active — verified June 22, 2026
+**Status**: Active — verified June 23, 2026
 
 ### Recent
 - **ASR vocabulary biasing — all 5 voice surfaces (PRs #123-125, Jun 7)** — New `src/lib/asr/clinical-lexicon.ts` biases all voice surfaces toward a neurology lexicon (curated symptom/anatomy/scale terms + full `NEURO_FORMULARY` brand+generic drug list). Realtime surfaces (Historian, Intake, Follow-Up) get a budget-trimmed Whisper `prompt`; Deepgram Nova-3 paths — dictation (`/api/ai/transcribe`) and visit recording (`/api/ai/visit-ai`) — get a `keyterm` array. Follow-Up hoists patient name/provider/meds first to survive the ~224-token cap. Gated by `ASR_VOCAB_BIASING` (default on). 13 unit tests in `src/lib/__tests__/clinical-lexicon.test.ts`.
