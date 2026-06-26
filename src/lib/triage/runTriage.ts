@@ -73,6 +73,7 @@ export async function runTriage(input: TriageInput): Promise<TriageResult> {
       temperature,
       signal: controller.signal,
       model: input.model,
+      cacheSystem: true,
     })
     parsed = result.parsed as Record<string, unknown>
   } finally {

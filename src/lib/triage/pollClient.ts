@@ -16,9 +16,9 @@
  */
 
 interface PollOptions {
-  /** Milliseconds between polls. Default 1500. */
+  /** Milliseconds between polls. Default 1000. */
   intervalMs?: number
-  /** Maximum number of polls before giving up. Default 80 (~2min at 1.5s). */
+  /** Maximum number of polls before giving up. Default 120 (~2min at 1s). */
   maxAttempts?: number
 }
 
@@ -70,8 +70,8 @@ async function pollUntilDone<T>(
   signal: AbortSignal | undefined,
   options: PollOptions,
 ): Promise<T> {
-  const intervalMs = options.intervalMs ?? 1500
-  const maxAttempts = options.maxAttempts ?? 80
+  const intervalMs = options.intervalMs ?? 1000
+  const maxAttempts = options.maxAttempts ?? 120
 
   for (let attempt = 0; attempt < maxAttempts; attempt++) {
     if (signal?.aborted) {

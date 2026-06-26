@@ -144,6 +144,7 @@ async function processTriageInBackground(
       maxTokens: 3000,
       temperature: params.temperature,
       model: TRIAGE_MODEL,
+      cacheSystem: true,
     })
 
     const validationError = validateAIResponse(result.parsed as Record<string, unknown>)
