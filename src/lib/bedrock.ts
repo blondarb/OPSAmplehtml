@@ -72,6 +72,14 @@ export interface BedrockInvokeOptions {
   signal?: AbortSignal
   /** Override the default model ID for this call. */
   model?: string
+  /**
+   * When true, the system prompt is sent as a cached content block
+   * (`cache_control: ephemeral`) so Bedrock reuses the prefill across calls
+   * within the ~5-min TTL. Use for large static system prompts (≥1024 tokens)
+   * that are identical call-to-call — e.g. the triage scoring prompt. Cuts
+   * time-to-first-token and input cost on repeated back-to-back calls.
+   */
+  cacheSystem?: boolean
 }
 
 export interface BedrockResponse {
@@ -102,10 +110,17 @@ export async function invokeBedrock(
     systemPrompt += '\n\nRespond with ONLY valid JSON. Do not wrap in markdown code blocks.'
   }
 
+  // Send the system prompt as a cached content block when requested, so Bedrock
+  // reuses the prefill across back-to-back calls (ephemeral, ~5-min TTL). Falls
+  // back to the plain string form otherwise — identical output either way.
+  const systemField = opts.cacheSystem
+    ? [{ type: 'text', text: systemPrompt, cache_control: { type: 'ephemeral' } }]
+    : systemPrompt
+
   const body = JSON.stringify({
     anthropic_version: 'bedrock-2023-05-31',
     max_tokens: opts.maxTokens ?? 2000,
-    system: systemPrompt,
+    system: systemField,
     messages: opts.messages,
     temperature: opts.temperature ?? 0.2,
   })

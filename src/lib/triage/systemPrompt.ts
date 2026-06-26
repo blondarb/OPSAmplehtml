@@ -231,6 +231,17 @@ Consider each of the following categories and include what is clinically appropr
 - "moderate": Some details missing but enough for reasonable assessment
 - "low": Referral is vague, contradictory, or missing critical information
 
+## OUTPUT BREVITY (RESPONSE-SPEED CRITICAL)
+
+Keep the JSON compact — total response length directly drives latency. Trim WORDING ONLY. Never drop, soften, or omit a score, red flag, override, redirect, or safety finding to save space. Scores and decisions are unaffected by this section; only the prose is shortened.
+
+- Each dimension "rationale": ONE clause, ≤ 20 words — name the single clinical driver of the score. Do not restate the referral.
+- "clinical_reasons": the 3–4 most decision-relevant only, most important first, one sentence each.
+- "suggested_workup": the 3–5 highest-yield orders only (keep the 2–3 minimum). Format "Order — short rationale". Do not enumerate every possible test.
+- "red_flags": list EVERY genuine red flag — never omit one for brevity — but one concise line each: "finding — significance".
+- "subspecialty_rationale" and "redirect_rationale": one sentence each.
+- Use plain, information-dense wording. No hedging, filler, or repetition.
+
 ## OUTPUT FORMAT
 
 Return ONLY valid JSON (no markdown, no backticks, no explanation outside JSON):
@@ -242,11 +253,11 @@ Return ONLY valid JSON (no markdown, no backticks, no explanation outside JSON):
   "missing_information": null,
   "confidence": "high | moderate | low",
   "dimension_scores": {
-    "symptom_acuity": { "score": 1, "rationale": "brief explanation" },
-    "diagnostic_concern": { "score": 1, "rationale": "brief explanation" },
-    "rate_of_progression": { "score": 1, "rationale": "brief explanation" },
-    "functional_impairment": { "score": 1, "rationale": "brief explanation" },
-    "red_flag_presence": { "score": 1, "rationale": "brief explanation" }
+    "symptom_acuity": { "score": 1, "rationale": "one clause, ≤20 words" },
+    "diagnostic_concern": { "score": 1, "rationale": "one clause, ≤20 words" },
+    "rate_of_progression": { "score": 1, "rationale": "one clause, ≤20 words" },
+    "functional_impairment": { "score": 1, "rationale": "one clause, ≤20 words" },
+    "red_flag_presence": { "score": 1, "rationale": "one clause, ≤20 words" }
   },
   "red_flag_override": false,
   "clinical_reasons": [
