@@ -60,7 +60,7 @@ export default function TriageTierBadge({ tier, weightedScore, isRedFlagOverride
           {config.timeframe}
           {isRedFlagOverride && ' (Red Flag Override)'}
         </span>
-        {weightedScore !== null && weightedScore !== undefined && (
+        {typeof weightedScore === 'number' && Number.isFinite(weightedScore) && (
           <span style={{ fontSize: '0.75rem', opacity: 0.7, marginTop: '2px' }}>
             Weighted Score: {weightedScore.toFixed(2)}
           </span>

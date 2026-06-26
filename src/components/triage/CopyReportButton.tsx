@@ -16,7 +16,7 @@ export default function CopyReportButton({ result }: Props) {
     lines.push('')
     lines.push(`Triage Tier: ${result.triage_tier_display}`)
     lines.push(`Confidence: ${result.confidence}`)
-    if (result.weighted_score !== null) {
+    if (typeof result.weighted_score === 'number' && Number.isFinite(result.weighted_score)) {
       lines.push(`Weighted Score: ${result.weighted_score.toFixed(2)}`)
     }
     lines.push('')

@@ -20,6 +20,14 @@ function parseJSON(value: unknown) {
   }
 }
 
+// NUMERIC columns come back from node-postgres as strings. Return a finite
+// number or null — never a string that would crash `.toFixed()` downstream.
+function parseWeightedScore(value: unknown): number | null {
+  if (value == null) return null
+  const n = typeof value === 'number' ? value : Number(value)
+  return Number.isFinite(n) ? n : null
+}
+
 export async function GET(
   _req: Request,
   ctx: { params: Promise<{ id: string }> },
@@ -80,7 +88,10 @@ export async function GET(
     triage_tier_display: triageTierDisplay,
     confidence: data.confidence,
     dimension_scores: parseJSON(data.dimension_scores),
-    weighted_score: data.weighted_score,
+    // node-postgres returns NUMERIC/DECIMAL columns as strings, which would
+    // slip past the UI's `!== null` guard and crash `.toFixed()`. Coerce back
+    // to a real number so the typed `weighted_score: number | null` holds.
+    weighted_score: parseWeightedScore(data.weighted_score),
     red_flag_override: aiResponse.red_flag_override ?? false,
     emergent_override: aiResponse.emergent_override ?? false,
     emergent_reason: aiResponse.emergent_reason ?? null,
