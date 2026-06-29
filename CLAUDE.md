@@ -130,16 +130,16 @@ Full changelog: [`docs/CHANGELOG.md`](docs/CHANGELOG.md)
 
 ## Body of Work
 
-**Status**: Active — verified June 28, 2026
+**Status**: Active — verified June 29, 2026
 
 ### Recent
+- **Triage latency reduction (2026-06-26)** — Cut `/triage` response time ~32% via Bedrock prompt caching (`cacheSystem` flag on Sonnet 4.6 system prompt), output brevity directive (−32% output tokens, scores/safety unchanged), and poll interval 1.5s→1s. Verified on 5 referrals: all scores/tiers identical; no model downgrade.
+- **Triage custom-note crash fix (2026-06-26)** — Fixed `TypeError: i.toFixed is not a function` on custom referral notes: Postgres NUMERIC `weighted_score` arrives as string; `parseWeightedScore()` at API boundary coerces to `number | null`; render sites hardened with `typeof === 'number' && Number.isFinite()` backstop.
 - **ASR vocabulary biasing — all 5 voice surfaces (PRs #123-125, Jun 7)** — New `src/lib/asr/clinical-lexicon.ts` biases all voice surfaces toward a neurology lexicon (curated symptom/anatomy/scale terms + full `NEURO_FORMULARY` brand+generic drug list). Realtime surfaces (Historian, Intake, Follow-Up) get a budget-trimmed Whisper `prompt`; Deepgram Nova-3 paths — dictation (`/api/ai/transcribe`) and visit recording (`/api/ai/visit-ai`) — get a `keyterm` array. Follow-Up hoists patient name/provider/meds first to survive the ~224-token cap. Gated by `ASR_VOCAB_BIASING` (default on). 13 unit tests in `src/lib/__tests__/clinical-lexicon.test.ts`.
 - **RDS TLS validation + RDS_DATABASE env override (PRs #120-121, Jun 7)** — `src/lib/rds-ca-bundle.ts` vendors the full AWS RDS global CA bundle as an embedded string (survives Amplify SSR Lambda bundling); both DB pools now validate TLS against it. `getRdsCredentials()` now honors `RDS_DATABASE` in all environments so prod stays on `ops_amplehtml` regardless of Secrets Manager default. Emergency escape hatch: `RDS_SSL_INSECURE=true`.
 - **AI Historian Realtime API upgrade — 3-tool surface, Localizer push channel, paginated scale_step (PR #114, May 27)** — Migrated `/consult` demo historian to OpenAI GA Realtime API (`client_secrets` + `/v1/realtime/calls` + `gpt-realtime-2` + `semantic_vad`). Tool surface consolidated to 3: `save_interview_output`, `query_evidence`, `scale_step` (paginated). New Localizer push channel via re-serialized `session.update` every 3 turns (base prompt + delta). Phased prompt structure (turns 1–3 open, turns 4+ tool-augmented), 15–25 turn budget with explicit neurology focus. Migration 047: paginated state on `scale_results`, relaxed NOT NULL on `patient_id`/`responses`/`raw_score`.
 - **Triage async + polling pattern (PRs #112-113, May 2)** — `/api/triage` and `/api/triage/extract` now use a 202 Accept + poll pattern; migration 046 dropped NOT NULL on result columns so pending rows insert cleanly; eliminates the ~28s Amplify gateway timeout.
 - **Neuro Intake pipeline depth pass (PR #109, Apr 25)** — Scale-trigger pipeline wired in `EmbeddedHistorian`; AI Assessment+Plan synthesis via `assessment-generator.ts`; physician corrections persisted; 7 safety fields extracted from referrals; historian fully embedded inline.
-- **SSO error surfacing on /login (PR #108, Apr 22)** — Cognito `error` + `error_description` params now propagated through callback route to login page; `access_denied` → "Sign-in was cancelled"; actual error description shown with admin contact hint.
-- **Consult JSONB + early-end fixes (PRs #106-107, Apr 17)** — Fixed "Failed to save interview data" (JSONB arrays pre-stringified at call site); mobile `LocalizerPanel` width fix; `EmbeddedHistorian` auto-opens differential. Early-end fix: `endSession` nudges AI + falls back to raw transcript; `interview_completion_status` column (complete | ended_early) via migration 044.
 
 ### In Progress
 - None
