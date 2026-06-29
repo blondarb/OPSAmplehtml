@@ -1,8 +1,19 @@
 /**
  * Neuro FAQ Voice — Amazon Polly TTS wrapper (production speech-out component).
  *
- * POC SKELETON — NET-NEW dependency. Requires:  npm install @aws-sdk/client-polly
+ * POC SKELETON — NET-NEW dependency, not yet installed.
  * Polly is on the AWS HIPAA-eligible services list and covered by Sevaro's AWS BAA.
+ *
+ * INSTALL IS CURRENTLY BLOCKED by an npm 11.8.0 / node 25 arborist bug
+ * ("Cannot read properties of null (reading 'matches')") triggered by this
+ * repo's `file:./packages/feedback` workspace dep during incremental dedupe.
+ * Every `npm install <pkg>` flavor hits it. Fix (one of):
+ *   (a) clean rebuild:  rm -rf node_modules package-lock.json && npm install \
+ *                       && npm install @aws-sdk/client-polly@3.1010.0
+ *   (b) downgrade npm:  npm i -g npm@10  (then the normal install works)
+ * Then uncomment the import + implementation below.
+ * Until installed, synthesizeSpeech() throws and the client treats TTS as
+ * optional (text answer still renders) — graceful degradation, nothing breaks.
  *
  * Credentials/region resolve via the same default provider chain the rest of the
  * AWS SDK uses in this repo (see src/lib/bedrock.ts getClient()). In prod the

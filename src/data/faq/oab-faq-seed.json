@@ -1,0 +1,52 @@
+{
+  "_meta": {
+    "note": "POC SEED CORPUS (urology / overactive bladder) — placeholder content for the specialty-seam demo only. NOT clinically reviewed. Every canonical_answer MUST be reviewed and owned by a clinician (ideally the urologist collaborator) before ANY non-internal exposure. Sources: MedlinePlus, NIDDK (public domain). See faq_sources_bibliography.md.",
+    "escalation_legend": "none = answer plainly | soft = answer + defer-to-prescriber tag | route = do not answer, route to staff"
+  },
+  "entries": [
+    {
+      "id": "oab_what_is_oab",
+      "topic": "oab_basics",
+      "question": "What is overactive bladder?",
+      "canonical_answer": "Overactive bladder, or OAB, is a common condition where you get a sudden, strong urge to urinate that can be hard to control, sometimes with leaking, and often needing to go many times during the day or night. It's a treatable condition, not a normal part of aging.",
+      "escalation": "none",
+      "keywords": ["overactive bladder", "oab", "what is", "urgency"],
+      "source": "NIDDK / MedlinePlus (public domain)",
+      "reviewed_by": null,
+      "last_reviewed": null
+    },
+    {
+      "id": "oab_med_mirabegron_overview",
+      "topic": "medications",
+      "question": "What does my mirabegron (Myrbetriq) do?",
+      "canonical_answer": "Mirabegron, sold as Myrbetriq, is a medication for overactive bladder. It helps relax the bladder muscle so it can hold more urine, which can reduce sudden urges and how often you need to go. It's taken on a regular schedule.",
+      "escalation": "soft",
+      "keywords": ["mirabegron", "myrbetriq", "what does", "bladder medication"],
+      "source": "MedlinePlus (public domain)",
+      "reviewed_by": null,
+      "last_reviewed": null
+    },
+    {
+      "id": "oab_lifestyle_fluids_caffeine",
+      "topic": "oab_basics",
+      "question": "Does caffeine make overactive bladder worse?",
+      "canonical_answer": "For many people, caffeine and alcohol can irritate the bladder and increase urgency, so some find that cutting back helps. Spreading fluids through the day rather than drinking a lot at once can also help. Everyone is a little different.",
+      "escalation": "none",
+      "keywords": ["caffeine", "coffee", "alcohol", "fluids", "diet", "worse"],
+      "source": "NIDDK (public domain)",
+      "reviewed_by": null,
+      "last_reviewed": null
+    },
+    {
+      "id": "oab_postop_sling_recovery",
+      "topic": "post_op_uro",
+      "question": "What should I expect after a bladder sling procedure?",
+      "canonical_answer": "After a sling procedure it's common to have some soreness, mild spotting, and changes in your urine stream for a little while as you heal. Your surgeon's discharge instructions will cover activity limits and when to follow up.",
+      "escalation": "soft",
+      "keywords": ["sling", "after surgery", "recovery", "procedure", "post op"],
+      "source": "Urology patient guidance (Sevaro-original placeholder)",
+      "reviewed_by": null,
+      "last_reviewed": null
+    }
+  ]
+}
