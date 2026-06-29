@@ -31,6 +31,7 @@ export default function FaqVoiceView() {
     useStreamingDictation()
   const [turns, setTurns] = useState<Turn[]>([])
   const [thinking, setThinking] = useState(false)
+  const [typed, setTyped] = useState('')
   const audioRef = useRef<HTMLAudioElement | null>(null)
 
   const ask = useCallback(async (utterance: string) => {
@@ -106,14 +107,33 @@ export default function FaqVoiceView() {
         {thinking && <div style={{ color: '#94a3b8' }}>…</div>}
       </div>
 
-      {/* Push-to-talk control */}
-      <div style={{ position: 'fixed', bottom: 0, left: 0, right: 0, padding: 20, display: 'flex', justifyContent: 'center', background: 'linear-gradient(0deg, #0F172A 60%, transparent)' }}>
+      {/* Control bar: type OR talk (text fallback works without a mic) */}
+      <div style={{ position: 'fixed', bottom: 0, left: 0, right: 0, padding: 16, display: 'flex', justifyContent: 'center', gap: 10, alignItems: 'center', background: 'linear-gradient(0deg, #0F172A 70%, transparent)' }}>
+        <form
+          onSubmit={(e) => { e.preventDefault(); const q = typed; setTyped(''); ask(q) }}
+          style={{ display: 'flex', gap: 8, alignItems: 'center', width: '100%', maxWidth: 560 }}
+        >
+          <input
+            value={typed}
+            onChange={(e) => setTyped(e.target.value)}
+            placeholder="Type a question, or tap the mic…"
+            aria-label="Type a question"
+            style={{ flex: 1, height: 48, borderRadius: 24, border: '1px solid rgba(255,255,255,0.15)', background: 'rgba(255,255,255,0.06)', color: 'white', padding: '0 18px', fontSize: 15, outline: 'none' }}
+          />
+          <button
+            type="submit"
+            disabled={!typed.trim() || thinking}
+            style={{ height: 48, padding: '0 18px', borderRadius: 24, border: 'none', cursor: typed.trim() ? 'pointer' : 'default', background: typed.trim() ? ACCENT : 'rgba(255,255,255,0.1)', color: 'white', fontSize: 15, fontWeight: 600 }}
+          >
+            Ask
+          </button>
+        </form>
         <button
           onClick={isRecording ? onStop : startRecording}
-          style={{ width: 72, height: 72, borderRadius: '50%', border: 'none', cursor: 'pointer', background: isRecording ? '#ef4444' : ACCENT, color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 4px 20px rgba(0,0,0,0.4)' }}
+          style={{ width: 56, height: 56, flexShrink: 0, borderRadius: '50%', border: 'none', cursor: 'pointer', background: isRecording ? '#ef4444' : ACCENT, color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 4px 20px rgba(0,0,0,0.4)' }}
           aria-label={isRecording ? 'Stop and ask' : 'Tap to talk'}
         >
-          {isRecording ? <Square size={28} /> : <Mic size={28} />}
+          {isRecording ? <Square size={24} /> : <Mic size={24} />}
         </button>
       </div>
 
