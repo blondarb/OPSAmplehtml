@@ -1,7 +1,7 @@
 import {
   Brain, CalendarClock, Activity, Stethoscope,
   ClipboardList, Mic, MessageCircle, HeartPulse,
-  MessageSquare, Watch, LayoutDashboard,
+  MessageSquare, Watch, LayoutDashboard, HelpCircle,
 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 
@@ -102,6 +102,14 @@ export const patientTrack: JourneyTrackData = {
       icon: HeartPulse,
       status: 'live',
       description: 'Your AI care coordinator follows up on how you\'re feeling after your visit.',
+    },
+    {
+      phase: 'Questions & Support',
+      name: 'Neuro FAQ Voice',
+      route: '/faq',
+      icon: HelpCircle,
+      status: 'building',
+      description: 'POC — ask common neurology questions by voice. FAQ answers only; routes urgent or out-of-scope questions to your care team.',
     },
   ],
 }

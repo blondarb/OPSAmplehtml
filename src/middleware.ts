@@ -2,7 +2,7 @@ import { NextResponse, type NextRequest } from 'next/server'
 import { createRemoteJWKSet, jwtVerify } from 'jose'
 
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL || ''
-const PUBLIC_ROUTES = ['/', '/login', '/about', '/patient', '/triage']
+const PUBLIC_ROUTES = ['/', '/login', '/about', '/patient', '/triage', '/faq']
 
 const COGNITO_REGION = process.env.NEXT_PUBLIC_COGNITO_REGION || 'us-east-2'
 const COGNITO_POOL_ID = process.env.NEXT_PUBLIC_COGNITO_USER_POOL_ID || 'us-east-2_9y6XyJnXC'

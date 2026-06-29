@@ -1,0 +1,96 @@
+{
+  "_meta": {
+    "note": "POC SEED CORPUS — placeholder content for skeleton wiring only. NOT clinically reviewed. Every canonical_answer MUST be reviewed and owned by a clinician (populate reviewed_by/last_reviewed) before ANY non-internal exposure. Sources: NINDS, MedlinePlus, CDC (public domain). See ~/ClaudeSync/projects/OPSample/neuro-faq-voice/faq_sources_bibliography.md",
+    "escalation_legend": "none = answer plainly | soft = answer + defer-to-prescriber tag | route = do not answer, route to staff (handled by guardrails, not stored here)"
+  },
+  "entries": [
+    {
+      "id": "stroke_aftercare_driving",
+      "topic": "stroke_aftercare",
+      "question": "When can I drive after a stroke?",
+      "canonical_answer": "Driving after a stroke depends on how the stroke affected your vision, movement, and reaction time, and many regions require a waiting period and a clinician's clearance. Most people are asked not to drive until their care team has evaluated them.",
+      "escalation": "soft",
+      "keywords": ["drive", "driving", "car", "stroke"],
+      "source": "NINDS / general clinical guidance (public domain)",
+      "reviewed_by": null,
+      "last_reviewed": null
+    },
+    {
+      "id": "stroke_aftercare_recovery_timeline",
+      "topic": "stroke_aftercare",
+      "question": "What should I expect in the first few weeks of stroke recovery?",
+      "canonical_answer": "Recovery is different for everyone. The first weeks often focus on rehabilitation — physical, occupational, and speech therapy — and gradual return of function. Fatigue and emotional ups and downs are common during this period.",
+      "escalation": "none",
+      "keywords": ["recovery", "recover", "weeks", "after stroke", "rehab", "rehabilitation"],
+      "source": "NINDS (public domain)",
+      "reviewed_by": null,
+      "last_reviewed": null
+    },
+    {
+      "id": "followup_when_after_stroke",
+      "topic": "followup_logistics",
+      "question": "When is my follow-up appointment after a stroke?",
+      "canonical_answer": "Follow-up timing varies, but many people are seen within a few weeks of leaving the hospital, with neurology and sometimes primary care and therapy visits. Your discharge paperwork should list your specific appointments.",
+      "escalation": "none",
+      "keywords": ["follow up", "follow-up", "appointment", "when", "next visit"],
+      "source": "General clinical guidance (Sevaro-original placeholder)",
+      "reviewed_by": null,
+      "last_reviewed": null
+    },
+    {
+      "id": "followup_ct_vs_mri",
+      "topic": "general_neuro",
+      "question": "Why did they order both a CT and an MRI?",
+      "canonical_answer": "CT and MRI show different things. A CT scan is fast and good at detecting bleeding, while an MRI gives more detailed pictures of brain tissue and can show changes a CT may miss. Ordering both is common and lets the team see a fuller picture.",
+      "escalation": "none",
+      "keywords": ["ct", "mri", "scan", "imaging", "both"],
+      "source": "MedlinePlus (public domain)",
+      "reviewed_by": null,
+      "last_reviewed": null
+    },
+    {
+      "id": "seizure_postictal_fatigue",
+      "topic": "seizure",
+      "question": "Is it normal to feel very tired after a seizure?",
+      "canonical_answer": "Feeling tired, confused, or sore for minutes to hours after a seizure is common — this is often called the post-ictal period. Rest usually helps. If recovery seems unusually long or different from your past seizures, let your care team know.",
+      "escalation": "none",
+      "keywords": ["tired", "fatigue", "after seizure", "exhausted", "post seizure"],
+      "source": "Epilepsy Foundation (paraphrased) / NINDS",
+      "reviewed_by": null,
+      "last_reviewed": null
+    },
+    {
+      "id": "med_levetiracetam_overview",
+      "topic": "medications",
+      "question": "What does my levetiracetam (Keppra) do?",
+      "canonical_answer": "Levetiracetam, sold as Keppra, is a medication used to help prevent seizures. It works on electrical activity in the brain to make seizures less likely. It's taken on a schedule to keep a steady level in your body.",
+      "escalation": "soft",
+      "keywords": ["levetiracetam", "keppra", "what does", "medication", "seizure medicine"],
+      "source": "MedlinePlus (public domain)",
+      "reviewed_by": null,
+      "last_reviewed": null
+    },
+    {
+      "id": "postop_crani_stitches",
+      "topic": "post_op_neuro",
+      "question": "When do my stitches or staples come out after brain surgery?",
+      "canonical_answer": "Stitches or staples after a craniotomy are often removed roughly one to two weeks after surgery, but the exact timing is set by your surgeon based on healing. Your discharge instructions should give your specific date.",
+      "escalation": "soft",
+      "keywords": ["stitches", "staples", "sutures", "come out", "removed", "craniotomy", "brain surgery"],
+      "source": "AANS / hospital post-op guidance (structure only; Sevaro-original text)",
+      "reviewed_by": null,
+      "last_reviewed": null
+    },
+    {
+      "id": "postop_lp_headache",
+      "topic": "general_neuro",
+      "question": "Is a headache normal a few days after a lumbar puncture?",
+      "canonical_answer": "A headache after a lumbar puncture is a known and usually self-limited effect, often worse when sitting or standing and better when lying down. Staying hydrated and resting can help. If it is severe, lasts many days, or comes with fever, stiff neck, or other new symptoms, contact your care team.",
+      "escalation": "soft",
+      "keywords": ["lumbar puncture", "lp", "spinal tap", "headache after"],
+      "source": "MedlinePlus / NINDS (public domain)",
+      "reviewed_by": null,
+      "last_reviewed": null
+    }
+  ]
+}
