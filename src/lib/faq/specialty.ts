@@ -67,6 +67,18 @@ const NEURO_SEIZURE: RedFlagBank = {
   ],
 }
 
+// Cauda equina / acute spinal-cord compression — a time-critical surgical
+// emergency. Sudden bladder/bowel loss or saddle/groin numbness must intercept.
+const NEURO_CAUDA_EQUINA: RedFlagBank = {
+  category: 'cauda_equina',
+  patterns: [
+    /saddle (numbness|anesthesia)/, /numb(ness)? (in|around|near) (my )?(groin|saddle|inner thigh)/,
+    /(lost|losing|can'?t) control (of )?(my )?(bladder|bowels?)/,
+    /(can'?t feel|no feeling) (when i|to) (pee|urinate|poop|go)/,
+    /wet myself/, /soiled myself/,
+  ],
+}
+
 // ── Urology / OAB-specific banks ─────────────────────────────────────────────
 
 const URO_RETENTION: RedFlagBank = {
@@ -100,7 +112,7 @@ export const SPECIALTIES: Record<SpecialtyId, SpecialtyConfig> = {
   neuro: {
     id: 'neuro',
     label: 'Neurology',
-    redFlagBanks: [NEURO_STROKE, NEURO_SEIZURE],
+    redFlagBanks: [NEURO_STROKE, NEURO_SEIZURE, NEURO_CAUDA_EQUINA],
     outOfScopePatterns: [],
     corpus: (neuroSeed as { entries: FaqEntry[] }).entries,
   },

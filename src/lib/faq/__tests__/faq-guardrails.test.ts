@@ -47,6 +47,16 @@ describe('Gate 0 — urology/OAB-specific red flags', () => {
   })
 })
 
+describe('Gate 0 — cauda equina (neuro surgical emergency)', () => {
+  it.each([
+    'I suddenly lost control of my bladder and my back hurts',
+    'I have numbness in my groin and saddle area',
+    'I cant control my bowels',
+  ])('intercepts: %s', (utterance) => {
+    expect(checkGuardrails(utterance, neuro).kind).toBe('red_flag')
+  })
+})
+
 describe('Gate 1 — out-of-scope (clinical judgment) refuses', () => {
   it.each([
     'should I change my dose',

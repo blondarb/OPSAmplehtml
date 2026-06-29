@@ -1013,6 +1013,431 @@
       "source": "General clinical guidance",
       "reviewed_by": null,
       "last_reviewed": null
+    },
+    {
+      "id": "cog_what_is_dementia",
+      "topic": "cognitive",
+      "question": "What is dementia?",
+      "canonical_answer": "Dementia is a general term for a decline in memory and thinking that is serious enough to affect daily life, and it has several causes. Some contributing factors are treatable, so an evaluation is worthwhile if you or your family are concerned.",
+      "escalation": "none",
+      "keywords": [
+        "dementia",
+        "memory loss",
+        "cognitive"
+      ],
+      "source": "NINDS / MedlinePlus (public domain)",
+      "reviewed_by": null,
+      "last_reviewed": null
+    },
+    {
+      "id": "cog_normal_aging_vs_dementia",
+      "topic": "cognitive",
+      "question": "Is my forgetfulness normal aging or dementia?",
+      "canonical_answer": "Occasionally forgetting a name or where you put your keys is common with aging, while dementia tends to involve worsening memory and thinking that interferes with everyday activities. Because the line can be hard to judge, an evaluation by your care team is the best way to know.",
+      "escalation": "soft",
+      "keywords": [
+        "normal aging",
+        "forgetful",
+        "forgetfulness",
+        "memory",
+        "dementia"
+      ],
+      "source": "NINDS (public domain)",
+      "reviewed_by": null,
+      "last_reviewed": null
+    },
+    {
+      "id": "cog_prepare_memory_eval",
+      "topic": "cognitive",
+      "question": "How do I prepare for a memory evaluation?",
+      "canonical_answer": "It helps to bring a list of your medications, specific examples of the changes you've noticed and when they started, any prior test results, and ideally a family member who knows your day-to-day. Writing down your questions ahead of time is useful too.",
+      "escalation": "none",
+      "keywords": [
+        "memory evaluation",
+        "memory test",
+        "prepare",
+        "appointment cognitive"
+      ],
+      "source": "General clinical guidance",
+      "reviewed_by": null,
+      "last_reviewed": null
+    },
+    {
+      "id": "mov_what_is_parkinsons",
+      "topic": "movement",
+      "question": "What is Parkinson's disease?",
+      "canonical_answer": "Parkinson's disease is a movement disorder that can cause a tremor at rest, stiffness, slowness, and balance changes, and it develops gradually. It's a treatable condition with several options, which your neurologist can discuss with you.",
+      "escalation": "none",
+      "keywords": [
+        "parkinson",
+        "parkinsons",
+        "movement disorder"
+      ],
+      "source": "NINDS (public domain)",
+      "reviewed_by": null,
+      "last_reviewed": null
+    },
+    {
+      "id": "mov_tremor_vs_parkinsons",
+      "topic": "movement",
+      "question": "What's the difference between essential tremor and Parkinson's?",
+      "canonical_answer": "In general, essential tremor tends to happen when you're using your hands, like holding a cup or writing, while a Parkinson's tremor is often most noticeable at rest and comes with other features like stiffness or slowness. They're different conditions, and an exam is the best way to tell them apart.",
+      "escalation": "soft",
+      "keywords": [
+        "essential tremor",
+        "tremor",
+        "parkinson",
+        "shaking",
+        "difference"
+      ],
+      "source": "NINDS / general clinical guidance",
+      "reviewed_by": null,
+      "last_reviewed": null
+    },
+    {
+      "id": "mov_levodopa_timing",
+      "topic": "movement",
+      "question": "Why does the timing of my carbidopa-levodopa matter?",
+      "canonical_answer": "Carbidopa-levodopa works best when taken on a consistent schedule, and for some people food, especially protein, can affect how well a dose works. Because the right timing is individual, follow the plan your prescriber gave you and ask them before changing it.",
+      "escalation": "soft",
+      "keywords": [
+        "carbidopa",
+        "levodopa",
+        "sinemet",
+        "timing",
+        "parkinson medication"
+      ],
+      "source": "MedlinePlus / general clinical guidance",
+      "reviewed_by": null,
+      "last_reviewed": null
+    },
+    {
+      "id": "ms_what_is",
+      "topic": "ms",
+      "question": "What is multiple sclerosis?",
+      "canonical_answer": "Multiple sclerosis, or MS, is a condition where the immune system affects the protective covering of nerves in the brain and spinal cord, which can cause symptoms like numbness, weakness, vision changes, or balance problems. It's managed with a range of treatments your neurologist can review.",
+      "escalation": "none",
+      "keywords": [
+        "multiple sclerosis",
+        "ms",
+        "demyelinating"
+      ],
+      "source": "NINDS (public domain)",
+      "reviewed_by": null,
+      "last_reviewed": null
+    },
+    {
+      "id": "ms_relapse_vs_pseudo",
+      "topic": "ms",
+      "question": "What is an MS relapse versus a pseudo-relapse?",
+      "canonical_answer": "A true MS relapse is a new or clearly worsening symptom that lasts more than a day and isn't explained by heat or infection. A pseudo-relapse is a temporary worsening of old symptoms triggered by things like heat, fever, or being run down, which improves once the trigger resolves. If you're unsure, contact your care team.",
+      "escalation": "soft",
+      "keywords": [
+        "relapse",
+        "flare",
+        "pseudo relapse",
+        "pseudo-relapse",
+        "ms",
+        "exacerbation"
+      ],
+      "source": "General clinical guidance",
+      "reviewed_by": null,
+      "last_reviewed": null
+    },
+    {
+      "id": "ms_when_to_call",
+      "topic": "ms",
+      "question": "When should I call about my MS symptoms?",
+      "canonical_answer": "It's reasonable to call your care team about new or worsening neurological symptoms that last more than a day, or anything that worries you. For sudden severe symptoms like loss of vision, severe weakness, or trouble speaking, treat it as urgent and seek emergency care.",
+      "escalation": "soft",
+      "keywords": [
+        "ms",
+        "call",
+        "when to call",
+        "symptoms",
+        "worsening"
+      ],
+      "source": "General clinical guidance",
+      "reviewed_by": null,
+      "last_reviewed": null
+    },
+    {
+      "id": "tbi_recovery_timeline",
+      "topic": "concussion",
+      "question": "How long does it take to recover from a concussion?",
+      "canonical_answer": "Most people recover from a concussion over days to a few weeks, often starting with relative rest and then a gradual, guided return to activity. Recovery varies from person to person, so check in with your care team about your progress.",
+      "escalation": "none",
+      "keywords": [
+        "concussion",
+        "recovery",
+        "head injury",
+        "how long",
+        "tbi"
+      ],
+      "source": "CDC (public domain)",
+      "reviewed_by": null,
+      "last_reviewed": null
+    },
+    {
+      "id": "tbi_return_to_activity",
+      "topic": "concussion",
+      "question": "When can I return to screens, sports, or work after a concussion?",
+      "canonical_answer": "Return to screens, sports, work, or school after a concussion is usually gradual and stepwise, increasing activity as long as symptoms don't flare. Because the right pace is individual, and returning to contact sports too soon carries real risk, follow the plan from your care team.",
+      "escalation": "soft",
+      "keywords": [
+        "concussion",
+        "return",
+        "screens",
+        "sports",
+        "work",
+        "school"
+      ],
+      "source": "CDC / general clinical guidance",
+      "reviewed_by": null,
+      "last_reviewed": null
+    },
+    {
+      "id": "tbi_red_flags",
+      "topic": "concussion",
+      "question": "What concussion symptoms are an emergency?",
+      "canonical_answer": "After a head injury, seek emergency care right away for a worsening or very severe headache, repeated vomiting, increasing confusion or trouble staying awake, slurred speech, weakness or numbness, seizures, or unequal pupils. When in doubt, call 911.",
+      "escalation": "none",
+      "keywords": [
+        "concussion",
+        "emergency",
+        "head injury",
+        "worse",
+        "red flag",
+        "911"
+      ],
+      "source": "CDC (public domain)",
+      "reviewed_by": null,
+      "last_reviewed": null
+    },
+    {
+      "id": "seizure_pregnancy",
+      "topic": "seizure",
+      "question": "I take seizure medicine and might become pregnant. What should I do?",
+      "canonical_answer": "If you take seizure medicine and are pregnant or thinking about it, talk with your neurologist before making any change, since planning ahead matters and some medicines carry different risks in pregnancy. Don't stop your medicine on your own, because uncontrolled seizures also carry risk.",
+      "escalation": "soft",
+      "keywords": [
+        "pregnant",
+        "pregnancy",
+        "trying to conceive",
+        "seizure medicine",
+        "baby"
+      ],
+      "source": "General clinical guidance",
+      "reviewed_by": null,
+      "last_reviewed": null
+    },
+    {
+      "id": "seizure_contraception",
+      "topic": "seizure",
+      "question": "Do seizure medicines affect birth control?",
+      "canonical_answer": "Some seizure medicines can interact with hormonal birth control, making either one less effective, while others don't. Because it depends on your specific medicine, check with your prescriber or pharmacist about the best contraception for you.",
+      "escalation": "soft",
+      "keywords": [
+        "birth control",
+        "contraception",
+        "seizure medicine",
+        "interact"
+      ],
+      "source": "General clinical guidance",
+      "reviewed_by": null,
+      "last_reviewed": null
+    },
+    {
+      "id": "seizure_rescue_meds",
+      "topic": "seizure",
+      "question": "What is a seizure rescue medicine?",
+      "canonical_answer": "A seizure rescue medicine is a fast-acting treatment, often given into the nose or cheek, used to stop a prolonged seizure or a cluster of seizures as part of a personalized seizure action plan. If you think you might need one, ask your neurologist whether a rescue medicine and action plan are right for you.",
+      "escalation": "soft",
+      "keywords": [
+        "rescue medicine",
+        "rescue med",
+        "nasal",
+        "midazolam",
+        "diazepam",
+        "seizure plan"
+      ],
+      "source": "General clinical guidance",
+      "reviewed_by": null,
+      "last_reviewed": null
+    },
+    {
+      "id": "seizure_daily_safety",
+      "topic": "seizure",
+      "question": "What daily safety tips help if I have seizures?",
+      "canonical_answer": "Common safety steps include taking showers instead of baths, being cautious around heights, open water, and heavy machinery, and not swimming alone. The right precautions depend on how well your seizures are controlled, so your care team can personalize them.",
+      "escalation": "none",
+      "keywords": [
+        "safety",
+        "daily",
+        "swimming",
+        "bath",
+        "shower",
+        "seizure",
+        "precautions"
+      ],
+      "source": "General clinical guidance",
+      "reviewed_by": null,
+      "last_reviewed": null
+    },
+    {
+      "id": "dizzy_when_serious",
+      "topic": "general_neuro",
+      "question": "When is dizziness serious?",
+      "canonical_answer": "Most dizziness isn't dangerous, but call 911 if it comes on suddenly with stroke-like signs such as slurred speech, face or limb weakness, double vision, a severe headache, or trouble walking. Otherwise, ongoing or bothersome dizziness is worth discussing with your care team.",
+      "escalation": "none",
+      "keywords": [
+        "dizzy",
+        "dizziness",
+        "vertigo",
+        "lightheaded",
+        "when serious"
+      ],
+      "source": "NINDS / general clinical guidance",
+      "reviewed_by": null,
+      "last_reviewed": null
+    },
+    {
+      "id": "dizzy_what_is_vertigo",
+      "topic": "general_neuro",
+      "question": "What is vertigo or BPPV?",
+      "canonical_answer": "Vertigo is a sensation that you or the room is spinning, and a common cause is BPPV, a usually harmless inner-ear problem triggered by certain head movements. Many causes are treatable, so an evaluation can help find the reason for yours.",
+      "escalation": "none",
+      "keywords": [
+        "vertigo",
+        "bppv",
+        "spinning",
+        "inner ear",
+        "dizzy"
+      ],
+      "source": "NINDS / MedlinePlus (public domain)",
+      "reviewed_by": null,
+      "last_reviewed": null
+    },
+    {
+      "id": "spine_sciatica",
+      "topic": "general_neuro",
+      "question": "What is sciatica or a pinched nerve?",
+      "canonical_answer": "Sciatica, or a pinched nerve in the spine, happens when a nerve root is irritated or compressed, causing pain, numbness, or tingling that can travel down an arm or leg. Many cases improve over time, and your care team can guide treatment.",
+      "escalation": "none",
+      "keywords": [
+        "sciatica",
+        "pinched nerve",
+        "radiculopathy",
+        "nerve root",
+        "back pain"
+      ],
+      "source": "NINDS / MedlinePlus (public domain)",
+      "reviewed_by": null,
+      "last_reviewed": null
+    },
+    {
+      "id": "spine_cauda_equina_redflags",
+      "topic": "general_neuro",
+      "question": "When is back pain with leg symptoms an emergency?",
+      "canonical_answer": "Back pain becomes an emergency if you develop new loss of bladder or bowel control, numbness in the groin or saddle area, or rapidly worsening leg weakness. These can signal serious nerve compression, so call 911 or go to the emergency room right away.",
+      "escalation": "none",
+      "keywords": [
+        "back pain",
+        "bladder",
+        "bowel",
+        "saddle",
+        "leg weakness",
+        "emergency",
+        "cauda equina"
+      ],
+      "source": "General clinical guidance",
+      "reviewed_by": null,
+      "last_reviewed": null
+    },
+    {
+      "id": "med_apixaban",
+      "topic": "medications",
+      "question": "What does apixaban (Eliquis) do?",
+      "canonical_answer": "Apixaban, sold as Eliquis, is a blood thinner, or anticoagulant, that helps prevent blood clots and is often used to lower stroke risk in conditions like atrial fibrillation. Take it exactly as prescribed and tell your other providers and dentists you're on it, since it affects bleeding.",
+      "escalation": "soft",
+      "keywords": [
+        "apixaban",
+        "eliquis",
+        "blood thinner",
+        "anticoagulant",
+        "what does"
+      ],
+      "source": "MedlinePlus (public domain)",
+      "reviewed_by": null,
+      "last_reviewed": null
+    },
+    {
+      "id": "med_warfarin",
+      "topic": "medications",
+      "question": "What does warfarin (Coumadin) do?",
+      "canonical_answer": "Warfarin, sold as Coumadin, is a blood thinner used to prevent clots and strokes. It usually needs regular blood tests, called INR checks, and is affected by diet and other medicines, so consistency and follow-up matter. Take it exactly as prescribed.",
+      "escalation": "soft",
+      "keywords": [
+        "warfarin",
+        "coumadin",
+        "blood thinner",
+        "inr",
+        "anticoagulant"
+      ],
+      "source": "MedlinePlus (public domain)",
+      "reviewed_by": null,
+      "last_reviewed": null
+    },
+    {
+      "id": "med_blood_thinner_precautions",
+      "topic": "medications",
+      "question": "What precautions should I take on a blood thinner?",
+      "canonical_answer": "On a blood thinner it's important to watch for unusual bleeding, tell all your providers and dentists that you take it, and be careful to avoid falls and injuries. If you have a significant head injury, severe or non-stopping bleeding, or black or bloody stools, seek emergency care.",
+      "escalation": "soft",
+      "keywords": [
+        "blood thinner",
+        "precautions",
+        "bleeding",
+        "anticoagulant",
+        "safety"
+      ],
+      "source": "General clinical guidance",
+      "reviewed_by": null,
+      "last_reviewed": null
+    },
+    {
+      "id": "headache_medication_overuse",
+      "topic": "general_neuro",
+      "question": "What is medication-overuse headache?",
+      "canonical_answer": "Medication-overuse headache, sometimes called rebound headache, can develop when acute pain or headache medicines are used too often, leading to more frequent headaches. If you're reaching for pain relievers many days a week, it's worth talking with your care team about a better plan.",
+      "escalation": "soft",
+      "keywords": [
+        "medication overuse",
+        "rebound headache",
+        "too much",
+        "painkiller",
+        "headache"
+      ],
+      "source": "General clinical guidance",
+      "reviewed_by": null,
+      "last_reviewed": null
+    },
+    {
+      "id": "neuropathy_foot_care",
+      "topic": "general_neuro",
+      "question": "How should I care for my feet if I have neuropathy?",
+      "canonical_answer": "With neuropathy, especially numbness in the feet, it helps to check your feet daily for cuts or sores, wear well-fitting protective shoes, and take steps to prevent falls. Report any wound that isn't healing to your care team.",
+      "escalation": "soft",
+      "keywords": [
+        "neuropathy",
+        "foot care",
+        "feet",
+        "numbness",
+        "fall prevention"
+      ],
+      "source": "General clinical guidance",
+      "reviewed_by": null,
+      "last_reviewed": null
     }
   ]
 }
