@@ -26,6 +26,13 @@ const nextConfig: NextConfig = {
     BEDROCK_TRIAGE_MODEL: process.env.BEDROCK_TRIAGE_MODEL,
     BEDROCK_KB_ID: process.env.BEDROCK_KB_ID,
     COGNITO_CLIENT_SECRET: process.env.COGNITO_CLIENT_SECRET,
+    // Neuro/OAB FAQ voice POC — selects the active specialty corpus + lexicons,
+    // classifier model, and escape-hatch phone numbers at runtime on Amplify SSR.
+    FAQ_SPECIALTY: process.env.FAQ_SPECIALTY,
+    BEDROCK_FAQ_CLASSIFIER_MODEL: process.env.BEDROCK_FAQ_CLASSIFIER_MODEL,
+    FAQ_POLLY_VOICE_ID: process.env.FAQ_POLLY_VOICE_ID,
+    FAQ_CLINIC_NUMBER: process.env.FAQ_CLINIC_NUMBER,
+    FAQ_AFTER_HOURS_NUMBER: process.env.FAQ_AFTER_HOURS_NUMBER,
   },
 };
 
