@@ -35,10 +35,10 @@ import {
   type ClassifierLabel,
 } from '@/lib/faq/faqPrompts'
 
-// Cheap, fast model for the per-turn classifier. TODO(steve): confirm the exact
-// Bedrock inference-profile id for Haiku in our account before relying on this.
+// Cheap, fast model for the per-turn classifier. Verified ACTIVE in us-east-2
+// (aws bedrock list-inference-profiles, 2026-06-29). Haiku 4.5.
 const CLASSIFIER_MODEL =
-  process.env.BEDROCK_FAQ_CLASSIFIER_MODEL || 'us.anthropic.claude-haiku-4-5'
+  process.env.BEDROCK_FAQ_CLASSIFIER_MODEL || 'us.anthropic.claude-haiku-4-5-20251001-v1:0'
 
 type AnswerResult = {
   kind: 'emergency' | 'refuse' | 'answer'
@@ -88,7 +88,7 @@ export async function POST(request: Request) {
         system: CLASSIFIER_SYSTEM_PROMPT,
         messages: [{ role: 'user', content: utterance }],
         model: CLASSIFIER_MODEL,
-        maxTokens: 8,
+        maxTokens: 16,
         temperature: 0,
       })
       const raw = cls.text.trim().toUpperCase()
