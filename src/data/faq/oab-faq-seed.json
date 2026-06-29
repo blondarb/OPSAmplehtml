@@ -1,50 +1,1147 @@
 {
   "_meta": {
-    "note": "POC SEED CORPUS (urology / overactive bladder) — placeholder content for the specialty-seam demo only. NOT clinically reviewed. Every canonical_answer MUST be reviewed and owned by a clinician (ideally the urologist collaborator) before ANY non-internal exposure. Sources: MedlinePlus, NIDDK (public domain). See faq_sources_bibliography.md.",
-    "escalation_legend": "none = answer plainly | soft = answer + defer-to-prescriber tag | route = do not answer, route to staff"
+    "note": "POC corpus (urology / overactive bladder). DRAFT patient-education content grounded in PUBLIC + authoritative sources (NIDDK, Urology Care Foundation, AUA/SUFU 2024 OAB guideline, MedlinePlus) plus general clinical patient-education knowledge. NOT clinically reviewed — every canonical_answer MUST be reviewed and owned by a clinician (ideally the urologist collaborator) before ANY patient/non-internal exposure. Answers are deliberately general patient education (NO individualized medical advice); they describe what options exist and what to expect, and defer all individualized choices to the patient's urology team. NOTE: the 2024 AUA/SUFU guideline replaced rigid 'step therapy' with shared decision-making — answers reflect options, not a fixed ladder.",
+    "escalation_legend": "none = answer plainly | soft = answer + defer to prescriber/urology team | route = handled by guardrails",
+    "review_status": "ALL ENTRIES UNREVIEWED (reviewed_by: null)"
   },
   "entries": [
     {
-      "id": "oab_what_is_oab",
+      "id": "oab_what_is",
       "topic": "oab_basics",
       "question": "What is overactive bladder?",
-      "canonical_answer": "Overactive bladder, or OAB, is a common condition where you get a sudden, strong urge to urinate that can be hard to control, sometimes with leaking, and often needing to go many times during the day or night. It's a treatable condition, not a normal part of aging.",
+      "canonical_answer": "Overactive bladder, or OAB, is a common condition where you get sudden, strong urges to urinate that are hard to control, often need to go many times a day, and sometimes wake at night to go. Some people also leak with the urge. It's a treatable condition, not just a normal part of aging.",
       "escalation": "none",
-      "keywords": ["overactive bladder", "oab", "what is", "urgency"],
-      "source": "NIDDK / MedlinePlus (public domain)",
+      "keywords": [
+        "overactive bladder",
+        "oab",
+        "what is"
+      ],
+      "source": "Urology Care Foundation / NIDDK",
       "reviewed_by": null,
       "last_reviewed": null
     },
     {
-      "id": "oab_med_mirabegron_overview",
-      "topic": "medications",
-      "question": "What does my mirabegron (Myrbetriq) do?",
-      "canonical_answer": "Mirabegron, sold as Myrbetriq, is a medication for overactive bladder. It helps relax the bladder muscle so it can hold more urine, which can reduce sudden urges and how often you need to go. It's taken on a regular schedule.",
-      "escalation": "soft",
-      "keywords": ["mirabegron", "myrbetriq", "what does", "bladder medication"],
-      "source": "MedlinePlus (public domain)",
-      "reviewed_by": null,
-      "last_reviewed": null
-    },
-    {
-      "id": "oab_lifestyle_fluids_caffeine",
+      "id": "oab_symptoms",
       "topic": "oab_basics",
-      "question": "Does caffeine make overactive bladder worse?",
-      "canonical_answer": "For many people, caffeine and alcohol can irritate the bladder and increase urgency, so some find that cutting back helps. Spreading fluids through the day rather than drinking a lot at once can also help. Everyone is a little different.",
+      "question": "What are the symptoms of overactive bladder?",
+      "canonical_answer": "The main symptoms are a sudden strong urge to urinate (urgency), needing to go often during the day (frequency), waking at night to urinate (nocturia), and sometimes leaking urine when the urge hits (urgency incontinence). You don't have to have leakage to have OAB.",
       "escalation": "none",
-      "keywords": ["caffeine", "coffee", "alcohol", "fluids", "diet", "worse"],
-      "source": "NIDDK (public domain)",
+      "keywords": [
+        "symptoms",
+        "urgency",
+        "frequency",
+        "nocturia",
+        "leak",
+        "oab"
+      ],
+      "source": "Urology Care Foundation / NIDDK",
       "reviewed_by": null,
       "last_reviewed": null
     },
     {
-      "id": "oab_postop_sling_recovery",
-      "topic": "post_op_uro",
-      "question": "What should I expect after a bladder sling procedure?",
-      "canonical_answer": "After a sling procedure it's common to have some soreness, mild spotting, and changes in your urine stream for a little while as you heal. Your surgeon's discharge instructions will cover activity limits and when to follow up.",
+      "id": "oab_urgency_meaning",
+      "topic": "oab_basics",
+      "question": "What does urinary urgency mean?",
+      "canonical_answer": "Urgency is a sudden, strong need to urinate that is hard to put off, and it's the hallmark symptom of overactive bladder. It's different from the normal, gradual feeling of a full bladder. Your urology team can help reduce it.",
+      "escalation": "none",
+      "keywords": [
+        "urgency",
+        "strong urge",
+        "sudden urge",
+        "what does"
+      ],
+      "source": "AUA/SUFU OAB guideline",
+      "reviewed_by": null,
+      "last_reviewed": null
+    },
+    {
+      "id": "oab_nocturia",
+      "topic": "oab_basics",
+      "question": "Why do I wake up so many times at night to urinate?",
+      "canonical_answer": "Waking at night to urinate is called nocturia and can be part of overactive bladder, but it also has other causes like drinking fluids late, certain medicines, or other medical conditions. Because the cause matters for treatment, it's worth discussing with your care team.",
       "escalation": "soft",
-      "keywords": ["sling", "after surgery", "recovery", "procedure", "post op"],
-      "source": "Urology patient guidance (Sevaro-original placeholder)",
+      "keywords": [
+        "night",
+        "nocturia",
+        "wake up",
+        "nighttime",
+        "wake at night"
+      ],
+      "source": "Urology Care Foundation / NIDDK",
+      "reviewed_by": null,
+      "last_reviewed": null
+    },
+    {
+      "id": "oab_frequency_normal",
+      "topic": "oab_basics",
+      "question": "How often is it normal to urinate?",
+      "canonical_answer": "Many people urinate about every 3 to 4 hours, or roughly 6 to 8 times in a day, but this varies with how much you drink and other factors. Going much more often than usual for you, especially with urgency, can be a sign of overactive bladder worth discussing.",
+      "escalation": "none",
+      "keywords": [
+        "how often",
+        "normal",
+        "frequency",
+        "times a day",
+        "urinate"
+      ],
+      "source": "Urology Care Foundation / general clinical guidance",
+      "reviewed_by": null,
+      "last_reviewed": null
+    },
+    {
+      "id": "oab_causes",
+      "topic": "oab_basics",
+      "question": "What causes overactive bladder?",
+      "canonical_answer": "OAB happens when the bladder muscle squeezes when it shouldn't, and the exact cause often isn't clear. Things that can contribute include aging, nerve conditions, certain medicines, bladder irritants, and in men an enlarged prostate. Your care team can help sort out what's contributing for you.",
+      "escalation": "none",
+      "keywords": [
+        "cause",
+        "causes",
+        "why do i have",
+        "oab"
+      ],
+      "source": "Urology Care Foundation / NIDDK",
+      "reviewed_by": null,
+      "last_reviewed": null
+    },
+    {
+      "id": "oab_aging",
+      "topic": "oab_basics",
+      "question": "Is overactive bladder just a normal part of getting older?",
+      "canonical_answer": "OAB becomes more common with age, but it is not an unavoidable or untreatable part of aging. Many people improve a lot with treatment, so it's worth bringing up rather than just living with it.",
+      "escalation": "none",
+      "keywords": [
+        "aging",
+        "getting older",
+        "normal",
+        "age",
+        "old"
+      ],
+      "source": "Urology Care Foundation / NIDDK",
+      "reviewed_by": null,
+      "last_reviewed": null
+    },
+    {
+      "id": "oab_vs_uti",
+      "topic": "oab_basics",
+      "question": "How is overactive bladder different from a urinary tract infection?",
+      "canonical_answer": "A UTI usually comes on more suddenly and often causes burning with urination, cloudy or strong-smelling urine, or fever, while OAB is an ongoing pattern of urgency and frequency without infection. Because a UTI can mimic or worsen bladder symptoms, your team may test your urine to tell them apart.",
+      "escalation": "soft",
+      "keywords": [
+        "uti",
+        "infection",
+        "difference",
+        "urinary tract",
+        "burning"
+      ],
+      "source": "Urology Care Foundation / NIDDK",
+      "reviewed_by": null,
+      "last_reviewed": null
+    },
+    {
+      "id": "oab_vs_stress_incontinence",
+      "topic": "oab_basics",
+      "question": "What's the difference between overactive bladder and stress incontinence?",
+      "canonical_answer": "Overactive bladder leakage happens with a sudden urge you can't hold, while stress incontinence is leakage when you cough, laugh, sneeze, or exercise. Some people have both, called mixed incontinence. The type matters because treatments differ, so your team will help identify which you have.",
+      "escalation": "none",
+      "keywords": [
+        "stress incontinence",
+        "difference",
+        "cough",
+        "leak",
+        "mixed"
+      ],
+      "source": "Urology Care Foundation",
+      "reviewed_by": null,
+      "last_reviewed": null
+    },
+    {
+      "id": "oab_men",
+      "topic": "oab_basics",
+      "question": "Can men get overactive bladder?",
+      "canonical_answer": "Yes, men get OAB too. In men, an enlarged prostate can cause or add to urgency and frequency, so evaluation often looks at the prostate as well. Treatments can include the same behavioral steps and medicines, sometimes along with prostate-directed treatment.",
+      "escalation": "none",
+      "keywords": [
+        "men",
+        "male",
+        "prostate",
+        "man"
+      ],
+      "source": "Urology Care Foundation / NIDDK",
+      "reviewed_by": null,
+      "last_reviewed": null
+    },
+    {
+      "id": "oab_will_it_go_away",
+      "topic": "oab_basics",
+      "question": "Will overactive bladder go away on its own?",
+      "canonical_answer": "OAB usually doesn't simply go away on its own, but it is very treatable and many people get significant relief with behavioral changes, medicines, or other therapies. Treating any contributing causes can also help. Your urology team can build a plan with you.",
+      "escalation": "none",
+      "keywords": [
+        "go away",
+        "cure",
+        "permanent",
+        "on its own",
+        "better"
+      ],
+      "source": "Urology Care Foundation / NIDDK",
+      "reviewed_by": null,
+      "last_reviewed": null
+    },
+    {
+      "id": "dx_what_to_expect",
+      "topic": "diagnosis",
+      "question": "What happens at a urology visit for bladder problems?",
+      "canonical_answer": "A typical visit includes talking through your symptoms and history, a physical exam, and usually a urine test to check for infection or blood. Your provider may ask you to keep a bladder diary and may check how much urine is left after you go. More detailed testing is only used when needed.",
+      "escalation": "none",
+      "keywords": [
+        "urology visit",
+        "what to expect",
+        "appointment",
+        "first visit",
+        "exam"
+      ],
+      "source": "Urology Care Foundation / AUA OAB guideline",
+      "reviewed_by": null,
+      "last_reviewed": null
+    },
+    {
+      "id": "dx_bladder_diary",
+      "topic": "diagnosis",
+      "question": "What is a bladder diary and why do I need one?",
+      "canonical_answer": "A bladder diary is a simple record, usually over a few days, of when and how much you drink, when you urinate, how much, and any leaks or urgent episodes. It helps your team understand your pattern and tailor treatment, and it can show progress over time.",
+      "escalation": "none",
+      "keywords": [
+        "bladder diary",
+        "voiding diary",
+        "log",
+        "diary",
+        "track"
+      ],
+      "source": "AUA/SUFU OAB guideline / NIDDK",
+      "reviewed_by": null,
+      "last_reviewed": null
+    },
+    {
+      "id": "dx_urinalysis",
+      "topic": "diagnosis",
+      "question": "Why do they test my urine?",
+      "canonical_answer": "A urine test (urinalysis) checks for things like infection or blood that could be causing or adding to your bladder symptoms. Ruling those out is a standard early step before treating overactive bladder.",
+      "escalation": "none",
+      "keywords": [
+        "urine test",
+        "urinalysis",
+        "why test",
+        "sample"
+      ],
+      "source": "AUA/SUFU OAB guideline",
+      "reviewed_by": null,
+      "last_reviewed": null
+    },
+    {
+      "id": "dx_pvr",
+      "topic": "diagnosis",
+      "question": "What is a post-void residual test?",
+      "canonical_answer": "A post-void residual checks how much urine is left in your bladder right after you urinate, usually with a quick ultrasound or a small catheter. It helps make sure your bladder is emptying well, which matters when choosing treatments.",
+      "escalation": "none",
+      "keywords": [
+        "post void residual",
+        "pvr",
+        "left in bladder",
+        "emptying",
+        "ultrasound"
+      ],
+      "source": "AUA/SUFU OAB guideline",
+      "reviewed_by": null,
+      "last_reviewed": null
+    },
+    {
+      "id": "dx_urodynamics",
+      "topic": "diagnosis",
+      "question": "What is urodynamic testing?",
+      "canonical_answer": "Urodynamics is a group of tests that measure how your bladder fills, stores, and empties urine, using small sensors. It isn't needed for everyone with OAB; it's mainly used when the picture is unclear or before certain procedures. Your urologist can explain whether you need it.",
+      "escalation": "none",
+      "keywords": [
+        "urodynamics",
+        "urodynamic",
+        "bladder test",
+        "pressure test"
+      ],
+      "source": "AUA/SUFU OAB guideline",
+      "reviewed_by": null,
+      "last_reviewed": null
+    },
+    {
+      "id": "dx_what_to_bring",
+      "topic": "diagnosis",
+      "question": "What should I bring to my urology appointment?",
+      "canonical_answer": "Bring a list of your medications and doses, any bladder diary you've kept, notes on your symptoms and what makes them better or worse, your insurance and ID, and a list of questions. If you've had prior urine tests or imaging elsewhere, those records help too.",
+      "escalation": "none",
+      "keywords": [
+        "bring",
+        "appointment",
+        "prepare",
+        "what to bring",
+        "urology"
+      ],
+      "source": "General clinical guidance",
+      "reviewed_by": null,
+      "last_reviewed": null
+    },
+    {
+      "id": "beh_overview",
+      "topic": "behavioral",
+      "question": "What lifestyle changes help overactive bladder?",
+      "canonical_answer": "Helpful steps include bladder training and timed voiding, pelvic floor (Kegel) exercises, managing how much and when you drink, cutting back on bladder irritants like caffeine and alcohol, reaching a healthy weight, preventing constipation, and not smoking. These behavioral approaches are a foundation of OAB care and are often tried first.",
+      "escalation": "none",
+      "keywords": [
+        "lifestyle",
+        "behavioral",
+        "changes",
+        "what helps",
+        "natural",
+        "without medication"
+      ],
+      "source": "AUA/SUFU OAB guideline / NIDDK",
+      "reviewed_by": null,
+      "last_reviewed": null
+    },
+    {
+      "id": "beh_bladder_training",
+      "topic": "behavioral",
+      "question": "What is bladder training?",
+      "canonical_answer": "Bladder training means urinating on a set schedule and slowly increasing the time between trips so your bladder learns to hold more. Combined with urge-suppression techniques, it can reduce urgency and accidents over several weeks. Your team or a pelvic floor therapist can coach you through it.",
+      "escalation": "none",
+      "keywords": [
+        "bladder training",
+        "timed voiding",
+        "schedule",
+        "hold it",
+        "training"
+      ],
+      "source": "AUA/SUFU OAB guideline / NIDDK",
+      "reviewed_by": null,
+      "last_reviewed": null
+    },
+    {
+      "id": "beh_urge_suppression",
+      "topic": "behavioral",
+      "question": "How can I control a sudden urge to urinate?",
+      "canonical_answer": "When an urge hits, instead of rushing to the bathroom, many people find it helps to stop, stay still, take slow breaths, and do a few quick pelvic floor squeezes until the urge passes, then walk calmly to the toilet. These urge-suppression techniques get easier with practice.",
+      "escalation": "none",
+      "keywords": [
+        "control urge",
+        "sudden urge",
+        "hold",
+        "urge suppression",
+        "calm urge"
+      ],
+      "source": "NIDDK / AUA OAB guideline",
+      "reviewed_by": null,
+      "last_reviewed": null
+    },
+    {
+      "id": "beh_kegels",
+      "topic": "behavioral",
+      "question": "What are Kegel or pelvic floor exercises?",
+      "canonical_answer": "Kegel exercises strengthen the pelvic floor muscles that help control urination, by squeezing and relaxing them in sets through the day. A pelvic floor physical therapist or biofeedback can help you find the right muscles. For some people the pelvic floor is already too tense, and strengthening can worsen symptoms — so if Kegels make things worse, tell your team, since relaxation techniques may suit you better.",
+      "escalation": "none",
+      "keywords": [
+        "kegel",
+        "pelvic floor",
+        "exercises",
+        "muscles",
+        "biofeedback"
+      ],
+      "source": "NIDDK / Urology Care Foundation",
+      "reviewed_by": null,
+      "last_reviewed": null
+    },
+    {
+      "id": "beh_pelvic_floor_pt",
+      "topic": "behavioral",
+      "question": "What is pelvic floor physical therapy?",
+      "canonical_answer": "Pelvic floor physical therapy is working with a specially trained therapist who helps you find, strengthen, and coordinate the muscles that control your bladder, sometimes using biofeedback. It's a common, non-surgical option for overactive bladder and other pelvic problems.",
+      "escalation": "none",
+      "keywords": [
+        "pelvic floor therapy",
+        "physical therapy",
+        "therapist",
+        "pelvic pt",
+        "biofeedback"
+      ],
+      "source": "Urology Care Foundation",
+      "reviewed_by": null,
+      "last_reviewed": null
+    },
+    {
+      "id": "beh_fluids",
+      "topic": "behavioral",
+      "question": "How much should I drink if I have overactive bladder?",
+      "canonical_answer": "Most people do best drinking a normal, steady amount through the day rather than a lot at once, and easing off fluids a few hours before bed to cut nighttime trips. Drinking too little can actually irritate the bladder, so the goal is balance. Your team can help set a target for you.",
+      "escalation": "soft",
+      "keywords": [
+        "how much drink",
+        "fluids",
+        "water",
+        "drinking",
+        "liquid"
+      ],
+      "source": "NIDDK / Urology Care Foundation",
+      "reviewed_by": null,
+      "last_reviewed": null
+    },
+    {
+      "id": "beh_irritants",
+      "topic": "behavioral",
+      "question": "What foods and drinks can irritate the bladder?",
+      "canonical_answer": "Common bladder irritants include caffeine (coffee, tea, soda), alcohol, carbonated drinks, artificial sweeteners, and very acidic or spicy foods. Not everyone reacts to the same things, so cutting back one at a time can help you find your own triggers.",
+      "escalation": "none",
+      "keywords": [
+        "irritants",
+        "caffeine",
+        "alcohol",
+        "coffee",
+        "food",
+        "diet",
+        "trigger"
+      ],
+      "source": "NIDDK / Urology Care Foundation",
+      "reviewed_by": null,
+      "last_reviewed": null
+    },
+    {
+      "id": "beh_caffeine",
+      "topic": "behavioral",
+      "question": "Does caffeine make overactive bladder worse?",
+      "canonical_answer": "For many people caffeine increases urgency and how often they go, because it both stimulates the bladder and acts as a diuretic. Cutting back gradually, rather than stopping suddenly, can help and avoids withdrawal headaches. See whether it makes a difference for you.",
+      "escalation": "none",
+      "keywords": [
+        "caffeine",
+        "coffee",
+        "tea",
+        "soda",
+        "worse"
+      ],
+      "source": "NIDDK",
+      "reviewed_by": null,
+      "last_reviewed": null
+    },
+    {
+      "id": "beh_constipation",
+      "topic": "behavioral",
+      "question": "Can constipation affect my bladder?",
+      "canonical_answer": "Yes. A full, backed-up bowel can press on the bladder and worsen urgency and frequency, so managing constipation with enough fiber and fluids can help your bladder too. If constipation is a struggle, mention it to your care team.",
+      "escalation": "none",
+      "keywords": [
+        "constipation",
+        "bowel",
+        "fiber",
+        "constipated"
+      ],
+      "source": "NIDDK / AUA OAB guideline",
+      "reviewed_by": null,
+      "last_reviewed": null
+    },
+    {
+      "id": "beh_weight",
+      "topic": "behavioral",
+      "question": "Does losing weight help overactive bladder?",
+      "canonical_answer": "For people who are overweight, losing some weight can reduce pressure on the bladder and lessen leaks and urgency. Even a modest amount can help. Your care team can suggest realistic goals.",
+      "escalation": "none",
+      "keywords": [
+        "weight",
+        "lose weight",
+        "overweight",
+        "obesity"
+      ],
+      "source": "NIDDK",
+      "reviewed_by": null,
+      "last_reviewed": null
+    },
+    {
+      "id": "beh_double_voiding",
+      "topic": "behavioral",
+      "question": "What is double voiding?",
+      "canonical_answer": "Double voiding means urinating, waiting a short moment, and then trying again to empty your bladder more completely. It can help some people who feel they don't fully empty. Ask your team if it's right for you.",
+      "escalation": "none",
+      "keywords": [
+        "double voiding",
+        "empty",
+        "twice",
+        "fully empty"
+      ],
+      "source": "General clinical guidance",
+      "reviewed_by": null,
+      "last_reviewed": null
+    },
+    {
+      "id": "beh_nocturia_tips",
+      "topic": "behavioral",
+      "question": "How can I reduce waking at night to urinate?",
+      "canonical_answer": "Tips that help some people include easing off fluids a few hours before bed, limiting evening caffeine and alcohol, elevating the legs in the late afternoon if you have swelling, and emptying the bladder right before sleep. If nighttime trips stay frequent, talk with your team, since there can be other causes.",
+      "escalation": "soft",
+      "keywords": [
+        "night",
+        "nocturia",
+        "reduce",
+        "nighttime",
+        "sleep",
+        "wake up"
+      ],
+      "source": "NIDDK / Urology Care Foundation",
+      "reviewed_by": null,
+      "last_reviewed": null
+    },
+    {
+      "id": "med_how_chosen",
+      "topic": "medications",
+      "question": "How do doctors decide which overactive bladder treatment to use?",
+      "canonical_answer": "Recent guidelines favor shared decision-making rather than a strict order of treatments, so your urologist weighs your symptoms, other health conditions, preferences, and past treatments to pick an approach with you. Behavioral steps are often part of the plan at any stage. It's very reasonable to ask why a particular option is being suggested for you.",
+      "escalation": "soft",
+      "keywords": [
+        "how decide",
+        "which treatment",
+        "step therapy",
+        "options",
+        "choose"
+      ],
+      "source": "AUA/SUFU 2024 OAB guideline",
+      "reviewed_by": null,
+      "last_reviewed": null
+    },
+    {
+      "id": "med_anticholinergics_overview",
+      "topic": "medications",
+      "question": "What are anticholinergic bladder medications?",
+      "canonical_answer": "Anticholinergics (also called antimuscarinics) are a common class of OAB medicine that calm the bladder muscle so it doesn't squeeze as urgently. Examples include oxybutynin, tolterodine, solifenacin, trospium, fesoterodine, and darifenacin. Common side effects are dry mouth and constipation.",
+      "escalation": "soft",
+      "keywords": [
+        "anticholinergic",
+        "antimuscarinic",
+        "bladder medication",
+        "class"
+      ],
+      "source": "AUA OAB guideline / MedlinePlus",
+      "reviewed_by": null,
+      "last_reviewed": null
+    },
+    {
+      "id": "med_oxybutynin",
+      "topic": "medications",
+      "question": "What does oxybutynin do?",
+      "canonical_answer": "Oxybutynin is an anticholinergic medicine that relaxes the bladder muscle to reduce urgency, frequency, and urge leakage. It comes as pills, an extended-release form, and a skin patch or gel. Dry mouth and constipation are common side effects; take it as prescribed.",
+      "escalation": "soft",
+      "keywords": [
+        "oxybutynin",
+        "ditropan",
+        "what does",
+        "bladder medicine"
+      ],
+      "source": "MedlinePlus",
+      "reviewed_by": null,
+      "last_reviewed": null
+    },
+    {
+      "id": "med_solifenacin",
+      "topic": "medications",
+      "question": "What does solifenacin (Vesicare) do?",
+      "canonical_answer": "Solifenacin, sold as Vesicare, is an anticholinergic that calms the bladder to reduce urgency, frequency, and urge incontinence. It's taken once daily. Common side effects include dry mouth and constipation.",
+      "escalation": "soft",
+      "keywords": [
+        "solifenacin",
+        "vesicare",
+        "what does",
+        "bladder medicine"
+      ],
+      "source": "MedlinePlus",
+      "reviewed_by": null,
+      "last_reviewed": null
+    },
+    {
+      "id": "med_tolterodine",
+      "topic": "medications",
+      "question": "What does tolterodine (Detrol) do?",
+      "canonical_answer": "Tolterodine, sold as Detrol, is an anticholinergic medicine that relaxes the bladder to ease urgency and frequency. It comes in regular and long-acting forms. Dry mouth and constipation are the most common side effects.",
+      "escalation": "soft",
+      "keywords": [
+        "tolterodine",
+        "detrol",
+        "what does",
+        "bladder medicine"
+      ],
+      "source": "MedlinePlus",
+      "reviewed_by": null,
+      "last_reviewed": null
+    },
+    {
+      "id": "med_mirabegron",
+      "topic": "medications",
+      "question": "What does mirabegron (Myrbetriq) do?",
+      "canonical_answer": "Mirabegron, sold as Myrbetriq, is a beta-3 agonist that relaxes the bladder muscle so it can hold more urine, lowering urgency and frequency. Unlike anticholinergics it usually doesn't cause dry mouth, but it can raise blood pressure, so your team may check it. Take it on a regular schedule.",
+      "escalation": "soft",
+      "keywords": [
+        "mirabegron",
+        "myrbetriq",
+        "what does",
+        "beta 3",
+        "bladder medicine"
+      ],
+      "source": "MedlinePlus",
+      "reviewed_by": null,
+      "last_reviewed": null
+    },
+    {
+      "id": "med_vibegron",
+      "topic": "medications",
+      "question": "What does vibegron (Gemtesa) do?",
+      "canonical_answer": "Vibegron, sold as Gemtesa, is a beta-3 agonist that relaxes the bladder to reduce urgency, frequency, and urge leakage. It's taken once daily and tends to have few side effects. Your prescriber can tell you what to expect.",
+      "escalation": "soft",
+      "keywords": [
+        "vibegron",
+        "gemtesa",
+        "what does",
+        "beta 3",
+        "bladder medicine"
+      ],
+      "source": "MedlinePlus",
+      "reviewed_by": null,
+      "last_reviewed": null
+    },
+    {
+      "id": "med_beta3_vs_anticholinergic",
+      "topic": "medications",
+      "question": "What's the difference between mirabegron and anticholinergic bladder medicines?",
+      "canonical_answer": "Both calm the bladder, but they work differently. Anticholinergics (like oxybutynin or solifenacin) commonly cause dry mouth and constipation, while beta-3 agonists (mirabegron, vibegron) usually don't but can affect blood pressure. Which is better depends on your health and how you tolerate them, so it's a good discussion to have with your prescriber.",
+      "escalation": "soft",
+      "keywords": [
+        "difference",
+        "mirabegron",
+        "anticholinergic",
+        "beta 3",
+        "compare",
+        "which"
+      ],
+      "source": "AUA OAB guideline / MedlinePlus",
+      "reviewed_by": null,
+      "last_reviewed": null
+    },
+    {
+      "id": "med_dry_mouth",
+      "topic": "medications",
+      "question": "Why does my bladder medication cause dry mouth?",
+      "canonical_answer": "Dry mouth and constipation are common with anticholinergic bladder medicines because they also affect glands and the gut, not just the bladder. Sipping water, sugar-free gum, and managing constipation can help. If it's bothersome, ask your prescriber, since other options exist.",
+      "escalation": "soft",
+      "keywords": [
+        "dry mouth",
+        "constipation",
+        "side effect",
+        "thirsty"
+      ],
+      "source": "MedlinePlus / AUA OAB guideline",
+      "reviewed_by": null,
+      "last_reviewed": null
+    },
+    {
+      "id": "med_elderly_cognitive",
+      "topic": "medications",
+      "question": "Are bladder medications safe for older adults?",
+      "canonical_answer": "Some anticholinergic bladder medicines can add to confusion or memory problems in older adults, so providers often weigh this carefully and may prefer beta-3 agonists or lower doses. This is an important thing to discuss, especially if there are memory concerns. Don't stop a medicine on your own, but do raise it with your prescriber.",
+      "escalation": "soft",
+      "keywords": [
+        "older",
+        "elderly",
+        "memory",
+        "confusion",
+        "cognitive",
+        "dementia"
+      ],
+      "source": "AUA OAB guideline",
+      "reviewed_by": null,
+      "last_reviewed": null
+    },
+    {
+      "id": "med_how_long_to_work",
+      "topic": "medications",
+      "question": "How long until my bladder medication works?",
+      "canonical_answer": "Bladder medicines often take a few weeks to show their full effect, so it's worth giving them some time along with behavioral changes. If you've taken it as directed for several weeks without improvement, let your prescriber know, since the dose or medicine can be adjusted.",
+      "escalation": "soft",
+      "keywords": [
+        "how long",
+        "work",
+        "kick in",
+        "weeks",
+        "effect"
+      ],
+      "source": "AUA OAB guideline / general clinical guidance",
+      "reviewed_by": null,
+      "last_reviewed": null
+    },
+    {
+      "id": "med_not_working",
+      "topic": "medications",
+      "question": "What if my bladder medication isn't working?",
+      "canonical_answer": "If a medicine hasn't helped after a fair trial, that's common and not the end of the road. Options include adjusting the dose, switching to a different medicine, combining approaches with behavioral therapy, or considering advanced treatments. Let your prescriber know so you can plan the next step together.",
+      "escalation": "soft",
+      "keywords": [
+        "not working",
+        "isnt working",
+        "no improvement",
+        "didnt help",
+        "still"
+      ],
+      "source": "AUA OAB guideline",
+      "reviewed_by": null,
+      "last_reviewed": null
+    },
+    {
+      "id": "med_missed_dose",
+      "topic": "medications",
+      "question": "What if I miss a dose of my bladder medication?",
+      "canonical_answer": "Because the right thing to do for a missed dose depends on the specific medicine and timing, check the instructions that came with it or ask your pharmacist or prescriber. As a general rule, don't take two doses to make up for a missed one. Taking bladder medicines consistently helps them work.",
+      "escalation": "soft",
+      "keywords": [
+        "missed dose",
+        "forgot",
+        "skipped",
+        "miss"
+      ],
+      "source": "MedlinePlus / general clinical guidance",
+      "reviewed_by": null,
+      "last_reviewed": null
+    },
+    {
+      "id": "med_alpha_blocker_men",
+      "topic": "medications",
+      "question": "Why might a man with bladder symptoms be given an alpha-blocker?",
+      "canonical_answer": "In men, an enlarged prostate can block urine flow and add to urgency and frequency. Alpha-blockers relax the prostate and bladder neck to improve flow, and they're sometimes used along with OAB medicines. Your urologist can explain why a particular combination is right for you.",
+      "escalation": "soft",
+      "keywords": [
+        "alpha blocker",
+        "tamsulosin",
+        "flomax",
+        "prostate",
+        "men",
+        "bph"
+      ],
+      "source": "NIDDK / Urology Care Foundation",
+      "reviewed_by": null,
+      "last_reviewed": null
+    },
+    {
+      "id": "proc_when_considered",
+      "topic": "procedures",
+      "question": "When are advanced procedures considered for overactive bladder?",
+      "canonical_answer": "Advanced therapies like bladder Botox, nerve stimulation, or sacral neuromodulation are options your urologist may discuss based on shared decision-making. Under current guidelines they don't necessarily require 'failing' medicines first — depending on your situation and preferences they can be considered sooner or later. Your urologist can review which fits you.",
+      "escalation": "soft",
+      "keywords": [
+        "advanced",
+        "procedure",
+        "when considered",
+        "next step",
+        "options surgery"
+      ],
+      "source": "AUA/SUFU OAB guideline",
+      "reviewed_by": null,
+      "last_reviewed": null
+    },
+    {
+      "id": "proc_botox",
+      "topic": "procedures",
+      "question": "What is bladder Botox for overactive bladder?",
+      "canonical_answer": "Bladder Botox is a procedure where small amounts of onabotulinumtoxinA are injected into the bladder muscle to relax it, making room for more urine and reducing urgency and leaks. The effect is temporary and usually repeated over time. Possible effects include urinary tract infection and, in some people, trouble emptying that may need temporary self-catheterization, which your urologist will discuss.",
+      "escalation": "soft",
+      "keywords": [
+        "botox",
+        "bladder botox",
+        "injection",
+        "onabotulinumtoxin",
+        "what is"
+      ],
+      "source": "Urology Care Foundation / AUA OAB guideline",
+      "reviewed_by": null,
+      "last_reviewed": null
+    },
+    {
+      "id": "proc_botox_how_long",
+      "topic": "procedures",
+      "question": "How long does bladder Botox last?",
+      "canonical_answer": "Bladder Botox usually works for several months and then is repeated when symptoms return, with the exact timing varying from person to person. Your urologist will plan a schedule based on how long it lasts for you.",
+      "escalation": "soft",
+      "keywords": [
+        "botox",
+        "how long",
+        "last",
+        "repeat",
+        "again"
+      ],
+      "source": "Urology Care Foundation",
+      "reviewed_by": null,
+      "last_reviewed": null
+    },
+    {
+      "id": "proc_ptns",
+      "topic": "procedures",
+      "question": "What is PTNS (percutaneous tibial nerve stimulation)?",
+      "canonical_answer": "PTNS sends mild electrical pulses through a thin needle near the ankle to a nerve connected to the bladder, helping calm overactivity, typically in a series of short sessions to start. Newer implantable tibial nerve stimulators are also available that work continuously without weekly visits. Your team can explain the options and schedule.",
+      "escalation": "soft",
+      "keywords": [
+        "ptns",
+        "tibial nerve",
+        "ankle",
+        "nerve stimulation",
+        "what is"
+      ],
+      "source": "Urology Care Foundation / AUA OAB guideline",
+      "reviewed_by": null,
+      "last_reviewed": null
+    },
+    {
+      "id": "proc_sacral_neuromodulation",
+      "topic": "procedures",
+      "question": "What is sacral neuromodulation or InterStim?",
+      "canonical_answer": "Sacral neuromodulation, sometimes known by the brand InterStim, uses a small implanted device to gently stimulate the nerves that control the bladder. It's usually done as a test phase first to see if it helps, and if it works well a permanent device is placed. Your urologist can explain whether you're a candidate.",
+      "escalation": "soft",
+      "keywords": [
+        "sacral neuromodulation",
+        "interstim",
+        "implant",
+        "nerve",
+        "device",
+        "what is"
+      ],
+      "source": "Urology Care Foundation / AUA OAB guideline",
+      "reviewed_by": null,
+      "last_reviewed": null
+    },
+    {
+      "id": "proc_nerve_stim_general",
+      "topic": "procedures",
+      "question": "How does nerve stimulation help an overactive bladder?",
+      "canonical_answer": "Nerve stimulation therapies gently adjust the nerve signals between the bladder and brain so the bladder is less overactive. Types include tibial nerve stimulation at the ankle (as repeated sessions or a newer implantable device) and sacral neuromodulation with an implanted device. Your urologist can explain which might suit you.",
+      "escalation": "soft",
+      "keywords": [
+        "nerve stimulation",
+        "how does",
+        "neuromodulation",
+        "electrical"
+      ],
+      "source": "Urology Care Foundation / NIDDK",
+      "reviewed_by": null,
+      "last_reviewed": null
+    },
+    {
+      "id": "life_pads_products",
+      "topic": "lifestyle",
+      "question": "Are absorbent pads or products a good option?",
+      "canonical_answer": "Absorbent pads and underwear designed for bladder leaks can help you stay comfortable and confident while you work on treatment, and using them doesn't mean giving up on improvement. Products made for urine work better than menstrual pads. Your team can suggest options and also keep treating the cause.",
+      "escalation": "none",
+      "keywords": [
+        "pads",
+        "products",
+        "diapers",
+        "absorbent",
+        "underwear",
+        "protection"
+      ],
+      "source": "Urology Care Foundation",
+      "reviewed_by": null,
+      "last_reviewed": null
+    },
+    {
+      "id": "life_skin_care",
+      "topic": "lifestyle",
+      "question": "How do I protect my skin from leaks?",
+      "canonical_answer": "Staying dry helps prevent skin irritation, so change wet pads promptly, gently clean and dry the skin, and use a barrier cream if needed. If you notice a rash, sores, or skin breakdown, let your care team know.",
+      "escalation": "soft",
+      "keywords": [
+        "skin",
+        "rash",
+        "irritation",
+        "barrier",
+        "sore"
+      ],
+      "source": "General clinical guidance",
+      "reviewed_by": null,
+      "last_reviewed": null
+    },
+    {
+      "id": "life_travel",
+      "topic": "lifestyle",
+      "question": "Any tips for traveling or being out with overactive bladder?",
+      "canonical_answer": "Many people feel more at ease by locating restrooms ahead of time, sitting near the aisle or exit, easing off bladder irritants before travel, and carrying a spare pad or change of clothes. Practicing urge-suppression techniques helps too. These are about comfort and confidence while treatment works.",
+      "escalation": "none",
+      "keywords": [
+        "travel",
+        "out",
+        "tips",
+        "going out",
+        "trip",
+        "restroom"
+      ],
+      "source": "Urology Care Foundation",
+      "reviewed_by": null,
+      "last_reviewed": null
+    },
+    {
+      "id": "life_emotional",
+      "topic": "lifestyle",
+      "question": "Is it normal for bladder problems to affect my mood or social life?",
+      "canonical_answer": "Yes, bladder problems commonly affect confidence, sleep, mood, and social activities, and you're not alone in that. The good news is that treatment often improves quality of life a lot. If you're feeling down or withdrawing, it's worth mentioning to your care team.",
+      "escalation": "soft",
+      "keywords": [
+        "mood",
+        "embarrassed",
+        "social",
+        "depression",
+        "quality of life",
+        "anxiety"
+      ],
+      "source": "Urology Care Foundation",
+      "reviewed_by": null,
+      "last_reviewed": null
+    },
+    {
+      "id": "fu_how_treatments_stepped",
+      "topic": "followup",
+      "question": "What happens if the first treatment doesn't fully work?",
+      "canonical_answer": "OAB care is a partnership, and plans are often adjusted over time. Options include changing or combining medicines, adding pelvic floor therapy, or considering advanced treatments like Botox or nerve stimulation — and current guidelines favor choosing among these together with you rather than a fixed order. Keep your team posted on what's working.",
+      "escalation": "soft",
+      "keywords": [
+        "first treatment",
+        "doesnt work",
+        "next step",
+        "what if",
+        "still symptoms"
+      ],
+      "source": "AUA/SUFU OAB guideline",
+      "reviewed_by": null,
+      "last_reviewed": null
+    },
+    {
+      "id": "fu_when_followup",
+      "topic": "followup",
+      "question": "When should I follow up about my bladder treatment?",
+      "canonical_answer": "Many treatments are reviewed after several weeks to see how they're working and whether to adjust, and your team will usually tell you when to return. Sooner is reasonable if you have side effects or new symptoms. Keeping a short bladder diary helps make the follow-up useful.",
+      "escalation": "soft",
+      "keywords": [
+        "follow up",
+        "when",
+        "check in",
+        "return",
+        "next appointment"
+      ],
+      "source": "AUA OAB guideline / general clinical guidance",
+      "reviewed_by": null,
+      "last_reviewed": null
+    },
+    {
+      "id": "fu_realistic_expectations",
+      "topic": "followup",
+      "question": "Will treatment completely cure my overactive bladder?",
+      "canonical_answer": "Many people get major improvement in urgency, frequency, and leaks, though for some it's about good control rather than a complete cure. Combining behavioral changes with the right treatment usually gives the best results. Your team can set realistic goals with you.",
+      "escalation": "soft",
+      "keywords": [
+        "cure",
+        "completely",
+        "fixed",
+        "expectations",
+        "better"
+      ],
+      "source": "AUA OAB guideline",
+      "reviewed_by": null,
+      "last_reviewed": null
+    },
+    {
+      "id": "rf_blood_in_urine",
+      "topic": "oab_basics",
+      "question": "Is blood in my urine something to worry about?",
+      "canonical_answer": "Blood in the urine is not a normal part of overactive bladder and should always be checked by a clinician, since it can have causes that need evaluation. If you see visible blood or are passing clots, contact your care team promptly, and seek urgent care if you also have severe pain, fever, or trouble urinating.",
+      "escalation": "soft",
+      "keywords": [
+        "blood",
+        "blood in urine",
+        "red urine",
+        "hematuria"
+      ],
+      "source": "Urology Care Foundation / general clinical guidance",
+      "reviewed_by": null,
+      "last_reviewed": null
+    },
+    {
+      "id": "rf_painful_urination",
+      "topic": "oab_basics",
+      "question": "Is burning or pain when I urinate part of overactive bladder?",
+      "canonical_answer": "Burning or pain with urination is not typical of overactive bladder and often suggests a urinary tract infection or another issue. Because it usually needs a urine test and possibly treatment, contact your care team. Seek urgent care if you also have fever, back or flank pain, or feel very unwell.",
+      "escalation": "soft",
+      "keywords": [
+        "burning",
+        "pain",
+        "hurts",
+        "painful urination",
+        "sting"
+      ],
+      "source": "Urology Care Foundation / general clinical guidance",
+      "reviewed_by": null,
+      "last_reviewed": null
+    },
+    {
+      "id": "rf_cant_urinate",
+      "topic": "oab_basics",
+      "question": "What should I do if I suddenly cannot urinate?",
+      "canonical_answer": "Being suddenly unable to urinate while feeling a painfully full bladder can be urinary retention, which is a medical emergency. Do not wait it out, seek emergency care or call 911. This can sometimes happen after certain procedures or with some medicines.",
+      "escalation": "soft",
+      "keywords": [
+        "cant urinate",
+        "cannot pee",
+        "retention",
+        "unable to urinate",
+        "blocked"
+      ],
+      "source": "Urology Care Foundation / general clinical guidance",
+      "reviewed_by": null,
+      "last_reviewed": null
+    },
+    {
+      "id": "med_combination",
+      "topic": "medications",
+      "question": "Can I take two bladder medicines together?",
+      "canonical_answer": "Sometimes, yes. Current guidance allows combining a beta-3 agonist (like mirabegron) with an anticholinergic when one medicine alone isn't enough, and your prescriber decides if that's appropriate for you. Don't combine medicines on your own — ask whether it's right for your situation.",
+      "escalation": "soft",
+      "keywords": [
+        "combine",
+        "two medicines",
+        "together",
+        "combination",
+        "add another"
+      ],
+      "source": "AUA/SUFU 2024 OAB guideline",
+      "reviewed_by": null,
+      "last_reviewed": null
+    },
+    {
+      "id": "med_dementia_link",
+      "topic": "medications",
+      "question": "Do bladder medications cause dementia?",
+      "canonical_answer": "Some studies have linked long-term use of certain anticholinergic medicines to a higher risk of memory problems, which is why providers are cautious with them in older adults and may prefer beta-3 agonists (which don't carry this concern). This is a very reasonable thing to discuss with your prescriber; don't stop a medicine on your own.",
+      "escalation": "soft",
+      "keywords": [
+        "dementia",
+        "alzheimer",
+        "memory",
+        "anticholinergic",
+        "cause dementia"
+      ],
+      "source": "AUA OAB guideline / general clinical guidance",
+      "reviewed_by": null,
+      "last_reviewed": null
+    },
+    {
+      "id": "med_anticholinergic_cautions",
+      "topic": "medications",
+      "question": "Who should be careful with anticholinergic bladder medicines?",
+      "canonical_answer": "Anticholinergic bladder medicines may not be a good fit for people with narrow-angle glaucoma, trouble emptying the bladder, significant prostate blockage, severe constipation, or memory concerns. Make sure your prescriber knows your full history so they can choose a safe option for you.",
+      "escalation": "soft",
+      "keywords": [
+        "who should avoid",
+        "caution",
+        "glaucoma",
+        "not take",
+        "contraindication",
+        "safe for me"
+      ],
+      "source": "MedlinePlus / AUA OAB guideline",
+      "reviewed_by": null,
+      "last_reviewed": null
+    },
+    {
+      "id": "dx_cystoscopy",
+      "topic": "diagnosis",
+      "question": "Will I need a cystoscopy or imaging for overactive bladder?",
+      "canonical_answer": "Most people with straightforward OAB don't need a cystoscopy (a look inside the bladder with a small scope) or imaging. These are used in specific situations, such as blood in the urine, pain, or an unclear diagnosis. Your urologist can explain whether you need one and why.",
+      "escalation": "none",
+      "keywords": [
+        "cystoscopy",
+        "scope",
+        "imaging",
+        "ultrasound",
+        "camera",
+        "need test"
+      ],
+      "source": "AUA/SUFU OAB guideline",
+      "reviewed_by": null,
+      "last_reviewed": null
+    },
+    {
+      "id": "oab_polyuria",
+      "topic": "oab_basics",
+      "question": "What's the difference between going often and making a lot of urine?",
+      "canonical_answer": "Going often (frequency) means many trips, while polyuria means actually producing a large total volume of urine, which can come from drinking a lot, diabetes, or certain medicines like water pills. They're treated differently, so a bladder diary that records amounts helps your team tell them apart.",
+      "escalation": "soft",
+      "keywords": [
+        "polyuria",
+        "large amount",
+        "volume",
+        "lots of urine",
+        "making a lot",
+        "diabetes"
+      ],
+      "source": "Urology Care Foundation / general clinical guidance",
+      "reviewed_by": null,
+      "last_reviewed": null
+    },
+    {
+      "id": "beh_vaginal_estrogen",
+      "topic": "behavioral",
+      "question": "Can vaginal estrogen help bladder symptoms after menopause?",
+      "canonical_answer": "For some women after menopause, low-dose vaginal estrogen can ease urinary urgency, frequency, and recurrent infections that come from thinning tissues. It's different from estrogen pills and is prescribed and supervised by a clinician. Ask your provider whether it might help you.",
+      "escalation": "soft",
+      "keywords": [
+        "vaginal estrogen",
+        "menopause",
+        "postmenopausal",
+        "estrogen",
+        "cream",
+        "women"
+      ],
+      "source": "AUA OAB guideline / Urology Care Foundation",
+      "reviewed_by": null,
+      "last_reviewed": null
+    },
+    {
+      "id": "life_supplements",
+      "topic": "lifestyle",
+      "question": "Do supplements like pumpkin seed or cranberry help overactive bladder?",
+      "canonical_answer": "Evidence for supplements such as pumpkin seed extract for OAB is limited, and cranberry is aimed at urinary tract infections, not overactive bladder. Supplements can also interact with medicines, so check with your pharmacist or provider before trying one rather than relying on it.",
+      "escalation": "soft",
+      "keywords": [
+        "supplement",
+        "pumpkin seed",
+        "cranberry",
+        "natural remedy",
+        "vitamins",
+        "herbal"
+      ],
+      "source": "General clinical guidance",
+      "reviewed_by": null,
+      "last_reviewed": null
+    },
+    {
+      "id": "life_insurance_cost",
+      "topic": "followup",
+      "question": "Does insurance cover Botox or nerve stimulation for OAB?",
+      "canonical_answer": "Coverage varies by plan, but bladder Botox and nerve stimulation are established treatments that many insurers and Medicare cover, often after other steps are documented. Your urology office can usually check your benefits and any prior-authorization needs before you decide.",
+      "escalation": "none",
+      "keywords": [
+        "insurance",
+        "cost",
+        "cover",
+        "medicare",
+        "afford",
+        "coverage",
+        "pay"
+      ],
+      "source": "General clinical guidance",
       "reviewed_by": null,
       "last_reviewed": null
     }

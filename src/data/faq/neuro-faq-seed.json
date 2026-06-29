@@ -1438,6 +1438,451 @@
       "source": "General clinical guidance",
       "reviewed_by": null,
       "last_reviewed": null
+    },
+    {
+      "id": "gen_what_is_stroke",
+      "topic": "general_neuro",
+      "question": "What is a stroke?",
+      "canonical_answer": "A stroke happens when blood flow to part of the brain is suddenly cut off or a blood vessel bursts, so brain cells in that area are injured. It's a medical emergency, and fast treatment matters. Symptoms come on suddenly, which is why BE-FAST and calling 911 are so important.",
+      "escalation": "none",
+      "keywords": [
+        "what is a stroke",
+        "stroke definition",
+        "brain attack"
+      ],
+      "source": "NINDS / CDC (public domain)",
+      "reviewed_by": null,
+      "last_reviewed": null
+    },
+    {
+      "id": "gen_ischemic_vs_hemorrhagic",
+      "topic": "general_neuro",
+      "question": "What's the difference between an ischemic and a hemorrhagic stroke?",
+      "canonical_answer": "An ischemic stroke is caused by a clot blocking blood flow to the brain and is the most common type, while a hemorrhagic stroke is caused by bleeding from a burst vessel. They can look similar at first, so a brain scan is used to tell them apart, and treatment differs.",
+      "escalation": "none",
+      "keywords": [
+        "ischemic",
+        "hemorrhagic",
+        "type of stroke",
+        "bleed",
+        "clot",
+        "difference"
+      ],
+      "source": "NINDS (public domain)",
+      "reviewed_by": null,
+      "last_reviewed": null
+    },
+    {
+      "id": "gen_aneurysm",
+      "topic": "general_neuro",
+      "question": "What is a brain aneurysm?",
+      "canonical_answer": "A brain aneurysm is a weak, balloon-like bulge in a blood vessel in the brain. Many never cause problems, but if one leaks or bursts it is a life-threatening emergency, often felt as a sudden worst-ever headache, which needs 911 right away. Your team can explain monitoring or treatment if one is found.",
+      "escalation": "none",
+      "keywords": [
+        "aneurysm",
+        "brain aneurysm",
+        "bulge",
+        "what is"
+      ],
+      "source": "NINDS (public domain)",
+      "reviewed_by": null,
+      "last_reviewed": null
+    },
+    {
+      "id": "gen_syncope",
+      "topic": "general_neuro",
+      "question": "What is fainting and when is it serious?",
+      "canonical_answer": "Fainting (syncope) is a brief loss of consciousness from a temporary drop in blood flow to the brain, often from standing up fast, dehydration, or a strong emotional or pain response. Seek urgent care if fainting comes with chest pain, palpitations, trouble breathing, injury, or happens during exercise, or if it keeps happening.",
+      "escalation": "none",
+      "keywords": [
+        "fainting",
+        "faint",
+        "syncope",
+        "passed out",
+        "blackout"
+      ],
+      "source": "NINDS / general clinical guidance",
+      "reviewed_by": null,
+      "last_reviewed": null
+    },
+    {
+      "id": "gen_bells_palsy",
+      "topic": "general_neuro",
+      "question": "What is Bell's palsy?",
+      "canonical_answer": "Bell's palsy is sudden weakness or drooping of one side of the face from irritation of the facial nerve, and it usually improves over weeks to months. Because facial drooping can also be a sign of stroke, a sudden droop should be evaluated urgently to be safe, especially if it comes with other stroke symptoms.",
+      "escalation": "soft",
+      "keywords": [
+        "bells palsy",
+        "facial droop",
+        "face weakness",
+        "facial nerve"
+      ],
+      "source": "NINDS (public domain)",
+      "reviewed_by": null,
+      "last_reviewed": null
+    },
+    {
+      "id": "hdr_tension_headache",
+      "topic": "general_neuro",
+      "question": "What is a tension headache?",
+      "canonical_answer": "A tension headache is the most common type, usually felt as a dull, tight, band-like pressure on both sides of the head, often linked to stress, poor sleep, or muscle tension. They're generally not dangerous and respond to lifestyle measures and simple treatments your team can review.",
+      "escalation": "none",
+      "keywords": [
+        "tension headache",
+        "band",
+        "pressure",
+        "both sides",
+        "stress headache"
+      ],
+      "source": "NINDS / MedlinePlus (public domain)",
+      "reviewed_by": null,
+      "last_reviewed": null
+    },
+    {
+      "id": "hdr_cluster_headache",
+      "topic": "general_neuro",
+      "question": "What is a cluster headache?",
+      "canonical_answer": "Cluster headaches are severe, one-sided headaches, often around the eye, that come in groups or 'clusters' over days to weeks, frequently with a watery eye or stuffy nose on that side. They're uncommon but very painful and treatable, so a neurologist's input helps.",
+      "escalation": "none",
+      "keywords": [
+        "cluster headache",
+        "one sided",
+        "around eye",
+        "severe headache"
+      ],
+      "source": "NINDS (public domain)",
+      "reviewed_by": null,
+      "last_reviewed": null
+    },
+    {
+      "id": "hdr_migraine_triggers",
+      "topic": "general_neuro",
+      "question": "What commonly triggers migraines?",
+      "canonical_answer": "Common migraine triggers include stress, missed meals, poor or changed sleep, dehydration, certain foods or alcohol, hormonal changes, and bright light or strong smells. Triggers vary by person, so a headache diary can help you spot yours.",
+      "escalation": "none",
+      "keywords": [
+        "migraine trigger",
+        "triggers",
+        "what causes migraine",
+        "set off"
+      ],
+      "source": "NINDS / American Migraine Foundation (paraphrased)",
+      "reviewed_by": null,
+      "last_reviewed": null
+    },
+    {
+      "id": "hdr_migraine_treatment",
+      "topic": "general_neuro",
+      "question": "How are migraines treated?",
+      "canonical_answer": "Migraine treatment generally has two parts: medicines taken to stop an attack once it starts, and, for frequent migraines, preventive treatments taken regularly to reduce how often they happen. Lifestyle steps and avoiding triggers help too. Your neurologist can build a plan for you.",
+      "escalation": "soft",
+      "keywords": [
+        "migraine treatment",
+        "treat migraine",
+        "how treated",
+        "migraine medicine"
+      ],
+      "source": "NINDS / American Migraine Foundation (paraphrased)",
+      "reviewed_by": null,
+      "last_reviewed": null
+    },
+    {
+      "id": "hdr_migraine_prevention",
+      "topic": "general_neuro",
+      "question": "What medicines help prevent migraines?",
+      "canonical_answer": "Several types of medicine can reduce how often migraines happen, including certain blood-pressure medicines, some antidepressants, certain anti-seizure medicines, and newer migraine-specific preventives, plus Botox for chronic migraine. Which is best depends on you, so it's a discussion for your prescriber.",
+      "escalation": "soft",
+      "keywords": [
+        "migraine prevention",
+        "prevent migraine",
+        "preventive",
+        "prophylaxis"
+      ],
+      "source": "American Migraine Foundation (paraphrased)",
+      "reviewed_by": null,
+      "last_reviewed": null
+    },
+    {
+      "id": "hdr_aura",
+      "topic": "general_neuro",
+      "question": "What is a migraine aura?",
+      "canonical_answer": "An aura is a set of warning symptoms that can come before or with a migraine, most often visual, like flashing lights, zigzag lines, or blind spots, and sometimes tingling or speech changes, usually lasting under an hour. Because aura-like symptoms can also signal a stroke, a first-ever or very different episode should be checked.",
+      "escalation": "soft",
+      "keywords": [
+        "aura",
+        "visual",
+        "flashing",
+        "zigzag",
+        "warning"
+      ],
+      "source": "American Migraine Foundation (paraphrased)",
+      "reviewed_by": null,
+      "last_reviewed": null
+    },
+    {
+      "id": "med_sumatriptan",
+      "topic": "medications",
+      "question": "What does sumatriptan (Imitrex) do?",
+      "canonical_answer": "Sumatriptan, sold as Imitrex, is a 'triptan' used to stop a migraine attack once it has started by narrowing blood vessels and calming nerve signals. It's taken at the start of an attack, not daily. It isn't right for everyone, so use it as prescribed.",
+      "escalation": "soft",
+      "keywords": [
+        "sumatriptan",
+        "imitrex",
+        "triptan",
+        "migraine medicine",
+        "what does"
+      ],
+      "source": "MedlinePlus (public domain)",
+      "reviewed_by": null,
+      "last_reviewed": null
+    },
+    {
+      "id": "med_amitriptyline",
+      "topic": "medications",
+      "question": "What does amitriptyline do for neurology?",
+      "canonical_answer": "Amitriptyline is an older medicine that, at low doses, is often used in neurology to help prevent migraines or ease certain nerve pain, and it can aid sleep. It's taken regularly, not just when symptoms hit. Your prescriber can explain what to expect.",
+      "escalation": "soft",
+      "keywords": [
+        "amitriptyline",
+        "elavil",
+        "nerve pain",
+        "migraine prevention",
+        "what does"
+      ],
+      "source": "MedlinePlus (public domain)",
+      "reviewed_by": null,
+      "last_reviewed": null
+    },
+    {
+      "id": "med_propranolol",
+      "topic": "medications",
+      "question": "What does propranolol do for migraines?",
+      "canonical_answer": "Propranolol is a beta-blocker that, taken daily, can reduce how often migraines occur. It also lowers blood pressure and heart rate, so your team will check those. It's a preventive, not a treatment for an attack in progress.",
+      "escalation": "soft",
+      "keywords": [
+        "propranolol",
+        "beta blocker",
+        "migraine prevention",
+        "what does"
+      ],
+      "source": "MedlinePlus (public domain)",
+      "reviewed_by": null,
+      "last_reviewed": null
+    },
+    {
+      "id": "med_botox_migraine",
+      "topic": "medications",
+      "question": "What does Botox do for migraines?",
+      "canonical_answer": "For chronic migraine (headaches on many days each month), Botox is given as a series of small injections around the head and neck every few months to reduce how often migraines happen. It's used for prevention, not to stop a single attack. A headache specialist can say if you're a candidate.",
+      "escalation": "soft",
+      "keywords": [
+        "botox",
+        "migraine",
+        "injection",
+        "chronic migraine",
+        "what does"
+      ],
+      "source": "American Migraine Foundation (paraphrased)",
+      "reviewed_by": null,
+      "last_reviewed": null
+    },
+    {
+      "id": "sz_what_is_epilepsy",
+      "topic": "seizure",
+      "question": "What is epilepsy?",
+      "canonical_answer": "Epilepsy is a condition in which a person tends to have repeated seizures, which are bursts of abnormal electrical activity in the brain. It has many causes and is often well controlled with medication. A neurologist guides diagnosis and treatment.",
+      "escalation": "none",
+      "keywords": [
+        "epilepsy",
+        "what is",
+        "seizure disorder"
+      ],
+      "source": "NINDS (public domain)",
+      "reviewed_by": null,
+      "last_reviewed": null
+    },
+    {
+      "id": "sz_types",
+      "topic": "seizure",
+      "question": "What are the different types of seizures?",
+      "canonical_answer": "Broadly, seizures are grouped into focal seizures, which start in one part of the brain and may or may not affect awareness, and generalized seizures, which involve both sides and can cause stiffening and shaking or staring spells. Knowing the type guides treatment, which is why descriptions of your events help your neurologist.",
+      "escalation": "none",
+      "keywords": [
+        "types of seizures",
+        "focal",
+        "generalized",
+        "kinds",
+        "what type"
+      ],
+      "source": "NINDS / Epilepsy Foundation (paraphrased)",
+      "reviewed_by": null,
+      "last_reviewed": null
+    },
+    {
+      "id": "sz_first_seizure",
+      "topic": "seizure",
+      "question": "What should I do after a first-ever seizure?",
+      "canonical_answer": "A first-ever seizure should be evaluated promptly, and if someone is actively having their first seizure you should call 911. After it, a medical work-up usually looks for a cause and decides whether treatment is needed. Write down what happened, since those details help the evaluation.",
+      "escalation": "soft",
+      "keywords": [
+        "first seizure",
+        "first time",
+        "new seizure",
+        "after first"
+      ],
+      "source": "MedlinePlus / general clinical guidance",
+      "reviewed_by": null,
+      "last_reviewed": null
+    },
+    {
+      "id": "mov_parkinsons_symptoms",
+      "topic": "movement",
+      "question": "What are the main symptoms of Parkinson's disease?",
+      "canonical_answer": "Common Parkinson's symptoms include a tremor at rest (often in a hand), slowness of movement, muscle stiffness, and balance or walking changes, and they usually start gradually on one side. Non-movement symptoms like sleep, mood, or smell changes can also occur. A neurologist makes the diagnosis.",
+      "escalation": "none",
+      "keywords": [
+        "parkinsons symptoms",
+        "signs",
+        "tremor",
+        "slowness",
+        "stiffness"
+      ],
+      "source": "NINDS (public domain)",
+      "reviewed_by": null,
+      "last_reviewed": null
+    },
+    {
+      "id": "mov_parkinsons_exercise",
+      "topic": "movement",
+      "question": "Does exercise help Parkinson's disease?",
+      "canonical_answer": "Yes, regular exercise is an important part of managing Parkinson's and can help with movement, balance, flexibility, and mood. Many people benefit from physical therapy or programs designed for Parkinson's. Your care team can suggest what's safe for you.",
+      "escalation": "soft",
+      "keywords": [
+        "parkinsons exercise",
+        "activity",
+        "physical therapy",
+        "movement"
+      ],
+      "source": "NINDS / Parkinson's Foundation (paraphrased)",
+      "reviewed_by": null,
+      "last_reviewed": null
+    },
+    {
+      "id": "mov_dbs",
+      "topic": "movement",
+      "question": "What is deep brain stimulation?",
+      "canonical_answer": "Deep brain stimulation, or DBS, is a treatment for some people with Parkinson's or certain tremors, where a small implanted device sends electrical signals to specific brain areas to improve movement symptoms. It's considered in selected cases, and your neurologist can explain whether it might fit.",
+      "escalation": "soft",
+      "keywords": [
+        "deep brain stimulation",
+        "dbs",
+        "implant",
+        "tremor",
+        "parkinsons"
+      ],
+      "source": "NINDS (public domain)",
+      "reviewed_by": null,
+      "last_reviewed": null
+    },
+    {
+      "id": "mov_restless_legs",
+      "topic": "movement",
+      "question": "What is restless legs syndrome?",
+      "canonical_answer": "Restless legs syndrome is an uncomfortable urge to move the legs, usually in the evening or at rest, that eases with movement and can disrupt sleep. It has several causes, including low iron in some people, and there are effective treatments. Your team can help find the cause.",
+      "escalation": "none",
+      "keywords": [
+        "restless legs",
+        "rls",
+        "legs",
+        "urge to move",
+        "creepy crawly"
+      ],
+      "source": "NINDS (public domain)",
+      "reviewed_by": null,
+      "last_reviewed": null
+    },
+    {
+      "id": "ms_heat",
+      "topic": "ms",
+      "question": "Why do my MS symptoms get worse in the heat?",
+      "canonical_answer": "Many people with MS notice symptoms temporarily worsen with heat, fever, or overheating, a reversible effect sometimes called Uhthoff's phenomenon. Cooling down usually brings symptoms back to baseline. Because a true relapse is different, let your team know if symptoms don't recover after you cool off.",
+      "escalation": "soft",
+      "keywords": [
+        "heat",
+        "hot",
+        "temperature",
+        "worse",
+        "uhthoff",
+        "ms"
+      ],
+      "source": "National MS Society (paraphrased)",
+      "reviewed_by": null,
+      "last_reviewed": null
+    },
+    {
+      "id": "ms_treatment",
+      "topic": "ms",
+      "question": "How is multiple sclerosis treated?",
+      "canonical_answer": "MS care usually includes disease-modifying treatments that aim to reduce relapses and slow progression, treatments to manage specific symptoms, and rehabilitation. The right plan is individualized, so your neurologist will tailor it to your type of MS and goals.",
+      "escalation": "soft",
+      "keywords": [
+        "ms treatment",
+        "treat ms",
+        "disease modifying",
+        "how treated"
+      ],
+      "source": "National MS Society / NINDS (paraphrased)",
+      "reviewed_by": null,
+      "last_reviewed": null
+    },
+    {
+      "id": "ms_fatigue",
+      "topic": "ms",
+      "question": "How can I manage MS fatigue?",
+      "canonical_answer": "Fatigue is one of the most common MS symptoms. Strategies that help many people include pacing activities, prioritizing rest, staying cool, regular gentle exercise, and good sleep, and sometimes treating other contributors like mood or sleep problems. Your team can help build a plan.",
+      "escalation": "soft",
+      "keywords": [
+        "ms fatigue",
+        "tired",
+        "energy",
+        "exhausted",
+        "fatigue"
+      ],
+      "source": "National MS Society (paraphrased)",
+      "reviewed_by": null,
+      "last_reviewed": null
+    },
+    {
+      "id": "gen_neuropathy_causes",
+      "topic": "general_neuro",
+      "question": "What causes neuropathy?",
+      "canonical_answer": "Neuropathy has many possible causes, including diabetes, vitamin deficiencies, certain medicines or toxins, infections, and other medical conditions, and sometimes no cause is found. Identifying the cause matters because some are treatable, so an evaluation is worthwhile.",
+      "escalation": "none",
+      "keywords": [
+        "neuropathy cause",
+        "causes",
+        "why neuropathy",
+        "diabetic neuropathy"
+      ],
+      "source": "NINDS (public domain)",
+      "reviewed_by": null,
+      "last_reviewed": null
+    },
+    {
+      "id": "cog_memory_medications",
+      "topic": "cognitive",
+      "question": "Are there medications for memory loss or dementia?",
+      "canonical_answer": "There are medicines that can help with symptoms of certain types of dementia for some people, and newer treatments exist for early Alzheimer's in selected cases, though none are a cure. Treating contributing factors and supportive care also matter. A specialist can discuss what fits.",
+      "escalation": "soft",
+      "keywords": [
+        "memory medication",
+        "dementia medicine",
+        "alzheimer treatment",
+        "treat memory"
+      ],
+      "source": "NINDS / general clinical guidance",
+      "reviewed_by": null,
+      "last_reviewed": null
     }
   ]
 }

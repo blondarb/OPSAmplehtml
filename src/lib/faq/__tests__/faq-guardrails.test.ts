@@ -42,8 +42,16 @@ describe('Gate 0 — urology/OAB-specific red flags', () => {
     "I can't urinate at all",
     'there is blood in my urine and clots',
     'I have a fever and flank pain',
+    // recall: phrasings that dodge the obvious keywords (cross-review finding)
+    "I've been trying to pee for hours and my belly hurts",
+    "I can't empty my bladder",
+    "I haven't been able to go all evening",
   ])('intercepts: %s', (utterance) => {
     expect(checkGuardrails(utterance, oab).kind).toBe('red_flag')
+  })
+
+  it('does NOT over-fire on a plain stomach ache (no urinary context)', () => {
+    expect(checkGuardrails('my stomach hurts a little', oab).kind).toBe('pass')
   })
 })
 

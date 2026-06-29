@@ -87,6 +87,10 @@ const URO_RETENTION: RedFlagBank = {
     /can'?t (urinate|pee|go|pass urine)/, /unable to (urinate|pee|pass urine)/,
     /nothing (comes|is coming) out/, /bladder (is )?(full|bursting)/,
     /haven'?t (peed|urinated) (all day|in hours)/,
+    /can'?t empty my bladder/, /haven'?t been able to (pee|urinate|go)/,
+    /trying to (pee|urinate|go) for (hours|a long time|so long|ages)/,
+    /(belly|stomach|abdomen).{0,40}(can'?t|cannot|unable to|trying to)\s?(pee|urinate|go|empty)/,
+    /(can'?t|cannot|unable to)\s?(pee|urinate|empty).{0,40}(belly|stomach|abdomen)/,
   ],
 }
 
