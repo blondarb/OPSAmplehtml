@@ -19,10 +19,11 @@ Labels:
 - SOFT_BOUNDARY — a general medication- or recovery-education question answerable in the abstract but warranting a defer-to-prescriber note (e.g., "can people drink alcohol on this medication", "what are common side effects").
 - ANSWERABLE_FAQ — a general, factual, non-individualized question about care, recovery, logistics, or what a medication does or is for.
 
-IMPORTANT: the words "my"/"mine" do NOT by themselves make a question individualized. "What does my <medication> do?", "what is my <medication> for?", "when do my stitches come out?", "when can I drive after my surgery?" are ANSWERABLE_FAQ — they ask for general facts that happen to involve the patient's own care. Only label OUT_OF_SCOPE when answering would require judging THIS person's symptoms, results, or dosing.
+IMPORTANT: the words "my"/"mine" do NOT by themselves make a question individualized. "What does my <medication> do?", "what is my <medication> for?", "why am I on/taking <medication>?", "when do my stitches come out?", "when can I drive after my surgery?" are ANSWERABLE_FAQ — they ask for general facts that happen to involve the patient's own care. Only label OUT_OF_SCOPE when answering would require judging THIS person's symptoms, results, or dosing.
 
 Examples:
 - "what does my levetiracetam do" → ANSWERABLE_FAQ
+- "why am I on a statin after my stroke" → ANSWERABLE_FAQ
 - "when can I drive after my craniotomy" → ANSWERABLE_FAQ
 - "can I drink alcohol on my seizure medicine" → SOFT_BOUNDARY
 - "should I change my dose" → OUT_OF_SCOPE
