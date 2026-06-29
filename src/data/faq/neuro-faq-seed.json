@@ -60,7 +60,7 @@
       "id": "stroke_fatigue",
       "topic": "stroke_aftercare",
       "question": "Is it normal to feel very tired after a stroke?",
-      "canonical_answer": "Yes, fatigue is very common after a stroke and can last weeks to months as your brain and body recover. Pacing activities and rest often help. If tiredness is sudden, severe, or comes with new symptoms, contact your care team.",
+      "canonical_answer": "Fatigue is very common after a stroke and can last weeks to months as your brain and body recover, and pacing activities with rest often helps. But if you suddenly develop new symptoms such as face drooping, weakness or numbness on one side, trouble speaking, or vision changes, call 911 right away, since those can be signs of another stroke.",
       "escalation": "none",
       "keywords": [
         "tired",
@@ -132,7 +132,7 @@
       "id": "stroke_tia",
       "topic": "stroke_aftercare",
       "question": "What is a TIA or mini-stroke?",
-      "canonical_answer": "A TIA, sometimes called a mini-stroke, is a brief episode of stroke-like symptoms that resolves on its own. Even though it goes away, it is a serious warning sign and needs urgent medical evaluation, because it can signal a higher risk of a full stroke.",
+      "canonical_answer": "A TIA, sometimes called a mini-stroke, is a brief episode of stroke-like symptoms that goes away on its own. Even though it resolves, it is a medical emergency that needs immediate evaluation in an emergency room, because it can signal a high risk of a full stroke in the days that follow. If you are having stroke-like symptoms now, call 911.",
       "escalation": "soft",
       "keywords": [
         "tia",
@@ -401,7 +401,7 @@
       "id": "seizure_first_aid",
       "topic": "seizure",
       "question": "What should I do if someone is having a seizure?",
-      "canonical_answer": "Help them to the ground in a safe spot, move away hard or sharp objects, cushion the head, loosen anything tight around the neck, and gently turn them on their side. Do not hold them down or put anything in their mouth, and stay with them until they recover. Call 911 if it lasts over 5 minutes or they don't wake up.",
+      "canonical_answer": "Help them to the ground in a safe spot, move away hard or sharp objects, cushion the head, loosen anything tight around the neck, and gently turn them on their side. Do not hold them down or put anything in their mouth, and stay with them until they recover. Call 911 if the seizure lasts more than 5 minutes, if another starts before they recover, if they do not wake up, if it is their first seizure, or if they are injured, pregnant, in water, or having trouble breathing.",
       "escalation": "none",
       "keywords": [
         "first aid",
@@ -503,7 +503,7 @@
       "id": "seizure_family_should_know",
       "topic": "seizure",
       "question": "What should my family know about my seizures?",
-      "canonical_answer": "It helps for family to know basic seizure first aid: keep you safe, cushion your head, turn you on your side, time the seizure, and not put anything in your mouth. They should also know to call 911 if a seizure lasts over 5 minutes or you don't wake up afterward.",
+      "canonical_answer": "It helps for family to know basic seizure first aid: keep you safe, cushion your head, turn you on your side, time the seizure, and never put anything in your mouth. They should also know to call 911 if a seizure lasts more than 5 minutes, if another begins before you recover, if you do not wake up, if you are injured or having trouble breathing, or if it happens in water.",
       "escalation": "none",
       "keywords": [
         "family",
@@ -534,7 +534,7 @@
       "id": "med_lamotrigine",
       "topic": "medications",
       "question": "What does lamotrigine (Lamictal) do?",
-      "canonical_answer": "Lamotrigine, sold as Lamictal, is used to help prevent seizures and, in some people, to help stabilize mood. It's usually started at a low dose and increased slowly. If you ever develop a rash while taking it, contact your prescriber promptly.",
+      "canonical_answer": "Lamotrigine, sold as Lamictal, is used to help prevent seizures and, in some people, to help stabilize mood. It's usually started at a low dose and increased slowly. A new rash while taking lamotrigine can rarely be a sign of a serious reaction, so if you develop a rash, especially with fever, blistering, or sores in the mouth or eyes, seek emergency care right away.",
       "escalation": "soft",
       "keywords": [
         "lamotrigine",
@@ -771,7 +771,7 @@
       "id": "postop_fatigue",
       "topic": "post_op_neuro",
       "question": "Is it normal to feel very tired after brain surgery?",
-      "canonical_answer": "Fatigue is common and can last weeks after a craniotomy as your brain heals, and resting and gradually increasing activity usually helps. If tiredness suddenly worsens or comes with new symptoms like worsening headache, confusion, or fever, contact your care team.",
+      "canonical_answer": "Fatigue is common and can last weeks after a craniotomy as your brain heals, and resting and gradually increasing activity usually helps. But a suddenly worsening headache, new confusion, fever, repeated vomiting, weakness, or vision changes after brain surgery can be an emergency, so call your surgeon's on-call line or seek emergency care right away.",
       "escalation": "soft",
       "keywords": [
         "tired",
@@ -855,7 +855,7 @@
       "id": "general_lp_headache",
       "topic": "general_neuro",
       "question": "Is a headache normal a few days after a lumbar puncture?",
-      "canonical_answer": "A headache after a lumbar puncture is a known and usually self-limited effect, often worse when sitting or standing and better when lying down. Resting and staying hydrated can help. If it's severe, lasts many days, or comes with fever, a stiff neck, or new symptoms, contact your care team.",
+      "canonical_answer": "A headache after a lumbar puncture is a known and usually self-limited effect, often worse when sitting or standing and better when lying down. Resting and staying hydrated can help. But a severe headache with fever, a stiff neck, confusion, or vision changes can be a sign of a serious problem such as meningitis, so for those, seek emergency care right away rather than waiting.",
       "escalation": "soft",
       "keywords": [
         "lumbar puncture",
