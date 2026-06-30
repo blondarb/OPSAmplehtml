@@ -19,9 +19,9 @@ import { PollyClient, SynthesizeSpeechCommand, type VoiceId, type Engine } from 
 // HIPAA-eligible. Override with FAQ_POLLY_REGION.
 const REGION = process.env.FAQ_POLLY_REGION || 'us-east-1'
 // Generative is Amazon's most natural/conversational tier (a step above neural).
-// Ruth-generative is the default; both overridable. Ruth/Matthew/Joanna all
-// support generative in us-east-1 (verified 2026-06-29).
-const VOICE_ID = process.env.FAQ_POLLY_VOICE_ID || 'Ruth'
+// Matthew-generative is the default (Steve's pick 2026-06-30); both overridable.
+// Matthew/Ruth/Joanna/Danielle all support generative in us-east-1.
+const VOICE_ID = process.env.FAQ_POLLY_VOICE_ID || 'Matthew'
 const ENGINE = (process.env.FAQ_POLLY_ENGINE || 'generative') as Engine
 
 let _client: PollyClient | null = null
