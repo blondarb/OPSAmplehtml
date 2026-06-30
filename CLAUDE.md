@@ -130,7 +130,7 @@ Full changelog: [`docs/CHANGELOG.md`](docs/CHANGELOG.md)
 
 ## Body of Work
 
-**Status**: Active — verified June 29, 2026
+**Status**: Active — verified June 30, 2026
 
 ### Recent
 - **Triage latency reduction (2026-06-26)** — Cut `/triage` response time ~32% via Bedrock prompt caching (`cacheSystem` flag on Sonnet 4.6 system prompt), output brevity directive (−32% output tokens, scores/safety unchanged), and poll interval 1.5s→1s. Verified on 5 referrals: all scores/tiers identical; no model downgrade.
