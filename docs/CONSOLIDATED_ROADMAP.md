@@ -741,7 +741,7 @@ Based on the analysis, here's the recommended implementation order to minimize r
 
 | Feature | Status | Notes |
 |---------|--------|-------|
-| Acoustic Speech Biomarkers (SDNE + voice surfaces) | ⏳ PENDING (🎯 test-week bake-off) | Measure neuro speech signs (hypophonia, monopitch, vocal tremor, DDK rate, jitter/shimmer/HNR) from captured audio instead of discarding the waveform after ASR. Sevaro-side TS MVP behind `VOICE_BIOMARKERS_ENABLED` + engine bake-off (Parselmouth/eGeMAPS/DisVoice vs pure-TS) on labeled profiles; results map to MDS-UPDRS speech item via `scale_results`. SDNE-side enhancement (T08 Pa-Ta-Ka already exists) tracked as a hand-off. Spec: `docs/plans/2026-06-30-acoustic-speech-biomarkers-spec.md` |
+| Acoustic Speech Biomarkers (SDNE + voice surfaces) | 🔧 PARTIAL — Phase A scaffolded (🎯 test-week bake-off) | Measure neuro speech signs (hypophonia, monopitch, vocal tremor, DDK rate, jitter/shimmer/HNR) from captured audio instead of discarding the waveform after ASR. **Phase A shipped behind `VOICE_BIOMARKERS_ENABLED` (default off):** pure-TS engine (`src/lib/voice/acoustic.ts`), `/api/ai/voice-biomarkers` route, 3-task capture UI + card, `/voice-biomarkers` runner, 7 vitest cases. Test week: engine bake-off (Parselmouth/eGeMAPS/DisVoice vs pure-TS) on labeled profiles + threshold tuning; results map to MDS-UPDRS speech item via `scale_results`. SDNE-side enhancement (T08 Pa-Ta-Ka already exists) tracked as a hand-off. Spec: `docs/plans/2026-06-30-acoustic-speech-biomarkers-spec.md` |
 
 ---
 

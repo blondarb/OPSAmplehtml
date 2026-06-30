@@ -1,6 +1,6 @@
 # Test Cases - Sevaro Clinical
-# test_cases_version: 2.0
-# Last updated: 2026-02-06
+# test_cases_version: 2.1
+# Last updated: 2026-06-30
 #
 # Structure: Each case has id, title, preconditions, steps, expected, data_verification (optional).
 # Organized by suite matching TEST_RUNBOOK.md sections.
@@ -1190,3 +1190,35 @@ cross_platform:
     steps:
       - Run through smoke suite on Firefox
     expected: Core features work
+
+---
+# Acoustic Speech Biomarkers (Phase A — behind VOICE_BIOMARKERS_ENABLED, default off)
+# Added 2026-06-30. See docs/plans/2026-06-30-acoustic-speech-biomarkers-spec.md
+voice_biomarkers:
+  - id: VB1
+    title: Route gated off by default
+    preconditions: [VOICE_BIOMARKERS_ENABLED unset/false]
+    steps:
+      - POST /api/ai/voice-biomarkers?task=sustained_vowel&sampleRate=16000 with PCM body
+    expected: 503 with "Voice biomarkers are disabled" — never analyzes when flag off
+
+  - id: VB2
+    title: Guided 3-task capture flow completes
+    preconditions: [VOICE_BIOMARKERS_ENABLED=true, logged in, mic permission, /voice-biomarkers]
+    steps:
+      - Record sustained /a/, then pa-ta-ka, then the reading passage
+    expected: Progress bar fills per task; a SpeechBiomarkerCard renders per task with GREEN/YELLOW/RED flags and feature rows
+
+  - id: VB3
+    title: Engine bake-off on labeled profiles
+    preconditions: [VOICE_BIOMARKERS_ENABLED=true, recordings for Morrison(PD)/Wright(ET)/Santos(normal)]
+    steps:
+      - Run each profile's recordings through the pure-TS engine and the local Parselmouth bench
+    expected: Panels separate the three profiles on expected signs (PD=hypophonia/monopitch/low DDK; ET=4-8 Hz vocal tremor; normal=clean); record which engine separates cleanest per feature
+
+  - id: VB4
+    title: Quality gating on a too-short / clipped clip
+    preconditions: [VOICE_BIOMARKERS_ENABLED=true]
+    steps:
+      - Record a <1s clip, then a deliberately over-loud (clipped) clip
+    expected: Card shows the "too short" / "clipped" QC banner; overall flag INVALID for too-short; jitter/shimmer/HNR rows show the approximate (≈) marker

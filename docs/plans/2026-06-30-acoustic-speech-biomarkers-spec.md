@@ -6,7 +6,7 @@
 |-------|-------|
 | Type | Spec / scoping doc |
 | Created | 2026-06-30 |
-| Status | Proposed — engine bake-off + testable MVP targeted for the 2026-07 test week |
+| Status | Phase A scaffolded (2026-06-30) — pure-TS engine + route + capture UI shipped behind `VOICE_BIOMARKERS_ENABLED` (default off); engine bake-off + threshold tuning targeted for the 2026-07 test week. See "Phase A scaffold" at the end. |
 | Motivation | The `menelly/AI_Ears` MCP server (audio analysis *beyond transcription* — "the whisper, the tremor, the breath") surfaced a capability category we don't have: treating captured voice as a measurable neuro signal, not just an ASR feed. |
 | Owner | Sevaro Clinical Engineering |
 | Related | `docs/PRD_SDNE_Integration.md`, `docs/references/voice-agent-field-lessons.md`, `docs/PRD_Neurology_Scales.md` |
@@ -196,3 +196,49 @@ Do not log raw audio or patient-identified feature panels in plaintext app logs.
   sub-section, or as its own item in the Physical Exams tab?
 - Threshold provenance: adopt published MDS-UPDRS / Frenchay cutoffs, or derive from our own
   labeled recordings? (Start with published, refine on bench.)
+
+---
+
+## Phase A scaffold (2026-06-30)
+
+Shipped the testable MVP behind `VOICE_BIOMARKERS_ENABLED` (default **off** — the route
+returns 503 until enabled). No production surface wires it in yet; it runs at the standalone
+`/voice-biomarkers` page for test week.
+
+**Architecture as built:** the browser decodes the recorded blob (`AudioContext.decodeAudioData`),
+downmixes to mono, resamples to 16 kHz, and POSTs raw Int16 PCM to the route — so the Node Lambda
+needs no ffmpeg and no Python. The route runs the pure-TS engine and returns a flagged panel.
+
+**New files:**
+- `src/lib/voice/types.ts` — `VoiceTask`, task prompts, `BiomarkerFeature` / `BiomarkerPanel`.
+- `src/lib/voice/acoustic.ts` — zero-dependency time-domain engine (`ENGINE_ID = sevaro-ts-acoustic-v0.1`).
+  Autocorrelation F0, RMS contour, voiced/pause timing, max phonation time, DDK onset rate +
+  regularity (CV), 4–8 Hz tremor via F0-contour autocorrelation. Jitter/shimmer/HNR are computed
+  frame-to-frame and **explicitly marked `approximate`** (Praat-grade cycle detection is the
+  bake-off's job — directly addressing the AI_Ears "no jitter/shimmer" gap).
+- `src/lib/voice/flagging.ts` — provisional GREEN/YELLOW/RED thresholds as **named, commented
+  config** (`THRESHOLDS`) — to be tuned on the bench; `isVoiceBiomarkersEnabled()` master switch;
+  worst-flag roll-up; `INVALID` when signal is too short.
+- `src/app/api/ai/voice-biomarkers/route.ts` — `POST` (auth + flag gated), Int16 PCM in →
+  `BiomarkerPanel` out; best-effort `scale_results` write (`scale_id = mds_updrs_speech_<task>`,
+  0–2 severity from the overall flag) only when `patientId` is supplied; DB failure never fails
+  the analysis.
+- `src/lib/voice/clientCapture.ts` — decode/downsample/PCM helpers + `analyzeTask()` fetch wrapper.
+- `src/components/voice/SpeechBiomarkerCard.tsx` — results card reusing `SDNEFlagChip` + QC banners.
+- `src/components/voice/VoiceTaskCapture.tsx` — 3-task guided flow; capture with AGC / echo-cancel /
+  noise-suppression **off** so the raw signal reaches the engine.
+- `src/app/voice-biomarkers/page.tsx` — standalone runner (accepts `?patient=&visit=`).
+- `src/lib/voice/__tests__/acoustic.test.ts` — vitest: F0 accuracy on a pure tone, 5 Hz tremor on
+  an FM tone, ~6 syll/s DDK recovery + low CV, too-short gating, reading-panel monopitch. **7/7 pass.**
+
+**Verification:** `npx tsc --noEmit` clean (0 errors), `npx vitest run` 7/7, `npx eslint` clean.
+Not yet exercised end-to-end with a real microphone (needs a browser + `VOICE_BIOMARKERS_ENABLED`
+on) — that's the first test-week step.
+
+**Test-week to-dos (unchanged from the plan):** flip the flag on, capture the 3 labeled profiles
+(Morrison/Wright/Santos), run the engine bench (a) vs the local Parselmouth bench (b), tune
+`THRESHOLDS`, and decide go/no-go on the Python sidecar for real jitter/shimmer/HNR.
+
+**Amplify note:** `VOICE_BIOMARKERS_ENABLED` is read via `process.env`; per the CLAUDE.md gotcha,
+runtime access in prod SSR needs the `next.config` inline env block — wire that in only when we
+promote this past the local/test-week stage.
