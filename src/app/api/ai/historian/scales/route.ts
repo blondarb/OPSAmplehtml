@@ -26,6 +26,30 @@ import {
 import type { LocalizerSnapshot, ScaleResult, SeverityLevel } from '@/lib/consult/scales'
 import type { ScaleStepResponse } from '@/lib/historianTypes'
 
+// Resolve the patient this scale belongs to, from the historian session or the
+// consult, so scale_results rows link to a patient (the foundation for
+// longitudinal scale trends). Fail-safe: returns null if neither is linked
+// (e.g. demo sessions with no real patient) and never throws.
+async function resolveScalePatientId(
+  consultId: string | null | undefined,
+  historianSessionId: string | null | undefined,
+): Promise<string | null> {
+  try {
+    const pool = await getPool()
+    if (historianSessionId) {
+      const r = await pool.query('SELECT patient_id FROM historian_sessions WHERE id = $1', [historianSessionId])
+      if (r.rows[0]?.patient_id) return r.rows[0].patient_id
+    }
+    if (consultId) {
+      const r = await pool.query('SELECT patient_id FROM neurology_consults WHERE id = $1', [consultId])
+      if (r.rows[0]?.patient_id) return r.rows[0].patient_id
+    }
+  } catch (e: any) {
+    console.warn('[scales API] patient_id resolve failed (non-fatal):', e?.message)
+  }
+  return null
+}
+
 // ─── Route dispatcher ────────────────────────────────────────────────────────
 
 export async function POST(request: NextRequest) {
@@ -206,8 +230,10 @@ async function handleSubmit(body: {
 
   // Persist to DB
   const pool = await getPool()
+  const patientId = await resolveScalePatientId(consult_id, historian_session_id)
   const { rows } = await pool.query(
     `INSERT INTO scale_results (
+      patient_id,
       historian_session_id,
       consult_id,
       scale_id,
@@ -222,9 +248,10 @@ async function handleSubmit(body: {
       admin_mode,
       administered_at,
       completed_at
-    ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)
+    ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)
     RETURNING *`,
     [
+      patientId,
       historian_session_id ?? null,
       consult_id ?? null,
       scale_id,
@@ -396,8 +423,10 @@ async function handleStep(body: {
     // historian_session_id passed as NULL — populated only by a separate
     // backfill if/when the consult row maps to a historian_sessions row.
     const pool = await getPool()
+    const patientId = await resolveScalePatientId(consultId, null)
     await pool.query(
       `INSERT INTO scale_results (
+        patient_id,
         historian_session_id,
         consult_id,
         scale_id,
@@ -410,8 +439,9 @@ async function handleStep(body: {
         current_index,
         admin_mode,
         administered_at
-      ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,NOW())`,
+      ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,NOW())`,
       [
+        patientId,
         null,
         consultId,
         scaleDef.id,
