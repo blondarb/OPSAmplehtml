@@ -175,6 +175,29 @@ export function getTurnDetectionConfig(mode: string | undefined): TurnDetectionC
   return { type: 'semantic_vad', eagerness: 'low' }
 }
 
+// ─── Input noise reduction (env-driven) ─────────────────────────────────────
+//
+// OpenAI Realtime filters the input audio BEFORE it reaches the VAD + model,
+// which cuts the false speech-detections that background noise was causing
+// (Riya 2026-06-29: noisy rooms made the historian freeze/stutter). See
+// https://developers.openai.com/api/reference/resources/realtime
+//   far_field  — laptop / speakerphone / open room (default; most robust to noise)
+//   near_field — headset / phone held to the ear
+//   off        — disable (legacy behavior, no filtering)
+export type NoiseReductionConfig = { type: 'near_field' | 'far_field' } | null
+
+/**
+ * Resolve noise reduction from HISTORIAN_NOISE_REDUCTION. Defaults to far_field
+ * (the most noise-robust option) so background noise no longer interrupts the AI.
+ * Returns null when explicitly disabled, so the session omits the field entirely.
+ */
+export function getNoiseReductionConfig(mode: string | undefined): NoiseReductionConfig {
+  const m = (mode || '').toLowerCase()
+  if (m === 'off' || m === 'none' || m === 'false') return null
+  if (m === 'near_field' || m === 'near') return { type: 'near_field' }
+  return { type: 'far_field' }
+}
+
 // ─── Tool: query_evidence ───────────────────────────────────────────────────
 
 export type QueryEvidenceArgs = {

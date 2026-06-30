@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { buildHistorianSystemPrompt, getHistorianToolDefinition } from '@/lib/historianPrompts'
 import type { HistorianSessionType } from '@/lib/historianTypes'
-import { getTurnDetectionConfig } from '@/lib/historianTypes'
+import { getTurnDetectionConfig, getNoiseReductionConfig } from '@/lib/historianTypes'
 import { getOpenAIKey } from '@/lib/secrets'
 import { getConsult, markHistorianStarted } from '@/lib/consult/pipeline'
 import { buildHistorianContextFromConsult } from '@/lib/consult/contextBuilder'
@@ -44,6 +44,10 @@ export async function POST(request: Request) {
     const tools = getHistorianToolDefinition()
     const model = process.env.OPENAI_HISTORIAN_REALTIME_MODEL || 'gpt-realtime-2'
     const turnDetection = getTurnDetectionConfig(process.env.HISTORIAN_TURN_DETECTION_MODE)
+    // Filter background noise before it reaches the VAD + model so noisy rooms
+    // stop false-triggering turn-taking and freezing the AI (Riya 2026-06-29).
+    // Hot-revert with HISTORIAN_NOISE_REDUCTION=off.
+    const noiseReduction = getNoiseReductionConfig(process.env.HISTORIAN_NOISE_REDUCTION)
 
     // Bias ASR toward neurology vocabulary (drug names, anatomy, scales) so the
     // high-stakes words general ASR misses transcribe correctly. Hot-revertable
@@ -53,15 +57,9 @@ export async function POST(request: Request) {
       transcription.prompt = buildWhisperBiasPrompt()
     }
 
-    // Request an ephemeral client_secret from OpenAI's current GA endpoint.
-    // Replaces the deprecated POST /v1/realtime/sessions flow.
-    const response = await fetch('https://api.openai.com/v1/realtime/client_secrets', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${apiKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
+    // Build the session body; include noise_reduction only when enabled.
+    const buildBody = (withNoiseReduction: boolean) =>
+      JSON.stringify({
         session: {
           type: 'realtime',
           model,
@@ -70,13 +68,40 @@ export async function POST(request: Request) {
             input: {
               turn_detection: turnDetection,
               transcription,
+              ...(withNoiseReduction && noiseReduction
+                ? { noise_reduction: noiseReduction }
+                : {}),
             },
             output: { voice: 'verse' },
           },
           tools,
         },
-      }),
-    })
+      })
+
+    const callOpenAI = (body: string) =>
+      // OpenAI's current GA endpoint (replaces the deprecated /v1/realtime/sessions).
+      fetch('https://api.openai.com/v1/realtime/client_secrets', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${apiKey}`,
+          'Content-Type': 'application/json',
+        },
+        body,
+      })
+
+    let response = await callOpenAI(buildBody(true))
+    // Fail-open safety: if OpenAI rejects the request and noise_reduction was
+    // included, retry once WITHOUT it. This enhancement can never break session
+    // creation — worst case the historian behaves exactly as it did before.
+    if (!response.ok && noiseReduction) {
+      const firstErr = await response.text()
+      console.warn(
+        '[historian/session] retrying without noise_reduction after error:',
+        response.status,
+        firstErr.slice(0, 200),
+      )
+      response = await callOpenAI(buildBody(false))
+    }
 
     if (!response.ok) {
       const errorBody = await response.text()

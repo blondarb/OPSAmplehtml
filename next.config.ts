@@ -26,6 +26,9 @@ const nextConfig: NextConfig = {
     BEDROCK_TRIAGE_MODEL: process.env.BEDROCK_TRIAGE_MODEL,
     BEDROCK_KB_ID: process.env.BEDROCK_KB_ID,
     COGNITO_CLIENT_SECRET: process.env.COGNITO_CLIENT_SECRET,
+    // AI Historian turn-taking / noise handling (hot-revertable without a code change)
+    HISTORIAN_TURN_DETECTION_MODE: process.env.HISTORIAN_TURN_DETECTION_MODE,
+    HISTORIAN_NOISE_REDUCTION: process.env.HISTORIAN_NOISE_REDUCTION,
   },
 };
 
