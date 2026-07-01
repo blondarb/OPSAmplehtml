@@ -74,9 +74,15 @@ export const parselmouthEngine: VoiceEngine = {
     }
     try {
       const pcm = floatToInt16(input.samples)
+      // Send the shared x-api-key when configured. The deployed sidecar gates
+      // /score on it for real-subject PHI trials (VOICE_PRAAT_API_KEY on both
+      // sides); left unset for the open local/synthetic path. Voice is PHI.
+      const headers: Record<string, string> = { 'Content-Type': 'application/octet-stream' }
+      const apiKey = process.env.VOICE_PRAAT_API_KEY?.trim()
+      if (apiKey) headers['x-api-key'] = apiKey
       const res = await fetch(`${url.replace(/\/$/, '')}/score?task=${encodeURIComponent(task)}&sampleRate=${input.sampleRate}`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/octet-stream' },
+        headers,
         body: pcm,
       })
       if (!res.ok) {
