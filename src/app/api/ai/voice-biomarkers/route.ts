@@ -25,6 +25,7 @@ import { getTenantServer } from '@/lib/tenant'
 import { from } from '@/lib/db-query'
 import { analyzeAcoustic } from '@/lib/voice/acoustic'
 import { buildPanel, isVoiceBiomarkersEnabled } from '@/lib/voice/flagging'
+import { scoreAllEngines } from '@/lib/voice/engines'
 import type { VoiceTask, BiomarkerPanel } from '@/lib/voice/types'
 
 const VALID_TASKS: VoiceTask[] = ['sustained_vowel', 'ddk', 'reading']
@@ -50,6 +51,10 @@ export async function POST(request: NextRequest) {
   const sampleRate = parseInt(searchParams.get('sampleRate') || '0', 10)
   const patientId = searchParams.get('patientId')
   const visitId = searchParams.get('visitId')
+  // Research/trials mode: score with EVERY registered engine in parallel (pure-TS
+  // + Praat sidecar if VOICE_PRAAT_URL is set) so a capture yields both engines'
+  // numbers on the identical audio for the bake-off.
+  const allEngines = ['1', 'true', 'on'].includes((searchParams.get('allEngines') || '').toLowerCase())
 
   if (!task || !VALID_TASKS.includes(task)) {
     return NextResponse.json(
@@ -84,6 +89,20 @@ export async function POST(request: NextRequest) {
   // Int16 → Float32 in [-1, 1).
   const samples = new Float32Array(pcm.length)
   for (let i = 0; i < pcm.length; i++) samples[i] = pcm[i] / 32768
+
+  // Research/trials mode: return every engine's result (no persistence — the
+  // offline bench owns archival + comparison).
+  if (allEngines) {
+    try {
+      const engines = await scoreAllEngines(task, { samples, sampleRate })
+      return NextResponse.json({ task, sampleRate, engines })
+    } catch (e) {
+      return NextResponse.json(
+        { error: `Multi-engine scoring failed: ${e instanceof Error ? e.message : String(e)}` },
+        { status: 500 }
+      )
+    }
+  }
 
   let panel: BiomarkerPanel
   try {

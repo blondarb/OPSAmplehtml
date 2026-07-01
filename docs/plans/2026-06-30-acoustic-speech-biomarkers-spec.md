@@ -242,3 +242,21 @@ on) — that's the first test-week step.
 **Amplify note:** `VOICE_BIOMARKERS_ENABLED` is read via `process.env`; per the CLAUDE.md gotcha,
 runtime access in prod SSR needs the `next.config` inline env block — wire that in only when we
 promote this past the local/test-week stage.
+
+## Multi-engine bake-off harness (2026-06-30 addendum)
+
+Per the "capture once, score with every engine, decide later" decision, added the analysis half:
+
+- `src/lib/voice/engines.ts` — engine registry + `scoreAllEngines()` parallel fan-out (pure-TS
+  in-process + `parselmouthEngine` HTTP adapter to a `VOICE_PRAAT_URL` sidecar, unavailable-safe).
+- `src/lib/voice/stats.ts` — `icc21` (ICC(2,1) absolute agreement), `blandAltman`, `withinSubjectCv`,
+  `iccLabel`.
+- `src/lib/voice/bench.ts` — `buildBenchReport()`: per task/feature/engine engine-agreement ICC,
+  test-retest ICC, within-subject CV, and profile separation.
+- `src/lib/voice/wav.ts` — lossless WAV reader for archived trial audio.
+- `scripts/voice-bench.ts` — CLI runner over a manifest + audio dir → markdown/CSV report.
+- Route gains `?allEngines=1` for live multi-engine scoring of one capture.
+- Tests: `src/lib/voice/__tests__/{stats,analysis}.test.ts` (+16 cases; 23 voice tests total).
+
+The **headset capture + trial protocol** (SDNE-repo work) lives in its own cross-repo spec:
+`docs/plans/2026-06-30-sdne-speech-trial-capture-spec.md`.
