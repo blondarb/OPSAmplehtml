@@ -422,7 +422,7 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
       // Detect server-side session teardown (OpenAI Realtime ~8-min max).
       // Without these handlers the connection goes cold and endSession() never
       // runs — leaving the screen frozen with no closing message.
-      // Uses finalizingRef (shared with endSession) so whichever fires first wins.
+      // endSession owns finalizingRef — handleDrop just calls it directly.
       const handleDrop = (source: string) => {
         console.warn(`[useRealtimeSession] connection dropped (${source}) — running graceful end`)
         endSessionRef.current()
