@@ -142,6 +142,10 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
   // latest version without a circular useCallback dependency.
   const endSessionRef = useRef<() => Promise<void>>(async () => {})
 
+  // One-shot finalize guard — whichever path fires first (manual end or drop)
+  // wins; the other no-ops. Prevents double-save to /api/ai/historian/save.
+  const finalizingRef = useRef<boolean>(false)
+
   // Session renewal — fires ~90 s before the ephemeral token expires so the
   // client swaps the credential without tearing down the WebRTC connection.
   const renewalTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -185,7 +189,12 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
         }
         const { ephemeralKey, expiresAt: newExpiresAt } = await res.json()
         if (!ephemeralKey) return
-        // Swap the credential on the existing peer connection via session.update
+        // Attempt to swap the credential via session.update.
+        // TODO: verify whether OpenAI Realtime actually accepts client_secret
+        // on session.update (the ephemeral key authenticates SDP setup, not
+        // per-event config). If the 8-min cap is a hard session-duration limit
+        // rather than token TTL, this send will be a no-op and the
+        // onconnectionstatechange handler will catch the drop gracefully.
         dcRef.current!.send(JSON.stringify({
           type: 'session.update',
           session: { client_secret: ephemeralKey },
@@ -315,6 +324,7 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
     setAdministeredScaleIds(new Set())
     setDetectedRedFlags([])
     setInterviewCompleted(false)
+    finalizingRef.current = false
 
     try {
       // 1. Get ephemeral token
@@ -412,11 +422,10 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
       // Detect server-side session teardown (OpenAI Realtime ~8-min max).
       // Without these handlers the connection goes cold and endSession() never
       // runs — leaving the screen frozen with no closing message.
-      // Guard with a one-shot flag so an intentional end + a drop don't double-fire.
-      let sessionEndedByDrop = false
+      // Uses finalizingRef (shared with endSession) so whichever fires first wins.
       const handleDrop = (source: string) => {
-        if (sessionEndedByDrop) return
-        sessionEndedByDrop = true
+        if (finalizingRef.current) return
+        finalizingRef.current = true
         console.warn(`[useRealtimeSession] connection dropped (${source}) — running graceful end`)
         endSessionRef.current()
       }
@@ -424,7 +433,9 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
       pc.onconnectionstatechange = () => {
         const state = pc.connectionState
         console.log('[useRealtimeSession] pc.connectionState ->', state)
-        if (state === 'failed' || state === 'disconnected' || state === 'closed') {
+        // Skip 'disconnected' — ICE can bounce disconnected→connected on a brief
+        // network blip; only treat terminal states as a real drop.
+        if (state === 'failed' || state === 'closed') {
           handleDrop(`pc:${state}`)
         }
       }
@@ -873,6 +884,8 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
   }, [])
 
   const endSession = useCallback(async () => {
+    if (finalizingRef.current) return
+    finalizingRef.current = true
     setStatus('ending')
 
     const finalDuration = Math.floor((Date.now() - startTimeRef.current) / 1000)
