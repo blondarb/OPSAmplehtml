@@ -142,6 +142,11 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
   // latest version without a circular useCallback dependency.
   const endSessionRef = useRef<() => Promise<void>>(async () => {})
 
+  // Session renewal — fires ~90 s before the ephemeral token expires so the
+  // client swaps the credential without tearing down the WebRTC connection.
+  const renewalTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const sessionTypeRef = useRef<string>('new_patient')
+
   // Localizer-specific refs
   const patientTurnCountRef = useRef<number>(0)
   const lastLocalizerTurnRef = useRef<number>(0)
@@ -161,10 +166,47 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
     return false
   }, [options])
 
+  const scheduleRenewal = useCallback((expiresAt: number) => {
+    if (renewalTimerRef.current) clearTimeout(renewalTimerRef.current)
+    const msUntilExpiry = expiresAt * 1000 - Date.now()
+    const msUntilRenew = Math.max(msUntilExpiry - 90_000, 0) // 90 s before expiry
+    console.log(`[useRealtimeSession] scheduling token renewal in ${Math.round(msUntilRenew / 1000)}s`)
+    renewalTimerRef.current = setTimeout(async () => {
+      if (!pcRef.current || !dcRef.current || dcRef.current.readyState !== 'open') return
+      try {
+        const res = await fetch('/api/ai/historian/session-renew', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ sessionType: sessionTypeRef.current }),
+        })
+        if (!res.ok) {
+          console.warn('[useRealtimeSession] session-renew failed:', res.status)
+          return
+        }
+        const { ephemeralKey, expiresAt: newExpiresAt } = await res.json()
+        if (!ephemeralKey) return
+        // Swap the credential on the existing peer connection via session.update
+        dcRef.current!.send(JSON.stringify({
+          type: 'session.update',
+          session: { client_secret: ephemeralKey },
+        }))
+        console.log('[useRealtimeSession] token renewed — session continues')
+        // Schedule the next renewal for the new token
+        if (newExpiresAt) scheduleRenewal(newExpiresAt)
+      } catch (err) {
+        console.warn('[useRealtimeSession] session renewal error (non-fatal):', err)
+      }
+    }, msUntilRenew)
+  }, [])
+
   const cleanup = useCallback(() => {
     if (timerRef.current) {
       clearInterval(timerRef.current)
       timerRef.current = null
+    }
+    if (renewalTimerRef.current) {
+      clearTimeout(renewalTimerRef.current)
+      renewalTimerRef.current = null
     }
     if (dcRef.current) {
       try { dcRef.current.close() } catch {}
@@ -293,10 +335,15 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
 
       const {
         ephemeralKey,
+        expiresAt,
         model: sessionModel,
         base_instructions: sessionBaseInstructions,
       } = await tokenRes.json()
       if (!ephemeralKey) throw new Error('No ephemeral key returned')
+
+      // Store sessionType for renewal requests and schedule the first renewal.
+      sessionTypeRef.current = options.sessionType ?? 'new_patient'
+      if (expiresAt) scheduleRenewal(expiresAt)
 
       // Phase 5 of 2026-05-27 historian upgrade: store the resolved base
       // instructions so pushLocalizerContext can re-serialize BASE_PROMPT +
