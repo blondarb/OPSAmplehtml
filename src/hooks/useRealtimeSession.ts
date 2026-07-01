@@ -138,6 +138,10 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
   const onScaleCompleteRef = useRef(options.onScaleComplete)
   useEffect(() => { onScaleCompleteRef.current = options.onScaleComplete }, [options.onScaleComplete])
 
+  // Stable ref to endSession so startSession's drop handlers can call the
+  // latest version without a circular useCallback dependency.
+  const endSessionRef = useRef<() => Promise<void>>(async () => {})
+
   // Localizer-specific refs
   const patientTurnCountRef = useRef<number>(0)
   const lastLocalizerTurnRef = useRef<number>(0)
@@ -356,6 +360,31 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
           const msg = JSON.parse(event.data)
           handleServerEvent(msg)
         } catch {}
+      }
+
+      // Detect server-side session teardown (OpenAI Realtime ~8-min max).
+      // Without these handlers the connection goes cold and endSession() never
+      // runs — leaving the screen frozen with no closing message.
+      // Guard with a one-shot flag so an intentional end + a drop don't double-fire.
+      let sessionEndedByDrop = false
+      const handleDrop = (source: string) => {
+        if (sessionEndedByDrop) return
+        sessionEndedByDrop = true
+        console.warn(`[useRealtimeSession] connection dropped (${source}) — running graceful end`)
+        endSessionRef.current()
+      }
+
+      pc.onconnectionstatechange = () => {
+        const state = pc.connectionState
+        console.log('[useRealtimeSession] pc.connectionState ->', state)
+        if (state === 'failed' || state === 'disconnected' || state === 'closed') {
+          handleDrop(`pc:${state}`)
+        }
+      }
+
+      dc.onclose = () => {
+        console.log('[useRealtimeSession] data channel closed')
+        handleDrop('dc:close')
       }
 
       // 6. SDP offer
@@ -877,6 +906,9 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
 
     setStatus('complete')
   }, [cleanup, options, interviewCompleted])
+
+  // Keep the ref in sync so startSession's drop handlers always call the latest endSession.
+  useEffect(() => { endSessionRef.current = endSession }, [endSession])
 
   // Clean up on unmount
   useEffect(() => {
