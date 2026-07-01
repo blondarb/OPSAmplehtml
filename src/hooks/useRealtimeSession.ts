@@ -138,6 +138,19 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
   const onScaleCompleteRef = useRef(options.onScaleComplete)
   useEffect(() => { onScaleCompleteRef.current = options.onScaleComplete }, [options.onScaleComplete])
 
+  // Stable ref to endSession so startSession's drop handlers can call the
+  // latest version without a circular useCallback dependency.
+  const endSessionRef = useRef<() => Promise<void>>(async () => {})
+
+  // One-shot finalize guard — whichever path fires first (manual end or drop)
+  // wins; the other no-ops. Prevents double-save to /api/ai/historian/save.
+  const finalizingRef = useRef<boolean>(false)
+
+  // Session renewal — fires ~90 s before the ephemeral token expires so the
+  // client swaps the credential without tearing down the WebRTC connection.
+  const renewalTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const sessionTypeRef = useRef<string>('new_patient')
+
   // Localizer-specific refs
   const patientTurnCountRef = useRef<number>(0)
   const lastLocalizerTurnRef = useRef<number>(0)
@@ -157,10 +170,52 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
     return false
   }, [options])
 
+  const scheduleRenewal = useCallback((expiresAt: number) => {
+    if (renewalTimerRef.current) clearTimeout(renewalTimerRef.current)
+    const msUntilExpiry = expiresAt * 1000 - Date.now()
+    const msUntilRenew = Math.max(msUntilExpiry - 90_000, 0) // 90 s before expiry
+    console.log(`[useRealtimeSession] scheduling token renewal in ${Math.round(msUntilRenew / 1000)}s`)
+    renewalTimerRef.current = setTimeout(async () => {
+      if (!pcRef.current || !dcRef.current || dcRef.current.readyState !== 'open') return
+      try {
+        const res = await fetch('/api/ai/historian/session-renew', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ sessionType: sessionTypeRef.current }),
+        })
+        if (!res.ok) {
+          console.warn('[useRealtimeSession] session-renew failed:', res.status)
+          return
+        }
+        const { ephemeralKey, expiresAt: newExpiresAt } = await res.json()
+        if (!ephemeralKey) return
+        // Attempt to swap the credential via session.update.
+        // TODO: verify whether OpenAI Realtime actually accepts client_secret
+        // on session.update (the ephemeral key authenticates SDP setup, not
+        // per-event config). If the 8-min cap is a hard session-duration limit
+        // rather than token TTL, this send will be a no-op and the
+        // onconnectionstatechange handler will catch the drop gracefully.
+        dcRef.current!.send(JSON.stringify({
+          type: 'session.update',
+          session: { client_secret: ephemeralKey },
+        }))
+        console.log('[useRealtimeSession] token renewed — session continues')
+        // Schedule the next renewal for the new token
+        if (newExpiresAt) scheduleRenewal(newExpiresAt)
+      } catch (err) {
+        console.warn('[useRealtimeSession] session renewal error (non-fatal):', err)
+      }
+    }, msUntilRenew)
+  }, [])
+
   const cleanup = useCallback(() => {
     if (timerRef.current) {
       clearInterval(timerRef.current)
       timerRef.current = null
+    }
+    if (renewalTimerRef.current) {
+      clearTimeout(renewalTimerRef.current)
+      renewalTimerRef.current = null
     }
     if (dcRef.current) {
       try { dcRef.current.close() } catch {}
@@ -269,6 +324,7 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
     setAdministeredScaleIds(new Set())
     setDetectedRedFlags([])
     setInterviewCompleted(false)
+    finalizingRef.current = false
 
     try {
       // 1. Get ephemeral token
@@ -289,10 +345,15 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
 
       const {
         ephemeralKey,
+        expiresAt,
         model: sessionModel,
         base_instructions: sessionBaseInstructions,
       } = await tokenRes.json()
       if (!ephemeralKey) throw new Error('No ephemeral key returned')
+
+      // Store sessionType for renewal requests and schedule the first renewal.
+      sessionTypeRef.current = options.sessionType ?? 'new_patient'
+      if (expiresAt) scheduleRenewal(expiresAt)
 
       // Phase 5 of 2026-05-27 historian upgrade: store the resolved base
       // instructions so pushLocalizerContext can re-serialize BASE_PROMPT +
@@ -356,6 +417,30 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
           const msg = JSON.parse(event.data)
           handleServerEvent(msg)
         } catch {}
+      }
+
+      // Detect server-side session teardown (OpenAI Realtime ~8-min max).
+      // Without these handlers the connection goes cold and endSession() never
+      // runs — leaving the screen frozen with no closing message.
+      // endSession owns finalizingRef — handleDrop just calls it directly.
+      const handleDrop = (source: string) => {
+        console.warn(`[useRealtimeSession] connection dropped (${source}) — running graceful end`)
+        endSessionRef.current()
+      }
+
+      pc.onconnectionstatechange = () => {
+        const state = pc.connectionState
+        console.log('[useRealtimeSession] pc.connectionState ->', state)
+        // Skip 'disconnected' — ICE can bounce disconnected→connected on a brief
+        // network blip; only treat terminal states as a real drop.
+        if (state === 'failed' || state === 'closed') {
+          handleDrop(`pc:${state}`)
+        }
+      }
+
+      dc.onclose = () => {
+        console.log('[useRealtimeSession] data channel closed')
+        handleDrop('dc:close')
       }
 
       // 6. SDP offer
@@ -797,6 +882,8 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
   }, [])
 
   const endSession = useCallback(async () => {
+    if (finalizingRef.current) return
+    finalizingRef.current = true
     setStatus('ending')
 
     const finalDuration = Math.floor((Date.now() - startTimeRef.current) / 1000)
@@ -877,6 +964,9 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
 
     setStatus('complete')
   }, [cleanup, options, interviewCompleted])
+
+  // Keep the ref in sync so startSession's drop handlers always call the latest endSession.
+  useEffect(() => { endSessionRef.current = endSession }, [endSession])
 
   // Clean up on unmount
   useEffect(() => {
