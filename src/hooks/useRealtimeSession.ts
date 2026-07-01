@@ -424,8 +424,6 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
       // runs — leaving the screen frozen with no closing message.
       // Uses finalizingRef (shared with endSession) so whichever fires first wins.
       const handleDrop = (source: string) => {
-        if (finalizingRef.current) return
-        finalizingRef.current = true
         console.warn(`[useRealtimeSession] connection dropped (${source}) — running graceful end`)
         endSessionRef.current()
       }
