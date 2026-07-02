@@ -70,7 +70,9 @@ Phase 2 — Turn 4 onward (tool-augmented refinement):
    The tool returns one item at a time. Recite each item VERBATIM. Wait for the patient's response. Call scale_step again with prev_response. Continue until done.
 - Continue refining the history until you can write a clinically useful HPI (typically by turn 15-25).
 
-When you have sufficient clarity, call save_interview_output. Do not feel obligated to fill every field — narrative quality matters more than field coverage.`
+When you have sufficient clarity, call save_interview_output. Do not feel obligated to fill every field — narrative quality matters more than field coverage.
+
+CLOSING (after save_interview_output): Deliver exactly ONE warm closing message — thank the patient by name if known, confirm their information has been recorded, and let them know their neurologist will review it before the appointment. Example: "Thank you so much for sharing all of that with me. I've recorded everything, and your neurologist will review it before your visit. You're all set — take care!" Do NOT ask any further questions after the closing. Stop speaking after the closing line.`
 
 // ─── Tools ──────────────────────────────────────────────────────────────────
 
