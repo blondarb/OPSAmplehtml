@@ -137,6 +137,7 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
   // Keep stable reference to options callbacks to avoid stale closures
   const onScaleCompleteRef = useRef(options.onScaleComplete)
   useEffect(() => { onScaleCompleteRef.current = options.onScaleComplete }, [options.onScaleComplete])
+  useEffect(() => { interviewCompletedRef.current = interviewCompleted }, [interviewCompleted])
 
   // Stable ref to endSession so startSession's drop handlers can call the
   // latest version without a circular useCallback dependency.
@@ -145,6 +146,12 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
   // One-shot finalize guard — whichever path fires first (manual end or drop)
   // wins; the other no-ops. Prevents double-save to /api/ai/historian/save.
   const finalizingRef = useRef<boolean>(false)
+
+  // Mirror of interviewCompleted state as a ref so event handlers can read
+  // the latest value without stale closure issues (avoids React state timing
+  // races in response.audio_transcript.done).
+  const interviewCompletedRef = useRef<boolean>(false)
+  const autoEndTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   // Session renewal — fires ~90 s before the ephemeral token expires so the
   // client swaps the credential without tearing down the WebRTC connection.
@@ -216,6 +223,10 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
     if (renewalTimerRef.current) {
       clearTimeout(renewalTimerRef.current)
       renewalTimerRef.current = null
+    }
+    if (autoEndTimerRef.current) {
+      clearTimeout(autoEndTimerRef.current)
+      autoEndTimerRef.current = null
     }
     if (dcRef.current) {
       try { dcRef.current.close() } catch {}
@@ -513,6 +524,16 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
         }
         setCurrentAssistantText('')
         setIsAiSpeaking(false)
+
+        // If save_interview_output already fired, this audio is the closing
+        // message. Schedule auto-end now that the AI has finished speaking —
+        // use a ref so this handler never has a stale closure on endSessionRef.
+        if (interviewCompletedRef.current && !finalizingRef.current) {
+          if (autoEndTimerRef.current) clearTimeout(autoEndTimerRef.current)
+          autoEndTimerRef.current = setTimeout(() => {
+            endSessionRef.current()
+          }, 1500)
+        }
         break
       }
 
