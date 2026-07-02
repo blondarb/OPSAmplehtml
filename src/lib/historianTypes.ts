@@ -171,8 +171,9 @@ export function getTurnDetectionConfig(mode: string | undefined): TurnDetectionC
       silence_duration_ms: 1200,
     }
   }
-  // Default: semantic_vad with low eagerness (least likely to cut off patient)
-  return { type: 'semantic_vad', eagerness: 'low' }
+  // Default: semantic_vad with medium eagerness — balances responsiveness
+  // against cutting the patient off mid-sentence. Was 'low' (3-5s latency).
+  return { type: 'semantic_vad', eagerness: 'medium' }
 }
 
 // ─── Input noise reduction (env-driven) ─────────────────────────────────────
