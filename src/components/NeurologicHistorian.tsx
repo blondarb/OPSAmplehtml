@@ -114,7 +114,6 @@ export default function NeurologicHistorian() {
     error,
     localizerData,
     localizerLoading,
-    interviewCompleted,
     startSession,
     endSession,
   } = useRealtimeSession({
@@ -201,18 +200,6 @@ export default function NeurologicHistorian() {
   useEffect(() => {
     transcriptEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [transcript, currentAssistantText])
-
-  // Auto-end once the historian calls save_interview_output and finishes speaking.
-  // Mirrors EmbeddedHistorian — wait for AI to stop, then end cleanly.
-  useEffect(() => {
-    if (!interviewCompleted) return
-    if (phase !== 'active') return
-    if (isAiSpeaking) return
-    const t = setTimeout(() => {
-      endSession()
-    }, 1500)
-    return () => clearTimeout(t)
-  }, [interviewCompleted, isAiSpeaking, phase, endSession])
 
   const handleSelectScenario = (scenario: DemoScenario) => {
     setSelectedScenario(scenario)
