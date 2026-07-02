@@ -414,13 +414,8 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
       dcRef.current = dc
 
       dc.onopen = () => {
-        // Session is connected, send initial response.create to kick things off
-        dc.send(JSON.stringify({
-          type: 'response.create',
-          response: {
-            modalities: ['text', 'audio'],
-          },
-        }))
+        // Data channel is open — wait for session.created before greeting
+        // so instructions are guaranteed applied before the AI speaks.
       }
 
       dc.onmessage = (event) => {
@@ -502,6 +497,19 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
   // Handle server events from the data channel
   const handleServerEvent = useCallback((msg: any) => {
     switch (msg.type) {
+      case 'session.created': {
+        // Session is fully configured — instructions are applied. Fire the
+        // opening response.create now so the historian greets the patient
+        // immediately without waiting for them to speak first.
+        if (dcRef.current?.readyState === 'open') {
+          dcRef.current.send(JSON.stringify({
+            type: 'response.create',
+            response: { modalities: ['text', 'audio'] },
+          }))
+        }
+        break
+      }
+
       case 'response.audio_transcript.delta': {
         // Streaming AI text
         setCurrentAssistantText(prev => prev + (msg.delta || ''))
