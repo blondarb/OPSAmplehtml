@@ -134,7 +134,7 @@ Full changelog: [`docs/CHANGELOG.md`](docs/CHANGELOG.md)
 
 ## Body of Work
 
-**Status**: Active — verified July 3, 2026
+**Status**: Active — verified July 4, 2026
 
 ### Recent
 - **Historian reliability hardening (PRs #130, #132-134, Jul 2)** — Graceful end: Riya-requested "End Interview" button cleanly flushes `save_interview_output` before closing the Realtime session (PR #130). Reliable ref-based auto-end + greet-first opening: historian auto-ends via `sessionRef`/`cleanupRef` so the ref is always current (PR #132). `semantic_vad` eagerness raised low→medium for snappier turn detection (PR #133). Greeting `response.create` fired on `session.created` instead of `dc.onopen` to prevent missed greetings when the data channel opens late (PR #134).
