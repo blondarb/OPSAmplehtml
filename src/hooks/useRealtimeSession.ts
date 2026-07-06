@@ -337,6 +337,10 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
     setInterviewCompleted(false)
     interviewCompletedRef.current = false
     finalizingRef.current = false
+    if (autoEndTimerRef.current) {
+      clearTimeout(autoEndTimerRef.current)
+      autoEndTimerRef.current = null
+    }
 
     try {
       // 1. Get ephemeral token
