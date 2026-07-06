@@ -147,6 +147,13 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
   // wins; the other no-ops. Prevents double-save to /api/ai/historian/save.
   const finalizingRef = useRef<boolean>(false)
 
+  // Monotonic session counter. Incremented in startSession; captured by each
+  // session's drop handlers (dc.onclose, pc.onconnectionstatechange). If the
+  // counter has advanced by the time the handler fires, it belongs to a stale
+  // session (e.g. dc.onclose firing async after cleanup() already ran) and
+  // must not call endSession on the new session.
+  const sessionGenRef = useRef<number>(0)
+
   // Mirror of interviewCompleted state as a ref so event handlers can read
   // the latest value without stale closure issues (avoids React state timing
   // races in response.audio_transcript.done).
@@ -337,6 +344,11 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
     setInterviewCompleted(false)
     interviewCompletedRef.current = false
     finalizingRef.current = false
+    if (autoEndTimerRef.current) {
+      clearTimeout(autoEndTimerRef.current)
+      autoEndTimerRef.current = null
+    }
+    const sessionGen = ++sessionGenRef.current
 
     try {
       // 1. Get ephemeral token
@@ -431,6 +443,7 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
       // runs — leaving the screen frozen with no closing message.
       // endSession owns finalizingRef — handleDrop just calls it directly.
       const handleDrop = (source: string) => {
+        if (sessionGenRef.current !== sessionGen) return // stale handler from a previous session
         console.warn(`[useRealtimeSession] connection dropped (${source}) — running graceful end`)
         endSessionRef.current()
       }
