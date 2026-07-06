@@ -8,7 +8,7 @@
 |-------|-------|
 | Status | Draft for review |
 | Date | 2026-07-06 |
-| Audience | Steve Arbogast, DO (Medical Director, Product & Innovation); Sam Saha (VP Medical Operations); Dr. Charles Schutt, MD |
+| Audience | Steve Arbogast, DO (Medical Director, Product & Innovation); Sam Saha (VP Medical Operations); Riya (Historian evaluation lane) |
 | Scope | AI Historian voice intake agent only — `/patient/historian` and `/consult` |
 | Deliverable type | Docs-only. No code changes. |
 
@@ -42,12 +42,14 @@ pipeline.
 
 ### 1.2 What's actually wired (verified in code)
 
-**Built today: OpenAI Realtime API over WebRTC. There is no AWS Nova Sonic
-anywhere in this repository or its docs** — a full-text search of `src/`,
-`docs/`, and `playbooks/` for "nova" returns zero hits. Some Sevaro-wide
-planning notes describe a target architecture of "Nova Sonic voice + async
-Claude reasoner" for the AI Historian generally; **that description does not
-match what is deployed in this repo.** See Section 5 for the explicit
+**Built today (on `main`): OpenAI Realtime API over WebRTC.** A full-text
+search of `main`'s `src/`, `docs/`, and `playbooks/` for "nova" returns zero
+code hits. The AWS-native voice work **does exist in this repo — on the
+unmerged `feat/nova-sonic-voice` branch** (24 commits, parked since
+2026-06-06), and the settled target architecture (Steve + Riya, 2026-06-29)
+is a two-tier AWS design — Nova Sonic voice + async Bedrock Claude reasoner —
+replacing OpenAI Realtime specifically because it is not BAA-eligible. Riya
+owns that migration end-to-end. See Section 5 for the explicit
 built-vs-target comparison.
 
 What's actually running, end to end:
@@ -156,8 +158,8 @@ hits "End Interview" early), `useRealtimeSession.ts`'s `endSession()` first
 tries to nudge the model to flush a summary, and falls back to storing the
 raw transcript as the narrative summary with an `endedEarly` flag — so data
 is not silently dropped, but the physician-facing artifact for that case is
-materially different (raw transcript, no structured fields) and Dr. Schutt's
-protocol should include at least one scenario that exercises this path.
+materially different (raw transcript, no structured fields) — scenario #8 in
+the protocol exercises this path.
 
 ### 1.5 PHI / consent posture
 
@@ -179,8 +181,8 @@ protocol should include at least one scenario that exercises this path.
   (`buildHistorianContextFromConsult()` in `src/lib/consult/contextBuilder.ts`).
   **If this route is used with a real patient's data rather than a demo
   persona, that patient context — and the patient's live voice — would in
-  fact reach OpenAI.** This is the single most important fact for Dr. Schutt
-  and Sam to know before treating any session as a demo: the demo/production
+  fact reach OpenAI.** This is the single most important fact for any
+  reviewer and Sam to know before treating any session as a demo: the demo/production
   boundary is enforced by *usage discipline* (which patient record you pick),
   not by a code-level gate that blocks real PHI from reaching OpenAI.
   **[unverified — confirm in live session: is there any environment-level or
@@ -194,10 +196,13 @@ protocol should include at least one scenario that exercises this path.
 ## 2. MD validation protocol
 
 **Format:** structured pass, target 2–3 hours, one sitting or split across two
-sessions. Dr. Schutt plays the "patient" role reading from the scripts below
-(voice, not text — the point is to exercise the actual ASR + conversational
-path) while another person or a recording rig captures the interaction, or
-Dr. Schutt runs it solo with the demo scenario selector and a quiet room.
+sessions. **Executor: this protocol runs in Riya's evaluation lane, with Steve
+as clinical backstop — Dr. Schutt is scoped to FPPE/OPPE chart audits only for
+now (Steve, 2026-07-06).** The reviewer plays the "patient" role reading from
+the scripts below (voice, not text — the point is to exercise the actual ASR +
+conversational path) while another person or a recording rig captures the
+interaction, or the reviewer runs it solo with the demo scenario selector and a
+quiet room.
 
 **Fastest path to a working session:** `/patient/historian` → select a demo
 scenario from `DEMO_SCENARIOS` (headache_new, seizure_new,
@@ -275,7 +280,7 @@ actual WebRTC + Whisper + `gpt-realtime-2` pipeline end to end. (The repo's
 own eval process for the 2026-05-27 upgrade — see
 `docs/superpowers/plans/2026-05-27-ai-historian-realtime-upgrade.md` and
 `qa/historian-baselines/` — was itself a manual pre/post comparison against
-five sample personas, not an automated suite.) This means Dr. Schutt's
+five sample personas, not an automated suite.) This means the physician
 validation pass is not a stopgap until "real" automated testing exists — for
 this feature, it **is** the testing, and should be expected to recur
 periodically (e.g., after model or prompt version bumps) rather than be
@@ -299,6 +304,11 @@ today this may be low-urgency, but it's a prerequisite before any real-patient
 rollout and is worth deciding on now rather than discovering it during a
 production push.
 
+**Decision (Steve Arbogast, DO — 2026-07-06): build the consent/disclosure
+step now.** All patients in the system today are artificial/synthetic, so
+there is no live exposure — but the disclosure ships ahead of any
+real-patient use. Implementation is in flight as a separate PR.
+
 ```
 Fix prompt:
 In the OPSAmplehtml repo, before the AI Historian interview starts
@@ -317,8 +327,13 @@ patient consent guidance for wording before finalizing.
 As detailed in Section 1.5, `/patient/historian?patient_id={id}` pulls real
 prior-visit HPI/diagnoses/meds into the OpenAI-bound system prompt. The
 demo-only framing is enforced by which patient record a user selects, not by
-a code check. Worth a decision from Steve/Sam on whether this needs an
-explicit environment flag rather than relying on usage discipline.
+a code check.
+
+**Decision (Steve, 2026-07-06): usage stays artificial-patients-only for
+now.** The structural fix is the AWS voice migration in Riya's lane — Nova
+Sonic + Bedrock are the BAA-eligible path, at which point this exposure class
+goes away. The env-flag gate below remains available if an interim hard stop
+is wanted.
 
 ```
 Fix prompt:
@@ -410,35 +425,32 @@ fallback for a fully AI-summarized note.
 Kept intentionally short and non-prescriptive — final split is Steve/Sam's
 call, this is a starting proposal based on what each lane already owns.
 
-- **Dr. Schutt's MD-feedback lane (this document):** the AI Historian *as it
-  exists today* on `/patient/historian` and `/consult` — clinical quality of
-  the conversation itself: question relevance, red-flag handling, history
-  accuracy, safety-boundary compliance, and whether the output is usable for
-  a real visit. This is a point-in-time clinical review of the current build,
-  run periodically (see 2.4), and is stretch scope after his core FPPE/OPPE
-  chart-audit work — expect a lighter cadence than the chart-audit lane.
-- **Riya's evaluation lane:** the phased P0 eval → P4 follow-up historian
-  work on the DDx/longitudinal side — i.e., the broader AI Historian
-  *evaluation methodology and roadmap* (grounding on longitudinal scale
-  trends, the two-tier target architecture question, follow-up historian
-  design). Riya's lane is about where the Historian is headed and how it's
-  measured systematically; Schutt's lane is a manual clinical gut-check on
-  where it stands right now. These are complementary, not competing — Schutt's
-  findings from Section 3 (e.g., the consent gap, the real-patient-context
-  gate) are exactly the kind of concrete, code-verified items that should feed
-  into whichever backlog Riya's eval roadmap tracks, rather than being
-  duplicated as a separate workstream.
+- **Scope decision (Steve, 2026-07-06): Dr. Schutt validates FPPE/OPPE only
+  for now** — the chart-audit and grader-calibration lane in the program
+  charter. The Historian protocol in this document is **not** assigned to him.
+- **Riya's lane (includes this protocol):** Riya owns the Historian
+  end-to-end — the phased P0 eval → P4 follow-up historian roadmap, the
+  two-tier AWS migration (Nova Sonic voice + Bedrock Claude reasoner), and
+  the manual clinical passes this document describes, with Steve as clinical
+  backstop. The findings in Section 3 (consent, real-patient-context gate,
+  public-route evidence 401s) feed Riya's backlog rather than becoming a
+  separate workstream.
 
 ---
 
 ## 5. Built-vs-target architecture — explicit discrepancy note
 
-Some Sevaro planning notes (outside this repo) describe the AI Historian's
-target production architecture as a **two-tier design: "Nova Sonic voice +
-async Claude reasoner,"** with evidence-RAG dropped in favor of grounding on
-longitudinal scale trends. Per the repo's own CLAUDE.md, that target
-architecture applies to a *different, not-yet-built* production path (real
-patient encounters, HIPAA-eligible transcription).
+The settled target architecture (Steve + Riya, 2026-06-29) is a **two-tier
+AWS design: Nova Sonic voice + async Bedrock Claude reasoner** —
+HIPAA-eligible end-to-end, evidence-RAG dropped in favor of grounding on
+longitudinal scale trends. That work is real and in this repo: the
+**`feat/nova-sonic-voice` branch carries 24 unmerged commits, parked since
+2026-06-06**, and Riya now owns the full vertical slice (voice + brain).
+Riya's plan deliberately keeps a transcript seam between tiers so the voice
+engine stays swappable — which is also why running on OpenAI Realtime today
+locks nothing in. Per the repo's own CLAUDE.md, HIPAA-eligible real-encounter
+voice (AWS Transcribe Medical) is likewise a "Planned" item distinct from
+today's demo path.
 
 **What's built today, in this repo, right now:** a single-tier design — one
 conversational model (OpenAI `gpt-realtime-2` over WebRTC, not Nova Sonic)
