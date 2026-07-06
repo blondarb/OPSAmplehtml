@@ -452,6 +452,14 @@ locks nothing in. Per the repo's own CLAUDE.md, HIPAA-eligible real-encounter
 voice (AWS Transcribe Medical) is likewise a "Planned" item distinct from
 today's demo path.
 
+**The OpenAI build also has a standing role in the migration itself:** Riya's
+plan (Slack canvas, Phase 1.5) explicitly benchmarks the Nova Sonic spike
+*against the current OpenAI Realtime feel* — round-trip latency, barge-in,
+ASR accuracy on clinical vocabulary, and conversational naturalness. So the
+OpenAI path is the **comparator**, kept intact (synthetic/demo audio only,
+per the BAA boundary) until Nova Sonic meets that bar — it should not be
+deleted the moment the migration starts.
+
 **What's built today, in this repo, right now:** a single-tier design — one
 conversational model (OpenAI `gpt-realtime-2` over WebRTC, not Nova Sonic)
 handling both the voice interaction and the reasoning/tool-calling in the
