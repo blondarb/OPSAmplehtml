@@ -938,6 +938,21 @@ historian_patient:
       - Select a scenario
     expected: Navigates to /patient/historian?scenario=<id>, mock context loads
 
+  - id: H9
+    title: Consent/disclosure gate before interview start
+    preconditions: [patient or scenario selected, on /patient/historian and on /consult embedded historian]
+    steps:
+      - Click "Start Voice Interview"
+      - Observe the "Before you begin" modal (AI-not-a-clinician disclosure, 911 emergency notice, recording notice)
+      - Click Cancel and confirm no session/mic activity started
+      - Click "Start Voice Interview" again, then click "I understand — start the interview"
+    expected: |
+      - Modal appears before any mic permission prompt or Realtime session connects
+      - Cancel dismisses the modal with no session started (status stays idle, no "Connecting..." phase)
+      - Confirming proceeds exactly as before (status moves to Connecting → Active, AI greeting plays)
+      - "You can end the interview at any time" secondary line is visible
+    data_verification: No historian_sessions row or Realtime session/mic activity occurs prior to clicking the confirm button
+
 ---
 historian_data_flow:
   - id: I1

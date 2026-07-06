@@ -6,6 +6,7 @@ import { useRealtimeSession } from '@/hooks/useRealtimeSession'
 import { DEMO_SCENARIOS, type DemoScenario, type HistorianStructuredOutput, type HistorianRedFlag, type HistorianTranscriptEntry, type HistorianSessionType, type PatientContext } from '@/lib/historianTypes'
 import { getTenantClient } from '@/lib/tenant'
 import HistorianSessionComplete from './HistorianSessionComplete'
+import HistorianConsentDisclosure from './HistorianConsentDisclosure'
 import LocalizerPanel from './LocalizerPanel'
 import PlatformShell from '@/components/layout/PlatformShell'
 import FeatureSubHeader from '@/components/layout/FeatureSubHeader'
@@ -39,6 +40,11 @@ export default function NeurologicHistorian() {
   const [selectedScenario, setSelectedScenario] = useState<DemoScenario | null>(null)
   const [sessionConfig, setSessionConfig] = useState<SessionConfig | null>(null)
   const [showTranscript, setShowTranscript] = useState(false)
+  // Consent/disclosure gate — must be acknowledged before startSession() can run.
+  // See handleStartInterview / handleConsentConfirm below: startSession() is only
+  // ever called from handleConsentConfirm, never directly from the button handler.
+  const [showConsentDisclosure, setShowConsentDisclosure] = useState(false)
+  const [consentAcknowledged, setConsentAcknowledged] = useState(false)
   const [completionData, setCompletionData] = useState<{
     structuredOutput: HistorianStructuredOutput | null
     narrativeSummary: string | null
@@ -218,10 +224,26 @@ export default function NeurologicHistorian() {
     setSelectedScenario(scenario)
   }
 
-  const handleStartInterview = async () => {
+  const handleStartInterview = () => {
     // Allow start if we have a real patient config OR a selected demo scenario
     if (!selectedScenario && !sessionConfig) return
-    await startSession()
+    // Gate: show the consent/disclosure step before any session/mic start.
+    // startSession() is invoked only from handleConsentConfirm.
+    if (!consentAcknowledged) {
+      setShowConsentDisclosure(true)
+      return
+    }
+    void startSession()
+  }
+
+  const handleConsentConfirm = () => {
+    setConsentAcknowledged(true)
+    setShowConsentDisclosure(false)
+    void startSession()
+  }
+
+  const handleConsentCancel = () => {
+    setShowConsentDisclosure(false)
   }
 
   const handleEndInterview = () => {
@@ -316,6 +338,12 @@ export default function NeurologicHistorian() {
 
   return (
     <PlatformShell>
+    {showConsentDisclosure && (
+      <HistorianConsentDisclosure
+        onConfirm={handleConsentConfirm}
+        onCancel={handleConsentCancel}
+      />
+    )}
     <FeatureSubHeader
       title="AI Health Interview"
       icon={Mic}

@@ -7,6 +7,7 @@ import type { LocalizerResponse } from '@/lib/consult/localizer-types'
 import type { SaveScaleResponsesArgs, LocalizerSnapshot, TriggeredScale } from '@/lib/consult/scales'
 import { getTenantClient } from '@/lib/tenant'
 import LocalizerPanel from '@/components/LocalizerPanel'
+import HistorianConsentDisclosure from '@/components/HistorianConsentDisclosure'
 
 type Phase = 'ready' | 'connecting' | 'active' | 'ending' | 'saving' | 'complete' | 'safety_escalation'
 
@@ -36,6 +37,11 @@ export default function EmbeddedHistorian({
   const [phase, setPhase] = useState<Phase>('ready')
   const [showTranscript, setShowTranscript] = useState(false)
   const [showPhysicianPanel, setShowPhysicianPanel] = useState(false)
+  // Consent/disclosure gate — must be acknowledged before startSession() can run.
+  // startSession() is only ever invoked from handleConsentConfirm, never
+  // directly from the "Start Voice Interview" button handler.
+  const [showConsentDisclosure, setShowConsentDisclosure] = useState(false)
+  const [consentAcknowledged, setConsentAcknowledged] = useState(false)
   const [autoShownPhysicianPanel, setAutoShownPhysicianPanel] = useState(false)
   const [completionData, setCompletionData] = useState<{
     structuredOutput: HistorianStructuredOutput | null
@@ -255,8 +261,24 @@ export default function EmbeddedHistorian({
     setAutoShownPhysicianPanel(true)
   }, [localizerData, autoShownPhysicianPanel])
 
-  const handleStart = async () => {
-    await startSession()
+  const handleStart = () => {
+    // Gate: show the consent/disclosure step before any session/mic start.
+    // startSession() is invoked only from handleConsentConfirm.
+    if (!consentAcknowledged) {
+      setShowConsentDisclosure(true)
+      return
+    }
+    void startSession()
+  }
+
+  const handleConsentConfirm = () => {
+    setConsentAcknowledged(true)
+    setShowConsentDisclosure(false)
+    void startSession()
+  }
+
+  const handleConsentCancel = () => {
+    setShowConsentDisclosure(false)
   }
 
   const handleEnd = useCallback(() => {
@@ -323,6 +345,12 @@ export default function EmbeddedHistorian({
   if (phase === 'ready') {
     return (
       <div>
+        {showConsentDisclosure && (
+          <HistorianConsentDisclosure
+            onConfirm={handleConsentConfirm}
+            onCancel={handleConsentCancel}
+          />
+        )}
         {error && (
           <div style={{ background: 'rgba(239,68,68,0.15)', border: '1px solid rgba(239,68,68,0.3)', borderRadius: 8, padding: '12px 16px', color: '#fca5a5', fontSize: 13, marginBottom: 16 }}>
             {error}
