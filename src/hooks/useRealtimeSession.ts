@@ -335,6 +335,7 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
     setAdministeredScaleIds(new Set())
     setDetectedRedFlags([])
     setInterviewCompleted(false)
+    interviewCompletedRef.current = false
     finalizingRef.current = false
 
     try {
