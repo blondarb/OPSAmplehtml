@@ -154,6 +154,10 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
   // must not call endSession on the new session.
   const sessionGenRef = useRef<number>(0)
 
+  // Set to true when session.created arrives. Used by dc.onopen to fire the
+  // greeting response.create in case session.created beat the channel open.
+  const sessionCreatedRef = useRef<boolean>(false)
+
   // Mirror of interviewCompleted state as a ref so event handlers can read
   // the latest value without stale closure issues (avoids React state timing
   // races in response.audio_transcript.done).
@@ -348,6 +352,7 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
       clearTimeout(autoEndTimerRef.current)
       autoEndTimerRef.current = null
     }
+    sessionCreatedRef.current = false
     const sessionGen = ++sessionGenRef.current
 
     try {
@@ -427,8 +432,14 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
       dcRef.current = dc
 
       dc.onopen = () => {
-        // Data channel is open — wait for session.created before greeting
-        // so instructions are guaranteed applied before the AI speaks.
+        // If session.created already arrived before the channel opened,
+        // fire the greeting now — otherwise session.created handler does it.
+        if (sessionCreatedRef.current) {
+          dc.send(JSON.stringify({
+            type: 'response.create',
+            response: { modalities: ['text', 'audio'] },
+          }))
+        }
       }
 
       dc.onmessage = (event) => {
@@ -512,9 +523,10 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
   const handleServerEvent = useCallback((msg: any) => {
     switch (msg.type) {
       case 'session.created': {
-        // Session is fully configured — instructions are applied. Fire the
-        // opening response.create now so the historian greets the patient
-        // immediately without waiting for them to speak first.
+        // Session is fully configured — instructions are applied. Mark the
+        // ref so dc.onopen can fire the greeting if the channel isn't open
+        // yet, then fire immediately if it already is.
+        sessionCreatedRef.current = true
         if (dcRef.current?.readyState === 'open') {
           dcRef.current.send(JSON.stringify({
             type: 'response.create',
