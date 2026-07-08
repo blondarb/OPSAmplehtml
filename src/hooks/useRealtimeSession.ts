@@ -566,7 +566,7 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
           if (autoEndTimerRef.current) clearTimeout(autoEndTimerRef.current)
           autoEndTimerRef.current = setTimeout(() => {
             endSessionRef.current()
-          }, 1500)
+          }, 0)
         }
         break
       }
