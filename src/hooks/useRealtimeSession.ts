@@ -437,7 +437,7 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
         if (sessionCreatedRef.current) {
           dc.send(JSON.stringify({
             type: 'response.create',
-            response: { modalities: ['text', 'audio'] },
+            response: {},
           }))
         }
       }
@@ -530,7 +530,7 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
         if (dcRef.current?.readyState === 'open') {
           dcRef.current.send(JSON.stringify({
             type: 'response.create',
-            response: { modalities: ['text', 'audio'] },
+            response: {},
           }))
         }
         break
@@ -657,7 +657,7 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
                   }))
                   dcRef.current.send(JSON.stringify({
                     type: 'response.create',
-                    response: { modalities: ['text', 'audio'] },
+                    response: {},
                   }))
                 }
               } catch (e) {
@@ -691,7 +691,7 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
                   }))
                   dcRef.current.send(JSON.stringify({
                     type: 'response.create',
-                    response: { modalities: ['text', 'audio'] },
+                    response: {},
                   }))
                 }
               } catch (e) {
@@ -932,7 +932,7 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
     // Trigger the model to start asking scale questions
     dcRef.current.send(JSON.stringify({
       type: 'response.create',
-      response: { modalities: ['text', 'audio'] },
+      response: {},
     }))
   }, [])
 
