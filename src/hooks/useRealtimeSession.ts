@@ -173,6 +173,11 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
   const patientTurnCountRef = useRef<number>(0)
   const lastLocalizerTurnRef = useRef<number>(0)
   const localizerInFlightRef = useRef<boolean>(false)
+  // F3 (perf/historian-pr114-cleanup-2026-05-30): abort in-flight Localizer
+  // when a fresher one is scheduled; debounce rapid utterances by 500ms so
+  // back-to-back short turns don't stack pipelines.
+  const localizerAbortRef = useRef<AbortController | null>(null)
+  const localizerDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   // Safety keyword check (secondary defense)
   const checkSafety = useCallback((text: string) => {
@@ -264,8 +269,12 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
   const runLocalizer = useCallback(async () => {
     const localizerEnabled = options.enableLocalizer !== false // default true
     if (!localizerEnabled) return
-    if (localizerInFlightRef.current) return
     if (transcriptRef.current.length < 2) return
+
+    // F3: cancel any in-flight Localizer so the fresher request wins.
+    if (localizerAbortRef.current) localizerAbortRef.current.abort()
+    const controller = new AbortController()
+    localizerAbortRef.current = controller
 
     localizerInFlightRef.current = true
     setLocalizerLoading(true)
@@ -290,6 +299,8 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
           chiefComplaint: options.referralReason,
           referralReason: options.referralReason,
         }),
+        // F3: aborted by the next scheduled Localizer run.
+        signal: controller.signal,
       })
 
       if (!res.ok) {
@@ -304,25 +315,24 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
       setLocalizerData(data)
       options.onLocalizerUpdate?.(data)
 
-      // Inject follow-up questions as advisory guidance into the session
-      if (data.contextHint && dcRef.current?.readyState === 'open') {
-        const guidance = `[Clinical guidance — advisory]: ${data.contextHint}`
-        dcRef.current.send(JSON.stringify({
-          type: 'conversation.item.create',
-          item: {
-            type: 'message',
-            role: 'system',
-            content: [{ type: 'input_text', text: guidance }],
-          },
-        }))
-        // No response.create — advisory only; AI picks it up on its next natural turn
-      }
+      // F2 (perf/historian-pr114-cleanup-2026-05-30): legacy advisory
+      // conversation.item.create removed. PR #114 introduced
+      // pushLocalizerContext (called from EmbeddedHistorian's
+      // handleLocalizerUpdate) as the canonical channel for injecting
+      // Localizer findings into the live session; the contextHint path
+      // here was a leftover and was double-injecting on every run.
     } catch (err: any) {
+      // F3: AbortError is expected when a fresher Localizer cancels this one.
+      if (err?.name === 'AbortError') return
       // Network/timeout errors must not interrupt the session
       console.warn('[localizer] run failed (session continues):', err?.message)
     } finally {
-      localizerInFlightRef.current = false
-      setLocalizerLoading(false)
+      // Only clear loading state if this run is still the latest in-flight.
+      if (localizerAbortRef.current === controller) {
+        localizerAbortRef.current = null
+        localizerInFlightRef.current = false
+        setLocalizerLoading(false)
+      }
     }
   }, [options])
 
@@ -342,6 +352,15 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
     patientTurnCountRef.current = 0
     lastLocalizerTurnRef.current = 0
     localizerInFlightRef.current = false
+    // F3: cancel any pending/in-flight Localizer before a new session resets state.
+    if (localizerDebounceRef.current) {
+      clearTimeout(localizerDebounceRef.current)
+      localizerDebounceRef.current = null
+    }
+    if (localizerAbortRef.current) {
+      localizerAbortRef.current.abort()
+      localizerAbortRef.current = null
+    }
     administeredScaleIdsRef.current = new Set()
     setAdministeredScaleIds(new Set())
     setDetectedRedFlags([])
@@ -602,8 +621,11 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
           const turnsSinceLast = patientTurnCountRef.current - lastLocalizerTurnRef.current
           if (turnsSinceLast >= LOCALIZER_INTERVAL) {
             lastLocalizerTurnRef.current = patientTurnCountRef.current
-            // Fire async — must not block the event loop
-            runLocalizer()
+            // F3: debounce 500ms so back-to-back short utterances coalesce
+            // into a single Localizer run. Fire async — never blocks the
+            // event loop.
+            if (localizerDebounceRef.current) clearTimeout(localizerDebounceRef.current)
+            localizerDebounceRef.current = setTimeout(() => { runLocalizer() }, 500)
           }
         }
         setCurrentUserText('')
@@ -847,18 +869,22 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
    * Phase 5 of 2026-05-27 historian upgrade — Localizer push channel.
    *
    * Called after each Localizer pipeline run completes (every ~3 turns).
-   * Re-serializes BASE_PROMPT + latest delta into the full instructions
-   * string and emits session.update on the data channel.
+   * Injects ONLY the latest delta as a role:'system' conversation item.
    *
-   * Why this pattern (vs conversation.item.create with a role:"system"
-   * message): see spec section 4 + Cross-check round 2.
-   *   - session.update OVERWRITES the instructions field — by passing the
-   *     full re-serialized BASE + delta, we preserve the base prompt + safety
-   *     block (no loss) AND keep only the latest delta active (no timeline
-   *     pollution from accumulating role:"system" messages).
+   * F1 (perf/historian-pr114-cleanup-2026-05-30): swapped from
+   * session.update(instructions: BASE + delta) to
+   * conversation.item.create(role: 'system', delta). The old path
+   * re-serialized the entire ~15.7KB base prompt every run (~94KB / session
+   * of redundant data-channel traffic) and forced the model to re-prime
+   * its system context every ~30-60s of live conversation. The base
+   * prompt is set once at session start (in startSession via the initial
+   * session.update) and is NOT re-sent here. conversation.item.create
+   * additively appends a role:'system' message to the conversation
+   * timeline — it does NOT overwrite the base prompt the way
+   * session.update.instructions would.
    *
    * Non-fatal: if the push fails, the interview continues on the prior
-   * instructions. No retries.
+   * context. No retries.
    */
   const pushLocalizerContext = useCallback(
     (pushPayload: {
@@ -868,7 +894,6 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
       turn_count?: number
     }) => {
       if (dcRef.current?.readyState !== 'open') return
-      if (!baseInstructionsRef.current) return
 
       const delta = [
         `[LATEST LOCALIZER PUSH${pushPayload.turn_count != null ? ` @ turn ${pushPayload.turn_count}` : ''}]`,
@@ -877,25 +902,21 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
         `- Suggested scale to consider: ${pushPayload.suggested_scale_id ?? '(none)'}`,
       ].join('\n')
 
-      const updatedInstructions = baseInstructionsRef.current + '\n\n' + delta
-
       try {
         dcRef.current.send(
           JSON.stringify({
-            type: 'session.update',
-            session: {
-              // OpenAI's new Realtime API requires session.type on every
-              // session.update, not just at session create. Without it the
-              // push gets rejected with HTTP 400 missing_required_parameter.
-              // Caught by /tmp/historian-play.py WSS smoke 2026-05-27.
-              type: 'realtime',
-              instructions: updatedInstructions,
+            type: 'conversation.item.create',
+            item: {
+              type: 'message',
+              role: 'system',
+              content: [{ type: 'input_text', text: delta }],
             },
           }),
         )
+        // No response.create — advisory only; AI picks it up on its next natural turn.
       } catch (err) {
         console.error('[useRealtimeSession] pushLocalizerContext failed:', err)
-        // Non-fatal — interview continues on previous instructions
+        // Non-fatal — interview continues on previous context
       }
     },
     [],

@@ -39,7 +39,7 @@ export default function HistorianSessionPanel({ sessions, onImport }: HistorianS
         padding: '0 4px',
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#0d9488" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#23C5B7" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <path d="M9.5 2A5.5 5.5 0 005 7.5c0 .88.21 1.71.58 2.45" />
             <path d="M4.5 12.5C3 13.5 2 15.37 2 17.5 2 20 4 22 6.5 22c1.5 0 2.84-.73 3.67-1.85" />
             <path d="M14.5 2A5.5 5.5 0 0120 7.5c0 .88-.21 1.71-.58 2.45" />
@@ -51,7 +51,7 @@ export default function HistorianSessionPanel({ sessions, onImport }: HistorianS
           </span>
           {unreviewed.length > 0 && (
             <span style={{
-              background: '#0d9488',
+              background: '#23C5B7',
               color: '#fff',
               fontSize: '0.65rem',
               fontWeight: 700,
@@ -135,7 +135,7 @@ export default function HistorianSessionPanel({ sessions, onImport }: HistorianS
                       padding: '1px 6px',
                       borderRadius: '4px',
                       background: session.session_type === 'new_patient' ? 'rgba(139,92,246,0.15)' : 'rgba(13,148,136,0.15)',
-                      color: session.session_type === 'new_patient' ? '#8B5CF6' : '#0d9488',
+                      color: session.session_type === 'new_patient' ? '#8B5CF6' : '#23C5B7',
                       fontSize: '0.65rem',
                       fontWeight: 600,
                       textTransform: 'uppercase',
@@ -167,7 +167,7 @@ export default function HistorianSessionPanel({ sessions, onImport }: HistorianS
                     {!session.reviewed && (
                       <span style={{
                         width: 6, height: 6, borderRadius: '50%',
-                        background: '#0d9488', display: 'inline-block',
+                        background: '#23C5B7', display: 'inline-block',
                       }} />
                     )}
                   </div>
@@ -196,8 +196,8 @@ export default function HistorianSessionPanel({ sessions, onImport }: HistorianS
                           padding: '6px 12px',
                           background: 'none',
                           border: 'none',
-                          borderBottom: expandedSection === sec ? '2px solid #0d9488' : '2px solid transparent',
-                          color: expandedSection === sec ? '#0d9488' : 'var(--text-secondary, #64748b)',
+                          borderBottom: expandedSection === sec ? '2px solid #23C5B7' : '2px solid transparent',
+                          color: expandedSection === sec ? '#23C5B7' : 'var(--text-secondary, #64748b)',
                           fontWeight: 600,
                           fontSize: '0.7rem',
                           cursor: 'pointer',
@@ -292,12 +292,12 @@ export default function HistorianSessionPanel({ sessions, onImport }: HistorianS
                               padding: '6px 10px',
                               borderRadius: '6px',
                               background: entry.role === 'assistant' ? 'rgba(13,148,136,0.06)' : 'rgba(139,92,246,0.06)',
-                              borderLeft: `2px solid ${entry.role === 'assistant' ? '#0d9488' : '#8B5CF6'}`,
+                              borderLeft: `2px solid ${entry.role === 'assistant' ? '#23C5B7' : '#8B5CF6'}`,
                             }}
                           >
                             <div style={{
                               fontSize: '0.65rem',
-                              color: entry.role === 'assistant' ? '#0d9488' : '#8B5CF6',
+                              color: entry.role === 'assistant' ? '#23C5B7' : '#8B5CF6',
                               fontWeight: 600,
                               marginBottom: '1px',
                             }}>
@@ -324,7 +324,7 @@ export default function HistorianSessionPanel({ sessions, onImport }: HistorianS
                         style={{
                           padding: '6px 12px',
                           borderRadius: '6px',
-                          background: '#0d9488',
+                          background: '#23C5B7',
                           color: '#fff',
                           border: 'none',
                           fontWeight: 600,

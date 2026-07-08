@@ -359,14 +359,14 @@ export default function EmbeddedHistorian({
 
         <div style={{
           padding: 20, borderRadius: 12,
-          border: '2px solid #0d9488',
+          border: '2px solid #23C5B7',
           background: 'rgba(13, 148, 136, 0.1)',
           marginBottom: 20,
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
             <div style={{
               width: 36, height: 36, borderRadius: '50%',
-              background: 'linear-gradient(135deg, #0d9488, #14b8a6)',
+              background: 'linear-gradient(135deg, #23C5B7, #1a7d79)',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
               color: '#fff', fontWeight: 700, fontSize: '0.9rem',
             }}>
@@ -396,7 +396,7 @@ export default function EmbeddedHistorian({
           onClick={handleStart}
           style={{
             width: '100%', padding: 14, borderRadius: 10,
-            background: '#0d9488', color: '#fff', border: 'none',
+            background: '#23C5B7', color: '#fff', border: 'none',
             fontWeight: 700, fontSize: '1rem', cursor: 'pointer',
             display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
           }}
@@ -427,7 +427,7 @@ export default function EmbeddedHistorian({
           margin: '0 auto 24px',
           animation: 'embHistPulse 2s infinite',
         }}>
-          <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#0d9488" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#23C5B7" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <path d="M12 1a3 3 0 00-3 3v8a3 3 0 006 0V4a3 3 0 00-3-3z" />
             <path d="M19 10v2a7 7 0 01-14 0v-2" />
           </svg>
@@ -447,7 +447,7 @@ export default function EmbeddedHistorian({
       <div style={{ textAlign: 'center', padding: '48px 24px' }}>
         <div style={{
           width: 48, height: 48, borderRadius: '50%',
-          border: '3px solid #334155', borderTopColor: '#0d9488',
+          border: '3px solid #334155', borderTopColor: '#23C5B7',
           animation: 'embHistSpin 1s linear infinite',
           margin: '0 auto 16px',
         }} />
@@ -514,7 +514,7 @@ export default function EmbeddedHistorian({
           </svg>
           {showPhysicianPanel ? 'Hide Dx' : 'Differential'}
           {localizerLoading && (
-            <span style={{ width: 5, height: 5, borderRadius: '50%', background: '#0d9488', animation: 'embHistBlink 1s infinite', flexShrink: 0 }} />
+            <span style={{ width: 5, height: 5, borderRadius: '50%', background: '#23C5B7', animation: 'embHistBlink 1s infinite', flexShrink: 0 }} />
           )}
         </button>
       </div>
@@ -540,7 +540,7 @@ export default function EmbeddedHistorian({
           <div style={{
             width: 64, height: 64, borderRadius: '50%',
             background: isAiSpeaking
-              ? 'linear-gradient(135deg, #0d9488, #14b8a6)'
+              ? 'linear-gradient(135deg, #23C5B7, #1a7d79)'
               : isUserSpeaking
                 ? 'linear-gradient(135deg, #8B5CF6, #A78BFA)'
                 : '#334155',
@@ -617,7 +617,7 @@ export default function EmbeddedHistorian({
             <div key={i} style={{
               padding: '10px 14px', borderRadius: 10,
               background: entry.role === 'assistant' ? 'rgba(13,148,136,0.08)' : 'rgba(139,92,246,0.08)',
-              borderLeft: `3px solid ${entry.role === 'assistant' ? '#0d9488' : '#8B5CF6'}`,
+              borderLeft: `3px solid ${entry.role === 'assistant' ? '#23C5B7' : '#8B5CF6'}`,
             }}>
               <div style={{ fontSize: '0.7rem', color: entry.role === 'assistant' ? '#5eead4' : '#c4b5fd', fontWeight: 600, marginBottom: 2 }}>
                 {entry.role === 'assistant' ? 'AI Historian' : 'Patient'} - {formatTime(entry.timestamp)}
