@@ -262,3 +262,31 @@ export function getHistorianToolDefinition() {
   // wrapped this in [getHistorianToolDefinition()] must drop the wrapper.
   return [SAVE_INTERVIEW_OUTPUT_TOOL, QUERY_EVIDENCE_TOOL, SCALE_STEP_TOOL]
 }
+
+// ─── Nova tool adapter (Nova 2 Sonic voice migration) ──────────────────────
+//
+// Nova Sonic's tool-use config (Bedrock Converse `toolSpec`) shapes tool
+// specs differently from OpenAI Realtime's flat {name, description,
+// parameters} — it wants { toolSpec: { name, description, inputSchema:
+// { json: <stringified JSON Schema> } } }. `toNovaToolSpec` adapts one
+// OpenAI-shaped tool; `getHistorianToolsForProvider` returns the existing
+// OpenAI-shaped array unchanged for 'openai', or the Nova-adapted array for
+// 'nova'. The 3 historian tools (save_interview_output, query_evidence,
+// scale_step) and their JSON-Schema `parameters` are unchanged either way —
+// only the wrapper shape differs.
+
+/** OpenAI realtime tool spec → Nova Sonic toolSpec. */
+export function toNovaToolSpec(openAiTool: { name: string; description?: string; parameters: unknown }) {
+  return {
+    toolSpec: {
+      name: openAiTool.name,
+      description: openAiTool.description ?? '',
+      inputSchema: { json: JSON.stringify(openAiTool.parameters) },
+    },
+  }
+}
+
+export function getHistorianToolsForProvider(provider: 'nova' | 'openai') {
+  const tools = getHistorianToolDefinition() // existing OpenAI-style array
+  return provider === 'openai' ? tools : tools.map((t) => toNovaToolSpec(t as any))
+}

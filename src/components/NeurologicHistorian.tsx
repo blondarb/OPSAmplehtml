@@ -10,6 +10,8 @@ import HistorianConsentDisclosure from './HistorianConsentDisclosure'
 import LocalizerPanel from './LocalizerPanel'
 import PlatformShell from '@/components/layout/PlatformShell'
 import FeatureSubHeader from '@/components/layout/FeatureSubHeader'
+import VoiceProviderToggle from '@/components/voice/VoiceProviderToggle'
+import { useVoiceProviderPreference } from '@/lib/voice/useVoiceProviderPreference'
 import { Mic } from 'lucide-react'
 
 type Phase = 'loading_context' | 'scenario_select' | 'connecting' | 'active' | 'ending' | 'complete' | 'safety_escalation'
@@ -64,6 +66,9 @@ export default function NeurologicHistorian() {
       : `session-${Date.now()}`
   )
   const tenant = getTenantClient()
+  // Voice engine selection — defaults to 'openai' (today's production path);
+  // Nova only engages via an explicit ?voice=nova link or a toggle click.
+  const [voiceProvider, setVoiceProvider] = useVoiceProviderPreference()
 
   // Derive active config from either real patient or demo scenario
   const activeConfig: SessionConfig = sessionConfig || {
@@ -129,6 +134,7 @@ export default function NeurologicHistorian() {
     patientName: activeConfig.patientName,
     patientContext: activeConfig.patientContext,
     consultId: consultIdRef.current,
+    provider: voiceProvider,
     enableLocalizer: true,
     onComplete: handleComplete,
     onSafetyEscalation: handleSafetyEscalation,
@@ -506,6 +512,10 @@ export default function NeurologicHistorian() {
                 ))}
               </div>
             )}
+
+            <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 10 }}>
+              <VoiceProviderToggle value={voiceProvider} onChange={setVoiceProvider} />
+            </div>
 
             <button
               onClick={handleStartInterview}
