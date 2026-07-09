@@ -161,11 +161,21 @@ export class NovaSonicWsProvider implements VoiceProvider {
         this.emit({ type: 'aiSpeechStart' })
         break
       case 'aiSpeechStop':
+        // The relay sends this the moment Nova's turn (completionEnd) ends,
+        // but the closing audio may still be queued in the player — Nova
+        // streams PCM as separate chunks scheduled ahead of real time. Defer
+        // the "AI stopped speaking" signal until the player actually drains
+        // so the hook's order-independent auto-end (useRealtimeSession's
+        // maybeScheduleAutoEnd, which gates on !isAiSpeaking) never tears the
+        // session down mid-audio. No-op delay for ordinary turns — resolves
+        // immediately once nothing is left scheduled.
         this.aiSpeaking = false
-        this.emit({ type: 'aiSpeechStop' })
+        this.emitAiSpeechStopWhenDrained()
         break
       case 'bargeIn':
-        // User interrupted: flush queued AI audio, then signal speech stopped.
+        // User interrupted: flush queued AI audio, then signal speech stopped
+        // immediately — interrupt() already silenced playback, so there is
+        // nothing left to drain.
         this.player?.interrupt()
         this.aiSpeaking = false
         this.emit({ type: 'aiSpeechStop' })
@@ -180,16 +190,33 @@ export class NovaSonicWsProvider implements VoiceProvider {
         break
       case 'completion':
         // End-of-turn. No dedicated VoiceEvent; if the AI was still flagged as
-        // speaking (no explicit aiSpeechStop arrived), close the turn out.
+        // speaking (no explicit aiSpeechStop arrived), close the turn out —
+        // same drain-then-emit path as the aiSpeechStop case above.
         if (this.aiSpeaking) {
           this.aiSpeaking = false
-          this.emit({ type: 'aiSpeechStop' })
+          this.emitAiSpeechStopWhenDrained()
         }
         break
       case 'error':
         this.emit({ type: 'error', message: msg.message })
         break
     }
+  }
+
+  /**
+   * Emits `aiSpeechStop` only after any PCM already queued in the player has
+   * finished playing (see PcmPlayer.whenDrained). Falls back to an immediate
+   * emit if there's no player (e.g. already torn down).
+   */
+  private emitAiSpeechStopWhenDrained(): void {
+    const player = this.player
+    if (!player) {
+      this.emit({ type: 'aiSpeechStop' })
+      return
+    }
+    player.whenDrained().then(() => {
+      this.emit({ type: 'aiSpeechStop' })
+    })
   }
 
   sendToolResult(toolUseId: string, output: unknown): void {
