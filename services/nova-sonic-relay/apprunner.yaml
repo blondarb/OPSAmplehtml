@@ -1,0 +1,35 @@
+# ---------------------------------------------------------------------------
+# AWS App Runner — source-based configuration (alternative to image deploy).
+#
+# NOTE: The image-based path via the Dockerfile is the RECOMMENDED route for
+# production. Build the image, push to Amazon ECR, and point App Runner at
+# the ECR repository. The source-based config below is provided as a
+# convenience for rapid prototyping; it runs `npm ci && npm run build` on
+# App Runner's managed build environment on every deploy.
+#
+# Schema reference:
+#   https://docs.aws.amazon.com/apprunner/latest/dg/config-file-ref.html
+# ---------------------------------------------------------------------------
+version: 1.0
+runtime: nodejs18
+
+build:
+  commands:
+    build:
+      - npm ci
+      - npm run build
+
+run:
+  command: node dist/server.js
+  network:
+    port: 8081
+    # App Runner injects the listen port under this env var name; the server
+    # reads process.env.PORT, so map it to PORT (not the default APP_PORT).
+    env: PORT
+  env:
+    - name: NOVA_SONIC_REGION
+      value: us-east-1
+    - name: NOVA_SONIC_MODEL_ID
+      value: amazon.nova-2-sonic-v1:0
+    # NOVA_SONIC_VOICE_ID — set in the App Runner console or via
+    # aws apprunner update-service if you want a non-default voice.
