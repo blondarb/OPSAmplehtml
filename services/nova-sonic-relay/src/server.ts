@@ -193,6 +193,10 @@ wss.on('connection', (ws) => {
 // ---------------------------------------------------------------------------
 
 const PORT = Number(process.env.PORT) || 8081
-server.listen(PORT, () => {
+// Bind explicitly to 0.0.0.0 (IPv4). Node's default `listen(PORT)` binds the
+// IPv6 unspecified address (::), which App Runner's IPv4 TCP health check
+// cannot reach in its container network — the app runs but the deploy fails
+// the health check with no application logs. Explicit IPv4 bind fixes it.
+server.listen(PORT, '0.0.0.0', () => {
   console.log(`relay on port ${PORT}`)
 })
