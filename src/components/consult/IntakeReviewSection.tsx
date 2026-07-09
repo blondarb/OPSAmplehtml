@@ -1,11 +1,24 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import type { NeurologyConsult } from '@/lib/consult/types'
 import type { HistorianStructuredOutput } from '@/lib/historianTypes'
 
+/**
+ * Minimal shape this component needs from a consult-like record. Loosened
+ * from `NeurologyConsult | null` (2026-07-09) so standalone surfaces — e.g.
+ * HistorianReportView on the `/patient/historian` post-interview report,
+ * which has no real `neurology_consults` row — can reuse this same
+ * physician-facing review UI. A real `NeurologyConsult` satisfies this shape
+ * structurally, so existing callers (PatientToolsStepPanel) are unaffected.
+ */
+export interface IntakeReviewData {
+  historian_structured_output: Record<string, unknown> | null
+  historian_summary: string | null
+  interview_completion_status?: 'complete' | 'ended_early' | null
+}
+
 interface IntakeReviewSectionProps {
-  consult: NeurologyConsult | null
+  consult: IntakeReviewData | null
   /**
    * Called whenever the physician adds, edits, or clears a correction note
    * on any section. Receives the full corrections map keyed by section id.
