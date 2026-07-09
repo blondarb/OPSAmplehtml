@@ -68,7 +68,15 @@ export class NovaSonicWsProvider implements VoiceProvider {
     try {
     this.player = new PcmPlayer()
 
-    const ws = new WebSocket(opts.relayUrl)
+    // The relay's WS upgrade requires a short-lived auth token (see
+    // services/nova-sonic-relay/src/server.ts verifyClient). Browsers cannot
+    // set custom headers on a WS handshake, so the token rides along as a
+    // second subprotocol next to the fixed 'nova.v1' tag. If the session
+    // route didn't return a token (NOVA_RELAY_SHARED_SECRET unset
+    // server-side), we still attempt the connection with just 'nova.v1' —
+    // the relay's fail-closed verifyClient rejects it and the existing
+    // onclose/onerror -> `disconnected`/`error` path surfaces the failure.
+    const ws = new WebSocket(opts.relayUrl, ['nova.v1', opts.relayToken].filter(Boolean) as string[])
     this.ws = ws
 
     ws.onopen = () => {

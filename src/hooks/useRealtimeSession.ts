@@ -579,6 +579,7 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
         tools: sessionTools,
         voiceId,
         relayUrl,
+        relayToken,
         expiresAt,
       } = sessionConfig
 
@@ -607,7 +608,7 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
       provider.on((e) => handleVoiceEvent(e, sessionGen))
 
       // 4. Open the transport. The provider ignores fields it doesn't need
-      //    (OpenAI ignores relayUrl; Nova ignores ephemeralKey/model/expiresAt).
+      //    (OpenAI ignores relayUrl/relayToken; Nova ignores ephemeralKey/model/expiresAt).
       await provider.start({
         instructions: baseInstructionsRef.current,
         tools: sessionTools ?? [],
@@ -615,6 +616,7 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
         ephemeralKey,
         model: sessionModel,
         relayUrl,
+        relayToken,
         expiresAt,
         sessionType: sessionTypeRef.current,
       })

@@ -35,6 +35,11 @@ const nextConfig: NextConfig = {
     VOICE_PROVIDER: process.env.VOICE_PROVIDER,
     NOVA_SONIC_RELAY_URL: process.env.NOVA_SONIC_RELAY_URL,
     NOVA_SONIC_VOICE_ID: process.env.NOVA_SONIC_VOICE_ID,
+    // Shared secret used to mint the relay's WS-upgrade auth token
+    // (src/app/api/ai/historian/session/route.ts mintNovaRelayToken). Same
+    // known Amplify SSR gotcha as the vars above — must be inlined here or
+    // the session route can't read it at runtime.
+    NOVA_RELAY_SHARED_SECRET: process.env.NOVA_RELAY_SHARED_SECRET,
   },
 };
 

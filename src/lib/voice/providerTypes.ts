@@ -81,6 +81,15 @@ export interface VoiceStartOptions {
   // ── Nova-only (ignored by OpenAI) ──
   /** WebSocket URL of the Nova Sonic relay. */
   relayUrl?: string
+  /**
+   * Short-lived HMAC auth token for the Nova Sonic relay's WebSocket
+   * upgrade, minted by the session route (see mintNovaRelayToken in
+   * src/app/api/ai/historian/session/route.ts). The provider sends it as a
+   * WS subprotocol (browsers cannot set custom headers on a WS handshake) —
+   * see novaSonicWsProvider.ts. Undefined when NOVA_RELAY_SHARED_SECRET is
+   * unset server-side; the relay then fail-closed-rejects the connection.
+   */
+  relayToken?: string
 }
 
 /**
