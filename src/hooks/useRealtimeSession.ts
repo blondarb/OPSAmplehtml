@@ -169,6 +169,17 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
   const interviewCompletedRef = useRef<boolean>(false)
   const autoEndTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
+  // Mirror of isAiSpeaking state as a ref (Fix 3, 2026-07-09) — lets
+  // maybeScheduleAutoEnd read the latest speaking state synchronously,
+  // the same way interviewCompletedRef avoids stale-closure races.
+  // setAiSpeaking() is the single call site that keeps both in sync; every
+  // setIsAiSpeaking(...) call in this hook goes through it.
+  const isAiSpeakingRef = useRef<boolean>(false)
+  const setAiSpeaking = useCallback((speaking: boolean) => {
+    isAiSpeakingRef.current = speaking
+    setIsAiSpeaking(speaking)
+  }, [])
+
   const sessionTypeRef = useRef<string>('new_patient')
 
   // Localizer-specific refs
@@ -202,6 +213,31 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
     if (autoEndTimerRef.current) {
       clearTimeout(autoEndTimerRef.current)
       autoEndTimerRef.current = null
+    }
+  }, [])
+
+  /**
+   * Fix 3 (2026-07-09): order-independent, provider-agnostic auto-end.
+   *
+   * Root cause this replaces: the old auto-end only fired from the
+   * assistantTranscript handler, and only if interviewCompletedRef was
+   * ALREADY true when the closing transcript arrived. On OpenAI,
+   * save_interview_output surfaces via response.done, which fires AFTER
+   * response.audio_transcript.done (the closing transcript) — so
+   * interviewCompleted was still false at the moment that mattered, and
+   * auto-end never scheduled.
+   *
+   * This helper is called from every place that could be the LAST of the
+   * three signals to arrive (closing transcript, save_interview_output tool
+   * call, AI stops speaking) and only schedules once all three gates are
+   * satisfied — so it doesn't matter which one lands last.
+   */
+  const maybeScheduleAutoEnd = useCallback(() => {
+    if (interviewCompletedRef.current && !finalizingRef.current && !isAiSpeakingRef.current) {
+      if (autoEndTimerRef.current) clearTimeout(autoEndTimerRef.current)
+      autoEndTimerRef.current = setTimeout(() => {
+        endSessionRef.current()
+      }, 250)
     }
   }, [])
 
@@ -287,12 +323,20 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
           safetyEscalatedRef.current = true
         }
         // Signal to consumers that the interview has concluded so they can
-        // auto-end the session after the AI's closing line.
+        // auto-end the session after the AI's closing line. Set the ref
+        // synchronously (not just via the interviewCompleted-state effect
+        // below, which only runs after the next render) so the immediate
+        // maybeScheduleAutoEnd() call sees it — this is the path that fixes
+        // Henry: on OpenAI, this tool call lands AFTER the closing transcript
+        // (response.done fires after response.audio_transcript.done), so
+        // isAiSpeakingRef is already false and auto-end schedules right here.
+        interviewCompletedRef.current = true
         setInterviewCompleted(true)
         // The OpenAI provider's sendToolResult issues its own response.create
         // after the ack (no modalities — #142) so the model speaks its
         // closing line; Nova self-triggers.
         provider?.sendToolResult(toolUseId, { success: true })
+        maybeScheduleAutoEnd()
       } catch (e) {
         console.error('Error handling save_interview_output:', e)
       }
@@ -391,7 +435,7 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
       })()
       return
     }
-  }, [options.consultId])
+  }, [options.consultId, maybeScheduleAutoEnd])
 
   // ── Normalized provider event handler — replaces handleServerEvent.
   // Routes provider-agnostic VoiceEvents to the SAME harness logic as before
@@ -401,7 +445,7 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
       case 'assistantTextDelta': {
         // Streaming AI text (was response.audio_transcript.delta)
         setCurrentAssistantText(prev => prev + (e.text || ''))
-        setIsAiSpeaking(true)
+        setAiSpeaking(true)
         break
       }
 
@@ -419,18 +463,16 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
           questionCountRef.current += 1
         }
         setCurrentAssistantText('')
-        setIsAiSpeaking(false)
+        setAiSpeaking(false)
 
-        // #143: if save_interview_output already fired, this audio is the
-        // closing message. Schedule auto-end now that the AI has finished
-        // speaking — via a ref so this handler never has a stale closure on
-        // endSessionRef.
-        if (interviewCompletedRef.current && !finalizingRef.current) {
-          if (autoEndTimerRef.current) clearTimeout(autoEndTimerRef.current)
-          autoEndTimerRef.current = setTimeout(() => {
-            endSessionRef.current()
-          }, 0)
-        }
+        // Fix 3 (2026-07-09): if save_interview_output already fired, this
+        // transcript is the closing message — try to schedule auto-end now
+        // that the AI has finished speaking. Order-independent: if
+        // interviewCompletedRef isn't set yet (the Henry/OpenAI case, where
+        // response.done — and its save_interview_output tool call — fires
+        // AFTER this transcript event), this is a no-op here and the
+        // handleToolCall branch schedules it instead once the tool call lands.
+        maybeScheduleAutoEnd()
         break
       }
 
@@ -489,12 +531,16 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
       }
 
       case 'aiSpeechStart': {
-        setIsAiSpeaking(true)
+        setAiSpeaking(true)
         break
       }
 
       case 'aiSpeechStop': {
-        setIsAiSpeaking(false)
+        // Nova (via novaSonicWsProvider) only fires this once its player has
+        // actually drained the closing audio (Fix 2) — so if the tool call
+        // landed while still speaking, this is what schedules the end.
+        setAiSpeaking(false)
+        maybeScheduleAutoEnd()
         break
       }
 
@@ -520,7 +566,7 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
         break
       }
     }
-  }, [checkSafety, runLocalizer, handleToolCall, options])
+  }, [checkSafety, runLocalizer, handleToolCall, options, setAiSpeaking, maybeScheduleAutoEnd])
 
   const startSession = useCallback(async () => {
     setStatus('connecting')

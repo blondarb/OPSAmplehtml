@@ -31,6 +31,8 @@ export class PcmPlayer {
   private ctx: AudioContext | null = null;
   private nextStartTime = 0;
   private activeSources = new Set<AudioBufferSourceNode>();
+  /** Resolvers waiting on whenDrained() — flushed once activeSources empties. */
+  private drainWaiters: Array<() => void> = [];
 
   /** Lazily create the AudioContext on first use. */
   private getContext(): AudioContext {
@@ -80,7 +82,33 @@ export class PcmPlayer {
     this.activeSources.add(src);
     src.onended = () => {
       this.activeSources.delete(src);
+      this.checkDrained();
     };
+  }
+
+  /** Flush any pending whenDrained() resolvers once nothing is left scheduled. */
+  private checkDrained(): void {
+    if (this.activeSources.size === 0 && this.drainWaiters.length > 0) {
+      const waiters = this.drainWaiters;
+      this.drainWaiters = [];
+      for (const resolve of waiters) resolve();
+    }
+  }
+
+  /**
+   * Resolves once all currently scheduled PCM has finished playing (no active
+   * sources remain). Resolves immediately if nothing is queued. If more audio
+   * is enqueued before draining completes, the wait naturally extends to
+   * cover it — callers get "actually done speaking," not "done as of the
+   * moment I asked."
+   */
+  whenDrained(): Promise<void> {
+    if (this.activeSources.size === 0) {
+      return Promise.resolve();
+    }
+    return new Promise<void>((resolve) => {
+      this.drainWaiters.push(resolve);
+    });
   }
 
   /**
@@ -97,6 +125,10 @@ export class PcmPlayer {
     }
     this.activeSources.clear();
     this.nextStartTime = 0;
+    // stop() fires each source's onended asynchronously, but callers waiting
+    // on whenDrained() should see the interrupt as "drained now" rather than
+    // waiting on those async callbacks to trickle in.
+    this.checkDrained();
   }
 
   /**
