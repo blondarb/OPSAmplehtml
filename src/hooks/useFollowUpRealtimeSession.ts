@@ -2,12 +2,23 @@
 
 import { useState, useRef, useCallback, useEffect } from 'react'
 import type { TranscriptEntry, PatientScenario, EscalationFlag } from '@/lib/follow-up/types'
-import { scanForEscalationTriggers } from '@/lib/follow-up/escalationRules'
+import { scanForEscalationTriggers, escalationFlagFromToolOutput } from '@/lib/follow-up/escalationRules'
+import type { VoiceEvent, VoiceProvider } from '@/lib/voice/providerTypes'
+import { selectProvider, makeProvider } from '@/lib/voice/selectProvider'
 
 type SessionStatus = 'idle' | 'connecting' | 'active' | 'ending' | 'complete' | 'error' | 'safety_escalation'
 
 export interface UseFollowUpRealtimeSessionOptions {
   scenario: PatientScenario
+  /**
+   * Optional voice provider override ('nova' | 'openai'). Defaults to
+   * 'openai' (today's production path — an anti-echo mic-mute WebRTC flow
+   * that is NOT reproducible through the shared VoiceProvider abstraction
+   * without losing that behavior, so it stays as its own inline code path
+   * below, completely untouched by adding Nova support). Nova only engages
+   * via an explicit override.
+   */
+  provider?: 'nova' | 'openai'
   onSafetyEscalation?: () => void
   onEscalation?: (flag: EscalationFlag) => void
   onComplete?: (data: {
@@ -64,6 +75,12 @@ export function useFollowUpRealtimeSession(
   const transcriptRef = useRef<TranscriptEntry[]>([])
   const aiSpeakingRef = useRef<boolean>(false)
   const responseHadAudioRef = useRef<boolean>(false)
+  // Nova-only transport (VoiceProvider). Null whenever the OpenAI inline
+  // WebRTC path above is active — the two paths never run simultaneously.
+  const novaProviderRef = useRef<VoiceProvider | null>(null)
+  // Stable ref to endSession so the Nova provider's `disconnected` handler can
+  // call the latest version without a circular useCallback dependency.
+  const endSessionRef = useRef<() => void>(() => {})
 
   // Store callbacks in refs to avoid dependency churn
   const onSafetyEscalationRef = useRef(options.onSafetyEscalation)
@@ -156,7 +173,100 @@ export function useFollowUpRealtimeSession(
       audioElRef.current.remove()
       audioElRef.current = null
     }
+    if (novaProviderRef.current) {
+      try { novaProviderRef.current.stop() } catch {}
+      novaProviderRef.current = null
+    }
   }, [])
+
+  // ── Nova path event handler — maps the normalized VoiceEvent stream onto
+  // the SAME transcript/safety/escalation state as the OpenAI
+  // handleServerEvent below. No mic-mute (Nova's relay handles its own audio
+  // routing), no response.created-based mute timing — those are OpenAI-
+  // transport-specific anti-echo mechanics that don't apply to the WS relay.
+  const handleNovaVoiceEvent = useCallback((e: VoiceEvent) => {
+    switch (e.type) {
+      case 'assistantTextDelta': {
+        setCurrentAssistantText(prev => prev + (e.text || ''))
+        setIsAiSpeaking(true)
+        break
+      }
+      case 'assistantTranscript': {
+        const fullText = e.text || ''
+        if (fullText.trim()) {
+          const entry: TranscriptEntry = {
+            role: 'agent',
+            text: fullText.trim(),
+            timestamp: Math.floor((Date.now() - startTimeRef.current) / 1000),
+          }
+          transcriptRef.current = [...transcriptRef.current, entry]
+          setTranscript([...transcriptRef.current])
+        }
+        setCurrentAssistantText('')
+        setIsAiSpeaking(false)
+        break
+      }
+      case 'userTranscript': {
+        const userText = e.text || ''
+        if (userText.trim()) {
+          const entry: TranscriptEntry = {
+            role: 'patient',
+            text: userText.trim(),
+            timestamp: Math.floor((Date.now() - startTimeRef.current) / 1000),
+          }
+          transcriptRef.current = [...transcriptRef.current, entry]
+          setTranscript([...transcriptRef.current])
+          checkSafety(userText)
+          checkEscalation(userText)
+        }
+        setCurrentUserText('')
+        setIsUserSpeaking(false)
+        break
+      }
+      case 'userSpeechStart': {
+        setIsUserSpeaking(true)
+        setCurrentUserText('(listening...)')
+        break
+      }
+      case 'userSpeechStop': {
+        setIsUserSpeaking(false)
+        break
+      }
+      case 'aiSpeechStart': {
+        setIsAiSpeaking(true)
+        break
+      }
+      case 'aiSpeechStop': {
+        setIsAiSpeaking(false)
+        break
+      }
+      case 'toolCall': {
+        if (e.toolName === 'save_followup_output') {
+          const args: any = (e.input && typeof e.input === 'object') ? e.input : {}
+          // Use the real schema fields (escalation_triggered/tier/reason) —
+          // NOT the non-existent escalation_flags array the OpenAI branch's
+          // pre-existing handler reads (see escalationRules.ts comment).
+          const escalation = escalationFlagFromToolOutput(args)
+          if (escalation) {
+            escalationFlagsRef.current = [...escalationFlagsRef.current, escalation]
+            onEscalationRef.current?.(escalation)
+          }
+          novaProviderRef.current?.sendToolResult(e.toolUseId, { success: true })
+        }
+        break
+      }
+      case 'disconnected': {
+        console.warn('[useFollowUpRealtimeSession] Nova transport disconnected —', e.reason)
+        endSessionRef.current()
+        break
+      }
+      case 'error': {
+        console.error('Nova voice provider error:', e.message)
+        setError(e.message || 'Voice provider error')
+        break
+      }
+    }
+  }, [checkSafety, checkEscalation])
 
   // Handle server events from the data channel
   const handleServerEvent = useCallback((msg: any) => {
@@ -318,12 +428,14 @@ export function useFollowUpRealtimeSession(
     safetyEscalatedRef.current = false
 
     try {
-      // 1. Get ephemeral token
+      // 1. Get provider config. The route returns provider-native config: for
+      //    OpenAI an ephemeral key; for Nova a relayUrl + voiceId + tools.
       const tokenRes = await fetch('/api/follow-up/realtime-session', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           patient_context: options.scenario,
+          provider: options.provider,
         }),
       })
 
@@ -332,7 +444,36 @@ export function useFollowUpRealtimeSession(
         throw new Error(errData.error || `Failed to get session token (${tokenRes.status})`)
       }
 
-      const { ephemeralKey } = await tokenRes.json()
+      const sessionConfig = await tokenRes.json()
+      const kind: 'nova' | 'openai' =
+        sessionConfig.provider === 'openai' || sessionConfig.provider === 'nova'
+          ? sessionConfig.provider
+          : selectProvider(options.provider)
+
+      // ── Nova path: additive, separate transport. Does not touch any of the
+      // OpenAI inline WebRTC code below.
+      if (kind === 'nova') {
+        const provider = makeProvider('nova')
+        novaProviderRef.current = provider
+        provider.on(handleNovaVoiceEvent)
+        await provider.start({
+          instructions: sessionConfig.instructions ?? '',
+          tools: sessionConfig.tools ?? [],
+          voiceId: sessionConfig.voiceId,
+          relayUrl: sessionConfig.relayUrl,
+        })
+
+        startTimeRef.current = Date.now()
+        timerRef.current = setInterval(() => {
+          setDuration(Math.floor((Date.now() - startTimeRef.current) / 1000))
+        }, 1000)
+
+        setStatus('active')
+        return
+      }
+
+      // ── OpenAI path — UNCHANGED from before Nova support was added. ──
+      const { ephemeralKey } = sessionConfig
       if (!ephemeralKey) throw new Error('No ephemeral key returned')
 
       // 2. Create RTCPeerConnection
@@ -424,7 +565,7 @@ export function useFollowUpRealtimeSession(
       setStatus('error')
       cleanup()
     }
-  }, [options.scenario, cleanup, handleServerEvent])
+  }, [options.scenario, options.provider, cleanup, handleServerEvent, handleNovaVoiceEvent])
 
   const endSession = useCallback(() => {
     setStatus('ending')
@@ -443,6 +584,10 @@ export function useFollowUpRealtimeSession(
 
     setStatus('complete')
   }, [cleanup])
+
+  // Keep the ref in sync so the Nova provider's `disconnected` handler always
+  // calls the latest endSession.
+  useEffect(() => { endSessionRef.current = endSession }, [endSession])
 
   // Clean up on unmount
   useEffect(() => {

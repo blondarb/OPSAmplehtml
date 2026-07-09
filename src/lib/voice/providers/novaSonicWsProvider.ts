@@ -101,17 +101,21 @@ export class NovaSonicWsProvider implements VoiceProvider {
     }
 
     ws.onerror = () => {
-      // The browser WebSocket error event carries no detail; surface a generic
-      // error. onclose will follow and is suppressed once we've emitted here.
-      if (!this.closing) {
-        this.emit({ type: 'error', message: 'Nova relay socket error' })
-      }
+      // The browser WebSocket error event carries no detail. onclose follows
+      // and is the one that decides disconnected-vs-clean, so no emit here —
+      // avoids double-reporting the same drop as both `error` and
+      // `disconnected`.
     }
 
     ws.onclose = (event: CloseEvent) => {
-      // Only an unexpected close (not our own stop(), not a clean 1000) is an error.
+      // Only an unexpected close (not our own stop(), not a clean 1000) is a
+      // drop. Emitted as `disconnected` (not `error`) so the hook runs the
+      // SAME graceful end-of-session flow as the OpenAI provider's transport-
+      // drop handling and a manual "End Interview" click — flush
+      // save_interview_output, fall back to a raw-transcript narrative, tear
+      // down, fire onComplete.
       if (!this.closing && !event.wasClean && event.code !== 1000) {
-        this.emit({ type: 'error', message: `Nova relay closed unexpectedly (code ${event.code})` })
+        this.emit({ type: 'disconnected', reason: `ws:close(${event.code})` })
       }
     }
     } catch (err) {
@@ -189,7 +193,8 @@ export class NovaSonicWsProvider implements VoiceProvider {
 
   requestResponse(): void {
     // No-op: Nova drives its own turn-taking; the injected system text is acted
-    // on as it continues. There is no relay frame to force a turn.
+    // on as it continues. There is no relay frame to force a turn, and no
+    // text-only response concept (opts ignored).
   }
 
   async stop(): Promise<void> {

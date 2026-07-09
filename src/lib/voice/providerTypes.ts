@@ -39,6 +39,14 @@ export type VoiceEvent =
   | { type: 'aiSpeechStop' }
   | { type: 'toolCall'; toolName: string; toolUseId: string; input: unknown }
   | { type: 'error'; message: string }
+  // Transport dropped unexpectedly (WebRTC connection failed/closed, data
+  // channel closed, WS closed non-cleanly) — distinct from `error`, which is
+  // an in-session protocol-level error the session can survive. `disconnected`
+  // means the transport is gone; the hook uses it to run the SAME graceful
+  // end-of-session flow as a manual "End Interview" click (flush
+  // save_interview_output, fall back to a raw-transcript narrative, tear down,
+  // fire onComplete). Never emitted as a result of the provider's own stop().
+  | { type: 'disconnected'; reason: string }
 
 /**
  * Options passed to `start`. Some fields are provider-specific; each provider
@@ -56,6 +64,20 @@ export interface VoiceStartOptions {
   ephemeralKey?: string
   /** Realtime model id (defaults to gpt-realtime-2 in the OpenAI provider). */
   model?: string
+  /**
+   * Unix seconds when `ephemeralKey` expires. When present, the OpenAI
+   * provider self-schedules a token renewal ~90s before expiry (via
+   * POST /api/ai/historian/session-renew) so long sessions survive past the
+   * ephemeral token's short TTL without tearing down the WebRTC connection.
+   * Omit to disable renewal (e.g. tests, or providers/routes that don't
+   * return an expiry).
+   */
+  expiresAt?: number
+  /**
+   * Historian session type ('new_patient' | 'follow_up'), forwarded to
+   * session-renew so it can rebuild matching instructions. OpenAI-only.
+   */
+  sessionType?: string
   // ── Nova-only (ignored by OpenAI) ──
   /** WebSocket URL of the Nova Sonic relay. */
   relayUrl?: string
@@ -75,7 +97,23 @@ export interface VoiceProvider {
   sendToolResult(toolUseId: string, output: unknown): void
   /** Inject advisory system text mid-session (localizer / scale guidance). */
   injectSystemText(text: string): void
-  /** Force the model to produce a response now (e.g. to kick off scale administration).
-   *  OpenAI → response.create; Nova → no-op (Nova self-triggers turns). */
-  requestResponse(): void
+  /**
+   * Force the model to produce a response now (e.g. to kick off scale
+   * administration, or to flush a save before ending early).
+   * OpenAI → response.create; Nova → no-op (Nova self-triggers turns).
+   *
+   * `opts.textOnly` restricts the forced response to text (no audio) — used
+   * by the end-of-interview flush prompt so the AI doesn't start speaking a
+   * full reply right before the transport tears down. Ignored by Nova.
+   */
+  requestResponse(opts?: { textOnly?: boolean }): void
+  /**
+   * OpenAI-only escape hatch: overwrite the live session's full instructions
+   * (session.update) rather than append an advisory item to the timeline.
+   * Used by the Localizer push channel to re-serialize BASE_PROMPT + the
+   * latest delta so only one delta stays active (no timeline pollution from
+   * accumulating advisory messages). Nova has no equivalent primitive — its
+   * provider leaves this undefined; callers fall back to `injectSystemText`.
+   */
+  updateInstructions?(fullText: string): void
 }
