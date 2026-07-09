@@ -77,8 +77,10 @@ export class OpenAiWebrtcProvider implements VoiceProvider {
   async start(opts: VoiceStartOptions): Promise<void> {
     if (this.pc) return // already started — idempotent guard
     if (!opts.ephemeralKey) {
-      this.emit({ type: 'error', message: 'openaiWebrtcProvider: ephemeralKey is required' })
-      return
+      // Throw (don't emit+return): a failed start() must REJECT so the hook's
+      // catch sets status:'error'. Resolving here would let the hook flip to
+      // 'active' with no live transport.
+      throw new Error('openaiWebrtcProvider: ephemeralKey is required')
     }
 
     this.stopped = false
@@ -195,12 +197,14 @@ export class OpenAiWebrtcProvider implements VoiceProvider {
       // the token's short TTL without a reconnect.
       if (opts.expiresAt) this.scheduleRenewal(opts.expiresAt)
     } catch (err: unknown) {
-      this.emit({
-        type: 'error',
-        message: err instanceof Error ? err.message : 'Failed to start OpenAI WebRTC session',
-      })
-      // Tear down any half-open transport so the provider is reusable.
+      // Tear down any half-open transport so the provider is reusable, then
+      // RE-THROW so start() rejects. Pre-refactor, getUserMedia / SDP /
+      // setRemoteDescription failures bubbled to the hook's catch, which sets
+      // status:'error' + cleanup. Emitting an 'error' VoiceEvent and resolving
+      // instead would let the hook believe start() succeeded and flip to
+      // 'active' with a dead transport — a live-historian regression.
       await this.stop()
+      throw err instanceof Error ? err : new Error('Failed to start OpenAI WebRTC session')
     }
   }
 

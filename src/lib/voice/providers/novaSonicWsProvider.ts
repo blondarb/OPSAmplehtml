@@ -124,11 +124,11 @@ export class NovaSonicWsProvider implements VoiceProvider {
       }
     }
     } catch (err) {
-      this.emit({
-        type: 'error',
-        message: `nova start failed: ${err instanceof Error ? err.message : String(err)}`,
-      })
+      // Tear down, then RE-THROW so start() rejects and the hook's catch sets
+      // status:'error' (same contract as the OpenAI provider). Resolving after
+      // a synchronous setup failure would strand the hook in 'active'.
       await this.stop()
+      throw err instanceof Error ? err : new Error(`nova start failed: ${String(err)}`)
     }
   }
 
