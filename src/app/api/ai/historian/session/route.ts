@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { buildHistorianSystemPrompt, getHistorianToolDefinition } from '@/lib/historianPrompts'
+import { buildHistorianSystemPrompt, getHistorianToolDefinition, getHistorianToolsForProvider } from '@/lib/historianPrompts'
 import type { HistorianSessionType } from '@/lib/historianTypes'
 import { getTurnDetectionConfig, getNoiseReductionConfig } from '@/lib/historianTypes'
 import { getOpenAIKey } from '@/lib/secrets'
@@ -13,6 +13,13 @@ export async function POST(request: Request) {
     const sessionType: HistorianSessionType = body.sessionType || 'new_patient'
     let referralReason: string | undefined = body.referralReason
     let patientContext: string | undefined = body.patientContext
+
+    // Provider selection: explicit client `provider` field wins, else the
+    // server-side VOICE_PROVIDER env var, else default to 'openai' — today's
+    // production path. Only 'nova' opts into the WS-relay/Bedrock path; any
+    // other/missing value falls back to openai (fail-safe default).
+    const requestedProvider = (body.provider ?? process.env.VOICE_PROVIDER ?? 'openai') as string
+    const provider: 'nova' | 'openai' = requestedProvider === 'nova' ? 'nova' : 'openai'
 
     // Phase 1 pipeline: enrich the historian context with triage + intake from
     // the consult record. Caller-provided values are overridden when a consult
@@ -32,6 +39,24 @@ export async function POST(request: Request) {
       }
     }
 
+    // ── Nova path: no OpenAI client_secrets call. Return relay config + the
+    // Nova-native tool specs (Bedrock Converse toolSpec shape). The hook
+    // builds a NovaSonicWsProvider from this — no ephemeral key needed.
+    if (provider === 'nova') {
+      const instructions = buildHistorianSystemPrompt(sessionType, referralReason, patientContext)
+      return NextResponse.json({
+        provider: 'nova',
+        instructions,
+        tools: getHistorianToolsForProvider('nova'),
+        relayUrl: process.env.NOVA_SONIC_RELAY_URL,
+        voiceId: process.env.NOVA_SONIC_VOICE_ID,
+        // base_instructions kept for client parity (localizer push channel).
+        base_instructions: instructions,
+        consult_id: consultId || null,
+      })
+    }
+
+    // ── OpenAI path (unchanged client_secrets flow below) ──
     const apiKey = await getOpenAIKey()
     if (!apiKey) {
       return NextResponse.json(
@@ -121,6 +146,11 @@ export async function POST(request: Request) {
     const data = await response.json()
 
     return NextResponse.json({
+      // Tells the client which provider minted this session so the hook
+      // instantiates the matching VoiceProvider (added for the voice-provider
+      // abstraction; every other field below is unchanged from before it).
+      provider: 'openai',
+      tools,
       // Shape unchanged from client's perspective
       ephemeralKey: data.value ?? data.client_secret?.value,
       sessionId: data.session_id ?? data.id,

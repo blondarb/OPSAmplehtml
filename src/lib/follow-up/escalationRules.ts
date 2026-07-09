@@ -56,6 +56,57 @@ export function scanForEscalationTriggers(text: string): EscalationFlag[] {
   return flags
 }
 
+// Default clinician action per tier, used when the escalation comes from the
+// AI's own assessment (which supplies a reason but not an action). Mirrors the
+// tone of the regex-rule recommendedActions and the EscalationAlert tier headers.
+const AI_ESCALATION_ACTIONS: Record<EscalationTier, string> = {
+  urgent: 'Immediate clinician notification.',
+  same_day: 'Same-day clinician callback.',
+  next_visit: 'Flag for next scheduled visit.',
+  informational: 'Informational note — no immediate action required.',
+}
+
+const ESCALATION_TIERS: EscalationTier[] = ['urgent', 'same_day', 'next_visit', 'informational']
+
+function isEscalationTier(v: unknown): v is EscalationTier {
+  return typeof v === 'string' && (ESCALATION_TIERS as string[]).includes(v)
+}
+
+/**
+ * Build an EscalationFlag from the AI's `save_followup_output` tool call.
+ *
+ * The tool schema (FOLLOWUP_TOOL in the realtime-session route) reports the
+ * AI's own escalation assessment through three flat fields —
+ * `escalation_triggered` (boolean), `escalation_tier` (enum), and
+ * `escalation_reason` (string) — NOT a structured `escalation_flags` array.
+ * The voice hook historically read the non-existent array, so the AI's
+ * assessment was silently dropped and escalations only ever came from the
+ * client-side regex net. This maps the real schema fields onto the
+ * EscalationFlag shape the clinician dashboard consumes.
+ *
+ * Returns null when the AI did not flag an escalation (`escalation_triggered`
+ * is not true), so callers can skip surfacing anything.
+ */
+export function escalationFlagFromToolOutput(args: unknown): EscalationFlag | null {
+  if (!args || typeof args !== 'object') return null
+  const a = args as Record<string, unknown>
+  if (a.escalation_triggered !== true) return null
+
+  const tier: EscalationTier = isEscalationTier(a.escalation_tier)
+    ? a.escalation_tier
+    : 'informational'
+  const reason = typeof a.escalation_reason === 'string' ? a.escalation_reason.trim() : ''
+
+  return {
+    tier,
+    triggerText: 'AI-flagged during follow-up conversation',
+    category: 'ai_assessment',
+    aiAssessment: reason || 'The follow-up agent flagged this conversation for clinician review.',
+    recommendedAction: AI_ESCALATION_ACTIONS[tier],
+    timestamp: new Date().toISOString(),
+  }
+}
+
 /**
  * Merge AI-detected and regex-detected escalations.
  * Takes the higher severity when both detect the same category.
