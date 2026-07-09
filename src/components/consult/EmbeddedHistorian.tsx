@@ -8,6 +8,8 @@ import type { SaveScaleResponsesArgs, LocalizerSnapshot, TriggeredScale } from '
 import { getTenantClient } from '@/lib/tenant'
 import LocalizerPanel from '@/components/LocalizerPanel'
 import HistorianConsentDisclosure from '@/components/HistorianConsentDisclosure'
+import VoiceProviderToggle from '@/components/voice/VoiceProviderToggle'
+import { useVoiceProviderPreference } from '@/lib/voice/useVoiceProviderPreference'
 
 type Phase = 'ready' | 'connecting' | 'active' | 'ending' | 'saving' | 'complete' | 'safety_escalation'
 
@@ -56,6 +58,9 @@ export default function EmbeddedHistorian({
 
   const transcriptEndRef = useRef<HTMLDivElement>(null)
   const tenant = getTenantClient()
+  // Voice engine selection — defaults to 'openai' (today's production path);
+  // Nova only engages via an explicit ?voice=nova link or a toggle click.
+  const [voiceProvider, setVoiceProvider] = useVoiceProviderPreference()
 
   // Scales that have been injected into the live session (by us, not the AI's choice).
   // Used to deduplicate trigger evaluations so we never re-inject the same scale
@@ -219,6 +224,7 @@ export default function EmbeddedHistorian({
     referralReason,
     patientName,
     consultId,
+    provider: voiceProvider,
     enableLocalizer: true,
     onComplete: handleSessionComplete,
     onSafetyEscalation: handleSafetyEscalation,
@@ -390,6 +396,10 @@ export default function EmbeddedHistorian({
               {referralReason}
             </div>
           )}
+        </div>
+
+        <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 10 }}>
+          <VoiceProviderToggle value={voiceProvider} onChange={setVoiceProvider} />
         </div>
 
         <button

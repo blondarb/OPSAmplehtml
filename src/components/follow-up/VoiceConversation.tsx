@@ -10,6 +10,14 @@ interface VoiceConversationProps {
   onDashboardUpdate: (update: DashboardUpdate) => void
   onConversationComplete: (sessionId: string) => void
   onEscalation: (flag: EscalationFlag) => void
+  /**
+   * Optional voice provider override ('nova' | 'openai'). Defaults to
+   * 'openai' (today's production path) when omitted — see
+   * useFollowUpRealtimeSession. No UI toggle is mounted for this surface
+   * yet (Phase 4 scope was the historian surfaces only); pass this through
+   * from a parent if/when a follow-up toggle ships.
+   */
+  provider?: 'nova' | 'openai'
 }
 
 export default function VoiceConversation({
@@ -17,6 +25,7 @@ export default function VoiceConversation({
   onDashboardUpdate,
   onConversationComplete,
   onEscalation,
+  provider,
 }: VoiceConversationProps) {
   const scrollRef = useRef<HTMLDivElement>(null)
 
@@ -71,6 +80,7 @@ export default function VoiceConversation({
     endSession,
   } = useFollowUpRealtimeSession({
     scenario,
+    provider,
     onSafetyEscalation: () => {
       onEscalation({
         tier: 'urgent',

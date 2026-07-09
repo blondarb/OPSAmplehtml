@@ -8,9 +8,10 @@
  * Priority (highest → lowest):
  *   1. URL query param  ?voice=nova|openai  (useful for PO A/B links)
  *   2. localStorage['voiceProvider']        (survives page reloads)
- *   3. Hard default: 'nova'
+ *   3. Hard default: 'openai' — matches today's production default; Nova
+ *      only engages via an explicit link or toggle interaction.
  *
- * SSR-safe: initializes to 'nova' on the server / first render to avoid
+ * SSR-safe: initializes to 'openai' on the server / first render to avoid
  * hydration mismatch. Reads localStorage and the URL query in a useEffect
  * so the value is resolved only on the client after mount.
  */
@@ -51,16 +52,18 @@ function resolveClientPreference(): VoiceProviderKind {
     // Private browsing / storage disabled
   }
 
-  // 3. Default
-  return 'nova'
+  // 3. Default — OpenAI. Nova only ever engages via an explicit ?voice=nova
+  // link or a prior toggle interaction; a bare page load must reproduce
+  // today's OpenAI-only behavior exactly.
+  return 'openai'
 }
 
 export function useVoiceProviderPreference(): [
   VoiceProviderKind,
   (p: VoiceProviderKind) => void,
 ] {
-  // Initialize to 'nova' for SSR — overridden in useEffect after mount.
-  const [provider, setProviderState] = useState<VoiceProviderKind>('nova')
+  // Initialize to 'openai' for SSR — overridden in useEffect after mount.
+  const [provider, setProviderState] = useState<VoiceProviderKind>('openai')
 
   // Resolve the real preference once we're on the client.
   useEffect(() => {

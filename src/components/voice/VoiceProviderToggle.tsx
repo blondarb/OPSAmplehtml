@@ -25,8 +25,8 @@ interface VoiceProviderToggleProps {
 }
 
 const OPTIONS: { id: 'nova' | 'openai'; label: string }[] = [
-  { id: 'nova', label: 'Nova Sonic' },
   { id: 'openai', label: 'OpenAI' },
+  { id: 'nova', label: 'Nova Sonic' },
 ]
 
 export default function VoiceProviderToggle({
