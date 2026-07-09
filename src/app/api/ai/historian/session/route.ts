@@ -1,3 +1,4 @@
+import crypto from 'crypto'
 import { NextResponse } from 'next/server'
 import { buildHistorianSystemPrompt, getHistorianToolDefinition, getHistorianToolsForProvider } from '@/lib/historianPrompts'
 import type { HistorianSessionType } from '@/lib/historianTypes'
@@ -6,6 +7,44 @@ import { getOpenAIKey } from '@/lib/secrets'
 import { getConsult, markHistorianStarted } from '@/lib/consult/pipeline'
 import { buildHistorianContextFromConsult } from '@/lib/consult/contextBuilder'
 import { buildWhisperBiasPrompt, isAsrBiasingEnabled } from '@/lib/asr/clinical-lexicon'
+
+/**
+ * Mint a short-lived relay auth token for the Nova Sonic WS relay
+ * (services/nova-sonic-relay). Browsers cannot set custom headers on a
+ * WebSocket handshake, so this token travels as a WS SUBPROTOCOL
+ * (`['nova.v1', token]`) instead — see novaSonicWsProvider.ts.
+ *
+ * Format: `${base64url(JSON.stringify({exp}))}.${base64url(HMAC_SHA256(secret, payload))}`.
+ * MUST match the relay's verification logic in
+ * services/nova-sonic-relay/src/server.ts byte-for-byte. 120s TTL covers
+ * session start (mint -> WS connect) with headroom — the relay only checks
+ * `exp` at handshake time, not for the life of the call.
+ *
+ * Returns null if NOVA_RELAY_SHARED_SECRET is unset — the caller then omits
+ * `relayToken` from the response, and the relay (fail-closed) rejects the
+ * resulting connection. That is the correct behavior, not a bug: an
+ * unconfigured secret must never silently disable auth.
+ */
+function mintNovaRelayToken(): string | null {
+  const secret = process.env.NOVA_RELAY_SHARED_SECRET
+  if (!secret) {
+    console.warn('[historian/session] NOVA_RELAY_SHARED_SECRET is not set — issuing no relay token; the relay will reject the connection.')
+    return null
+  }
+  const payloadB64 = Buffer.from(JSON.stringify({ exp: Math.floor(Date.now() / 1000) + 120 }))
+    .toString('base64')
+    .replace(/\+/g, '-')
+    .replace(/\//g, '_')
+    .replace(/=+$/, '')
+  const sig = crypto
+    .createHmac('sha256', secret)
+    .update(payloadB64)
+    .digest('base64')
+    .replace(/\+/g, '-')
+    .replace(/\//g, '_')
+    .replace(/=+$/, '')
+  return `${payloadB64}.${sig}`
+}
 
 export async function POST(request: Request) {
   try {
@@ -50,6 +89,11 @@ export async function POST(request: Request) {
         tools: getHistorianToolsForProvider('nova'),
         relayUrl: process.env.NOVA_SONIC_RELAY_URL,
         voiceId: process.env.NOVA_SONIC_VOICE_ID,
+        // Short-lived relay auth token (see mintNovaRelayToken above).
+        // Omitted (undefined -> dropped by JSON.stringify) when the shared
+        // secret isn't configured — the relay fail-closed-rejects the
+        // resulting connection.
+        relayToken: mintNovaRelayToken() ?? undefined,
         // base_instructions kept for client parity (localizer push channel).
         base_instructions: instructions,
         consult_id: consultId || null,

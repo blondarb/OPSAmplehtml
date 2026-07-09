@@ -1,10 +1,15 @@
-import http from 'http'
+import crypto from 'crypto'
+import http, { type IncomingMessage } from 'http'
 import { WebSocketServer, WebSocket } from 'ws'
 import { NovaSonicSession } from './novaSonicSession.js'
 import type { ClientMsg, ServerMsg } from './wsProtocol.js'
 
 // ---------------------------------------------------------------------------
 // HTTP server — answers GET /healthz for App Runner health checks; 404 otherwise.
+// This handler only ever sees plain HTTP requests (GET /healthz or a 404) —
+// the WS auth gate below hooks the `upgrade` path via verifyClient/
+// handleProtocols and never touches this function, so /healthz stays
+// unauthenticated for the ALB health check.
 // ---------------------------------------------------------------------------
 
 const server = http.createServer((req, res) => {
@@ -18,13 +23,130 @@ const server = http.createServer((req, res) => {
 })
 
 // ---------------------------------------------------------------------------
+// WebSocket upgrade authentication
+//
+// Browsers cannot set custom headers on a WebSocket handshake, so the caller
+// (src/app/api/ai/historian/session/route.ts in the Next.js app) mints a
+// short-lived HMAC token and the browser sends it as a WS SUBPROTOCOL
+// alongside the fixed 'nova.v1' tag: `Sec-WebSocket-Protocol: nova.v1, <token>`.
+//
+// Token format: `${base64url(JSON.stringify({exp}))}.${base64url(HMAC_SHA256(secret, payload))}`.
+// verifyClient recomputes the HMAC (timing-safe compare) and checks `exp`
+// BEFORE the 101 handshake completes; handleProtocols only echoes back
+// 'nova.v1' once verifyClient has already accepted the request — ws never
+// calls handleProtocols after verifyClient rejects (aborts with 401 first).
+//
+// FAIL CLOSED: if NOVA_RELAY_SHARED_SECRET is not configured, every
+// connection is rejected. There is no "auth disabled" mode.
+// ---------------------------------------------------------------------------
+
+const NOVA_PROTOCOL = 'nova.v1'
+
+const SHARED_SECRET = process.env.NOVA_RELAY_SHARED_SECRET || ''
+if (!SHARED_SECRET) {
+  console.warn(
+    '[nova-relay] NOVA_RELAY_SHARED_SECRET is not set — rejecting ALL WebSocket connections (fail closed).'
+  )
+}
+
+const ALLOWED_ORIGINS = (process.env.NOVA_RELAY_ALLOWED_ORIGINS || '')
+  .split(',')
+  .map((o) => o.trim())
+  .filter(Boolean)
+
+if (ALLOWED_ORIGINS.length === 0) {
+  console.warn(
+    '[nova-relay] NOVA_RELAY_ALLOWED_ORIGINS is not set — Origin header is not checked; the token is the sole gate.'
+  )
+}
+
+function base64urlToBuffer(input: string): Buffer {
+  return Buffer.from(input.replace(/-/g, '+').replace(/_/g, '/'), 'base64')
+}
+
+function bufferToBase64url(buf: Buffer): string {
+  return buf.toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
+}
+
+/**
+ * Validate a relay auth token against `secret`. Recomputes the HMAC over the
+ * payload (timing-safe compare against the supplied signature), then checks
+ * the embedded `exp` (unix seconds) is still in the future. See the header
+ * comment above for the exact token format — it must match the minting logic
+ * in the historian session route byte-for-byte.
+ */
+function isValidToken(token: string, secret: string): boolean {
+  const dot = token.indexOf('.')
+  if (dot <= 0 || dot === token.length - 1) return false
+  const payloadB64 = token.slice(0, dot)
+  const sig = token.slice(dot + 1)
+
+  const expectedSig = bufferToBase64url(
+    crypto.createHmac('sha256', secret).update(payloadB64).digest()
+  )
+  const sigBuf = Buffer.from(sig)
+  const expectedBuf = Buffer.from(expectedSig)
+  // timingSafeEqual throws on length mismatch — guard first, and a length
+  // mismatch is itself decisive proof the signature is wrong.
+  if (sigBuf.length !== expectedBuf.length) return false
+  if (!crypto.timingSafeEqual(sigBuf, expectedBuf)) return false
+
+  let payload: { exp?: unknown }
+  try {
+    payload = JSON.parse(base64urlToBuffer(payloadB64).toString('utf8'))
+  } catch {
+    return false
+  }
+  return typeof payload.exp === 'number' && payload.exp > Date.now() / 1000
+}
+
+/** Parse the raw `Sec-WebSocket-Protocol` header into its comma-separated values. */
+function parseRequestedProtocols(req: IncomingMessage): string[] {
+  const header = req.headers['sec-websocket-protocol']
+  if (!header) return []
+  return header.split(',').map((p) => p.trim()).filter(Boolean)
+}
+
+/**
+ * Gate the WS upgrade: reject (401, no 101 handshake) unless a secret is
+ * configured, the Origin is allowed (when an allowlist is set), and the
+ * client supplied a valid, unexpired token as one of its subprotocols.
+ */
+function verifyClient(info: { origin: string; secure: boolean; req: IncomingMessage }): boolean {
+  if (!SHARED_SECRET) return false // fail closed — no secret configured
+
+  if (ALLOWED_ORIGINS.length > 0 && !ALLOWED_ORIGINS.includes(info.origin)) {
+    console.warn(`[nova-relay] rejected connection: disallowed origin (${info.origin || '(none)'})`)
+    return false
+  }
+
+  const protocols = parseRequestedProtocols(info.req)
+  const token = protocols.find((p) => p !== NOVA_PROTOCOL)
+  if (!token || !isValidToken(token, SHARED_SECRET)) {
+    console.warn('[nova-relay] rejected connection: missing/invalid/expired token')
+    return false
+  }
+
+  return true
+}
+
+// ---------------------------------------------------------------------------
 // WebSocket server
 // ---------------------------------------------------------------------------
 
 // maxPayload caps a single inbound frame (untrusted browser input). Audio
 // frames are small base64 PCM; 1 MB leaves ample headroom for instructions /
 // tool results while preventing unbounded allocation from a hostile client.
-const wss = new WebSocketServer({ server, maxPayload: 1024 * 1024 })
+//
+// verifyClient/handleProtocols gate the upgrade itself (see block above) —
+// only a request with a valid token (and an allowed Origin, if configured)
+// ever reaches the 'connection' handler below.
+const wss = new WebSocketServer({
+  server,
+  maxPayload: 1024 * 1024,
+  verifyClient,
+  handleProtocols: (protocols) => (protocols.has(NOVA_PROTOCOL) ? NOVA_PROTOCOL : false),
+})
 
 function send(ws: WebSocket, msg: ServerMsg): void {
   if (ws.readyState === WebSocket.OPEN) {
