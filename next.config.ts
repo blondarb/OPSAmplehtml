@@ -29,6 +29,12 @@ const nextConfig: NextConfig = {
     // AI Historian turn-taking / noise handling (hot-revertable without a code change)
     HISTORIAN_TURN_DETECTION_MODE: process.env.HISTORIAN_TURN_DETECTION_MODE,
     HISTORIAN_NOISE_REDUCTION: process.env.HISTORIAN_NOISE_REDUCTION,
+    // Voice provider A/B (OpenAI Realtime vs Nova Sonic). Must be inlined here or
+    // the historian session route can't read them at runtime on Amplify SSR.
+    // Nova fails closed (provider.start throws) until NOVA_SONIC_RELAY_URL is set.
+    VOICE_PROVIDER: process.env.VOICE_PROVIDER,
+    NOVA_SONIC_RELAY_URL: process.env.NOVA_SONIC_RELAY_URL,
+    NOVA_SONIC_VOICE_ID: process.env.NOVA_SONIC_VOICE_ID,
   },
 };
 
