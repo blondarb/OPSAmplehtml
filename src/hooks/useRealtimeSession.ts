@@ -230,14 +230,34 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
    * This helper is called from every place that could be the LAST of the
    * three signals to arrive (closing transcript, save_interview_output tool
    * call, AI stops speaking) and only schedules once all three gates are
-   * satisfied — so it doesn't matter which one lands last.
+   * satisfied — so it doesn't matter which one lands last. `delayMs` lets
+   * call sites tune how long to wait before actually ending (see Fix 4
+   * below for why this now varies by call site).
+   *
+   * Fix 4 (2026-07-09): closing-statement clipping regression. Fix 3 fixed
+   * "Henry never auto-ends" but introduced "Henry auto-ends but clips his
+   * own closing line." Root cause: on OpenAI, sendToolResult() (called from
+   * the save_interview_output tool-call branch) always issues a follow-up
+   * response.create — so the closing line may be spoken AFTER the tool
+   * call, via that follow-up response, not before it. The tool-call branch
+   * scheduled a fixed 250ms auto-end timer immediately after firing that
+   * response.create, and — critically — the old aiSpeechStart handler never
+   * cancelled a pending timer. So if the follow-up closing response's audio
+   * started (aiSpeechStart) within that 250ms window, the stale timer fired
+   * anyway and tore the session down mid-utterance. Fix: aiSpeechStart now
+   * clears any pending autoEndTimer (a new utterance — likely the closing —
+   * is starting, don't end under it); the tool-call branch schedules a
+   * GENEROUS fallback delay instead of a short one, so a follow-up response
+   * has time to actually start speaking and cancel it via aiSpeechStart; and
+   * aiSpeechStop schedules a SHORT delay when interviewCompleted, which is
+   * what actually ends the session right after the closing audio finishes.
    */
-  const maybeScheduleAutoEnd = useCallback(() => {
+  const maybeScheduleAutoEnd = useCallback((delayMs: number = 250) => {
     if (interviewCompletedRef.current && !finalizingRef.current && !isAiSpeakingRef.current) {
       if (autoEndTimerRef.current) clearTimeout(autoEndTimerRef.current)
       autoEndTimerRef.current = setTimeout(() => {
         endSessionRef.current()
-      }, 250)
+      }, delayMs)
     }
   }, [])
 
@@ -326,17 +346,23 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
         // auto-end the session after the AI's closing line. Set the ref
         // synchronously (not just via the interviewCompleted-state effect
         // below, which only runs after the next render) so the immediate
-        // maybeScheduleAutoEnd() call sees it — this is the path that fixes
-        // Henry: on OpenAI, this tool call lands AFTER the closing transcript
-        // (response.done fires after response.audio_transcript.done), so
-        // isAiSpeakingRef is already false and auto-end schedules right here.
+        // maybeScheduleAutoEnd() call sees it.
         interviewCompletedRef.current = true
         setInterviewCompleted(true)
         // The OpenAI provider's sendToolResult issues its own response.create
         // after the ack (no modalities — #142) so the model speaks its
         // closing line; Nova self-triggers.
         provider?.sendToolResult(toolUseId, { success: true })
-        maybeScheduleAutoEnd()
+        // Fix 4 (2026-07-09): this is only a FALLBACK schedule, not the
+        // primary end trigger. The closing line may already be fully spoken
+        // (same-turn ordering — the tool call landed after
+        // response.audio_transcript.done) or may still be coming via the
+        // sendToolResult response.create above (tool-first ordering). Use a
+        // generous delay so that if a follow-up closing response starts
+        // speaking, its aiSpeechStart cancels this timer and aiSpeechStop
+        // schedules the real (short) end once that speech finishes. If no
+        // further speech ever comes, this fallback still ends the session.
+        maybeScheduleAutoEnd(2500)
       } catch (e) {
         console.error('Error handling save_interview_output:', e)
       }
@@ -531,6 +557,16 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
       }
 
       case 'aiSpeechStart': {
+        // Fix 4 (2026-07-09): a new utterance is starting — on OpenAI this is
+        // very likely the closing line arriving via sendToolResult's
+        // follow-up response.create (tool-first ordering). Cancel any
+        // pending auto-end timer (e.g. the tool-call branch's fallback) so we
+        // never tear the session down mid-utterance; aiSpeechStop below
+        // reschedules the real end once this utterance actually finishes.
+        if (autoEndTimerRef.current) {
+          clearTimeout(autoEndTimerRef.current)
+          autoEndTimerRef.current = null
+        }
         setAiSpeaking(true)
         break
       }
@@ -538,9 +574,12 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
       case 'aiSpeechStop': {
         // Nova (via novaSonicWsProvider) only fires this once its player has
         // actually drained the closing audio (Fix 2) — so if the tool call
-        // landed while still speaking, this is what schedules the end.
+        // landed while still speaking, this is what schedules the end. Short
+        // delay: interviewCompleted + speech just stopped means this was (or
+        // just finished) the closing line — end promptly rather than waiting
+        // out the tool-call branch's generous fallback.
         setAiSpeaking(false)
-        maybeScheduleAutoEnd()
+        maybeScheduleAutoEnd(400)
         break
       }
 
