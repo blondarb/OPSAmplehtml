@@ -91,6 +91,15 @@ export interface VoiceProvider {
   start(opts: VoiceStartOptions): Promise<void>
   /** Tear the session down. Idempotent. */
   stop(): Promise<void>
+  /**
+   * Whether the transport is currently open/live (WebRTC data channel open /
+   * WS OPEN). The hook gates its pre-teardown save-flush on this: a dropped
+   * transport must SKIP the flush (it can never reach the model) and fall
+   * straight through to the raw-transcript fallback, matching main's original
+   * `dcRef.readyState === 'open'` check. Without it, ending via a transport
+   * drop stalls ~4s waiting on output that will never arrive.
+   */
+  isOpen(): boolean
   /** Register the single event sink the provider emits VoiceEvents to. */
   on(cb: (e: VoiceEvent) => void): void
   /** Return a tool result for a prior `toolCall` (the hook executes the tool). */

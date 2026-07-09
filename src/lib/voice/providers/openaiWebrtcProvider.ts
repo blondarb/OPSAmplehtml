@@ -64,6 +64,11 @@ export class OpenAiWebrtcProvider implements VoiceProvider {
     }
   }
 
+  /** Transport-open signal for the hook's save-flush gate (see VoiceProvider). */
+  isOpen(): boolean {
+    return this.dc?.readyState === 'open'
+  }
+
   /** #142: response.create with NO response.modalities field. */
   private sendResponseCreate(): void {
     this.dcSend({ type: 'response.create', response: {} })

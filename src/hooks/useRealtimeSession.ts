@@ -742,10 +742,17 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
     // unexpected transport drop) silently drops the entire intake — both the
     // structured output and the narrative summary — and the review step shows
     // "No interview data available" despite the patient answering questions.
+    // Gate on the transport actually being OPEN (not merely that a provider
+    // object exists). On a genuine transport drop the flush can never reach
+    // the model, so we must skip it and fall through to the raw-transcript
+    // fallback — otherwise the flush loop stalls ~4s waiting on output that
+    // will never arrive. Restores main's original `dcRef.readyState === 'open'`
+    // behavior across the provider abstraction.
     const needsFlush =
       !structuredOutputRef.current &&
       transcriptRef.current.length >= 2 &&
-      !!provider
+      !!provider &&
+      provider.isOpen()
 
     if (needsFlush && provider) {
       try {

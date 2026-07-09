@@ -45,6 +45,11 @@ export class NovaSonicWsProvider implements VoiceProvider {
     }
   }
 
+  /** Transport-open signal for the hook's save-flush gate (see VoiceProvider). */
+  isOpen(): boolean {
+    return this.ws?.readyState === WebSocket.OPEN
+  }
+
   async start(opts: VoiceStartOptions): Promise<void> {
     if (this.ws) return // already started — idempotent guard
     if (!opts.relayUrl) {
