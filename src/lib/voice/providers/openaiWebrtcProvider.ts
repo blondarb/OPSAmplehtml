@@ -378,6 +378,12 @@ export class OpenAiWebrtcProvider implements VoiceProvider {
     this.sendResponseCreate()
   }
 
+  nudgeClosing(): void {
+    // No-op: `sendToolResult` already issues a follow-up response.create (#142),
+    // so Henry speaks his closing line on his own. Nudging here would fire a
+    // second response.create and make him deliver the closing twice.
+  }
+
   updateInstructions(fullText: string): void {
     // Overwrites the live session's instructions (vs. injectSystemText's
     // timeline-append). Requires `session.type` on every session.update, not

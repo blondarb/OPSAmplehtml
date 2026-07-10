@@ -349,10 +349,16 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
         // maybeScheduleAutoEnd() call sees it.
         interviewCompletedRef.current = true
         setInterviewCompleted(true)
-        // The OpenAI provider's sendToolResult issues its own response.create
-        // after the ack (no modalities — #142) so the model speaks its
-        // closing line; Nova self-triggers.
+        // OpenAI's sendToolResult issues its own response.create after the ack
+        // (no modalities — #142) so Henry speaks his closing line. Nova does
+        // NOT self-trigger — it's speech-to-speech and stays silent after the
+        // tool result (same reason it needed a greeting kickoff), which is why
+        // the Nova closing was missing entirely. nudgeClosing() injects the
+        // closing prompt on Nova and is a no-op on OpenAI (which would double-
+        // speak). The closing audio then drains before teardown via the
+        // whenDrained/auto-end sequence below.
         provider?.sendToolResult(toolUseId, { success: true })
+        provider?.nudgeClosing()
         // Fix 4 (2026-07-09): this is only a FALLBACK schedule, not the
         // primary end trigger. The closing line may already be fully spoken
         // (same-turn ordering — the tool call landed after
