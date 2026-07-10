@@ -126,6 +126,20 @@ export interface VoiceProvider {
    */
   requestResponse(opts?: { textOnly?: boolean }): void
   /**
+   * Prompt the model to speak its single closing message after
+   * save_interview_output has been acked. Providers differ on whether this is
+   * needed at all:
+   *   OpenAI → no-op. `sendToolResult` already issues a follow-up
+   *            response.create, so Henry speaks his closing on its own; a
+   *            second trigger here would double-speak.
+   *   Nova   → inject a closing nudge. Nova is speech-to-speech and, exactly
+   *            like the session-open greeting, stays SILENT after the tool
+   *            result unless explicitly prompted — which is why the closing
+   *            statement was missing entirely (not just clipped). Mirrors
+   *            `sendGreetingKickoff` on the relay side.
+   */
+  nudgeClosing(): void
+  /**
    * OpenAI-only escape hatch: overwrite the live session's full instructions
    * (session.update) rather than append an advisory item to the timeline.
    * Used by the Localizer push channel to re-serialize BASE_PROMPT + the

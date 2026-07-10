@@ -237,6 +237,18 @@ export class NovaSonicWsProvider implements VoiceProvider {
     // text-only response concept (opts ignored).
   }
 
+  nudgeClosing(): void {
+    // Nova is speech-to-speech and stays SILENT after the save_interview_output
+    // tool result unless prompted — the same reason it needed sendGreetingKickoff
+    // to open. Inject a USER-role text turn (via the existing systemText relay
+    // frame) telling it to deliver its one closing message now. The closing
+    // audio then streams as PCM and is drained by whenDrained() before
+    // aiSpeechStop fires (#150), so it plays in full before teardown.
+    this.injectSystemText(
+      '[The interview is now complete and your notes have been saved. Please now speak your single warm closing message to the patient, then stop. Do not ask any further questions and do not wait for the patient to reply.]',
+    )
+  }
+
   async stop(): Promise<void> {
     if (this.closing) return // idempotent
     this.closing = true
