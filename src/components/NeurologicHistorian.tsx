@@ -5,7 +5,7 @@ import { useSearchParams, useRouter } from 'next/navigation'
 import { useRealtimeSession } from '@/hooks/useRealtimeSession'
 import { DEMO_SCENARIOS, type DemoScenario, type HistorianStructuredOutput, type HistorianRedFlag, type HistorianTranscriptEntry, type HistorianSessionType, type PatientContext } from '@/lib/historianTypes'
 import { getTenantClient } from '@/lib/tenant'
-import HistorianSessionComplete from './HistorianSessionComplete'
+import HistorianReportView from './HistorianReportView'
 import HistorianConsentDisclosure from './HistorianConsentDisclosure'
 import LocalizerPanel from './LocalizerPanel'
 import PlatformShell from '@/components/layout/PlatformShell'
@@ -865,9 +865,13 @@ export default function NeurologicHistorian() {
 
         {/* ====== COMPLETE ====== */}
         {phase === 'complete' && completionData && (
-          <HistorianSessionComplete
+          <HistorianReportView
+            structuredOutput={completionData.structuredOutput}
+            narrativeSummary={completionData.narrativeSummary}
+            redFlags={completionData.redFlags}
             duration={completionData.duration}
             questionCount={completionData.questionCount}
+            transcript={completionData.transcript}
             onStartAnother={handleStartAnother}
             onBackToPortal={handleBackToPortal}
           />
