@@ -70,6 +70,7 @@ export class NovaSonicSession {
 
   private active = false
   private closed = false
+  private kickoffSent = false
 
   // Init events, captured at start() and replayed by the generator's preamble.
   private initEvents: RawEvent[] = []
@@ -187,6 +188,29 @@ export class NovaSonicSession {
     // unhandled rejection (errors are still routed via onError inside the loop).
     this.responseLoop = this.runResponseLoop(response)
     this.responseLoop.catch(() => {})
+
+    this.sendGreetingKickoff()
+  }
+
+  /**
+   * Enqueue one initial USER-role text turn that prompts Nova to open the
+   * conversation with its greeting, immediately after the stream opens.
+   * Nova is speech-to-speech and otherwise waits silently for the patient to
+   * speak first — unlike the OpenAI/Henry path, which sends `response.create`
+   * on session-open. This reuses the exact same enqueue path as
+   * pushSystemText()/userText() (role USER, not SYSTEM — a second SYSTEM
+   * block fails the whole stream with "Duplicate SYSTEM content"). Fires
+   * once per session; the historian system prompt owns the actual greeting
+   * content/persona, this just signals "start now."
+   */
+  private sendGreetingKickoff(): void {
+    if (this.kickoffSent || !this.active) {
+      return
+    }
+    this.kickoffSent = true
+    this.pushSystemText(
+      '[The interview has now started. Please greet the patient warmly by beginning the conversation and asking your first question.]',
+    )
   }
 
   /** Enqueue one chunk of user audio (base64 LPCM). No-op if not active. */
