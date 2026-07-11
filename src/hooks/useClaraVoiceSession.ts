@@ -62,6 +62,11 @@ export function useClaraVoiceSession() {
   const [error, setError] = useState<string | null>(null)
   const [emergencyActive, setEmergencyActive] = useState(false)
   const [lastClassification, setLastClassification] = useState<ClaraClassification | null>(null)
+  // The single end-of-call disposition — a fresh classification of the WHOLE
+  // caller transcript, so there is always a clear "where would this route"
+  // answer even when per-turn classification was sparse (e.g. echo-guarded
+  // turns). This is what the results panel leads with.
+  const [finalClassification, setFinalClassification] = useState<ClaraClassification | null>(null)
   const [loggedSessionId, setLoggedSessionId] = useState<string | null>(null)
 
   const providerRef = useRef<VoiceProvider | null>(null)
@@ -161,6 +166,7 @@ export function useClaraVoiceSession() {
     turnsRef.current = []
     setTurns([])
     setLastClassification(null)
+    setFinalClassification(null)
     setLoggedSessionId(null)
 
     try {
@@ -206,7 +212,31 @@ export function useClaraVoiceSession() {
     const durationSeconds = startTimeRef.current ? Math.round((Date.now() - startTimeRef.current) / 1000) : 0
     const finalTurns = turnsRef.current
     const gate0Fired = finalTurns.some((t) => t.gate0?.fired)
-    const last = [...finalTurns].reverse().find((t) => t.classification)?.classification
+    const lastPerTurn = [...finalTurns].reverse().find((t) => t.classification)?.classification
+
+    // FINAL DISPOSITION — classify the whole caller transcript once so we always
+    // have a definitive "where would this route" answer, even if per-turn
+    // classification was sparse. Caller (user) turns only — never Clara's own
+    // words, which would false-trigger Gate 0's red-flag intercept.
+    const callerText = finalTurns
+      .filter((t) => t.role === 'user' && t.text.trim())
+      .map((t) => t.text.trim())
+      .join('. ')
+    let disposition: ClaraClassification | null = lastPerTurn ?? null
+    if (callerText) {
+      try {
+        const fres = await fetch('/api/ai/clara/classify', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ transcript: callerText }),
+        })
+        const fdata = await fres.json()
+        if (fres.ok) disposition = fdata as ClaraClassification
+      } catch {
+        // keep per-turn fallback
+      }
+    }
+    setFinalClassification(disposition)
 
     try {
       const res = await fetch('/api/ai/clara/log', {
@@ -216,15 +246,15 @@ export function useClaraVoiceSession() {
           turns: finalTurns,
           durationSeconds,
           gate0Fired,
-          consultType: last?.consultType,
-          confidence: last?.confidence,
-          rationale: last?.rationale,
-          statLevel: last?.statLevel,
-          redFlags: last?.redFlags,
-          urgencyLevel: last?.urgencyLevel,
-          needsClarification: last?.needsClarification,
-          clarificationQuestions: last?.clarificationQuestions,
-          routing: last?.routing,
+          consultType: disposition?.consultType,
+          confidence: disposition?.confidence,
+          rationale: disposition?.rationale,
+          statLevel: disposition?.statLevel,
+          redFlags: disposition?.redFlags,
+          urgencyLevel: disposition?.urgencyLevel,
+          needsClarification: disposition?.needsClarification,
+          clarificationQuestions: disposition?.clarificationQuestions,
+          routing: disposition?.routing,
         }),
       })
       const data = await res.json().catch(() => ({}))
@@ -260,6 +290,7 @@ export function useClaraVoiceSession() {
     setError(null)
     setEmergencyActive(false)
     setLastClassification(null)
+    setFinalClassification(null)
     setLoggedSessionId(null)
     setStatus('idle')
   }, [])
@@ -272,6 +303,7 @@ export function useClaraVoiceSession() {
     error,
     emergencyActive,
     lastClassification,
+    finalClassification,
     loggedSessionId,
     startSession,
     endSession,

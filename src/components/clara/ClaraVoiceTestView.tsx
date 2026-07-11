@@ -29,6 +29,7 @@ export default function ClaraVoiceTestView() {
     error,
     emergencyActive,
     lastClassification,
+    finalClassification,
     loggedSessionId,
     startSession,
     endSession,
@@ -44,7 +45,11 @@ export default function ClaraVoiceTestView() {
   const classifiedTurns = turns
     .map((t, i) => ({ turn: t, index: i }))
     .filter(({ turn }) => turn.role === 'user' && turn.classification)
-  const showResults = status === 'idle' && classifiedTurns.length > 0
+  // Show results whenever a call has actually ended with some transcript — NOT
+  // only when a per-turn classification survived. The end-of-call final
+  // disposition (finalClassification) is the lead, so results must render even
+  // if per-turn classification was empty (otherwise a real call shows nothing).
+  const showResults = status === 'idle' && (classifiedTurns.length > 0 || !!finalClassification || turns.length > 0)
   // Cold-start state: nothing has run yet this call, chips are front and center.
   const showPresets = status === 'idle' && turns.length === 0
 
@@ -209,6 +214,39 @@ export default function ClaraVoiceTestView() {
           </div>
           {!loggedSessionId && (
             <div style={{ color: '#64748b', fontSize: 12 }}>Logging call…</div>
+          )}
+
+          {/* FINAL DISPOSITION — the single "where would this route" answer for the
+              whole call. This is what matters most to grade, so it leads. */}
+          {finalClassification ? (
+            <div style={{ border: `2px solid ${URGENCY_COLORS[finalClassification.urgencyLevel] || '#64748b'}`, borderRadius: 12, overflow: 'hidden' }}>
+              <div style={{ background: URGENCY_COLORS[finalClassification.urgencyLevel] || '#64748b', color: 'white', fontWeight: 800, fontSize: 12, letterSpacing: '0.06em', padding: '6px 12px', textTransform: 'uppercase' }}>
+                ★ Final disposition — where this call routes
+              </div>
+              <ClaraDecisionCard
+                heading="Full-call classification"
+                decision={{
+                  consultType: finalClassification.consultType,
+                  confidence: finalClassification.confidence,
+                  rationale: finalClassification.rationale,
+                  urgencyLevel: finalClassification.urgencyLevel,
+                  statLevel: finalClassification.statLevel,
+                  redFlags: finalClassification.redFlags,
+                  gate0Fired: !!finalClassification.gate0?.fired,
+                }}
+                routingActionLabel={finalClassification.routing?.label}
+                sessionId={loggedSessionId}
+                turnIndex={-1}
+              />
+            </div>
+          ) : (
+            <div style={{ background: 'rgba(234,179,8,0.12)', border: '1px solid rgba(234,179,8,0.4)', borderRadius: 10, padding: 12, color: '#fde68a', fontSize: 13 }}>
+              No caller speech was captured, so no routing could be determined. Check that the mic picked you up — if Clara spoke but your replies didn’t register, it’s a capture issue, not a classifier one.
+            </div>
+          )}
+
+          {classifiedTurns.length > 0 && (
+            <div style={{ color: '#94a3b8', fontSize: 12, fontWeight: 700, marginTop: 4 }}>Per-turn detail</div>
           )}
           {classifiedTurns.map(({ turn, index }, i) => (
             <ClaraDecisionCard
