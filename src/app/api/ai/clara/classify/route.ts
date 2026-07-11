@@ -66,7 +66,7 @@ const ACTIVE_SEIZURE_EMERGENCY =
   /\b(airway|not\s+breathing|can'?t\s+breathe|unresponsive|seizing|convulsing|having\s+a\s+seizure|won'?t\s+stop|not\s+stopping|coding|escalat|intubat)/i
 
 type RoutingDecision = {
-  action: 'escalate_911' | 'transfer_md1' | 'transfer_stat1' | 'transfer_stat2' | 'schedule_callback' | 'route_workflow'
+  action: 'escalate_911' | 'transfer_md1' | 'transfer_md2' | 'transfer_stat1' | 'transfer_stat2' | 'route_eeg_reader' | 'refer_pcp' | 'schedule_callback' | 'route_workflow'
   label: string
   slaMinutes: number | null
 }
@@ -98,23 +98,31 @@ function buildRouting(
       urgencyLevel === URGENCY_LEVEL.CRITICAL ||
       urgencyLevel === URGENCY_LEVEL.HIGH
     return highBurden
-      ? { action: 'transfer_md1', label: 'Ceribell ≥20% burden → EMERGENT on-call neurologist + EEG reader, engaged simultaneously (per EEG-dept protocol)', slaMinutes: 0 }
-      : { action: 'route_workflow', label: 'Ceribell ≤19% burden → RN calls the study in non-emergently when complete; routine EEG read', slaMinutes: null }
+      ? { action: 'transfer_md1', label: 'Ceribell ≥20% burden → EMERGENT on-call neurologist (MD1) + EEG reader, engaged simultaneously (per EEG-dept protocol)', slaMinutes: 0 }
+      : { action: 'route_eeg_reader', label: 'Ceribell <20% burden → EEG reader (routine); does NOT go to the non-emergent MD', slaMinutes: null }
   }
   if (consultType === CONSULT_TYPE.EEG_READ) {
-    return { action: 'route_workflow', label: 'EEG read → route to EEG reader (non-emergent)', slaMinutes: null }
+    return { action: 'route_eeg_reader', label: 'EEG read → EEG reader', slaMinutes: null }
   }
   if (consultType === CONSULT_TYPE.NON_EMERGENT && statLevel === 1) {
-    return { action: 'transfer_stat1', label: 'STAT 1 — callback within 15–20 min (would transfer to on-call queue)', slaMinutes: 20 }
+    return { action: 'transfer_stat1', label: 'STAT 1 — callback within 15–20 min (on-call STAT queue)', slaMinutes: 20 }
   }
   if (consultType === CONSULT_TYPE.NON_EMERGENT && statLevel === 2) {
-    return { action: 'transfer_stat2', label: 'STAT 2 — callback within 60 min (would transfer to on-call queue)', slaMinutes: 60 }
+    return { action: 'transfer_stat2', label: 'STAT 2 — callback within 60 min (on-call STAT queue)', slaMinutes: 60 }
   }
   if (consultType === CONSULT_TYPE.CT_RETURN) {
-    return { action: 'route_workflow', label: 'CT-return → the neurologist who already saw this patient (needs prior-provider lookup in the dispatch layer)', slaMinutes: null }
+    // Steve, 2026-07-11: CT-return branches on whether we already have this patient.
+    // WITH a prior record → back to the neurologist who saw them (Clara confirms name+MRN,
+    // then just notifies — no need to re-gather). WITHOUT a prior record → this is likely a
+    // fresh emergent stroke → MD1 (Clara gathers name/DOB/location on the call). The prior-
+    // record lookup lives in the dispatch layer; Clara asks the "seen before?" question live.
+    return { action: 'transfer_md1', label: 'CT-return → prior provider IF this patient was already seen (confirm name+MRN, then notify); if NO prior record → probable emergent stroke → MD1 (gather name/DOB/location). Clara asks "seen before?" live.', slaMinutes: null }
   }
-  if (consultType === CONSULT_TYPE.ROUNDING || consultType === CONSULT_TYPE.OUTPATIENT) {
-    return { action: 'schedule_callback', label: 'Low urgency — would route to scheduling/coordination', slaMinutes: null }
+  if (consultType === CONSULT_TYPE.ROUNDING) {
+    return { action: 'transfer_md2', label: 'Rounding / scheduled inpatient follow-up (incl. rounding on new patients) → MD2 (rounding physician)', slaMinutes: null }
+  }
+  if (consultType === CONSULT_TYPE.OUTPATIENT) {
+    return { action: 'refer_pcp', label: 'Outpatient — Sevaro has NO outpatient coverage; direct the caller to the patient’s primary care provider', slaMinutes: null }
   }
   return { action: 'route_workflow', label: `Would route to ${consultType} workflow`, slaMinutes: null }
 }
