@@ -66,4 +66,22 @@ export const CLARA_PRESET_SCENARIOS: ClaraPresetScenario[] = [
     script:
       "You're an ICU nurse. Say: \"Ceribell on a patient showing high seizure burden — need it read.\"",
   },
+  {
+    id: 'ct-return-known',
+    label: 'CT-return (known patient)',
+    script:
+      "You're an ED physician. Say: \"CT return — you all already saw this patient earlier, the head CT is back and it's negative, no new deficits.\" (Clara should ask if the patient was seen before, then route back to the neurologist who saw them.)",
+  },
+  {
+    id: 'outpatient-request',
+    label: 'Outpatient request',
+    script:
+      "You're a clinic nurse. Say: \"I'm trying to set up an outpatient neurology follow-up for a patient — can you schedule that?\" (Clara should decline — no outpatient coverage — and point to the primary care provider.)",
+  },
+  {
+    id: 'non-emergent-not-covered',
+    label: 'Non-emergent · facility not covered',
+    script:
+      "You're a hospitalist at a facility that only contracts Sevaro for EMERGENCIES. Say: \"We're at a hospital that only uses Sevaro for emergencies — but I've got a non-emergent consult, a stable patient with a few days of mild dizziness.\" (Clara should recognize it's non-emergent, explain we don't cover non-emergent for this facility, and offer the MD1 escape hatch.)",
+  },
 ]
