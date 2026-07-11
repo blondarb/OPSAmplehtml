@@ -1,7 +1,7 @@
 # AI Prompts & Model Configuration
 
 > Complete reference for every AI endpoint in Sevaro Clinical.
-> Last updated: 2026-03-12
+> Last updated: 2026-07-10
 
 ---
 
@@ -109,6 +109,7 @@ Sevaro Clinical uses a two-tier model strategy to balance cost, latency, and rea
 
 **Architecture notes:**
 - The AI never determines the triage tier — it only scores dimensions. Tier assignment is deterministic application code.
+- Safety-critical triage, extraction, and adjudication calls must use `invokeBedrockClinicalJSON`; only `stop_reason=end_turn` is complete. `max_tokens`, refusal, other stop reasons, and malformed JSON require retry or review and are never JSON-repaired.
 - Weighted scoring formula: symptom_acuity × 0.30 + diagnostic_concern × 0.25 + rate_of_progression × 0.20 + functional_impairment × 0.15 + red_flag_presence × 0.10
 - If red_flag_presence dimension score ≥ 4 and tier is not already urgent/emergent, auto-escalate to urgent (deterministic, replaces old subjective boolean).
 - Anti-bias instruction embedded in system prompt prevents demographic-based score adjustments.

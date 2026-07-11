@@ -208,6 +208,59 @@ function repairTruncatedJSON(text: string): string {
 
 // ── Convenience: invoke and parse JSON ───────────────────────────────
 
+export class ClinicalModelOutputError extends Error {
+  readonly name = 'ClinicalModelOutputError'
+
+  constructor(
+    public readonly code: 'incomplete' | 'malformed',
+    public readonly stopReason: string,
+    message: string
+  ) {
+    super(message)
+  }
+}
+
+export function parseCompleteClinicalJSON<T>(text: string, stopReason: string): T {
+  if (stopReason !== 'end_turn') {
+    throw new ClinicalModelOutputError(
+      'incomplete',
+      stopReason,
+      `Clinical model output was incomplete (stop reason: ${stopReason}).`
+    )
+  }
+
+  try {
+    return JSON.parse(text.trim()) as T
+  } catch {
+    throw new ClinicalModelOutputError(
+      'malformed',
+      stopReason,
+      'Clinical model output was not valid JSON.'
+    )
+  }
+}
+
+export async function invokeBedrockClinicalJSON<T>(
+  opts: Omit<BedrockInvokeOptions, 'jsonMode'>
+): Promise<{
+  parsed: T
+  raw: string
+  stopReason: string
+  inputTokens?: number
+  outputTokens?: number
+}> {
+  const result = await invokeBedrock({ ...opts, jsonMode: true })
+  const parsed = parseCompleteClinicalJSON<T>(result.text, result.stopReason)
+
+  return {
+    parsed,
+    raw: result.text,
+    stopReason: result.stopReason,
+    inputTokens: result.inputTokens,
+    outputTokens: result.outputTokens,
+  }
+}
+
 /**
  * Invoke Bedrock with JSON mode and parse the response as JSON.
  *
