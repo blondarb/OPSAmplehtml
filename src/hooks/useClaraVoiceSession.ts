@@ -62,6 +62,7 @@ export function useClaraVoiceSession() {
   const [error, setError] = useState<string | null>(null)
   const [emergencyActive, setEmergencyActive] = useState(false)
   const [lastClassification, setLastClassification] = useState<ClaraClassification | null>(null)
+  const [loggedSessionId, setLoggedSessionId] = useState<string | null>(null)
 
   const providerRef = useRef<VoiceProvider | null>(null)
   const turnsRef = useRef<ClaraTurn[]>([])
@@ -142,6 +143,7 @@ export function useClaraVoiceSession() {
     turnsRef.current = []
     setTurns([])
     setLastClassification(null)
+    setLoggedSessionId(null)
 
     try {
       const res = await fetch('/api/ai/clara/session', { method: 'POST' })
@@ -189,7 +191,7 @@ export function useClaraVoiceSession() {
     const last = [...finalTurns].reverse().find((t) => t.classification)?.classification
 
     try {
-      await fetch('/api/ai/clara/log', {
+      const res = await fetch('/api/ai/clara/log', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -207,6 +209,13 @@ export function useClaraVoiceSession() {
           routing: last?.routing,
         }),
       })
+      const data = await res.json().catch(() => ({}))
+      // Post-call results/feedback UI keys off this — feedback rows FK to
+      // clara_test_sessions.id, so feedback can't be submitted until the
+      // call is logged and this resolves.
+      if (res.ok && data?.session?.id) {
+        setLoggedSessionId(data.session.id)
+      }
     } catch (err) {
       console.error('[useClaraVoiceSession] session log failed (non-fatal):', err)
     }
@@ -222,6 +231,7 @@ export function useClaraVoiceSession() {
     error,
     emergencyActive,
     lastClassification,
+    loggedSessionId,
     startSession,
     endSession,
   }

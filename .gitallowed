@@ -7,6 +7,8 @@ resolution:.*integrity:.*sha512-
 src/components/neuroscribe/
 src/components/triage/
 @/components/triage/
+@/components/clara/
+src/components/clara/
 # Documentation URLs and references
 docs.aws.amazon.com
 docs/plans/
