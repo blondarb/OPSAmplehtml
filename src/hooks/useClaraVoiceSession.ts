@@ -169,17 +169,28 @@ export function useClaraVoiceSession() {
       if (!res.ok) {
         throw new Error(data?.error || `session route returned ${res.status}`)
       }
-      if (!data.relayUrl) {
+
+      // Clara runs on OpenAI Realtime (same engine as the historian's Henry —
+      // clean audio) by default; the session route echoes back `provider`.
+      const kind = data.provider === 'nova' ? 'nova' : 'openai'
+      if (kind === 'openai' && !data.ephemeralKey) {
+        throw new Error(data?.error || 'Clara session did not return an OpenAI ephemeral key.')
+      }
+      if (kind === 'nova' && !data.relayUrl) {
         throw new Error('NOVA_SONIC_RELAY_URL is not configured server-side — cannot start a Clara voice session.')
       }
 
-      const provider = makeProvider('nova')
+      const provider = makeProvider(kind)
       providerRef.current = provider
       provider.on(handleEvent)
 
       await provider.start({
         instructions: data.instructions,
         tools: data.tools || [],
+        // OpenAI path
+        ephemeralKey: data.ephemeralKey,
+        model: data.model,
+        // Nova path (ignored by the OpenAI provider)
         voiceId: data.voiceId,
         relayUrl: data.relayUrl,
         relayToken: data.relayToken,
