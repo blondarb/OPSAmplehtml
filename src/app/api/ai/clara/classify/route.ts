@@ -66,27 +66,42 @@ const ACTIVE_SEIZURE_EMERGENCY =
   /\b(airway|not\s+breathing|can'?t\s+breathe|unresponsive|seizing|convulsing|having\s+a\s+seizure|won'?t\s+stop|not\s+stopping|coding|escalat|intubat)/i
 
 type RoutingDecision = {
-  action: 'escalate_911' | 'transfer_stat1' | 'transfer_stat2' | 'schedule_callback' | 'route_workflow'
+  action: 'escalate_911' | 'transfer_md1' | 'transfer_stat1' | 'transfer_stat2' | 'schedule_callback' | 'route_workflow'
   label: string
   slaMinutes: number | null
 }
 
 /** SLA MAPPING from Clara's rulebook, translated into a narrated routing decision (no real transfer). */
-function buildRouting(consultType: string, statLevel: number | null, urgencyLevel: string): RoutingDecision {
-  // EMERGENT is the ONLY 911/immediate-page path. urgencyLevel 'critical' does
-  // NOT by itself mean 911 — the rulebook also marks a Ceribell ≥20%-burden read
-  // as 'critical', which is a STAT EEG read, not an emergency. Key escalation off
-  // consultType, not urgency, or high-burden EEG reads get mislabeled emergent
+function buildRouting(
+  consultType: string,
+  statLevel: number | null,
+  urgencyLevel: string,
+  seizureBurdenPct: number | null,
+): RoutingDecision {
+  // EMERGENT is the ONLY 911/status-epilepticus page path. urgencyLevel 'critical'
+  // does NOT by itself mean emergent — the rulebook also marks a Ceribell
+  // ≥20%-burden read as 'critical'. Key escalation off consultType, not urgency
   // (Steve, 2026-07-11).
   if (consultType === CONSULT_TYPE.EMERGENT) {
     return { action: 'escalate_911', label: 'EMERGENT — immediate on-call neurologist page (would transfer now)', slaMinutes: 0 }
   }
-  // Ceribell / EEG reads: ≥20% burden (critical/high urgency) = STAT EEG read.
-  if (consultType === CONSULT_TYPE.CERIBELL_EEG || consultType === CONSULT_TYPE.EEG_READ) {
-    const stat = urgencyLevel === URGENCY_LEVEL.CRITICAL || urgencyLevel === URGENCY_LEVEL.HIGH
-    return stat
-      ? { action: 'route_workflow', label: 'STAT EEG read — high seizure burden (≥20%), expedite read (would route to STAT EEG)', slaMinutes: 60 }
-      : { action: 'route_workflow', label: 'EEG read — routine (would route to EEG read)', slaMinutes: null }
+  // Ceribell rapid-EEG routing — Sevaro EEG-dept protocol (Marion Fossum, EEG Lead;
+  // OneDrive + site On-Call Guides): ≥20% seizure burden → the EMERGENT MD1 provider,
+  // WITH a (non-emergent) EEG-reader notification in case MD1 asks about the study.
+  // ≤19% (or study complete) → the RN calls the study in NON-emergently. Ceribell is
+  // NOT read emergently. Prefer the actual burden % when the model returned one; fall
+  // back to urgency (critical/high ≈ ≥20%).
+  if (consultType === CONSULT_TYPE.CERIBELL_EEG) {
+    const highBurden =
+      (typeof seizureBurdenPct === 'number' && seizureBurdenPct >= 20) ||
+      urgencyLevel === URGENCY_LEVEL.CRITICAL ||
+      urgencyLevel === URGENCY_LEVEL.HIGH
+    return highBurden
+      ? { action: 'transfer_md1', label: 'Ceribell ≥20% burden → EMERGENT MD1 (on-call neurologist); EEG reader notified for non-emergent review (per EEG-dept protocol)', slaMinutes: 0 }
+      : { action: 'route_workflow', label: 'Ceribell ≤19% burden → RN calls the study in non-emergently when complete; EEG reader notified (routine)', slaMinutes: null }
+  }
+  if (consultType === CONSULT_TYPE.EEG_READ) {
+    return { action: 'route_workflow', label: 'EEG read → route to EEG reader (non-emergent)', slaMinutes: null }
   }
   if (consultType === CONSULT_TYPE.NON_EMERGENT && statLevel === 1) {
     return { action: 'transfer_stat1', label: 'STAT 1 — callback within 15–20 min (would transfer to on-call queue)', slaMinutes: 20 }
@@ -214,7 +229,12 @@ export async function POST(request: Request) {
     const normalizedUrgency = typeof parsed.urgencyLevel === 'string' ? parsed.urgencyLevel.toLowerCase() : parsed.urgencyLevel
     parsed = { ...parsed, consultType: normalizedConsultType, urgencyLevel: normalizedUrgency }
 
-    const routing = buildRouting(parsed.consultType, parsed.statLevel ?? null, parsed.urgencyLevel)
+    const routing = buildRouting(
+      parsed.consultType,
+      parsed.statLevel ?? null,
+      parsed.urgencyLevel,
+      typeof parsed.seizureBurdenPercentage === 'number' ? parsed.seizureBurdenPercentage : null,
+    )
 
     return NextResponse.json({
       ...parsed,
