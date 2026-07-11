@@ -31,6 +31,51 @@ interface LogRequestBody {
   metadata?: unknown
 }
 
+/** True for a Postgres "relation does not exist" error (undefined_table). */
+function isUndefinedTableError(error: { code?: string; message: string } | null): boolean {
+  return error?.code === '42P01' || /relation .* does not exist/i.test(error?.message || '')
+}
+
+/**
+ * GET /api/ai/clara/log — lists recent test sessions (most recent first),
+ * for the /rnd/clara/results review page. Full rows including `turns`
+ * (each turn's Gate 0 + classification, if any) so the review UI can render
+ * decision cards without a second round-trip per session.
+ */
+export async function GET(request: Request) {
+  try {
+    const cookieStore = await cookies()
+    if (!verifyGateToken(cookieStore.get(CLARA_GATE_COOKIE)?.value)) {
+      return NextResponse.json({ error: 'Not authorized for the Clara test surface.' }, { status: 401 })
+    }
+
+    const url = new URL(request.url)
+    const limitParam = Number(url.searchParams.get('limit'))
+    const limit = Number.isFinite(limitParam) && limitParam > 0 ? Math.min(limitParam, 200) : 50
+
+    const { data, error } = await from('clara_test_sessions').select('*').order('created_at', { ascending: false }).limit(limit)
+
+    if (error) {
+      console.error('[clara/log] list error:', error)
+      if (isUndefinedTableError(error)) {
+        return NextResponse.json(
+          { error: 'clara_test_sessions table not found — apply migrations/048_clara_test_sessions.sql before using this route.', sessions: [] },
+          { status: 503 },
+        )
+      }
+      return NextResponse.json({ error: error.message }, { status: 500 })
+    }
+
+    return NextResponse.json({ sessions: data || [] })
+  } catch (error: unknown) {
+    console.error('[clara/log] error:', error)
+    return NextResponse.json(
+      { error: error instanceof Error ? error.message : 'Failed to list Clara test sessions' },
+      { status: 500 },
+    )
+  }
+}
+
 export async function POST(request: Request) {
   try {
     const cookieStore = await cookies()

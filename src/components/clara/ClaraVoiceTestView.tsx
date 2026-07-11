@@ -9,18 +9,14 @@
  * decision rendered (narrated only — no real Twilio transfer/Synapse write).
  */
 
-import { Bot, Mic, Phone, Square, TriangleAlert } from 'lucide-react'
+import Link from 'next/link'
+import { Bot, ClipboardList, Mic, Phone, Square, TriangleAlert } from 'lucide-react'
 import FeatureSubHeader from '@/components/layout/FeatureSubHeader'
 import { useClaraVoiceSession } from '@/hooks/useClaraVoiceSession'
+import { URGENCY_COLORS } from '@/lib/clara/routingDisplay'
+import ClaraDecisionCard from './ClaraDecisionCard'
 
 const ACCENT = '#8B5CF6'
-
-const URGENCY_COLORS: Record<string, string> = {
-  critical: '#ef4444',
-  high: '#f97316',
-  moderate: '#eab308',
-  low: '#22c55e',
-}
 
 export default function ClaraVoiceTestView() {
   const {
@@ -31,11 +27,16 @@ export default function ClaraVoiceTestView() {
     error,
     emergencyActive,
     lastClassification,
+    loggedSessionId,
     startSession,
     endSession,
   } = useClaraVoiceSession()
 
   const isActive = status === 'active' || status === 'connecting'
+  const classifiedTurns = turns
+    .map((t, i) => ({ turn: t, index: i }))
+    .filter(({ turn }) => turn.role === 'user' && turn.classification)
+  const showResults = status === 'idle' && classifiedTurns.length > 0
 
   return (
     <div style={{ minHeight: '100vh', background: 'linear-gradient(180deg, #0F172A 0%, #1E293B 100%)', color: 'white' }}>
@@ -49,6 +50,13 @@ export default function ClaraVoiceTestView() {
         <div style={{ background: 'rgba(239,68,68,0.12)', border: '1px solid rgba(239,68,68,0.4)', borderRadius: 8, padding: 10, color: '#fca5a5', fontSize: 13, display: 'flex', alignItems: 'center', gap: 8 }}>
           <Phone size={16} /> <strong>Real emergency? Call 911.</strong> This is a test harness and cannot connect you to real emergency services.
         </div>
+
+        <Link
+          href="/rnd/clara/results"
+          style={{ alignSelf: 'flex-start', display: 'flex', alignItems: 'center', gap: 6, color: '#a78bfa', fontSize: 13, textDecoration: 'none' }}
+        >
+          <ClipboardList size={15} /> Review past test sessions &amp; feedback
+        </Link>
 
         {emergencyActive && (
           <div
@@ -123,6 +131,34 @@ export default function ClaraVoiceTestView() {
           <div style={{ background: 'rgba(239,68,68,0.15)', border: '1px solid rgba(239,68,68,0.4)', borderRadius: 8, padding: 10, color: '#fca5a5', fontSize: 13 }}>
             {error}
           </div>
+        </div>
+      )}
+
+      {/* Post-call results + feedback — every classified turn from the just-ended call, rate each decision. */}
+      {showResults && (
+        <div style={{ padding: '8px 24px', maxWidth: 720, margin: '0 auto', display: 'flex', flexDirection: 'column', gap: 10 }}>
+          <div style={{ fontSize: 15, fontWeight: 700 }}>Call results</div>
+          {!loggedSessionId && (
+            <div style={{ color: '#64748b', fontSize: 12 }}>Logging call…</div>
+          )}
+          {classifiedTurns.map(({ turn, index }, i) => (
+            <ClaraDecisionCard
+              key={index}
+              heading={`Turn ${i + 1} — "${turn.text.slice(0, 80)}${turn.text.length > 80 ? '…' : ''}"`}
+              decision={{
+                consultType: turn.classification!.consultType,
+                confidence: turn.classification!.confidence,
+                rationale: turn.classification!.rationale,
+                urgencyLevel: turn.classification!.urgencyLevel,
+                statLevel: turn.classification!.statLevel,
+                redFlags: turn.classification!.redFlags,
+                gate0Fired: !!turn.gate0?.fired,
+              }}
+              routingActionLabel={turn.classification!.routing?.label}
+              sessionId={loggedSessionId}
+              turnIndex={index}
+            />
+          ))}
         </div>
       )}
 
