@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, type FormEvent } from 'react'
+import { useState, useEffect, type FormEvent } from 'react'
 import { Lock } from 'lucide-react'
 
 interface ClaraPasswordGateProps {
@@ -12,6 +12,34 @@ export default function ClaraPasswordGate({ configured }: ClaraPasswordGateProps
   const [password, setPassword] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  // Invite-link flow: /rnd/clara?invite=<token> auto-redeems for the session
+  // cookie so a recipient lands straight in the test UI (no password screen).
+  const [invitePending, setInvitePending] = useState(false)
+
+  useEffect(() => {
+    const token = new URLSearchParams(window.location.search).get('invite')
+    if (!token) return
+    setInvitePending(true)
+    ;(async () => {
+      try {
+        const res = await fetch('/api/ai/clara/redeem', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ token }),
+        })
+        if (res.ok) {
+          // Cookie set — reload so the server component re-checks and renders the app.
+          window.location.reload()
+          return
+        }
+        const data = await res.json().catch(() => ({}))
+        setError(data?.error || 'This invite link is invalid or has expired.')
+      } catch {
+        setError('Something went wrong verifying your invite. Please try again.')
+      }
+      setInvitePending(false)
+    })()
+  }, [])
 
   const onSubmit = async (e: FormEvent) => {
     e.preventDefault()
@@ -77,10 +105,13 @@ export default function ClaraPasswordGate({ configured }: ClaraPasswordGateProps
         </div>
         <h1 style={{ fontSize: 18, fontWeight: 700, marginBottom: 4 }}>Clara Voice Test</h1>
         <p style={{ fontSize: 13, color: '#94a3b8', marginBottom: 20 }}>
-          Internal R&amp;D surface. Synthetic use only — enter the access password to continue.
+          Internal R&amp;D surface. Synthetic use only.
+          {!invitePending && ' Enter the access password to continue.'}
         </p>
 
-        {!configured ? (
+        {invitePending ? (
+          <div style={{ fontSize: 14, color: '#c4b5fd', padding: '10px 0' }}>Verifying your invite…</div>
+        ) : !configured ? (
           <div
             style={{
               background: 'rgba(234,179,8,0.12)',

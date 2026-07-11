@@ -52,11 +52,18 @@ export function checkPassword(candidate: string): boolean {
   }
 }
 
-/** Mints a signed gate token. Returns null if CLARA_TEST_PASSWORD is unset. */
-export function mintGateToken(): string | null {
+/**
+ * Mints a signed gate token. Returns null if CLARA_TEST_PASSWORD is unset.
+ * Defaults to the 24h session TTL; pass a larger `ttlSeconds` to mint a
+ * longer-lived share/invite token (see /api/ai/clara/invite). An invite token
+ * is just a gate token with a longer expiry — /api/ai/clara/redeem verifies it
+ * and issues a fresh 24h session cookie, so the same signed-token contract and
+ * fail-closed verification apply to both.
+ */
+export function mintGateToken(ttlSeconds: number = CLARA_GATE_TTL_SECONDS): string | null {
   const secret = getSecret()
   if (!secret) return null
-  const payloadB64 = base64url(JSON.stringify({ exp: Math.floor(Date.now() / 1000) + CLARA_GATE_TTL_SECONDS }))
+  const payloadB64 = base64url(JSON.stringify({ exp: Math.floor(Date.now() / 1000) + ttlSeconds }))
   return `${payloadB64}.${sign(payloadB64, secret)}`
 }
 
