@@ -139,16 +139,16 @@ Full changelog: [`docs/CHANGELOG.md`](docs/CHANGELOG.md)
 
 ## Body of Work
 
-**Status**: Active — verified July 10, 2026
+**Status**: Active — verified July 11, 2026
 
 ### Recent
+- **Nova historian closing statement + conversation quality fixes (PR #154, Jul 11)** — Three fixes from Riya's A/B testing: (1) Nova Sonic missing closing statement — new `VoiceProvider.nudgeClosing()` injects closing prompt via systemText relay frame after `sendToolResult` (no relay redeploy needed); (2) over-acknowledging — CRITICAL RULE 7 reworded to vary reactions and weave answers into next question; (3) re-asking answered questions — CRITICAL RULE 11 added to treat volunteered details as answered.
 - **Nova Sonic historian silence-at-start fix (PR #153, Jul 10)** — `NovaSonicSession.start()` now calls `sendGreetingKickoff()` right after the response loop starts, enqueuing one USER-role text turn to trigger the opening greeting; `kickoffSent` guard fires it exactly once per session. Needs on-device test against live relay to verify (relay requires ECS redeploy to take effect).
 - **Post-interview Physician/Patient report tabs (PR #152, Jul 9)** — New `HistorianReportView.tsx` replaces `HistorianSessionComplete` on `phase === 'complete'`. Physician tab reuses `IntakeReviewSection` with new `IntakeReviewData` shape. Patient tab calls `POST /api/ai/historian/patient-report` (Bedrock Sonnet 4.6, no auth, fails open); system prompt forbids diagnosis, red flags, and medical advice.
 - **AI Historian close/barge-in + Henry clipping fixes (PRs #150-151, Jul 9)** — Four close/barge-in fixes across both voice engines (PR #150): Henry auto-end ordering fixed; Nova Sonic closing audio drained via `PcmPlayer.whenDrained()` before `aiSpeechStop`; CRITICAL RULE 10 added to Nova prompt; barge-in deflection scoped to actual medical-advice requests. PR #151: `aiSpeechStart` clears any pending auto-end timer; save branch schedules 2.5s fallback; `aiSpeechStop` schedules 400ms close.
 - **Nova Sonic revive + relay infrastructure (PRs #144-149, Jul 7-8)** — `VoiceProvider` abstraction (Phases 2-4): `useRealtimeSession` driven through a provider interface; session routes branch Nova vs OpenAI; voice-engine toggle mounted on both historian surfaces. Relay hardened: IPv4 `0.0.0.0` bind for App Runner health check; `start()` rejects on setup failure; WebSocket upgrade requires `x-api-key` auth; `VOICE_PROVIDER` + `NOVA_SONIC_RELAY_URL`/`VOICE_ID` wired into `next.config`.
 - **Historian 2nd-session stability (PRs #137, #139, Jul 7)** — Auto-end ref reset on 2nd historian session + VAD eagerness raised medium→high for snappier turn detection on re-started sessions (PR #137); stale-session auto-end paths killed — prevented 29M-minute instant-complete when opening the historian a second time in the same page load (PR #139).
 - **AI Historian patient consent/disclosure gate (Jul 6)** — New pre-interview consent modal (`HistorianConsentDisclosure.tsx`) gates `startSession()` on both `/patient/historian` and `/consult` embedded historian surfaces; approved by Steve Arbogast, DO ahead of any real-patient use. UI gate only, no schema changes.
-- **Historian reliability hardening (PRs #130, #132-134, Jul 2)** — Graceful end: "End Interview" button cleanly flushes `save_interview_output` before closing the Realtime session (PR #130). Reliable ref-based auto-end: historian auto-ends via `sessionRef`/`cleanupRef` (PR #132). `semantic_vad` eagerness raised low→medium (PR #133). Greeting `response.create` fired on `session.created` instead of `dc.onopen` (PR #134).
 
 ### In Progress
 - Nova Sonic end-to-end live testing (relay on ECS; on-device verification needed to confirm greeting + full interview flow)
