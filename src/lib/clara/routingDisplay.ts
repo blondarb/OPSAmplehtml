@@ -20,21 +20,21 @@ export const URGENCY_COLORS: Record<string, string> = {
 export function describeRoutingTarget(consultType: string, statLevel: number | null): string {
   switch (consultType) {
     case CONSULT_TYPE.EMERGENT:
-      return 'MD1 / on-call neurologist — URGENT transfer'
+      return 'MD1 — emergent on-call neurologist (URGENT)'
     case CONSULT_TYPE.NON_EMERGENT:
-      if (statLevel === 1) return 'MD2 / on-call — STAT1 (callback ≤15–20 min)'
-      if (statLevel === 2) return 'MD2 / on-call — STAT2 (callback ≤60 min)'
-      return 'MD2 / on-call — STAT1 ≤15–20m or STAT2 ≤60m per statLevel'
+      if (statLevel === 1) return 'STAT 1 — on-call STAT queue (callback ≤15–20 min)'
+      if (statLevel === 2) return 'STAT 2 — on-call STAT queue (callback ≤60 min)'
+      return 'STAT — on-call STAT queue (STAT 1 ≤15–20m or STAT 2 ≤60m per statLevel)'
     case CONSULT_TYPE.CT_RETURN:
-      return 'neurologist who already saw this patient (CT-return review)'
+      return 'CT-return — prior provider if already seen; if no prior record → probable emergent → MD1'
     case CONSULT_TYPE.EEG_READ:
       return 'EEG reader'
     case CONSULT_TYPE.CERIBELL_EEG:
-      return 'Ceribell/rapid EEG — ≥20% → emergent on-call neurologist + EEG reader (simultaneous); <20% → EEG reader (routine)'
+      return 'Ceribell — ≥20% → MD1 (emergent) + EEG reader, simultaneously; <20% → EEG reader (routine)'
     case CONSULT_TYPE.ROUNDING:
-      return 'rounding queue (incl. follow-ups on patients already being seen)'
+      return 'MD2 — rounding physician (scheduled inpatient follow-up, incl. new-patient rounding)'
     case CONSULT_TYPE.OUTPATIENT:
-      return 'scheduling'
+      return 'not covered — refer to the patient’s primary care provider'
     default:
       return `${consultType || 'unknown'} (unmapped routing target)`
   }
