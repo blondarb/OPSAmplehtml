@@ -28,15 +28,6 @@ export class MicCapture {
   private source: MediaStreamAudioSourceNode | null = null;
   private workletNode: AudioWorkletNode | null = null;
   private silentGain: GainNode | null = null;
-  /** When true, captured chunks are dropped (not sent). Used for half-duplex —
-   *  mute the mic while the AI is speaking so it can't hear its own audio. The
-   *  graph keeps running so unmuting is instant. */
-  private muted = false;
-
-  /** Enable/disable half-duplex muting (see `muted`). */
-  setMuted(muted: boolean): void {
-    this.muted = muted;
-  }
 
   /**
    * Start mic capture. Calls onChunk with a base64-encoded 16 kHz PCM16
@@ -83,11 +74,7 @@ export class MicCapture {
       workletNode.port.onmessage = (e: MessageEvent) => {
         const float = e.data as Float32Array;
         const down = downsampleTo16k(float, ctx.sampleRate);
-        // Half-duplex: while muted (AI speaking), send SILENCE — not nothing.
-        // Nova's server-side VAD needs a CONTINUOUS audio stream; dropping frames
-        // entirely desyncs it and it stops hearing the caller after the AI speaks.
-        // Zero-filled frames keep the stream alive but carry no echo.
-        const pcm = this.muted ? new Int16Array(down.length) : floatTo16BitPCM(down);
+        const pcm = floatTo16BitPCM(down);
         onChunk(base64FromPcm(pcm));
       };
     } catch (err) {

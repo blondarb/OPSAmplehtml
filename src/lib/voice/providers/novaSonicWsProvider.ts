@@ -29,8 +29,6 @@ export class NovaSonicWsProvider implements VoiceProvider {
   private closing = false
   /** True while the AI is producing audio — lets `completion` end the turn cleanly. */
   private aiSpeaking = false
-  /** Half-duplex: when true, mute the mic while the AI speaks (opt-in, Clara). */
-  private muteWhileSpeaking = false
 
   on(cb: (e: VoiceEvent) => void): void {
     this.cb = cb
@@ -61,7 +59,6 @@ export class NovaSonicWsProvider implements VoiceProvider {
       throw new Error('novaSonicWsProvider: relayUrl is required (set NOVA_SONIC_RELAY_URL)')
     }
 
-    this.muteWhileSpeaking = !!opts.muteWhileSpeaking
     this.closing = false
     this.aiSpeaking = false
 
@@ -161,9 +158,6 @@ export class NovaSonicWsProvider implements VoiceProvider {
         break
       case 'aiSpeechStart':
         this.aiSpeaking = true
-        // Half-duplex: mute the mic so Nova can't hear its own audio (echo →
-        // false barge-in → self-interruption/static). Unmuted on drain below.
-        if (this.muteWhileSpeaking) this.mic?.setMuted(true)
         this.emit({ type: 'aiSpeechStart' })
         break
       case 'aiSpeechStop':
@@ -184,7 +178,6 @@ export class NovaSonicWsProvider implements VoiceProvider {
         // nothing left to drain.
         this.player?.interrupt()
         this.aiSpeaking = false
-        if (this.muteWhileSpeaking) this.mic?.setMuted(false)
         this.emit({ type: 'aiSpeechStop' })
         break
       case 'toolCall':
@@ -218,15 +211,10 @@ export class NovaSonicWsProvider implements VoiceProvider {
   private emitAiSpeechStopWhenDrained(): void {
     const player = this.player
     if (!player) {
-      // Half-duplex: nothing left to play, so it's safe to re-open the mic now.
-      if (this.muteWhileSpeaking) this.mic?.setMuted(false)
       this.emit({ type: 'aiSpeechStop' })
       return
     }
     player.whenDrained().then(() => {
-      // Unmute only once the AI's audio has fully finished playing — otherwise
-      // the mic would pick up the tail and echo back into Nova.
-      if (this.muteWhileSpeaking) this.mic?.setMuted(false)
       this.emit({ type: 'aiSpeechStop' })
     })
   }
