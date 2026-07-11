@@ -37,17 +37,11 @@ export class PcmPlayer {
   /** Lazily create the AudioContext on first use. */
   private getContext(): AudioContext {
     if (!this.ctx) {
-      // Create the context AT the incoming audio's native rate (24 kHz, Nova
-      // Sonic PCM). Without this, mobile browsers open the context at 48 kHz and
-      // resample every 24 kHz chunk independently — the discontinuities between
-      // those per-chunk resamples produce audible clicking (reported on phone).
-      // Matching the rate means the buffers play natively, gapless, no resample.
-      // Fall back to a default context if a browser rejects the explicit rate.
-      try {
-        this.ctx = new AudioContext({ sampleRate: 24000 });
-      } catch {
-        this.ctx = new AudioContext();
-      }
+      // Use the browser's default context rate. (An attempt to force 24 kHz to
+      // avoid mobile resampling made the clicking WORSE on-device — reverted
+      // 2026-07-11. The mobile clicking cause is still open; do not guess again
+      // without an on-device A/B.)
+      this.ctx = new AudioContext();
     }
     return this.ctx;
   }
