@@ -70,6 +70,9 @@ export default function ClaraVoiceTestView() {
 
       {/* Safety + disclosure chrome — always visible, never hidden by scroll state */}
       <div style={{ padding: '12px 24px', display: 'flex', flexDirection: 'column', gap: 8, maxWidth: 720, margin: '0 auto' }}>
+        <div style={{ background: 'rgba(139,92,246,0.12)', border: '1px solid rgba(139,92,246,0.4)', borderRadius: 8, padding: 12, color: '#ddd6fe', fontSize: 13, lineHeight: 1.5 }}>
+          👋 <strong>This is a test version of Clara.</strong> Role-play any consult call you like — a stroke alert, an EEG, a rounding request, whatever — and <strong>try to break it.</strong> After each call, tell us if she routed it to the right place: <strong>👍</strong> if the call type was correct, or <strong>👎</strong> with what it should have been and why. Run as many scenarios as you want — every one helps us validate her. Thanks for taking a shot at it.
+        </div>
         <div style={{ background: 'rgba(234,179,8,0.12)', border: '1px solid rgba(234,179,8,0.4)', borderRadius: 8, padding: 10, color: '#fde68a', fontSize: 13 }}>
           ⚠️ Internal R&amp;D test harness — <strong>synthetic scenarios only, no real PHI.</strong> Clara announces herself as an automated test line at the start of every session. No real 911/STAT transfer happens here — routing decisions are narrated, not executed.
         </div>
