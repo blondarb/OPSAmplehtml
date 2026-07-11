@@ -29,6 +29,10 @@ import { pcmFromBase64 } from './pcm';
 import { makeResampleState, resamplePcm16, type ResampleState } from './resample';
 
 const SOURCE_RATE = 24000; // Nova Sonic PCM chunk rate
+// Jitter buffer: when playback falls behind the audio clock (first chunk or a
+// late-arriving chunk on mobile), restart this far ahead so late chunks have
+// slack instead of clicking. ~180 ms trades a little latency for gapless audio.
+const JITTER_S = 0.18;
 
 export class PcmPlayer {
   private ctx: AudioContext | null = null;
@@ -81,8 +85,18 @@ export class PcmPlayer {
     src.buffer = buffer;
     src.connect(ctx.destination);
 
-    // Gapless scheduling: glue this chunk immediately after the previous one.
-    const startAt = Math.max(ctx.currentTime, this.nextStartTime);
+    // Scheduling with a jitter buffer. If the cursor is still ahead of the audio
+    // clock, glue this chunk straight onto the previous one (gapless). But if the
+    // cursor has fallen BEHIND the clock — the first chunk, or an underrun when a
+    // chunk arrived late on a jittery mobile connection — don't resume at
+    // currentTime with zero runway (that just underruns again on the next late
+    // chunk, and every underrun is an audible click). Instead restart JITTER_S
+    // ahead of the clock to rebuild a cushion, so subsequent late chunks have
+    // slack and play seamlessly.
+    const startAt =
+      this.nextStartTime >= ctx.currentTime
+        ? this.nextStartTime
+        : ctx.currentTime + JITTER_S;
     src.start(startAt);
     this.nextStartTime = startAt + buffer.duration;
 
