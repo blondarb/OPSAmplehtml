@@ -118,6 +118,17 @@ export function useClaraVoiceSession() {
 
   const classifyTurn = useCallback(async (index: number, text: string) => {
     updateTurn(index, { classifying: true })
+    // Classify on the CUMULATIVE caller transcript up to and including this turn,
+    // NOT just this one line (Steve 7/11). The right disposition depends on
+    // everything said so far — a later detail ("just rounding, admitted last
+    // night") reframes an earlier one — so each turn's classification must see
+    // the whole conversation to date. Caller (user) turns only — never Clara's
+    // words, which would false-trigger Gate 0's red-flag intercept.
+    const cumulative = turnsRef.current
+      .slice(0, index + 1)
+      .filter((t) => t.role === 'user' && t.text.trim())
+      .map((t) => t.text.trim())
+      .join('. ')
     // Per-turn classification is a live convenience signal, NOT the authoritative
     // result — the end-of-call Final Disposition re-classifies the whole caller
     // transcript. So a transient per-turn failure (e.g. brief Bedrock throttle
@@ -129,7 +140,7 @@ export function useClaraVoiceSession() {
         const res = await fetch('/api/ai/clara/classify', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ transcript: text }),
+          body: JSON.stringify({ transcript: cumulative || text }),
         })
         const data = await res.json()
         if (!res.ok) {
