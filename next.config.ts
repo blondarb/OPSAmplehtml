@@ -40,6 +40,11 @@ const nextConfig: NextConfig = {
     // known Amplify SSR gotcha as the vars above — must be inlined here or
     // the session route can't read it at runtime.
     NOVA_RELAY_SHARED_SECRET: process.env.NOVA_RELAY_SHARED_SECRET,
+    // Clara R&D voice test gate (src/lib/clara/testGate.ts). Doubles as the
+    // HMAC secret for the gate cookie. Same Amplify SSR gotcha — must be
+    // inlined here or /api/ai/clara/auth fail-closes with "unset" at runtime.
+    CLARA_TEST_PASSWORD: process.env.CLARA_TEST_PASSWORD,
+    BEDROCK_CLARA_CLASSIFIER_MODEL: process.env.BEDROCK_CLARA_CLASSIFIER_MODEL,
   },
 };
 
