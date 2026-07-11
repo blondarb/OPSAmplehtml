@@ -1,4 +1,13 @@
-import { AITriageResponse, TriageTier, TIER_DISPLAY } from './types'
+import {
+  AITriageResponse,
+  CarePathway,
+  DataQuality,
+  OutpatientTriageTier,
+  ReviewRequirement,
+  TriageDecisionState,
+  TriageTier,
+  TIER_DISPLAY,
+} from './types'
 
 export interface ScoringResult {
   tier: TriageTier
@@ -32,12 +41,88 @@ export function calculateWeightedScore(scores: {
   return Math.round(raw * 100) / 100
 }
 
-export function mapScoreToTier(weightedScore: number): TriageTier {
+export function mapScoreToTier(weightedScore: number): OutpatientTriageTier {
   if (weightedScore >= 4.0) return 'urgent'
   if (weightedScore >= 3.0) return 'semi_urgent'
   if (weightedScore >= 2.5) return 'routine_priority'
   if (weightedScore >= 1.5) return 'routine'
   return 'non_urgent'
+}
+
+const OUTPATIENT_ORDER: OutpatientTriageTier[] = [
+  'urgent',
+  'semi_urgent',
+  'routine_priority',
+  'routine',
+  'non_urgent',
+]
+
+function moreUrgentOutpatientTier(
+  a: OutpatientTriageTier,
+  b: OutpatientTriageTier,
+): OutpatientTriageTier {
+  return OUTPATIENT_ORDER.indexOf(a) <= OUTPATIENT_ORDER.indexOf(b) ? a : b
+}
+
+export function calculateTriageDecision(aiResponse: AITriageResponse): TriageDecisionState {
+  const weightedScore = calculateWeightedScore(aiResponse.dimension_scores)
+  let outpatientPriority = mapScoreToTier(weightedScore)
+  const appliedFloors: string[] = []
+  const scores = aiResponse.dimension_scores
+
+  if (aiResponse.red_flag_override) {
+    appliedFloors.push('red_flag_override')
+  }
+  if (scores.red_flag_presence.score >= 4) {
+    appliedFloors.push('red_flag_presence_urgent')
+  }
+  if (scores.symptom_acuity.score === 5) {
+    appliedFloors.push('symptom_acuity_5_urgent')
+  }
+  if (scores.diagnostic_concern.score === 5) {
+    appliedFloors.push('diagnostic_concern_5_urgent')
+  }
+  if (scores.rate_of_progression.score === 5) {
+    appliedFloors.push('rate_of_progression_5_urgent')
+  }
+
+  const urgentFloorCount = appliedFloors.length
+
+  if (scores.symptom_acuity.score >= 4) {
+    appliedFloors.push('symptom_acuity_4_semi_urgent')
+  }
+  if (scores.diagnostic_concern.score >= 4) {
+    appliedFloors.push('diagnostic_concern_4_semi_urgent')
+  }
+
+  const hasUrgentFloor = urgentFloorCount > 0
+  const hasSemiUrgentFloor = appliedFloors.length > urgentFloorCount
+
+  if (hasUrgentFloor) {
+    outpatientPriority = moreUrgentOutpatientTier(outpatientPriority, 'urgent')
+  } else if (hasSemiUrgentFloor) {
+    outpatientPriority = moreUrgentOutpatientTier(outpatientPriority, 'semi_urgent')
+  }
+
+  const dataQuality: DataQuality = aiResponse.insufficient_data ? 'insufficient' : 'sufficient'
+  const carePathway: CarePathway = aiResponse.emergent_override
+    ? 'emergency_now'
+    : outpatientPriority === 'urgent' || outpatientPriority === 'semi_urgent'
+      ? 'expedited_outpatient'
+      : 'routine_outpatient'
+  const reviewRequirement: ReviewRequirement = aiResponse.emergent_override
+    ? 'emergency_action'
+    : 'clinician_confirmation'
+
+  return {
+    carePathway,
+    outpatientPriority,
+    dataQuality,
+    reviewRequirement,
+    schedulingLocked: true,
+    weightedScore,
+    appliedFloors,
+  }
 }
 
 export function formatTierDisplay(tier: TriageTier, isRedFlagOverride?: boolean): string {
@@ -101,8 +186,11 @@ export function calculateTriageTier(aiResponse: AITriageResponse): ScoringResult
     }
   }
 
-  // 2. Check insufficient data SECOND
-  if (aiResponse.insufficient_data) {
+  const decision = calculateTriageDecision(aiResponse)
+
+  // Missingness remains independent of urgency. Preserve a safety floor even
+  // when the referral lacks enough information for ordinary score-only triage.
+  if (aiResponse.insufficient_data && decision.appliedFloors.length === 0) {
     return {
       tier: 'insufficient_data',
       display: formatTierDisplay('insufficient_data'),
@@ -110,28 +198,10 @@ export function calculateTriageTier(aiResponse: AITriageResponse): ScoringResult
     }
   }
 
-  // 3. Calculate weighted score
-  const weightedScore = calculateWeightedScore(aiResponse.dimension_scores)
-
-  // 4. Deterministic red flag escalation: if red_flag_presence dimension ≥ 4
-  //    ("one or more major red flags identified"), auto-escalate to urgent.
-  //    This replaces the AI's subjective red_flag_override boolean, which was
-  //    inconsistent across runs even when dimension scores were identical.
-  const redFlagScore = aiResponse.dimension_scores.red_flag_presence.score
-  const scoreDerivedTier = mapScoreToTier(weightedScore)
-  if (redFlagScore >= 4 && scoreDerivedTier !== 'urgent' && scoreDerivedTier !== 'emergent') {
-    return {
-      tier: 'urgent',
-      display: formatTierDisplay('urgent', true),
-      weightedScore,
-    }
-  }
-
-  // 5. Map score to tier
-  const tier = scoreDerivedTier
+  const tier = decision.outpatientPriority
   return {
     tier,
-    display: formatTierDisplay(tier),
-    weightedScore,
+    display: formatTierDisplay(tier, aiResponse.red_flag_override),
+    weightedScore: decision.weightedScore,
   }
 }

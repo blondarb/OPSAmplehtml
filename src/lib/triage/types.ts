@@ -8,6 +8,34 @@ export type TriageTier =
   | 'non_urgent'
   | 'insufficient_data'
 
+export type OutpatientTriageTier = Exclude<TriageTier, 'emergent' | 'insufficient_data'>
+
+export type CarePathway =
+  | 'emergency_now'
+  | 'same_day_clinician_review'
+  | 'expedited_outpatient'
+  | 'routine_outpatient'
+  | 'redirect'
+  | 'undetermined'
+
+export type DataQuality = 'sufficient' | 'partial' | 'insufficient' | 'conflicting'
+
+export type ReviewRequirement =
+  | 'emergency_action'
+  | 'immediate_clinician_review'
+  | 'clinician_confirmation'
+  | 'none'
+
+export interface TriageDecisionState {
+  carePathway: CarePathway
+  outpatientPriority: OutpatientTriageTier
+  dataQuality: DataQuality
+  reviewRequirement: ReviewRequirement
+  schedulingLocked: boolean
+  weightedScore: number
+  appliedFloors: string[]
+}
+
 export type TriageConfidence = 'high' | 'moderate' | 'low'
 
 export type SubspecialtyType =

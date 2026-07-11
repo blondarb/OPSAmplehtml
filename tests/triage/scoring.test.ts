@@ -1,5 +1,11 @@
 import { describe, it, expect } from 'vitest'
-import { calculateTriageTier, calculateWeightedScore, mapScoreToTier, formatTierDisplay } from '../../src/lib/triage/scoring'
+import {
+  calculateTriageDecision,
+  calculateTriageTier,
+  calculateWeightedScore,
+  mapScoreToTier,
+  formatTierDisplay,
+} from '../../src/lib/triage/scoring'
 import { AITriageResponse, DimensionScores } from '../../src/lib/triage/types'
 
 // Helper to build a minimal AITriageResponse
@@ -68,6 +74,88 @@ describe('mapScoreToTier', () => {
   it('maps 1.0 to non_urgent', () => expect(mapScoreToTier(1.0)).toBe('non_urgent'))
 })
 
+describe('calculateTriageDecision', () => {
+  it.each([
+    ['symptom acuity', makeScores(5, 1, 1, 1, 1), 'symptom_acuity_5_urgent'],
+    ['diagnostic concern', makeScores(1, 5, 1, 1, 1), 'diagnostic_concern_5_urgent'],
+    ['rate of progression', makeScores(1, 1, 5, 1, 1), 'rate_of_progression_5_urgent'],
+    ['red flag presence', makeScores(1, 1, 1, 1, 5), 'red_flag_presence_urgent'],
+  ])('applies an urgent floor when %s is 5', (_dimension, scores, floor) => {
+    const decision = calculateTriageDecision(makeResponse({ dimension_scores: scores }))
+
+    expect(decision.outpatientPriority).toBe('urgent')
+    expect(decision.carePathway).toBe('expedited_outpatient')
+    expect(decision.appliedFloors).toContain(floor)
+  })
+
+  it('applies an urgent floor when red flag presence is 4', () => {
+    const decision = calculateTriageDecision(makeResponse({ dimension_scores: makeScores(1, 1, 1, 1, 4) }))
+
+    expect(decision.outpatientPriority).toBe('urgent')
+    expect(decision.appliedFloors).toEqual(['red_flag_presence_urgent'])
+  })
+
+  it('honors the red flag override as an urgent floor', () => {
+    const decision = calculateTriageDecision(makeResponse({
+      red_flag_override: true,
+      dimension_scores: makeScores(2, 2, 2, 2, 2),
+    }))
+
+    expect(decision.outpatientPriority).toBe('urgent')
+    expect(decision.appliedFloors).toEqual(['red_flag_override'])
+  })
+
+  it.each([
+    ['symptom acuity', makeScores(4, 1, 1, 1, 1), 'symptom_acuity_4_semi_urgent'],
+    ['diagnostic concern', makeScores(1, 4, 1, 1, 1), 'diagnostic_concern_4_semi_urgent'],
+  ])('applies a semi-urgent floor when %s is 4', (_dimension, scores, floor) => {
+    const decision = calculateTriageDecision(makeResponse({ dimension_scores: scores }))
+
+    expect(decision.outpatientPriority).toBe('semi_urgent')
+    expect(decision.carePathway).toBe('expedited_outpatient')
+    expect(decision.appliedFloors).toEqual([floor])
+  })
+
+  it('does not apply an urgency floor for functional impairment alone', () => {
+    const decision = calculateTriageDecision(makeResponse({ dimension_scores: makeScores(1, 1, 1, 5, 1) }))
+
+    expect(decision.outpatientPriority).toBe('routine')
+    expect(decision.carePathway).toBe('routine_outpatient')
+    expect(decision.appliedFloors).toEqual([])
+  })
+
+  it('keeps emergency action and insufficient data as orthogonal state', () => {
+    const decision = calculateTriageDecision(makeResponse({
+      emergent_override: true,
+      insufficient_data: true,
+      dimension_scores: makeScores(1, 1, 1, 1, 1),
+    }))
+
+    expect(decision.carePathway).toBe('emergency_now')
+    expect(decision.dataQuality).toBe('insufficient')
+    expect(decision.reviewRequirement).toBe('emergency_action')
+    expect(decision.schedulingLocked).toBe(true)
+  })
+
+  it('records every applicable floor once in deterministic order', () => {
+    const decision = calculateTriageDecision(makeResponse({
+      red_flag_override: true,
+      dimension_scores: makeScores(5, 5, 5, 5, 5),
+    }))
+
+    expect(decision.appliedFloors).toEqual([
+      'red_flag_override',
+      'red_flag_presence_urgent',
+      'symptom_acuity_5_urgent',
+      'diagnostic_concern_5_urgent',
+      'rate_of_progression_5_urgent',
+      'symptom_acuity_4_semi_urgent',
+      'diagnostic_concern_4_semi_urgent',
+    ])
+    expect(new Set(decision.appliedFloors).size).toBe(decision.appliedFloors.length)
+  })
+})
+
 describe('calculateTriageTier', () => {
   it('returns emergent when emergent_override is true', () => {
     const resp = makeResponse({
@@ -91,6 +179,19 @@ describe('calculateTriageTier', () => {
     expect(result.tier).toBe('insufficient_data')
     expect(result.weightedScore).toBeNull()
     expect(result.display).toContain('INSUFFICIENT DATA')
+  })
+
+  it('preserves an urgent safety floor when data is insufficient', () => {
+    const resp = makeResponse({
+      insufficient_data: true,
+      missing_information: ['symptom onset date'],
+      dimension_scores: makeScores(5, 1, 1, 1, 1),
+    })
+
+    const result = calculateTriageTier(resp)
+
+    expect(result.tier).toBe('urgent')
+    expect(result.weightedScore).toBe(2.2)
   })
 
   it('emergent takes precedence over insufficient_data', () => {
