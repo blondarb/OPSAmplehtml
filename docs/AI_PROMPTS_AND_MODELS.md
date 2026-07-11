@@ -119,6 +119,14 @@ Sevaro Clinical uses a two-tier model strategy to balance cost, latency, and rea
 - Clinical anchoring examples in the prompt reduce borderline score oscillation between adjacent levels.
 - Token usage is logged per triage call for cost monitoring.
 
+#### Deterministic neurology emergency review gateway
+
+- **Version:** `neurology-emergency-gateway-v1` (`src/lib/triage/emergencyGateway.ts`). This is application code, not a model prompt, and evaluates the original referral text before lossy summarization.
+- **Syndrome families:** acute focal cerebrovascular deficits; thunderclap/maximal-at-onset worst headache or a new sudden severe headache with a high-risk companion (focal deficit, syncope, pregnancy/postpartum, anticoagulation, or altered consciousness); status, prolonged, or no-recovery seizure; acute cord/cauda equina clusters; fever with a new severe headache, meningeal features, or acute altered mental status; raised intracranial pressure; progressive bulbar/respiratory failure warning; acute vision loss; acute altered mental status/coma; traumatic neurologic deterioration including anticoagulated head injury; and active suicide/violence intent.
+- **Context handling:** semicolon/clause boundaries keep an unrelated denial or instruction from erasing a later active finding, and a relative reporting the patient's symptoms is not treated as the symptom experiencer. Bounded adjacent spans can complete a clinical pattern (for example, `Aphasia. Began 20 minutes ago.`), while remote/family/education headings suppress only fragments that do not independently assert a current patient event. Encounter words such as `today` or `currently` do not reactivate a stable/baseline deficit unless the later clause explicitly introduces a new or worsening symptom. A possible or unclear time-critical feature is held for same-day clinician review rather than promoted to a confirmed emergency or discarded.
+- **Evidence contract:** every emitted signal retains one or more exact source quotes with global start/end offsets, including the full bounded span when a pattern crosses adjacent sentences. Optional packet, document, and page provenance is copied onto each evidence item; missing provenance is represented explicitly as `null`.
+- **Operating mode:** shadow/review-only clinical decision support. It does not diagnose, independently clear a referral, auto-schedule, or replace clinician judgment. Present signals request emergency action; uncertain signals request immediate clinician review; every gateway result keeps scheduling locked.
+
 ---
 
 ## 2. Complete System Prompts by Endpoint
