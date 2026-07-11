@@ -67,6 +67,10 @@ export function useClaraVoiceSession() {
   const providerRef = useRef<VoiceProvider | null>(null)
   const turnsRef = useRef<ClaraTurn[]>([])
   const startTimeRef = useRef<number>(0)
+  // Echo guard: is Clara speaking right now, and when did she last stop — so we
+  // can ignore the mic picking up her own audio (see the userTranscript case).
+  const isAiSpeakingRef = useRef(false)
+  const lastAiSpeechEndRef = useRef(0)
 
   const pushTurn = useCallback((turn: ClaraTurn) => {
     turnsRef.current = [...turnsRef.current, turn]
@@ -109,8 +113,19 @@ export function useClaraVoiceSession() {
   const handleEvent = useCallback((e: VoiceEvent) => {
     switch (e.type) {
       case 'userTranscript': {
-        const idx = pushTurn({ role: 'user', text: e.text, ts: Date.now() })
-        void classifyTurn(idx, e.text)
+        const text = (e.text || '').trim()
+        const now = Date.now()
+        // Echo guard: a "caller" transcript that arrives while Clara is speaking —
+        // or within ~800ms after — is almost always the mic picking up Clara's own
+        // audio (browser echoCancellation is imperfect on laptop/speakerphone).
+        // Drop it so her greeting can't appear as a caller turn or fire a premature
+        // (often "emergent") classification. Rare cost: a genuine barge-in mid-
+        // speech is ignored in this test harness.
+        if (!text || isAiSpeakingRef.current || now - lastAiSpeechEndRef.current < 800) {
+          break
+        }
+        const idx = pushTurn({ role: 'user', text, ts: now })
+        void classifyTurn(idx, text)
         break
       }
       case 'assistantTranscript': {
@@ -122,9 +137,12 @@ export function useClaraVoiceSession() {
         setCurrentAssistantText((t) => t + e.text)
         break
       case 'aiSpeechStart':
+        isAiSpeakingRef.current = true
         setIsAiSpeaking(true)
         break
       case 'aiSpeechStop':
+        isAiSpeakingRef.current = false
+        lastAiSpeechEndRef.current = Date.now()
         setIsAiSpeaking(false)
         break
       case 'error':
