@@ -86,19 +86,20 @@ function buildRouting(
     return { action: 'escalate_911', label: 'EMERGENT — immediate on-call neurologist page (would transfer now)', slaMinutes: 0 }
   }
   // Ceribell rapid-EEG routing — Sevaro EEG-dept protocol (Marion Fossum, EEG Lead;
-  // OneDrive + site On-Call Guides): ≥20% seizure burden → the EMERGENT MD1 provider,
-  // WITH a (non-emergent) EEG-reader notification in case MD1 asks about the study.
-  // ≤19% (or study complete) → the RN calls the study in NON-emergently. Ceribell is
-  // NOT read emergently. Prefer the actual burden % when the model returned one; fall
-  // back to urgency (critical/high ≈ ≥20%).
+  // OneDrive + site On-Call Guides) as confirmed by Steve Arbogast, DO (2026-07-11):
+  // ≥20% seizure burden → the EMERGENT on-call neurologist AND the EEG reader,
+  // engaged SIMULTANEOUSLY (both brought in at once, not sequentially).
+  // ≤19% (or study complete) → the RN calls the study in NON-emergently; routine EEG read.
+  // Prefer the actual burden % when the model returned one; fall back to urgency
+  // (critical/high ≈ ≥20%).
   if (consultType === CONSULT_TYPE.CERIBELL_EEG) {
     const highBurden =
       (typeof seizureBurdenPct === 'number' && seizureBurdenPct >= 20) ||
       urgencyLevel === URGENCY_LEVEL.CRITICAL ||
       urgencyLevel === URGENCY_LEVEL.HIGH
     return highBurden
-      ? { action: 'transfer_md1', label: 'Ceribell ≥20% burden → EMERGENT MD1 (on-call neurologist); EEG reader notified for non-emergent review (per EEG-dept protocol)', slaMinutes: 0 }
-      : { action: 'route_workflow', label: 'Ceribell ≤19% burden → RN calls the study in non-emergently when complete; EEG reader notified (routine)', slaMinutes: null }
+      ? { action: 'transfer_md1', label: 'Ceribell ≥20% burden → EMERGENT on-call neurologist + EEG reader, engaged simultaneously (per EEG-dept protocol)', slaMinutes: 0 }
+      : { action: 'route_workflow', label: 'Ceribell ≤19% burden → RN calls the study in non-emergently when complete; routine EEG read', slaMinutes: null }
   }
   if (consultType === CONSULT_TYPE.EEG_READ) {
     return { action: 'route_workflow', label: 'EEG read → route to EEG reader (non-emergent)', slaMinutes: null }
@@ -110,7 +111,7 @@ function buildRouting(
     return { action: 'transfer_stat2', label: 'STAT 2 — callback within 60 min (would transfer to on-call queue)', slaMinutes: 60 }
   }
   if (consultType === CONSULT_TYPE.CT_RETURN) {
-    return { action: 'route_workflow', label: 'CT-return review (would route to CT-return workflow)', slaMinutes: null }
+    return { action: 'route_workflow', label: 'CT-return → the neurologist who already saw this patient (needs prior-provider lookup in the dispatch layer)', slaMinutes: null }
   }
   if (consultType === CONSULT_TYPE.ROUNDING || consultType === CONSULT_TYPE.OUTPATIENT) {
     return { action: 'schedule_callback', label: 'Low urgency — would route to scheduling/coordination', slaMinutes: null }
@@ -164,9 +165,9 @@ export async function POST(request: Request) {
     // seizure BURDEN is monitoring data, not active status epilepticus. In a clear
     // Ceribell/EEG-read context with no active-emergency language, don't let the
     // deterministic seizure floor pre-empt the rulebook — it already routes
-    // ≥20% burden → CRITICAL Ceribell-EEG (a STAT EEG read). The floor still fires
-    // for stroke/thunderclap/self-harm and for seizures described with active-
-    // seizing / airway / escalation language.
+    // ≥20% burden → CRITICAL Ceribell-EEG (emergent on-call neurologist + EEG reader,
+    // simultaneously). The floor still fires for stroke/thunderclap/self-harm and for
+    // seizures described with active-seizing / airway / escalation language.
     // SSOT: the production Clara service (sevaro-voice-agent) needs this same
     // policy layer around its own Gate-0.
     if (gate0.fired) {
@@ -179,7 +180,7 @@ export async function POST(request: Request) {
       }
       gate0.deescalated = true
       gate0.deescalationReason =
-        'Seizure terms detected in a Ceribell/EEG-read burden report with no active-emergency language — deferring to the rulebook (≥20% burden → STAT EEG read).'
+        'Seizure terms detected in a Ceribell/EEG-read burden report with no active-emergency language — deferring to the rulebook (≥20% burden → emergent on-call neurologist + EEG reader, simultaneously).'
     }
 
     // ── Clara's rulebook on Bedrock ──────────────────────────────────────────

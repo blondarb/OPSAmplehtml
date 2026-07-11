@@ -26,13 +26,13 @@ export function describeRoutingTarget(consultType: string, statLevel: number | n
       if (statLevel === 2) return 'MD2 / on-call — STAT2 (callback ≤60 min)'
       return 'MD2 / on-call — STAT1 ≤15–20m or STAT2 ≤60m per statLevel'
     case CONSULT_TYPE.CT_RETURN:
-      return 'CT-return review'
+      return 'neurologist who already saw this patient (CT-return review)'
     case CONSULT_TYPE.EEG_READ:
       return 'EEG reader'
     case CONSULT_TYPE.CERIBELL_EEG:
-      return 'Ceribell/rapid EEG (high vs low burden)'
+      return 'Ceribell/rapid EEG — ≥20% → emergent on-call neurologist + EEG reader (simultaneous); <20% → EEG reader (routine)'
     case CONSULT_TYPE.ROUNDING:
-      return 'rounding queue'
+      return 'rounding queue (incl. follow-ups on patients already being seen)'
     case CONSULT_TYPE.OUTPATIENT:
       return 'scheduling'
     default:
