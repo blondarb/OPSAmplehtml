@@ -81,10 +81,13 @@ export class MicCapture {
       silentGain.connect(ctx.destination);
 
       workletNode.port.onmessage = (e: MessageEvent) => {
-        if (this.muted) return; // half-duplex: drop mic audio while AI speaks
         const float = e.data as Float32Array;
         const down = downsampleTo16k(float, ctx.sampleRate);
-        const pcm = floatTo16BitPCM(down);
+        // Half-duplex: while muted (AI speaking), send SILENCE — not nothing.
+        // Nova's server-side VAD needs a CONTINUOUS audio stream; dropping frames
+        // entirely desyncs it and it stops hearing the caller after the AI speaks.
+        // Zero-filled frames keep the stream alive but carry no echo.
+        const pcm = this.muted ? new Int16Array(down.length) : floatTo16BitPCM(down);
         onChunk(base64FromPcm(pcm));
       };
     } catch (err) {
