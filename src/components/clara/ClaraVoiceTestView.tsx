@@ -324,8 +324,10 @@ export default function ClaraVoiceTestView() {
             </div>
             {t.role === 'user' && (
               <div style={{ marginTop: 4, fontSize: 12, color: '#94a3b8', display: 'flex', gap: 6, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
-                {t.classifying && <span>classifying…</span>}
-                {t.classifyError && <span style={{ color: '#fca5a5' }}>classify error: {t.classifyError}</span>}
+                {t.classifying && <span style={{ color: '#64748b' }}>classifying…</span>}
+                {/* Per-turn classify failures are intentionally NOT surfaced here — the
+                    end-of-call Final Disposition is the authoritative routing result, so a
+                    transient per-turn hiccup should not alarm the tester. */}
                 {t.gate0?.fired && (
                   <span style={{ color: '#fca5a5', fontWeight: 600 }}>
                     GATE 0: {t.gate0.category} ({t.gate0.matchedTerms.join(', ')})
