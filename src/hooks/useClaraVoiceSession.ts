@@ -19,7 +19,7 @@
  * of band from the voice loop.
  */
 
-import { useCallback, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { makeProvider } from '@/lib/voice/selectProvider'
 import type { VoiceEvent, VoiceProvider } from '@/lib/voice/providerTypes'
 
@@ -72,10 +72,38 @@ export function useClaraVoiceSession() {
   const providerRef = useRef<VoiceProvider | null>(null)
   const turnsRef = useRef<ClaraTurn[]>([])
   const startTimeRef = useRef<number>(0)
-  // Echo guard: is Clara speaking right now, and when did she last stop — so we
-  // can ignore the mic picking up her own audio (see the userTranscript case).
   const isAiSpeakingRef = useRef(false)
   const lastAiSpeechEndRef = useRef(0)
+
+  // Keep the phone screen awake during a live call — otherwise a mobile browser
+  // sleeps the screen mid-conversation (it doesn't know audio is streaming) and
+  // the session gets suspended. Screen Wake Lock is released automatically when
+  // the tab is hidden, so re-acquire on visibilitychange while the call is live.
+  const wakeLockRef = useRef<WakeLockSentinel | null>(null)
+  useEffect(() => {
+    const callLive = status === 'active' || status === 'connecting'
+    const nav = navigator as Navigator & { wakeLock?: { request: (t: 'screen') => Promise<WakeLockSentinel> } }
+    async function acquire() {
+      if (!callLive || !nav.wakeLock || wakeLockRef.current) return
+      try {
+        wakeLockRef.current = await nav.wakeLock.request('screen')
+        wakeLockRef.current.addEventListener('release', () => { wakeLockRef.current = null })
+      } catch {
+        // Non-fatal: unsupported browser, denied, or not a user-gesture context.
+      }
+    }
+    function release() {
+      wakeLockRef.current?.release().catch(() => {})
+      wakeLockRef.current = null
+    }
+    if (callLive) {
+      void acquire()
+      const onVis = () => { if (document.visibilityState === 'visible') void acquire() }
+      document.addEventListener('visibilitychange', onVis)
+      return () => document.removeEventListener('visibilitychange', onVis)
+    }
+    release()
+  }, [status])
 
   const pushTurn = useCallback((turn: ClaraTurn) => {
     turnsRef.current = [...turnsRef.current, turn]
