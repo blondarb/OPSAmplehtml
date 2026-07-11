@@ -65,7 +65,7 @@ export default function ClaraVoiceTestView() {
   }
 
   return (
-    <div style={{ minHeight: '100vh', background: 'linear-gradient(180deg, #0F172A 0%, #1E293B 100%)', color: 'white' }}>
+    <div style={{ minHeight: '100vh', background: 'linear-gradient(180deg, #0F172A 0%, #1E293B 100%)', color: 'white', paddingBottom: 'calc(150px + env(safe-area-inset-bottom))' }}>
       <FeatureSubHeader title="Clara Voice Test" icon={Bot} accentColor={ACCENT} badgeText="R&D" />
 
       {/* Safety + disclosure chrome — always visible, never hidden by scroll state */}
