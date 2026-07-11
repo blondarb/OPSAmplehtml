@@ -10,10 +10,12 @@
  */
 
 import Link from 'next/link'
-import { Bot, ClipboardList, Mic, Phone, Square, TriangleAlert } from 'lucide-react'
+import { useState } from 'react'
+import { Bot, ClipboardList, Mic, Phone, RotateCcw, Square, TriangleAlert } from 'lucide-react'
 import FeatureSubHeader from '@/components/layout/FeatureSubHeader'
 import { useClaraVoiceSession } from '@/hooks/useClaraVoiceSession'
 import { URGENCY_COLORS } from '@/lib/clara/routingDisplay'
+import { CLARA_PRESET_SCENARIOS, type ClaraPresetScenario } from '@/lib/clara/presetScenarios'
 import ClaraDecisionCard from './ClaraDecisionCard'
 
 const ACCENT = '#8B5CF6'
@@ -30,13 +32,37 @@ export default function ClaraVoiceTestView() {
     loggedSessionId,
     startSession,
     endSession,
+    resetSession,
   } = useClaraVoiceSession()
+
+  // Which preset scenario (if any) the tester tapped for the CURRENT call —
+  // purely a display aid (the script banner while the call is live). Clara
+  // still classifies live; this never touches the classify/log pipeline.
+  const [activeScenario, setActiveScenario] = useState<ClaraPresetScenario | null>(null)
 
   const isActive = status === 'active' || status === 'connecting'
   const classifiedTurns = turns
     .map((t, i) => ({ turn: t, index: i }))
     .filter(({ turn }) => turn.role === 'user' && turn.classification)
   const showResults = status === 'idle' && classifiedTurns.length > 0
+  // Cold-start state: nothing has run yet this call, chips are front and center.
+  const showPresets = status === 'idle' && turns.length === 0
+
+  const startScenario = (scenario: ClaraPresetScenario) => {
+    if (status !== 'idle') return
+    setActiveScenario(scenario)
+    void startSession()
+  }
+
+  const startFreeform = () => {
+    setActiveScenario(null)
+    void startSession()
+  }
+
+  const handleTestAnother = () => {
+    setActiveScenario(null)
+    resetSession()
+  }
 
   return (
     <div style={{ minHeight: '100vh', background: 'linear-gradient(180deg, #0F172A 0%, #1E293B 100%)', color: 'white' }}>
@@ -81,6 +107,25 @@ export default function ClaraVoiceTestView() {
           </div>
         )}
       </div>
+
+      {/* Preset scenario script — stays visible for the whole call so the tester can read it. */}
+      {activeScenario && status !== 'idle' && (
+        <div style={{ padding: '0 24px', maxWidth: 720, margin: '0 auto 8px' }}>
+          <div
+            style={{
+              background: 'rgba(139,92,246,0.14)',
+              border: '1px solid rgba(139,92,246,0.4)',
+              borderRadius: 10,
+              padding: 14,
+            }}
+          >
+            <div style={{ fontSize: 11, fontWeight: 700, color: '#c4b5fd', textTransform: 'uppercase', letterSpacing: 0.4, marginBottom: 4 }}>
+              Scenario: {activeScenario.label}
+            </div>
+            <div style={{ fontSize: 15, color: 'white', lineHeight: 1.4 }}>{activeScenario.script}</div>
+          </div>
+        </div>
+      )}
 
       {/* Live routing/classification summary */}
       {lastClassification && (
@@ -137,7 +182,28 @@ export default function ClaraVoiceTestView() {
       {/* Post-call results + feedback — every classified turn from the just-ended call, rate each decision. */}
       {showResults && (
         <div style={{ padding: '8px 24px', maxWidth: 720, margin: '0 auto', display: 'flex', flexDirection: 'column', gap: 10 }}>
-          <div style={{ fontSize: 15, fontWeight: 700 }}>Call results</div>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap' }}>
+            <div style={{ fontSize: 15, fontWeight: 700 }}>Call results</div>
+            <button
+              onClick={handleTestAnother}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 6,
+                background: ACCENT,
+                color: 'white',
+                border: 'none',
+                borderRadius: 10,
+                padding: '10px 16px',
+                fontSize: 13,
+                fontWeight: 700,
+                cursor: 'pointer',
+                minHeight: 44,
+              }}
+            >
+              <RotateCcw size={16} /> Test another scenario
+            </button>
+          </div>
           {!loggedSessionId && (
             <div style={{ color: '#64748b', fontSize: 12 }}>Logging call…</div>
           )}
@@ -162,13 +228,45 @@ export default function ClaraVoiceTestView() {
         </div>
       )}
 
-      {/* Transcript */}
-      <div style={{ padding: '8px 24px 140px', maxWidth: 720, margin: '0 auto', display: 'flex', flexDirection: 'column', gap: 12 }}>
-        {turns.length === 0 && status === 'idle' && (
-          <p style={{ color: '#64748b', fontSize: 14, textAlign: 'center', marginTop: 24 }}>
-            Tap the mic to start a test call with Clara.
+      {/* One-tap preset scenarios — cold-start demo needs zero improvisation. Tapping a chip
+          shows the script (banner above) and starts the mic; Clara still classifies live via
+          the real pipeline, this is purely a prompt for the human caller. */}
+      {showPresets && (
+        <div style={{ padding: '4px 24px 8px', maxWidth: 720, margin: '0 auto' }}>
+          <p style={{ color: '#94a3b8', fontSize: 13, textAlign: 'center', marginBottom: 12 }}>
+            Tap a scenario to start, or tap the mic below for a freeform call.
           </p>
-        )}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', gap: 10 }}>
+            {CLARA_PRESET_SCENARIOS.map((scenario) => (
+              <button
+                key={scenario.id}
+                onClick={() => startScenario(scenario)}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  textAlign: 'center',
+                  minHeight: 48,
+                  padding: '10px 14px',
+                  borderRadius: 10,
+                  border: '1px solid rgba(139,92,246,0.4)',
+                  background: 'rgba(139,92,246,0.14)',
+                  color: 'white',
+                  fontSize: 13,
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  lineHeight: 1.3,
+                }}
+              >
+                {scenario.label}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Transcript */}
+      <div style={{ padding: '8px 24px 150px', maxWidth: 720, margin: '0 auto', display: 'flex', flexDirection: 'column', gap: 12 }}>
         {turns.map((t, i) => (
           <div key={i} style={{ alignSelf: t.role === 'user' ? 'flex-end' : 'flex-start', maxWidth: '90%' }}>
             <div
@@ -206,36 +304,77 @@ export default function ClaraVoiceTestView() {
         )}
       </div>
 
-      {/* Control bar */}
-      <div style={{ position: 'fixed', bottom: 0, left: 0, right: 0, padding: 20, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8, background: 'linear-gradient(0deg, #0F172A 70%, transparent)' }}>
+      {/* Sticky bottom action bar — thumb-reachable primary control on mobile.
+          Three mutually-exclusive states: Stop (mid-call), Test another (just
+          finished, results showing), Start (idle, nothing run yet). */}
+      <div
+        style={{
+          position: 'fixed',
+          bottom: 0,
+          left: 0,
+          right: 0,
+          padding: '16px 20px calc(16px + env(safe-area-inset-bottom))',
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          gap: 8,
+          background: 'linear-gradient(0deg, #0F172A 75%, transparent)',
+        }}
+      >
         <div style={{ fontSize: 12, color: '#64748b' }}>
-          {status === 'idle' && 'Ready'}
+          {status === 'idle' && (showResults ? 'Call finished — logged for review' : 'Ready')}
           {status === 'connecting' && 'Connecting to Clara…'}
           {status === 'active' && (isAiSpeaking ? 'Clara is speaking…' : 'Listening…')}
           {status === 'ending' && 'Ending call…'}
           {status === 'error' && 'Session error'}
         </div>
-        <button
-          onClick={isActive ? endSession : startSession}
-          disabled={status === 'connecting' || status === 'ending'}
-          style={{
-            width: 64,
-            height: 64,
-            borderRadius: '50%',
-            border: 'none',
-            cursor: status === 'connecting' || status === 'ending' ? 'default' : 'pointer',
-            background: isActive ? '#ef4444' : ACCENT,
-            color: 'white',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            boxShadow: '0 4px 20px rgba(0,0,0,0.4)',
-            opacity: status === 'connecting' || status === 'ending' ? 0.6 : 1,
-          }}
-          aria-label={isActive ? 'End test call' : 'Start test call'}
-        >
-          {isActive ? <Square size={26} /> : <Mic size={26} />}
-        </button>
+
+        {showResults ? (
+          <button
+            onClick={handleTestAnother}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 8,
+              width: '100%',
+              maxWidth: 340,
+              justifyContent: 'center',
+              minHeight: 56,
+              borderRadius: 14,
+              border: 'none',
+              background: ACCENT,
+              color: 'white',
+              fontSize: 16,
+              fontWeight: 700,
+              cursor: 'pointer',
+              boxShadow: '0 4px 20px rgba(0,0,0,0.4)',
+            }}
+          >
+            <RotateCcw size={20} /> Test another scenario
+          </button>
+        ) : (
+          <button
+            onClick={isActive ? endSession : startFreeform}
+            disabled={status === 'connecting' || status === 'ending'}
+            style={{
+              width: 64,
+              height: 64,
+              borderRadius: '50%',
+              border: 'none',
+              cursor: status === 'connecting' || status === 'ending' ? 'default' : 'pointer',
+              background: isActive ? '#ef4444' : ACCENT,
+              color: 'white',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              boxShadow: '0 4px 20px rgba(0,0,0,0.4)',
+              opacity: status === 'connecting' || status === 'ending' ? 0.6 : 1,
+            }}
+            aria-label={isActive ? 'End test call' : 'Start test call'}
+          >
+            {isActive ? <Square size={26} /> : <Mic size={26} />}
+          </button>
+        )}
       </div>
     </div>
   )

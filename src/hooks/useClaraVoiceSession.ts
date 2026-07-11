@@ -223,6 +223,29 @@ export function useClaraVoiceSession() {
     setStatus('idle')
   }, [])
 
+  /**
+   * Clears a finished call's transcript/turns/classification/logged-session
+   * so the tester can immediately run another scenario — distinct from
+   * startSession's own reset (which also opens a new mic/relay session).
+   * This is a pure state reset back to "ready to start"; it does NOT touch
+   * providerRef, so it must only be called while status is already 'idle'
+   * (i.e. after endSession has finished tearing down the prior session).
+   * The NEXT startSession() call mints a fresh POST /api/ai/clara/log on
+   * endSession, so every call — reset or not — always lands as its own new
+   * clara_test_sessions row; nothing here overwrites a prior session.
+   */
+  const resetSession = useCallback(() => {
+    turnsRef.current = []
+    setTurns([])
+    setCurrentAssistantText('')
+    setIsAiSpeaking(false)
+    setError(null)
+    setEmergencyActive(false)
+    setLastClassification(null)
+    setLoggedSessionId(null)
+    setStatus('idle')
+  }, [])
+
   return {
     status,
     turns,
@@ -234,5 +257,6 @@ export function useClaraVoiceSession() {
     loggedSessionId,
     startSession,
     endSession,
+    resetSession,
   }
 }
