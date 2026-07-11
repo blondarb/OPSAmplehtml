@@ -118,18 +118,19 @@ export function useClaraVoiceSession() {
   const handleEvent = useCallback((e: VoiceEvent) => {
     switch (e.type) {
       case 'userTranscript': {
+        // Record EVERY caller utterance — same as the historian
+        // (useRealtimeSession), which runs on this exact Nova relay with no
+        // echo-guard and transcribes callers cleanly. An earlier blanket
+        // echo-guard (drop while Clara is speaking / <800ms after) was eating
+        // most legitimate caller turns on a live call: Clara still heard the
+        // caller (Nova is speech-to-speech, it doesn't need the text to reply),
+        // but their words never reached the transcript OR the classifier — only
+        // the very first pre-greeting turn slipped through. Nova's relay only
+        // emits userTranscript for actual caller speech (proven by the
+        // historian), so the guard was unnecessary and net-harmful.
         const text = (e.text || '').trim()
-        const now = Date.now()
-        // Echo guard: a "caller" transcript that arrives while Clara is speaking —
-        // or within ~800ms after — is almost always the mic picking up Clara's own
-        // audio (browser echoCancellation is imperfect on laptop/speakerphone).
-        // Drop it so her greeting can't appear as a caller turn or fire a premature
-        // (often "emergent") classification. Rare cost: a genuine barge-in mid-
-        // speech is ignored in this test harness.
-        if (!text || isAiSpeakingRef.current || now - lastAiSpeechEndRef.current < 800) {
-          break
-        }
-        const idx = pushTurn({ role: 'user', text, ts: now })
+        if (!text) break
+        const idx = pushTurn({ role: 'user', text, ts: Date.now() })
         void classifyTurn(idx, text)
         break
       }
