@@ -211,11 +211,14 @@ export async function POST(request: Request) {
       )
     }
 
-    // Normalize casing — Claude occasionally returns e.g. "OUTPATIENT" even
-    // though the rulebook's own enum interpolations are lowercase
-    // ('outpatient'). This is a parsing-layer accommodation only; it does not
-    // touch the rulebook text itself (must stay byte-identical).
-    const normalizedConsultType = typeof parsed.consultType === 'string' ? parsed.consultType.toLowerCase() : parsed.consultType
+    // Normalize casing AND separator — Claude occasionally returns the enum NAME
+    // instead of the value: "OUTPATIENT", or (the intermittent Ceribell 502)
+    // "CERIBELL_EEG" / "NON_EMERGENT" / "CT_RETURN" / "EEG_READ" with underscores,
+    // where the valid values are hyphenated ('ceribell-eeg', 'non-emergent', …).
+    // Lowercase + underscore→hyphen maps both forms onto the canonical value.
+    // Parsing-layer accommodation only; does not touch the (byte-identical) rulebook.
+    const normalizedConsultType =
+      typeof parsed.consultType === 'string' ? parsed.consultType.toLowerCase().replace(/_/g, '-') : parsed.consultType
     if (!normalizedConsultType || !validConsultTypes.has(normalizedConsultType as CONSULT_TYPE)) {
       console.error('[clara/classify] invalid consultType from model:', parsed.consultType)
       return NextResponse.json(
