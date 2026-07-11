@@ -1,22 +1,43 @@
 /**
- * Clara voice test — OpenAI Realtime session bootstrap (SAME engine as the
- * historian's "Henry").
+ * Clara voice test — Nova Sonic relay session bootstrap.
  *
- * Switched off Nova Sonic on 2026-07-11: in live testing the Nova relay's audio
- * was staticky / self-interrupting, while OpenAI Realtime (WebRTC, server-side
- * noise reduction) is clean — the historian's Henry has no static on the same
- * hardware. Voice transport only: triage classification still happens turn-by-
- * turn via POST /api/ai/clara/classify (Bedrock Gate-0 + rulebook), NOT an
- * in-session tool call, so the classification brain is unchanged. Mirrors the
- * OpenAI (client_secrets) path of src/app/api/ai/historian/session/route.ts.
+ * Mirrors the `provider: 'nova'` branch of
+ * src/app/api/ai/historian/session/route.ts (same relay, same HMAC token
+ * mint), but self-contained for Clara: fixed instructions (Clara's phone-
+ * operator persona + the mandatory "I'm an automated AI assistant — this is
+ * a test line" disclosure), no consult/patient context, no OpenAI fallback.
+ * Transport only — the actual triage classification happens turn-by-turn via
+ * POST /api/ai/clara/classify, not via an in-session tool call.
  */
 
+import crypto from 'crypto'
 import { NextResponse } from 'next/server'
 import { cookies } from 'next/headers'
 import { CLARA_GATE_COOKIE, verifyGateToken } from '@/lib/clara/testGate'
-import { getOpenAIKey } from '@/lib/secrets'
-import { getTurnDetectionConfig, getNoiseReductionConfig } from '@/lib/historianTypes'
-import { buildWhisperBiasPrompt, isAsrBiasingEnabled } from '@/lib/asr/clinical-lexicon'
+
+// Same token format/verification contract as
+// mintNovaRelayToken() in src/app/api/ai/historian/session/route.ts — MUST
+// match services/nova-sonic-relay/src/server.ts byte-for-byte.
+function mintNovaRelayToken(): string | null {
+  const secret = process.env.NOVA_RELAY_SHARED_SECRET
+  if (!secret) {
+    console.warn('[clara/session] NOVA_RELAY_SHARED_SECRET is not set — issuing no relay token; the relay will reject the connection.')
+    return null
+  }
+  const payloadB64 = Buffer.from(JSON.stringify({ exp: Math.floor(Date.now() / 1000) + 120 }))
+    .toString('base64')
+    .replace(/\+/g, '-')
+    .replace(/\//g, '_')
+    .replace(/=+$/, '')
+  const sig = crypto
+    .createHmac('sha256', secret)
+    .update(payloadB64)
+    .digest('base64')
+    .replace(/\+/g, '-')
+    .replace(/\//g, '_')
+    .replace(/=+$/, '')
+  return `${payloadB64}.${sig}`
+}
 
 const CLARA_VOICE_INSTRUCTIONS = `You are "Clara," Sevaro's automated neuro-triage phone operator, running in an INTERNAL TEST HARNESS. Your callers are clinicians — ED physicians, hospitalists, nurses — requesting a neurology teleconsult. Talk to them peer-to-peer.
 
@@ -43,81 +64,14 @@ export async function POST() {
       return NextResponse.json({ error: 'Not authorized for the Clara test surface.' }, { status: 401 })
     }
 
-    const apiKey = await getOpenAIKey()
-    if (!apiKey) {
-      return NextResponse.json({ error: 'OpenAI API key not configured.' }, { status: 500 })
-    }
-
-    const model =
-      process.env.OPENAI_CLARA_REALTIME_MODEL ||
-      process.env.OPENAI_HISTORIAN_REALTIME_MODEL ||
-      'gpt-realtime-2'
-    const turnDetection = getTurnDetectionConfig(process.env.HISTORIAN_TURN_DETECTION_MODE)
-    // Server-side noise reduction (far_field default) is the key reason Henry is
-    // clean on laptop/speakerphone — OpenAI filters echo/noise before the VAD.
-    const noiseReduction = getNoiseReductionConfig(process.env.HISTORIAN_NOISE_REDUCTION)
-    const transcription: { model: string; prompt?: string } = { model: 'whisper-1' }
-    if (isAsrBiasingEnabled()) {
-      transcription.prompt = buildWhisperBiasPrompt()
-    }
-
-    const buildBody = (withNoiseReduction: boolean) =>
-      JSON.stringify({
-        session: {
-          type: 'realtime',
-          model,
-          instructions: CLARA_VOICE_INSTRUCTIONS,
-          audio: {
-            input: {
-              turn_detection: turnDetection,
-              transcription,
-              ...(withNoiseReduction && noiseReduction ? { noise_reduction: noiseReduction } : {}),
-            },
-            output: { voice: 'verse' },
-          },
-          // No in-session tools — Clara's triage classification is a separate
-          // Bedrock call per turn (/api/ai/clara/classify).
-          tools: [],
-        },
-      })
-
-    const callOpenAI = (body: string) =>
-      fetch('https://api.openai.com/v1/realtime/client_secrets', {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${apiKey}`,
-          'Content-Type': 'application/json',
-        },
-        body,
-      })
-
-    // Fail-open on noise_reduction, exactly like the historian route.
-    let response = await callOpenAI(buildBody(true))
-    if (!response.ok && noiseReduction) {
-      const firstErr = await response.text()
-      console.warn('[clara/session] retrying without noise_reduction:', response.status, firstErr.slice(0, 200))
-      response = await callOpenAI(buildBody(false))
-    }
-
-    if (!response.ok) {
-      const errorBody = await response.text()
-      console.error('[clara/session] OpenAI client_secrets error:', response.status, errorBody)
-      return NextResponse.json(
-        { error: `OpenAI Realtime API returned ${response.status}`, openai_error: errorBody, status: response.status },
-        { status: response.status },
-      )
-    }
-
-    const data = await response.json()
-
     return NextResponse.json({
-      provider: 'openai',
+      provider: 'nova',
       instructions: CLARA_VOICE_INSTRUCTIONS,
       tools: [],
-      ephemeralKey: data.value ?? data.client_secret?.value,
-      sessionId: data.session_id ?? data.id,
-      expiresAt: data.expires_at ?? data.client_secret?.expires_at,
-      model,
+      relayUrl: process.env.NOVA_SONIC_RELAY_URL,
+      voiceId: process.env.NOVA_SONIC_VOICE_ID,
+      relayToken: mintNovaRelayToken() ?? undefined,
+      base_instructions: CLARA_VOICE_INSTRUCTIONS,
     })
   } catch (error: unknown) {
     console.error('[clara/session] error:', error)
