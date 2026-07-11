@@ -122,11 +122,12 @@ export function getClaraSystemPrompt(): string {
 
       - ${CONSULT_TYPE.ROUNDING}:
         • Scheduled inpatient follow‑up, progress, discharge, or coordination, no new issues.
-        • Phrases: "ready for the round", "routine follow‑up", "reconnect before admission", "video rounding", "ready for video assessment", "computer/video setup", or **"initial video assessment" if patient is already admitted.**
+        • Phrases: "round on", "add to the rounding list", "ready for the round", "routine follow‑up", "reconnect before admission", "video rounding", "ready for video assessment", "computer/video setup", or **"initial video assessment" if patient is already admitted.**
+        • **INTENT over recency: if the caller explicitly asks us to ROUND on / follow up on / add to the rounding list a patient — even one admitted only hours ago — with no NEW neuro complaint, that is ${CONSULT_TYPE.ROUNDING}. Recent admission by itself does NOT make it a STAT consult.**
         • Post‑consult clarification (e.g., vitals, BP, medication parameters) with no new neuro issues → ${CONSULT_TYPE.ROUNDING}.
-        • Not used for new consults, re‑initiations, or any new neuro event.
         • If neuro already following & discussing imaging/plan (e.g., anticoagulation) → ${CONSULT_TYPE.ROUNDING}.
-        • If first call for this admission → ${CONSULT_TYPE.NON_EMERGENT} (STAT 2).
+        • Not used for a NEW neuro event or a first-time evaluation request.
+        • "First call for this admission → STAT 2" applies ONLY to a NEW CONSULT (they're asking us to evaluate the patient for the first time). It does NOT apply when the ask is explicitly rounding / follow‑up. When in doubt between rounding and STAT 2, the deciding question is intent: "Is this a routine round/follow‑up, or a new problem you need evaluated?"
 
       - ${CONSULT_TYPE.OUTPATIENT}:
         • Explicit outpatient/clinic consults or follow‑ups but not any other consult type like EEG, CT, rounding, etc. mentioned in the conversation etc.
