@@ -26,6 +26,9 @@
  */
 
 import { pcmFromBase64 } from './pcm';
+import { makeResampleState, resamplePcm16, type ResampleState } from './resample';
+
+const SOURCE_RATE = 24000; // Nova Sonic PCM chunk rate
 
 export class PcmPlayer {
   private ctx: AudioContext | null = null;
@@ -33,14 +36,16 @@ export class PcmPlayer {
   private activeSources = new Set<AudioBufferSourceNode>();
   /** Resolvers waiting on whenDrained() — flushed once activeSources empties. */
   private drainWaiters: Array<() => void> = [];
+  /** Carries resample interpolation state across chunks so seams don't click. */
+  private resampleState: ResampleState = makeResampleState();
 
   /** Lazily create the AudioContext on first use. */
   private getContext(): AudioContext {
     if (!this.ctx) {
-      // Use the browser's default context rate. (An attempt to force 24 kHz to
-      // avoid mobile resampling made the clicking WORSE on-device — reverted
-      // 2026-07-11. The mobile clicking cause is still open; do not guess again
-      // without an on-device A/B.)
+      // Keep the browser's DEFAULT rate (forcing 24 kHz regressed mobile audio,
+      // reverted 2026-07-11). We instead resample 24 kHz → the context's native
+      // rate ourselves, continuously (see enqueue), so the browser never does a
+      // per-chunk resample — that per-chunk resampling was the mobile clicking.
       this.ctx = new AudioContext();
     }
     return this.ctx;
@@ -61,16 +66,15 @@ export class PcmPlayer {
       });
     }
 
-    // Decode PCM16 → Float32 in [-1, 1].
+    // Decode PCM16, then resample 24 kHz → the context's native rate HERE,
+    // carrying interpolation state across chunks so seams stay continuous. This
+    // replaces the browser's per-chunk resample (which clicked at every seam on
+    // mobile). Buffer is built at ctx.sampleRate so Web Audio does no resample.
     const pcm = pcmFromBase64(base64Pcm16At24k);
-    const float = new Float32Array(pcm.length);
-    for (let i = 0; i < pcm.length; i++) {
-      float[i] = pcm[i] / 32768;
-    }
+    const float = resamplePcm16(pcm, SOURCE_RATE, ctx.sampleRate, this.resampleState);
+    if (float.length === 0) return;
 
-    // Build an AudioBuffer at 24 kHz. The AudioContext will resample to its
-    // own output rate (e.g. 48 kHz) transparently on playback.
-    const buffer = ctx.createBuffer(1, float.length, 24000);
+    const buffer = ctx.createBuffer(1, float.length, ctx.sampleRate);
     buffer.getChannelData(0).set(float);
 
     const src = ctx.createBufferSource();
@@ -129,6 +133,7 @@ export class PcmPlayer {
     }
     this.activeSources.clear();
     this.nextStartTime = 0;
+    this.resampleState = makeResampleState();
     // stop() fires each source's onended asynchronously, but callers waiting
     // on whenDrained() should see the interrupt as "drained now" rather than
     // waiting on those async callbacks to trickle in.
