@@ -90,28 +90,39 @@ export function useClaraVoiceSession() {
 
   const classifyTurn = useCallback(async (index: number, text: string) => {
     updateTurn(index, { classifying: true })
-    try {
-      const res = await fetch('/api/ai/clara/classify', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ transcript: text }),
-      })
-      const data = await res.json()
-      if (!res.ok) {
-        updateTurn(index, { classifying: false, classifyError: data?.error || `HTTP ${res.status}` })
+    // Per-turn classification is a live convenience signal, NOT the authoritative
+    // result — the end-of-call Final Disposition re-classifies the whole caller
+    // transcript. So a transient per-turn failure (e.g. brief Bedrock throttle
+    // when several turns fire in a burst) is retried once, then fails QUIETLY:
+    // we record classifyError for diagnostics but never surface it as an alarming
+    // banner, because the call still gets a correct Final Disposition.
+    for (let attempt = 0; attempt < 2; attempt++) {
+      try {
+        const res = await fetch('/api/ai/clara/classify', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ transcript: text }),
+        })
+        const data = await res.json()
+        if (!res.ok) {
+          if (attempt === 0) { await new Promise((r) => setTimeout(r, 400)); continue }
+          updateTurn(index, { classifying: false, classifyError: data?.error || `HTTP ${res.status}` })
+          return
+        }
+        const classification = data as ClaraClassification
+        updateTurn(index, { classifying: false, classifyError: undefined, gate0: classification.gate0, classification })
+        setLastClassification(classification)
+        if (classification.gate0?.fired || classification.urgencyLevel === 'critical') {
+          setEmergencyActive(true)
+        }
         return
+      } catch (err) {
+        if (attempt === 0) { await new Promise((r) => setTimeout(r, 400)); continue }
+        updateTurn(index, {
+          classifying: false,
+          classifyError: err instanceof Error ? err.message : String(err),
+        })
       }
-      const classification = data as ClaraClassification
-      updateTurn(index, { classifying: false, gate0: classification.gate0, classification })
-      setLastClassification(classification)
-      if (classification.gate0?.fired || classification.urgencyLevel === 'critical') {
-        setEmergencyActive(true)
-      }
-    } catch (err) {
-      updateTurn(index, {
-        classifying: false,
-        classifyError: err instanceof Error ? err.message : String(err),
-      })
     }
   }, [updateTurn])
 
