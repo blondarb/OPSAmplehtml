@@ -59,6 +59,13 @@ export interface VoiceStartOptions {
   tools: unknown[]
   /** Optional voice selection (provider-specific voice id). */
   voiceId?: string
+  /**
+   * Half-duplex: mute the mic while the AI is speaking (Nova provider only).
+   * Opt-in per session — off by default so full-duplex barge-in (the historian)
+   * is unaffected. Set true for the Clara test line, where laptop-speaker echo
+   * was reaching Nova's VAD and making it interrupt itself (static/cut-out).
+   */
+  muteWhileSpeaking?: boolean
   // ── OpenAI-only (ignored by Nova) ──
   /** Ephemeral bearer key for the OpenAI Realtime SDP exchange. */
   ephemeralKey?: string

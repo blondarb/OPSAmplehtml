@@ -183,6 +183,10 @@ export function useClaraVoiceSession() {
         voiceId: data.voiceId,
         relayUrl: data.relayUrl,
         relayToken: data.relayToken,
+        // Half-duplex: mute the mic while Clara speaks so laptop-speaker echo
+        // can't reach Nova's VAD and make her interrupt herself (static/cut-out).
+        // Opt-in here only — the historian stays full-duplex for barge-in.
+        muteWhileSpeaking: true,
       })
 
       startTimeRef.current = Date.now()

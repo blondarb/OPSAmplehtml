@@ -28,6 +28,15 @@ export class MicCapture {
   private source: MediaStreamAudioSourceNode | null = null;
   private workletNode: AudioWorkletNode | null = null;
   private silentGain: GainNode | null = null;
+  /** When true, captured chunks are dropped (not sent). Used for half-duplex —
+   *  mute the mic while the AI is speaking so it can't hear its own audio. The
+   *  graph keeps running so unmuting is instant. */
+  private muted = false;
+
+  /** Enable/disable half-duplex muting (see `muted`). */
+  setMuted(muted: boolean): void {
+    this.muted = muted;
+  }
 
   /**
    * Start mic capture. Calls onChunk with a base64-encoded 16 kHz PCM16
@@ -72,6 +81,7 @@ export class MicCapture {
       silentGain.connect(ctx.destination);
 
       workletNode.port.onmessage = (e: MessageEvent) => {
+        if (this.muted) return; // half-duplex: drop mic audio while AI speaks
         const float = e.data as Float32Array;
         const down = downsampleTo16k(float, ctx.sampleRate);
         const pcm = floatTo16BitPCM(down);
