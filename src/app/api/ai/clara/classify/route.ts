@@ -51,7 +51,19 @@ type Gate0Result = {
   fired: boolean
   category: string | null
   matchedTerms: string[]
+  /** True when a seizure-category hit was intentionally NOT escalated because the
+   *  call is a Ceribell/EEG-read burden report (deferred to the rulebook). */
+  deescalated?: boolean
+  deescalationReason?: string
 }
+
+// Ceribell / rapid-EEG / seizure-burden READ context — a report of EEG
+// monitoring data, not (necessarily) active status epilepticus.
+const CERIBELL_EEG_READ_CONTEXT =
+  /\b(ceribell|cerebell|rapid\s+eeg|headband\s+eeg|seizure\s+burden|burden\s+of\s+\d|continuous\s+eeg|eeg\s+(?:read|monitor|interpret|study|follow))/i
+// Active clinical emergency that KEEPS the emergency floor even in an EEG context.
+const ACTIVE_SEIZURE_EMERGENCY =
+  /\b(airway|not\s+breathing|can'?t\s+breathe|unresponsive|seizing|convulsing|having\s+a\s+seizure|won'?t\s+stop|not\s+stopping|coding|escalat|intubat)/i
 
 type RoutingDecision = {
   action: 'escalate_911' | 'transfer_stat1' | 'transfer_stat2' | 'schedule_callback' | 'route_workflow'
@@ -61,14 +73,29 @@ type RoutingDecision = {
 
 /** SLA MAPPING from Clara's rulebook, translated into a narrated routing decision (no real transfer). */
 function buildRouting(consultType: string, statLevel: number | null, urgencyLevel: string): RoutingDecision {
-  if (urgencyLevel === URGENCY_LEVEL.CRITICAL) {
+  // EMERGENT is the ONLY 911/immediate-page path. urgencyLevel 'critical' does
+  // NOT by itself mean 911 — the rulebook also marks a Ceribell ≥20%-burden read
+  // as 'critical', which is a STAT EEG read, not an emergency. Key escalation off
+  // consultType, not urgency, or high-burden EEG reads get mislabeled emergent
+  // (Steve, 2026-07-11).
+  if (consultType === CONSULT_TYPE.EMERGENT) {
     return { action: 'escalate_911', label: 'EMERGENT — immediate on-call neurologist page (would transfer now)', slaMinutes: 0 }
+  }
+  // Ceribell / EEG reads: ≥20% burden (critical/high urgency) = STAT EEG read.
+  if (consultType === CONSULT_TYPE.CERIBELL_EEG || consultType === CONSULT_TYPE.EEG_READ) {
+    const stat = urgencyLevel === URGENCY_LEVEL.CRITICAL || urgencyLevel === URGENCY_LEVEL.HIGH
+    return stat
+      ? { action: 'route_workflow', label: 'STAT EEG read — high seizure burden (≥20%), expedite read (would route to STAT EEG)', slaMinutes: 60 }
+      : { action: 'route_workflow', label: 'EEG read — routine (would route to EEG read)', slaMinutes: null }
   }
   if (consultType === CONSULT_TYPE.NON_EMERGENT && statLevel === 1) {
     return { action: 'transfer_stat1', label: 'STAT 1 — callback within 15–20 min (would transfer to on-call queue)', slaMinutes: 20 }
   }
   if (consultType === CONSULT_TYPE.NON_EMERGENT && statLevel === 2) {
     return { action: 'transfer_stat2', label: 'STAT 2 — callback within 60 min (would transfer to on-call queue)', slaMinutes: 60 }
+  }
+  if (consultType === CONSULT_TYPE.CT_RETURN) {
+    return { action: 'route_workflow', label: 'CT-return review (would route to CT-return workflow)', slaMinutes: null }
   }
   if (consultType === CONSULT_TYPE.ROUNDING || consultType === CONSULT_TYPE.OUTPATIENT) {
     return { action: 'schedule_callback', label: 'Low urgency — would route to scheduling/coordination', slaMinutes: null }
@@ -118,8 +145,26 @@ export async function POST(request: Request) {
       category: flagResult.category,
       matchedTerms: flagResult.matchedTerms,
     }
+    // Clinical rule (Steve, 2026-07-11): a Ceribell / rapid-EEG call reporting a
+    // seizure BURDEN is monitoring data, not active status epilepticus. In a clear
+    // Ceribell/EEG-read context with no active-emergency language, don't let the
+    // deterministic seizure floor pre-empt the rulebook — it already routes
+    // ≥20% burden → CRITICAL Ceribell-EEG (a STAT EEG read). The floor still fires
+    // for stroke/thunderclap/self-harm and for seizures described with active-
+    // seizing / airway / escalation language.
+    // SSOT: the production Clara service (sevaro-voice-agent) needs this same
+    // policy layer around its own Gate-0.
     if (gate0.fired) {
-      return gate0EmergencyResult(gate0)
+      const ceribellBurdenRead =
+        gate0.category === 'seizure' &&
+        CERIBELL_EEG_READ_CONTEXT.test(transcript) &&
+        !ACTIVE_SEIZURE_EMERGENCY.test(transcript)
+      if (!ceribellBurdenRead) {
+        return gate0EmergencyResult(gate0)
+      }
+      gate0.deescalated = true
+      gate0.deescalationReason =
+        'Seizure terms detected in a Ceribell/EEG-read burden report with no active-emergency language — deferring to the rulebook (≥20% burden → STAT EEG read).'
     }
 
     // ── Clara's rulebook on Bedrock ──────────────────────────────────────────
