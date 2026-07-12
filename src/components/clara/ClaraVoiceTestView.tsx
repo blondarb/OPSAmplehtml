@@ -51,6 +51,7 @@ export default function ClaraVoiceTestView() {
     finalClassification,
     loggedSessionId,
     audioDiagnostics,
+    capturedIdentifier,
     startSession,
     endSession,
     resetSession,
@@ -237,6 +238,15 @@ export default function ClaraVoiceTestView() {
           )}
           {audioDiagnostics && formatAudioDiagnostics(audioDiagnostics) && (
             <div style={{ color: '#64748b', fontSize: 11 }}>{formatAudioDiagnostics(audioDiagnostics)}</div>
+          )}
+          {/* Phase 3 MRN cross-check: the authoritative captured identifier —
+              verified when Nova and Transcribe Medical independently agree. */}
+          {capturedIdentifier && (
+            <div style={{ color: '#64748b', fontSize: 11 }}>
+              {capturedIdentifier.verified
+                ? `MRN cross-check ✓ ${capturedIdentifier.value} (Nova & Transcribe Medical agree)`
+                : `MRN (unverified, ${capturedIdentifier.source === 'transcribe-medical' ? 'Transcribe Medical' : 'Nova'}): ${capturedIdentifier.value}`}
+            </div>
           )}
 
           {/* FINAL DISPOSITION — the single "where would this route" answer for the

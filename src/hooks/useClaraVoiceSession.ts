@@ -22,6 +22,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { makeProvider } from '@/lib/voice/selectProvider'
 import type { VoiceEvent, VoiceProvider } from '@/lib/voice/providerTypes'
+import { createMrnCrosscheck } from '@/lib/clara/mrnCrosscheck'
+import type { CapturedIdentifier, CrosscheckAction } from '@/lib/clara/mrnCrosscheck'
 
 export interface ClaraGate0 {
   fired: boolean
@@ -91,6 +93,10 @@ export function useClaraVoiceSession() {
   // turns). This is what the results panel leads with.
   const [finalClassification, setFinalClassification] = useState<ClaraClassification | null>(null)
   const [loggedSessionId, setLoggedSessionId] = useState<string | null>(null)
+  // Phase 3 MRN cross-check: the authoritative captured identifier for this
+  // call (verified when Nova's ASR and Transcribe Medical agree on the digits,
+  // Transcribe-preferred otherwise). Surfaced as a muted line in the results UI.
+  const [capturedIdentifier, setCapturedIdentifier] = useState<CapturedIdentifier | null>(null)
   // Playback diagnostics (worklet underrun/prime/queue counters) captured at
   // end of call — iOS "crackle" instrumentation, see PcmPlayer.getDiagnostics.
   // null until a call finishes; instrumentation only, never drives behavior.
@@ -107,6 +113,16 @@ export function useClaraVoiceSession() {
   // vs Nova's own transcript can be compared later — v1 capture + log only,
   // no effect on Clara's conversational behavior.
   const medicalTranscriptRef = useRef<string[]>([])
+  // Phase 3: read the MRN back ONLY when Nova's transcript and Transcribe
+  // Medical's transcript DISAGREE on the digits — two independent ASRs
+  // disagreeing IS the uncertainty signal for the conditional read-back
+  // (CLARA_VOICE_INSTRUCTIONS already tells Clara to read back when unsure;
+  // the injected nudge is what makes her unsure). On agreement we stay silent:
+  // a false read-back is worse than a missed one, so the comparison normalizes
+  // BOTH transcripts to bare digits (Nova speaks words, Transcribe writes
+  // "24,590") and withholds mismatch verdicts until fragmented finals settle.
+  // See src/lib/clara/mrnCrosscheck.ts for the full decision rules.
+  const crosscheckRef = useRef(createMrnCrosscheck())
 
   // Keep the phone screen awake during a live call — otherwise a mobile browser
   // sleeps the screen mid-conversation (it doesn't know audio is streaming) and
@@ -147,6 +163,14 @@ export function useClaraVoiceSession() {
   const updateTurn = useCallback((index: number, patch: Partial<ClaraTurn>) => {
     turnsRef.current = turnsRef.current.map((t, i) => (i === index ? { ...t, ...patch } : t))
     setTurns(turnsRef.current)
+  }, [])
+
+  // Apply a cross-check result: a nudge action injects advisory system text
+  // (same primitive the historian's localizer uses — Nova folds it into its
+  // next turn), and the captured-identifier state refreshes either way.
+  const applyCrosscheck = useCallback((action: CrosscheckAction | null) => {
+    if (action) providerRef.current?.injectSystemText(action.nudgeText)
+    setCapturedIdentifier(crosscheckRef.current.getCapturedIdentifier())
   }, [])
 
   const classifyTurn = useCallback(async (index: number, text: string) => {
@@ -221,6 +245,7 @@ export function useClaraVoiceSession() {
         if (isDuplicateTurn(turnsRef.current, 'user', text)) break
         const idx = pushTurn({ role: 'user', text, ts: Date.now() })
         void classifyTurn(idx, text)
+        applyCrosscheck(crosscheckRef.current.noteUserTurn(text, Date.now()))
         break
       }
       case 'assistantTranscript': {
@@ -245,6 +270,12 @@ export function useClaraVoiceSession() {
         }
         pushTurn({ role: 'assistant', text: aText, ts: Date.now() })
         setCurrentAssistantText('')
+        // Assistant turns never contribute digits to the cross-check (Clara's
+        // own read-back speaks the number); they open the capture window when
+        // Clara asks for identifiers and give a settled mismatch its trigger
+        // to fire — but never wipe an active window (Clara echoes identifiers
+        // in recaps constantly).
+        applyCrosscheck(crosscheckRef.current.noteAssistantTurn(aText, Date.now()))
         break
       }
       case 'assistantTextDelta':
@@ -268,10 +299,11 @@ export function useClaraVoiceSession() {
       case 'medicalTranscript':
         if (!e.isPartial && e.text?.trim()) {
           medicalTranscriptRef.current = [...medicalTranscriptRef.current, e.text.trim()]
+          applyCrosscheck(crosscheckRef.current.noteMedicalSegment(e.text.trim(), Date.now()))
         }
         break
     }
-  }, [pushTurn, classifyTurn])
+  }, [pushTurn, classifyTurn, applyCrosscheck])
 
   const startSession = useCallback(async () => {
     setStatus('connecting')
@@ -284,6 +316,8 @@ export function useClaraVoiceSession() {
     setLoggedSessionId(null)
     setAudioDiagnostics(null)
     medicalTranscriptRef.current = []
+    crosscheckRef.current = createMrnCrosscheck()
+    setCapturedIdentifier(null)
 
     try {
       const res = await fetch('/api/ai/clara/session', { method: 'POST' })
@@ -378,7 +412,16 @@ export function useClaraVoiceSession() {
           needsClarification: disposition?.needsClarification,
           clarificationQuestions: disposition?.clarificationQuestions,
           routing: disposition?.routing,
-          metadata: { audioDiagnostics: capturedAudioDiagnostics, medicalTranscript: medicalTranscriptRef.current },
+          metadata: {
+            audioDiagnostics: capturedAudioDiagnostics,
+            medicalTranscript: medicalTranscriptRef.current,
+            // Phase 3 audit trail: every match/mismatch verdict plus the
+            // authoritative captured identifier (Transcribe-preferred).
+            identifierCrosscheck: {
+              captured: crosscheckRef.current.getCapturedIdentifier(),
+              events: crosscheckRef.current.getEvents(),
+            },
+          },
         }),
       })
       const data = await res.json().catch(() => ({}))
@@ -418,6 +461,8 @@ export function useClaraVoiceSession() {
     setLoggedSessionId(null)
     setAudioDiagnostics(null)
     medicalTranscriptRef.current = []
+    crosscheckRef.current = createMrnCrosscheck()
+    setCapturedIdentifier(null)
     setStatus('idle')
   }, [])
 
@@ -432,6 +477,7 @@ export function useClaraVoiceSession() {
     finalClassification,
     loggedSessionId,
     audioDiagnostics,
+    capturedIdentifier,
     startSession,
     endSession,
     resetSession,
