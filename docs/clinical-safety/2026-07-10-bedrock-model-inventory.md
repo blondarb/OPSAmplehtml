@@ -1,6 +1,8 @@
 # Bedrock Model Inventory for Neurology Triage
 
 **Checked:** 2026-07-10
+**Rechecked:** 2026-07-11 (catalog, inference-profile status, agreement,
+authorization, entitlement, and regional availability)
 **AWS profile:** `sevaro-sandbox`
 **Region:** `us-east-2`
 **Method:** read-only AWS CLI discovery and availability checks
