@@ -2,13 +2,15 @@
 
 import { useState } from 'react'
 import type { ClinicalExtraction, NoteType } from '@/lib/triage/types'
+import { buildExtractionSafetyView } from '@/lib/triage/extractionSafetyView'
 
 interface ExtractionReviewPanelProps {
   extraction: ClinicalExtraction
   originalText: string
-  onApprove: (editedSummary: string) => void
+  onApprove: () => void
   onBack: () => void
   disabled?: boolean
+  approvalBlockedReason?: string
 }
 
 const NOTE_TYPE_LABELS: Record<NoteType, { label: string; color: string }> = {
@@ -33,13 +35,33 @@ export default function ExtractionReviewPanel({
   onApprove,
   onBack,
   disabled,
+  approvalBlockedReason,
 }: ExtractionReviewPanelProps) {
-  const [editedSummary, setEditedSummary] = useState(extraction.extracted_summary)
   const [showFindings, setShowFindings] = useState(false)
   const [showOriginal, setShowOriginal] = useState(false)
 
   const noteType = NOTE_TYPE_LABELS[extraction.note_type_detected] || NOTE_TYPE_LABELS.unknown
   const confidence = CONFIDENCE_DISPLAY[extraction.extraction_confidence] || CONFIDENCE_DISPLAY.moderate
+  const safetyView = buildExtractionSafetyView(extraction)
+  const sourceTextVerified = Boolean(
+    originalText.trim() &&
+      Number.isSafeInteger(extraction.original_text_length) &&
+      extraction.original_text_length === originalText.length,
+  )
+  const sourceVerificationBlockedReason = sourceTextVerified
+    ? undefined
+    : 'Authoritative original source text is unavailable or does not match the persisted source length. Do not approve; return for manual review.'
+  const reviewBlockedReason = [
+    approvalBlockedReason,
+    sourceVerificationBlockedReason,
+  ]
+    .filter(Boolean)
+    .join(' ')
+  const approvalDisabled = Boolean(
+    disabled ||
+      reviewBlockedReason ||
+      !extraction.extracted_summary.trim(),
+  )
 
   const kf = extraction.key_findings
 
@@ -111,20 +133,70 @@ export default function ExtractionReviewPanel({
         )}
       </div>
 
-      {/* Editable summary */}
+      {safetyView.requiresImmediateAction && (
+        <section
+          aria-label="Complete-source safety alert"
+          style={{
+            marginBottom: '20px',
+            padding: '16px',
+            borderRadius: '8px',
+            background:
+              safetyView.severity === 'emergency'
+                ? 'rgba(127, 29, 29, 0.24)'
+                : 'rgba(146, 64, 14, 0.2)',
+            border: `2px solid ${
+              safetyView.severity === 'emergency' ? '#DC2626' : '#F59E0B'
+            }`,
+          }}
+        >
+          <h3 style={{ color: '#FEF2F2', fontSize: '0.95rem', margin: 0 }}>
+            {safetyView.title}
+          </h3>
+          <p style={{ color: '#FECACA', fontSize: '0.82rem', lineHeight: 1.5 }}>
+            {safetyView.message}
+          </p>
+          {safetyView.evidence.length > 0 && (
+            <div style={{ display: 'grid', gap: '8px', maxHeight: '240px', overflowY: 'auto' }}>
+              {safetyView.evidence.map((item, index) => (
+                <blockquote
+                  key={`${item.documentId}-${item.pageNumber}-${item.startOffset}-${index}`}
+                  style={{
+                    margin: 0,
+                    padding: '8px 10px',
+                    background: '#0f172a',
+                    borderLeft: '3px solid #EF4444',
+                    color: '#E2E8F0',
+                    fontSize: '0.78rem',
+                    lineHeight: 1.5,
+                  }}
+                >
+                  <div style={{ color: '#FCA5A5', fontSize: '0.68rem' }}>
+                    {item.syndrome.replace(/_/g, ' ')}
+                    {item.pageNumber ? ` · page ${item.pageNumber}` : ''}
+                  </div>
+                  “{item.quote}”
+                </blockquote>
+              ))}
+            </div>
+          )}
+        </section>
+      )}
+
+      {/* Source-bound summary */}
       <div style={{ marginBottom: '16px' }}>
-        <label style={{
+        <label htmlFor="source-bound-extracted-summary" style={{
           display: 'block',
           fontSize: '0.85rem',
           fontWeight: 500,
           color: '#e2e8f0',
           marginBottom: '6px',
         }}>
-          Extracted Summary (editable)
+          Extracted Summary
         </label>
         <textarea
-          value={editedSummary}
-          onChange={(e) => setEditedSummary(e.target.value)}
+          id="source-bound-extracted-summary"
+          value={extraction.extracted_summary}
+          readOnly
           disabled={disabled}
           rows={10}
           style={{
@@ -144,9 +216,27 @@ export default function ExtractionReviewPanel({
           }}
         />
         <p style={{ fontSize: '0.75rem', color: '#94a3b8', marginTop: '4px' }}>
-          Edit the summary above to correct or add information before triage scoring.
+          Review this source-bound extraction against the original. Do not approve if it is inaccurate; return it for manual review. Versioned clinician corrections are added in the next evidence-revision milestone.
         </p>
       </div>
+
+      {reviewBlockedReason && (
+        <div
+          role="alert"
+          style={{
+            marginBottom: '16px',
+            padding: '10px 12px',
+            borderRadius: '8px',
+            border: '1px solid #DC2626',
+            background: 'rgba(220, 38, 38, 0.12)',
+            color: '#FCA5A5',
+            fontSize: '0.8rem',
+            lineHeight: 1.5,
+          }}
+        >
+          {reviewBlockedReason}
+        </div>
+      )}
 
       {/* Key findings (collapsible) */}
       <div style={{
@@ -296,24 +386,24 @@ export default function ExtractionReviewPanel({
             opacity: disabled ? 0.6 : 1,
           }}
         >
-          Back
+          Do Not Approve — Return to Intake
         </button>
         <button
-          onClick={() => onApprove(editedSummary)}
-          disabled={disabled || !editedSummary.trim()}
+          onClick={onApprove}
+          disabled={approvalDisabled}
           style={{
             padding: '12px 32px',
             borderRadius: '8px',
             border: 'none',
-            background: disabled || !editedSummary.trim() ? '#334155' : '#0D9488',
+            background: approvalDisabled ? '#334155' : '#0D9488',
             color: '#FFFFFF',
             fontSize: '0.9rem',
             fontWeight: 600,
-            cursor: disabled || !editedSummary.trim() ? 'not-allowed' : 'pointer',
-            opacity: disabled || !editedSummary.trim() ? 0.6 : 1,
+            cursor: approvalDisabled ? 'not-allowed' : 'pointer',
+            opacity: approvalDisabled ? 0.6 : 1,
           }}
         >
-          Approve & Triage
+          Approve Source-Bound Extraction
         </button>
       </div>
     </div>

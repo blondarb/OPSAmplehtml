@@ -6,6 +6,7 @@ import TriageTierBadge from './TriageTierBadge'
 import PreVisitWorkup from './PreVisitWorkup'
 import FailedTherapiesList from './FailedTherapiesList'
 import DisclaimerBanner from './DisclaimerBanner'
+import ExtractionIngressSafetyAlert from './ExtractionIngressSafetyAlert'
 
 interface Props {
   items: BatchItem[]
@@ -40,7 +41,8 @@ export default function BatchResultsPanel({ items, onTryAnother }: Props) {
           </h2>
           <p style={{ color: '#94a3b8', fontSize: '0.8rem', margin: 0 }}>
             {completed.length} of {items.length} processed
-            {failed.length > 0 && ` · ${failed.length} failed`}
+            {failed.length > 0 &&
+              ` · ${failed.length} ${failed.length === 1 ? 'requires' : 'require'} human review`}
           </p>
         </div>
         <button
@@ -122,12 +124,26 @@ export default function BatchResultsPanel({ items, onTryAnother }: Props) {
                     borderRadius: '10px',
                     whiteSpace: 'nowrap',
                   }}>
-                    Failed
+                    Needs human review
                   </span>
                 ) : item.status === 'extracting' || item.status === 'triaging' ? (
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#EA580C" strokeWidth="2" style={{ animation: 'spin 1s linear infinite', flexShrink: 0 }}>
-                    <path d="M21 12a9 9 0 1 1-6.219-8.56" />
-                  </svg>
+                  <span style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    color: '#fdba74',
+                    fontSize: '0.72rem',
+                    whiteSpace: 'nowrap',
+                  }}>
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#EA580C" strokeWidth="2" style={{ animation: 'spin 1s linear infinite', flexShrink: 0 }}>
+                      <path d="M21 12a9 9 0 1 1-6.219-8.56" />
+                    </svg>
+                    {item.processingProgress ?? (
+                      item.status === 'extracting'
+                        ? 'Processing packet…'
+                        : 'Scoring…'
+                    )}
+                  </span>
                 ) : result ? (
                   <TriageTierBadge tier={result.triage_tier} compact />
                 ) : null}
@@ -160,6 +176,29 @@ export default function BatchResultsPanel({ items, onTryAnother }: Props) {
                   </svg>
                 )}
               </button>
+
+              {item.safetyNotice && (
+                <div style={{ padding: '0 12px 12px' }}>
+                  <ExtractionIngressSafetyAlert
+                    immediateReviewRequired={
+                      item.safetyNotice.immediateReviewRequired
+                    }
+                    safetyTriageSessionId={
+                      item.safetyNotice.safetyTriageSessionId
+                    }
+                    sourceLabel={item.safetyNotice.sourceLabel}
+                    safetyPathway={item.safetyNotice.safetyPathway}
+                    outpatientScoringBlocked={
+                      item.safetyNotice.outpatientScoringBlocked
+                    }
+                    humanReviewRequired={
+                      item.safetyNotice.humanReviewRequired
+                    }
+                    schedulingLocked={item.safetyNotice.schedulingLocked}
+                    holdReason={item.safetyNotice.holdReason}
+                  />
+                </div>
+              )}
 
               {/* Expanded details */}
               {isExpanded && result && (
