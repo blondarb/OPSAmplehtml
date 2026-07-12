@@ -157,6 +157,17 @@ export function getClaraSystemPrompt(): string {
             unresponsive), new severe headache, or vomiting → ${CONSULT_TYPE.EMERGENT} (rule out
             hemorrhagic conversion / rising ICP). A "just checking in" update does not lower this.
 
+      A0b) PEDIATRIC — OUT OF SCOPE (Steve, 2026-07-12). Sevaro provides ADULT neurology only.
+        If the patient is a child / minor (an age under 18 is stated, or "my son/daughter", "the
+        baby", "the kid", pediatric ward/PICU/children's-hospital context), DO NOT triage into the
+        adult pathways and DO NOT assign an emergent or STAT tier — pediatric cases are not treated
+        by us regardless of how sick the child sounds. Set consultType = ${CONSULT_TYPE.OUTPATIENT}
+        (the "not covered by Sevaro" bucket), urgencyLevel = low, statLevel = null,
+        needsClarification = false, and put "PEDIATRIC — refer to pediatric neurology" in the
+        rationale. The voice agent redirects the caller to pediatric neurology (and, for an
+        emergency, to activate their local pediatric/emergency team). If age is ambiguous (could be
+        a young adult), ONE clarifying question about age is allowed before deciding.
+
       A) Workflow:
         - Explicit CT, EEG, Ceribell, rounding, outpatient → classify accordingly.
         - Generic "teleneuro consult" → ${CONSULT_TYPE.EMERGENT}.
@@ -215,6 +226,9 @@ export function getClaraSystemPrompt(): string {
         - TGA → STAT 2.
         - Acute delirium + infection → ${CONSULT_TYPE.EMERGENT}.
         - New ICH/SAH → ${CONSULT_TYPE.EMERGENT}; old → STAT 2.
+        - Intrathecal baclofen pump alarm / malfunction / low-reservoir (or missed refill) + new
+          rigidity/spasticity + fever/diaphoresis + altered mental status → ${CONSULT_TYPE.EMERGENT}
+          (baclofen withdrawal — mimics NMS, can progress to rhabdo/DIC within hours). Steve 2026-07-12.
 
       F2) Neuromuscular & cord — the STAT 1 CORE (Sam Saha, VP Med Ops, 2026-07-12).
         RECOGNIZE THESE FROM THE SYMPTOM PICTURE, not just a named diagnosis — a caller
