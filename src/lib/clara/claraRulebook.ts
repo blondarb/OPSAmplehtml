@@ -241,8 +241,43 @@ export function getClaraSystemPrompt(): string {
               – ConsultType is CERIBELL_EEG or EEG_READ (monitoring/interpretation pathway), or
               – The transcript clearly states the seizure(s) have resolved and there is no ongoing concern.
 
-        G3) Otherwise:
+        G3) Neuromuscular / cord clarification (the F2 companion — only when the tier hinges):
+          • Trigger when: the picture partly fits GBS / myasthenia exacerbation / acute cord (see F2),
+            the caller has NOT named the diagnosis, AND the missing detail would move it between
+            plain non-emergent / STAT 2 and STAT 1 (or between STAT 1 and EMERGENT).
+          • Ask ONE question that elicits BOTH of: (a) the discriminating pattern feature —
+            is the weakness/numbness ascending and symmetric (GBS), fatigable/worse-by-end-of-day
+            or with new ptosis/double vision/swallowing trouble (MG), or bilateral leg weakness
+            with a sensory level and a new bladder/bowel change (cord); AND (b) the escalation
+            check — any trouble breathing, weak cough, or trouble handling secretions.
+          • Any breathing/airway/bulbar-failure "yes" → upgrade to EMERGENT. Otherwise the
+            confirmed pattern → NON_EMERGENT STAT 1. While waiting, default to STAT 1, never lower.
+
+        G4) Vertigo / dizziness — central vs peripheral (a can't-miss split):
+          • Trigger when: acute isolated vertigo/dizziness where the tier hinges on whether this is
+            a benign peripheral cause (STAT 2) or a posterior-circulation stroke (EMERGENT).
+          • Ask ONE question that elicits the central red-flags: alongside the spinning, any double
+            vision, slurred speech, trouble walking/standing, weakness or numbness — or is it purely
+            positional room-spinning with none of those.
+          • Any central sign, inability to walk, or sudden onset with vascular risk → EMERGENT (treat
+            as posterior stroke until proven otherwise). Purely positional / isolated → STAT 2.
+
+        G5) Onset & trajectory — the universal STAT 1 vs STAT 2 lever (use when no set above applies):
+          • Trigger when: an acute or subacute neurologic deficit where STAT 1 vs STAT 2 hinges on how
+            new and how fast-moving it is, and the transcript does not already make that clear.
+          • Ask ONE question eliciting BOTH: when did it start, and is it getting worse, staying the
+            same, or improving.
+          • Rapidly progressive / hyperacute (or still worsening) → the more urgent tier (STAT 1, or
+            EMERGENT if it meets an emergent rule). Stable, subacute, or improving → STAT 2. This
+            encodes the core principle: STAT 1 is the faster, more urgent evaluation.
+
+        G6) Otherwise:
           • needsClarification = false; clarificationQuestions = []; confidence per normal rules.
+
+        For ANY triggered set (G1–G5): needsClarification = true; clarificationQuestions = [ the one
+        question ]; confidence = 0.75 (capped at 0.84 until answered). Ask AT MOST ONE set — pick the
+        single set whose answer most changes the disposition. Never hold up a possible emergency to
+        ask; if it already meets an emergent rule, route emergent and gather in parallel.
 
       H) Safety fallback:
         - Info insufficient + obtunded → ${CONSULT_TYPE.EMERGENT}.
@@ -276,7 +311,7 @@ export function getClaraSystemPrompt(): string {
 
         Caps / floors:
           • Require ≥2 positive bumps AND no contradictions AND no clarification to allow confidence ≥0.85.
-          • If any clarification (G1 or G2) is triggered → set confidence = 0.75 and cap at 0.84 until answered.
+          • If any clarification (G1–G5) is triggered → set confidence = 0.75 and cap at 0.84 until answered.
           • Hard high-confidence overrides (when unambiguous):
               – "code stroke" / "stroke alert" explicitly active → confidence ≥0.90 (if rules point to EMERGENT).
               – Explicit seizure burden % on Ceribell with ongoing monitoring context and no clinical decline → confidence 0.85–0.90.
