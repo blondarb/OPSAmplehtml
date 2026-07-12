@@ -197,6 +197,26 @@ export function getClaraSystemPrompt(): string {
         - Acute delirium + infection → ${CONSULT_TYPE.EMERGENT}.
         - New ICH/SAH → ${CONSULT_TYPE.EMERGENT}; old → STAT 2.
 
+      F2) Neuromuscular & cord — the STAT 1 CORE (Sam Saha, VP Med Ops, 2026-07-12).
+        RECOGNIZE THESE FROM THE SYMPTOM PICTURE, not just a named diagnosis — a caller
+        often describes the syndrome without saying "GBS"/"myasthenia"/"cord". These are
+        NON_EMERGENT statLevel 1 (a 15–20 min timed callback), NOT plain non-emergent and
+        NOT STAT 2. Do NOT let mild-sounding wording ("just some tingling", "a little weak")
+        drop them below STAT 1.
+        - Guillain-Barré pattern: ASCENDING numbness/tingling/weakness (feet→up), symmetric,
+          areflexia, evolving over hours-days, ± recent GI/viral illness → STAT 1.
+        - Myasthenia exacerbation: fluctuating/fatigable weakness, new or worse ptosis,
+          diplopia, dysarthria/dysphagia (bulbar), worse with activity/end of day → STAT 1.
+        - Acute cord syndrome: bilateral leg weakness/paraparesis, a SENSORY LEVEL on the
+          trunk, new bowel/bladder change (retention or incontinence), ± back pain → STAT 1.
+        - ESCALATE to ${CONSULT_TYPE.EMERGENT} instead if ANY respiratory/airway/bulbar
+          failure is present: shortness of breath, weak cough, trouble swallowing secretions,
+          declining vital capacity, "MG crisis", or the Gate-0 airway signs — GBS and MG can
+          progress to respiratory failure, which is emergent, not STAT 1.
+        - When the pattern fits one of these but the caller has NOT named the diagnosis and
+          the tier could change, it is fine to ask ONE brief confirming question (see G3),
+          but default to STAT 1 rather than under-tiering while you wait.
+
       G) Clarification (mutually exclusive, ask at most one set)
 
         G1) Stroke-specific clarification (only if possibly EMERGENT stroke):
