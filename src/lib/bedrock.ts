@@ -28,20 +28,31 @@ export const BEDROCK_MODEL = 'us.anthropic.claude-sonnet-4-6'
 // ── Client singleton ─────────────────────────────────────────────────
 let _client: BedrockRuntimeClient | null = null
 
+export function buildBedrockClientConfig(
+  env: Record<string, string | undefined> = process.env,
+): Record<string, unknown> {
+  const region = env.BEDROCK_REGION || env.AWS_REGION || 'us-east-2'
+  const config: Record<string, unknown> = { region }
+  const accessKeyId = env.BEDROCK_ACCESS_KEY_ID
+  const secretAccessKey = env.BEDROCK_SECRET_ACCESS_KEY
+  if (env.NODE_ENV !== 'production' && accessKeyId && secretAccessKey) {
+    config.credentials = env.AWS_SESSION_TOKEN
+      ? {
+          accessKeyId,
+          secretAccessKey,
+          sessionToken: env.AWS_SESSION_TOKEN,
+        }
+      : { accessKeyId, secretAccessKey }
+  }
+  return config
+}
+
 function getClient(): BedrockRuntimeClient {
   if (!_client) {
-    const region = process.env.BEDROCK_REGION || process.env.AWS_REGION || 'us-east-2'
-    const accessKeyId = process.env.BEDROCK_ACCESS_KEY_ID
-    const secretAccessKey = process.env.BEDROCK_SECRET_ACCESS_KEY
-
-    const config: Record<string, unknown> = { region }
-    if (accessKeyId && secretAccessKey) {
-      const sessionToken = process.env.AWS_SESSION_TOKEN
-      config.credentials = sessionToken
-        ? { accessKeyId, secretAccessKey, sessionToken }
-        : { accessKeyId, secretAccessKey }
-    }
-    _client = new BedrockRuntimeClient(config)
+    // Production must use the SSR/Lambda/ECS execution role's temporary
+    // credentials. Static credentials remain a local-development escape hatch
+    // only and are never embedded by next.config.ts.
+    _client = new BedrockRuntimeClient(buildBedrockClientConfig())
   }
   return _client
 }
@@ -82,15 +93,108 @@ export interface BedrockInvokeOptions {
   cacheSystem?: boolean
 }
 
-export interface BedrockResponse {
+export interface BedrockTokenUsage {
+  /** Non-cached input tokens. */
+  inputTokens?: number
+  outputTokens?: number
+  cacheWriteInputTokens?: number
+  cacheReadInputTokens?: number
+  cacheWrite5mInputTokens?: number
+  cacheWrite1hInputTokens?: number
+}
+
+export interface BedrockResponse extends BedrockTokenUsage {
   /** The raw text content returned by the model. */
   text: string
   /** The stop reason (e.g. "end_turn", "max_tokens"). */
   stopReason: string
-  /** Input token count (if returned by the model). */
-  inputTokens?: number
-  /** Output token count (if returned by the model). */
-  outputTokens?: number
+}
+
+export function copyBedrockTokenUsage(
+  value: BedrockTokenUsage,
+): BedrockTokenUsage {
+  return {
+    ...(value.inputTokens !== undefined
+      ? { inputTokens: value.inputTokens }
+      : {}),
+    ...(value.outputTokens !== undefined
+      ? { outputTokens: value.outputTokens }
+      : {}),
+    ...(value.cacheWriteInputTokens !== undefined
+      ? { cacheWriteInputTokens: value.cacheWriteInputTokens }
+      : {}),
+    ...(value.cacheReadInputTokens !== undefined
+      ? { cacheReadInputTokens: value.cacheReadInputTokens }
+      : {}),
+    ...(value.cacheWrite5mInputTokens !== undefined
+      ? { cacheWrite5mInputTokens: value.cacheWrite5mInputTokens }
+      : {}),
+    ...(value.cacheWrite1hInputTokens !== undefined
+      ? { cacheWrite1hInputTokens: value.cacheWrite1hInputTokens }
+      : {}),
+  }
+}
+
+interface AnthropicContentBlock {
+  type?: string
+  text?: string
+  name?: string
+  input?: unknown
+}
+
+interface AnthropicModelResponse {
+  content?: AnthropicContentBlock[]
+  stop_reason?: string
+  usage?: {
+    input_tokens?: number
+    output_tokens?: number
+    cache_creation_input_tokens?: number
+    cache_read_input_tokens?: number
+    cache_creation?: {
+      ephemeral_5m_input_tokens?: number
+      ephemeral_1h_input_tokens?: number
+    }
+  }
+}
+
+function validTokenCount(value: unknown): value is number {
+  return Number.isSafeInteger(value) && (value as number) >= 0
+}
+
+function parseBedrockTokenUsage(
+  usage: AnthropicModelResponse['usage'],
+): BedrockTokenUsage {
+  if (!usage) return {}
+  const parsed: BedrockTokenUsage = {}
+  if (validTokenCount(usage.input_tokens)) {
+    parsed.inputTokens = usage.input_tokens
+  }
+  if (validTokenCount(usage.output_tokens)) {
+    parsed.outputTokens = usage.output_tokens
+  }
+  if (validTokenCount(usage.cache_creation_input_tokens)) {
+    parsed.cacheWriteInputTokens = usage.cache_creation_input_tokens
+  }
+  if (validTokenCount(usage.cache_read_input_tokens)) {
+    parsed.cacheReadInputTokens = usage.cache_read_input_tokens
+  }
+  if (validTokenCount(usage.cache_creation?.ephemeral_5m_input_tokens)) {
+    parsed.cacheWrite5mInputTokens =
+      usage.cache_creation.ephemeral_5m_input_tokens
+  }
+  if (validTokenCount(usage.cache_creation?.ephemeral_1h_input_tokens)) {
+    parsed.cacheWrite1hInputTokens =
+      usage.cache_creation.ephemeral_1h_input_tokens
+  }
+  return parsed
+}
+
+function modelOmitsTemperature(modelId: string): boolean {
+  return (
+    modelId.includes('claude-sonnet-5') ||
+    modelId.includes('claude-opus-4-8') ||
+    modelId.includes('claude-fable-5')
+  )
 }
 
 // ── Core invoke function ─────────────────────────────────────────────
@@ -117,16 +221,24 @@ export async function invokeBedrock(
     ? [{ type: 'text', text: systemPrompt, cache_control: { type: 'ephemeral' } }]
     : systemPrompt
 
-  const body = JSON.stringify({
+  const modelId = opts.model || BEDROCK_MODEL
+  // Current Bedrock Sonnet 5 and Opus 4.8 profiles reject `temperature`
+  // rather than ignoring it. Keep sampling controls for evaluated legacy
+  // profiles while omitting the deprecated field for these reasoning models.
+  const omitsTemperature = modelOmitsTemperature(modelId)
+  const requestBody = {
     anthropic_version: 'bedrock-2023-05-31',
     max_tokens: opts.maxTokens ?? 2000,
     system: systemField,
     messages: opts.messages,
-    temperature: opts.temperature ?? 0.2,
-  })
+    ...(!omitsTemperature
+      ? { temperature: opts.temperature ?? 0.2 }
+      : {}),
+  }
+  const body = JSON.stringify(requestBody)
 
   const command = new InvokeModelCommand({
-    modelId: opts.model || BEDROCK_MODEL,
+    modelId,
     contentType: 'application/json',
     accept: 'application/json',
     body: new TextEncoder().encode(body),
@@ -136,13 +248,22 @@ export async function invokeBedrock(
     abortSignal: opts.signal,
   })
 
-  const decoded = JSON.parse(new TextDecoder().decode(response.body))
+  const decoded = JSON.parse(
+    new TextDecoder().decode(response.body),
+  ) as AnthropicModelResponse
+  const text = (decoded.content ?? [])
+    .filter(
+      (block): block is AnthropicContentBlock & { text: string } =>
+        (block.type === 'text' || block.type === undefined) &&
+        typeof block.text === 'string',
+    )
+    .map((block) => block.text)
+    .join('')
 
   return {
-    text: decoded.content?.[0]?.text ?? '',
+    text,
     stopReason: decoded.stop_reason ?? 'unknown',
-    inputTokens: decoded.usage?.input_tokens,
-    outputTokens: decoded.usage?.output_tokens,
+    ...parseBedrockTokenUsage(decoded.usage),
   }
 }
 
@@ -208,6 +329,171 @@ function repairTruncatedJSON(text: string): string {
 
 // ── Convenience: invoke and parse JSON ───────────────────────────────
 
+export class ClinicalModelOutputError extends Error {
+  readonly name = 'ClinicalModelOutputError'
+
+  constructor(
+    public readonly code: 'incomplete' | 'malformed',
+    public readonly stopReason: string,
+    message: string
+  ) {
+    super(message)
+  }
+}
+
+export function parseCompleteClinicalJSON<T>(text: string, stopReason: string): T {
+  if (stopReason !== 'end_turn') {
+    throw new ClinicalModelOutputError(
+      'incomplete',
+      stopReason,
+      `Clinical model output was incomplete (stop reason: ${stopReason}).`
+    )
+  }
+
+  try {
+    return JSON.parse(text.trim()) as T
+  } catch {
+    throw new ClinicalModelOutputError(
+      'malformed',
+      stopReason,
+      'Clinical model output was not valid JSON.'
+    )
+  }
+}
+
+export async function invokeBedrockClinicalJSON<T>(
+  opts: Omit<BedrockInvokeOptions, 'jsonMode'>
+): Promise<{
+  parsed: T
+  raw: string
+  stopReason: string
+} & BedrockTokenUsage> {
+  const result = await invokeBedrock({ ...opts, jsonMode: true })
+  const parsed = parseCompleteClinicalJSON<T>(result.text, result.stopReason)
+
+  return {
+    parsed,
+    raw: result.text,
+    stopReason: result.stopReason,
+    ...parseBedrockTokenUsage({
+      input_tokens: result.inputTokens,
+      output_tokens: result.outputTokens,
+      cache_creation_input_tokens: result.cacheWriteInputTokens,
+      cache_read_input_tokens: result.cacheReadInputTokens,
+      cache_creation: {
+        ephemeral_5m_input_tokens: result.cacheWrite5mInputTokens,
+        ephemeral_1h_input_tokens: result.cacheWrite1hInputTokens,
+      },
+    }),
+  }
+}
+
+export interface BedrockClinicalToolOptions
+  extends Omit<BedrockInvokeOptions, 'jsonMode'> {
+  toolName: string
+  toolDescription: string
+  inputSchema: Record<string, unknown>
+}
+
+/**
+ * Force a single schema-described tool call and treat its input as the
+ * structured clinical result. This is the strict path for Bedrock models
+ * that lack native structured output and routinely emit thinking blocks or
+ * markdown around text JSON. `tool_use` is complete only when exactly one
+ * matching tool block is present; every other stop/result shape is rejected.
+ */
+export async function invokeBedrockClinicalTool<T>(
+  opts: BedrockClinicalToolOptions,
+): Promise<{
+  parsed: T
+  raw: string
+  stopReason: string
+} & BedrockTokenUsage> {
+  if (!/^[a-zA-Z][a-zA-Z0-9_-]{0,63}$/.test(opts.toolName)) {
+    throw new ClinicalModelOutputError(
+      'malformed',
+      'configuration',
+      'Clinical tool name is invalid.',
+    )
+  }
+  if (!opts.toolDescription || opts.toolDescription.length > 1_000) {
+    throw new ClinicalModelOutputError(
+      'malformed',
+      'configuration',
+      'Clinical tool description is invalid.',
+    )
+  }
+
+  const client = getClient()
+  const modelId = opts.model || BEDROCK_MODEL
+  const systemField = opts.cacheSystem
+    ? [
+        {
+          type: 'text',
+          text: opts.system,
+          cache_control: { type: 'ephemeral' },
+        },
+      ]
+    : opts.system
+  const requestBody = {
+    anthropic_version: 'bedrock-2023-05-31',
+    max_tokens: opts.maxTokens ?? 2_000,
+    system: systemField,
+    messages: opts.messages,
+    tools: [
+      {
+        name: opts.toolName,
+        description: opts.toolDescription,
+        input_schema: opts.inputSchema,
+      },
+    ],
+    tool_choice: { type: 'tool', name: opts.toolName },
+    ...(!modelOmitsTemperature(modelId)
+      ? { temperature: opts.temperature ?? 0.2 }
+      : {}),
+  }
+  const command = new InvokeModelCommand({
+    modelId,
+    contentType: 'application/json',
+    accept: 'application/json',
+    body: new TextEncoder().encode(JSON.stringify(requestBody)),
+  })
+  const response = await client.send(command, { abortSignal: opts.signal })
+  const decoded = JSON.parse(
+    new TextDecoder().decode(response.body),
+  ) as AnthropicModelResponse
+  const stopReason = decoded.stop_reason ?? 'unknown'
+  if (stopReason !== 'tool_use') {
+    throw new ClinicalModelOutputError(
+      'incomplete',
+      stopReason,
+      `Clinical tool output was incomplete (stop reason: ${stopReason}).`,
+    )
+  }
+  const matchingBlocks = (decoded.content ?? []).filter(
+    (block) => block.type === 'tool_use' && block.name === opts.toolName,
+  )
+  if (
+    matchingBlocks.length !== 1 ||
+    typeof matchingBlocks[0].input !== 'object' ||
+    matchingBlocks[0].input === null ||
+    Array.isArray(matchingBlocks[0].input)
+  ) {
+    throw new ClinicalModelOutputError(
+      'malformed',
+      stopReason,
+      'Clinical tool output did not contain exactly one matching object.',
+    )
+  }
+  const parsed = matchingBlocks[0].input as T
+  return {
+    parsed,
+    raw: JSON.stringify(parsed),
+    stopReason,
+    ...parseBedrockTokenUsage(decoded.usage),
+  }
+}
+
 /**
  * Invoke Bedrock with JSON mode and parse the response as JSON.
  *
@@ -216,7 +502,7 @@ function repairTruncatedJSON(text: string): string {
  */
 export async function invokeBedrockJSON<T = Record<string, unknown>>(
   opts: Omit<BedrockInvokeOptions, 'jsonMode'>
-): Promise<{ parsed: T; raw: string; stopReason: string; inputTokens?: number; outputTokens?: number }> {
+): Promise<{ parsed: T; raw: string; stopReason: string } & BedrockTokenUsage> {
   const result = await invokeBedrock({ ...opts, jsonMode: true })
 
   // Strip markdown code fences if the model wraps the JSON anyway
@@ -226,7 +512,26 @@ export async function invokeBedrockJSON<T = Record<string, unknown>>(
   if (cleaned.endsWith('```')) cleaned = cleaned.slice(0, -3)
   cleaned = cleaned.trim()
 
-  const tokenInfo = { inputTokens: result.inputTokens, outputTokens: result.outputTokens }
+  const tokenInfo: BedrockTokenUsage = {
+    ...(result.inputTokens !== undefined
+      ? { inputTokens: result.inputTokens }
+      : {}),
+    ...(result.outputTokens !== undefined
+      ? { outputTokens: result.outputTokens }
+      : {}),
+    ...(result.cacheWriteInputTokens !== undefined
+      ? { cacheWriteInputTokens: result.cacheWriteInputTokens }
+      : {}),
+    ...(result.cacheReadInputTokens !== undefined
+      ? { cacheReadInputTokens: result.cacheReadInputTokens }
+      : {}),
+    ...(result.cacheWrite5mInputTokens !== undefined
+      ? { cacheWrite5mInputTokens: result.cacheWrite5mInputTokens }
+      : {}),
+    ...(result.cacheWrite1hInputTokens !== undefined
+      ? { cacheWrite1hInputTokens: result.cacheWrite1hInputTokens }
+      : {}),
+  }
 
   // Try direct parse first
   try {
@@ -243,7 +548,7 @@ export async function invokeBedrockJSON<T = Record<string, unknown>>(
       try {
         const parsed = JSON.parse(repaired) as T
         return { parsed, raw: result.text, stopReason: result.stopReason, ...tokenInfo }
-      } catch (repairErr) {
+      } catch {
         throw new Error(
           `AI response was truncated at ${opts.maxTokens ?? 2000} tokens and could not be repaired. ` +
           `Try again with a shorter document.`
@@ -263,18 +568,7 @@ let _agentClient: BedrockAgentRuntimeClient | null = null
 
 function getAgentClient(): BedrockAgentRuntimeClient {
   if (!_agentClient) {
-    const region = process.env.BEDROCK_REGION || process.env.AWS_REGION || 'us-east-2'
-    const accessKeyId = process.env.BEDROCK_ACCESS_KEY_ID
-    const secretAccessKey = process.env.BEDROCK_SECRET_ACCESS_KEY
-
-    const config: Record<string, unknown> = { region }
-    if (accessKeyId && secretAccessKey) {
-      const sessionToken = process.env.AWS_SESSION_TOKEN
-      config.credentials = sessionToken
-        ? { accessKeyId, secretAccessKey, sessionToken }
-        : { accessKeyId, secretAccessKey }
-    }
-    _agentClient = new BedrockAgentRuntimeClient(config)
+    _agentClient = new BedrockAgentRuntimeClient(buildBedrockClientConfig())
   }
   return _agentClient
 }
@@ -393,8 +687,8 @@ export async function retrieveChunksFromKB(
     },
   })
 
-  const response: any = await client.send(cmd as any)
-  const chunks: KBChunk[] = (response.retrievalResults ?? []).map((r: any) => ({
+  const response = await client.send(cmd)
+  const chunks: KBChunk[] = (response.retrievalResults ?? []).map((r) => ({
     content: r.content?.text ?? '',
     source: r.location?.s3Location?.uri ?? r.location?.webLocation?.url ?? 'unknown',
     score: r.score,

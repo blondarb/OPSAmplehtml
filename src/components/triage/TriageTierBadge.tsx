@@ -7,9 +7,16 @@ interface Props {
   weightedScore?: number | null
   isRedFlagOverride?: boolean
   compact?: boolean
+  timeframeOverride?: string
 }
 
-export default function TriageTierBadge({ tier, weightedScore, isRedFlagOverride, compact }: Props) {
+export default function TriageTierBadge({
+  tier,
+  weightedScore,
+  isRedFlagOverride,
+  compact,
+  timeframeOverride,
+}: Props) {
   const config = TIER_DISPLAY[tier]
 
   if (compact) {
@@ -57,7 +64,7 @@ export default function TriageTierBadge({ tier, weightedScore, isRedFlagOverride
           {config.label}
         </span>
         <span style={{ fontSize: '0.9rem', fontWeight: 500, opacity: 0.9 }}>
-          {config.timeframe}
+          {timeframeOverride ?? config.timeframe}
           {isRedFlagOverride && ' (Red Flag Override)'}
         </span>
         {typeof weightedScore === 'number' && Number.isFinite(weightedScore) && (

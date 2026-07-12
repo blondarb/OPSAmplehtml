@@ -8,7 +8,11 @@ import {
   BedrockRuntimeClient,
   InvokeModelCommand,
 } from '@aws-sdk/client-bedrock-runtime'
-import { calculateTriageTier, validateAIResponse } from '../src/lib/triage/scoring'
+import {
+  calculateTriageTier,
+  extractScoringEmergencyEnvelope,
+  parseAndNormalizeAIResponse,
+} from '../src/lib/triage/scoring'
 import { TRIAGE_SYSTEM_PROMPT, buildTriageUserPrompt } from '../src/lib/triage/systemPrompt'
 import { AITriageResponse } from '../src/lib/triage/types'
 import { Pool } from 'pg'
@@ -86,10 +90,15 @@ async function callBedrock(referralText: string, patientAge: number | null, pati
   if (!jsonMatch) throw new Error('No JSON found in response')
 
   const parsed = JSON.parse(jsonMatch[0])
-  const validationError = validateAIResponse(parsed)
-  if (validationError) throw new Error(`AI response validation failed: ${validationError}`)
-
-  const aiResponse = parsed as AITriageResponse
+  let aiResponse: AITriageResponse
+  try {
+    aiResponse = parseAndNormalizeAIResponse(parsed)
+  } catch (error) {
+    const emergencyEnvelope = extractScoringEmergencyEnvelope(parsed)
+    throw new Error(
+      `AI response validation failed${emergencyEnvelope.emergentOverride ? ' (emergency_override=true preserved)' : ''}: ${error instanceof Error ? error.message : 'unknown schema error'}`,
+    )
+  }
   const scoring = calculateTriageTier(aiResponse)
 
   return {

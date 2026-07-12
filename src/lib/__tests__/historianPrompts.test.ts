@@ -2,7 +2,19 @@ import { describe, it, expect } from 'vitest'
 import {
   buildHistorianSystemPrompt,
   getHistorianToolDefinition,
+  getHistorianToolsForProvider,
 } from '@/lib/historianPrompts'
+
+interface TestToolDefinition {
+  name: string
+  parameters: {
+    required?: readonly string[]
+    properties: Record<string, unknown>
+  }
+}
+
+const getTestTools = () =>
+  getHistorianToolDefinition() as unknown as TestToolDefinition[]
 
 describe('buildHistorianSystemPrompt', () => {
   it('includes the safety block (988 / 741741 / 911 escalation)', () => {
@@ -68,24 +80,74 @@ describe('buildHistorianSystemPrompt', () => {
     const prompt = buildHistorianSystemPrompt('new_patient', undefined, '72M, retired machinist')
     expect(prompt).toContain('72M, retired machinist')
   })
+
+  it('locks referral clarification to the clinician-approved question IDs', () => {
+    const prompt = buildHistorianSystemPrompt(
+      'referral_clarification',
+      'episodic numbness',
+      'stable outpatient referral',
+      [
+        {
+          id: 'question-1',
+          code: 'symptom_onset',
+          text: 'When did the current symptom begin?',
+        },
+      ],
+    )
+
+    expect(prompt).toContain('Ask ONLY the clinician-approved questions')
+    expect(prompt).toContain('question-1')
+    expect(prompt).toContain('symptom_onset')
+    expect(prompt).toContain('patient-reported and unverified')
+    expect(prompt).toContain('Never diagnose, score urgency, clear an emergency')
+    expect(prompt).not.toContain('Phase 1')
+    expect(prompt).not.toContain('scale_step')
+  })
+
+  it('rejects referral clarification without an approved question set', () => {
+    expect(() =>
+      buildHistorianSystemPrompt('referral_clarification'),
+    ).toThrow('Referral clarification requires approved questions')
+  })
 })
 
 describe('getHistorianToolDefinition', () => {
   it('returns an array of exactly 3 tools', () => {
-    const tools = getHistorianToolDefinition()
+    const tools = getTestTools()
     expect(Array.isArray(tools)).toBe(true)
     expect(tools).toHaveLength(3)
   })
 
   it('exposes save_interview_output, query_evidence, scale_step by name', () => {
-    const tools = getHistorianToolDefinition()
-    const names = tools.map((t: any) => t.name).sort()
+    const tools = getTestTools()
+    const names = tools.map((tool) => tool.name).sort()
     expect(names).toEqual(['query_evidence', 'save_interview_output', 'scale_step'])
   })
 
+  it('hard-limits referral clarification to the save tool', () => {
+    const tools = getHistorianToolDefinition(
+      'referral_clarification',
+    ) as unknown as TestToolDefinition[]
+
+    expect(tools.map((tool) => tool.name)).toEqual(['save_interview_output'])
+    expect(tools[0].parameters.required).toContain('clarification_answers')
+    expect(tools[0].parameters.properties.clarification_answers).toBeDefined()
+  })
+
+  it('hard-limits Nova referral clarification to the save tool', () => {
+    const tools = getHistorianToolsForProvider(
+      'nova',
+      'referral_clarification',
+    ) as Array<{ toolSpec: { name: string } }>
+
+    expect(tools.map((tool) => tool.toolSpec.name)).toEqual([
+      'save_interview_output',
+    ])
+  })
+
   it('save_interview_output requires chief_complaint, hpi, narrative_summary, safety_escalated', () => {
-    const tools = getHistorianToolDefinition()
-    const tool = tools.find((t: any) => t.name === 'save_interview_output')
+    const tools = getTestTools()
+    const tool = tools.find((candidate) => candidate.name === 'save_interview_output')
     expect(tool).toBeDefined()
     expect(tool!.parameters.required).toEqual(
       expect.arrayContaining(['chief_complaint', 'hpi', 'narrative_summary', 'safety_escalated']),
@@ -93,17 +155,19 @@ describe('getHistorianToolDefinition', () => {
   })
 
   it('query_evidence requires question, allows focus_diagnoses optional', () => {
-    const tools = getHistorianToolDefinition()
-    const tool = tools.find((t: any) => t.name === 'query_evidence') as any
+    const tools = getTestTools()
+    const tool = tools.find((candidate) => candidate.name === 'query_evidence')
     expect(tool).toBeDefined()
+    if (!tool) throw new Error('query_evidence tool missing')
     expect(tool.parameters.required).toEqual(['question'])
     expect(tool.parameters.properties.focus_diagnoses).toBeDefined()
   })
 
   it('scale_step requires scale_id, allows prev_index/prev_response optional', () => {
-    const tools = getHistorianToolDefinition()
-    const tool = tools.find((t: any) => t.name === 'scale_step') as any
+    const tools = getTestTools()
+    const tool = tools.find((candidate) => candidate.name === 'scale_step')
     expect(tool).toBeDefined()
+    if (!tool) throw new Error('scale_step tool missing')
     expect(tool.parameters.required).toEqual(expect.arrayContaining(['scale_id']))
     expect(tool.parameters.properties.prev_index).toBeDefined()
     expect(tool.parameters.properties.prev_response).toBeDefined()

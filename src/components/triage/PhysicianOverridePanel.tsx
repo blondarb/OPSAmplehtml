@@ -5,19 +5,29 @@ import { TriageTier, TIER_DISPLAY, OVERRIDE_CATEGORIES, OverrideCategory } from 
 
 interface Props {
   sessionId: string
+  currentTier: TriageTier
 }
 
 const ALL_TIERS: TriageTier[] = [
   'emergent', 'urgent', 'semi_urgent', 'routine_priority', 'routine', 'non_urgent',
 ]
 
-export default function PhysicianOverridePanel({ sessionId }: Props) {
+export default function PhysicianOverridePanel({ sessionId, currentTier }: Props) {
   const [expanded, setExpanded] = useState(false)
   const [selectedTier, setSelectedTier] = useState<TriageTier | ''>('')
   const [selectedReason, setSelectedReason] = useState<OverrideCategory | ''>('')
   const [submitting, setSubmitting] = useState(false)
   const [submitted, setSubmitted] = useState(false)
   const [error, setError] = useState('')
+  const currentRank = ALL_TIERS.indexOf(currentTier)
+  const escalationTiers =
+    currentTier === 'insufficient_data'
+      ? ALL_TIERS.slice(0, 3)
+      : currentRank > 0
+        ? ALL_TIERS.slice(0, currentRank)
+        : []
+
+  if (escalationTiers.length === 0) return null
 
   async function handleSubmit() {
     if (!selectedTier || !selectedReason) return
@@ -62,7 +72,7 @@ export default function PhysicianOverridePanel({ sessionId }: Props) {
           <polyline points="20 6 9 17 4 12" />
         </svg>
         <span style={{ color: '#16A34A', fontSize: '0.85rem', fontWeight: 500 }}>
-          Override submitted: {selectedTier && TIER_DISPLAY[selectedTier].label}
+          Escalation recorded: {selectedTier && TIER_DISPLAY[selectedTier].label}
         </span>
       </div>
     )
@@ -90,7 +100,7 @@ export default function PhysicianOverridePanel({ sessionId }: Props) {
           alignItems: 'center',
         }}
       >
-        Physician Override
+        Clinician Escalation
         <svg
           width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"
           style={{ transform: expanded ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.2s' }}
@@ -104,7 +114,7 @@ export default function PhysicianOverridePanel({ sessionId }: Props) {
           <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
             <div>
               <label style={{ color: '#94a3b8', fontSize: '0.75rem', display: 'block', marginBottom: '4px' }}>
-                New Tier
+                Higher Urgency Tier
               </label>
               <select
                 value={selectedTier}
@@ -120,7 +130,7 @@ export default function PhysicianOverridePanel({ sessionId }: Props) {
                 }}
               >
                 <option value="">Select tier...</option>
-                {ALL_TIERS.map(t => (
+                {escalationTiers.map(t => (
                   <option key={t} value={t}>{TIER_DISPLAY[t].label} — {TIER_DISPLAY[t].timeframe}</option>
                 ))}
               </select>
@@ -169,7 +179,7 @@ export default function PhysicianOverridePanel({ sessionId }: Props) {
                 opacity: submitting ? 0.6 : 1,
               }}
             >
-              {submitting ? 'Submitting...' : 'Submit Override'}
+              {submitting ? 'Submitting...' : 'Escalate Priority'}
             </button>
           </div>
         </div>

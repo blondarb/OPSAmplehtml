@@ -1,34 +1,207 @@
 import { NextResponse } from 'next/server'
-import { invokeBedrockJSON, BEDROCK_MODEL } from '@/lib/bedrock'
-import { calculateTriageTier, validateAIResponse } from '@/lib/triage/scoring'
-import { TRIAGE_SYSTEM_PROMPT, buildTriageUserPrompt } from '@/lib/triage/systemPrompt'
-import { AITriageResponse } from '@/lib/triage/types'
+import type { CoverageStatus, SourceType } from '@/lib/triage/types'
 import { from } from '@/lib/db-query'
-import { createConsult, linkTriageToConsult } from '@/lib/consult/pipeline'
-import { deriveChiefComplaint, buildTriageSummaryForConsult } from '@/lib/consult/contextBuilder'
-import { notifyTriageUrgent } from '@/lib/notifications'
-import { autoScheduleFromTriage } from '@/lib/triage/autoSchedule'
 import { runInBackground } from '@/lib/triage/asyncRunner'
-
-const TRIAGE_MODEL = process.env.BEDROCK_TRIAGE_MODEL || BEDROCK_MODEL
+import { authorizeClinicalAccess } from '@/lib/auth/clinicalAccess'
+import {
+  processTriageInBackground,
+  TRIAGE_MODEL,
+  type TriageBackgroundParams,
+} from '@/lib/triage/processTriageInBackground'
+import { buildLongPacketAdjudicationText } from '@/lib/triage/longPacketIngestion'
+import { FILE_CONSTRAINTS } from '@/lib/triage/types'
+import { selectDominantBoundedSafetyEvidence } from '@/lib/triage/safetyEvidenceSelection'
+import { startOrReuseTriageSession } from '@/lib/triage/sessionStart'
+import {
+  runEmergencyGateway,
+  type EmergencyGatewayResult,
+} from '@/lib/triage/emergencyGateway'
+import { persistEmergencyGatewayResult } from '@/lib/triage/gatewayPersistence'
+import {
+  validatePersistedSourceExtractionAuthority,
+  type GovernedSourceSafetyPathway,
+  type SourceFailureEmergencyGateway,
+} from '@/lib/triage/sourceExtractionAuthority'
 
 // Lambda must stay alive for Bedrock + DB writes after the 202 is sent.
 // 120s gives plenty of headroom for the typical 25-40s total work.
 export const maxDuration = 120
 
-interface TriageBackgroundParams {
-  textForScoring: string
-  patient_age?: number
-  patient_sex?: string
-  referring_provider_type?: string
-  patient_id?: string
-  referral_text: string
-  temperature: number
-  createConsultFlag: boolean
-  existingConsultId?: string
+const MAX_HOLD_SAFETY_SIGNALS = 20
+const MAX_HOLD_EVIDENCE_PER_SIGNAL = 5
+const MAX_HOLD_EVIDENCE_REEVALUATIONS = 64
+const MAX_HOLD_EVIDENCE_QUOTE_CHARACTERS = 2_000
+
+function boundedHoldPacketSafety(
+  gateway: SourceFailureEmergencyGateway | undefined,
+) {
+  if (
+    !gateway ||
+    (gateway.carePathway !== 'emergency_now' &&
+      gateway.carePathway !== 'same_day_clinician_review')
+  ) {
+    return undefined
+  }
+  return {
+    care_pathway: gateway.carePathway,
+    review_requirement: gateway.reviewRequirement,
+    clinician_hold: true,
+    signals: gateway.signals.slice(0, MAX_HOLD_SAFETY_SIGNALS).map((signal) => ({
+      code: signal.code,
+      syndrome: signal.syndrome,
+      action: signal.action,
+      evidence: selectDominantBoundedSafetyEvidence(signal, {
+        maximumEvidence: MAX_HOLD_EVIDENCE_PER_SIGNAL,
+        maximumQuoteCharacters: MAX_HOLD_EVIDENCE_QUOTE_CHARACTERS,
+        maximumReevaluations: MAX_HOLD_EVIDENCE_REEVALUATIONS,
+      }),
+    })),
+  }
+}
+
+function sourceAuthorityHoldResponse(input: {
+  reason: string
+  safetyPathway?: GovernedSourceSafetyPathway
+  deterministicGateway?: SourceFailureEmergencyGateway
+  safetySessionId?: string
+  error?: string
+  status?: number
+}) {
+  const packetSafety = boundedHoldPacketSafety(input.deterministicGateway)
+  return NextResponse.json(
+    {
+      error:
+        input.error ??
+        'Source extraction authority could not be verified. Human review is required.',
+      reason: input.reason,
+      outpatient_scoring_blocked: true,
+      human_review_required: true,
+      scheduling_locked: true,
+      immediate_action_required: input.safetyPathway !== undefined,
+      ...(input.safetyPathway
+        ? { safety_pathway: input.safetyPathway }
+        : {}),
+      ...(packetSafety ? { packet_safety: packetSafety } : {}),
+      ...(input.safetySessionId
+        ? {
+            session_id: input.safetySessionId,
+            safety_triage_session_id: input.safetySessionId,
+          }
+        : {}),
+    },
+    { status: input.status ?? 409 },
+  )
+}
+
+function positiveRawReferralGateway(
+  referralText: unknown,
+): (EmergencyGatewayResult & {
+  carePathway: GovernedSourceSafetyPathway
+}) | undefined {
+  if (
+    typeof referralText !== 'string' ||
+    !referralText.trim() ||
+    referralText.length > FILE_CONSTRAINTS.MAX_PACKET_TEXT_LENGTH
+  ) {
+    return undefined
+  }
+  const gateway = runEmergencyGateway(referralText)
+  return gateway.status === 'completed' &&
+    (gateway.carePathway === 'emergency_now' ||
+      gateway.carePathway === 'same_day_clinician_review')
+    ? (gateway as EmergencyGatewayResult & {
+        carePathway: GovernedSourceSafetyPathway
+      })
+    : undefined
+}
+
+function positiveShortReferralGateway(referralText: string) {
+  return referralText.trim().length < 50
+    ? positiveRawReferralGateway(referralText)
+    : undefined
+}
+
+async function markShortReferralScoringBlocked(input: {
+  triageSessionId: string
+  tenantId: string
+  processingAttemptCount: number
+}): Promise<boolean> {
+  try {
+    const result = await from('triage_sessions')
+      .update({
+        processing_status: 'error',
+        processing_claimed_at: null,
+        processing_lease_expires_at: null,
+        error_message:
+          'The referral is too short for outpatient scoring. Its time-critical safety pathway remains active for mandatory clinician action.',
+        completed_at: new Date(),
+      })
+      .eq('id', input.triageSessionId)
+      .eq('tenant_id', input.tenantId)
+      .eq('processing_status', 'pending')
+      .eq('processing_attempt_count', input.processingAttemptCount)
+      .select('id')
+      .single()
+    if (
+      result.error ||
+      !result.data ||
+      result.data.id !== input.triageSessionId
+    ) {
+      console.error('[triage] short-referral scoring block was not persisted')
+      return false
+    }
+    return true
+  } catch {
+    console.error('[triage] short-referral scoring block was not persisted')
+    return false
+  }
+}
+
+function highestGovernedSafetyPathway(input: {
+  deterministic?: string
+  model?: string
+}): GovernedSourceSafetyPathway | undefined {
+  if (
+    input.deterministic === 'emergency_now' ||
+    input.model === 'emergency_now'
+  ) {
+    return 'emergency_now'
+  }
+  if (
+    input.deterministic === 'same_day_clinician_review' ||
+    input.model === 'same_day_clinician_review'
+  ) {
+    return 'same_day_clinician_review'
+  }
+  return undefined
+}
+
+function unverifiedPatientBindingHold(input: {
+  safetyPathway?: GovernedSourceSafetyPathway
+  deterministicGateway?: SourceFailureEmergencyGateway
+}) {
+  return sourceAuthorityHoldResponse({
+    error:
+      'Patient or consult binding requires a separately verified identity workflow and is not accepted by triage intake.',
+    reason: 'unverified_patient_binding_not_allowed',
+    safetyPathway: input.safetyPathway,
+    deterministicGateway: input.deterministicGateway,
+    status: 409,
+  })
 }
 
 export async function POST(request: Request) {
+  const access = await authorizeClinicalAccess({
+    action: 'triage.create',
+    allowedRoles: ['clinician', 'admin'],
+  })
+  if (!access.ok) {
+    return NextResponse.json(
+      { error: 'Access denied', reason: access.reason },
+      { status: access.status },
+    )
+  }
+
   let body: Record<string, unknown>
   try {
     body = await request.json()
@@ -36,272 +209,461 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 })
   }
 
-  const referral_text = body.referral_text as string | undefined
-  const patient_age = body.patient_age as number | undefined
-  const patient_sex = body.patient_sex as string | undefined
-  const referring_provider_type = body.referring_provider_type as string | undefined
-  const patient_id = body.patient_id as string | undefined
-  const extracted_summary = body.extracted_summary as string | undefined
-  const source_type = body.source_type as string | undefined
-  const source_filename = body.source_filename as string | undefined
-  const extraction_confidence = body.extraction_confidence as string | undefined
-  const note_type_detected = body.note_type_detected as string | undefined
+  let referral_text = body.referral_text as string | undefined
+  const rawPositiveGateway = positiveRawReferralGateway(body.referral_text)
+  let patient_age = body.patient_age as number | undefined
+  let patient_sex = body.patient_sex as string | undefined
+  let referring_provider_type = body.referring_provider_type as
+    | string
+    | undefined
+  const unverifiedPatientBindingWasSupplied =
+    Object.prototype.hasOwnProperty.call(body, 'patient_id') ||
+    Object.prototype.hasOwnProperty.call(body, 'consult_id') ||
+    Object.prototype.hasOwnProperty.call(body, 'create_consult')
+  let extracted_summary = body.extracted_summary as string | undefined
+  const requestedSourceType = body.source_type as string | undefined
+  const sourceFilenameWasSupplied = Object.prototype.hasOwnProperty.call(
+    body,
+    'source_filename',
+  )
+  let source_filename: string | undefined
+  let extraction_confidence = body.extraction_confidence as string | undefined
+  let note_type_detected = body.note_type_detected as string | undefined
+  const sourceExtractionIdWasSupplied = Object.prototype.hasOwnProperty.call(
+    body,
+    'source_extraction_id',
+  )
+  if (
+    sourceExtractionIdWasSupplied &&
+    (typeof body.source_extraction_id !== 'string' ||
+      !body.source_extraction_id.trim())
+  ) {
+    if (rawPositiveGateway) {
+      return sourceAuthorityHoldResponse({
+        error: 'source_extraction_id must be a non-empty string.',
+        reason: 'invalid_source_extraction_id',
+        safetyPathway: rawPositiveGateway.carePathway,
+        deterministicGateway: rawPositiveGateway,
+        status: 400,
+      })
+    }
+    return NextResponse.json(
+      {
+        error: 'source_extraction_id must be a non-empty string.',
+        reason: 'invalid_source_extraction_id',
+      },
+      { status: 400 },
+    )
+  }
+  const sourceExtractionId = sourceExtractionIdWasSupplied
+    ? (body.source_extraction_id as string).trim()
+    : undefined
   const batch_id = body.batch_id as string | undefined
   const fusion_group_id = body.fusion_group_id as string | undefined
   const requestedTemp = body.temperature as number | undefined
-  const createConsultFlag = (body.create_consult as boolean | undefined) ?? false
-  const existingConsultId = body.consult_id as string | undefined
+  let precomputedGateway: TriageBackgroundParams['precomputedGateway']
+  let precomputedSafetyResult: TriageBackgroundParams['precomputedSafetyResult']
+  let adjudicationText: string | undefined
+  let authoritativeCoverageStatus: CoverageStatus | undefined
 
-  // Synchronous input validation — return 400 JSON for client errors.
+  let sourceType: SourceType = 'paste'
+  if (!sourceExtractionId) {
+    if (
+      requestedSourceType !== undefined &&
+      !['paste', 'pdf', 'docx', 'txt'].includes(requestedSourceType)
+    ) {
+      if (rawPositiveGateway) {
+        return sourceAuthorityHoldResponse({
+          error: 'Invalid source_type',
+          reason: 'invalid_source_type',
+          safetyPathway: rawPositiveGateway.carePathway,
+          deterministicGateway: rawPositiveGateway,
+          status: 400,
+        })
+      }
+      return NextResponse.json({ error: 'Invalid source_type' }, { status: 400 })
+    }
+    if (sourceFilenameWasSupplied) {
+      return sourceAuthorityHoldResponse({
+        error:
+          'Document filename metadata requires its tenant-bound raw source extraction.',
+        reason: 'raw_source_binding_required',
+        safetyPathway: rawPositiveGateway?.carePathway,
+        deterministicGateway: rawPositiveGateway,
+      })
+    }
+    sourceType = (requestedSourceType ?? 'paste') as SourceType
+    // A caller-generated summary has no immutable source or model provenance.
+    // Plain pasted referrals are scored from the pasted note itself.
+    extracted_summary = undefined
+  }
+
+  if (!sourceExtractionId && unverifiedPatientBindingWasSupplied) {
+    return unverifiedPatientBindingHold({
+      safetyPathway: rawPositiveGateway?.carePathway,
+      deterministicGateway: rawPositiveGateway,
+    })
+  }
+
+  // A generated summary is never accepted as the only source for an uploaded
+  // document. Resolve the tenant-bound extraction and retain the complete raw
+  // text for the deterministic emergency gateway.
+  if (sourceExtractionId) {
+    const { data: sourceExtraction, error: sourceError } = await from(
+      'triage_extractions',
+    )
+      .select(
+        'id, status, text_input, extracted_summary, key_findings, source_filename, patient_age, patient_sex, extraction_confidence, note_type_detected, ingestion_mode, coverage_status, coverage_report, source_pages, source_sha256, packet_plan, packet_plan_sha256, packet_emergency_result, model_map_result, model_reduce_result, safety_prompt_versions',
+      )
+      .eq('id', sourceExtractionId)
+      .eq('tenant_id', access.context.tenantId)
+      .single()
+
+    if (sourceError || !sourceExtraction) {
+      return sourceAuthorityHoldResponse({
+        error: 'Source extraction not found',
+        reason: 'source_extraction_not_found',
+        safetyPathway: rawPositiveGateway?.carePathway,
+        deterministicGateway: rawPositiveGateway,
+        status: 404,
+      })
+    }
+    const authorityDecision = validatePersistedSourceExtractionAuthority(
+      sourceExtraction,
+    )
+    if (!authorityDecision.ok) {
+      return sourceAuthorityHoldResponse({
+        reason: authorityDecision.reason,
+        safetyPathway: authorityDecision.safetyPathway,
+        deterministicGateway: authorityDecision.deterministicGateway,
+      })
+    }
+
+    const authority = authorityDecision.authority
+    referral_text = authority.rawText
+    extracted_summary = authority.extractedSummary
+    sourceType = authority.sourceType
+    source_filename = authority.sourceFilename
+    patient_age = authority.patientAge
+    patient_sex = authority.patientSex
+    extraction_confidence = authority.extractionConfidence
+    note_type_detected = authority.noteTypeDetected
+    // Pre-referral-case milestone: the extraction row has no source-bound
+    // referring-provider field, so a caller value cannot become authoritative.
+    referring_provider_type = undefined
+    authoritativeCoverageStatus = authority.coverageStatus
+    precomputedGateway = authority.deterministicGateway
+
+    if (authority.ingestionMode === 'long_packet') {
+      const validated = authority.longPacketSafety
+      if (!validated) {
+        return sourceAuthorityHoldResponse({
+          error: 'Long-packet safety provenance could not be verified',
+          reason: 'long_packet_safety_artifacts_invalid',
+          safetyPathway: highestGovernedSafetyPathway({
+            deterministic: authority.deterministicGateway.carePathway,
+          }),
+        })
+      }
+      precomputedGateway = validated.gateway
+      precomputedSafetyResult = validated.safetyResult
+    }
+
+    const verifiedSafetyPathway = highestGovernedSafetyPathway({
+      deterministic: authority.deterministicGateway.carePathway,
+      model: precomputedSafetyResult?.carePathway,
+    })
+    if (unverifiedPatientBindingWasSupplied) {
+      return unverifiedPatientBindingHold({
+        safetyPathway: verifiedSafetyPathway,
+        deterministicGateway: authority.deterministicGateway,
+      })
+    }
+    if (!extracted_summary) {
+      return sourceAuthorityHoldResponse({
+        error:
+          'The persisted extraction summary is missing. Outpatient scoring is blocked pending human review.',
+        reason: 'source_extraction_summary_missing',
+        safetyPathway: verifiedSafetyPathway,
+      })
+    }
+
+    if (authority.ingestionMode === 'long_packet') {
+      try {
+        adjudicationText = buildLongPacketAdjudicationText({
+          extractedSummary: extracted_summary,
+          safetyArtifacts: authority.longPacketSafety!,
+        })
+      } catch {
+        return sourceAuthorityHoldResponse({
+          error: 'Long-packet safety provenance could not be verified',
+          reason: 'long_packet_safety_artifacts_invalid',
+          safetyPathway: verifiedSafetyPathway,
+        })
+      }
+    }
+  } else if (sourceType !== 'paste') {
+    if (rawPositiveGateway) {
+      return sourceAuthorityHoldResponse({
+        error:
+          'Uploaded-document triage requires its tenant-bound raw source extraction.',
+        reason: 'raw_source_binding_required',
+        safetyPathway: rawPositiveGateway.carePathway,
+        deterministicGateway: rawPositiveGateway,
+      })
+    }
+    return NextResponse.json(
+      {
+        error:
+          'Uploaded-document triage requires its tenant-bound raw source extraction.',
+        reason: 'raw_source_binding_required',
+      },
+      { status: 409 },
+    )
+  }
+
+  // Synchronous input validation — return JSON for client errors.
   if (!referral_text || typeof referral_text !== 'string') {
     return NextResponse.json({ error: 'referral_text is required' }, { status: 400 })
   }
   if (referral_text.trim().length < 50) {
+    const shortGateway = positiveShortReferralGateway(referral_text)
+    if (shortGateway) {
+      const shortCoverageStatus: CoverageStatus =
+        authoritativeCoverageStatus ??
+        (extracted_summary || sourceType !== 'paste'
+          ? 'partial'
+          : 'not_applicable')
+      let shortStart: Awaited<ReturnType<typeof startOrReuseTriageSession>>
+      try {
+        shortStart = await startOrReuseTriageSession({
+          tenantId: access.context.tenantId,
+          sourceExtractionId,
+          referralText: referral_text,
+          patientAge: patient_age,
+          patientSex: patient_sex,
+          referringProviderType: referring_provider_type,
+          sourceType,
+          sourceFilename: source_filename,
+          extractedSummary: extracted_summary,
+          extractionConfidence: extraction_confidence,
+          noteTypeDetected: note_type_detected,
+          batchId: batch_id,
+          fusionGroupId: fusion_group_id,
+          modelProfile: TRIAGE_MODEL,
+          coverageStatus: shortCoverageStatus,
+        })
+      } catch {
+        shortStart = { ok: false, reason: 'persistence_failed' }
+      }
+      if (!shortStart.ok || shortStart.processingStatus !== 'pending') {
+        return sourceAuthorityHoldResponse({
+          error:
+            'Time-critical language was detected, but its automated safety workflow could not be created. Escalate manually now.',
+          reason: 'short_referral_safety_workflow_unavailable',
+          safetyPathway: shortGateway.carePathway,
+          deterministicGateway: shortGateway,
+          status: 503,
+        })
+      }
+      let safetyPersisted = false
+      try {
+        safetyPersisted = await persistEmergencyGatewayResult(
+          shortStart.triageSessionId,
+          access.context.tenantId,
+          shortGateway,
+          shortStart.processingAttemptCount,
+        )
+      } catch {
+        console.error('[triage] short-referral safety workflow was not persisted')
+      }
+      const scoringBlockPersisted = await markShortReferralScoringBlocked({
+        triageSessionId: shortStart.triageSessionId,
+        tenantId: access.context.tenantId,
+        processingAttemptCount: shortStart.processingAttemptCount,
+      })
+      const shortWorkflowIsPollSafe =
+        safetyPersisted && scoringBlockPersisted
+      return sourceAuthorityHoldResponse({
+        error: shortWorkflowIsPollSafe
+          ? 'This short referral contains time-critical neurologic language. Complete the mandatory safety action now; outpatient scoring remains blocked.'
+          : safetyPersisted
+            ? 'Time-critical language was recorded, but a terminal scoring block could not be confirmed. Escalate manually now; do not poll or schedule from this response.'
+            : 'Time-critical language was detected, but its automated safety workflow could not be recorded. Escalate manually now.',
+        reason: shortWorkflowIsPollSafe
+          ? 'referral_text_below_minimum_time_critical'
+          : safetyPersisted
+            ? 'short_referral_scoring_block_unavailable'
+            : 'short_referral_safety_workflow_unavailable',
+        safetyPathway: shortGateway.carePathway,
+        deterministicGateway: shortGateway,
+        ...(shortWorkflowIsPollSafe
+          ? { safetySessionId: shortStart.triageSessionId }
+          : {}),
+        status: shortWorkflowIsPollSafe ? 409 : 503,
+      })
+    }
     return NextResponse.json(
       { error: 'Referral text must be at least 50 characters for meaningful triage.' },
-      { status: 400 },
+      { status: 413 },
     )
   }
-  if (referral_text.length > 50000) {
+  if (referral_text.length > FILE_CONSTRAINTS.MAX_PACKET_TEXT_LENGTH) {
     return NextResponse.json(
       {
         error:
-          'Referral text exceeds the maximum length of 50,000 characters. Please shorten the text or use the extraction pipeline for long documents.',
+          'Referral text exceeds the maximum verified packet size.',
       },
-      { status: 400 },
+      { status: 413 },
+    )
+  }
+  if (
+    referral_text.length > FILE_CONSTRAINTS.MAX_TEXT_LENGTH &&
+    (!precomputedGateway || !precomputedSafetyResult)
+  ) {
+    return NextResponse.json(
+      {
+        error:
+          'Long referral text requires a completed tenant-bound long-packet extraction.',
+        reason: 'long_packet_extraction_required',
+      },
+      { status: 409 },
     )
   }
 
   const temperature =
     typeof requestedTemp === 'number' ? Math.max(0, Math.min(1, requestedTemp)) : 0
+  const coverageStatus: CoverageStatus =
+    authoritativeCoverageStatus ??
+    (extracted_summary || sourceType !== 'paste'
+      ? 'partial'
+      : 'not_applicable')
 
-  // Insert pending session row. The id is the polling handle.
-  const { data: inserted, error: insertError } = await from('triage_sessions')
-    .insert({
-      referral_text,
-      patient_age: patient_age ?? null,
-      patient_sex: patient_sex ?? null,
-      referring_provider_type: referring_provider_type ?? null,
-      patient_id: patient_id ?? null,
-      source_type: source_type ?? 'paste',
-      source_filename: source_filename ?? null,
-      extracted_summary: extracted_summary ?? null,
-      extraction_confidence: extraction_confidence ?? null,
-      note_type_detected: note_type_detected ?? null,
-      batch_id: batch_id ?? null,
-      fusion_group_id: fusion_group_id ?? null,
-      ai_model_used: TRIAGE_MODEL,
-      processing_status: 'pending',
+  let started: Awaited<ReturnType<typeof startOrReuseTriageSession>>
+  try {
+    started = await startOrReuseTriageSession({
+      tenantId: access.context.tenantId,
+      sourceExtractionId,
+      referralText: referral_text,
+      patientAge: patient_age,
+      patientSex: patient_sex,
+      referringProviderType: referring_provider_type,
+      sourceType,
+      sourceFilename: source_filename,
+      extractedSummary: extracted_summary,
+      extractionConfidence: extraction_confidence,
+      noteTypeDetected: note_type_detected,
+      batchId: batch_id,
+      fusionGroupId: fusion_group_id,
+      modelProfile: TRIAGE_MODEL,
+      coverageStatus,
     })
-    .select('id')
-    .single()
+  } catch {
+    console.error('[triage] session start rejected')
+    return sourceAuthorityHoldResponse({
+      error:
+        'The authoritative triage workflow could not be started. Maintain the human-review hold.',
+      reason: 'triage_session_start_failed',
+      safetyPathway: highestGovernedSafetyPathway({
+        deterministic: precomputedGateway?.carePathway,
+        model: precomputedSafetyResult?.carePathway,
+      }),
+      status: 503,
+    })
+  }
 
-  if (insertError || !inserted?.id) {
-    console.error('Triage init insert failed:', insertError)
-    return NextResponse.json(
-      { error: 'Could not start triage. Please try again.' },
-      { status: 500 },
+  if (!started.ok) {
+    console.error('Triage init or processing claim failed:', started.reason)
+    const sourceBindingMismatch =
+      started.reason === 'source_session_binding_mismatch'
+    const transactionalBindingFailure =
+      started.reason === 'patient_not_found' ||
+      started.reason === 'consult_not_found' ||
+      started.reason === 'patient_consult_mismatch'
+    return sourceAuthorityHoldResponse({
+      error:
+        started.reason === 'source_extraction_not_found'
+          ? 'Source extraction not found'
+          : sourceBindingMismatch
+            ? 'The source-bound triage session belongs to a different patient or consult.'
+            : transactionalBindingFailure
+              ? 'Patient or consult binding is not available'
+              : 'The authoritative triage workflow could not be started. Maintain the human-review hold.',
+      reason:
+        started.reason === 'source_extraction_not_found'
+          ? 'source_extraction_not_found'
+          : sourceBindingMismatch
+            ? 'source_session_binding_mismatch'
+            : transactionalBindingFailure
+              ? started.reason
+              : 'triage_session_start_failed',
+      safetyPathway: highestGovernedSafetyPathway({
+        deterministic: precomputedGateway?.carePathway,
+        model: precomputedSafetyResult?.carePathway,
+      }),
+      status:
+        started.reason === 'source_extraction_not_found'
+          ? 404
+          : sourceBindingMismatch
+            ? 409
+            : started.reason === 'patient_consult_mismatch'
+              ? 409
+              : transactionalBindingFailure
+                ? 404
+            : 503,
+    })
+  }
+
+  const sessionId = started.triageSessionId
+  const successfulStartSafetyPathway = highestGovernedSafetyPathway({
+    deterministic: precomputedGateway?.carePathway,
+    model: precomputedSafetyResult?.carePathway,
+  })
+
+  if (started.launchProcessing) {
+    // The database lease prevents duplicate model runs for repeated POSTs and
+    // permits a safe retry if a compute invocation dies before completion.
+    runInBackground(() =>
+      processTriageInBackground(sessionId, {
+        referral_text,
+        gatewayText: referral_text,
+        textForScoring:
+          adjudicationText ?? extracted_summary ?? referral_text,
+        patient_age,
+        patient_sex,
+        referring_provider_type,
+        patient_id: started.patientId,
+        temperature,
+        createConsultFlag: false,
+        existingConsultId: started.consultId,
+        coverageStatus,
+        tenantId: access.context.tenantId,
+        precomputedGateway,
+        precomputedSafetyResult,
+        adjudicationText,
+        processingAttemptCount: started.processingAttemptCount,
+      }),
     )
   }
 
-  const sessionId = inserted.id as string
-
-  // Fire-and-forget. Lambda keeps running until this resolves (or hits maxDuration).
-  runInBackground(() =>
-    processTriageInBackground(sessionId, {
-      referral_text,
-      textForScoring: extracted_summary || referral_text,
-      patient_age,
-      patient_sex,
-      referring_provider_type,
-      patient_id,
-      temperature,
-      createConsultFlag,
-      existingConsultId,
-    }),
-  )
-
   return NextResponse.json(
-    { session_id: sessionId, status: 'pending' },
+    {
+      session_id: sessionId,
+      status: started.processingStatus,
+      reused: started.reused,
+      processing_started: started.launchProcessing,
+      ...(successfulStartSafetyPathway
+        ? {
+            safety_pathway: successfulStartSafetyPathway,
+            immediate_review_required: true,
+            immediate_action_required: true,
+            outpatient_scoring_blocked: true,
+            human_review_required: true,
+            scheduling_locked: true,
+            safety_triage_session_id: sessionId,
+          }
+        : {}),
+    },
     { status: 202 },
   )
-}
-
-async function processTriageInBackground(
-  sessionId: string,
-  params: TriageBackgroundParams,
-): Promise<void> {
-  try {
-    const userPrompt = buildTriageUserPrompt(params.textForScoring, {
-      patientAge: params.patient_age,
-      patientSex: params.patient_sex,
-      referringProviderType: params.referring_provider_type,
-    })
-
-    const result = await invokeBedrockJSON({
-      system: TRIAGE_SYSTEM_PROMPT,
-      messages: [{ role: 'user', content: userPrompt }],
-      maxTokens: 3000,
-      temperature: params.temperature,
-      model: TRIAGE_MODEL,
-      cacheSystem: true,
-    })
-
-    const validationError = validateAIResponse(result.parsed as Record<string, unknown>)
-    if (validationError) {
-      console.error('AI response validation failed:', validationError, result.parsed)
-      await markError(
-        sessionId,
-        'The triage system returned an unexpected response format. Please try again.',
-      )
-      return
-    }
-
-    const aiResponse = result.parsed as unknown as AITriageResponse
-    const scoring = calculateTriageTier(aiResponse)
-    const toJSON = (v: unknown) => (v != null ? JSON.stringify(v) : null)
-
-    // Write the AI result + scoring before kicking off downstream pipeline steps,
-    // so the client can poll and read a complete row even if pipeline steps fail.
-    await from('triage_sessions')
-      .update({
-        triage_tier: scoring.tier,
-        confidence: aiResponse.confidence,
-        dimension_scores: toJSON(aiResponse.dimension_scores),
-        weighted_score: scoring.weightedScore,
-        clinical_reasons: toJSON(aiResponse.clinical_reasons),
-        red_flags: toJSON(aiResponse.red_flags),
-        suggested_workup: toJSON(aiResponse.suggested_workup),
-        failed_therapies: toJSON(aiResponse.failed_therapies),
-        missing_information: toJSON(aiResponse.missing_information),
-        subspecialty_recommendation: aiResponse.subspecialty_recommendation,
-        subspecialty_rationale: aiResponse.subspecialty_rationale,
-        ai_raw_response: toJSON(aiResponse),
-        ai_input_tokens: result.inputTokens ?? null,
-        ai_output_tokens: result.outputTokens ?? null,
-        processing_status: 'complete',
-        completed_at: new Date(),
-      })
-      .eq('id', sessionId)
-
-    // ── Consult pipeline integration (non-fatal) ──────────────────
-    let consultId: string | null = null
-    try {
-      const chiefComplaint = deriveChiefComplaint(
-        aiResponse.clinical_reasons || [],
-        params.referral_text,
-        aiResponse.subspecialty_recommendation || '',
-      )
-      const triageSummary = buildTriageSummaryForConsult(
-        scoring.display,
-        aiResponse.clinical_reasons || [],
-        aiResponse.suggested_workup || [],
-        aiResponse.subspecialty_recommendation || '',
-        aiResponse.subspecialty_rationale || '',
-      )
-      const triageConsultData = {
-        triage_session_id: sessionId,
-        triage_urgency: scoring.tier,
-        triage_tier_display: scoring.display,
-        triage_summary: triageSummary,
-        triage_chief_complaint: chiefComplaint,
-        triage_red_flags: aiResponse.red_flags || [],
-        triage_subspecialty: aiResponse.subspecialty_recommendation || '',
-      }
-
-      if (params.existingConsultId) {
-        await linkTriageToConsult(params.existingConsultId, triageConsultData)
-        consultId = params.existingConsultId
-      } else if (params.createConsultFlag) {
-        const consultResult = await createConsult(
-          params.referral_text,
-          triageConsultData,
-          params.patient_id || undefined,
-        )
-        consultId = consultResult.data?.id || null
-      }
-    } catch (consultErr) {
-      console.error('Consult pipeline integration error (non-fatal):', consultErr)
-    }
-
-    // ── Urgent triage notification (non-fatal) ────────────────────
-    try {
-      await notifyTriageUrgent(
-        sessionId,
-        scoring.tier,
-        scoring.display,
-        deriveChiefComplaint(
-          aiResponse.clinical_reasons || [],
-          params.referral_text,
-          aiResponse.subspecialty_recommendation || '',
-        ),
-        params.patient_id || null,
-      )
-    } catch (notifErr) {
-      console.error('Triage notification error (non-fatal):', notifErr)
-    }
-
-    // ── Auto-schedule appointment (non-fatal) ─────────────────────
-    let scheduledAppointmentId: string | null = null
-    if (params.patient_id) {
-      try {
-        const appt = await autoScheduleFromTriage(
-          sessionId,
-          scoring.tier,
-          params.patient_id,
-          aiResponse.clinical_reasons || [],
-          aiResponse.subspecialty_recommendation || '',
-        )
-        scheduledAppointmentId = appt?.id || null
-      } catch (schedErr) {
-        console.error('Triage auto-schedule error (non-fatal):', schedErr)
-      }
-    }
-
-    // Persist the derived ids so the polling GET can return them.
-    if (consultId || scheduledAppointmentId) {
-      try {
-        await from('triage_sessions')
-          .update({
-            consult_id: consultId,
-            scheduled_appointment_id: scheduledAppointmentId,
-          })
-          .eq('id', sessionId)
-      } catch (e) {
-        console.error('Failed to persist consult_id/scheduled_appointment_id:', e)
-      }
-    }
-  } catch (error: unknown) {
-    console.error('Background triage failed:', error)
-    let message = 'An error occurred while processing your request'
-    if (error instanceof Error) {
-      const raw = error.message
-      if (
-        raw.includes('credential') ||
-        raw.includes('Could not load') ||
-        raw.includes('AWS') ||
-        raw.includes('Bedrock')
-      ) {
-        message =
-          'The triage service is temporarily unavailable. Please try again shortly or triage this patient manually.'
-      } else {
-        message = raw
-      }
-    }
-    await markError(sessionId, message)
-  }
-}
-
-async function markError(sessionId: string, message: string): Promise<void> {
-  try {
-    await from('triage_sessions')
-      .update({
-        processing_status: 'error',
-        error_message: message,
-        completed_at: new Date(),
-      })
-      .eq('id', sessionId)
-  } catch (e) {
-    console.error('Failed to mark triage_sessions row as error:', e)
-  }
 }

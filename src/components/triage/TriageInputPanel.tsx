@@ -1,24 +1,116 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import {
+  forwardRef,
+  useCallback,
+  useEffect,
+  useImperativeHandle,
+  useRef,
+  useState,
+} from 'react'
 import SampleNoteLoader from './SampleNoteLoader'
-import DemoScenarioLoader from './DemoScenarioLoader'
+import DemoScenarioLoader, {
+  type DemoScenarioLoaderHandle,
+} from './DemoScenarioLoader'
 import FileUploadZone from './FileUploadZone'
 import { FILE_CONSTRAINTS } from '@/lib/triage/types'
+import {
+  assessReferralTextInput,
+  MIN_REFERRAL_TEXT_LENGTH,
+} from '@/lib/triage/triageInputPolicy'
+import {
+  commitReferralIdentityChange,
+  sameReferralFileSelection,
+  shouldRotateReferralInputMode,
+} from '@/lib/triage/referralFileSelection'
+
+export interface ReferralSubmissionMetadata {
+  patient_age?: number | string
+  patient_sex?: string
+}
+
+export interface TriageInputPanelHandle {
+  clearVisibleReferralInput: () => void
+}
+
+type ReferralMetadataValidation =
+  | { ok: true; metadata: ReferralSubmissionMetadata }
+  | {
+      ok: false
+      reason: 'invalid_patient_age' | 'invalid_patient_sex'
+      message: string
+      metadata: ReferralSubmissionMetadata
+    }
+
+const PATIENT_SEX_VALUES = new Set(['Male', 'Female', 'Other'])
+
+export function validatedReferralMetadata(
+  age: string,
+  sex: string,
+): ReferralMetadataValidation {
+  const normalizedAge = age.trim()
+  const rawMetadata: ReferralSubmissionMetadata = {
+    ...(normalizedAge ? { patient_age: normalizedAge } : {}),
+    ...(sex ? { patient_sex: sex } : {}),
+  }
+  if (normalizedAge && !/^[0-9]+$/.test(normalizedAge)) {
+    return {
+      ok: false,
+      reason: 'invalid_patient_age',
+      message: 'Age must be a whole number from 0 through 130.',
+      metadata: rawMetadata,
+    }
+  }
+  const patientAge = normalizedAge ? Number(normalizedAge) : undefined
+  if (
+    patientAge !== undefined &&
+    (!Number.isSafeInteger(patientAge) || patientAge < 0 || patientAge > 130)
+  ) {
+    return {
+      ok: false,
+      reason: 'invalid_patient_age',
+      message: 'Age must be a whole number from 0 through 130.',
+      metadata: rawMetadata,
+    }
+  }
+  if (sex && !PATIENT_SEX_VALUES.has(sex)) {
+    return {
+      ok: false,
+      reason: 'invalid_patient_sex',
+      message: 'Sex must be Male, Female, or Other.',
+      metadata: {
+        ...(patientAge !== undefined ? { patient_age: patientAge } : {}),
+        patient_sex: sex,
+      },
+    }
+  }
+  return {
+    ok: true,
+    metadata: {
+      ...(patientAge !== undefined ? { patient_age: patientAge } : {}),
+      ...(sex
+        ? { patient_sex: sex }
+        : {}),
+    },
+  }
+}
 
 interface Props {
-  onSubmit: (referralText: string, metadata: {
-    patient_age?: number
-    patient_sex?: string
-    referring_provider_type?: string
-  }) => void
+  onSubmit: (
+    referralText: string,
+    metadata: ReferralSubmissionMetadata,
+  ) => void
   loading: boolean
   // Phase 2 additions
-  onSubmitFiles?: (files: File[]) => void
+  onSubmitFiles?: (
+    files: File[],
+    metadata: ReferralSubmissionMetadata,
+  ) => void
   inputMode?: 'paste' | 'upload'
   onInputModeChange?: (mode: 'paste' | 'upload') => void
   loadingMessage?: string
   onCancel?: () => void
+  onReferralLifecycle: (event: 'clear' | 'source_replacement') => void
 }
 
 const LOADING_MESSAGES = [
@@ -35,24 +127,30 @@ const EXTRACTING_MESSAGES = [
   'Building clinical summary...',
 ]
 
-export default function TriageInputPanel({
-  onSubmit,
-  loading,
-  onSubmitFiles,
-  inputMode: controlledInputMode,
-  onInputModeChange,
-  loadingMessage,
-  onCancel,
-}: Props) {
+const TriageInputPanel = forwardRef<TriageInputPanelHandle, Props>(
+  function TriageInputPanel(
+    {
+      onSubmit,
+      loading,
+      onSubmitFiles,
+      inputMode: controlledInputMode,
+      onInputModeChange,
+      loadingMessage,
+      onCancel,
+      onReferralLifecycle,
+    },
+    ref,
+  ) {
   const [text, setText] = useState('')
   const [showMetadata, setShowMetadata] = useState(false)
   const [age, setAge] = useState('')
   const [sex, setSex] = useState('')
-  const [providerType, setProviderType] = useState('')
+  const [metadataError, setMetadataError] = useState('')
   const [loadingMsgIndex, setLoadingMsgIndex] = useState(0)
   const [internalMode, setInternalMode] = useState<'paste' | 'upload'>('paste')
   const [uploadedFiles, setUploadedFiles] = useState<File[]>([])
   const [demoFiles, setDemoFiles] = useState<File[] | undefined>(undefined)
+  const demoLoaderRef = useRef<DemoScenarioLoaderHandle>(null)
 
   // Use controlled mode if provided, otherwise internal state
   const activeMode = controlledInputMode ?? internalMode
@@ -80,52 +178,157 @@ export default function TriageInputPanel({
     return () => clearInterval(interval)
   }, [loading, messages.length])
 
-  // Determine if this is a long note or file upload for button text
-  const isLongNote = text.length >= FILE_CONSTRAINTS.SHORT_NOTE_THRESHOLD
-  const hasFiles = uploadedFiles.length > 0
-  const needsExtraction = isLongNote || hasFiles
+  // Preserve the complete paste. The server chooses single-pass versus durable
+  // long-packet processing; the client must never drop a potentially critical
+  // tail at that boundary.
+  const textInput = assessReferralTextInput(text)
+  const isLongNote = textInput.requiresExtraction
+  const hasFiles = uploadedFiles.length === 1
+  const needsExtraction =
+    (activeMode === 'paste' && textInput.canSubmit) ||
+    (activeMode === 'upload' && hasFiles)
+
+  function beginReferralLifecycle(
+    event: 'clear' | 'source_replacement',
+  ) {
+    demoLoaderRef.current?.invalidatePendingLoad()
+    onReferralLifecycle(event)
+  }
+
+  function commitVisibleIdentityChange<T>(
+    current: T,
+    next: T,
+    commit: (value: T) => void,
+    equals?: (current: T, next: T) => boolean,
+  ) {
+    return commitReferralIdentityChange(
+      current,
+      next,
+      {
+        beginReplacement: () =>
+          beginReferralLifecycle('source_replacement'),
+        commit,
+      },
+      equals,
+    )
+  }
+
+  function handleInputModeChange(mode: 'paste' | 'upload') {
+    if (activeMode === mode) return
+    if (
+      shouldRotateReferralInputMode({
+        currentMode: activeMode,
+        nextMode: mode,
+        pastePopulated: text.length > 0,
+        uploadPopulated: uploadedFiles.length > 0,
+      })
+    ) {
+      beginReferralLifecycle('source_replacement')
+    } else {
+      demoLoaderRef.current?.invalidatePendingLoad()
+    }
+    setActiveMode(mode)
+  }
 
   function handleSubmit() {
+    if (loading) return
+    const validation = validatedReferralMetadata(age, sex)
+    if (!validation.ok) {
+      setMetadataError(validation.message)
+    } else {
+      setMetadataError('')
+    }
     if (activeMode === 'upload' && hasFiles && onSubmitFiles) {
-      onSubmitFiles(uploadedFiles)
+      onSubmitFiles(uploadedFiles, validation.metadata)
       return
     }
-    if (text.length < 50 || loading) return
-    const metadata: Record<string, string | number> = {}
-    if (age) metadata.patient_age = parseInt(age, 10)
-    if (sex) metadata.patient_sex = sex
-    if (providerType) metadata.referring_provider_type = providerType
-    onSubmit(text, metadata)
+    if (!(textInput.canSubmit || textInput.canRunSafetyScreen)) return
+    onSubmit(textInput.submissionText, validation.metadata)
+  }
+
+  function handleBeginDemoLoad() {
+    // The loader has already claimed and invalidated its own generation. Calling
+    // beginReferralLifecycle here would abort that new load through the ref.
+    onReferralLifecycle('source_replacement')
   }
 
   function handleLoadDemoFiles(files: File[]) {
-    setUploadedFiles(files)
-    // Create a new array reference each time so useEffect in FileUploadZone re-triggers
-    // even if the same demo is loaded twice
     setDemoFiles([...files])
     setActiveMode('upload')
   }
 
-  function handleReset() {
+  function handleTextChange(nextText: string) {
+    commitVisibleIdentityChange(text, nextText, setText)
+  }
+
+  function handleFilesChange(files: File[]) {
+    commitVisibleIdentityChange(
+      uploadedFiles,
+      files,
+      setUploadedFiles,
+      sameReferralFileSelection,
+    )
+  }
+
+  function handleDemoFilesChange(files: File[]) {
+    // The demo click already opened the new-referral boundary synchronously.
+    setUploadedFiles(files)
+  }
+
+  function handleSampleNoteSelection(noteText: string) {
+    commitVisibleIdentityChange(text, noteText, setText)
+  }
+
+  function handleAgeChange(nextAge: string) {
+    setMetadataError('')
+    commitVisibleIdentityChange(age, nextAge, setAge)
+  }
+
+  function handleSexChange(nextSex: string) {
+    setMetadataError('')
+    commitVisibleIdentityChange(sex, nextSex, setSex)
+  }
+
+  const handleExternalFilesConsumed = useCallback(() => {
+    setDemoFiles(undefined)
+  }, [])
+
+  const clearVisibleReferralInput = useCallback(() => {
+    demoLoaderRef.current?.invalidatePendingLoad()
     setText('')
     setAge('')
     setSex('')
-    setProviderType('')
+    setMetadataError('')
     setUploadedFiles([])
     setDemoFiles(undefined)
+  }, [])
+
+  useImperativeHandle(
+    ref,
+    () => ({
+      clearVisibleReferralInput,
+    }),
+    [clearVisibleReferralInput],
+  )
+
+  function handleReset() {
+    beginReferralLifecycle('clear')
+    clearVisibleReferralInput()
   }
 
-  const charCount = text.length
-  const canSubmitPaste = charCount >= 50 && !loading
+  const charCount = textInput.characterCount
+  const canSubmitPaste =
+    (textInput.canSubmit || textInput.canRunSafetyScreen) && !loading
   const canSubmitUpload = hasFiles && !loading
   const canSubmit = activeMode === 'paste' ? canSubmitPaste : canSubmitUpload
 
   // Button label
-  let buttonLabel = 'Triage This Patient'
-  if (activeMode === 'upload' && hasFiles) {
-    buttonLabel = 'Extract & Triage'
-  } else if (activeMode === 'paste' && isLongNote) {
-    buttonLabel = 'Extract & Triage'
+  let buttonLabel = 'Extract & Triage'
+  if (
+    activeMode === 'paste' &&
+    textInput.canRunSafetyScreen
+  ) {
+    buttonLabel = 'Run Safety Check'
   }
 
   return (
@@ -147,13 +350,17 @@ export default function TriageInputPanel({
         <h2 style={{ color: '#e2e8f0', fontSize: '1rem', fontWeight: 600, margin: 0 }}>
           {activeMode === 'paste'
             ? 'Paste Referral Note or Intake Summary'
-            : 'Upload Clinical Documents'}
+            : 'Upload Referral File'}
         </h2>
         <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
           {activeMode === 'paste' && (
-            <SampleNoteLoader onSelect={(noteText) => setText(noteText)} />
+            <SampleNoteLoader onSelect={handleSampleNoteSelection} />
           )}
-          <DemoScenarioLoader onLoadFiles={handleLoadDemoFiles} />
+          <DemoScenarioLoader
+            ref={demoLoaderRef}
+            onBeginLoad={handleBeginDemoLoad}
+            onLoadFiles={handleLoadDemoFiles}
+          />
         </div>
       </div>
 
@@ -168,7 +375,7 @@ export default function TriageInputPanel({
         width: 'fit-content',
       }}>
         <button
-          onClick={() => setActiveMode('paste')}
+          onClick={() => handleInputModeChange('paste')}
           disabled={loading}
           style={{
             padding: '8px 20px',
@@ -192,7 +399,7 @@ export default function TriageInputPanel({
           Paste Text
         </button>
         <button
-          onClick={() => setActiveMode('upload')}
+          onClick={() => handleInputModeChange('upload')}
           disabled={loading}
           style={{
             padding: '8px 20px',
@@ -214,7 +421,7 @@ export default function TriageInputPanel({
             <polyline points="17 8 12 3 7 8" />
             <line x1="12" y1="3" x2="12" y2="15" />
           </svg>
-          Upload File(s)
+          Upload Referral File
           {hasFiles && activeMode !== 'upload' && (
             <span style={{
               backgroundColor: '#EA580C',
@@ -237,7 +444,7 @@ export default function TriageInputPanel({
         <>
           <textarea
             value={text}
-            onChange={(e) => setText(e.target.value.slice(0, FILE_CONSTRAINTS.MAX_TEXT_LENGTH))}
+            onChange={(e) => handleTextChange(e.target.value)}
             placeholder="Paste referral note, intake summary, or describe the clinical scenario..."
             rows={8}
             disabled={loading}
@@ -266,11 +473,16 @@ export default function TriageInputPanel({
             marginTop: '8px',
           }}>
             <span style={{
-              color: charCount < 50 ? '#94a3b8' : '#16A34A',
+              color: textInput.exceedsVerifiedPacketLimit
+                ? '#F87171'
+                : textInput.belowMinimum
+                  ? '#94a3b8'
+                  : '#16A34A',
               fontSize: '0.75rem',
             }}>
-              {charCount.toLocaleString()}/{FILE_CONSTRAINTS.MAX_TEXT_LENGTH.toLocaleString()} characters
-              {charCount > 0 && charCount < 50 && ` (minimum 50 required)`}
+              {charCount.toLocaleString()}/{FILE_CONSTRAINTS.MAX_PACKET_TEXT_LENGTH.toLocaleString()} characters
+              {charCount > 0 && textInput.belowMinimum &&
+                ` (minimum ${MIN_REFERRAL_TEXT_LENGTH} required)`}
             </span>
             {isLongNote && (
               <span style={{
@@ -289,19 +501,60 @@ export default function TriageInputPanel({
               </span>
             )}
           </div>
+          {textInput.canRunSafetyScreen && (
+            <div
+              role="alert"
+              style={{
+                marginTop: '8px',
+                padding: '10px 12px',
+                borderRadius: '6px',
+                border: '1px solid #D97706',
+                background: 'rgba(217, 119, 6, 0.12)',
+                color: '#FDE68A',
+                fontSize: '0.78rem',
+                lineHeight: 1.5,
+              }}
+            >
+              This note is too short for outpatient scoring. Run the server
+              safety check so explicit emergency or same-day language is not
+              missed; a negative check will still require more information.
+            </div>
+          )}
+          {textInput.exceedsVerifiedPacketLimit && (
+            <div
+              role="alert"
+              style={{
+                marginTop: '8px',
+                padding: '10px 12px',
+                borderRadius: '6px',
+                border: '1px solid #DC2626',
+                background: 'rgba(220, 38, 38, 0.12)',
+                color: '#FECACA',
+                fontSize: '0.78rem',
+                lineHeight: 1.5,
+              }}
+            >
+              This referral exceeds the verified packet limit. Nothing was
+              truncated; keep it on manual review and use the controlled
+              large-packet ingestion workflow.
+            </div>
+          )}
         </>
       )}
 
-      {/* Upload File(s) mode */}
+      {/* Upload referral file mode */}
       {activeMode === 'upload' && (
         <FileUploadZone
-          onFilesChange={setUploadedFiles}
+          files={uploadedFiles}
+          onFilesChange={handleFilesChange}
+          onExternalFilesChange={handleDemoFilesChange}
+          onExternalFilesConsumed={handleExternalFilesConsumed}
           disabled={loading}
           externalFiles={demoFiles}
         />
       )}
 
-      {/* Files selected indicator (visible in both modes) */}
+      {/* Referral file indicator (visible in both modes) */}
       {hasFiles && activeMode === 'paste' && (
         <div style={{
           marginTop: '8px',
@@ -319,7 +572,7 @@ export default function TriageInputPanel({
             <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
             <polyline points="14 2 14 8 20 8" />
           </svg>
-          {uploadedFiles.length} file{uploadedFiles.length !== 1 ? 's' : ''} also queued in Upload tab
+          Referral file queued in Upload tab
         </div>
       )}
 
@@ -360,8 +613,11 @@ export default function TriageInputPanel({
             <label style={{ color: '#94a3b8', fontSize: '0.75rem', display: 'block', marginBottom: '4px' }}>Age</label>
             <input
               type="number"
+              min={0}
+              max={130}
+              step={1}
               value={age}
-              onChange={(e) => setAge(e.target.value)}
+              onChange={(e) => handleAgeChange(e.target.value)}
               placeholder="e.g., 65"
               style={{
                 width: '100%',
@@ -379,7 +635,7 @@ export default function TriageInputPanel({
             <label style={{ color: '#94a3b8', fontSize: '0.75rem', display: 'block', marginBottom: '4px' }}>Sex</label>
             <select
               value={sex}
-              onChange={(e) => setSex(e.target.value)}
+              onChange={(e) => handleSexChange(e.target.value)}
               style={{
                 width: '100%',
                 padding: '8px 12px',
@@ -396,29 +652,15 @@ export default function TriageInputPanel({
               <option value="Other">Other</option>
             </select>
           </div>
-          <div style={{ flex: '1 1 160px' }}>
-            <label style={{ color: '#94a3b8', fontSize: '0.75rem', display: 'block', marginBottom: '4px' }}>Referring Provider</label>
-            <select
-              value={providerType}
-              onChange={(e) => setProviderType(e.target.value)}
-              style={{
-                width: '100%',
-                padding: '8px 12px',
-                borderRadius: '6px',
-                background: '#1e293b',
-                color: '#e2e8f0',
-                border: '1px solid #475569',
-                fontSize: '0.85rem',
-              }}
-            >
-              <option value="">Not specified</option>
-              <option value="PCP">PCP</option>
-              <option value="ED">Emergency Department</option>
-              <option value="Specialist">Specialist</option>
-              <option value="Hospitalist">Hospitalist</option>
-              <option value="Self-referral">Self-referral</option>
-            </select>
-          </div>
+          <p style={{ flex: '1 1 100%', color: '#94a3b8', fontSize: '0.72rem', margin: 0 }}>
+            Referring-provider type is unavailable until a reviewed provenance schema can persist and verify its source.
+          </p>
+        </div>
+      )}
+
+      {metadataError && (
+        <div role="alert" style={{ marginTop: '12px', color: '#FCA5A5', fontSize: '0.78rem' }}>
+          {metadataError}
         </div>
       )}
 
@@ -508,4 +750,7 @@ export default function TriageInputPanel({
       )}
     </div>
   )
-}
+  },
+)
+
+export default TriageInputPanel

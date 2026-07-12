@@ -71,7 +71,8 @@ export async function POST(request: Request) {
           const consultContext = buildHistorianContextFromConsult(consult)
           referralReason = consultContext.referralReason
           patientContext = consultContext.patientContext
-          await markHistorianStarted(consultId)
+          // Pre-tenancy caller: migration 048 backfills tenant_id 'default'
+          await markHistorianStarted(consultId, 'default')
         }
       } catch (pipelineErr) {
         console.error('[historian/session] consult context build error (non-fatal):', pipelineErr)
