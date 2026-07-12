@@ -30,6 +30,7 @@ export type ConsultStatus =
  */
 export interface NeurologyConsult {
   id: string
+  tenant_id: string
   patient_id: string | null
 
   status: ConsultStatus
@@ -43,6 +44,11 @@ export interface NeurologyConsult {
   triage_red_flags: string[] | null     // Red flag array from triage
   triage_subspecialty: string | null    // Recommended subspecialty
   triage_completed_at: string | null
+  historian_authorization?: {
+    allowed: boolean
+    reason?: string
+    approved_question_count: number
+  }
 
   // ── Intake / Follow-up phase ──────────────────────────────────────
   intake_session_id: string | null
@@ -97,7 +103,7 @@ export interface TriageConsultUpdate {
 
 /**
  * Intake context derived from a consult's triage data.
- * Returned by POST /api/consults/[id]/initiate-intake so the UI can
+ * Returned by POST /api/neuro-consults/[id]/initiate-intake so the UI can
  * pre-populate the intake agent with triage findings.
  */
 export interface ConsultIntakeContext {

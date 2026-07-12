@@ -24,3 +24,13 @@ src/app/api/ai/historian/localizer/route.ts
 src/app/api/ai/historian/evidence-query/route.ts
 src/components/consult/EmbeddedHistorian
 docs/superpowers/specs/
+# triage safety architecture (long identifiers + sha256 digests, not secrets)
+src/lib/triage/
+src/app/triage/
+src/app/api/triage/
+src/components/triage/
+src/workers/
+tests/triage/
+infrastructure/triage-ingestion/
+infrastructure/triage-worker/
+qa/triage-sentinel/

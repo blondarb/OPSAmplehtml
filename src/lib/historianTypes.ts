@@ -2,7 +2,16 @@
  * TypeScript types for the AI Neurologic Historian feature.
  */
 
-export type HistorianSessionType = 'new_patient' | 'follow_up'
+export type HistorianSessionType =
+  | 'new_patient'
+  | 'follow_up'
+  | 'referral_clarification'
+
+export interface ReferralClarificationQuestion {
+  id: string
+  code: string
+  text: string
+}
 export type HistorianSessionStatus = 'in_progress' | 'completed' | 'abandoned'
 
 export interface HistorianTranscriptEntry {
@@ -18,6 +27,10 @@ export interface HistorianRedFlag {
 }
 
 export interface HistorianStructuredOutput {
+  clarification_answers?: Array<{
+    question_id: string
+    answer: string
+  }>
   chief_complaint?: string
   hpi?: string
   onset?: string
@@ -171,9 +184,9 @@ export function getTurnDetectionConfig(mode: string | undefined): TurnDetectionC
       silence_duration_ms: 1200,
     }
   }
-  // Default: semantic_vad with high eagerness — fastest response, minimal
+  // Default: semantic_vad with low eagerness — patient-paced turn taking,
   // post-speech delay. Was 'medium'; bumped after medium still felt slow in testing.
-  return { type: 'semantic_vad', eagerness: 'high' }
+  return { type: 'semantic_vad', eagerness: 'low' }
 }
 
 // ─── Input noise reduction (env-driven) ─────────────────────────────────────

@@ -2,7 +2,11 @@
 // Stage 1: Extract neurology-relevant information from any clinical note type
 // Fusion: Combine multiple extractions for the same patient
 
+import { CLINICAL_SOURCE_TRUST_BOUNDARY } from './promptSafety'
+
 export const EXTRACTION_SYSTEM_PROMPT = `You are a neurology clinical data extraction system. Your task is to read a clinical document — which may be an ED note, PCP progress note, discharge summary, specialist consult, imaging report, or referral letter — and extract ONLY the neurology-relevant information into a structured summary suitable for triage scoring.
+
+${CLINICAL_SOURCE_TRUST_BOUNDARY}
 
 ## YOUR TASK
 
@@ -83,6 +87,8 @@ Return ONLY valid JSON (no markdown, no backticks):
 
 export const FUSION_SYSTEM_PROMPT = `You are a neurology clinical data fusion system. You receive multiple clinical extractions from different notes about the SAME patient and must combine them into a single comprehensive extraction. The fused result will be used for triage scoring.
 
+${CLINICAL_SOURCE_TRUST_BOUNDARY}
+
 ## YOUR TASK
 
 Read all provided clinical extractions and produce:
@@ -144,7 +150,7 @@ export function buildExtractionUserPrompt(
     sourceFilename?: string
   }
 ): string {
-  const age = metadata?.patientAge ? String(metadata.patientAge) : 'not provided'
+  const age = metadata?.patientAge != null ? String(metadata.patientAge) : 'not provided'
   const sex = metadata?.patientSex || 'not provided'
   const source = metadata?.sourceFilename ? `Source file: ${metadata.sourceFilename}` : 'Source: pasted text'
 
@@ -174,7 +180,7 @@ export function buildFusionUserPrompt(
     patientSex?: string
   }
 ): string {
-  const age = metadata?.patientAge ? String(metadata.patientAge) : 'not provided'
+  const age = metadata?.patientAge != null ? String(metadata.patientAge) : 'not provided'
   const sex = metadata?.patientSex || 'not provided'
 
   const extractionBlocks = extractions.map((ext, i) => {
