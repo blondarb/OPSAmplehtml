@@ -15,7 +15,9 @@ import { PATCH } from '../route'
 
 function callPatch(patientId = 'patient-1') {
   void patientId
-  return PATCH()
+  return PATCH(new Request('http://localhost/api/triage/session-1/patient', { method: 'PATCH' }), {
+    params: Promise.resolve({ id: 'session-1' }),
+  })
 }
 
 describe('triage patient-link route safety', () => {
