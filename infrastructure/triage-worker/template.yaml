@@ -20,10 +20,6 @@ Parameters:
     Type: String
     MinLength: 1
     Description: Explicit database name; never rely on the shared secret default.
-  PrivateSubnetIds:
-    Type: List<AWS::EC2::Subnet::Id>
-  LambdaSecurityGroupIds:
-    Type: List<AWS::EC2::SecurityGroup::Id>
   WorkerMaximumConcurrency:
     Type: Number
     Default: 6
@@ -41,9 +37,13 @@ Globals:
     Architectures: [arm64]
     MemorySize: 1024
     Tracing: Active
-    VpcConfig:
-      SubnetIds: !Ref PrivateSubnetIds
-      SecurityGroupIds: !Ref LambdaSecurityGroupIds
+    # Sandbox networking decision (2026-07-12): functions run OUTSIDE the VPC.
+    # sevaro-postgres is publicly accessible and its VPC has no NAT gateways or
+    # VPC endpoints, so in-VPC functions would have no route to SQS/Secrets
+    # Manager/Bedrock/CloudWatch. AWS-managed egress over TLS to the public RDS
+    # endpoint adds no exposure beyond current state. For staging/production:
+    # restore VpcConfig with private subnets + endpoints per the README
+    # preconditions, and close the RDS security group (currently 0.0.0.0/0).
     Environment:
       Variables:
         NODE_OPTIONS: --enable-source-maps
