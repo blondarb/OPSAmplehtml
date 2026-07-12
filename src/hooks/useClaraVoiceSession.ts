@@ -215,6 +215,20 @@ export function useClaraVoiceSession() {
       }
       case 'assistantTranscript': {
         const aText = e.text
+        // ROOT CAUSE (verified live 2026-07-11 via relay frame-probe): Nova
+        // Sonic emits every assistant turn's text twice — SPECULATIVE as the
+        // audio starts, then a byte-identical FINAL when the turn ends. The
+        // relay now stage-filters these (novaSonicSession.ts shouldForwardText),
+        // but until the ECS relay redeploys — and as a permanent backstop —
+        // drop any assistant text matching the MOST RECENT assistant turn,
+        // with no time window: the FINAL copy lands after the audio finishes,
+        // which on longer replies is well past the 8s windowed check below
+        // (exactly why the windowed dedup alone still duplicated live).
+        const lastAssistant = [...turnsRef.current].reverse().find((t) => t.role === 'assistant')
+        if (lastAssistant && normalizeTurnText(lastAssistant.text) === normalizeTurnText(aText)) {
+          setCurrentAssistantText('')
+          break
+        }
         if (isDuplicateTurn(turnsRef.current, 'assistant', aText)) {
           setCurrentAssistantText('')
           break

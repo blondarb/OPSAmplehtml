@@ -484,7 +484,16 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
       case 'assistantTranscript': {
         // AI finished speaking this response (was response.audio_transcript.done)
         const fullText = e.text || ''
-        if (fullText.trim()) {
+        // Nova Sonic emits every assistant turn's text twice — SPECULATIVE as
+        // the audio starts, then a byte-identical FINAL at end of turn
+        // (verified live 2026-07-11, relay frame-probe). The relay now
+        // stage-filters these, but until it redeploys — and as a permanent
+        // backstop — skip an exact repeat of the most recent assistant entry.
+        // Without this the historian double-appended every Nova reply AND
+        // double-counted questionCountRef, burning the turn budget at 2x.
+        const lastAssistant = [...transcriptRef.current].reverse().find(t => t.role === 'assistant')
+        const isRelayDuplicate = !!fullText.trim() && lastAssistant?.text === fullText.trim()
+        if (fullText.trim() && !isRelayDuplicate) {
           const entry: HistorianTranscriptEntry = {
             role: 'assistant',
             text: fullText.trim(),
