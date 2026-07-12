@@ -29,6 +29,10 @@ export class NovaSonicWsProvider implements VoiceProvider {
   private closing = false
   /** True while the AI is producing audio — lets `completion` end the turn cleanly. */
   private aiSpeaking = false
+  /** Last diagnostics snapshot captured from `player` before it was closed in
+   *  stop() — so getAudioDiagnostics() still has something to return after
+   *  teardown (e.g. when the hook reads it right after stop() completes). */
+  private stashedDiagnostics: Record<string, unknown> | null = null
 
   on(cb: (e: VoiceEvent) => void): void {
     this.cb = cb
@@ -200,6 +204,9 @@ export class NovaSonicWsProvider implements VoiceProvider {
       case 'error':
         this.emit({ type: 'error', message: msg.message })
         break
+      case 'medicalTranscript':
+        this.emit({ type: 'medicalTranscript', text: msg.text, isPartial: msg.isPartial })
+        break
     }
   }
 
@@ -217,6 +224,12 @@ export class NovaSonicWsProvider implements VoiceProvider {
     player.whenDrained().then(() => {
       this.emit({ type: 'aiSpeechStop' })
     })
+  }
+
+  /** See VoiceProvider.getAudioDiagnostics — iOS crackle instrumentation. */
+  async getAudioDiagnostics(): Promise<Record<string, unknown> | null> {
+    if (this.player) return this.player.getDiagnostics()
+    return this.stashedDiagnostics
   }
 
   sendToolResult(toolUseId: string, output: unknown): void {
@@ -237,6 +250,18 @@ export class NovaSonicWsProvider implements VoiceProvider {
     // text-only response concept (opts ignored).
   }
 
+  nudgeClosing(): void {
+    // Nova is speech-to-speech and stays SILENT after the save_interview_output
+    // tool result unless prompted — the same reason it needed sendGreetingKickoff
+    // to open. Inject a USER-role text turn (via the existing systemText relay
+    // frame) telling it to deliver its one closing message now. The closing
+    // audio then streams as PCM and is drained by whenDrained() before
+    // aiSpeechStop fires (#150), so it plays in full before teardown.
+    this.injectSystemText(
+      '[The interview is now complete and your notes have been saved. Please now speak your single warm closing message to the patient, then stop. Do not ask any further questions and do not wait for the patient to reply.]',
+    )
+  }
+
   async stop(): Promise<void> {
     if (this.closing) return // idempotent
     this.closing = true
@@ -255,6 +280,11 @@ export class NovaSonicWsProvider implements VoiceProvider {
     }
 
     if (this.player) {
+      // Stash a final diagnostics snapshot before close() tears the worklet
+      // node down — getAudioDiagnostics() would otherwise have nothing to
+      // return once `player` is gone. Best-effort: never let this block or
+      // fail teardown.
+      this.stashedDiagnostics = await this.player.getDiagnostics().catch(() => null)
       try {
         await this.player.close()
       } catch {

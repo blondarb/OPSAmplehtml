@@ -8,6 +8,8 @@ src/components/neuroscribe/
 src/components/triage/
 @/components/triage/
 src/lib/triage/
+@/components/clara/
+src/components/clara/
 # Documentation URLs and references
 docs.aws.amazon.com
 docs/plans/

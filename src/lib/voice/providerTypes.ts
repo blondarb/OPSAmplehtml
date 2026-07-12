@@ -39,6 +39,10 @@ export type VoiceEvent =
   | { type: 'aiSpeechStop' }
   | { type: 'toolCall'; toolName: string; toolUseId: string; input: unknown }
   | { type: 'error'; message: string }
+  // Parallel AWS Transcribe Medical accuracy check (flag-gated on the relay,
+  // Nova-only — see services/nova-sonic-relay/src/transcribeMedicalSession.ts).
+  // v1: capture + emit + log only, no effect on the conversation itself.
+  | { type: 'medicalTranscript'; text: string; isPartial: boolean }
   // Transport dropped unexpectedly (WebRTC connection failed/closed, data
   // channel closed, WS closed non-cleanly) — distinct from `error`, which is
   // an in-session protocol-level error the session can survive. `disconnected`
@@ -126,6 +130,20 @@ export interface VoiceProvider {
    */
   requestResponse(opts?: { textOnly?: boolean }): void
   /**
+   * Prompt the model to speak its single closing message after
+   * save_interview_output has been acked. Providers differ on whether this is
+   * needed at all:
+   *   OpenAI → no-op. `sendToolResult` already issues a follow-up
+   *            response.create, so Henry speaks his closing on its own; a
+   *            second trigger here would double-speak.
+   *   Nova   → inject a closing nudge. Nova is speech-to-speech and, exactly
+   *            like the session-open greeting, stays SILENT after the tool
+   *            result unless explicitly prompted — which is why the closing
+   *            statement was missing entirely (not just clipped). Mirrors
+   *            `sendGreetingKickoff` on the relay side.
+   */
+  nudgeClosing(): void
+  /**
    * OpenAI-only escape hatch: overwrite the live session's full instructions
    * (session.update) rather than append an advisory item to the timeline.
    * Used by the Localizer push channel to re-serialize BASE_PROMPT + the
@@ -134,4 +152,11 @@ export interface VoiceProvider {
    * provider leaves this undefined; callers fall back to `injectSystemText`.
    */
   updateInstructions?(fullText: string): void
+  /**
+   * Optional playback diagnostics snapshot (worklet underrun/prime/queue
+   * counters — see PcmPlayer.getDiagnostics), for the iOS "crackle"
+   * investigation. Instrumentation only; providers without an audio player
+   * (or that don't wire this up) simply omit the method. Never throws.
+   */
+  getAudioDiagnostics?(): Promise<Record<string, unknown> | null>
 }

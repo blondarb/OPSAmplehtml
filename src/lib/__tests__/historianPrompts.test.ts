@@ -35,6 +35,20 @@ describe('buildHistorianSystemPrompt', () => {
     expect(prompt).toMatch(/8.*20/)
   })
 
+  it('instructs the historian not to re-ask already-answered details', () => {
+    const prompt = buildHistorianSystemPrompt('new_patient')
+    expect(prompt).toMatch(/already told you|already volunteered|already covered/i)
+    expect(prompt).toMatch(/re-?ask/i)
+  })
+
+  it('does not mandate a formulaic acknowledgment before every question', () => {
+    const prompt = buildHistorianSystemPrompt('new_patient')
+    // The old Rule 7 said "Always acknowledge ... before moving to the next
+    // question"; the revised rule warns against that formulaic pattern instead.
+    expect(prompt).not.toMatch(/Always acknowledge what the patient just said before moving/i)
+    expect(prompt).toMatch(/formulaic|robotic/i)
+  })
+
   it('lists neurology focus conditions', () => {
     const prompt = buildHistorianSystemPrompt('new_patient')
     expect(prompt).toMatch(/migraine|cluster|tension/i)

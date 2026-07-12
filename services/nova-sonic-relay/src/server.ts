@@ -2,6 +2,7 @@ import crypto from 'crypto'
 import http, { type IncomingMessage } from 'http'
 import { WebSocketServer, WebSocket } from 'ws'
 import { NovaSonicSession } from './novaSonicSession.js'
+import { TranscribeMedicalSession } from './transcribeMedicalSession.js'
 import type { ClientMsg, ServerMsg } from './wsProtocol.js'
 
 // ---------------------------------------------------------------------------
@@ -58,6 +59,18 @@ if (ALLOWED_ORIGINS.length === 0) {
   console.warn(
     '[nova-relay] NOVA_RELAY_ALLOWED_ORIGINS is not set — Origin header is not checked; the token is the sole gate.'
   )
+}
+
+// Optional, flag-gated (default OFF): runs AWS Transcribe Medical streaming
+// transcription in parallel on the same caller audio Nova Sonic receives, as
+// a higher-accuracy check on spoken identifiers (MRN/name/DOB) that
+// Nova Sonic — speech-to-speech — is prone to dropping digits from. See
+// transcribeMedicalSession.ts header comment for the fail-safe contract.
+const TRANSCRIBE_MEDICAL_ENABLED =
+  process.env.TRANSCRIBE_MEDICAL_ENABLED === 'true' || process.env.TRANSCRIBE_MEDICAL_ENABLED === '1'
+
+if (TRANSCRIBE_MEDICAL_ENABLED) {
+  console.log('[nova-relay] Transcribe Medical parallel transcription ENABLED')
 }
 
 function base64urlToBuffer(input: string): Buffer {
@@ -240,6 +253,25 @@ wss.on('connection', (ws) => {
     },
   })
 
+  // Optional, flag-gated (default OFF) parallel AWS Transcribe Medical stream
+  // on the same caller audio — see transcribeMedicalSession.ts. Wrapped in
+  // try/catch so any construction/start failure never blocks the Nova Sonic
+  // session above: on any throw here, we log and continue Nova-only.
+  let transcribe: TranscribeMedicalSession | null = null
+  if (TRANSCRIBE_MEDICAL_ENABLED) {
+    try {
+      transcribe = new TranscribeMedicalSession({
+        onTranscript: (text, isPartial) => send(ws, { t: 'medicalTranscript', text, isPartial }),
+        onError: (e) =>
+          console.error('[transcribe-medical] error (continuing Nova-only):', e instanceof Error ? e.message : e),
+      })
+      transcribe.start().catch(() => {})
+    } catch (e) {
+      console.error('[transcribe-medical] setup failed (continuing Nova-only):', e instanceof Error ? e.message : e)
+      transcribe = null
+    }
+  }
+
   ws.on('message', (raw) => {
     let msg: ClientMsg
     try {
@@ -266,6 +298,7 @@ wss.on('connection', (ws) => {
 
         case 'audio':
           session.pushAudio(msg.pcm)
+          transcribe?.pushAudio(msg.pcm)
           break
 
         case 'userTurnEnd':
@@ -284,6 +317,7 @@ wss.on('connection', (ws) => {
           break
 
         case 'stop':
+          transcribe?.stop().catch(() => {})
           session.stop().then(() => {
             ws.close()
           }).catch(() => {
@@ -307,6 +341,7 @@ wss.on('connection', (ws) => {
   ws.on('close', () => {
     // Best-effort teardown — ignore any errors from stop().
     session.stop().catch(() => {})
+    transcribe?.stop().catch(() => {})
   })
 })
 
