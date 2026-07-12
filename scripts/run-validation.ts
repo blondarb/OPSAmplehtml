@@ -71,11 +71,13 @@ async function callBedrock(referralText: string, patientAge: number | null, pati
     patientSex: patientSex ?? undefined,
   })
 
+  // 5-family models spend max_tokens on a leading reasoning block before any
+  // text — 4000 truncates mid-JSON (or before it). Give them real headroom.
   const body = JSON.stringify({
     anthropic_version: 'bedrock-2023-05-31',
     system: TRIAGE_SYSTEM_PROMPT,
     messages: [{ role: 'user', content: userPrompt }],
-    max_tokens: 4000,
+    max_tokens: MODEL_SUPPORTS_TEMPERATURE ? 4000 : 16000,
     ...(MODEL_SUPPORTS_TEMPERATURE ? { temperature } : {}),
   })
 
@@ -97,6 +99,9 @@ async function callBedrock(referralText: string, patientAge: number | null, pati
     clearTimeout(timeout)
   }
   const responseBody = JSON.parse(new TextDecoder().decode(response.body))
+  if (responseBody.stop_reason === 'max_tokens') {
+    throw new Error('Response truncated at max_tokens — raise the budget')
+  }
   // Claude 5-family responses can lead with a reasoning block; content[0]
   // is then not the text block. Join every text block instead.
   const text = Array.isArray(responseBody.content)
