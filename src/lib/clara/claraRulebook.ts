@@ -89,6 +89,10 @@ export function getClaraSystemPrompt(): string {
       - ${CONSULT_TYPE.NON_EMERGENT}:
         • STAT 1 (callback 15–20 min): acute but stable neuro issues (ICH, meningitis/encephalitis, MG crisis, GBS, acute cord, MS relapse, first seizure now resolved).
         • STAT 2 (callback ≤60 min): stroke > 24h or resolved, TIA, chronic or stable deficits, mimics, dementia, Parkinson's, MS, outpatient-type issues.
+        • STAT 2 vs PLAIN non-emergent (statLevel null) — the case rules below that say "(STAT 2)" set the DEFAULT for that presentation; adjust by context (Steve, 2026-07-12):
+          – Patient is in the ER, or the provider asks for an "urgent" consult/callback → statLevel = 2 (a timed callback so the team can disposition the patient out of the ER). Most STAT 1/STAT 2 consults originate in the ER, though an admitted inpatient can also be STAT.
+          – Caller explicitly frames it as non-emergent/routine, or it's a stable admitted floor patient with no urgency request → statLevel = null (routine non-emergent provider, no timed SLA).
+          – Neither signal present → keep the case rule's default (STAT 2). Never invent urgency the caller didn't express, and never strip urgency they did express.
 
       - ${CONSULT_TYPE.CT_RETURN}:
         • Review of completed CT/CTA/MRI/perfusion results when patient stable.

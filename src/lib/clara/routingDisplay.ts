@@ -24,7 +24,10 @@ export function describeRoutingTarget(consultType: string, statLevel: number | n
     case CONSULT_TYPE.NON_EMERGENT:
       if (statLevel === 1) return 'STAT 1 — on-call STAT queue (callback ≤15–20 min)'
       if (statLevel === 2) return 'STAT 2 — on-call STAT queue (callback ≤60 min)'
-      return 'STAT — on-call STAT queue (STAT 1 ≤15–20m or STAT 2 ≤60m per statLevel)'
+      // statLevel null = PLAIN non-emergent (Steve 2026-07-12): caller framed
+      // it as routine / stable floor patient with no urgency request — goes to
+      // the non-emergent provider, no timed STAT SLA.
+      return 'Non-emergent provider — routine queue (no STAT SLA)'
     case CONSULT_TYPE.CT_RETURN:
       return 'CT-return — prior provider if already seen; if no prior record → probable emergent → MD1'
     case CONSULT_TYPE.EEG_READ:

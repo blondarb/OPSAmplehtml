@@ -115,6 +115,12 @@ function buildRouting(
   if (consultType === CONSULT_TYPE.NON_EMERGENT && statLevel === 2) {
     return { action: 'transfer_stat2', label: 'STAT 2 — callback within 60 min (on-call STAT queue)', slaMinutes: 60 }
   }
+  if (consultType === CONSULT_TYPE.NON_EMERGENT) {
+    // statLevel null = PLAIN non-emergent (Steve 2026-07-12): explicitly
+    // routine / no ER-urgency signals — non-emergent provider, no timed SLA.
+    // (Previously fell through to the generic "would route to workflow" label.)
+    return { action: 'route_workflow', label: 'Non-emergent → non-emergent provider (routine queue, no STAT SLA)', slaMinutes: null }
+  }
   if (consultType === CONSULT_TYPE.CT_RETURN) {
     // Steve, 2026-07-11: CT-return branches on whether we already have this patient.
     // WITH a prior record → back to the neurologist who saw them (Clara confirms name+MRN,
