@@ -17,7 +17,7 @@
 import { NextResponse } from 'next/server'
 import { cookies } from 'next/headers'
 import { invokeBedrockJSON } from '@/lib/bedrock'
-import { detectRedFlag } from '@/lib/clara/redFlagGate'
+import { detectRedFlag, isSubacuteStrokeReport } from '@/lib/clara/redFlagGate'
 import { CLARA_GATE_COOKIE, verifyGateToken } from '@/lib/clara/testGate'
 import {
   getClaraSystemPrompt,
@@ -183,12 +183,24 @@ export async function POST(request: Request) {
         gate0.category === 'seizure' &&
         CERIBELL_EEG_READ_CONTEXT.test(transcript) &&
         !ACTIVE_SEIZURE_EMERGENCY.test(transcript)
-      if (!ceribellBurdenRead) {
+      // Clinical rule (Sam's live finding, Steve relayed 2026-07-12): BE-FAST
+      // terms in an EXPLICITLY multi-day presentation ("two days of right-sided
+      // weakness", "LKW two days ago") are a completed/subacute stroke — the
+      // rulebook already tiers that correctly (stroke >24h → NON_EMERGENT
+      // STAT 2, callback ≤60 min) and must not be pre-empted by the floor.
+      // Fail-safe scope lives in isSubacuteStrokeReport (stroke bank only;
+      // explicit ≥2-day timeframe; no acute/worsening/"code stroke" language;
+      // no other-bank hit after stripping negated "no hemorrhage" imaging
+      // idiom). SSOT: the production Clara service (sevaro-voice-agent) needs
+      // this same policy layer around its own Gate-0.
+      const subacuteStroke = isSubacuteStrokeReport(transcript)
+      if (!ceribellBurdenRead && !subacuteStroke) {
         return gate0EmergencyResult(gate0)
       }
       gate0.deescalated = true
-      gate0.deescalationReason =
-        'Seizure terms detected in a Ceribell/EEG-read burden report with no active-emergency language — deferring to the rulebook (≥20% burden → emergent on-call neurologist + EEG reader, simultaneously).'
+      gate0.deescalationReason = ceribellBurdenRead
+        ? 'Seizure terms detected in a Ceribell/EEG-read burden report with no active-emergency language — deferring to the rulebook (≥20% burden → emergent on-call neurologist + EEG reader, simultaneously).'
+        : 'BE-FAST terms in an explicitly multi-day (subacute) presentation with no acute/worsening language — deferring to the rulebook (stroke >24h → NON_EMERGENT STAT 2 per its stroke-timing rule).'
     }
 
     // ── Clara's rulebook on Bedrock ──────────────────────────────────────────
