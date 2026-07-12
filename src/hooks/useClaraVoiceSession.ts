@@ -101,6 +101,12 @@ export function useClaraVoiceSession() {
   const startTimeRef = useRef<number>(0)
   const isAiSpeakingRef = useRef(false)
   const lastAiSpeechEndRef = useRef(0)
+  // Parallel AWS Transcribe Medical accuracy check (flag-gated on the relay;
+  // no-op when the relay's TRANSCRIBE_MEDICAL_ENABLED is off, so this simply
+  // never fills). Finalized (non-partial) transcript lines only, so accuracy
+  // vs Nova's own transcript can be compared later — v1 capture + log only,
+  // no effect on Clara's conversational behavior.
+  const medicalTranscriptRef = useRef<string[]>([])
 
   // Keep the phone screen awake during a live call — otherwise a mobile browser
   // sleeps the screen mid-conversation (it doesn't know audio is streaming) and
@@ -259,6 +265,11 @@ export function useClaraVoiceSession() {
       case 'disconnected':
         setStatus((s) => (s === 'ending' ? s : 'idle'))
         break
+      case 'medicalTranscript':
+        if (!e.isPartial && e.text?.trim()) {
+          medicalTranscriptRef.current = [...medicalTranscriptRef.current, e.text.trim()]
+        }
+        break
     }
   }, [pushTurn, classifyTurn])
 
@@ -272,6 +283,7 @@ export function useClaraVoiceSession() {
     setFinalClassification(null)
     setLoggedSessionId(null)
     setAudioDiagnostics(null)
+    medicalTranscriptRef.current = []
 
     try {
       const res = await fetch('/api/ai/clara/session', { method: 'POST' })
@@ -366,7 +378,7 @@ export function useClaraVoiceSession() {
           needsClarification: disposition?.needsClarification,
           clarificationQuestions: disposition?.clarificationQuestions,
           routing: disposition?.routing,
-          metadata: { audioDiagnostics: capturedAudioDiagnostics },
+          metadata: { audioDiagnostics: capturedAudioDiagnostics, medicalTranscript: medicalTranscriptRef.current },
         }),
       })
       const data = await res.json().catch(() => ({}))
@@ -405,6 +417,7 @@ export function useClaraVoiceSession() {
     setFinalClassification(null)
     setLoggedSessionId(null)
     setAudioDiagnostics(null)
+    medicalTranscriptRef.current = []
     setStatus('idle')
   }, [])
 

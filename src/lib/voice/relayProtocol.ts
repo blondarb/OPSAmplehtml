@@ -22,3 +22,4 @@ export type ServerMsg =
   | { t: 'toolCall'; toolName: string; toolUseId: string; input: unknown }
   | { t: 'completion' }
   | { t: 'error'; message: string }
+  | { t: 'medicalTranscript'; text: string; isPartial: boolean }

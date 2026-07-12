@@ -204,6 +204,9 @@ export class NovaSonicWsProvider implements VoiceProvider {
       case 'error':
         this.emit({ type: 'error', message: msg.message })
         break
+      case 'medicalTranscript':
+        this.emit({ type: 'medicalTranscript', text: msg.text, isPartial: msg.isPartial })
+        break
     }
   }
 
