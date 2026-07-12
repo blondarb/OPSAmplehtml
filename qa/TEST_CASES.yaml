@@ -1,6 +1,6 @@
 # Test Cases - Sevaro Clinical
-# test_cases_version: 2.1
-# Last updated: 2026-06-30
+# test_cases_version: 2.3
+# Last updated: 2026-07-12
 #
 # Structure: Each case has id, title, preconditions, steps, expected, data_verification (optional).
 # Organized by suite matching TEST_RUNBOOK.md sections.
@@ -569,7 +569,7 @@ mobile_settings:
 mobile_fab:
   - id: Q1
     title: FAB visible on chart view
-    preconditions: [on /mobile/chart/[id]]
+    preconditions: ['on /mobile/chart/[id]']
     steps:
       - View bottom-right corner of screen
     expected: Teal FAB button visible with checkmark icon
@@ -859,7 +859,7 @@ patient_portal:
     steps:
       - Fill name, subject, body
       - Submit
-    expected: "Message sent successfully" toast
+    expected: '"Message sent successfully" toast'
 
   - id: D3
     title: Portal accessible without auth
@@ -1237,3 +1237,135 @@ voice_biomarkers:
     steps:
       - Record a <1s clip, then a deliberately over-loud (clipped) clip
     expected: Card shows the "too short" / "clipped" QC banner; overall flag INVALID for too-short; jitter/shimmer/HNR rows show the approximate (≈) marker
+
+---
+# Security containment regressions. Use synthetic inputs only.
+security_containment:
+  - id: SEC1
+    title: Destructive demo reset routes are permanently retired
+    preconditions: [deployed build contains the reviewed retirement change]
+    steps:
+      - POST malformed JSON to /api/demo/reset while signed out
+      - POST synthetic credentials and a synthetic tenant identifier to /api/demo/reset
+      - POST the same synthetic inputs and an x-admin-secret header to /api/admin/reset-demo
+    expected: |
+      - Every request returns 410 Gone
+      - Every body is exactly {error: "Demo reset is no longer available", reason: "destructive_demo_reset_retired"}
+      - Cache-Control is no-store
+      - Authentication state, feature flags, body shape, and supplied credentials do not change the response
+    data_verification: No patient, visit, note, appointment, medication, allergy, diagnosis, imaging, or other database row is read, updated, or deleted
+
+  - id: SEC2
+    title: No self-service reset control or tour copy is exposed
+    preconditions: [logged in, clinical workspace and onboarding tour available]
+    steps:
+      - Open the clinical workspace user/settings menus
+      - Run or replay the schedule and EHR onboarding tours
+      - Search the rendered application for a Reset Demo action
+    expected: No reset action, confirmation modal, or reset-demo onboarding instruction is present
+
+  - id: SEC3
+    title: Unused public clinical prototypes are retired without side effects
+    preconditions: [deployed build contains the reviewed legacy-route retirement]
+    steps:
+      - Send GET and malformed synthetic POST requests to /api/ai/historian/escalation
+      - Send GET and malformed synthetic POST requests to /api/provider-messages and /api/provider-messages/threads
+      - Send GET plus malformed synthetic POST and PATCH requests to /api/consults
+      - Send GET to /api/incomplete-docs
+    expected: |
+      - Every supported method returns 410 Gone with Cache-Control no-store
+      - Historian escalation returns reason legacy_historian_escalation_superseded
+      - Provider messaging returns reason legacy_provider_messaging_retired
+      - Provider consults returns reason legacy_provider_consults_retired
+      - Incomplete documentation returns reason legacy_incomplete_docs_retired
+      - Authentication headers, query values, and malformed bodies do not change the response
+    data_verification: No consult, message, thread, red-flag, note, patient, or notification row is read, inserted, updated, or deleted
+
+---
+# Canonical neurology referral-triage flow. Synthetic/PHI-free local QA only.
+# Production remains unchanged; no AWS or deployment action was performed.
+triage_core_flow:
+  - id: TCF1
+    title: Long pasted referral preserves a final-tail emergency signal
+    preconditions: [local reviewed build, synthetic referral text only]
+    steps:
+      - Build one long synthetic referral whose final sentence is "Sudden aphasia and right facial droop began 20 minutes ago."
+      - Paste the complete referral into /triage and start extraction and triage
+      - Confirm the source-bound emergency safety hold is painted before scoring proceeds
+      - Observe the emergency decision advance directly to the full result screen without approving an extraction-review step
+    expected: |
+      - The exact final-tail emergency sentence is preserved in the source-bound extraction
+      - The case follows the emergency_now pathway with the immediate emergency timeframe
+      - The emergency safety hold is visibly painted before the direct transition to the full result
+      - The full triage result screen renders; no batch or reduced-result screen is used
+      - Emergency action and mandatory review remain visible
+    data_verification: The persisted complete-source text ends with the synthetic emergency sentence and has complete source coverage
+
+  - id: TCF2
+    title: One equivalent native-text PDF reaches the same full result flow
+    preconditions: [local reviewed build, one synthetic native-text PDF containing the TCF1 referral]
+    steps:
+      - Upload exactly one native-text PDF containing the same complete synthetic referral used in TCF1
+      - Confirm the source-bound emergency safety hold is painted before scoring proceeds
+      - Observe the emergency decision advance directly to the full result screen without approving an extraction-review step
+      - Compare the pathway, timeframe, safety action, and result-screen sections with TCF1
+    expected: |
+      - Both pages and the final-tail emergency sentence are present in the reconstructed complete source
+      - The PDF and pasted referral follow the same emergency_now pathway and immediate timeframe
+      - Both paint the emergency safety hold before proceeding directly to the full result
+      - Both render the same full triage result surface with emergency action and review hold
+      - Source type and extraction identifiers may differ; neither input uses a batch or reduced-result screen
+    data_verification: PDF coverage is complete and its reconstructed complete-source text equals the pasted comparator
+
+  - id: TCF3
+    title: Multiple-file upload is rejected without silently selecting a referral
+    preconditions: [local reviewed build, two synthetic supported referral files]
+    steps:
+      - Select two synthetic referral files in one upload attempt
+      - Attempt to start extraction
+      - Inspect the UI response and request activity
+    expected: |
+      - The attempt is rejected with an exactly-one-referral-file message
+      - Neither file is silently selected, combined, or submitted
+      - No extraction or triage session starts
+    data_verification: No persisted extraction or triage session is created for the rejected attempt
+
+  - id: TCF4
+    title: Forged caller summary cannot replace persisted extraction content
+    preconditions: [local reviewed build, valid synthetic extraction ID whose persisted source contains the TCF1 emergency sentence]
+    steps:
+      - Prepare a triage-start request with the valid extraction ID and a forged caller summary stating that the referral is stable and routine
+      - Submit the request through the triage API boundary
+      - Inspect the resulting pathway and source evidence
+    expected: |
+      - Caller-supplied extraction text and summary are non-authoritative
+      - The server reloads and uses the persisted source-bound extraction
+      - The persisted emergency evidence wins and the case remains emergency_now
+      - No outpatient recommendation is authorized from the forged summary
+    data_verification: The triage session is bound to the persisted extraction ID and persisted complete-source evidence, not the forged fields
+
+  - id: TCF5
+    title: Emergency screen and copied report suppress outpatient workup
+    preconditions: [local reviewed build, synthetic emergency result containing populated outpatient workup and routing fields]
+    steps:
+      - Render the full emergency triage result
+      - Inspect the on-screen recommendations, routing, and finalization controls
+      - Copy the triage report and inspect the copied text
+    expected: |
+      - The immediate emergency action and human-review hold are visible on screen and in copied output
+      - Outpatient workup, outpatient routing, and outpatient finalization are absent from both surfaces
+      - Missing information and clinical safety evidence remain visible
+      - The copied timeframe matches the immediate emergency timeframe shown on screen
+
+  - id: TCF6
+    title: Urgent safety floor does not hide missing information
+    preconditions: [local reviewed build, synthetic non-emergent result with rate_of_progression 5, decision-critical information missing, authoritative scheduling_locked true]
+    steps:
+      - Use a synthetic referral describing increasing focal seizures over one week with recovery between events and no current ongoing event
+      - Leave current antiseizure adherence and exact event duration undocumented
+      - Render the urgent-floor result and inspect the missing-information and scheduling state
+    expected: |
+      - The rate-of-progression safety floor is not downgraded below urgent
+      - The canonical urgent expedited-outpatient timeframe is exactly Within 1 Week
+      - The missing adherence and event-duration items remain visibly enumerated
+      - The authoritative scheduling hold remains explicitly locked; missing information is never treated as clearance

@@ -1,0 +1,48 @@
+{
+  "schemaVersion": "1.0",
+  "gateSetId": "neurology-triage-sentinel-release-gates-2026-07-11-v1",
+  "scope": "synthetic_software_release_only",
+  "clinicalValidationClaim": false,
+  "gates": [
+    {
+      "id": "zero-emergency-under-triage",
+      "scope": "synthetic_software_release_only",
+      "metric": "emergency_under_triage_count",
+      "operator": "eq",
+      "threshold": 0,
+      "description": "No synthetic emergency case may finish below emergency_now."
+    },
+    {
+      "id": "zero-invalid-time-critical-evidence",
+      "scope": "synthetic_software_release_only",
+      "metric": "invalid_time_critical_evidence_count",
+      "operator": "eq",
+      "threshold": 0,
+      "description": "Every emitted time-critical evidence reference must resolve exactly to its immutable source."
+    },
+    {
+      "id": "complete-offline-execution",
+      "scope": "synthetic_software_release_only",
+      "metric": "unevaluated_offline_case_count",
+      "operator": "eq",
+      "threshold": 0,
+      "description": "Every case declared eligible for offline deterministic execution must execute."
+    },
+    {
+      "id": "hard-negative-false-alert-rate",
+      "scope": "synthetic_software_release_only",
+      "metric": "hard_negative_false_alert_rate",
+      "operator": "lte",
+      "threshold": 0.05,
+      "description": "No more than five percent of evaluated synthetic hard negatives may trigger emergency or same-day alerting."
+    },
+    {
+      "id": "manual-hold-burden",
+      "scope": "synthetic_software_release_only",
+      "metric": "manual_hold_rate",
+      "operator": "lte",
+      "threshold": 0.15,
+      "description": "Manual holds may protect uncertainty but must remain at or below fifteen percent on the applicable synthetic suite."
+    }
+  ]
+}
