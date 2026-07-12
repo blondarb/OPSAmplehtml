@@ -97,7 +97,14 @@ async function callBedrock(referralText: string, patientAge: number | null, pati
     clearTimeout(timeout)
   }
   const responseBody = JSON.parse(new TextDecoder().decode(response.body))
-  const text = responseBody.content?.[0]?.text || ''
+  // Claude 5-family responses can lead with a reasoning block; content[0]
+  // is then not the text block. Join every text block instead.
+  const text = Array.isArray(responseBody.content)
+    ? responseBody.content
+        .filter((block: { type?: string; text?: string }) => typeof block?.text === 'string')
+        .map((block: { text: string }) => block.text)
+        .join('')
+    : ''
 
   // Parse JSON from response
   const jsonMatch = text.match(/\{[\s\S]*\}/)
