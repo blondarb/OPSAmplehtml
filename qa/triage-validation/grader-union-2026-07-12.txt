@@ -1,0 +1,70 @@
+grader: openai.gpt-oss-120b-1:0; disagreement cases: 17
+
+### outpatient-01-jennings (Jennings, Harold — Routine chronic disease follow-up with incidental resting tremor and bradykinesia.)
+expected: routine_priority | claude-sonnet-4-6: urgent | claude-sonnet-5: semi_urgent
+independent (openai.gpt-oss-120b-1:0): semi_urgent — New resting hand tremor with bradykinesia and constipation suggest early Parkinsonism, warranting neurologic assessment within 1‑2 weeks.
+
+### outpatient-02-gutierrez (Gutierrez, Maria — Postpartum visit with bilateral hand numbness and new headaches.)
+expected: routine_priority | claude-sonnet-4-6: routine_priority | claude-sonnet-5: semi_urgent
+independent (openai.gpt-oss-120b-1:0): urgent — The patient has likely bilateral carpal tunnel syndrome without red‑flag neurologic signs, but her anxiety and safety concerns about infant care warrant a neurologic evaluation within days for reassurance and management.
+
+### outpatient-03-patterson (Patterson, Thomas — HTN follow-up with two transient episodes of right arm weakness and speech difficulty.)
+expected: urgent | claude-sonnet-4-6: emergent | claude-sonnet-5: emergent
+independent (openai.gpt-oss-120b-1:0): emergent — Recent recurrent crescendo TIA with high stroke risk (ABCD2 ~6) warrants immediate emergency evaluation.
+
+### outpatient-04-williams (Williams, Deshawn — Staring spells at school with lip smacking, unresponsive for 10-15 seconds.)
+expected: urgent | claude-sonnet-4-6: urgent | claude-sonnet-5: semi_urgent
+independent (openai.gpt-oss-120b-1:0): urgent — New-onset frequent staring episodes with EEG‑provocable features suggest possible epilepsy and need prompt neurology evaluation within days.
+
+### outpatient-05-hargrove (Hargrove, Linda — Fibromyalgia follow-up with progressive bilateral foot numbness ascending to calves.)
+expected: routine_priority | claude-sonnet-4-6: urgent | claude-sonnet-5: urgent
+independent (openai.gpt-oss-120b-1:0): urgent — Progressive diabetic neuropathy with new hand involvement, motor weakness, and atypical rapid progression warrants prompt neurological evaluation within days to rule out alternative diagnoses such as CIDP.
+
+### outpatient-06-caldwell (Caldwell, Dorothy — Family concerned about progressive memory decline, getting lost, leaving stove on.)
+expected: routine_priority | claude-sonnet-4-6: urgent | claude-sonnet-5: semi_urgent
+independent (openai.gpt-oss-120b-1:0): semi_urgent — The patient shows moderate cognitive impairment with functional decline and safety concerns (driving, stove use), warranting neurology evaluation within 1-2 weeks but not an emergency.
+
+### outpatient-07-kowalski (Kowalski, Brittany — Recurrent headaches with nausea and photophobia in obese teen.)
+expected: routine_priority | claude-sonnet-4-6: semi_urgent | claude-sonnet-5: semi_urgent
+independent (openai.gpt-oss-120b-1:0): semi_urgent — Worsening chronic migraine with medication overuse and new headache pattern warrants timely neurology evaluation within 1–2 weeks, but lacks emergent red‑flag findings.
+
+### outpatient-09-washington (Washington, Eugene — Wife reports dream-enacting behavior with punching/kicking during sleep, anosmia.)
+expected: routine_priority | claude-sonnet-4-6: urgent | claude-sonnet-5: semi_urgent
+independent (openai.gpt-oss-120b-1:0): routine_priority — Patient has probable REM sleep behavior disorder and hyposmia indicating prodromal synucleinopathy but no acute neurologic deficits, requiring baseline evaluation within 2‑4 weeks.
+
+### outpatient-10-delgado (Delgado, Rosa — Graves disease follow-up with persistent tremor, diplopia, and balance issues despite normal thyroid.)
+expected: semi_urgent | claude-sonnet-4-6: urgent | claude-sonnet-5: urgent
+independent (openai.gpt-oss-120b-1:0): urgent — New diplopia with extraocular muscle involvement combined with gait instability and near-falls indicates a potentially serious neurologic process requiring evaluation within days.
+
+### cross-04-patel (Patel, Anita — Breast cancer patient on chemo with neuropathy plus new facial droop and arm weakness.)
+expected: urgent | claude-sonnet-4-6: emergent | claude-sonnet-5: emergent
+independent (openai.gpt-oss-120b-1:0): emergent — Acute focal neurologic deficit in metastatic cancer raises immediate concern for brain metastasis or leptomeningeal disease requiring same‑day imaging and possible emergent intervention.
+
+### cross-05-kowalczyk (Kowalczyk, Stefan — Crohn patient on infliximab with progressive bilateral leg weakness and areflexia.)
+expected: urgent | claude-sonnet-4-6: emergent | claude-sonnet-5: emergent
+independent (openai.gpt-oss-120b-1:0): urgent — Rapidly progressive ascending weakness with areflexia and early bulbar changes suggests possible GBS/CIDP requiring neurology assessment within days
+
+### cross-06-barnes (Barnes, Christine — Treatment-resistant depression with involuntary lip smacking, tongue protrusion, jaw movements.)
+expected: semi_urgent | claude-sonnet-4-6: semi_urgent | claude-sonnet-5: routine_priority
+independent (openai.gpt-oss-120b-1:0): semi_urgent — Moderate orofacial tardive dyskinesia causing functional and psychosocial impact requires evaluation within 1‑2 weeks but is not emergent.
+
+### cross-07-reynolds (Reynolds, Danielle — Collegiate soccer player with 5th concussion and persistent post-concussion symptoms x 3 months.)
+expected: routine_priority | claude-sonnet-4-6: semi_urgent | claude-sonnet-5: semi_urgent
+independent (openai.gpt-oss-120b-1:0): semi_urgent — Persistent post-concussion symptoms at 5 weeks with vestibular deficits and academic/athletic impact warrant neurology evaluation within 1-2 weeks to guide management.
+
+### cross-08-fletcher (Fletcher, George — CKD patient with burning foot pain, orthostatic hypotension, and autonomic dysfunction.)
+expected: semi_urgent | claude-sonnet-4-6: urgent | claude-sonnet-5: urgent
+independent (openai.gpt-oss-120b-1:0): urgent — Symptomatic orthostatic hypotension with near‑syncope and painful autonomic neuropathy necessitates prompt neurologic assessment to guide treatment and prevent falls.
+
+### cross-09-kim (Kim, Jennifer — Acute vertigo, hearing loss, and tinnitus after gentamicin course.)
+expected: semi_urgent | claude-sonnet-4-6: routine | claude-sonnet-5: routine
+independent (openai.gpt-oss-120b-1:0): routine_priority — Peripheral BPPV with successful treatment and no red flags; neurology consult is for reassurance only, so a standard 2‑4 week appointment is appropriate.
+
+### cross-10-okafor (Okafor, Emmanuel — Poorly controlled DM2 with both distal neuropathy and proximal motor weakness.)
+expected: semi_urgent | claude-sonnet-4-6: urgent | claude-sonnet-5: urgent
+independent (openai.gpt-oss-120b-1:0): semi_urgent — Progressive proximal weakness, pain, and weight loss suggest diabetic amyotrophy requiring EMG/NCS and exclusion of other serious causes, but no immediate life‑threatening signs, so evaluation within 1–2 weeks is appropriate.
+
+### packet-jimenez (Jimenez, Marta — First-time seizure with left frontal mass found on CT. Full ED workup.)
+expected: urgent | claude-sonnet-4-6: emergent | claude-sonnet-5: emergent
+independent (openai.gpt-oss-120b-1:0): semi_urgent — Newly identified left frontal brain mass causing seizure and focal deficits requires close outpatient neurology follow‑up within 1–2 weeks after discharge.
+
