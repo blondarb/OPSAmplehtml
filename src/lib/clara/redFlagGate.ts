@@ -97,6 +97,11 @@ export const RED_FLAG_BANKS: RedFlagBank[] = [
       /\bconvulsing\b/i,
       /\bseizure\s+(?:lasting|for)\s+(?:more\s+than\s+|over\s+)?\d+\s*min/i,
       /\b(?:back[\s-]to[\s-]back|multiple|repeated)\s+seizures?\b/i,
+      // "cluster of seizures" / "seizure cluster" — acute seizure activity that
+      // the back-to-back/multiple/repeated alternation missed (red-team
+      // 2026-07-12, ceribell-airway case: "cluster of seizures" bypassed the
+      // whole floor). Over-triage direction.
+      /\b(?:cluster\s+of\s+seizures?|seizure\s+cluster)\b/i,
       /\bwon'?t\s+wake\s+up\s+after\b/i,
       /\bstatus\s+epilepticus\b/i,
     ],
@@ -122,6 +127,24 @@ export const RED_FLAG_BANKS: RedFlagBank[] = [
       /\bhemorrhage\b/i,
       /\bgetting\s+worse\s+fast\b/i,
       /\bright\s+now\b/i,
+      // AIRWAY / BREATHING collapse — added 2026-07-12 (red-team): a postictal
+      // patient "not protecting his airway", "apneic", or "stopped breathing"
+      // bypassed Gate 0 entirely and was routed as a routine EEG read. These
+      // are unambiguous "call a code" signs regardless of cause; over-triage
+      // direction, faithful to the bank's high-recall design.
+      /\b(?:not\s+protecting|can'?t\s+protect|cannot\s+protect|unable\s+to\s+protect|failing\s+to\s+protect|losing|lost)\s+(?:his|her|their|the|its\s+)?\s*airway\b/i,
+      /\bairway\s+compromis\w*\b/i,
+      /\bstopped\s+breathing\b/i,
+      /\bnot\s+breathing\b/i,
+      /\bapne(?:a|ic)\b/i,
+      /\bdesaturat\w*\b/i,
+      /\bturning\s+blue\b/i,
+      /\bcyanotic\b/i,
+      // CONSCIOUSNESS collapse — cannot be roused / won't wake up. The bank had
+      // "unconscious"/"unresponsive" but missed these common phrasings (red-team
+      // ceribell-airway case: "not been able to rouse him").
+      /\b(?:un(?:able\s+to\s+)?rouse|unrousable|unarousable|can'?t\s+rouse|cannot\s+rouse|couldn'?t\s+rouse|won'?t\s+rouse|not\s+(?:been\s+)?able\s+to\s+rouse)\b/i,
+      /\b(?:can'?t|cannot|couldn'?t|won'?t|unable\s+to)\s+wake\s+(?:him|her|them)?\s*up\b/i,
     ],
   },
 ]

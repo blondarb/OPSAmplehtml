@@ -66,9 +66,13 @@ const CERIBELL_EEG_READ_CONTEXT =
 // sevaro-voice-agent port, SSOT pair): the word boundary in `not\s+breathing`
 // does NOT match inside "cannot", so an ASR "cannot breathe" slipped past
 // this override and a Ceribell burden-read would have deferred despite an
-// airway complaint.
+// airway complaint. Airway/consciousness-collapse terms extended 2026-07-12
+// (red-team) to match the acute_emergency Gate-0 bank exactly — otherwise a
+// "cluster of seizures" (category=seizure) + "apneic"/"unrousable"/
+// "desaturating" case (airway signs NOT the bare word "airway") could still
+// defer to the rulebook despite an active airway emergency.
 const ACTIVE_SEIZURE_EMERGENCY =
-  /\b(airway|not\s+breathing|(?:can'?t|cannot|couldn'?t)\s+breathe|unresponsive|seizing|convulsing|having\s+a\s+seizure|won'?t\s+stop|not\s+stopping|coding|escalat|intubat)/i
+  /\b(airway|not\s+breathing|stopped\s+breathing|apne(?:a|ic)|desaturat\w*|turning\s+blue|cyanotic|(?:can'?t|cannot|couldn'?t)\s+breathe|un(?:rousable|arousable|responsive)|(?:can'?t|cannot|couldn'?t|won'?t|not\s+(?:been\s+)?able\s+to)\s+rouse|seizing|convulsing|having\s+a\s+seizure|won'?t\s+stop|not\s+stopping|coding|escalat|intubat)/i
 
 type RoutingDecision = {
   action: 'escalate_911' | 'transfer_md1' | 'transfer_md2' | 'transfer_stat1' | 'transfer_stat2' | 'route_eeg_reader' | 'refer_pcp' | 'schedule_callback' | 'route_workflow'

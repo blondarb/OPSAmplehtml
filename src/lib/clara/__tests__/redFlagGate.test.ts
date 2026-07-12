@@ -20,6 +20,14 @@ describe('detectRedFlag — positives (must fire)', () => {
     ['he said he wants to hurt himself', 'self_harm'],
     ['patient is unresponsive and not breathing', 'acute_emergency'],
     ['he is unconscious and there is a lot of bleeding', 'acute_emergency'],
+    ['he is postictal now and not protecting his airway', 'acute_emergency'],
+    ['the patient is apneic and turning blue', 'acute_emergency'],
+    ['he stopped breathing for about a minute', 'acute_emergency'],
+    ['we have not been able to rouse him', 'acute_emergency'],
+    ['she is unrousable and desaturating', 'acute_emergency'],
+    ['we cannot wake him up', 'acute_emergency'],
+    ['he had a cluster of seizures overnight', 'seizure'],
+    ['there was a seizure cluster this morning', 'seizure'],
   ]
 
   it.each(cases)('fires on: %s', (text) => {
