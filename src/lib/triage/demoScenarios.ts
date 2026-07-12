@@ -2,3834 +2,655 @@ import { DemoScenario } from './types'
 
 export const DEMO_SCENARIOS: DemoScenario[] = [
   {
-    id: 'outpatient-01-jennings',
-    patientName: 'Jennings, Harold',
-    age: 74,
-    sex: 'M',
-    category: 'outpatient',
-    referringSpecialty: 'Family NP',
-    briefDescription: 'Routine chronic disease follow-up with incidental resting tremor and bradykinesia.',
-    clinicalHighlight: 'Early Parkinsonism',
-    expectedTier: 'routine_priority',
-    files: [
+    "id": "outpatient-01-jennings",
+    "patientName": "Jennings, Harold",
+    "age": 74,
+    "sex": "M",
+    "category": "outpatient",
+    "referringSpecialty": "Family NP",
+    "briefDescription": "Routine chronic disease follow-up with incidental resting tremor and bradykinesia.",
+    "clinicalHighlight": "Early Parkinsonism",
+    "expectedTier": "routine_priority",
+    "files": [
       {
-        filename: '01_Jennings_Harold.pdf',
-        path: '/samples/triage/outpatient/01_Jennings_Harold.pdf',
-        docType: 'PCP Referral',
-        previewText: `Prairie View Family Health Center
-102 Main Street, Eldon, MO 65026
-Phone: (573) 555-0142 | Fax: (573) 555-0143
-
-Patient: Harold W. Jennings
-
-Date of Service: 01/14/2026
-
-DOB: 04/12/1951
-
-Provider: Tammy R. Clifton, APRN, FNP-BC
-
-MRN: PV-20248831
-
-Credentials: Family Nurse Practitioner
-
-CHIEF COMPLAINT
-Follow-up for diabetes, hypertension, and knee pain.
-
-HISTORY OF PRESENT ILLNESS
-Mr. Jennings is a 74-year-old male who presents today for routine follow-up of his chronic conditions. He reports his blood
-sugars have been running in the 150s to 180s fasting. He admits to not following his diet well over the holidays. He had
-some dizziness a few weeks ago but it went away. He is still having bilateral knee pain that is worse with walking and going
-up stairs. He ran out of his metformin about a week ago and has not been taking it. He denies chest pain, shortness of
-breath, or swelling in his legs. He does mention that his wife has noticed his left hand shaking sometimes when he is sitting
-in his recliner watching TV. He says it does not bother him much. He also reports some constipation and says he feels like
-he is moving slower than he used to but attributes this to getting older.
-
-REVIEW OF SYSTEMS
-Constitutional: Denies fever, chills, or weight loss. Reports mild fatigue. HEENT: Denies vision changes, hearing loss.
-Cardiovascular: Denies chest pain, palpitations. Reports occasional dizziness, resolved. Respiratory: Denies cough,
-shortness of breath. GI: Reports constipation x 2 months. Denies nausea, vomiting, diarrhea. Musculoskeletal: Bilateral
-knee pain, chronic. Neurologic: Wife notes left hand tremor at rest. Patient reports slowed movement. Psych: Denies
-depression, anxiety.
-
-CURRENT MEDICATIONS
-1. Metformin 1000 mg BID (not taking - ran out)
-2. Lisinopril 20 mg daily
-3. Amlodipine 5 mg daily
-4. Atorvastatin 40 mg daily
-5. Acetaminophen 500 mg PRN knee pain
-6. Omeprazole 20 mg daily
-
-PHYSICAL EXAM
-Vitals: BP 148/88, HR 76, Temp 98.2, Wt 218 lbs, BMI 31.2
-General: Alert, cooperative, appears stated age. Slow to get up from chair.
-HEENT: PERRL, TMs clear bilaterally, oropharynx normal.
-Cardiovascular: RRR, no murmurs. Pedal pulses 2+ bilaterally.
-Lungs: CTA bilaterally.
-Abdomen: Soft, non-tender, non-distended. BS normal.
-Extremities: No edema. Bilateral knee crepitus. ROM limited by pain.
-Neuro: Intermittent left hand resting tremor noted. Gait slow, mildly stooped.
-
-ASSESSMENT AND PLAN
-1. Type 2 Diabetes Mellitus, uncontrolled (E11.65)
-A1c drawn today. Refill metformin. Counseled on diet and medication adherence. If A1c >9, will consider adding a
-sulfonylurea or GLP-1.
-2. Essential Hypertension (I10)
-BP elevated today. Increase lisinopril to 40 mg daily. Recheck in 4 weeks. Reviewed low-sodium diet.
-3. Bilateral Knee Osteoarthritis (M17.0)
-Discussed weight loss. Continue acetaminophen. May consider knee x-rays at next visit if not improving. Referred to PT but
-
-patient declined due to distance.
-4. Left hand tremor (R25.1)
-New finding. Resting tremor noted in left hand, wife reports progressive over past few months. Patient also with
-bradykinesia and constipation. Referring to Neurology for further evaluation. Closest neurologist is in Columbia. Placed
-referral.
-5. Constipation (K59.00)
-Started MiraLAX daily. Increase fluids and fiber.
-Follow-up in 4 weeks for BP recheck and A1c results.
-
-Electronically signed by Tammy R. Clifton, APRN, FNP-BC
-Document generated in PrairieEHR v3.1 | Encounter finalized 01/14/2026 17:42 CST`,
-      },
+        "filename": "01_Jennings_Harold.pdf",
+        "path": "/samples/triage/outpatient/01_Jennings_Harold.pdf",
+        "docType": "PCP Referral",
+        "previewText": "Prairie View Family Health Center\n102 Main Street, Eldon, MO 65026\nPhone: (573) 555-0142 | Fax: (573) 555-0143\n\nPatient: Harold W. Jennings\n\nDate of Service: 01/14/2026\n\nDOB: 04/12/1951\n\nProvider: Tammy R. Clifton, APRN, FNP-BC\n\nMRN: PV-20248831\n\nCredentials: Family Nurse Practitioner\n\nCHIEF COMPLAINT\nFollow-up for diabetes, hypertension, and knee pain.\n\nHISTORY OF PRESENT ILLNESS\nMr. Jennings is a 74-year-old male who presents today for routine follow-up of his chronic conditions. He reports his blood\nsugars have been running in the 150s to 180s fasting. He admits to not following his diet well over the holidays. He had\nsome dizziness a few weeks ago but it went away. He is still having bilateral knee pain that is worse with walking and going\nup stairs. He ran out of his metformin about a week ago and has not been taking it. He denies chest pain, shortness of\nbreath, or swelling in his legs. He does mention that his wife has noticed his left hand shaking sometimes when he is sitting\nin his recliner watching TV. He says it does not bother him much. He also reports some constipation and says he feels like\nhe is moving slower than he used to but attributes this to getting older.\n\nREVIEW OF SYSTEMS\nConstitutional: Denies fever, chills, or weight loss. Reports mild fatigue. HEENT: Denies vision changes, hearing loss.\nCardiovascular: Denies chest pain, palpitations. Reports occasional dizziness, resolved. Respiratory: Denies cough,\nshortness of breath. GI: Reports constipation x 2 months. Denies nausea, vomiting, diarrhea. Musculoskeletal: Bilateral\nknee pain, chronic. Neurologic: Wife notes left hand tremor at rest. Patient reports slowed movement. Psych: Denies\ndepression, anxiety.\n\nCURRENT MEDICATIONS\n1. Metformin 1000 mg BID (not taking - ran out)\n2. Lisinopril 20 mg daily\n3. Amlodipine 5 mg daily\n4. Atorvastatin 40 mg daily\n5. Acetaminophen 500 mg PRN knee pain\n6. Omeprazole 20 mg daily\n\nPHYSICAL EXAM\nVitals: BP 148/88, HR 76, Temp 98.2, Wt 218 lbs, BMI 31.2\nGeneral: Alert, cooperative, appears stated age. Slow to get up from chair.\nHEENT: PERRL, TMs clear bilaterally, oropharynx normal.\nCardiovascular: RRR, no murmurs. Pedal pulses 2+ bilaterally.\nLungs: CTA bilaterally.\nAbdomen: Soft, non-tender, non-distended. BS normal.\nExtremities: No edema. Bilateral knee crepitus. ROM limited by pain.\nNeuro: Intermittent left hand resting tremor noted. Gait slow, mildly stooped.\n\nASSESSMENT AND PLAN\n1. Type 2 Diabetes Mellitus, uncontrolled (E11.65)\nA1c drawn today. Refill metformin. Counseled on diet and medication adherence. If A1c >9, will consider adding a\nsulfonylurea or GLP-1.\n2. Essential Hypertension (I10)\nBP elevated today. Increase lisinopril to 40 mg daily. Recheck in 4 weeks. Reviewed low-sodium diet.\n3. Bilateral Knee Osteoarthritis (M17.0)\nDiscussed weight loss. Continue acetaminophen. May consider knee x-rays at next visit if not improving. Referred to PT but\n\n\fpatient declined due to distance.\n4. Left hand tremor (R25.1)\nNew finding. Resting tremor noted in left hand, wife reports progressive over past few months. Patient also with\nbradykinesia and constipation. Referring to Neurology for further evaluation. Closest neurologist is in Columbia. Placed\nreferral.\n5. Constipation (K59.00)\nStarted MiraLAX daily. Increase fluids and fiber.\nFollow-up in 4 weeks for BP recheck and A1c results.\n\nElectronically signed by Tammy R. Clifton, APRN, FNP-BC\nDocument generated in PrairieEHR v3.1 | Encounter finalized 01/14/2026 17:42 CST"
+      }
     ],
-    demoPoints: ['Neuro finding buried in routine visit', 'Movement disorders referral'],
+    "demoPoints": [
+      "Neuro finding buried in routine visit",
+      "Movement disorders referral"
+    ]
   },
   {
-    id: 'outpatient-02-gutierrez',
-    patientName: 'Gutierrez, Maria',
-    age: 29,
-    sex: 'F',
-    category: 'outpatient',
-    referringSpecialty: 'OB/GYN',
-    briefDescription: 'Postpartum visit with bilateral hand numbness and new headaches.',
-    clinicalHighlight: 'Postpartum carpal tunnel + headaches',
-    expectedTier: 'routine_priority',
-    files: [
+    "id": "outpatient-02-gutierrez",
+    "patientName": "Gutierrez, Maria",
+    "age": 29,
+    "sex": "F",
+    "category": "outpatient",
+    "referringSpecialty": "OB/GYN",
+    "briefDescription": "Postpartum visit with bilateral hand numbness and new headaches.",
+    "clinicalHighlight": "Postpartum carpal tunnel + headaches",
+    "expectedTier": "routine_priority",
+    "files": [
       {
-        filename: '02_Gutierrez_Maria.pdf',
-        path: '/samples/triage/outpatient/02_Gutierrez_Maria.pdf',
-        docType: 'OB/GYN Referral',
-        previewText: `Lakeshore Internal Medicine Associates
-4500 N. Michigan Ave, Suite 310, Chicago, IL 60611
-Phone: (312) 555-0276 | Fax: (312) 555-0277
-
-Patient: Maria Elena Gutierrez
-
-Date of Service: 01/22/2026
-
-DOB: 09/23/1988
-
-Provider: Robert A. Tanaka, MD, FACP
-
-MRN: LIM-00553921
-
-Specialty: Internal Medicine (Board Certified, 22 yrs practice)
-
-CHIEF COMPLAINT
-Worsening headaches over the past 3 months.
-
-HISTORY OF PRESENT ILLNESS
-Ms. Gutierrez is a 37-year-old female with a history of episodic migraine without aura since her early 20s who presents with
-a change in her headache pattern over the past 3 months. Previously, she experienced migraines approximately 2-3 times
-per month, typically perimenstrual, responding well to sumatriptan 100 mg PO. Over the past 12 weeks, she reports
-headaches occurring 4-5 days per week. The headaches are now bifrontal and occipital, described as a pressure/tightness
-with superimposed throbbing, rated 6-8/10 in intensity. Associated symptoms include photophobia, mild nausea (no
-vomiting), and difficulty concentrating at work. She denies visual aura, weakness, numbness, speech difficulty, or fever. No
-history of head trauma.
-She reports increased sumatriptan use to 10-12 doses per month. She was started on topiramate 25 mg BID by her prior
-PCP 6 weeks ago with titration to 50 mg BID, but she has seen no meaningful improvement and reports word-finding
-difficulty and paresthesias in her hands as side effects. She is a graphic designer and the cognitive side effects are
-significantly impacting her work.
-She works long hours at a computer, sleeps approximately 5-6 hours per night, drinks 3-4 cups of coffee daily, and reports
-moderate work-related stress. She exercises 2-3x/week. No recent vision changes aside from photophobia with headache.
-Last eye exam 8 months ago was normal.
-Of note, her mother has a history of migraine and her maternal aunt was diagnosed with idiopathic intracranial hypertension
-at age 35.
-
-REVIEW OF SYSTEMS
-Constitutional: Reports fatigue. No weight changes, fevers, or night sweats. HEENT: Photophobia with headaches. No
-vision loss, diplopia, tinnitus, hearing changes. Cardiovascular: No chest pain, palpitations. Respiratory: No cough or
-dyspnea. GI: Mild nausea with headaches. No vomiting, abdominal pain, or changes in bowel habits. Neurologic: No focal
-weakness, numbness (other than topiramate-related), gait difficulty, or seizures. Reports difficulty concentrating and
-word-finding trouble (on topiramate). Psych: Mild anxiety related to headaches affecting work. No depression, SI/HI.
-
-CURRENT MEDICATIONS
-1. Sumatriptan 100 mg PO PRN (using 10-12x/month)
-2. Topiramate 50 mg BID (started 6 weeks ago, poor response)
-3. Ibuprofen 400 mg PRN (using 2-3x/week)
-4. Combined oral contraceptive (ethinyl estradiol/norgestimate)
-
-ALLERGIES
-Amoxicillin (rash)
-
-PHYSICAL EXAM
-Vitals: BP 122/78, HR 72, Temp 98.4, Wt 156 lbs, Ht 5'5", BMI 26.0
-General: Well-appearing female, no acute distress.
-HEENT: Normocephalic, atraumatic. No tenderness over sinuses or temporal arteries. PERRL, EOMI, no papilledema on
-fundoscopic exam (limited view, non-dilated). TMs normal. Oropharynx clear.
-Neck: Supple, no meningismus, no lymphadenopathy. Mild trapezius tenderness bilaterally.
-Cardiovascular: RRR, no murmurs.
-
-Lungs: Clear bilaterally.
-Neurologic: Alert and oriented x3. Cranial nerves II-XII intact. Motor strength 5/5 in all extremities. Sensation intact to light
-touch. DTRs 2+ and symmetric. Finger-to-nose and heel-to-shin normal. Romberg negative. Gait normal including tandem.
-
-ASSESSMENT AND PLAN
-1. Chronic migraine with medication overuse headache (G43.709, G44.41)
-Patient has transitioned from episodic migraine to chronic migraine (>15 headache days/month x >3 months) with
-concurrent medication overuse (sumatriptan >10 days/month). Topiramate trial has been inadequate due to intolerable
-cognitive side effects. Family history notable for maternal aunt with IIH, though patient's exam does not suggest this at
-present.
-Plan:
-- Taper and discontinue topiramate over 2 weeks (50 mg daily x 1 week, then 25 mg daily x 1 week, then stop)
-- Limit sumatriptan to no more than 2 days/week; counseled on medication overuse headache
-- Start headache diary to track frequency, triggers, and acute medication use
-- Referring to Neurology/Headache specialist for further management including consideration of CGRP monoclonal antibody
-therapy (e.g., erenumab, fremanezumab) or alternative prophylaxis, and evaluation for medication overuse headache
-detoxification strategy
-- MRI brain without contrast ordered to evaluate given change in headache pattern and family history
-- Discussed sleep hygiene, caffeine reduction, and stress management
-2. Anxiety, mild, situational
-Related to headache impact on work function. Will defer to neurology for comprehensive management. If persistent, may
-consider SSRI which could serve dual purpose.
-Follow-up in 6 weeks or sooner after neurology evaluation.
-
-Electronically signed by Robert A. Tanaka, MD, FACP
-Signed electronically 01/22/2026 15:18 CST | Lakeshore IM EHR`,
-      },
+        "filename": "02_Gutierrez_Maria.pdf",
+        "path": "/samples/triage/outpatient/02_Gutierrez_Maria.pdf",
+        "docType": "OB/GYN Referral",
+        "previewText": "Women's Health Partners of Nashville\n2021 Richard Jones Rd, Suite 210, Nashville, TN 37215\nPhone: (615) 555-0381 | Fax: (615) 555-0382\n\nPatient: Danielle M. Reynolds\n\nDate: 01/24/2026\n\nDOB: 09/18/1993\n\nProvider: Gwendolyn Marsh, MD\n\nMRN: WHPN-0071254\n\nSpecialty: Obstetrics & Gynecology\n\nCHIEF COMPLAINT\n6-week postpartum visit. Also reports hand numbness and dropped baby.\n\nHISTORY OF PRESENT ILLNESS\nMs. Reynolds is a 32-year-old G2P2 who delivered her second child vaginally 6 weeks ago at 39+2 weeks. Uncomplicated\nvaginal delivery, no neuraxial complications, no postpartum hemorrhage. She is exclusively breastfeeding.\nToday she reports bilateral hand numbness and tingling that began in the third trimester and has not fully resolved. She\ndescribes the numbness in the thumb, index, and middle fingers of both hands. She wakes at night with numb hands and\nhas to shake them out. She reports that last Tuesday she was holding her 6-week-old and her right hand 'went completely\nnumb and I dropped him onto the couch.' The baby was uninjured. She is extremely distressed about this and tearful today.\nShe researched her symptoms online and found information about MS. She is terrified. She reports that her hands have\nalso been more clumsy in general — difficulty with buttons and her phone keyboard. She denies any vision changes, facial\nnumbness, leg weakness, bladder problems, or fatigue beyond normal new-mother exhaustion. No prior neurological\nsymptoms. No family history of MS or neurological disease. She has not had any fever, rash, or illness.\n\nPHYSICAL EXAM\nVitals: BP 110/68, HR 78, Wt 148 lbs (pre-pregnancy 138 lbs)\nGeneral: Well-appearing, tearful, anxious.\nBreast/Postpartum: Uterus involuted. Incision sites healing well. Breastfeeding successfully established per her report.\nHands (limited exam): Positive Tinel's sign bilateral wrists. Positive Phalen's bilateral. No thenar atrophy noted. Sensation\nappears reduced to light touch in median nerve distribution, though I acknowledge my neurological exam skills are limited. I\ndid not perform a formal strength or reflex assessment — outside my scope.\n\nASSESSMENT AND PLAN\n1. Bilateral hand numbness and tingling — postpartum (R20.2)\nHer symptom pattern — bilateral, median nerve distribution, worsening at night, relieved by shaking, onset in third trimester,\npersisting postpartum — is very consistent with bilateral carpal tunnel syndrome. This is extremely common in pregnancy\nand postpartum, particularly in breastfeeding women due to fluid retention and positioning during nursing. The 'dropping'\nepisode was almost certainly a sudden numbness event from CTS, not weakness.\nHowever, given her significant anxiety about MS and the functional impact on infant care, I am referring urgently to\nNeurology. I want to be honest: I do not think this is MS. But I am an OB/GYN and I am not the right person to rule that out\ndefinitively or to provide the reassurance she needs. A neurologist can formally evaluate her, likely confirm CTS, and\nprovide the credible reassurance that will help her anxiety more than I can. Please note the urgency is driven by her\nemotional state and childcare safety concern, not by my clinical suspicion for serious neurological disease.\nIn the meantime: bilateral wrist splints for nighttime use provided. Counseled on supported nursing positions to minimize\nwrist flexion. Will consult OT if not improved after neurology evaluation.\n2. Postpartum visit — otherwise unremarkable\nContraception: discussed IUD placement, patient deferred. EPDS score: 6 (reassuring, anxiety items elevated —\nmonitoring). Return to activity counseled. Anemia CBC today.\n\nElectronically signed by: Gwendolyn Marsh, MD\n\n\fSigned 01/24/2026 11:45 CST | WHPN EHR"
+      }
     ],
-    demoPoints: ['Postpartum neurologic symptoms', 'Multi-symptom referral'],
+    "demoPoints": [
+      "Postpartum neurologic symptoms",
+      "Multi-symptom referral"
+    ]
   },
   {
-    id: 'outpatient-03-patterson',
-    patientName: 'Patterson, Thomas',
-    age: 62,
-    sex: 'M',
-    category: 'outpatient',
-    referringSpecialty: 'Internal Medicine',
-    briefDescription: 'HTN follow-up with two transient episodes of right arm weakness and speech difficulty.',
-    clinicalHighlight: 'TIA presentation',
-    expectedTier: 'urgent',
-    files: [
+    "id": "outpatient-03-patterson",
+    "patientName": "Patterson, Thomas",
+    "age": 62,
+    "sex": "M",
+    "category": "outpatient",
+    "referringSpecialty": "Internal Medicine",
+    "briefDescription": "HTN follow-up with two transient episodes of right arm weakness and speech difficulty.",
+    "clinicalHighlight": "TIA presentation",
+    "expectedTier": "urgent",
+    "files": [
       {
-        filename: '03_Patterson_Thomas.pdf',
-        path: '/samples/triage/outpatient/03_Patterson_Thomas.pdf',
-        docType: 'PCP Referral',
-        previewText: `Riverbend Family Medicine
-780 Commerce Dr, Suite A, Dayton, OH 45402
-Phone: (937) 555-0388 | Fax: (937) 555-0389
-
-Patient: Thomas J. Patterson
-
-Date of Service: 01/08/2026
-
-DOB: 11/05/1962
-
-Provider: Andrea L. Mitchell, MD
-
-MRN: RFM-0041177
-
-Specialty: Family Medicine
-
-CHIEF COMPLAINT
-Diabetes follow-up, medication refills.
-
-HISTORY OF PRESENT ILLNESS
-Mr. Patterson is a 63-year-old male here for quarterly diabetes follow-up. His A1c from last month was 8.2%, improved from
-8.9% in July. He reports better adherence to metformin since we switched to extended release. He has been walking 20
-minutes most days. His home blood glucose readings are mostly in the 130-170 range fasting.
-He continues to smoke half a pack per day, down from one pack. We discussed cessation again today and he is considering
-varenicline. He reports his mood has been okay, though he is stressed about finances. He denies suicidal ideation.
-He also mentions ongoing numbness and tingling in both feet that has been gradually worsening over the past year. He
-says it is now up to his ankles. He dropped a cup last week because his right hand felt numb. He reports some burning pain
-at night in his feet that wakes him up. He has not tried anything for it. He has not had a fall but does feel unsteady
-sometimes.
-
-PAST MEDICAL HISTORY
-Type 2 DM x 12 years, Hypertension, Hyperlipidemia, GERD, Obesity, Depression (stable on sertraline), Former alcohol
-use disorder (sober 8 years)
-
-CURRENT MEDICATIONS
-1. Metformin ER 1000 mg BID
-2. Glipizide 10 mg BID
-3. Empagliflozin 10 mg daily
-4. Lisinopril 40 mg daily
-5. Atorvastatin 80 mg daily
-6. Sertraline 100 mg daily
-7. Omeprazole 20 mg daily
-8. Aspirin 81 mg daily
-
-PHYSICAL EXAM
-Vitals: BP 138/82, HR 80, Temp 98.0, Wt 247 lbs, BMI 34.5
-General: Obese male, pleasant, no acute distress.
-HEENT: PERRL, no retinopathy on undilated exam (due for ophthalmology).
-Cardiovascular: RRR, no murmurs, no edema.
-Lungs: Clear.
-Feet: Skin intact, no ulcers, no calluses. Monofilament testing: absent at multiple sites bilaterally in forefoot. Vibration sense
-decreased at bilateral great toes. Ankle reflexes absent bilaterally. Pedal pulses palpable. Mild stocking-distribution sensory
-loss to pinprick to mid-calf bilaterally. Right hand grip slightly reduced.
-Psych: Euthymic, appropriate affect.
-
-LABS (12/18/2025)
-A1c: 8.2% | Fasting glucose: 162 | BMP: Na 140, K 4.3, Cr 1.1, eGFR 72 | Lipids: TC 188, LDL 98, HDL 38, TG 210 | TSH:
-2.1 | B12: 285 (low-normal)
-
-ASSESSMENT AND PLAN
-
-1. Type 2 DM, improving but not at goal (E11.65)
-A1c improved to 8.2%. Continue current regimen. Goal A1c <7.5%. Counseled on continued lifestyle modification. Recheck
-A1c in 3 months.
-2. Peripheral Neuropathy (G63, E11.42)
-Progressive symmetric polyneuropathy affecting feet and now hands, in the setting of longstanding diabetes with suboptimal
-control. B12 is low-normal at 285 — will supplement with cyanocobalamin 1000 mcg daily and recheck methylmalonic acid
-level. However, hand involvement and the relatively rapid progression concern me. Referring to Neurology for EMG/NCS
-and further evaluation to confirm diagnosis and rule out other contributing etiologies (e.g., CIDP, other). Starting gabapentin
-100 mg TID for neuropathic pain, may titrate.
-3. Hypertension (I10)
-Borderline today. Continue current regimen. Home BP log reviewed, most readings 130s/80s.
-4. Tobacco use disorder (F17.210)
-Reduced to half PPD. Will prescribe varenicline if he decides to proceed. Counseled again today.
-5. Hypertriglyceridemia (E78.1)
-TG still elevated at 210. Likely related to diabetes control. Will reassess after A1c improves.
-RTC 3 months. Ophthalmology referral for diabetic eye exam placed. Podiatry referral placed.
-
-Electronically signed by Andrea L. Mitchell, MD
-Encounter signed 01/08/2026 16:55 EST | Riverbend EHR v4.2`,
-      },
+        "filename": "03_Patterson_Thomas.pdf",
+        "path": "/samples/triage/outpatient/03_Patterson_Thomas.pdf",
+        "docType": "PCP Referral",
+        "previewText": "Maple Ridge Internal Medicine\n214 Sycamore Ave, Suite 210, Dayton, OH 45409\nPhone: (937) 555-0421 | Fax: (937) 555-0422\n\nPatient: Thomas R. Patterson\n\nDate of Service: 03/10/2026\n\nDOB: 03/15/1963\n\nProvider: Karen S. Whitfield, MD\n\nMRN: MRIM-0025871\n\nSpecialty: Internal Medicine\n\nCHIEF COMPLAINT\nTwo episodes of transient right arm weakness and speech difficulty.\n\nHISTORY OF PRESENT ILLNESS\nMr. Patterson is a 62-year-old male seen urgently after his wife called the office concerned about two\nrecent episodes. First episode approximately 5 days ago (03/05/2026) while having morning coffee: sudden\nright arm heaviness and clumsiness, he dropped his cup, and his speech became slurred and hard to\nunderstand per his wife. This lasted about 15 minutes and resolved completely; he did not seek care,\nattributing it to fatigue. Second episode this morning around 7:30 AM: recurrence of right arm weakness\nand word-finding difficulty, with his wife also noting slight drooping on the right side of his face this\ntime. This episode lasted approximately 20 minutes and had fully resolved by the time they arrived at the\noffice roughly 30 minutes later, prompting today's visit. He denies headache, loss of consciousness,\nbowel/bladder involvement, or witnessed convulsive activity with either episode. He denies chest pain or\npalpitations. He is not on aspirin or any antiplatelet agent. Risk factor review: current smoker (1 pack/day\nx 35 years), hypertension with poorly controlled home readings, hyperlipidemia on statin therapy, no known\nhistory of atrial fibrillation or prior cardiac monitoring. No recent trauma, no anticoagulant use, no illicit\ndrug use.\n\nPAST MEDICAL HISTORY\nHypertension x 15 years, Hyperlipidemia, GERD, Erectile dysfunction, Right knee osteoarthritis. No prior\nstroke or TIA, no known arrhythmia, no diabetes.\n\nCURRENT MEDICATIONS\n1. Lisinopril 20 mg daily\n2. Atorvastatin 40 mg daily\n3. Omeprazole 20 mg daily\n4. Sildenafil PRN\n5. No current antiplatelet or anticoagulant therapy\n\nPHYSICAL EXAM\nVitals: BP 168/94, HR 88 regular, Temp 98.2, RR 16, SpO2 97% RA, BMI 29.1.\nGeneral: Anxious-appearing but conversant, no acute distress at this time.\nNeuro: Alert and oriented x3. Speech fluent and clear currently, no dysarthria or aphasia at rest. Cranial\nnerves II-XII intact, face symmetric, no ptosis. Motor 5/5 throughout bilaterally including right upper\nextremity, no pronator drift. Sensation intact to light touch. Coordination normal on finger-to-nose. Gait\nnormal, no imbalance reported. NIHSS 0 at time of this exam (performed after full resolution of symptoms).\nCardiovascular: Regular rate and rhythm, no murmurs, no carotid bruits appreciated on auscultation.\nNeck: Supple, no bruits.\n\nLABS\nPoint-of-care glucose 118 (in-office). CBC, BMP, lipid panel, HbA1c, PT/INR, and troponin sent stat — results\npending at time of this note.\n\nASSESSMENT AND PLAN\n\n1. Recurrent transient ischemic attack, crescendo pattern (G45.9)\nTwo stereotyped episodes within 5 days of right arm weakness and expressive speech difficulty, each fully\nresolved — classic TIA semiology localizing to the left MCA territory. Recurrent/crescendo TIA in a short\nwindow carries high short-term stroke risk (estimated ABCD2 ~6: age >=60, BP >=140/90, unilateral weakness\nwith speech disturbance, duration >=10 minutes). This is treated as a neurologic emergency. Calling Stroke\nNeurology directly today to arrange same-day evaluation with MRI/MRA brain, carotid imaging, and cardiac\nrhythm monitoring to evaluate for atrial fibrillation. Started aspirin 325 mg in-office pending neurology\nevaluation; no contraindication identified. Held sildenafil.\n2. Hypertension, uncontrolled (I10)\nBP 168/94 today. Continuing lisinopril; deferring major titration to the stroke team given urgency of\ntoday's presentation.\n3. Hyperlipidemia (E78.5)\nContinue atorvastatin 40 mg; anticipate stroke team may up-titrate to high-intensity statin dosing.\n4. Tobacco use disorder, cigarettes (F17.210)\nCounseled extensively on cessation given acute vascular event. Discussed nicotine replacement and\nvarenicline; he is willing to revisit with neurology/primary care.\nPatient and wife instructed to go directly to the Emergency Department for any recurrence of symptoms.\nUrgent same-day referral placed to Stroke Neurology; verbal report given to on-call stroke attending.\n\nElectronically signed by Karen S. Whitfield, MD\nEncounter signed 03/10/2026 09:40 EST | Maple Ridge Clinical EHR v6.1"
+      }
     ],
-    demoPoints: ['Urgent vascular neurology', 'TIA recognition'],
+    "demoPoints": [
+      "Urgent vascular neurology",
+      "TIA recognition"
+    ]
   },
   {
-    id: 'outpatient-04-williams',
-    patientName: 'Williams, Deshawn',
-    age: 8,
-    sex: 'M',
-    category: 'outpatient',
-    referringSpecialty: 'Pediatrics',
-    briefDescription: 'Staring spells at school with lip smacking, unresponsive for 10-15 seconds.',
-    clinicalHighlight: 'Absence seizures in child',
-    expectedTier: 'urgent',
-    files: [
+    "id": "outpatient-04-williams",
+    "patientName": "Williams, Deshawn",
+    "age": 8,
+    "sex": "M",
+    "category": "outpatient",
+    "referringSpecialty": "Pediatrics",
+    "briefDescription": "Staring spells at school with lip smacking, unresponsive for 10-15 seconds.",
+    "clinicalHighlight": "Absence seizures in child",
+    "expectedTier": "urgent",
+    "files": [
       {
-        filename: '04_Williams_Deshawn.pdf',
-        path: '/samples/triage/outpatient/04_Williams_Deshawn.pdf',
-        docType: 'Pediatric Referral',
-        previewText: `QuickCare Urgent Care
-1220 Veterans Blvd, Kenner, LA 70062
-Phone: (504) 555-0199 | Fax: (504) 555-0200
-
-Patient: Deshawn A. Williams
-
-Date of Service: 01/19/2026
-
-DOB: 03/17/1995
-
-Provider: Kyle M. Boudreaux, PA-C
-
-MRN: QC-90082714
-
-Credentials: Physician Assistant
-
-CHIEF COMPLAINT
-Episode of passing out and shaking, per girlfriend.
-
-HISTORY OF PRESENT ILLNESS
-30-year-old male presents accompanied by his girlfriend. She reports that last night while they were watching a movie, the
-patient suddenly became stiff and then started shaking all over for about 1-2 minutes. She states he was unresponsive
-during the episode and bit his tongue. Afterward he was confused for about 10 minutes and then very tired. He slept the rest
-of the night. He does not remember the episode. He says he felt fine otherwise yesterday. He had a few beers earlier in the
-evening (3-4). He denies any prior seizures, head injury, or drug use. He smokes marijuana occasionally. He has been
-sleeping poorly due to work stress. No family history of seizures that he knows of. No medications. He presents today
-because his girlfriend insisted.
-
-PHYSICAL EXAM
-Vitals: BP 128/76, HR 82, Temp 98.6, O2 sat 99% RA
-General: Alert, oriented, no distress. Appears tired.
-HEENT: Small healing bite mark on left lateral tongue. No head trauma signs.
-Neuro: A&Ox4.; Cranial nerves grossly intact. Strength and sensation intact. Gait normal. No focal deficits.
-Otherwise: Heart, lungs, abdomen unremarkable.
-
-ASSESSMENT AND PLAN
-1. First-time seizure (R56.9)
-Presentation consistent with witnessed generalized tonic-clonic seizure — tongue bite, postictal confusion, and amnesia for
-event. No clear provoking factor identified other than possible sleep deprivation and alcohol. Neuro exam normal today.
-- BMP, CBC, glucose, and UDS sent. Results pending at time of discharge.
-- Counseled patient not to drive until evaluated by Neurology
-- Advised against alcohol and to maintain regular sleep
-- Referral to Neurology for further workup including EEG and MRI
-- If another event occurs, go to ER
-- Prescription: none at this time, deferring to neurology for decision on antiepileptic medication
-
-Electronically signed by Kyle M. Boudreaux, PA-C
-Supervising Physician: James T. Fontenot, MD | Signed 01/19/2026 14:22 CST`,
-      },
+        "filename": "04_Williams_Deshawn.pdf",
+        "path": "/samples/triage/outpatient/04_Williams_Deshawn.pdf",
+        "docType": "Pediatric Referral",
+        "previewText": "Riverbend Pediatric Associates\n2140 Wilmington Pike, Suite 220, Kettering, OH 45420\nPhone: (937) 555-0163 | Fax: (937) 555-0164\n\nPatient: Deshawn M. Williams\n\nDate of Service: 01/20/2026\n\nDOB: 11/03/2017\n\nProvider: Lauren K. Ashford, MD\n\nMRN: RPA-0052210\n\nSpecialty: Pediatrics\n\nCHIEF COMPLAINT\n\"He zones out and stares a lot at school.\" (per mother)\n\nHISTORY OF PRESENT ILLNESS\nDeshawn is an 8-year-old right-handed male, previously healthy with normal growth and development, brought in by his mother after his second-grade teacher raised concerns about recurrent staring episodes at school. Per the teacher's written note and mother's report, episodes began approximately 6 weeks ago and have become more frequent, now estimated at 5-8 times per day. Episodes are stereotyped: Deshawn abruptly stops what he is doing, stares blankly, and is unresponsive to his name or a light tap on the shoulder for approximately 10-15 seconds. The teacher has observed subtle lip-smacking movements during some episodes; the mother has separately noted occasional fluttering of his eyelids. There is no associated falling, stiffening, or convulsive activity. He resumes his prior activity immediately afterward, does not appear confused, and has no recollection that the episode occurred. There is no tongue biting or incontinence. Episodes are not clearly provoked by any specific activity and have occurred both during quiet seatwork and at recess.\n\nHis grades have started to slip this quarter, which the teacher attributes to \"missing\" instruction during these episodes rather than any learning difficulty. He has otherwise been in his usual state of health, with no fevers, headaches, vomiting, or head trauma. No history of prior seizures, febrile or afebrile. Birth history is unremarkable (full-term, uncomplicated vaginal delivery); developmental milestones have all been met on time, and he is described as a bright, social child.\n\nIn clinic today, Deshawn was asked to hyperventilate (blow on a pinwheel) for approximately 90 seconds. This produced a brief episode, roughly 8 seconds, of staring with eyelid fluttering and lip-smacking; he was unresponsive to his mother's voice during the episode and returned to baseline immediately afterward with no recollection of it.\n\nPAST MEDICAL HISTORY\nNone. Full-term birth, uncomplicated pregnancy. Up to date on immunizations. No prior hospitalizations or surgeries.\n\nFAMILY HISTORY\nMaternal aunt reportedly had \"seizures as a child that she outgrew\" per mother's recollection; no further detail available. No family history of febrile seizures, developmental delay, or genetic syndromes.\n\nCURRENT MEDICATIONS\nNone. No prior antiseizure medication trials.\n\nPHYSICAL EXAM\nVitals: BP 102/64, HR 92, Temp 98.2 F, Wt 54 lbs (55th percentile), Ht 50 in (50th percentile)\nGeneral: Well-appearing, cooperative, interactive child in no distress.\nHEENT: Normocephalic, atraumatic. No dysmorphic features.\nNeuro: Alert and fully oriented for age. Cranial nerves II-XII grossly intact. Strength 5/5 in all extremities. Normal tone. Reflexes 2+ and symmetric. Gait, heel-to-toe, and finger-to-nose all normal. In-office hyperventilation maneuver as above reproduced a typical episode (see HPI).\nSkin: No neurocutaneous stigmata (no cafe-au-lait macules, no ash-leaf spots).\n\nASSESSMENT AND PLAN\n\n1. Recurrent staring spells, in-office hyperventilation-provoked (R56.9)\nStereotyped brief staring episodes with impaired responsiveness, occurring multiple times daily, reproduced in clinic with hyperventilation. Differential includes childhood absence epilepsy (G40.A0) given the brief duration, abrupt onset/offset, and immediate return to baseline without postictal confusion, versus a focal epilepsy with automatisms (G40.909) given the observed lip-smacking. Referring to pediatric neurology/epilepsy on an urgent basis for EEG (awake and sleep-deprived, with hyperventilation and photic stimulation activation) to characterize episode type and guide treatment; will defer to neurology regarding need for MRI brain based on EEG findings.\n2. Safety counseling\nDiscussed seizure precautions with mother pending workup: supervised bathing/swimming only, no unsupervised bicycle riding on streets, avoid heights, until cleared by neurology.\n3. School communication\nRecommended mother provide the teacher with an episode log (date, time, duration, activity, witnessed features) to bring to the neurology visit.\n4. Follow-up\nRTC after neurology evaluation; call sooner for any convulsive seizure, injury, or change in episode pattern.\n\nElectronically signed by Lauren K. Ashford, MD\nEncounter signed 01/20/2026 15:40 EST | Riverbend Pediatric Associates EHR v4.2"
+      }
     ],
-    demoPoints: ['Pediatric epilepsy referral', 'Seizure recognition'],
+    "demoPoints": [
+      "Pediatric epilepsy referral",
+      "Seizure recognition"
+    ]
   },
   {
-    id: 'outpatient-05-hargrove',
-    patientName: 'Hargrove, Linda',
-    age: 56,
-    sex: 'F',
-    category: 'outpatient',
-    referringSpecialty: 'Family Medicine',
-    briefDescription: 'Fibromyalgia follow-up with progressive bilateral foot numbness ascending to calves.',
-    clinicalHighlight: 'Peripheral neuropathy',
-    expectedTier: 'routine_priority',
-    files: [
+    "id": "outpatient-05-hargrove",
+    "patientName": "Hargrove, Linda",
+    "age": 56,
+    "sex": "F",
+    "category": "outpatient",
+    "referringSpecialty": "Family Medicine",
+    "briefDescription": "Fibromyalgia follow-up with progressive bilateral foot numbness ascending to calves.",
+    "clinicalHighlight": "Peripheral neuropathy",
+    "expectedTier": "routine_priority",
+    "files": [
       {
-        filename: '05_Hargrove_Linda.pdf',
-        path: '/samples/triage/outpatient/05_Hargrove_Linda.pdf',
-        docType: 'PCP Referral',
-        previewText: `Broken Bow Community Health Clinic
-P.O. Box 340, 14 Elm Street, Broken Bow, OK 74728
-Phone: (580) 555-0087 | Fax: (580) 555-0088
-
-Patient: Linda S. Hargrove
-
-Date of Service: 01/06/2026
-
-DOB: 06/29/1958
-
-Provider: Jessica Dye, APRN, FNP-C
-
-MRN: BB-0003291
-
-Credentials: Family Nurse Practitioner
-
-CHIEF COMPLAINT
-Back pain and medication refills.
-
-HISTORY OF PRESENT ILLNESS
-Mrs. Hargrove is a 67-year-old female here for ongoing low back pain and medication refills. She has had back pain for
-years, worse over the last 6 months. She had an MRI at the hospital in McAlester about 4 months ago that showed
-multilevel degenerative disc disease and a disc bulge at L4-L5. She got a steroid injection from pain management in
-September which helped for about a month. She is currently taking hydrocodone 5/325 two to three times a day for pain.
-She says the pain goes down the back of both legs to her calves. She rates it 7/10 today.
-She is also here for refills on her blood pressure and thyroid meds. She says her blood pressure has been running fine at
-home. She checks it at the pharmacy.
-She also mentions that her left foot has been dragging some when she walks and her left leg feels weak. She says it started
-maybe 2 months ago and is getting worse. She tripped on a rug last week because of it. She has not told anyone about it
-until today.
-
-CURRENT MEDICATIONS
-1. Hydrocodone/APAP 5/325 mg q8h PRN
-2. Levothyroxine 75 mcg daily
-3. Amlodipine 10 mg daily
-4. Ibuprofen 800 mg TID with food
-
-PHYSICAL EXAM
-Vitals: BP 134/78, HR 74, Wt 182 lbs
-General: Pleasant female, ambulates slowly, slightly antalgic gait favoring left.
-Back: Tender to palpation over lumbar paraspinals. Limited flexion and extension. Positive straight leg raise on left at 40
-degrees.
-Lower Extremities: Left dorsiflexion 3/5, right dorsiflexion 5/5. Left EHL weak. Sensation decreased lateral left leg and
-dorsum of left foot. Left patellar reflex 2+, left ankle reflex 1+. Right side normal.
-Remainder: Not formally examined today, focused visit.
-
-ASSESSMENT AND PLAN
-1. Chronic low back pain with left-sided radiculopathy (M54.5, M54.17)
-Known multilevel DDD with L4-5 disc bulge. Current presentation is consistent with left L5 radiculopathy. Continue
-hydrocodone for now. Refill ibuprofen. Medrol dosepak prescribed.
-2. Left foot drop / progressive left leg weakness
-This is new and concerning. Progressive left foot drop with fall risk. This needs neurology evaluation. Referred to neuro.
-Told patient this is important and not to wait on appointment. If worsens or develops bowel/bladder problems, go to ER.
-3. Hypothyroidism (E03.9)
-Stable. Refill levothyroxine. TSH due, ordered today.
-4. Hypertension (I10)
-Controlled. Refill amlodipine.
-
-Follow-up in 4-6 weeks, sooner if weakness worsens.
-
-Electronically signed by Jessica Dye, APRN, FNP-C
-Collaborating Physician: not available on-site | Signed 01/06/2026 11:30 CST`,
-      },
+        "filename": "05_Hargrove_Linda.pdf",
+        "path": "/samples/triage/outpatient/05_Hargrove_Linda.pdf",
+        "docType": "PCP Referral",
+        "previewText": "Riverbend Family Medicine\n780 Commerce Dr, Suite A, Dayton, OH 45402\nPhone: (937) 555-0388 | Fax: (937) 555-0389\n\nPatient: Thomas J. Patterson\n\nDate of Service: 01/08/2026\n\nDOB: 11/05/1962\n\nProvider: Andrea L. Mitchell, MD\n\nMRN: RFM-0041177\n\nSpecialty: Family Medicine\n\nCHIEF COMPLAINT\nDiabetes follow-up, medication refills.\n\nHISTORY OF PRESENT ILLNESS\nMr. Patterson is a 63-year-old male here for quarterly diabetes follow-up. His A1c from last month was 8.2%, improved from\n8.9% in July. He reports better adherence to metformin since we switched to extended release. He has been walking 20\nminutes most days. His home blood glucose readings are mostly in the 130-170 range fasting.\nHe continues to smoke half a pack per day, down from one pack. We discussed cessation again today and he is considering\nvarenicline. He reports his mood has been okay, though he is stressed about finances. He denies suicidal ideation.\nHe also mentions ongoing numbness and tingling in both feet that has been gradually worsening over the past year. He\nsays it is now up to his ankles. He dropped a cup last week because his right hand felt numb. He reports some burning pain\nat night in his feet that wakes him up. He has not tried anything for it. He has not had a fall but does feel unsteady\nsometimes.\n\nPAST MEDICAL HISTORY\nType 2 DM x 12 years, Hypertension, Hyperlipidemia, GERD, Obesity, Depression (stable on sertraline), Former alcohol\nuse disorder (sober 8 years)\n\nCURRENT MEDICATIONS\n1. Metformin ER 1000 mg BID\n2. Glipizide 10 mg BID\n3. Empagliflozin 10 mg daily\n4. Lisinopril 40 mg daily\n5. Atorvastatin 80 mg daily\n6. Sertraline 100 mg daily\n7. Omeprazole 20 mg daily\n8. Aspirin 81 mg daily\n\nPHYSICAL EXAM\nVitals: BP 138/82, HR 80, Temp 98.0, Wt 247 lbs, BMI 34.5\nGeneral: Obese male, pleasant, no acute distress.\nHEENT: PERRL, no retinopathy on undilated exam (due for ophthalmology).\nCardiovascular: RRR, no murmurs, no edema.\nLungs: Clear.\nFeet: Skin intact, no ulcers, no calluses. Monofilament testing: absent at multiple sites bilaterally in forefoot. Vibration sense\ndecreased at bilateral great toes. Ankle reflexes absent bilaterally. Pedal pulses palpable. Mild stocking-distribution sensory\nloss to pinprick to mid-calf bilaterally. Right hand grip slightly reduced.\nPsych: Euthymic, appropriate affect.\n\nLABS (12/18/2025)\nA1c: 8.2% | Fasting glucose: 162 | BMP: Na 140, K 4.3, Cr 1.1, eGFR 72 | Lipids: TC 188, LDL 98, HDL 38, TG 210 | TSH:\n2.1 | B12: 285 (low-normal)\n\nASSESSMENT AND PLAN\n\n\f1. Type 2 DM, improving but not at goal (E11.65)\nA1c improved to 8.2%. Continue current regimen. Goal A1c <7.5%. Counseled on continued lifestyle modification. Recheck\nA1c in 3 months.\n2. Peripheral Neuropathy (G63, E11.42)\nProgressive symmetric polyneuropathy affecting feet and now hands, in the setting of longstanding diabetes with suboptimal\ncontrol. B12 is low-normal at 285 — will supplement with cyanocobalamin 1000 mcg daily and recheck methylmalonic acid\nlevel. However, hand involvement and the relatively rapid progression concern me. Referring to Neurology for EMG/NCS\nand further evaluation to confirm diagnosis and rule out other contributing etiologies (e.g., CIDP, other). Starting gabapentin\n100 mg TID for neuropathic pain, may titrate.\n3. Hypertension (I10)\nBorderline today. Continue current regimen. Home BP log reviewed, most readings 130s/80s.\n4. Tobacco use disorder (F17.210)\nReduced to half PPD. Will prescribe varenicline if he decides to proceed. Counseled again today.\n5. Hypertriglyceridemia (E78.1)\nTG still elevated at 210. Likely related to diabetes control. Will reassess after A1c improves.\nRTC 3 months. Ophthalmology referral for diabetic eye exam placed. Podiatry referral placed.\n\nElectronically signed by Andrea L. Mitchell, MD\nEncounter signed 01/08/2026 16:55 EST | Riverbend EHR v4.2"
+      }
     ],
-    demoPoints: ['Neuropathy workup', 'Symptom overlap with fibromyalgia'],
+    "demoPoints": [
+      "Neuropathy workup",
+      "Symptom overlap with fibromyalgia"
+    ]
   },
   {
-    id: 'outpatient-06-caldwell',
-    patientName: 'Caldwell, Dorothy',
-    age: 78,
-    sex: 'F',
-    category: 'outpatient',
-    referringSpecialty: 'Geriatrics',
-    briefDescription: 'Family concerned about progressive memory decline, getting lost, leaving stove on.',
-    clinicalHighlight: 'Early dementia (MoCA 18/30)',
-    expectedTier: 'routine_priority',
-    files: [
+    "id": "outpatient-06-caldwell",
+    "patientName": "Caldwell, Dorothy",
+    "age": 78,
+    "sex": "F",
+    "category": "outpatient",
+    "referringSpecialty": "Geriatrics",
+    "briefDescription": "Family concerned about progressive memory decline, getting lost, leaving stove on.",
+    "clinicalHighlight": "Early dementia (MoCA 18/30)",
+    "expectedTier": "routine_priority",
+    "files": [
       {
-        filename: '06_Caldwell_Dorothy.pdf',
-        path: '/samples/triage/outpatient/06_Caldwell_Dorothy.pdf',
-        docType: 'Geriatric Referral',
-        previewText: `Commonwealth Geriatric & Internal Medicine
-2100 Brownsboro Road, Suite 200, Louisville, KY 40206
-Phone: (502) 555-0312 | Fax: (502) 555-0313
-
-Patient: Dorothy Mae Caldwell
-
-Date of Service: 01/16/2026
-
-DOB: 02/14/1940
-
-Provider: Priya Narayan, MD
-
-MRN: CGI-0071882
-
-Specialty: Internal Medicine / Geriatrics
-
-CHIEF COMPLAINT
-Annual wellness visit. Daughter present, concerned about memory.
-
-HISTORY OF PRESENT ILLNESS
-Mrs. Caldwell is an 85-year-old female presenting for her annual wellness visit. She is accompanied by her daughter, Karen,
-who has power of attorney for healthcare. Mrs. Caldwell reports she feels "fine" and does not have specific complaints.
-Karen reports increasing concern about her mother's memory over the past 12-18 months. She describes repetitive
-questioning, forgetting recent conversations, and difficulty managing her medications (she found pills in the wrong
-compartments of her pill organizer several times). Mrs. Caldwell got lost driving to church 2 months ago — a route she has
-driven for decades — and a neighbor had to help her home. Her daughter has since been driving her. She also left the stove
-on twice in December. Karen states her mother's personality has not changed and she is not agitated or having
-hallucinations, but she does seem more withdrawn and less interested in her garden, which she previously loved.
-Mrs. Caldwell has been independent in ADLs (bathing, dressing, toileting) but is now needing reminders. IADLs are
-declining — Karen has taken over finances, medication management, and cooking. Mrs. Caldwell acknowledges "I forget
-things sometimes" but does not seem concerned.
-No recent falls, urinary incontinence, gait changes, or new headaches. No depression screening done recently.
-
-PAST MEDICAL HISTORY
-Hypertension, Hyperlipidemia, Osteoarthritis (knees, hands), Osteoporosis (on alendronate), GERD, Chronic kidney
-disease stage 3a (eGFR 52), Remote history of breast cancer (2005, lumpectomy + radiation, in remission), Hearing loss
-(bilateral hearing aids)
-
-CURRENT MEDICATIONS
-1. Amlodipine 5 mg daily
-2. Losartan 50 mg daily
-3. Atorvastatin 20 mg daily
-4. Alendronate 70 mg weekly
-5. Calcium/Vitamin D 600/400 BID
-6. Omeprazole 20 mg daily
-7. Acetaminophen 500 mg TID PRN
-8. Diphenhydramine 25 mg QHS PRN sleep (per daughter, taking nightly)
-9. Lorazepam 0.5 mg PRN anxiety (per daughter, taking 2-3x/week)
-
-COGNITIVE SCREENING
-MoCA (administered today): 18/30
-Deficits in: delayed recall (0/5), visuospatial/executive (2/5), orientation (4/6). Attention and language relatively preserved.
-+1 point for education (high school graduate).
-PHQ-2: 1 (daughter answered; patient scored 0, daughter felt score of 1 more accurate). Does not meet threshold for major
-depression.
-GDS-4: 1/4. Not suggestive of significant depression.
-
-PHYSICAL EXAM
-Vitals: BP 128/68 (seated), 118/62 (standing, no symptoms), HR 68, Wt 138 lbs, Ht 5'2"
-General: Thin elderly female, well-groomed, pleasant. Hearing aids in place.
-
-Cardiovascular: RRR, grade 2/6 systolic murmur at aortic area (known, stable).
-Neuro: Alert, oriented to person and city but not date (said "January something... 2024?"). No focal motor or sensory
-deficits. Gait steady with narrow base, no assistive device. No tremor, rigidity, or bradykinesia. Cranial nerves grossly intact.
-
-LABS (01/09/2026)
-CBC: normal | BMP: Cr 1.2, eGFR 52, otherwise normal | TSH: 3.1 | B12: 410 | Folate: 14.2 | RPR: nonreactive | Vitamin D:
-28 (low-normal) | UA: normal
-
-ASSESSMENT AND PLAN
-1. Cognitive decline / suspected early-to-moderate dementia (R41.81)
-MoCA 18/30 with deficits in memory, executive function, and orientation, in the context of progressive functional decline
-over 12-18 months. Reversible causes screened: TSH, B12, folate, RPR all within normal limits. No depression on
-screening. CT head ordered to rule out structural pathology (NPH, SDH, mass).
-Referring to Neurology for formal evaluation and consideration of further cognitive testing, possible MRI with volumetrics,
-and discussion of cholinesterase inhibitor therapy. Would also appreciate their input on whether amyloid biomarker testing
-would be appropriate.
-IMPORTANT — Medication changes related to cognition:
-- Discontinuing diphenhydramine (high anticholinergic burden, Beers list) — will substitute melatonin 3 mg QHS for sleep
-- Tapering lorazepam: 0.25 mg x 2 weeks then discontinue — benzodiazepine use associated with worsened cognition in
-elderly; discussed with daughter who is on board
-- Counseled family on driving cessation (already implemented)
-- Discussed home safety: remove throw rugs, stove knob covers
-2. CKD stage 3a (N18.31) — Stable. Continue losartan. Recheck BMP in 6 months.
-3. Hypertension — Controlled. Orthostatics negative. Continue current regimen.
-4. Osteoporosis — Continue alendronate. DEXA due this year.
-5. Polypharmacy — Reviewed medications with daughter. Eliminating Beers list medications as above. Will reassess
-omeprazole at next visit (long-term PPI use).
-Follow-up in 8 weeks. Sooner if behavioral changes or rapid decline. Provided Alzheimer's Association caregiver resources
-to daughter.
-
-Electronically signed by Priya Narayan, MD
-Signed 01/16/2026 18:05 EST | CGIM EHR System`,
-      },
+        "filename": "06_Caldwell_Dorothy.pdf",
+        "path": "/samples/triage/outpatient/06_Caldwell_Dorothy.pdf",
+        "docType": "Geriatric Referral",
+        "previewText": "Commonwealth Geriatric & Internal Medicine\n2100 Brownsboro Road, Suite 200, Louisville, KY 40206\nPhone: (502) 555-0312 | Fax: (502) 555-0313\n\nPatient: Dorothy Mae Caldwell\n\nDate of Service: 01/16/2026\n\nDOB: 02/14/1940\n\nProvider: Priya Narayan, MD\n\nMRN: CGI-0071882\n\nSpecialty: Internal Medicine / Geriatrics\n\nCHIEF COMPLAINT\nAnnual wellness visit. Daughter present, concerned about memory.\n\nHISTORY OF PRESENT ILLNESS\nMrs. Caldwell is an 85-year-old female presenting for her annual wellness visit. She is accompanied by her daughter, Karen,\nwho has power of attorney for healthcare. Mrs. Caldwell reports she feels \"fine\" and does not have specific complaints.\nKaren reports increasing concern about her mother's memory over the past 12-18 months. She describes repetitive\nquestioning, forgetting recent conversations, and difficulty managing her medications (she found pills in the wrong\ncompartments of her pill organizer several times). Mrs. Caldwell got lost driving to church 2 months ago — a route she has\ndriven for decades — and a neighbor had to help her home. Her daughter has since been driving her. She also left the stove\non twice in December. Karen states her mother's personality has not changed and she is not agitated or having\nhallucinations, but she does seem more withdrawn and less interested in her garden, which she previously loved.\nMrs. Caldwell has been independent in ADLs (bathing, dressing, toileting) but is now needing reminders. IADLs are\ndeclining — Karen has taken over finances, medication management, and cooking. Mrs. Caldwell acknowledges \"I forget\nthings sometimes\" but does not seem concerned.\nNo recent falls, urinary incontinence, gait changes, or new headaches. No depression screening done recently.\n\nPAST MEDICAL HISTORY\nHypertension, Hyperlipidemia, Osteoarthritis (knees, hands), Osteoporosis (on alendronate), GERD, Chronic kidney\ndisease stage 3a (eGFR 52), Remote history of breast cancer (2005, lumpectomy + radiation, in remission), Hearing loss\n(bilateral hearing aids)\n\nCURRENT MEDICATIONS\n1. Amlodipine 5 mg daily\n2. Losartan 50 mg daily\n3. Atorvastatin 20 mg daily\n4. Alendronate 70 mg weekly\n5. Calcium/Vitamin D 600/400 BID\n6. Omeprazole 20 mg daily\n7. Acetaminophen 500 mg TID PRN\n8. Diphenhydramine 25 mg QHS PRN sleep (per daughter, taking nightly)\n9. Lorazepam 0.5 mg PRN anxiety (per daughter, taking 2-3x/week)\n\nCOGNITIVE SCREENING\nMoCA (administered today): 18/30\nDeficits in: delayed recall (0/5), visuospatial/executive (2/5), orientation (4/6). Attention and language relatively preserved.\n+1 point for education (high school graduate).\nPHQ-2: 1 (daughter answered; patient scored 0, daughter felt score of 1 more accurate). Does not meet threshold for major\ndepression.\nGDS-4: 1/4. Not suggestive of significant depression.\n\nPHYSICAL EXAM\nVitals: BP 128/68 (seated), 118/62 (standing, no symptoms), HR 68, Wt 138 lbs, Ht 5'2\"\nGeneral: Thin elderly female, well-groomed, pleasant. Hearing aids in place.\n\n\fCardiovascular: RRR, grade 2/6 systolic murmur at aortic area (known, stable).\nNeuro: Alert, oriented to person and city but not date (said \"January something... 2024?\"). No focal motor or sensory\ndeficits. Gait steady with narrow base, no assistive device. No tremor, rigidity, or bradykinesia. Cranial nerves grossly intact.\n\nLABS (01/09/2026)\nCBC: normal | BMP: Cr 1.2, eGFR 52, otherwise normal | TSH: 3.1 | B12: 410 | Folate: 14.2 | RPR: nonreactive | Vitamin D:\n28 (low-normal) | UA: normal\n\nASSESSMENT AND PLAN\n1. Cognitive decline / suspected early-to-moderate dementia (R41.81)\nMoCA 18/30 with deficits in memory, executive function, and orientation, in the context of progressive functional decline\nover 12-18 months. Reversible causes screened: TSH, B12, folate, RPR all within normal limits. No depression on\nscreening. CT head ordered to rule out structural pathology (NPH, SDH, mass).\nReferring to Neurology for formal evaluation and consideration of further cognitive testing, possible MRI with volumetrics,\nand discussion of cholinesterase inhibitor therapy. Would also appreciate their input on whether amyloid biomarker testing\nwould be appropriate.\nIMPORTANT — Medication changes related to cognition:\n- Discontinuing diphenhydramine (high anticholinergic burden, Beers list) — will substitute melatonin 3 mg QHS for sleep\n- Tapering lorazepam: 0.25 mg x 2 weeks then discontinue — benzodiazepine use associated with worsened cognition in\nelderly; discussed with daughter who is on board\n- Counseled family on driving cessation (already implemented)\n- Discussed home safety: remove throw rugs, stove knob covers\n2. CKD stage 3a (N18.31) — Stable. Continue losartan. Recheck BMP in 6 months.\n3. Hypertension — Controlled. Orthostatics negative. Continue current regimen.\n4. Osteoporosis — Continue alendronate. DEXA due this year.\n5. Polypharmacy — Reviewed medications with daughter. Eliminating Beers list medications as above. Will reassess\nomeprazole at next visit (long-term PPI use).\nFollow-up in 8 weeks. Sooner if behavioral changes or rapid decline. Provided Alzheimer's Association caregiver resources\nto daughter.\n\nElectronically signed by Priya Narayan, MD\nSigned 01/16/2026 18:05 EST | CGIM EHR System"
+      }
     ],
-    demoPoints: ['Cognitive decline workup', 'Dementia evaluation'],
+    "demoPoints": [
+      "Cognitive decline workup",
+      "Dementia evaluation"
+    ]
   },
   {
-    id: 'outpatient-07-kowalski',
-    patientName: 'Kowalski, Brittany',
-    age: 14,
-    sex: 'F',
-    category: 'outpatient',
-    referringSpecialty: 'Pediatrics',
-    briefDescription: 'Recurrent headaches with nausea and photophobia in obese teen.',
-    clinicalHighlight: 'Migraine +/- IIH concern',
-    expectedTier: 'routine_priority',
-    files: [
+    "id": "outpatient-07-kowalski",
+    "patientName": "Kowalski, Brittany",
+    "age": 14,
+    "sex": "F",
+    "category": "outpatient",
+    "referringSpecialty": "Pediatrics",
+    "briefDescription": "Recurrent headaches with nausea and photophobia in obese teen.",
+    "clinicalHighlight": "Migraine +/- IIH concern",
+    "expectedTier": "routine_priority",
+    "files": [
       {
-        filename: '07_Kowalski_Brittany.pdf',
-        path: '/samples/triage/outpatient/07_Kowalski_Brittany.pdf',
-        docType: 'Pediatric Referral',
-        previewText: `Sycamore Street Family Practice
-305 Sycamore St, Terre Haute, IN 47807
-Phone: (812) 555-0234 | Fax: (812) 555-0235
-
-Patient: Brittany N. Kowalski
-
-Date of Service: 01/21/2026
-
-DOB: 08/11/1993
-
-Provider: Michael Chen, MD
-
-MRN: SSFP-0028441
-
-Specialty: Family Medicine (2 yrs post-residency)
-
-CHIEF COMPLAINT
-Numbness in legs, fatigue, vision was blurry last month.
-
-HPI
-32 y/o F, no significant PMH, presents with several weeks of numbness/tingling in both legs below the knees. She also had
-an episode of blurry vision in her right eye about 5 weeks ago that lasted ~10 days then mostly resolved — she did not seek
-care at that time. Currently reports profound fatigue, worse than her baseline. She is having difficulty at work (she is a
-teacher) because her legs feel "heavy." Denies bowel or bladder issues. No back pain. No rash. No recent illness or travel.
-She did have a UTI treated with Macrobid about 2 months ago.
-
-EXAM
-Vitals: WNL
-General: Well-appearing, appears fatigued.
-Neuro: Strength 4+/5 bilateral LE, 5/5 UE. Hyperreflexia bilateral LE (3+). Positive Babinski on right. Decreased vibration
-sense bilateral feet. Visual acuity 20/25 OD, 20/20 OS. Mild RAPD on right.
-Other: Unremarkable.
-
-ASSESSMENT/PLAN
-Concerning for demyelinating disease given combination of optic neuritis history, upper motor neuron signs in LE, and
-sensory changes. Dissemination in space and time is suggested clinically.
-- MRI brain and C/T spine with and without contrast ordered (STAT)
-- CBC, CMP, ESR, CRP, ANA, B12, TSH ordered
-- Urgent neurology referral placed — requesting expedited appointment
-- Told patient to go to ER if she develops worsening weakness, difficulty walking, or bladder retention
-- Will call patient when MRI results are available
-
-Electronically signed by Michael Chen, MD
-Signed 01/21/2026 12:40 EST`,
-      },
+        "filename": "07_Kowalski_Brittany.pdf",
+        "path": "/samples/triage/outpatient/07_Kowalski_Brittany.pdf",
+        "docType": "Pediatric Referral",
+        "previewText": "Lakeshore Internal Medicine Associates\n4500 N. Michigan Ave, Suite 310, Chicago, IL 60611\nPhone: (312) 555-0276 | Fax: (312) 555-0277\n\nPatient: Maria Elena Gutierrez\n\nDate of Service: 01/22/2026\n\nDOB: 09/23/1988\n\nProvider: Robert A. Tanaka, MD, FACP\n\nMRN: LIM-00553921\n\nSpecialty: Internal Medicine (Board Certified, 22 yrs practice)\n\nCHIEF COMPLAINT\nWorsening headaches over the past 3 months.\n\nHISTORY OF PRESENT ILLNESS\nMs. Gutierrez is a 37-year-old female with a history of episodic migraine without aura since her early 20s who presents with\na change in her headache pattern over the past 3 months. Previously, she experienced migraines approximately 2-3 times\nper month, typically perimenstrual, responding well to sumatriptan 100 mg PO. Over the past 12 weeks, she reports\nheadaches occurring 4-5 days per week. The headaches are now bifrontal and occipital, described as a pressure/tightness\nwith superimposed throbbing, rated 6-8/10 in intensity. Associated symptoms include photophobia, mild nausea (no\nvomiting), and difficulty concentrating at work. She denies visual aura, weakness, numbness, speech difficulty, or fever. No\nhistory of head trauma.\nShe reports increased sumatriptan use to 10-12 doses per month. She was started on topiramate 25 mg BID by her prior\nPCP 6 weeks ago with titration to 50 mg BID, but she has seen no meaningful improvement and reports word-finding\ndifficulty and paresthesias in her hands as side effects. She is a graphic designer and the cognitive side effects are\nsignificantly impacting her work.\nShe works long hours at a computer, sleeps approximately 5-6 hours per night, drinks 3-4 cups of coffee daily, and reports\nmoderate work-related stress. She exercises 2-3x/week. No recent vision changes aside from photophobia with headache.\nLast eye exam 8 months ago was normal.\nOf note, her mother has a history of migraine and her maternal aunt was diagnosed with idiopathic intracranial hypertension\nat age 35.\n\nREVIEW OF SYSTEMS\nConstitutional: Reports fatigue. No weight changes, fevers, or night sweats. HEENT: Photophobia with headaches. No\nvision loss, diplopia, tinnitus, hearing changes. Cardiovascular: No chest pain, palpitations. Respiratory: No cough or\ndyspnea. GI: Mild nausea with headaches. No vomiting, abdominal pain, or changes in bowel habits. Neurologic: No focal\nweakness, numbness (other than topiramate-related), gait difficulty, or seizures. Reports difficulty concentrating and\nword-finding trouble (on topiramate). Psych: Mild anxiety related to headaches affecting work. No depression, SI/HI.\n\nCURRENT MEDICATIONS\n1. Sumatriptan 100 mg PO PRN (using 10-12x/month)\n2. Topiramate 50 mg BID (started 6 weeks ago, poor response)\n3. Ibuprofen 400 mg PRN (using 2-3x/week)\n4. Combined oral contraceptive (ethinyl estradiol/norgestimate)\n\nALLERGIES\nAmoxicillin (rash)\n\nPHYSICAL EXAM\nVitals: BP 122/78, HR 72, Temp 98.4, Wt 156 lbs, Ht 5'5\", BMI 26.0\nGeneral: Well-appearing female, no acute distress.\nHEENT: Normocephalic, atraumatic. No tenderness over sinuses or temporal arteries. PERRL, EOMI, no papilledema on\nfundoscopic exam (limited view, non-dilated). TMs normal. Oropharynx clear.\nNeck: Supple, no meningismus, no lymphadenopathy. Mild trapezius tenderness bilaterally.\nCardiovascular: RRR, no murmurs.\n\n\fLungs: Clear bilaterally.\nNeurologic: Alert and oriented x3. Cranial nerves II-XII intact. Motor strength 5/5 in all extremities. Sensation intact to light\ntouch. DTRs 2+ and symmetric. Finger-to-nose and heel-to-shin normal. Romberg negative. Gait normal including tandem.\n\nASSESSMENT AND PLAN\n1. Chronic migraine with medication overuse headache (G43.709, G44.41)\nPatient has transitioned from episodic migraine to chronic migraine (>15 headache days/month x >3 months) with\nconcurrent medication overuse (sumatriptan >10 days/month). Topiramate trial has been inadequate due to intolerable\ncognitive side effects. Family history notable for maternal aunt with IIH, though patient's exam does not suggest this at\npresent.\nPlan:\n- Taper and discontinue topiramate over 2 weeks (50 mg daily x 1 week, then 25 mg daily x 1 week, then stop)\n- Limit sumatriptan to no more than 2 days/week; counseled on medication overuse headache\n- Start headache diary to track frequency, triggers, and acute medication use\n- Referring to Neurology/Headache specialist for further management including consideration of CGRP monoclonal antibody\ntherapy (e.g., erenumab, fremanezumab) or alternative prophylaxis, and evaluation for medication overuse headache\ndetoxification strategy\n- MRI brain without contrast ordered to evaluate given change in headache pattern and family history\n- Discussed sleep hygiene, caffeine reduction, and stress management\n2. Anxiety, mild, situational\nRelated to headache impact on work function. Will defer to neurology for comprehensive management. If persistent, may\nconsider SSRI which could serve dual purpose.\nFollow-up in 6 weeks or sooner after neurology evaluation.\n\nElectronically signed by Robert A. Tanaka, MD, FACP\nSigned electronically 01/22/2026 15:18 CST | Lakeshore IM EHR"
+      }
     ],
-    demoPoints: ['Pediatric headache', 'IIH screening needed'],
+    "demoPoints": [
+      "Pediatric headache",
+      "IIH screening needed"
+    ]
   },
   {
-    id: 'outpatient-08-sandoval',
-    patientName: 'Sandoval, Richard',
-    age: 52,
-    sex: 'M',
-    category: 'outpatient',
-    referringSpecialty: 'Pulmonology/Sleep',
-    briefDescription: 'OSA patient with persistent daytime sleepiness and bilateral leg restlessness at night.',
-    clinicalHighlight: 'Restless legs syndrome (low ferritin)',
-    expectedTier: 'routine',
-    files: [
+    "id": "outpatient-08-sandoval",
+    "patientName": "Sandoval, Richard",
+    "age": 52,
+    "sex": "M",
+    "category": "outpatient",
+    "referringSpecialty": "Pulmonology/Sleep",
+    "briefDescription": "OSA patient with persistent daytime sleepiness and bilateral leg restlessness at night.",
+    "clinicalHighlight": "Restless legs syndrome (low ferritin)",
+    "expectedTier": "routine",
+    "files": [
       {
-        filename: '08_Sandoval_Richard.pdf',
-        path: '/samples/triage/outpatient/08_Sandoval_Richard.pdf',
-        docType: 'Sleep Medicine Referral',
-        previewText: `Harmony Integrative Family Medicine
-9020 W. Thunderbird Rd, Suite 4, Peoria, AZ 85381
-Phone: (623) 555-0471 | Fax: (623) 555-0472
-
-Patient: Richard P. Sandoval
-
-Date of Service: 01/12/2026
-
-DOB: 12/01/1955
-
-Provider: Catherine O'Brien, DO
-
-MRN: HIFM-008293
-
-Specialty: Family Medicine / OMM
-
-CHIEF COMPLAINT
-Annual physical exam.
-
-HISTORY OF PRESENT ILLNESS
-Mr. Sandoval is a 70-year-old male presenting for his annual physical. Overall he reports feeling well. He has been
-maintaining an active lifestyle, playing golf twice a week and walking daily. His wife accompanies him today.
-He reports his blood pressure has been well controlled at home, typically running 120s/70s. His blood sugars are in the
-prediabetes range — he has been trying to cut carbs. He had a colonoscopy last year that was normal. He is up to date on
-his PSA (0.8 last year).
-He reports good sleep, good appetite, no depression. He exercises regularly and his weight has been stable. He does report
-some bilateral hand tremor that he has noticed over the past 2-3 years. It is worse when he is trying to eat soup or pour
-coffee. His golf game has not been affected. His father had a similar tremor. It is getting more noticeable and he is a little
-embarrassed by it at restaurants. He has tried reducing caffeine, which helped a little. His wife says she has noticed his
-head seems to shake sometimes too.
-Otherwise, he reports some mild bilateral knee stiffness in the mornings that resolves with activity. He takes glucosamine
-and feels it helps. He denies chest pain, shortness of breath, urinary problems, or bowel changes.
-
-PREVENTIVE CARE
-Colonoscopy: 2025, normal. PSA: 0.8 (2025). LDCT lung: not indicated (never smoker). Tdap: 2022. Flu: 10/2025. COVID
-booster: 09/2025. Shingrix: completed series 2024. Pneumovax: 2023. Hearing: subjectively normal. Vision: wears readers,
-last eye exam 2024.
-
-CURRENT MEDICATIONS
-1. Lisinopril 10 mg daily
-2. Fish oil 1000 mg daily
-3. Vitamin D3 2000 IU daily
-4. Glucosamine/chondroitin daily
-5. Baby aspirin 81 mg daily (will discuss deprescribing per USPSTF)
-
-PHYSICAL EXAM
-Vitals: BP 124/72, HR 66, Temp 98.4, Wt 189 lbs, Ht 5'10", BMI 27.1
-General: Well-developed, well-nourished male. Appears younger than stated age.
-HEENT: PERRL, EOMI, TMs clear. Mild head titubation noted.
-Neck: No thyromegaly, no LAD.
-Cardiovascular: RRR, no murmurs. No carotid bruits.
-Lungs: CTA bilaterally.
-Abdomen: Soft, NT, ND. No masses.
-MSK: Bilateral knee crepitus, full ROM. OMM: somatic dysfunction T4-T8, treated with muscle energy. Mild sacral torsion
-corrected.
-Neuro: Action tremor bilateral hands, right greater than left, 4-6 Hz. Tremor increases with intention (finger-to-nose). Mild
-head tremor (yes-yes pattern). No resting tremor. No rigidity, no bradykinesia. Gait normal. Tandem gait normal. Writing
-sample obtained — shows moderate tremor affecting legibility.
-DRE: Prostate smooth, no nodules, normal size. Guaiac negative.
-
-LABS ORDERED TODAY
-CBC, CMP, Lipid panel, TSH, Free T4, Fasting glucose, A1c, Vitamin D, PSA
-
-ASSESSMENT AND PLAN
-1. Essential tremor, progressive (G25.0)
-Bilateral action tremor with family history, no features of parkinsonism. Getting worse over 2-3 years, now affecting eating
-and writing. Head tremor also present. Reduced caffeine with minimal benefit. Could consider propranolol trial, but given
-progression and impact on function, referring to Neurology for confirmation and treatment optimization. Patient interested in
-learning about all options.
-2. Prediabetes (R73.03)
-Continue dietary modifications. A1c today. If >6.0, will start metformin discussion.
-3. Hypertension, controlled (I10)
-Continue lisinopril. Excellent home readings.
-4. Osteoarthritis, bilateral knees (M17.0)
-Mild, activity responsive. Continue glucosamine. Consider OMM for hip/knee biomechanics.
-5. Aspirin deprescribing
-Per updated USPSTF, primary prevention aspirin no longer recommended for his age group. Discussed discontinuation.
-Patient agreeable. Will stop aspirin.
-6. Somatic dysfunction, thoracic (M99.02)
-Treated today with muscle energy technique. Improved post-treatment.
-Follow-up in 6 months or after neurology evaluation.
-
-Electronically signed by Catherine O'Brien, DO
-Signed 01/12/2026 17:20 MST | Harmony EHR`,
-      },
+        "filename": "08_Sandoval_Richard.pdf",
+        "path": "/samples/triage/outpatient/08_Sandoval_Richard.pdf",
+        "docType": "Sleep Medicine Referral",
+        "previewText": "Riverbend Pulmonary & Sleep Center\n5510 Far Hills Ave, Suite 310, Kettering, OH 45429\nPhone: (937) 555-0271 | Fax: (937) 555-0272\n\nPatient: Richard A. Sandoval\n\nDate of Service: 02/25/2026\n\nDOB: 06/14/1973\n\nProvider: Sanjay R. Iyer, MD\n\nMRN: RPSC-0038847\n\nSpecialty: Pulmonology / Sleep Medicine\n\nCHIEF COMPLAINT\nPersistent daytime sleepiness despite CPAP use; new evening leg discomfort.\n\nHISTORY OF PRESENT ILLNESS\nMr. Sandoval is a 52-year-old male with moderate obstructive sleep apnea, diagnosed by home sleep apnea test in March 2024 (AHI 22/hour), on CPAP therapy since April 2024, here for routine sleep follow-up. His most recent CPAP download (30-day) shows average use of 5.4 hours/night on 87% of nights, with a residual AHI of 2.9/hour on his current pressure setting of 10 cmH2O and no significant mask leak. Despite objectively adequate CPAP adherence and control of his apnea, he continues to report significant daytime sleepiness; his Epworth Sleepiness Scale today is 15/24 (elevated; his baseline pre-CPAP score was 17/24). He denies cataplexy, sleep paralysis, or hypnagogic hallucinations. He naps once daily for about 30 minutes and still feels unrefreshed on waking.\n\nSeparately, over the past 3-4 months he has developed an uncomfortable \"crawling, aching\" sensation deep in both legs that occurs almost every evening, typically starting 30-60 minutes before he wants to go to bed while he is sitting to watch television. He describes an irresistible urge to move his legs that accompanies the sensation. Walking around or stretching his legs relieves it almost completely, but the discomfort returns within minutes of sitting or lying back down. Symptoms are consistently worse in the evening and at night and are essentially absent in the morning or early afternoon. His wife, who sleeps in the same bed, has noted him kicking his legs repeatedly during sleep on multiple occasions. He denies joint pain, swelling, or cramping, and denies numbness or tingling. He has not started any new medications recently and specifically denies use of antihistamines, antiemetics (e.g., metoclopramide), or SSRI/SNRI antidepressants, which can exacerbate these symptoms.\n\nPAST MEDICAL HISTORY\nObstructive sleep apnea (on CPAP), Hypertension, Hyperlipidemia, GERD\n\nFAMILY HISTORY\nFather reportedly had \"restless legs\" in his 60s-70s, self-managed, never formally diagnosed or treated.\n\nCURRENT MEDICATIONS\n1. Lisinopril 10 mg daily\n2. Atorvastatin 20 mg daily\n3. Omeprazole 20 mg daily as needed\n4. Multivitamin daily\n\nPHYSICAL EXAM\nVitals: BP 132/80, HR 76, Temp 98.1 F, Wt 224 lbs, BMI 31.2\nGeneral: Obese male, mildly fatigued-appearing, no acute distress.\nHEENT: Oropharynx crowded (Mallampati III), no tonsillar hypertrophy currently.\nCardiovascular: RRR, no murmurs, no edema.\nLungs: Clear to auscultation bilaterally.\nNeuro: Alert, fully oriented. Cranial nerves II-XII intact. Strength 5/5 throughout. Sensation to light touch and pinprick intact and symmetric in both feet. Vibration sense intact at great toes. Ankle and patellar reflexes 2+ and symmetric. Pedal pulses 2+ bilaterally. Gait normal. No tremor.\nExtremities: No joint swelling, no varicosities, no peripheral edema.\n\nLABS (02/20/2026)\nCBC: Hgb 14.2, Hct 42.1, MCV 84 (within normal limits, no anemia)\nFerritin: 18 ng/mL (low; goal >75 ng/mL in RLS)\nIron/TIBC: Iron 42, TIBC 410, % saturation 10%\nTSH: 1.8 (normal)\nBMP: Na 140, K 4.1, Cr 0.9, eGFR >60 (normal renal function)\nA1c: 5.6% (normal)\n\nASSESSMENT AND PLAN\n\n1. Restless legs syndrome, likely iron-deficiency related (G47.61)\nMeets all four essential diagnostic criteria: urge to move the legs with uncomfortable sensation, onset/worsening at rest, relief with movement, and worse in the evening/night. Ferritin markedly low at 18, well below the treatment goal of >75 ng/mL for RLS. Starting oral ferrous sulfate 325 mg daily with vitamin C for absorption; will recheck ferritin in 3 months. Counseled on RLS triggers (caffeine, alcohol) and to avoid antihistamines/dopamine-blocking antiemetics. Referring to general/sleep neurology on a routine basis for confirmation and to discuss pharmacologic options (e.g., alpha-2-delta ligands) if iron repletion does not adequately control symptoms; bed partner's report of kicking raises possibility of coexisting periodic limb movement disorder, which neurology can further characterize.\n2. Obstructive sleep apnea on CPAP, adequately treated but with persistent EDS (G47.33)\nCPAP adherence and residual AHI are both at goal, yet Epworth remains elevated at 15. Persistent sleepiness is not fully explained by residual OSA and may be contributed to by RLS-related sleep fragmentation; will reassess Epworth after RLS treatment is optimized. If EDS persists despite adequate CPAP and RLS control, will consider MSLT to evaluate for an independent hypersomnia disorder.\n3. Follow-up\nRTC in 3 months with repeat CPAP download and ferritin; sooner if symptoms worsen.\n\nElectronically signed by Sanjay R. Iyer, MD\nEncounter signed 02/25/2026 11:15 EST | Riverbend Pulmonary & Sleep Center EHR v4.2"
+      }
     ],
-    demoPoints: ['Sleep disorder referral', 'RLS recognition'],
+    "demoPoints": [
+      "Sleep disorder referral",
+      "RLS recognition"
+    ]
   },
   {
-    id: 'outpatient-09-washington',
-    patientName: 'Washington, Eugene',
-    age: 71,
-    sex: 'M',
-    category: 'outpatient',
-    referringSpecialty: 'Family Medicine',
-    briefDescription: 'Wife reports dream-enacting behavior with punching/kicking during sleep, anosmia.',
-    clinicalHighlight: 'REM sleep behavior disorder (prodromal neurodegeneration)',
-    expectedTier: 'routine_priority',
-    files: [
+    "id": "outpatient-09-washington",
+    "patientName": "Washington, Eugene",
+    "age": 71,
+    "sex": "M",
+    "category": "outpatient",
+    "referringSpecialty": "Family Medicine",
+    "briefDescription": "Wife reports dream-enacting behavior with punching/kicking during sleep, anosmia.",
+    "clinicalHighlight": "REM sleep behavior disorder (prodromal neurodegeneration)",
+    "expectedTier": "routine_priority",
+    "files": [
       {
-        filename: '09_Washington_Eugene.pdf',
-        path: '/samples/triage/outpatient/09_Washington_Eugene.pdf',
-        docType: 'PCP Referral',
-        previewText: `Midtown Medical Associates
-1400 Peachtree St NE, Suite 500, Atlanta, GA 30309
-Phone: (404) 555-0588 | Fax: (404) 555-0589
-
-Patient: Eugene L. Washington
-
-Date of Service: 01/15/2026
-
-DOB: 07/22/1953
-
-Provider: Samuel K. Abernathy, MD, FACP
-
-MRN: MMA-0055120
-
-Specialty: Internal Medicine
-
-CHIEF COMPLAINT
-Follow-up CHF, diabetes, blood pressure. Also had a funny spell.
-
-HISTORY OF PRESENT ILLNESS
-Mr. Washington is a 72-year-old African American male with extensive medical history including HFrEF (EF 35%), type 2
-diabetes on insulin, hypertension, atrial fibrillation on Eliquis, CKD stage 3b, and COPD. He presents for scheduled
-follow-up.
-He reports his breathing has been stable. He can walk about one block before getting short of breath, which is his baseline.
-He weighs himself daily and his weight has been stable around 220 lbs. He is checking his blood sugars — morning
-readings are 140-190. He reports compliance with his medications. He uses his inhalers as prescribed. He is sleeping on
-two pillows, no change.
-He ran out of Eliquis for about 5 days earlier this month because of a prior authorization issue. He restarted it 4 days ago.
-When specifically asked about any new concerns, he mentions a 'funny spell' about 10 days ago (during the time he was off
-Eliquis). He was eating breakfast and suddenly his right hand went numb and he could not hold his fork. His wife said his
-face looked droopy on the right side. He also had trouble getting words out. The episode lasted approximately 15-20
-minutes and then completely resolved. He did not seek medical attention because 'it went away.' He has not had
-recurrence. He denies headache, vision changes, or weakness since then.
-
-CURRENT MEDICATIONS
-1. Carvedilol 25 mg BID
-2. Sacubitril/valsartan 49/51 mg BID
-3. Spironolactone 25 mg daily
-4. Furosemide 40 mg daily
-5. Apixaban 5 mg BID (restarted 4 days ago)
-6. Insulin glargine 28 units QHS
-7. Insulin lispro sliding scale with meals
-8. Metformin 500 mg BID
-9. Empagliflozin 10 mg daily
-10. Atorvastatin 80 mg daily
-11. Tiotropium 18 mcg inhaled daily
-12. Albuterol MDI PRN
-13. Potassium chloride 20 mEq daily
-
-PHYSICAL EXAM
-Vitals: BP 142/88, HR 78 (irregular), Temp 98.2, Wt 221 lbs, O2 sat 94% RA
-General: Chronically ill-appearing male, no acute distress.
-Cardiovascular: Irregularly irregular rhythm. Grade 2/6 systolic murmur at apex. JVP 8 cm. Trace bilateral pedal edema,
-improved from prior.
-Lungs: Bibasilar crackles, mild. No wheezes today.
-Neuro: Alert, oriented x3. Face symmetric today. Speech fluent, no dysarthria. Motor 5/5 all extremities. No drift. Sensation
-intact.
-
-ASSESSMENT AND PLAN
-
-1. HFrEF, NYHA Class II-III, stable (I50.22)
-Weight stable, trace edema improved. Continue sacubitril/valsartan, carvedilol, spironolactone, furosemide, empagliflozin.
-BMP today — monitor K and Cr.
-2. Atrial fibrillation (I48.91)
-Rate controlled today. Eliquis gap is very concerning in the context below.
-3. Probable TIA (G45.9)
-Episode of acute-onset right facial droop, right hand numbness, and expressive language difficulty lasting 15-20 minutes
-with complete resolution — classic TIA presentation. This occurred while off anticoagulation for 5 days in the setting of atrial
-fibrillation (CHA2DS2-VASc score = 5). Normal neuro exam today. HOWEVER, this requires urgent workup.
-- Stat CT head ordered today (done in office — no acute hemorrhage or large territory infarct)
-- Urgent Neurology referral placed — requesting appointment within 1 week
-- MRI brain with DWI, MRA head and neck ordered
-- Carotid duplex ultrasound ordered
-- Emphasized to patient and wife the critical importance of not missing ANY doses of Eliquis. Provided 2-week bridge supply
-from office samples
-- If any recurrent symptoms, call 911 immediately
-4. Type 2 DM on insulin (E11.65)
-A1c pending. Fasting sugars elevated. May need glargine uptitration. Await A1c.
-5. CKD 3b (N18.32)
-Cr 1.8, eGFR 38 last check. Recheck today. Monitor with diuretic and SGLT2i.
-6. Hypertension, suboptimal (I10)
-BP 142/88 today. At goal <130/80 given comorbidities, we are above target. However, not adjusting today given fluid status.
-Will reassess.
-Follow-up in 2 weeks. Urgent neurology within 1 week.
-
-Electronically signed by Samuel K. Abernathy, MD, FACP
-Signed 01/15/2026 16:30 EST | Midtown Medical EHR`,
-      },
+        "filename": "09_Washington_Eugene.pdf",
+        "path": "/samples/triage/outpatient/09_Washington_Eugene.pdf",
+        "docType": "PCP Referral",
+        "previewText": "Meridian Valley Internal Medicine\n1420 Sycamore Avenue, Suite 200, Columbus, OH 43215\nPhone: (614) 555-0172 | Fax: (614) 555-0173\n\nPatient: Eugene R. Washington\n\nDate of Service: 06/09/2026\n\nDOB: 03/14/1955\n\nProvider: Harold T. Ibekwe, MD\n\nMRN: MVIM-0078245\n\nSpecialty: Internal Medicine\n\nCHIEF COMPLAINT\nDream-enactment behavior during sleep, reported by spouse; referral to Neurology.\n\nHISTORY OF PRESENT ILLNESS\nMr. Washington is a 71-year-old male here with his wife for a scheduled follow-up. She reports that over\nthe past approximately two years he has become increasingly physically active during sleep — punching,\nkicking, and shouting or vocalizing, appearing to act out vivid dreams — several nights per week. She\nstates he struck her on one occasion and has come close to falling out of bed on two others. When woken\nduring an episode he reports vivid, action-oriented dream content matching the movements (e.g., fighting\noff an assailant or being chased), and he is immediately oriented on waking with no confusion. He has not\nbeen observed getting out of bed and walking during these episodes, and there have been no injuries to\nhimself. He denies excessive daytime sleepiness. His wife reports longstanding loud snoring but has never\nwitnessed apneic pauses; she says the punching/shouting behavior is distinctly new and different from the\nsnoring.\nSeparately, he reports a gradual decline in his sense of smell over several years — he says food \"doesn't\ntaste like it used to\" and he no longer notices strong odors such as coffee or gasoline. No nasal\ncongestion, sinus disease, or head trauma history. He denies tremor, denies stiffness or slowness of\nmovement, denies constipation change, and denies lightheadedness on standing. No falls, no gait changes,\nno handwriting changes per patient.\n\nPAST MEDICAL HISTORY\nHypertension, hyperlipidemia, benign prostatic hyperplasia, remote L4-L5 laminectomy (2015).\n\nCURRENT MEDICATIONS\n1. Amlodipine 5 mg daily\n2. Atorvastatin 20 mg daily\n3. Tamsulosin 0.4 mg daily\n4. Aspirin 81 mg daily\n5. Vitamin D3 2000 IU daily\n\nPHYSICAL EXAM\nVitals: BP 132/78, HR 68, Temp 97.9, Wt 191 lbs. No orthostatic drop on repeat standing BP.\nGeneral: Alert, well-appearing male, no acute distress.\nNeuro: Oriented x3, MoCA 27/30. Cranial nerves II-XII grossly intact; bedside smell testing (coffee grounds,\nalcohol swab) grossly reduced bilaterally, formal olfactory testing deferred. No resting tremor. No\nbradykinesia on rapid finger tapping or hand-opening/closing. No rigidity on passive range of motion at\nwrists or elbows. Normal rapid alternating movements. Gait normal-based with normal arm swing and stride\nlength; no shuffling. Pull test: no retropulsion. Facial expression full, no hypomimia.\nCardiovascular: RRR, no murmurs. Lungs clear.\n\nLABS\nCBC, CMP, and TSH from routine visit three months ago were within normal limits; not repeated today.\n\nASSESSMENT AND PLAN\n\n1. REM sleep behavior disorder, probable (G47.52)\nClinical history is characteristic — dream-enactment behavior with vocalization and limb movement matching\ndream content, without confusion on waking. Recommend formal polysomnography with EMG to confirm loss of\nREM atonia and to exclude mimics (obstructive sleep apnea-related arousals, nocturnal seizure). Given the\nwell-established association between RBD and prodromal synucleinopathy (Parkinson disease, dementia with\nLewy bodies, multiple system atrophy), referring to Neurology / Movement Disorders for baseline evaluation\nand longitudinal monitoring. No parkinsonian signs on today's exam.\n2. Hyposmia, gradual onset, cause unclear (R43.8)\nAnother recognized prodromal marker for synucleinopathy; no alternative cause identified (no sinus disease,\nno trauma). To be assessed further by Neurology, possibly with formal olfactory testing (UPSIT).\n3. Counseled patient and wife on bed-safety measures (padding, clearing bedside furniture, consider\ntemporary separate sleeping arrangements) pending sleep study and specialist evaluation.\nReferral: Neurology / Movement Disorders — routine priority. No current motor parkinsonism; referral is for\nbaseline evaluation and monitoring, not an acute concern.\nRTC 6 months or sooner if new motor symptoms develop.\n\nElectronically signed by Harold T. Ibekwe, MD\nEncounter signed 06/09/2026 14:20 EST | MVIM EHR v3.1"
+      }
     ],
-    demoPoints: ['Prodromal neurodegenerative disease', 'RBD recognition'],
+    "demoPoints": [
+      "Prodromal neurodegenerative disease",
+      "RBD recognition"
+    ]
   },
   {
-    id: 'outpatient-10-delgado',
-    patientName: 'Delgado, Rosa',
-    age: 45,
-    sex: 'F',
-    category: 'outpatient',
-    referringSpecialty: 'Endocrinology',
-    briefDescription: 'Graves disease follow-up with persistent tremor, diplopia, and balance issues despite normal thyroid.',
-    clinicalHighlight: 'Neurologic symptoms beyond thyroid disease',
-    expectedTier: 'semi_urgent',
-    files: [
+    "id": "outpatient-10-delgado",
+    "patientName": "Delgado, Rosa",
+    "age": 45,
+    "sex": "F",
+    "category": "outpatient",
+    "referringSpecialty": "Endocrinology",
+    "briefDescription": "Graves disease follow-up with persistent tremor, diplopia, and balance issues despite normal thyroid.",
+    "clinicalHighlight": "Neurologic symptoms beyond thyroid disease",
+    "expectedTier": "semi_urgent",
+    "files": [
       {
-        filename: '10_Delgado_Rosa.pdf',
-        path: '/samples/triage/outpatient/10_Delgado_Rosa.pdf',
-        docType: 'Endocrinology Referral',
-        previewText: `Esperanza Community Health Center
-2850 W. Cermak Rd, Chicago, IL 60623
-Phone: (773) 555-0661 | Fax: (773) 555-0662
-
-Patient: Rosa M. Delgado
-
-Date of Service: 01/20/2026
-
-DOB: 03/08/1970
-
-Provider: Maria Santos, APRN, ANP-BC
-
-MRN: ECH-0099203
-
-Credentials: Adult Nurse Practitioner
-
-CHIEF COMPLAINT
-Hand numbness, dropping things. (Visit conducted with Spanish medical interpreter, ID #4417.)
-
-HISTORY OF PRESENT ILLNESS
-Ms. Delgado is a 55-year-old Spanish-speaking female who works as a housekeeper at a hotel. She presents with
-numbness and tingling in both hands for the past 6 months, gradually worsening. She says she wakes up at night with numb
-hands and has to shake them out. She has been dropping things — dishes at work, her phone. She reports the numbness is
-mostly in the thumb, index, and middle fingers of both hands. She also notes some neck pain radiating to her shoulders that
-has been present for about a year. She has been taking ibuprofen for this.
-On further questioning, she also reports that her legs have been feeling stiff and she has trouble walking fast. She says her
-balance is not as good as it used to be. She tripped going up stairs last week. She also notes an electric shock sensation
-that goes down her back and into her legs when she bends her neck forward. She has not mentioned this to anyone before
-because she thought it was normal aging.
-She reports no bowel or bladder problems. No history of trauma. No fevers or weight loss. She has diabetes and
-hypertension. She does not have a regular doctor and comes to this clinic as needed. She has not seen a doctor in about a
-year.
-
-PAST MEDICAL HISTORY
-Type 2 Diabetes (last A1c unknown, not monitored regularly), Hypertension, Obesity
-
-CURRENT MEDICATIONS
-1. Metformin 500 mg BID (reports taking inconsistently)
-2. Lisinopril 20 mg daily
-3. Ibuprofen 600 mg TID PRN
-
-SOCIAL HISTORY
-Born in Mexico, in US for 20 years. Works full time as hotel housekeeper — repetitive hand motions, lifting. Lives with
-husband and two adult children. No tobacco, rare alcohol. No insurance (sliding-scale patient). Primary language: Spanish.
-
-PHYSICAL EXAM
-Vitals: BP 152/94, HR 80, Wt 198 lbs, Ht 5'3", BMI 35.1
-General: Obese female, cooperative, communicating through interpreter.
-Neck: Limited ROM in extension and lateral flexion. Tenderness over posterior cervical paraspinals. Positive Spurling's on
-right.
-Upper extremities: Positive Tinel's bilateral wrists. Positive Phalen's bilateral. Thenar atrophy bilateral, right worse than
-left. Grip strength reduced bilaterally. Sensation decreased in median nerve distribution bilateral hands.
-Lower extremities: Spastic catch in bilateral hamstrings. Hyperreflexia bilateral LE (3+). Positive Babinski bilateral. Positive
-Hoffman's sign bilateral. Gait wide-based and mildly spastic. Heel-to-toe walking impaired.
-Special: Positive Lhermitte's sign (electric sensation down spine with neck flexion).
-
-ASSESSMENT AND PLAN
-1. Bilateral carpal tunnel syndrome (G56.03)
-Classic symptoms with positive provocative testing and thenar atrophy. Likely related to occupational repetitive use. Will
-provide bilateral wrist splints for nighttime use.
-
-2. Cervical myelopathy (M47.12)
-This is the more concerning finding. Patient has upper motor neuron signs in bilateral lower extremities (hyperreflexia,
-Babinski, Hoffman's, spastic gait) with positive Lhermitte's sign, in the setting of neck pain and limited cervical ROM. This
-suggests cervical spinal cord compression and is potentially a surgical issue.
-- URGENT MRI cervical spine ordered (coordinating with radiology for charity care pricing)
-- URGENT Neurology referral — requesting expedited evaluation
-- Counseled patient (via interpreter) that this is a serious condition that needs prompt evaluation, and that she should go to
-the ER if she develops weakness in legs, difficulty walking, or loss of bowel/bladder control
-- Provided work restrictions letter: no heavy lifting, no repetitive overhead work until further evaluation
-- Social work consulted for financial assistance with MRI and specialist visit
-3. Type 2 DM, unmonitored (E11.65)
-A1c, BMP, lipid panel, urine microalbumin ordered. Increase metformin to 1000 mg BID if renal function allows. Diabetic
-education referral (Spanish-speaking educator).
-4. Hypertension, uncontrolled (I10)
-BP 152/94. Increase lisinopril to 40 mg. Add HCTZ 12.5 mg if still elevated at follow-up.
-5. NSAID overuse
-Taking ibuprofen TID chronically — risk of GI bleed, renal injury especially with DM and HTN. Counseled to stop ibuprofen.
-Provided acetaminophen as alternative.
-Follow-up in 2 weeks for lab results and to check on MRI/neuro scheduling. Interpreter services arranged for all future visits.
-
-Electronically signed by Maria Santos, APRN, ANP-BC
-Collaborating Physician: James Liu, MD | Signed 01/20/2026 15:45 CST | Esperanza EHR`,
-      },
+        "filename": "10_Delgado_Rosa.pdf",
+        "path": "/samples/triage/outpatient/10_Delgado_Rosa.pdf",
+        "docType": "Endocrinology Referral",
+        "previewText": "Lakeshore Endocrine & Diabetes Center\n875 Harbor Boulevard, Suite 310, Cleveland, OH 44114\nPhone: (216) 555-0298 | Fax: (216) 555-0299\n\nPatient: Rosa M. Delgado\n\nDate of Service: 06/22/2026\n\nDOB: 08/02/1980\n\nProvider: Priya Anand, MD\n\nMRN: LEDC-0033187\n\nSpecialty: Endocrinology\n\nCHIEF COMPLAINT\nGraves disease follow-up; persistent tremor, new double vision, and new imbalance despite normalized\nthyroid labs.\n\nHISTORY OF PRESENT ILLNESS\nMs. Delgado is a 45-year-old female with Graves disease diagnosed 14 months ago (presented with weight\nloss, palpitations, heat intolerance, and tremor). She was started on methimazole 15 mg daily, since\ntitrated down to 5 mg daily. TSH, free T4, and total T3 have been within normal range on the last three\nconsecutive visits, most recently six weeks ago. Despite biochemical euthyroidism, she continues to report\na persistent bilateral hand tremor, essentially unchanged in character or severity since diagnosis. Over\nthe past approximately three months she has also developed binocular horizontal diplopia, most noticeable\non lateral gaze and toward the end of the day, which resolves when either eye is covered. In the same\ntimeframe she has noted new unsteadiness while walking, several near-falls in the past month, and\ndifficulty walking in the dark or on uneven ground. She denies vertigo, hearing change, headache, focal\nweakness, or numbness. No recurrence of palpitations; weight and sleep are stable; no current heat or cold\nintolerance.\n\nPAST MEDICAL HISTORY\nGraves disease (14 months), mild intermittent asthma, migraine without aura (infrequent).\n\nCURRENT MEDICATIONS\n1. Methimazole 5 mg daily\n2. Propranolol LA 60 mg daily (on taper)\n3. Albuterol HFA PRN\n4. Sumatriptan 50 mg PRN migraine\n\nPHYSICAL EXAM\nVitals: BP 118/74, HR 78 and regular, Temp 98.2, Wt 141 lbs.\nHEENT: Mild bilateral proptosis, stable compared with prior clinic photos; mild lid lag; no significant\nperiorbital edema. Extraocular movements: limited upgaze bilaterally with diplopia reproduced on both right\nand left lateral gaze; no ptosis; pupils equal and reactive. Thyroid smooth, non-tender, no palpable goiter\ncurrently.\nNeuro: Bilateral postural/action tremor of the hands, approximately 8 Hz, symmetric, no resting component.\nGait mildly wide-based; unsteady on tandem gait; Romberg equivocal (mild sway, no fall). Strength 5/5\nthroughout, reflexes symmetric 2+, sensation intact to light touch and vibration distally. No nystagmus\nappreciated on limited office exam.\nCardiovascular: RRR, no murmurs. Lungs clear.\n\nLABS (06/10/2026)\nTSH 1.8 (nl) | Free T4 1.1 (nl) | Total T3 105 (nl) | TSI (thyroid-stimulating immunoglobulin): positive,\nelevated at prior check\n\nASSESSMENT AND PLAN\n\n1. Graves disease, currently euthyroid on methimazole (E05.00)\nBiochemically well controlled. Continue current dose; recheck TSH/free T4 in 3 months.\n2. Diplopia, binocular, favor thyroid eye disease / Graves orbitopathy (H53.2)\nExtraocular muscle involvement in Graves orbitopathy can persist or progress independent of thyroid hormone\nstatus. Referring for neurology / neuro-ophthalmology evaluation; consider orbital imaging.\n3. Persistent bilateral tremor, not explained by current euthyroid state (R25.1)\nWarrants full neurologic evaluation to distinguish residual enhanced physiologic tremor from an independent\ntremor disorder.\n4. New gait unsteadiness / imbalance (R26.81)\nNot accounted for by thyroid disease alone. In combination with the diplopia and tremor, this raises\nconcern for a process not fully explained by Graves disease and warrants prompt neurologic evaluation.\nReferral: Neurology, semi-urgent — combination of new gait/balance findings and diplopia that do not track\nwith normalized thyroid labs.\n\nElectronically signed by Priya Anand, MD\nEncounter signed 06/22/2026 11:05 EST | LEDC EHR v5.0"
+      }
     ],
-    demoPoints: ['Cross-specialty diagnostic puzzle', 'Thyroid-neuro overlap'],
+    "demoPoints": [
+      "Cross-specialty diagnostic puzzle",
+      "Thyroid-neuro overlap"
+    ]
   },
   {
-    id: 'cross-01-thornton',
-    patientName: 'Thornton, James',
-    age: 68,
-    sex: 'M',
-    category: 'cross_specialty',
-    referringSpecialty: 'Orthopedics',
-    briefDescription: 'Shoulder MRI incidentally revealed cervical cord signal abnormality with bilateral hand clumsiness.',
-    clinicalHighlight: 'Cervical myelopathy (incidental finding)',
-    expectedTier: 'urgent',
-    files: [
+    "id": "cross-01-thornton",
+    "patientName": "Thornton, James",
+    "age": 68,
+    "sex": "M",
+    "category": "cross_specialty",
+    "referringSpecialty": "Orthopedics",
+    "briefDescription": "Shoulder MRI incidentally revealed cervical cord signal abnormality with bilateral hand clumsiness.",
+    "clinicalHighlight": "Cervical myelopathy (incidental finding)",
+    "expectedTier": "urgent",
+    "files": [
       {
-        filename: '01_Thornton_James.pdf',
-        path: '/samples/triage/cross-specialty/01_Thornton_James.pdf',
-        docType: 'Orthopedic Referral',
-        previewText: `Southwest Orthopedic & Spine Associates
-7200 E. Camelback Rd, Suite 104, Scottsdale, AZ 85251
-Phone: (480) 555-0310 | Fax: (480) 555-0311
-
-Patient: James R. Thornton
-
-Date: 01/23/2026
-
-DOB: 03/14/1957
-
-Provider: David Park, MD
-
-MRN: SOSA-0038821
-
-Specialty: Orthopedic Surgery
-
-CHIEF COMPLAINT
-Right shoulder pain and weakness — follow-up after MRI shoulder.
-
-HISTORY OF PRESENT ILLNESS
-Mr. Thornton is a 68-year-old male who presents for review of right shoulder MRI obtained after 4 months of right shoulder
-pain with overhead weakness. He is an avid golfer and reports difficulty with his backswing. Pain is 5/10, worse with
-abduction. He has tried physical therapy with partial improvement. He denies any neck pain.
-MRI right shoulder (01/10/2026) shows a full-thickness supraspinatus tear, moderate acromioclavicular joint arthropathy,
-and mild long head biceps tendinopathy — findings discussed with patient and consistent with his symptoms.
-However, I note that the MRI report addendum also flags incidental findings on the scout sequences: 'Signal abnormality
-within the cervical cord at C4-C5 level is partially visualized on localizer sequences and warrants dedicated cervical spine
-MRI.' I reviewed the images myself and agree — there appears to be T2 signal change within the cord. On further
-questioning, Mr. Thornton does admit to some bilateral hand clumsiness over the past 8-10 months (difficulty with buttons,
-dropping things). He attributed this to arthritis. He also endorses occasional bilateral leg stiffness when walking longer
-distances. He has not had a fall but reports 'my legs feel heavier than they used to.'
-
-PHYSICAL EXAM
-Shoulder: Right shoulder — limited active abduction to 90 degrees, painful arc. Positive Neer and Hawkins. Supraspinatus
-weakness 3+/5 on right. AC joint tender.
-Cervical Spine: Limited extension. Mild bilateral upper extremity hyperreflexia (3+). Positive Hoffmann's sign bilateral. Grip
-strength mildly reduced bilaterally. Intrinsic hand muscle bulk appears slightly diminished right hand.
-Lower Extremities: Bilateral patellar reflexes 3+, ankle reflexes 2+. Mild spasticity in bilateral hamstrings. Gait slightly
-broad-based.
-
-ASSESSMENT AND PLAN
-1. Full-thickness right supraspinatus tear (M75.121)
-Surgical candidate — will schedule right shoulder arthroscopy and rotator cuff repair. Pre-op workup ordered. However, I
-am deferring shoulder surgery until cervical spine pathology is evaluated, as myelopathy must be assessed and may affect
-anesthesia positioning and surgical urgency.
-2. Suspected cervical myelopathy — INCIDENTAL FINDING (M47.12)
-This was not the reason for today's visit but cannot be ignored. Cord signal change on localizer sequences, bilateral upper
-motor neuron signs, progressive hand clumsiness, and lower extremity spasticity are all consistent with cervical cord
-compression. Ordering dedicated MRI cervical spine with and without contrast as urgent study. Referring to Neurology for
-evaluation prior to any surgical planning. Also notifying spine surgery colleague Dr. Reyes for potential co-management.
-Patient counseled on the importance of this finding. Told to avoid contact sports, heavy lifting, and any activity with risk of
-cervical hyperextension until evaluated. Warned that a fall or trauma could be catastrophic. Patient expressed surprise —
-he was not expecting this today.
-
-Electronically signed by: David Park, MD
-Signed 01/23/2026 15:44 MST | Southwest Ortho EHR`,
-      },
+        "filename": "01_Thornton_James.pdf",
+        "path": "/samples/triage/cross-specialty/01_Thornton_James.pdf",
+        "docType": "Orthopedic Referral",
+        "previewText": "Southwest Orthopedic & Spine Associates\n7200 E. Camelback Rd, Suite 104, Scottsdale, AZ 85251\nPhone: (480) 555-0310 | Fax: (480) 555-0311\n\nPatient: James R. Thornton\n\nDate: 01/23/2026\n\nDOB: 03/14/1957\n\nProvider: David Park, MD\n\nMRN: SOSA-0038821\n\nSpecialty: Orthopedic Surgery\n\nCHIEF COMPLAINT\nRight shoulder pain and weakness — follow-up after MRI shoulder.\n\nHISTORY OF PRESENT ILLNESS\nMr. Thornton is a 68-year-old male who presents for review of right shoulder MRI obtained after 4 months of right shoulder\npain with overhead weakness. He is an avid golfer and reports difficulty with his backswing. Pain is 5/10, worse with\nabduction. He has tried physical therapy with partial improvement. He denies any neck pain.\nMRI right shoulder (01/10/2026) shows a full-thickness supraspinatus tear, moderate acromioclavicular joint arthropathy,\nand mild long head biceps tendinopathy — findings discussed with patient and consistent with his symptoms.\nHowever, I note that the MRI report addendum also flags incidental findings on the scout sequences: 'Signal abnormality\nwithin the cervical cord at C4-C5 level is partially visualized on localizer sequences and warrants dedicated cervical spine\nMRI.' I reviewed the images myself and agree — there appears to be T2 signal change within the cord. On further\nquestioning, Mr. Thornton does admit to some bilateral hand clumsiness over the past 8-10 months (difficulty with buttons,\ndropping things). He attributed this to arthritis. He also endorses occasional bilateral leg stiffness when walking longer\ndistances. He has not had a fall but reports 'my legs feel heavier than they used to.'\n\nPHYSICAL EXAM\nShoulder: Right shoulder — limited active abduction to 90 degrees, painful arc. Positive Neer and Hawkins. Supraspinatus\nweakness 3+/5 on right. AC joint tender.\nCervical Spine: Limited extension. Mild bilateral upper extremity hyperreflexia (3+). Positive Hoffmann's sign bilateral. Grip\nstrength mildly reduced bilaterally. Intrinsic hand muscle bulk appears slightly diminished right hand.\nLower Extremities: Bilateral patellar reflexes 3+, ankle reflexes 2+. Mild spasticity in bilateral hamstrings. Gait slightly\nbroad-based.\n\nASSESSMENT AND PLAN\n1. Full-thickness right supraspinatus tear (M75.121)\nSurgical candidate — will schedule right shoulder arthroscopy and rotator cuff repair. Pre-op workup ordered. However, I\nam deferring shoulder surgery until cervical spine pathology is evaluated, as myelopathy must be assessed and may affect\nanesthesia positioning and surgical urgency.\n2. Suspected cervical myelopathy — INCIDENTAL FINDING (M47.12)\nThis was not the reason for today's visit but cannot be ignored. Cord signal change on localizer sequences, bilateral upper\nmotor neuron signs, progressive hand clumsiness, and lower extremity spasticity are all consistent with cervical cord\ncompression. Ordering dedicated MRI cervical spine with and without contrast as urgent study. Referring to Neurology for\nevaluation prior to any surgical planning. Also notifying spine surgery colleague Dr. Reyes for potential co-management.\nPatient counseled on the importance of this finding. Told to avoid contact sports, heavy lifting, and any activity with risk of\ncervical hyperextension until evaluated. Warned that a fall or trauma could be catastrophic. Patient expressed surprise —\nhe was not expecting this today.\n\nElectronically signed by: David Park, MD\nSigned 01/23/2026 15:44 MST | Southwest Ortho EHR"
+      }
     ],
-    demoPoints: ['Incidental finding on unrelated imaging', 'Myelopathy recognition'],
+    "demoPoints": [
+      "Incidental finding on unrelated imaging",
+      "Myelopathy recognition"
+    ]
   },
   {
-    id: 'cross-02-vasquez',
-    patientName: 'Vasquez, Isabel',
-    age: 34,
-    sex: 'F',
-    category: 'cross_specialty',
-    referringSpecialty: 'Rheumatology',
-    briefDescription: 'SLE patient with new-onset seizure, headaches, word-finding difficulty, and visual phenomena.',
-    clinicalHighlight: 'CNS lupus (cerebral vasculitis)',
-    expectedTier: 'urgent',
-    files: [
+    "id": "cross-02-vasquez",
+    "patientName": "Vasquez, Isabel",
+    "age": 34,
+    "sex": "F",
+    "category": "cross_specialty",
+    "referringSpecialty": "Rheumatology",
+    "briefDescription": "SLE patient with new-onset seizure, headaches, word-finding difficulty, and visual phenomena.",
+    "clinicalHighlight": "CNS lupus (cerebral vasculitis)",
+    "expectedTier": "urgent",
+    "files": [
       {
-        filename: '02_Vasquez_Isabel.pdf',
-        path: '/samples/triage/cross-specialty/02_Vasquez_Isabel.pdf',
-        docType: 'Rheumatology Referral',
-        previewText: `Pinebrook Behavioral Health & Psychiatry
-1402 Oak Park Ave, Suite 3B, Oak Park, IL 60302
-Phone: (708) 555-0182 | Fax: (708) 555-0183
-
-Patient: Isabel M. Vasquez
-
-Date: 01/26/2026
-
-DOB: 07/29/1991
-
-Provider: Carolyn Freed, MD
-
-MRN: PBH-0017743
-
-Specialty: Psychiatry
-
-CHIEF COMPLAINT
-Established patient follow-up. Ongoing 'spells.'
-
-HISTORY OF PRESENT ILLNESS
-Ms. Vasquez is a 34-year-old female with a psychiatric history significant for major depressive disorder (in partial remission
-on sertraline), childhood trauma, and a history of somatization. She has been my patient for 3 years. She returns today
-continuing to report episodic spells that began approximately 7 months ago.
-The spells involve sudden onset of bilateral leg weakness — she describes her legs 'just giving out' — associated with
-unresponsiveness lasting 2-8 minutes, followed by prolonged fatigue. During spells, her eyes are sometimes closed,
-sometimes open and deviated. Her boyfriend reports the episodes look 'like a seizure' but she has no tongue biting, no
-incontinence, and recovers talking immediately after. She has had approximately 14 such events since June.
-She was seen in the ED twice. Both times CT head was normal, basic labs normal. She was told 'it might be seizures' and
-referred to neurology, but she cancelled that appointment because she 'didn't think it was her brain.' She is convinced she
-has a 'heart problem' or 'blood sugar issue.' Glucometer readings during two spells documented by boyfriend were 94 and
-107.
-She has had increased stressors: relationship conflict, financial strain, and the anniversary of a significant trauma occurring
-in July. PHQ-9 today: 14 (moderate depression). GAD-7: 11. She endorses dissociative symptoms — 'checking out' and
-feeling 'not in her body' at times of high stress.
-From a clinical standpoint, the semiology — prolonged course, eyes closed during events, immediate full recall afterward,
-ictal crying noted once, waxing/waning course correlating with stressors — is most consistent with functional neurological
-symptom disorder / psychogenic non-epileptic spells (PNES). I have discussed this framework with her before with limited
-acceptance.
-
-MENTAL STATUS EXAM
-Alert, cooperative. Appears mildly distressed. Mood 'stressed.' Affect constricted. Speech normal rate/rhythm. Thought
-process linear. No psychosis. No SI/HI. Insight limited — does not connect spells to psychological stressors. Judgment fair.
-
-ASSESSMENT AND PLAN
-1. Major depressive disorder, moderate recurrence (F32.1)
-Increase sertraline from 100 mg to 150 mg daily. Schedule therapy — patient agreeable to return to CBT. Discussed
-trauma-focused therapy as longer-term goal.
-2. Functional neurological symptom disorder / suspected PNES (F44.5)
-Clinical presentation strongly suggests PNES in the context of MDD, trauma history, and dissociative symptoms. However, I
-am re-referring to Neurology to complete workup including video EEG monitoring during a typical event, which I have
-explained to her as 'making sure we have the full picture' rather than leading with the psychiatric framing, which she has
-previously rejected. The goal is to obtain EEG documentation of a spell and formally exclude epilepsy — both to complete
-the diagnostic workup and to allow us to engage her more meaningfully in treatment. Referral placed with note to Neurology
-explaining the clinical context and requesting outpatient video-EEG rather than empiric antiepileptic therapy.
-I will continue to manage the psychiatric component regardless of neurology's findings. Discussed with patient that the
-spells and her mental health are both real and both worth treating — she was somewhat receptive today.
-
-3. Generalized anxiety disorder (F41.1)
-Sertraline increase may help. Continue current PRN approach; no benzodiazepines given risk in this patient. Discussed
-diaphragmatic breathing exercises.
-
-Electronically signed by: Carolyn Freed, MD
-Signed 01/26/2026 17:30 CST | Pinebrook BH EHR | cc: patient PCP Dr. Amos Singh`,
-      },
+        "filename": "02_Vasquez_Isabel.pdf",
+        "path": "/samples/triage/cross-specialty/02_Vasquez_Isabel.pdf",
+        "docType": "Rheumatology Referral",
+        "previewText": "University Rheumatology Associates\n1500 E. Medical Center Dr, Ann Arbor, MI 48109\nPhone: (734) 555-0502 | Fax: (734) 555-0503\n\nPatient: Emmanuel C. Okafor\n\nDate: 01/29/2026\n\nDOB: 05/07/1976\n\nProvider: Helen Strauss, MD, PhD\n\nMRN: URA-0084410\n\nSpecialty: Rheumatology & Clinical Immunology\n\nCHIEF COMPLAINT\nNew patient — headache, confusion, and abnormal MRI. Referred by PCP.\n\nHISTORY OF PRESENT ILLNESS\nMr. Okafor is a 49-year-old male of Nigerian descent with a past medical history of hypertension and prior diagnosis of\n'possible sarcoidosis' (hilar lymphadenopathy noted on chest CT in 2021, never biopsied, resolved spontaneously). He was\nreferred urgently following an MRI brain obtained by his PCP for 6 weeks of progressive headache, intermittent confusion,\nand one witnessed episode of expressive aphasia lasting 4 hours that fully resolved.\nMRI brain with and without contrast (01/15/2026, outside hospital): Multiple bilateral cortical and subcortical enhancing\nlesions in a non-watershed distribution, involving the frontal and parietal lobes with adjacent leptomeningeal enhancement.\nPattern described by radiologist as 'atypical for demyelination; vasculitis or CNS lymphoma cannot be excluded.'\nHe reports the headache began 6 weeks ago — bitemporal, pressure-like, progressive, not relieved by acetaminophen or\nibuprofen. He has had 3-4 episodes of 'blanking out' during conversations, not remembering what was said. His wife notes\npersonality change — he is normally gregarious and is now withdrawn and irritable. He had one episode of seeing flickering\nlights in the right visual field lasting 15 minutes. He denies fever, rash, joint pain, dry eyes/mouth, or cough. He has lost 8 lbs\nover 6 weeks unintentionally. No recent travel. No known TB exposure. Not immunocompromised.\n\nREVIEW OF SYSTEMS\nPositive: Progressive headache, episodic confusion, transient aphasia, visual phenomena, weight loss, personality change.\nNegative: Fever, night sweats, rash, photosensitivity, oral ulcers, serositis, Raynaud's, sicca symptoms, arthritis, cough,\nhemoptysis.\n\nPHYSICAL EXAM\nVitals: BP 146/92, HR 78, Temp 98.6, Wt 174 lbs (down from 182 lbs in Oct 2025)\nGeneral: Alert, well-groomed male. Mildly slow in responses.\nHEENT: No oral ulcers, no lymphadenopathy. Fundoscopy: no papilledema.\nSkin: No rash, no purpura, no livedo reticularis.\nMSK: No synovitis, full ROM all joints.\nNeuro: Alert, oriented x3. Mild word-finding difficulty. Cranial nerves intact. Motor 5/5 all extremities. Sensation intact.\nCoordination normal. Gait normal.\n\nLABS / WORKUP ORDERED\nSent today: ESR, CRP, ANA, anti-dsDNA, ANCA (p and c), RF, anti-CCP, complement (C3/C4), antiphospholipid panel\n(aCL IgG/IgM, beta-2 glycoprotein, LA), SPEP, LDH, ACE level, CBC with diff, CMP, HIV, RPR, hepatitis B/C serologies,\nIGRA (QuantiFERON), serum protein electrophoresis.\nPending outside: CSF analysis (LP scheduled 01/31 by neurology).\n\nASSESSMENT AND PLAN\n1. CNS vasculitis vs. CNS lymphoma vs. neurosarcoidosis — high priority (M31.9 provisional)\nThis patient has a serious, progressive CNS inflammatory or neoplastic process requiring urgent and coordinated\nmultidisciplinary evaluation. The MRI pattern with leptomeningeal and parenchymal enhancement in a non-vascular\ndistribution raises the following differential:\n- Primary CNS vasculitis (PACNS) — isolated CNS, no systemic features\n- Secondary vasculitis from systemic disease (sarcoidosis, SLE, ANCA-associated) — prior hilar LAD is relevant\n- CNS lymphoma — weight loss, enhancing lesions, must exclude\n\n\f- Infectious (TB, fungal, viral encephalitis) — less likely but must screen\nI have contacted Neurology directly (Dr. Chen) and they are seeing him 01/31 for LP. I have also requested Neuroradiology\nre-review of the outside MRI with dedicated vasculitis protocol sequences. Brain biopsy may ultimately be required if LP and\nserology are non-diagnostic.\nGiven the rapidity of progression, I am starting a short course of high-dose prednisone 60 mg daily empirically to prevent\nfurther neurological injury while workup proceeds — with full understanding this may partially treat and obscure the\ndiagnosis. PCP notified. Discussed with patient and wife; they understand and consent.\n2. Hypertension — hold HCTZ (may mask inflammatory markers); continue amlodipine.\nWill present at multidisciplinary neuro-rheumatology conference Thursday.\n\nElectronically signed by: Helen Strauss, MD, PhD\nSigned 01/29/2026 19:15 EST | URA EHR | CC: Neurology (Chen), Neuroradiology, PCP"
+      }
     ],
-    demoPoints: ['Neuroimmunology referral', 'CNS lupus presentation'],
+    "demoPoints": [
+      "Neuroimmunology referral",
+      "CNS lupus presentation"
+    ]
   },
   {
-    id: 'cross-03-mcallister',
-    patientName: 'McAllister, Robert',
-    age: 72,
-    sex: 'M',
-    category: 'cross_specialty',
-    referringSpecialty: 'Cardiology',
-    briefDescription: 'AFib patient with recurrent transient confusion/word-finding difficulty despite anticoagulation.',
-    clinicalHighlight: 'TIAs despite anticoagulation',
-    expectedTier: 'urgent',
-    files: [
+    "id": "cross-03-mcallister",
+    "patientName": "McAllister, Robert",
+    "age": 72,
+    "sex": "M",
+    "category": "cross_specialty",
+    "referringSpecialty": "Cardiology",
+    "briefDescription": "AFib patient with recurrent transient confusion/word-finding difficulty despite anticoagulation.",
+    "clinicalHighlight": "TIAs despite anticoagulation",
+    "expectedTier": "urgent",
+    "files": [
       {
-        filename: '03_McAllister_Robert.pdf',
-        path: '/samples/triage/cross-specialty/03_McAllister_Robert.pdf',
-        docType: 'Cardiology Referral',
-        previewText: `Heartland Cardiovascular Consultants
-3300 N. Knoxville Ave, Suite 200, Peoria, IL 61604
-Phone: (309) 555-0441 | Fax: (309) 555-0442
-
-Patient: Robert G. McAllister
-
-Date: 01/20/2026
-
-DOB: 11/08/1958
-
-Provider: Nadia Okonkwo, MD, FACC
-
-MRN: HCC-0029301
-
-Specialty: Cardiovascular Disease
-
-CHIEF COMPLAINT
-Three syncopal episodes over the past 5 months.
-
-HISTORY OF PRESENT ILLNESS
-Mr. McAllister is a 67-year-old male with known coronary artery disease (2-vessel CABG 2018), hypertension, and type 2
-diabetes referred by his PCP for evaluation of recurrent syncope. He has had three witnessed loss-of-consciousness
-episodes:
-Episode 1 (August 2025): Occurred after prolonged standing at a family cookout on a hot day. He felt lightheaded and
-nauseated, then lost consciousness for approximately 30 seconds. Wife noted he was pale and limp. No shaking.
-Recovered quickly, felt tired. Did not seek care.
-Episode 2 (October 2025): Occurred while urinating in the middle of the night. He felt dizzy, sat down on the toilet, then
-'blacked out.' No witnesses. Was found on the bathroom floor by wife; unclear duration, was confused briefly afterward.
-Episode 3 (January 2026): Occurred during church — had been standing for about 20 minutes. He went pale, collapsed,
-and his wife states he had 'a few jerks of his arms' for about 10-15 seconds before going limp. He had no tongue bite, no
-incontinence. He was fully oriented within 2 minutes. EMS was called; blood glucose 118, BP 90/60 on scene, ECG showed
-sinus bradycardia at 46 bpm. He was not transported.
-He denies chest pain or palpitations prior to any of the episodes. He does note a prodrome of warmth, nausea, and tunnel
-vision in episodes 1 and 3. He takes metoprolol succinate 100 mg daily, lisinopril 20 mg, atorvastatin 80 mg, aspirin 81 mg,
-metformin 1000 mg BID, and amlodipine 5 mg.
-
-PHYSICAL EXAM
-Vitals: BP 134/80 seated, 118/74 standing (no symptoms), HR 58, RR 14
-General: Well-appearing male, no acute distress.
-Cardiovascular: Bradycardic, regular rhythm. No murmurs, rubs, or gallops. No carotid bruits. No JVD. No peripheral
-edema.
-Neuro: Alert, oriented x4. No focal deficits.
-
-RESULTS
-ECG today: Sinus bradycardia, HR 54. First-degree AV block (PR 218 ms). No acute ischemic changes. No QTc
-prolongation (QTc 412 ms).
-Echo (01/15/2026): EF 50-55%, mildly impaired relaxation, no wall motion abnormalities, no significant valvular disease.
-Holter monitor (worn 72 hrs, 12/2025): Sinus bradycardia with HR nadir 38 bpm at night. Two pauses of 2.1 and 2.4
-seconds. No high-degree block captured.
-
-ASSESSMENT AND PLAN
-1. Recurrent syncope — vasovagal vs. cardiogenic (R55)
-The first two episodes have classic vasovagal features: triggers (prolonged standing, heat, micturition), prodrome, and quick
-recovery. The third episode with brief myoclonic jerks and on-scene bradycardia of 46 is more ambiguous — brief
-convulsive activity can occur with any syncope due to cerebral hypoperfusion and does not indicate epilepsy. However, I
-cannot exclude a primary cardiac arrhythmia, particularly given his CAD history, baseline bradycardia, and 2.4-second
-pauses on Holter.
-Plan: Implantable loop recorder (ILR) discussed and patient consents — scheduling implantation within 2 weeks for
-
-long-term cardiac rhythm monitoring. Reduce metoprolol to 50 mg daily given significant bradycardia. Orthostatic
-precautions and hydration counseling provided. No driving until further evaluation completed.
-2. Neurology referral
-I am also placing a neurology referral regarding episode 3. Although I believe the convulsive movements most likely
-represent anoxic myoclonus from syncope, the brief postictal confusion and the atypical features warrant formal
-neurological evaluation to rule out a seizure disorder, particularly given his post-CABG status and history of possible
-cerebral emboli. I am asking Neurology to evaluate and would request an outpatient EEG if they feel it is warranted.
-3. Coronary artery disease, stable (I25.10)
-Continue aspirin and statin. Annual nuclear stress test due — will order.
-
-Electronically signed by: Nadia Okonkwo, MD, FACC
-Signed 01/20/2026 14:55 CST | Heartland CV EHR`,
-      },
+        "filename": "03_McAllister_Robert.pdf",
+        "path": "/samples/triage/cross-specialty/03_McAllister_Robert.pdf",
+        "docType": "Cardiology Referral",
+        "previewText": "Midtown Medical Associates\n1400 Peachtree St NE, Suite 500, Atlanta, GA 30309\nPhone: (404) 555-0588 | Fax: (404) 555-0589\n\nPatient: Eugene L. Washington\n\nDate of Service: 01/15/2026\n\nDOB: 07/22/1953\n\nProvider: Samuel K. Abernathy, MD, FACP\n\nMRN: MMA-0055120\n\nSpecialty: Internal Medicine\n\nCHIEF COMPLAINT\nFollow-up CHF, diabetes, blood pressure. Also had a funny spell.\n\nHISTORY OF PRESENT ILLNESS\nMr. Washington is a 72-year-old African American male with extensive medical history including HFrEF (EF 35%), type 2\ndiabetes on insulin, hypertension, atrial fibrillation on Eliquis, CKD stage 3b, and COPD. He presents for scheduled\nfollow-up.\nHe reports his breathing has been stable. He can walk about one block before getting short of breath, which is his baseline.\nHe weighs himself daily and his weight has been stable around 220 lbs. He is checking his blood sugars — morning\nreadings are 140-190. He reports compliance with his medications. He uses his inhalers as prescribed. He is sleeping on\ntwo pillows, no change.\nHe ran out of Eliquis for about 5 days earlier this month because of a prior authorization issue. He restarted it 4 days ago.\nWhen specifically asked about any new concerns, he mentions a 'funny spell' about 10 days ago (during the time he was off\nEliquis). He was eating breakfast and suddenly his right hand went numb and he could not hold his fork. His wife said his\nface looked droopy on the right side. He also had trouble getting words out. The episode lasted approximately 15-20\nminutes and then completely resolved. He did not seek medical attention because 'it went away.' He has not had\nrecurrence. He denies headache, vision changes, or weakness since then.\n\nCURRENT MEDICATIONS\n1. Carvedilol 25 mg BID\n2. Sacubitril/valsartan 49/51 mg BID\n3. Spironolactone 25 mg daily\n4. Furosemide 40 mg daily\n5. Apixaban 5 mg BID (restarted 4 days ago)\n6. Insulin glargine 28 units QHS\n7. Insulin lispro sliding scale with meals\n8. Metformin 500 mg BID\n9. Empagliflozin 10 mg daily\n10. Atorvastatin 80 mg daily\n11. Tiotropium 18 mcg inhaled daily\n12. Albuterol MDI PRN\n13. Potassium chloride 20 mEq daily\n\nPHYSICAL EXAM\nVitals: BP 142/88, HR 78 (irregular), Temp 98.2, Wt 221 lbs, O2 sat 94% RA\nGeneral: Chronically ill-appearing male, no acute distress.\nCardiovascular: Irregularly irregular rhythm. Grade 2/6 systolic murmur at apex. JVP 8 cm. Trace bilateral pedal edema,\nimproved from prior.\nLungs: Bibasilar crackles, mild. No wheezes today.\nNeuro: Alert, oriented x3. Face symmetric today. Speech fluent, no dysarthria. Motor 5/5 all extremities. No drift. Sensation\nintact.\n\nASSESSMENT AND PLAN\n\n\f1. HFrEF, NYHA Class II-III, stable (I50.22)\nWeight stable, trace edema improved. Continue sacubitril/valsartan, carvedilol, spironolactone, furosemide, empagliflozin.\nBMP today — monitor K and Cr.\n2. Atrial fibrillation (I48.91)\nRate controlled today. Eliquis gap is very concerning in the context below.\n3. Probable TIA (G45.9)\nEpisode of acute-onset right facial droop, right hand numbness, and expressive language difficulty lasting 15-20 minutes\nwith complete resolution — classic TIA presentation. This occurred while off anticoagulation for 5 days in the setting of atrial\nfibrillation (CHA2DS2-VASc score = 5). Normal neuro exam today. HOWEVER, this requires urgent workup.\n- Stat CT head ordered today (done in office — no acute hemorrhage or large territory infarct)\n- Urgent Neurology referral placed — requesting appointment within 1 week\n- MRI brain with DWI, MRA head and neck ordered\n- Carotid duplex ultrasound ordered\n- Emphasized to patient and wife the critical importance of not missing ANY doses of Eliquis. Provided 2-week bridge supply\nfrom office samples\n- If any recurrent symptoms, call 911 immediately\n4. Type 2 DM on insulin (E11.65)\nA1c pending. Fasting sugars elevated. May need glargine uptitration. Await A1c.\n5. CKD 3b (N18.32)\nCr 1.8, eGFR 38 last check. Recheck today. Monitor with diuretic and SGLT2i.\n6. Hypertension, suboptimal (I10)\nBP 142/88 today. At goal <130/80 given comorbidities, we are above target. However, not adjusting today given fluid status.\nWill reassess.\nFollow-up in 2 weeks. Urgent neurology within 1 week.\n\nElectronically signed by Samuel K. Abernathy, MD, FACP\nSigned 01/15/2026 16:30 EST | Midtown Medical EHR"
+      }
     ],
-    demoPoints: ['Cardiology-to-neurology referral', 'Breakthrough events on anticoagulation'],
+    "demoPoints": [
+      "Cardiology-to-neurology referral",
+      "Breakthrough events on anticoagulation"
+    ]
   },
   {
-    id: 'cross-04-patel',
-    patientName: 'Patel, Anita',
-    age: 58,
-    sex: 'F',
-    category: 'cross_specialty',
-    referringSpecialty: 'Oncology',
-    briefDescription: 'Breast cancer patient on chemo with neuropathy plus new facial droop and arm weakness.',
-    clinicalHighlight: 'Possible brain metastases vs leptomeningeal disease',
-    expectedTier: 'urgent',
-    files: [
+    "id": "cross-04-patel",
+    "patientName": "Patel, Anita",
+    "age": 58,
+    "sex": "F",
+    "category": "cross_specialty",
+    "referringSpecialty": "Oncology",
+    "briefDescription": "Breast cancer patient on chemo with neuropathy plus new facial droop and arm weakness.",
+    "clinicalHighlight": "Possible brain metastases vs leptomeningeal disease",
+    "expectedTier": "urgent",
+    "files": [
       {
-        filename: '04_Patel_Anita.pdf',
-        path: '/samples/triage/cross-specialty/04_Patel_Anita.pdf',
-        docType: 'Oncology Referral',
-        previewText: `Great Lakes ENT & Audiology
-900 Medical Campus Dr, Suite 12, Ann Arbor, MI 48109
-Phone: (734) 555-0267 | Fax: (734) 555-0268
-
-Patient: Anita J. Patel
-
-Date: 01/22/2026
-
-DOB: 08/04/1965
-
-Provider: Harrison Wolfe, MD
-
-MRN: GLEN-0053019
-
-Specialty: Otolaryngology – Head & Neck Surgery
-
-CHIEF COMPLAINT
-Episodic dizziness and spinning, worse with position changes. x 3 weeks.
-
-HISTORY OF PRESENT ILLNESS
-Ms. Patel is a 60-year-old female with no significant neurological history who presents with episodic vertigo for the past 3
-weeks. She describes sudden onset of a spinning sensation when she rolls over in bed, especially turning to the right, or
-when she tips her head back to look up (e.g., reaching into an overhead cabinet). Episodes last approximately 20-40
-seconds and then fully resolve. She has had no continuous dizziness between episodes. No hearing loss, no tinnitus, no ear
-fullness. No nausea severe enough to vomit. No headache. No diplopia, dysarthria, dysphagia, or focal weakness. No prior
-episodes. She did have a minor cold about 4 weeks ago that has fully resolved.
-She has extensively Googled her symptoms and is convinced she has had 'mini-strokes.' Her sister had a stroke 2 years
-ago, which has heightened her anxiety. She has been avoiding all movement out of fear and has not driven in 2 weeks.
-
-PHYSICAL EXAM
-Vitals: BP 126/80, HR 74, normal
-Otoscopy: Bilateral TMs intact, no effusion, no perforation. EACs clear.
-HEENT: No nystagmus in primary gaze. EOMI without corrective saccades or limitation. Hearing grossly intact bilateral (512
-Hz fork). No facial asymmetry.
-Dix-Hallpike Test:
-- Right Dix-Hallpike: POSITIVE. Upbeat-torsional nystagmus with 4-second latency, lasting approximately 18 seconds,
-fatigable on repeat. Patient reported intense vertigo.
-- Left Dix-Hallpike: Negative.
-Head Impulse Test: Normal (no corrective saccade — negative, as expected in BPPV).
-Romberg: Negative. Gait normal.
-
-TREATMENT
-Epley canalith repositioning maneuver performed for right posterior canal BPPV. Patient experienced vertigo and
-nystagmus during maneuver, confirming diagnosis. Post-maneuver: Dix-Hallpike right — NEGATIVE. Patient reports
-significant improvement in dizziness. Instructed to sleep semi-recumbent for 48 hours, avoid lying on right side for 1 week.
-Home Brandt-Daroff exercises demonstrated and handout provided.
-
-ASSESSMENT AND PLAN
-1. Benign paroxysmal positional vertigo, right posterior semicircular canal (H81.11)
-Classic history, positive Dix-Hallpike with characteristic upbeat-torsional fatigable nystagmus, normal head impulse test, and
-immediate response to Epley maneuver. This is entirely consistent with peripheral vestibular pathology — specifically
-canalith displacement in the right posterior semicircular canal. There are no features of central vertigo: no
-direction-changing nystagmus, no neurological symptoms or signs, normal head impulse test, and fatigable nystagmus.
-Reassured patient that this is not a stroke.
-Return to clinic in 2 weeks to confirm resolution. If symptoms recur, repeat Epley can be performed at home or in office.
-Approximately 50% of BPPV resolves within 4 weeks; recurrence rate approximately 15% per year.
-2. Neurology referral — patient request
-Despite thorough explanation of the diagnosis and reassurance, Ms. Patel remains anxious about the possibility of a stroke
-and is requesting a neurology opinion and brain MRI. I have explained that based on the clinical presentation, central
-pathology is extremely unlikely and imaging is not indicated by current guidelines (AAN/AAO). However, given her
-
-significant anxiety, family history of stroke, and the impact on her daily function, I am placing a neurology referral at her
-request. I have communicated to the referring neurologist that my clinical assessment is BPPV, treated successfully today,
-and that imaging is being requested for reassurance rather than clinical suspicion.
-Meclizine 12.5 mg PRN prescribed for symptomatic relief during any recurrent episodes (advised to use sparingly as it may
-impair vestibular compensation).
-
-Electronically signed by: Harrison Wolfe, MD
-Signed 01/22/2026 12:15 EST | Great Lakes ENT EHR`,
-      },
+        "filename": "04_Patel_Anita.pdf",
+        "path": "/samples/triage/cross-specialty/04_Patel_Anita.pdf",
+        "docType": "Oncology Referral",
+        "previewText": "Dayton Comprehensive Cancer Center\n5500 Founders Blvd, Dayton, OH 45426\nPhone: (937) 555-0512 | Fax: (937) 555-0513\n\nPatient: Anita R. Patel\n\nDate of Service: 03/18/2026\n\nDOB: 03/25/1967\n\nProvider: Michael T. Ferraro, MD\n\nMRN: DCCC-0093412\n\nSpecialty: Hematology/Oncology\n\nCHIEF COMPLAINT\nNew right facial droop and right arm weakness in a patient with metastatic breast cancer on chemotherapy.\n\nHISTORY OF PRESENT ILLNESS\nMs. Patel is a 58-year-old woman with metastatic ER+/HER2- invasive ductal carcinoma of the left breast\n(diagnosed 2023) with known bone and liver metastases, currently on cycle 6 of weekly paclitaxel after\nprogression on prior CDK4/6 inhibitor plus aromatase inhibitor therapy. She presents today, two days after\nher most recent infusion, with her husband reporting that this morning her mouth appeared \"crooked\" on the\nright and her speech sounded mildly slurred; she also noted her right hand had become clumsy and she\ndropped her toothbrush. Symptoms began 4-6 hours prior to this visit and have not resolved — she describes\nthe right arm as feeling distinctly heavier than earlier today, and a mild dull headache started about an\nhour ago. She denies witnessed seizure activity, fever, neck stiffness, visual changes, or nausea/vomiting.\nThis is clearly distinct from her known chemotherapy-induced peripheral neuropathy, which has been a\nsymmetric burning/tingling sensation in both feet and fingertips for about 3 months, gradually worsening\nwith cumulative paclitaxel dosing, and is unchanged today. Given the new focal, asymmetric, subacute\ndeficit in the setting of known metastatic visceral disease, the primary concern is CNS involvement\n(parenchymal brain metastasis versus leptomeningeal disease) rather than a peripheral or chemotoxic process.\n\nPAST MEDICAL HISTORY\nMetastatic ER+/HER2- breast cancer, left breast (dx 2023), with bone and liver metastases. Hypertension.\nChemotherapy-induced peripheral neuropathy (grade 2). Anxiety.\n\nCURRENT MEDICATIONS\n1. Paclitaxel 80 mg/m2 IV weekly (oncology-administered)\n2. Gabapentin 300 mg TID (for chemotherapy-induced neuropathy)\n3. Ondansetron PRN nausea\n4. Lisinopril 10 mg daily\n5. Escitalopram 10 mg daily\n6. Dexamethasone 4 mg — infusion premedication only\n\nPHYSICAL EXAM\nVitals: BP 142/88, HR 96, Temp 98.4, RR 16, SpO2 98% RA.\nGeneral: Alert, mildly anxious, no acute distress but visibly worried.\nNeuro: Alert and oriented x3. Speech mildly dysarthric, words fluent, no frank aphasia. Cranial nerves:\nright lower facial droop with forehead wrinkling spared bilaterally — consistent with a central/upper motor\nneuron pattern rather than a peripheral CN VII palsy. Pupils equal and reactive, extraocular movements\nfull, no diplopia. Motor: right upper extremity 4/5 proximally and distally with pronator drift; left upper\nextremity 5/5; bilateral lower extremities 5/5 proximally. Decreased vibration and light touch symmetrically\nat toes and fingertips bilaterally, unchanged stocking-glove pattern consistent with known CIPN. Reflexes\nmildly brisker at right biceps/triceps compared to left; ankle reflexes diminished bilaterally (chronic).\nBabinski equivocal on right, downgoing on left. Mild right-sided dysmetria on finger-to-nose, difficult to\nfully assess given weakness. Gait: assisted, mild right-sided drift on tandem gait.\nAbdomen: Liver edge palpable approximately 2 cm below the costal margin, nontender (known hepatic mets).\n\nLABS (today, pre-infusion)\nCBC: WBC 4.1, Hgb 10.8 (at chronic baseline), Plt 178. CMP: Na 138, K 4.0, Cr 0.7, Ca 9.4; LFTs mildly\nelevated at known baseline (AST 52, ALT 48, Alk Phos 210) consistent with hepatic metastases. CA 27.29\n(02/2026): elevated and rising from prior value.\n\nASSESSMENT AND PLAN\n\n1. New right-sided upper motor neuron facial droop and arm weakness, subacute onset — concerning for CNS\nmetastatic disease, parenchymal brain metastasis versus leptomeningeal carcinomatosis (C79.31)\nExam pattern (forehead-sparing facial droop, pronator drift, asymmetric hyperreflexia, equivocal Babinski)\nlocalizes to a left cerebral hemisphere process and is inconsistent with a peripheral or chemotoxic\netiology. Given known metastatic breast cancer with visceral disease, this is managed as a new CNS event\nuntil proven otherwise. Holding today's paclitaxel infusion. Urgent same-day Neurology/Neuro-oncology\nreferral placed with STAT MRI brain with and without contrast; if leptomeningeal disease remains on the\ndifferential after imaging, will proceed to lumbar puncture with cytology once deemed safe. Starting\ndexamethasone 4 mg BID today for possible vasogenic edema pending imaging; holding further chemotherapy\nuntil neurologic evaluation is complete.\n2. Metastatic breast cancer, ER+/HER2-, with bone and liver metastases, on active chemotherapy (C50.912,\nC79.51, C78.7)\nRising CA 27.29 raises concern for possible systemic progression independent of today's finding; will\nreassess systemic regimen jointly with neuro-oncology once CNS workup is complete.\n3. Chemotherapy-induced peripheral neuropathy, grade 2, paclitaxel-related (G62.0)\nDistal stocking-glove sensory changes stable and unchanged today, clearly distinguishable from the new focal\nfindings above. Continue gabapentin; will revisit taxane dose reduction once oncologic plan is reassessed.\n4. Hypertension (I10) — stable today, no changes.\nPatient and husband educated at length on findings and urgency; instructed to proceed directly to today's\nimaging appointment and to go to the Emergency Department immediately for any worsening (decreased\nconsciousness, new weakness elsewhere, seizure activity). Direct verbal handoff given to the neuro-oncology\nattending on call.\n\nElectronically signed by Michael T. Ferraro, MD\nEncounter signed 03/18/2026 14:20 EST | Dayton Comprehensive Cancer Center EHR v3.4"
+      }
     ],
-    demoPoints: ['Neuro-oncology urgency', 'Symptoms beyond CIPN'],
+    "demoPoints": [
+      "Neuro-oncology urgency",
+      "Symptoms beyond CIPN"
+    ]
   },
   {
-    id: 'cross-05-kowalczyk',
-    patientName: 'Kowalczyk, Stefan',
-    age: 67,
-    sex: 'M',
-    category: 'cross_specialty',
-    referringSpecialty: 'Gastroenterology',
-    briefDescription: 'Crohn patient on infliximab with progressive bilateral leg weakness and areflexia.',
-    clinicalHighlight: 'CIDP vs GBS variant (anti-TNF related)',
-    expectedTier: 'urgent',
-    files: [
+    "id": "cross-05-kowalczyk",
+    "patientName": "Kowalczyk, Stefan",
+    "age": 67,
+    "sex": "M",
+    "category": "cross_specialty",
+    "referringSpecialty": "Gastroenterology",
+    "briefDescription": "Crohn patient on infliximab with progressive bilateral leg weakness and areflexia.",
+    "clinicalHighlight": "CIDP vs GBS variant (anti-TNF related)",
+    "expectedTier": "urgent",
+    "files": [
       {
-        filename: '05_Kowalczyk_Stefan.pdf',
-        path: '/samples/triage/cross-specialty/05_Kowalczyk_Stefan.pdf',
-        docType: 'GI Referral',
-        previewText: `Tri-State Occupational Medicine
-215 Industrial Pkwy, Suite 100, Youngstown, OH 44505
-Phone: (330) 555-0378 | Fax: (330) 555-0379
-
-Patient: Stefan R. Kowalczyk
-
-Date: 01/19/2026
-
-DOB: 06/17/1974
-
-Provider: Renee Gallagher, MD, MPH
-
-MRN: TSOM-0061142
-
-Specialty: Occupational & Environmental Medicine
-
-CHIEF COMPLAINT
-Worker's compensation IME / evaluation — bilateral upper and lower extremity numbness. Referred by employer's WC
-carrier.
-
-HISTORY OF PRESENT ILLNESS
-Mr. Kowalczyk is a 51-year-old male who has worked for 18 years as a heavy equipment operator and assembly line
-supervisor at a steel fabrication plant. He filed a workers' compensation claim 6 months ago for bilateral hand numbness
-and tingling, with a claim that the condition is work-related. He was placed on modified duty 3 months ago and is currently
-off work pending this evaluation.
-He reports numbness and tingling in both hands — predominantly in the thumb, index, and middle fingers bilaterally.
-Symptoms are worse at night and with prolonged gripping of equipment controls. He also reports fatigue and bilateral leg
-heaviness that he says began around the same time. His treating physician (his PCP, Dr. Yost) diagnosed bilateral carpal
-tunnel syndrome and ordered nerve conduction studies, which Mr. Kowalczyk states showed 'abnormal results' — he does
-not have the report with him today.
-The WC carrier has specifically requested that this evaluation address 'whether the claimant's symptoms could represent
-multiple sclerosis or other neurological disease ' rather than an occupational injury.' This request was made after Mr.
-Kowalczyk's attorney mentioned MS as a possible diagnosis. The employer is arguing the condition is pre-existing and not
-work-related.
-He denies any vision changes, diplopia, bladder dysfunction, gait problems, fatigue beyond the norm, heat sensitivity, or
-prior neurological symptoms. He has no family history of neurological disease. He does not smoke and drinks socially. He
-has hypertension and takes lisinopril.
-
-PHYSICAL EXAM
-Vitals: BP 140/88, HR 76, Wt 224 lbs
-General: Well-developed male, cooperative, appeared somewhat guarded.
-Upper extremities: Bilateral positive Tinel's at wrists. Positive Phalen's bilaterally. Mild thenar flattening right hand, left
-WNL. Grip strength mildly reduced bilaterally by dynamometer (right 38 kg, left 41 kg; normal >45 kg). Sensation reduced in
-median nerve distribution bilaterally to monofilament. Sensation normal in ulnar and radial distributions.
-Lower extremities: Strength 5/5 bilaterally. Sensation intact. Reflexes 2+ symmetric. No Babinski. Gait normal. No ataxia.
-Romberg negative.
-Cervical Spine: Full ROM, no radicular symptoms with Spurling's test.
-Cranial nerves: II-XII intact. No RAPD. No internuclear ophthalmoplegia.
-
-ASSESSMENT AND PLAN
-1. Bilateral carpal tunnel syndrome (G56.03)
-Clinical presentation is fully consistent with bilateral CTS: classic median nerve distribution symptoms, positive provocative
-testing, thenar atrophy on the right, and occupation involving prolonged vibratory tool use and repetitive grip — all are
-well-established risk factors for CTS and support occupational causation. I will obtain the prior NCS report from Dr. Yost's
-office to confirm electrodiagnostic findings.
-2. Multiple sclerosis — NOT supported (addressed per WC carrier request)
-There are no clinical features to suggest MS in this patient. His neurological examination outside of the median nerve
-distribution is entirely normal: no upper motor neuron signs, no optic nerve or cerebellar findings, no bowel/bladder
-dysfunction, no history consistent with relapsing-remitting neurological events. The focal, bilateral median-nerve-distribution
-
-sensory loss without any CNS findings is not a presentation of MS. The 'leg heaviness' he describes is non-specific and his
-lower extremity exam is completely normal.
-That said, in the interest of completeness for the WC process, I am placing a neurology referral for formal evaluation and
-repeat NCS/EMG by a board-certified neurologist. This will formally document the electrodiagnostic findings and provide an
-independent neurological opinion on whether systemic neurological disease is present. I do not expect this evaluation to
-reveal MS or any condition other than bilateral CTS.
-3. Occupational causation opinion
-Based on available information, the bilateral CTS is consistent with workplace exposure to vibratory tools and repetitive
-gripping over 18 years. This is my preliminary assessment pending the neurology evaluation and review of prior NCS.
-
-Electronically signed by: Renee Gallagher, MD, MPH
-Signed 01/19/2026 16:10 EST | TSOM Case Management System | WC Claim #OH-2025-44871`,
-      },
+        "filename": "05_Kowalczyk_Stefan.pdf",
+        "path": "/samples/triage/cross-specialty/05_Kowalczyk_Stefan.pdf",
+        "docType": "GI Referral",
+        "previewText": "Meridian Gastroenterology & Digestive Health\n2200 Parkview Ave, Suite 210, Green Bay, WI 54303\nPhone: (920) 555-0164 | Fax: (920) 555-0165\n\nPatient: Stefan J. Kowalczyk\n\nDate of Service: 02/05/2026\n\nDOB: 08/14/1958\n\nProvider: David M. Reinholt, MD\n\nMRN: MGD-0038452\n\nSpecialty: Gastroenterology (Board Certified, IBD focus)\n\nCHIEF COMPLAINT\nScheduled infliximab infusion follow-up; new progressive leg and arm weakness.\n\nHISTORY OF PRESENT ILLNESS\nMr. Kowalczyk is a 67-year-old male with a 14-year history of ileocolonic Crohn's disease, currently maintained on\ninfliximab 5 mg/kg IV every 8 weeks (last infusion 3 weeks ago) plus weekly methotrexate, presenting today for a\nscheduled infusion visit. His Crohn's has been in steroid-free clinical remission for over a year with no abdominal\npain, diarrhea, or blood per rectum; December fecal calprotectin was within normal limits.\nHe reports that approximately 5-6 weeks ago he began noticing tingling in his feet, followed by progressive\ndifficulty climbing stairs and rising from low chairs. Over the past two weeks the weakness has spread proximally\nto involve both thighs and hip girdle, and in the last several days he has also developed mild clumsiness and\nweakness gripping objects with both hands — he dropped his coffee mug twice this week. He denies a preceding\ndiarrheal or febrile illness, recent vaccination, or any new medication other than his standing infliximab and\nmethotrexate. He denies bowel or bladder incontinence and denies double vision, but his wife feels his voice has\nsounded \"a little different\" over the past few days. He has fallen twice in the past week when his knees buckled,\nwithout loss of consciousness, and required assistance to climb the two steps into clinic today.\n\nREVIEW OF SYSTEMS\nConstitutional: denies fever, no weight loss beyond baseline. GI: no change in bowel habits, no blood per rectum.\nNeurologic: progressive, symmetric weakness of arms and legs as above, distal paresthesias, subjective voice change,\ndenies bowel/bladder change, denies diplopia or facial droop. Respiratory: denies shortness of breath at rest,\nthough limited exertion due to leg weakness.\n\nCURRENT MEDICATIONS\n1. Infliximab 5 mg/kg IV every 8 weeks\n2. Methotrexate 15 mg PO weekly\n3. Folic acid 1 mg daily\n4. Metformin 500 mg BID\n5. Atorvastatin 20 mg daily\n6. Vitamin D3 2000 IU daily\n\nALLERGIES\nNKDA\n\nPHYSICAL EXAM\nVitals: BP 128/76, HR 88, Temp 98.6, RR 16, SpO2 97% RA, Wt 184 lbs\nGeneral: Alert, appears anxious, uses exam table rail to sit down.\nAbdomen: Soft, non-tender, no rebound or guarding, no palpable mass.\nNeurologic: CN II-XII grossly intact though voice is mildly hoarse/soft; no facial asymmetry. Motor: hip flexors\n4-/5 bilaterally, knee extensors 4/5 bilaterally, ankle dorsiflexion 4-/5 bilaterally, grip strength 4/5 bilaterally,\nsymmetric throughout. DTRs absent at biceps, patellar, and Achilles bilaterally; trace brachioradialis. Sensation:\nreduced vibration sense at bilateral great toes and ankles, mildly diminished light touch in a stocking distribution\nto mid-shin; upper extremity sensation grossly intact. Gait: unable to safely assess independently, ambulates with\ntwo-person assist, wide-based with bilateral foot slap. Romberg deferred (unable to stand unassisted).\n\nASSESSMENT AND PLAN\n1. Subacute, symmetric, ascending sensorimotor polyneuropathy with global areflexia (G61.9)\nProgressive over 5-6 weeks with proximal and distal weakness in all four limbs, diffuse areflexia, and a new\nsubjective voice change concerning for early bulbar involvement. Differential includes CIDP versus a GBS-variant /\nsubacute inflammatory demyelinating polyradiculoneuropathy, given the progression falls at the borderline between\nthe two. Contacted Neurology directly and arranged expedited evaluation this week. Patient and wife counseled to\ngo to the ED immediately for any shortness of breath, difficulty swallowing liquids, or worsening voice change.\n2. Crohn's disease, ileocolonic, in remission on infliximab/methotrexate (K50.80)\nA temporal association between anti-TNF therapy and new demyelinating neuropathy has been reported in the\nliterature. Holding infliximab pending Neurology assessment; will coordinate with Neurology regarding whether to\nresume, switch, or discontinue anti-TNF therapy based on work-up (EMG/NCS, MRI spine, CSF studies).\n3. Type 2 diabetes mellitus, diet/metformin-controlled (E11.9)\nStable; continue metformin.\nPlan: Urgent referral to Neurology placed for expedited evaluation this week given rate of progression and new\nbulbar symptom, including EMG/NCS, MRI of the spine, and lumbar puncture for albuminocytologic dissociation to help\ndifferentiate CIDP from a GBS-variant. Infliximab held. Follow-up in GI after neurology work-up is complete.\n\nElectronically signed by David M. Reinholt, MD\nDocument generated in MeridianGI EHR v2.7 | Encounter finalized 02/05/2026 11:32 CST"
+      }
     ],
-    demoPoints: ['Drug-induced neuropathy', 'CIDP recognition'],
+    "demoPoints": [
+      "Drug-induced neuropathy",
+      "CIDP recognition"
+    ]
   },
   {
-    id: 'cross-06-barnes',
-    patientName: 'Barnes, Christine',
-    age: 41,
-    sex: 'F',
-    category: 'cross_specialty',
-    referringSpecialty: 'Psychiatry',
-    briefDescription: 'Treatment-resistant depression with involuntary lip smacking, tongue protrusion, jaw movements.',
-    clinicalHighlight: 'Tardive dyskinesia from perphenazine',
-    expectedTier: 'semi_urgent',
-    files: [
+    "id": "cross-06-barnes",
+    "patientName": "Barnes, Christine",
+    "age": 41,
+    "sex": "F",
+    "category": "cross_specialty",
+    "referringSpecialty": "Psychiatry",
+    "briefDescription": "Treatment-resistant depression with involuntary lip smacking, tongue protrusion, jaw movements.",
+    "clinicalHighlight": "Tardive dyskinesia from perphenazine",
+    "expectedTier": "semi_urgent",
+    "files": [
       {
-        filename: '06_Barnes_Christine.pdf',
-        path: '/samples/triage/cross-specialty/06_Barnes_Christine.pdf',
-        docType: 'Psychiatry Referral',
-        previewText: `Advanced Pain & Spine Center
-8840 Prominence Pkwy, Suite 105, Jacksonville, FL 32256
-Phone: (904) 555-0293 | Fax: (904) 555-0294
-
-Patient: Christine A. Barnes
-
-Date: 01/28/2026
-
-DOB: 04/02/1969
-
-Provider: Marcus Yee, MD
-
-MRN: APSC-0033774
-
-Specialty: Interventional Pain Management
-
-CHIEF COMPLAINT
-Right upper extremity burning pain, allodynia — follow-up.
-
-HISTORY OF PRESENT ILLNESS
-Ms. Barnes is a 56-year-old female who initially presented 14 months ago following a right wrist fracture (distal radius)
-sustained in a fall. She underwent ORIF by Dr. Kaminsky in November 2024. Postoperatively she developed
-disproportionate, burning pain in the right hand and forearm — far exceeding what would be expected from the surgical
-recovery. Over the following months she developed allodynia (light touch intolerable), color changes (right hand appears
-mottled, purplish at times, pale at others), temperature asymmetry (right hand cooler by 2-3°C on infrared thermometry),
-and edema of the right hand and fingers. She reports hyperhidrosis of the right hand. The pain is constant, 7-8/10, burning
-and electric in quality, worse with any movement, weather changes, and stress.
-She has been treated with a right stellate ganglion block (partial, temporary relief), two sympathetic nerve blocks (short-lived
-benefit), gabapentin 600 mg TID (partial benefit), duloxetine 60 mg daily (some mood benefit), and physical therapy (poorly
-tolerated due to pain). She has not tried IV ketamine or spinal cord stimulation.
-She is increasingly disabled — she was a dental hygienist and can no longer work. She is applying for disability. She reports
-significant depression and anxiety related to her condition. She asks today about 'whether this is all in my head' because her
-orthopedic surgeon implied her symptoms were 'out of proportion.'
-
-PHYSICAL EXAM
-Vitals: BP 128/78, HR 82
-Right upper extremity: Diffuse allodynia to light touch from wrist to mid-forearm. Skin mottled with patchy erythema and
-pallor. Mild non-pitting edema of dorsal hand. Right hand temperature 33.1°C vs left 35.8°C by infrared. Hyperhidrosis right
-palm. ROM of right wrist and fingers markedly limited by pain. Grip strength right 8 kg, left 42 kg.
-Neuro: Sensation difficult to formally assess given allodynia. No upper motor neuron signs. Left side normal. Cranial nerves
-intact.
-
-ASSESSMENT AND PLAN
-1. Complex Regional Pain Syndrome Type I, right upper extremity (G90.511)
-Meets Budapest Criteria: continuous pain disproportionate to inciting event; allodynia, hyperalgesia; color, temperature,
-trophic, and sudomotor changes; no other diagnosis explains the findings. This is a well-established CRPS diagnosis, not a
-somatoform disorder.
-Plan: Discuss spinal cord stimulation trial — she meets criteria. Refer to SCS-certified pain physician. Continue gabapentin
-and duloxetine. Revisit IV ketamine infusion series (3-5 infusions) as bridging therapy.
-2. Neurology referral
-While CRPS is a clinical diagnosis managed within pain medicine, I am referring Ms. Barnes to Neurology for a secondary
-opinion and for their assessment of any peripheral nerve contribution (e.g., median or radial nerve injury from ORIF
-hardware or surgical retraction). NCS/EMG of the right upper extremity would be valuable to rule out structural nerve injury
-that might modify surgical planning for SCS lead placement. Additionally, the patient's question about whether this is
-'psychological' deserves a definitive answer from a neurologist in writing, which will support her disability application.
-3. Depression/anxiety (F32.1, F41.1)
-Duloxetine serving dual purpose. Referred to chronic pain psychology — patient accepted.
-
-Electronically signed by: Marcus Yee, MD
-Signed 01/28/2026 16:20 EST | Advanced Pain EHR`,
-      },
+        "filename": "06_Barnes_Christine.pdf",
+        "path": "/samples/triage/cross-specialty/06_Barnes_Christine.pdf",
+        "docType": "Psychiatry Referral",
+        "previewText": "Cedar Grove Psychiatric Associates\n220 Elm Terrace, Suite 4B, Akron, OH 44308\nPhone: (330) 555-0417 | Fax: (330) 555-0418\n\nPatient: Christine L. Barnes\n\nDate of Service: 06/30/2026\n\nDOB: 04/19/1985\n\nProvider: Marcus D. Feldstein, MD\n\nMRN: CGPA-0091456\n\nSpecialty: Psychiatry\n\nCHIEF COMPLAINT\nInvoluntary orofacial movements; referral to Neurology for evaluation of suspected tardive dyskinesia.\n\nHISTORY OF PRESENT ILLNESS\nMs. Barnes is a 41-year-old female with treatment-resistant major depressive disorder, followed in this\npractice for 9 years. Her depression has required multiple medication trials and has been maintained on\nperphenazine 8 mg twice daily as an augmentation agent for the past 6 years, added after inadequate\nresponse to SSRI/SNRI monotherapy and during a prior episode with psychotic features (fixed, mood-congruent\nguilt-related ideation, non-bizarre), in combination with venlafaxine XR 225 mg daily. Over approximately\nthe past 4 months, her husband and subsequently the patient herself noticed involuntary movements of her\nmouth and tongue — lip-smacking, tongue protrusion and curling, and chewing-type jaw movements — occurring\nthroughout the day, worse when she is anxious or engaged in conversation, and absent during sleep. She can\nbriefly suppress the movements with conscious effort but they return. No limb or trunk movements reported.\nHer mood has remained stable on the current regimen (PHQ-9 stable in the mild range), and she is reluctant\nto change medications given prior difficulty achieving an effective regimen, but the movements are now\nnoticeable to others and are affecting her comfort eating in public and her self-esteem.\n\nPAST MEDICAL HISTORY\nMajor depressive disorder, recurrent, severe, with psychotic features (in remission) x 15 years; generalized\nanxiety disorder; hypothyroidism.\n\nCURRENT MEDICATIONS\n1. Perphenazine 8 mg BID\n2. Venlafaxine XR 225 mg daily\n3. Levothyroxine 75 mcg daily\n4. Trazodone 50 mg QHS PRN sleep\n\nPHYSICAL EXAM\nVitals: BP 116/72, HR 74, Temp 98.1, Wt 158 lbs.\nPsych: Alert, cooperative, mood euthymic, affect appropriate and full range, no acute distress. No\nsuicidal or homicidal ideation.\nNeuro / Orofacial: Intermittent rhythmic lip-smacking, tongue protrusion with lateral tongue movements, and\nchewing-type jaw movements observed throughout the encounter, worsened with distraction (counting\nbackward), transiently suppressible on request. No grimacing, no blepharospasm, no cervical dystonia. No\nlimb chorea, no resting or action tremor, no rigidity. Gait normal. AIMS (Abnormal Involuntary Movement\nScale) total score 14, most pronounced in the orofacial region.\n\nASSESSMENT AND PLAN\n\n1. Tardive dyskinesia, orofacial (G24.02)\nModerate severity by AIMS scoring, temporally associated with 6 years of chronic typical antipsychotic\n(perphenazine) exposure. Referring to Neurology / Movement Disorders for confirmation, severity staging,\nand discussion of treatment options including VMAT2 inhibitor therapy (valbenazine or deutetrabenazine).\n2. Major depressive disorder, recurrent, severe, with psychotic features, currently in full remission on\naugmentation therapy (F33.42)\nPsychiatrically stable on current regimen. Will coordinate closely with Neurology regarding any recommended\nchanges to the antipsychotic (taper vs. switch to an agent with lower EPS/TD risk) given her history of\ntreatment resistance, to minimize relapse risk during any transition.\n3. Given the functional and psychosocial impact of the dyskinesia and the need for coordinated antipsychotic\nmanagement, referring semi-urgently rather than routine.\n\nElectronically signed by Marcus D. Feldstein, MD\nEncounter signed 06/30/2026 15:40 EST | Cedar Grove Behavioral Health EHR v2.8"
+      }
     ],
-    demoPoints: ['Movement disorder from psych meds', 'Tardive dyskinesia recognition'],
+    "demoPoints": [
+      "Movement disorder from psych meds",
+      "Tardive dyskinesia recognition"
+    ]
   },
   {
-    id: 'cross-07-reynolds',
-    patientName: 'Reynolds, Danielle',
-    age: 28,
-    sex: 'F',
-    category: 'cross_specialty',
-    referringSpecialty: 'Sports Medicine',
-    briefDescription: 'Collegiate soccer player with 5th concussion and persistent post-concussion symptoms x 3 months.',
-    clinicalHighlight: 'Prolonged post-concussion syndrome (multiple prior)',
-    expectedTier: 'routine_priority',
-    files: [
+    "id": "cross-07-reynolds",
+    "patientName": "Reynolds, Danielle",
+    "age": 28,
+    "sex": "F",
+    "category": "cross_specialty",
+    "referringSpecialty": "Sports Medicine",
+    "briefDescription": "Collegiate soccer player with 5th concussion and persistent post-concussion symptoms x 3 months.",
+    "clinicalHighlight": "Prolonged post-concussion syndrome (multiple prior)",
+    "expectedTier": "routine_priority",
+    "files": [
       {
-        filename: '07_Reynolds_Danielle.pdf',
-        path: '/samples/triage/cross-specialty/07_Reynolds_Danielle.pdf',
-        docType: 'Sports Medicine Referral',
-        previewText: `Women's Health Partners of Nashville
-2021 Richard Jones Rd, Suite 210, Nashville, TN 37215
-Phone: (615) 555-0381 | Fax: (615) 555-0382
-
-Patient: Danielle M. Reynolds
-
-Date: 01/24/2026
-
-DOB: 09/18/1993
-
-Provider: Gwendolyn Marsh, MD
-
-MRN: WHPN-0071254
-
-Specialty: Obstetrics & Gynecology
-
-CHIEF COMPLAINT
-6-week postpartum visit. Also reports hand numbness and dropped baby.
-
-HISTORY OF PRESENT ILLNESS
-Ms. Reynolds is a 32-year-old G2P2 who delivered her second child vaginally 6 weeks ago at 39+2 weeks. Uncomplicated
-vaginal delivery, no neuraxial complications, no postpartum hemorrhage. She is exclusively breastfeeding.
-Today she reports bilateral hand numbness and tingling that began in the third trimester and has not fully resolved. She
-describes the numbness in the thumb, index, and middle fingers of both hands. She wakes at night with numb hands and
-has to shake them out. She reports that last Tuesday she was holding her 6-week-old and her right hand 'went completely
-numb and I dropped him onto the couch.' The baby was uninjured. She is extremely distressed about this and tearful today.
-She researched her symptoms online and found information about MS. She is terrified. She reports that her hands have
-also been more clumsy in general — difficulty with buttons and her phone keyboard. She denies any vision changes, facial
-numbness, leg weakness, bladder problems, or fatigue beyond normal new-mother exhaustion. No prior neurological
-symptoms. No family history of MS or neurological disease. She has not had any fever, rash, or illness.
-
-PHYSICAL EXAM
-Vitals: BP 110/68, HR 78, Wt 148 lbs (pre-pregnancy 138 lbs)
-General: Well-appearing, tearful, anxious.
-Breast/Postpartum: Uterus involuted. Incision sites healing well. Breastfeeding successfully established per her report.
-Hands (limited exam): Positive Tinel's sign bilateral wrists. Positive Phalen's bilateral. No thenar atrophy noted. Sensation
-appears reduced to light touch in median nerve distribution, though I acknowledge my neurological exam skills are limited. I
-did not perform a formal strength or reflex assessment — outside my scope.
-
-ASSESSMENT AND PLAN
-1. Bilateral hand numbness and tingling — postpartum (R20.2)
-Her symptom pattern — bilateral, median nerve distribution, worsening at night, relieved by shaking, onset in third trimester,
-persisting postpartum — is very consistent with bilateral carpal tunnel syndrome. This is extremely common in pregnancy
-and postpartum, particularly in breastfeeding women due to fluid retention and positioning during nursing. The 'dropping'
-episode was almost certainly a sudden numbness event from CTS, not weakness.
-However, given her significant anxiety about MS and the functional impact on infant care, I am referring urgently to
-Neurology. I want to be honest: I do not think this is MS. But I am an OB/GYN and I am not the right person to rule that out
-definitively or to provide the reassurance she needs. A neurologist can formally evaluate her, likely confirm CTS, and
-provide the credible reassurance that will help her anxiety more than I can. Please note the urgency is driven by her
-emotional state and childcare safety concern, not by my clinical suspicion for serious neurological disease.
-In the meantime: bilateral wrist splints for nighttime use provided. Counseled on supported nursing positions to minimize
-wrist flexion. Will consult OT if not improved after neurology evaluation.
-2. Postpartum visit — otherwise unremarkable
-Contraception: discussed IUD placement, patient deferred. EPDS score: 6 (reassuring, anxiety items elevated —
-monitoring). Return to activity counseled. Anemia CBC today.
-
-Electronically signed by: Gwendolyn Marsh, MD
-
-Signed 01/24/2026 11:45 CST | WHPN EHR`,
-      },
+        "filename": "07_Reynolds_Danielle.pdf",
+        "path": "/samples/triage/cross-specialty/07_Reynolds_Danielle.pdf",
+        "docType": "Sports Medicine Referral",
+        "previewText": "Peak Performance Sports Medicine\n630 W. University Ave, Gainesville, FL 32601\nPhone: (352) 555-0448 | Fax: (352) 555-0449\n\nPatient: Jennifer L. Kim\n\nDate: 01/27/2026\n\nDOB: 11/30/2001\n\nProvider: Trevor Hollis, DO\n\nMRN: PPSM-0018872\n\nSpecialty: Sports Medicine / Primary Care\n\nCHIEF COMPLAINT\nHead injury 5 weeks ago — headache, brain fog, not cleared for return to play.\n\nHISTORY OF PRESENT ILLNESS\nMs. Kim is a 24-year-old female Division I soccer goalkeeper who sustained a concussion on December 19, 2025 during a\ncollision with a field player. She was removed from play per concussion protocol, evaluated on the sideline, and diagnosed\nwith a concussion (no LOC, brief confusion, no amnesia). Initial symptom burden was significant: headache 8/10, dizziness,\nnausea, photophobia, phonophobia, and difficulty concentrating.\nShe is now 5 weeks post-injury and has not been cleared. Symptom progress has been slow. Current symptoms: persistent\nheadache (bifrontal, pressure-type, 4/10 at baseline, spikes to 7/10 with exertion or screen time), cognitive fog ('I feel like I'm\nthinking through mud'), sleep disruption (difficulty initiating sleep, vivid dreams), increased irritability, and emotional lability\n— she cried three times this week without clear trigger. She is a pre-med student and her academic performance has\nsuffered significantly. She is anxious about her athletic career and her upcoming spring season.\nShe attempted Stage 2 of the Graduated Return to Play protocol (light aerobic exercise) twice and both times had symptom\nexacerbation requiring 24-hour rest. She has not progressed further. She is currently using ibuprofen 400 mg 3-4x per day\nfor headaches.\nShe has a prior concussion in 2022 (recovered fully in 3 weeks). No other neurological history. No prior psychiatric history.\nNot currently taking any other medications.\n\nNEUROLOGICAL EXAM / CONCUSSION TESTING\nVitals: BP 112/70, HR 68\nVOMS (Vestibular/Ocular Motor Screening):\n- Smooth pursuit: normal\n- Saccades (horizontal/vertical): normal latency, some symptom provocation with rapid vertical\n- Near point of convergence: 8 cm (mildly increased; normal <5 cm), provoked headache\n- Vestibulo-ocular reflex (VOR): mildly impaired, symptom provocation\n- Visual motion sensitivity: significant dizziness with optokinetic stimulus\nBalance (mBESS): 6 errors (normal <4 for this age group)\nKing-Devick: 52 seconds (baseline unknown, but above expected norms)\nImPACT: Verbal memory 78, Visual memory 70, Processing speed 32.4, Reaction time 0.68 (all below her baseline scores\nfrom pre-season testing)\nCervical spine: Restricted rotation bilateral, tenderness over right upper trapezius and suboccipital muscles. Cervicogenic\nheadache component likely.\n\nASSESSMENT AND PLAN\n1. Post-concussion syndrome (F07.81)\nPersistent symptoms at 5 weeks following a second concussion in 3 years, with objective deficits on vestibulo-ocular and\nneurocognitive testing. Not yet cleared for GRTP. Ibuprofen overuse likely contributing to headache chronification —\ncounseled to limit to 2 days/week maximum.\nNeurology referral placed — requesting evaluation by concussion specialist/sports neurologist. Specific concerns: (1) rate of\nrecovery slower than expected, (2) prior concussion history, (3) vestibular dysfunction pattern, (4) academic and\noccupational impact. Would appreciate evaluation for possible pharmacologic support (e.g., amitriptyline for\nsleep/headache), formal vestibular rehabilitation referral, and guidance on return-to-sport timeline.\n\n\f2. Cervicogenic headache component\nRefer to PT specializing in concussion/cervical rehabilitation. Manual therapy and vestibular rehab to be coordinated with\nneurology plan.\n3. Academic accommodations\nProvided documentation for extended test time, reduced course load, screen time limits. Coordinated with athletic academic\nadvisor.\n4. Return to play\nNOT CLEARED. Will not progress GRTP until symptom-free at rest AND formal neurology clearance.\n\nElectronically signed by: Trevor Hollis, DO\nSigned 01/27/2026 13:50 EST | Peak Performance EHR | cc: Athletic Training Staff"
+      }
     ],
-    demoPoints: ['Repeat concussion management', 'Return-to-play clearance'],
+    "demoPoints": [
+      "Repeat concussion management",
+      "Return-to-play clearance"
+    ]
   },
   {
-    id: 'cross-08-fletcher',
-    patientName: 'Fletcher, George',
-    age: 74,
-    sex: 'M',
-    category: 'cross_specialty',
-    referringSpecialty: 'Nephrology',
-    briefDescription: 'CKD patient with burning foot pain, orthostatic hypotension, and autonomic dysfunction.',
-    clinicalHighlight: 'Complex neuropathy (diabetic vs uremic)',
-    expectedTier: 'semi_urgent',
-    files: [
+    "id": "cross-08-fletcher",
+    "patientName": "Fletcher, George",
+    "age": 74,
+    "sex": "M",
+    "category": "cross_specialty",
+    "referringSpecialty": "Nephrology",
+    "briefDescription": "CKD patient with burning foot pain, orthostatic hypotension, and autonomic dysfunction.",
+    "clinicalHighlight": "Complex neuropathy (diabetic vs uremic)",
+    "expectedTier": "semi_urgent",
+    "files": [
       {
-        filename: '08_Fletcher_George.pdf',
-        path: '/samples/triage/cross-specialty/08_Fletcher_George.pdf',
-        docType: 'Nephrology Referral',
-        previewText: `MedFirst Urgent Care – Riverside
-4410 Riverside Dr, Macon, GA 31210
-Phone: (478) 555-0155 | Fax: (478) 555-0156
-
-Patient: George T. Fletcher
-
-Date: 01/21/2026
-
-DOB: 02/22/1952
-
-Provider: Dylan Brandt, PA-C
-
-MRN: MF-00294551
-
-Credentials: Physician Assistant-Certified
-
-CHIEF COMPLAINT
-Weakness, confusion, unsteady walking — daughter brought him in.
-
-HISTORY OF PRESENT ILLNESS
-73-year-old male brought in by his daughter who reports he 'hasn't been himself' for the past week. She says he has been
-moving slowly, seems confused at times, and nearly fell twice trying to get up from his recliner. He has not been eating well.
-She is worried he is having strokes.
-Patient himself minimizes symptoms — says he is 'just tired.' He did have a GI illness about 10 days ago with vomiting and
-diarrhea that lasted 3 days. He says he has barely eaten since then. He drinks 'a lot of water' because he heard that was
-good for you — daughter estimates 12-15 glasses a day since his illness. He takes hydrochlorothiazide 25 mg, lisinopril,
-and atorvastatin. He has hypertension, type 2 diabetes (diet-controlled), and 'some memory problems' per daughter, though
-she says this is much worse than his baseline.
-He denies any sudden onset of focal weakness, speech difficulty, facial droop, or vision changes. No headache. No chest
-pain. Daughter is not sure about these.
-
-PHYSICAL EXAM
-Vitals: BP 108/62, HR 92, Temp 97.8, O2 sat 97% RA, wt 161 lbs (daughter says he weighed 174 lbs at his doctor's office 2
-months ago)
-General: Elderly male, thin, appears fatigued and mildly confused. Slow to respond.
-HEENT: Dry mucous membranes. Eyes sunken.
-Cardiovascular: Tachycardic, regular. No murmurs.
-Neuro: Alert but disoriented to date. Follows simple commands. No obvious facial asymmetry. Moves all extremities. Grip
-weak bilaterally — hard to say if focal or diffuse. Gait unsteady but I couldn't determine if this was new vs. baseline.
-
-LABS
-BMP: Na 121, K 3.2, Cl 88, CO2 22, BUN 28, Cr 1.4 (unknown baseline), glucose 94
-CBC: WBC 7.2, Hgb 13.1, Plt 188 — unremarkable
-UA: concentrated, specific gravity 1.028, no infection
-
-ASSESSMENT AND PLAN
-Assessment: Weakness, confusion, and gait instability in elderly male. Differential includes TIA/stroke vs. metabolic
-encephalopathy vs. other. Significant lab findings noted.
-1. Sending to ED via EMS for further evaluation. Na of 121 is critically low and may explain presentation but stroke cannot
-be ruled out here without imaging. Called Navicent Health ED to give report. Advised slow correction of sodium — do not
-over-correct.
-2. Neurology referral placed for outpatient follow-up after hospitalization given weakness and confusion. ED and inpatient
-team should determine if acute neurology consult needed during admission.
-Note: I did not have the capability to obtain CT imaging or IV fluids here. Transfer is the appropriate next step.
-
-Electronically signed by: Dylan Brandt, PA-C
-Supervising MD: Priscilla Tran, MD (off-site) | Signed 01/21/2026 14:05 EST`,
-      },
+        "filename": "08_Fletcher_George.pdf",
+        "path": "/samples/triage/cross-specialty/08_Fletcher_George.pdf",
+        "docType": "Nephrology Referral",
+        "previewText": "Cascade Nephrology & Hypertension Associates\n908 Riverside Pkwy, Suite 400, Spokane, WA 99201\nPhone: (509) 555-0233 | Fax: (509) 555-0234\n\nPatient: George A. Fletcher\n\nDate of Service: 02/12/2026\n\nDOB: 03/22/1951\n\nProvider: Susan K. Whitfield, MD\n\nMRN: CNH-0071563\n\nSpecialty: Nephrology (Board Certified)\n\nCHIEF COMPLAINT\nCKD follow-up; burning foot pain and lightheadedness on standing.\n\nHISTORY OF PRESENT ILLNESS\nMr. Fletcher is a 74-year-old male with CKD stage 4 (baseline eGFR ~21-24, attributed to longstanding type 2\ndiabetes and hypertension) followed quarterly in this clinic, presenting today for routine labs and blood pressure\nmanagement. His diabetes has been present roughly 20 years, historically with periods of poor control (A1c as high\nas 10% in his 50s), currently better controlled (A1c 7.4% three months ago).\nHe reports several months of burning, tingling pain in both feet, worse at night, now extending to his mid-shins,\nwhich he describes as \"like walking on hot coals.\" Over the past 6-8 weeks he has also noticed episodes of\nlightheadedness and near-syncope when standing quickly from bed or a chair, witnessed twice by his wife — on one\noccasion he had to sit back down before he \"grayed out.\" He also describes new early satiety with bloating after\nmodest meals, alternating constipation and loose stools over the past couple of months, and new difficulty with\nerections over the past year that he had not previously mentioned. He denies focal limb weakness, denies chest pain\nduring these episodes, and denies loss of consciousness or incontinence. He has not fallen but now holds onto the\nwall when getting up at night.\n\nREVIEW OF SYSTEMS\nConstitutional: denies fever, weight stable. Cardiovascular: denies chest pain; reports presyncope with position\nchange as above. GI: early satiety, bloating, alternating bowel habits. GU: erectile dysfunction, denies dysuria.\nNeurologic: bilateral burning foot and leg pain, denies focal weakness, denies vision change. Skin: reports feet\nfeel unusually dry with decreased sweating.\n\nCURRENT MEDICATIONS\n1. Insulin glargine 24 units subcutaneous nightly\n2. Insulin lispro sliding scale with meals\n3. Amlodipine 10 mg daily\n4. Carvedilol 12.5 mg BID\n5. Sodium bicarbonate 650 mg TID\n6. Sevelamer 800 mg TID with meals\n7. Epoetin alfa per renal protocol\n8. Atorvastatin 40 mg daily\n9. Aspirin 81 mg daily\n10. Furosemide 40 mg daily\n\nALLERGIES\nSulfa drugs (rash)\n\nPHYSICAL EXAM\nVitals: Supine BP 148/84, HR 78; standing (3 min) BP 112/66, HR 92, with reported lightheadedness, no assistance\nrequired today. Wt 176 lbs.\nGeneral: Thin, chronically ill-appearing, no acute distress.\nCardiovascular: RRR, no murmurs, no JVD.\nLungs: Clear bilaterally.\nAbdomen: Soft, mildly distended, non-tender, bowel sounds present.\nExtremities: No edema. Feet warm, skin dry with reduced distal hair growth, no ulcers.\nNeurologic: Cranial nerves intact. Motor strength 5/5 throughout. Sensation: markedly reduced pinprick and light\ntouch to mid-shin bilaterally, absent vibration sense at bilateral great toes, absent ankle reflexes bilaterally,\npatellar reflexes 1+ and symmetric. Gait cautious, mildly wide-based, no ataxia.\n\nLABS (02/10/2026)\nBUN 58 | Cr 3.1 | eGFR 21 | K 4.9 | HCO3 20 | Hgb 10.1 | A1c 7.4% | Phos 5.2 | iPTH 310 | B12 410\n\nASSESSMENT AND PLAN\n1. Distal symmetric polyneuropathy with prominent autonomic features (G62.9, G90.09)\nPainful, small-fiber-predominant polyneuropathy with symptomatic orthostatic hypotension (28 mmHg systolic drop\nwith symptoms today), GI dysmotility, and erectile dysfunction, in the setting of both longstanding diabetes and\nadvancing CKD — a uremic contribution is likely given eGFR 21. Referring to Neurology for EMG/NCS and formal\nautonomic testing to characterize the relative diabetic versus uremic contribution and guide symptomatic management.\n2. Orthostatic hypotension, symptomatic (I95.1)\nLikely neurogenic given the autonomic features above; also reviewing antihypertensive regimen. Held today's\nfurosemide dose, counseled on slow positional changes, compression stockings, and hydration.\n3. CKD stage 4, diabetic and hypertensive nephropathy (N18.4, E11.22, I12.9)\neGFR stable at 21 from prior visit. Continue current regimen; reviewed renal diet and phosphorus restriction.\n4. Anemia of chronic kidney disease (D63.1)\nHgb 10.1; continue epoetin per protocol.\n5. Secondary hyperparathyroidism of renal origin (E21.1)\niPTH 310; continue sevelamer, will monitor trend.\nPlan: Referral to Neurology placed for the polyneuropathy/autonomic work-up; findings not felt to be acutely\ndangerous today (presyncope but no witnessed syncope or injury), so evaluation within the next few weeks is\nreasonable. Continue current nephrology management. RTC in 3 months, sooner if syncope or a fall occurs.\n\nElectronically signed by Susan K. Whitfield, MD\nDocument generated in CascadeCare EHR v5.0 | Encounter finalized 02/12/2026 14:07 PST"
+      }
     ],
-    demoPoints: ['Multi-etiology neuropathy', 'Nephrology-to-neurology referral'],
+    "demoPoints": [
+      "Multi-etiology neuropathy",
+      "Nephrology-to-neurology referral"
+    ]
   },
   {
-    id: 'cross-09-kim',
-    patientName: 'Kim, Jennifer',
-    age: 43,
-    sex: 'F',
-    category: 'cross_specialty',
-    referringSpecialty: 'ENT',
-    briefDescription: 'Acute vertigo, hearing loss, and tinnitus after gentamicin course.',
-    clinicalHighlight: 'Aminoglycoside ototoxicity vs vestibular neuritis',
-    expectedTier: 'semi_urgent',
-    files: [
+    "id": "cross-09-kim",
+    "patientName": "Kim, Jennifer",
+    "age": 43,
+    "sex": "F",
+    "category": "cross_specialty",
+    "referringSpecialty": "ENT",
+    "briefDescription": "Acute vertigo, hearing loss, and tinnitus after gentamicin course.",
+    "clinicalHighlight": "Aminoglycoside ototoxicity vs vestibular neuritis",
+    "expectedTier": "semi_urgent",
+    "files": [
       {
-        filename: '09_Kim_Jennifer.pdf',
-        path: '/samples/triage/cross-specialty/09_Kim_Jennifer.pdf',
-        docType: 'ENT Referral',
-        previewText: `Peak Performance Sports Medicine
-630 W. University Ave, Gainesville, FL 32601
-Phone: (352) 555-0448 | Fax: (352) 555-0449
-
-Patient: Jennifer L. Kim
-
-Date: 01/27/2026
-
-DOB: 11/30/2001
-
-Provider: Trevor Hollis, DO
-
-MRN: PPSM-0018872
-
-Specialty: Sports Medicine / Primary Care
-
-CHIEF COMPLAINT
-Head injury 5 weeks ago — headache, brain fog, not cleared for return to play.
-
-HISTORY OF PRESENT ILLNESS
-Ms. Kim is a 24-year-old female Division I soccer goalkeeper who sustained a concussion on December 19, 2025 during a
-collision with a field player. She was removed from play per concussion protocol, evaluated on the sideline, and diagnosed
-with a concussion (no LOC, brief confusion, no amnesia). Initial symptom burden was significant: headache 8/10, dizziness,
-nausea, photophobia, phonophobia, and difficulty concentrating.
-She is now 5 weeks post-injury and has not been cleared. Symptom progress has been slow. Current symptoms: persistent
-headache (bifrontal, pressure-type, 4/10 at baseline, spikes to 7/10 with exertion or screen time), cognitive fog ('I feel like I'm
-thinking through mud'), sleep disruption (difficulty initiating sleep, vivid dreams), increased irritability, and emotional lability
-— she cried three times this week without clear trigger. She is a pre-med student and her academic performance has
-suffered significantly. She is anxious about her athletic career and her upcoming spring season.
-She attempted Stage 2 of the Graduated Return to Play protocol (light aerobic exercise) twice and both times had symptom
-exacerbation requiring 24-hour rest. She has not progressed further. She is currently using ibuprofen 400 mg 3-4x per day
-for headaches.
-She has a prior concussion in 2022 (recovered fully in 3 weeks). No other neurological history. No prior psychiatric history.
-Not currently taking any other medications.
-
-NEUROLOGICAL EXAM / CONCUSSION TESTING
-Vitals: BP 112/70, HR 68
-VOMS (Vestibular/Ocular Motor Screening):
-- Smooth pursuit: normal
-- Saccades (horizontal/vertical): normal latency, some symptom provocation with rapid vertical
-- Near point of convergence: 8 cm (mildly increased; normal <5 cm), provoked headache
-- Vestibulo-ocular reflex (VOR): mildly impaired, symptom provocation
-- Visual motion sensitivity: significant dizziness with optokinetic stimulus
-Balance (mBESS): 6 errors (normal <4 for this age group)
-King-Devick: 52 seconds (baseline unknown, but above expected norms)
-ImPACT: Verbal memory 78, Visual memory 70, Processing speed 32.4, Reaction time 0.68 (all below her baseline scores
-from pre-season testing)
-Cervical spine: Restricted rotation bilateral, tenderness over right upper trapezius and suboccipital muscles. Cervicogenic
-headache component likely.
-
-ASSESSMENT AND PLAN
-1. Post-concussion syndrome (F07.81)
-Persistent symptoms at 5 weeks following a second concussion in 3 years, with objective deficits on vestibulo-ocular and
-neurocognitive testing. Not yet cleared for GRTP. Ibuprofen overuse likely contributing to headache chronification —
-counseled to limit to 2 days/week maximum.
-Neurology referral placed — requesting evaluation by concussion specialist/sports neurologist. Specific concerns: (1) rate of
-recovery slower than expected, (2) prior concussion history, (3) vestibular dysfunction pattern, (4) academic and
-occupational impact. Would appreciate evaluation for possible pharmacologic support (e.g., amitriptyline for
-sleep/headache), formal vestibular rehabilitation referral, and guidance on return-to-sport timeline.
-
-2. Cervicogenic headache component
-Refer to PT specializing in concussion/cervical rehabilitation. Manual therapy and vestibular rehab to be coordinated with
-neurology plan.
-3. Academic accommodations
-Provided documentation for extended test time, reduced course load, screen time limits. Coordinated with athletic academic
-advisor.
-4. Return to play
-NOT CLEARED. Will not progress GRTP until symptom-free at rest AND formal neurology clearance.
-
-Electronically signed by: Trevor Hollis, DO
-Signed 01/27/2026 13:50 EST | Peak Performance EHR | cc: Athletic Training Staff`,
-      },
+        "filename": "09_Kim_Jennifer.pdf",
+        "path": "/samples/triage/cross-specialty/09_Kim_Jennifer.pdf",
+        "docType": "ENT Referral",
+        "previewText": "Great Lakes ENT & Audiology\n900 Medical Campus Dr, Suite 12, Ann Arbor, MI 48109\nPhone: (734) 555-0267 | Fax: (734) 555-0268\n\nPatient: Anita J. Patel\n\nDate: 01/22/2026\n\nDOB: 08/04/1965\n\nProvider: Harrison Wolfe, MD\n\nMRN: GLEN-0053019\n\nSpecialty: Otolaryngology – Head & Neck Surgery\n\nCHIEF COMPLAINT\nEpisodic dizziness and spinning, worse with position changes. x 3 weeks.\n\nHISTORY OF PRESENT ILLNESS\nMs. Patel is a 60-year-old female with no significant neurological history who presents with episodic vertigo for the past 3\nweeks. She describes sudden onset of a spinning sensation when she rolls over in bed, especially turning to the right, or\nwhen she tips her head back to look up (e.g., reaching into an overhead cabinet). Episodes last approximately 20-40\nseconds and then fully resolve. She has had no continuous dizziness between episodes. No hearing loss, no tinnitus, no ear\nfullness. No nausea severe enough to vomit. No headache. No diplopia, dysarthria, dysphagia, or focal weakness. No prior\nepisodes. She did have a minor cold about 4 weeks ago that has fully resolved.\nShe has extensively Googled her symptoms and is convinced she has had 'mini-strokes.' Her sister had a stroke 2 years\nago, which has heightened her anxiety. She has been avoiding all movement out of fear and has not driven in 2 weeks.\n\nPHYSICAL EXAM\nVitals: BP 126/80, HR 74, normal\nOtoscopy: Bilateral TMs intact, no effusion, no perforation. EACs clear.\nHEENT: No nystagmus in primary gaze. EOMI without corrective saccades or limitation. Hearing grossly intact bilateral (512\nHz fork). No facial asymmetry.\nDix-Hallpike Test:\n- Right Dix-Hallpike: POSITIVE. Upbeat-torsional nystagmus with 4-second latency, lasting approximately 18 seconds,\nfatigable on repeat. Patient reported intense vertigo.\n- Left Dix-Hallpike: Negative.\nHead Impulse Test: Normal (no corrective saccade — negative, as expected in BPPV).\nRomberg: Negative. Gait normal.\n\nTREATMENT\nEpley canalith repositioning maneuver performed for right posterior canal BPPV. Patient experienced vertigo and\nnystagmus during maneuver, confirming diagnosis. Post-maneuver: Dix-Hallpike right — NEGATIVE. Patient reports\nsignificant improvement in dizziness. Instructed to sleep semi-recumbent for 48 hours, avoid lying on right side for 1 week.\nHome Brandt-Daroff exercises demonstrated and handout provided.\n\nASSESSMENT AND PLAN\n1. Benign paroxysmal positional vertigo, right posterior semicircular canal (H81.11)\nClassic history, positive Dix-Hallpike with characteristic upbeat-torsional fatigable nystagmus, normal head impulse test, and\nimmediate response to Epley maneuver. This is entirely consistent with peripheral vestibular pathology — specifically\ncanalith displacement in the right posterior semicircular canal. There are no features of central vertigo: no\ndirection-changing nystagmus, no neurological symptoms or signs, normal head impulse test, and fatigable nystagmus.\nReassured patient that this is not a stroke.\nReturn to clinic in 2 weeks to confirm resolution. If symptoms recur, repeat Epley can be performed at home or in office.\nApproximately 50% of BPPV resolves within 4 weeks; recurrence rate approximately 15% per year.\n2. Neurology referral — patient request\nDespite thorough explanation of the diagnosis and reassurance, Ms. Patel remains anxious about the possibility of a stroke\nand is requesting a neurology opinion and brain MRI. I have explained that based on the clinical presentation, central\npathology is extremely unlikely and imaging is not indicated by current guidelines (AAN/AAO). However, given her\n\n\fsignificant anxiety, family history of stroke, and the impact on her daily function, I am placing a neurology referral at her\nrequest. I have communicated to the referring neurologist that my clinical assessment is BPPV, treated successfully today,\nand that imaging is being requested for reassurance rather than clinical suspicion.\nMeclizine 12.5 mg PRN prescribed for symptomatic relief during any recurrent episodes (advised to use sparingly as it may\nimpair vestibular compensation).\n\nElectronically signed by: Harrison Wolfe, MD\nSigned 01/22/2026 12:15 EST | Great Lakes ENT EHR"
+      }
     ],
-    demoPoints: ['ENT-to-neuro referral', 'Drug-induced vestibular toxicity'],
+    "demoPoints": [
+      "ENT-to-neuro referral",
+      "Drug-induced vestibular toxicity"
+    ]
   },
   {
-    id: 'cross-10-okafor',
-    patientName: 'Okafor, Emmanuel',
-    age: 55,
-    sex: 'M',
-    category: 'cross_specialty',
-    referringSpecialty: 'Endocrinology',
-    briefDescription: 'Poorly controlled DM2 with both distal neuropathy and proximal motor weakness.',
-    clinicalHighlight: 'Diabetic amyotrophy + polyneuropathy',
-    expectedTier: 'semi_urgent',
-    files: [
+    "id": "cross-10-okafor",
+    "patientName": "Okafor, Emmanuel",
+    "age": 55,
+    "sex": "M",
+    "category": "cross_specialty",
+    "referringSpecialty": "Endocrinology",
+    "briefDescription": "Poorly controlled DM2 with both distal neuropathy and proximal motor weakness.",
+    "clinicalHighlight": "Diabetic amyotrophy + polyneuropathy",
+    "expectedTier": "semi_urgent",
+    "files": [
       {
-        filename: '10_Okafor_Emmanuel.pdf',
-        path: '/samples/triage/cross-specialty/10_Okafor_Emmanuel.pdf',
-        docType: 'Endocrinology Referral',
-        previewText: `University Rheumatology Associates
-1500 E. Medical Center Dr, Ann Arbor, MI 48109
-Phone: (734) 555-0502 | Fax: (734) 555-0503
-
-Patient: Emmanuel C. Okafor
-
-Date: 01/29/2026
-
-DOB: 05/07/1976
-
-Provider: Helen Strauss, MD, PhD
-
-MRN: URA-0084410
-
-Specialty: Rheumatology & Clinical Immunology
-
-CHIEF COMPLAINT
-New patient — headache, confusion, and abnormal MRI. Referred by PCP.
-
-HISTORY OF PRESENT ILLNESS
-Mr. Okafor is a 49-year-old male of Nigerian descent with a past medical history of hypertension and prior diagnosis of
-'possible sarcoidosis' (hilar lymphadenopathy noted on chest CT in 2021, never biopsied, resolved spontaneously). He was
-referred urgently following an MRI brain obtained by his PCP for 6 weeks of progressive headache, intermittent confusion,
-and one witnessed episode of expressive aphasia lasting 4 hours that fully resolved.
-MRI brain with and without contrast (01/15/2026, outside hospital): Multiple bilateral cortical and subcortical enhancing
-lesions in a non-watershed distribution, involving the frontal and parietal lobes with adjacent leptomeningeal enhancement.
-Pattern described by radiologist as 'atypical for demyelination; vasculitis or CNS lymphoma cannot be excluded.'
-He reports the headache began 6 weeks ago — bitemporal, pressure-like, progressive, not relieved by acetaminophen or
-ibuprofen. He has had 3-4 episodes of 'blanking out' during conversations, not remembering what was said. His wife notes
-personality change — he is normally gregarious and is now withdrawn and irritable. He had one episode of seeing flickering
-lights in the right visual field lasting 15 minutes. He denies fever, rash, joint pain, dry eyes/mouth, or cough. He has lost 8 lbs
-over 6 weeks unintentionally. No recent travel. No known TB exposure. Not immunocompromised.
-
-REVIEW OF SYSTEMS
-Positive: Progressive headache, episodic confusion, transient aphasia, visual phenomena, weight loss, personality change.
-Negative: Fever, night sweats, rash, photosensitivity, oral ulcers, serositis, Raynaud's, sicca symptoms, arthritis, cough,
-hemoptysis.
-
-PHYSICAL EXAM
-Vitals: BP 146/92, HR 78, Temp 98.6, Wt 174 lbs (down from 182 lbs in Oct 2025)
-General: Alert, well-groomed male. Mildly slow in responses.
-HEENT: No oral ulcers, no lymphadenopathy. Fundoscopy: no papilledema.
-Skin: No rash, no purpura, no livedo reticularis.
-MSK: No synovitis, full ROM all joints.
-Neuro: Alert, oriented x3. Mild word-finding difficulty. Cranial nerves intact. Motor 5/5 all extremities. Sensation intact.
-Coordination normal. Gait normal.
-
-LABS / WORKUP ORDERED
-Sent today: ESR, CRP, ANA, anti-dsDNA, ANCA (p and c), RF, anti-CCP, complement (C3/C4), antiphospholipid panel
-(aCL IgG/IgM, beta-2 glycoprotein, LA), SPEP, LDH, ACE level, CBC with diff, CMP, HIV, RPR, hepatitis B/C serologies,
-IGRA (QuantiFERON), serum protein electrophoresis.
-Pending outside: CSF analysis (LP scheduled 01/31 by neurology).
-
-ASSESSMENT AND PLAN
-1. CNS vasculitis vs. CNS lymphoma vs. neurosarcoidosis — high priority (M31.9 provisional)
-This patient has a serious, progressive CNS inflammatory or neoplastic process requiring urgent and coordinated
-multidisciplinary evaluation. The MRI pattern with leptomeningeal and parenchymal enhancement in a non-vascular
-distribution raises the following differential:
-- Primary CNS vasculitis (PACNS) — isolated CNS, no systemic features
-- Secondary vasculitis from systemic disease (sarcoidosis, SLE, ANCA-associated) — prior hilar LAD is relevant
-- CNS lymphoma — weight loss, enhancing lesions, must exclude
-
-- Infectious (TB, fungal, viral encephalitis) — less likely but must screen
-I have contacted Neurology directly (Dr. Chen) and they are seeing him 01/31 for LP. I have also requested Neuroradiology
-re-review of the outside MRI with dedicated vasculitis protocol sequences. Brain biopsy may ultimately be required if LP and
-serology are non-diagnostic.
-Given the rapidity of progression, I am starting a short course of high-dose prednisone 60 mg daily empirically to prevent
-further neurological injury while workup proceeds — with full understanding this may partially treat and obscure the
-diagnosis. PCP notified. Discussed with patient and wife; they understand and consent.
-2. Hypertension — hold HCTZ (may mask inflammatory markers); continue amlodipine.
-Will present at multidisciplinary neuro-rheumatology conference Thursday.
-
-Electronically signed by: Helen Strauss, MD, PhD
-Signed 01/29/2026 19:15 EST | URA EHR | CC: Neurology (Chen), Neuroradiology, PCP`,
-      },
+        "filename": "10_Okafor_Emmanuel.pdf",
+        "path": "/samples/triage/cross-specialty/10_Okafor_Emmanuel.pdf",
+        "docType": "Endocrinology Referral",
+        "previewText": "Lakeview Endocrine & Diabetes Center\n1450 Providence Rd, Suite 120, Charlotte, NC 28207\nPhone: (704) 555-0187 | Fax: (704) 555-0188\n\nPatient: Emmanuel C. Okafor\n\nDate of Service: 02/19/2026\n\nDOB: 11/03/1970\n\nProvider: Michael T. Aldrich, MD\n\nMRN: LED-0029841\n\nSpecialty: Endocrinology, Diabetes & Metabolism (Board Certified)\n\nCHIEF COMPLAINT\nPoorly controlled type 2 diabetes; new thigh pain, weakness, and weight loss.\n\nHISTORY OF PRESENT ILLNESS\nMr. Okafor is a 55-year-old male with a 9-year history of type 2 diabetes mellitus, historically poorly controlled\n(A1c consistently 9-11% despite multiple regimen adjustments, with admitted inconsistent insulin use due to his\nwork schedule), presenting for follow-up. His most recent A1c was 10.6%.\nHe reports several months of gradually worsening numbness and burning in both feet, up to the ankles, which he has\nhad intermittently for a couple of years but which has progressed recently. More concerning to him is a newer\nproblem over the past 6-8 weeks: significant aching pain in both thighs, worse on the right, followed by\nprogressive weakness getting up from a seated position and climbing stairs at his warehouse-supervisor job. He has\nnoticed his right thigh looks visibly smaller than his left. He has lost approximately 18 pounds over the past 3\nmonths, which he attributes partly to poor appetite from the pain and partly intentional. He denies fever and\ndenies preceding trauma. He denies bowel or bladder dysfunction, double vision, or facial weakness, and denies\nchest pain. He reports some night sweats, which he attributes to poor glucose control.\n\nREVIEW OF SYSTEMS\nConstitutional: 18 lb unintentional weight loss, night sweats. Endocrine: intermittent polyuria and polydipsia with\npoor control. Neurologic: bilateral distal numbness/burning in the feet; new asymmetric (right greater than left)\nproximal thigh pain and weakness; denies bowel or bladder change. Musculoskeletal: denies joint swelling.\n\nCURRENT MEDICATIONS\n1. Insulin glargine 40 units subcutaneous nightly (admits frequent missed doses)\n2. Metformin 1000 mg BID\n3. Insulin aspart with meals (inconsistent use)\n4. Lisinopril 20 mg daily\n5. Atorvastatin 40 mg daily\n\nALLERGIES\nNKDA\n\nPHYSICAL EXAM\nVitals: BP 142/88, HR 84, Temp 98.4, Wt 221 lbs (down from 239 three months ago), BMI 32.8\nGeneral: Uncomfortable appearing, mild distress with position changes.\nHEENT: Unremarkable.\nCardiovascular: RRR, no murmurs.\nLungs: Clear.\nAbdomen: Soft, non-tender.\nExtremities: No edema.\nNeurologic: Cranial nerves intact. Motor: hip flexion 3+/5 right, 4/5 left; knee extension 3+/5 right, 4+/5 left;\nvisible atrophy of the right quadriceps compared to left with measurable thigh-circumference asymmetry; distal\nstrength (ankle dorsi/plantarflexion) 4/5 bilaterally and symmetric. DTRs: patellar reflex absent on right, 1+ on\nleft; Achilles reflexes absent bilaterally; upper extremity reflexes 2+ and symmetric. Sensation: reduced\npinprick/light touch in a stocking distribution to mid-shin bilaterally, and reduced sensation over the right\nanterolateral thigh. Gait: antalgic, favoring the right leg, uses arms to push off when rising from a chair.\n\nLABS (02/17/2026)\nA1c 10.6% | Fasting glucose 224 | BMP: Na 138, K 4.1, Cr 0.9, eGFR >90 | ESR 38 (mildly elevated) | CRP 1.1 |\nB12 512 | TSH 2.4\n\nASSESSMENT AND PLAN\n1. Diabetic lumbosacral radiculoplexus neuropathy (diabetic amyotrophy), right greater than left (E11.44)\nSubacute asymmetric proximal weakness, pain, quadriceps wasting, and areflexia superimposed on a chronic distal\nsensory polyneuropathy, in the setting of poorly controlled diabetes with recent significant weight loss — a\nclassic presentation for diabetic amyotrophy. The degree of weight loss and constitutional symptoms also warrant\nexcluding an alternative infiltrative or paraneoplastic process. Referring to Neurology for EMG/NCS to confirm the\nradiculoplexus pattern, with consideration of MRI lumbar plexus and additional labs given the asymmetry.\n2. Distal symmetric diabetic sensory polyneuropathy (E11.42)\nChronic, stable distribution; starting gabapentin, will defer further titration to Neurology.\n3. Type 2 diabetes mellitus, poorly controlled with hyperglycemia (E11.65)\nA1c 10.6%. Discussed importance of glycemic control both for diabetes complications generally and because diabetic\namyotrophy is more common around periods of glucose fluctuation. Adjusting insulin regimen, diabetes educator\nreferral placed, discussed adherence barriers related to work schedule.\n4. Unintentional weight loss (R63.4)\n18 lbs over 3 months; will coordinate age-appropriate malignancy screening with PCP if not already up to date.\nPlan: Semi-urgent referral to Neurology placed for EMG/NCS and further evaluation of the proximal weakness; not\nfelt to be an emergency today given no bulbar, respiratory, or bowel/bladder involvement, but should be seen within\nthe next couple of weeks given the pace of functional decline at work. Starting gabapentin 300 mg TID for\nneuropathic pain. RTC in 4 weeks, sooner if further weight loss or new symptoms develop.\n\nElectronically signed by Michael T. Aldrich, MD\nDocument generated in LakeviewEndo EHR v3.4 | Encounter finalized 02/19/2026 10:48 EST"
+      }
     ],
-    demoPoints: ['Complex diabetic neuropathy', 'Dual neuropathy pattern'],
+    "demoPoints": [
+      "Complex diabetic neuropathy",
+      "Dual neuropathy pattern"
+    ]
   },
   {
-    id: 'cross-11-petrov',
-    patientName: 'Petrov, Nina',
-    age: 62,
-    sex: 'F',
-    category: 'cross_specialty',
-    referringSpecialty: 'Pulmonology',
-    briefDescription: 'Reduced FVC with progressive dysarthria, dysphagia, fasciculations, and UMN+LMN signs.',
-    clinicalHighlight: 'Suspected ALS (motor neuron disease)',
-    expectedTier: 'urgent',
-    files: [
+    "id": "cross-11-petrov",
+    "patientName": "Petrov, Nina",
+    "age": 62,
+    "sex": "F",
+    "category": "cross_specialty",
+    "referringSpecialty": "Pulmonology",
+    "briefDescription": "Reduced FVC with progressive dysarthria, dysphagia, fasciculations, and UMN+LMN signs.",
+    "clinicalHighlight": "Suspected ALS (motor neuron disease)",
+    "expectedTier": "urgent",
+    "files": [
       {
-        filename: '11_Petrov_Nina.pdf',
-        path: '/samples/triage/cross-specialty/11_Petrov_Nina.pdf',
-        docType: 'Pulmonology Referral',
-        previewText: `Midwest Eye Associates
-2900 N. Sheridan Rd, Suite 401, Chicago, IL 60657
-Phone: (773) 555-0614 | Fax: (773) 555-0615
-
-Patient: Nina P. Petrov
-
-Date: 01/30/2026
-
-DOB: 01/03/1985
-
-Provider: Andrew Tsai, MD
-
-MRN: MEA-0029882
-
-Specialty: Ophthalmology
-
-CHIEF COMPLAINT
-Annual eye exam, mild blurring for 2 months.
-
-HISTORY OF PRESENT ILLNESS
-Ms. Petrov is a 41-year-old female presenting for a routine annual eye exam. She mentions in passing that her vision has
-been 'slightly blurry' for about 2 months, which she attributed to needing a new glasses prescription. She also reports
-intermittent headaches described as a pressure-like sensation behind her eyes, daily, for the past 6 weeks — she is taking
-ibuprofen most days. She also notes transient visual obscurations (brief dimming or blackouts of vision in one or both eyes
-for seconds at a time) occurring several times a day, especially with positional changes such as standing up or bending
-over. She did not consider these symptoms serious and did not report them to her PCP.
-She has no prior history of optic nerve disease, glaucoma, or significant eye pathology. She has a BMI of 38 (obesity). She
-takes an oral contraceptive pill and vitamin D. No prior neurological diagnoses. No diplopia, no pulsatile tinnitus noted today
-(will ask specifically). She is a 41-year-old female with obesity and headache — this clinical picture is immediately
-concerning.
-
-EYE EXAM
-Visual acuity (with current correction): OD 20/30, OS 20/25 (previously 20/20 OU)
-Pupils: Equal and reactive, no RAPD
-IOP: OD 14 mmHg, OS 15 mmHg (normal)
-Confrontation visual fields: Enlarged blind spots bilateral on confrontation; formal Humphrey perimetry performed (see
-below)
-Humphrey 24-2 Visual Fields: Bilateral enlarged blind spots with early arcuate defects superior OD
-Fundoscopy (dilated exam):
-- OD: Optic disc markedly swollen, elevated, with blurred margins, peripapillary hemorrhages at 7 and 11 o'clock positions.
-Spontaneous venous pulsations ABSENT.
-- OS: Optic disc swollen with blurred margins, less pronounced than OD but clearly abnormal. Spontaneous venous
-pulsations ABSENT.
-- Bilateral optic disc photographs obtained and saved in chart.
-- Macula: flat and even bilaterally. Vessels normal caliber.
-
-ASSESSMENT AND PLAN
-1. Bilateral papilledema — URGENT (H47.10)
-This is a serious and urgent finding. Bilateral optic disc edema with absent venous pulsations, peripapillary hemorrhages,
-visual field defects, and transient visual obscurations in a young obese woman on oral contraceptives is highly concerning
-for elevated intracranial pressure, most likely idiopathic intracranial hypertension (IIH) but must exclude secondary causes
-including intracranial mass, venous sinus thrombosis, or other space-occupying lesion.
-Actions taken today:
-- Patient counseled on the urgency and seriousness of this finding — she was not expecting this
-- Called her PCP (Dr. Kim, (773) 555-0820) directly during the appointment
-- Neurology referral placed as URGENT — requesting appointment within 48-72 hours
-- Instructed patient to go to the Emergency Department now if: sudden severe headache, vision loss, diplopia, weakness, or
-any change in mental status
-- MRI brain and orbits with and without gadolinium + MRV (to evaluate venous sinuses) ordered
-- Oral contraceptive pill — recommend stopping immediately pending neurology evaluation (OCP associated with cerebral
-venous thrombosis); discussed with patient and she agrees
-
-- Do NOT give ibuprofen or any NSAIDs — could mask symptoms
-I documented the disc photographs, perimetry results, and full exam findings. Patient has my direct line and will call if any
-new or worsening symptoms before the neurology appointment. This case requires urgent attention.
-
-Electronically signed by: Andrew Tsai, MD
-Signed 01/30/2026 16:55 CST | Midwest Eye EHR | Urgent: neurology and PCP notified by phone`,
-      },
+        "filename": "11_Petrov_Nina.pdf",
+        "path": "/samples/triage/cross-specialty/11_Petrov_Nina.pdf",
+        "docType": "Pulmonology Referral",
+        "previewText": "Highland Pulmonary & Sleep Medicine\n55 Waterman St, Suite 3B, Providence, RI 02906\nPhone: (401) 555-0142 | Fax: (401) 555-0143\n\nPatient: Nina V. Petrov\n\nDate of Service: 02/26/2026\n\nDOB: 09/17/1963\n\nProvider: Christine A. Bowers, MD\n\nMRN: HPS-0055214\n\nSpecialty: Pulmonary Medicine (Board Certified)\n\nCHIEF COMPLAINT\nProgressive shortness of breath with new speech and swallowing difficulty.\n\nHISTORY OF PRESENT ILLNESS\nMs. Petrov is a 62-year-old female referred to pulmonology roughly two months ago by her PCP for progressive\nexertional dyspnea and was found to have a restrictive pattern on spirometry (FVC 61% predicted) with normal DLCO,\nraising concern for a neuromuscular cause of respiratory weakness rather than primary lung disease; chest CT at\nthat time was unremarkable aside from mild basilar atelectasis. She returns today for repeat PFTs and to discuss\nfindings.\nOn further questioning today, she and her husband describe approximately 4 months of gradually worsening speech —\nher voice has become progressively more slurred and \"nasal,\" to the point that coworkers have had trouble\nunderstanding her on the phone. She also reports increasing difficulty swallowing over the past 6-8 weeks,\ninitially with thin liquids causing coughing, now also with some solid foods sticking; she has had two episodes of\ncoughing badly enough with water that her husband was concerned about choking. She has lost about 12 pounds, which\nshe attributes to eating less due to swallowing difficulty and fatigue with chewing. Her family has also noticed\nher tongue \"twitching\" at rest over the past month. She denies double vision or ptosis, and denies limb weakness\nshe has noticed herself, though she does report tripping twice recently and describes her legs feeling \"stiff.\"\nShe denies bowel or bladder change. She now sleeps propped on three pillows and wakes gasping for air roughly\ntwice weekly, which is new over the past month.\n\nREVIEW OF SYSTEMS\nConstitutional: 12 lb unintentional weight loss, fatigue. Respiratory: exertional and now positional dyspnea,\northopnea (3-pillow), nocturnal awakenings with air hunger. HEENT: progressive dysarthria, dysphagia to liquids and\nsolids, tongue fasciculations noted by family. Neurologic: subjective leg stiffness, two recent trips/near-falls,\ndenies diplopia or ptosis, denies sensory symptoms, denies bowel/bladder change. Psychiatric: denies depression,\nthough reports frustration about symptoms; husband notes she seems more emotionally reactive lately.\n\nCURRENT MEDICATIONS\n1. Lisinopril 10 mg daily\n2. Levothyroxine 88 mcg daily\n3. Omeprazole 20 mg daily\n\nALLERGIES\nNKDA\n\nPHYSICAL EXAM\nVitals: BP 132/78, HR 88, RR 20, SpO2 95% RA sitting, Temp 98.2, Wt 138 lbs (down from 150 two months ago)\nGeneral: Mildly dyspneic with conversation, thin.\nHEENT: Dysarthric speech with a mixed spastic-flaccid quality (strained/strangled with hypernasal component);\ntongue shows visible fasciculations at rest with mild atrophy along the lateral borders; palate elevates\nsymmetrically but weakly; gag present but reduced. Cranial nerves otherwise: EOMI, no ptosis, facial strength\nsymmetric, facial sensation normal.\nNeck: Mild neck flexor weakness (4/5).\nCardiovascular: RRR.\nLungs: Clear, though shallow breathing pattern noted; unable to complete a full sentence without pausing for\nbreath.\nMotor: Bulk grossly preserved in the limbs, though mild fasciculations noted in bilateral deltoids and thigh\nmuscles; strength 5-/5 proximal and distal throughout, symmetric. Tone mildly increased (spastic) in bilateral\nlower extremities. DTRs 3+ and brisk throughout including a pathologically brisk jaw jerk; bilateral Babinski signs\npresent. Sensation intact to all modalities. Gait mildly spastic and narrow-based; ambulates independently today.\n\nPULMONARY FUNCTION TESTS (today)\nFVC 58% predicted (down from 61% two months ago); seated-to-supine FVC drop of 22% (concerning for diaphragmatic\nweakness); DLCO normal; FEV1/FVC ratio normal, consistent with restriction rather than obstruction.\n\nASSESSMENT AND PLAN\n1. Progressive bulbar dysfunction with tongue fasciculations/atrophy and coexistent upper motor neuron signs\n(R47.1, R25.3)\nCombination of lower motor neuron bulbar findings (dysarthria, tongue fasciculations/atrophy, weak palate) and\nupper motor neuron signs (brisk jaw jerk, hyperreflexia, bilateral Babinski, spasticity) is highly concerning for a\nmotor neuron disease such as ALS. Discussed this concern directly with the patient and her husband today.\n2. Restrictive ventilatory pattern with orthopnea and a significant supine FVC drop, concerning for diaphragmatic\nweakness (R06.89)\nFVC declined from 61% to 58% predicted over two months with a 22% supine drop, correlating with reported orthopnea\nand nocturnal air hunger. Given risk of nocturnal hypoventilation, obtaining overnight pulse oximetry today and\nwill discuss early consideration of noninvasive ventilation pending neurology evaluation.\n3. Dysphagia with unintentional weight loss and aspiration risk (R13.10, R63.4)\nRecommend a mechanically altered/thickened-liquid diet pending formal swallow evaluation; placing an urgent\nspeech-language pathology swallow study referral given the choking episodes with liquids.\nPlan: Placing an urgent referral to Neurology today for evaluation of suspected motor neuron disease given the\ncombination of bulbar LMN findings, UMN signs, and progressive restrictive respiratory decline; given the\nrespiratory trajectory (supine FVC drop, orthopnea, nocturnal symptoms) she should be seen this week. Overnight\npulse oximetry and formal swallow evaluation ordered in the interim. Patient and husband counseled that worsening\nshortness of breath, choking, or inability to manage secretions should prompt immediate ED evaluation. Will\nco-manage respiratory status with Neurology going forward.\n\nElectronically signed by Christine A. Bowers, MD\nDocument generated in Highland PulmEHR v2.1 | Encounter finalized 02/26/2026 09:21 EST"
+      }
     ],
-    demoPoints: ['ALS recognition', 'Pulmonology-to-neurology urgency'],
+    "demoPoints": [
+      "ALS recognition",
+      "Pulmonology-to-neurology urgency"
+    ]
   },
   {
-    id: 'cross-12-wei',
-    patientName: 'Wei, Liang',
-    age: 38,
-    sex: 'M',
-    category: 'cross_specialty',
-    referringSpecialty: 'Infectious Disease',
-    briefDescription: 'HIV+ patient with new seizure, right-sided weakness, and ring-enhancing brain lesion.',
-    clinicalHighlight: 'Ring-enhancing lesion (toxo vs lymphoma vs PML)',
-    expectedTier: 'urgent',
-    files: [
+    "id": "cross-12-wei",
+    "patientName": "Wei, Liang",
+    "age": 38,
+    "sex": "M",
+    "category": "cross_specialty",
+    "referringSpecialty": "Infectious Disease",
+    "briefDescription": "HIV+ patient with new seizure, right-sided weakness, and ring-enhancing brain lesion.",
+    "clinicalHighlight": "Ring-enhancing lesion (toxo vs lymphoma vs PML)",
+    "expectedTier": "urgent",
+    "files": [
       {
-        filename: '12_Wei_Liang.pdf',
-        path: '/samples/triage/cross-specialty/12_Wei_Liang.pdf',
-        docType: 'Infectious Disease Referral',
-        previewText: `University Hospital Emergency Department
-500 S. State St, Ann Arbor, MI 48109 | Emergency Medicine
-Phone: (734) 555-0800 | Fax: (734) 555-0801
-
-Patient: Liang T. Wei
-
-Date: 01/30/2026
-
-DOB: 07/11/1974
-
-Provider: Sandra Kopp, MD
-
-MRN: UH-ED-1047823
-
-Specialty: Emergency Medicine
-
-CHIEF COMPLAINT
-Worst headache of my life — sudden onset while exercising.
-
-HISTORY OF PRESENT ILLNESS
-Mr. Wei is a 51-year-old male with no significant past medical history who presents via EMS after sudden onset of severe
-headache while lifting weights at a gym at approximately 10:45 AM. He reports he was in the middle of a squat when he
-developed an instantaneous, explosive headache he describes as 'like a bat hit the back of my head.' He rated the pain
-10/10. He did not lose consciousness. He became nauseated and vomited once at the gym. A bystander called 911. He has
-never had a headache like this before.
-He has had prior occasional tension-type headaches, never requiring medical attention. He denies recent illness, fever,
-neck stiffness at onset (though has some neck discomfort now), any medication use, cocaine or stimulant use. He takes no
-prescription medications. Family history: mother had a brain aneurysm; he does not know if she had surgery. He smokes
-half a pack per day, drinks socially. He is a software engineer.
-
-PHYSICAL EXAM (on arrival)
-Vitals: BP 172/98, HR 96, Temp 37.0°C, RR 18, O2 sat 99% RA
-General: Alert, distressed, photophobic, holding head.
-HEENT: PERRL. No papilledema on fundoscopic exam (limited, non-dilated). Photophobia present. Phonophobia present.
-Neck: Meningismus present — resistance to passive neck flexion, positive Kernig's sign. Brudzinski's sign equivocal.
-Neuro: Alert and oriented x4. Cranial nerves II-XII intact. Motor 5/5 all extremities. No pronator drift. Sensation intact.
-Reflexes 2+ symmetric. No ataxia.
-
-DIAGNOSTIC RESULTS
-CT Head without contrast (11:38 AM): Hyperdense material in the basal cisterns and bilateral Sylvian fissures consistent
-with subarachnoid hemorrhage. No hydrocephalus. No midline shift. No intraparenchymal hemorrhage identified. CT
-Angiography Head/Neck (12:02 PM): 7mm saccular aneurysm at the junction of the left posterior communicating artery and
-left internal carotid artery. No other aneurysms identified.
-Lumbar Puncture (1:45 PM): Performed given classic presentation even after positive CT. Opening pressure 24 cmH2O.
-Tube 1: RBC 185,000/mm3. Tube 4: RBC 182,000/mm3 (not clearing). Xanthochromia: PRESENT (yellow tinge). WBC 12
-(likely reactive). Protein 98 mg/dL. Glucose 62.
-Labs: CBC: Hgb 14.8, Plt 224,000. PT/INR 1.0. BMP: normal. Type and screen sent.
-
-ASSESSMENT AND PLAN
-1. Subarachnoid hemorrhage from ruptured left PComA aneurysm (I60.7, Q28.3)
-Hunt-Hess Grade II (severe headache, meningismus, no neurological deficit). Fisher Grade 2 (subarachnoid blood only, no
-IVH or thick clot).
-Neurosurgery and Neurology both paged and at bedside:
-- Neurosurgery (Dr. Abramowitz): Planning endovascular coiling via interventional neuroradiology — likely tonight pending
-family consent and prep
-- Neurology (Dr. Vasquez): Admitting to Neurocritical Care Unit, initiating nimodipine 60 mg q4h for vasospasm prophylaxis
-ED interventions:
-- IV access x2 large bore; NS maintenance
-
-- Strict bed rest, HOB 30 degrees
-- BP target systolic 100-140 mmHg — labetalol 10 mg IV given x1, BP now 148/88
-- NPO for OR
-- Morphine 4 mg IV for pain, ondansetron 4 mg IV for nausea
-- Repeat neuro checks q1h
-- Family called — wife en route
-Disposition: Admitted to Neurocritical Care Unit under joint Neurosurgery/Neurology service.
-
-Electronically signed by: Sandra Kopp, MD
-Signed 01/30/2026 15:22 EST | UH Emergency EHR | Attending attestation: James Hollis, MD`,
-      },
+        "filename": "12_Wei_Liang.pdf",
+        "path": "/samples/triage/cross-specialty/12_Wei_Liang.pdf",
+        "docType": "Infectious Disease Referral",
+        "previewText": "Miami Valley Infectious Disease Associates\n1120 Wilmington Pike, Suite 300, Kettering, OH 45420\nPhone: (937) 555-0637 | Fax: (937) 555-0638\n\nPatient: Liang Wei\n\nDate of Service: 04/02/2026\n\nDOB: 04/10/1987\n\nProvider: Sarah J. Okonkwo, MD\n\nMRN: MVID-0011203\n\nSpecialty: Infectious Disease\n\nCHIEF COMPLAINT\nNew-onset seizure and right-sided weakness in a patient with HIV and a low CD4 count.\n\nHISTORY OF PRESENT ILLNESS\nMr. Wei is a 38-year-old male with HIV, diagnosed 2019, with a history of poor adherence to antiretroviral\ntherapy and multiple gaps in care; last seen in this clinic 14 months ago. He presents today after being\nbrought in by a friend following an event three days ago described as sudden right arm and leg jerking\nlasting approximately 2 minutes, with post-event confusion lasting 20-30 minutes — consistent with a focal\nseizure with secondary generalization. He does not recall the event. Since then, his friend has noted he has\nbeen dragging his right foot, his right hand grip is weaker, and his speech is mildly slower. He was seen at\nan outside ED at the time, started on levetiracetam, and had an MRI brain obtained showing a single\nring-enhancing lesion in the left frontoparietal region with surrounding vasogenic edema and mild mass\neffect without midline shift; he was referred here for urgent evaluation given his HIV status. He reports\nroughly 2 weeks of mild headache preceding the seizure. He denies fever or night sweats that he has noticed,\nthough admits poor self-monitoring. He denies current IV drug use (prior history, none in over 5 years),\ndenies recent travel outside the US. His friend confirms he has owned a cat for over a year. He is not\ncurrently on antiretroviral therapy, having self-discontinued his regimen (bictegravir/emtricitabine/\ntenofovir alafenamide) approximately 8 months ago, and is not on toxoplasmosis or PJP prophylaxis.\n\nPAST MEDICAL HISTORY\nHIV (dx 2019, intermittent ART adherence, no prior documented AIDS-defining illness). Hepatitis C (treated,\nsustained virologic response). Tobacco use.\n\nCURRENT MEDICATIONS\n1. Levetiracetam 500 mg BID (started at outside ED)\n2. No current antiretroviral therapy (self-discontinued ~8 months ago)\n3. No toxoplasmosis or PJP prophylaxis\n\nPHYSICAL EXAM\nVitals: BP 122/76, HR 84, Temp 99.1, RR 16, SpO2 99% RA. Weight down approximately 15 lbs from last visit\nper chart.\nGeneral: Thin, mildly ill-appearing, no acute distress at rest.\nHEENT: No oral thrush noted today. No cervical lymphadenopathy.\nNeuro: Alert and oriented x3, mildly slowed speech/processing but no frank aphasia. Cranial nerves grossly\nintact, no facial asymmetry. Motor: right upper extremity 4/5 with mild pronator drift, right lower\nextremity 4/5; left side 5/5 throughout. Reflexes 3+ at right biceps/patellar versus 2+ on the left, right\nBabinski upgoing. Sensation grossly intact. Gait: right leg circumduction with mild foot drag, uses wall for\nbalance.\nSkin: No Kaposi sarcoma lesions noted.\n\nLABS\nCD4 count (outside ED, 3 days ago): 42 cells/uL. HIV viral load: 210,000 copies/mL (unsuppressed). Toxoplasma\nIgG: pending. CBC: WBC 3.8, Hgb 11.2, Plt 190. CMP unremarkable. RPR nonreactive. Outside MRI brain with\ncontrast (reviewed): 2.1 cm ring-enhancing lesion, left frontoparietal white matter, surrounding vasogenic\nedema, mild mass effect without significant midline shift; no other lesions identified.\n\nASSESSMENT AND PLAN\n\n1. Ring-enhancing intracranial lesion with new focal seizure and right hemiparesis, in the setting of AIDS\n(CD4 42) — differential includes toxoplasmic encephalitis, primary CNS lymphoma, and less likely progressive\nmultifocal leukoencephalopathy given the enhancing, mass-effect pattern is atypical for PML (R90.0)\nGiven profound immunosuppression (CD4 42, unsuppressed viral load), toxoplasmosis is statistically most\nlikely, particularly with known cat exposure and no prior prophylaxis; primary CNS lymphoma also remains\non the differential given the single-lesion pattern and size. Sending Toxoplasma IgG (pending) and\ncoordinating urgently with Neurology/Neuro-oncology to consider an empiric anti-toxoplasmosis treatment\ntrial with short-interval repeat imaging in 10-14 days; if no radiographic improvement, will proceed to\nbrain biopsy to rule out lymphoma. Urgent same-week Neurology/Neuro-oncology referral placed. Continuing\nlevetiracetam for seizure control; no evidence of status epilepticus.\n2. HIV disease, AIDS, CD4 42, unsuppressed viral load, non-adherent to antiretroviral therapy (B20)\nWill restart antiretroviral therapy in close coordination with neurology given potential drug interactions\nwith an anti-toxoplasmosis regimen and concern for immune reconstitution inflammatory syndrome if ART is\nresumed prematurely relative to CNS infection treatment; deferring ART restart by several days per joint\nID/neurology discussion. Case management referral placed to address adherence barriers.\n3. New focal seizure, acute symptomatic, secondary to intracranial lesion (R56.9)\nContinue levetiracetam, will adjust per neurology recommendations.\n4. Unintentional weight loss, HIV-related (R63.4)\nNutrition referral placed.\nPatient counseled at length on the urgency of this presentation and risk of decompensation; instructed to\ngo to the Emergency Department immediately for worsening weakness, decreased consciousness, or recurrent\nseizure. Case management engaged today for housing and adherence support.\n\nElectronically signed by Sarah J. Okonkwo, MD\nEncounter signed 04/02/2026 11:05 EST | Miami Valley ID EHR v2.9"
+      }
     ],
-    demoPoints: ['Neuro-infectious disease', 'HIV-related CNS pathology'],
+    "demoPoints": [
+      "Neuro-infectious disease",
+      "HIV-related CNS pathology"
+    ]
   },
   {
-    id: 'packet-donnelly',
-    patientName: 'Donnelly, Frank',
-    age: 71,
-    sex: 'M',
-    category: 'packet',
-    referringSpecialty: 'Cardiology',
-    briefDescription: 'AFib patient with acute left-sided weakness episode. Full stroke workup packet.',
-    clinicalHighlight: 'TIA/embolic stroke with complete workup',
-    expectedTier: 'urgent',
-    files: [
+    "id": "packet-donnelly",
+    "patientName": "Donnelly, Frank",
+    "age": 71,
+    "sex": "M",
+    "category": "packet",
+    "referringSpecialty": "Cardiology",
+    "briefDescription": "Transient right arm weakness + dysarthria with MRI-confirmed pontine stroke; full embolic workup packet.",
+    "clinicalHighlight": "TIA/embolic stroke with complete workup",
+    "expectedTier": "urgent",
+    "files": [
       {
-        filename: '01_Cardiology_Note.pdf',
-        path: '/samples/triage/packets/donnelly-frank/01_Cardiology_Note.pdf',
-        docType: 'Cardiology Note',
-        previewText: `Boston Heart & Vascular Institute
-110 Francis St, Suite 4B, Boston, MA 02215
-Phone: (617) 555-0330 | Fax: (617) 555-0331
-
-Patient: Frank J. Donnelly
-
-Date: 01/26/2026
-
-DOB: 08/28/1950
-
-Provider: Thomas Greer, MD, FACC
-
-MRN: BHVI-0044028
-
-Specialty: Cardiovascular Disease / Interventional Cardiology
-
-CHIEF COMPLAINT
-Referred by PCP after transient episode of right arm weakness and slurred speech.
-
-HISTORY OF PRESENT ILLNESS
-Mr. Donnelly is a 75-year-old male with a history of hypertension, hyperlipidemia, type 2 diabetes, and known coronary
-artery disease (stent to LAD, 2019) referred for cardiology evaluation following an episode of sudden right arm weakness
-and dysarthria that lasted approximately 25 minutes and then fully resolved. Episode occurred on January 18, 2026, while
-he was reading the newspaper. His wife noted slurred speech and saw him drop his coffee cup. He had no headache, no
-vision changes, and no loss of consciousness. He did not call 911; his PCP saw him the next day.
-His PCP obtained an MRI brain (results reviewed below) and referred to both Cardiology and Neurology. He is on aspirin 81
-mg, clopidogrel 75 mg (from his coronary stent), atorvastatin 80 mg, lisinopril 20 mg, metoprolol succinate 50 mg, and
-metformin 1000 mg BID. He has had no prior TIA or stroke. He was a smoker for 30 years, quit 10 years ago.
-
-PHYSICAL EXAM
-Vitals: BP 152/90, HR 68, regular. Wt 198 lbs.
-Cardiovascular: RRR, no murmurs or gallops. No JVD. Trace bilateral ankle edema.
-Carotids: Right carotid bruit audible.
-Neuro (today): No focal deficits. Normal cranial nerves, strength, speech.
-
-RESULTS REVIEWED
-MRI brain with DWI (01/20/2026): Small area of restricted diffusion in the left pons — see radiology report. Consistent with
-small acute infarction.
-ECG today: Normal sinus rhythm, HR 68. No ST changes. No LVH. QTc 418 ms.
-
-ASSESSMENT AND PLAN
-1. TIA / minor ischemic stroke, left pontine (G45.9 / I63.9)
-Despite symptom resolution, MRI evidence of acute pontine infarct makes this a minor stroke rather than a pure TIA. The
-right carotid bruit raises concern for significant ipsilateral (left-sided) stenosis given contralateral symptom pattern — or
-alternatively the bruit may represent the right side while pathology is on the left.
-Carotid duplex ultrasound ordered (see results). Echocardiogram ordered to evaluate for cardioembolic source (LV
-thrombus, structural disease, PFO). Hypercoagulability panel ordered given age and cryptogenic component if stenosis is
-insufficient to explain.
-Not changing antithrombotic regimen today — he is already on dual antiplatelet therapy for his coronary stent. Coordinate
-with Neurology regarding definitive antithrombotic strategy. If PFO found, anticoagulation vs. device closure discussion will
-be needed.
-2. Hypertension, inadequately controlled (I10)
-BP 152/90 — target <130/80 post-stroke per ACC/AHA. Increase lisinopril to 40 mg. Add amlodipine 5 mg. Recheck in 2
-weeks.
-3. Neurology referral
-Urgent neurology referral in place per PCP. I have called Dr. Hasan directly to discuss the case and share imaging results.
-Will co-manage.
-
-Electronically signed by: Thomas Greer, MD, FACC
-Signed 01/26/2026 14:40 EST | BHVI Cardiology EHR | cc: Neurology — Dr. Hasan`,
+        "filename": "01_Cardiology_Note.pdf",
+        "path": "/samples/triage/packets/donnelly-frank/01_Cardiology_Note.pdf",
+        "docType": "Cardiology Note",
+        "previewText": "Boston Heart & Vascular Institute\n110 Francis St, Suite 4B, Boston, MA 02215\nPhone: (617) 555-0330 | Fax: (617) 555-0331\n\nPatient: Frank J. Donnelly\n\nDate: 01/26/2026\n\nDOB: 08/28/1950\n\nProvider: Thomas Greer, MD, FACC\n\nMRN: BHVI-0044028\n\nSpecialty: Cardiovascular Disease / Interventional Cardiology\n\nCHIEF COMPLAINT\nReferred by PCP after transient episode of right arm weakness and slurred speech.\n\nHISTORY OF PRESENT ILLNESS\nMr. Donnelly is a 75-year-old male with a history of hypertension, hyperlipidemia, type 2 diabetes, and known coronary\nartery disease (stent to LAD, 2019) referred for cardiology evaluation following an episode of sudden right arm weakness\nand dysarthria that lasted approximately 25 minutes and then fully resolved. Episode occurred on January 18, 2026, while\nhe was reading the newspaper. His wife noted slurred speech and saw him drop his coffee cup. He had no headache, no\nvision changes, and no loss of consciousness. He did not call 911; his PCP saw him the next day.\nHis PCP obtained an MRI brain (results reviewed below) and referred to both Cardiology and Neurology. He is on aspirin 81\nmg, clopidogrel 75 mg (from his coronary stent), atorvastatin 80 mg, lisinopril 20 mg, metoprolol succinate 50 mg, and\nmetformin 1000 mg BID. He has had no prior TIA or stroke. He was a smoker for 30 years, quit 10 years ago.\n\nPHYSICAL EXAM\nVitals: BP 152/90, HR 68, regular. Wt 198 lbs.\nCardiovascular: RRR, no murmurs or gallops. No JVD. Trace bilateral ankle edema.\nCarotids: Right carotid bruit audible.\nNeuro (today): No focal deficits. Normal cranial nerves, strength, speech.\n\nRESULTS REVIEWED\nMRI brain with DWI (01/20/2026): Small area of restricted diffusion in the left pons — see radiology report. Consistent with\nsmall acute infarction.\nECG today: Normal sinus rhythm, HR 68. No ST changes. No LVH. QTc 418 ms.\n\nASSESSMENT AND PLAN\n1. TIA / minor ischemic stroke, left pontine (G45.9 / I63.9)\nDespite symptom resolution, MRI evidence of acute pontine infarct makes this a minor stroke rather than a pure TIA. The\nright carotid bruit raises concern for significant ipsilateral (left-sided) stenosis given contralateral symptom pattern — or\nalternatively the bruit may represent the right side while pathology is on the left.\nCarotid duplex ultrasound ordered (see results). Echocardiogram ordered to evaluate for cardioembolic source (LV\nthrombus, structural disease, PFO). Hypercoagulability panel ordered given age and cryptogenic component if stenosis is\ninsufficient to explain.\nNot changing antithrombotic regimen today — he is already on dual antiplatelet therapy for his coronary stent. Coordinate\nwith Neurology regarding definitive antithrombotic strategy. If PFO found, anticoagulation vs. device closure discussion will\nbe needed.\n2. Hypertension, inadequately controlled (I10)\nBP 152/90 — target <130/80 post-stroke per ACC/AHA. Increase lisinopril to 40 mg. Add amlodipine 5 mg. Recheck in 2\nweeks.\n3. Neurology referral\nUrgent neurology referral in place per PCP. I have called Dr. Hasan directly to discuss the case and share imaging results.\nWill co-manage.\n\n\fElectronically signed by: Thomas Greer, MD, FACC\nSigned 01/26/2026 14:40 EST | BHVI Cardiology EHR | cc: Neurology — Dr. Hasan"
       },
       {
-        filename: '02_MRI_Brain_DWI_Report.pdf',
-        path: '/samples/triage/packets/donnelly-frank/02_MRI_Brain_DWI_Report.pdf',
-        docType: 'MRI Brain Report',
-        previewText: `Massachusetts General Hospital — Department of Radiology
-55 Fruit St, Boston, MA 02114
-Phone: (617) 555-0200 | Fax: (617) 555-0201
-
-RADIOLOGY REPORT
-Patient: Frank J. Donnelly
-
-DOB: 08/28/1950
-
-MRN: BHVI-0044028
-
-Exam Date: 01/20/2026 14:10
-
-Ordering MD: Robert Klein, MD (PCP)
-
-Accession: MGH-MR-20260120-8812
-
-EXAM
-MRI BRAIN WITH DIFFUSION-WEIGHTED IMAGING, WITHOUT AND WITH GADOLINIUM CONTRAST
-CLINICAL INDICATION
-75-year-old male with acute-onset right arm weakness and dysarthria lasting 25 minutes, now resolved. Rule out acute
-infarction.
-TECHNIQUE
-3T MRI brain: axial DWI/ADC, axial FLAIR, axial T2, axial T2*, axial and sagittal T1, post-contrast axial T1 MPRAGE.
-Gadavist 0.1 mmol/kg administered.
-COMPARISON
-No prior MRI available.
-FINDINGS
-Diffusion-weighted imaging: A 7 x 5 mm focus of restricted diffusion (bright on DWI, dark on ADC map) is identified in the
-left paramedian pons at the level of the mid-pons. This is consistent with acute to early subacute infarction (approximately
-2-7 days old).
-FLAIR: The pontine lesion demonstrates early T2/FLAIR signal change. No other areas of restricted diffusion. No additional
-acute lesions identified.
-White matter: Moderate periventricular and subcortical white matter T2/FLAIR hyperintensities in a pattern consistent with
-chronic small vessel ischemic disease (Fazekas grade 2). This is an expected finding for age.
-Contrast enhancement: No abnormal enhancement identified. The pontine lesion does not enhance (consistent with
-acute/early subacute ischemia rather than demyelination or neoplasm).
-Major vessels: Flow voids of the basilar artery, bilateral ICAs, and MCAs appear grossly preserved on this non-MRA study.
-MRA is recommended for vascular assessment.
-Posterior fossa: No cerebellar infarction. Brainstem otherwise unremarkable outside the described lesion. No mass or
-herniation.
-Ventricles/Calvarium: Mild prominence of cortical sulci consistent with age-related volume loss. No hydrocephalus. No
-hemorrhage. No calvarial abnormality.
-
-IMPRESSION
-1. 7 x 5 mm acute to early subacute infarction, left paramedian pons. Clinically consistent with the reported episode of right
-arm weakness and dysarthria (corticospinal and corticobulbar tract involvement at the mid-pons level).
-2. Moderate chronic small vessel ischemic changes (Fazekas grade 2) — background finding consistent with patient's
-vascular risk factor history.
-3. No intracranial hemorrhage.
-4. MRA of the head and neck is recommended to evaluate the posterior circulation vessels (basilar artery, vertebral
-arteries) and carotid arteries.
-
-Electronically attested by: Patricia Walsh, MD — Neuroradiology
-Attested 01/20/2026 17:50 EST | MGH Radiology PACS`,
+        "filename": "02_MRI_Brain_DWI_Report.pdf",
+        "path": "/samples/triage/packets/donnelly-frank/02_MRI_Brain_DWI_Report.pdf",
+        "docType": "MRI Brain Report",
+        "previewText": "Massachusetts General Hospital — Department of Radiology\n55 Fruit St, Boston, MA 02114\nPhone: (617) 555-0200 | Fax: (617) 555-0201\n\nRADIOLOGY REPORT\nPatient: Frank J. Donnelly\n\nDOB: 08/28/1950\n\nMRN: BHVI-0044028\n\nExam Date: 01/20/2026 14:10\n\nOrdering MD: Robert Klein, MD (PCP)\n\nAccession: MGH-MR-20260120-8812\n\nEXAM\nMRI BRAIN WITH DIFFUSION-WEIGHTED IMAGING, WITHOUT AND WITH GADOLINIUM CONTRAST\nCLINICAL INDICATION\n75-year-old male with acute-onset right arm weakness and dysarthria lasting 25 minutes, now resolved. Rule out acute\ninfarction.\nTECHNIQUE\n3T MRI brain: axial DWI/ADC, axial FLAIR, axial T2, axial T2*, axial and sagittal T1, post-contrast axial T1 MPRAGE.\nGadavist 0.1 mmol/kg administered.\nCOMPARISON\nNo prior MRI available.\nFINDINGS\nDiffusion-weighted imaging: A 7 x 5 mm focus of restricted diffusion (bright on DWI, dark on ADC map) is identified in the\nleft paramedian pons at the level of the mid-pons. This is consistent with acute to early subacute infarction (approximately\n2-7 days old).\nFLAIR: The pontine lesion demonstrates early T2/FLAIR signal change. No other areas of restricted diffusion. No additional\nacute lesions identified.\nWhite matter: Moderate periventricular and subcortical white matter T2/FLAIR hyperintensities in a pattern consistent with\nchronic small vessel ischemic disease (Fazekas grade 2). This is an expected finding for age.\nContrast enhancement: No abnormal enhancement identified. The pontine lesion does not enhance (consistent with\nacute/early subacute ischemia rather than demyelination or neoplasm).\nMajor vessels: Flow voids of the basilar artery, bilateral ICAs, and MCAs appear grossly preserved on this non-MRA study.\nMRA is recommended for vascular assessment.\nPosterior fossa: No cerebellar infarction. Brainstem otherwise unremarkable outside the described lesion. No mass or\nherniation.\nVentricles/Calvarium: Mild prominence of cortical sulci consistent with age-related volume loss. No hydrocephalus. No\nhemorrhage. No calvarial abnormality.\n\nIMPRESSION\n1. 7 x 5 mm acute to early subacute infarction, left paramedian pons. Clinically consistent with the reported episode of right\narm weakness and dysarthria (corticospinal and corticobulbar tract involvement at the mid-pons level).\n2. Moderate chronic small vessel ischemic changes (Fazekas grade 2) — background finding consistent with patient's\nvascular risk factor history.\n3. No intracranial hemorrhage.\n4. MRA of the head and neck is recommended to evaluate the posterior circulation vessels (basilar artery, vertebral\narteries) and carotid arteries.\n\n\fElectronically attested by: Patricia Walsh, MD — Neuroradiology\nAttested 01/20/2026 17:50 EST | MGH Radiology PACS"
       },
       {
-        filename: '03_Carotid_Duplex_Report.pdf',
-        path: '/samples/triage/packets/donnelly-frank/03_Carotid_Duplex_Report.pdf',
-        docType: 'Carotid Duplex',
-        previewText: `Boston Heart & Vascular Institute — Vascular Lab
-110 Francis St, Suite 2A, Boston, MA 02215
-Phone: (617) 555-0340 | Fax: (617) 555-0341
-
-CAROTID DUPLEX ULTRASOUND REPORT
-Patient: Frank J. Donnelly
-
-DOB: 08/28/1950
-
-MRN: BHVI-0044028
-
-Exam Date: 01/27/2026 09:30
-
-Ordering MD: Thomas Greer, MD
-
-Accession: BHVI-VL-20260127-0441
-
-CLINICAL INDICATION
-75-year-old male with acute left pontine infarct. Right carotid bruit on exam. Evaluate carotid stenosis.
-TECHNIQUE
-B-mode and color/spectral Doppler ultrasound of bilateral carotid arteries including common carotid, carotid bifurcation,
-proximal internal carotid (ICA), and external carotid arteries (ECA). Vertebral artery flow also assessed.
-FINDINGS
-RIGHT CAROTID SYSTEM:
-Common carotid artery (CCA): Patent, normal flow. No plaque.
-Carotid bifurcation: Heterogeneous calcified and soft plaque at the right carotid bulb extending into the proximal ICA. Plaque
-surface irregular.
-Internal carotid artery (ICA):
-PSV: 248 cm/s; EDV: 112 cm/s
-ICA/CCA ratio: 4.2
-Estimated stenosis: 70-79% (moderate-severe by NASCET criteria)
-External carotid artery: Patent, no significant stenosis.
-LEFT CAROTID SYSTEM:
-Common carotid artery: Patent, normal flow.
-Carotid bifurcation: Mild intima-media thickening. Small calcified plaque at bifurcation.
-Internal carotid artery (ICA):
-PSV: 98 cm/s; EDV: 34 cm/s
-ICA/CCA ratio: 1.4
-Estimated stenosis: <50% (mild)
-VERTEBRAL ARTERIES:
-Bilateral vertebral artery flow is antegrade and symmetric. No significant stenosis identified.
-
-IMPRESSION
-1. Right internal carotid artery stenosis 70-79% (NASCET moderate-severe) with heterogeneous, irregular plaque —
-high-risk plaque morphology.
-2. Left ICA stenosis less than 50% — mild, not hemodynamically significant.
-3. Normal vertebral artery flow bilaterally.
-Note: The acute infarction was in the left pons (posterior circulation territory). The right ICA stenosis does not directly
-explain a left pontine infarct via the carotid system. CTA or MRA of the posterior circulation (vertebrobasilar system) is
-recommended to evaluate for vertebral artery or basilar artery disease as the more likely culprit vessel. Right ICA stenosis
-warrants vascular surgery consultation regardless for secondary prevention.
-
-Electronically attested by: Kevin Moore, RVT — Registered Vascular Technologist
-Interpreted by: Thomas Greer, MD, FACC | Attested 01/27/2026 12:15 EST`,
+        "filename": "03_Carotid_Duplex_Report.pdf",
+        "path": "/samples/triage/packets/donnelly-frank/03_Carotid_Duplex_Report.pdf",
+        "docType": "Carotid Duplex",
+        "previewText": "Boston Heart & Vascular Institute — Vascular Lab\n110 Francis St, Suite 2A, Boston, MA 02215\nPhone: (617) 555-0340 | Fax: (617) 555-0341\n\nCAROTID DUPLEX ULTRASOUND REPORT\nPatient: Frank J. Donnelly\n\nDOB: 08/28/1950\n\nMRN: BHVI-0044028\n\nExam Date: 01/27/2026 09:30\n\nOrdering MD: Thomas Greer, MD\n\nAccession: BHVI-VL-20260127-0441\n\nCLINICAL INDICATION\n75-year-old male with acute left pontine infarct. Right carotid bruit on exam. Evaluate carotid stenosis.\nTECHNIQUE\nB-mode and color/spectral Doppler ultrasound of bilateral carotid arteries including common carotid, carotid bifurcation,\nproximal internal carotid (ICA), and external carotid arteries (ECA). Vertebral artery flow also assessed.\nFINDINGS\nRIGHT CAROTID SYSTEM:\nCommon carotid artery (CCA): Patent, normal flow. No plaque.\nCarotid bifurcation: Heterogeneous calcified and soft plaque at the right carotid bulb extending into the proximal ICA. Plaque\nsurface irregular.\nInternal carotid artery (ICA):\nPSV: 248 cm/s; EDV: 112 cm/s\nICA/CCA ratio: 4.2\nEstimated stenosis: 70-79% (moderate-severe by NASCET criteria)\nExternal carotid artery: Patent, no significant stenosis.\nLEFT CAROTID SYSTEM:\nCommon carotid artery: Patent, normal flow.\nCarotid bifurcation: Mild intima-media thickening. Small calcified plaque at bifurcation.\nInternal carotid artery (ICA):\nPSV: 98 cm/s; EDV: 34 cm/s\nICA/CCA ratio: 1.4\nEstimated stenosis: <50% (mild)\nVERTEBRAL ARTERIES:\nBilateral vertebral artery flow is antegrade and symmetric. No significant stenosis identified.\n\nIMPRESSION\n1. Right internal carotid artery stenosis 70-79% (NASCET moderate-severe) with heterogeneous, irregular plaque —\nhigh-risk plaque morphology.\n2. Left ICA stenosis less than 50% — mild, not hemodynamically significant.\n3. Normal vertebral artery flow bilaterally.\nNote: The acute infarction was in the left pons (posterior circulation territory). The right ICA stenosis does not directly\nexplain a left pontine infarct via the carotid system. CTA or MRA of the posterior circulation (vertebrobasilar system) is\nrecommended to evaluate for vertebral artery or basilar artery disease as the more likely culprit vessel. Right ICA stenosis\nwarrants vascular surgery consultation regardless for secondary prevention.\n\nElectronically attested by: Kevin Moore, RVT — Registered Vascular Technologist\nInterpreted by: Thomas Greer, MD, FACC | Attested 01/27/2026 12:15 EST"
       },
       {
-        filename: '04_Echocardiogram_Report.pdf',
-        path: '/samples/triage/packets/donnelly-frank/04_Echocardiogram_Report.pdf',
-        docType: 'Echocardiogram',
-        previewText: `Boston Heart & Vascular Institute — Echocardiography Lab
-110 Francis St, Suite 2A, Boston, MA 02215
-Phone: (617) 555-0340 | Fax: (617) 555-0341
-
-ECHOCARDIOGRAPHY REPORT — TRANSTHORACIC + BUBBLE STUDY
-Patient: Frank J. Donnelly
-
-DOB: 08/28/1950
-
-MRN: BHVI-0044028
-
-Exam Date: 01/27/2026 11:00
-
-Ordering MD: Thomas Greer, MD
-
-Accession:
-BHVI-ECHO-20260127-0214
-
-CLINICAL INDICATION
-Acute left pontine infarct. Evaluate for cardioembolic source. Bubble study for PFO.
-TECHNIQUE
-Complete 2D transthoracic echocardiogram with Doppler. Agitated saline contrast (bubble study) performed at rest and with
-Valsalva maneuver.
-FINDINGS
-Left ventricle: Normal size. EF estimated 55-60% (normal). No wall motion abnormalities. No LV thrombus. Normal
-diastolic function (Grade I impairment).
-Right ventricle: Normal size and systolic function.
-Atria: Left atrium mildly dilated (LA volume index 32 mL/m2; normal <34). Right atrium normal size. No intracardiac
-thrombus identified. No spontaneous echo contrast.
-Valves: Mild mitral annular calcification. Mild mitral regurgitation (1+). Aortic valve mildly thickened and calcified; aortic
-stenosis mild (peak gradient 18 mmHg, mean 9 mmHg). Tricuspid valve normal. No pulmonic stenosis.
-Pericardium: No pericardial effusion.
-Aortic root: Mildly dilated at 3.9 cm.
-BUBBLE STUDY (Agitated Saline Contrast):
-At rest: No right-to-left shunting observed.
-With Valsalva: POSITIVE — appearance of >20 microbubbles in the left atrium within 3 cardiac cycles of right atrial
-opacification. This is consistent with a patent foramen ovale (PFO) with right-to-left shunting on Valsalva. Bubble passage
-quantity suggests a moderate-sized PFO.
-
-IMPRESSION
-1. Normal left ventricular size and systolic function (EF 55-60%). No LV thrombus.
-2. Mild LA enlargement. No intracardiac mass or thrombus.
-3. Mild valvular disease as described (mitral regurgitation, early aortic stenosis) — not considered embolic source.
-4. PATENT FORAMEN OVALE (PFO) with moderate right-to-left shunting demonstrated on Valsalva — potentially
-relevant embolic source, particularly in context of acute ischemic stroke. Correlation with clinical stroke characteristics and
-discussion of closure vs. anticoagulation vs. continued antiplatelet therapy is recommended in a multidisciplinary setting.
-
-Electronically attested by: Thomas Greer, MD, FACC
-Attested 01/27/2026 13:45 EST | BHVI Cardiology EHR`,
+        "filename": "04_Echocardiogram_Report.pdf",
+        "path": "/samples/triage/packets/donnelly-frank/04_Echocardiogram_Report.pdf",
+        "docType": "Echocardiogram",
+        "previewText": "Boston Heart & Vascular Institute — Echocardiography Lab\n110 Francis St, Suite 2A, Boston, MA 02215\nPhone: (617) 555-0340 | Fax: (617) 555-0341\n\nECHOCARDIOGRAPHY REPORT — TRANSTHORACIC + BUBBLE STUDY\nPatient: Frank J. Donnelly\n\nDOB: 08/28/1950\n\nMRN: BHVI-0044028\n\nExam Date: 01/27/2026 11:00\n\nOrdering MD: Thomas Greer, MD\n\nAccession:\nBHVI-ECHO-20260127-0214\n\nCLINICAL INDICATION\nAcute left pontine infarct. Evaluate for cardioembolic source. Bubble study for PFO.\nTECHNIQUE\nComplete 2D transthoracic echocardiogram with Doppler. Agitated saline contrast (bubble study) performed at rest and with\nValsalva maneuver.\nFINDINGS\nLeft ventricle: Normal size. EF estimated 55-60% (normal). No wall motion abnormalities. No LV thrombus. Normal\ndiastolic function (Grade I impairment).\nRight ventricle: Normal size and systolic function.\nAtria: Left atrium mildly dilated (LA volume index 32 mL/m2; normal <34). Right atrium normal size. No intracardiac\nthrombus identified. No spontaneous echo contrast.\nValves: Mild mitral annular calcification. Mild mitral regurgitation (1+). Aortic valve mildly thickened and calcified; aortic\nstenosis mild (peak gradient 18 mmHg, mean 9 mmHg). Tricuspid valve normal. No pulmonic stenosis.\nPericardium: No pericardial effusion.\nAortic root: Mildly dilated at 3.9 cm.\nBUBBLE STUDY (Agitated Saline Contrast):\nAt rest: No right-to-left shunting observed.\nWith Valsalva: POSITIVE — appearance of >20 microbubbles in the left atrium within 3 cardiac cycles of right atrial\nopacification. This is consistent with a patent foramen ovale (PFO) with right-to-left shunting on Valsalva. Bubble passage\nquantity suggests a moderate-sized PFO.\n\nIMPRESSION\n1. Normal left ventricular size and systolic function (EF 55-60%). No LV thrombus.\n2. Mild LA enlargement. No intracardiac mass or thrombus.\n3. Mild valvular disease as described (mitral regurgitation, early aortic stenosis) — not considered embolic source.\n4. PATENT FORAMEN OVALE (PFO) with moderate right-to-left shunting demonstrated on Valsalva — potentially\nrelevant embolic source, particularly in context of acute ischemic stroke. Correlation with clinical stroke characteristics and\ndiscussion of closure vs. anticoagulation vs. continued antiplatelet therapy is recommended in a multidisciplinary setting.\n\nElectronically attested by: Thomas Greer, MD, FACC\nAttested 01/27/2026 13:45 EST | BHVI Cardiology EHR"
       },
       {
-        filename: '05_Hypercoagulability_Labs.pdf',
-        path: '/samples/triage/packets/donnelly-frank/05_Hypercoagulability_Labs.pdf',
-        docType: 'Hypercoagulability Labs',
-        previewText: `Brigham Specialized Coagulation Laboratory
-75 Francis St, Boston, MA 02115 | CLIA #22D0009832
-Phone: (617) 555-0950 | Fax: (617) 555-0951
-
-HYPERCOAGULABILITY / THROMBOPHILIA PANEL
-Patient: Frank J. Donnelly
-
-DOB: 08/28/1950
-
-MRN: BHVI-0044028
-
-Exam Date: 01/27/2026 08:00
-
-Ordering MD: Thomas Greer, MD
-
-Accession: BCL-20260127-5541
-
-CLINICAL INDICATION: Acute ischemic stroke — evaluate for hereditary or acquired thrombophilia.
-NOTE: Patient is on aspirin 81 mg and clopidogrel 75 mg at time of collection. Antiplatelet agents may affect some functional assays; results should
-be interpreted in clinical context. Patient is NOT on anticoagulation.
-
-ANTIPHOSPHOLIPID ANTIBODY PANEL
-Test
-
-Result
-
-Reference
-
-Flag
-
-Anticardiolipin IgG
-
-8 GPL
-
-<20 GPL (negative)
-
-Anticardiolipin IgM
-
-6 MPL
-
-<20 MPL (negative)
-
-Anti-beta2-glycoprotein I IgG
-
-4 SGU
-
-<20 SGU (negative)
-
-Anti-beta2-glycoprotein I IgM
-
-3 SMU
-
-<20 SMU (negative)
-
-Lupus Anticoagulant (dRVVT screen)
-
-Negative
-
-Negative
-
-Lupus Anticoagulant (Silica clot time)
-
-Negative
-
-Negative
-
-Test
-
-Result
-
-Reference
-
-Flag
-
-Factor V Leiden mutation (PCR)
-
-HETEROZYGOUS
-(R506Q)
-
-Negative / Wild-type
-
-H
-
-Prothrombin G20210A mutation (PCR)
-
-Not detected
-
-Negative
-
-MTHFR C677T
-
-Heterozygous
-
-—
-
-MTHFR A1298C
-
-Not detected
-
-—
-
-Protein C activity
-
-88%
-
-70-140%
-
-Protein S (free antigen)
-
-74%
-
-65-140%
-
-Antithrombin III activity
-
-96%
-
-80-120%
-
-Homocysteine (fasting)
-
-18.4 µmol/L
-
-<15 µmol/L
-
-H
-
-Test
-
-Result
-
-Reference
-
-Flag
-
-PT / INR
-
-12.1 sec / 1.0
-
-11-14 sec / 0.8-1.2
-
-aPTT
-
-30 sec
-
-25-38 sec
-
-Fibrinogen
-
-388 mg/dL
-
-200-400 mg/dL
-
-D-dimer
-
-0.62 mg/L FEU
-
-<0.50 mg/L FEU
-
-HEREDITARY THROMBOPHILIA
-
-OTHER COAGULATION
-
-H
-
-INTERPRETATION: Factor V Leiden heterozygous mutation detected. This is the most common inherited thrombophilia
-and confers approximately 3-7x increased risk of venous thromboembolism; arterial risk data are less robust but some
-studies suggest modest increased stroke risk. Mildly elevated homocysteine (18.4) is a modifiable risk factor —
-supplement with folate and B6/B12. MTHFR heterozygosity may contribute to homocysteinemia. No antiphospholipid
-antibodies detected. D-dimer mildly elevated — nonspecific in the context of recent ischemic event.
-
-Electronically attested by: Anna Bergstrom, PhD — Hemostasis Laboratory
-Director: Robert Flaumenhaft, MD | Reported 01/27/2026 15:30 EST`,
-      },
+        "filename": "05_Hypercoagulability_Labs.pdf",
+        "path": "/samples/triage/packets/donnelly-frank/05_Hypercoagulability_Labs.pdf",
+        "docType": "Hypercoagulability Labs",
+        "previewText": "Brigham Specialized Coagulation Laboratory\n75 Francis St, Boston, MA 02115 | CLIA #22D0009832\nPhone: (617) 555-0950 | Fax: (617) 555-0951\n\nHYPERCOAGULABILITY / THROMBOPHILIA PANEL\nPatient: Frank J. Donnelly\n\nDOB: 08/28/1950\n\nMRN: BHVI-0044028\n\nExam Date: 01/27/2026 08:00\n\nOrdering MD: Thomas Greer, MD\n\nAccession: BCL-20260127-5541\n\nCLINICAL INDICATION: Acute ischemic stroke — evaluate for hereditary or acquired thrombophilia.\nNOTE: Patient is on aspirin 81 mg and clopidogrel 75 mg at time of collection. Antiplatelet agents may affect some functional assays; results should\nbe interpreted in clinical context. Patient is NOT on anticoagulation.\n\nANTIPHOSPHOLIPID ANTIBODY PANEL\nTest\n\nResult\n\nReference\n\nFlag\n\nAnticardiolipin IgG\n\n8 GPL\n\n<20 GPL (negative)\n\nAnticardiolipin IgM\n\n6 MPL\n\n<20 MPL (negative)\n\nAnti-beta2-glycoprotein I IgG\n\n4 SGU\n\n<20 SGU (negative)\n\nAnti-beta2-glycoprotein I IgM\n\n3 SMU\n\n<20 SMU (negative)\n\nLupus Anticoagulant (dRVVT screen)\n\nNegative\n\nNegative\n\nLupus Anticoagulant (Silica clot time)\n\nNegative\n\nNegative\n\nTest\n\nResult\n\nReference\n\nFlag\n\nFactor V Leiden mutation (PCR)\n\nHETEROZYGOUS\n(R506Q)\n\nNegative / Wild-type\n\nH\n\nProthrombin G20210A mutation (PCR)\n\nNot detected\n\nNegative\n\nMTHFR C677T\n\nHeterozygous\n\n—\n\nMTHFR A1298C\n\nNot detected\n\n—\n\nProtein C activity\n\n88%\n\n70-140%\n\nProtein S (free antigen)\n\n74%\n\n65-140%\n\nAntithrombin III activity\n\n96%\n\n80-120%\n\nHomocysteine (fasting)\n\n18.4 µmol/L\n\n<15 µmol/L\n\nH\n\nTest\n\nResult\n\nReference\n\nFlag\n\nPT / INR\n\n12.1 sec / 1.0\n\n11-14 sec / 0.8-1.2\n\naPTT\n\n30 sec\n\n25-38 sec\n\nFibrinogen\n\n388 mg/dL\n\n200-400 mg/dL\n\nD-dimer\n\n0.62 mg/L FEU\n\n<0.50 mg/L FEU\n\nHEREDITARY THROMBOPHILIA\n\nOTHER COAGULATION\n\nH\n\nINTERPRETATION: Factor V Leiden heterozygous mutation detected. This is the most common inherited thrombophilia\nand confers approximately 3-7x increased risk of venous thromboembolism; arterial risk data are less robust but some\nstudies suggest modest increased stroke risk. Mildly elevated homocysteine (18.4) is a modifiable risk factor —\nsupplement with folate and B6/B12. MTHFR heterozygosity may contribute to homocysteinemia. No antiphospholipid\nantibodies detected. D-dimer mildly elevated — nonspecific in the context of recent ischemic event.\n\nElectronically attested by: Anna Bergstrom, PhD — Hemostasis Laboratory\nDirector: Robert Flaumenhaft, MD | Reported 01/27/2026 15:30 EST"
+      }
     ],
-    demoPoints: ['Multi-document patient packet', 'Stroke workup fusion', 'Imaging + labs + clinical notes'],
+    "demoPoints": [
+      "Multi-document patient packet",
+      "Stroke workup fusion",
+      "Imaging + labs + clinical notes"
+    ]
   },
   {
-    id: 'packet-jimenez',
-    patientName: 'Jimenez, Marta',
-    age: 72,
-    sex: 'F',
-    category: 'packet',
-    referringSpecialty: 'Emergency Medicine',
-    briefDescription: 'First-time seizure with left frontal mass found on CT. Full ED workup.',
-    clinicalHighlight: 'New-onset seizure with brain mass',
-    expectedTier: 'urgent',
-    files: [
+    "id": "packet-jimenez",
+    "patientName": "Jimenez, Marta",
+    "age": 72,
+    "sex": "F",
+    "category": "packet",
+    "referringSpecialty": "Emergency Medicine",
+    "briefDescription": "First-time seizure with left frontal mass found on CT. Full ED workup.",
+    "clinicalHighlight": "New-onset seizure with brain mass",
+    "expectedTier": "urgent",
+    "files": [
       {
-        filename: '01_ED_Note.pdf',
-        path: '/samples/triage/packets/jimenez-marta/01_ED_Note.pdf',
-        docType: 'ED Note',
-        previewText: `Memorial Regional Hospital — Emergency Department
-3501 Johnson St, Hollywood, FL 33021 | Level I Trauma Center
-Phone: (954) 555-0600 | Fax: (954) 555-0601
-
-Patient: Marta L. Jimenez
-
-Date: 01/31/2026
-
-DOB: 04/17/1958
-
-Provider: Kevin Daly, MD
-
-MRN: MRH-0882341
-
-Specialty: Emergency Medicine
-
-CHIEF COMPLAINT
-Confusion and slurred speech — brought by daughter. Possible stroke per EMS.
-
-HISTORY OF PRESENT ILLNESS
-67-year-old Hispanic female brought by EMS after her daughter found her confused and speaking incoherently at home. Per
-daughter (primary historian — patient is minimally verbal and not providing reliable history): Patient was in her usual state of
-health yesterday morning. Daughter called her at 6 PM and she 'sounded drunk and confused.' Daughter arrived at the
-house at 8 PM and found her mother confused, slurring words, and not recognizing her. She had been incontinent of urine.
-No witnessed seizure activity. No facial droop per daughter, though she is not certain. No vomiting.
-Patient has a history of cirrhosis (daughter believes from alcohol — patient 'used to drink a lot'), hypertension, and type 2
-diabetes. She takes lactulose 'sometimes' per daughter but is not always compliant. She also takes lisinopril and metformin.
-Daughter reports patient has been constipated for 4-5 days. She has had two prior hospitalizations for 'liver problems' —
-daughter does not know details. She has not seen her doctor in over a year. Daughter is unaware of any recent infections,
-falls, or head trauma.
-EMS documented: GCS 11 (E3V3M5), BP 162/96, glucose 78, no obvious facial asymmetry on field assessment. EMS
-stroke alert activated given altered mental status and slurred speech.
-
-PHYSICAL EXAM
-Vitals on arrival: BP 168/98, HR 102, Temp 37.8°C, RR 18, O2 sat 94% RA, Wt ~155 lbs
-GCS: 12 (E3V4M5) — improved from field
-General: Jaundiced female, mildly unkempt. Mild asterixis noted on outstretched hands. Spider angiomata on anterior
-chest. Palmar erythema. Moderate abdominal distension.
-HEENT: Scleral icterus. Pupils 3mm, equal and sluggishly reactive. No obvious facial asymmetry at rest.
-Cardiovascular: Tachycardic, regular. No murmurs.
-Abdomen: Distended, dull to percussion in flanks — possible ascites. Mild diffuse tenderness without guarding.
-Extremities: 2+ bilateral pitting edema to the knees. No focal limb weakness apparent.
-Neuro: Confused, disoriented. Follows simple commands inconsistently. Speech slurred and slow. Cannot assess focal
-deficits reliably given cooperation. No obvious hemiplegia. Asterixis present bilaterally. Reflexes 2+ symmetric. Toes
-downgoing bilaterally.
-
-ED COURSE AND WORKUP
-Stroke team activated. CT head obtained (see report). IV access x2, O2 2L NC, monitor. Glucose 78 on finger stick — 1
-amp D50 given empirically — minimal response. Labs sent (see lab report). Chest X-ray: cardiomegaly, no acute infiltrate.
-EKG: sinus tachycardia, no ischemic changes.
-CT head returned as no acute hemorrhage but with chronic changes. Stroke team performed NIHSS: score 4 (confusion,
-mild dysarthria). tPA window considered — on hold pending labs and further evaluation. Neurology attending called to
-bedside.
-
-ASSESSMENT AND PLAN
-Assessment: Altered mental status with slurred speech in patient with cirrhosis. Initial concern for acute stroke given EMS
-activation, however clinical picture becoming more consistent with hepatic encephalopathy: asterixis, jaundice, stigmata of
-chronic liver disease, constipation, known cirrhosis, lactulose non-compliance, and fever. Stroke has NOT been definitively
-excluded — MRI with DWI would be needed but patient is confused and may not cooperate. tPA not administered given
-significant uncertainty about diagnosis and concern about coagulopathy in a cirrhotic patient.
-
-1. Admit to medicine / hepatology
-2. Lactulose 30 mL q2h until 3 soft BMs per day
-3. Rifaximin 550 mg BID
-4. IV thiamine 100 mg given prior to any dextrose
-5. Blood cultures x2 for SBP workup given fever and ascites
-6. Neurology consult ordered — please evaluate for stroke vs. metabolic encephalopathy
-7. EEG ordered per neurology
-8. MRI brain if patient's mental status and cooperation permit
-
-Electronically signed by: Kevin Daly, MD
-Signed 01/31/2026 23:58 EST | MRH Emergency EHR | Attending: Gloria Nwachukwu, MD`,
-      },
-      {
-        filename: '02_CT_Head_Report.pdf',
-        path: '/samples/triage/packets/jimenez-marta/02_CT_Head_Report.pdf',
-        docType: 'CT Head Report',
-        previewText: `Memorial Regional Hospital — Department of Radiology
-3501 Johnson St, Hollywood, FL 33021
-Phone: (954) 555-0610 | Fax: (954) 555-0611
-
-RADIOLOGY REPORT
-Patient: Marta L. Jimenez
-
-DOB: 04/17/1958
-
-MRN: MRH-0882341
-
-Exam Date: 01/31/2026 22:10
-
-Ordering MD: Kevin Daly, MD
-
-Accession: MRH-R-20260131-9920
-
-EXAM
-CT HEAD WITHOUT CONTRAST — ACUTE STROKE PROTOCOL
-CLINICAL INDICATION
-67-year-old female with acute onset confusion and slurred speech. Stroke alert. Rule out hemorrhage.
-TECHNIQUE
-Non-contrast CT head. Standard stroke protocol with 5 mm axial slices and thin coronal/sagittal reformats.
-COMPARISON
-CT head from 03/2022 (outside study, available for comparison via PACS).
-FINDINGS
-Acute findings: No intracranial hemorrhage. No hyperdense vessel sign. No sulcal effacement or loss of gray-white
-differentiation to suggest early large territory infarction. ASPECTS score: 10/10.
-Chronic/background findings:
-- Multiple bilateral subcortical and periventricular hypodensities consistent with chronic small vessel ischemic disease
-(Fazekas grade 2-3). Findings are more prominent than on 2022 study, suggesting progression.
-- A 6 mm hypodensity in the right posterior limb internal capsule and a 4 mm hypodensity in the left putamen are present —
-consistent with chronic lacunar infarcts, unchanged from prior study.
-- Mild cortical volume loss and sulcal prominence consistent with age and possible alcohol-related atrophy.
-Ventricles: Mildly prominent but stable compared to 2022. No hydrocephalus.
-Posterior fossa: No acute cerebellar or brainstem lesion.
-Calvarium: No fracture. No acute bony pathology.
-Soft tissues: No scalp hematoma.
-
-IMPRESSION
-1. NO ACUTE INTRACRANIAL HEMORRHAGE.
-2. No CT evidence of acute large territory infarction (ASPECTS 10). Acute ischemia cannot be excluded by CT alone —
-MRI with diffusion-weighted imaging is significantly more sensitive for acute infarct and is recommended.
-3. Chronic small vessel ischemic disease, progressed since 2022.
-4. Known chronic bilateral lacunar infarcts — right PLIC and left putamen — unchanged.
-5. Mild cortical volume loss.
-Clinical correlation required. In the appropriate clinical context, CTA head and neck should be considered for large vessel
-occlusion assessment if ischemic stroke remains suspected.
-
-Electronically attested by: Mark Brennan, MD — Neuroradiology (Attending, on call)
-Attested 01/31/2026 22:48 EST | MRH Radiology PACS`,
-      },
-      {
-        filename: '03_Comprehensive_Labs.pdf',
-        path: '/samples/triage/packets/jimenez-marta/03_Comprehensive_Labs.pdf',
-        docType: 'Comprehensive Labs',
-        previewText: `Memorial Regional Hospital — Clinical Laboratory
-3501 Johnson St, Hollywood, FL 33021 | CLIA #10D0065831
-Phone: (954) 555-0620 | Fax: (954) 555-0621
-
-LABORATORY REPORT — COMPREHENSIVE PANEL
-Patient: Marta L. Jimenez
-
-DOB: 04/17/1958
-
-MRN: MRH-0882341
-
-Exam Date: 01/31/2026 22:15
-
-Ordering MD: Kevin Daly, MD
-
-Accession: LAB-20260131-6641
-
-COLLECTION: 01/31/2026 22:15 | REPORTED: 02/01/2026 00:45
-BASIC METABOLIC PANEL
-Test
-
-Result
-
-Reference
-
-Flag
-
-Sodium
-
-128
-
-136-145 mEq/L
-
-H
-
-Potassium
-
-3.2
-
-3.5-5.0 mEq/L
-
-L
-
-Chloride
-
-94
-
-98-107 mEq/L
-
-L
-
-CO2
-
-20
-
-22-29 mEq/L
-
-L
-
-BUN
-
-38
-
-7-20 mg/dL
-
-H
-
-Creatinine
-
-1.4
-
-0.6-1.1 mg/dL
-
-H
-
-eGFR (CKD-EPI)
-
-38
-
-≥60 mL/min/1.73m²
-
-L
-
-Glucose
-
-82
-
-70-99 mg/dL
-
-Test
-
-Result
-
-Reference
-
-Flag
-
-AST (SGOT)
-
-188
-
-10-40 U/L
-
-H
-
-ALT (SGPT)
-
-72
-
-7-56 U/L
-
-H
-
-Total Bilirubin
-
-8.4
-
-0.2-1.2 mg/dL
-
-H
-
-Direct Bilirubin
-
-5.1
-
-0-0.3 mg/dL
-
-H
-
-Alkaline Phosphatase
-
-214
-
-44-147 U/L
-
-H
-
-GGT
-
-310
-
-9-48 U/L
-
-H
-
-Total Protein
-
-5.8
-
-6.3-8.2 g/dL
-
-L
-
-Albumin
-
-2.4
-
-3.5-5.0 g/dL
-
-L
-
-Prothrombin Time (PT)
-
-18.2 sec
-
-11.0-14.0 sec
-
-H
-
-INR
-
-1.62
-
-0.8-1.2
-
-H
-
-Test
-
-Result
-
-Reference
-
-Flag
-
-Ammonia (plasma)
-
-142 µmol/L
-
-11-48 µmol/L
-
-H
-
-Lactate
-
-3.1 mmol/L
-
-0.5-2.2 mmol/L
-
-H
-
-Lipase
-
-48
-
-13-60 U/L
-
-TSH
-
-2.8
-
-0.4-4.0 mIU/L
-
-Vitamin B12
-
-312
-
-200-900 pg/mL
-
-Blood Culture x2
-
-Pending 5 days
-
-Negative
-
-Test
-
-Result
-
-Reference
-
-LIVER FUNCTION TESTS
-
-AMMONIA & SPECIAL
-
-CBC
-Flag
-
-WBC
-
-11.4
-
-4.5-11.0 K/µL
-
-H
-
-Hemoglobin
-
-9.8
-
-12.0-16.0 g/dL
-
-L
-
-MCV
-
-102
-
-80-100 fL
-
-H
-
-Platelets
-
-68
-
-150-400 K/µL
-
-L
-
-Neutrophils %
-
-78
-
-40-75%
-
-H
-
-Test
-
-Result
-
-Reference
-
-Flag
-
-Serum Ethanol
-
-<10 mg/dL
-(undetectable)
-
-<10 mg/dL
-
-Urine Drug Screen
-
-Negative (all
-panels)
-
-Negative
-
-Salicylate level
-
-<1.0 mg/dL
-
-<20 mg/dL
-
-Acetaminophen level
-
-<10 µg/mL
-
-<20 µg/mL
-
-TOXICOLOGY
-
-CRITICAL VALUES CALLED: Sodium 128 mEq/L (critical low) called to RN at 00:52. Ammonia 142 µmol/L (critical high)
-called to RN at 00:52. INR 1.62 flagged. Platelets 68K — thrombocytopenia.
-SUMMARY NOTE: Findings consistent with decompensated liver cirrhosis: markedly elevated ammonia, conjugated
-hyperbilirubinemia, hypoalbuminemia, coagulopathy (elevated PT/INR), thrombocytopenia, and hyponatremia. Elevated
-lactate may reflect hepatic dysfunction and/or early sepsis. Macrocytic anemia (MCV 102) consistent with hepatic disease
-or prior alcohol use. Ethanol undetectable at time of draw.
-
-Electronically attested by: Memorial Regional Laboratory, CLIA Certified
-Laboratory Director: Helena Park, MD | Reported 02/01/2026 00:45 EST`,
-      },
-      {
-        filename: '04_EEG_Report.pdf',
-        path: '/samples/triage/packets/jimenez-marta/04_EEG_Report.pdf',
-        docType: 'EEG Report',
-        previewText: `Memorial Regional Hospital — Neurophysiology Laboratory
-3501 Johnson St, Hollywood, FL 33021
-Phone: (954) 555-0630 | Fax: (954) 555-0631
-
-ELECTROENCEPHALOGRAPHY (EEG) REPORT — PORTABLE BEDSIDE
-Patient: Marta L. Jimenez
-
-DOB: 04/17/1958
-
-MRN: MRH-0882341
-
-Exam Date: 02/01/2026 06:30
-
-Ordering MD: Raymond Osei, MD
-(Neurology)
-
-Accession: MRH-EEG-20260201-0114
-
-CLINICAL INDICATION
-67-year-old female admitted for altered mental status. Known cirrhosis. Ammonia elevated (142 µmol/L). Evaluate for
-nonconvulsive seizures vs. encephalopathy pattern.
-RECORDING DETAILS
-Portable bedside EEG performed in medical ICU. 21-electrode standard 10-20 placement. Recording duration: 30 minutes.
-Patient encephalopathic — drowsy to lethargic throughout. No hyperventilation performed (patient unable to cooperate).
-Photic stimulation not performed.
-BACKGROUND ACTIVITY
-No normal posterior dominant rhythm identified. Background consists predominantly of moderate-amplitude diffuse theta
-(4-7 Hz) and delta (0.5-3 Hz) activity. No normal sleep architecture. No normal waking background for age. The background
-is diffusely slow and disorganized — no regional predominance.
-INTERICTAL / ABNORMAL FINDINGS
-Prominent generalized, bilaterally synchronous triphasic waves (TWs) are identified throughout the recording. These are
-high-amplitude, frontally predominant, with a characteristic morphology: positive-negative-positive complex with
-anterior-to-posterior phase lag. Frequency approximately 1.5-2.5 Hz. They persist throughout all states of arousal captured.
-No clear focal onset epileptiform discharges identified. No electrographic seizure activity recorded.
-Attempted stimulation of the patient during recording produced brief attenuation of the pattern followed by resumption —
-consistent with encephalopathy, not seizure.
-REACTIVITY
-EEG mildly reactive to stimulation with brief attenuation. No normal reactivity pattern.
-NO SEIZURE ACTIVITY
-No electrographic or clinical seizures recorded during this 30-minute study. A longer recording or continuous EEG
-monitoring may be considered if nonconvulsive status epilepticus (NCSE) remains a clinical concern.
-
-IMPRESSION
-1. ABNORMAL EEG — moderately-severely abnormal.
-2. Diffuse background slowing with prominent generalized triphasic waves. This pattern is classically associated with
-metabolic encephalopathy, most commonly hepatic encephalopathy (in this clinical context), uremic encephalopathy, or
-other toxic-metabolic derangements. The pattern is not specific to etiology but is highly consistent with the patient's clinical
-profile and markedly elevated ammonia.
-3. No epileptiform discharges. No electrographic seizures in this recording.
-4. Triphasic waves can occasionally be difficult to distinguish from NCSE; if clinical suspicion for NCSE remains, a
-benzodiazepine trial under EEG monitoring or continuous EEG can be considered. However, the pattern here is typical of
-metabolic encephalopathy rather than NCSE.
-Recommend clinical correlation with ammonia, liver function, and metabolic parameters. EEG findings support a primary
-metabolic/toxic etiology over structural or epileptic cause.
-
-Electronically attested by: Raymond Osei, MD — Neurology / Clinical Neurophysiology
-
-Attested 02/01/2026 09:15 EST | MRH Neurophysiology Lab`,
-      },
+        "filename": "01_ED_Note.pdf",
+        "path": "/samples/triage/packets/jimenez-marta/01_ED_Note.pdf",
+        "docType": "ED Note",
+        "previewText": "Dayton Regional Medical Center — Emergency Department\n3200 South Dixie Hwy, Dayton, OH 45439\nPhone: (937) 555-0911 | Fax: (937) 555-0912\n\nPatient: Marta L. Jimenez\n\nDate of Service: 04/20/2026\n\nDOB: 04/28/1953\n\nProvider: Daniel R. Okafor, DO\n\nMRN: DRMC-ED-0078654\n\nSpecialty: Emergency Medicine\n\nCHIEF COMPLAINT\nFirst-time witnessed seizure.\n\nHISTORY OF PRESENT ILLNESS\nMs. Jimenez is a 72-year-old female with no prior seizure history, brought in by EMS after a witnessed\ngeneralized tonic-clonic seizure at home this afternoon. Per her daughter, who witnessed the event, the\npatient suddenly stopped speaking mid-sentence, her head and eyes turned to the right, followed within\nseconds by generalized stiffening and rhythmic jerking of all four extremities lasting approximately 2\nminutes, with associated urinary incontinence and a small tongue laceration noted. Postictal confusion and\nlethargy lasted approximately 25 minutes, during which the patient was minimally responsive, gradually\nreturning toward baseline mental status by the time EMS arrived. Her daughter additionally reports that the\npatient has had increasing clumsiness of her right hand and occasional word-finding difficulty over the\npast several weeks, which the family had attributed to normal aging and had not yet brought to medical\nattention. No fever, no recent head trauma, no illicit substance or alcohol use. No history of stroke, no\nknown malignancy. Home medications reconciled with daughter: only medications for hypertension and\nosteoporosis; no anticoagulants.\n\nPAST MEDICAL HISTORY\nHypertension. Osteoporosis. Hypothyroidism (on levothyroxine). Bilateral cataract surgery (remote).\n\nCURRENT MEDICATIONS\n1. Amlodipine 5 mg daily\n2. Levothyroxine 75 mcg daily\n3. Alendronate 70 mg weekly\n4. Calcium/Vitamin D supplement daily\n5. No anticoagulant or antiplatelet therapy\n\nPHYSICAL EXAM\nVitals: BP 158/90, HR 92, Temp 98.6, RR 18, SpO2 97% RA, POC glucose 128.\nGeneral: Postictal, now awake and gradually reorienting. Small tongue laceration on the right lateral\ntongue, no other trauma noted.\nNeuro: Approximately 40 minutes post-seizure — alert, oriented to person and place, only partially oriented\nto time (knows month/year, improving). Mild expressive word-finding hesitancy noted during conversation;\ndaughter confirms this is somewhat worse than baseline over recent weeks but more pronounced right now,\nlikely a combination of postictal (Todd's) phenomenon superimposed on a preexisting subtle deficit. Cranial\nnerves grossly intact, face symmetric. Motor: subtle right pronator drift, right hand grip slightly weaker\nthan left (4+/5 vs 5/5) — most consistent with transient postictal paresis versus an underlying structural\nlesion; will reassess once fully post-ictal. Left side full strength throughout. Sensation grossly intact.\nReflexes symmetric, Babinski downgoing bilaterally. Gait deferred, fall precautions and bed rest ordered.\nCardiovascular/Pulm: Regular rate and rhythm, no murmurs, lungs clear.\n\nLABS / IMAGING\nCBC, CMP, Mg, Phos unremarkable — Na 138, glucose 128, Ca 9.6. Troponin negative x1. UA negative for\ninfection. CT head without contrast: 3.2 cm left frontal lobe mass with irregular margins and moderate\nsurrounding vasogenic edema, with mild leftward-to-right midline shift (~3 mm); findings concerning for a\nprimary CNS neoplasm versus solitary metastasis — no known primary malignancy history at this time. No\nacute hemorrhage. CT chest/abdomen/pelvis with contrast ordered to screen for an occult primary malignancy\ngiven metastasis remains on the differential.\n\nASSESSMENT AND PLAN\n\n1. First-time generalized tonic-clonic seizure, acute symptomatic, secondary to left frontal mass with mass\neffect (R56.9, R90.0)\nSemiology (initial right head/eye deviation with speech arrest, followed by secondary generalization)\nlocalizes to a left frontal focal-onset seizure, congruent with the left frontal mass on CT. Loaded with\nlevetiracetam IV per weight-based protocol for seizure prophylaxis given the structural lesion and ongoing\nseizure risk; will continue maintenance levetiracetam 500 mg BID. Urgent Neurosurgery and Neuro-oncology\nconsultation placed given the mass with midline shift; admitting to inpatient neurology/neurosurgery service\nfor MRI brain with and without contrast, further characterization, and surgical planning (biopsy versus\nresection depending on location and eloquence). Dexamethasone 10 mg IV given for vasogenic edema, to\ncontinue on a tapering course per neurosurgery.\n2. Intracranial mass, left frontal lobe, etiology undetermined — primary CNS neoplasm (e.g., glioma,\nmeningioma) versus solitary metastasis (D49.6, R90.0)\nNo known primary malignancy; CT chest/abdomen/pelvis ordered to evaluate for an occult primary. Age and\nimaging characteristics keep both a primary brain tumor and metastatic disease on the differential; will be\nresolved with MRI characterization and eventual tissue diagnosis via neurosurgery.\n3. Subacute word-finding difficulty and right-hand clumsiness, weeks in duration, preceding today's seizure\n(R47.01, G81.91)\nFamily-reported progressive symptoms over several weeks are consistent with a slowly enlarging mass lesion\npredating today's seizure; will be further characterized by inpatient neurology exam once the postictal\nstate fully resolves.\n4. Hypertension, currently elevated in the setting of acute illness (I10)\nWill monitor; deferring medication changes pending admission.\nAdmitting to inpatient neurology/neurosurgery service for further workup as above. Family at bedside,\nupdated on findings and plan, and consented for admission. Seizure precautions in place.\n\nElectronically signed by Daniel R. Okafor, DO\nEncounter signed 04/20/2026 17:15 EST | Dayton Regional ED Track v8.0"
+      }
     ],
-    demoPoints: ['Multi-document patient packet', 'Seizure workup with structural lesion', 'Urgent neurosurgery consideration'],
+    "demoPoints": [
+      "Multi-document patient packet",
+      "Seizure workup with structural lesion",
+      "Urgent neurosurgery consideration"
+    ]
   },
   {
-    id: 'packet-nakamura',
-    patientName: 'Nakamura, Eleanor',
-    age: 31,
-    sex: 'F',
-    category: 'packet',
-    referringSpecialty: 'Family Medicine',
-    briefDescription: 'Progressive weakness, numbness, vision changes. Full MS diagnostic workup.',
-    clinicalHighlight: 'Multiple sclerosis (complete McDonald criteria)',
-    expectedTier: 'urgent',
-    files: [
+    "id": "packet-nakamura",
+    "patientName": "Nakamura, Eleanor",
+    "age": 31,
+    "sex": "F",
+    "category": "packet",
+    "referringSpecialty": "Family Medicine",
+    "briefDescription": "Progressive weakness, numbness, vision changes. Full MS diagnostic workup.",
+    "clinicalHighlight": "Multiple sclerosis (complete McDonald criteria)",
+    "expectedTier": "urgent",
+    "files": [
       {
-        filename: '01_PCP_Referral.pdf',
-        path: '/samples/triage/packets/nakamura-eleanor/01_PCP_Referral.pdf',
-        docType: 'PCP Referral',
-        previewText: `Harbor View Family Medicine
-4422 Pacific Coast Hwy, Suite B, Long Beach, CA 90804
-Phone: (562) 555-0271 | Fax: (562) 555-0272
-
-Patient: Eleanor K. Nakamura
-
-Date: 01/20/2026
-
-DOB: 06/15/1994
-
-Provider: Carmen Rodriguez, MD
-
-MRN: HVFM-0041903
-
-Specialty: Family Medicine
-
-CHIEF COMPLAINT
-Bilateral leg weakness, right eye vision problem last month, extreme fatigue.
-
-HISTORY OF PRESENT ILLNESS
-Ms. Nakamura is a 31-year-old Japanese-American female with no significant past medical history who presents with
-several weeks of bilateral lower extremity weakness and fatigue. She also reports an episode approximately 6 weeks ago of
-blurry vision and pain with eye movement in her right eye that lasted about 10 days and then mostly resolved — she did not
-seek care at that time. Current vision is described as 'almost back to normal' but colors seem slightly washed out in the right
-eye.
-She has had progressive bilateral leg heaviness and weakness over the past 4 weeks, worse in the afternoons and with
-heat (she noticed it dramatically worsens after a hot shower). She has difficulty climbing stairs and has tripped twice. She is
-a high school teacher and has been calling in sick frequently. She also reports a band-like tightness around her
-mid-abdomen that started 3 weeks ago. She has had urinary urgency with two episodes of incontinence, which she finds
-very distressing.
-She denies back pain, recent illness, rash, joint pain, or family history of neurological disease. She is on no medications.
-She is a non-smoker and drinks socially.
-
-PHYSICAL EXAM
-Vitals: BP 118/74, HR 76, Temp 98.3, Wt 138 lbs
-General: Alert, appears fatigued, mildly anxious.
-Eyes: Visual acuity OD 20/40, OS 20/20. Mild RAPD right eye. Color vision (Ishihara): OD 6/12 plates correct, OS 12/12.
-Fundoscopy: optic disc OD appears slightly pale — subtle.
-Motor: Hip flexors 4/5 bilaterally, knee extensors 4+/5 bilaterally. Ankles 5/5. Upper extremities 5/5.
-Reflexes: Bilateral patellar 3+, bilateral ankle 3+. Bilateral Babinski present. Hoffman's bilateral.
-Sensation: Vibration mildly reduced bilateral feet. Pinprick intact. Lhermitte's sign: patient reports electric sensation down
-spine with neck flexion.
-Gait: Mildly spastic, circumduction of right leg.
-
-ASSESSMENT AND PLAN
-1. Suspected demyelinating disease — probable multiple sclerosis (G35, provisional)
-This presentation is very concerning: young woman with subacute bilateral upper motor neuron signs in the legs, prior
-episode clinically consistent with optic neuritis (right eye pain, vision loss over days, partial recovery, now RAPD and
-reduced color vision), Lhermitte's sign, Uhthoff's phenomenon (heat sensitivity), urinary symptoms, and sensory level. This
-represents clinical dissemination in both time and space.
-Urgent neurology referral placed — requesting expedited appointment. Ordered MRI brain and cervical spine with and
-without contrast today (ordered as outpatient but marked urgent). Also ordering CBC, CMP, TSH, B12, ANA,
-NMO-IgG/MOG antibodies, ESR, CRP, and VEP referral.
-Counseled patient that this is serious and requires specialist evaluation. She is understandably frightened. Provided MS
-Society patient education materials. Told her not to take hot baths.
-
-Electronically signed by: Carmen Rodriguez, MD
-Signed 01/20/2026 17:10 PST | Harbor View FHR EHR`,
+        "filename": "01_PCP_Referral.pdf",
+        "path": "/samples/triage/packets/nakamura-eleanor/01_PCP_Referral.pdf",
+        "docType": "PCP Referral",
+        "previewText": "Harbor View Family Medicine\n4422 Pacific Coast Hwy, Suite B, Long Beach, CA 90804\nPhone: (562) 555-0271 | Fax: (562) 555-0272\n\nPatient: Eleanor K. Nakamura\n\nDate: 01/20/2026\n\nDOB: 06/15/1994\n\nProvider: Carmen Rodriguez, MD\n\nMRN: HVFM-0041903\n\nSpecialty: Family Medicine\n\nCHIEF COMPLAINT\nBilateral leg weakness, right eye vision problem last month, extreme fatigue.\n\nHISTORY OF PRESENT ILLNESS\nMs. Nakamura is a 31-year-old Japanese-American female with no significant past medical history who presents with\nseveral weeks of bilateral lower extremity weakness and fatigue. She also reports an episode approximately 6 weeks ago of\nblurry vision and pain with eye movement in her right eye that lasted about 10 days and then mostly resolved — she did not\nseek care at that time. Current vision is described as 'almost back to normal' but colors seem slightly washed out in the right\neye.\nShe has had progressive bilateral leg heaviness and weakness over the past 4 weeks, worse in the afternoons and with\nheat (she noticed it dramatically worsens after a hot shower). She has difficulty climbing stairs and has tripped twice. She is\na high school teacher and has been calling in sick frequently. She also reports a band-like tightness around her\nmid-abdomen that started 3 weeks ago. She has had urinary urgency with two episodes of incontinence, which she finds\nvery distressing.\nShe denies back pain, recent illness, rash, joint pain, or family history of neurological disease. She is on no medications.\nShe is a non-smoker and drinks socially.\n\nPHYSICAL EXAM\nVitals: BP 118/74, HR 76, Temp 98.3, Wt 138 lbs\nGeneral: Alert, appears fatigued, mildly anxious.\nEyes: Visual acuity OD 20/40, OS 20/20. Mild RAPD right eye. Color vision (Ishihara): OD 6/12 plates correct, OS 12/12.\nFundoscopy: optic disc OD appears slightly pale — subtle.\nMotor: Hip flexors 4/5 bilaterally, knee extensors 4+/5 bilaterally. Ankles 5/5. Upper extremities 5/5.\nReflexes: Bilateral patellar 3+, bilateral ankle 3+. Bilateral Babinski present. Hoffman's bilateral.\nSensation: Vibration mildly reduced bilateral feet. Pinprick intact. Lhermitte's sign: patient reports electric sensation down\nspine with neck flexion.\nGait: Mildly spastic, circumduction of right leg.\n\nASSESSMENT AND PLAN\n1. Suspected demyelinating disease — probable multiple sclerosis (G35, provisional)\nThis presentation is very concerning: young woman with subacute bilateral upper motor neuron signs in the legs, prior\nepisode clinically consistent with optic neuritis (right eye pain, vision loss over days, partial recovery, now RAPD and\nreduced color vision), Lhermitte's sign, Uhthoff's phenomenon (heat sensitivity), urinary symptoms, and sensory level. This\nrepresents clinical dissemination in both time and space.\nUrgent neurology referral placed — requesting expedited appointment. Ordered MRI brain and cervical spine with and\nwithout contrast today (ordered as outpatient but marked urgent). Also ordering CBC, CMP, TSH, B12, ANA,\nNMO-IgG/MOG antibodies, ESR, CRP, and VEP referral.\nCounseled patient that this is serious and requires specialist evaluation. She is understandably frightened. Provided MS\nSociety patient education materials. Told her not to take hot baths.\n\nElectronically signed by: Carmen Rodriguez, MD\nSigned 01/20/2026 17:10 PST | Harbor View FHR EHR"
       },
       {
-        filename: '02_MRI_Brain_Report.pdf',
-        path: '/samples/triage/packets/nakamura-eleanor/02_MRI_Brain_Report.pdf',
-        docType: 'MRI Brain Report',
-        previewText: `Pacific Neuroimaging Center
-3100 Wilshire Blvd, Suite 700, Los Angeles, CA 90010
-Phone: (213) 555-0440 | Fax: (213) 555-0441
-
-RADIOLOGY REPORT
-Patient: Eleanor K. Nakamura
-
-DOB: 06/15/1994
-
-MRN: HVFM-0041903
-
-Exam Date: 01/22/2026 14:30
-
-Ordering MD: Carmen Rodriguez, MD
-
-Accession: PNC-MR-20260122-3301
-
-EXAM
-MRI BRAIN WITH AND WITHOUT GADOLINIUM CONTRAST
-CLINICAL INDICATION
-31-year-old female with right eye vision loss (partial recovery), bilateral leg weakness, upper motor neuron signs,
-Lhermitte's sign. Rule out demyelinating disease.
-TECHNIQUE
-Multiplanar, multisequence MRI brain performed at 3T. Sequences: sagittal T1, axial FLAIR, axial T2, axial DWI/ADC, axial
-T2*, sagittal MPRAGE pre- and post-contrast, axial T1 post-contrast. Gadavist 0.1 mmol/kg IV administered.
-COMPARISON
-No prior MRI available.
-FINDINGS
-White matter: Multiple T2/FLAIR hyperintense lesions are identified, as follows:
-- Periventricular: At least 6 ovoid lesions oriented perpendicular to the lateral ventricles (Dawson's fingers appearance),
-largest measuring 12 x 6 mm in the left periventricular region.
-- Juxtacortical: 3 lesions at the gray-white junction, right frontal (2) and left parietal (1).
-- Infratentorial: One 5 mm lesion in the right middle cerebellar peduncle.
-- Deep white matter: 2 additional lesions in the bilateral centrum semiovale.
-Total: At least 12 discrete white matter lesions.
-Contrast enhancement: Two lesions demonstrate ring enhancement: one periventricular left (12 x 6 mm) and one
-juxtacortical right frontal (8 x 4 mm). Enhancement pattern is consistent with active/recent demyelinating plaques (<6
-weeks).
-Corpus callosum: Multiple T2 lesions along the undersurface of the corpus callosum (callososeptal interface), highly
-characteristic of MS.
-Optic nerves: Right optic nerve shows subtle T2 signal increase and mild enhancement on fat-saturated coronal
-post-contrast sequence — consistent with resolving optic neuritis.
-Gray matter, cortex: No cortical lesions identified on DIR sequence. No atrophy.
-Posterior fossa, brainstem: Right MCP lesion as above. No other brainstem lesions.
-Ventricles/CSF: Normal. No hydrocephalus.
-Vascular: No territorial infarction. No mass effect or midline shift.
-
-IMPRESSION
-1. Multiple T2/FLAIR white matter lesions in a distribution highly characteristic of multiple sclerosis: periventricular
-(Dawson's fingers), juxtacortical, infratentorial, and corpus callosum involvement — satisfying MAGNIMS 2016 criteria for
-dissemination in space.
-2. Two actively enhancing lesions consistent with acute/subacute demyelinating plaques, indicating recent disease
-activity.
-3. Right optic nerve T2 signal change and enhancement consistent with right optic neuritis, correlating with clinical history.
-4. Findings are consistent with McDonald 2017 criteria for diagnosis of MS when combined with clinical history of prior
-optic neuritis and current presentation.
-
-5. CSF analysis (for oligoclonal bands) and spinal cord MRI recommended for complete workup.
-
-Electronically attested by: Rachel Kim, MD — Neuroradiology
-Read and attested 01/22/2026 18:45 PST | PNC Radiology System`,
+        "filename": "02_MRI_Brain_Report.pdf",
+        "path": "/samples/triage/packets/nakamura-eleanor/02_MRI_Brain_Report.pdf",
+        "docType": "MRI Brain Report",
+        "previewText": "Pacific Neuroimaging Center\n3100 Wilshire Blvd, Suite 700, Los Angeles, CA 90010\nPhone: (213) 555-0440 | Fax: (213) 555-0441\n\nRADIOLOGY REPORT\nPatient: Eleanor K. Nakamura\n\nDOB: 06/15/1994\n\nMRN: HVFM-0041903\n\nExam Date: 01/22/2026 14:30\n\nOrdering MD: Carmen Rodriguez, MD\n\nAccession: PNC-MR-20260122-3301\n\nEXAM\nMRI BRAIN WITH AND WITHOUT GADOLINIUM CONTRAST\nCLINICAL INDICATION\n31-year-old female with right eye vision loss (partial recovery), bilateral leg weakness, upper motor neuron signs,\nLhermitte's sign. Rule out demyelinating disease.\nTECHNIQUE\nMultiplanar, multisequence MRI brain performed at 3T. Sequences: sagittal T1, axial FLAIR, axial T2, axial DWI/ADC, axial\nT2*, sagittal MPRAGE pre- and post-contrast, axial T1 post-contrast. Gadavist 0.1 mmol/kg IV administered.\nCOMPARISON\nNo prior MRI available.\nFINDINGS\nWhite matter: Multiple T2/FLAIR hyperintense lesions are identified, as follows:\n- Periventricular: At least 6 ovoid lesions oriented perpendicular to the lateral ventricles (Dawson's fingers appearance),\nlargest measuring 12 x 6 mm in the left periventricular region.\n- Juxtacortical: 3 lesions at the gray-white junction, right frontal (2) and left parietal (1).\n- Infratentorial: One 5 mm lesion in the right middle cerebellar peduncle.\n- Deep white matter: 2 additional lesions in the bilateral centrum semiovale.\nTotal: At least 12 discrete white matter lesions.\nContrast enhancement: Two lesions demonstrate ring enhancement: one periventricular left (12 x 6 mm) and one\njuxtacortical right frontal (8 x 4 mm). Enhancement pattern is consistent with active/recent demyelinating plaques (<6\nweeks).\nCorpus callosum: Multiple T2 lesions along the undersurface of the corpus callosum (callososeptal interface), highly\ncharacteristic of MS.\nOptic nerves: Right optic nerve shows subtle T2 signal increase and mild enhancement on fat-saturated coronal\npost-contrast sequence — consistent with resolving optic neuritis.\nGray matter, cortex: No cortical lesions identified on DIR sequence. No atrophy.\nPosterior fossa, brainstem: Right MCP lesion as above. No other brainstem lesions.\nVentricles/CSF: Normal. No hydrocephalus.\nVascular: No territorial infarction. No mass effect or midline shift.\n\nIMPRESSION\n1. Multiple T2/FLAIR white matter lesions in a distribution highly characteristic of multiple sclerosis: periventricular\n(Dawson's fingers), juxtacortical, infratentorial, and corpus callosum involvement — satisfying MAGNIMS 2016 criteria for\ndissemination in space.\n2. Two actively enhancing lesions consistent with acute/subacute demyelinating plaques, indicating recent disease\nactivity.\n3. Right optic nerve T2 signal change and enhancement consistent with right optic neuritis, correlating with clinical history.\n4. Findings are consistent with McDonald 2017 criteria for diagnosis of MS when combined with clinical history of prior\noptic neuritis and current presentation.\n\n\f5. CSF analysis (for oligoclonal bands) and spinal cord MRI recommended for complete workup.\n\nElectronically attested by: Rachel Kim, MD — Neuroradiology\nRead and attested 01/22/2026 18:45 PST | PNC Radiology System"
       },
       {
-        filename: '03_MRI_Cervical_Thoracic_Spine_Report.pdf',
-        path: '/samples/triage/packets/nakamura-eleanor/03_MRI_Cervical_Thoracic_Spine_Report.pdf',
-        docType: 'MRI Spine Report',
-        previewText: `Pacific Neuroimaging Center
-3100 Wilshire Blvd, Suite 700, Los Angeles, CA 90010
-Phone: (213) 555-0440 | Fax: (213) 555-0441
-
-RADIOLOGY REPORT
-Patient: Eleanor K. Nakamura
-
-DOB: 06/15/1994
-
-MRN: HVFM-0041903
-
-Exam Date: 01/22/2026 15:20
-
-Ordering MD: Carmen Rodriguez, MD
-
-Accession: PNC-MR-20260122-3302
-
-EXAM
-MRI CERVICAL AND THORACIC SPINE WITH AND WITHOUT GADOLINIUM CONTRAST
-CLINICAL INDICATION
-Same as MRI brain above. Evaluate for spinal cord demyelinating lesions.
-TECHNIQUE
-Sagittal T1, T2, STIR, and axial T2 sequences cervical and thoracic spine at 3T. Post-contrast sagittal and axial T1
-sequences obtained.
-FINDINGS
-Cervical spine alignment: Normal lordotic curvature. No fracture or subluxation.
-Cervical cord: A single focal T2 hyperintense lesion measuring 8 x 3 mm is identified within the posterior right hemicord at
-the C4 level. The lesion spans less than 2 vertebral segments in length. No cord expansion or swelling. No abnormal
-enhancement post-contrast (this lesion is therefore not acutely active). No cord atrophy.
-Cervical disc spaces: Mild C5-C6 disc dessication without significant canal or foraminal stenosis. No cord compression.
-Thoracic spine: Thoracic cord normal in caliber and signal. One small 4 mm T2 hyperintense lesion in the posterior
-thoracic cord at T6 level — morphology similar to cervical lesion. No enhancement. No compression.
-Vertebral bodies: Normal marrow signal. No compression fractures.
-
-IMPRESSION
-1. Single right posterior cervical cord lesion at C4 (8 x 3 mm), T2 hyperintense, non-enhancing, less than 2 vertebral
-segments — morphologically consistent with a non-active demyelinating plaque. Satisfies spinal cord dissemination in
-space criteria per MAGNIMS 2016.
-2. Probable additional small demyelinating lesion at T6 level.
-3. No acute cord compression or myelopathy from structural cause.
-4. Combined with brain MRI findings, the overall imaging supports a diagnosis of multiple sclerosis with dissemination in
-space (brain, spinal cord, optic nerve) and in time (enhancing and non-enhancing lesions).
-
-Electronically attested by: Rachel Kim, MD — Neuroradiology
-Read and attested 01/22/2026 19:10 PST | PNC Radiology System`,
+        "filename": "03_MRI_Cervical_Thoracic_Spine_Report.pdf",
+        "path": "/samples/triage/packets/nakamura-eleanor/03_MRI_Cervical_Thoracic_Spine_Report.pdf",
+        "docType": "MRI Spine Report",
+        "previewText": "Pacific Neuroimaging Center\n3100 Wilshire Blvd, Suite 700, Los Angeles, CA 90010\nPhone: (213) 555-0440 | Fax: (213) 555-0441\n\nRADIOLOGY REPORT\nPatient: Eleanor K. Nakamura\n\nDOB: 06/15/1994\n\nMRN: HVFM-0041903\n\nExam Date: 01/22/2026 15:20\n\nOrdering MD: Carmen Rodriguez, MD\n\nAccession: PNC-MR-20260122-3302\n\nEXAM\nMRI CERVICAL AND THORACIC SPINE WITH AND WITHOUT GADOLINIUM CONTRAST\nCLINICAL INDICATION\nSame as MRI brain above. Evaluate for spinal cord demyelinating lesions.\nTECHNIQUE\nSagittal T1, T2, STIR, and axial T2 sequences cervical and thoracic spine at 3T. Post-contrast sagittal and axial T1\nsequences obtained.\nFINDINGS\nCervical spine alignment: Normal lordotic curvature. No fracture or subluxation.\nCervical cord: A single focal T2 hyperintense lesion measuring 8 x 3 mm is identified within the posterior right hemicord at\nthe C4 level. The lesion spans less than 2 vertebral segments in length. No cord expansion or swelling. No abnormal\nenhancement post-contrast (this lesion is therefore not acutely active). No cord atrophy.\nCervical disc spaces: Mild C5-C6 disc dessication without significant canal or foraminal stenosis. No cord compression.\nThoracic spine: Thoracic cord normal in caliber and signal. One small 4 mm T2 hyperintense lesion in the posterior\nthoracic cord at T6 level — morphology similar to cervical lesion. No enhancement. No compression.\nVertebral bodies: Normal marrow signal. No compression fractures.\n\nIMPRESSION\n1. Single right posterior cervical cord lesion at C4 (8 x 3 mm), T2 hyperintense, non-enhancing, less than 2 vertebral\nsegments — morphologically consistent with a non-active demyelinating plaque. Satisfies spinal cord dissemination in\nspace criteria per MAGNIMS 2016.\n2. Probable additional small demyelinating lesion at T6 level.\n3. No acute cord compression or myelopathy from structural cause.\n4. Combined with brain MRI findings, the overall imaging supports a diagnosis of multiple sclerosis with dissemination in\nspace (brain, spinal cord, optic nerve) and in time (enhancing and non-enhancing lesions).\n\nElectronically attested by: Rachel Kim, MD — Neuroradiology\nRead and attested 01/22/2026 19:10 PST | PNC Radiology System"
       },
       {
-        filename: '04_VEP_Report.pdf',
-        path: '/samples/triage/packets/nakamura-eleanor/04_VEP_Report.pdf',
-        docType: 'VEP Report',
-        previewText: `Pacific Neuroimaging Center — Neurophysiology Division
-3100 Wilshire Blvd, Suite 700, Los Angeles, CA 90010
-Phone: (213) 555-0440 | Fax: (213) 555-0441
-
-VISUAL EVOKED POTENTIAL (VEP) REPORT
-Patient: Eleanor K. Nakamura
-
-DOB: 06/15/1994
-
-MRN: HVFM-0041903
-
-Exam Date: 01/28/2026 10:00
-
-Ordering MD: Sarah Chen, MD (Neurology)
-
-Accession: PNC-VEP-20260128-0214
-
-CLINICAL INDICATION
-Suspected right optic neuritis. Prior visual symptoms right eye. Evaluate optic nerve conduction.
-TECHNIQUE
-Pattern-reversal VEP performed using standard checkerboard stimulus (60' and 15' check sizes) at 2 reversals/second.
-Electrode placement: Oz, O1, O2, MO, Cz (referential montage). Each eye tested separately with the other eye patched.
-Corrective lenses worn. Room luminance controlled. 200 averages per trial; trials repeated for reproducibility.
-RESULTS
-Right Eye (OD):
-P100 latency: 126 ms (normal ≤115 ms) — PROLONGED
-P100 amplitude: 4.2 µV (low-normal; normal ≥4 µV)
-Waveform morphology: Present but broadened.
-Left Eye (OS):
-P100 latency: 104 ms (normal ≤115 ms) — NORMAL
-P100 amplitude: 9.8 µV — Normal
-Waveform morphology: Normal.
-Interocular latency difference: 22 ms (abnormal; normal ≤8 ms)
-
-IMPRESSION
-1. ABNORMAL Visual Evoked Potentials.
-2. Prolonged P100 latency right eye (126 ms) with significant interocular asymmetry (22 ms difference), consistent with
-right optic nerve demyelination.
-3. Left eye VEP normal.
-4. Findings are consistent with prior right optic neuritis with residual conduction delay, correlating with the clinical history
-and MRI optic nerve findings. This constitutes objective paraclinical evidence supporting the diagnosis of multiple
-sclerosis.
-
-Electronically attested by: James Park, PhD — Clinical Neurophysiology
-Reviewed by: Sarah Chen, MD (Neurology) | Attested 01/28/2026 15:00 PST`,
+        "filename": "04_VEP_Report.pdf",
+        "path": "/samples/triage/packets/nakamura-eleanor/04_VEP_Report.pdf",
+        "docType": "VEP Report",
+        "previewText": "Pacific Neuroimaging Center — Neurophysiology Division\n3100 Wilshire Blvd, Suite 700, Los Angeles, CA 90010\nPhone: (213) 555-0440 | Fax: (213) 555-0441\n\nVISUAL EVOKED POTENTIAL (VEP) REPORT\nPatient: Eleanor K. Nakamura\n\nDOB: 06/15/1994\n\nMRN: HVFM-0041903\n\nExam Date: 01/28/2026 10:00\n\nOrdering MD: Sarah Chen, MD (Neurology)\n\nAccession: PNC-VEP-20260128-0214\n\nCLINICAL INDICATION\nSuspected right optic neuritis. Prior visual symptoms right eye. Evaluate optic nerve conduction.\nTECHNIQUE\nPattern-reversal VEP performed using standard checkerboard stimulus (60' and 15' check sizes) at 2 reversals/second.\nElectrode placement: Oz, O1, O2, MO, Cz (referential montage). Each eye tested separately with the other eye patched.\nCorrective lenses worn. Room luminance controlled. 200 averages per trial; trials repeated for reproducibility.\nRESULTS\nRight Eye (OD):\nP100 latency: 126 ms (normal ≤115 ms) — PROLONGED\nP100 amplitude: 4.2 µV (low-normal; normal ≥4 µV)\nWaveform morphology: Present but broadened.\nLeft Eye (OS):\nP100 latency: 104 ms (normal ≤115 ms) — NORMAL\nP100 amplitude: 9.8 µV — Normal\nWaveform morphology: Normal.\nInterocular latency difference: 22 ms (abnormal; normal ≤8 ms)\n\nIMPRESSION\n1. ABNORMAL Visual Evoked Potentials.\n2. Prolonged P100 latency right eye (126 ms) with significant interocular asymmetry (22 ms difference), consistent with\nright optic nerve demyelination.\n3. Left eye VEP normal.\n4. Findings are consistent with prior right optic neuritis with residual conduction delay, correlating with the clinical history\nand MRI optic nerve findings. This constitutes objective paraclinical evidence supporting the diagnosis of multiple\nsclerosis.\n\nElectronically attested by: James Park, PhD — Clinical Neurophysiology\nReviewed by: Sarah Chen, MD (Neurology) | Attested 01/28/2026 15:00 PST"
       },
       {
-        filename: '05_CSF_LP_Results.pdf',
-        path: '/samples/triage/packets/nakamura-eleanor/05_CSF_LP_Results.pdf',
-        docType: 'CSF/LP Results',
-        previewText: `UCLA Health Laboratory — Cerebrospinal Fluid Analysis
-757 Westwood Plaza, Los Angeles, CA 90095 | CLIA #05D0644312
-Phone: (310) 555-0900 | Fax: (310) 555-0901
-
-CEREBROSPINAL FLUID (CSF) ANALYSIS REPORT
-Patient: Eleanor K. Nakamura
-
-DOB: 06/15/1994
-
-MRN: HVFM-0041903
-
-Exam Date: 01/29/2026 08:45
-
-Ordering MD: Sarah Chen, MD (Neurology)
-
-Accession: UCLA-CSF-20260129-1109
-
-PROCEDURE NOTE
-Lumbar puncture performed at L3-L4 under fluoroscopic guidance by Dr. Chen. Patient in lateral decubitus position.
-Opening pressure measured. 15 mL CSF collected in sequential numbered tubes. No complications. Patient tolerated
-procedure well.
-OPENING PRESSURE & APPEARANCE
-Test
-
-Result
-
-Reference
-
-Flag
-
-Opening Pressure
-
-16 cmH2O
-
-≤20 cmH2O
-
-Appearance
-
-Clear, colorless
-
-Clear, colorless
-
-Xanthochromia
-
-Absent
-
-Absent
-
-Test
-
-Result
-
-Reference
-
-WBC
-
-3
-
-0-5 cells/µL
-
-RBC
-
-2
-
-0-5 cells/µL (traumatic tap
-excluded)
-
-Differential — Lymphocytes
-
-90%
-
-60-80% of WBC (upper limit)
-
-Differential — Monocytes
-
-10%
-
-15-45%
-
-Differential — Neutrophils
-
-0%
-
-0-6%
-
-Test
-
-Result
-
-Reference
-
-Glucose (CSF)
-
-62 mg/dL
-
-45-80 mg/dL (serum 94 mg/dL)
-
-CSF/Serum Glucose Ratio
-
-0.66
-
-≥0.60
-
-Total Protein
-
-48 mg/dL
-
-15-45 mg/dL
-
-Albumin (CSF)
-
-22 mg/dL
-
-10-30 mg/dL
-
-IgG (CSF)
-
-8.4 mg/dL
-
-0.8-6.0 mg/dL
-
-H
-
-IgG Index
-
-0.82
-
-<0.70 (elevated indicates
-intrathecal IgG production)
-
-H
-
-Test
-
-Result
-
-Reference
-
-Flag
-
-Serum OCBs
-
-1 band
-
-—
-
-CSF OCBs
-
-5 bands
-
-—
-
-H
-
-Unique CSF bands (not in serum)
-
-4
-
-0-1 (positive threshold: ≥2 unique
-bands)
-
-H
-
-Interpretation
-
-POSITIVE —
-intrathecal IgG
-synthesis
-
-—
-
-H
-
-CELL COUNTS
-Flag
-
-CHEMISTRY
-Flag
-
-H
-
-OLIGOCLONAL BANDS (Isoelectric Focusing)
-
-OTHER
-Test
-
-Result
-
-Reference
-
-Myelin Basic Protein (MBP)
-
-3.8 ng/mL
-
-<4.0 ng/mL — high-normal
-
-Culture and Gram Stain
-
-No growth / No
-organisms
-
-Negative
-
-VDRL (CSF)
-
-Nonreactive
-
-Nonreactive
-
-Cytology
-
-No malignant cells
-
-Negative
-
-Flag
-
-INTERPRETATION: CSF profile consistent with intrathecal IgG synthesis: elevated IgG index (0.82) and 4 unique
-oligoclonal bands not present in serum. These findings, in conjunction with clinical presentation and MRI results, support
-the diagnosis of multiple sclerosis. Mildly elevated protein and slightly elevated lymphocyte percentage are consistent with
-active demyelination. No evidence of infection or malignancy.
-
-Electronically attested by: Lisa Wong, MD, PhD — Neuropathology / CSF Laboratory
-Authorized 01/29/2026 16:30 PST | UCLA Health Lab`,
-      },
+        "filename": "05_CSF_LP_Results.pdf",
+        "path": "/samples/triage/packets/nakamura-eleanor/05_CSF_LP_Results.pdf",
+        "docType": "CSF/LP Results",
+        "previewText": "UCLA Health Laboratory — Cerebrospinal Fluid Analysis\n757 Westwood Plaza, Los Angeles, CA 90095 | CLIA #05D0644312\nPhone: (310) 555-0900 | Fax: (310) 555-0901\n\nCEREBROSPINAL FLUID (CSF) ANALYSIS REPORT\nPatient: Eleanor K. Nakamura\n\nDOB: 06/15/1994\n\nMRN: HVFM-0041903\n\nExam Date: 01/29/2026 08:45\n\nOrdering MD: Sarah Chen, MD (Neurology)\n\nAccession: UCLA-CSF-20260129-1109\n\nPROCEDURE NOTE\nLumbar puncture performed at L3-L4 under fluoroscopic guidance by Dr. Chen. Patient in lateral decubitus position.\nOpening pressure measured. 15 mL CSF collected in sequential numbered tubes. No complications. Patient tolerated\nprocedure well.\nOPENING PRESSURE & APPEARANCE\nTest\n\nResult\n\nReference\n\nFlag\n\nOpening Pressure\n\n16 cmH2O\n\n≤20 cmH2O\n\nAppearance\n\nClear, colorless\n\nClear, colorless\n\nXanthochromia\n\nAbsent\n\nAbsent\n\nTest\n\nResult\n\nReference\n\nWBC\n\n3\n\n0-5 cells/µL\n\nRBC\n\n2\n\n0-5 cells/µL (traumatic tap\nexcluded)\n\nDifferential — Lymphocytes\n\n90%\n\n60-80% of WBC (upper limit)\n\nDifferential — Monocytes\n\n10%\n\n15-45%\n\nDifferential — Neutrophils\n\n0%\n\n0-6%\n\nTest\n\nResult\n\nReference\n\nGlucose (CSF)\n\n62 mg/dL\n\n45-80 mg/dL (serum 94 mg/dL)\n\nCSF/Serum Glucose Ratio\n\n0.66\n\n≥0.60\n\nTotal Protein\n\n48 mg/dL\n\n15-45 mg/dL\n\nAlbumin (CSF)\n\n22 mg/dL\n\n10-30 mg/dL\n\nIgG (CSF)\n\n8.4 mg/dL\n\n0.8-6.0 mg/dL\n\nH\n\nIgG Index\n\n0.82\n\n<0.70 (elevated indicates\nintrathecal IgG production)\n\nH\n\nTest\n\nResult\n\nReference\n\nFlag\n\nSerum OCBs\n\n1 band\n\n—\n\nCSF OCBs\n\n5 bands\n\n—\n\nH\n\nUnique CSF bands (not in serum)\n\n4\n\n0-1 (positive threshold: ≥2 unique\nbands)\n\nH\n\nInterpretation\n\nPOSITIVE —\nintrathecal IgG\nsynthesis\n\n—\n\nH\n\nCELL COUNTS\nFlag\n\nCHEMISTRY\nFlag\n\nH\n\nOLIGOCLONAL BANDS (Isoelectric Focusing)\n\n\fOTHER\nTest\n\nResult\n\nReference\n\nMyelin Basic Protein (MBP)\n\n3.8 ng/mL\n\n<4.0 ng/mL — high-normal\n\nCulture and Gram Stain\n\nNo growth / No\norganisms\n\nNegative\n\nVDRL (CSF)\n\nNonreactive\n\nNonreactive\n\nCytology\n\nNo malignant cells\n\nNegative\n\nFlag\n\nINTERPRETATION: CSF profile consistent with intrathecal IgG synthesis: elevated IgG index (0.82) and 4 unique\noligoclonal bands not present in serum. These findings, in conjunction with clinical presentation and MRI results, support\nthe diagnosis of multiple sclerosis. Mildly elevated protein and slightly elevated lymphocyte percentage are consistent with\nactive demyelination. No evidence of infection or malignancy.\n\nElectronically attested by: Lisa Wong, MD, PhD — Neuropathology / CSF Laboratory\nAuthorized 01/29/2026 16:30 PST | UCLA Health Lab"
+      }
     ],
-    demoPoints: ['Multi-document patient packet', 'MS diagnostic workup', 'MRI + VEP + CSF fusion'],
+    "demoPoints": [
+      "Multi-document patient packet",
+      "MS diagnostic workup",
+      "MRI + VEP + CSF fusion"
+    ]
   },
   {
-    id: 'packet-reyes',
-    patientName: 'Reyes, Carlos',
-    age: 19,
-    sex: 'M',
-    category: 'packet',
-    referringSpecialty: 'Emergency Medicine',
-    briefDescription: 'College student with first GTC seizure during finals. ED workup with EEG showing generalized epileptiform discharges.',
-    clinicalHighlight: 'First seizure — genetic generalized epilepsy (JME pattern)',
-    expectedTier: 'urgent',
-    files: [
+    "id": "packet-reyes",
+    "patientName": "Reyes, Carlos",
+    "age": 19,
+    "sex": "M",
+    "category": "packet",
+    "referringSpecialty": "Emergency Medicine",
+    "briefDescription": "College student with first GTC seizure during finals. ED workup with EEG showing generalized epileptiform discharges.",
+    "clinicalHighlight": "First seizure — genetic generalized epilepsy (JME pattern)",
+    "expectedTier": "urgent",
+    "files": [
       {
-        filename: '01_ED_Note.pdf',
-        path: '/samples/triage/packets/reyes-carlos/01_ED_Note.pdf',
-        docType: 'ED Note',
-        previewText: `St. Catherine Medical Center — Emergency Department
-2100 S. Western Ave, Chicago, IL 60608 | Level II Trauma Center
-Phone: (312) 555-0700 | Fax: (312) 555-0701
-
-Patient: Carlos E. Reyes
-
-Date: 01/25/2026
-
-DOB: 10/05/1988
-
-Provider: Patricia Eng, MD
-
-MRN: SCM-0339147
-
-Specialty: Emergency Medicine
-
-CHIEF COMPLAINT
-Witnessed seizure — brought in by girlfriend.
-
-HISTORY OF PRESENT ILLNESS
-Mr. Reyes is a 37-year-old male with no known medical history who presents after a witnessed generalized tonic-clonic
-seizure at home. Per girlfriend: He was watching TV when he suddenly let out a cry, went stiff, then started shaking
-rhythmically in all four limbs. She estimates the convulsion lasted 2 minutes. He was unresponsive during the event. She
-rolled him onto his side. He was incontinent of urine. After the shaking stopped he was confused and combative for
-approximately 15 minutes, then became very sleepy. She called 911. He bit the right side of his tongue.
-Patient himself has no recall of the event. He says he felt 'fine' before it happened. He denies any prodrome of aura, smell,
-or visual changes. He denies prior episodes. He does report poor sleep this past week due to work stress and consumed
-4-5 beers the night before. He denies illicit drug use. He smokes half a pack per day. No family history of epilepsy. Takes no
-medications. No recent head trauma or illness. No prior CT or MRI of the brain.
-
-PHYSICAL EXAM
-Vitals (on arrival): BP 148/92, HR 110, Temp 37.2°C, O2 sat 98% RA, RR 16
-General: Drowsy but arousable, oriented to self only initially. Improved to fully oriented x4 over 45 minutes.
-HEENT: Healing laceration right lateral tongue. No head trauma signs. PERRL, 3mm and reactive bilaterally.
-Cardiovascular: Tachycardic, regular. No murmurs.
-Neuro (post-ictal, on arrival): Drowsy, confused. No focal motor deficits. Moving all four extremities symmetrically. No
-gaze deviation. No nystagmus.
-Neuro (2 hours post-ictally): Alert and oriented x4. Cranial nerves intact. Motor 5/5 all extremities. Sensation intact.
-Reflexes 2+ and symmetric. Gait normal.
-
-ASSESSMENT AND PLAN
-1. First unprovoked generalized tonic-clonic seizure (R56.9)
-Classic witnessed GTC seizure with tongue bite, urinary incontinence, and postictal confusion. No clear provoking cause
-identified, though sleep deprivation and alcohol use are potential lowering factors. Neurological exam normal post-ictally.
-Workup:
-- CT head without contrast: obtained — results documented separately
-- BMP, CBC, glucose, LFTs, UDS, EtOH level: obtained — see labs
-- EEG: ordered as outpatient — see referral
-- MRI brain with/without contrast: ordered as outpatient
-- Counseled patient regarding seizure precautions: no driving, no swimming alone, no operating heavy machinery until
-cleared by neurology
-- Strongly advised alcohol reduction
-- No antiepileptic medication initiated — deferring to outpatient Neurology
-- Neurology referral placed; requesting appointment within 1-2 weeks
-- Return precautions given: return to ED for any recurrent episode
-Disposition: Discharged home with girlfriend after 4 hours of observation. Patient fully oriented at discharge, ambulating
-independently.
-
-Electronically signed by: Patricia Eng, MD
-Signed 01/25/2026 22:40 CST | St. Catherine ED EHR | Attending: Marcus Webb, MD`,
-      },
-      {
-        filename: '02_CT_Head_Report.pdf',
-        path: '/samples/triage/packets/reyes-carlos/02_CT_Head_Report.pdf',
-        docType: 'CT Head Report',
-        previewText: `University Radiology Group — St. Catherine Medical Center
-2100 S. Western Ave, Chicago, IL 60608
-Phone: (312) 555-0750 | Fax: (312) 555-0751
-
-RADIOLOGY REPORT
-Patient: Carlos E. Reyes
-
-DOB: 10/05/1988
-
-MRN: SCM-0339147
-
-Exam Date: 01/25/2026 21:15
-
-Ordering MD: Patricia Eng, MD
-
-Accession: SCM-R-20260125-4471
-
-EXAM
-CT HEAD WITHOUT CONTRAST
-CLINICAL INDICATION
-37-year-old male with first-time generalized seizure. Rule out intracranial pathology.
-TECHNIQUE
-Axial CT of the head performed without IV contrast using standard head protocol. 5 mm and 1.25 mm reconstructions in
-axial, coronal, and sagittal planes reviewed.
-COMPARISON
-None available.
-FINDINGS
-Brain parenchyma: No acute intracranial hemorrhage. No area of abnormal density to suggest infarction or contusion.
-Gray-white matter differentiation is preserved. No mass effect or midline shift.
-Ventricles/Cisterns: Ventricles are normal in size and configuration. Basal cisterns are patent. No hydrocephalus.
-Sulci/Cortex: Normal cortical sulcal pattern for age. No gyral swelling.
-Posterior fossa: Cerebellum, brainstem, and fourth ventricle appear unremarkable.
-Calvarium/Skull base: No fracture. No bony destructive lesion.
-Orbits/Paranasal sinuses: Mild mucosal thickening in bilateral maxillary sinuses, likely chronic/incidental. Orbits grossly
-unremarkable.
-
-IMPRESSION
-1. No acute intracranial hemorrhage, mass, or structural abnormality identified.
-2. No imaging evidence of acute infarction on non-contrast CT.
-3. Mild bilateral maxillary sinus mucosal thickening — incidental, clinically insignificant.
-Note: A normal non-contrast CT does not exclude subtle structural lesions (e.g., cortical dysplasia, low-grade neoplasm).
-MRI brain is recommended for comprehensive evaluation of new-onset seizure.
-
-Electronically attested by: Yuki Tanaka, MD, Diagnostic Radiology
-Read and attested 01/25/2026 23:05 CST | Accession SCM-R-20260125-4471`,
-      },
-      {
-        filename: '03_Lab_Results.pdf',
-        path: '/samples/triage/packets/reyes-carlos/03_Lab_Results.pdf',
-        docType: 'Lab Results',
-        previewText: `St. Catherine Medical Center — Laboratory Services
-2100 S. Western Ave, Chicago, IL 60608 | CLIA #14D0088440
-Phone: (312) 555-0760 | Fax: (312) 555-0761
-
-LABORATORY REPORT
-Patient: Carlos E. Reyes
-
-DOB: 10/05/1988
-
-MRN: SCM-0339147
-
-Exam Date: 01/25/2026 21:30
-
-Ordering MD: Patricia Eng, MD
-
-Accession: LAB-20260125-7821
-
-COLLECTION TIME: 01/25/2026 21:30 | REPORTED: 01/25/2026 22:55
-BASIC METABOLIC PANEL
-Test
-
-Result
-
-Reference Range
-
-Sodium
-
-138
-
-136-145 mEq/L
-
-Potassium
-
-3.9
-
-3.5-5.0 mEq/L
-
-Chloride
-
-101
-
-98-107 mEq/L
-
-CO2 (Bicarbonate)
-
-22
-
-22-29 mEq/L
-
-BUN
-
-14
-
-7-20 mg/dL
-
-Creatinine
-
-0.9
-
-0.7-1.3 mg/dL
-
-eGFR (CKD-EPI)
-
->60
-
-≥60 mL/min/1.73m²
-
-Glucose
-
-94
-
-70-99 mg/dL
-
-Calcium
-
-9.2
-
-8.5-10.2 mg/dL
-
-Test
-
-Result
-
-Reference Range
-
-WBC
-
-8.4
-
-4.5-11.0 K/µL
-
-RBC
-
-5.1
-
-4.5-5.9 M/µL
-
-Hemoglobin
-
-15.2
-
-13.5-17.5 g/dL
-
-Hematocrit
-
-44.8
-
-41-53%
-
-MCV
-
-88
-
-80-100 fL
-
-Platelets
-
-198
-
-150-400 K/µL
-
-Neutrophils %
-
-72
-
-40-75%
-
-Lymphocytes %
-
-22
-
-20-45%
-
-Test
-
-Result
-
-Reference Range
-
-AST
-
-28
-
-10-40 U/L
-
-ALT
-
-32
-
-7-56 U/L
-
-Total Bilirubin
-
-0.8
-
-0.2-1.2 mg/dL
-
-Alkaline Phosphatase
-
-74
-
-44-147 U/L
-
-Total Protein
-
-7.2
-
-6.3-8.2 g/dL
-
-Albumin
-
-4.3
-
-3.5-5.0 g/dL
-
-Magnesium
-
-1.9
-
-1.7-2.2 mg/dL
-
-Phosphorus
-
-3.4
-
-2.5-4.5 mg/dL
-
-Flag
-
-COMPLETE BLOOD COUNT
-Flag
-
-LIVER FUNCTION / OTHER
-
-TOXICOLOGY / ALCOHOL
-
-Flag
-
-Test
-
-Result
-
-Reference Range
-
-Flag
-
-Serum Ethanol
-
-62
-
-<10 mg/dL (negative)
-
-H
-
-Urine Drug Screen — Cannabinoids
-
-POSITIVE
-
-Negative
-
-H
-
-Urine Drug Screen — Cocaine
-
-Negative
-
-Negative
-
-Urine Drug Screen — Opiates
-
-Negative
-
-Negative
-
-Urine Drug Screen — Amphetamines
-
-Negative
-
-Negative
-
-Urine Drug Screen — Benzodiazepines
-
-Negative
-
-Negative
-
-Serum ethanol level of 62 mg/dL is above the legal driving limit (80 mg/dL in IL). Clinical correlation advised. Cannabis detected — may lower
-seizure threshold during withdrawal in chronic users, though causal role uncertain.
-Electronically attested by: St. Catherine Laboratory Services, CLIA Certified
-Director: Howard Park, MD, PhD | Reported 01/25/2026 22:55 CST`,
-      },
-      {
-        filename: '04_EEG_Report.pdf',
-        path: '/samples/triage/packets/reyes-carlos/04_EEG_Report.pdf',
-        docType: 'EEG Report',
-        previewText: `Chicago Neurophysiology Associates
-875 N. Michigan Ave, Suite 1900, Chicago, IL 60611
-Phone: (312) 555-0820 | Fax: (312) 555-0821
-
-ELECTROENCEPHALOGRAPHY (EEG) REPORT
-Patient: Carlos E. Reyes
-
-DOB: 10/05/1988
-
-MRN: SCM-0339147
-
-Exam Date: 02/03/2026 09:15
-
-Ordering MD: Marcus Webb, MD (Neurology) Accession: CNA-EEG-20260203-0882
-
-CLINICAL INDICATION
-37-year-old male with first unprovoked generalized tonic-clonic seizure on 01/25/2026. Evaluate for epileptiform activity.
-Prior CT head normal.
-RECORDING DETAILS
-Standard 21-electrode placement per modified 10-20 international system. Recording duration: 40 minutes. Includes
-wakefulness, drowsiness, and stage N1/N2 sleep. Hyperventilation performed x3 minutes. Photic stimulation at 1-30 Hz
-performed. Video co-recording: yes. Patient cooperative.
-BACKGROUND ACTIVITY
-Waking background: Posterior dominant rhythm (PDR) of 10 Hz, well-formed, symmetric, and reactive to eye opening.
-Amplitude 30-50 µV. Appropriate fronto-central beta activity. No focal slowing. No asymmetry.
-SLEEP
-Patient transitioned to drowsiness and stage N1/N2 sleep. Vertex waves and sleep spindles identified bilaterally and
-symmetrically. K-complexes present. No activation of epileptiform discharges during sleep.
-INTERICTAL FINDINGS
-Intermittent right temporal sharp waves with phase reversal at T4/T6, occurring in brief runs of 2-4 discharges at
-approximately 2 Hz. Maximum amplitude 80 µV. These were most prominent during drowsiness and light sleep. Frequency:
-6-8 complexes per 10-minute epoch during drowsiness. No generalized spike-wave complexes observed. No continuous
-focal slowing.
-HYPERVENTILATION
-Hyperventilation produced mild diffuse slowing, normal response. No epileptiform activation.
-PHOTIC STIMULATION
-No photoparoxysmal response at any flash frequency.
-NO CLINICAL SEIZURE
-No clinical or electrographic seizure was recorded during this study.
-
-IMPRESSION
-1. Mildly ABNORMAL EEG.
-2. Intermittent right temporal sharp waves during drowsiness and sleep are epileptiform and increase the risk of recurrent
-seizure. This finding is consistent with a focal epileptic tendency, though the index event was clinically generalized —
-secondary generalization from a right temporal focus is possible.
-3. No generalized epileptiform discharges identified.
-4. Normal background activity.
-Clinical correlation required. MRI brain with epilepsy protocol is recommended to evaluate for structural etiology in the right
-temporal region (e.g., mesial temporal sclerosis, cortical dysplasia, neoplasm).
-
-Electronically attested by: David Park, MD, PhD — Clinical Neurophysiology
-Read and attested 02/03/2026 14:30 CST | CNA EEG Lab`,
-      },
+        "filename": "01_ED_Note.pdf",
+        "path": "/samples/triage/packets/reyes-carlos/01_ED_Note.pdf",
+        "docType": "ED Note",
+        "previewText": "Riverbend Regional Medical Center — Department of Emergency Medicine\n1 Medical Center Dr, Dayton, OH 45409\nPhone: (937) 555-0911 | Fax: (937) 555-0912\n\nPatient: Carlos J. Reyes\n\nDate of Service: 12/12/2025\n\nDOB: 03/22/2006\n\nProvider: Marcus T. Whitfield, MD\n\nMRN: RRMC-0071925\n\nSpecialty: Emergency Medicine\n\nCHIEF COMPLAINT\nWitnessed convulsive seizure.\n\nHISTORY OF PRESENT ILLNESS\nMr. Reyes is a 19-year-old male, college sophomore, brought to the ED by EMS after a witnessed convulsive episode in his dorm room during finals week. Per his roommate, who witnessed the event, Mr. Reyes suddenly stiffened, fell, then had rhythmic jerking of all four extremities lasting approximately 90 seconds, followed by roughly 15-20 minutes of confusion and lethargy before returning to his baseline. The roommate reports Mr. Reyes bit his tongue during the event and may have had brief urinary incontinence. There was no prior chest pain, palpitations, or witnessed pallor/diaphoresis preceding the event to suggest a cardiac or syncopal cause.\n\nMr. Reyes reports he has been sleeping approximately 4 hours per night for the past 3 nights while studying for final exams. He drank 4-5 beers the prior evening at a study-break gathering. He also reports taking a friend's prescription dextroamphetamine/amphetamine (Adderall) tablets on two occasions this week to help him stay awake to study, with his last dose approximately 14 hours prior to the event. He denies any other recreational drug use.\n\nHe denies any prior diagnosed seizures. However, on specific questioning, he reports that over the past 6 months he has noticed occasional brief jerking movements of his hands, most often shortly after waking in the morning, sufficient on a few occasions to make him drop his toothbrush or phone. He had not previously mentioned this to anyone or considered it medically significant. He denies any associated loss of awareness with these morning jerks.\n\nPAST MEDICAL HISTORY\nNone known. No prior seizures, head trauma, CNS infection, or febrile seizures in childhood per patient report.\n\nFAMILY HISTORY\nMaternal cousin reportedly diagnosed with \"epilepsy\" as a teenager; details unknown.\n\nCURRENT MEDICATIONS\nNone prescribed. Reports intermittent nonprescribed use of a friend's dextroamphetamine/amphetamine (Adderall) as above.\n\nPHYSICAL EXAM\nVitals: BP 128/78, HR 92, Temp 98.6 F, RR 16, SpO2 99% RA\nGeneral: Post-ictal but improving over course of ED stay; now alert and appropriately interactive.\nHEENT: Laceration of the left lateral tongue, healing edges, no active bleeding. No scalp hematoma.\nNeuro: Alert and oriented x3 at time of this exam. Cranial nerves II-XII intact. Strength 5/5 in all four extremities. Sensation intact. Reflexes 2+ and symmetric. No pronator drift. Gait steady. No nuchal rigidity, no photophobia.\nCardiovascular: RRR, no murmurs.\nSkin: No rash, no track marks.\n\nDIAGNOSTIC STUDIES\nHead CT without contrast: No acute intracranial hemorrhage, mass, or midline shift.\nEEG (obtained during ED observation stay, awake and drowsy states): Background is age-appropriate and well-organized. Interictal record demonstrates generalized, bisynchronous 4-6 Hz polyspike-and-wave discharges, most prominent bifrontally, occurring both spontaneously and activated by hyperventilation. Intermittent photic stimulation at 14-16 Hz elicits a photoparoxysmal response with generalized spike-and-wave discharges outlasting the stimulus. No focal slowing and no focal epileptiform discharges identified.\n\nLABS\nCBC: WBC 9.8, Hgb 15.1, Plt 244 (unremarkable)\nBMP: Na 139, K 4.0, Cl 102, CO2 24, Glucose 94, Cr 0.9, eGFR >60 (unremarkable, no metabolic trigger)\nLFTs: within normal limits\nEthanol level: 38 mg/dL (detectable, consistent with reported alcohol use the prior evening)\nUrine toxicology: positive for amphetamines (consistent with reported nonprescribed Adderall use); negative for cocaine, opiates, benzodiazepines, cannabinoids\nUrine hCG: N/A (male)\n\nASSESSMENT AND PLAN\n\n1. First generalized tonic-clonic seizure, now with EEG findings consistent with a genetic generalized epilepsy syndrome (R56.9)\nClinical semiology (generalized convulsion with tongue laceration and post-ictal confusion), history elicited on questioning of longstanding morning myoclonic jerks, and EEG showing generalized (not focal) 4-6 Hz polyspike-and-wave discharges with a photoparoxysmal response are together most consistent with juvenile myoclonic epilepsy (Janz syndrome) (G40.B0), rather than a single provoked event. Precipitants of sleep deprivation, alcohol use, and nonprescribed stimulant use likely lowered seizure threshold for this convulsion but do not explain the underlying interictal EEG pattern or the pre-existing morning myoclonus. Referring to neurology/epilepsy on an urgent basis (within 1 week) for confirmation, discussion of antiseizure medication initiation (e.g., levetiracetam or valproate, weighing side-effect profile), and semiology-directed counseling, given significant risk of seizure recurrence if untreated.\n2. Safety counseling\nAdvised no driving until cleared by neurology per state DMV seizure-free interval requirements. Counseled on strict sleep hygiene, alcohol moderation, and discontinuation of nonprescribed stimulant use. Discussed avoidance of swimming alone, heights, and operating machinery until seen by neurology.\n3. Disposition\nNeurologic exam has normalized, head CT is negative, and patient is medically stable. Discharging home with roommate to stay with him overnight. Outpatient urgent neurology referral placed. Return to ED for recurrent seizure, seizure lasting more than 5 minutes, injury, or fever.\n\nElectronically signed by Marcus T. Whitfield, MD\nEncounter signed 12/12/2025 23:10 EST | Riverbend Regional Medical Center EHR v4.2"
+      }
     ],
-    demoPoints: ['Multi-document patient packet', 'First seizure workup', 'EEG-guided epilepsy classification'],
-  },
+    "demoPoints": [
+      "Multi-document patient packet",
+      "First seizure workup",
+      "EEG-guided epilepsy classification"
+    ]
+  }
 ]
 
 export const DEMO_CATEGORIES = [
