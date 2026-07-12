@@ -180,12 +180,28 @@ export function useClaraVoiceSession() {
         // historian), so the guard was unnecessary and net-harmful.
         const text = (e.text || '').trim()
         if (!text) break
-        const idx = pushTurn({ role: 'user', text, ts: Date.now() })
+        // Dedup: the relay/ASR sometimes emits the same final transcript twice
+        // (e.g. an interim that already matches the final). Skip an exact repeat
+        // of the last user turn within a short window so the sentence isn't
+        // written — or classified — twice.
+        const nowU = Date.now()
+        const prevU = turnsRef.current[turnsRef.current.length - 1]
+        if (prevU && prevU.role === 'user' && prevU.text === text && nowU - prevU.ts < 5000) break
+        const idx = pushTurn({ role: 'user', text, ts: nowU })
         void classifyTurn(idx, text)
         break
       }
       case 'assistantTranscript': {
-        pushTurn({ role: 'assistant', text: e.text, ts: Date.now() })
+        const aText = e.text
+        // Same dedup as caller turns — drop an exact repeat of Clara's last line
+        // within a short window (duplicate final emission).
+        const nowA = Date.now()
+        const prevA = turnsRef.current[turnsRef.current.length - 1]
+        if (prevA && prevA.role === 'assistant' && prevA.text === aText && nowA - prevA.ts < 5000) {
+          setCurrentAssistantText('')
+          break
+        }
+        pushTurn({ role: 'assistant', text: aText, ts: nowA })
         setCurrentAssistantText('')
         break
       }
