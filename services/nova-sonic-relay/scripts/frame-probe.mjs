@@ -38,6 +38,10 @@ const GAP_S = Number(argOne('gap', '22'))   // silence between utterances (AI re
 const TAIL_S = Number(argOne('tail', '25')) // silence after last utterance
 const OUT = argOne('out', 'frames.jsonl')
 const PORT = argOne('port', process.env.PORT ?? '8082')
+// --url wss://relay.example.com overrides the local default — lets the probe
+// verify a DEPLOYED relay end-to-end (requires that relay's shared secret in
+// NOVA_RELAY_SHARED_SECRET to mint a valid token).
+const RELAY_URL = argOne('url', `ws://localhost:${PORT}`)
 const SECRET = process.env.NOVA_RELAY_SHARED_SECRET || 'localtest'
 const INSTRUCTIONS = argOne(
   'instructions',
@@ -92,7 +96,11 @@ function logFrame(obj) {
   outStream.write(JSON.stringify({ tMs: Date.now() - t0, ...obj }) + '\n')
 }
 
-const ws = new WebSocket(`ws://localhost:${PORT}`, ['nova.v1', mintToken(SECRET)])
+// --origin: required when the target relay sets NOVA_RELAY_ALLOWED_ORIGINS —
+// its verifyClient checks the Origin header, which non-browser WS clients
+// don't send by default.
+const ORIGIN = argOne('origin', '')
+const ws = new WebSocket(RELAY_URL, ['nova.v1', mintToken(SECRET)], ORIGIN ? { headers: { Origin: ORIGIN } } : undefined)
 
 const CHUNK_MS = 100
 const CHUNK_BYTES = (16000 * 2 * CHUNK_MS) / 1000 // 3200
@@ -125,7 +133,7 @@ async function streamWav(path) {
 }
 
 ws.on('open', async () => {
-  console.log(`connected to ws://localhost:${PORT} — logging frames to ${OUT}`)
+  console.log(`connected to ${RELAY_URL} — logging frames to ${OUT}`)
   ws.send(JSON.stringify({ t: 'start', instructions: INSTRUCTIONS, tools: [] }))
 
   await streamSilence(1)
