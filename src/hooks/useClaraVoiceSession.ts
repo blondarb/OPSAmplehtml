@@ -91,6 +91,10 @@ export function useClaraVoiceSession() {
   // turns). This is what the results panel leads with.
   const [finalClassification, setFinalClassification] = useState<ClaraClassification | null>(null)
   const [loggedSessionId, setLoggedSessionId] = useState<string | null>(null)
+  // Playback diagnostics (worklet underrun/prime/queue counters) captured at
+  // end of call — iOS "crackle" instrumentation, see PcmPlayer.getDiagnostics.
+  // null until a call finishes; instrumentation only, never drives behavior.
+  const [audioDiagnostics, setAudioDiagnostics] = useState<Record<string, unknown> | null>(null)
 
   const providerRef = useRef<VoiceProvider | null>(null)
   const turnsRef = useRef<ClaraTurn[]>([])
@@ -267,6 +271,7 @@ export function useClaraVoiceSession() {
     setLastClassification(null)
     setFinalClassification(null)
     setLoggedSessionId(null)
+    setAudioDiagnostics(null)
 
     try {
       const res = await fetch('/api/ai/clara/session', { method: 'POST' })
@@ -301,12 +306,19 @@ export function useClaraVoiceSession() {
 
   const endSession = useCallback(async () => {
     setStatus('ending')
+    // Capture playback diagnostics BEFORE stop() tears the provider's audio
+    // player down — iOS crackle instrumentation (see PcmPlayer.getDiagnostics
+    // / novaSonicWsProvider.getAudioDiagnostics). Best-effort: never blocks
+    // or fails teardown.
+    const capturedAudioDiagnostics =
+      (await providerRef.current?.getAudioDiagnostics?.().catch(() => null)) ?? null
     try {
       await providerRef.current?.stop()
     } catch {
       // best-effort teardown
     }
     providerRef.current = null
+    setAudioDiagnostics(capturedAudioDiagnostics)
 
     const durationSeconds = startTimeRef.current ? Math.round((Date.now() - startTimeRef.current) / 1000) : 0
     const finalTurns = turnsRef.current
@@ -354,6 +366,7 @@ export function useClaraVoiceSession() {
           needsClarification: disposition?.needsClarification,
           clarificationQuestions: disposition?.clarificationQuestions,
           routing: disposition?.routing,
+          metadata: { audioDiagnostics: capturedAudioDiagnostics },
         }),
       })
       const data = await res.json().catch(() => ({}))
@@ -391,6 +404,7 @@ export function useClaraVoiceSession() {
     setLastClassification(null)
     setFinalClassification(null)
     setLoggedSessionId(null)
+    setAudioDiagnostics(null)
     setStatus('idle')
   }, [])
 
@@ -404,6 +418,7 @@ export function useClaraVoiceSession() {
     lastClassification,
     finalClassification,
     loggedSessionId,
+    audioDiagnostics,
     startSession,
     endSession,
     resetSession,

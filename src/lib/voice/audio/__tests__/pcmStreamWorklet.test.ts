@@ -57,4 +57,68 @@ describe('renderBlock', () => {
     expect(out[0]).toBeGreaterThan(0)
     expect(out[DECLICK]).toBeCloseTo(1, 5) // reaches full level after the ramp
   })
+
+  // --- diagnostics counters (iOS crackle instrumentation, 2026-07-11) ---
+
+  it('counts blocksRendered once per renderBlock call regardless of prime state', () => {
+    const s = makeStreamState(100) // never reaches the prime cushion below
+    const out = new Float32Array(4)
+    expect(s.stats.blocksRendered).toBe(0)
+    renderBlock(s, out) // not primed — still counts a rendered block
+    renderBlock(s, out)
+    renderBlock(s, out)
+    expect(s.stats.blocksRendered).toBe(3)
+  })
+
+  it('does NOT count a prime or underrun for the not-yet-primed early return', () => {
+    const s = makeStreamState(4) // needs 4 queued samples to prime
+    push(s, [0.5]) // only 1 queued — under threshold, stays in the buffering path
+    const out = new Float32Array(4)
+    renderBlock(s, out)
+    expect(s.primed).toBe(false)
+    expect(s.stats.primes).toBe(0)
+    expect(s.stats.underruns).toBe(0)
+    expect(s.stats.blocksRendered).toBe(1)
+  })
+
+  it('increments stats.primes on (re)prime and stats.underruns exactly once per exhaustion', () => {
+    const s = makeStreamState(2) // prime after 2 samples queued
+    push(s, [0.5]) // 1 queued — not enough to prime yet
+    renderBlock(s, new Float32Array(4))
+    expect(s.stats.primes).toBe(0)
+    expect(s.stats.underruns).toBe(0)
+
+    // Now 2 queued: primes this block, then immediately exhausts mid-block —
+    // one underrun, re-primed=false for the next cushion.
+    push(s, [0.5])
+    renderBlock(s, new Float32Array(4))
+    expect(s.stats.primes).toBe(1)
+    expect(s.stats.underruns).toBe(1)
+    expect(s.primed).toBe(false)
+
+    // Re-prime and underrun again — counters advance by exactly one each,
+    // not double-counted per exhaustion.
+    push(s, [0.5, 0.5])
+    renderBlock(s, new Float32Array(4))
+    expect(s.stats.primes).toBe(2)
+    expect(s.stats.underruns).toBe(2)
+    expect(s.primed).toBe(false)
+  })
+
+  it('joining across chunk boundaries once primed does not trip an underrun', () => {
+    const s = makeStreamState(0)
+    s.silent = false
+    push(s, [1, 2])
+    push(s, [3, 4])
+    const out = new Float32Array(4)
+    renderBlock(s, out)
+    expect(s.stats.underruns).toBe(0) // fully filled the block — no exhaustion
+    expect(s.stats.blocksRendered).toBe(1)
+  })
+
+  // Note: pushes/samplesIn/maxQueued are tracked only in the worklet string's
+  // port 'push' handler (there is no port on the pure StreamState side), and
+  // the `clear` message that must preserve stats across a barge-in also only
+  // exists in the worklet string — neither is reachable/testable from pure
+  // renderBlock/makeStreamState, per the instrumentation spec.
 })

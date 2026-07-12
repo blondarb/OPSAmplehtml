@@ -20,6 +20,25 @@ import ClaraDecisionCard from './ClaraDecisionCard'
 
 const ACCENT = '#8B5CF6'
 
+/**
+ * Formats a PcmPlayer diagnostics snapshot (see PcmPlayer.getDiagnostics /
+ * useClaraVoiceSession's audioDiagnostics) into a single quiet debug line for
+ * the post-call results section — iOS "crackle" instrumentation, purely for
+ * screenshots/data-gathering. Fields absent from the snapshot are omitted
+ * gracefully; returns null (render nothing) if nothing usable is present.
+ */
+function formatAudioDiagnostics(diag: Record<string, unknown> | null): string | null {
+  if (!diag) return null
+  const parts: string[] = []
+  if (typeof diag.path === 'string') parts.push(diag.path)
+  if (typeof diag.contextSampleRate === 'number') parts.push(`${diag.contextSampleRate} Hz`)
+  if (typeof diag.underruns === 'number') parts.push(`underruns ${diag.underruns}`)
+  if (typeof diag.primes === 'number') parts.push(`primes ${diag.primes}`)
+  if (typeof diag.maxQueued === 'number') parts.push(`maxQ ${diag.maxQueued.toLocaleString()}`)
+  if (parts.length === 0) return null
+  return `Audio: ${parts.join(' · ')}`
+}
+
 export default function ClaraVoiceTestView() {
   const {
     status,
@@ -31,6 +50,7 @@ export default function ClaraVoiceTestView() {
     lastClassification,
     finalClassification,
     loggedSessionId,
+    audioDiagnostics,
     startSession,
     endSession,
     resetSession,
@@ -214,6 +234,9 @@ export default function ClaraVoiceTestView() {
           </div>
           {!loggedSessionId && (
             <div style={{ color: '#64748b', fontSize: 12 }}>Logging call…</div>
+          )}
+          {audioDiagnostics && formatAudioDiagnostics(audioDiagnostics) && (
+            <div style={{ color: '#64748b', fontSize: 11 }}>{formatAudioDiagnostics(audioDiagnostics)}</div>
           )}
 
           {/* FINAL DISPOSITION — the single "where would this route" answer for the

@@ -19,6 +19,23 @@
  * its own realm and cannot import modules).
  */
 
+/**
+ * Diagnostics counters — cumulative per session, never reset by `clear`
+ * (barge-in). Added 2026-07-11 to get hard numbers on the iOS "crackle"
+ * hypothesis (worklet queue underruns) instead of another guess. Pure
+ * StreamState tracks underruns/primes/blocksRendered (unit-testable); the
+ * worklet string additionally tracks pushes/samplesIn/maxQueued in its port
+ * 'push' handler, since the pure side has no port to observe pushes on.
+ */
+export interface StreamStats {
+  underruns: number
+  primes: number
+  pushes: number
+  samplesIn: number
+  blocksRendered: number
+  maxQueued: number
+}
+
 export interface StreamState {
   chunks: Float32Array[]
   readPos: number
@@ -27,13 +44,27 @@ export interface StreamState {
   silent: boolean // last block ended in silence (so next real audio fades in)
   lastOut: number // last emitted sample value, for declick ramps
   primeSamples: number // cushion to buffer before (re)starting playback
+  stats: StreamStats
 }
 
 /** ~32 samples ≈ 0.7 ms at 48 kHz — inaudible fade that removes boundary pops. */
 export const DECLICK = 32
 
+function makeStats(): StreamStats {
+  return { underruns: 0, primes: 0, pushes: 0, samplesIn: 0, blocksRendered: 0, maxQueued: 0 }
+}
+
 export function makeStreamState(primeSamples: number): StreamState {
-  return { chunks: [], readPos: 0, queued: 0, primed: false, silent: true, lastOut: 0, primeSamples }
+  return {
+    chunks: [],
+    readPos: 0,
+    queued: 0,
+    primed: false,
+    silent: true,
+    lastOut: 0,
+    primeSamples,
+    stats: makeStats(),
+  }
 }
 
 function fillSilence(s: StreamState, out: Float32Array, from: number): void {
@@ -52,9 +83,12 @@ function fillSilence(s: StreamState, out: Float32Array, from: number): void {
  */
 export function renderBlock(s: StreamState, out: Float32Array): void {
   const n = out.length
+  s.stats.blocksRendered++
   if (!s.primed) {
-    if (s.queued >= s.primeSamples) s.primed = true
-    else return fillSilence(s, out, 0)
+    if (s.queued >= s.primeSamples) {
+      s.primed = true
+      s.stats.primes++
+    } else return fillSilence(s, out, 0)
   }
   let i = 0
   const resumeRamp = s.silent ? DECLICK : 0
@@ -80,6 +114,7 @@ export function renderBlock(s: StreamState, out: Float32Array): void {
     s.silent = false
     return
   }
+  s.stats.underruns++
   fillSilence(s, out, i) // underrun: fade out, then re-prime to rebuild a cushion
   s.primed = false
 }
@@ -95,7 +130,11 @@ const DECLICK = ${DECLICK};
 class PcmStreamProcessor extends AudioWorkletProcessor {
   constructor() {
     super();
-    this.s = { chunks: [], readPos: 0, queued: 0, primed: false, silent: true, lastOut: 0, primeSamples: Math.round(sampleRate * 0.5) };
+    this.s = {
+      chunks: [], readPos: 0, queued: 0, primed: false, silent: true, lastOut: 0,
+      primeSamples: Math.round(sampleRate * 0.5),
+      stats: { underruns: 0, primes: 0, pushes: 0, samplesIn: 0, blocksRendered: 0, maxQueued: 0 },
+    };
     this.pendingData = false;
     this.emptyBlocks = 0;
     this.port.onmessage = (e) => {
@@ -103,14 +142,24 @@ class PcmStreamProcessor extends AudioWorkletProcessor {
       if (d.type === 'push') {
         this.s.chunks.push(d.samples);
         this.s.queued += d.samples.length;
+        this.s.stats.pushes++;
+        this.s.stats.samplesIn += d.samples.length;
+        if (this.s.queued > this.s.stats.maxQueued) this.s.stats.maxQueued = this.s.queued;
         this.pendingData = true;
         this.emptyBlocks = 0;
       } else if (d.type === 'clear') {
+        // Barge-in: reset playback state only — stats are cumulative
+        // per-session diagnostics and must survive a clear.
         this.s.chunks = []; this.s.readPos = 0; this.s.queued = 0;
         this.s.primed = false; this.s.silent = true;
         this.pendingData = false; this.emptyBlocks = 0;
+      } else if (d.type === 'getStats') {
+        this.port.postMessage({ type: 'stats', stats: this.statsPayload() });
       }
     };
+  }
+  statsPayload() {
+    return { ...this.s.stats, queued: this.s.queued, primed: this.s.primed, sampleRate };
   }
   fillSilence(out, from) {
     const n = out.length;
@@ -124,8 +173,9 @@ class PcmStreamProcessor extends AudioWorkletProcessor {
     if (!out) return true;
     const s = this.s;
     const n = out.length;
+    s.stats.blocksRendered++;
     if (!s.primed) {
-      if (s.queued >= s.primeSamples) s.primed = true;
+      if (s.queued >= s.primeSamples) { s.primed = true; s.stats.primes++; }
       else { this.fillSilence(out, 0); this.reportDrain(); return true; }
     }
     let i = 0;
@@ -143,14 +193,14 @@ class PcmStreamProcessor extends AudioWorkletProcessor {
       if (s.readPos >= cur.length) { s.chunks.shift(); s.readPos = 0; }
     }
     if (i >= n) { s.silent = false; }
-    else { this.fillSilence(out, i); s.primed = false; }
+    else { s.stats.underruns++; this.fillSilence(out, i); s.primed = false; }
     this.reportDrain();
     return true;
   }
   reportDrain() {
     if (this.s.chunks.length === 0) {
       this.emptyBlocks++;
-      if (this.pendingData && this.emptyBlocks >= 4) { this.pendingData = false; this.port.postMessage({ type: 'drained' }); }
+      if (this.pendingData && this.emptyBlocks >= 4) { this.pendingData = false; this.port.postMessage({ type: 'drained', stats: this.statsPayload() }); }
     } else { this.emptyBlocks = 0; }
   }
 }

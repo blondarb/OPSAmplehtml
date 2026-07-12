@@ -148,4 +148,11 @@ export interface VoiceProvider {
    * provider leaves this undefined; callers fall back to `injectSystemText`.
    */
   updateInstructions?(fullText: string): void
+  /**
+   * Optional playback diagnostics snapshot (worklet underrun/prime/queue
+   * counters — see PcmPlayer.getDiagnostics), for the iOS "crackle"
+   * investigation. Instrumentation only; providers without an audio player
+   * (or that don't wire this up) simply omit the method. Never throws.
+   */
+  getAudioDiagnostics?(): Promise<Record<string, unknown> | null>
 }

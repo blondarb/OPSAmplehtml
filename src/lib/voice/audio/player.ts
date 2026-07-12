@@ -38,6 +38,14 @@ export class PcmPlayer {
   private pendingPushes: Float32Array[] = []; // buffered until the node is ready
   private workletActive = false; // audio pushed since the last drain report
 
+  // --- diagnostics (iOS crackle instrumentation, 2026-07-11) ---
+  /** Most recent stats payload seen from any worklet message carrying `.stats`
+   *  ('stats' response or 'drained'). Used as a fallback when the worklet node
+   *  is gone/closed, or when a fresh getStats round-trip times out. */
+  private lastStats: Record<string, unknown> | null = null;
+  /** One-shot resolver for an in-flight getDiagnostics() 'stats' round-trip. */
+  private statsWaiter: ((stats: Record<string, unknown>) => void) | null = null;
+
   // --- fallback (BufferSource) path ---
   private nextStartTime = 0;
   private activeSources = new Set<AudioBufferSourceNode>();
@@ -62,7 +70,14 @@ export class PcmPlayer {
         URL.revokeObjectURL(url);
         const node = new AudioWorkletNode(ctx, 'pcm-stream');
         node.port.onmessage = (e: MessageEvent) => {
-          if (e.data?.type === 'drained') this.onWorkletDrained();
+          const d = e.data;
+          if (d?.stats) this.lastStats = d.stats;
+          if (d?.type === 'drained') this.onWorkletDrained();
+          if (d?.type === 'stats' && this.statsWaiter) {
+            const waiter = this.statsWaiter;
+            this.statsWaiter = null;
+            waiter(d.stats);
+          }
         };
         node.connect(ctx.destination);
         this.workletNode = node;
@@ -143,6 +158,58 @@ export class PcmPlayer {
     }
     if (this.activeSources.size === 0) return Promise.resolve();
     return new Promise<void>((resolve) => this.drainWaiters.push(resolve));
+  }
+
+  /**
+   * Snapshot of playback diagnostics (worklet underrun/prime/queue counters),
+   * for the iOS "crackle" investigation — instrumentation only, never affects
+   * playback. Never throws and always resolves within ~350ms:
+   *   - worklet path, live node: round-trips a 'getStats' request, falls back
+   *     to the last-seen stats on a 300ms timeout.
+   *   - worklet path, node gone/closed: returns the last-seen stats (or null
+   *     if none were ever captured).
+   *   - fallback (BufferSource) path: no per-chunk stats exist; returns just
+   *     the path + context sample rate.
+   */
+  async getDiagnostics(): Promise<Record<string, unknown> | null> {
+    try {
+      const ctx = this.ctx;
+      if (!this.useWorklet) {
+        return { path: 'buffersource', contextSampleRate: ctx?.sampleRate ?? null };
+      }
+      const node = this.workletNode;
+      if (!node) {
+        return this.lastStats ? { path: 'worklet', contextSampleRate: null, ...this.lastStats } : null;
+      }
+      const stats = await new Promise<Record<string, unknown> | null>((resolve) => {
+        let settled = false;
+        const timer = setTimeout(() => {
+          if (settled) return;
+          settled = true;
+          this.statsWaiter = null;
+          resolve(this.lastStats);
+        }, 300);
+        this.statsWaiter = (s) => {
+          if (settled) return;
+          settled = true;
+          clearTimeout(timer);
+          resolve(s);
+        };
+        try {
+          node.port.postMessage({ type: 'getStats' });
+        } catch {
+          if (!settled) {
+            settled = true;
+            clearTimeout(timer);
+            this.statsWaiter = null;
+            resolve(this.lastStats);
+          }
+        }
+      });
+      return stats ? { path: 'worklet', contextSampleRate: ctx?.sampleRate ?? null, ...stats } : null;
+    } catch {
+      return null;
+    }
   }
 
   /** Barge-in: drop all queued/playing audio immediately; context stays open. */
