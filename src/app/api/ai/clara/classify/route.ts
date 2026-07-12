@@ -62,8 +62,13 @@ type Gate0Result = {
 const CERIBELL_EEG_READ_CONTEXT =
   /\b(ceribell|cerebell|rapid\s+eeg|headband\s+eeg|seizure\s+burden|burden\s+of\s+\d|continuous\s+eeg|eeg\s+(?:read|monitor|interpret|study|follow))/i
 // Active clinical emergency that KEEPS the emergency floor even in an EEG context.
+// "cannot|couldn't breathe" added 2026-07-12 (cross-model review of the
+// sevaro-voice-agent port, SSOT pair): the word boundary in `not\s+breathing`
+// does NOT match inside "cannot", so an ASR "cannot breathe" slipped past
+// this override and a Ceribell burden-read would have deferred despite an
+// airway complaint.
 const ACTIVE_SEIZURE_EMERGENCY =
-  /\b(airway|not\s+breathing|can'?t\s+breathe|unresponsive|seizing|convulsing|having\s+a\s+seizure|won'?t\s+stop|not\s+stopping|coding|escalat|intubat)/i
+  /\b(airway|not\s+breathing|(?:can'?t|cannot|couldn'?t)\s+breathe|unresponsive|seizing|convulsing|having\s+a\s+seizure|won'?t\s+stop|not\s+stopping|coding|escalat|intubat)/i
 
 type RoutingDecision = {
   action: 'escalate_911' | 'transfer_md1' | 'transfer_md2' | 'transfer_stat1' | 'transfer_stat2' | 'route_eeg_reader' | 'refer_pcp' | 'schedule_callback' | 'route_workflow'
