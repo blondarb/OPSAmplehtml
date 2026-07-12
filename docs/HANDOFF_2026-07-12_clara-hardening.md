@@ -63,14 +63,14 @@ Production SSOT sync of all the above → sevaro-voice-agent PR #39 (94/94 gate 
 - `src/lib/clara/claraRulebook.ts` — classifier rulebook (Gate 0 deferrals live in redFlagGate.ts + classify route)
 - `src/lib/clara/redFlagGate.ts` — Gate 0 deterministic floor
 - `services/nova-sonic-relay/src/transcribeMedicalSession.ts` + `server.ts` — Transcribe Medical wiring
-- `scratchpad/redteam/voice-steelman.mjs` — the voice test harness (logs nova + medical transcripts)
+- `services/nova-sonic-relay/scripts/voice-steelman.mjs (run from that dir)` — the voice test harness (logs nova + medical transcripts)
 - `qa/STEEL-MAN-2026-07-12.md` — red-team report
 
 ## Prompt for Next Session
 ```
 Repo: ~/dev/repos/OPSAmplehtml (AWS: --profile sevaro-sandbox; relay in us-east-1). Read docs/HANDOFF_2026-07-12_clara-hardening.md and .claude/progress.json first.
 FIRST: confirm whether Steve merged sevaro-voice-agent PR #39 (the Gate-0 safety pass) — if not, remind him; never auto-merge.
-MAIN TASK — Phase 3: make Clara read the MRN back ONLY when Nova's transcript and the Transcribe Medical transcript DISAGREE. Transcribe Medical is LIVE in the relay (flag on, task def rev 3, us-east-1) emitting medicalTranscript frames now logged in clara_test_sessions.metadata. Build client-side in useClaraVoiceSession if feasible (no relay redeploy): extract the MRN digit-string from BOTH transcripts for the same caller turn, NORMALIZE both to bare digits (Nova = spoken-words→digits; Transcribe = strip thousands-commas/spaces/PIN-MRN prefix — it renders 24590 as "24,590"), compare; on mismatch inject a systemText nudge to Nova to read it back (provider.injectSystemText exists), on match stay silent. SMOKE-TEST with discrepant cases (fast/mumbled/alphanumeric) via scratchpad/redteam/voice-steelman.mjs (run from services/nova-sonic-relay dir for ws) — a false read-back is worse than none.
+MAIN TASK — Phase 3: make Clara read the MRN back ONLY when Nova's transcript and the Transcribe Medical transcript DISAGREE. Transcribe Medical is LIVE in the relay (flag on, task def rev 3, us-east-1) emitting medicalTranscript frames now logged in clara_test_sessions.metadata. Build client-side in useClaraVoiceSession if feasible (no relay redeploy): extract the MRN digit-string from BOTH transcripts for the same caller turn, NORMALIZE both to bare digits (Nova = spoken-words→digits; Transcribe = strip thousands-commas/spaces/PIN-MRN prefix — it renders 24590 as "24,590"), compare; on mismatch inject a systemText nudge to Nova to read it back (provider.injectSystemText exists), on match stay silent. SMOKE-TEST with discrepant cases (fast/mumbled/alphanumeric) via services/nova-sonic-relay/scripts/voice-steelman.mjs (run from that dir) (run from services/nova-sonic-relay dir for ws) — a false read-back is worse than none.
 COMPANION: use the Transcribe value as the authoritative captured identifier (same digit-normalization).
 CONSTRAINT: NEVER change a triage threshold/tier without Steve's clinical sign-off. Everything else this session is shipped+verified.
 ```
