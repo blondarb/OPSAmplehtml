@@ -54,6 +54,29 @@ export interface ClaraTurn {
 
 export type ClaraSessionStatus = 'idle' | 'connecting' | 'active' | 'ending' | 'error'
 
+/** Normalize transcript text for dedup: lowercase, collapse whitespace, drop
+ *  trailing punctuation — so "I'm calling a stroke" and "I'm calling a stroke."
+ *  are treated as the same utterance. */
+function normalizeTurnText(t: string): string {
+  return t.toLowerCase().replace(/\s+/g, ' ').replace(/[.,!?;:]+$/g, '').trim()
+}
+
+/** True if an equivalent turn (same role, same normalized text) already exists
+ *  within the last few seconds. Catches the relay/ASR emitting the same sentence
+ *  twice — even non-consecutively (Clara replied between) or with a trailing
+ *  punctuation/whitespace difference. */
+function isDuplicateTurn(turns: ClaraTurn[], role: 'user' | 'assistant', text: string): boolean {
+  const key = normalizeTurnText(text)
+  if (!key) return false
+  const now = Date.now()
+  for (let i = turns.length - 1; i >= 0; i--) {
+    const t = turns[i]
+    if (now - t.ts > 8000) break // only scan the recent window (turns are time-ordered)
+    if (t.role === role && normalizeTurnText(t.text) === key) return true
+  }
+  return false
+}
+
 export function useClaraVoiceSession() {
   const [status, setStatus] = useState<ClaraSessionStatus>('idle')
   const [turns, setTurns] = useState<ClaraTurn[]>([])
@@ -180,28 +203,23 @@ export function useClaraVoiceSession() {
         // historian), so the guard was unnecessary and net-harmful.
         const text = (e.text || '').trim()
         if (!text) break
-        // Dedup: the relay/ASR sometimes emits the same final transcript twice
-        // (e.g. an interim that already matches the final). Skip an exact repeat
-        // of the last user turn within a short window so the sentence isn't
-        // written — or classified — twice.
-        const nowU = Date.now()
-        const prevU = turnsRef.current[turnsRef.current.length - 1]
-        if (prevU && prevU.role === 'user' && prevU.text === text && nowU - prevU.ts < 5000) break
-        const idx = pushTurn({ role: 'user', text, ts: nowU })
+        // Dedup: the relay/ASR sometimes emits the same sentence twice (an
+        // interim that already matches the final, sometimes not back-to-back and
+        // sometimes with trailing-punctuation/whitespace differences). Skip it if
+        // an equivalent user turn already exists within a short window — compare
+        // NORMALIZED text and scan recent turns, not just the immediately prior.
+        if (isDuplicateTurn(turnsRef.current, 'user', text)) break
+        const idx = pushTurn({ role: 'user', text, ts: Date.now() })
         void classifyTurn(idx, text)
         break
       }
       case 'assistantTranscript': {
         const aText = e.text
-        // Same dedup as caller turns — drop an exact repeat of Clara's last line
-        // within a short window (duplicate final emission).
-        const nowA = Date.now()
-        const prevA = turnsRef.current[turnsRef.current.length - 1]
-        if (prevA && prevA.role === 'assistant' && prevA.text === aText && nowA - prevA.ts < 5000) {
+        if (isDuplicateTurn(turnsRef.current, 'assistant', aText)) {
           setCurrentAssistantText('')
           break
         }
-        pushTurn({ role: 'assistant', text: aText, ts: nowA })
+        pushTurn({ role: 'assistant', text: aText, ts: Date.now() })
         setCurrentAssistantText('')
         break
       }

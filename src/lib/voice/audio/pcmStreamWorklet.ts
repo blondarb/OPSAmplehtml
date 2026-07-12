@@ -95,7 +95,7 @@ const DECLICK = ${DECLICK};
 class PcmStreamProcessor extends AudioWorkletProcessor {
   constructor() {
     super();
-    this.s = { chunks: [], readPos: 0, queued: 0, primed: false, silent: true, lastOut: 0, primeSamples: Math.round(sampleRate * 0.2) };
+    this.s = { chunks: [], readPos: 0, queued: 0, primed: false, silent: true, lastOut: 0, primeSamples: Math.round(sampleRate * 0.5) };
     this.pendingData = false;
     this.emptyBlocks = 0;
     this.port.onmessage = (e) => {
