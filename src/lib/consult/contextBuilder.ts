@@ -15,7 +15,7 @@ import type { NeurologyConsult, ConsultIntakeContext, HistorianConsultContext } 
 
 /**
  * Build the intake context object from a consult's triage data.
- * Returned by POST /api/consults/[id]/initiate-intake so the UI can
+ * Returned by POST /api/neuro-consults/[id]/initiate-intake so the UI can
  * pre-populate the intake agent with triage findings.
  */
 export function buildIntakeContextFromConsult(consult: NeurologyConsult): ConsultIntakeContext {

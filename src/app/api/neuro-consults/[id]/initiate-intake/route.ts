@@ -13,6 +13,8 @@ import { NextResponse } from 'next/server'
 import { getConsult, linkIntakeToConsult } from '@/lib/consult/pipeline'
 import { buildIntakeContextFromConsult, buildTriageSummaryText } from '@/lib/consult/contextBuilder'
 import { from } from '@/lib/db-query'
+import { authorizeClinicalAccess } from '@/lib/auth/clinicalAccess'
+import { loadSchedulingAuthorization } from '@/lib/triage/schedulingAuthorization'
 
 export async function POST(
   _request: Request,
@@ -20,7 +22,18 @@ export async function POST(
 ) {
   const { id } = await params
   try {
-    const consult = await getConsult(id)
+    const access = await authorizeClinicalAccess({
+      action: 'consult.initiate_intake',
+      allowedRoles: ['clinician', 'admin'],
+    })
+    if (!access.ok) {
+      return NextResponse.json(
+        { error: 'Access denied', reason: access.reason },
+        { status: access.status },
+      )
+    }
+
+    const consult = await getConsult(id, access.context.tenantId)
 
     if (!consult) {
       return NextResponse.json({ error: 'Consult not found' }, { status: 404 })
@@ -33,6 +46,20 @@ export async function POST(
     ) {
       return NextResponse.json(
         { error: 'Triage must be completed before initiating intake' },
+        { status: 409 },
+      )
+    }
+
+    const safetyAuthorization = await loadSchedulingAuthorization(
+      consult.triage_session_id,
+      access.context.tenantId,
+    )
+    if (!safetyAuthorization.decision.allowed) {
+      return NextResponse.json(
+        {
+          error: 'Intake is blocked by triage safety state',
+          reason: safetyAuthorization.decision.reason,
+        },
         { status: 409 },
       )
     }
@@ -101,6 +128,7 @@ export async function POST(
           updated_at: new Date().toISOString(),
         })
         .eq('id', consult.id)
+        .eq('tenant_id', access.context.tenantId)
 
       return NextResponse.json({
         context: intakeContext,
@@ -111,7 +139,14 @@ export async function POST(
     }
 
     // Link the pre-created session to the consult
-    await linkIntakeToConsult(consult.id, newSessionId, 'intake_in_progress')
+    await linkIntakeToConsult(
+      consult.id,
+      newSessionId,
+      'intake_in_progress',
+      undefined,
+      undefined,
+      access.context.tenantId,
+    )
 
     return NextResponse.json({
       context: intakeContext,
@@ -121,7 +156,9 @@ export async function POST(
     })
   } catch (error: unknown) {
     console.error(`POST /api/neuro-consults/${id}/initiate-intake error:`, error)
-    const message = error instanceof Error ? error.message : 'Failed to initiate intake'
-    return NextResponse.json({ error: message }, { status: 500 })
+    return NextResponse.json(
+      { error: 'Failed to initiate intake' },
+      { status: 500 },
+    )
   }
 }

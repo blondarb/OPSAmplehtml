@@ -12,22 +12,37 @@
     "test:watch": "vitest",
     "test:audio": "npx tsx tests/audio/run-pipeline-test.ts",
     "test:audio:generate": "bash tests/audio/scripts/generate-visit-audio.sh",
-    "seed:wearable": "npx tsx scripts/seed-wearable-demo.ts"
+    "seed:wearable": "npx tsx scripts/seed-wearable-demo.ts",
+    "triage:sentinel": "npx tsx scripts/triage-sentinel.ts"
+  },
+  "overrides": {
+    "@xmldom/xmldom": "0.8.13",
+    "axios": "1.18.1",
+    "esbuild": "$esbuild",
+    "fast-xml-builder": "1.2.1",
+    "fast-xml-parser": "5.10.0",
+    "form-data": "4.0.6",
+    "postcss": "$postcss",
+    "qs": "6.15.3",
+    "ws": "8.21.0"
   },
   "dependencies": {
-    "@aws-sdk/client-bedrock-agent-runtime": "^3.1003.0",
-    "@aws-sdk/client-bedrock-runtime": "^3.1003.0",
-    "@aws-sdk/client-secrets-manager": "^3.1003.0",
-    "@aws-sdk/client-transcribe-streaming": "^3.1010.0",
-    "@aws-sdk/credential-providers": "^3.1011.0",
+    "@aws-sdk/client-bedrock-agent-runtime": "^3.1085.0",
+    "@aws-sdk/client-bedrock-runtime": "^3.1085.0",
+    "@aws-sdk/client-s3": "^3.1085.0",
+    "@aws-sdk/client-secrets-manager": "^3.1085.0",
+    "@aws-sdk/client-sqs": "^3.1085.0",
+    "@aws-sdk/client-textract": "^3.1085.0",
+    "@aws-sdk/client-transcribe-streaming": "^3.1085.0",
+    "@aws-sdk/credential-providers": "^3.1085.0",
+    "@aws-sdk/s3-request-presigner": "^3.1085.0",
     "@deepgram/sdk": "^4.11.3",
     "@sevaro/feedback": "file:./packages/feedback",
-
     "framer-motion": "^12.34.3",
     "jose": "^6.2.0",
     "lucide-react": "^0.575.0",
     "mammoth": "^1.11.0",
-    "next": "15.1.11",
+    "next": "^15.5.20",
     "pdf-parse": "^2.4.5",
     "pg": "^8.20.0",
     "react": "^18.3.1",
@@ -37,13 +52,26 @@
     "unpdf": "^1.4.0"
   },
   "pnpm": {
+    "overrides": {
+      "axios": "1.18.1",
+      "esbuild": "0.28.1",
+      "fast-xml-builder": "1.2.1",
+      "fast-xml-parser": "5.10.0",
+      "form-data": "4.0.6",
+      "postcss": "8.5.16",
+      "qs": "6.15.3",
+      "ws": "8.21.0",
+      "@xmldom/xmldom": "0.8.13"
+    },
     "onlyBuiltDependencies": [
+      "esbuild",
       "sharp",
       "unrs-resolver"
     ]
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3.2.0",
+    "@types/aws-lambda": "^8.10.162",
     "@types/node": "^20.19.30",
     "@types/pdf-parse": "^1.1.5",
     "@types/pg": "^8.18.0",
@@ -51,9 +79,10 @@
     "@types/react-dom": "^18",
     "autoprefixer": "^10.4.20",
     "dotenv": "^17.2.3",
+    "esbuild": "^0.28.1",
     "eslint": "^8",
-    "eslint-config-next": "15.1.11",
-    "postcss": "^8.4.49",
+    "eslint-config-next": "15.5.20",
+    "postcss": "^8.5.16",
     "tailwindcss": "^3.4.17",
     "ts-node": "^10.9.2",
     "typescript": "5.9.3",

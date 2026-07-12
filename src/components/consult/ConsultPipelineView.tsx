@@ -1,23 +1,25 @@
 'use client'
 
 import { useState, useCallback, useEffect } from 'react'
-import type { NeurologyConsult, ConsultStatus } from '@/lib/consult/types'
+import type { NeurologyConsult } from '@/lib/consult/types'
 import type { ConsultReport } from '@/lib/consult/report'
 import type { SamplePersona } from '@/lib/consult/samplePersonas'
-import ConsultReportView from '@/components/ConsultReportView'
 import TriageStepPanel from './TriageStepPanel'
 import HistorianStepPanel from './HistorianStepPanel'
 import PatientToolsStepPanel from './PatientToolsStepPanel'
 import ReportStepPanel from './ReportStepPanel'
 import DemoActorCard from './DemoActorCard'
+import {
+  getConsultActiveStep,
+  isConsultStepComplete,
+  type ConsultStepId,
+} from '@/lib/consult/workflow'
 
 /**
  * Pipeline steps in display order.
  * Each step maps to one or more ConsultStatus values.
  */
-type StepId = 'triage' | 'historian' | 'patient_tools' | 'report'
-
-const PIPELINE_STEPS: Array<{ id: StepId; label: string; statuses: string[] }> = [
+const PIPELINE_STEPS: Array<{ id: ConsultStepId; label: string; statuses: string[] }> = [
   { id: 'triage', label: 'Triage', statuses: ['triage_pending'] },
   { id: 'historian', label: 'AI Historian', statuses: ['triage_complete', 'intake_pending', 'intake_in_progress', 'intake_complete', 'historian_pending', 'historian_in_progress'] },
   { id: 'patient_tools', label: 'Review & Tools', statuses: ['historian_complete'] },
@@ -29,25 +31,9 @@ interface ConsultPipelineViewProps {
   onConsultCreated: (id: string) => void
 }
 
-function getActiveStep(status: ConsultStatus | null): StepId {
-  if (!status) return 'triage'
-  for (const step of PIPELINE_STEPS) {
-    if (step.statuses.includes(status as string)) return step.id
-  }
-  return 'report'
-}
-
-function isStepComplete(stepId: StepId, status: ConsultStatus | null): boolean {
-  if (!status) return false
-  const stepIndex = PIPELINE_STEPS.findIndex((s) => s.id === stepId)
-  const statusStep = getActiveStep(status)
-  const statusIndex = PIPELINE_STEPS.findIndex((s) => s.id === statusStep)
-  return statusIndex > stepIndex
-}
-
 export default function ConsultPipelineView({ consultId, onConsultCreated }: ConsultPipelineViewProps) {
   const [consult, setConsult] = useState<NeurologyConsult | null>(null)
-  const [activeStep, setActiveStep] = useState<StepId>('triage')
+  const [activeStep, setActiveStep] = useState<ConsultStepId>('triage')
   const [report, setReport] = useState<ConsultReport | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
@@ -64,7 +50,12 @@ export default function ConsultPipelineView({ consultId, onConsultCreated }: Con
       .then((data) => {
         if (data.consult) {
           setConsult(data.consult)
-          setActiveStep(getActiveStep(data.consult.status))
+          setActiveStep(
+            getConsultActiveStep(
+              data.consult.status,
+              data.consult.historian_authorization,
+            ),
+          )
         }
       })
       .catch(() => setError('Failed to load consult'))
@@ -77,6 +68,12 @@ export default function ConsultPipelineView({ consultId, onConsultCreated }: Con
     const data = await r.json()
     if (data.consult) {
       setConsult(data.consult)
+      setActiveStep(
+        getConsultActiveStep(
+          data.consult.status,
+          data.consult.historian_authorization,
+        ),
+      )
     }
   }, [consultId])
 
@@ -84,7 +81,12 @@ export default function ConsultPipelineView({ consultId, onConsultCreated }: Con
     (newConsultId: string, updatedConsult: NeurologyConsult) => {
       onConsultCreated(newConsultId)
       setConsult(updatedConsult)
-      setActiveStep('historian')
+      setActiveStep(
+        getConsultActiveStep(
+          updatedConsult.status,
+          updatedConsult.historian_authorization,
+        ),
+      )
     },
     [onConsultCreated],
   )
@@ -121,7 +123,11 @@ export default function ConsultPipelineView({ consultId, onConsultCreated }: Con
       >
         {PIPELINE_STEPS.map((step, i) => {
           const isActive = step.id === activeStep
-          const isDone = isStepComplete(step.id, consult?.status ?? null)
+          const isDone = isConsultStepComplete(
+            step.id,
+            consult?.status ?? null,
+            consult?.historian_authorization,
+          )
           const isClickable = isDone || isActive
 
           return (
@@ -255,7 +261,34 @@ export default function ConsultPipelineView({ consultId, onConsultCreated }: Con
         }}
       >
         <div style={{ minWidth: 0 }}>
-          {!loading && activeStep === 'triage' && (
+          {!loading &&
+            activeStep === 'triage' &&
+            consult?.status === 'triage_complete' &&
+            !consult.historian_authorization?.allowed && (
+              <div
+                role="status"
+                style={{
+                  padding: 24,
+                  borderRadius: 12,
+                  border: '1px solid #F59E0B',
+                  background: 'rgba(245, 158, 11, 0.08)',
+                  color: '#F8FAFC',
+                }}
+              >
+                <h3 style={{ margin: '0 0 8px', fontSize: 18 }}>
+                  Clinical safety review required
+                </h3>
+                <p style={{ margin: 0, color: '#CBD5E1', lineHeight: 1.5 }}>
+                  This referral will remain on hold until a clinician clears
+                  any safety or information gaps and approves the exact patient
+                  clarification questions. Outpatient scheduling remains locked.
+                </p>
+              </div>
+            )}
+
+          {!loading &&
+            activeStep === 'triage' &&
+            consult?.status !== 'triage_complete' && (
             <TriageStepPanel
               consult={consult}
               onTriageComplete={handleTriageComplete}
@@ -263,7 +296,7 @@ export default function ConsultPipelineView({ consultId, onConsultCreated }: Con
               selectedPersonaId={persona?.id ?? null}
               onPersonaSelected={setPersona}
             />
-          )}
+            )}
 
           {!loading && activeStep === 'historian' && consultId && (
             <HistorianStepPanel

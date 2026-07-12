@@ -1,13 +1,24 @@
 import { NextResponse } from 'next/server'
-import { invokeBedrockJSON } from '@/lib/bedrock'
-import { getUser } from '@/lib/cognito/server'
+import { invokeBedrockClinicalJSON } from '@/lib/bedrock'
 import { FUSION_SYSTEM_PROMPT, buildFusionUserPrompt } from '@/lib/triage/extractionPrompt'
 import type { FusionResult } from '@/lib/triage/types'
+import { authorizeClinicalAccess } from '@/lib/auth/clinicalAccess'
 
 
 export const maxDuration = 60
 
 export async function POST(request: Request) {
+  const access = await authorizeClinicalAccess({
+    action: 'triage.fuse',
+    allowedRoles: ['clinician', 'admin'],
+  })
+  if (!access.ok) {
+    return NextResponse.json(
+      { error: 'Access denied', reason: access.reason },
+      { status: access.status },
+    )
+  }
+
   try {
     const body = await request.json()
     const { extractions, patient_age, patient_sex } = body
@@ -16,6 +27,23 @@ export async function POST(request: Request) {
       return NextResponse.json(
         { error: 'At least 2 extractions are required for fusion.' },
         { status: 400 }
+      )
+    }
+    if (
+      extractions.length > 20 ||
+      extractions.some(
+        (extraction: unknown) =>
+          !extraction ||
+          typeof extraction !== 'object' ||
+          typeof (extraction as Record<string, unknown>).extracted_summary !==
+            'string' ||
+          ((extraction as Record<string, unknown>).extracted_summary as string)
+            .length > 10_000,
+      )
+    ) {
+      return NextResponse.json(
+        { error: 'Fusion sources exceed the verified input limits.' },
+        { status: 400 },
       )
     }
 
@@ -29,7 +57,7 @@ export async function POST(request: Request) {
 
     let aiResponse: Omit<FusionResult, 'fusion_group_id'>
     try {
-      const result = await invokeBedrockJSON<typeof aiResponse>({
+      const result = await invokeBedrockClinicalJSON<typeof aiResponse>({
         system: FUSION_SYSTEM_PROMPT,
         messages: [{ role: 'user', content: userPrompt }],
         maxTokens: 3000,
@@ -44,7 +72,7 @@ export async function POST(request: Request) {
           { status: 504 }
         )
       }
-      console.error('Failed to parse fusion response:', parseErr)
+      console.error('[triage/fuse] clinical output failed validation')
       return NextResponse.json(
         { error: 'The fusion system returned an invalid response. Please try again.' },
         { status: 500 }
@@ -64,7 +92,7 @@ export async function POST(request: Request) {
 
     return NextResponse.json(result)
   } catch (error: unknown) {
-    console.error('Fusion API Error:', error)
+    console.error('[triage/fuse] request failed')
 
     if (error instanceof Error && error.name === 'AbortError') {
       return NextResponse.json(
@@ -73,7 +101,9 @@ export async function POST(request: Request) {
       )
     }
 
-    const message = error instanceof Error ? error.message : 'An error occurred during fusion'
-    return NextResponse.json({ error: message }, { status: 500 })
+    return NextResponse.json(
+      { error: 'An error occurred during fusion' },
+      { status: 500 },
+    )
   }
 }

@@ -1,14 +1,19 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getUser } from '@/lib/cognito/server'
+import { authorizeClinicalAccess } from '@/lib/auth/clinicalAccess'
 import { from } from '@/lib/db-query'
 
 // POST /api/patients - Create a new patient
 export async function POST(request: NextRequest) {
   try {
-
-    const user = await getUser()
-    if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    const access = await authorizeClinicalAccess({
+      action: 'patient.create',
+      allowedRoles: ['scheduler', 'clinician', 'admin'],
+    })
+    if (!access.ok) {
+      return NextResponse.json(
+        { error: 'Access denied', reason: access.reason },
+        { status: access.status },
+      )
     }
 
     const body = await request.json()
@@ -43,7 +48,8 @@ export async function POST(request: NextRequest) {
 
     const { data, error } = await from('patients')
       .insert({
-        user_id: user.id,
+        user_id: access.context.userId,
+        tenant_id: access.context.tenantId,
         mrn: generatedMrn,
         first_name: firstName,
         last_name: lastName,

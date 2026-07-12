@@ -4,9 +4,15 @@ This document provides comprehensive API documentation for the Sevaro Clinical a
 
 **Base URL:** `/api`
 
-**Authentication:** All endpoints require Supabase Auth session (cookie-based). Requests without valid authentication return `401 Unauthorized`.
+**Authentication:** Clinician endpoints require the Cognito httpOnly session plus
+an active server-verified tenant membership and role unless a route explicitly
+documents a purpose-limited patient capability, signed webhook, or retired
+contract. `/api/*` is not protected by middleware; each handler must establish
+its own authorization boundary before parsing caller input.
 
-**Multi-tenancy:** Most endpoints are tenant-scoped using the `tenant_id` derived from server context.
+**Multi-tenancy:** Clinical tenant IDs come from the active membership returned
+by the server authorization layer. A caller-provided tenant ID or static tenant
+configuration is not sufficient authorization.
 
 ---
 
@@ -35,7 +41,9 @@ This document provides comprehensive API documentation for the Sevaro Clinical a
 10. [Saved Plans](#saved-plans)
 11. [Feedback](#feedback)
 12. [Patient Portal](#patient-portal)
-13. [Admin/Demo](#admindemo)
+13. [Referral Triage](#referral-triage-local-current-state)
+14. [Retired Legacy Clinical Endpoints](#retired-legacy-clinical-endpoints)
+15. [Admin/Demo](#admindemo)
 
 ---
 
@@ -1912,61 +1920,177 @@ List messages for tenant.
 
 ---
 
+## Referral Triage (local current state)
+
+This section records only behavior proven in the local worktree. No AWS
+configuration or deployment was performed, so production remains unchanged.
+Local controlled-output tests do not establish production model parity or
+clinical validation.
+
+### Canonical single-referral intake
+
+- One pasted referral or exactly one supported file with complete native-text
+  extraction enters `POST /api/triage/extract`, persists source-bound evidence,
+  and converges on the same extraction-review and full-triage result flow. The
+  executable parity case includes a two-page native-text PDF.
+- The full referral is preserved; a time-critical phrase at the end of a long
+  paste or on the final PDF page is not truncated. There is no uploaded-file
+  batch or reduced-result branch.
+- Multipart requests must contain exactly one binary `file` field. Zero files,
+  multiple files, or an additional binary field return `400` with
+  `reason: 'exactly_one_referral_file_required'`; no file is silently selected.
+- A triage-start request is authorized by a valid persisted extraction ID. Any
+  caller-supplied extraction text or summary is non-authoritative: the server
+  reloads and validates the persisted complete-source extraction before
+  outpatient scoring.
+
+### Short and incomplete-source safety behavior
+
+- A nonempty pasted note below the 50-character outpatient-scoring minimum may
+  run only the server safety screen. A positive emergency or same-day signal is
+  persisted with immediate action and a human-review/scheduling hold; a
+  negative screen still requests more information and never authorizes routine
+  outpatient scoring. Short pasted notes do not bypass source-bound extraction.
+- When a PDF has some native-text pages but incomplete page coverage, available
+  contiguous page runs are screened for emergency and same-day evidence. The
+  response remains `coverage_status: 'failed'` with
+  `source_hold_reason: 'ocr_required'`; OCR and human review remain mandatory,
+  and outpatient scoring/finalization is not authorized. Actionable page-bound
+  evidence is preserved even while coverage is incomplete. Invalid or
+  unscannable partial-source artifacts fail closed to manual review.
+
+### Full-result safety presentation
+
+- Any authoritative emergency marker produces the immediate emergency
+  timeframe and mandatory emergency action. Both the result screen and copied
+  report suppress outpatient workup, outpatient routing, and outpatient
+  finalization while preserving clinical reasons, red flags, and missing
+  information.
+- Missing information remains visible without lowering an urgent or same-day
+  pathway. A same-day workup is explicitly nonblocking and must not delay
+  review.
+- `data_quality: 'conflicting'` creates an explicit clinician-reconciliation
+  hold and scheduling lock, synthesizes a generic conflict item when no
+  specific item was supplied, and suppresses outpatient workup/routing until
+  reconciliation.
+
+### Not yet implemented or validated
+
+The following remain pending and must not be inferred from the local slice:
+
+- multi-document packet assembly;
+- full OCR plus durable pre-parse intake and recovery;
+- recommendation-schema evolution;
+- delivery and completion of clarification requests;
+- AWS configuration or deployment; and
+- production clinical validation and live/stochastic model validation.
+
+---
+
+## Retired Legacy Clinical Endpoints
+
+The following unused prototypes were retired because they exposed clinical data
+or mutations without a complete route-level authorization and lifecycle model.
+Every listed method returns `410 Gone`, sets `Cache-Control: no-store`, and does
+not parse a request or access authentication, tenant, database, red-flag, or
+notification dependencies.
+
+### GET, POST /api/ai/historian/escalation
+
+Superseded by the authorized historian-save and durable emergency-action
+workflow. It must not be reintroduced.
+
+```typescript
+{
+  error: 'Legacy historian escalation API has been superseded';
+  reason: 'legacy_historian_escalation_superseded';
+}
+```
+
+### GET, POST /api/provider-messages
+
+### GET, POST /api/provider-messages/threads
+
+Retired pending a redesigned communications subsystem with normalized thread
+participants, active same-tenant membership checks, server-derived sender
+identity, patient binding, and append-only audit evidence.
+
+```typescript
+{
+  error: 'Legacy provider messaging API is no longer available';
+  reason: 'legacy_provider_messaging_retired';
+}
+```
+
+### GET, POST, PATCH /api/consults
+
+This is distinct from the active `/api/neuro-consults` intake pipeline. The
+legacy provider-to-provider consult prototype is retired pending requester,
+recipient, patient, tenant, and transition authorization.
+
+```typescript
+{
+  error: 'Legacy provider consult API is no longer available';
+  reason: 'legacy_provider_consults_retired';
+}
+```
+
+### GET /api/incomplete-docs
+
+The legacy browser-triggered scan combined unscoped reads with notification
+side effects. Any replacement must be an authenticated, tenant-scoped read plus
+a separate service-authenticated idempotent reminder job.
+
+```typescript
+{
+  error: 'Legacy incomplete documentation scan is no longer available';
+  reason: 'legacy_incomplete_docs_retired';
+}
+```
+
+Historical data and tables used by these prototypes are not deleted by endpoint
+retirement.
+
+---
+
 ## Admin/Demo
 
 ### POST /api/admin/reset-demo
 
-Reset all demo data for a tenant (requires admin secret).
+**Retired.** This endpoint always returns `410 Gone` and performs no request
+parsing, authentication, tenant lookup, database query, or data deletion.
 
-**Headers:**
-| Header | Value |
-|--------|-------|
-| x-admin-secret | Must match ADMIN_RESET_SECRET env var |
-
-**Request Body:**
+**Response (410):**
 ```typescript
 {
-  tenant_id: string;                   // Required - tenant to wipe
+  error: 'Demo reset is no longer available';
+  reason: 'destructive_demo_reset_retired';
 }
 ```
 
-**Response (200):**
-```typescript
-{
-  message: 'Demo data reset for tenant "..."';
-  results: {
-    patient_messages: 'cleared' | 'error: ...' | 'skipped: ...';
-    patient_intake_forms: string;
-    clinical_notes: string;
-    diagnoses: string;
-    scale_results: string;
-    clinical_scales: string;
-    imaging_studies: string;
-    dot_phrases: string;
-    visits: string;
-    patients: string;
-  };
-}
-```
+**Response Headers:** `Cache-Control: no-store`
 
 ---
 
 ### POST /api/demo/reset
 
-Reset demo data for the current user (authenticated).
+**Retired.** This endpoint always returns `410 Gone` and performs no request
+parsing, authentication, tenant lookup, database query, or data deletion.
 
-**Response (200):**
+**Response (410):**
 ```typescript
 {
-  message: 'Demo reset successful';
-  cleaned: {
-    visitsDeleted: number;
-    appointmentsReset: boolean;
-    futureAppointmentsDeleted: number;
-    dynamicPatientsDeleted: number;
-  };
+  error: 'Demo reset is no longer available';
+  reason: 'destructive_demo_reset_retired';
 }
 ```
+
+**Response Headers:** `Cache-Control: no-store`
+
+Synthetic dataset resets, when needed, must use an approval-gated operator
+workflow outside the web application. Neither retired route is an operator
+interface, and callers must not send admin secrets or tenant identifiers to
+them.
 
 ---
 

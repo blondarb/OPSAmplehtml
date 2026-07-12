@@ -108,6 +108,7 @@ export default function HistorianStepPanel({ consultId, consult, onComplete, onE
       {interviewStarted ? (
         <EmbeddedHistorian
           consultId={consultId}
+          sessionType="referral_clarification"
           referralReason={consult?.triage_chief_complaint || ''}
           patientName={consult?.referral_text?.match(/(?:patient|name)[:\s]+([A-Z][a-z]+ [A-Z][a-z]+)/i)?.[1] || 'Patient'}
           onComplete={onComplete}

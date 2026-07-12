@@ -1,12 +1,23 @@
 import { NextResponse } from 'next/server'
-import { getUser } from '@/lib/cognito/server'
+import { authorizeClinicalAccess } from '@/lib/auth/clinicalAccess'
 import { rpc } from '@/lib/db-query'
 
 
 export async function POST(request: Request) {
   try {
+    const access = await authorizeClinicalAccess({
+      action: 'patient.register',
+      allowedRoles: ['scheduler', 'clinician', 'admin'],
+    })
+    if (!access.ok) {
+      return NextResponse.json(
+        { error: 'Access denied', reason: access.reason },
+        { status: access.status },
+      )
+    }
+
     const body = await request.json()
-    const { first_name, last_name, referral_reason, tenant_id } = body
+    const { first_name, last_name, referral_reason } = body
 
     if (!first_name || !last_name) {
       return NextResponse.json(
@@ -20,19 +31,22 @@ export async function POST(request: Request) {
       p_first_name: first_name,
       p_last_name: last_name,
       p_referral_reason: referral_reason || null,
-      p_tenant_id: tenant_id || 'default',
+      p_tenant_id: access.context.tenantId,
     })
 
     if (error) {
-      console.error('Error registering patient:', error)
-      return NextResponse.json({ error: error.message }, { status: 500 })
+      console.error('[patient/register] registration failed')
+      return NextResponse.json(
+        { error: 'Failed to register patient' },
+        { status: 500 },
+      )
     }
 
     return NextResponse.json({ patientId: data })
-  } catch (error: any) {
-    console.error('Patient register API error:', error)
+  } catch {
+    console.error('[patient/register] request failed')
     return NextResponse.json(
-      { error: error?.message || 'Failed to register patient' },
+      { error: 'Failed to register patient' },
       { status: 500 },
     )
   }

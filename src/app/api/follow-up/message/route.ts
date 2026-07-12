@@ -1,40 +1,317 @@
 import { NextResponse } from 'next/server'
-import { getUser } from '@/lib/cognito/server'
 import { processConversationTurn } from '@/lib/follow-up/conversationEngine'
-import type { FollowUpMessageRequest, FollowUpMessageResponse } from '@/lib/follow-up/types'
+import type {
+  FollowUpMessageRequest,
+  FollowUpMessageResponse,
+  PatientScenario,
+} from '@/lib/follow-up/types'
 import { suggestCptCode, CPT_CODES } from '@/lib/follow-up/cptCodes'
 import { from } from '@/lib/db-query'
-import { linkIntakeToConsult } from '@/lib/consult/pipeline'
+import { getConsult, linkIntakeToConsult } from '@/lib/consult/pipeline'
 import { notifyFollowUpEscalation } from '@/lib/notifications'
+import { authorizeClinicalAccess } from '@/lib/auth/clinicalAccess'
+import { getPool } from '@/lib/db'
+import { loadSchedulingAuthorization } from '@/lib/triage/schedulingAuthorization'
 
 
 export const maxDuration = 30
 
+interface ExistingFollowUpBinding {
+  id: string
+  session_patient_id: string | null
+  patient_name: string | null
+  patient_age: number | null
+  patient_gender: string | null
+  diagnosis: string | null
+  visit_date: string | Date | null
+  provider_name: string | null
+  medications: unknown
+  visit_summary: string | null
+  consult_id: string | null
+  consult_patient_id: string | null
+  triage_session_id: string | null
+}
+
+function parseMedications(value: unknown): PatientScenario['medications'] {
+  if (Array.isArray(value)) return value as PatientScenario['medications']
+  if (typeof value === 'string') {
+    try {
+      const parsed = JSON.parse(value)
+      return Array.isArray(parsed)
+        ? (parsed as PatientScenario['medications'])
+        : []
+    } catch {
+      return []
+    }
+  }
+  return []
+}
+
+function authoritativePatientContext(
+  binding: ExistingFollowUpBinding,
+  requested: PatientScenario,
+  patientId: string,
+): PatientScenario {
+  const visitDate =
+    binding.visit_date instanceof Date
+      ? binding.visit_date.toISOString().split('T')[0]
+      : binding.visit_date
+
+  return {
+    id: patientId,
+    name: binding.patient_name || requested.name,
+    age: binding.patient_age != null && Number.isFinite(Number(binding.patient_age))
+      ? Number(binding.patient_age)
+      : requested.age,
+    gender: binding.patient_gender || requested.gender,
+    diagnosis: binding.diagnosis || requested.diagnosis,
+    visitDate: visitDate || requested.visitDate,
+    providerName: binding.provider_name || requested.providerName,
+    medications:
+      binding.medications == null
+        ? requested.medications
+        : parseMedications(binding.medications),
+    visitSummary: binding.visit_summary || requested.visitSummary,
+  }
+}
+
 export async function POST(request: Request) {
+  const access = await authorizeClinicalAccess({
+    action: 'follow_up.message',
+    allowedRoles: ['clinician', 'admin'],
+  })
+  if (!access.ok) {
+    return NextResponse.json(
+      { error: 'Access denied', reason: access.reason },
+      { status: access.status },
+    )
+  }
+
   try {
     const body = await request.json()
     const {
       session_id,
       patient_message,
-      patient_context,
+      patient_context: requestedPatientContext,
       conversation_history,
       // Phase 1 pipeline — optional consult linkage
       consult_id,
     } = body as FollowUpMessageRequest & { consult_id?: string }
 
     // Validate input
-    if (!patient_context) {
+    if (!requestedPatientContext) {
       return NextResponse.json(
         { error: 'patient_context is required' },
         { status: 400 }
       )
     }
 
+    const pool = await getPool()
+    if (requestedPatientContext.id) {
+      const { rows } = await pool.query(
+        `SELECT id
+           FROM patients
+          WHERE id = $1
+            AND tenant_id = $2
+          LIMIT 1`,
+        [requestedPatientContext.id, access.context.tenantId],
+      )
+      if (!rows[0]) {
+        return NextResponse.json({ error: 'Patient not found' }, { status: 404 })
+      }
+    }
+
+    const requestedConsultId =
+      typeof consult_id === 'string' && consult_id.trim()
+        ? consult_id.trim()
+        : undefined
+    let consultId = requestedConsultId
+    let triageSessionId: string | null = null
+    let patientContext = requestedPatientContext
+
+    if (session_id) {
+      const { rows } = await pool.query(
+        `SELECT fs.id,
+                fs.patient_id AS session_patient_id,
+                fs.patient_name,
+                fs.patient_age,
+                fs.patient_gender,
+                fs.diagnosis,
+                fs.visit_date,
+                fs.provider_name,
+                fs.medications,
+                fs.visit_summary,
+                nc.id AS consult_id,
+                nc.patient_id AS consult_patient_id,
+                nc.triage_session_id
+           FROM followup_sessions fs
+           LEFT JOIN neurology_consults nc
+             ON nc.intake_session_id = fs.id
+            AND nc.tenant_id = fs.tenant_id
+          WHERE fs.id = $1
+            AND fs.tenant_id = $2
+          LIMIT 2`,
+        [session_id, access.context.tenantId],
+      )
+      if (rows.length === 0) {
+        return NextResponse.json(
+          { error: 'Follow-up session not found' },
+          { status: 404 },
+        )
+      }
+      if (rows.length !== 1) {
+        return NextResponse.json(
+          {
+            error: 'Follow-up session binding is inconsistent',
+            reason: 'follow_up_session_binding_conflict',
+          },
+          { status: 409 },
+        )
+      }
+
+      const binding = rows[0] as ExistingFollowUpBinding
+      if (
+        binding.session_patient_id &&
+        binding.consult_patient_id &&
+        binding.session_patient_id !== binding.consult_patient_id
+      ) {
+        return NextResponse.json(
+          {
+            error: 'Follow-up session binding is inconsistent',
+            reason: 'follow_up_session_binding_conflict',
+          },
+          { status: 409 },
+        )
+      }
+
+      const boundPatientId =
+        binding.consult_patient_id || binding.session_patient_id
+      if (!boundPatientId) {
+        return NextResponse.json(
+          {
+            error: 'Follow-up session has no authoritative patient binding',
+            reason: 'follow_up_session_patient_unbound',
+          },
+          { status: 409 },
+        )
+      }
+      if (
+        requestedPatientContext.id &&
+        requestedPatientContext.id !== boundPatientId
+      ) {
+        return NextResponse.json(
+          {
+            error: 'Patient context does not match the follow-up session',
+            reason: 'follow_up_session_patient_mismatch',
+          },
+          { status: 409 },
+        )
+      }
+      if (
+        requestedConsultId &&
+        requestedConsultId !== binding.consult_id
+      ) {
+        return NextResponse.json(
+          {
+            error: 'Consult does not match the follow-up session',
+            reason: 'follow_up_session_consult_mismatch',
+          },
+          { status: 409 },
+        )
+      }
+
+      consultId = binding.consult_id || undefined
+      triageSessionId = binding.triage_session_id
+      patientContext = authoritativePatientContext(
+        binding,
+        requestedPatientContext,
+        boundPatientId,
+      )
+    }
+
+    if (consultId && !session_id) {
+      const consult = await getConsult(consultId, access.context.tenantId)
+      if (!consult) {
+        return NextResponse.json({ error: 'Consult not found' }, { status: 404 })
+      }
+      if (!consult.patient_id || !patientContext.id) {
+        return NextResponse.json(
+          {
+            error: 'Consult-linked follow-up requires an authoritative patient binding',
+            reason: 'follow_up_consult_patient_binding_required',
+          },
+          { status: 409 },
+        )
+      }
+      if (
+        consult.patient_id !== patientContext.id
+      ) {
+        return NextResponse.json(
+          { error: 'Patient and consult binding do not match' },
+          { status: 409 },
+        )
+      }
+      if (!consult.triage_session_id) {
+        return NextResponse.json(
+          {
+            error: 'Follow-up agent is blocked by triage safety state',
+            reason: 'triage_authorization_missing',
+          },
+          { status: 409 },
+        )
+      }
+      triageSessionId = consult.triage_session_id
+    }
+
+    if (consultId) {
+      if (!triageSessionId) {
+        return NextResponse.json(
+          {
+            error: 'Follow-up agent is blocked by triage safety state',
+            reason: 'triage_authorization_missing',
+          },
+          { status: 409 },
+        )
+      }
+      const safetyAuthorization = await loadSchedulingAuthorization(
+        triageSessionId,
+        access.context.tenantId,
+      )
+      if (!safetyAuthorization.decision.allowed) {
+        return NextResponse.json(
+          {
+            error: 'Follow-up agent is blocked by triage safety state',
+            reason: safetyAuthorization.decision.reason,
+          },
+          { status: 409 },
+        )
+      }
+    }
+
     // Call shared conversation engine (uses Bedrock — no API key needed)
     const result = await processConversationTurn(
-      { patient_message, patient_context, conversation_history },
+      { patient_message, patient_context: patientContext, conversation_history },
       '' // API key param kept for backward compatibility; engine uses Bedrock env credentials
     )
+
+    // Bedrock processing is an external call. Re-read the safety state before
+    // returning its response or writing any turn data so an emergency hold
+    // raised while the model was running wins the race.
+    if (consultId && triageSessionId) {
+      const currentSafetyAuthorization = await loadSchedulingAuthorization(
+        triageSessionId,
+        access.context.tenantId,
+      )
+      if (!currentSafetyAuthorization.decision.allowed) {
+        return NextResponse.json(
+          {
+            error: 'Follow-up agent is blocked by triage safety state',
+            reason: currentSafetyAuthorization.decision.reason,
+          },
+          { status: 409 },
+        )
+      }
+    }
 
     // Build the response
     const responsePayload: FollowUpMessageResponse = {
@@ -71,24 +348,27 @@ export async function POST(request: Request) {
         const { data: inserted, error: insertError } = await from('followup_sessions')
           .insert({
             id: newSessionId,
-            patient_id: patient_context.id,
-            patient_name: patient_context.name,
-            patient_age: patient_context.age,
-            patient_gender: patient_context.gender,
-            diagnosis: patient_context.diagnosis,
-            visit_date: patient_context.visitDate,
-            provider_name: patient_context.providerName,
-            medications: patient_context.medications,
-            visit_summary: patient_context.visitSummary,
+            tenant_id: access.context.tenantId,
+            patient_id: patientContext.id,
+            patient_name: patientContext.name,
+            patient_age: patientContext.age,
+            patient_gender: patientContext.gender,
+            diagnosis: patientContext.diagnosis,
+            visit_date: patientContext.visitDate,
+            provider_name: patientContext.providerName,
+            medications: JSON.stringify(patientContext.medications || []),
+            visit_summary: patientContext.visitSummary,
             follow_up_method: 'sms',
             status: result.dashboard_update.status,
             current_module: result.current_module,
-            transcript: newTranscriptEntries,
-            medication_status: result.medication_status,
+            // db-query intentionally leaves arrays untouched for PostgreSQL
+            // array columns. Encode these JSONB arrays explicitly.
+            transcript: JSON.stringify(newTranscriptEntries),
+            medication_status: JSON.stringify(result.medication_status),
             escalation_level: result.highest_tier !== 'none' ? result.highest_tier : null,
             functional_status: result.extracted_data.functional_status,
             functional_details: result.extracted_data.functional_details,
-            patient_questions: result.extracted_data.patient_questions,
+            patient_questions: JSON.stringify(result.extracted_data.patient_questions),
             caregiver_info: result.caregiver_info,
           })
           .select('id')
@@ -104,6 +384,7 @@ export async function POST(request: Request) {
         const { data: existing } = await from('followup_sessions')
           .select('transcript')
           .eq('id', session_id)
+          .eq('tenant_id', access.context.tenantId)
           .single()
 
         const currentTranscript = (existing?.transcript as Array<unknown>) || []
@@ -113,16 +394,17 @@ export async function POST(request: Request) {
           .update({
             status: result.dashboard_update.status,
             current_module: result.current_module,
-            transcript: updatedTranscript,
-            medication_status: result.medication_status,
+            transcript: JSON.stringify(updatedTranscript),
+            medication_status: JSON.stringify(result.medication_status),
             escalation_level: result.highest_tier !== 'none' ? result.highest_tier : null,
             functional_status: result.extracted_data.functional_status,
             functional_details: result.extracted_data.functional_details,
-            patient_questions: result.extracted_data.patient_questions,
+            patient_questions: JSON.stringify(result.extracted_data.patient_questions),
             caregiver_info: result.caregiver_info,
             conversation_complete: result.conversation_complete,
           })
           .eq('id', session_id)
+          .eq('tenant_id', access.context.tenantId)
 
         if (updateError) {
           console.error('DB update error (non-fatal):', updateError)
@@ -151,17 +433,18 @@ export async function POST(request: Request) {
         // Fire escalation notification (non-blocking)
         notifyFollowUpEscalation(
           responsePayload.session_id,
-          patient_context.name || 'Unknown Patient',
+          patientContext.name || 'Unknown Patient',
           topFlag.tier,
           topFlag.tier,
           topFlag.category,
-          patient_context.id || null,
+          patientContext.id || null,
+          access.context.tenantId,
         ).catch(err => console.error('Follow-up escalation notification error (non-fatal):', err))
       }
 
       // ── Phase 1: Link intake session to consult pipeline ──────────────────
       // Non-fatal — follow-up still works without consult linkage.
-      if (consult_id) {
+      if (consultId) {
         try {
           const linkedSessionId = responsePayload.session_id
           if (result.conversation_complete) {
@@ -182,15 +465,23 @@ export async function POST(request: Request) {
               summaryParts.push(`Patient questions: ${result.extracted_data.patient_questions.join('; ')}`)
             }
             await linkIntakeToConsult(
-              consult_id,
+              consultId,
               linkedSessionId,
               'intake_complete',
               summaryParts.join('\n'),
               result.highest_tier !== 'none' ? result.highest_tier : null,
+              access.context.tenantId,
             )
           } else if (!session_id) {
             // First message — mark intake as in progress
-            await linkIntakeToConsult(consult_id, linkedSessionId, 'intake_in_progress')
+            await linkIntakeToConsult(
+              consultId,
+              linkedSessionId,
+              'intake_in_progress',
+              undefined,
+              undefined,
+              access.context.tenantId,
+            )
           }
         } catch (pipelineErr) {
           console.error('Consult pipeline linkage error (non-fatal):', pipelineErr)
@@ -210,8 +501,8 @@ export async function POST(request: Request) {
 
           await from('followup_billing_entries').insert({
             session_id: responsePayload.session_id,
-            patient_id: patient_context.id || null,
-            patient_name: patient_context.name,
+            patient_id: patientContext.id || null,
+            patient_name: patientContext.name,
             service_date: new Date().toISOString().split('T')[0],
             billing_month: new Date().toISOString().slice(0, 7),
             program: 'ccm',
@@ -236,7 +527,7 @@ export async function POST(request: Request) {
 
     return NextResponse.json(responsePayload)
   } catch (error: unknown) {
-    console.error('Follow-up message API error:', error)
+    console.error('[follow-up/message] request failed')
 
     if (error instanceof Error && error.name === 'AbortError') {
       return NextResponse.json(
@@ -245,7 +536,9 @@ export async function POST(request: Request) {
       )
     }
 
-    const message = error instanceof Error ? error.message : 'An error occurred while processing your request'
-    return NextResponse.json({ error: message }, { status: 500 })
+    return NextResponse.json(
+      { error: 'An error occurred while processing your request' },
+      { status: 500 },
+    )
   }
 }

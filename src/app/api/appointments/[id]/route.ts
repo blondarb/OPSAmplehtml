@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getUser } from '@/lib/cognito/server'
 import { getPool } from '@/lib/db'
 import { from } from '@/lib/db-query'
+import { authorizeClinicalAccess } from '@/lib/auth/clinicalAccess'
 
 // GET /api/appointments/[id] - Get a single appointment
 export async function GET(
@@ -9,13 +9,18 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { id } = await params
-
-    // Check authentication
-    const user = await getUser()
-    if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    const access = await authorizeClinicalAccess({
+      action: 'appointment.read',
+      allowedRoles: ['viewer', 'scheduler', 'clinician', 'admin'],
+    })
+    if (!access.ok) {
+      return NextResponse.json(
+        { error: 'Access denied', reason: access.reason },
+        { status: access.status },
+      )
     }
+
+    const { id } = await params
 
     const pool = await getPool()
     const sql = `
@@ -27,13 +32,20 @@ export async function GET(
         (SELECT json_agg(cn.*) FROM "clinical_notes" cn WHERE cn."visit_id" = v."id") AS visit_clinical_notes,
         (SELECT json_agg(cn.*) FROM "clinical_notes" cn WHERE cn."visit_id" = pv."id") AS prior_visit_clinical_notes
       FROM "appointments" a
-      LEFT JOIN "patients" p ON p."id" = a."patient_id"
-      LEFT JOIN "visits" v ON v."id" = a."visit_id"
-      LEFT JOIN "visits" pv ON pv."id" = a."prior_visit_id"
+      LEFT JOIN "patients" p
+        ON p."id" = a."patient_id"
+       AND p."tenant_id" = a."tenant_id"
+      LEFT JOIN "visits" v
+        ON v."id" = a."visit_id"
+       AND v."tenant_id" = a."tenant_id"
+      LEFT JOIN "visits" pv
+        ON pv."id" = a."prior_visit_id"
+       AND pv."tenant_id" = a."tenant_id"
       WHERE a."id" = $1
+        AND a."tenant_id" = $2
       LIMIT 1
     `
-    const { rows } = await pool.query(sql, [id])
+    const { rows } = await pool.query(sql, [id, access.context.tenantId])
 
     if (!rows.length) {
       return NextResponse.json({ error: 'Appointment not found' }, { status: 404 })
@@ -59,13 +71,18 @@ export async function PATCH(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { id } = await params
-
-    // Check authentication
-    const user = await getUser()
-    if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    const access = await authorizeClinicalAccess({
+      action: 'appointment.write',
+      allowedRoles: ['scheduler', 'clinician', 'admin'],
+    })
+    if (!access.ok) {
+      return NextResponse.json(
+        { error: 'Access denied', reason: access.reason },
+        { status: access.status },
+      )
     }
+
+    const { id } = await params
 
     const body = await request.json()
     const {
@@ -80,8 +97,24 @@ export async function PATCH(
       schedulingNotes,
     } = body
 
+    if (
+      appointmentType !== undefined &&
+      String(appointmentType)
+        .trim()
+        .toLowerCase()
+        .replace(/[_\s]+/g, '-') === 'new-consult'
+    ) {
+      return NextResponse.json(
+        {
+          error: 'New referral appointments require an authorized triage workflow',
+          reason: 'triage_authorization_required',
+        },
+        { status: 409 },
+      )
+    }
+
     // Build update object with only provided fields
-    const updateData: Record<string, any> = {
+    const updateData: Record<string, unknown> = {
       updated_at: new Date().toISOString(),
     }
 
@@ -98,6 +131,7 @@ export async function PATCH(
     const { data, error } = await from('appointments')
       .update(updateData)
       .eq('id', id)
+      .eq('tenant_id', access.context.tenantId)
       .select()
       .single()
 
@@ -119,13 +153,18 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { id } = await params
-
-    // Check authentication
-    const user = await getUser()
-    if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    const access = await authorizeClinicalAccess({
+      action: 'appointment.write',
+      allowedRoles: ['scheduler', 'clinician', 'admin'],
+    })
+    if (!access.ok) {
+      return NextResponse.json(
+        { error: 'Access denied', reason: access.reason },
+        { status: access.status },
+      )
     }
+
+    const { id } = await params
 
     // Soft delete by setting status to 'cancelled'
     const { data, error } = await from('appointments')
@@ -134,6 +173,7 @@ export async function DELETE(
         updated_at: new Date().toISOString(),
       })
       .eq('id', id)
+      .eq('tenant_id', access.context.tenantId)
       .select()
       .single()
 

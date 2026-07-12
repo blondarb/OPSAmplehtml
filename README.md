@@ -44,7 +44,7 @@ AI-powered clinical documentation platform for neurology outpatient practices.
 
 ### Prerequisites
 
-- Node.js 18+
+- Node.js 20+ (Node.js 22 is the production target)
 - AWS account with RDS, Cognito, and Bedrock configured
 - OpenAI API key (for Whisper transcription)
 
@@ -61,17 +61,23 @@ cd OPSAmplehtml
 pnpm install
 ```
 
-3. Create `.env.local` with your AWS credentials (see CLAUDE.md for full list):
+3. Authenticate with a temporary AWS SSO profile. The AWS SDK default
+   credential chain is used; do not put long-lived AWS access keys in this
+   repository or a Next.js environment file.
+
+   Add only local, non-committed configuration to `.env.local` (see
+   `CLAUDE.md` for the full list):
 ```
-COGNITO_USER_POOL_ID=us-east-2_...
-COGNITO_CLIENT_ID=...
-RDS_HOST=...
-RDS_USER=...
-RDS_PASSWORD=...
+AWS_PROFILE=sevaro-sandbox
+NEXT_PUBLIC_COGNITO_USER_POOL_ID=us-east-2_...
+NEXT_PUBLIC_COGNITO_CLIENT_ID=...
+RDS_SECRET_ID=sevaro/rds/credentials
 RDS_DATABASE=ops_amplehtml
-BEDROCK_ACCESS_KEY_ID=...
-BEDROCK_SECRET_ACCESS_KEY=...
+BEDROCK_REGION=us-east-2
 ```
+
+   Production uses the Amplify SSR compute role and named Secrets Manager
+   resources. See `infrastructure/amplify-ssr-runtime/README.md`.
 
 4. Start the development server:
 ```bash

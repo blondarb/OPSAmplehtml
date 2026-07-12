@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getUser } from '@/lib/cognito/server'
+import { authorizeClinicalAccess } from '@/lib/auth/clinicalAccess'
 import { getPool } from '@/lib/db'
 import { from } from '@/lib/db-query'
 
@@ -9,22 +9,26 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { id } = await params
-
-    // Check authentication
-    const user = await getUser()
-    if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    const access = await authorizeClinicalAccess({
+      action: 'patient.read',
+      allowedRoles: ['viewer', 'scheduler', 'clinician', 'admin'],
+    })
+    if (!access.ok) {
+      return NextResponse.json(
+        { error: 'Access denied', reason: access.reason },
+        { status: access.status },
+      )
     }
+    const { id } = await params
 
     // Fetch patient basic info
     const { data: patient, error: patientError } = await from('patients')
       .select('*')
       .eq('id', id)
+      .eq('tenant_id', access.context.tenantId)
       .single()
 
     if (patientError || !patient) {
-      console.error('Error fetching patient:', patientError)
       return NextResponse.json({ error: 'Patient not found' }, { status: 404 })
     }
 
@@ -32,6 +36,7 @@ export async function GET(
     const { data: medications } = await from('patient_medications')
       .select('*')
       .eq('patient_id', id)
+      .eq('tenant_id', access.context.tenantId)
       .eq('is_active', true)
       .order('medication_name')
 
@@ -39,6 +44,7 @@ export async function GET(
     const { data: allergies } = await from('patient_allergies')
       .select('*')
       .eq('patient_id', id)
+      .eq('tenant_id', access.context.tenantId)
       .eq('is_active', true)
       .order('allergen')
 
@@ -47,17 +53,22 @@ export async function GET(
     const { rows: visits } = await pool.query(`
       SELECT
         v.*,
-        (SELECT json_agg(cn.*) FROM "clinical_notes" cn WHERE cn."visit_id" = v."id") AS clinical_notes
+        (SELECT json_agg(cn.*)
+           FROM "clinical_notes" cn
+          WHERE cn."visit_id" = v."id"
+            AND cn."tenant_id" = $2) AS clinical_notes
       FROM "visits" v
       WHERE v."patient_id" = $1
+        AND v."tenant_id" = $2
       ORDER BY v."visit_date" DESC
       LIMIT 10
-    `, [id])
+    `, [id, access.context.tenantId])
 
     // Fetch appointments
     const { data: appointments } = await from('appointments')
       .select('*')
       .eq('patient_id', id)
+      .eq('tenant_id', access.context.tenantId)
       .order('appointment_date', { ascending: false })
       .limit(20)
 
@@ -65,6 +76,7 @@ export async function GET(
     const { data: scaleResults } = await from('scale_results')
       .select('*')
       .eq('patient_id', id)
+      .eq('tenant_id', access.context.tenantId)
       .order('completed_at', { ascending: false })
       .limit(20)
 
@@ -72,6 +84,7 @@ export async function GET(
     const { data: imagingStudies } = await from('imaging_studies')
       .select('*')
       .eq('patient_id', id)
+      .eq('tenant_id', access.context.tenantId)
       .order('study_date', { ascending: false })
       .limit(20)
 
@@ -104,7 +117,7 @@ export async function GET(
     }
 
     // Transform medications
-    const transformedMedications = (medications || []).map((med: any) => ({
+    const transformedMedications = (medications || []).map((med: Record<string, unknown>) => ({
       id: med.id,
       name: med.medication_name,
       dosage: med.dosage,
@@ -116,7 +129,7 @@ export async function GET(
     }))
 
     // Transform allergies
-    const transformedAllergies = (allergies || []).map((allergy: any) => ({
+    const transformedAllergies = (allergies || []).map((allergy: Record<string, unknown>) => ({
       id: allergy.id,
       allergen: allergy.allergen,
       reaction: allergy.reaction,
@@ -125,10 +138,13 @@ export async function GET(
 
     // Transform visits with clinical notes
     // clinical_notes is an object (unique FK on visit_id) not array
-    const transformedVisits = (visits || []).map((visit: any) => {
-      const note = Array.isArray(visit.clinical_notes)
+    const transformedVisits = (visits || []).map((visit: Record<string, unknown>) => {
+      const rawNote = Array.isArray(visit.clinical_notes)
         ? visit.clinical_notes[0]
         : visit.clinical_notes
+      const note = rawNote && typeof rawNote === 'object'
+        ? rawNote as Record<string, unknown>
+        : null
       return {
         id: visit.id,
         visitDate: visit.visit_date,
@@ -151,15 +167,25 @@ export async function GET(
     })
 
     // Transform scale results for score history
-    const scoreHistory = (scaleResults || []).map((result: any) => ({
-      id: result.id,
-      scaleType: result.scale_id?.toUpperCase().replace('PHQ9', 'PHQ-9').replace('GAD7', 'GAD-7').replace('HIT6', 'HIT-6'),
-      score: result.raw_score,
-      maxScore: result.max_score,
-      interpretation: result.interpretation,
-      severity: result.severity,
-      completedAt: result.completed_at,
-    }))
+    const scoreHistory = (scaleResults || []).map((result: Record<string, unknown>) => {
+      const scaleType = typeof result.scale_id === 'string'
+        ? result.scale_id
+          .toUpperCase()
+          .replace('PHQ9', 'PHQ-9')
+          .replace('GAD7', 'GAD-7')
+          .replace('HIT6', 'HIT-6')
+        : null
+
+      return {
+        id: result.id,
+        scaleType,
+        score: result.raw_score,
+        maxScore: result.max_score,
+        interpretation: result.interpretation,
+        severity: result.severity,
+        completedAt: result.completed_at,
+      }
+    })
 
     return NextResponse.json({
       patient: transformedPatient,
@@ -170,8 +196,8 @@ export async function GET(
       scoreHistory,
       imagingStudies: imagingStudies || [],
     })
-  } catch (error) {
-    console.error('Error in patient API:', error)
+  } catch {
+    console.error('[patients/id] request failed')
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }

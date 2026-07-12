@@ -1,0 +1,98 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: >-
+  Least-privilege Amplify SSR compute role for OPSAmplehtml. This template
+  creates a replacement role only; it does not attach it to an Amplify app.
+
+Parameters:
+  CognitoClientSecretArn:
+    Type: String
+    Description: ARN of sevaro/ops-amplehtml/cognito.
+  NovaRelaySecretArn:
+    Type: String
+    Description: ARN of sevaro/nova-relay/shared-secret.
+  RdsSecretArn:
+    Type: String
+  OpenAiSecretArn:
+    Type: String
+  DeepgramSecretArn:
+    Type: String
+  TwilioSecretArn:
+    Type: String
+  BedrockKnowledgeBaseId:
+    Type: String
+    Default: T4W8S8RNMN
+
+Resources:
+  OpsAmpleSsrComputeRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: OPSAmple-AmplifySSR-LeastPrivilege
+      Description: Temporary runtime credentials for OPSAmplehtml SSR only.
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Sid: AmplifySsrComputeTrust
+            Effect: Allow
+            Principal:
+              Service: amplify.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: OpsAmpleRuntimeSecrets
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Sid: ReadOnlyNamedRuntimeSecrets
+                Effect: Allow
+                Action: secretsmanager:GetSecretValue
+                Resource:
+                  - !Ref CognitoClientSecretArn
+                  - !Ref NovaRelaySecretArn
+                  - !Ref RdsSecretArn
+                  - !Ref OpenAiSecretArn
+                  - !Ref DeepgramSecretArn
+                  - !Ref TwilioSecretArn
+        - PolicyName: OpsAmplePinnedBedrockModels
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Sid: InvokeOnlyPinnedInferenceProfiles
+                Effect: Allow
+                Action:
+                  - bedrock:InvokeModel
+                  - bedrock:InvokeModelWithResponseStream
+                Resource:
+                  - !Sub arn:${AWS::Partition}:bedrock:${AWS::Region}:${AWS::AccountId}:inference-profile/us.anthropic.claude-haiku-4-5-20251001-v1:0
+                  - !Sub arn:${AWS::Partition}:bedrock:${AWS::Region}:${AWS::AccountId}:inference-profile/us.anthropic.claude-sonnet-5
+                  - !Sub arn:${AWS::Partition}:bedrock:${AWS::Region}:${AWS::AccountId}:inference-profile/us.anthropic.claude-sonnet-4-6
+                  - !Sub arn:${AWS::Partition}:bedrock:${AWS::Region}:${AWS::AccountId}:inference-profile/us.anthropic.claude-opus-4-8
+                  - !Sub arn:${AWS::Partition}:bedrock:*::foundation-model/anthropic.claude-haiku-4-5-20251001-v1:0
+                  - !Sub arn:${AWS::Partition}:bedrock:*::foundation-model/anthropic.claude-sonnet-5
+                  - !Sub arn:${AWS::Partition}:bedrock:*::foundation-model/anthropic.claude-sonnet-4-6
+                  - !Sub arn:${AWS::Partition}:bedrock:*::foundation-model/anthropic.claude-opus-4-8
+              - Sid: RetrieveFromNamedKnowledgeBase
+                Effect: Allow
+                Action:
+                  - bedrock:Retrieve
+                  - bedrock:RetrieveAndGenerate
+                Resource:
+                  - !Sub arn:${AWS::Partition}:bedrock:${AWS::Region}:${AWS::AccountId}:knowledge-base/${BedrockKnowledgeBaseId}
+                  - !Sub arn:${AWS::Partition}:bedrock:*::foundation-model/anthropic.claude-sonnet-4-6
+        - PolicyName: OpsAmpleVoiceServices
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Sid: PresignMedicalStreamingTranscription
+                Effect: Allow
+                Action: transcribe:StartMedicalStreamTranscriptionWebSocket
+                Resource: '*'
+              - Sid: SynthesizeFaqSpeech
+                Effect: Allow
+                Action: polly:SynthesizeSpeech
+                Resource: '*'
+
+Outputs:
+  ComputeRoleArn:
+    Value: !GetAtt OpsAmpleSsrComputeRole.Arn
+    Description: >-
+      Candidate role ARN. Attach only after sandbox canary verification and
+      explicit approval; this stack never updates Amplify itself.

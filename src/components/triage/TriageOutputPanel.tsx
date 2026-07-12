@@ -1,7 +1,16 @@
 'use client'
 
 import { useState } from 'react'
-import { TriageResult, LOW_CONFIDENCE_DISCLAIMER, RED_FLAG_DISCLAIMER } from '@/lib/triage/types'
+import {
+  LOW_CONFIDENCE_DISCLAIMER,
+  RED_FLAG_DISCLAIMER,
+  type TriageResult,
+} from '@/lib/triage/types'
+import {
+  DATA_CONFLICT_INFORMATION,
+  INSUFFICIENT_DATA_INFORMATION,
+  triageOutputPolicy,
+} from '@/lib/triage/triageOutputPolicy'
 import TriageTierBadge from './TriageTierBadge'
 import ClinicalReasons from './ClinicalReasons'
 import RedFlagAlert from './RedFlagAlert'
@@ -9,13 +18,17 @@ import PreVisitWorkup from './PreVisitWorkup'
 import FailedTherapiesList from './FailedTherapiesList'
 import SubspecialtyRouter from './SubspecialtyRouter'
 import InsufficientDataPanel from './InsufficientDataPanel'
+import MissingInformationPanel from './MissingInformationPanel'
 import EmergentAlert from './EmergentAlert'
 import DisclaimerBanner from './DisclaimerBanner'
 import CopyReportButton from './CopyReportButton'
 import AlgorithmModal from './AlgorithmModal'
 import PhysicianOverridePanel from './PhysicianOverridePanel'
-import PatientSelector from './PatientSelector'
+import SafetyReviewPanel from './SafetyReviewPanel'
+import EmergencyActionPanel from './EmergencyActionPanel'
 
+const EMERGENCY_TIMEFRAME = 'Emergency evaluation now'
+const SAME_DAY_TIMEFRAME = 'Same-day clinician review'
 interface Props {
   result: TriageResult
   onTryAnother: () => void
@@ -24,16 +37,39 @@ interface Props {
 export default function TriageOutputPanel({ result, onTryAnother }: Props) {
   const [emergentAcknowledged, setEmergentAcknowledged] = useState(false)
   const [algorithmOpen, setAlgorithmOpen] = useState(false)
-
-  const isEmergent = result.triage_tier === 'emergent'
-  const isInsufficientData = result.triage_tier === 'insufficient_data'
+  const displayedResult = result
+  const outputPolicy = triageOutputPolicy(displayedResult)
+  const presentationResult =
+    displayedResult.scheduling_locked === outputPolicy.schedulingLocked
+      ? displayedResult
+      : { ...displayedResult, scheduling_locked: outputPolicy.schedulingLocked }
+  const displayedMissingInformation =
+    presentationResult.missing_information?.length
+      ? presentationResult.missing_information
+      : Array.from(
+          new Set([
+            ...(outputPolicy.dataConflict
+              ? [DATA_CONFLICT_INFORMATION]
+              : []),
+            ...(outputPolicy.insufficientDataHold
+              ? [INSUFFICIENT_DATA_INFORMATION]
+              : []),
+          ]),
+        )
+  const isEmergent = outputPolicy.timeframe === EMERGENCY_TIMEFRAME
+  const isSameDay = outputPolicy.timeframe === SAME_DAY_TIMEFRAME
+  const isInsufficientData =
+    !isEmergent &&
+    !isSameDay &&
+    (presentationResult.triage_tier === 'insufficient_data' ||
+      presentationResult.care_pathway === 'undetermined')
 
   return (
     <>
       {/* Full-screen emergent alert */}
       {isEmergent && !emergentAcknowledged && (
         <EmergentAlert
-          reason={result.emergent_reason}
+          reason={presentationResult.emergent_reason}
           onAcknowledge={() => setEmergentAcknowledged(true)}
         />
       )}
@@ -57,7 +93,7 @@ export default function TriageOutputPanel({ result, onTryAnother }: Props) {
             Triage Recommendation
           </h2>
           <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-            <CopyReportButton result={result} />
+            <CopyReportButton result={presentationResult} />
             <button
               onClick={() => setAlgorithmOpen(true)}
               style={{
@@ -99,19 +135,120 @@ export default function TriageOutputPanel({ result, onTryAnother }: Props) {
           </div>
         </div>
 
+        <SafetyReviewPanel result={presentationResult} />
+        {outputPolicy.safetyConflict && (
+          <div
+            role="alert"
+            style={{
+              marginBottom: '16px',
+              padding: '16px',
+              borderRadius: '8px',
+              border: '2px solid #DC2626',
+              background: 'rgba(127, 29, 29, 0.24)',
+            }}
+          >
+            <h3
+              style={{
+                color: '#FEE2E2',
+                fontSize: '0.95rem',
+                margin: '0 0 6px',
+              }}
+            >
+              Safety conflict — human review hold
+            </h3>
+            <p
+              style={{
+                color: '#FECACA',
+                fontSize: '0.8rem',
+                lineHeight: 1.5,
+                margin: 0,
+              }}
+            >
+              Emergency markers conflict with the projected care pathway.
+              Emergency evaluation now remains active; outpatient disposition
+              and scheduling remain blocked pending clinician reconciliation.
+            </p>
+          </div>
+        )}
+        {!isEmergent && outputPolicy.insufficientDataHold && (
+          <div
+            role="alert"
+            style={{
+              marginBottom: '16px',
+              padding: '16px',
+              borderRadius: '8px',
+              border: '2px solid #D97706',
+              background: 'rgba(120, 53, 15, 0.22)',
+            }}
+          >
+            <h3
+              style={{
+                color: '#FDE68A',
+                fontSize: '0.95rem',
+                margin: '0 0 6px',
+              }}
+            >
+              Insufficient or undetermined data — human review hold
+            </h3>
+            <p
+              style={{
+                color: '#FCD34D',
+                fontSize: '0.8rem',
+                lineHeight: 1.5,
+                margin: '0 0 6px',
+              }}
+            >
+              {isSameDay
+                ? 'Same-day clinician review remains the active action. '
+                : ''}
+              Outpatient workup, routing, and final disposition remain blocked
+              until a clinician reviews the available source evidence and
+              resolves the decision-critical gaps.
+            </p>
+            <p
+              style={{
+                color: '#FCA5A5',
+                fontSize: '0.78rem',
+                fontWeight: 700,
+                margin: 0,
+              }}
+            >
+              Scheduling remains locked.
+            </p>
+          </div>
+        )}
+        {isEmergent && (
+          <EmergencyActionPanel sessionId={presentationResult.session_id} />
+        )}
         {/* Insufficient data — special layout */}
         {isInsufficientData ? (
-          <InsufficientDataPanel missingInformation={result.missing_information} />
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+            <InsufficientDataPanel
+              missingInformation={displayedMissingInformation}
+            />
+            <ClinicalReasons reasons={presentationResult.clinical_reasons} />
+            <RedFlagAlert redFlags={presentationResult.red_flags} />
+          </div>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
             {/* Tier badge — centered */}
             <div style={{ textAlign: 'center', padding: '8px 0' }}>
               <TriageTierBadge
-                tier={result.triage_tier}
-                weightedScore={result.weighted_score}
-                isRedFlagOverride={result.red_flag_override}
+                tier={presentationResult.triage_tier}
+                weightedScore={presentationResult.weighted_score}
+                isRedFlagOverride={presentationResult.red_flag_override}
+                timeframeOverride={outputPolicy.timeframe}
               />
             </div>
+
+            {outputPolicy.showMissingInformation && (
+              <MissingInformationPanel
+                missingInformation={displayedMissingInformation}
+                timeframe={outputPolicy.timeframe}
+                schedulingLocked={outputPolicy.schedulingLocked}
+                humanReviewHold={outputPolicy.dataConflict}
+              />
+            )}
 
             {/* Confidence */}
             <div style={{
@@ -119,16 +256,16 @@ export default function TriageOutputPanel({ result, onTryAnother }: Props) {
               padding: '4px 0',
             }}>
               <span style={{
-                color: result.confidence === 'high' ? '#16A34A' : result.confidence === 'moderate' ? '#CA8A04' : '#DC2626',
+                color: presentationResult.confidence === 'high' ? '#16A34A' : presentationResult.confidence === 'moderate' ? '#CA8A04' : '#DC2626',
                 fontSize: '0.85rem',
                 fontWeight: 600,
               }}>
-                Confidence: {result.confidence.charAt(0).toUpperCase() + result.confidence.slice(1)}
+                Confidence: {presentationResult.confidence.charAt(0).toUpperCase() + presentationResult.confidence.slice(1)}
               </span>
             </div>
 
             {/* Low confidence disclaimer */}
-            {result.confidence === 'low' && (
+            {presentationResult.confidence === 'low' && (
               <div style={{
                 padding: '10px 14px',
                 background: 'rgba(220, 38, 38, 0.08)',
@@ -142,7 +279,7 @@ export default function TriageOutputPanel({ result, onTryAnother }: Props) {
             )}
 
             {/* Red flag disclaimer */}
-            {result.red_flags.length > 0 && (
+            {presentationResult.red_flags.length > 0 && (
               <div style={{
                 padding: '10px 14px',
                 background: 'rgba(220, 38, 38, 0.05)',
@@ -156,25 +293,63 @@ export default function TriageOutputPanel({ result, onTryAnother }: Props) {
             )}
 
             {/* Clinical reasons */}
-            <ClinicalReasons reasons={result.clinical_reasons} />
+            <ClinicalReasons reasons={presentationResult.clinical_reasons} />
 
             {/* Red flags */}
-            <RedFlagAlert redFlags={result.red_flags} />
+            <RedFlagAlert redFlags={presentationResult.red_flags} />
 
             {/* Suggested workup */}
-            <PreVisitWorkup workup={result.suggested_workup} />
+            {outputPolicy.showPreVisitWorkup && (
+              <>
+                {isSameDay && presentationResult.suggested_workup.length > 0 && (
+                  <div
+                    aria-label="Same-day non-blocking workup notice"
+                    style={{
+                      padding: '12px 14px',
+                      background: 'rgba(217, 119, 6, 0.12)',
+                      border: '1px solid #D97706',
+                      borderRadius: '8px',
+                    }}
+                  >
+                    <h3
+                      style={{
+                        color: '#FDE68A',
+                        fontSize: '0.85rem',
+                        margin: '0 0 4px',
+                      }}
+                    >
+                      Non-blocking workup
+                    </h3>
+                    <p
+                      style={{
+                        color: '#FCD34D',
+                        fontSize: '0.78rem',
+                        lineHeight: 1.5,
+                        margin: 0,
+                      }}
+                    >
+                      Any suggested workup is optional before review and must
+                      not delay same-day clinician review.
+                    </p>
+                  </div>
+                )}
+                <PreVisitWorkup workup={presentationResult.suggested_workup} />
+              </>
+            )}
 
             {/* Failed therapies */}
-            <FailedTherapiesList therapies={result.failed_therapies} />
+            <FailedTherapiesList therapies={presentationResult.failed_therapies} />
 
             {/* Subspecialty routing */}
-            <SubspecialtyRouter
-              subspecialty={result.subspecialty_recommendation}
-              rationale={result.subspecialty_rationale}
-              redirectToNonNeuro={result.redirect_to_non_neuro}
-              redirectSpecialty={result.redirect_specialty}
-              redirectRationale={result.redirect_rationale}
-            />
+            {outputPolicy.showOutpatientRouting && (
+              <SubspecialtyRouter
+                subspecialty={presentationResult.subspecialty_recommendation}
+                rationale={presentationResult.subspecialty_rationale}
+                redirectToNonNeuro={presentationResult.redirect_to_non_neuro}
+                redirectSpecialty={presentationResult.redirect_specialty}
+                redirectRationale={presentationResult.redirect_rationale}
+              />
+            )}
 
             {/* Dimension scores breakdown */}
             <div style={{
@@ -187,7 +362,7 @@ export default function TriageOutputPanel({ result, onTryAnother }: Props) {
                 Dimension Scores
               </h3>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                {Object.entries(result.dimension_scores).map(([key, dim]) => (
+                {Object.entries(presentationResult.dimension_scores).map(([key, dim]) => (
                   <div key={key} style={{ display: 'flex', alignItems: 'flex-start', gap: '10px' }}>
                     <span style={{
                       color: '#e2e8f0',
@@ -211,13 +386,16 @@ export default function TriageOutputPanel({ result, onTryAnother }: Props) {
               </div>
             </div>
 
-            {/* Patient selector */}
-            <PatientSelector sessionId={result.session_id} />
-
-            {/* Physician override */}
-            <PhysicianOverridePanel sessionId={result.session_id} />
           </div>
         )}
+
+        {/* Human review actions remain available even when data is insufficient. */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', marginTop: '16px' }}>
+          <PhysicianOverridePanel
+            sessionId={presentationResult.session_id}
+            currentTier={presentationResult.triage_tier}
+          />
+        </div>
 
         {/* Disclaimer banner */}
         <DisclaimerBanner />

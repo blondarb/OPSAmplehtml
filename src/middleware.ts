@@ -6,6 +6,8 @@ const PUBLIC_ROUTES = ['/', '/login', '/about', '/patient', '/triage']
 
 const COGNITO_REGION = process.env.NEXT_PUBLIC_COGNITO_REGION || 'us-east-2'
 const COGNITO_POOL_ID = process.env.NEXT_PUBLIC_COGNITO_USER_POOL_ID || 'us-east-2_9y6XyJnXC'
+const COGNITO_CLIENT_ID =
+  process.env.NEXT_PUBLIC_COGNITO_CLIENT_ID?.trim() || ''
 const ISSUER = `https://cognito-idp.${COGNITO_REGION}.amazonaws.com/${COGNITO_POOL_ID}`
 const JWKS_URL = `${ISSUER}/.well-known/jwks.json`
 
@@ -20,9 +22,17 @@ function getJWKS() {
 
 async function verifyIdToken(token: string): Promise<boolean> {
   try {
+    if (!COGNITO_CLIENT_ID) return false
     const jwks = getJWKS()
-    await jwtVerify(token, jwks, { issuer: ISSUER })
-    return true
+    const { payload } = await jwtVerify(token, jwks, {
+      issuer: ISSUER,
+      audience: COGNITO_CLIENT_ID,
+    })
+    return (
+      payload.token_use === 'id' &&
+      typeof payload.sub === 'string' &&
+      payload.sub.length > 0
+    )
   } catch {
     return false
   }

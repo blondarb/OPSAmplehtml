@@ -1,6 +1,6 @@
 # Implementation Status - Sevaro Clinical
 
-**Last Updated:** March 20, 2026 (Integrated Neuro Intake Engine — all 7 phases complete)
+**Last Updated:** July 12, 2026 (local referral-triage safety flow verification)
 **Based on:** PRD_AI_Scribe.md v1.4, Sevaro_Outpatient_MVP_PRD_v1.4, PRD_Roadmap_Phase3.md, PRD_MOBILE_APP.md
 
 ---
@@ -19,6 +19,41 @@
 This document tracks implementation progress against the product requirements and notes current work, issues, and next steps.
 
 ### Current Priority Focus
+
+**Neurology referral triage safety flow (July 12, 2026; local only, not deployed):**
+- ✅ One pasted referral or one supported file with complete native-text
+  extraction, including the tested two-page native-text PDF, now converges on
+  the same source-bound extraction review and full triage result flow. Multiple
+  files are rejected instead of silently selecting or reducing a referral.
+- ✅ A valid extraction ID is only a lookup key; caller-provided extraction text
+  or summary is non-authoritative, and persisted complete-source content is
+  reloaded and validated before scoring.
+- ✅ Emergency results and copied reports retain immediate action, safety
+  evidence, missing information, and human review while suppressing outpatient
+  workup, routing, and finalization. Conflicting data creates a reconciliation
+  hold/lock even when no specific conflict item was supplied.
+- ✅ Short nonempty notes can run a server-only positive safety screen but cannot
+  receive routine outpatient scoring. Partial native-text PDFs preserve
+  actionable page-bound evidence while failed coverage requires OCR and human
+  review and blocks outpatient scoring/finalization.
+- ⏳ Multi-document packet assembly, full OCR with durable pre-parse intake and
+  recovery, recommendation-schema evolution, clarification delivery, AWS
+  deployment, and production clinical/live-model validation remain pending.
+- ℹ️ No AWS configuration or deployment occurred; production is unchanged.
+
+**Clinical safety containment (July 11, 2026; local, pending deployment):**
+- ✅ Destructive self-service demo reset removed from both API routes and all
+  production UI/tour surfaces; fixed `410 Gone`/`no-store` responses have no
+  authentication, tenant, secret, or database side effects.
+- ✅ Focused route/UI regression tests, TypeScript, and changed-file lint pass.
+- ✅ Unused public provider-consult, provider-message, legacy historian-
+  escalation, and incomplete-document prototype routes are retired locally with
+  fixed `410 Gone`/`no-store` contracts and dependency-isolation tests.
+- ⏳ Production remains unchanged until an exact AWS/deployment change set is
+  reviewed and explicitly approved.
+- ⏳ Demo seed/diagnostic surfaces, critical-alert lifecycle protection,
+  wearable/RPM authorization, and remaining tenant scopes are tracked as
+  follow-on hardening work.
 
 **Integrated Neuro Intake Engine — Phases 1–7 (March 20, 2026):**
 - ✅ **Phase 1 — Triage & Intake Enhancement** — ConsultStatus state machine (11 states), pipeline helpers, consult CRUD API

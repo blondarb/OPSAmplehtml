@@ -2,7 +2,16 @@
  * TypeScript types for the AI Neurologic Historian feature.
  */
 
-export type HistorianSessionType = 'new_patient' | 'follow_up'
+export type HistorianSessionType =
+  | 'new_patient'
+  | 'follow_up'
+  | 'referral_clarification'
+
+export interface ReferralClarificationQuestion {
+  id: string
+  code: string
+  text: string
+}
 export type HistorianSessionStatus = 'in_progress' | 'completed' | 'abandoned'
 
 export interface HistorianTranscriptEntry {
@@ -18,6 +27,10 @@ export interface HistorianRedFlag {
 }
 
 export interface HistorianStructuredOutput {
+  clarification_answers?: Array<{
+    question_id: string
+    answer: string
+  }>
   chief_complaint?: string
   hpi?: string
   onset?: string

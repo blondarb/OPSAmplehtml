@@ -13,6 +13,7 @@
 import { NextResponse } from 'next/server'
 import { getConsult } from '@/lib/consult/pipeline'
 import { buildHistorianContextFromConsult } from '@/lib/consult/contextBuilder'
+import { authorizeClinicalAccess } from '@/lib/auth/clinicalAccess'
 
 export async function GET(
   _request: Request,
@@ -20,7 +21,18 @@ export async function GET(
 ) {
   const { id } = await params
   try {
-    const consult = await getConsult(id)
+    const access = await authorizeClinicalAccess({
+      action: 'consult.read',
+      allowedRoles: ['viewer', 'scheduler', 'clinician', 'admin'],
+    })
+    if (!access.ok) {
+      return NextResponse.json(
+        { error: 'Access denied', reason: access.reason },
+        { status: access.status },
+      )
+    }
+
+    const consult = await getConsult(id, access.context.tenantId)
 
     if (!consult) {
       return NextResponse.json({ error: 'Consult not found' }, { status: 404 })
@@ -51,7 +63,9 @@ export async function GET(
     })
   } catch (error: unknown) {
     console.error(`GET /api/neuro-consults/${id}/historian-context error:`, error)
-    const message = error instanceof Error ? error.message : 'Failed to build historian context'
-    return NextResponse.json({ error: message }, { status: 500 })
+    return NextResponse.json(
+      { error: 'Failed to build historian context' },
+      { status: 500 },
+    )
   }
 }

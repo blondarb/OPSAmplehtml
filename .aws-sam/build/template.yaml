@@ -1,0 +1,332 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: 'Sevaro neurology triage durable long-packet workers. Queue messages
+  contain opaque run/job identifiers only; source clinical text remains in the tenant-bound
+  database.
+
+  '
+Parameters:
+  Environment:
+    Type: String
+    Default: sandbox
+    AllowedValues:
+    - sandbox
+    - staging
+    - production
+  RdsSecretArn:
+    Type: String
+    Description: ARN of the Secrets Manager secret containing RDS credentials.
+  RdsSecretId:
+    Type: String
+    Default: sevaro/rds/credentials
+  RdsDatabase:
+    Type: String
+    MinLength: 1
+    Description: Explicit database name; never rely on the shared secret default.
+  PrivateSubnetIds:
+    Type: List<AWS::EC2::Subnet::Id>
+  LambdaSecurityGroupIds:
+    Type: List<AWS::EC2::SecurityGroup::Id>
+  WorkerMaximumConcurrency:
+    Type: Number
+    Default: 6
+    MinValue: 1
+    MaxValue: 20
+Globals:
+  Function:
+    Runtime: nodejs22.x
+    Architectures:
+    - arm64
+    MemorySize: 1024
+    Tracing: Active
+    VpcConfig:
+      SubnetIds:
+        Ref: PrivateSubnetIds
+      SecurityGroupIds:
+        Ref: LambdaSecurityGroupIds
+    Environment:
+      Variables:
+        NODE_OPTIONS: --enable-source-maps
+        NODE_ENV: production
+        AWS_NODEJS_CONNECTION_REUSE_ENABLED: '1'
+        BEDROCK_REGION:
+          Ref: AWS::Region
+        RDS_SECRET_ID:
+          Ref: RdsSecretId
+        RDS_DATABASE:
+          Ref: RdsDatabase
+        TRIAGE_LONG_PACKET_QUEUE_URL:
+          Ref: LongPacketWorkQueue
+        TRIAGE_LONG_PACKET_LEASE_SECONDS: '360'
+    Tags:
+      Project: sevaro-clinical
+      Component: neurology-triage-worker
+      Environment:
+        Ref: Environment
+Resources:
+  LongPacketDeadLetterQueue:
+    Type: AWS::SQS::Queue
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      MessageRetentionPeriod: 1209600
+      SqsManagedSseEnabled: true
+      Tags:
+      - Key: Project
+        Value: sevaro-clinical
+      - Key: Component
+        Value: neurology-triage-worker-dlq
+      - Key: Environment
+        Value:
+          Ref: Environment
+  LongPacketWorkQueue:
+    Type: AWS::SQS::Queue
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      VisibilityTimeout: 1800
+      MessageRetentionPeriod: 345600
+      ReceiveMessageWaitTimeSeconds: 20
+      SqsManagedSseEnabled: true
+      RedrivePolicy:
+        deadLetterTargetArn:
+          Fn::GetAtt:
+          - LongPacketDeadLetterQueue
+          - Arn
+        maxReceiveCount: 5
+      Tags:
+      - Key: Project
+        Value: sevaro-clinical
+      - Key: Component
+        Value: neurology-triage-worker
+      - Key: Environment
+        Value:
+          Ref: Environment
+  LongPacketQueueTlsPolicy:
+    Type: AWS::SQS::QueuePolicy
+    Properties:
+      Queues:
+      - Ref: LongPacketWorkQueue
+      - Ref: LongPacketDeadLetterQueue
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+        - Sid: DenyInsecureTransport
+          Effect: Deny
+          Principal: '*'
+          Action: sqs:*
+          Resource:
+          - Fn::GetAtt:
+            - LongPacketWorkQueue
+            - Arn
+          - Fn::GetAtt:
+            - LongPacketDeadLetterQueue
+            - Arn
+          Condition:
+            Bool:
+              aws:SecureTransport: 'false'
+  LongPacketWorkerFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: LongPacketWorkerFunction
+      Handler: triageLongPacketWorker.handler
+      Description: Claims and executes one idempotent long-packet job per message.
+      Timeout: 300
+      ReservedConcurrentExecutions:
+        Ref: WorkerMaximumConcurrency
+      Policies:
+      - AWSLambdaVPCAccessExecutionRole
+      - Statement:
+        - Sid: ReadRdsCredentials
+          Effect: Allow
+          Action: secretsmanager:GetSecretValue
+          Resource:
+            Ref: RdsSecretArn
+        - Sid: InvokePinnedClinicalModels
+          Effect: Allow
+          Action: bedrock:InvokeModel
+          Resource:
+          - Fn::Sub: arn:${AWS::Partition}:bedrock:${AWS::Region}:${AWS::AccountId}:inference-profile/us.anthropic.claude-haiku-4-5-20251001-v1:0
+          - Fn::Sub: arn:${AWS::Partition}:bedrock:${AWS::Region}:${AWS::AccountId}:inference-profile/us.anthropic.claude-sonnet-5
+          - Fn::Sub: arn:${AWS::Partition}:bedrock:${AWS::Region}:${AWS::AccountId}:inference-profile/us.anthropic.claude-sonnet-4-6
+          - Fn::Sub: arn:${AWS::Partition}:bedrock:*::foundation-model/anthropic.claude-haiku-4-5-20251001-v1:0
+          - Fn::Sub: arn:${AWS::Partition}:bedrock:*::foundation-model/anthropic.claude-sonnet-5
+          - Fn::Sub: arn:${AWS::Partition}:bedrock:*::foundation-model/anthropic.claude-sonnet-4-6
+      Events:
+        WorkQueue:
+          Type: SQS
+          Properties:
+            Queue:
+              Fn::GetAtt:
+              - LongPacketWorkQueue
+              - Arn
+            BatchSize: 1
+            FunctionResponseTypes:
+            - ReportBatchItemFailures
+            ScalingConfig:
+              MaximumConcurrency:
+                Ref: WorkerMaximumConcurrency
+      LoggingConfig:
+        LogFormat: JSON
+        ApplicationLogLevel: INFO
+        SystemLogLevel: WARN
+    Metadata:
+      BuildMethod: esbuild
+      BuildProperties:
+        EntryPoints:
+        - src/workers/triageLongPacketWorker.ts
+        Minify: true
+        Sourcemap: true
+        Target: es2022
+      SamResourceId: LongPacketWorkerFunction
+  LongPacketDispatcherFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: LongPacketDispatcherFunction
+      Handler: triageLongPacketDispatcher.handler
+      Description: Re-enqueues pending, retry-due, and expired durable jobs.
+      Timeout: 60
+      MemorySize: 512
+      ReservedConcurrentExecutions: 1
+      Policies:
+      - AWSLambdaVPCAccessExecutionRole
+      - Statement:
+        - Sid: ReadRdsCredentials
+          Effect: Allow
+          Action: secretsmanager:GetSecretValue
+          Resource:
+            Ref: RdsSecretArn
+        - Sid: SendOpaqueWorkIdentifiers
+          Effect: Allow
+          Action: sqs:SendMessage
+          Resource:
+            Fn::GetAtt:
+            - LongPacketWorkQueue
+            - Arn
+      Events:
+        RecoverySweep:
+          Type: ScheduleV2
+          Properties:
+            ScheduleExpression: rate(1 minute)
+            FlexibleTimeWindow:
+              Mode: 'OFF'
+            RetryPolicy:
+              MaximumEventAgeInSeconds: 300
+              MaximumRetryAttempts: 3
+      LoggingConfig:
+        LogFormat: JSON
+        ApplicationLogLevel: INFO
+        SystemLogLevel: WARN
+    Metadata:
+      BuildMethod: esbuild
+      BuildProperties:
+        EntryPoints:
+        - src/workers/triageLongPacketDispatcher.ts
+        Minify: true
+        Sourcemap: true
+        Target: es2022
+      SamResourceId: LongPacketDispatcherFunction
+  WorkerLogGroup:
+    Type: AWS::Logs::LogGroup
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      LogGroupName:
+        Fn::Sub: /aws/lambda/${LongPacketWorkerFunction}
+      RetentionInDays: 30
+  DispatcherLogGroup:
+    Type: AWS::Logs::LogGroup
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      LogGroupName:
+        Fn::Sub: /aws/lambda/${LongPacketDispatcherFunction}
+      RetentionInDays: 30
+  TriageWorkerAlarmTopic:
+    Type: AWS::SNS::Topic
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      TopicName:
+        Fn::Sub: sevaro-triage-worker-${Environment}-alarms
+      KmsMasterKeyId: alias/aws/sns
+      Tags:
+      - Key: Project
+        Value: sevaro-clinical
+      - Key: Environment
+        Value:
+          Ref: Environment
+  DeadLetterQueueVisibleAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmDescription: A neurology triage worker message reached the DLQ.
+      Namespace: AWS/SQS
+      MetricName: ApproximateNumberOfMessagesVisible
+      Dimensions:
+      - Name: QueueName
+        Value:
+          Fn::GetAtt:
+          - LongPacketDeadLetterQueue
+          - QueueName
+      Statistic: Maximum
+      Period: 60
+      EvaluationPeriods: 1
+      Threshold: 1
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      TreatMissingData: notBreaching
+      AlarmActions:
+      - Ref: TriageWorkerAlarmTopic
+  WorkQueueAgeAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmDescription: Durable neurology triage work has waited more than 15 minutes.
+      Namespace: AWS/SQS
+      MetricName: ApproximateAgeOfOldestMessage
+      Dimensions:
+      - Name: QueueName
+        Value:
+          Fn::GetAtt:
+          - LongPacketWorkQueue
+          - QueueName
+      Statistic: Maximum
+      Period: 60
+      EvaluationPeriods: 2
+      DatapointsToAlarm: 2
+      Threshold: 900
+      ComparisonOperator: GreaterThanThreshold
+      TreatMissingData: notBreaching
+      AlarmActions:
+      - Ref: TriageWorkerAlarmTopic
+  WorkerErrorAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmDescription: Durable neurology triage worker Lambda errors detected.
+      Namespace: AWS/Lambda
+      MetricName: Errors
+      Dimensions:
+      - Name: FunctionName
+        Value:
+          Ref: LongPacketWorkerFunction
+      Statistic: Sum
+      Period: 300
+      EvaluationPeriods: 1
+      Threshold: 1
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      TreatMissingData: notBreaching
+      AlarmActions:
+      - Ref: TriageWorkerAlarmTopic
+Outputs:
+  WorkQueueUrl:
+    Value:
+      Ref: LongPacketWorkQueue
+  WorkQueueArn:
+    Value:
+      Fn::GetAtt:
+      - LongPacketWorkQueue
+      - Arn
+  DeadLetterQueueUrl:
+    Value:
+      Ref: LongPacketDeadLetterQueue
+  AlarmTopicArn:
+    Value:
+      Ref: TriageWorkerAlarmTopic

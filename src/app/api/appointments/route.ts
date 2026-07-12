@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getUser } from '@/lib/cognito/server'
 import { getPool } from '@/lib/db'
 import { from } from '@/lib/db-query'
+import { authorizeClinicalAccess } from '@/lib/auth/clinicalAccess'
 
 // Demo appointment templates — generated relative to the requested date
 const DEMO_TEMPLATES = [
@@ -67,8 +67,16 @@ function generateDemoForRange(startDate: string, endDate: string) {
 // GET /api/appointments - Get appointments with optional filters
 export async function GET(request: NextRequest) {
   try {
-    // Auth is optional for GET (demo app) — allow anonymous reads
-    await getUser().catch(() => null)
+    const access = await authorizeClinicalAccess({
+      action: 'appointment.read',
+      allowedRoles: ['viewer', 'scheduler', 'clinician', 'admin'],
+    })
+    if (!access.ok) {
+      return NextResponse.json(
+        { error: 'Access denied', reason: access.reason },
+        { status: access.status },
+      )
+    }
 
     const { searchParams } = new URL(request.url)
     const startDate = searchParams.get('startDate')
@@ -78,9 +86,9 @@ export async function GET(request: NextRequest) {
     const date = searchParams.get('date') // Single date query
 
     // Build SQL with JOINs for nested appointment relations
-    const conditions: string[] = []
-    const values: unknown[] = []
-    let paramIdx = 0
+    const conditions: string[] = ['a."tenant_id" = $1']
+    const values: unknown[] = [access.context.tenantId]
+    let paramIdx = 1
 
     if (date) {
       conditions.push(`a."appointment_date" = $${++paramIdx}`)
@@ -114,20 +122,30 @@ export async function GET(request: NextRequest) {
         row_to_json(v.*) AS prior_visit,
         cn."ai_summary" AS prior_visit_ai_summary
       FROM "appointments" a
-      LEFT JOIN "patients" p ON p."id" = a."patient_id"
-      LEFT JOIN "visits" v ON v."id" = a."prior_visit_id"
-      LEFT JOIN "clinical_notes" cn ON cn."visit_id" = v."id"
+      LEFT JOIN "patients" p
+        ON p."id" = a."patient_id"
+       AND p."tenant_id" = a."tenant_id"
+      LEFT JOIN "visits" v
+        ON v."id" = a."prior_visit_id"
+       AND v."tenant_id" = a."tenant_id"
+      LEFT JOIN "clinical_notes" cn
+        ON cn."visit_id" = v."id"
+       AND cn."tenant_id" = a."tenant_id"
       ${whereClause}
       ORDER BY a."appointment_date" ASC, a."appointment_time" ASC
     `
 
-    let appointments: any[] = []
+    let appointments: Array<Record<string, unknown>> = []
     try {
       const pool = await getPool()
       const { rows } = await pool.query(sql, values)
 
       // Transform data to match frontend expectations
-      appointments = (rows || []).map((apt: any) => ({
+      appointments = (rows || []).map((raw: unknown) => {
+        const apt = raw as Record<string, unknown>
+        const patient = apt.patient as Record<string, unknown> | null
+        const priorVisit = apt.prior_visit as Record<string, unknown> | null
+        return {
         id: apt.id,
         appointmentDate: apt.appointment_date,
         appointmentTime: apt.appointment_time,
@@ -139,35 +157,40 @@ export async function GET(request: NextRequest) {
         schedulingNotes: apt.scheduling_notes,
         visitId: apt.visit_id,
         priorVisitId: apt.prior_visit_id,
-        patient: apt.patient ? {
-          id: apt.patient.id,
-          mrn: apt.patient.mrn,
-          firstName: apt.patient.first_name,
-          lastName: apt.patient.last_name,
-          name: `${apt.patient.first_name} ${apt.patient.last_name}`,
-          dateOfBirth: apt.patient.date_of_birth,
-          age: apt.patient.date_of_birth
-            ? Math.floor((Date.now() - new Date(apt.patient.date_of_birth).getTime()) / (365.25 * 24 * 60 * 60 * 1000))
+        patient: patient ? {
+          id: patient.id,
+          mrn: patient.mrn,
+          firstName: patient.first_name,
+          lastName: patient.last_name,
+          name: `${patient.first_name} ${patient.last_name}`,
+          dateOfBirth: patient.date_of_birth,
+          age: patient.date_of_birth
+            ? Math.floor((Date.now() - new Date(String(patient.date_of_birth)).getTime()) / (365.25 * 24 * 60 * 60 * 1000))
             : null,
-          gender: apt.patient.gender,
-          phone: apt.patient.phone,
-          email: apt.patient.email,
-          referringPhysician: apt.patient.referring_physician,
-          referralReason: apt.patient.referral_reason,
+          gender: patient.gender,
+          phone: patient.phone,
+          email: patient.email,
+          referringPhysician: patient.referring_physician,
+          referralReason: patient.referral_reason,
         } : null,
-        priorVisit: apt.prior_visit ? {
-          id: apt.prior_visit.id,
-          visitDate: apt.prior_visit.visit_date,
-          visitType: apt.prior_visit.visit_type,
+        priorVisit: priorVisit ? {
+          id: priorVisit.id,
+          visitDate: priorVisit.visit_date,
+          visitType: priorVisit.visit_type,
           aiSummary: apt.prior_visit_ai_summary || null,
         } : null,
-      }))
+      }
+      })
     } catch (dbError) {
       console.error('DB query failed, using demo data:', dbError)
     }
 
-    // Fallback: generate demo appointments when DB has none for the requested range
-    if (appointments.length === 0 && !patientId) {
+    // Synthetic demo identities must never appear in an empty clinical query.
+    // They are available only to an explicitly configured demo tenant.
+    const demoFallbackEnabled =
+      process.env.ENABLE_DEMO_APPOINTMENT_FALLBACK === 'true' &&
+      access.context.tenantId === (process.env.DEMO_TENANT_ID ?? 'demo')
+    if (demoFallbackEnabled && appointments.length === 0 && !patientId) {
       if (date) {
         appointments = generateDemoAppointments(date)
       } else if (startDate && endDate) {
@@ -191,11 +214,15 @@ export async function GET(request: NextRequest) {
 // POST /api/appointments - Create a new appointment
 export async function POST(request: NextRequest) {
   try {
-
-    // Check authentication
-    const user = await getUser()
-    if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    const access = await authorizeClinicalAccess({
+      action: 'appointment.write',
+      allowedRoles: ['scheduler', 'clinician', 'admin'],
+    })
+    if (!access.ok) {
+      return NextResponse.json(
+        { error: 'Access denied', reason: access.reason },
+        { status: access.status },
+      )
     }
 
     const body = await request.json()
@@ -209,6 +236,7 @@ export async function POST(request: NextRequest) {
       reasonForVisit,
       priorVisitId,
       schedulingNotes,
+      triageSessionId,
     } = body
 
     // Validate required fields
@@ -219,9 +247,37 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    const normalizedType = String(appointmentType)
+      .trim()
+      .toLowerCase()
+      .replace(/[_\s]+/g, '-')
+    if (normalizedType === 'new-consult' || triageSessionId) {
+      return NextResponse.json(
+        {
+          error: 'New referral appointments require an authorized triage workflow',
+          reason: 'triage_authorization_required',
+        },
+        { status: 409 },
+      )
+    }
+
+    const pool = await getPool()
+    const patientResult = await pool.query(
+      `SELECT id
+         FROM patients
+        WHERE id = $1
+          AND tenant_id = $2
+        LIMIT 1`,
+      [patientId, access.context.tenantId],
+    )
+    if (!patientResult.rows[0]) {
+      return NextResponse.json({ error: 'Patient not found' }, { status: 404 })
+    }
+
     // Create appointment
     const { data, error } = await from('appointments')
       .insert({
+        tenant_id: access.context.tenantId,
         patient_id: patientId,
         appointment_date: appointmentDate,
         appointment_time: appointmentTime,
@@ -232,7 +288,7 @@ export async function POST(request: NextRequest) {
         reason_for_visit: reasonForVisit,
         prior_visit_id: priorVisitId,
         scheduling_notes: schedulingNotes,
-        created_by: user.id,
+        created_by: access.context.userId,
       })
       .select()
       .single()
@@ -243,8 +299,8 @@ export async function POST(request: NextRequest) {
     }
 
     return NextResponse.json({ appointment: data }, { status: 201 })
-  } catch (error) {
-    console.error('Error in appointments API:', error)
+  } catch {
+    console.error('[appointments] request failed')
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }

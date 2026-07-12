@@ -1,41 +1,51 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getUser } from '@/lib/cognito/server'
-import { getTenantServer } from '@/lib/tenant'
 import { invokeBedrock } from '@/lib/bedrock'
 import { getPool } from '@/lib/db'
 import { from } from '@/lib/db-query'
 import { notifyVisitSigned } from '@/lib/notifications'
 import { triggerFollowUpFromVisit } from '@/lib/follow-up/visitTrigger'
+import { authorizeClinicalAccess } from '@/lib/auth/clinicalAccess'
 
 // POST /api/visits/[id]/sign - Sign and complete a visit
 export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const access = await authorizeClinicalAccess({
+    action: 'visit.sign',
+    allowedRoles: ['clinician', 'admin'],
+  })
+  if (!access.ok) {
+    return NextResponse.json(
+      { error: 'Access denied', reason: access.reason },
+      { status: access.status },
+    )
+  }
+
   try {
     const { id } = await params
-
-    // Check authentication
-    const user = await getUser()
-    if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
 
     // Get the visit with clinical note and patient info
     const pool = await getPool()
     const { rows: visitRows } = await pool.query(`
       SELECT
         v.*,
-        (SELECT json_agg(cn.*) FROM "clinical_notes" cn WHERE cn."visit_id" = v."id") AS clinical_notes,
+        (SELECT json_agg(cn.*)
+           FROM "clinical_notes" cn
+          WHERE cn."visit_id" = v."id"
+            AND cn."tenant_id" = v."tenant_id") AS clinical_notes,
         CASE WHEN p."id" IS NOT NULL THEN json_build_object(
           'first_name', p."first_name", 'last_name', p."last_name",
           'date_of_birth', p."date_of_birth", 'gender', p."gender"
         ) ELSE NULL END AS patient
       FROM "visits" v
-      LEFT JOIN "patients" p ON p."id" = v."patient_id"
+      LEFT JOIN "patients" p
+        ON p."id" = v."patient_id"
+       AND p."tenant_id" = v."tenant_id"
       WHERE v."id" = $1
+        AND v."tenant_id" = $2
       LIMIT 1
-    `, [id])
+    `, [id, access.context.tenantId])
 
     const visit = visitRows[0]
     if (!visit) {
@@ -48,15 +58,19 @@ export async function POST(
       const { data: existingNote } = await from('clinical_notes')
         .select('*')
         .eq('visit_id', id)
+        .eq('tenant_id', access.context.tenantId)
         .single()
 
       if (existingNote) {
         clinicalNote = existingNote
       } else {
         // Create a clinical note if one truly doesn't exist
-        const tenantId = await getTenantServer()
         const { data: newNote, error: createNoteError } = await from('clinical_notes')
-          .insert({ visit_id: id, status: 'draft', tenant_id: tenantId })
+          .insert({
+            visit_id: id,
+            status: 'draft',
+            tenant_id: access.context.tenantId,
+          })
           .select()
           .single()
         if (createNoteError || !newNote) {
@@ -115,6 +129,7 @@ Generate a professional clinical summary:`
         updated_at: new Date().toISOString(),
       })
       .eq('id', clinicalNote.id)
+      .eq('tenant_id', access.context.tenantId)
 
     if (noteUpdateError) {
       console.error('Error signing clinical note:', noteUpdateError)
@@ -128,9 +143,11 @@ Generate a professional clinical summary:`
         updated_at: new Date().toISOString(),
       })
       .eq('id', id)
+      .eq('tenant_id', access.context.tenantId)
 
     if (visitUpdateError) {
       console.error('Error completing visit:', visitUpdateError)
+      return NextResponse.json({ error: 'Failed to complete visit' }, { status: 500 })
     }
 
     // Update appointment status to completed (if visit has an appointment_id)
@@ -141,28 +158,39 @@ Generate a professional clinical summary:`
           updated_at: new Date().toISOString(),
         })
         .eq('id', visit.appointment_id)
+        .eq('tenant_id', access.context.tenantId)
     }
 
     // Fire visit-signed notification (non-blocking)
     const patientName = visit.patient
       ? `${visit.patient.first_name} ${visit.patient.last_name}`
       : 'Unknown Patient'
-    notifyVisitSigned(id, patientName, user.email || 'Provider', visit.patient_id || null)
+    notifyVisitSigned(
+      id,
+      patientName,
+      access.context.email || 'Provider',
+      visit.patient_id || null,
+      access.context.tenantId,
+    )
       .catch(err => console.error('[sign] notification error:', err))
 
     // Auto-trigger follow-up session from this visit (non-blocking)
-    triggerFollowUpFromVisit(id)
+    triggerFollowUpFromVisit(id, access.context.tenantId)
       .catch(err => console.error('[sign] follow-up trigger error:', err))
 
     // Fetch the updated visit
     const { rows: updatedRows } = await pool.query(`
       SELECT
         v.*,
-        (SELECT json_agg(cn.*) FROM "clinical_notes" cn WHERE cn."visit_id" = v."id") AS clinical_notes
+        (SELECT json_agg(cn.*)
+           FROM "clinical_notes" cn
+          WHERE cn."visit_id" = v."id"
+            AND cn."tenant_id" = v."tenant_id") AS clinical_notes
       FROM "visits" v
       WHERE v."id" = $1
+        AND v."tenant_id" = $2
       LIMIT 1
-    `, [id])
+    `, [id, access.context.tenantId])
     const updatedVisit = updatedRows[0] || null
 
     return NextResponse.json({

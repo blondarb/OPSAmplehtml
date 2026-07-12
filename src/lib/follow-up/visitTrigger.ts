@@ -8,7 +8,7 @@
 
 import { getPool } from '@/lib/db'
 import { from } from '@/lib/db-query'
-import type { MedicationInfo, PatientScenario } from '@/lib/follow-up/types'
+import type { MedicationInfo } from '@/lib/follow-up/types'
 
 /**
  * Creates a follow-up session record directly (no HTTP round-trip).
@@ -16,8 +16,10 @@ import type { MedicationInfo, PatientScenario } from '@/lib/follow-up/types'
  */
 export async function triggerFollowUpFromVisit(
   visitId: string,
+  tenantId: string,
 ): Promise<string | null> {
   try {
+    if (!visitId || !tenantId) return null
     const pool = await getPool()
 
     const { rows } = await pool.query(
@@ -26,6 +28,7 @@ export async function triggerFollowUpFromVisit(
         v."id"             AS visit_id,
         v."patient_id",
         v."visit_date",
+        v."status"           AS visit_status,
         v."chief_complaint",
         p."first_name",
         p."last_name",
@@ -36,17 +39,26 @@ export async function triggerFollowUpFromVisit(
         cn."ai_summary",
         cn."medications"
       FROM "visits" v
-      LEFT JOIN "patients" p       ON p."id" = v."patient_id"
-      LEFT JOIN "clinical_notes" cn ON cn."visit_id" = v."id"
+      JOIN "patients" p
+        ON p."id" = v."patient_id"
+       AND p."tenant_id" = v."tenant_id"
+      LEFT JOIN "clinical_notes" cn
+        ON cn."visit_id" = v."id"
+       AND cn."tenant_id" = v."tenant_id"
       WHERE v."id" = $1
+        AND v."tenant_id" = $2
       LIMIT 1
       `,
-      [visitId],
+      [visitId, tenantId],
     )
 
     const row = rows[0]
     if (!row) {
       console.warn('[visitTrigger] Visit not found:', visitId)
+      return null
+    }
+    if (row.visit_status !== 'completed') {
+      console.warn('[visitTrigger] Follow-up requires a completed visit:', visitId)
       return null
     }
 
@@ -94,6 +106,7 @@ export async function triggerFollowUpFromVisit(
     const { data: session, error: insertError } = await from('followup_sessions')
       .insert({
         id: sessionId,
+        tenant_id: tenantId,
         patient_id: row.patient_id || null,
         patient_name: patientName,
         patient_age: age,
@@ -106,12 +119,12 @@ export async function triggerFollowUpFromVisit(
           'Not documented',
         visit_date: visitDate,
         provider_name: 'Provider',
-        medications,
+        medications: JSON.stringify(medications),
         visit_summary: visitSummary,
         follow_up_method: 'sms',
         status: 'idle',
         current_module: 'greeting',
-        transcript: [],
+        transcript: JSON.stringify([]),
         visit_id: visitId,
       })
       .select('id')

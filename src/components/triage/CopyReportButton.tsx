@@ -1,7 +1,8 @@
 'use client'
 
 import { useState } from 'react'
-import { TriageResult } from '@/lib/triage/types'
+import { buildTriageReport } from '@/lib/triage/triageReport'
+import type { TriageResult } from '@/lib/triage/types'
 
 interface Props {
   result: TriageResult
@@ -10,69 +11,16 @@ interface Props {
 export default function CopyReportButton({ result }: Props) {
   const [copied, setCopied] = useState(false)
 
-  function formatReport(): string {
-    const lines: string[] = []
-    lines.push('=== NEUROLOGY TRIAGE RECOMMENDATION ===')
-    lines.push('')
-    lines.push(`Triage Tier: ${result.triage_tier_display}`)
-    lines.push(`Confidence: ${result.confidence}`)
-    if (typeof result.weighted_score === 'number' && Number.isFinite(result.weighted_score)) {
-      lines.push(`Weighted Score: ${result.weighted_score.toFixed(2)}`)
-    }
-    lines.push('')
-
-    if (result.clinical_reasons.length) {
-      lines.push('Clinical Reasons:')
-      result.clinical_reasons.forEach((r, i) => lines.push(`  ${i + 1}. ${r}`))
-      lines.push('')
-    }
-
-    if (result.red_flags.length) {
-      lines.push('Red Flags:')
-      result.red_flags.forEach(f => lines.push(`  - ${f}`))
-      lines.push('')
-    } else {
-      lines.push('Red Flags: None identified')
-      lines.push('')
-    }
-
-    if (result.failed_therapies.length) {
-      lines.push('Failed/Previously Tried Therapies:')
-      result.failed_therapies.forEach(t => {
-        lines.push(`  - ${t.therapy}${t.reason_stopped ? ` (${t.reason_stopped})` : ''}`)
-      })
-      lines.push('')
-    }
-
-    if (result.suggested_workup.length) {
-      lines.push('Suggested Pre-Visit Workup:')
-      result.suggested_workup.forEach(w => lines.push(`  - ${w}`))
-      lines.push('')
-    }
-
-    if (result.subspecialty_recommendation) {
-      lines.push(`Subspecialty Routing: ${result.subspecialty_recommendation}`)
-      if (result.subspecialty_rationale) {
-        lines.push(`  Rationale: ${result.subspecialty_rationale}`)
-      }
-      lines.push('')
-    }
-
-    lines.push('---')
-    lines.push(result.disclaimer)
-
-    return lines.join('\n')
-  }
-
   async function handleCopy() {
+    const report = buildTriageReport(result)
     try {
-      await navigator.clipboard.writeText(formatReport())
+      await navigator.clipboard.writeText(report)
       setCopied(true)
       setTimeout(() => setCopied(false), 2000)
     } catch {
       // Fallback for older browsers
       const textarea = document.createElement('textarea')
-      textarea.value = formatReport()
+      textarea.value = report
       document.body.appendChild(textarea)
       textarea.select()
       document.execCommand('copy')

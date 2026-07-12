@@ -8,6 +8,10 @@
  */
 
 import { from } from '@/lib/db-query'
+import {
+  canActivateOutpatientScheduling,
+  type SchedulingAuthorization,
+} from './workflowPolicy'
 
 interface ScheduledAppointment {
   id: string
@@ -26,26 +30,25 @@ export async function autoScheduleFromTriage(
   patientId: string,
   clinicalReasons: string[],
   subspecialtyRecommendation: string,
+  authorization: SchedulingAuthorization,
 ): Promise<ScheduledAppointment | null> {
   try {
-    const urgentTiers = ['urgent', 'emergent', 'critical']
-    if (!urgentTiers.includes(tier.toLowerCase())) {
+    const policy = canActivateOutpatientScheduling(authorization)
+    if (!policy.allowed) {
+      console.warn('[autoSchedule] blocked by workflow policy', {
+        reason: policy.reason,
+      })
       return null
     }
 
-    const lowerTier = tier.toLowerCase()
-    let suggestedDate: string
-    let appointmentType: string
-
-    if (lowerTier === 'emergent' || lowerTier === 'critical') {
-      suggestedDate = new Date().toISOString().split('T')[0]
-      appointmentType = 'urgent-consult'
-    } else {
-      const nextWeek = new Date()
-      nextWeek.setDate(nextWeek.getDate() + 7)
-      suggestedDate = nextWeek.toISOString().split('T')[0]
-      appointmentType = 'new-consult'
+    if (tier.toLowerCase() !== 'urgent') {
+      return null
     }
+
+    const nextWeek = new Date()
+    nextWeek.setDate(nextWeek.getDate() + 7)
+    const suggestedDate = nextWeek.toISOString().split('T')[0]
+    const appointmentType = 'new-consult'
 
     const reason =
       subspecialtyRecommendation ||
@@ -54,6 +57,7 @@ export async function autoScheduleFromTriage(
 
     const { data, error } = await from('appointments')
       .insert({
+        triage_session_id: triageSessionId,
         patient_id: patientId,
         appointment_date: suggestedDate,
         appointment_time: '09:00',
@@ -68,16 +72,16 @@ export async function autoScheduleFromTriage(
       .single()
 
     if (error) {
-      console.error('[autoSchedule] insert error:', error)
+      console.error('[autoSchedule] appointment insert failed', {
+        code: error.code ?? 'UNKNOWN',
+      })
       return null
     }
 
-    console.log(
-      `[autoSchedule] AI-suggested ${appointmentType} created for patient ${patientId} on ${suggestedDate}`,
-    )
+    console.info('[autoSchedule] pending-review suggestion created')
     return data as ScheduledAppointment
-  } catch (err) {
-    console.error('[autoSchedule] exception:', err)
+  } catch {
+    console.error('[autoSchedule] unexpected scheduling failure')
     return null
   }
 }

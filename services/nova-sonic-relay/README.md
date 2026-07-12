@@ -9,12 +9,19 @@ Listens on `PORT` (default `8081`). Health check: `GET /healthz` → `200 ok`.
 ## Run locally
 
 ```bash
-AWS_PROFILE=sevaro-sandbox npm run dev
+AWS_PROFILE=sevaro-sandbox \
+NOVA_RELAY_SHARED_SECRET="$NOVA_RELAY_SHARED_SECRET" \
+NOVA_RELAY_ALLOWED_ORIGINS=http://localhost:3000 \
+NOVA_RELAY_REPLAY_TABLE=nova-relay-replay \
+npm run dev
 ```
 
-The relay uses the default AWS credential provider chain. In local dev that means your SSO profile. In App Runner it uses the instance IAM role — no keys needed.
+The relay uses the default AWS credential provider chain. Local development
+should use an SSO profile; the deployed ECS task uses its task role. Static AWS
+access keys are not required or recommended.
 
-Environment variables (all optional except `NOVA_RELAY_SHARED_SECRET`, defaults shown):
+The environment variables `NOVA_RELAY_SHARED_SECRET`,
+`NOVA_RELAY_ALLOWED_ORIGINS`, and `NOVA_RELAY_REPLAY_TABLE` are required:
 
 | Variable | Default | Purpose |
 |---|---|---|
@@ -22,18 +29,31 @@ Environment variables (all optional except `NOVA_RELAY_SHARED_SECRET`, defaults 
 | `NOVA_SONIC_REGION` | `us-east-1` | AWS region for Bedrock |
 | `NOVA_SONIC_MODEL_ID` | `amazon.nova-2-sonic-v1:0` | Nova 2 Sonic model ID |
 | `NOVA_SONIC_VOICE_ID` | *(model default)* | Voice ID passed to Nova Sonic |
-| `NOVA_RELAY_SHARED_SECRET` | *(none)* | **Required to accept any connection.** HMAC secret shared with the Next.js app's `NOVA_RELAY_SHARED_SECRET`; used to validate the short-lived auth token the browser sends as a WS subprotocol. Unset = every WebSocket upgrade is rejected (fail closed) — there is no "auth disabled" mode. |
-| `NOVA_RELAY_ALLOWED_ORIGINS` | *(none — origin check skipped)* | Comma-separated allowlist of exact `Origin` header values (e.g. `https://app.neuroplans.app`). When set, connections from any other origin are rejected alongside the token check. When unset, the token is the sole gate. |
+| `NOVA_RELAY_SHARED_SECRET` | *(none)* | **Required to accept any connection.** Inject it into the relay at runtime from the `shared_secret` field in `sevaro/nova-relay/shared-secret`; the Next.js app reads the same named secret. It validates the short-lived auth token carried as a WS subprotocol. Unset = every WebSocket upgrade is rejected (fail closed). |
+| `NOVA_RELAY_SECONDARY_SHARED_SECRET` | *(none)* | Optional overlap key injected from `secondary_shared_secret`. The relay accepts either signing key during an approved, bounded rotation; the primary remains mandatory. |
+| `NOVA_RELAY_ALLOWED_ORIGINS` | *(none)* | Required comma-separated allowlist of exact `Origin` values (for example `https://app.neuroplans.app`). Unset rejects every upgrade. |
+| `NOVA_RELAY_REPLAY_TABLE` | *(none)* | Required DynamoDB table used to atomically consume each signed token ID once. Unset rejects every upgrade. |
 
 ### WebSocket authentication
 
-`/healthz` stays unauthenticated (ALB health check). Every other WS upgrade is gated in `src/server.ts` via `verifyClient`/`handleProtocols`:
+`/healthz` stays unauthenticated for the ALB health check. Every WebSocket
+upgrade passes through the asynchronous gate in `src/relayUpgrade.ts` before
+`ws.handleUpgrade` takes ownership:
 
 1. The browser cannot set custom headers on a WS handshake, so the caller (the Next.js historian session route) mints a short-lived HMAC token and the browser sends it as a second WS **subprotocol** alongside the fixed `nova.v1` tag: `Sec-WebSocket-Protocol: nova.v1, <token>`.
-2. `verifyClient` rejects the upgrade (401, no 101 handshake) unless: `NOVA_RELAY_SHARED_SECRET` is configured, the `Origin` header is allowed (when `NOVA_RELAY_ALLOWED_ORIGINS` is set), and the token's HMAC + `exp` (unix seconds) both check out.
-3. `handleProtocols` only runs after `verifyClient` accepts, and simply echoes back `nova.v1` as the negotiated subprotocol.
+2. The asynchronous gate rejects the upgrade (401, no 101 handshake) unless
+   the required primary secret, exact Origin allowlist, and shared replay table
+   are configured. The token HMAC may match the primary or optional overlap
+   secret; its expiry, configuration digest, and UUIDv4 `jti` must validate.
+3. The gate conditionally writes the `jti` to DynamoDB. A simultaneous or later
+   reuse fails the conditional write and is rejected across all relay replicas.
+4. The gate hands the verified configuration to the accepted connection once,
+   removes its temporary raw-socket listener, and only then calls
+   `handleUpgrade`; `handleProtocols` echoes `nova.v1`.
 
-Token format: `${base64url(JSON.stringify({exp}))}.${base64url(HMAC_SHA256(secret, payload))}` — see the header comment in `src/server.ts` and the minting logic in `src/app/api/ai/historian/session/route.ts` (Next.js app) for the exact byte-for-byte contract both sides must agree on.
+The signed payload contains the expiry and a SHA-256 digest of the exact
+server-approved start configuration. See `src/relayAuth.ts` and
+`src/lib/voice/novaRelayAuth.ts` for the byte-for-byte contract.
 
 ---
 
@@ -43,52 +63,43 @@ Token format: `${base64url(JSON.stringify({exp}))}.${base64url(HMAC_SHA256(secre
 docker build -t nova-sonic-relay .
 ```
 
-Run the image locally (credentials via env for testing; never do this in prod):
+Run the image locally with an SSO/default-chain credential profile. The named
+DynamoDB replay table must exist in the selected development account:
 
 ```bash
 docker run --rm -p 8081:8081 \
-  -e AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID \
-  -e AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY \
-  -e AWS_SESSION_TOKEN=$AWS_SESSION_TOKEN \
+  -v "$HOME/.aws:/root/.aws:ro" \
+  -e AWS_PROFILE=sevaro-sandbox \
+  -e AWS_REGION=us-east-1 \
   -e NOVA_SONIC_REGION=us-east-1 \
-  -e NOVA_RELAY_SHARED_SECRET=$NOVA_RELAY_SHARED_SECRET \
+  -e NOVA_RELAY_SHARED_SECRET \
+  -e NOVA_RELAY_SECONDARY_SHARED_SECRET \
+  -e NOVA_RELAY_ALLOWED_ORIGINS=http://localhost:3000 \
+  -e NOVA_RELAY_REPLAY_TABLE=nova-relay-replay \
   nova-sonic-relay
 ```
 
-`NOVA_RELAY_SHARED_SECRET` must match the value configured on the Next.js app (Amplify env var of the same name) or every connection will be rejected.
+`NOVA_RELAY_SHARED_SECRET` must match the runtime Secrets Manager value used by
+the Next.js app or every connection will be rejected. Do not build the secret
+into either artifact.
 
 ---
 
-## Deploy to AWS App Runner
+## Existing AWS deployment
 
-### Option A — Image via ECR (recommended for production)
+The current relay runs on ECS Fargate in `us-east-1`: cluster
+`fastfill-cluster`, service `nova-sonic-relay-svc`, task-definition family
+`nova-sonic-relay`, behind the ALB at `nova-relay.neuroplans.app`. Images are
+built through the existing `nova-sonic-relay-build` CodeBuild project and
+stored in ECR.
 
-1. Push the image to ECR:
+An approved relay release updates the image, registers a task-definition
+revision, and rolls that existing ECS service. The task role supplies Bedrock
+and replay-table access; the execution role injects both JSON secret keys. Keep
+`/healthz` healthy and verify authorization, one-use replay rejection, and
+alarms during a canary before completing a rollout.
 
-   ```bash
-   ACCOUNT=$(aws sts get-caller-identity --query Account --output text --profile sevaro-sandbox)
-   REGION=us-east-1
-   REPO=$ACCOUNT.dkr.ecr.$REGION.amazonaws.com/nova-sonic-relay
-
-   aws ecr get-login-password --region $REGION --profile sevaro-sandbox \
-     | docker login --username AWS --password-stdin $ACCOUNT.dkr.ecr.$REGION.amazonaws.com
-
-   docker build -t nova-sonic-relay .
-   docker tag nova-sonic-relay:latest $REPO:latest
-   docker push $REPO:latest
-   ```
-
-2. Create / update the App Runner service pointing at the ECR image.
-
-3. Attach an IAM instance role with:
-   - `bedrock:InvokeModelWithBidirectionalStream` on `arn:aws:bedrock:us-east-1::foundation-model/amazon.nova-2-sonic-v1:0`
-
-### Option B — Source-based via apprunner.yaml
-
-Point App Runner at this repository; it will run `npm ci && npm run build` then
-`node dist/server.js` on each deploy using the `apprunner.yaml` in this directory.
-Requires the same IAM instance role as Option A.
-
-> The `nodejs18` managed runtime in `apprunner.yaml` is the latest generally
-> available managed runtime. If App Runner adds `nodejs20` support by the time
-> you deploy, update the `runtime:` line accordingly.
+Secret rotation requires forced ECS deployments because changing Secrets
+Manager does not refresh already-running tasks. Follow the approval-gated
+overlap and wait procedure in
+[`infrastructure/nova-relay-security/README.md`](../../infrastructure/nova-relay-security/README.md).

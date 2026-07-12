@@ -5,7 +5,10 @@
 
 import { NextResponse } from 'next/server'
 import { getConsult } from '@/lib/consult/pipeline'
+import { getPool } from '@/lib/db'
 import { from } from '@/lib/db-query'
+import { loadHistorianAuthorization } from '@/lib/triage/historianAuthorization'
+import { authorizeClinicalAccess } from '@/lib/auth/clinicalAccess'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // GET /api/neuro-consults/[id]
@@ -17,13 +20,58 @@ export async function GET(
 ) {
   const { id } = await params
   try {
-    const consult = await getConsult(id)
+    const access = await authorizeClinicalAccess({
+      action: 'consult.read',
+      allowedRoles: ['viewer', 'scheduler', 'clinician', 'admin'],
+    })
+    if (!access.ok) {
+      return NextResponse.json(
+        { error: 'Access denied', reason: access.reason },
+        { status: access.status },
+      )
+    }
+
+    const consult = await getConsult(id, access.context.tenantId)
 
     if (!consult) {
       return NextResponse.json({ error: 'Consult not found' }, { status: 404 })
     }
 
-    return NextResponse.json({ consult })
+    let historianAuthorization = {
+      allowed: false,
+      reason: 'triage_authorization_missing',
+      approved_question_count: 0,
+    }
+    if (consult.triage_session_id) {
+      try {
+        const authorization = await loadHistorianAuthorization(
+          consult.triage_session_id,
+          access.context.tenantId,
+        )
+        historianAuthorization = authorization.decision.allowed
+          ? {
+              allowed: true,
+              reason: '',
+              approved_question_count: authorization.approvedQuestions.length,
+            }
+          : {
+              allowed: false,
+              reason: authorization.decision.reason,
+              approved_question_count: 0,
+            }
+      } catch {
+        console.error('[neuro-consults] historian authorization unavailable')
+        historianAuthorization = {
+          allowed: false,
+          reason: 'triage_authorization_unavailable',
+          approved_question_count: 0,
+        }
+      }
+    }
+
+    return NextResponse.json({
+      consult: { ...consult, historian_authorization: historianAuthorization },
+    })
   } catch (error: unknown) {
     console.error(`GET /api/neuro-consults/${id} error:`, error)
     const message = error instanceof Error ? error.message : 'Failed to fetch consult'
@@ -62,6 +110,17 @@ export async function PUT(
 ) {
   const { id } = await params
   try {
+    const access = await authorizeClinicalAccess({
+      action: 'consult.update',
+      allowedRoles: ['clinician', 'admin'],
+    })
+    if (!access.ok) {
+      return NextResponse.json(
+        { error: 'Access denied', reason: access.reason },
+        { status: access.status },
+      )
+    }
+
     const body = await request.json()
 
     // Only allow updating safe, manually-editable fields via this endpoint.
@@ -86,28 +145,108 @@ export async function PUT(
       )
     }
 
+    const requiresCurrentConsult =
+      'status' in updateData || 'patient_id' in updateData
+    const currentConsult = requiresCurrentConsult
+      ? await getConsult(id, access.context.tenantId)
+      : null
+    if (
+      requiresCurrentConsult &&
+      !currentConsult &&
+      !('patient_id' in updateData)
+    ) {
+      return NextResponse.json({ error: 'Consult not found' }, { status: 404 })
+    }
+
     // Validate status transitions if status is being changed
-    if ('status' in updateData) {
-      const consult = await getConsult(id)
-      if (!consult) {
-        return NextResponse.json({ error: 'Consult not found' }, { status: 404 })
-      }
-      if (!isValidStatusTransition(consult.status, updateData.status as string)) {
+    if ('status' in updateData && currentConsult) {
+      if (!isValidStatusTransition(currentConsult.status, updateData.status as string)) {
         return NextResponse.json(
-          { error: `Invalid status transition: ${consult.status} → ${updateData.status}` },
+          { error: `Invalid status transition: ${currentConsult.status} → ${updateData.status}` },
           { status: 400 },
         )
       }
     }
 
+    if ('patient_id' in updateData && currentConsult?.triage_session_id) {
+      return NextResponse.json(
+        {
+          error: 'The consult patient assignment could not be updated.',
+          reason: 'consult_patient_reassignment_conflict',
+        },
+        { status: 409 },
+      )
+    }
+
+    if ('patient_id' in updateData) {
+      const values: unknown[] = [
+        id,
+        access.context.tenantId,
+        updateData.patient_id,
+        currentConsult?.patient_id ?? null,
+      ]
+      const assignments = ['patient_id = target_patient.id']
+
+      if ('notes' in updateData) {
+        values.push(updateData.notes)
+        assignments.push(`notes = $${values.length}`)
+      }
+      if ('status' in updateData) {
+        values.push(updateData.status)
+        assignments.push(`status = $${values.length}`)
+      }
+      values.push(updateData.updated_at)
+      assignments.push(`updated_at = $${values.length}`)
+
+      const reassignment = await (await getPool()).query(
+        `WITH valid_patient AS MATERIALIZED (
+           SELECT id
+             FROM patients
+            WHERE id = $3
+              AND tenant_id = $2
+            FOR KEY SHARE
+         ),
+         target_patient AS MATERIALIZED (
+           SELECT id FROM valid_patient
+           UNION ALL
+           SELECT NULL::uuid WHERE $3::uuid IS NULL
+         )
+         UPDATE neurology_consults AS consult
+            SET ${assignments.join(', ')}
+           FROM target_patient
+          WHERE consult.id = $1
+            AND consult.tenant_id = $2
+            AND consult.patient_id IS NOT DISTINCT FROM $4
+            AND consult.triage_session_id IS NULL
+      RETURNING consult.*`,
+        values,
+      )
+      const data = reassignment.rows[0]
+      if (reassignment.rowCount !== 1 || !data) {
+        return NextResponse.json(
+          {
+            error: 'The consult patient assignment could not be updated.',
+            reason: 'consult_patient_reassignment_conflict',
+          },
+          { status: 409 },
+        )
+      }
+
+      return NextResponse.json({ consult: data })
+    }
+
     const { data, error } = await from('neurology_consults')
       .update(updateData)
       .eq('id', id)
+      .eq('tenant_id', access.context.tenantId)
       .select()
       .single()
 
     if (error) {
-      return NextResponse.json({ error: error.message }, { status: 500 })
+      return NextResponse.json(
+        { error: error.message },
+        { status: 500 },
+      )
     }
 
     return NextResponse.json({ consult: data })

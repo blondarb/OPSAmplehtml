@@ -1,40 +1,57 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { DEMO_SCENARIOS } from '@/lib/follow-up/demoScenarios'
 import { Smartphone, Send, Shield, AlertCircle } from 'lucide-react'
 
 interface LiveDemoPanelProps {
   onSessionStarted: (sessionId: string) => void
 }
 
+interface EligibleSmsSession {
+  id: string
+  patientName: string
+  visitDate: string | null
+  destination: string
+}
+
 export default function LiveDemoPanel({ onSessionStarted }: LiveDemoPanelProps) {
-  const [phone, setPhone] = useState('')
-  const [scenarioId, setScenarioId] = useState(DEMO_SCENARIOS[0].id)
+  const [sessions, setSessions] = useState<EligibleSmsSession[]>([])
+  const [selectedSessionId, setSelectedSessionId] = useState('')
   const [status, setStatus] = useState<'idle' | 'sending' | 'sent' | 'error'>('idle')
   const [errorMsg, setErrorMsg] = useState('')
   const [twilioConfigured, setTwilioConfigured] = useState<boolean | null>(null)
 
-  // Check Twilio readiness on mount
+  // Load independent readiness and tenant-bound destination data in parallel.
   useEffect(() => {
-    async function checkTwilio() {
+    async function loadSmsOptions() {
       try {
-        const res = await fetch('/api/follow-up/twilio-status')
-        if (res.ok) {
-          const data = await res.json()
-          setTwilioConfigured(data.configured)
-        } else {
-          setTwilioConfigured(false)
-        }
+        const [statusResponse, sessionsResponse] = await Promise.all([
+          fetch('/api/follow-up/twilio-status'),
+          fetch('/api/follow-up/send-sms'),
+        ])
+        const statusData = statusResponse.ok
+          ? await statusResponse.json()
+          : { configured: false }
+        const sessionsData = sessionsResponse.ok
+          ? await sessionsResponse.json()
+          : { sessions: [] }
+        const eligible = Array.isArray(sessionsData.sessions)
+          ? (sessionsData.sessions as EligibleSmsSession[])
+          : []
+        setTwilioConfigured(Boolean(statusData.configured))
+        setSessions(eligible)
+        setSelectedSessionId(eligible[0]?.id || '')
       } catch {
         setTwilioConfigured(false)
+        setSessions([])
+        setSelectedSessionId('')
       }
     }
-    checkTwilio()
+    loadSmsOptions()
   }, [])
 
   async function handleSend() {
-    if (!phone.trim()) return
+    if (!selectedSessionId) return
     setStatus('sending')
     setErrorMsg('')
 
@@ -42,7 +59,7 @@ export default function LiveDemoPanel({ onSessionStarted }: LiveDemoPanelProps) 
       const res = await fetch('/api/follow-up/send-sms', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ phone_number: phone, scenario_id: scenarioId }),
+        body: JSON.stringify({ session_id: selectedSessionId }),
       })
       const data = await res.json()
 
@@ -77,10 +94,10 @@ export default function LiveDemoPanel({ onSessionStarted }: LiveDemoPanelProps) 
         </div>
         <div>
           <h3 style={{ margin: 0, fontSize: 16, fontWeight: 600, color: '#fff' }}>
-            Try It Live on Your Phone
+            Send Patient Check-In
           </h3>
           <p style={{ margin: 0, fontSize: 13, color: '#94a3b8' }}>
-            Get a real text message from the AI agent
+            Start a secure SMS follow-up using the patient phone on file
           </p>
         </div>
       </div>
@@ -114,10 +131,10 @@ export default function LiveDemoPanel({ onSessionStarted }: LiveDemoPanelProps) 
       ) : status !== 'sent' ? (
         <>
           <label style={{ display: 'block', marginBottom: 12 }}>
-            <span style={{ fontSize: 12, color: '#94a3b8', display: 'block', marginBottom: 4 }}>Scenario</span>
+            <span style={{ fontSize: 12, color: '#94a3b8', display: 'block', marginBottom: 4 }}>Eligible patient follow-up</span>
             <select
-              value={scenarioId}
-              onChange={e => setScenarioId(e.target.value)}
+              value={selectedSessionId}
+              onChange={e => setSelectedSessionId(e.target.value)}
               disabled={status === 'sending'}
               style={{
                 width: '100%', padding: '10px 12px', borderRadius: 8,
@@ -125,29 +142,20 @@ export default function LiveDemoPanel({ onSessionStarted }: LiveDemoPanelProps) 
                 fontSize: 14, cursor: 'pointer',
               }}
             >
-              {DEMO_SCENARIOS.map(s => (
-                <option key={s.id} value={s.id}>
-                  {s.name} — {s.diagnosis}
+              {sessions.map(session => (
+                <option key={session.id} value={session.id}>
+                  {session.patientName} — {session.destination}
+                  {session.visitDate ? ` — visit ${session.visitDate}` : ''}
                 </option>
               ))}
             </select>
           </label>
 
-          <label style={{ display: 'block', marginBottom: 16 }}>
-            <span style={{ fontSize: 12, color: '#94a3b8', display: 'block', marginBottom: 4 }}>Your Phone Number</span>
-            <input
-              type="tel"
-              placeholder="(555) 123-4567"
-              value={phone}
-              onChange={e => setPhone(e.target.value)}
-              disabled={status === 'sending'}
-              style={{
-                width: '100%', padding: '10px 12px', borderRadius: 8,
-                background: '#334155', color: '#fff', border: '1px solid #475569',
-                fontSize: 14, boxSizing: 'border-box',
-              }}
-            />
-          </label>
+          {sessions.length === 0 && (
+            <div style={{ color: '#FBBF24', fontSize: 13, marginBottom: 12 }}>
+              No completed-visit follow-up sessions with a valid patient phone are ready to send.
+            </div>
+          )}
 
           {status === 'error' && (
             <div style={{ color: '#F87171', fontSize: 13, marginBottom: 12 }}>
@@ -157,7 +165,7 @@ export default function LiveDemoPanel({ onSessionStarted }: LiveDemoPanelProps) 
 
           <button
             onClick={handleSend}
-            disabled={!phone.trim() || status === 'sending'}
+            disabled={!selectedSessionId || status === 'sending'}
             style={{
               width: '100%', padding: '12px', borderRadius: 8,
               background: status === 'sending' ? '#334155' : '#16A34A',
@@ -175,7 +183,7 @@ export default function LiveDemoPanel({ onSessionStarted }: LiveDemoPanelProps) 
             marginTop: 12, fontSize: 11, color: '#64748b',
           }}>
             <Shield size={12} />
-            Your number is used only for this demo and automatically deleted after 24 hours.
+            Messages go only to the masked phone on the tenant patient record. The temporary SMS mapping expires after 24 hours.
           </div>
         </>
       ) : (

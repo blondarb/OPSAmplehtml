@@ -20,11 +20,147 @@ import { getTurnDetectionConfig, getNoiseReductionConfig } from '@/lib/historian
 import { getOpenAIKey } from '@/lib/secrets'
 import { buildHistorianSystemPrompt, getHistorianToolDefinition } from '@/lib/historianPrompts'
 import { buildWhisperBiasPrompt, isAsrBiasingEnabled } from '@/lib/asr/clinical-lexicon'
+import { getConsult } from '@/lib/consult/pipeline'
+import { buildHistorianContextFromConsult } from '@/lib/consult/contextBuilder'
+import { loadHistorianAuthorization } from '@/lib/triage/historianAuthorization'
+import type { ReferralClarificationQuestion } from '@/lib/historianTypes'
+import { authorizeClinicalOrPatientAccess } from '@/lib/patientAccess/routeAuthorization'
+
+function isHistorianSessionType(value: unknown): value is HistorianSessionType {
+  return value === 'new_patient' || value === 'follow_up' || value === 'referral_clarification'
+}
 
 export async function POST(request: Request) {
   try {
     const body = await request.json().catch(() => ({}))
-    const sessionType: HistorianSessionType = body.sessionType || 'new_patient'
+    const requestedSessionType = body.sessionType ?? 'new_patient'
+    if (!isHistorianSessionType(requestedSessionType)) {
+      return NextResponse.json(
+        { error: 'Invalid historian session type' },
+        { status: 400 },
+      )
+    }
+    const requestedConsultId =
+      typeof body.consult_id === 'string' && body.consult_id.trim()
+        ? body.consult_id.trim()
+        : undefined
+    const requestedPatientId =
+      typeof body.patient_id === 'string' && body.patient_id.trim()
+        ? body.patient_id.trim()
+        : undefined
+    const clarificationRequested =
+      requestedSessionType === 'referral_clarification' ||
+      requestedConsultId !== undefined
+    const access = await authorizeClinicalOrPatientAccess({
+      clinicalAction: 'historian.renew',
+      clinicalRoles: ['clinician', 'admin'],
+      patientScopes: clarificationRequested
+        ? ['patient:clarification:answer']
+        : ['patient:historian:renew'],
+      ...(requestedPatientId ? { expectedPatientId: requestedPatientId } : {}),
+      ...(requestedConsultId ? { expectedConsultId: requestedConsultId } : {}),
+    })
+    if (!access.ok) {
+      return NextResponse.json(
+        { error: 'Access denied', reason: access.reason },
+        { status: access.status },
+      )
+    }
+    if (
+      access.principal === 'patient' &&
+      requestedPatientId &&
+      requestedPatientId !== access.context.patientId
+    ) {
+      return NextResponse.json(
+        { error: 'Access denied', reason: 'binding_mismatch' },
+        { status: 403 },
+      )
+    }
+    const tenantId = access.context.tenantId
+    let sessionType: HistorianSessionType = requestedSessionType
+    const consultId =
+      requestedConsultId ??
+      (requestedSessionType === 'referral_clarification' &&
+      access.principal === 'patient'
+        ? access.context.consultId
+        : undefined)
+    let referralReason: string | undefined
+    let patientContext: string | undefined
+    let approvedQuestions: ReferralClarificationQuestion[] | undefined
+
+    if (sessionType === 'referral_clarification' && !consultId) {
+      return NextResponse.json(
+        {
+          error: 'Historian renewal is not authorized',
+          reason: 'triage_authorization_missing',
+        },
+        { status: 409 },
+      )
+    }
+
+    if (consultId) {
+      if (
+        access.principal === 'patient' &&
+        access.context.consultId !== consultId
+      ) {
+        return NextResponse.json(
+          { error: 'Access denied', reason: 'binding_mismatch' },
+          { status: 403 },
+        )
+      }
+      const consult = await getConsult(consultId, tenantId)
+      if (!consult?.triage_session_id) {
+        return NextResponse.json(
+          {
+            error: 'Historian renewal is not authorized',
+            reason: 'triage_authorization_missing',
+          },
+          { status: 409 },
+        )
+      }
+      if (
+        access.principal === 'patient' &&
+        consult.patient_id !== access.context.patientId
+      ) {
+        return NextResponse.json(
+          { error: 'Access denied', reason: 'binding_mismatch' },
+          { status: 403 },
+        )
+      }
+
+      const authorization = await loadHistorianAuthorization(
+        consult.triage_session_id,
+        tenantId,
+      )
+      if (!authorization.decision.allowed) {
+        return NextResponse.json(
+          {
+            error: 'Historian renewal is not authorized',
+            reason: authorization.decision.reason,
+          },
+          { status: 409 },
+        )
+      }
+
+      const context = buildHistorianContextFromConsult(consult)
+      referralReason = context.referralReason
+      patientContext = context.patientContext
+      approvedQuestions = authorization.approvedQuestions
+      sessionType = 'referral_clarification'
+    }
+
+    // Referral clarification is Nova-only. This OpenAI-specific endpoint must
+    // never mint a credential that would let browser code bypass the relay's
+    // signed instructions/tool/voice/session-type boundary.
+    if (sessionType === 'referral_clarification') {
+      return NextResponse.json(
+        {
+          error: 'OpenAI renewal is not permitted for referral clarification',
+          reason: 'referral_clarification_uses_signed_nova',
+        },
+        { status: 409 },
+      )
+    }
 
     const apiKey = await getOpenAIKey()
     if (!apiKey) {
@@ -37,8 +173,13 @@ export async function POST(request: Request) {
     const model = process.env.OPENAI_HISTORIAN_REALTIME_MODEL || 'gpt-realtime-2'
     const turnDetection = getTurnDetectionConfig(process.env.HISTORIAN_TURN_DETECTION_MODE)
     const noiseReduction = getNoiseReductionConfig(process.env.HISTORIAN_NOISE_REDUCTION)
-    const instructions = buildHistorianSystemPrompt(sessionType)
-    const tools = getHistorianToolDefinition()
+    const instructions = buildHistorianSystemPrompt(
+      sessionType,
+      referralReason,
+      patientContext,
+      approvedQuestions,
+    )
+    const tools = getHistorianToolDefinition(sessionType)
 
     const transcription: { model: string; prompt?: string } = { model: 'whisper-1' }
     if (isAsrBiasingEnabled()) {
@@ -101,10 +242,13 @@ export async function POST(request: Request) {
       ephemeralKey: data.value ?? data.client_secret?.value,
       expiresAt: data.expires_at ?? data.client_secret?.expires_at,
     })
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('[historian/session-renew] error:', error)
     return NextResponse.json(
-      { error: error?.message || 'Failed to renew session' },
+      {
+        error:
+          error instanceof Error ? error.message : 'Failed to renew session',
+      },
       { status: 500 },
     )
   }

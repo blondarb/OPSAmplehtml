@@ -1,0 +1,123 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: >-
+  Approval-gated single-use token and secret-injection foundation for the Nova
+  Sonic relay in us-east-1. This stack does not register or deploy an ECS task.
+
+Parameters:
+  RelayTaskRoleName:
+    Type: String
+    Default: NovaSonicRelayInstanceRole
+  RelayExecutionRoleName:
+    Type: String
+    Default: novaSonicRelayExecutionRole
+  RelaySecretReplicaArn:
+    Type: String
+    Description: Exact us-east-1 replica ARN of sevaro/nova-relay/shared-secret.
+  RelaySecretKmsKeyArn:
+    Type: String
+    Description: Exact CMK ARN protecting the relay secret replica.
+  AlarmTopicArn:
+    Type: String
+    Description: SNS topic for operational security alarms.
+
+Resources:
+  RelayReplayTable:
+    Type: AWS::DynamoDB::Table
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      TableName: nova-relay-replay
+      BillingMode: PAY_PER_REQUEST
+      DeletionProtectionEnabled: true
+      AttributeDefinitions:
+        - AttributeName: jti
+          AttributeType: S
+      KeySchema:
+        - AttributeName: jti
+          KeyType: HASH
+      TimeToLiveSpecification:
+        AttributeName: expires_at
+        Enabled: true
+      SSESpecification:
+        SSEEnabled: true
+
+  RelayReplayWritePolicy:
+    Type: AWS::IAM::Policy
+    Properties:
+      PolicyName: NovaRelayConsumeOneUseTokens
+      Roles:
+        - !Ref RelayTaskRoleName
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Sid: ConditionallyConsumeOpaqueJti
+            Effect: Allow
+            Action: dynamodb:PutItem
+            Resource: !GetAtt RelayReplayTable.Arn
+
+  RelaySecretInjectionPolicy:
+    Type: AWS::IAM::Policy
+    Properties:
+      PolicyName: NovaRelayInjectSharedSecret
+      Roles:
+        - !Ref RelayExecutionRoleName
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Sid: ReadOnlyExactRelaySecretReplica
+            Effect: Allow
+            Action: secretsmanager:GetSecretValue
+            Resource: !Ref RelaySecretReplicaArn
+          - Sid: DecryptOnlyRelaySecretKey
+            Effect: Allow
+            Action: kms:Decrypt
+            Resource: !Ref RelaySecretKmsKeyArn
+            Condition:
+              StringEquals:
+                kms:ViaService: !Sub secretsmanager.${AWS::Region}.amazonaws.com
+
+  ReplayTableThrottleAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmDescription: Nova relay replay table throttled a token consume.
+      Namespace: AWS/DynamoDB
+      MetricName: ThrottledRequests
+      Dimensions:
+        - Name: TableName
+          Value: !Ref RelayReplayTable
+        - Name: Operation
+          Value: PutItem
+      Statistic: Sum
+      Period: 60
+      EvaluationPeriods: 1
+      Threshold: 1
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      TreatMissingData: notBreaching
+      AlarmActions:
+        - !Ref AlarmTopicArn
+
+  ReplayTableSystemErrorAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmDescription: Nova relay replay table returned a system error.
+      Namespace: AWS/DynamoDB
+      MetricName: SystemErrors
+      Dimensions:
+        - Name: TableName
+          Value: !Ref RelayReplayTable
+        - Name: Operation
+          Value: PutItem
+      Statistic: Sum
+      Period: 60
+      EvaluationPeriods: 1
+      Threshold: 1
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      TreatMissingData: notBreaching
+      AlarmActions:
+        - !Ref AlarmTopicArn
+
+Outputs:
+  ReplayTableName:
+    Value: !Ref RelayReplayTable
+  ReplayTableArn:
+    Value: !GetAtt RelayReplayTable.Arn

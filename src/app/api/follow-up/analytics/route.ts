@@ -1,28 +1,59 @@
 import { NextResponse } from 'next/server'
-import { getUser } from '@/lib/cognito/server'
 import type { AnalyticsData } from '@/lib/follow-up/billingTypes'
-import { from } from '@/lib/db-query'
+import { authorizeClinicalAccess } from '@/lib/auth/clinicalAccess'
+import { getPool } from '@/lib/db'
 
 export async function GET(request: Request) {
+  const access = await authorizeClinicalAccess({
+    action: 'follow_up.read',
+    allowedRoles: ['viewer', 'scheduler', 'clinician', 'admin'],
+  })
+  if (!access.ok) {
+    return NextResponse.json(
+      { error: 'Access denied', reason: access.reason },
+      { status: access.status },
+    )
+  }
+
   try {
     const { searchParams } = new URL(request.url)
     const fromDate = searchParams.get('from') || new Date(Date.now() - 30 * 86400000).toISOString()
     const toDate = searchParams.get('to') || new Date().toISOString()
     const sourceFilter = searchParams.get('source') // 'visit' | 'demo' | null (all)
-
-    // Fetch all sessions in range (including visit-linked ones)
-    const { data: sessions, error: sessionsError } = await from('followup_sessions')
-      .select('*')
-      .gte('created_at', fromDate)
-      .lte('created_at', toDate)
-      .order('created_at', { ascending: true })
-
-    if (sessionsError) {
-      console.error('Analytics sessions query error:', sessionsError)
-      return NextResponse.json({ error: 'Failed to fetch analytics data' }, { status: 500 })
+    const fromTime = Date.parse(fromDate)
+    const toTime = Date.parse(toDate)
+    if (
+      !Number.isFinite(fromTime) ||
+      !Number.isFinite(toTime) ||
+      toTime < fromTime ||
+      toTime - fromTime > 366 * 86400000 ||
+      (sourceFilter != null && !['visit', 'demo'].includes(sourceFilter))
+    ) {
+      return NextResponse.json(
+        { error: 'Analytics filters are invalid or exceed the one-year limit' },
+        { status: 400 },
+      )
     }
 
-    const rawSessions = sessions || []
+    const pool = await getPool()
+
+    // Fetch all sessions in range (including visit-linked ones)
+    const { rows: rawSessions } = await pool.query(
+      `SELECT *
+         FROM followup_sessions
+        WHERE tenant_id = $1
+          AND created_at >= $2
+          AND created_at <= $3
+        ORDER BY created_at ASC
+        LIMIT 10001`,
+      [access.context.tenantId, fromDate, toDate],
+    )
+    if (rawSessions.length > 10000) {
+      return NextResponse.json(
+        { error: 'Analytics range contains too many sessions; use a shorter range' },
+        { status: 422 },
+      )
+    }
 
     // Compute visit-linked metrics before filtering
     const sessionsFromVisits = rawSessions.filter(
@@ -57,11 +88,16 @@ export async function GET(request: Request) {
     const avgDuration = totalCalls > 0 ? Math.round(totalDuration / totalCalls) : 0
 
     // Estimated revenue from billing entries
-    const { data: billingData } = await from('followup_billing_entries')
-      .select('cpt_rate, billing_status')
-      .in('billing_status', ['ready_to_bill', 'billed'])
-      .gte('created_at', fromDate)
-      .lte('created_at', toDate)
+    const { rows: billingData } = await pool.query(
+      `SELECT b.cpt_rate, b.billing_status
+         FROM followup_billing_entries b
+         JOIN followup_sessions fs ON fs.id = b.session_id
+        WHERE fs.tenant_id = $1
+          AND b.billing_status IN ('ready_to_bill', 'billed')
+          AND b.created_at >= $2
+          AND b.created_at <= $3`,
+      [access.context.tenantId, fromDate, toDate],
+    )
 
     const estimatedRevenue = (billingData || []).reduce(
       (sum: number, b: Record<string, unknown>) => sum + (Number(b.cpt_rate) || 0),
@@ -150,12 +186,22 @@ export async function GET(request: Request) {
     }
 
     // Recent escalations
-    const { data: escalations } = await from('followup_escalations')
-      .select('id, session_id, tier, category, created_at, acknowledged')
-      .gte('created_at', fromDate)
-      .lte('created_at', toDate)
-      .order('created_at', { ascending: false })
-      .limit(10)
+    const { rows: escalations } = await pool.query(
+      `SELECT e.id,
+              e.session_id,
+              e.tier,
+              e.category,
+              e.created_at,
+              e.acknowledged
+         FROM followup_escalations e
+         JOIN followup_sessions fs ON fs.id = e.session_id
+        WHERE fs.tenant_id = $1
+          AND e.created_at >= $2
+          AND e.created_at <= $3
+        ORDER BY e.created_at DESC
+        LIMIT 10`,
+      [access.context.tenantId, fromDate, toDate],
+    )
 
     // Map escalations to include patient name from sessions
     const sessionMap = new Map(allSessions.map((s: Record<string, unknown>) => [s.id, s]))
@@ -192,9 +238,8 @@ export async function GET(request: Request) {
     }
 
     return NextResponse.json(analyticsData)
-  } catch (error) {
-    console.error('Analytics API error:', error)
-    const message = error instanceof Error ? error.message : 'Failed to fetch analytics'
-    return NextResponse.json({ error: message }, { status: 500 })
+  } catch {
+    console.error('[follow-up/analytics] request failed')
+    return NextResponse.json({ error: 'Failed to fetch analytics' }, { status: 500 })
   }
 }

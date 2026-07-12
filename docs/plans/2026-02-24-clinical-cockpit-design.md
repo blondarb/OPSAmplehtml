@@ -44,10 +44,10 @@ Migrations: `026_notifications.sql`, `027_provider_messages.sql`, `028_consult_r
 | Route | Methods | Purpose |
 |-------|---------|---------|
 | `/api/notifications` | GET, POST, PATCH | List/create/update notifications |
-| `/api/provider-messages` | GET, POST | Messages in a thread |
-| `/api/provider-messages/threads` | GET, POST | Thread CRUD |
-| `/api/consults` | GET, POST, PATCH | Consult requests |
-| `/api/incomplete-docs` | GET | Detect unsigned/incomplete notes |
+| `/api/provider-messages` | GET, POST | **Retired prototype (410)** — requires a participant-authorized redesign |
+| `/api/provider-messages/threads` | GET, POST | **Retired prototype (410)** — requires normalized participant membership |
+| `/api/consults` | GET, POST, PATCH | **Retired prototype (410)** — distinct from active `/api/neuro-consults` |
+| `/api/incomplete-docs` | GET | **Retired prototype (410)** — replacement must separate reads from idempotent reminder jobs |
 | `/api/ai/draft-response` | POST | Generate AI draft for patient messages (GPT-5-mini) |
 
 ## UI Components

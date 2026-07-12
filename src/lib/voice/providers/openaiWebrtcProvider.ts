@@ -31,6 +31,8 @@
  */
 
 import type { VoiceEvent, VoiceProvider, VoiceStartOptions } from '@/lib/voice/providerTypes'
+import { buildHistorianRenewalRequest } from '@/lib/historianSessionClient'
+import type { HistorianSessionType } from '@/lib/historianTypes'
 
 const DEFAULT_MODEL = 'gpt-realtime-2'
 
@@ -48,6 +50,7 @@ export class OpenAiWebrtcProvider implements VoiceProvider {
   /** Token renewal (~90s before expiry). */
   private renewalTimer: ReturnType<typeof setTimeout> | null = null
   private sessionType = 'new_patient'
+  private consultId: string | undefined
 
   on(cb: (e: VoiceEvent) => void): void {
     this.cb = cb
@@ -75,6 +78,11 @@ export class OpenAiWebrtcProvider implements VoiceProvider {
   }
 
   async start(opts: VoiceStartOptions): Promise<void> {
+    if (opts.sessionType === 'referral_clarification') {
+      throw new Error(
+        'openaiWebrtcProvider: referral clarification requires the signed Nova relay',
+      )
+    }
     if (this.pc) return // already started — idempotent guard
     if (!opts.ephemeralKey) {
       // Throw (don't emit+return): a failed start() must REJECT so the hook's
@@ -87,6 +95,7 @@ export class OpenAiWebrtcProvider implements VoiceProvider {
     this.aiSpeaking = false
     this.sessionCreated = false
     if (opts.sessionType) this.sessionType = opts.sessionType
+    this.consultId = opts.consultId
 
     try {
       // 1. Peer connection
@@ -226,7 +235,12 @@ export class OpenAiWebrtcProvider implements VoiceProvider {
         const res = await fetch('/api/ai/historian/session-renew', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ sessionType: this.sessionType }),
+          body: JSON.stringify(
+            buildHistorianRenewalRequest(
+              this.sessionType as HistorianSessionType,
+              this.consultId,
+            ),
+          ),
         })
         if (!res.ok) {
           console.warn('[openaiWebrtcProvider] session-renew failed:', res.status)
@@ -256,6 +270,8 @@ export class OpenAiWebrtcProvider implements VoiceProvider {
    * Mirrors the switch in useRealtimeSession.handleServerEvent, minus the
    * harness-specific bookkeeping that now lives in the hook.
    */
+  // Provider events are an external, provider-versioned JSON protocol.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   private handleServerEvent(msg: any): void {
     switch (msg.type) {
       case 'session.created': {

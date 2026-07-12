@@ -86,6 +86,7 @@ export class NovaSonicWsProvider implements VoiceProvider {
         instructions: opts.instructions,
         tools: opts.tools,
         voiceId: opts.voiceId,
+        sessionType: opts.sessionType ?? 'new_patient',
       })
 
       // Start mic capture: each 16k PCM16 base64 chunk becomes an `audio` msg.
@@ -228,7 +229,10 @@ export class NovaSonicWsProvider implements VoiceProvider {
   }
 
   injectSystemText(text: string): void {
-    this.send({ t: 'systemText', text })
+    // Browser-authored mid-session prompt injection is intentionally disabled
+    // for Nova. The relay accepts only the server-signed start configuration;
+    // a future dynamic guidance channel must carry its own server signature.
+    void text
   }
 
   requestResponse(): void {

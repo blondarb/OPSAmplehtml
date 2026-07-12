@@ -105,11 +105,12 @@ What's actually running, end to end:
    headache, acute vision loss, ascending weakness/GBS, new seizure, cauda
    equina, ↑ICP, acute mental status change, rapidly progressive dementia, new
    focal deficit, status epilepticus, meningismus, papilledema) scans the
-   cumulative patient transcript after every turn and separately reports
-   detections to the UI and to `POST /api/ai/historian/escalation`
-   (`src/app/api/ai/historian/escalation/route.ts`), which persists
-   `red_flag_events` rows and bumps a `red_flag_count` on the consult record.
-   This runs regardless of whether the model itself calls `query_evidence`.
+   cumulative patient transcript after every turn and reports detections to the
+   UI. The legacy `POST /api/ai/historian/escalation` route is retired. The
+   canonical persistence boundary is the authorized/capability-bound
+   `POST /api/ai/historian/save`, which invokes the closed-loop historian safety
+   escalation workflow transactionally. This runs regardless of whether the
+   model itself calls `query_evidence`.
 8. **Session completion:** the model calls `save_interview_output`; the client
    posts the result to `POST /api/ai/historian/save/route.ts`, which persists
    to the `historian_sessions` table.

@@ -3,7 +3,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { signOut as cognitoSignOut } from '@/lib/cognito/client'
 import { useRouter } from 'next/navigation'
-import TopNav from './TopNav'
 import LeftSidebar from './LeftSidebar'
 import CenterPanel from './CenterPanel'
 import { AcuteIconNav, AcuteTopBar, AcuteActionBar, AcutePatientPanel, AcuteBreadcrumb } from './acute-care'
@@ -13,7 +12,7 @@ import DotPhrasesDrawer from './DotPhrasesDrawer'
 import EnhancedNotePreviewModal from './EnhancedNotePreviewModal'
 import SettingsDrawer from './SettingsDrawer'
 import IdeasDrawer from './IdeasDrawer'
-import OnboardingTour, { resetAllTours, type TourPhase } from './OnboardingTour'
+import OnboardingTour, { type TourPhase } from './OnboardingTour'
 import PatientAppointments, { type Appointment } from './PatientAppointments'
 import ScheduleFollowupModal from './ScheduleFollowupModal'
 import ScheduleNewPatientModal from './ScheduleNewPatientModal'
@@ -220,8 +219,6 @@ export default function ClinicalNote({
   const [activeTextField, setActiveTextField] = useState<string | null>(null)
   const [selectedRecommendations, setSelectedRecommendations] = useState<RecommendationItem[]>([])
   const [followupModalOpen, setFollowupModalOpen] = useState(false)
-  const [resetModalOpen, setResetModalOpen] = useState(false)
-  const [resetting, setResetting] = useState(false)
   const [scheduleNewPatientOpen, setScheduleNewPatientOpen] = useState(false)
   const [demoHint, setDemoHint] = useState<string | null>(null)
   const [appointmentsRefreshKey, setAppointmentsRefreshKey] = useState(0)
@@ -922,33 +919,6 @@ export default function ClinicalNote({
     setViewMode('appointments')
     setActiveIcon('home')
   }, [resetAllClinicalState])
-
-  // Handle demo reset - opens confirmation modal
-  const handleResetDemo = () => {
-    setResetModalOpen(true)
-  }
-
-  const executeResetDemo = async () => {
-    setResetting(true)
-    try {
-      const response = await fetch('/api/demo/reset', { method: 'POST' })
-      if (!response.ok) {
-        const data = await response.json()
-        console.error('Reset failed:', data.error)
-        setResetting(false)
-        setResetModalOpen(false)
-        return
-      }
-      // Reset the onboarding tours so they replay
-      resetAllTours()
-      // Go back to appointments view and reload the page
-      window.location.href = '/dashboard'
-    } catch (err) {
-      console.error('Error resetting demo:', err)
-      setResetting(false)
-      setResetModalOpen(false)
-    }
-  }
 
   const handleSignOut = async () => {
     await cognitoSignOut()
@@ -1690,110 +1660,6 @@ export default function ClinicalNote({
         forceShow={showTour}
         onComplete={() => setShowTour(false)}
       />
-
-      {/* Reset Demo Confirmation Modal */}
-      {resetModalOpen && (
-        <>
-          <div
-            onClick={() => !resetting && setResetModalOpen(false)}
-            style={{
-              position: 'fixed',
-              top: 0,
-              left: 0,
-              right: 0,
-              bottom: 0,
-              background: 'rgba(0,0,0,0.5)',
-              zIndex: 10000,
-            }}
-          />
-          <div style={{
-            position: 'fixed',
-            top: '50%',
-            left: '50%',
-            transform: 'translate(-50%, -50%)',
-            background: 'var(--bg-white)',
-            borderRadius: '16px',
-            padding: '28px',
-            width: '420px',
-            maxWidth: '95vw',
-            zIndex: 10001,
-            boxShadow: '0 20px 40px rgba(0,0,0,0.25)',
-            textAlign: 'center',
-          }}>
-            <div style={{
-              width: '56px',
-              height: '56px',
-              borderRadius: '50%',
-              background: '#FEF3C7',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              margin: '0 auto 16px',
-            }}>
-              <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#F59E0B" strokeWidth="2">
-                <path d="M1 4v6h6" /><path d="M3.51 15a9 9 0 102.13-9.36L1 10" />
-              </svg>
-            </div>
-            <h3 style={{ margin: '0 0 8px', fontSize: '18px', fontWeight: 600, color: 'var(--text-primary)' }}>
-              Reset Demo?
-            </h3>
-            <p style={{ margin: '0 0 24px', fontSize: '14px', color: 'var(--text-secondary)', lineHeight: 1.5 }}>
-              This will clear all visits, notes, and return appointments to their original &quot;Scheduled&quot; state. The onboarding tour will replay for the next viewer.
-            </p>
-            <div style={{ display: 'flex', gap: '12px', justifyContent: 'center' }}>
-              <button
-                onClick={() => setResetModalOpen(false)}
-                disabled={resetting}
-                style={{
-                  padding: '10px 24px',
-                  borderRadius: '8px',
-                  border: '1px solid var(--border)',
-                  background: 'var(--bg-white)',
-                  cursor: 'pointer',
-                  fontSize: '14px',
-                  fontWeight: 500,
-                  color: 'var(--text-primary)',
-                }}
-              >
-                Cancel
-              </button>
-              <button
-                onClick={executeResetDemo}
-                disabled={resetting}
-                style={{
-                  padding: '10px 24px',
-                  borderRadius: '8px',
-                  border: 'none',
-                  background: '#F59E0B',
-                  color: 'white',
-                  cursor: resetting ? 'wait' : 'pointer',
-                  fontSize: '14px',
-                  fontWeight: 600,
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '8px',
-                }}
-              >
-                {resetting ? (
-                  <>
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ animation: 'spin 1s linear infinite' }}>
-                      <circle cx="12" cy="12" r="10" strokeDasharray="32" strokeDashoffset="32"/>
-                    </svg>
-                    Resetting...
-                  </>
-                ) : (
-                  <>
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                      <path d="M1 4v6h6" /><path d="M3.51 15a9 9 0 102.13-9.36L1 10" />
-                    </svg>
-                    Reset Demo
-                  </>
-                )}
-              </button>
-            </div>
-          </div>
-        </>
-      )}
 
       {/* Schedule Follow-up Modal - opens after signing a note */}
       <ScheduleFollowupModal

@@ -1,25 +1,54 @@
 import { NextResponse } from 'next/server'
-import { getUser } from '@/lib/cognito/server'
-import { from } from '@/lib/db-query'
+import { authorizeClinicalAccess } from '@/lib/auth/clinicalAccess'
+import { getPool } from '@/lib/db'
+
+function validMonth(value: string): boolean {
+  return /^\d{4}-(0[1-9]|1[0-2])$/.test(value)
+}
+
+function csvCell(value: unknown): string {
+  let text = String(value ?? '')
+  if (/^[=+\-@\t\r]/.test(text)) text = `'${text}`
+  return `"${text.replace(/"/g, '""')}"`
+}
 
 export async function GET(request: Request) {
+  const access = await authorizeClinicalAccess({
+    action: 'follow_up.billing_read',
+    allowedRoles: ['clinician', 'admin'],
+  })
+  if (!access.ok) {
+    return NextResponse.json(
+      { error: 'Access denied', reason: access.reason },
+      { status: access.status },
+    )
+  }
+
   try {
     const { searchParams } = new URL(request.url)
     const month = searchParams.get('month') || new Date().toISOString().slice(0, 7)
     const format = searchParams.get('format') || 'csv'
-
-
-    const { data: entries, error } = await from('followup_billing_entries')
-      .select('*')
-      .eq('billing_month', month)
-      .order('service_date', { ascending: true })
-
-    if (error) {
-      console.error('Billing export query error:', error)
-      return NextResponse.json({ error: 'Failed to fetch billing data' }, { status: 500 })
+    if (!validMonth(month) || !['csv', 'pdf'].includes(format)) {
+      return NextResponse.json({ error: 'Export filters are invalid' }, { status: 400 })
     }
 
-    const rows = entries || []
+    const pool = await getPool()
+    const { rows } = await pool.query(
+      `SELECT b.*
+         FROM followup_billing_entries b
+         JOIN followup_sessions fs ON fs.id = b.session_id
+        WHERE fs.tenant_id = $1
+          AND b.billing_month = $2
+        ORDER BY b.service_date ASC
+        LIMIT 5001`,
+      [access.context.tenantId, month],
+    )
+    if (rows.length > 5000) {
+      return NextResponse.json(
+        { error: 'Export contains too many entries; use a shorter period' },
+        { status: 422 },
+      )
+    }
 
     if (format === 'csv') {
       const headers = [
@@ -39,79 +68,82 @@ export async function GET(request: Request) {
         'Notes',
       ]
 
-      const csvLines = [headers.join(',')]
+      const csvLines = [headers.map(csvCell).join(',')]
       for (const row of rows) {
-        const r = row as Record<string, unknown>
         const values = [
-          `"${String(r.patient_name || '').replace(/"/g, '""')}"`,
-          r.service_date,
-          r.program,
-          r.cpt_code,
-          r.cpt_rate,
-          r.prep_minutes,
-          r.call_minutes,
-          r.documentation_minutes,
-          r.coordination_minutes,
-          r.total_minutes,
-          r.meets_threshold ? 'Yes' : 'No',
-          r.billing_status,
-          `"${String(r.reviewed_by || '').replace(/"/g, '""')}"`,
-          `"${String(r.notes || '').replace(/"/g, '""')}"`,
+          row.patient_name,
+          row.service_date,
+          row.program,
+          row.cpt_code,
+          row.cpt_rate,
+          row.prep_minutes,
+          row.call_minutes,
+          row.documentation_minutes,
+          row.coordination_minutes,
+          row.total_minutes,
+          row.meets_threshold ? 'Yes' : 'No',
+          row.billing_status,
+          row.reviewed_by,
+          row.notes,
         ]
-        csvLines.push(values.join(','))
+        csvLines.push(values.map(csvCell).join(','))
       }
 
-      const csv = csvLines.join('\n')
-      return new Response(csv, {
+      return new Response(csvLines.join('\n'), {
         headers: {
-          'Content-Type': 'text/csv',
-          'Content-Disposition': `attachment; filename=billing-${month}.csv`,
+          'Content-Type': 'text/csv; charset=utf-8',
+          'Content-Disposition': `attachment; filename="billing-${month}.csv"`,
+          'X-Content-Type-Options': 'nosniff',
         },
       })
     }
 
-    // Text format (print-friendly) for PDF placeholder
     const lines = [
-      `FOLLOW-UP BILLING REPORT`,
+      'FOLLOW-UP BILLING REPORT',
       `Month: ${month}`,
       `Generated: ${new Date().toISOString().split('T')[0]}`,
-      `${'='.repeat(70)}`,
+      '='.repeat(70),
       '',
     ]
 
     for (const row of rows) {
-      const r = row as Record<string, unknown>
-      lines.push(`Patient: ${r.patient_name}`)
-      lines.push(`Date: ${r.service_date}  |  Program: ${String(r.program).toUpperCase()}  |  CPT: ${r.cpt_code}`)
-      lines.push(`Time: Prep ${r.prep_minutes}m + Call ${r.call_minutes}m + Doc ${r.documentation_minutes}m + Coord ${r.coordination_minutes}m = ${r.total_minutes}m`)
-      lines.push(`Rate: $${Number(r.cpt_rate).toFixed(2)}  |  Threshold: ${r.meets_threshold ? 'Met' : 'NOT MET'}  |  Status: ${r.billing_status}`)
-      if (r.reviewed_by) lines.push(`Reviewed by: ${r.reviewed_by}`)
-      if (r.notes) lines.push(`Notes: ${r.notes}`)
-      lines.push(`${'-'.repeat(70)}`)
+      lines.push(`Patient: ${row.patient_name}`)
+      lines.push(
+        `Date: ${row.service_date}  |  Program: ${String(row.program).toUpperCase()}  |  CPT: ${row.cpt_code}`,
+      )
+      lines.push(
+        `Time: Prep ${row.prep_minutes}m + Call ${row.call_minutes}m + Doc ${row.documentation_minutes}m + Coord ${row.coordination_minutes}m = ${row.total_minutes}m`,
+      )
+      lines.push(
+        `Rate: $${Number(row.cpt_rate).toFixed(2)}  |  Threshold: ${row.meets_threshold ? 'Met' : 'NOT MET'}  |  Status: ${row.billing_status}`,
+      )
+      if (row.reviewed_by) lines.push(`Reviewed by: ${row.reviewed_by}`)
+      if (row.notes) lines.push(`Notes: ${row.notes}`)
+      lines.push('-'.repeat(70))
     }
 
-    // Summary
     const totalRevenue = rows.reduce(
-      (sum: number, r: Record<string, unknown>) =>
-        (r as Record<string, unknown>).meets_threshold ? sum + (Number((r as Record<string, unknown>).cpt_rate) || 0) : sum,
-      0
+      (sum: number, row: Record<string, unknown>) =>
+        row.meets_threshold ? sum + (Number(row.cpt_rate) || 0) : sum,
+      0,
     )
     lines.push('')
-    lines.push(`SUMMARY`)
+    lines.push('SUMMARY')
     lines.push(`Total Sessions: ${rows.length}`)
-    lines.push(`Billable Sessions: ${rows.filter((r: Record<string, unknown>) => r.meets_threshold).length}`)
+    lines.push(
+      `Billable Sessions: ${rows.filter((row: Record<string, unknown>) => row.meets_threshold).length}`,
+    )
     lines.push(`Estimated Revenue: $${totalRevenue.toFixed(2)}`)
 
-    const text = lines.join('\n')
-    return new Response(text, {
+    return new Response(lines.join('\n'), {
       headers: {
-        'Content-Type': 'text/plain',
-        'Content-Disposition': `attachment; filename=billing-${month}.txt`,
+        'Content-Type': 'text/plain; charset=utf-8',
+        'Content-Disposition': `attachment; filename="billing-${month}.txt"`,
+        'X-Content-Type-Options': 'nosniff',
       },
     })
-  } catch (error) {
-    console.error('Billing export error:', error)
-    const message = error instanceof Error ? error.message : 'Failed to export billing data'
-    return NextResponse.json({ error: message }, { status: 500 })
+  } catch {
+    console.error('[follow-up/billing/export] request failed')
+    return NextResponse.json({ error: 'Failed to export billing data' }, { status: 500 })
   }
 }

@@ -1,15 +1,43 @@
 import { NextResponse } from 'next/server'
-import { getUser } from '@/lib/cognito/server'
-import { getTenantServer } from '@/lib/tenant'
 import { from } from '@/lib/db-query'
-import { createConsult } from '@/lib/consult/pipeline'
+import { getPool } from '@/lib/db'
+import { createConsult, getConsult } from '@/lib/consult/pipeline'
 import { createNotification } from '@/lib/notifications'
+import { authorizeClinicalAccess } from '@/lib/auth/clinicalAccess'
+import { authorizeClinicalOrPatientAccess } from '@/lib/patientAccess/routeAuthorization'
 
 // POST /api/patient/intake — Submit a patient intake form
 export async function POST(request: Request) {
   try {
     const body = await request.json()
-    const tenant = body.tenant_id || getTenantServer()
+    const access = await authorizeClinicalOrPatientAccess({
+      clinicalAction: 'patient.intake_write',
+      clinicalRoles: ['scheduler', 'clinician', 'admin'],
+      patientScopes: ['patient:intake:submit'],
+    })
+    if (!access.ok) {
+      return NextResponse.json(
+        { error: 'Access denied', reason: access.reason },
+        { status: access.status },
+      )
+    }
+
+    const tenant = access.context.tenantId
+
+    if (
+      access.principal === 'patient' &&
+      ((body.patient_id !== undefined &&
+        body.patient_id !== access.context.patientId) ||
+        (body.tenant_id !== undefined &&
+          body.tenant_id !== access.context.tenantId) ||
+        (body.consult_id !== undefined &&
+          body.consult_id !== (access.context.consultId ?? null)))
+    ) {
+      return NextResponse.json(
+        { error: 'Access denied', reason: 'binding_mismatch' },
+        { status: 403 },
+      )
+    }
 
     const { patient_name, chief_complaint } = body
     if (!patient_name || !chief_complaint) {
@@ -19,8 +47,41 @@ export async function POST(request: Request) {
       )
     }
 
+    const patientId =
+      access.principal === 'patient'
+        ? access.context.patientId
+        : typeof body.patient_id === 'string' && body.patient_id.trim()
+          ? body.patient_id.trim()
+          : null
 
-    const insertData: Record<string, any> = {
+    if (patientId) {
+      const pool = await getPool()
+      const patientResult = await pool.query(
+        `SELECT id
+           FROM patients
+          WHERE id = $1
+            AND tenant_id = $2
+          LIMIT 1`,
+        [patientId, tenant],
+      )
+      if (!patientResult.rows[0]) {
+        return NextResponse.json({ error: 'Patient not found' }, { status: 404 })
+      }
+    }
+
+    const capabilityConsultId =
+      access.principal === 'patient' ? access.context.consultId ?? null : null
+    if (capabilityConsultId) {
+      const boundConsult = await getConsult(capabilityConsultId, tenant)
+      if (!boundConsult || boundConsult.patient_id !== patientId) {
+        return NextResponse.json(
+          { error: 'Access denied', reason: 'binding_mismatch' },
+          { status: 403 },
+        )
+      }
+    }
+
+    const insertData: Record<string, unknown> = {
       tenant_id: tenant,
       patient_name: body.patient_name,
       date_of_birth: body.date_of_birth || null,
@@ -35,8 +96,8 @@ export async function POST(request: Request) {
     }
 
     // Link to patient record if patient_id is provided
-    if (body.patient_id) {
-      insertData.patient_id = body.patient_id
+    if (patientId) {
+      insertData.patient_id = patientId
     }
 
     const { data, error } = await from('patient_intake_forms')
@@ -51,15 +112,18 @@ export async function POST(request: Request) {
 
     // Auto-create a consult pipeline record so the intake feeds into the
     // clinical workflow (triage -> historian -> physician review).
-    let consultId: string | null = null
+    let consultId: string | null = capabilityConsultId
     try {
       const referralText = `Patient intake: ${body.chief_complaint}${body.medical_history ? ` | History: ${body.medical_history}` : ''}`
-      const consultResult = await createConsult(
-        referralText,
-        undefined, // No triage data yet — consult starts in 'triage_pending'
-        body.patient_id || undefined,
-      )
-      consultId = consultResult.data?.id || null
+      if (!consultId) {
+        const consultResult = await createConsult(
+          referralText,
+          undefined, // No triage data yet — consult starts in 'triage_pending'
+          patientId || undefined,
+          tenant,
+        )
+        consultId = consultResult.data?.id || null
+      }
 
       if (consultId && data?.id) {
         // Link the intake form to the consult record
@@ -72,6 +136,7 @@ export async function POST(request: Request) {
             updated_at: new Date().toISOString(),
           })
           .eq('id', consultId)
+          .eq('tenant_id', tenant)
       }
     } catch (consultErr) {
       // Non-fatal — the intake is saved regardless
@@ -86,7 +151,8 @@ export async function POST(request: Request) {
         body: body.chief_complaint,
         priority: 'normal',
         sourceId: data?.id?.toString() || null,
-        patientId: body.patient_id || null,
+        patientId,
+        tenantId: tenant,
       })
     } catch (notifErr) {
       // Non-fatal
@@ -94,16 +160,26 @@ export async function POST(request: Request) {
     }
 
     return NextResponse.json({ intake: data, consult_id: consultId }, { status: 201 })
-  } catch (err: any) {
-    console.error('Intake API error:', err)
-    return NextResponse.json({ error: err.message }, { status: 500 })
+  } catch {
+    console.error('[patient-intake] request failed')
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }
 
 // GET /api/patient/intake — List intake forms for current tenant
 export async function GET() {
   try {
-    const tenant = getTenantServer()
+    const access = await authorizeClinicalAccess({
+      action: 'patient.intake_read',
+      allowedRoles: ['viewer', 'scheduler', 'clinician', 'admin'],
+    })
+    if (!access.ok) {
+      return NextResponse.json(
+        { error: 'Access denied', reason: access.reason },
+        { status: access.status },
+      )
+    }
+    const tenant = access.context.tenantId
 
     const { data, error } = await from('patient_intake_forms')
       .select('*')
@@ -116,7 +192,7 @@ export async function GET() {
     }
 
     return NextResponse.json({ intakes: data })
-  } catch (err: any) {
-    return NextResponse.json({ error: err.message }, { status: 500 })
+  } catch {
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }

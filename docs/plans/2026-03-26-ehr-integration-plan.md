@@ -306,7 +306,9 @@ The `notifications` table exists and the API reads from it, but nothing writes t
 - Follow-up escalation -> `POST /api/follow-up/message` calls `createNotification('followup_escalation', ...)`
 - Historian red flag -> `POST /api/ai/historian/save` calls `createNotification('historian_red_flag', ...)`
 - Wearable alert -> new cron or webhook handler calls `createNotification('wearable_alert', ...)`
-- Unsigned note reminder -> `GET /api/incomplete-docs` side-effect or cron
+- Unsigned note reminders -> future service-authenticated, tenant-scoped,
+  idempotent job. The legacy side-effecting `GET /api/incomplete-docs` is
+  retired and must not be used as a cron target.
 
 **Complexity:** Medium | **Effort:** 12-16 hours | **Dependencies:** None | **Risk:** Low
 

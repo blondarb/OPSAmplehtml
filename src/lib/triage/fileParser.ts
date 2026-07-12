@@ -1,14 +1,81 @@
 import { SourceType, FILE_CONSTRAINTS } from './types'
 
+export const MAX_PDF_PAGE_COUNT = 3_000
+
+// Native PDF extraction occasionally returns only a page footer, watermark, or
+// letterhead for an otherwise scanned page. Keep this detector bounded: long
+// pages are not classified from an unbounded vocabulary/regex scan, while the
+// sparse pages that need this safeguard are fully represented by this window.
+const NATIVE_PDF_SUSPICIOUS_PAGE_SCAN_LIMIT = 2_048
+const NATIVE_PDF_SHORT_PAGE_LIMIT = 512
+
+const PDF_ARTIFACT_TOKENS = new Set([
+  'attachment',
+  'attached',
+  'blank',
+  'confidential',
+  'copy',
+  'document',
+  'draft',
+  'figure',
+  'image',
+  'intentionally',
+  'page',
+  'photo',
+  'photograph',
+  'scan',
+  'scanned',
+  'scanner',
+  'void',
+  'watermark',
+])
+
+const PDF_PAGINATION_TOKENS = new Set(['of', 'p', 'page', 'pg'])
+
+const PDF_CLINICAL_CONTENT_PATTERN =
+  /\b(?:acute|assessment|aphasia|ataxia|cognitive|confusion|continue|diagnos(?:is|es|ed|tic)|dizz(?:y|iness)|eeg|emergency|exam|follow[ -]?up|gait|headache|history|impression|medication|memory|migraine|mri|neurologic|normal|numb(?:ness)?|onset|pain|parkinson(?:ism|s)?|plan|referral|reports?|request(?:ed)?|seizures?|speech|stable|stroke|sudden|symptoms?|tia|tremor|urgent|vertigo|vision|weakness)\b/i
+
+const PDF_ORGANIZATION_PATTERN =
+  /\b(?:associates|center|centre|clinic|department|health|healthcare|hospital|institute|medical|neurology|neuroscience|practice)\b/i
+
+const PDF_CONTACT_OR_ADDRESS_PATTERN =
+  /(?:\b(?:fax|phone|tel|telephone|www)\b|https?:\/\/|\b\d{5}(?:-\d{4})?\b|\b\d{3}[-.)\s]+\d{3}[-.\s]+\d{4}\b|\b(?:avenue|ave|boulevard|blvd|drive|dr|highway|hwy|lane|ln|road|rd|street|st|suite)\b)/i
+
+const PDF_DEMOGRAPHIC_HEADER_PATTERN =
+  /\b(?:date of birth|dob|medical record|mrn|patient id)\b/i
+
+export interface ParsedFilePage {
+  pageNumber: number
+  text: string
+  extractionMethod: 'native_text' | 'ocr'
+  extractionConfidence: number | null
+}
+
 export interface ParsedFile {
   text: string
+  pages: ParsedFilePage[]
   sourceType: SourceType
   filename: string
   originalSize: number
 }
 
+export interface PartialParsedFile extends ParsedFile {
+  totalPageCount: number
+  missingPageNumbers: number[]
+}
+
 export class FileParseError extends Error {
-  constructor(message: string, public code: 'INVALID_TYPE' | 'TOO_LARGE' | 'PARSE_FAILED' | 'EMPTY_CONTENT') {
+  constructor(
+    message: string,
+    public code:
+      | 'INVALID_TYPE'
+      | 'TOO_LARGE'
+      | 'PARSE_FAILED'
+      | 'EMPTY_CONTENT'
+      | 'OCR_REQUIRED',
+    public readonly pageNumbers?: number[],
+    public readonly partialResult?: PartialParsedFile,
+  ) {
     super(message)
     this.name = 'FileParseError'
   }
@@ -39,18 +106,18 @@ export async function parseUploadedFile(file: File): Promise<ParsedFile> {
   }
 
   const buffer = Buffer.from(await file.arrayBuffer())
-  let text: string
+  let pages: ParsedFilePage[]
 
   try {
     switch (sourceType) {
       case 'pdf':
-        text = await parsePdf(buffer)
+        pages = await parsePdf(buffer)
         break
       case 'docx':
-        text = await parseDocx(buffer)
+        pages = [nativeTextPage(1, await parseDocx(buffer))]
         break
       case 'txt':
-        text = buffer.toString('utf-8')
+        pages = [nativeTextPage(1, buffer.toString('utf-8'))]
         break
       default:
         throw new FileParseError(`Unsupported source type: ${sourceType}`, 'INVALID_TYPE')
@@ -63,8 +130,45 @@ export async function parseUploadedFile(file: File): Promise<ParsedFile> {
     )
   }
 
-  // Clean up extracted text
-  text = text.trim()
+  const normalizedPages = pages.map((page) => ({
+    ...page,
+    text: page.text.trim(),
+  }))
+  const unreliablePageNumbers = normalizedPages
+    .filter(
+      (page) =>
+        !page.text ||
+        (sourceType === 'pdf' && isSuspiciousNativePdfPageText(page.text)),
+    )
+    .map((page) => page.pageNumber)
+
+  if (sourceType === 'pdf' && unreliablePageNumbers.length > 0) {
+    const pageLabel = unreliablePageNumbers.length === 1 ? 'page' : 'pages'
+    const unreliablePageNumberSet = new Set(unreliablePageNumbers)
+    const availablePages = normalizedPages.filter(
+      (page) => page.text && !unreliablePageNumberSet.has(page.pageNumber),
+    )
+    const partialText = availablePages.map((page) => page.text).join('\n\n')
+    throw new FileParseError(
+      `Reliable native text could not be extracted from PDF ${pageLabel} ${unreliablePageNumbers.join(', ')} in ${file.name}. OCR is required before this referral can be screened safely.`,
+      'OCR_REQUIRED',
+      unreliablePageNumbers,
+      partialText
+        ? {
+            text: partialText,
+            pages: availablePages,
+            sourceType,
+            filename: file.name,
+            originalSize: file.size,
+            totalPageCount: normalizedPages.length,
+            missingPageNumbers: unreliablePageNumbers,
+          }
+        : undefined,
+    )
+  }
+
+  pages = normalizedPages
+  const text = pages.map((page) => page.text).join('\n\n')
 
   if (!text) {
     throw new FileParseError(
@@ -73,25 +177,124 @@ export async function parseUploadedFile(file: File): Promise<ParsedFile> {
     )
   }
 
-  // Truncate if exceeding max length
-  if (text.length > FILE_CONSTRAINTS.MAX_TEXT_LENGTH) {
-    text = text.substring(0, FILE_CONSTRAINTS.MAX_TEXT_LENGTH)
-  }
-
   return {
     text,
+    pages,
     sourceType,
     filename: file.name,
     originalSize: file.size,
   }
 }
 
-async function parsePdf(buffer: Buffer): Promise<string> {
+/**
+ * Returns true only for bounded, high-confidence native-PDF extraction
+ * artifacts. This is deliberately not a general clinical-text classifier:
+ * uncertain pages are sent to OCR/manual review, while concise clinical
+ * statements such as "Assessment: migraine." remain usable native text.
+ */
+function isSuspiciousNativePdfPageText(text: string): boolean {
+  // The caller supplies its already-trimmed page text. All content inspection
+  // below is capped by NATIVE_PDF_SUSPICIOUS_PAGE_SCAN_LIMIT.
+  if (!text) return true
+
+  const sample = text.slice(0, NATIVE_PDF_SUSPICIOUS_PAGE_SCAN_LIMIT)
+  const tokens = sample.toLowerCase().match(/[a-z0-9]+/g) ?? []
+  const alphaNumericCount = sample.replace(/[^a-z0-9]/gi, '').length
+
+  if (alphaNumericCount <= 1 || tokens.length === 0) return true
+
+  const isOrdinal = (token: string) => /^\d+$/.test(token) || /^[ivxlcdm]+$/.test(token)
+  const paginationOnly =
+    tokens.some((token) => PDF_PAGINATION_TOKENS.has(token)) &&
+    tokens.every(
+      (token) => PDF_PAGINATION_TOKENS.has(token) || isOrdinal(token),
+    )
+  if (paginationOnly) return true
+
+  const artifactOnly = tokens.every(
+    (token) => PDF_ARTIFACT_TOKENS.has(token) || isOrdinal(token),
+  )
+  if (artifactOnly) return true
+
+  const hasClinicalContent = PDF_CLINICAL_CONTENT_PATTERN.test(sample)
+  if (hasClinicalContent) return false
+
+  if (text.length > NATIVE_PDF_SHORT_PAGE_LIMIT) return false
+
+  const hasOrganizationMarker = PDF_ORGANIZATION_PATTERN.test(sample)
+  const hasContactOrAddressMarker = PDF_CONTACT_OR_ADDRESS_PATTERN.test(sample)
+  const hasDemographicHeaderMarker = PDF_DEMOGRAPHIC_HEADER_PATTERN.test(sample)
+  const hasArtifactMarker = tokens.some((token) => PDF_ARTIFACT_TOKENS.has(token))
+
+  if (
+    hasOrganizationMarker &&
+    (hasContactOrAddressMarker || hasDemographicHeaderMarker || hasArtifactMarker)
+  ) {
+    return true
+  }
+
+  // A short organization/logo line is not enough evidence that the page body
+  // was extracted. A concise clinical statement wins above this rule.
+  if (hasOrganizationMarker && tokens.length <= 6) return true
+
+  return false
+}
+
+function nativeTextPage(pageNumber: number, text: string): ParsedFilePage {
+  return {
+    pageNumber,
+    text,
+    extractionMethod: 'native_text',
+    extractionConfidence: null,
+  }
+}
+
+async function parsePdf(buffer: Buffer): Promise<ParsedFilePage[]> {
   // Use unpdf instead of pdf-parse — it's designed for serverless environments
   // and doesn't require browser APIs (DOMMatrix, web workers, etc.)
   const { extractText } = await import('unpdf')
-  const { text } = await extractText(new Uint8Array(buffer))
-  return text.join('\n')
+  const extraction = await extractText(new Uint8Array(buffer))
+  const extractedPages = Array.isArray(extraction.text) ? extraction.text : []
+  const reportedPageCount =
+    Number.isSafeInteger(extraction.totalPages) && extraction.totalPages > 0
+      ? extraction.totalPages
+      : 0
+  if (
+    reportedPageCount > MAX_PDF_PAGE_COUNT ||
+    extractedPages.length > MAX_PDF_PAGE_COUNT
+  ) {
+    throw new FileParseError(
+      `PDF exceeds the verified ${MAX_PDF_PAGE_COUNT}-page safety limit. Human review is required.`,
+      'TOO_LARGE',
+    )
+  }
+  let extractedTextCharacters = 0
+  for (const page of extractedPages) {
+    if (typeof page !== 'string') continue
+    extractedTextCharacters += page.length
+    if (extractedTextCharacters > FILE_CONSTRAINTS.MAX_PACKET_TEXT_LENGTH) {
+      throw new FileParseError(
+        'Extracted PDF text exceeds the verified packet safety limit. Human review is required.',
+        'TOO_LARGE',
+      )
+    }
+  }
+  const pageCount = Math.max(reportedPageCount, extractedPages.length)
+
+  if (pageCount === 0) {
+    throw new FileParseError(
+      'No PDF pages could be read. OCR is required before this referral can be screened safely.',
+      'OCR_REQUIRED',
+      [],
+    )
+  }
+
+  return Array.from({ length: pageCount }, (_, index) =>
+    nativeTextPage(
+      index + 1,
+      typeof extractedPages[index] === 'string' ? extractedPages[index] : '',
+    ),
+  )
 }
 
 async function parseDocx(buffer: Buffer): Promise<string> {

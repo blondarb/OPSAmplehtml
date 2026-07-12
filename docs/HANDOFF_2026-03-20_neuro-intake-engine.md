@@ -93,7 +93,9 @@ Built the complete Integrated Neuro Intake Engine — a 7-phase clinical pipelin
 - `src/app/api/neuro-consults/[id]/sdne/route.ts`
 - `src/app/api/neuro-consults/[id]/report/route.ts`
 - `src/app/api/ai/historian/localizer/route.ts`
-- `src/app/api/ai/historian/escalation/route.ts`
+- `src/app/api/ai/historian/escalation/route.ts` — legacy endpoint retired with
+  `410 Gone`; safety escalation now enters through the authorized historian-save
+  workflow
 - `src/app/api/ai/historian/scales/route.ts`
 - `src/app/patient/tools/page.tsx`
 - `migrations/036_patient_web_tools.sql`

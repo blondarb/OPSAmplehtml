@@ -2,6 +2,63 @@
 
 Full history of notable changes. For project overview and architecture, see [CLAUDE.md](../CLAUDE.md).
 
+## July 2026
+
+### Canonical neurology referral-triage safety flow (July 12, 2026; local, not deployed)
+
+- Converged one pasted referral and one supported complete native-text file on
+  the same source-bound extraction review and full triage result flow; local
+  executable parity coverage includes a two-page native-text PDF with an acute
+  focal-neurologic episode on its final page.
+- Rejected multiple-file input without silently selecting a file, and made
+  caller-supplied extraction text/summary non-authoritative when a persisted
+  extraction ID is used.
+- Applied the same safety presentation to screen and copied report: emergency
+  output preserves immediate action, reasons, red flags, missing information,
+  and review hold while suppressing outpatient workup, routing, and
+  finalization. Missing information remains visible on urgent/same-day results,
+  and conflicting data creates an explicit reconciliation hold/lock.
+- Preserved a server-only positive safety screen for nonempty below-minimum
+  notes without authorizing outpatient scoring. Partial native-text PDFs retain
+  actionable page-bound evidence, but failed coverage still requires OCR and
+  human review and cannot proceed to outpatient scoring/finalization.
+- Added synthetic/PHI-free `TCF1`–`TCF6` cases in `qa/TEST_CASES.yaml` for long
+  tail emergencies, native-PDF parity, multiple-file rejection, forged-summary
+  resistance, emergency screen/copy suppression, and urgent-floor missing
+  information.
+- Multi-document packet assembly, full OCR plus durable pre-parse intake and
+  recovery, recommendation-schema evolution, clarification delivery, AWS
+  deployment, and production clinical/live-model validation remain pending.
+- No AWS configuration or deployment occurred; production remains unchanged.
+
+### Unused public clinical prototype retirement (July 11, 2026; local, not deployed)
+
+- Retired the unauthenticated legacy provider-consult, provider-messaging,
+  historian-escalation, and incomplete-document API handlers after repository
+  tracing found no production callers.
+- Every supported method returns a fixed `410 Gone` response with
+  `Cache-Control: no-store` before any request parsing or clinical dependency
+  access.
+- Kept historical data/tables intact and documented secure requirements before
+  any provider-communication or incomplete-document workflow is reintroduced.
+- Added 10 focused PHI-free dependency-isolation tests across five route files.
+- No AWS configuration, production data, or deployment was changed.
+
+### Destructive demo-reset containment (July 11, 2026; local, not deployed)
+
+- Permanently retired `POST /api/demo/reset` and
+  `POST /api/admin/reset-demo` with fixed `410 Gone` responses and
+  `Cache-Control: no-store`.
+- Removed all request parsing, authentication, feature-flag, tenant, secret, and
+  database paths from those handlers.
+- Removed the ClinicalNote reset handler/modal, dormant TopNav reset
+  prop/button, and onboarding text that advertised self-service reset.
+- Added dependency-isolation route tests and a production-source regression
+  scan preventing the retired caller/UI from being reintroduced.
+- Documented that future synthetic resets require an approval-gated operator
+  workflow outside the web application.
+- No AWS configuration, migration, production data, or deployment was changed.
+
 ## April 2026
 
 ### Consult page feedback fixes (April 17, 2026)

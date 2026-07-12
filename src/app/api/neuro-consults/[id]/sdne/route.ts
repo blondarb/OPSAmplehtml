@@ -12,6 +12,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getConsult } from '@/lib/consult/pipeline'
 import { linkSDNEToConsult, markSDNERequested } from '@/lib/consult/pipeline'
+import { authorizeClinicalAccess } from '@/lib/auth/clinicalAccess'
+import { loadSchedulingAuthorization } from '@/lib/triage/schedulingAuthorization'
 
 export async function POST(
   req: NextRequest,
@@ -20,12 +22,50 @@ export async function POST(
   const { id } = await params
 
   try {
+    const access = await authorizeClinicalAccess({
+      action: 'consult.sdne_write',
+      allowedRoles: ['clinician', 'admin'],
+    })
+    if (!access.ok) {
+      return NextResponse.json(
+        { error: 'Access denied', reason: access.reason },
+        { status: access.status },
+      )
+    }
+
+    const consult = await getConsult(id, access.context.tenantId)
+    if (!consult) {
+      return NextResponse.json({ error: 'Consult not found' }, { status: 404 })
+    }
+    if (!consult.triage_session_id) {
+      return NextResponse.json(
+        {
+          error: 'SDNE is blocked by triage safety state',
+          reason: 'triage_authorization_missing',
+        },
+        { status: 409 },
+      )
+    }
+    const safetyAuthorization = await loadSchedulingAuthorization(
+      consult.triage_session_id,
+      access.context.tenantId,
+    )
+    if (!safetyAuthorization.decision.allowed) {
+      return NextResponse.json(
+        {
+          error: 'SDNE is blocked by triage safety state',
+          reason: safetyAuthorization.decision.reason,
+        },
+        { status: 409 },
+      )
+    }
+
     const body = await req.json()
     const { action } = body
 
     // Action: request — mark consult as awaiting SDNE exam
     if (action === 'request') {
-      const ok = await markSDNERequested(id)
+      const ok = await markSDNERequested(id, access.context.tenantId)
       if (!ok) {
         return NextResponse.json(
           { error: 'Failed to mark SDNE as requested' },
@@ -56,6 +96,7 @@ export async function POST(
       session_flag,
       domain_flags,
       detected_patterns || [],
+      access.context.tenantId,
     )
 
     if (!ok) {
@@ -67,9 +108,8 @@ export async function POST(
 
     return NextResponse.json({ success: true, status: 'sdne_complete' })
   } catch (error: unknown) {
-    const message = error instanceof Error ? error.message : 'Unknown error'
-    console.error('[sdne] POST error:', message)
-    return NextResponse.json({ error: message }, { status: 500 })
+    console.error('[sdne] POST request failed')
+    return NextResponse.json({ error: 'SDNE request failed' }, { status: 500 })
   }
 }
 
@@ -80,7 +120,18 @@ export async function GET(
   const { id } = await params
 
   try {
-    const consult = await getConsult(id)
+    const access = await authorizeClinicalAccess({
+      action: 'consult.read',
+      allowedRoles: ['viewer', 'scheduler', 'clinician', 'admin'],
+    })
+    if (!access.ok) {
+      return NextResponse.json(
+        { error: 'Access denied', reason: access.reason },
+        { status: access.status },
+      )
+    }
+
+    const consult = await getConsult(id, access.context.tenantId)
     if (!consult) {
       return NextResponse.json({ error: 'Consult not found' }, { status: 404 })
     }
@@ -94,8 +145,7 @@ export async function GET(
       has_sdne: !!consult.sdne_session_id,
     })
   } catch (error: unknown) {
-    const message = error instanceof Error ? error.message : 'Unknown error'
-    console.error('[sdne] GET error:', message)
-    return NextResponse.json({ error: message }, { status: 500 })
+    console.error('[sdne] GET request failed')
+    return NextResponse.json({ error: 'Failed to read SDNE data' }, { status: 500 })
   }
 }

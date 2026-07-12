@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getUser } from '@/lib/cognito/server'
-import { getTenantServer } from '@/lib/tenant'
+import { authorizeClinicalAccess } from '@/lib/auth/clinicalAccess'
 import { from } from '@/lib/db-query'
 
 /**
@@ -14,9 +13,15 @@ import { from } from '@/lib/db-query'
  */
 export async function PATCH(request: NextRequest) {
   try {
-    const user = await getUser()
-    if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    const access = await authorizeClinicalAccess({
+      action: 'patient.message_draft_review',
+      allowedRoles: ['clinician', 'admin'],
+    })
+    if (!access.ok) {
+      return NextResponse.json(
+        { error: 'Access denied', reason: access.reason },
+        { status: access.status },
+      )
     }
 
     const body = await request.json()
@@ -36,7 +41,7 @@ export async function PATCH(request: NextRequest) {
       )
     }
 
-    const tenant = getTenantServer()
+    const tenant = access.context.tenantId
 
     if (action === 'reject') {
       const { data, error } = await from('patient_messages')
@@ -50,7 +55,11 @@ export async function PATCH(request: NextRequest) {
         .single()
 
       if (error) {
-        return NextResponse.json({ error: error.message }, { status: 500 })
+        console.error('[patient/messages/draft] rejection update failed')
+        return NextResponse.json(
+          { error: 'Failed to update message draft' },
+          { status: 500 },
+        )
       }
       return NextResponse.json({ message: data })
     }
@@ -69,7 +78,11 @@ export async function PATCH(request: NextRequest) {
         .single()
 
       if (error) {
-        return NextResponse.json({ error: error.message }, { status: 500 })
+        console.error('[patient/messages/draft] approval update failed')
+        return NextResponse.json(
+          { error: 'Failed to update message draft' },
+          { status: 500 },
+        )
       }
       return NextResponse.json({ message: data })
     }
@@ -95,6 +108,7 @@ export async function PATCH(request: NextRequest) {
     await from('patient_messages')
       .update({ draft_status: 'sent' })
       .eq('id', message_id)
+      .eq('tenant_id', tenant)
 
     // 3. Create outbound message
     const { data: outbound, error: insertErr } = await from('patient_messages')
@@ -111,14 +125,20 @@ export async function PATCH(request: NextRequest) {
       .single()
 
     if (insertErr) {
-      console.error('[draft/send] Outbound insert error:', insertErr)
-      return NextResponse.json({ error: insertErr.message }, { status: 500 })
+      console.error('[patient/messages/draft] outbound insert failed')
+      return NextResponse.json(
+        { error: 'Failed to send message draft' },
+        { status: 500 },
+      )
     }
 
     return NextResponse.json({ message: outbound, original_message_id: message_id })
-  } catch (err: any) {
-    console.error('Draft action error:', err)
-    return NextResponse.json({ error: err.message }, { status: 500 })
+  } catch {
+    console.error('[patient/messages/draft] request failed')
+    return NextResponse.json(
+      { error: 'Failed to update message draft' },
+      { status: 500 },
+    )
   }
 }
 
@@ -127,21 +147,38 @@ export async function PATCH(request: NextRequest) {
  */
 export async function GET() {
   try {
-    const tenant = getTenantServer()
+    const access = await authorizeClinicalAccess({
+      action: 'patient.message_read',
+      allowedRoles: ['viewer', 'scheduler', 'clinician', 'admin'],
+    })
+    if (!access.ok) {
+      return NextResponse.json(
+        { error: 'Access denied', reason: access.reason },
+        { status: access.status },
+      )
+    }
 
     const { data, error } = await from('patient_messages')
       .select('*')
-      .eq('tenant_id', tenant)
+      .eq('tenant_id', access.context.tenantId)
       .eq('draft_status', 'pending')
       .order('created_at', { ascending: false })
       .limit(20)
 
     if (error) {
-      return NextResponse.json({ error: error.message }, { status: 500 })
+      console.error('[patient/messages/draft] pending list failed')
+      return NextResponse.json(
+        { error: 'Failed to fetch pending drafts' },
+        { status: 500 },
+      )
     }
 
     return NextResponse.json({ messages: data || [] })
-  } catch (err: any) {
-    return NextResponse.json({ error: err.message }, { status: 500 })
+  } catch {
+    console.error('[patient/messages/draft] list request failed')
+    return NextResponse.json(
+      { error: 'Failed to fetch pending drafts' },
+      { status: 500 },
+    )
   }
 }

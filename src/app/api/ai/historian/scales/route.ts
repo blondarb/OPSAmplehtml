@@ -25,6 +25,8 @@ import {
 } from '@/lib/consult/scales'
 import type { LocalizerSnapshot, ScaleResult, SeverityLevel } from '@/lib/consult/scales'
 import type { ScaleStepResponse } from '@/lib/historianTypes'
+import { authorizeClinicalAccess } from '@/lib/auth/clinicalAccess'
+import { loadSchedulingAuthorization } from '@/lib/triage/schedulingAuthorization'
 
 // Resolve the patient this scale belongs to, from the historian session or the
 // consult, so scale_results rows link to a patient (the foundation for
@@ -33,19 +35,26 @@ import type { ScaleStepResponse } from '@/lib/historianTypes'
 async function resolveScalePatientId(
   consultId: string | null | undefined,
   historianSessionId: string | null | undefined,
+  tenantId: string,
 ): Promise<string | null> {
   try {
     const pool = await getPool()
     if (historianSessionId) {
-      const r = await pool.query('SELECT patient_id FROM historian_sessions WHERE id = $1', [historianSessionId])
+      const r = await pool.query(
+        'SELECT patient_id FROM historian_sessions WHERE id = $1 AND tenant_id = $2',
+        [historianSessionId, tenantId],
+      )
       if (r.rows[0]?.patient_id) return r.rows[0].patient_id
     }
     if (consultId) {
-      const r = await pool.query('SELECT patient_id FROM neurology_consults WHERE id = $1', [consultId])
+      const r = await pool.query(
+        'SELECT patient_id FROM neurology_consults WHERE id = $1 AND tenant_id = $2',
+        [consultId, tenantId],
+      )
       if (r.rows[0]?.patient_id) return r.rows[0].patient_id
     }
-  } catch (e: any) {
-    console.warn('[scales API] patient_id resolve failed (non-fatal):', e?.message)
+  } catch {
+    console.warn('[scales API] patient_id resolve failed (non-fatal)')
   }
   return null
 }
@@ -53,11 +62,58 @@ async function resolveScalePatientId(
 // ─── Route dispatcher ────────────────────────────────────────────────────────
 
 export async function POST(request: NextRequest) {
+  const access = await authorizeClinicalAccess({
+    action: 'historian.scale_write',
+    allowedRoles: ['clinician', 'admin'],
+  })
+  if (!access.ok) {
+    return NextResponse.json(
+      { error: 'Access denied', reason: access.reason },
+      { status: access.status },
+    )
+  }
+
   const { searchParams } = new URL(request.url)
   const action = searchParams.get('action') ?? 'step'
 
   try {
     const body = await request.json()
+    const binding = await validateScaleBindings(
+      body,
+      access.context.tenantId,
+    )
+    if (!binding.ok) {
+      return NextResponse.json(
+        { error: binding.error, reason: binding.reason },
+        { status: binding.status },
+      )
+    }
+
+    if ((action === 'submit' || action === 'step') && binding.consult) {
+      if (!binding.consult.triage_session_id) {
+        return NextResponse.json(
+          {
+            error: 'Scale workflow has no triage safety authorization',
+            reason: 'triage_authorization_missing',
+          },
+          { status: 409 },
+        )
+      }
+
+      const safetyAuthorization = await loadSchedulingAuthorization(
+        binding.consult.triage_session_id,
+        access.context.tenantId,
+      )
+      if (!safetyAuthorization.decision.allowed) {
+        return NextResponse.json(
+          {
+            error: 'Scale workflow is blocked by triage safety state',
+            reason: safetyAuthorization.decision.reason,
+          },
+          { status: 409 },
+        )
+      }
+    }
 
     switch (action) {
       case 'trigger':
@@ -65,22 +121,33 @@ export async function POST(request: NextRequest) {
       case 'administer':
         return handleAdminister(body)
       case 'submit':
-        return handleSubmit(body)
+        return handleSubmit(body, access.context.tenantId)
       case 'step':
-        return handleStep(body)
+        return handleStep(body, access.context.tenantId)
       default:
         return NextResponse.json(
           { error: 'Invalid ?action= param. Valid: trigger | administer | submit | step' },
           { status: 400 }
         )
     }
-  } catch (err: any) {
-    console.error('[scales API] error:', err)
-    return NextResponse.json({ error: err?.message ?? 'Internal error' }, { status: 500 })
+  } catch {
+    console.error('[scales API] request failed')
+    return NextResponse.json({ error: 'Internal error' }, { status: 500 })
   }
 }
 
 export async function GET(request: NextRequest) {
+  const access = await authorizeClinicalAccess({
+    action: 'historian.scale_read',
+    allowedRoles: ['viewer', 'scheduler', 'clinician', 'admin'],
+  })
+  if (!access.ok) {
+    return NextResponse.json(
+      { error: 'Access denied', reason: access.reason },
+      { status: access.status },
+    )
+  }
+
   const { searchParams } = new URL(request.url)
   const sessionId = searchParams.get('session_id')
   const consultId = searchParams.get('consult_id')
@@ -92,7 +159,102 @@ export async function GET(request: NextRequest) {
     )
   }
 
+  const binding = await validateScaleBindings(
+    {
+      historian_session_id: sessionId ?? undefined,
+      consult_id: consultId ?? undefined,
+    },
+    access.context.tenantId,
+  )
+  if (!binding.ok) {
+    return NextResponse.json(
+      { error: binding.error, reason: binding.reason },
+      { status: binding.status },
+    )
+  }
+
   return handleGetResults({ sessionId, consultId })
+}
+
+type ScaleBindingResult =
+  | {
+      ok: true
+      consult: {
+        id: string
+        patient_id: string | null
+        triage_session_id: string | null
+      } | null
+    }
+  | {
+      ok: false
+      status: 404
+      error: string
+      reason: 'scale_binding_not_found'
+    }
+
+async function validateScaleBindings(
+  body: {
+    consult_id?: unknown
+    historian_session_id?: unknown
+  },
+  tenantId: string,
+): Promise<ScaleBindingResult> {
+  const consultId =
+    typeof body.consult_id === 'string' && body.consult_id.trim()
+      ? body.consult_id.trim()
+      : null
+  const historianSessionId =
+    typeof body.historian_session_id === 'string' &&
+    body.historian_session_id.trim()
+      ? body.historian_session_id.trim()
+      : null
+  const pool = await getPool()
+  let consult: {
+    id: string
+    patient_id: string | null
+    triage_session_id: string | null
+  } | null = null
+
+  if (consultId) {
+    const { rows } = await pool.query(
+      `SELECT id, patient_id, triage_session_id
+         FROM neurology_consults
+        WHERE id = $1
+          AND tenant_id = $2
+        LIMIT 1`,
+      [consultId, tenantId],
+    )
+    if (!rows[0]) {
+      return {
+        ok: false,
+        status: 404,
+        error: 'Scale consult binding not found',
+        reason: 'scale_binding_not_found',
+      }
+    }
+    consult = rows[0]
+  }
+
+  if (historianSessionId) {
+    const { rows } = await pool.query(
+      `SELECT id
+         FROM historian_sessions
+        WHERE id = $1
+          AND tenant_id = $2
+        LIMIT 1`,
+      [historianSessionId, tenantId],
+    )
+    if (!rows[0]) {
+      return {
+        ok: false,
+        status: 404,
+        error: 'Scale historian binding not found',
+        reason: 'scale_binding_not_found',
+      }
+    }
+  }
+
+  return { ok: true, consult }
 }
 
 // ─── Handler: trigger ─────────────────────────────────────────────────────────
@@ -194,7 +356,7 @@ async function handleSubmit(body: {
   historian_session_id?: string
   consult_id?: string
   admin_mode?: 'voice_administrable' | 'exam_required'
-}) {
+}, tenantId: string) {
   const { scale_id, responses, historian_session_id, consult_id } = body
 
   if (!scale_id || !responses) {
@@ -230,7 +392,11 @@ async function handleSubmit(body: {
 
   // Persist to DB
   const pool = await getPool()
-  const patientId = await resolveScalePatientId(consult_id, historian_session_id)
+  const patientId = await resolveScalePatientId(
+    consult_id,
+    historian_session_id,
+    tenantId,
+  )
   const { rows } = await pool.query(
     `INSERT INTO scale_results (
       patient_id,
@@ -369,7 +535,7 @@ async function handleStep(body: {
   prev_response?: string | number
   historian_session_id?: string
   consult_id?: string
-}): Promise<NextResponse> {
+}, tenantId: string): Promise<NextResponse> {
   const scaleId = body.scale_id?.toLowerCase()
   if (!scaleId) {
     return NextResponse.json(
@@ -404,10 +570,10 @@ async function handleStep(body: {
   // and is not always populated at scale-admin time; we only store it if it
   // refers to a real row (we'd need a separate lookup to verify, so we
   // currently pass null and rely on consult_id).
-  const consultId = body.consult_id ?? body.historian_session_id // tolerate either
+  const consultId = body.consult_id
   if (!consultId) {
     return NextResponse.json(
-      { error: 'consult_id (or historian_session_id) is required' },
+      { error: 'consult_id is required for paginated scale administration' },
       { status: 400 },
     )
   }
@@ -423,7 +589,7 @@ async function handleStep(body: {
     // historian_session_id passed as NULL — populated only by a separate
     // backfill if/when the consult row maps to a historian_sessions row.
     const pool = await getPool()
-    const patientId = await resolveScalePatientId(consultId, null)
+    const patientId = await resolveScalePatientId(consultId, null, tenantId)
     await pool.query(
       `INSERT INTO scale_results (
         patient_id,
@@ -572,7 +738,7 @@ async function handleStep(body: {
       done: true,
       total_score: calculation.rawScore,
       interpretation: calculation.interpretation,
-      severity_level: severityLevel as any,
+      severity_level: severityLevel,
     },
     { status: 200 },
   )

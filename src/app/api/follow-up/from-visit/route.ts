@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getPool } from '@/lib/db'
 import { from } from '@/lib/db-query'
 import type { PatientScenario, MedicationInfo } from '@/lib/follow-up/types'
+import { authorizeClinicalAccess } from '@/lib/auth/clinicalAccess'
 
 /**
  * POST /api/follow-up/from-visit
@@ -13,11 +14,22 @@ import type { PatientScenario, MedicationInfo } from '@/lib/follow-up/types'
  * Returns: { session: { id, patient_context }, message: string }
  */
 export async function POST(request: NextRequest) {
+  const access = await authorizeClinicalAccess({
+    action: 'follow_up.message',
+    allowedRoles: ['clinician', 'admin'],
+  })
+  if (!access.ok) {
+    return NextResponse.json(
+      { error: 'Access denied', reason: access.reason },
+      { status: access.status },
+    )
+  }
+
   try {
     const body = await request.json()
-    const { visitId } = body
+    const visitId = typeof body.visitId === 'string' ? body.visitId.trim() : ''
 
-    if (!visitId) {
+    if (!visitId || visitId.length > 128) {
       return NextResponse.json(
         { error: 'visitId is required' },
         { status: 400 },
@@ -45,12 +57,17 @@ export async function POST(request: NextRequest) {
         cn."ai_summary",
         cn."medications"
       FROM "visits" v
-      LEFT JOIN "patients" p      ON p."id" = v."patient_id"
-      LEFT JOIN "clinical_notes" cn ON cn."visit_id" = v."id"
+      JOIN "patients" p
+        ON p."id" = v."patient_id"
+       AND p."tenant_id" = v."tenant_id"
+      LEFT JOIN "clinical_notes" cn
+        ON cn."visit_id" = v."id"
+       AND cn."tenant_id" = v."tenant_id"
       WHERE v."id" = $1
+        AND v."tenant_id" = $2
       LIMIT 1
       `,
-      [visitId],
+      [visitId, access.context.tenantId],
     )
 
     const row = rows[0]
@@ -58,6 +75,15 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         { error: 'Visit not found' },
         { status: 404 },
+      )
+    }
+    if (row.visit_status !== 'completed') {
+      return NextResponse.json(
+        {
+          error: 'Follow-up requires a completed source visit',
+          reason: 'source_visit_not_completed',
+        },
+        { status: 409 },
       )
     }
 
@@ -123,6 +149,7 @@ export async function POST(request: NextRequest) {
     const { data: session, error: insertError } = await from('followup_sessions')
       .insert({
         id: sessionId,
+        tenant_id: access.context.tenantId,
         patient_id: row.patient_id || null,
         patient_name: patientContext.name,
         patient_age: patientContext.age,
@@ -130,12 +157,12 @@ export async function POST(request: NextRequest) {
         diagnosis: patientContext.diagnosis,
         visit_date: patientContext.visitDate,
         provider_name: patientContext.providerName,
-        medications: patientContext.medications,
+        medications: JSON.stringify(patientContext.medications),
         visit_summary: patientContext.visitSummary,
         follow_up_method: 'sms',
         status: 'idle',
         current_module: 'greeting',
-        transcript: [],
+        transcript: JSON.stringify([]),
         // Link back to the originating visit
         visit_id: visitId,
       })

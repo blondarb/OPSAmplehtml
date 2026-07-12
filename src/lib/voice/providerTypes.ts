@@ -78,6 +78,8 @@ export interface VoiceStartOptions {
    * session-renew so it can rebuild matching instructions. OpenAI-only.
    */
   sessionType?: string
+  /** Consult bound to a purpose-limited referral clarification session. */
+  consultId?: string
   // ── Nova-only (ignored by OpenAI) ──
   /** WebSocket URL of the Nova Sonic relay. */
   relayUrl?: string

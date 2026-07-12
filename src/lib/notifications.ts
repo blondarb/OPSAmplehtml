@@ -36,6 +36,7 @@ export interface CreateNotificationParams {
   patientId?: string | null
   recipientUserId?: string | null
   metadata?: Record<string, unknown>
+  tenantId?: string
 }
 
 export interface NotificationRecord {
@@ -64,7 +65,7 @@ export async function createNotification(
   params: CreateNotificationParams,
 ): Promise<NotificationRecord | null> {
   try {
-    const tenant = getTenantServer()
+    const tenant = params.tenantId ?? getTenantServer()
 
     const { data, error } = await from('notifications')
       .insert({
@@ -103,6 +104,7 @@ export async function notifyPatientMessage(
   patientName: string,
   subject: string,
   patientId?: string | null,
+  tenantId?: string,
 ): Promise<NotificationRecord | null> {
   return createNotification({
     sourceType: 'patient_message',
@@ -111,6 +113,7 @@ export async function notifyPatientMessage(
     priority: 'normal',
     sourceId: messageId,
     patientId: patientId || null,
+    tenantId,
   })
 }
 
@@ -123,6 +126,7 @@ export async function notifyTriageUrgent(
   tierDisplay: string,
   chiefComplaint: string,
   patientId?: string | null,
+  tenantId?: string,
 ): Promise<NotificationRecord | null> {
   // Only notify for urgent, emergent tiers
   const urgentTiers = ['urgent', 'emergent', 'critical']
@@ -138,6 +142,7 @@ export async function notifyTriageUrgent(
     sourceId: sessionId,
     patientId: patientId || null,
     metadata: { tier, tierDisplay },
+    tenantId,
   })
 }
 
@@ -149,6 +154,7 @@ export async function notifyHistorianRedFlag(
   patientName: string,
   redFlags: Array<{ flag: string; severity: string; context: string }>,
   patientId?: string | null,
+  tenantId?: string,
 ): Promise<NotificationRecord | null> {
   if (!redFlags || redFlags.length === 0) return null
 
@@ -163,6 +169,36 @@ export async function notifyHistorianRedFlag(
     sourceId: sessionId,
     patientId: patientId || null,
     metadata: { redFlagCount: redFlags.length, flags: redFlags },
+    tenantId,
+  })
+}
+
+/** Always notify for an explicit Historian safety escalation, even when the
+ * model did not also populate the optional red_flags array. */
+export async function notifyHistorianSafetyEscalation(
+  sessionId: string,
+  patientName: string,
+  redFlags: Array<{ flag: string; severity: string; context: string }>,
+  patientId?: string | null,
+  tenantId?: string,
+): Promise<NotificationRecord | null> {
+  const flagSummary = redFlags.map((flag) => flag.flag).filter(Boolean).join(', ')
+
+  return createNotification({
+    sourceType: 'historian_red_flag',
+    title: `Emergency safety escalation for ${patientName}`,
+    body:
+      flagSummary ||
+      'The Historian triggered an emergency safety escalation; immediate clinical follow-up is required.',
+    priority: 'critical',
+    sourceId: sessionId,
+    patientId: patientId || null,
+    metadata: {
+      safetyEscalated: true,
+      redFlagCount: redFlags.length,
+      flags: redFlags,
+    },
+    tenantId,
   })
 }
 
@@ -174,6 +210,7 @@ export async function notifyVisitSigned(
   patientName: string,
   providerName: string,
   patientId?: string | null,
+  tenantId?: string,
 ): Promise<NotificationRecord | null> {
   return createNotification({
     sourceType: 'visit_signed',
@@ -183,6 +220,7 @@ export async function notifyVisitSigned(
     sourceId: visitId,
     patientId: patientId || null,
     metadata: { providerName },
+    tenantId,
   })
 }
 
@@ -198,6 +236,7 @@ export async function notifyIncompleteNotes(
     note_id: string | null
     description: string
   }>,
+  tenantId?: string,
 ): Promise<NotificationRecord[]> {
   const results: NotificationRecord[] = []
 
@@ -214,6 +253,7 @@ export async function notifyIncompleteNotes(
           visit_id: doc.visit_id,
           note_id: doc.note_id,
         },
+        tenantId,
       })
       if (record) results.push(record)
     } catch (err) {
@@ -234,6 +274,7 @@ export async function notifyFollowUpEscalation(
   severity: string,
   category: string,
   patientId?: string | null,
+  tenantId?: string,
 ): Promise<NotificationRecord | null> {
   const isCritical = severity === 'urgent' || severity === 'same_day'
 
@@ -250,6 +291,7 @@ export async function notifyFollowUpEscalation(
       category,
       conversationLink: `/follow-up?session=${sessionId}`,
     },
+    tenantId,
   })
 }
 
@@ -263,6 +305,7 @@ export async function notifyWearableAlert(
   severity: string,
   patientId?: string | null,
   metadata?: Record<string, unknown>,
+  tenantId?: string,
 ): Promise<NotificationRecord | null> {
   const isCritical = severity === 'critical' || severity === 'high'
 
@@ -274,5 +317,6 @@ export async function notifyWearableAlert(
     sourceId: alertId,
     patientId: patientId || null,
     metadata: { alertType, severity, ...metadata },
+    tenantId,
   })
 }

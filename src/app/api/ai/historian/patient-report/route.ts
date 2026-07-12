@@ -18,6 +18,7 @@
 import { NextResponse } from 'next/server'
 import { invokeBedrock } from '@/lib/bedrock'
 import type { HistorianStructuredOutput, HistorianTranscriptEntry } from '@/lib/historianTypes'
+import { authorizeClinicalOrPatientAccess } from '@/lib/patientAccess/routeAuthorization'
 
 const SYSTEM_PROMPT = `You are writing a plain-language recap for a PATIENT of what THEY shared during an AI health-intake interview. This text is shown directly to the patient, before their neurologist has reviewed anything.
 
@@ -37,6 +38,9 @@ interface PatientReportRequestBody {
   structuredOutput?: HistorianStructuredOutput | null
   narrativeSummary?: string | null
   transcript?: HistorianTranscriptEntry[] | null
+  tenant_id?: unknown
+  patient_id?: unknown
+  consult_id?: unknown
 }
 
 function buildUserContent(
@@ -80,6 +84,18 @@ function buildUserContent(
 }
 
 export async function POST(request: Request) {
+  const access = await authorizeClinicalOrPatientAccess({
+    clinicalAction: 'historian.patient_report',
+    clinicalRoles: ['clinician', 'admin'],
+    patientScopes: ['patient:historian:report'],
+  })
+  if (!access.ok) {
+    return NextResponse.json(
+      { error: 'Access denied', reason: access.reason },
+      { status: access.status },
+    )
+  }
+
   let body: PatientReportRequestBody
   try {
     body = await request.json()
@@ -87,9 +103,46 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'invalid json' }, { status: 400 })
   }
 
+  if (
+    access.principal === 'patient' &&
+    ((body.tenant_id !== undefined &&
+      body.tenant_id !== access.context.tenantId) ||
+      (body.patient_id !== undefined &&
+        body.patient_id !== access.context.patientId) ||
+      (body.consult_id !== undefined &&
+        body.consult_id !== (access.context.consultId ?? null)))
+  ) {
+    return NextResponse.json(
+      { error: 'Access denied', reason: 'binding_mismatch' },
+      { status: 403 },
+    )
+  }
+
   const narrativeSummary = body.narrativeSummary ?? null
   const structuredOutput = body.structuredOutput ?? null
   const transcript = body.transcript ?? null
+
+  const structuredLength = structuredOutput
+    ? JSON.stringify(structuredOutput).length
+    : 0
+  const transcriptLength = Array.isArray(transcript)
+    ? transcript.reduce(
+        (total, entry) =>
+          total + (typeof entry?.text === 'string' ? entry.text.length : 0),
+        0,
+      )
+    : 0
+  if (
+    (narrativeSummary?.length ?? 0) > 20_000 ||
+    structuredLength > 40_000 ||
+    (Array.isArray(transcript) && transcript.length > 500) ||
+    transcriptLength > 50_000
+  ) {
+    return NextResponse.json(
+      { error: 'Patient report input exceeds the verified limit' },
+      { status: 413 },
+    )
+  }
 
   // Fail-open fallback — used for both "nothing to generate from" and any
   // Bedrock error below. The UI must never show a blank or crashed tab.

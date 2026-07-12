@@ -1,15 +1,147 @@
 import { NextResponse } from 'next/server'
-import { getUser } from '@/lib/cognito/server'
-import { getTenantServer } from '@/lib/tenant'
 import { from } from '@/lib/db-query'
-import { linkHistorianToConsult } from '@/lib/consult/pipeline'
-import { notifyHistorianRedFlag } from '@/lib/notifications'
+import { getConsult } from '@/lib/consult/pipeline'
+import {
+  notifyHistorianRedFlag,
+  notifyHistorianSafetyEscalation,
+} from '@/lib/notifications'
+import { recordHistorianSafetyEscalation } from '@/lib/triage/historianSafetyEscalation'
+import { authorizeClinicalAccess } from '@/lib/auth/clinicalAccess'
+import { authorizeClinicalOrPatientAccess } from '@/lib/patientAccess/routeAuthorization'
+import { recordReferralClarificationCompletion } from '@/lib/triage/historianClarificationCompletion'
+import { getPool } from '@/lib/db'
 
 export async function POST(request: Request) {
   try {
     const body = await request.json()
-    const tenant = body.tenant_id || getTenantServer()
+    const requestedConsultId =
+      typeof body.consult_id === 'string' && body.consult_id.trim()
+        ? body.consult_id.trim()
+        : undefined
+    const requestedPatientId =
+      typeof body.patient_id === 'string' && body.patient_id.trim()
+        ? body.patient_id.trim()
+        : undefined
+    const clarificationRequested =
+      body.session_type === 'referral_clarification' ||
+      requestedConsultId !== undefined
+    const access = await authorizeClinicalOrPatientAccess({
+      clinicalAction: 'historian.save',
+      clinicalRoles: ['clinician', 'admin'],
+      patientScopes: clarificationRequested
+        ? ['patient:clarification:answer']
+        : ['patient:historian:save'],
+      ...(requestedPatientId ? { expectedPatientId: requestedPatientId } : {}),
+      ...(requestedConsultId ? { expectedConsultId: requestedConsultId } : {}),
+    })
+    if (!access.ok) {
+      return NextResponse.json(
+        { error: 'Access denied', reason: access.reason },
+        { status: access.status },
+      )
+    }
 
+    if (
+      access.principal === 'patient' &&
+      requestedPatientId &&
+      requestedPatientId !== access.context.patientId
+    ) {
+      return NextResponse.json(
+        { error: 'Access denied', reason: 'binding_mismatch' },
+        { status: 403 },
+      )
+    }
+    const tenant = access.context.tenantId
+    const consultId =
+      requestedConsultId ??
+      (clarificationRequested && access.principal === 'patient'
+        ? access.context.consultId
+        : undefined)
+    if (
+      access.principal === 'patient' &&
+      clarificationRequested &&
+      (!consultId || access.context.consultId !== consultId)
+    ) {
+      return NextResponse.json(
+        { error: 'Access denied', reason: 'binding_mismatch' },
+        { status: 403 },
+      )
+    }
+    const consult = consultId
+      ? await getConsult(consultId, tenant)
+      : null
+    if (consultId && !consult) {
+      return NextResponse.json({ error: 'Consult not found' }, { status: 404 })
+    }
+    if (
+      access.principal === 'patient' &&
+      consult &&
+      consult.patient_id !== access.context.patientId
+    ) {
+      return NextResponse.json(
+        { error: 'Access denied', reason: 'binding_mismatch' },
+        { status: 403 },
+      )
+    }
+    if (!consultId && body.session_type === 'referral_clarification') {
+      return NextResponse.json(
+        { error: 'Referral clarification requires a consult binding' },
+        { status: 409 },
+      )
+    }
+    const patientId =
+      access.principal === 'patient'
+        ? access.context.patientId
+        : consult
+          ? consult.patient_id || null
+          : requestedPatientId ?? null
+    if (access.principal === 'clinical' && !consult && patientId) {
+      const pool = await getPool()
+      const { rows } = await pool.query(
+        `SELECT id
+           FROM patients
+          WHERE id = $1
+            AND tenant_id = $2
+          LIMIT 1`,
+        [patientId, tenant],
+      )
+      if (!rows[0]) {
+        return NextResponse.json({ error: 'Patient not found' }, { status: 404 })
+      }
+    }
+    const sessionType = consult
+      ? 'referral_clarification'
+      : body.session_type || 'new_patient'
+    const safetyEscalated = body.safety_escalated === true
+    const redFlags = Array.isArray(body.red_flags) ? body.red_flags : []
+    const structuredOutput =
+      body.structured_output && typeof body.structured_output === 'object'
+        ? body.structured_output
+        : {}
+    const rawClarificationAnswers = structuredOutput.clarification_answers
+    if (
+      consult &&
+      !safetyEscalated &&
+      !Array.isArray(rawClarificationAnswers)
+    ) {
+      return NextResponse.json(
+        { error: 'Approved clarification answers are required' },
+        { status: 400 },
+      )
+    }
+    const clarificationAnswers = Array.isArray(rawClarificationAnswers)
+      ? rawClarificationAnswers.map((answer: unknown) => {
+          const candidate = answer as Record<string, unknown>
+          return {
+            questionId:
+              typeof candidate?.question_id === 'string'
+                ? candidate.question_id
+                : '',
+            answer:
+              typeof candidate?.answer === 'string' ? candidate.answer : '',
+          }
+        })
+      : []
 
     const completionStatus: 'complete' | 'ended_early' | null =
       body.interview_completion_status === 'complete' ||
@@ -26,15 +158,15 @@ export async function POST(request: Request) {
     const { data, error } = await from('historian_sessions')
       .insert({
         tenant_id: tenant,
-        patient_id: body.patient_id || null,
-        session_type: body.session_type || 'new_patient',
+        patient_id: patientId,
+        session_type: sessionType,
         patient_name: body.patient_name || '',
         referral_reason: body.referral_reason || null,
-        structured_output: toJSON(body.structured_output),
+        structured_output: toJSON(structuredOutput),
         narrative_summary: body.narrative_summary || null,
         transcript: toJSON(body.transcript),
         red_flags: toJSON(body.red_flags),
-        safety_escalated: body.safety_escalated || false,
+        safety_escalated: safetyEscalated,
         duration_seconds: body.duration_seconds || 0,
         question_count: body.question_count || 0,
         status: body.status || 'completed',
@@ -51,33 +183,66 @@ export async function POST(request: Request) {
     }
 
     // Phase 1 pipeline: link the saved historian session back to the consult
-    const consultId: string | undefined = body.consult_id
     if (consultId && data) {
-      try {
-        await linkHistorianToConsult(
+      if (safetyEscalated) {
+        const recorded = await recordHistorianSafetyEscalation({
           consultId,
-          data.id,
-          body.narrative_summary || '',
-          body.structured_output || {},
-          body.red_flags || [],
-          body.safety_escalated || false,
+          historianSessionId: data.id,
+          summary: body.narrative_summary || '',
+          structuredOutput,
+          redFlags,
+          safetyEscalated: true,
           completionStatus,
-        )
-      } catch (pipelineErr) {
-        // Non-fatal — historian session is saved regardless
-        console.error('[historian/save] consult linkage error (non-fatal):', pipelineErr)
+          tenantId: tenant,
+        })
+        if (!recorded) {
+          return NextResponse.json(
+            { error: 'Emergency safety hold could not be recorded' },
+            { status: 503 },
+          )
+        }
+      } else {
+        const completion = await recordReferralClarificationCompletion({
+          consultId,
+          tenantId: tenant,
+          historianSessionId: data.id,
+          summary: body.narrative_summary || '',
+          structuredOutput,
+          redFlags,
+          completionStatus,
+          answers: clarificationAnswers,
+        })
+        if (!completion.ok) {
+          const persistenceFailure =
+            completion.reason === 'clarification_persistence_failed'
+          return NextResponse.json(
+            {
+              error: 'Referral clarification could not be reconciled',
+              reason: completion.reason,
+            },
+            { status: persistenceFailure ? 503 : 409 },
+          )
+        }
       }
     }
 
     // ── Notification: alert staff if red flags were detected ──────────
     try {
-      const redFlags = body.red_flags || []
-      if (redFlags.length > 0 && data) {
+      if (safetyEscalated && data) {
+        await notifyHistorianSafetyEscalation(
+          data.id,
+          body.patient_name || 'Unknown patient',
+          redFlags,
+          patientId,
+          tenant,
+        )
+      } else if (redFlags.length > 0 && data) {
         await notifyHistorianRedFlag(
           data.id,
           body.patient_name || 'Unknown patient',
           redFlags,
-          body.patient_id || null,
+          patientId,
+          tenant,
         )
       }
     } catch (notifErr) {
@@ -85,10 +250,15 @@ export async function POST(request: Request) {
     }
 
     return NextResponse.json({ session: data, consult_id: consultId || null })
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Historian save API error:', error)
     return NextResponse.json(
-      { error: error?.message || 'Failed to save historian session' },
+      {
+        error:
+          error instanceof Error
+            ? error.message
+            : 'Failed to save historian session',
+      },
       { status: 500 },
     )
   }
@@ -96,11 +266,21 @@ export async function POST(request: Request) {
 
 export async function GET(request: Request) {
   try {
+    const access = await authorizeClinicalAccess({
+      action: 'consult.read',
+      allowedRoles: ['viewer', 'scheduler', 'clinician', 'admin'],
+    })
+    if (!access.ok) {
+      return NextResponse.json(
+        { error: 'Access denied', reason: access.reason },
+        { status: access.status },
+      )
+    }
+
     const { searchParams } = new URL(request.url)
-    const tenant = searchParams.get('tenant_id') || getTenantServer()
+    const tenant = access.context.tenantId
     const patientId = searchParams.get('patient_id')
 
-    const { getPool } = await import('@/lib/db')
     const pool = await getPool()
 
     const conditions = ['hs."tenant_id" = $1']
@@ -126,10 +306,15 @@ export async function GET(request: Request) {
     const { rows } = await pool.query(sql, values)
 
     return NextResponse.json({ sessions: rows || [] })
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Historian list API error:', error)
     return NextResponse.json(
-      { error: error?.message || 'Failed to fetch historian sessions' },
+      {
+        error:
+          error instanceof Error
+            ? error.message
+            : 'Failed to fetch historian sessions',
+      },
       { status: 500 },
     )
   }

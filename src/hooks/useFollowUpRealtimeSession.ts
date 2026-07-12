@@ -461,6 +461,8 @@ export function useFollowUpRealtimeSession(
           tools: sessionConfig.tools ?? [],
           voiceId: sessionConfig.voiceId,
           relayUrl: sessionConfig.relayUrl,
+          relayToken: sessionConfig.relayToken,
+          sessionType: sessionConfig.sessionType ?? 'follow_up',
         })
 
         startTimeRef.current = Date.now()

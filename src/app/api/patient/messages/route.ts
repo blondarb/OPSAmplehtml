@@ -1,14 +1,24 @@
 import { NextResponse } from 'next/server'
-import { getUser } from '@/lib/cognito/server'
-import { getTenantServer } from '@/lib/tenant'
+import { authorizeClinicalAccess } from '@/lib/auth/clinicalAccess'
+import { getPool } from '@/lib/db'
 import { from } from '@/lib/db-query'
 import { notifyPatientMessage } from '@/lib/notifications'
 
 // POST /api/patient/messages — Send a patient message
 export async function POST(request: Request) {
   try {
+    const access = await authorizeClinicalAccess({
+      action: 'patient.message_write',
+      allowedRoles: ['scheduler', 'clinician', 'admin'],
+    })
+    if (!access.ok) {
+      return NextResponse.json(
+        { error: 'Access denied', reason: access.reason },
+        { status: access.status },
+      )
+    }
+
     const body = await request.json()
-    const tenant = body.tenant_id || getTenantServer()
 
     const { patient_name, body: msgBody } = body
     if (!patient_name || !msgBody) {
@@ -18,9 +28,30 @@ export async function POST(request: Request) {
       )
     }
 
+    if (body.patient_id) {
+      if (typeof body.patient_id !== 'string') {
+        return NextResponse.json(
+          { error: 'patient_id must be a string' },
+          { status: 400 },
+        )
+      }
 
-    const insertData: Record<string, any> = {
-      tenant_id: tenant,
+      const pool = await getPool()
+      const { rows } = await pool.query(
+        `SELECT id
+           FROM patients
+          WHERE id = $1
+            AND tenant_id = $2
+          LIMIT 1`,
+        [body.patient_id, access.context.tenantId],
+      )
+      if (!rows[0]) {
+        return NextResponse.json({ error: 'Patient not found' }, { status: 404 })
+      }
+    }
+
+    const insertData: Record<string, unknown> = {
+      tenant_id: access.context.tenantId,
       patient_name: body.patient_name,
       subject: body.subject || '',
       body: msgBody,
@@ -38,8 +69,11 @@ export async function POST(request: Request) {
       .single()
 
     if (error) {
-      console.error('Message insert error:', error)
-      return NextResponse.json({ error: error.message }, { status: 500 })
+      console.error('[patient/messages] message insert failed')
+      return NextResponse.json(
+        { error: 'Failed to save message' },
+        { status: 500 },
+      )
     }
 
     // Generate notification for the clinical team
@@ -49,6 +83,7 @@ export async function POST(request: Request) {
         body.patient_name,
         body.subject || msgBody.substring(0, 100),
         body.patient_id || null,
+        access.context.tenantId,
       )
     } catch (notifErr) {
       // Non-fatal — the message is saved regardless
@@ -56,29 +91,46 @@ export async function POST(request: Request) {
     }
 
     return NextResponse.json({ message: data }, { status: 201 })
-  } catch (err: any) {
-    console.error('Messages API error:', err)
-    return NextResponse.json({ error: err.message }, { status: 500 })
+  } catch {
+    console.error('[patient/messages] request failed')
+    return NextResponse.json({ error: 'Failed to save message' }, { status: 500 })
   }
 }
 
 // GET /api/patient/messages — List messages for current tenant
 export async function GET() {
   try {
-    const tenant = getTenantServer()
+    const access = await authorizeClinicalAccess({
+      action: 'patient.message_read',
+      allowedRoles: ['viewer', 'scheduler', 'clinician', 'admin'],
+    })
+    if (!access.ok) {
+      return NextResponse.json(
+        { error: 'Access denied', reason: access.reason },
+        { status: access.status },
+      )
+    }
 
     const { data, error } = await from('patient_messages')
       .select('*')
-      .eq('tenant_id', tenant)
+      .eq('tenant_id', access.context.tenantId)
       .order('created_at', { ascending: false })
       .limit(20)
 
     if (error) {
-      return NextResponse.json({ error: error.message }, { status: 500 })
+      console.error('[patient/messages] message list failed')
+      return NextResponse.json(
+        { error: 'Failed to fetch messages' },
+        { status: 500 },
+      )
     }
 
     return NextResponse.json({ messages: data })
-  } catch (err: any) {
-    return NextResponse.json({ error: err.message }, { status: 500 })
+  } catch {
+    console.error('[patient/messages] list request failed')
+    return NextResponse.json(
+      { error: 'Failed to fetch messages' },
+      { status: 500 },
+    )
   }
 }

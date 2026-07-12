@@ -1,7 +1,7 @@
 # Consolidated Roadmap - Sevaro Clinical
 
-**Version:** 1.8
-**Last Updated:** March 17, 2026 (Phase 10: Advanced Clinical Workflows & Neuro OS Foundation — stakeholder feedback integration)
+**Version:** 1.10
+**Last Updated:** July 12, 2026 (local referral-triage safety flow verification)
 **Purpose:** Single source of truth consolidating all phases across PRDs
 
 ---
@@ -26,6 +26,37 @@ This document provides a unified view of all planned features across:
 | 🔧 PARTIAL | Some elements implemented, more work needed |
 | ⏳ PENDING | Not yet started |
 | 🎯 PRIORITY | Should be addressed next |
+
+---
+
+## Current Safety Hardening
+
+| Work item | Status | Deployment state |
+|-----------|--------|------------------|
+| Converge one pasted referral or one complete native-text file on the same full triage flow | ✅ COMPLETE locally | Native-text PDF parity and controlled full-result parity verified locally; not deployed |
+| Make persisted extraction content authoritative over caller summaries | ✅ COMPLETE locally | Source-bound reload/validation verified locally; not deployed |
+| Suppress outpatient workup/routing/finalization for emergency and conflicting outputs | ✅ COMPLETE locally | Screen/copy policy and explicit holds verified locally; not deployed |
+| Preserve short-note and partial-PDF safety while blocking unsupported outpatient scoring | ✅ COMPLETE locally | Safety screen/hold only; full OCR remains pending; not deployed |
+| Retire destructive self-service demo reset APIs and UI | ✅ COMPLETE locally | Not deployed; production unchanged pending explicit approval |
+| Retire unused public legacy clinical APIs | ✅ COMPLETE locally | Not deployed; production unchanged pending explicit approval |
+| Enforce critical emergency-notification lifecycle through action closure | 🎯 PRIORITY | Plan complete; database guard must precede UI |
+| Secure demo seed/diagnostics, wearable/RPM, visits/legacy CRUD, and AI credential/cost routes | 🎯 PRIORITY | Audit complete; implementation pending |
+| Complete scanned-packet tenant control plane and validation | 🎯 PRIORITY | Foundation only; not production-authorized |
+| Assemble multi-document referral packets | ⏳ PENDING | Single-referral/single-file scope only |
+| Deliver full OCR and durable pre-parse intake/recovery | ⏳ PENDING | Partial-PDF safety hold exists; end-to-end intake/recovery is not complete |
+| Evolve recommendation schema and deliver clarification requests | ⏳ PENDING | Not included in the verified slice |
+| Deploy and complete production clinical/live-model validation | ⏳ PENDING | No AWS or deployment action occurred; production remains unchanged |
+
+The retired reset routes return `410 Gone` with `Cache-Control: no-store` and
+cannot parse inputs or reach authentication, tenant, secret, or database code.
+Any future synthetic reset must be an approval-gated operator workflow outside
+the web app.
+
+The completed triage rows above describe local deterministic and
+controlled-output verification only. They do not establish production-model
+parity, clinical performance, or deployment readiness. Emergency suppression
+retains visible clinical evidence and missing information, while conflicting
+data retains an explicit reconciliation hold and scheduling lock.
 
 ---
 

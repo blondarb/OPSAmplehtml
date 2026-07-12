@@ -22,6 +22,24 @@ interface EmbeddedHistorianProps {
   onError: (msg: string) => void
 }
 
+interface HistorianCompletionData {
+  structuredOutput: HistorianStructuredOutput | null
+  narrativeSummary: string | null
+  redFlags: HistorianRedFlag[]
+  safetyEscalated: boolean
+  transcript: HistorianTranscriptEntry[]
+  duration: number
+  questionCount: number
+  endedEarly: boolean
+}
+
+interface LocalizerPushPayload {
+  top_differentials?: string[]
+  suggested_next_question?: string | null
+  suggested_scale_id?: string | null
+  turn_count?: number
+}
+
 function formatTime(seconds: number): string {
   const m = Math.floor(seconds / 60)
   const s = seconds % 60
@@ -45,17 +63,6 @@ export default function EmbeddedHistorian({
   const [showConsentDisclosure, setShowConsentDisclosure] = useState(false)
   const [consentAcknowledged, setConsentAcknowledged] = useState(false)
   const [autoShownPhysicianPanel, setAutoShownPhysicianPanel] = useState(false)
-  const [completionData, setCompletionData] = useState<{
-    structuredOutput: HistorianStructuredOutput | null
-    narrativeSummary: string | null
-    redFlags: HistorianRedFlag[]
-    safetyEscalated: boolean
-    transcript: HistorianTranscriptEntry[]
-    duration: number
-    questionCount: number
-    endedEarly: boolean
-  } | null>(null)
-
   const transcriptEndRef = useRef<HTMLDivElement>(null)
   const tenant = getTenantClient()
   // Voice engine selection — defaults to 'openai' (today's production path);
@@ -69,9 +76,7 @@ export default function EmbeddedHistorian({
   const scaleAdminInProgressRef = useRef<boolean>(false)
   const [activeScale, setActiveScale] = useState<{ id: string; abbreviation: string } | null>(null)
 
-  const handleSessionComplete = useCallback(async (data: typeof completionData) => {
-    if (!data) return
-    setCompletionData(data)
+  const handleSessionComplete = useCallback(async (data: HistorianCompletionData) => {
     setPhase('saving')
 
     try {
@@ -120,7 +125,9 @@ export default function EmbeddedHistorian({
   const injectScaleAdministrationRef = useRef<((block: string) => void) | null>(null)
   // Phase 5 of 2026-05-27 historian upgrade: ref to the hook's pushLocalizerContext.
   // Same forward-declaration pattern as injectScaleAdministrationRef.
-  const pushLocalizerContextRef = useRef<((payload: any) => void) | null>(null)
+  const pushLocalizerContextRef = useRef<
+    ((payload: LocalizerPushPayload) => void) | null
+  >(null)
   const turnCountRef = useRef(0)
 
   const buildSnapshotFromLocalizer = useCallback((data: LocalizerResponse): LocalizerSnapshot => {
@@ -138,7 +145,9 @@ export default function EmbeddedHistorian({
     }
   }, [referralReason])
 
-  const handleLocalizerUpdate = useCallback(async (data: LocalizerResponse & { push_payload?: any }) => {
+  const handleLocalizerUpdate = useCallback(async (
+    data: LocalizerResponse & { push_payload?: LocalizerPushPayload },
+  ) => {
     // Phase 5 of 2026-05-27 historian upgrade: push Localizer findings into
     // the live OpenAI session via the new pushLocalizerContext channel.
     // Additive — not load-bearing if the helper isn't ready yet.
@@ -225,7 +234,7 @@ export default function EmbeddedHistorian({
     patientName,
     consultId,
     provider: voiceProvider,
-    enableLocalizer: true,
+    enableLocalizer: sessionType !== 'referral_clarification',
     onComplete: handleSessionComplete,
     onSafetyEscalation: handleSafetyEscalation,
     onLocalizerUpdate: handleLocalizerUpdate,

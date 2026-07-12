@@ -16,8 +16,11 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server'
-import { invokeBedrockJSON, retrieveFromKB } from '@/lib/bedrock'
+import { invokeBedrockClinicalJSON, retrieveFromKB } from '@/lib/bedrock'
 import { from } from '@/lib/db-query'
+import { getPool } from '@/lib/db'
+import { authorizeClinicalAccess } from '@/lib/auth/clinicalAccess'
+import { loadSchedulingAuthorization } from '@/lib/triage/schedulingAuthorization'
 import type {
   LocalizerRequest,
   LocalizerResponse,
@@ -153,17 +156,18 @@ function extractKBSources(citations: { sourceUri?: string; documentTitle?: strin
  * Non-fatal — if the consult record doesn't exist or the write fails, we log and move on.
  */
 async function persistLocalizerResults(
-  sessionId: string,
+  consultId: string,
+  tenantId: string,
   differential: DifferentialEntry[],
   followUpQuestions: string[],
   localizationHypothesis: string,
   kbSources: string[]
 ): Promise<void> {
   try {
-    // Find the consult linked to this historian session
     const { data: consult } = await from('neurology_consults')
       .select('id, localizer_run_count')
-      .eq('historian_session_id', sessionId)
+      .eq('id', consultId)
+      .eq('tenant_id', tenantId)
       .maybeSingle()
 
     if (!consult) {
@@ -181,6 +185,7 @@ async function persistLocalizerResults(
         localizer_run_count: (consult.localizer_run_count ?? 0) + 1,
       })
       .eq('id', consult.id)
+      .eq('tenant_id', tenantId)
   } catch (err) {
     console.error('[localizer] Failed to persist results to neurology_consults:', err)
   }
@@ -190,6 +195,17 @@ async function persistLocalizerResults(
 
 export async function POST(req: NextRequest): Promise<NextResponse> {
   const startMs = Date.now()
+
+  const access = await authorizeClinicalAccess({
+    action: 'historian.localize',
+    allowedRoles: ['clinician', 'admin'],
+  })
+  if (!access.ok) {
+    return NextResponse.json(
+      { error: 'Access denied', reason: access.reason },
+      { status: access.status },
+    )
+  }
 
   // ── Parse and validate request ───────────────────────────────────────────
   let body: LocalizerRequest
@@ -201,11 +217,58 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
 
   const { sessionId, sessionType, transcript, chiefComplaint, referralReason } = body
 
+  if (sessionType === 'referral_clarification') {
+    return NextResponse.json(
+      { error: 'Localizer is disabled for referral clarification' },
+      { status: 409 },
+    )
+  }
+
   if (!sessionId || !transcript || !Array.isArray(transcript)) {
     return NextResponse.json(
       { error: 'sessionId and transcript array are required' },
       { status: 400 }
     )
+  }
+
+  // The client-provided session type is not a safety boundary. Resolve any
+  // consult binding within the authenticated tenant and require its current,
+  // server-side triage state to be fully cleared before localization.
+  const pool = await getPool()
+  const { rows: consultRows } = await pool.query(
+    `SELECT id, triage_session_id
+       FROM neurology_consults
+      WHERE tenant_id = $2
+        AND (id = $1 OR historian_session_id = $1)
+      LIMIT 1`,
+    [sessionId, access.context.tenantId],
+  )
+  const boundConsult = consultRows[0] as
+    | { id: string; triage_session_id: string | null }
+    | undefined
+  if (boundConsult) {
+    if (!boundConsult.triage_session_id) {
+      return NextResponse.json(
+        {
+          error: 'Localizer is blocked by triage safety state',
+          reason: 'triage_authorization_missing',
+        },
+        { status: 409 },
+      )
+    }
+    const safetyAuthorization = await loadSchedulingAuthorization(
+      boundConsult.triage_session_id,
+      access.context.tenantId,
+    )
+    if (!safetyAuthorization.decision.allowed) {
+      return NextResponse.json(
+        {
+          error: 'Localizer is blocked by triage safety state',
+          reason: safetyAuthorization.decision.reason,
+        },
+        { status: 409 },
+      )
+    }
   }
 
   // Minimum data check — don't waste Bedrock calls on empty sessions
@@ -255,7 +318,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
         .filter(Boolean)
         .join('\n')
 
-      const { parsed } = await invokeBedrockJSON<ExtractedSymptoms>({
+      const { parsed } = await invokeBedrockClinicalJSON<ExtractedSymptoms>({
         system: SYMPTOM_EXTRACTOR_PROMPT,
         messages: [{ role: 'user', content: userContext }],
         maxTokens: 500,
@@ -302,7 +365,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
           transcriptSummary: symptoms.clinicalSummary,
         })
 
-        const { parsed } = await invokeBedrockJSON<GeneratedQuestions>({
+        const { parsed } = await invokeBedrockClinicalJSON<GeneratedQuestions>({
           system: QUESTION_GENERATOR_PROMPT,
           messages: [{ role: 'user', content: generatorInput }],
           maxTokens: 600,
@@ -321,8 +384,8 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     const isTimeout = signal.aborted
     console.warn(
       isTimeout
-        ? `[localizer] Timeout after ${LOCALIZER_TIMEOUT_MS}ms for session ${sessionId}`
-        : `[localizer] Unrecoverable error for session ${sessionId}:`,
+        ? `[localizer] Timeout after ${LOCALIZER_TIMEOUT_MS}ms`
+        : '[localizer] Unrecoverable pipeline error:',
       isTimeout ? '' : err
     )
     degradedReason = isTimeout ? `Timeout after ${LOCALIZER_TIMEOUT_MS}ms` : 'Localizer pipeline error'
@@ -331,15 +394,20 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   }
 
   // ── Persist to DB (fire-and-forget, non-fatal) ───────────────────────────
-  if (questions && questions.differential.length > 0) {
+  if (
+    boundConsult &&
+    questions &&
+    questions.differential.length > 0
+  ) {
     persistLocalizerResults(
-      sessionId,
+      boundConsult.id,
+      access.context.tenantId,
       questions.differential,
       questions.followUpQuestions,
       questions.localizationHypothesis,
       extractKBSources(kbCitations)
-    ).catch((err) => {
-      console.error('[localizer] DB persist error (non-fatal):', err)
+    ).catch(() => {
+      console.error('[localizer] DB persist error (non-fatal)')
     })
   }
 
@@ -366,7 +434,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   const pushPayload = {
     top_differentials: (questions?.differential ?? [])
       .slice(0, 3)
-      .map((d: any) => `${d.diagnosis ?? d.name ?? 'unknown'} (${d.confidence ?? 'medium'})`),
+      .map((d) => `${d.diagnosis || 'unknown'} (${d.likelihood || 'medium'})`),
     suggested_next_question: questions?.followUpQuestions?.[0] ?? null,
     suggested_scale_id: null as string | null,
   }

@@ -54,8 +54,8 @@ const SCHEDULE_TOUR_STEPS: TourStep[] = [
   },
   {
     id: 'settings',
-    title: 'Settings & Reset Demo',
-    description: 'Access your profile settings here. The Reset Demo option restores the original demo state for the next viewer.',
+    title: 'Settings',
+    description: 'Access your profile and application settings here.',
     target: '[data-tour="settings"]',
     position: 'left',
     spotlightPadding: 12,

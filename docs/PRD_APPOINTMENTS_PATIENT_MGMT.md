@@ -640,7 +640,6 @@ interface TopNavProps {
   onOpenIdeas: () => void
   onToggleSidebar?: () => void
   isSidebarOpen?: boolean
-  onResetDemo?: () => void
 }
 ```
 
@@ -662,7 +661,7 @@ interface TopNavProps {
 | Lock Screen | Button that shows lock overlay |
 | Notifications | Bell icon with badge and dropdown panel |
 | AI Launcher | Orange sparkle button with AI tools menu |
-| User Avatar | Dropdown with Settings, Reset Demo, Sign Out |
+| User Avatar | Dropdown with Settings and Sign Out |
 
 ### 6.4 Billing Timer
 

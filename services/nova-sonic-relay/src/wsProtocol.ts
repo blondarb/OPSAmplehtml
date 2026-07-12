@@ -2,8 +2,15 @@
 // MUST stay in sync with src/lib/voice/relayProtocol.ts in the Next.js app.
 
 // Browser → relay
+export interface RelayStartConfig {
+  instructions: string
+  tools: unknown[]
+  voiceId?: string
+  sessionType: string
+}
+
 export type ClientMsg =
-  | { t: 'start'; instructions: string; tools: unknown[]; voiceId?: string }
+  | ({ t: 'start' } & RelayStartConfig)
   | { t: 'audio'; pcm: string }            // base64 PCM16 @16k
   | { t: 'userTurnEnd' }
   | { t: 'toolResult'; toolUseId: string; output: string }

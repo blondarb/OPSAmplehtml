@@ -1,24 +1,39 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getPool } from '@/lib/db'
 import { from } from '@/lib/db-query'
+import {
+  canActivateOutpatientScheduling,
+  type SchedulingAuthorization,
+} from '@/lib/triage/workflowPolicy'
+import { authorizeClinicalAccess } from '@/lib/auth/clinicalAccess'
 
 /**
  * POST /api/triage/[id]/schedule
  *
- * Auto-creates an AI-suggested appointment for urgent/emergent triage results.
+ * Creates a pending-review suggestion only after explicit clinician clearance.
  * Called automatically from the triage route or manually by staff.
  *
- * The appointment is created with scheduling_notes indicating it was
- * AI-suggested so staff can review and confirm.
+ * The API policy and a database trigger both fail closed.
  */
 export async function POST(
-  request: NextRequest,
+  _request: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ) {
   try {
+    const access = await authorizeClinicalAccess({
+      action: 'triage.schedule',
+      allowedRoles: ['scheduler', 'clinician', 'admin'],
+    })
+    if (!access.ok) {
+      return NextResponse.json(
+        { error: 'Access denied', reason: access.reason },
+        { status: access.status },
+      )
+    }
+
     const { id: triageSessionId } = await params
 
-    // Fetch the triage session to get tier and patient info
+    // Fetch only the fields required for scheduling authorization and display.
     const pool = await getPool()
     const { rows } = await pool.query(
       `
@@ -26,17 +41,37 @@ export async function POST(
         ts."id",
         ts."triage_tier",
         ts."patient_id",
-        ts."referral_text",
         ts."clinical_reasons",
         ts."subspecialty_recommendation",
-        p."first_name",
-        p."last_name"
+        ts."care_pathway",
+        ts."data_quality",
+        ts."coverage_status",
+        ts."review_requirement",
+        ts."workflow_status",
+        ts."scheduling_locked",
+        ts."reviewed_at",
+        ts."reviewed_by",
+        ts."final_care_pathway",
+        ts."final_triage_tier",
+        (
+          SELECT COUNT(*)::integer
+          FROM "triage_clarification_questions" q
+          WHERE q."triage_session_id" = ts."id"
+            AND q."criticality" = 'critical'
+            AND q."status" NOT IN ('verified', 'closed')
+        ) AS "open_critical_clarifications"
+        ,(
+          SELECT COUNT(*)::integer
+          FROM "triage_emergency_actions" action
+          WHERE action."triage_session_id" = ts."id"
+            AND action."status" <> 'closed'
+        ) AS "open_emergency_actions"
       FROM "triage_sessions" ts
-      LEFT JOIN "patients" p ON p."id" = ts."patient_id"
       WHERE ts."id" = $1
+        AND ts."tenant_id" = $2
       LIMIT 1
       `,
-      [triageSessionId],
+      [triageSessionId, access.context.tenantId],
     )
 
     const triage = rows[0]
@@ -47,11 +82,39 @@ export async function POST(
       )
     }
 
-    // Only create appointments for urgent+ tiers
-    const urgentTiers = ['urgent', 'emergent', 'critical']
-    if (!urgentTiers.includes((triage.triage_tier || '').toLowerCase())) {
+    const authorization = {
+      carePathway: triage.care_pathway,
+      dataQuality: triage.data_quality,
+      coverageStatus: triage.coverage_status,
+      reviewRequirement: triage.review_requirement,
+      workflowStatus: triage.workflow_status,
+      schedulingLocked: triage.scheduling_locked,
+      reviewedAt: triage.reviewed_at,
+      reviewedBy: triage.reviewed_by,
+      finalCarePathway: triage.final_care_pathway,
+      finalTriageTier: triage.final_triage_tier,
+      openCriticalClarifications: Number(
+        triage.open_critical_clarifications,
+      ),
+      openEmergencyActions: Number(triage.open_emergency_actions),
+    } as SchedulingAuthorization
+    const policy = canActivateOutpatientScheduling(authorization)
+    if (!policy.allowed) {
       return NextResponse.json(
-        { error: 'Appointment auto-scheduling is only for urgent or higher triage results' },
+        {
+          error: 'Triage session is not authorized for outpatient scheduling',
+          reason: policy.reason,
+        },
+        { status: 409 },
+      )
+    }
+
+    // Legacy tier labels are explanatory only. Emergency/critical labels can
+    // never create an outpatient appointment, even if other fields drift.
+    const tier = (triage.triage_tier || '').toLowerCase()
+    if (tier !== 'urgent') {
+      return NextResponse.json(
+        { error: 'Only a cleared urgent outpatient decision can be suggested' },
         { status: 400 },
       )
     }
@@ -64,21 +127,10 @@ export async function POST(
       )
     }
 
-    // Determine suggested appointment timing based on tier
-    const tier = (triage.triage_tier || '').toLowerCase()
-    let suggestedDate: string
-    let appointmentType: string
-    if (tier === 'emergent' || tier === 'critical') {
-      // Same day
-      suggestedDate = new Date().toISOString().split('T')[0]
-      appointmentType = 'urgent-consult'
-    } else {
-      // Within 1 week for urgent
-      const nextWeek = new Date()
-      nextWeek.setDate(nextWeek.getDate() + 7)
-      suggestedDate = nextWeek.toISOString().split('T')[0]
-      appointmentType = 'new-consult'
-    }
+    const nextWeek = new Date()
+    nextWeek.setDate(nextWeek.getDate() + 7)
+    const suggestedDate = nextWeek.toISOString().split('T')[0]
+    const appointmentType = 'new-consult'
 
     // Build reason from triage data
     const clinicalReasons = Array.isArray(triage.clinical_reasons)
@@ -89,13 +141,11 @@ export async function POST(
       clinicalReasons ||
       'Urgent triage result — review needed'
 
-    const patientName = triage.first_name && triage.last_name
-      ? `${triage.first_name} ${triage.last_name}`
-      : 'Unknown'
-
     // Create the appointment flagged as AI-suggested
     const { data: appointment, error: insertError } = await from('appointments')
       .insert({
+        tenant_id: access.context.tenantId,
+        triage_session_id: triageSessionId,
         patient_id: triage.patient_id,
         appointment_date: suggestedDate,
         appointment_time: '09:00', // Default morning slot; staff will adjust
@@ -110,7 +160,9 @@ export async function POST(
       .single()
 
     if (insertError) {
-      console.error('[triage/schedule] appointment insert error:', insertError)
+      console.error('[triage/schedule] appointment insert failed', {
+        code: insertError.code ?? 'UNKNOWN',
+      })
       return NextResponse.json(
         { error: 'Failed to create appointment' },
         { status: 500 },
@@ -120,13 +172,13 @@ export async function POST(
     return NextResponse.json(
       {
         appointment,
-        message: `AI-suggested ${appointmentType} appointment created for ${patientName} on ${suggestedDate}`,
+        message: `AI-suggested ${appointmentType} appointment created for ${suggestedDate}`,
         ai_suggested: true,
       },
       { status: 201 },
     )
-  } catch (error) {
-    console.error('[triage/schedule] error:', error)
+  } catch {
+    console.error('[triage/schedule] request failed')
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 },

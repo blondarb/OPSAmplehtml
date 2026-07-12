@@ -61,10 +61,10 @@ export type KeyFactor = typeof KEY_FACTOR_OPTIONS[number]
 
 // ── Subspecialty options (matching existing types) ──
 
-export const SUBSPECIALTY_OPTIONS: SubspecialtyType[] = NEURO_SUBSPECIALTIES
+export const SUBSPECIALTY_OPTIONS: readonly SubspecialtyType[] = NEURO_SUBSPECIALTIES
 
 // Re-export for convenience in validation form
-export const NON_NEURO_SPECIALTY_OPTIONS: NonNeuroSpecialtyType[] = NON_NEURO_SPECIALTIES
+export const NON_NEURO_SPECIALTY_OPTIONS: readonly NonNeuroSpecialtyType[] = NON_NEURO_SPECIALTIES
 
 // ── AI Run (one triage pass of one case at a specific temperature) ──
 
