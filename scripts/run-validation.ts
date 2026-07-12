@@ -41,14 +41,23 @@ pool.on('error', (err) => {
   console.error('Pool error (will reconnect):', err.message)
 })
 
-// Direct Bedrock client (no timeout wrapper from runTriage)
+// Direct Bedrock client (no timeout wrapper from runTriage).
+// Explicit env keys win; otherwise fall back to the SDK default chain
+// (AWS_PROFILE / SSO) — empty-string creds fail every call with
+// "security token invalid".
+const explicitKey = process.env.BEDROCK_ACCESS_KEY_ID || process.env.AWS_ACCESS_KEY_ID
+const explicitSecret = process.env.BEDROCK_SECRET_ACCESS_KEY || process.env.AWS_SECRET_ACCESS_KEY
 const bedrockClient = new BedrockRuntimeClient({
   region: process.env.BEDROCK_REGION || 'us-east-2',
-  credentials: {
-    accessKeyId: process.env.BEDROCK_ACCESS_KEY_ID || process.env.AWS_ACCESS_KEY_ID || '',
-    secretAccessKey: process.env.BEDROCK_SECRET_ACCESS_KEY || process.env.AWS_SECRET_ACCESS_KEY || '',
-    ...(process.env.AWS_SESSION_TOKEN ? { sessionToken: process.env.AWS_SESSION_TOKEN } : {}),
-  },
+  ...(explicitKey && explicitSecret
+    ? {
+        credentials: {
+          accessKeyId: explicitKey,
+          secretAccessKey: explicitSecret,
+          ...(process.env.AWS_SESSION_TOKEN ? { sessionToken: process.env.AWS_SESSION_TOKEN } : {}),
+        },
+      }
+    : {}),
 })
 
 async function callBedrock(referralText: string, patientAge: number | null, patientSex: string | null, temperature: number) {

@@ -2,8 +2,8 @@ import { NextResponse } from 'next/server'
 
 import { authorizeClinicalAccess } from '@/lib/auth/clinicalAccess'
 export async function POST(
-  _request?: Request,
-  _context?: { params: Promise<{ id: string }> },
+  _request: Request,
+  _context: { params: Promise<{ id: string }> },
 ) {
   const access = await authorizeClinicalAccess({
     action: 'triage.finalize_outpatient',

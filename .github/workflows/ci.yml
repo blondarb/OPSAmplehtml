@@ -22,3 +22,5 @@ jobs:
       - run: npx tsc --noEmit
       # tests/simulated-patients needs a live dev server; everything else is hermetic
       - run: npx vitest run --exclude "tests/simulated-patients/**"
+      # catches Next route-contract violations tsc alone misses (no .next types in CI)
+      - run: npx next build

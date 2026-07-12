@@ -5,8 +5,8 @@ import { authorizeClinicalAccess } from '@/lib/auth/clinicalAccess'
 // triage processing. A session id plus caller-selected patient id is not a
 // sufficient identity proof and can mix two patients within the same tenant.
 export async function PATCH(
-  _request?: Request,
-  _context?: { params: Promise<{ id: string }> },
+  _request: Request,
+  _context: { params: Promise<{ id: string }> },
 ) {
   const access = await authorizeClinicalAccess({
     action: 'triage.link_patient',
