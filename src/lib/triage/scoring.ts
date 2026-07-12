@@ -5,6 +5,7 @@ import {
   NEURO_SUBSPECIALTIES,
   NON_NEURO_SPECIALTIES,
   NonNeuroSpecialtyType,
+  resolveNonNeuroSpecialty,
   OutpatientTriageTier,
   ReviewRequirement,
   SubspecialtyType,
@@ -406,12 +407,10 @@ export function parseAndNormalizeAIResponse(parsed: unknown): AITriageResponse {
   )
   let redirectSpecialty: NonNeuroSpecialtyType | null = null
   if (redirectToNonNeuro) {
-    if (
-      typeof redirectSpecialtyRaw !== 'string' ||
-      !NON_NEUROLOGY_SERVICES.has(
-        redirectSpecialtyRaw as NonNeuroSpecialtyType,
-      )
-    ) {
+    // Normalizing resolver: accepts spelling variants of governed values
+    // ("ENT", "Otolaryngology") but never widens the governed set.
+    const resolved = resolveNonNeuroSpecialty(redirectSpecialtyRaw)
+    if (!resolved || !NON_NEUROLOGY_SERVICES.has(resolved)) {
       throw new AITriageResponseValidationError(
         'redirect_specialty',
         'must be a governed non-neurology service when redirect is true',
@@ -423,7 +422,7 @@ export function parseAndNormalizeAIResponse(parsed: unknown): AITriageResponse {
         'is required when redirect_to_non_neuro is true',
       )
     }
-    redirectSpecialty = redirectSpecialtyRaw as NonNeuroSpecialtyType
+    redirectSpecialty = resolved
   } else if (redirectSpecialtyRaw !== null) {
     throw new AITriageResponseValidationError(
       'redirect_specialty',

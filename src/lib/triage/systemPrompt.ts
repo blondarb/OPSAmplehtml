@@ -3,9 +3,10 @@
 // The AI scores 5 dimensions (1-5 integers). Application code calculates tiers.
 
 import { CLINICAL_SOURCE_TRUST_BOUNDARY } from './promptSafety'
+import { NON_NEURO_SPECIALTIES } from './types'
 
 export const TRIAGE_SCORING_PROMPT_VERSION =
-  'neurology-outpatient-scorer-v2026-07-11'
+  'neurology-outpatient-scorer-v2026-07-12'
 
 export const TRIAGE_SYSTEM_PROMPT = `You are a neurology clinical decision support system designed to triage ADULT (≥18 years) outpatient referrals. You are NOT a physician and you do NOT make final clinical decisions. You provide structured clinical scoring that a human clinician will review.
 
@@ -144,7 +145,7 @@ Evaluate whether the referral describes a condition that is NOT primarily neurol
 
 IMPORTANT: Still complete all scoring even if redirect is recommended. Some presentations have neurological overlap — if there is ANY neurological component (e.g., radiculopathy, neuropathy, myelopathy), the referral IS appropriate for neurology. Only redirect when the presentation is clearly non-neurological.
 
-If "redirect_to_non_neuro" is true, specify the recommended specialty in "redirect_specialty" and explain in "redirect_rationale".
+If "redirect_to_non_neuro" is true, set "redirect_specialty" to EXACTLY one of the following governed values (no other wording is accepted): ${NON_NEURO_SPECIALTIES.join('; ')}. Explain in "redirect_rationale".
 
 ## STEP 6: EXTRACT FAILED THERAPIES
 

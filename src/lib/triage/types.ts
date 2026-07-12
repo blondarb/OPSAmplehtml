@@ -104,6 +104,39 @@ export const NON_NEURO_SPECIALTIES: readonly NonNeuroSpecialtyType[] =
 export const NON_NEURO_REDIRECT_FALLBACK: NonNeuroSpecialtyType =
   'Other Specialty'
 
+function normalizeSpecialtyToken(value: string): string {
+  return value
+    .toLowerCase()
+    .replace(/&/g, 'and')
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim()
+}
+
+// Governed values and their slash-segments ("ENT / Otolaryngology" resolves
+// from "ENT", "Otolaryngology", or the full string), compared after
+// case/punctuation normalization. Anything unresolvable stays null so the
+// caller keeps its fail-closed behavior — this widens accepted SPELLINGS,
+// never the governed SET.
+const NON_NEURO_SPECIALTY_LOOKUP: ReadonlyMap<string, NonNeuroSpecialtyType> =
+  (() => {
+    const lookup = new Map<string, NonNeuroSpecialtyType>()
+    for (const governed of NON_NEURO_SPECIALTIES) {
+      const tokens = [governed, ...governed.split('/')]
+      for (const token of tokens) {
+        const key = normalizeSpecialtyToken(token)
+        if (key && !lookup.has(key)) lookup.set(key, governed)
+      }
+    }
+    return lookup
+  })()
+
+export function resolveNonNeuroSpecialty(
+  raw: unknown,
+): NonNeuroSpecialtyType | null {
+  if (typeof raw !== 'string') return null
+  return NON_NEURO_SPECIALTY_LOOKUP.get(normalizeSpecialtyToken(raw)) ?? null
+}
+
 export const NEURO_SUBSPECIALTIES: readonly SubspecialtyType[] = Object.freeze([
   'General Neurology',
   'Epilepsy',

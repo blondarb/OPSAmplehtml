@@ -60,6 +60,11 @@ const bedrockClient = new BedrockRuntimeClient({
     : {}),
 })
 
+// Claude 5-family (and Opus 4.8) Bedrock endpoints reject the temperature
+// parameter: "`temperature` is deprecated for this model." Omit it there;
+// repeat runs then measure default-sampling variance instead of temp spread.
+const MODEL_SUPPORTS_TEMPERATURE = !/sonnet-5|opus-4-8|fable/.test(MODEL)
+
 async function callBedrock(referralText: string, patientAge: number | null, patientSex: string | null, temperature: number) {
   const userPrompt = buildTriageUserPrompt(referralText, {
     patientAge: patientAge ?? undefined,
@@ -71,7 +76,7 @@ async function callBedrock(referralText: string, patientAge: number | null, pati
     system: TRIAGE_SYSTEM_PROMPT,
     messages: [{ role: 'user', content: userPrompt }],
     max_tokens: 4000,
-    temperature,
+    ...(MODEL_SUPPORTS_TEMPERATURE ? { temperature } : {}),
   })
 
   const command = new InvokeModelCommand({

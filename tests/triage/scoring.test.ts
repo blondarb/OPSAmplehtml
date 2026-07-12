@@ -309,6 +309,30 @@ describe('parseAndNormalizeAIResponse', () => {
     expect(parsed.redirect_specialty).toBe('Orthopedics')
   })
 
+  it('resolves governed-specialty spelling variants without widening the governed set', () => {
+    // Live failure 2026-07-12: vertigo+hearing-loss case redirected to "ENT",
+    // strict equality rejected it, and all 4 scoring runs died on vocabulary.
+    for (const variant of ['ENT', 'Otolaryngology', 'ent/otolaryngology', 'ENT / Otolaryngology']) {
+      const raw = validRawModelResponse()
+      raw.redirect_to_non_neuro = true
+      raw.redirect_specialty = variant
+      raw.redirect_rationale = 'Peripheral vestibular pattern with hearing loss.'
+      expect(parseAndNormalizeAIResponse(raw).redirect_specialty).toBe('ENT / Otolaryngology')
+    }
+
+    const pcp = validRawModelResponse()
+    pcp.redirect_to_non_neuro = true
+    pcp.redirect_specialty = 'PCP'
+    pcp.redirect_rationale = 'Uncomplicated metabolic workup first.'
+    expect(parseAndNormalizeAIResponse(pcp).redirect_specialty).toBe('Primary Care / PCP')
+
+    const stillInvented = validRawModelResponse()
+    stillInvented.redirect_to_non_neuro = true
+    stillInvented.redirect_specialty = 'Audiology'
+    stillInvented.redirect_rationale = 'Synthetic redirect.'
+    expect(() => parseAndNormalizeAIResponse(stillInvented)).toThrow('redirect_specialty')
+  })
+
   it('requires bounded missing information and a stated gap when data are insufficient', () => {
     const noGap = validRawModelResponse()
     noGap.insufficient_data = true
