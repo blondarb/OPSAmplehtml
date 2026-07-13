@@ -243,6 +243,8 @@ export default function EmbeddedHistorian({
   useEffect(() => {
     if (status === 'connecting') setPhase('connecting')
     else if (status === 'active') setPhase('active')
+    else if (status === 'ending') setPhase('ending')
+    else if (status === 'complete') setPhase('complete')
     else if (status === 'error') setPhase('ready')
     else if (status === 'safety_escalation') setPhase('safety_escalation')
   }, [status])
