@@ -28,6 +28,24 @@ describe('detectRedFlag — positives (must fire)', () => {
     ['we cannot wake him up', 'acute_emergency'],
     ['he had a cluster of seizures overnight', 'seizure'],
     ['there was a seizure cluster this morning', 'seizure'],
+    // Stroke-alert ACTIVATION language (2026-07-13, Steve live test): the floor
+    // must fire on how a stroke is actually called in, not just symptom
+    // descriptions. "code stroke"/"stroke alert" previously lived only in the
+    // subacute-deferral override and never fired the bank at all.
+    ['i need to call an emergency stroke consult', 'stroke'],
+    ['we have a stroke alert in the ER', 'stroke'],
+    ['this is a code stroke', 'stroke'],
+    ['can you activate a stroke for room 4', 'stroke'],
+    ['ED calling about a possible stroke', 'stroke'],
+    ['acute stroke workup in progress', 'stroke'],
+    // Lateralized weakness/numbness in NOUN form — the natural hemiparesis
+    // description the adjacency-only "weak arm" patterns all missed.
+    ['patient has right-sided weakness', 'stroke'],
+    ['left sided weakness and numbness since this morning', 'stroke'],
+    ['sudden weakness in his right arm', 'stroke'],
+    ['numbness in the left leg', 'stroke'],
+    ['his right arm is weak and his left leg went numb', 'stroke'],
+    ['one-sided facial droop', 'stroke'],
   ]
 
   it.each(cases)('fires on: %s', (text) => {
@@ -78,6 +96,43 @@ describe('detectRedFlag — negatives (must NOT fire)', () => {
 
   it('returns a safe empty result for empty input', () => {
     expect(detectRedFlag('')).toEqual({ isRedFlag: false, category: null, matchedTerms: [] })
+  })
+
+  // The widened stroke-activation / lateralized-weakness patterns (2026-07-13)
+  // must not start firing on benign chronic or scheduling language.
+  const activationNegatives = [
+    'following up after his stroke rehab last year',
+    'history of stroke, here for a routine medication refill',
+    'he had a stroke five years ago, doing well now',
+    'wants to discuss stroke prevention and diet',
+    'her arm feels a little stiff after the workout',
+  ]
+  it.each(activationNegatives)('does not fire on benign stroke-adjacent phrasing: %s', (text) => {
+    expect(detectRedFlag(text).isRedFlag).toBe(false)
+  })
+})
+
+// Steve's 2026-07-13 live bypass session (36fc3af7): an explicit "emergency
+// stroke consult" with lateralized weakness produced gate0Fired=false on every
+// turn — the emergent call rode entirely on the LLM. The floor must now ENGAGE
+// on that transcript (then defer the 2-day timing to the rulebook, which is the
+// correct subacute behavior).
+describe('Gate 0 — stroke-alert bypass regression (Steve 2026-07-13)', () => {
+  const cumulative =
+    'i need to call an emergency stroke consult. mark jones medical record number five nine three eight ' +
+    'two one in e r. room twenty three. two days ago. yeah he has got some weakness that has been going ' +
+    'on in the right arm and leg'
+
+  it('fires the deterministic floor on the stroke-alert activation', () => {
+    const r = detectRedFlag(cumulative)
+    expect(r.isRedFlag).toBe(true)
+    expect(r.category).toBe('stroke')
+  })
+
+  it('defers the tier to the rulebook because LKW is explicitly 2 days', () => {
+    // Floor engages, then hands the subacute (>24h) tiering to the rulebook —
+    // the designed behavior, not a hard emergent lock.
+    expect(isSubacuteStrokeReport(cumulative)).toBe(true)
   })
 })
 

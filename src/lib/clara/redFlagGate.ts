@@ -63,6 +63,32 @@ export const RED_FLAG_BANKS: RedFlagBank[] = [
   {
     category: 'stroke',
     patterns: [
+      // STROKE-ALERT ACTIVATION LANGUAGE — added 2026-07-13 (Steve live test):
+      // a caller opening with "I need an emergency stroke consult" / "we have a
+      // stroke alert" / "code stroke" is the STRONGEST possible signal on a real
+      // triage line (it's how nurses and ED clinicians actually call one in),
+      // yet the floor missed all of them — it was keyed only to symptom
+      // descriptions (face droop, weak arm), so an explicit activation sailed
+      // past Gate 0 and the emergent call rode entirely on the LLM. "code
+      // stroke"/"stroke alert" previously lived ONLY in ACUTE_STROKE_OVERRIDE
+      // (they influenced the subacute deferral but never fired the bank itself).
+      // Over-triage direction; a genuinely subacute one still defers via the
+      // ≥2-day rule below.
+      /\bcode\s+stroke\b/i,
+      /\bstroke\s+alert\b/i,
+      /\bstroke\s+(?:consult|activation|protocol|code|workup)\b/i,
+      /\bactivat\w*\s+(?:a\s+|the\s+)?stroke\b/i,
+      /\bemergency\s+stroke\b/i,
+      /\bpossible\s+stroke\b/i,
+      /\bacute\s+stroke\b/i,
+      // LATERALIZED WEAKNESS/NUMBNESS in noun form — the most natural way a
+      // caller describes a hemiparesis ("right-sided weakness", "weakness in his
+      // right arm and leg"), which the adjacency-only "weak arm"/"arm is weak"
+      // patterns below all missed (live test, same session).
+      /\b(?:left|right|one)[\s-]?sided?\s+(?:weak(?:ness)?|numb(?:ness)?|paralysis|paresis|droop)/i,
+      /\bweak(?:ness)?\s+(?:in|on|of|to)\s+(?:the\s+|his\s+|her\s+|their\s+|my\s+|one\s+)?(?:right\s+|left\s+)?(?:side|arm|leg|face|hand)\b/i,
+      /\bnumb(?:ness)?\s+(?:in|on|of)\s+(?:the\s+|his\s+|her\s+|their\s+|my\s+|one\s+)?(?:right\s+|left\s+)?(?:side|arm|leg|face|hand)\b/i,
+      /\b(?:right|left)\s+(?:arm|leg|hand|side|face)\s+(?:is\s+|are\s+|feels?\s+|went\s+|going\s+|has\s+gone\s+)?(?:weak|numb|paralyz|droop)/i,
       // BE-FAST — Balance, Eyes, Face, Arm, Speech, Time
       /\bface\s+droop(?:ing|ed)?\b/i,
       /\b(?:face|mouth)\s+is\s+droop(?:ing)?\b/i,
