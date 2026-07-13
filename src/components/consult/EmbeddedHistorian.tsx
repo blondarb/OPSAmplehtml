@@ -305,6 +305,17 @@ export default function EmbeddedHistorian({
     return () => clearTimeout(t)
   }, [interviewCompleted, isAiSpeaking, phase, handleEnd])
 
+  // Hard fallback: if interviewCompleted is true but isAiSpeaking never
+  // clears (e.g. Nova speech-end event missed), force-end after 10s.
+  useEffect(() => {
+    if (!interviewCompleted) return
+    if (phase !== 'active') return
+    const t = setTimeout(() => {
+      handleEnd()
+    }, 10000)
+    return () => clearTimeout(t)
+  }, [interviewCompleted, phase, handleEnd])
+
   // ── Safety Escalation ──
   if (phase === 'safety_escalation') {
     return (
