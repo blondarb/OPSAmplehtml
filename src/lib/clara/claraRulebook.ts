@@ -87,8 +87,8 @@ export function getClaraSystemPrompt(): string {
         • Status epilepticus (seizure lasting more than 5 minutes or more than three seizures without recovery between episodes) or recurrent seizures without recovery.
 
       - ${CONSULT_TYPE.NON_EMERGENT}:
-        • STAT 1 (callback 15–20 min): acute but stable neuro issues (ICH, meningitis/encephalitis, MG crisis, GBS, acute cord, MS relapse, first seizure now resolved).
-        • STAT 2 (callback ≤60 min): stroke > 24h or resolved, TIA, chronic or stable deficits, mimics, dementia, Parkinson's, MS, outpatient-type issues.
+        • STAT 1 (verbal recs to the caller's docs within 60 min): the acute NON‑stroke neuro emergencies that don't meet Code Stroke / Code Status — per the Sevaro contract this is a NARROW list: **GBS (AIDP), myasthenia gravis exacerbation/crisis, acute cord syndromes**, plus **meningitis/encephalitis** (Steve 2026‑07‑13). NOTE: acute ICH is a hemorrhagic stroke → ${CONSULT_TYPE.EMERGENT}, NOT STAT 1 (Steve).
+        • STAT 2 (Sevaro supports disposition; ≤60 min): everything else non‑emergent that doesn't meet Code Stroke/Status or STAT 1 — stroke > 24h or resolved, TIA, **MS / MS relapse**, **first seizure now resolved / seizure returned to baseline**, **altered mental status from metabolic encephalopathy**, migraine, chronic or stable deficits, mimics, dementia, Parkinson's, outpatient‑type issues.
         • STAT 2 vs PLAIN non-emergent (statLevel null) — the case rules below that say "(STAT 2)" set the DEFAULT for that presentation; adjust by context (Steve, 2026-07-12):
           – Patient is in the ER, or the provider asks for an "urgent" consult/callback → statLevel = 2 (a timed callback so the team can disposition the patient out of the ER). Most STAT 1/STAT 2 consults originate in the ER, though an admitted inpatient can also be STAT.
           – Caller explicitly frames it as non-emergent/routine, or it's a stable admitted floor patient with no urgency request → statLevel = null (routine non-emergent provider, no timed SLA).
@@ -200,14 +200,14 @@ export function getClaraSystemPrompt(): string {
       C) Seizure logic:
         - "Ceribell/rapid EEG/headband/cerebral EEG" → ${CONSULT_TYPE.CERIBELL_EEG}.
         - Ongoing seizure/no EEG → ${CONSULT_TYPE.EMERGENT}.
-        - Single resolved seizure → ${CONSULT_TYPE.NON_EMERGENT} (STAT 1).
+        - Single resolved seizure / seizure returned to baseline → ${CONSULT_TYPE.NON_EMERGENT} (STAT 2). (Contract: STAT 1 is GBS/MG/cord/meningitis only; a resolved seizure is STAT 2.)
         - EEG monitoring update → ${CONSULT_TYPE.EEG_READ}.
         - If "status" mentioned **in EEG device context** (e.g., "still showing status on Ceribell") → ${CONSULT_TYPE.CERIBELL_EEG}, NOT ${CONSULT_TYPE.EMERGENT}, unless clinical signs indicate worsening.
-        - **If patient already admitted for non‑neurological reason (e.g., pneumonia, cardiac) and seizure described without clustering/status → ${CONSULT_TYPE.NON_EMERGENT} (STAT 1).**
+        - **If patient already admitted for non‑neurological reason (e.g., pneumonia, cardiac) and seizure described without clustering/status → ${CONSULT_TYPE.NON_EMERGENT} (STAT 2).**
 
       D) AMS without focal findings:
-        - Confusion/obtundation without focal neuro signs or seizure → ${CONSULT_TYPE.NON_EMERGENT} (STAT 1) by default.
-        - Treat common metabolic/toxic causes (infection/sepsis, missed dialysis, liver disease, meds) as STAT 1.
+        - Confusion/obtundation without focal neuro signs or seizure → ${CONSULT_TYPE.NON_EMERGENT} (STAT 2) by default. (Contract: altered mental status from metabolic encephalopathy is STAT 2, not STAT 1.)
+        - Treat common metabolic/toxic causes (infection/sepsis, missed dialysis, liver disease, meds) as STAT 2.
         - Classify as ${CONSULT_TYPE.EMERGENT} ONLY IF ALL of the following are true:
             1) Patient is obtunded or cannot protect airway, AND
             2) Stroke is NOT ruled out by the criteria below, AND
@@ -219,9 +219,9 @@ export function getClaraSystemPrompt(): string {
         - Imaging-negative obtundation override:
             • If head CT this encounter is documented **negative**, with NO new BEFAST signs and NO activation language,
               and prior encephalopathy/metabolic etiology is suspected or documented,
-              → ${CONSULT_TYPE.NON_EMERGENT} (STAT 1). Do NOT escalate to EMERGENT merely for obtundation.
+              → ${CONSULT_TYPE.NON_EMERGENT} (STAT 2). Do NOT escalate to EMERGENT merely for obtundation.
         - Recent neuro involvement:
-            • If "seen by you guys" / follow-up but today's issue is non-focal AMS and CT negative → ${CONSULT_TYPE.NON_EMERGENT} (STAT 1).
+            • If "seen by you guys" / follow-up but today's issue is non-focal AMS and CT negative → ${CONSULT_TYPE.NON_EMERGENT} (STAT 2).
             • Use ${CONSULT_TYPE.ROUNDING} only for clearly scheduled logistics (rounds/video setup) with no new issue.
 
       E) Vision:
@@ -229,7 +229,7 @@ export function getClaraSystemPrompt(): string {
         - Migraine‑like resolving → ${CONSULT_TYPE.NON_EMERGENT} (STAT 2).
 
       F) Specific patterns:
-        - MS ≥ 24 h no stroke → STAT 1; sudden/onset < 24 h → ${CONSULT_TYPE.EMERGENT}.
+        - MS / MS relapse ≥ 24 h no stroke → STAT 2 (contract: MS is STAT 2); sudden/onset < 24 h with a stroke‑like focal deficit → ${CONSULT_TYPE.EMERGENT}.
         - TGA → STAT 2.
         - Acute delirium + infection → ${CONSULT_TYPE.EMERGENT}.
         - New ICH/SAH → ${CONSULT_TYPE.EMERGENT}; old → STAT 2.
@@ -240,7 +240,7 @@ export function getClaraSystemPrompt(): string {
       F2) Neuromuscular & cord — the STAT 1 CORE (Sam Saha, VP Med Ops, 2026-07-12).
         RECOGNIZE THESE FROM THE SYMPTOM PICTURE, not just a named diagnosis — a caller
         often describes the syndrome without saying "GBS"/"myasthenia"/"cord". These are
-        NON_EMERGENT statLevel 1 (a 15–20 min timed callback), NOT plain non-emergent and
+        NON_EMERGENT statLevel 1 (verbal recs to the docs within 60 min), NOT plain non-emergent and
         NOT STAT 2. Do NOT let mild-sounding wording ("just some tingling", "a little weak")
         drop them below STAT 1.
         - Guillain-Barré pattern: ASCENDING numbness/tingling/weakness (feet→up), symmetric,

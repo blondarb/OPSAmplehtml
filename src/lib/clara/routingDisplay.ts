@@ -22,8 +22,8 @@ export function describeRoutingTarget(consultType: string, statLevel: number | n
     case CONSULT_TYPE.EMERGENT:
       return 'MD1 — emergent on-call neurologist (URGENT)'
     case CONSULT_TYPE.NON_EMERGENT:
-      if (statLevel === 1) return 'STAT 1 — on-call STAT queue (callback ≤15–20 min)'
-      if (statLevel === 2) return 'STAT 2 — on-call STAT queue (callback ≤60 min)'
+      if (statLevel === 1) return 'STAT 1 — acute non-stroke neuro (GBS/MG/cord/meningitis); verbal recs to docs ≤60 min'
+      if (statLevel === 2) return 'STAT 2 — disposition support ≤60 min'
       // statLevel null = PLAIN non-emergent (Steve 2026-07-12): caller framed
       // it as routine / stable floor patient with no urgency request — goes to
       // the non-emergent provider, no timed STAT SLA.
