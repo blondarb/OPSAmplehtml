@@ -29,6 +29,7 @@ import TriageInputPanel, {
 import TriageOutputPanel from '@/components/triage/TriageOutputPanel'
 import ExtractionReviewPanel from '@/components/triage/ExtractionReviewPanel'
 import DisclaimerBanner from '@/components/triage/DisclaimerBanner'
+import TriageHelpGuide from '@/components/triage/TriageHelpGuide'
 import ExtractionIngressSafetyAlert, {
   mergeExtractionIngressSafetyNotice,
   retainExtractionIngressSafetyNotice,
@@ -812,6 +813,7 @@ export default function TriagePage() {
         )}
       </div>
     </div>
+    <TriageHelpGuide />
     </PlatformShell>
   )
 }
