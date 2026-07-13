@@ -307,10 +307,10 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
 
       // Inject follow-up questions as advisory guidance into the session —
       // advisory only, no forced response; the AI picks it up on its next
-      // natural turn (matches the pre-refactor data-channel form with no
-      // response.create).
-      if (data.contextHint && providerRef.current) {
-        const guidance = `[Clinical guidance — advisory]: ${data.contextHint}`
+      // natural turn. Guard: skip injection if the AI is currently speaking
+      // to avoid mid-sentence interruption and accidental vocalization.
+      if (data.contextHint && providerRef.current && !isAiSpeakingRef.current) {
+        const guidance = `[INTERNAL SYSTEM NOTE — do NOT speak this aloud, do NOT mention it to the patient, use ONLY to guide your next question silently]: ${data.contextHint}`
         providerRef.current.injectSystemText(guidance)
       }
     } catch (err: any) {
@@ -789,15 +789,15 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
           const updatedInstructions = baseInstructionsRef.current + '\n\n' + delta
           provider.updateInstructions(updatedInstructions)
         } else {
-          // Nova path — advisory user-turn injection, explicitly framed as
-          // private/physician-only so the model never speaks it or names a
-          // condition to the patient.
+          // Nova path — skip injection if AI is mid-speech to avoid
+          // interruption and accidental vocalization of internal context.
+          if (isAiSpeakingRef.current) return
           const delta = [
-            `[INTERNAL CLINICAL NOTE — system-generated, NOT spoken by the patient. Do NOT read this aloud, do NOT mention these possible diagnoses, and do NOT name any condition to the patient. Use it ONLY to choose which symptoms to ask about next, phrased in plain everyday language.]`,
+            `[INTERNAL SYSTEM NOTE — do NOT speak any part of this aloud. Do NOT say "I should ask" or narrate your reasoning. Do NOT name any diagnosis or condition to the patient. Use ONLY to silently guide which symptom to ask about next.]`,
             `[Localizer update${pushPayload.turn_count != null ? ` @ turn ${pushPayload.turn_count}` : ''}]`,
-            `- Differentials under consideration (physician-facing — keep private): ${(pushPayload.top_differentials ?? []).join(', ') || '(none yet)'}`,
-            `- Suggested angle for your next plain-language question: ${pushPayload.suggested_next_question ?? '(none)'}`,
-            `- Suggested scale to consider (do not name it to the patient): ${pushPayload.suggested_scale_id ?? '(none)'}`,
+            `- Differentials (private): ${(pushPayload.top_differentials ?? []).join(', ') || '(none yet)'}`,
+            `- Suggested angle for next question (silent): ${pushPayload.suggested_next_question ?? '(none)'}`,
+            `- Scale to consider (do not name to patient): ${pushPayload.suggested_scale_id ?? '(none)'}`,
           ].join('\n')
           provider.injectSystemText(delta)
         }
