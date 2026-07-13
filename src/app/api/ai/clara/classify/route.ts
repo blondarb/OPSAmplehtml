@@ -17,7 +17,7 @@
 import { NextResponse } from 'next/server'
 import { cookies } from 'next/headers'
 import { invokeBedrockJSON } from '@/lib/bedrock'
-import { detectRedFlag, isSubacuteStrokeReport } from '@/lib/clara/redFlagGate'
+import { detectRedFlag, isSubacuteStrokeReport, evaluateStrokeDowngradeGuard } from '@/lib/clara/redFlagGate'
 import { CLARA_GATE_COOKIE, verifyGateToken } from '@/lib/clara/testGate'
 import {
   getClaraSystemPrompt,
@@ -268,6 +268,25 @@ export async function POST(request: Request) {
     const normalizedUrgency = typeof parsed.urgencyLevel === 'string' ? parsed.urgencyLevel.toLowerCase() : parsed.urgencyLevel
     parsed = { ...parsed, consultType: normalizedConsultType, urgencyLevel: normalizedUrgency }
 
+    // STROKE-DOWNGRADE SAFETY GUARD (red-team 2026-07-13). The stroke-alert →
+    // STAT-2 downgrade is the only under-triage-capable path and the LLM does it
+    // unreliably on ambiguous timing (stable mis-reads + temp-0.4 flips). This
+    // deterministic backstop vetoes a stroke that was downgraded to
+    // NON_EMERGENT without a clean, confident, stable >24h onset (or with any
+    // uncertainty/fluctuation/wake-up/worsening marker) and forces it back to
+    // EMERGENT. Escalate-only — it can never under-triage. A clean, confidently
+    // subacute stroke ("witnessed three days ago, stable") still downgrades.
+    const strokeGuard = evaluateStrokeDowngradeGuard(transcript, parsed.consultType)
+    if (strokeGuard.forceEmergent) {
+      parsed = {
+        ...parsed,
+        consultType: CONSULT_TYPE.EMERGENT,
+        urgencyLevel: 'critical',
+        statLevel: null,
+        rationale: `${parsed.rationale ? parsed.rationale + ' ' : ''}[Safety guard: ${strokeGuard.reason}; forced EMERGENT — a stroke is only stepped down on a confident, stable >24h onset.]`,
+      }
+    }
+
     const routing = buildRouting(
       parsed.consultType,
       parsed.statLevel ?? null,
@@ -279,6 +298,7 @@ export async function POST(request: Request) {
       ...parsed,
       gate0,
       routing,
+      downgradeGuardFired: strokeGuard.forceEmergent,
     })
   } catch (error: unknown) {
     console.error('[clara/classify] error:', error)

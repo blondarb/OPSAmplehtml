@@ -259,6 +259,84 @@ export function isSubacuteStrokeReport(text: string): boolean {
   return !nonStrokeHit
 }
 
+// ---------------------------------------------------------------------------
+// Stroke-downgrade safety guard (red-team 2026-07-13).
+//
+// The stroke-alert → STAT-2 downgrade is the ONLY under-triage-capable path in
+// the classifier, and the LLM does it unreliably on ambiguous timing: the
+// red-team found STABLE mis-reads ("a couple days back, hard to say" = 5/5
+// non-emergent) AND stochastic flips (temp 0.4). Prompt tuning could not close
+// it. This is the deterministic backstop: it only ever ESCALATES a stroke that
+// the model tried to downgrade — it can NEVER under-triage — so a wrong guess
+// costs an MD1 page (safe/costly), never a missed stroke (dangerous).
+//
+// Scope: fires ONLY on a consultType === 'non-emergent' result (the stroke-
+// timing STAT-2 bucket) with stroke context. CT-return / EEG / Ceribell /
+// rounding / outpatient are DISTINCT consult types with their own logic and are
+// never touched. A downgrade is PERMITTED only when the transcript carries a
+// confident, unambiguous, stable > 24 h onset and NONE of the danger markers.
+// ---------------------------------------------------------------------------
+
+/** Any focal-deficit / stroke signal — broad on purpose (over-firing only ever escalates, which is safe). */
+const STROKE_CONTEXT =
+  /\b(stroke|weak(?:ness)?|numb(?:ness)?|paralys\w*|hemipar\w*|hemipleg\w*|facial\s+droop|droop\w*|slur\w*|aphasi\w*|dysarthr\w*|vision\s+loss|field\s+cut|neglect|ataxi\w*|can'?t\s+(?:move|speak|see)|face\s+is\s+droop)/i
+
+/** Uncertainty/hedging about WHEN it started → not a confident onset → keep EMERGENT. */
+const GUARD_UNCERTAINTY =
+  /\b(?:not\s+sure|unsure|not\s+(?:totally|entirely|really)\s+sure|hard\s+to\s+say|hard\s+to\s+tell|(?:i|he|she|they|we|patient|family|husband|wife|son|daughter|mother|father|mom|dad)\s+thinks?|i\s+want\s+to\s+say|maybe|roughly|sometime|somewhere\s+around|around\b|[a-z]+-ish\b|poor\s+historian|isn'?t\s+sure|aren'?t\s+sure|not\s+certain|uncertain|unclear|unknown|don'?t\s+know|can'?t\s+say|guessing|approximately|give\s+or\s+take)\b/i
+/** Fluctuating / relapsing course → active process → keep EMERGENT. */
+const GUARD_FLUCTUATION =
+  /\b(?:comes?\s+and\s+goes?|on\s+and\s+off|on-and-off|intermittent\w*|waxing|waning|back\s+again|came?\s+back|returned|relaps\w*)\b/i
+/** Wake-up / found-down → LKW is last-seen-normal, may be in window → keep EMERGENT. */
+const GUARD_WAKEUP =
+  /\b(?:woke\s+up|wake[\s-]?up|found\s+(?:him|her|them|the\s+patient|down|on\s+the)|on\s+waking|on\s+awakening)\b/i
+/** Any worsening / progression / new deficit → stroke-in-evolution → keep EMERGENT. */
+const GUARD_WORSENING =
+  /\b(?:worse|worsen\w*|worsened|progress\w*|spread\w*|deteriorat\w*|declin\w*|getting\s+bad|new\s+(?:deficit|weakness|numbness|symptom|onset))\b/i
+
+/** CONFIDENT, unambiguous > 24 h onset (≥ 2 days / weeks / months, or a named day/week). Required to permit a downgrade. */
+const CONFIDENT_OVER_24H =
+  /\b(?:two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|\d{1,3})\s+(?:days?|weeks?|months?)\s+ago\b|\b(?:since|last)\s+(?:monday|tuesday|wednesday|thursday|friday|saturday|sunday|week|month)\b|\ba\s+(?:week|month)\s+ago\b|\b(?:weeks?|months?)\s+ago\b/i
+/** Explicitly stable / unchanged / resolved. Required (with a confident > 24 h) to permit a downgrade. */
+const STABLE_SIGNAL =
+  /\b(?:stable|unchanged|no\s+change|no\s+new|baseline|resolved|back\s+to\s+(?:normal|baseline)|hasn'?t\s+changed|since\s+then\s+nothing)\b/i
+
+export interface StrokeDowngradeGuardResult {
+  /** True → the caller MUST force the disposition back to EMERGENT. */
+  forceEmergent: boolean
+  reason: string | null
+}
+
+/**
+ * Given the raw transcript and the model's chosen consultType, decide whether a
+ * stroke was unsafely downgraded. Returns forceEmergent=true when the model put
+ * a stroke-context case into NON_EMERGENT without a clean, confident, stable
+ * > 24 h onset — or with any danger marker present. Escalate-only.
+ */
+export function evaluateStrokeDowngradeGuard(
+  transcript: string,
+  consultType: string | null | undefined,
+): StrokeDowngradeGuardResult {
+  const t = (transcript || '').toLowerCase()
+  // Only the stroke-timing STAT-2 bucket is in scope. Other non-emergent
+  // consult TYPES (ct-return, eeg-read, ceribell-eeg, rounding, outpatient) are
+  // legitimately not-emergent and are never touched.
+  if (consultType !== 'non-emergent') return { forceEmergent: false, reason: null }
+  if (!STROKE_CONTEXT.test(t)) return { forceEmergent: false, reason: null }
+
+  const danger =
+    (GUARD_UNCERTAINTY.test(t) && 'uncertain/hedged onset') ||
+    (GUARD_FLUCTUATION.test(t) && 'fluctuating/relapsing course') ||
+    (GUARD_WAKEUP.test(t) && 'wake-up / found-down (LKW may be in window)') ||
+    (GUARD_WORSENING.test(t) && 'worsening / new deficit')
+  const confidentSubacute = CONFIDENT_OVER_24H.test(t) && STABLE_SIGNAL.test(t)
+
+  if (danger) return { forceEmergent: true, reason: `stroke downgrade vetoed — ${danger}` }
+  if (!confidentSubacute)
+    return { forceEmergent: true, reason: 'stroke downgrade vetoed — no confident, stable >24h onset stated' }
+  return { forceEmergent: false, reason: null }
+}
+
 /**
  * Deterministic, regex-based red-flag detector. HIGH RECALL by design —
  * this is Gate 0 and must never depend on an LLM "deciding" a symptom is

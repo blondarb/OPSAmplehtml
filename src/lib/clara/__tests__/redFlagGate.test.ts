@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { detectRedFlag, isSubacuteStrokeReport } from '@/lib/clara/redFlagGate'
+import { detectRedFlag, isSubacuteStrokeReport, evaluateStrokeDowngradeGuard } from '@/lib/clara/redFlagGate'
 
 describe('detectRedFlag — positives (must fire)', () => {
   const cases: Array<[string, string]> = [
@@ -217,5 +217,41 @@ describe('isSubacuteStrokeReport — keeps the floor (must NOT defer)', () => {
 
   it('is safe on empty input', () => {
     expect(isSubacuteStrokeReport('')).toBe(false)
+  })
+})
+
+// Stroke-downgrade safety guard (red-team 2026-07-13): the deterministic
+// backstop that vetoes an LLM stroke downgrade the prompt couldn't reliably
+// prevent. Escalate-only — fires only on consultType 'non-emergent' + stroke
+// context, and only forces EMERGENT (never the reverse).
+describe('evaluateStrokeDowngradeGuard', () => {
+  const veto = (t: string) => evaluateStrokeDowngradeGuard(t, 'non-emergent').forceEmergent
+
+  it('VETOES an unsafe stroke downgrade (red-team stable failures)', () => {
+    expect(veto('weakness, um, i want to say a couple days back, hard to say')).toBe(true) // hedged
+    expect(veto('right sided weakness, he thinks it was a couple days ago, poor historian')).toBe(true) // hedged/2nd-hand
+    expect(veto('weakness that comes and goes, here yesterday gone today back again now')).toBe(true) // fluctuating
+    expect(veto('probably nothing, a little weakness a couple days, family not sure when')).toBe(true) // no confident onset
+    expect(veto('he woke up this morning with weakness, felt off a couple days ago')).toBe(true) // wake-up
+    expect(veto('weakness two or three days ago but this morning it clearly got worse')).toBe(true) // worsening
+    expect(veto('numbness for a couple days')).toBe(true) // no confident+stable >24h stated
+  })
+
+  it('PERMITS a clean, confident, stable >24h downgrade (no over-triage of real subacute)', () => {
+    expect(veto('symptoms started two days ago, right sided weakness stable no change since')).toBe(false)
+    expect(veto('stroke consult, three days ago, completely stable, no changes since')).toBe(false)
+    expect(veto('witnessed onset one week ago, deficit unchanged, follow up')).toBe(false)
+  })
+
+  it('NEVER touches other consult types or an already-emergent result', () => {
+    expect(evaluateStrokeDowngradeGuard('CT return, stroke imaging done, no new findings', 'ct-return').forceEmergent).toBe(false)
+    expect(evaluateStrokeDowngradeGuard('had a stroke last week, routine follow up', 'rounding').forceEmergent).toBe(false)
+    expect(evaluateStrokeDowngradeGuard('routine EEG read, remote stroke history', 'eeg-read').forceEmergent).toBe(false)
+    expect(evaluateStrokeDowngradeGuard('resolved stroke symptoms three days ago, outpatient', 'outpatient').forceEmergent).toBe(false)
+    expect(evaluateStrokeDowngradeGuard('emergency stroke consult, weakness 30 minutes ago', 'emergent').forceEmergent).toBe(false)
+  })
+
+  it('does not fire without stroke context (a non-stroke non-emergent call is untouched)', () => {
+    expect(veto('just calling to reschedule his appointment for next week, not sure when')).toBe(false)
   })
 })
