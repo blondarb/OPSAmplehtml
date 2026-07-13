@@ -34,7 +34,17 @@ Why this still needs thought (not "solved by one rule"):
 - **Second-hand callers:** a nurse relaying "family said a couple days" — how firm is that onset? Confidence in the stated LKW should factor in.
 - **The downgrade is the one UNDER-triage-capable path in the whole flow** — every other default fires MD1. So this branch deserves the most scrutiny and the most conservative parsing.
 
-Action items for the deeper pass: (1) enumerate LKW phrasings and their correct tier (clear-old / clear-recent / vague / unknown / wake-up / second-hand); (2) decide the confidence bar for "affirmatively >24h"; (3) **DONE — Clara confirm-back on a downgrade is SHIPPED** ("the symptoms started about [two days] ago, and nothing new or worse since then?" → any hesitation/uncertainty/new-or-worse pages now); still needs live validation against vague/mumbled/second-hand phrasings; (4) red-team the downgrade path specifically for under-triage (still open).
+Action items for the deeper pass: (1) enumerate LKW phrasings and their correct tier (clear-old / clear-recent / vague / unknown / wake-up / second-hand); (2) decide the confidence bar for "affirmatively >24h"; (3) **DONE — Clara confirm-back on a downgrade is SHIPPED** ("the symptoms started about [two days] ago, and nothing new or worse since then?" → any hesitation/uncertainty/new-or-worse pages now); still needs live validation against vague/mumbled/second-hand phrasings; (4) red-team the downgrade path specifically for under-triage.
+
+## Red-team round 1 — 2026-07-13 (commit 49df017)
+
+Fired an adversarial LKW/downgrade battery at live `/classify`. **Two real under-triages found** (a genuine acute stroke dropped to STAT-2):
+1. **Wake-up stroke** — "woke up this morning with weakness" + a stray "felt off a couple days ago" → non-emergent/STAT-2. Wake-up LKW is bedtime, thrombectomy-eligible → must be EMERGENT.
+2. **Minimizing + unknown timing** — "probably nothing, weakness a couple days, family's not even sure when it started" → non-emergent/STAT-2. "Not sure when" = unknown → must be EMERGENT; the downplay drove it down.
+
+Both fixed (safe direction): rulebook downgrade now requires CONFIDENT unambiguous >24h + NOT wake-up + hedged-onset-stays-EMERGENT + minimizing-never-lowers-tier; Gate-0 gained wake-up-with-deficit + post-tPA-deterioration floor patterns (the post-tPA gap was also confirmed here — was LLM-only). Held with no regression: stray "two days"=admission date, vague "a bit", new-worsening-buried, routine-framing-on-acute, clean subacute still downgrades.
+
+**Still open:** mumbled/ASR-corrupted LKW (needs the live VOICE surface, not text /classify), second-hand-caller confidence weighting, and repeat rounds probing new angles. This path stays on the watch list — it is the only under-triage-capable branch in the flow.
 
 ## Draft voice-flow block (awaiting Steve review — NOT yet in the prompt)
 
