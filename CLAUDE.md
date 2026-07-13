@@ -1,5 +1,7 @@
 # Sevaro Clinical - AI-Powered Clinical Documentation
 
+> **MEMORY PROTOCOL:** Read HANDOFF.md first and update it last every session — it is the shared source of truth with ChatGPT/Codex.
+
 Neurology outpatient web app: clinical notes, AI assistance, voice dictation, dot phrases, clinical scales, patient management.
 
 ## Deploy Workflow
