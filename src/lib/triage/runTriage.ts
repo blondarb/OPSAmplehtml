@@ -4,10 +4,28 @@
  * self-fetch so it works reliably on serverless (AWS Amplify / Lambda).
  */
 
-import { invokeBedrockJSON } from '@/lib/bedrock'
-import { calculateTriageTier, validateAIResponse } from './scoring'
+import {
+  copyBedrockTokenUsage,
+  invokeBedrockClinicalJSON,
+  type BedrockTokenUsage,
+} from '@/lib/bedrock'
+import {
+  calculateTriageTier,
+  extractScoringEmergencyEnvelope,
+  parseAndNormalizeAIResponse,
+  type ScoringEmergencyEnvelope,
+} from './scoring'
 import { TRIAGE_SYSTEM_PROMPT, buildTriageUserPrompt } from './systemPrompt'
-import { AITriageResponse, DimensionScores, DISCLAIMER_TEXT } from './types'
+import {
+  AITriageResponse,
+  DimensionScores,
+  DISCLAIMER_TEXT,
+  type FailedTherapy,
+  type NonNeuroSpecialtyType,
+  type SubspecialtyType,
+  type TriageConfidence,
+  type TriageTier,
+} from './types'
 
 export interface TriageInput {
   referral_text: string
@@ -21,9 +39,9 @@ export interface TriageInput {
 
 export interface TriageResult {
   session_id: string
-  triage_tier: string
+  triage_tier: TriageTier
   triage_tier_display: string
-  confidence: string
+  confidence: TriageConfidence
   dimension_scores: DimensionScores
   weighted_score: number | null
   red_flag_override: boolean
@@ -34,20 +52,36 @@ export interface TriageResult {
   clinical_reasons: string[]
   red_flags: string[]
   suggested_workup: string[]
-  failed_therapies: unknown[]
-  subspecialty_recommendation: string
+  failed_therapies: FailedTherapy[]
+  subspecialty_recommendation: SubspecialtyType
   subspecialty_rationale: string
   redirect_to_non_neuro: boolean
-  redirect_specialty: string | null
+  redirect_specialty: NonNeuroSpecialtyType | null
   redirect_rationale: string | null
   disclaimer: string
+}
+
+export class AITriageModelOutputError extends Error {
+  readonly name = 'AITriageModelOutputError'
+
+  constructor(
+    public readonly emergencyEnvelope: ScoringEmergencyEnvelope,
+    validationMessage: string,
+  ) {
+    super(
+      `AI response validation failed${emergencyEnvelope.emergentOverride ? ' (emergency_override=true preserved)' : ''}: ${validationMessage}`,
+    )
+  }
 }
 
 /**
  * Run a single triage call against AWS Bedrock Claude and return structured results.
  * Does NOT persist to DB — callers handle storage.
  */
-export async function runTriage(input: TriageInput): Promise<TriageResult> {
+export async function runTriage(
+  input: TriageInput,
+  options: { onUsage?: (usage: BedrockTokenUsage) => void } = {},
+): Promise<TriageResult> {
   const temperature = typeof input.temperature === 'number'
     ? Math.max(0, Math.min(1, input.temperature))
     : 0
@@ -64,9 +98,9 @@ export async function runTriage(input: TriageInput): Promise<TriageResult> {
   const controller = new AbortController()
   const timeout = setTimeout(() => controller.abort(), 45000)
 
-  let parsed: Record<string, unknown>
+  let parsed: unknown
   try {
-    const result = await invokeBedrockJSON({
+    const result = await invokeBedrockClinicalJSON<unknown>({
       system: TRIAGE_SYSTEM_PROMPT,
       messages: [{ role: 'user', content: userPrompt }],
       maxTokens: 3000,
@@ -75,17 +109,21 @@ export async function runTriage(input: TriageInput): Promise<TriageResult> {
       model: input.model,
       cacheSystem: true,
     })
-    parsed = result.parsed as Record<string, unknown>
+    options.onUsage?.(copyBedrockTokenUsage(result))
+    parsed = result.parsed
   } finally {
     clearTimeout(timeout)
   }
 
-  const validationError = validateAIResponse(parsed)
-  if (validationError) {
-    throw new Error(`AI response validation failed: ${validationError}`)
+  let aiResponse: AITriageResponse
+  try {
+    aiResponse = parseAndNormalizeAIResponse(parsed)
+  } catch (error) {
+    throw new AITriageModelOutputError(
+      extractScoringEmergencyEnvelope(parsed),
+      error instanceof Error ? error.message : 'unknown schema error',
+    )
   }
-
-  const aiResponse = parsed as unknown as AITriageResponse
   const scoring = calculateTriageTier(aiResponse)
 
   return {
@@ -106,9 +144,9 @@ export async function runTriage(input: TriageInput): Promise<TriageResult> {
     failed_therapies: aiResponse.failed_therapies,
     subspecialty_recommendation: aiResponse.subspecialty_recommendation,
     subspecialty_rationale: aiResponse.subspecialty_rationale,
-    redirect_to_non_neuro: aiResponse.redirect_to_non_neuro || false,
-    redirect_specialty: aiResponse.redirect_specialty || null,
-    redirect_rationale: aiResponse.redirect_rationale || null,
+    redirect_to_non_neuro: aiResponse.redirect_to_non_neuro,
+    redirect_specialty: aiResponse.redirect_specialty,
+    redirect_rationale: aiResponse.redirect_rationale,
     disclaimer: DISCLAIMER_TEXT,
   }
 }

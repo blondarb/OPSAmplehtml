@@ -10,6 +10,9 @@ const nextConfig: NextConfig = {
   // Amplify SSR compute does not inject app-level env vars at runtime,
   // so we inline them during the build via next.config.
   env: {
+    // Durable long-packet rollout flag (SAM worker stacks deployed 2026-07-12)
+    TRIAGE_LONG_PACKET_DURABLE_ENABLED: process.env.TRIAGE_LONG_PACKET_DURABLE_ENABLED,
+    TRIAGE_LONG_PACKET_MAX_ATTEMPTS: process.env.TRIAGE_LONG_PACKET_MAX_ATTEMPTS,
     OPENAI_API_KEY: process.env.OPENAI_API_KEY,
     DEEPGRAM_API_KEY: process.env.DEEPGRAM_API_KEY,
     RDS_HOST: process.env.RDS_HOST,
@@ -40,6 +43,11 @@ const nextConfig: NextConfig = {
     // known Amplify SSR gotcha as the vars above — must be inlined here or
     // the session route can't read it at runtime.
     NOVA_RELAY_SHARED_SECRET: process.env.NOVA_RELAY_SHARED_SECRET,
+    // Clara R&D voice test gate (src/lib/clara/testGate.ts). Doubles as the
+    // HMAC secret for the gate cookie. Same Amplify SSR gotcha — must be
+    // inlined here or /api/ai/clara/auth fail-closes with "unset" at runtime.
+    CLARA_TEST_PASSWORD: process.env.CLARA_TEST_PASSWORD,
+    BEDROCK_CLARA_CLASSIFIER_MODEL: process.env.BEDROCK_CLARA_CLASSIFIER_MODEL,
   },
 };
 

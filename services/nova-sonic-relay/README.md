@@ -24,6 +24,7 @@ Environment variables (all optional except `NOVA_RELAY_SHARED_SECRET`, defaults 
 | `NOVA_SONIC_VOICE_ID` | *(model default)* | Voice ID passed to Nova Sonic |
 | `NOVA_RELAY_SHARED_SECRET` | *(none)* | **Required to accept any connection.** HMAC secret shared with the Next.js app's `NOVA_RELAY_SHARED_SECRET`; used to validate the short-lived auth token the browser sends as a WS subprotocol. Unset = every WebSocket upgrade is rejected (fail closed) — there is no "auth disabled" mode. |
 | `NOVA_RELAY_ALLOWED_ORIGINS` | *(none — origin check skipped)* | Comma-separated allowlist of exact `Origin` header values (e.g. `https://app.neuroplans.app`). When set, connections from any other origin are rejected alongside the token check. When unset, the token is the sole gate. |
+| `TRANSCRIBE_MEDICAL_ENABLED` | `false` | **Flag-gated, off by default.** When `true`/`1`, the relay opens a second, parallel AWS Transcribe Medical streaming session per call on the same caller audio Nova Sonic receives, and emits `medicalTranscript` messages (`{ t: 'medicalTranscript', text, isPartial }`) alongside Nova's own transcripts — a higher-accuracy cross-check on spoken identifiers (MRN/name/DOB) that Nova Sonic (speech-to-speech) is prone to dropping digits from. Fail-safe: any Transcribe Medical error is logged and the session goes inert; the Nova Sonic call is never affected. Requires the task role to have `transcribe:StartMedicalStreamTranscription`. See `src/transcribeMedicalSession.ts`. |
 
 ### WebSocket authentication
 

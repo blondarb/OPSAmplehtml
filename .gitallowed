@@ -7,12 +7,17 @@ resolution:.*integrity:.*sha512-
 src/components/neuroscribe/
 src/components/triage/
 @/components/triage/
+src/lib/triage/
+@/components/clara/
+src/components/clara/
 # Documentation URLs and references
 docs.aws.amazon.com
 docs/plans/
 docs/HANDOFF_
 docs/SEVARO_EVIDENCE_ENGINE_PLAYBOOK
 docs/NEUROSCRIBE_WORKFLOW_REDESIGN
+docs/clinical-safety/
+docs/superpowers/plans/
 # Vendored AWS RDS public CA bundle (PEM base64 trips the 40-char entropy pattern; not a secret)
 src/lib/rds-ca-bundle.ts
 # Data file content
@@ -21,3 +26,13 @@ src/app/api/ai/historian/localizer/route.ts
 src/app/api/ai/historian/evidence-query/route.ts
 src/components/consult/EmbeddedHistorian
 docs/superpowers/specs/
+# triage safety architecture (long identifiers + sha256 digests, not secrets)
+src/lib/triage/
+src/app/triage/
+src/app/api/triage/
+src/components/triage/
+src/workers/
+tests/triage/
+infrastructure/triage-ingestion/
+infrastructure/triage-worker/
+qa/triage-sentinel/

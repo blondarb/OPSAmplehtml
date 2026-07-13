@@ -2,7 +2,11 @@ import { NextResponse, type NextRequest } from 'next/server'
 import { createRemoteJWKSet, jwtVerify } from 'jose'
 
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL || ''
-const PUBLIC_ROUTES = ['/', '/login', '/about', '/patient', '/triage']
+// '/rnd/clara' is the password-gated Clara voice test surface (see
+// src/lib/clara/testGate.ts) — deliberately public here so it works as a
+// standalone internal test link independent of Cognito login state; access
+// is controlled entirely by its own password gate, not this middleware.
+const PUBLIC_ROUTES = ['/', '/login', '/about', '/patient', '/triage', '/rnd/clara']
 
 const COGNITO_REGION = process.env.NEXT_PUBLIC_COGNITO_REGION || 'us-east-2'
 const COGNITO_POOL_ID = process.env.NEXT_PUBLIC_COGNITO_USER_POOL_ID || 'us-east-2_9y6XyJnXC'

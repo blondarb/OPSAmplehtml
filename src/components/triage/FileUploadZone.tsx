@@ -1,10 +1,14 @@
 'use client'
 
 import { useState, useRef, useCallback, useEffect } from 'react'
+import { applyReferralFileSelection } from '@/lib/triage/referralFileSelection'
 import { FILE_CONSTRAINTS } from '@/lib/triage/types'
 
 interface FileUploadZoneProps {
+  files: File[]
   onFilesChange: (files: File[]) => void
+  onExternalFilesChange: (files: File[]) => void
+  onExternalFilesConsumed: () => void
   disabled?: boolean
   externalFiles?: File[]  // Files injected from demo loader
 }
@@ -30,72 +34,52 @@ function getTypeBadge(name: string): { label: string; color: string } {
   }
 }
 
-function isValidFileType(file: File): boolean {
-  const ext = getFileExtension(file.name)
-  return (FILE_CONSTRAINTS.ALLOWED_EXTENSIONS as readonly string[]).includes(ext)
-}
-
-export default function FileUploadZone({ onFilesChange, disabled, externalFiles }: FileUploadZoneProps) {
-  const [files, setFiles] = useState<File[]>([])
+export default function FileUploadZone({
+  files,
+  onFilesChange,
+  onExternalFilesChange,
+  onExternalFilesConsumed,
+  disabled,
+  externalFiles,
+}: FileUploadZoneProps) {
   const [dragOver, setDragOver] = useState(false)
   const [errors, setErrors] = useState<string[]>([])
   const inputRef = useRef<HTMLInputElement>(null)
 
-  // Sync external files (from demo loader) into internal state
-  useEffect(() => {
-    if (externalFiles && externalFiles.length > 0) {
-      setFiles(externalFiles)
-      setErrors([])
-    }
-  }, [externalFiles])
-
   const addFiles = useCallback((newFiles: FileList | File[]) => {
     const incoming = Array.from(newFiles)
-    const validationErrors: string[] = []
-
-    const validFiles = incoming.filter(file => {
-      if (!isValidFileType(file)) {
-        validationErrors.push(`${file.name}: Unsupported type. Accepted: ${FILE_CONSTRAINTS.ALLOWED_EXTENSIONS.join(', ')}`)
-        return false
-      }
-      if (file.size > FILE_CONSTRAINTS.MAX_FILE_SIZE_BYTES) {
-        validationErrors.push(`${file.name}: Exceeds ${FILE_CONSTRAINTS.MAX_FILE_SIZE_DISPLAY} limit`)
-        return false
-      }
-      return true
-    })
-
-    setErrors(validationErrors)
-
-    setFiles(prev => {
-      const combined = [...prev, ...validFiles]
-      if (combined.length > FILE_CONSTRAINTS.MAX_BATCH_FILES) {
-        setErrors(e => [...e, `Maximum ${FILE_CONSTRAINTS.MAX_BATCH_FILES} files allowed. Some files were not added.`])
-        const trimmed = combined.slice(0, FILE_CONSTRAINTS.MAX_BATCH_FILES)
-        onFilesChange(trimmed)
-        return trimmed
-      }
-      onFilesChange(combined)
-      return combined
-    })
+    const transition = applyReferralFileSelection(incoming, onFilesChange)
+    setErrors(transition.error ? [transition.error] : [])
   }, [onFilesChange])
+
+  const addExternalFiles = useCallback((newFiles: FileList | File[]) => {
+    const incoming = Array.from(newFiles)
+    const transition = applyReferralFileSelection(
+      incoming,
+      onExternalFilesChange,
+    )
+    setErrors(transition.error ? [transition.error] : [])
+  }, [onExternalFilesChange])
+
+  // Demo-loader files cross the same exact-one and validation boundary as
+  // browser-selected files. An omitted prop means no external selection event.
+  useEffect(() => {
+    if (externalFiles === undefined) return
+    addExternalFiles(externalFiles)
+    onExternalFilesConsumed()
+  }, [addExternalFiles, externalFiles, onExternalFilesConsumed])
 
   const removeFile = useCallback((index: number) => {
-    setFiles(prev => {
-      const updated = prev.filter((_, i) => i !== index)
-      onFilesChange(updated)
-      return updated
-    })
+    const updated = files.filter((_, i) => i !== index)
+    onFilesChange(updated)
     setErrors([])
-  }, [onFilesChange])
+  }, [files, onFilesChange])
 
   const handleDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault()
     setDragOver(false)
     if (disabled) return
-    if (e.dataTransfer.files.length > 0) {
-      addFiles(e.dataTransfer.files)
-    }
+    addFiles(e.dataTransfer.files)
   }, [addFiles, disabled])
 
   const handleDragOver = useCallback((e: React.DragEvent) => {
@@ -108,10 +92,8 @@ export default function FileUploadZone({ onFilesChange, disabled, externalFiles 
   }, [])
 
   const handleInputChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files.length > 0) {
-      addFiles(e.target.files)
-      e.target.value = '' // reset so same file can be re-added
-    }
+    addFiles(e.target.files ?? [])
+    e.target.value = '' // reset so same file can be re-added
   }, [addFiles])
 
   return (
@@ -141,18 +123,17 @@ export default function FileUploadZone({ onFilesChange, disabled, externalFiles 
           </svg>
         </div>
         <p style={{ color: '#e2e8f0', fontWeight: 500, marginBottom: '4px', margin: '0 0 4px 0' }}>
-          {dragOver ? 'Drop files here' : 'Drag & drop clinical notes here'}
+          {dragOver ? 'Drop referral file here' : 'Drag & drop a referral file here'}
         </p>
         <p style={{ color: '#94a3b8', fontSize: '0.85rem', marginBottom: '12px', margin: '0 0 12px 0' }}>
           or click to browse
         </p>
         <p style={{ color: '#64748b', fontSize: '0.75rem', margin: 0 }}>
-          PDF, DOCX, TXT &mdash; up to {FILE_CONSTRAINTS.MAX_FILE_SIZE_DISPLAY} each, {FILE_CONSTRAINTS.MAX_BATCH_FILES} files max
+          PDF, DOCX, or TXT &mdash; one referral packet up to {FILE_CONSTRAINTS.MAX_FILE_SIZE_DISPLAY}
         </p>
         <input
           ref={inputRef}
           type="file"
-          multiple
           accept={FILE_CONSTRAINTS.ALLOWED_EXTENSIONS.join(',')}
           onChange={handleInputChange}
           style={{ display: 'none' }}
@@ -243,7 +224,7 @@ export default function FileUploadZone({ onFilesChange, disabled, externalFiles 
             )
           })}
           <p style={{ fontSize: '0.75rem', color: '#64748b', textAlign: 'right', margin: 0 }}>
-            {files.length} file{files.length !== 1 ? 's' : ''} selected
+            Referral file selected
           </p>
         </div>
       )}

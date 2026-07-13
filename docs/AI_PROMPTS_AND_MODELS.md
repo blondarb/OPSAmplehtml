@@ -1,7 +1,7 @@
 # AI Prompts & Model Configuration
 
 > Complete reference for every AI endpoint in Sevaro Clinical.
-> Last updated: 2026-03-12
+> Last updated: 2026-07-10
 
 ---
 
@@ -108,12 +108,30 @@ Sevaro Clinical uses a two-tier model strategy to balance cost, latency, and rea
 - Bedrock client: `src/lib/bedrock.ts`
 
 **Architecture notes:**
-- The AI never determines the triage tier — it only scores dimensions. Tier assignment is deterministic application code.
+- The AI never determines scheduling priority or care disposition — it only scores dimensions and returns structured safety signals. Application code produces four orthogonal decision axes: outpatient priority, care pathway, data quality, and review requirement. Scheduling remains locked pending clinician review.
+- Safety-critical triage, extraction, and adjudication calls must use `invokeBedrockClinicalJSON`; only `stop_reason=end_turn` is complete. `max_tokens`, refusal, other stop reasons, and malformed JSON require retry or review and are never JSON-repaired.
 - Weighted scoring formula: symptom_acuity × 0.30 + diagnostic_concern × 0.25 + rate_of_progression × 0.20 + functional_impairment × 0.15 + red_flag_presence × 0.10
-- If red_flag_presence dimension score ≥ 4 and tier is not already urgent/emergent, auto-escalate to urgent (deterministic, replaces old subjective boolean).
+- Weighted outpatient priority thresholds are urgent ≥ 4.0, semi-urgent ≥ 3.0, routine-priority ≥ 2.5, routine ≥ 1.5, and non-urgent below 1.5.
+- Deterministic urgent floors apply for `red_flag_override`, `red_flag_presence >= 4`, `symptom_acuity == 5`, `diagnostic_concern == 5`, or `rate_of_progression == 5`. Semi-urgent floors apply for `symptom_acuity >= 4` or `diagnostic_concern >= 4`. Functional impairment alone does not impose an urgency floor.
+- Every applicable floor is recorded once in this order: red-flag override, red-flag presence, acuity 5, diagnostic concern 5, progression 5, acuity 4+, diagnostic concern 4+.
+- `emergent_override` independently sets the care pathway to `emergency_now` and review requirement to `emergency_action`; it does not erase outpatient priority or data quality. `insufficient_data` independently sets data quality to `insufficient`; the legacy tier result reports `insufficient_data` only when no safety floor applies.
 - Anti-bias instruction embedded in system prompt prevents demographic-based score adjustments.
 - Clinical anchoring examples in the prompt reduce borderline score oscillation between adjacent levels.
 - Token usage is logged per triage call for cost monitoring.
+
+#### Deterministic neurology emergency review gateway
+
+- **Version:** `neurology-emergency-gateway-v2` (`src/lib/triage/emergencyGateway.ts`). This is application code, not a model prompt, and evaluates the original referral text before lossy summarization. Version 2 adds specific autonomic-dysreflexia constellation detection.
+- **Syndrome families:** acute focal cerebrovascular deficits; thunderclap/maximal-at-onset worst headache or a new sudden severe headache with a high-risk companion (focal deficit, syncope, pregnancy/postpartum, anticoagulation, or altered consciousness); status, prolonged, or no-recovery seizure; acute cord/cauda equina clusters; fever with a new severe headache, meningeal features, or acute altered mental status; raised intracranial pressure; progressive bulbar/respiratory failure warning; acute vision loss; acute altered mental status/coma; traumatic neurologic deterioration including anticoagulated head injury; and active suicide/violence intent.
+- **Context handling:** semicolon/clause boundaries keep an unrelated denial or instruction from erasing a later active finding, and a relative reporting the patient's symptoms is not treated as the symptom experiencer. Bounded adjacent spans can complete a clinical pattern (for example, `Aphasia. Began 20 minutes ago.`), while remote/family/education headings suppress only fragments that do not independently assert a current patient event. Encounter words such as `today` or `currently` do not reactivate a stable/baseline deficit unless the later clause explicitly introduces a new or worsening symptom. A possible or unclear time-critical feature is held for same-day clinician review rather than promoted to a confirmed emergency or discarded.
+- **Evidence contract:** every emitted signal retains one or more exact source quotes with global start/end offsets, including the full bounded span when a pattern crosses adjacent sentences. Optional packet, document, and page provenance is copied onto each evidence item; missing provenance is represented explicitly as `null`.
+- **Operating mode:** shadow/review-only clinical decision support. It does not diagnose, independently clear a referral, auto-schedule, or replace clinician judgment. Present signals request emergency action; uncertain signals request immediate clinician review; every gateway result keeps scheduling locked.
+
+#### Workflow safety gates
+
+- Outpatient scheduling is fail-closed and requires an outpatient care pathway, `decision_ready` workflow state, complete packet coverage, no open critical clarification, a valid clinician-review timestamp, and an explicitly released scheduling lock. The legacy `emergent` and `critical` tier labels can never create an outpatient appointment.
+- Referral-clarification Historian sessions use a separate gate. They require a stable outpatient pathway, complete coverage, no critical unknown, a clinician-review timestamp, a clinician-approved patient question set, and `patient_clarification` workflow state. The scheduling lock must remain engaged throughout clarification.
+- Policy denials return machine-readable reason codes and perform no database operation. Safety logs omit patient, session, and clinical-text identifiers.
 
 ---
 

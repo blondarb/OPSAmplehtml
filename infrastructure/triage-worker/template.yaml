@@ -1,0 +1,893 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: >
+  Sevaro neurology triage durable long-packet and emergency-action alert
+  workers. Queue messages contain opaque identifiers only; source clinical
+  text remains in the tenant-bound database.
+
+Parameters:
+  Environment:
+    Type: String
+    Default: sandbox
+    AllowedValues: [sandbox, staging, production]
+  RdsSecretArn:
+    Type: String
+    Description: ARN of the Secrets Manager secret containing RDS credentials.
+  RdsSecretId:
+    Type: String
+    Default: sevaro/rds/credentials
+  RdsDatabase:
+    Type: String
+    MinLength: 1
+    Description: Explicit database name; never rely on the shared secret default.
+  WorkerMaximumConcurrency:
+    Type: Number
+    Default: 6
+    MinValue: 2
+    MaxValue: 20
+  EmergencyAlertMaximumConcurrency:
+    Type: Number
+    Default: 4
+    MinValue: 2
+    MaxValue: 20
+
+Globals:
+  Function:
+    Runtime: nodejs22.x
+    Architectures: [arm64]
+    MemorySize: 1024
+    Tracing: Active
+    # Sandbox networking decision (2026-07-12): functions run OUTSIDE the VPC.
+    # sevaro-postgres is publicly accessible and its VPC has no NAT gateways or
+    # VPC endpoints, so in-VPC functions would have no route to SQS/Secrets
+    # Manager/Bedrock/CloudWatch. AWS-managed egress over TLS to the public RDS
+    # endpoint adds no exposure beyond current state. For staging/production:
+    # restore VpcConfig with private subnets + endpoints per the README
+    # preconditions, and close the RDS security group (currently 0.0.0.0/0).
+    Environment:
+      Variables:
+        NODE_OPTIONS: --enable-source-maps
+        NODE_ENV: production
+        AWS_NODEJS_CONNECTION_REUSE_ENABLED: '1'
+        BEDROCK_REGION: !Ref AWS::Region
+        RDS_SECRET_ID: !Ref RdsSecretId
+        RDS_DATABASE: !Ref RdsDatabase
+        TRIAGE_LONG_PACKET_QUEUE_URL: !Ref LongPacketWorkQueue
+        # Longer than the 300-second worker timeout so an invocation cannot
+        # outlive its authoritative database lease.
+        TRIAGE_LONG_PACKET_LEASE_SECONDS: '360'
+    Tags:
+      Project: sevaro-clinical
+      Component: neurology-triage-worker
+      Environment: !Ref Environment
+
+Resources:
+  LongPacketDeadLetterQueue:
+    Type: AWS::SQS::Queue
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      MessageRetentionPeriod: 1209600
+      SqsManagedSseEnabled: true
+      Tags:
+        - Key: Project
+          Value: sevaro-clinical
+        - Key: Component
+          Value: neurology-triage-worker-dlq
+        - Key: Environment
+          Value: !Ref Environment
+
+  LongPacketWorkQueue:
+    Type: AWS::SQS::Queue
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      VisibilityTimeout: 1800
+      MessageRetentionPeriod: 345600
+      ReceiveMessageWaitTimeSeconds: 20
+      SqsManagedSseEnabled: true
+      RedrivePolicy:
+        deadLetterTargetArn: !GetAtt LongPacketDeadLetterQueue.Arn
+        maxReceiveCount: 5
+      Tags:
+        - Key: Project
+          Value: sevaro-clinical
+        - Key: Component
+          Value: neurology-triage-worker
+        - Key: Environment
+          Value: !Ref Environment
+
+  LongPacketQueueTlsPolicy:
+    Type: AWS::SQS::QueuePolicy
+    Properties:
+      Queues:
+        - !Ref LongPacketWorkQueue
+        - !Ref LongPacketDeadLetterQueue
+      PolicyDocument:
+        Version: '2012-10-17'
+        # SQS queue policies require exactly one resource per statement.
+        Statement:
+          - Sid: DenyInsecureTransportWork
+            Effect: Deny
+            Principal: '*'
+            Action: sqs:*
+            Resource: !GetAtt LongPacketWorkQueue.Arn
+            Condition:
+              Bool:
+                aws:SecureTransport: 'false'
+          - Sid: DenyInsecureTransportDlq
+            Effect: Deny
+            Principal: '*'
+            Action: sqs:*
+            Resource: !GetAtt LongPacketDeadLetterQueue.Arn
+            Condition:
+              Bool:
+                aws:SecureTransport: 'false'
+
+  EmergencyAlertWorkDeadLetterQueue:
+    Type: AWS::SQS::Queue
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      MessageRetentionPeriod: 1209600
+      SqsManagedSseEnabled: true
+      Tags:
+        - Key: Project
+          Value: sevaro-clinical
+        - Key: Component
+          Value: neurology-triage-emergency-alert-dlq
+        - Key: Environment
+          Value: !Ref Environment
+
+  EmergencyAlertWorkQueue:
+    Type: AWS::SQS::Queue
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      # Six times the publisher timeout, so Lambda can complete or persist a
+      # retry decision before SQS exposes the same opaque reference again.
+      VisibilityTimeout: 360
+      MessageRetentionPeriod: 345600
+      ReceiveMessageWaitTimeSeconds: 20
+      SqsManagedSseEnabled: true
+      RedrivePolicy:
+        deadLetterTargetArn: !GetAtt EmergencyAlertWorkDeadLetterQueue.Arn
+        maxReceiveCount: 5
+      Tags:
+        - Key: Project
+          Value: sevaro-clinical
+        - Key: Component
+          Value: neurology-triage-emergency-alert-work
+        - Key: Environment
+          Value: !Ref Environment
+
+  EmergencyAlertDeliveryDeadLetterQueue:
+    Type: AWS::SQS::Queue
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      QueueName: !Sub sevaro-triage-emergency-alert-delivery-dlq-${Environment}.fifo
+      FifoQueue: true
+      MessageRetentionPeriod: 1209600
+      SqsManagedSseEnabled: true
+      Tags:
+        - Key: Project
+          Value: sevaro-clinical
+        - Key: Component
+          Value: neurology-triage-emergency-alert-delivery-dlq
+        - Key: Environment
+          Value: !Ref Environment
+
+  EmergencyAlertDeliveryQueue:
+    Type: AWS::SQS::Queue
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      QueueName: !Sub sevaro-triage-emergency-alert-delivery-${Environment}.fifo
+      FifoQueue: true
+      ContentBasedDeduplication: true
+      VisibilityTimeout: 120
+      MessageRetentionPeriod: 345600
+      ReceiveMessageWaitTimeSeconds: 20
+      SqsManagedSseEnabled: true
+      RedrivePolicy:
+        deadLetterTargetArn: !GetAtt EmergencyAlertDeliveryDeadLetterQueue.Arn
+        # Leave headroom beyond the five database delivery attempts for a
+        # publisher-commit race or visibility-only retry.
+        maxReceiveCount: 10
+      Tags:
+        - Key: Project
+          Value: sevaro-clinical
+        - Key: Component
+          Value: neurology-triage-emergency-alert-delivery
+        - Key: Environment
+          Value: !Ref Environment
+
+  EmergencyAlertQueueTlsPolicy:
+    Type: AWS::SQS::QueuePolicy
+    Properties:
+      Queues:
+        - !Ref EmergencyAlertWorkQueue
+        - !Ref EmergencyAlertWorkDeadLetterQueue
+        - !Ref EmergencyAlertDeliveryQueue
+        - !Ref EmergencyAlertDeliveryDeadLetterQueue
+      PolicyDocument:
+        Version: '2012-10-17'
+        # SQS queue policies require exactly one resource per statement.
+        Statement:
+          - Sid: DenyInsecureEmergencyAlertWork
+            Effect: Deny
+            Principal: '*'
+            Action: sqs:*
+            Resource: !GetAtt EmergencyAlertWorkQueue.Arn
+            Condition:
+              Bool:
+                aws:SecureTransport: 'false'
+          - Sid: DenyInsecureEmergencyAlertWorkDlq
+            Effect: Deny
+            Principal: '*'
+            Action: sqs:*
+            Resource: !GetAtt EmergencyAlertWorkDeadLetterQueue.Arn
+            Condition:
+              Bool:
+                aws:SecureTransport: 'false'
+          - Sid: DenyInsecureEmergencyAlertDelivery
+            Effect: Deny
+            Principal: '*'
+            Action: sqs:*
+            Resource: !GetAtt EmergencyAlertDeliveryQueue.Arn
+            Condition:
+              Bool:
+                aws:SecureTransport: 'false'
+          - Sid: DenyInsecureEmergencyAlertDeliveryDlq
+            Effect: Deny
+            Principal: '*'
+            Action: sqs:*
+            Resource: !GetAtt EmergencyAlertDeliveryDeadLetterQueue.Arn
+            Condition:
+              Bool:
+                aws:SecureTransport: 'false'
+
+  LongPacketWorkerFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: ../../
+      Handler: src/workers/triageLongPacketWorker.handler
+      Description: Claims and executes one idempotent long-packet job per message.
+      Timeout: 300
+      ReservedConcurrentExecutions: !Ref WorkerMaximumConcurrency
+      Policies:
+        - AWSLambdaVPCAccessExecutionRole
+        - Statement:
+            - Sid: ReadRdsCredentials
+              Effect: Allow
+              Action: secretsmanager:GetSecretValue
+              Resource: !Ref RdsSecretArn
+            - Sid: ConsumeOpaqueLongPacketWork
+              Effect: Allow
+              Action:
+                - sqs:ReceiveMessage
+                - sqs:DeleteMessage
+                - sqs:GetQueueAttributes
+                - sqs:ChangeMessageVisibility
+              Resource: !GetAtt LongPacketWorkQueue.Arn
+            - Sid: InvokePinnedClinicalModels
+              Effect: Allow
+              Action: bedrock:InvokeModel
+              Resource:
+                - !Sub arn:${AWS::Partition}:bedrock:${AWS::Region}:${AWS::AccountId}:inference-profile/us.anthropic.claude-haiku-4-5-20251001-v1:0
+                - !Sub arn:${AWS::Partition}:bedrock:${AWS::Region}:${AWS::AccountId}:inference-profile/us.anthropic.claude-sonnet-5
+                - !Sub arn:${AWS::Partition}:bedrock:${AWS::Region}:${AWS::AccountId}:inference-profile/us.anthropic.claude-sonnet-4-6
+                - !Sub arn:${AWS::Partition}:bedrock:*::foundation-model/anthropic.claude-haiku-4-5-20251001-v1:0
+                - !Sub arn:${AWS::Partition}:bedrock:*::foundation-model/anthropic.claude-sonnet-5
+                - !Sub arn:${AWS::Partition}:bedrock:*::foundation-model/anthropic.claude-sonnet-4-6
+      Events:
+        WorkQueue:
+          Type: SQS
+          Properties:
+            Queue: !GetAtt LongPacketWorkQueue.Arn
+            BatchSize: 1
+            FunctionResponseTypes:
+              - ReportBatchItemFailures
+            ScalingConfig:
+              MaximumConcurrency: !Ref WorkerMaximumConcurrency
+      LoggingConfig:
+        LogFormat: JSON
+        ApplicationLogLevel: INFO
+        SystemLogLevel: WARN
+    Metadata:
+      BuildMethod: esbuild
+      BuildProperties:
+        EntryPoints:
+          - src/workers/triageLongPacketWorker.ts
+        Minify: true
+        Sourcemap: true
+        Target: es2022
+
+  LongPacketDispatcherFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: ../../
+      Handler: src/workers/triageLongPacketDispatcher.handler
+      Description: Re-enqueues pending, retry-due, and expired durable jobs.
+      Timeout: 60
+      MemorySize: 512
+      ReservedConcurrentExecutions: 1
+      Policies:
+        - AWSLambdaVPCAccessExecutionRole
+        - Statement:
+            - Sid: ReadRdsCredentials
+              Effect: Allow
+              Action: secretsmanager:GetSecretValue
+              Resource: !Ref RdsSecretArn
+            - Sid: SendOpaqueWorkIdentifiers
+              Effect: Allow
+              Action: sqs:SendMessage
+              Resource: !GetAtt LongPacketWorkQueue.Arn
+      Events:
+        RecoverySweep:
+          Type: ScheduleV2
+          Properties:
+            ScheduleExpression: rate(1 minute)
+            FlexibleTimeWindow:
+              Mode: 'OFF'
+            RetryPolicy:
+              MaximumEventAgeInSeconds: 300
+              MaximumRetryAttempts: 3
+      LoggingConfig:
+        LogFormat: JSON
+        ApplicationLogLevel: INFO
+        SystemLogLevel: WARN
+    Metadata:
+      BuildMethod: esbuild
+      BuildProperties:
+        EntryPoints:
+          - src/workers/triageLongPacketDispatcher.ts
+        Minify: true
+        Sourcemap: true
+        Target: es2022
+
+  EmergencyAlertPublisherFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: ../../
+      Handler: src/workers/triageEmergencyAlertWorker.handler
+      Description: Publishes claimed opaque emergency-action alert references.
+      Timeout: 60
+      MemorySize: 512
+      ReservedConcurrentExecutions: !Ref EmergencyAlertMaximumConcurrency
+      Environment:
+        Variables:
+          TRIAGE_EMERGENCY_ALERT_WORK_QUEUE_URL: !Ref EmergencyAlertWorkQueue
+          TRIAGE_EMERGENCY_ALERT_DELIVERY_QUEUE_URL: !Ref EmergencyAlertDeliveryQueue
+          # Shorter than the queue visibility timeout and long enough for the
+          # publish plus authoritative database state transition.
+          TRIAGE_EMERGENCY_ALERT_LEASE_SECONDS: '120'
+      Policies:
+        - AWSLambdaVPCAccessExecutionRole
+        - Statement:
+            - Sid: ReadRdsCredentials
+              Effect: Allow
+              Action: secretsmanager:GetSecretValue
+              Resource: !Ref RdsSecretArn
+            - Sid: ConsumeOpaqueEmergencyAlertWork
+              Effect: Allow
+              Action:
+                - sqs:ReceiveMessage
+                - sqs:DeleteMessage
+                - sqs:GetQueueAttributes
+                - sqs:ChangeMessageVisibility
+              Resource: !GetAtt EmergencyAlertWorkQueue.Arn
+            - Sid: SendOpaqueEmergencyAlerts
+              Effect: Allow
+              Action: sqs:SendMessage
+              Resource: !GetAtt EmergencyAlertDeliveryQueue.Arn
+      Events:
+        WorkQueue:
+          Type: SQS
+          Properties:
+            Queue: !GetAtt EmergencyAlertWorkQueue.Arn
+            BatchSize: 10
+            FunctionResponseTypes:
+              - ReportBatchItemFailures
+            ScalingConfig:
+              MaximumConcurrency: !Ref EmergencyAlertMaximumConcurrency
+      LoggingConfig:
+        LogFormat: JSON
+        ApplicationLogLevel: INFO
+        SystemLogLevel: WARN
+    Metadata:
+      BuildMethod: esbuild
+      BuildProperties:
+        EntryPoints:
+          - src/workers/triageEmergencyAlertWorker.ts
+        Minify: true
+        Sourcemap: true
+        Target: es2022
+
+  EmergencyAlertDispatcherFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: ../../
+      Handler: src/workers/triageEmergencyAlertDispatcher.handler
+      Description: Creates due reminders and enqueues opaque emergency alerts.
+      Timeout: 60
+      MemorySize: 512
+      ReservedConcurrentExecutions: 1
+      Environment:
+        Variables:
+          TRIAGE_EMERGENCY_ALERT_WORK_QUEUE_URL: !Ref EmergencyAlertWorkQueue
+          TRIAGE_EMERGENCY_ALERT_DISPATCH_LIMIT: '500'
+      Policies:
+        - AWSLambdaVPCAccessExecutionRole
+        - Statement:
+            - Sid: ReadRdsCredentials
+              Effect: Allow
+              Action: secretsmanager:GetSecretValue
+              Resource: !Ref RdsSecretArn
+            - Sid: SendOpaqueEmergencyAlertWork
+              Effect: Allow
+              Action: sqs:SendMessage
+              Resource: !GetAtt EmergencyAlertWorkQueue.Arn
+      Events:
+        EmergencyAlertSweep:
+          Type: ScheduleV2
+          Properties:
+            ScheduleExpression: rate(1 minute)
+            FlexibleTimeWindow:
+              Mode: 'OFF'
+            RetryPolicy:
+              MaximumEventAgeInSeconds: 300
+              MaximumRetryAttempts: 3
+      LoggingConfig:
+        LogFormat: JSON
+        ApplicationLogLevel: INFO
+        SystemLogLevel: WARN
+    Metadata:
+      BuildMethod: esbuild
+      BuildProperties:
+        EntryPoints:
+          - src/workers/triageEmergencyAlertDispatcher.ts
+        Minify: true
+        Sourcemap: true
+        Target: es2022
+
+  EmergencyAlertDeliveryWorkerFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: ../../
+      Handler: src/workers/triageEmergencyAlertDeliveryWorker.handler
+      Description: Inserts an idempotent critical UI notification for an active emergency action.
+      Timeout: 20
+      MemorySize: 512
+      ReservedConcurrentExecutions: !Ref EmergencyAlertMaximumConcurrency
+      Environment:
+        Variables:
+          TRIAGE_EMERGENCY_ALERT_DELIVERY_QUEUE_URL: !Ref EmergencyAlertDeliveryQueue
+          TRIAGE_EMERGENCY_ALERT_DELIVERY_LEASE_SECONDS: '60'
+      Policies:
+        - AWSLambdaVPCAccessExecutionRole
+        - Statement:
+            - Sid: ReadRdsCredentials
+              Effect: Allow
+              Action: secretsmanager:GetSecretValue
+              Resource: !Ref RdsSecretArn
+            - Sid: ConsumeOpaqueEmergencyAlertDelivery
+              Effect: Allow
+              Action:
+                - sqs:ReceiveMessage
+                - sqs:DeleteMessage
+                - sqs:GetQueueAttributes
+                - sqs:ChangeMessageVisibility
+              Resource: !GetAtt EmergencyAlertDeliveryQueue.Arn
+      Events:
+        DeliveryQueue:
+          Type: SQS
+          Properties:
+            Queue: !GetAtt EmergencyAlertDeliveryQueue.Arn
+            # One record preserves strict FIFO retry timing and prevents an
+            # unprocessed later reminder inheriting the default visibility.
+            BatchSize: 1
+            FunctionResponseTypes:
+              - ReportBatchItemFailures
+            ScalingConfig:
+              MaximumConcurrency: !Ref EmergencyAlertMaximumConcurrency
+      LoggingConfig:
+        LogFormat: JSON
+        ApplicationLogLevel: INFO
+        SystemLogLevel: WARN
+    Metadata:
+      BuildMethod: esbuild
+      BuildProperties:
+        EntryPoints:
+          - src/workers/triageEmergencyAlertDeliveryWorker.ts
+        Minify: true
+        Sourcemap: true
+        Target: es2022
+
+  EmergencyAlertDeliveryDispatcherFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: ../../
+      Handler: src/workers/triageEmergencyAlertDeliveryDispatcher.handler
+      Description: Re-enqueues due, expired, or migration-backfilled critical UI deliveries.
+      Timeout: 60
+      MemorySize: 512
+      ReservedConcurrentExecutions: 1
+      Environment:
+        Variables:
+          TRIAGE_EMERGENCY_ALERT_DELIVERY_QUEUE_URL: !Ref EmergencyAlertDeliveryQueue
+          TRIAGE_EMERGENCY_ALERT_DELIVERY_DISPATCH_LIMIT: '500'
+      Policies:
+        - AWSLambdaVPCAccessExecutionRole
+        - Statement:
+            - Sid: ReadRdsCredentials
+              Effect: Allow
+              Action: secretsmanager:GetSecretValue
+              Resource: !Ref RdsSecretArn
+            - Sid: RecoverOpaqueEmergencyAlertDelivery
+              Effect: Allow
+              Action: sqs:SendMessage
+              Resource: !GetAtt EmergencyAlertDeliveryQueue.Arn
+      Events:
+        DeliveryRecoverySweep:
+          Type: ScheduleV2
+          Properties:
+            ScheduleExpression: rate(1 minute)
+            FlexibleTimeWindow:
+              Mode: 'OFF'
+            RetryPolicy:
+              MaximumEventAgeInSeconds: 300
+              MaximumRetryAttempts: 3
+      LoggingConfig:
+        LogFormat: JSON
+        ApplicationLogLevel: INFO
+        SystemLogLevel: WARN
+    Metadata:
+      BuildMethod: esbuild
+      BuildProperties:
+        EntryPoints:
+          - src/workers/triageEmergencyAlertDeliveryDispatcher.ts
+        Minify: true
+        Sourcemap: true
+        Target: es2022
+
+  WorkerLogGroup:
+    Type: AWS::Logs::LogGroup
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      LogGroupName: !Sub /aws/lambda/${LongPacketWorkerFunction}
+      RetentionInDays: 30
+
+  DispatcherLogGroup:
+    Type: AWS::Logs::LogGroup
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      LogGroupName: !Sub /aws/lambda/${LongPacketDispatcherFunction}
+      RetentionInDays: 30
+
+  EmergencyAlertPublisherLogGroup:
+    Type: AWS::Logs::LogGroup
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      LogGroupName: !Sub /aws/lambda/${EmergencyAlertPublisherFunction}
+      RetentionInDays: 30
+
+  EmergencyAlertDispatcherLogGroup:
+    Type: AWS::Logs::LogGroup
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      LogGroupName: !Sub /aws/lambda/${EmergencyAlertDispatcherFunction}
+      RetentionInDays: 30
+
+  EmergencyAlertDeliveryWorkerLogGroup:
+    Type: AWS::Logs::LogGroup
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      LogGroupName: !Sub /aws/lambda/${EmergencyAlertDeliveryWorkerFunction}
+      RetentionInDays: 30
+
+  EmergencyAlertDeliveryDispatcherLogGroup:
+    Type: AWS::Logs::LogGroup
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      LogGroupName: !Sub /aws/lambda/${EmergencyAlertDeliveryDispatcherFunction}
+      RetentionInDays: 30
+
+  TriageWorkerAlarmTopic:
+    Type: AWS::SNS::Topic
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      TopicName: !Sub sevaro-triage-worker-${Environment}-alarms
+      KmsMasterKeyId: alias/aws/sns
+      Tags:
+        - Key: Project
+          Value: sevaro-clinical
+        - Key: Environment
+          Value: !Ref Environment
+
+  DeadLetterQueueVisibleAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmDescription: A neurology triage worker message reached the DLQ.
+      Namespace: AWS/SQS
+      MetricName: ApproximateNumberOfMessagesVisible
+      Dimensions:
+        - Name: QueueName
+          Value: !GetAtt LongPacketDeadLetterQueue.QueueName
+      Statistic: Maximum
+      Period: 60
+      EvaluationPeriods: 1
+      Threshold: 1
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      TreatMissingData: notBreaching
+      AlarmActions: [!Ref TriageWorkerAlarmTopic]
+
+  WorkQueueAgeAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmDescription: Durable neurology triage work has waited more than 15 minutes.
+      Namespace: AWS/SQS
+      MetricName: ApproximateAgeOfOldestMessage
+      Dimensions:
+        - Name: QueueName
+          Value: !GetAtt LongPacketWorkQueue.QueueName
+      Statistic: Maximum
+      Period: 60
+      EvaluationPeriods: 2
+      DatapointsToAlarm: 2
+      Threshold: 900
+      ComparisonOperator: GreaterThanThreshold
+      TreatMissingData: notBreaching
+      AlarmActions: [!Ref TriageWorkerAlarmTopic]
+
+  WorkerErrorAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmDescription: Durable neurology triage worker Lambda errors detected.
+      Namespace: AWS/Lambda
+      MetricName: Errors
+      Dimensions:
+        - Name: FunctionName
+          Value: !Ref LongPacketWorkerFunction
+      Statistic: Sum
+      Period: 300
+      EvaluationPeriods: 1
+      Threshold: 1
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      TreatMissingData: notBreaching
+      AlarmActions: [!Ref TriageWorkerAlarmTopic]
+
+  EmergencyAlertDeadLetterAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmDescription: An emergency-action alert work item reached the DLQ.
+      Namespace: AWS/SQS
+      MetricName: ApproximateNumberOfMessagesVisible
+      Dimensions:
+        - Name: QueueName
+          Value: !GetAtt EmergencyAlertWorkDeadLetterQueue.QueueName
+      Statistic: Maximum
+      Period: 60
+      EvaluationPeriods: 1
+      Threshold: 1
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      TreatMissingData: notBreaching
+      AlarmActions: [!Ref TriageWorkerAlarmTopic]
+
+  EmergencyAlertQueueAgeAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmDescription: Emergency-action alert work has waited more than two minutes.
+      Namespace: AWS/SQS
+      MetricName: ApproximateAgeOfOldestMessage
+      Dimensions:
+        - Name: QueueName
+          Value: !GetAtt EmergencyAlertWorkQueue.QueueName
+      Statistic: Maximum
+      Period: 60
+      EvaluationPeriods: 2
+      DatapointsToAlarm: 2
+      Threshold: 120
+      ComparisonOperator: GreaterThanThreshold
+      TreatMissingData: notBreaching
+      AlarmActions: [!Ref TriageWorkerAlarmTopic]
+
+  EmergencyAlertPublisherErrorAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmDescription: Emergency-action alert publisher Lambda errors detected.
+      Namespace: AWS/Lambda
+      MetricName: Errors
+      Dimensions:
+        - Name: FunctionName
+          Value: !Ref EmergencyAlertPublisherFunction
+      Statistic: Sum
+      Period: 60
+      EvaluationPeriods: 1
+      Threshold: 1
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      TreatMissingData: notBreaching
+      AlarmActions: [!Ref TriageWorkerAlarmTopic]
+
+  EmergencyAlertDispatcherHeartbeatAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmDescription: Emergency-alert outbox recovery did not run within five minutes.
+      Namespace: AWS/Lambda
+      MetricName: Invocations
+      Dimensions:
+        - Name: FunctionName
+          Value: !Ref EmergencyAlertDispatcherFunction
+      Statistic: Sum
+      Period: 300
+      EvaluationPeriods: 1
+      Threshold: 1
+      ComparisonOperator: LessThanThreshold
+      TreatMissingData: breaching
+      AlarmActions: [!Ref TriageWorkerAlarmTopic]
+
+  EmergencyAlertDeliveryAgeAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmDescription: Published emergency-action alerts await downstream delivery.
+      Namespace: AWS/SQS
+      MetricName: ApproximateAgeOfOldestMessage
+      Dimensions:
+        - Name: QueueName
+          Value: !GetAtt EmergencyAlertDeliveryQueue.QueueName
+      Statistic: Maximum
+      Period: 60
+      EvaluationPeriods: 2
+      DatapointsToAlarm: 2
+      Threshold: 300
+      ComparisonOperator: GreaterThanThreshold
+      TreatMissingData: notBreaching
+      AlarmActions: [!Ref TriageWorkerAlarmTopic]
+
+  EmergencyAlertDeliveryDeadLetterAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmDescription: A critical UI emergency-alert delivery reached the DLQ.
+      Namespace: AWS/SQS
+      MetricName: ApproximateNumberOfMessagesVisible
+      Dimensions:
+        - Name: QueueName
+          Value: !GetAtt EmergencyAlertDeliveryDeadLetterQueue.QueueName
+      Statistic: Maximum
+      Period: 60
+      EvaluationPeriods: 1
+      Threshold: 1
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      TreatMissingData: notBreaching
+      AlarmActions: [!Ref TriageWorkerAlarmTopic]
+
+  EmergencyAlertDeliveryWorkerErrorAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmDescription: Critical UI emergency-alert delivery Lambda errors detected.
+      Namespace: AWS/Lambda
+      MetricName: Errors
+      Dimensions:
+        - Name: FunctionName
+          Value: !Ref EmergencyAlertDeliveryWorkerFunction
+      Statistic: Sum
+      Period: 60
+      EvaluationPeriods: 1
+      Threshold: 1
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      TreatMissingData: notBreaching
+      AlarmActions: [!Ref TriageWorkerAlarmTopic]
+
+  EmergencyAlertDeliveryDispatcherErrorAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmDescription: Critical UI emergency-alert recovery dispatcher errors detected.
+      Namespace: AWS/Lambda
+      MetricName: Errors
+      Dimensions:
+        - Name: FunctionName
+          Value: !Ref EmergencyAlertDeliveryDispatcherFunction
+      Statistic: Sum
+      Period: 60
+      EvaluationPeriods: 1
+      Threshold: 1
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      TreatMissingData: notBreaching
+      AlarmActions: [!Ref TriageWorkerAlarmTopic]
+
+  EmergencyAlertDeliveryDispatcherHeartbeatAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmDescription: Critical UI delivery recovery did not run within five minutes.
+      Namespace: AWS/Lambda
+      MetricName: Invocations
+      Dimensions:
+        - Name: FunctionName
+          Value: !Ref EmergencyAlertDeliveryDispatcherFunction
+      Statistic: Sum
+      Period: 300
+      EvaluationPeriods: 1
+      Threshold: 1
+      ComparisonOperator: LessThanThreshold
+      TreatMissingData: breaching
+      AlarmActions: [!Ref TriageWorkerAlarmTopic]
+
+  EmergencyAlertTerminalFailureMetric:
+    Type: AWS::Logs::MetricFilter
+    Properties:
+      LogGroupName: !Ref EmergencyAlertPublisherLogGroup
+      FilterPattern: '{ $.event = "triage_emergency_alert_terminal_failure" }'
+      MetricTransformations:
+        - MetricNamespace: Sevaro/TriageSafety
+          MetricName: EmergencyAlertTerminalFailures
+          MetricValue: '1'
+          DefaultValue: 0
+
+  EmergencyAlertTerminalFailureAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmDescription: An emergency-action alert exhausted publisher retries.
+      Namespace: Sevaro/TriageSafety
+      MetricName: EmergencyAlertTerminalFailures
+      Statistic: Sum
+      Period: 60
+      EvaluationPeriods: 1
+      Threshold: 1
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      TreatMissingData: notBreaching
+      AlarmActions: [!Ref TriageWorkerAlarmTopic]
+
+  EmergencyAlertDeliveryTerminalFailureMetric:
+    Type: AWS::Logs::MetricFilter
+    Properties:
+      LogGroupName: !Ref EmergencyAlertDeliveryWorkerLogGroup
+      FilterPattern: '{ $.event = "triage_emergency_alert_delivery_terminal_failure" }'
+      MetricTransformations:
+        - MetricNamespace: Sevaro/TriageSafety
+          MetricName: EmergencyAlertDeliveryTerminalFailures
+          MetricValue: '1'
+          DefaultValue: 0
+
+  EmergencyAlertDeliveryTerminalFailureAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmDescription: A critical UI emergency alert exhausted delivery retries.
+      Namespace: Sevaro/TriageSafety
+      MetricName: EmergencyAlertDeliveryTerminalFailures
+      Statistic: Sum
+      Period: 60
+      EvaluationPeriods: 1
+      Threshold: 1
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      TreatMissingData: notBreaching
+      AlarmActions: [!Ref TriageWorkerAlarmTopic]
+
+Outputs:
+  WorkQueueUrl:
+    Value: !Ref LongPacketWorkQueue
+  WorkQueueArn:
+    Value: !GetAtt LongPacketWorkQueue.Arn
+  DeadLetterQueueUrl:
+    Value: !Ref LongPacketDeadLetterQueue
+  EmergencyAlertWorkQueueUrl:
+    Value: !Ref EmergencyAlertWorkQueue
+  EmergencyAlertWorkQueueArn:
+    Value: !GetAtt EmergencyAlertWorkQueue.Arn
+  EmergencyAlertDeadLetterQueueUrl:
+    Value: !Ref EmergencyAlertWorkDeadLetterQueue
+  EmergencyAlertDeliveryQueueUrl:
+    Value: !Ref EmergencyAlertDeliveryQueue
+  EmergencyAlertDeliveryQueueArn:
+    Value: !GetAtt EmergencyAlertDeliveryQueue.Arn
+  EmergencyAlertDeliveryDeadLetterQueueUrl:
+    Value: !Ref EmergencyAlertDeliveryDeadLetterQueue
+  AlarmTopicArn:
+    Value: !Ref TriageWorkerAlarmTopic

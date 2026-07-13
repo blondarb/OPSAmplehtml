@@ -8,6 +8,51 @@ export type TriageTier =
   | 'non_urgent'
   | 'insufficient_data'
 
+export type OutpatientTriageTier = Exclude<TriageTier, 'emergent' | 'insufficient_data'>
+
+export type CarePathway =
+  | 'emergency_now'
+  | 'same_day_clinician_review'
+  | 'expedited_outpatient'
+  | 'routine_outpatient'
+  | 'redirect'
+  | 'undetermined'
+
+export type DataQuality = 'sufficient' | 'partial' | 'insufficient' | 'conflicting'
+
+export type CoverageStatus =
+  | 'complete'
+  | 'partial'
+  | 'failed'
+  | 'not_applicable'
+  | 'legacy_unknown'
+
+export type WorkflowStatus =
+  | 'pending_safety_screen'
+  | 'emergency_hold'
+  | 'clinician_review'
+  | 'provider_clarification'
+  | 'patient_clarification'
+  | 'decision_ready'
+  | 'action_pending'
+  | 'closed'
+
+export type ReviewRequirement =
+  | 'emergency_action'
+  | 'immediate_clinician_review'
+  | 'clinician_confirmation'
+  | 'none'
+
+export interface TriageDecisionState {
+  carePathway: CarePathway
+  outpatientPriority: OutpatientTriageTier
+  dataQuality: DataQuality
+  reviewRequirement: ReviewRequirement
+  schedulingLocked: boolean
+  weightedScore: number
+  appliedFloors: string[]
+}
+
 export type TriageConfidence = 'high' | 'moderate' | 'low'
 
 export type SubspecialtyType =
@@ -33,25 +78,66 @@ export type NonNeuroSpecialtyType =
   | 'Ophthalmology'
   | 'Cardiology'
   | 'Endocrinology'
+  | 'Vascular Surgery'
   | 'Other Specialty'
 
-export const NON_NEURO_SPECIALTIES: NonNeuroSpecialtyType[] = [
-  'Primary Care / PCP',
-  'Orthopedics',
-  'Spine Surgery',
-  'Pain Management',
-  'Rheumatology',
-  'Psychiatry',
-  'Podiatry',
-  'Physical Medicine & Rehab',
-  'ENT / Otolaryngology',
-  'Ophthalmology',
-  'Cardiology',
-  'Endocrinology',
-  'Other Specialty',
-]
+export const NON_NEURO_SPECIALTIES: readonly NonNeuroSpecialtyType[] =
+  Object.freeze([
+    'Primary Care / PCP',
+    'Orthopedics',
+    'Spine Surgery',
+    'Pain Management',
+    'Rheumatology',
+    'Psychiatry',
+    'Podiatry',
+    'Physical Medicine & Rehab',
+    'ENT / Otolaryngology',
+    'Ophthalmology',
+    'Cardiology',
+    'Endocrinology',
+    'Vascular Surgery',
+    'Other Specialty',
+  ])
 
-export const NEURO_SUBSPECIALTIES: SubspecialtyType[] = [
+// This is a governed, non-routable fallback. It keeps an uncertain redirect
+// inside clinician review instead of allowing the model to invent a service.
+export const NON_NEURO_REDIRECT_FALLBACK: NonNeuroSpecialtyType =
+  'Other Specialty'
+
+function normalizeSpecialtyToken(value: string): string {
+  return value
+    .toLowerCase()
+    .replace(/&/g, 'and')
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim()
+}
+
+// Governed values and their slash-segments ("ENT / Otolaryngology" resolves
+// from "ENT", "Otolaryngology", or the full string), compared after
+// case/punctuation normalization. Anything unresolvable stays null so the
+// caller keeps its fail-closed behavior — this widens accepted SPELLINGS,
+// never the governed SET.
+const NON_NEURO_SPECIALTY_LOOKUP: ReadonlyMap<string, NonNeuroSpecialtyType> =
+  (() => {
+    const lookup = new Map<string, NonNeuroSpecialtyType>()
+    for (const governed of NON_NEURO_SPECIALTIES) {
+      const tokens = [governed, ...governed.split('/')]
+      for (const token of tokens) {
+        const key = normalizeSpecialtyToken(token)
+        if (key && !lookup.has(key)) lookup.set(key, governed)
+      }
+    }
+    return lookup
+  })()
+
+export function resolveNonNeuroSpecialty(
+  raw: unknown,
+): NonNeuroSpecialtyType | null {
+  if (typeof raw !== 'string') return null
+  return NON_NEURO_SPECIALTY_LOOKUP.get(normalizeSpecialtyToken(raw)) ?? null
+}
+
+export const NEURO_SUBSPECIALTIES: readonly SubspecialtyType[] = Object.freeze([
   'General Neurology',
   'Epilepsy',
   'Movement Disorders',
@@ -59,7 +145,7 @@ export const NEURO_SUBSPECIALTIES: SubspecialtyType[] = [
   'Neuromuscular',
   'Cognitive/Memory',
   'Stroke',
-]
+])
 
 // Override categories per CMIO review
 export type OverrideCategory =
@@ -110,23 +196,24 @@ export interface AITriageResponse {
   red_flags: string[]
   suggested_workup: string[]
   failed_therapies: FailedTherapy[]
-  subspecialty_recommendation: SubspecialtyType | string
+  subspecialty_recommendation: SubspecialtyType
   subspecialty_rationale: string
-  // Non-neuro redirect (new — AI may recommend a different specialty entirely)
-  redirect_to_non_neuro?: boolean
-  redirect_specialty?: string
-  redirect_rationale?: string
+  // Model output may name only a governed service. An unrecognized value is
+  // rejected at the model boundary and cannot persist as executable routing.
+  redirect_to_non_neuro: boolean
+  redirect_specialty: NonNeuroSpecialtyType | null
+  redirect_rationale: string | null
   // Safety-critical history extraction. Each field is verbatim from the
   // referral when stated, or null when not mentioned. The AI does NOT
   // fabricate values — missing-but-clinically-critical items are flagged
   // via missing_information with a "SAFETY: " prefix instead.
-  safety_anticoagulation?: string | null
-  safety_symptom_onset_time?: string | null
-  safety_allergies?: string | null
-  safety_implanted_devices?: string | null
-  safety_pregnancy_status?: string | null
-  safety_recent_procedures?: string | null
-  safety_renal_function?: string | null
+  safety_anticoagulation: string | null
+  safety_symptom_onset_time: string | null
+  safety_allergies: string | null
+  safety_implanted_devices: string | null
+  safety_pregnancy_status: string | null
+  safety_recent_procedures: string | null
+  safety_renal_function: string | null
 }
 
 // Full result after app-side scoring
@@ -152,6 +239,14 @@ export interface TriageResult {
   redirect_specialty: string | null
   redirect_rationale: string | null
   disclaimer: string
+  care_pathway?: CarePathway
+  data_quality?: DataQuality
+  coverage_status?: CoverageStatus
+  review_requirement?: ReviewRequirement
+  workflow_status?: WorkflowStatus
+  scheduling_locked?: boolean
+  outpatient_finalization_allowed?: boolean
+  safety_review?: Record<string, unknown> | null
 }
 
 // API Request
@@ -324,6 +419,7 @@ export const FILE_CONSTRAINTS = {
   MAX_FILE_SIZE_DISPLAY: '10MB',
   MAX_BATCH_FILES: 20,
   MAX_TEXT_LENGTH: 50_000,
+  MAX_PACKET_TEXT_LENGTH: 5_000_000,
   SHORT_NOTE_THRESHOLD: 2_000, // below this, skip extraction
   ALLOWED_TYPES: ['application/pdf', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', 'text/plain'] as const,
   ALLOWED_EXTENSIONS: ['.pdf', '.docx', '.txt'] as const,
@@ -349,8 +445,30 @@ export interface ClinicalExtraction {
   extraction_confidence: TriageConfidence
   extracted_summary: string
   key_findings: ExtractionKeyFindings
+  // Tenant-bound persisted source text returned only with a completed
+  // extraction. Callers must fail closed if an older/malformed response omits it.
+  original_text?: string
   original_text_length: number
   source_filename?: string
+  ingestion_mode?: 'single_pass' | 'long_packet' | 'legacy_unknown'
+  coverage_status?: CoverageStatus
+  packet_safety?: {
+    care_pathway: CarePathway
+    review_requirement: ReviewRequirement
+    clinician_hold: boolean
+    signals: Array<{
+      code: string
+      syndrome: string
+      action: string
+      evidence: Array<{
+        quote: string
+        documentId: string | null
+        pageNumber: number | null
+        startOffset: number
+        endOffset: number
+      }>
+    }>
+  }
 }
 
 // Request to the extraction endpoint
@@ -384,6 +502,8 @@ export interface FusionRequest {
 
 // Enhanced triage request with Phase 2 fields (backward-compatible)
 export interface EnhancedTriageRequest extends TriageRequest {
+  source_extraction_id?: string
+  // Legacy caller-supplied extraction content/metadata is non-authoritative when this ID is present.
   extracted_summary?: string
   source_type?: SourceType
   source_filename?: string
@@ -394,6 +514,18 @@ export interface EnhancedTriageRequest extends TriageRequest {
 }
 
 // Batch processing
+export interface BatchSafetyNotice {
+  immediateReviewRequired: boolean
+  safetyTriageSessionId: string | null
+  sourceLabel?: string
+  safetyPathway?: 'emergency_now' | 'same_day_clinician_review'
+  outpatientScoringBlocked: boolean
+  humanReviewRequired: boolean
+  schedulingLocked: boolean
+  safetyWorkflowIdentityConflict?: boolean
+  holdReason?: string
+}
+
 export interface BatchItem {
   id: string
   filename?: string
@@ -402,6 +534,8 @@ export interface BatchItem {
   status: 'pending' | 'extracting' | 'extracted' | 'triaging' | 'completed' | 'error'
   extraction?: ClinicalExtraction
   triageResult?: TriageResult
+  processingProgress?: string
+  safetyNotice?: BatchSafetyNotice
   error?: string
 }
 
@@ -421,4 +555,3 @@ export type TriagePageState =
   | 'review'       // User reviewing extraction
   | 'triaging'     // Stage 2: AI scoring triage
   | 'result'       // Showing triage result
-  | 'batch'        // Batch mode: processing multiple items

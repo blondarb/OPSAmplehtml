@@ -9,7 +9,9 @@
  */
 
 import { from } from '@/lib/db-query'
+import { getPool } from '@/lib/db'
 import type { NeurologyConsult, TriageConsultUpdate } from './types'
+import { getTenantServer } from '@/lib/tenant'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Create
@@ -31,11 +33,13 @@ export async function createConsult(
   referralText?: string,
   triageUpdate?: TriageConsultUpdate,
   patientId?: string,
+  tenantId = getTenantServer(),
 ): Promise<CreateConsultResult> {
   const now = new Date().toISOString()
   const status = triageUpdate ? 'triage_complete' : 'triage_pending'
 
   const insertData: Record<string, unknown> = {
+    tenant_id: tenantId,
     referral_text: referralText || null,
     patient_id: patientId || null,
     status,
@@ -89,27 +93,62 @@ export async function createConsult(
 export async function linkTriageToConsult(
   consultId: string,
   update: TriageConsultUpdate,
+  tenantId: string,
+  expectedPatientId: string | null,
+  processingAttemptCount: number,
 ): Promise<boolean> {
-  const { error } = await from('neurology_consults')
-    .update({
-      status: 'triage_complete',
-      triage_session_id: update.triage_session_id,
-      triage_urgency: update.triage_urgency,
-      triage_tier_display: update.triage_tier_display,
-      triage_summary: update.triage_summary,
-      triage_chief_complaint: update.triage_chief_complaint,
-      triage_red_flags: update.triage_red_flags,
-      triage_subspecialty: update.triage_subspecialty,
-      triage_completed_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-    })
-    .eq('id', consultId)
-
-  if (error) {
+  try {
+    const now = new Date().toISOString()
+    const result = await (await getPool()).query(
+      `UPDATE neurology_consults
+          SET status = 'triage_complete',
+              triage_session_id = $3,
+              triage_urgency = $5,
+              triage_tier_display = $6,
+              triage_summary = $7,
+              triage_chief_complaint = $8,
+              triage_red_flags = $9,
+              triage_subspecialty = $10,
+              triage_completed_at = $11,
+              updated_at = $11
+        WHERE id = $1
+          AND tenant_id = $2
+          AND patient_id IS NOT DISTINCT FROM $4
+          AND (triage_session_id IS NULL OR triage_session_id = $3)
+          AND EXISTS (
+            SELECT 1
+              FROM triage_sessions session
+             WHERE session.id = $3
+               AND session.tenant_id = $2
+               AND session.patient_id IS NOT DISTINCT FROM $4
+               AND (
+                 session.consult_id IS NULL
+                 OR session.consult_id = $1
+               )
+               AND session.processing_status = 'pending'
+               AND session.processing_attempt_count = $12
+          )
+      RETURNING id`,
+      [
+        consultId,
+        tenantId,
+        update.triage_session_id,
+        expectedPatientId,
+        update.triage_urgency,
+        update.triage_tier_display,
+        update.triage_summary,
+        update.triage_chief_complaint,
+        update.triage_red_flags,
+        update.triage_subspecialty,
+        now,
+        processingAttemptCount,
+      ],
+    )
+    return result.rowCount === 1 && result.rows[0]?.id === consultId
+  } catch (error) {
     console.error('[pipeline] linkTriageToConsult error:', error)
     return false
   }
-  return true
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -128,6 +167,7 @@ export async function linkIntakeToConsult(
   status: 'intake_in_progress' | 'intake_complete',
   summary?: string,
   escalationLevel?: string | null,
+  tenantId?: string,
 ): Promise<boolean> {
   const updateData: Record<string, unknown> = {
     intake_session_id: intakeSessionId,
@@ -142,9 +182,11 @@ export async function linkIntakeToConsult(
     if (escalationLevel !== undefined) updateData.intake_escalation_level = escalationLevel
   }
 
-  const { error } = await from('neurology_consults')
+  let query = from('neurology_consults')
     .update(updateData)
     .eq('id', consultId)
+  if (tenantId) query = query.eq('tenant_id', tenantId)
+  const { error } = await query
 
   if (error) {
     console.error('[pipeline] linkIntakeToConsult error:', error)
@@ -160,15 +202,21 @@ export async function linkIntakeToConsult(
 /**
  * Mark a consult as 'historian_in_progress' when the WebRTC session starts.
  */
-export async function markHistorianStarted(consultId: string): Promise<boolean> {
-  const { error } = await from('neurology_consults')
+export async function markHistorianStarted(
+  consultId: string,
+  tenantId: string,
+): Promise<boolean> {
+  const { data, error } = await from('neurology_consults')
     .update({
       status: 'historian_in_progress',
       updated_at: new Date().toISOString(),
     })
     .eq('id', consultId)
+    .eq('tenant_id', tenantId)
+    .select('id')
+    .single()
 
-  if (error) {
+  if (error || !data) {
     console.error('[pipeline] markHistorianStarted error:', error)
     return false
   }
@@ -225,13 +273,18 @@ export async function linkHistorianToConsult(
 /**
  * Mark a consult as 'sdne_pending' when a SDNE exam is requested.
  */
-export async function markSDNERequested(consultId: string): Promise<boolean> {
-  const { error } = await from('neurology_consults')
+export async function markSDNERequested(
+  consultId: string,
+  tenantId?: string,
+): Promise<boolean> {
+  let query = from('neurology_consults')
     .update({
       status: 'sdne_pending',
       updated_at: new Date().toISOString(),
     })
     .eq('id', consultId)
+  if (tenantId) query = query.eq('tenant_id', tenantId)
+  const { error } = await query
 
   if (error) {
     console.error('[pipeline] markSDNERequested error:', error)
@@ -250,8 +303,9 @@ export async function linkSDNEToConsult(
   sessionFlag: string,
   domainFlags: Record<string, string>,
   detectedPatterns: Array<{ description: string; confidence: string }>,
+  tenantId?: string,
 ): Promise<boolean> {
-  const { error } = await from('neurology_consults')
+  let query = from('neurology_consults')
     .update({
       sdne_session_id: sdneSessionId,
       sdne_session_flag: sessionFlag,
@@ -262,6 +316,8 @@ export async function linkSDNEToConsult(
       updated_at: new Date().toISOString(),
     })
     .eq('id', consultId)
+  if (tenantId) query = query.eq('tenant_id', tenantId)
+  const { error } = await query
 
   if (error) {
     console.error('[pipeline] linkSDNEToConsult error:', error)
@@ -275,11 +331,15 @@ export async function linkSDNEToConsult(
 // ─────────────────────────────────────────────────────────────────────────────
 
 /** Fetch a single consult by ID. Returns null if not found or on error. */
-export async function getConsult(consultId: string): Promise<NeurologyConsult | null> {
-  const { data, error } = await from('neurology_consults')
+export async function getConsult(
+  consultId: string,
+  tenantId?: string,
+): Promise<NeurologyConsult | null> {
+  let query = from('neurology_consults')
     .select()
     .eq('id', consultId)
-    .single()
+  if (tenantId) query = query.eq('tenant_id', tenantId)
+  const { data, error } = await query.single()
 
   if (error || !data) {
     if (error?.code !== 'PGRST116') {
@@ -294,11 +354,13 @@ export async function getConsult(consultId: string): Promise<NeurologyConsult | 
 
 /** List recent consults, optionally filtered by patient. */
 export async function listConsults(
-  patientId?: string,
-  limit = 20,
+  patientId: string | undefined,
+  limit: number,
+  tenantId: string,
 ): Promise<NeurologyConsult[]> {
   let query = from('neurology_consults')
     .select()
+    .eq('tenant_id', tenantId)
     .order('created_at', { ascending: false })
     .limit(limit)
 

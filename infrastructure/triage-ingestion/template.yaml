@@ -1,0 +1,531 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: >
+  Non-production foundation for encrypted direct upload and asynchronous OCR of
+  opaque neurology referral packets. Tenant/auth control-plane persistence must
+  be integrated before any clinical deployment.
+
+Parameters:
+  Environment:
+    Type: String
+    Default: sandbox
+    AllowedValues: [sandbox, staging, production]
+  ClinicalDataKmsKeyArn:
+    Type: String
+    Description: Customer-managed KMS key ARN approved for clinical data.
+    AllowedPattern: '^arn:[a-z0-9-]+:kms:[a-z0-9-]+:[0-9]{12}:key/[0-9a-fA-F-]{36}$'
+  AllowedUploadOrigin:
+    Type: String
+    Default: http://localhost:3000
+    Description: Exact application origin allowed to use presigned upload URLs.
+  QuarantineRetentionDays:
+    Type: Number
+    Default: 30
+    MinValue: 1
+    MaxValue: 3650
+  TextractOutputRetentionDays:
+    Type: Number
+    Default: 30
+    MinValue: 1
+    MaxValue: 3650
+  ResultRetentionDays:
+    Type: Number
+    Default: 365
+    MinValue: 1
+    MaxValue: 3650
+  WorkerMaximumConcurrency:
+    Type: Number
+    Default: 2
+    MinValue: 2
+    MaxValue: 10
+  WorkerMaximumResultRequests:
+    Type: Number
+    Default: 10000
+    MinValue: 1
+    MaxValue: 10000
+
+Globals:
+  Function:
+    Runtime: nodejs22.x
+    Architectures: [arm64]
+    Tracing: Active
+    Environment:
+      Variables:
+        NODE_OPTIONS: --enable-source-maps
+        NODE_ENV: production
+        AWS_NODEJS_CONNECTION_REUSE_ENABLED: '1'
+    Tags:
+      Project: sevaro-clinical
+      Component: neurology-scanned-packet-ingestion
+      Environment: !Ref Environment
+
+Resources:
+  ScannedPacketBucket:
+    Type: AWS::S3::Bucket
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - BucketKeyEnabled: true
+            ServerSideEncryptionByDefault:
+              SSEAlgorithm: aws:kms
+              KMSMasterKeyID: !Ref ClinicalDataKmsKeyArn
+      OwnershipControls:
+        Rules:
+          - ObjectOwnership: BucketOwnerEnforced
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      VersioningConfiguration:
+        Status: Enabled
+      CorsConfiguration:
+        CorsRules:
+          - AllowedMethods: [PUT, HEAD]
+            AllowedOrigins: [!Ref AllowedUploadOrigin]
+            AllowedHeaders:
+              - content-type
+              - x-amz-checksum-sha256
+              - x-amz-content-sha256
+              - x-amz-sdk-checksum-algorithm
+            ExposedHeaders:
+              - ETag
+              - x-amz-checksum-sha256
+              - x-amz-version-id
+            MaxAge: 600
+      LifecycleConfiguration:
+        Rules:
+          - Id: AbortIncompleteMultipartUploads
+            Status: Enabled
+            AbortIncompleteMultipartUpload:
+              DaysAfterInitiation: 1
+          - Id: QuarantineRetention
+            Status: Enabled
+            Prefix: quarantine/
+            ExpirationInDays: !Ref QuarantineRetentionDays
+            NoncurrentVersionExpiration:
+              NoncurrentDays: !Ref QuarantineRetentionDays
+          - Id: TextractOutputRetention
+            Status: Enabled
+            Prefix: textract-output/
+            ExpirationInDays: !Ref TextractOutputRetentionDays
+            NoncurrentVersionExpiration:
+              NoncurrentDays: !Ref TextractOutputRetentionDays
+          - Id: ControlRetention
+            Status: Enabled
+            Prefix: control/
+            ExpirationInDays: !Ref ResultRetentionDays
+            NoncurrentVersionExpiration:
+              NoncurrentDays: !Ref ResultRetentionDays
+          - Id: ValidatedRetention
+            Status: Enabled
+            Prefix: validated/
+            ExpirationInDays: !Ref ResultRetentionDays
+            NoncurrentVersionExpiration:
+              NoncurrentDays: !Ref ResultRetentionDays
+          - Id: ReviewRetention
+            Status: Enabled
+            Prefix: review/
+            ExpirationInDays: !Ref ResultRetentionDays
+            NoncurrentVersionExpiration:
+              NoncurrentDays: !Ref ResultRetentionDays
+      Tags:
+        - Key: Project
+          Value: sevaro-clinical
+        - Key: Component
+          Value: neurology-scanned-packet-ingestion
+        - Key: Environment
+          Value: !Ref Environment
+
+  ScannedPacketBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref ScannedPacketBucket
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Sid: DenyInsecureTransport
+            Effect: Deny
+            Principal: '*'
+            Action: s3:*
+            Resource:
+              - !GetAtt ScannedPacketBucket.Arn
+              - !Sub ${ScannedPacketBucket.Arn}/*
+            Condition:
+              Bool:
+                aws:SecureTransport: 'false'
+          - Sid: DenyExplicitNonKmsEncryption
+            Effect: Deny
+            Principal: '*'
+            Action: s3:PutObject
+            Resource: !Sub ${ScannedPacketBucket.Arn}/*
+            Condition:
+              'Null':
+                s3:x-amz-server-side-encryption: 'false'
+              StringNotEquals:
+                s3:x-amz-server-side-encryption: aws:kms
+          - Sid: DenyExplicitWrongKmsKey
+            Effect: Deny
+            Principal: '*'
+            Action: s3:PutObject
+            Resource: !Sub ${ScannedPacketBucket.Arn}/*
+            Condition:
+              'Null':
+                s3:x-amz-server-side-encryption-aws-kms-key-id: 'false'
+              StringNotEquals:
+                s3:x-amz-server-side-encryption-aws-kms-key-id: !Ref ClinicalDataKmsKeyArn
+
+  TextractCompletionTopic:
+    Type: AWS::SNS::Topic
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      # Textract asynchronous APIs require the SNS topic name to begin with
+      # AmazonTextract.
+      TopicName: !Sub AmazonTextract-sevaro-triage-scan-${Environment}-complete
+      KmsMasterKeyId: !Ref ClinicalDataKmsKeyArn
+      Tags:
+        - Key: Project
+          Value: sevaro-clinical
+        - Key: Environment
+          Value: !Ref Environment
+
+  ScannedPacketDeadLetterQueue:
+    Type: AWS::SQS::Queue
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      QueueName: !Sub sevaro-triage-scan-${Environment}-completion-dlq
+      MessageRetentionPeriod: 1209600
+      KmsMasterKeyId: !Ref ClinicalDataKmsKeyArn
+      KmsDataKeyReusePeriodSeconds: 300
+      Tags:
+        - Key: Project
+          Value: sevaro-clinical
+        - Key: Environment
+          Value: !Ref Environment
+
+  ScannedPacketSnsDeliveryDeadLetterQueue:
+    Type: AWS::SQS::Queue
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      QueueName: !Sub sevaro-triage-scan-${Environment}-sns-delivery-dlq
+      MessageRetentionPeriod: 1209600
+      KmsMasterKeyId: !Ref ClinicalDataKmsKeyArn
+      KmsDataKeyReusePeriodSeconds: 300
+      Tags:
+        - Key: Project
+          Value: sevaro-clinical
+        - Key: Environment
+          Value: !Ref Environment
+
+  ScannedPacketCompletionQueue:
+    Type: AWS::SQS::Queue
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      QueueName: !Sub sevaro-triage-scan-${Environment}-completion
+      VisibilityTimeout: 5400
+      MessageRetentionPeriod: 1209600
+      ReceiveMessageWaitTimeSeconds: 20
+      KmsMasterKeyId: !Ref ClinicalDataKmsKeyArn
+      KmsDataKeyReusePeriodSeconds: 300
+      RedrivePolicy:
+        deadLetterTargetArn: !GetAtt ScannedPacketDeadLetterQueue.Arn
+        maxReceiveCount: 5
+      Tags:
+        - Key: Project
+          Value: sevaro-clinical
+        - Key: Environment
+          Value: !Ref Environment
+
+  CompletionQueuePolicy:
+    Type: AWS::SQS::QueuePolicy
+    Properties:
+      Queues:
+        - !Ref ScannedPacketCompletionQueue
+        - !Ref ScannedPacketDeadLetterQueue
+        - !Ref ScannedPacketSnsDeliveryDeadLetterQueue
+      PolicyDocument:
+        Version: '2012-10-17'
+        # SQS queue policies require exactly one resource per statement.
+        Statement:
+          - Sid: AllowOnlyConfiguredSnsTopicCompletion
+            Effect: Allow
+            Principal:
+              Service: sns.amazonaws.com
+            Action: sqs:SendMessage
+            Resource: !GetAtt ScannedPacketCompletionQueue.Arn
+            Condition:
+              ArnEquals:
+                aws:SourceArn: !Ref TextractCompletionTopic
+              StringEquals:
+                aws:SourceAccount: !Ref AWS::AccountId
+          - Sid: AllowOnlyConfiguredSnsTopicSnsDlq
+            Effect: Allow
+            Principal:
+              Service: sns.amazonaws.com
+            Action: sqs:SendMessage
+            Resource: !GetAtt ScannedPacketSnsDeliveryDeadLetterQueue.Arn
+            Condition:
+              ArnEquals:
+                aws:SourceArn: !Ref TextractCompletionTopic
+              StringEquals:
+                aws:SourceAccount: !Ref AWS::AccountId
+          - Sid: DenyInsecureTransportCompletion
+            Effect: Deny
+            Principal: '*'
+            Action: sqs:*
+            Resource: !GetAtt ScannedPacketCompletionQueue.Arn
+            Condition:
+              Bool:
+                aws:SecureTransport: 'false'
+          - Sid: DenyInsecureTransportDlq
+            Effect: Deny
+            Principal: '*'
+            Action: sqs:*
+            Resource: !GetAtt ScannedPacketDeadLetterQueue.Arn
+            Condition:
+              Bool:
+                aws:SecureTransport: 'false'
+          - Sid: DenyInsecureTransportSnsDlq
+            Effect: Deny
+            Principal: '*'
+            Action: sqs:*
+            Resource: !GetAtt ScannedPacketSnsDeliveryDeadLetterQueue.Arn
+            Condition:
+              Bool:
+                aws:SecureTransport: 'false'
+
+  TextractCompletionSubscription:
+    Type: AWS::SNS::Subscription
+    DependsOn: CompletionQueuePolicy
+    Properties:
+      TopicArn: !Ref TextractCompletionTopic
+      Protocol: sqs
+      Endpoint: !GetAtt ScannedPacketCompletionQueue.Arn
+      RawMessageDelivery: true
+      RedrivePolicy:
+        deadLetterTargetArn: !GetAtt ScannedPacketSnsDeliveryDeadLetterQueue.Arn
+
+  TextractPublishRole:
+    Type: AWS::IAM::Role
+    Properties:
+      Path: /sevaro/triage/
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: textract.amazonaws.com
+            Action: sts:AssumeRole
+            Condition:
+              StringEquals:
+                aws:SourceAccount: !Ref AWS::AccountId
+              ArnLike:
+                aws:SourceArn: !Sub arn:${AWS::Partition}:textract:${AWS::Region}:${AWS::AccountId}:*
+      Policies:
+        - PolicyName: PublishOnlyConfiguredCompletionTopic
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action: sns:Publish
+                Resource: !Ref TextractCompletionTopic
+              - Sid: EncryptCompletionNotifications
+                Effect: Allow
+                Action:
+                  - kms:GenerateDataKey*
+                  - kms:Decrypt
+                Resource: !Ref ClinicalDataKmsKeyArn
+      Tags:
+        - Key: Project
+          Value: sevaro-clinical
+        - Key: Environment
+          Value: !Ref Environment
+
+  ScannedPacketCompletionWorker:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: ../../
+      Handler: src/workers/triageScannedPacketWorker.handler
+      Description: Validates opaque Textract completion and writes immutable page/review manifests.
+      Timeout: 900
+      MemorySize: 4096
+      EphemeralStorage:
+        Size: 1024
+      ReservedConcurrentExecutions: !Ref WorkerMaximumConcurrency
+      Environment:
+        Variables:
+          TRIAGE_SCANNED_PACKET_SOURCE_BUCKET: !Ref ScannedPacketBucket
+          TRIAGE_SCANNED_PACKET_RESULT_BUCKET: !Ref ScannedPacketBucket
+          TRIAGE_SCANNED_PACKET_KMS_KEY_ARN: !Ref ClinicalDataKmsKeyArn
+          TRIAGE_SCANNED_PACKET_MAX_RESULT_REQUESTS: !Ref WorkerMaximumResultRequests
+      Policies:
+        - Statement:
+            - Sid: ReadOpaqueBindingAndPriorImmutableResults
+              Effect: Allow
+              Action: s3:GetObject
+              Resource:
+                - !Sub ${ScannedPacketBucket.Arn}/control/*
+                - !Sub ${ScannedPacketBucket.Arn}/validated/*
+                - !Sub ${ScannedPacketBucket.Arn}/review/*
+            - Sid: WriteImmutableValidatedOrReviewResult
+              Effect: Allow
+              Action: s3:PutObject
+              Resource:
+                - !Sub ${ScannedPacketBucket.Arn}/validated/*
+                - !Sub ${ScannedPacketBucket.Arn}/review/*
+            - Sid: RetrieveOnlyTextractTextDetectionResults
+              Effect: Allow
+              Action: textract:GetDocumentTextDetection
+              Resource: '*'
+            - Sid: UseApprovedClinicalDataKey
+              Effect: Allow
+              Action:
+                - kms:Decrypt
+                - kms:Encrypt
+                - kms:GenerateDataKey
+                - kms:DescribeKey
+              Resource: !Ref ClinicalDataKmsKeyArn
+            - Sid: ConsumeOnlyCompletionQueue
+              Effect: Allow
+              Action:
+                - sqs:ReceiveMessage
+                - sqs:DeleteMessage
+                - sqs:GetQueueAttributes
+                - sqs:ChangeMessageVisibility
+              Resource: !GetAtt ScannedPacketCompletionQueue.Arn
+      Events:
+        CompletionQueue:
+          Type: SQS
+          Properties:
+            Queue: !GetAtt ScannedPacketCompletionQueue.Arn
+            BatchSize: 1
+            MaximumBatchingWindowInSeconds: 0
+            FunctionResponseTypes:
+              - ReportBatchItemFailures
+            ScalingConfig:
+              MaximumConcurrency: !Ref WorkerMaximumConcurrency
+      LoggingConfig:
+        LogFormat: JSON
+        ApplicationLogLevel: ERROR
+        SystemLogLevel: WARN
+    Metadata:
+      BuildMethod: esbuild
+      BuildProperties:
+        EntryPoints:
+          - src/workers/triageScannedPacketWorker.ts
+        Minify: true
+        Sourcemap: true
+        Target: es2022
+
+  CompletionWorkerLogGroup:
+    Type: AWS::Logs::LogGroup
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      LogGroupName: !Sub /aws/lambda/${ScannedPacketCompletionWorker}
+      RetentionInDays: 30
+
+  ScannedPacketAlarmTopic:
+    Type: AWS::SNS::Topic
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      TopicName: !Sub sevaro-triage-scan-${Environment}-alarms
+      KmsMasterKeyId: !Ref ClinicalDataKmsKeyArn
+
+  CompletionDeadLetterAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmDescription: A scanned-packet completion reached the dead-letter queue.
+      Namespace: AWS/SQS
+      MetricName: ApproximateNumberOfMessagesVisible
+      Dimensions:
+        - Name: QueueName
+          Value: !GetAtt ScannedPacketDeadLetterQueue.QueueName
+      Statistic: Maximum
+      Period: 60
+      EvaluationPeriods: 1
+      DatapointsToAlarm: 1
+      Threshold: 1
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      TreatMissingData: notBreaching
+      AlarmActions: [!Ref ScannedPacketAlarmTopic]
+
+  SnsDeliveryDeadLetterAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmDescription: SNS could not deliver a Textract completion to its queue.
+      Namespace: AWS/SQS
+      MetricName: ApproximateNumberOfMessagesVisible
+      Dimensions:
+        - Name: QueueName
+          Value: !GetAtt ScannedPacketSnsDeliveryDeadLetterQueue.QueueName
+      Statistic: Maximum
+      Period: 60
+      EvaluationPeriods: 1
+      DatapointsToAlarm: 1
+      Threshold: 1
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      TreatMissingData: notBreaching
+      AlarmActions: [!Ref ScannedPacketAlarmTopic]
+
+  CompletionQueueAgeAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmDescription: A scanned-packet completion has waited longer than 15 minutes.
+      Namespace: AWS/SQS
+      MetricName: ApproximateAgeOfOldestMessage
+      Dimensions:
+        - Name: QueueName
+          Value: !GetAtt ScannedPacketCompletionQueue.QueueName
+      Statistic: Maximum
+      Period: 300
+      EvaluationPeriods: 1
+      DatapointsToAlarm: 1
+      Threshold: 900
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      TreatMissingData: notBreaching
+      AlarmActions: [!Ref ScannedPacketAlarmTopic]
+
+  CompletionWorkerErrorAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmDescription: The scanned-packet completion worker returned an error.
+      Namespace: AWS/Lambda
+      MetricName: Errors
+      Dimensions:
+        - Name: FunctionName
+          Value: !Ref ScannedPacketCompletionWorker
+      Statistic: Sum
+      Period: 300
+      EvaluationPeriods: 1
+      DatapointsToAlarm: 1
+      Threshold: 1
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      TreatMissingData: notBreaching
+      AlarmActions: [!Ref ScannedPacketAlarmTopic]
+
+Outputs:
+  ScannedPacketBucketName:
+    Description: Opaque encrypted source/control/result bucket for later control-plane integration.
+    Value: !Ref ScannedPacketBucket
+  ScannedPacketBucketArn:
+    Value: !GetAtt ScannedPacketBucket.Arn
+  TextractCompletionTopicArn:
+    Value: !Ref TextractCompletionTopic
+  TextractPublishRoleArn:
+    Value: !GetAtt TextractPublishRole.Arn
+  CompletionQueueArn:
+    Value: !GetAtt ScannedPacketCompletionQueue.Arn
+  SnsDeliveryDeadLetterQueueArn:
+    Value: !GetAtt ScannedPacketSnsDeliveryDeadLetterQueue.Arn
+  AlarmTopicArn:
+    Value: !Ref ScannedPacketAlarmTopic
+  CompletionWorkerArn:
+    Value: !GetAtt ScannedPacketCompletionWorker.Arn

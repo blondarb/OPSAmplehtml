@@ -1,32 +1,30 @@
 import { NextResponse } from 'next/server'
-import { getUser } from '@/lib/cognito/server'
-import { from } from '@/lib/db-query'
+import { authorizeClinicalAccess } from '@/lib/auth/clinicalAccess'
 
-// PATCH /api/triage/[id]/patient — link a patient to a triage session
+// Patient identity must be established on an immutable referral case before
+// triage processing. A session id plus caller-selected patient id is not a
+// sufficient identity proof and can mix two patients within the same tenant.
 export async function PATCH(
-  request: Request,
-  { params }: { params: Promise<{ id: string }> }
+  _request: Request,
+  _context: { params: Promise<{ id: string }> },
 ) {
-  const user = await getUser()
-
-  if (!user) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  const access = await authorizeClinicalAccess({
+    action: 'triage.link_patient',
+    allowedRoles: ['clinician', 'admin'],
+  })
+  if (!access.ok) {
+    return NextResponse.json(
+      { error: 'Access denied', reason: access.reason },
+      { status: access.status },
+    )
   }
 
-  const { id: sessionId } = await params
-  const { patient_id } = await request.json()
-
-  if (!patient_id) {
-    return NextResponse.json({ error: 'patient_id is required' }, { status: 400 })
-  }
-
-  const { error } = await from('triage_sessions')
-    .update({ patient_id })
-    .eq('id', sessionId)
-
-  if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 })
-  }
-
-  return NextResponse.json({ success: true })
+  return NextResponse.json(
+    {
+      error:
+        'Patient binding requires a verified referral identity workflow and is not available from a triage session.',
+      reason: 'unverified_patient_binding_not_allowed',
+    },
+    { status: 409 },
+  )
 }

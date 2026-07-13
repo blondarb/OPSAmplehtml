@@ -39,6 +39,10 @@ export type VoiceEvent =
   | { type: 'aiSpeechStop' }
   | { type: 'toolCall'; toolName: string; toolUseId: string; input: unknown }
   | { type: 'error'; message: string }
+  // Parallel AWS Transcribe Medical accuracy check (flag-gated on the relay,
+  // Nova-only — see services/nova-sonic-relay/src/transcribeMedicalSession.ts).
+  // v1: capture + emit + log only, no effect on the conversation itself.
+  | { type: 'medicalTranscript'; text: string; isPartial: boolean }
   // Transport dropped unexpectedly (WebRTC connection failed/closed, data
   // channel closed, WS closed non-cleanly) — distinct from `error`, which is
   // an in-session protocol-level error the session can survive. `disconnected`
@@ -148,4 +152,11 @@ export interface VoiceProvider {
    * provider leaves this undefined; callers fall back to `injectSystemText`.
    */
   updateInstructions?(fullText: string): void
+  /**
+   * Optional playback diagnostics snapshot (worklet underrun/prime/queue
+   * counters — see PcmPlayer.getDiagnostics), for the iOS "crackle"
+   * investigation. Instrumentation only; providers without an audio player
+   * (or that don't wire this up) simply omit the method. Never throws.
+   */
+  getAudioDiagnostics?(): Promise<Record<string, unknown> | null>
 }

@@ -8,7 +8,11 @@ import {
   BedrockRuntimeClient,
   InvokeModelCommand,
 } from '@aws-sdk/client-bedrock-runtime'
-import { calculateTriageTier, validateAIResponse } from '../src/lib/triage/scoring'
+import {
+  calculateTriageTier,
+  extractScoringEmergencyEnvelope,
+  parseAndNormalizeAIResponse,
+} from '../src/lib/triage/scoring'
 import { TRIAGE_SYSTEM_PROMPT, buildTriageUserPrompt } from '../src/lib/triage/systemPrompt'
 import { AITriageResponse } from '../src/lib/triage/types'
 import { Pool } from 'pg'
@@ -37,15 +41,29 @@ pool.on('error', (err) => {
   console.error('Pool error (will reconnect):', err.message)
 })
 
-// Direct Bedrock client (no timeout wrapper from runTriage)
+// Direct Bedrock client (no timeout wrapper from runTriage).
+// Explicit env keys win; otherwise fall back to the SDK default chain
+// (AWS_PROFILE / SSO) — empty-string creds fail every call with
+// "security token invalid".
+const explicitKey = process.env.BEDROCK_ACCESS_KEY_ID || process.env.AWS_ACCESS_KEY_ID
+const explicitSecret = process.env.BEDROCK_SECRET_ACCESS_KEY || process.env.AWS_SECRET_ACCESS_KEY
 const bedrockClient = new BedrockRuntimeClient({
   region: process.env.BEDROCK_REGION || 'us-east-2',
-  credentials: {
-    accessKeyId: process.env.BEDROCK_ACCESS_KEY_ID || process.env.AWS_ACCESS_KEY_ID || '',
-    secretAccessKey: process.env.BEDROCK_SECRET_ACCESS_KEY || process.env.AWS_SECRET_ACCESS_KEY || '',
-    ...(process.env.AWS_SESSION_TOKEN ? { sessionToken: process.env.AWS_SESSION_TOKEN } : {}),
-  },
+  ...(explicitKey && explicitSecret
+    ? {
+        credentials: {
+          accessKeyId: explicitKey,
+          secretAccessKey: explicitSecret,
+          ...(process.env.AWS_SESSION_TOKEN ? { sessionToken: process.env.AWS_SESSION_TOKEN } : {}),
+        },
+      }
+    : {}),
 })
+
+// Claude 5-family (and Opus 4.8) Bedrock endpoints reject the temperature
+// parameter: "`temperature` is deprecated for this model." Omit it there;
+// repeat runs then measure default-sampling variance instead of temp spread.
+const MODEL_SUPPORTS_TEMPERATURE = !/sonnet-5|opus-4-8|fable/.test(MODEL)
 
 async function callBedrock(referralText: string, patientAge: number | null, patientSex: string | null, temperature: number) {
   const userPrompt = buildTriageUserPrompt(referralText, {
@@ -53,12 +71,14 @@ async function callBedrock(referralText: string, patientAge: number | null, pati
     patientSex: patientSex ?? undefined,
   })
 
+  // 5-family models spend max_tokens on a leading reasoning block before any
+  // text — 4000 truncates mid-JSON (or before it). Give them real headroom.
   const body = JSON.stringify({
     anthropic_version: 'bedrock-2023-05-31',
     system: TRIAGE_SYSTEM_PROMPT,
     messages: [{ role: 'user', content: userPrompt }],
-    max_tokens: 4000,
-    temperature,
+    max_tokens: MODEL_SUPPORTS_TEMPERATURE ? 4000 : 16000,
+    ...(MODEL_SUPPORTS_TEMPERATURE ? { temperature } : {}),
   })
 
   const command = new InvokeModelCommand({
@@ -79,17 +99,32 @@ async function callBedrock(referralText: string, patientAge: number | null, pati
     clearTimeout(timeout)
   }
   const responseBody = JSON.parse(new TextDecoder().decode(response.body))
-  const text = responseBody.content?.[0]?.text || ''
+  if (responseBody.stop_reason === 'max_tokens') {
+    throw new Error('Response truncated at max_tokens — raise the budget')
+  }
+  // Claude 5-family responses can lead with a reasoning block; content[0]
+  // is then not the text block. Join every text block instead.
+  const text = Array.isArray(responseBody.content)
+    ? responseBody.content
+        .filter((block: { type?: string; text?: string }) => typeof block?.text === 'string')
+        .map((block: { text: string }) => block.text)
+        .join('')
+    : ''
 
   // Parse JSON from response
   const jsonMatch = text.match(/\{[\s\S]*\}/)
   if (!jsonMatch) throw new Error('No JSON found in response')
 
   const parsed = JSON.parse(jsonMatch[0])
-  const validationError = validateAIResponse(parsed)
-  if (validationError) throw new Error(`AI response validation failed: ${validationError}`)
-
-  const aiResponse = parsed as AITriageResponse
+  let aiResponse: AITriageResponse
+  try {
+    aiResponse = parseAndNormalizeAIResponse(parsed)
+  } catch (error) {
+    const emergencyEnvelope = extractScoringEmergencyEnvelope(parsed)
+    throw new Error(
+      `AI response validation failed${emergencyEnvelope.emergentOverride ? ' (emergency_override=true preserved)' : ''}: ${error instanceof Error ? error.message : 'unknown schema error'}`,
+    )
+  }
   const scoring = calculateTriageTier(aiResponse)
 
   return {

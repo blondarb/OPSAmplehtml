@@ -29,6 +29,10 @@ export class NovaSonicWsProvider implements VoiceProvider {
   private closing = false
   /** True while the AI is producing audio — lets `completion` end the turn cleanly. */
   private aiSpeaking = false
+  /** Last diagnostics snapshot captured from `player` before it was closed in
+   *  stop() — so getAudioDiagnostics() still has something to return after
+   *  teardown (e.g. when the hook reads it right after stop() completes). */
+  private stashedDiagnostics: Record<string, unknown> | null = null
 
   on(cb: (e: VoiceEvent) => void): void {
     this.cb = cb
@@ -200,6 +204,9 @@ export class NovaSonicWsProvider implements VoiceProvider {
       case 'error':
         this.emit({ type: 'error', message: msg.message })
         break
+      case 'medicalTranscript':
+        this.emit({ type: 'medicalTranscript', text: msg.text, isPartial: msg.isPartial })
+        break
     }
   }
 
@@ -217,6 +224,12 @@ export class NovaSonicWsProvider implements VoiceProvider {
     player.whenDrained().then(() => {
       this.emit({ type: 'aiSpeechStop' })
     })
+  }
+
+  /** See VoiceProvider.getAudioDiagnostics — iOS crackle instrumentation. */
+  async getAudioDiagnostics(): Promise<Record<string, unknown> | null> {
+    if (this.player) return this.player.getDiagnostics()
+    return this.stashedDiagnostics
   }
 
   sendToolResult(toolUseId: string, output: unknown): void {
@@ -267,6 +280,11 @@ export class NovaSonicWsProvider implements VoiceProvider {
     }
 
     if (this.player) {
+      // Stash a final diagnostics snapshot before close() tears the worklet
+      // node down — getAudioDiagnostics() would otherwise have nothing to
+      // return once `player` is gone. Best-effort: never let this block or
+      // fail teardown.
+      this.stashedDiagnostics = await this.player.getDiagnostics().catch(() => null)
       try {
         await this.player.close()
       } catch {

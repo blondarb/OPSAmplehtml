@@ -31,5 +31,7 @@ run:
       value: us-east-1
     - name: NOVA_SONIC_MODEL_ID
       value: amazon.nova-2-sonic-v1:0
+    - name: TRANSCRIBE_MEDICAL_ENABLED
+      value: "false"
     # NOVA_SONIC_VOICE_ID — set in the App Runner console or via
     # aws apprunner update-service if you want a non-default voice.

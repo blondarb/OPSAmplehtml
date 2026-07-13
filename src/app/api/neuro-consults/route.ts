@@ -53,7 +53,8 @@ export async function GET(request: Request) {
     const patientId = searchParams.get('patient_id') || undefined
     const limit = parseInt(searchParams.get('limit') || '20', 10)
 
-    const consults = await listConsults(patientId, Math.min(limit, 100))
+    // Pre-tenancy caller: migration 048 backfills tenant_id 'default'
+    const consults = await listConsults(patientId, Math.min(limit, 100), 'default')
 
     return NextResponse.json({ consults })
   } catch (error: unknown) {

@@ -1,0 +1,651 @@
+{
+  "schemaVersion": "1.0",
+  "catalogId": "neurology-triage-sentinel-2026-07-11-v2",
+  "gateSetId": "neurology-triage-sentinel-release-gates-2026-07-11-v1",
+  "mode": "live_ensemble",
+  "synthetic": true,
+  "clinicalValidationClaim": false,
+  "generatedAt": "2026-07-11T12:46:22.169Z",
+  "evaluationScope": "subset",
+  "releaseGateEligible": false,
+  "outcomes": [
+    {
+      "caseId": "autonomic-dysreflexia-current",
+      "title": "Current autonomic dysreflexia constellation",
+      "syndrome": "autonomic_dysreflexia",
+      "tags": [
+        "emergency",
+        "current",
+        "autonomic_dysreflexia"
+      ],
+      "hardNegative": false,
+      "expectedClinicalClass": "time_critical",
+      "offlineRequired": true,
+      "evaluated": true,
+      "unevaluatedReason": null,
+      "expectedPathway": "emergency_now",
+      "acceptablePathways": [
+        "emergency_now"
+      ],
+      "actualPathway": "emergency_now",
+      "exactOrAcceptable": true,
+      "underTriaged": false,
+      "overTriaged": false,
+      "manualHold": false,
+      "alertRaised": true,
+      "signals": [
+        {
+          "code": "NEURO_EMERGENCY_AUTONOMIC_DYSREFLEXIA",
+          "syndrome": "autonomic_dysreflexia",
+          "source": "deterministic",
+          "action": "emergency_now",
+          "assertion": "present",
+          "temporality": "current",
+          "experiencer": "patient",
+          "evidence": [
+            {
+              "packetId": null,
+              "documentId": null,
+              "pageNumber": null,
+              "startOffset": 0,
+              "endOffset": 158,
+              "quote": "Patient with a high spinal cord injury now has blood pressure 224/118, pounding headache, flushing, sweating above the injury, and a blocked urinary catheter.",
+              "extractionMethod": "native_text",
+              "extractionConfidence": null
+            },
+            {
+              "packetId": null,
+              "documentId": null,
+              "pageNumber": null,
+              "startOffset": 159,
+              "endOffset": 193,
+              "quote": "Concern for autonomic dysreflexia.",
+              "extractionMethod": "native_text",
+              "extractionConfidence": null
+            }
+          ]
+        },
+        {
+          "code": "NEURO_EMERGENCY_INTRACRANIAL_HEMORRHAGE_OR_SAH",
+          "syndrome": "intracranial_hemorrhage_or_sah",
+          "source": "deterministic",
+          "action": "emergency_now",
+          "assertion": "present",
+          "temporality": "current",
+          "experiencer": "patient",
+          "evidence": [
+            {
+              "packetId": null,
+              "documentId": null,
+              "pageNumber": null,
+              "startOffset": 0,
+              "endOffset": 158,
+              "quote": "Patient with a high spinal cord injury now has blood pressure 224/118, pounding headache, flushing, sweating above the injury, and a blocked urinary catheter.",
+              "extractionMethod": "native_text",
+              "extractionConfidence": null
+            }
+          ]
+        },
+        {
+          "code": "autonomic_dysreflexia_acute",
+          "syndrome": "autonomic_dysreflexia",
+          "source": "safety_model",
+          "action": "emergency_now",
+          "assertion": "present",
+          "temporality": "current",
+          "experiencer": "patient",
+          "evidence": [
+            {
+              "packetId": null,
+              "documentId": null,
+              "pageNumber": null,
+              "startOffset": 0,
+              "endOffset": 158,
+              "quote": "Patient with a high spinal cord injury now has blood pressure 224/118, pounding headache, flushing, sweating above the injury, and a blocked urinary catheter.",
+              "extractionMethod": "native_text",
+              "extractionConfidence": null
+            },
+            {
+              "packetId": null,
+              "documentId": null,
+              "pageNumber": null,
+              "startOffset": 159,
+              "endOffset": 193,
+              "quote": "Concern for autonomic dysreflexia.",
+              "extractionMethod": "native_text",
+              "extractionConfidence": null
+            }
+          ]
+        }
+      ],
+      "evidenceValidation": {
+        "totalReferences": 5,
+        "validReferences": 5,
+        "invalidReferences": 0,
+        "invalidReasons": []
+      },
+      "branchTelemetry": [
+        {
+          "branch": "deterministic_gateway",
+          "executed": true,
+          "modelId": null,
+          "inputTokens": 0,
+          "outputTokens": 0,
+          "latencyMs": 26.283209,
+          "costUsd": 0,
+          "status": "complete",
+          "reason": null
+        },
+        {
+          "branch": "safety_extractor",
+          "executed": true,
+          "modelId": "us.anthropic.claude-sonnet-5",
+          "inputTokens": null,
+          "outputTokens": null,
+          "latencyMs": 5374.071959,
+          "costUsd": null,
+          "status": "complete",
+          "reason": null
+        },
+        {
+          "branch": "outpatient_scorer",
+          "executed": true,
+          "modelId": "us.anthropic.claude-sonnet-4-6",
+          "inputTokens": null,
+          "outputTokens": null,
+          "latencyMs": 19041.389625,
+          "costUsd": null,
+          "status": "complete",
+          "reason": null
+        },
+        {
+          "branch": "adjudicator",
+          "executed": true,
+          "modelId": "us.anthropic.claude-opus-4-8",
+          "inputTokens": null,
+          "outputTokens": null,
+          "latencyMs": 3632.6073749999996,
+          "costUsd": null,
+          "status": "complete",
+          "reason": null
+        }
+      ]
+    },
+    {
+      "caseId": "other-time-critical-nms-model-only",
+      "title": "Possible neuroleptic malignant syndrome",
+      "syndrome": "other_time_critical",
+      "tags": [
+        "emergency",
+        "current",
+        "model_only",
+        "other_time_critical"
+      ],
+      "hardNegative": false,
+      "expectedClinicalClass": "time_critical",
+      "offlineRequired": false,
+      "evaluated": true,
+      "unevaluatedReason": null,
+      "expectedPathway": "emergency_now",
+      "acceptablePathways": [
+        "emergency_now"
+      ],
+      "actualPathway": "emergency_now",
+      "exactOrAcceptable": true,
+      "underTriaged": false,
+      "overTriaged": false,
+      "manualHold": false,
+      "alertRaised": true,
+      "signals": [
+        {
+          "code": "hyperthermia_rigidity_obtundation_nms",
+          "syndrome": "altered_mental_status_or_coma",
+          "source": "safety_model",
+          "action": "emergency_now",
+          "assertion": "present",
+          "temporality": "current",
+          "experiencer": "patient",
+          "evidence": [
+            {
+              "packetId": null,
+              "documentId": null,
+              "pageNumber": null,
+              "startOffset": 37,
+              "endOffset": 154,
+              "quote": "the patient now has temperature 40.2 C, generalized lead-pipe rigidity, obtundation, and marked autonomic instability",
+              "extractionMethod": "native_text",
+              "extractionConfidence": null
+            }
+          ]
+        },
+        {
+          "code": "suspected_neuroleptic_malignant_syndrome",
+          "syndrome": "other_time_critical",
+          "source": "safety_model",
+          "action": "emergency_now",
+          "assertion": "present",
+          "temporality": "current",
+          "experiencer": "patient",
+          "evidence": [
+            {
+              "packetId": null,
+              "documentId": null,
+              "pageNumber": null,
+              "startOffset": 156,
+              "endOffset": 199,
+              "quote": "Concern for neuroleptic malignant syndrome.",
+              "extractionMethod": "native_text",
+              "extractionConfidence": null
+            }
+          ]
+        },
+        {
+          "code": "autonomic_instability_current",
+          "syndrome": "autonomic_dysreflexia",
+          "source": "safety_model",
+          "action": "emergency_now",
+          "assertion": "present",
+          "temporality": "current",
+          "experiencer": "patient",
+          "evidence": [
+            {
+              "packetId": null,
+              "documentId": null,
+              "pageNumber": null,
+              "startOffset": 126,
+              "endOffset": 154,
+              "quote": "marked autonomic instability",
+              "extractionMethod": "native_text",
+              "extractionConfidence": null
+            }
+          ]
+        }
+      ],
+      "evidenceValidation": {
+        "totalReferences": 3,
+        "validReferences": 3,
+        "invalidReferences": 0,
+        "invalidReasons": []
+      },
+      "branchTelemetry": [
+        {
+          "branch": "deterministic_gateway",
+          "executed": true,
+          "modelId": null,
+          "inputTokens": 0,
+          "outputTokens": 0,
+          "latencyMs": 0.5982499999990978,
+          "costUsd": 0,
+          "status": "complete",
+          "reason": null
+        },
+        {
+          "branch": "safety_extractor",
+          "executed": true,
+          "modelId": "us.anthropic.claude-sonnet-5",
+          "inputTokens": null,
+          "outputTokens": null,
+          "latencyMs": 6839.053499999998,
+          "costUsd": null,
+          "status": "complete",
+          "reason": null
+        },
+        {
+          "branch": "outpatient_scorer",
+          "executed": true,
+          "modelId": "us.anthropic.claude-sonnet-4-6",
+          "inputTokens": null,
+          "outputTokens": null,
+          "latencyMs": 18366.056167000002,
+          "costUsd": null,
+          "status": "complete",
+          "reason": null
+        },
+        {
+          "branch": "adjudicator",
+          "executed": true,
+          "modelId": "us.anthropic.claude-opus-4-8",
+          "inputTokens": null,
+          "outputTokens": null,
+          "latencyMs": 5512.307708,
+          "costUsd": null,
+          "status": "complete",
+          "reason": null
+        }
+      ]
+    }
+  ],
+  "metrics": {
+    "totalCases": 2,
+    "evaluatedCases": 2,
+    "unevaluatedCases": 0,
+    "unevaluatedOfflineCases": 0,
+    "exactOrAcceptable": {
+      "count": 2,
+      "denominator": 2,
+      "rate": 1
+    },
+    "underTriage": {
+      "count": 0,
+      "denominator": 2,
+      "rate": 0
+    },
+    "emergencyUnderTriage": {
+      "count": 0,
+      "denominator": 2,
+      "rate": 0
+    },
+    "overTriage": {
+      "count": 0,
+      "denominator": 0,
+      "rate": null
+    },
+    "manualHold": {
+      "count": 0,
+      "denominator": 2,
+      "rate": 0
+    },
+    "alertBurden": {
+      "count": 2,
+      "denominator": 2,
+      "rate": 1
+    },
+    "hardNegativeFalseAlerts": {
+      "count": 0,
+      "denominator": 0,
+      "rate": null
+    },
+    "evidenceExactness": {
+      "count": 8,
+      "denominator": 8,
+      "rate": 1
+    },
+    "timeCriticalEvidenceExactness": {
+      "count": 8,
+      "denominator": 8,
+      "rate": 1
+    },
+    "bySyndrome": {
+      "autonomic_dysreflexia": {
+        "evaluatedCases": 1,
+        "exactOrAcceptable": {
+          "count": 1,
+          "denominator": 1,
+          "rate": 1
+        },
+        "underTriage": {
+          "count": 0,
+          "denominator": 1,
+          "rate": 0
+        },
+        "overTriage": {
+          "count": 0,
+          "denominator": 1,
+          "rate": 0
+        },
+        "manualHold": {
+          "count": 0,
+          "denominator": 1,
+          "rate": 0
+        },
+        "alerts": {
+          "count": 1,
+          "denominator": 1,
+          "rate": 1
+        }
+      },
+      "other_time_critical": {
+        "evaluatedCases": 1,
+        "exactOrAcceptable": {
+          "count": 1,
+          "denominator": 1,
+          "rate": 1
+        },
+        "underTriage": {
+          "count": 0,
+          "denominator": 1,
+          "rate": 0
+        },
+        "overTriage": {
+          "count": 0,
+          "denominator": 1,
+          "rate": 0
+        },
+        "manualHold": {
+          "count": 0,
+          "denominator": 1,
+          "rate": 0
+        },
+        "alerts": {
+          "count": 1,
+          "denominator": 1,
+          "rate": 1
+        }
+      }
+    },
+    "bySubgroup": {
+      "emergency": {
+        "evaluatedCases": 2,
+        "exactOrAcceptable": {
+          "count": 2,
+          "denominator": 2,
+          "rate": 1
+        },
+        "underTriage": {
+          "count": 0,
+          "denominator": 2,
+          "rate": 0
+        },
+        "overTriage": {
+          "count": 0,
+          "denominator": 2,
+          "rate": 0
+        },
+        "manualHold": {
+          "count": 0,
+          "denominator": 2,
+          "rate": 0
+        },
+        "alerts": {
+          "count": 2,
+          "denominator": 2,
+          "rate": 1
+        }
+      },
+      "current": {
+        "evaluatedCases": 2,
+        "exactOrAcceptable": {
+          "count": 2,
+          "denominator": 2,
+          "rate": 1
+        },
+        "underTriage": {
+          "count": 0,
+          "denominator": 2,
+          "rate": 0
+        },
+        "overTriage": {
+          "count": 0,
+          "denominator": 2,
+          "rate": 0
+        },
+        "manualHold": {
+          "count": 0,
+          "denominator": 2,
+          "rate": 0
+        },
+        "alerts": {
+          "count": 2,
+          "denominator": 2,
+          "rate": 1
+        }
+      },
+      "autonomic_dysreflexia": {
+        "evaluatedCases": 1,
+        "exactOrAcceptable": {
+          "count": 1,
+          "denominator": 1,
+          "rate": 1
+        },
+        "underTriage": {
+          "count": 0,
+          "denominator": 1,
+          "rate": 0
+        },
+        "overTriage": {
+          "count": 0,
+          "denominator": 1,
+          "rate": 0
+        },
+        "manualHold": {
+          "count": 0,
+          "denominator": 1,
+          "rate": 0
+        },
+        "alerts": {
+          "count": 1,
+          "denominator": 1,
+          "rate": 1
+        }
+      },
+      "model_only": {
+        "evaluatedCases": 1,
+        "exactOrAcceptable": {
+          "count": 1,
+          "denominator": 1,
+          "rate": 1
+        },
+        "underTriage": {
+          "count": 0,
+          "denominator": 1,
+          "rate": 0
+        },
+        "overTriage": {
+          "count": 0,
+          "denominator": 1,
+          "rate": 0
+        },
+        "manualHold": {
+          "count": 0,
+          "denominator": 1,
+          "rate": 0
+        },
+        "alerts": {
+          "count": 1,
+          "denominator": 1,
+          "rate": 1
+        }
+      },
+      "other_time_critical": {
+        "evaluatedCases": 1,
+        "exactOrAcceptable": {
+          "count": 1,
+          "denominator": 1,
+          "rate": 1
+        },
+        "underTriage": {
+          "count": 0,
+          "denominator": 1,
+          "rate": 0
+        },
+        "overTriage": {
+          "count": 0,
+          "denominator": 1,
+          "rate": 0
+        },
+        "manualHold": {
+          "count": 0,
+          "denominator": 1,
+          "rate": 0
+        },
+        "alerts": {
+          "count": 1,
+          "denominator": 1,
+          "rate": 1
+        }
+      }
+    },
+    "telemetryByBranch": {
+      "deterministic_gateway": {
+        "executions": 2,
+        "inputTokens": 0,
+        "outputTokens": 0,
+        "tokenUsageComplete": true,
+        "latencyMs": 26.881458999999097,
+        "costUsd": 0
+      },
+      "safety_extractor": {
+        "executions": 2,
+        "inputTokens": 0,
+        "outputTokens": 0,
+        "tokenUsageComplete": false,
+        "latencyMs": 12213.125458999999,
+        "costUsd": null
+      },
+      "outpatient_scorer": {
+        "executions": 2,
+        "inputTokens": 0,
+        "outputTokens": 0,
+        "tokenUsageComplete": false,
+        "latencyMs": 37407.445792,
+        "costUsd": null
+      },
+      "adjudicator": {
+        "executions": 2,
+        "inputTokens": 0,
+        "outputTokens": 0,
+        "tokenUsageComplete": false,
+        "latencyMs": 9144.915083,
+        "costUsd": null
+      }
+    }
+  },
+  "gates": [
+    {
+      "id": "zero-emergency-under-triage",
+      "metric": "emergency_under_triage_count",
+      "operator": "eq",
+      "threshold": 0,
+      "observed": 0,
+      "passed": true,
+      "description": "No synthetic emergency case may finish below emergency_now."
+    },
+    {
+      "id": "zero-invalid-time-critical-evidence",
+      "metric": "invalid_time_critical_evidence_count",
+      "operator": "eq",
+      "threshold": 0,
+      "observed": 0,
+      "passed": true,
+      "description": "Every emitted time-critical evidence reference must resolve exactly to its immutable source."
+    },
+    {
+      "id": "complete-offline-execution",
+      "metric": "unevaluated_offline_case_count",
+      "operator": "eq",
+      "threshold": 0,
+      "observed": 0,
+      "passed": true,
+      "description": "Every case declared eligible for offline deterministic execution must execute."
+    },
+    {
+      "id": "hard-negative-false-alert-rate",
+      "metric": "hard_negative_false_alert_rate",
+      "operator": "lte",
+      "threshold": 0.05,
+      "observed": 0,
+      "passed": true,
+      "description": "No more than five percent of evaluated synthetic hard negatives may trigger emergency or same-day alerting."
+    },
+    {
+      "id": "manual-hold-burden",
+      "metric": "manual_hold_rate",
+      "operator": "lte",
+      "threshold": 0.15,
+      "observed": 0,
+      "passed": true,
+      "description": "Manual holds may protect uncertainty but must remain at or below fifteen percent on the applicable synthetic suite."
+    }
+  ],
+  "releaseGatePassed": false
+}

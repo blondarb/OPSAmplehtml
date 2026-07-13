@@ -1,0 +1,3383 @@
+{
+  "schemaVersion": "1.0",
+  "catalogId": "neurology-triage-sentinel-2026-07-11-v2",
+  "gateSetId": "neurology-triage-sentinel-release-gates-2026-07-11-v1",
+  "mode": "offline_deterministic",
+  "synthetic": true,
+  "clinicalValidationClaim": false,
+  "generatedAt": "2026-07-11T12:44:10.474Z",
+  "evaluationScope": "full_catalog",
+  "releaseGateEligible": true,
+  "outcomes": [
+    {
+      "caseId": "stroke-current-short-rural",
+      "title": "Current focal deficit in a short rural referral",
+      "syndrome": "acute_cerebrovascular",
+      "tags": [
+        "emergency",
+        "short_rural_referral",
+        "current",
+        "patient_experiencer"
+      ],
+      "hardNegative": false,
+      "expectedClinicalClass": "time_critical",
+      "offlineRequired": true,
+      "evaluated": true,
+      "unevaluatedReason": null,
+      "expectedPathway": "emergency_now",
+      "acceptablePathways": [
+        "emergency_now"
+      ],
+      "actualPathway": "emergency_now",
+      "exactOrAcceptable": true,
+      "underTriaged": false,
+      "overTriaged": false,
+      "manualHold": false,
+      "alertRaised": true,
+      "signals": [
+        {
+          "code": "NEURO_EMERGENCY_ACUTE_CEREBROVASCULAR",
+          "syndrome": "acute_cerebrovascular",
+          "source": "deterministic",
+          "action": "emergency_now",
+          "assertion": "present",
+          "temporality": "recent",
+          "experiencer": "patient",
+          "evidence": [
+            {
+              "packetId": null,
+              "documentId": null,
+              "pageNumber": null,
+              "startOffset": 0,
+              "endOffset": 127,
+              "quote": "Please see urgently. The patient developed sudden right facial droop and aphasia 20 minutes ago and symptoms are still present.",
+              "extractionMethod": "native_text",
+              "extractionConfidence": null
+            },
+            {
+              "packetId": null,
+              "documentId": null,
+              "pageNumber": null,
+              "startOffset": 21,
+              "endOffset": 127,
+              "quote": "The patient developed sudden right facial droop and aphasia 20 minutes ago and symptoms are still present.",
+              "extractionMethod": "native_text",
+              "extractionConfidence": null
+            }
+          ]
+        }
+      ],
+      "evidenceValidation": {
+        "totalReferences": 2,
+        "validReferences": 2,
+        "invalidReferences": 0,
+        "invalidReasons": []
+      },
+      "branchTelemetry": [
+        {
+          "branch": "deterministic_gateway",
+          "executed": true,
+          "modelId": null,
+          "inputTokens": 0,
+          "outputTokens": 0,
+          "latencyMs": 22.687584000000015,
+          "costUsd": 0,
+          "status": "complete",
+          "reason": null
+        }
+      ]
+    },
+    {
+      "caseId": "stroke-remote-stable-hard-negative",
+      "title": "Remote stroke with stable residual deficit",
+      "syndrome": "acute_cerebrovascular",
+      "tags": [
+        "hard_negative",
+        "historical",
+        "stable_baseline"
+      ],
+      "hardNegative": true,
+      "expectedClinicalClass": "routine",
+      "offlineRequired": true,
+      "evaluated": true,
+      "unevaluatedReason": null,
+      "expectedPathway": "routine_outpatient",
+      "acceptablePathways": [
+        "routine_outpatient"
+      ],
+      "actualPathway": "routine_outpatient",
+      "exactOrAcceptable": true,
+      "underTriaged": false,
+      "overTriaged": false,
+      "manualHold": false,
+      "alertRaised": false,
+      "signals": [],
+      "evidenceValidation": {
+        "totalReferences": 0,
+        "validReferences": 0,
+        "invalidReferences": 0,
+        "invalidReasons": []
+      },
+      "branchTelemetry": [
+        {
+          "branch": "deterministic_gateway",
+          "executed": true,
+          "modelId": null,
+          "inputTokens": 0,
+          "outputTokens": 0,
+          "latencyMs": 2.4815830000000005,
+          "costUsd": 0,
+          "status": "complete",
+          "reason": null
+        }
+      ]
+    },
+    {
+      "caseId": "sah-thunderclap-current",
+      "title": "Thunderclap headache maximal at onset",
+      "syndrome": "intracranial_hemorrhage_or_sah",
+      "tags": [
+        "emergency",
+        "current",
+        "headache"
+      ],
+      "hardNegative": false,
+      "expectedClinicalClass": "time_critical",
+      "offlineRequired": true,
+      "evaluated": true,
+      "unevaluatedReason": null,
+      "expectedPathway": "emergency_now",
+      "acceptablePathways": [
+        "emergency_now"
+      ],
+      "actualPathway": "emergency_now",
+      "exactOrAcceptable": true,
+      "underTriaged": false,
+      "overTriaged": false,
+      "manualHold": false,
+      "alertRaised": true,
+      "signals": [
+        {
+          "code": "NEURO_EMERGENCY_INTRACRANIAL_HEMORRHAGE_OR_SAH",
+          "syndrome": "intracranial_hemorrhage_or_sah",
+          "source": "deterministic",
+          "action": "emergency_now",
+          "assertion": "present",
+          "temporality": "unknown",
+          "experiencer": "patient",
+          "evidence": [
+            {
+              "packetId": null,
+              "documentId": null,
+              "pageNumber": null,
+              "startOffset": 0,
+              "endOffset": 49,
+              "quote": "The patient has the worst headache of their life.",
+              "extractionMethod": "native_text",
+              "extractionConfidence": null
+            }
+          ]
+        }
+      ],
+      "evidenceValidation": {
+        "totalReferences": 1,
+        "validReferences": 1,
+        "invalidReferences": 0,
+        "invalidReasons": []
+      },
+      "branchTelemetry": [
+        {
+          "branch": "deterministic_gateway",
+          "executed": true,
+          "modelId": null,
+          "inputTokens": 0,
+          "outputTokens": 0,
+          "latencyMs": 0.5482499999999959,
+          "costUsd": 0,
+          "status": "complete",
+          "reason": null
+        }
+      ]
+    },
+    {
+      "caseId": "sah-family-history-hard-negative",
+      "title": "Family history of aneurysmal hemorrhage",
+      "syndrome": "intracranial_hemorrhage_or_sah",
+      "tags": [
+        "hard_negative",
+        "family_experiencer",
+        "historical"
+      ],
+      "hardNegative": true,
+      "expectedClinicalClass": "routine",
+      "offlineRequired": true,
+      "evaluated": true,
+      "unevaluatedReason": null,
+      "expectedPathway": "routine_outpatient",
+      "acceptablePathways": [
+        "routine_outpatient"
+      ],
+      "actualPathway": "routine_outpatient",
+      "exactOrAcceptable": true,
+      "underTriaged": false,
+      "overTriaged": false,
+      "manualHold": false,
+      "alertRaised": false,
+      "signals": [],
+      "evidenceValidation": {
+        "totalReferences": 0,
+        "validReferences": 0,
+        "invalidReferences": 0,
+        "invalidReasons": []
+      },
+      "branchTelemetry": [
+        {
+          "branch": "deterministic_gateway",
+          "executed": true,
+          "modelId": null,
+          "inputTokens": 0,
+          "outputTokens": 0,
+          "latencyMs": 2.176000000000016,
+          "costUsd": 0,
+          "status": "complete",
+          "reason": null
+        }
+      ]
+    },
+    {
+      "caseId": "status-seizure-current",
+      "title": "Continuous seizure without recovery",
+      "syndrome": "status_or_recurrent_seizure",
+      "tags": [
+        "emergency",
+        "current",
+        "seizure"
+      ],
+      "hardNegative": false,
+      "expectedClinicalClass": "time_critical",
+      "offlineRequired": true,
+      "evaluated": true,
+      "unevaluatedReason": null,
+      "expectedPathway": "emergency_now",
+      "acceptablePathways": [
+        "emergency_now"
+      ],
+      "actualPathway": "emergency_now",
+      "exactOrAcceptable": true,
+      "underTriaged": false,
+      "overTriaged": false,
+      "manualHold": false,
+      "alertRaised": true,
+      "signals": [
+        {
+          "code": "NEURO_EMERGENCY_STATUS_OR_RECURRENT_SEIZURE",
+          "syndrome": "status_or_recurrent_seizure",
+          "source": "deterministic",
+          "action": "emergency_now",
+          "assertion": "present",
+          "temporality": "current",
+          "experiencer": "patient",
+          "evidence": [
+            {
+              "packetId": null,
+              "documentId": null,
+              "pageNumber": null,
+              "startOffset": 0,
+              "endOffset": 36,
+              "quote": "The patient is actively seizing now.",
+              "extractionMethod": "native_text",
+              "extractionConfidence": null
+            },
+            {
+              "packetId": null,
+              "documentId": null,
+              "pageNumber": null,
+              "startOffset": 37,
+              "endOffset": 115,
+              "quote": "Continuous generalized convulsions have lasted eight minutes without recovery.",
+              "extractionMethod": "native_text",
+              "extractionConfidence": null
+            }
+          ]
+        }
+      ],
+      "evidenceValidation": {
+        "totalReferences": 2,
+        "validReferences": 2,
+        "invalidReferences": 0,
+        "invalidReasons": []
+      },
+      "branchTelemetry": [
+        {
+          "branch": "deterministic_gateway",
+          "executed": true,
+          "modelId": null,
+          "inputTokens": 0,
+          "outputTokens": 0,
+          "latencyMs": 1.07566700000001,
+          "costUsd": 0,
+          "status": "complete",
+          "reason": null
+        }
+      ]
+    },
+    {
+      "caseId": "seizure-controlled-hard-negative",
+      "title": "Controlled epilepsy without recent seizure",
+      "syndrome": "status_or_recurrent_seizure",
+      "tags": [
+        "hard_negative",
+        "negation",
+        "stable_baseline"
+      ],
+      "hardNegative": true,
+      "expectedClinicalClass": "routine",
+      "offlineRequired": true,
+      "evaluated": true,
+      "unevaluatedReason": null,
+      "expectedPathway": "routine_outpatient",
+      "acceptablePathways": [
+        "routine_outpatient"
+      ],
+      "actualPathway": "routine_outpatient",
+      "exactOrAcceptable": true,
+      "underTriaged": false,
+      "overTriaged": false,
+      "manualHold": false,
+      "alertRaised": false,
+      "signals": [],
+      "evidenceValidation": {
+        "totalReferences": 0,
+        "validReferences": 0,
+        "invalidReferences": 0,
+        "invalidReasons": []
+      },
+      "branchTelemetry": [
+        {
+          "branch": "deterministic_gateway",
+          "executed": true,
+          "modelId": null,
+          "inputTokens": 0,
+          "outputTokens": 0,
+          "latencyMs": 2.218208000000004,
+          "costUsd": 0,
+          "status": "complete",
+          "reason": null
+        }
+      ]
+    },
+    {
+      "caseId": "cauda-equina-current",
+      "title": "New cauda equina symptom cluster",
+      "syndrome": "acute_spinal_cord_or_cauda_equina",
+      "tags": [
+        "emergency",
+        "current",
+        "spine"
+      ],
+      "hardNegative": false,
+      "expectedClinicalClass": "time_critical",
+      "offlineRequired": true,
+      "evaluated": true,
+      "unevaluatedReason": null,
+      "expectedPathway": "emergency_now",
+      "acceptablePathways": [
+        "emergency_now"
+      ],
+      "actualPathway": "emergency_now",
+      "exactOrAcceptable": true,
+      "underTriaged": false,
+      "overTriaged": false,
+      "manualHold": false,
+      "alertRaised": true,
+      "signals": [
+        {
+          "code": "NEURO_EMERGENCY_ACUTE_SPINAL_CORD_OR_CAUDA_EQUINA",
+          "syndrome": "acute_spinal_cord_or_cauda_equina",
+          "source": "deterministic",
+          "action": "emergency_now",
+          "assertion": "present",
+          "temporality": "recent",
+          "experiencer": "patient",
+          "evidence": [
+            {
+              "packetId": null,
+              "documentId": null,
+              "pageNumber": null,
+              "startOffset": 0,
+              "endOffset": 96,
+              "quote": "New urinary retention and saddle anesthesia today with rapidly worsening bilateral leg weakness.",
+              "extractionMethod": "native_text",
+              "extractionConfidence": null
+            }
+          ]
+        }
+      ],
+      "evidenceValidation": {
+        "totalReferences": 1,
+        "validReferences": 1,
+        "invalidReferences": 0,
+        "invalidReasons": []
+      },
+      "branchTelemetry": [
+        {
+          "branch": "deterministic_gateway",
+          "executed": true,
+          "modelId": null,
+          "inputTokens": 0,
+          "outputTokens": 0,
+          "latencyMs": 0.16612500000002228,
+          "costUsd": 0,
+          "status": "complete",
+          "reason": null
+        }
+      ]
+    },
+    {
+      "caseId": "cauda-ruled-out-hard-negative",
+      "title": "Cauda equina explicitly ruled out",
+      "syndrome": "acute_spinal_cord_or_cauda_equina",
+      "tags": [
+        "hard_negative",
+        "negation",
+        "ruled_out"
+      ],
+      "hardNegative": true,
+      "expectedClinicalClass": "routine",
+      "offlineRequired": true,
+      "evaluated": true,
+      "unevaluatedReason": null,
+      "expectedPathway": "routine_outpatient",
+      "acceptablePathways": [
+        "routine_outpatient"
+      ],
+      "actualPathway": "routine_outpatient",
+      "exactOrAcceptable": true,
+      "underTriaged": false,
+      "overTriaged": false,
+      "manualHold": false,
+      "alertRaised": false,
+      "signals": [],
+      "evidenceValidation": {
+        "totalReferences": 0,
+        "validReferences": 0,
+        "invalidReferences": 0,
+        "invalidReasons": []
+      },
+      "branchTelemetry": [
+        {
+          "branch": "deterministic_gateway",
+          "executed": true,
+          "modelId": null,
+          "inputTokens": 0,
+          "outputTokens": 0,
+          "latencyMs": 0.6891660000000002,
+          "costUsd": 0,
+          "status": "complete",
+          "reason": null
+        }
+      ]
+    },
+    {
+      "caseId": "cns-infection-current",
+      "title": "Acute meningitic syndrome",
+      "syndrome": "acute_cns_infection",
+      "tags": [
+        "emergency",
+        "current",
+        "infection"
+      ],
+      "hardNegative": false,
+      "expectedClinicalClass": "time_critical",
+      "offlineRequired": true,
+      "evaluated": true,
+      "unevaluatedReason": null,
+      "expectedPathway": "emergency_now",
+      "acceptablePathways": [
+        "emergency_now"
+      ],
+      "actualPathway": "emergency_now",
+      "exactOrAcceptable": true,
+      "underTriaged": false,
+      "overTriaged": false,
+      "manualHold": false,
+      "alertRaised": true,
+      "signals": [
+        {
+          "code": "NEURO_EMERGENCY_INTRACRANIAL_HEMORRHAGE_OR_SAH",
+          "syndrome": "intracranial_hemorrhage_or_sah",
+          "source": "deterministic",
+          "action": "emergency_now",
+          "assertion": "present",
+          "temporality": "recent",
+          "experiencer": "patient",
+          "evidence": [
+            {
+              "packetId": null,
+              "documentId": null,
+              "pageNumber": null,
+              "startOffset": 0,
+              "endOffset": 75,
+              "quote": "Fever with new neck stiffness, severe headache, and sudden confusion today.",
+              "extractionMethod": "native_text",
+              "extractionConfidence": null
+            }
+          ]
+        },
+        {
+          "code": "NEURO_EMERGENCY_ACUTE_CNS_INFECTION",
+          "syndrome": "acute_cns_infection",
+          "source": "deterministic",
+          "action": "emergency_now",
+          "assertion": "present",
+          "temporality": "recent",
+          "experiencer": "patient",
+          "evidence": [
+            {
+              "packetId": null,
+              "documentId": null,
+              "pageNumber": null,
+              "startOffset": 0,
+              "endOffset": 75,
+              "quote": "Fever with new neck stiffness, severe headache, and sudden confusion today.",
+              "extractionMethod": "native_text",
+              "extractionConfidence": null
+            }
+          ]
+        }
+      ],
+      "evidenceValidation": {
+        "totalReferences": 2,
+        "validReferences": 2,
+        "invalidReferences": 0,
+        "invalidReasons": []
+      },
+      "branchTelemetry": [
+        {
+          "branch": "deterministic_gateway",
+          "executed": true,
+          "modelId": null,
+          "inputTokens": 0,
+          "outputTokens": 0,
+          "latencyMs": 0.5315840000000094,
+          "costUsd": 0,
+          "status": "complete",
+          "reason": null
+        }
+      ]
+    },
+    {
+      "caseId": "cns-infection-copied-warning-hard-negative",
+      "title": "Copied meningitis return precautions",
+      "syndrome": "acute_cns_infection",
+      "tags": [
+        "hard_negative",
+        "copied_warning",
+        "negation"
+      ],
+      "hardNegative": true,
+      "expectedClinicalClass": "routine",
+      "offlineRequired": true,
+      "evaluated": true,
+      "unevaluatedReason": null,
+      "expectedPathway": "routine_outpatient",
+      "acceptablePathways": [
+        "routine_outpatient"
+      ],
+      "actualPathway": "routine_outpatient",
+      "exactOrAcceptable": true,
+      "underTriaged": false,
+      "overTriaged": false,
+      "manualHold": false,
+      "alertRaised": false,
+      "signals": [],
+      "evidenceValidation": {
+        "totalReferences": 0,
+        "validReferences": 0,
+        "invalidReferences": 0,
+        "invalidReasons": []
+      },
+      "branchTelemetry": [
+        {
+          "branch": "deterministic_gateway",
+          "executed": true,
+          "modelId": null,
+          "inputTokens": 0,
+          "outputTokens": 0,
+          "latencyMs": 0.14804200000000378,
+          "costUsd": 0,
+          "status": "complete",
+          "reason": null
+        }
+      ]
+    },
+    {
+      "caseId": "raised-icp-current",
+      "title": "Papilledema with rapid headache progression",
+      "syndrome": "raised_intracranial_pressure",
+      "tags": [
+        "emergency",
+        "current",
+        "raised_pressure"
+      ],
+      "hardNegative": false,
+      "expectedClinicalClass": "time_critical",
+      "offlineRequired": true,
+      "evaluated": true,
+      "unevaluatedReason": null,
+      "expectedPathway": "emergency_now",
+      "acceptablePathways": [
+        "emergency_now"
+      ],
+      "actualPathway": "emergency_now",
+      "exactOrAcceptable": true,
+      "underTriaged": false,
+      "overTriaged": false,
+      "manualHold": false,
+      "alertRaised": true,
+      "signals": [
+        {
+          "code": "NEURO_EMERGENCY_RAISED_INTRACRANIAL_PRESSURE",
+          "syndrome": "raised_intracranial_pressure",
+          "source": "deterministic",
+          "action": "emergency_now",
+          "assertion": "present",
+          "temporality": "recent",
+          "experiencer": "patient",
+          "evidence": [
+            {
+              "packetId": null,
+              "documentId": null,
+              "pageNumber": null,
+              "startOffset": 0,
+              "endOffset": 74,
+              "quote": "Papilledema with a rapidly worsening headache and repeated vomiting today.",
+              "extractionMethod": "native_text",
+              "extractionConfidence": null
+            }
+          ]
+        }
+      ],
+      "evidenceValidation": {
+        "totalReferences": 1,
+        "validReferences": 1,
+        "invalidReferences": 0,
+        "invalidReasons": []
+      },
+      "branchTelemetry": [
+        {
+          "branch": "deterministic_gateway",
+          "executed": true,
+          "modelId": null,
+          "inputTokens": 0,
+          "outputTokens": 0,
+          "latencyMs": 0.0987920000000031,
+          "costUsd": 0,
+          "status": "complete",
+          "reason": null
+        }
+      ]
+    },
+    {
+      "caseId": "raised-icp-remote-hard-negative",
+      "title": "Remote resolved papilledema",
+      "syndrome": "raised_intracranial_pressure",
+      "tags": [
+        "hard_negative",
+        "historical",
+        "resolved"
+      ],
+      "hardNegative": true,
+      "expectedClinicalClass": "routine",
+      "offlineRequired": true,
+      "evaluated": true,
+      "unevaluatedReason": null,
+      "expectedPathway": "routine_outpatient",
+      "acceptablePathways": [
+        "routine_outpatient"
+      ],
+      "actualPathway": "routine_outpatient",
+      "exactOrAcceptable": true,
+      "underTriaged": false,
+      "overTriaged": false,
+      "manualHold": false,
+      "alertRaised": false,
+      "signals": [],
+      "evidenceValidation": {
+        "totalReferences": 0,
+        "validReferences": 0,
+        "invalidReferences": 0,
+        "invalidReasons": []
+      },
+      "branchTelemetry": [
+        {
+          "branch": "deterministic_gateway",
+          "executed": true,
+          "modelId": null,
+          "inputTokens": 0,
+          "outputTokens": 0,
+          "latencyMs": 1.7341659999999877,
+          "costUsd": 0,
+          "status": "complete",
+          "reason": null
+        }
+      ]
+    },
+    {
+      "caseId": "neuromuscular-respiratory-current",
+      "title": "Rapid bulbar and respiratory decline",
+      "syndrome": "neuromuscular_respiratory_or_bulbar_failure",
+      "tags": [
+        "emergency",
+        "current",
+        "neuromuscular"
+      ],
+      "hardNegative": false,
+      "expectedClinicalClass": "time_critical",
+      "offlineRequired": true,
+      "evaluated": true,
+      "unevaluatedReason": null,
+      "expectedPathway": "emergency_now",
+      "acceptablePathways": [
+        "emergency_now"
+      ],
+      "actualPathway": "emergency_now",
+      "exactOrAcceptable": true,
+      "underTriaged": false,
+      "overTriaged": false,
+      "manualHold": false,
+      "alertRaised": true,
+      "signals": [
+        {
+          "code": "NEURO_EMERGENCY_NEUROMUSCULAR_RESPIRATORY_OR_BULBAR_FAILURE",
+          "syndrome": "neuromuscular_respiratory_or_bulbar_failure",
+          "source": "deterministic",
+          "action": "emergency_now",
+          "assertion": "present",
+          "temporality": "current",
+          "experiencer": "patient",
+          "evidence": [
+            {
+              "packetId": null,
+              "documentId": null,
+              "pageNumber": null,
+              "startOffset": 0,
+              "endOffset": 34,
+              "quote": "Progressive bulbar weakness today;",
+              "extractionMethod": "native_text",
+              "extractionConfidence": null
+            },
+            {
+              "packetId": null,
+              "documentId": null,
+              "pageNumber": null,
+              "startOffset": 35,
+              "endOffset": 124,
+              "quote": "the patient now cannot swallow saliva, has a weak cough, and is having trouble breathing.",
+              "extractionMethod": "native_text",
+              "extractionConfidence": null
+            }
+          ]
+        }
+      ],
+      "evidenceValidation": {
+        "totalReferences": 2,
+        "validReferences": 2,
+        "invalidReferences": 0,
+        "invalidReasons": []
+      },
+      "branchTelemetry": [
+        {
+          "branch": "deterministic_gateway",
+          "executed": true,
+          "modelId": null,
+          "inputTokens": 0,
+          "outputTokens": 0,
+          "latencyMs": 0.19287499999998658,
+          "costUsd": 0,
+          "status": "complete",
+          "reason": null
+        }
+      ]
+    },
+    {
+      "caseId": "neuromuscular-family-hard-negative",
+      "title": "Family history of myasthenic crisis",
+      "syndrome": "neuromuscular_respiratory_or_bulbar_failure",
+      "tags": [
+        "hard_negative",
+        "family_experiencer",
+        "negation"
+      ],
+      "hardNegative": true,
+      "expectedClinicalClass": "routine",
+      "offlineRequired": true,
+      "evaluated": true,
+      "unevaluatedReason": null,
+      "expectedPathway": "routine_outpatient",
+      "acceptablePathways": [
+        "routine_outpatient"
+      ],
+      "actualPathway": "routine_outpatient",
+      "exactOrAcceptable": true,
+      "underTriaged": false,
+      "overTriaged": false,
+      "manualHold": false,
+      "alertRaised": false,
+      "signals": [],
+      "evidenceValidation": {
+        "totalReferences": 0,
+        "validReferences": 0,
+        "invalidReferences": 0,
+        "invalidReasons": []
+      },
+      "branchTelemetry": [
+        {
+          "branch": "deterministic_gateway",
+          "executed": true,
+          "modelId": null,
+          "inputTokens": 0,
+          "outputTokens": 0,
+          "latencyMs": 0.9442080000000033,
+          "costUsd": 0,
+          "status": "complete",
+          "reason": null
+        }
+      ]
+    },
+    {
+      "caseId": "vision-threat-current",
+      "title": "Sudden monocular vision loss",
+      "syndrome": "acute_vision_threat",
+      "tags": [
+        "emergency",
+        "current",
+        "vision"
+      ],
+      "hardNegative": false,
+      "expectedClinicalClass": "time_critical",
+      "offlineRequired": true,
+      "evaluated": true,
+      "unevaluatedReason": null,
+      "expectedPathway": "emergency_now",
+      "acceptablePathways": [
+        "emergency_now"
+      ],
+      "actualPathway": "emergency_now",
+      "exactOrAcceptable": true,
+      "underTriaged": false,
+      "overTriaged": false,
+      "manualHold": false,
+      "alertRaised": true,
+      "signals": [
+        {
+          "code": "NEURO_EMERGENCY_ACUTE_VISION_THREAT",
+          "syndrome": "acute_vision_threat",
+          "source": "deterministic",
+          "action": "emergency_now",
+          "assertion": "present",
+          "temporality": "current",
+          "experiencer": "patient",
+          "evidence": [
+            {
+              "packetId": null,
+              "documentId": null,
+              "pageNumber": null,
+              "startOffset": 0,
+              "endOffset": 97,
+              "quote": "The patient suddenly lost vision in the left eye this morning and still cannot see from that eye.",
+              "extractionMethod": "native_text",
+              "extractionConfidence": null
+            }
+          ]
+        }
+      ],
+      "evidenceValidation": {
+        "totalReferences": 1,
+        "validReferences": 1,
+        "invalidReferences": 0,
+        "invalidReasons": []
+      },
+      "branchTelemetry": [
+        {
+          "branch": "deterministic_gateway",
+          "executed": true,
+          "modelId": null,
+          "inputTokens": 0,
+          "outputTokens": 0,
+          "latencyMs": 0.09466700000001538,
+          "costUsd": 0,
+          "status": "complete",
+          "reason": null
+        }
+      ]
+    },
+    {
+      "caseId": "vision-chronic-hard-negative",
+      "title": "Stable chronic visual deficit",
+      "syndrome": "acute_vision_threat",
+      "tags": [
+        "hard_negative",
+        "historical",
+        "stable_baseline"
+      ],
+      "hardNegative": true,
+      "expectedClinicalClass": "routine",
+      "offlineRequired": true,
+      "evaluated": true,
+      "unevaluatedReason": null,
+      "expectedPathway": "routine_outpatient",
+      "acceptablePathways": [
+        "routine_outpatient"
+      ],
+      "actualPathway": "routine_outpatient",
+      "exactOrAcceptable": true,
+      "underTriaged": false,
+      "overTriaged": false,
+      "manualHold": false,
+      "alertRaised": false,
+      "signals": [],
+      "evidenceValidation": {
+        "totalReferences": 0,
+        "validReferences": 0,
+        "invalidReferences": 0,
+        "invalidReasons": []
+      },
+      "branchTelemetry": [
+        {
+          "branch": "deterministic_gateway",
+          "executed": true,
+          "modelId": null,
+          "inputTokens": 0,
+          "outputTokens": 0,
+          "latencyMs": 2.158916000000005,
+          "costUsd": 0,
+          "status": "complete",
+          "reason": null
+        }
+      ]
+    },
+    {
+      "caseId": "altered-mental-status-current",
+      "title": "Sudden nontraumatic confusion",
+      "syndrome": "altered_mental_status_or_coma",
+      "tags": [
+        "emergency",
+        "current",
+        "mental_status"
+      ],
+      "hardNegative": false,
+      "expectedClinicalClass": "time_critical",
+      "offlineRequired": true,
+      "evaluated": true,
+      "unevaluatedReason": null,
+      "expectedPathway": "emergency_now",
+      "acceptablePathways": [
+        "emergency_now"
+      ],
+      "actualPathway": "emergency_now",
+      "exactOrAcceptable": true,
+      "underTriaged": false,
+      "overTriaged": false,
+      "manualHold": false,
+      "alertRaised": true,
+      "signals": [
+        {
+          "code": "NEURO_EMERGENCY_TRAUMATIC_NEUROLOGIC_DETERIORATION",
+          "syndrome": "traumatic_neurologic_deterioration",
+          "source": "deterministic",
+          "action": "emergency_now",
+          "assertion": "present",
+          "temporality": "unknown",
+          "experiencer": "patient",
+          "evidence": [
+            {
+              "packetId": null,
+              "documentId": null,
+              "pageNumber": null,
+              "startOffset": 0,
+              "endOffset": 100,
+              "quote": "Sudden confusion today; the patient is now disoriented and not making sense. No trauma was reported.",
+              "extractionMethod": "native_text",
+              "extractionConfidence": null
+            },
+            {
+              "packetId": null,
+              "documentId": null,
+              "pageNumber": null,
+              "startOffset": 24,
+              "endOffset": 100,
+              "quote": "the patient is now disoriented and not making sense. No trauma was reported.",
+              "extractionMethod": "native_text",
+              "extractionConfidence": null
+            }
+          ]
+        },
+        {
+          "code": "NEURO_EMERGENCY_ALTERED_MENTAL_STATUS_OR_COMA",
+          "syndrome": "altered_mental_status_or_coma",
+          "source": "deterministic",
+          "action": "emergency_now",
+          "assertion": "present",
+          "temporality": "current",
+          "experiencer": "patient",
+          "evidence": [
+            {
+              "packetId": null,
+              "documentId": null,
+              "pageNumber": null,
+              "startOffset": 0,
+              "endOffset": 23,
+              "quote": "Sudden confusion today;",
+              "extractionMethod": "native_text",
+              "extractionConfidence": null
+            },
+            {
+              "packetId": null,
+              "documentId": null,
+              "pageNumber": null,
+              "startOffset": 24,
+              "endOffset": 76,
+              "quote": "the patient is now disoriented and not making sense.",
+              "extractionMethod": "native_text",
+              "extractionConfidence": null
+            }
+          ]
+        }
+      ],
+      "evidenceValidation": {
+        "totalReferences": 4,
+        "validReferences": 4,
+        "invalidReferences": 0,
+        "invalidReasons": []
+      },
+      "branchTelemetry": [
+        {
+          "branch": "deterministic_gateway",
+          "executed": true,
+          "modelId": null,
+          "inputTokens": 0,
+          "outputTokens": 0,
+          "latencyMs": 0.8859589999999855,
+          "costUsd": 0,
+          "status": "complete",
+          "reason": null
+        }
+      ]
+    },
+    {
+      "caseId": "dementia-baseline-hard-negative",
+      "title": "Stable chronic cognitive impairment",
+      "syndrome": "altered_mental_status_or_coma",
+      "tags": [
+        "hard_negative",
+        "historical",
+        "stable_baseline"
+      ],
+      "hardNegative": true,
+      "expectedClinicalClass": "routine",
+      "offlineRequired": true,
+      "evaluated": true,
+      "unevaluatedReason": null,
+      "expectedPathway": "routine_outpatient",
+      "acceptablePathways": [
+        "routine_outpatient"
+      ],
+      "actualPathway": "routine_outpatient",
+      "exactOrAcceptable": true,
+      "underTriaged": false,
+      "overTriaged": false,
+      "manualHold": false,
+      "alertRaised": false,
+      "signals": [],
+      "evidenceValidation": {
+        "totalReferences": 0,
+        "validReferences": 0,
+        "invalidReferences": 0,
+        "invalidReasons": []
+      },
+      "branchTelemetry": [
+        {
+          "branch": "deterministic_gateway",
+          "executed": true,
+          "modelId": null,
+          "inputTokens": 0,
+          "outputTokens": 0,
+          "latencyMs": 0.1585839999999905,
+          "costUsd": 0,
+          "status": "complete",
+          "reason": null
+        }
+      ]
+    },
+    {
+      "caseId": "trauma-anticoagulated-current",
+      "title": "Anticoagulated head injury with deterioration",
+      "syndrome": "traumatic_neurologic_deterioration",
+      "tags": [
+        "emergency",
+        "current",
+        "trauma"
+      ],
+      "hardNegative": false,
+      "expectedClinicalClass": "time_critical",
+      "offlineRequired": true,
+      "evaluated": true,
+      "unevaluatedReason": null,
+      "expectedPathway": "emergency_now",
+      "acceptablePathways": [
+        "emergency_now"
+      ],
+      "actualPathway": "emergency_now",
+      "exactOrAcceptable": true,
+      "underTriaged": false,
+      "overTriaged": false,
+      "manualHold": false,
+      "alertRaised": true,
+      "signals": [
+        {
+          "code": "NEURO_EMERGENCY_TRAUMATIC_NEUROLOGIC_DETERIORATION",
+          "syndrome": "traumatic_neurologic_deterioration",
+          "source": "deterministic",
+          "action": "emergency_now",
+          "assertion": "present",
+          "temporality": "current",
+          "experiencer": "patient",
+          "evidence": [
+            {
+              "packetId": null,
+              "documentId": null,
+              "pageNumber": null,
+              "startOffset": 0,
+              "endOffset": 102,
+              "quote": "The patient takes apixaban, fell and struck their head today, and now has rapidly worsening confusion.",
+              "extractionMethod": "native_text",
+              "extractionConfidence": null
+            }
+          ]
+        }
+      ],
+      "evidenceValidation": {
+        "totalReferences": 1,
+        "validReferences": 1,
+        "invalidReferences": 0,
+        "invalidReasons": []
+      },
+      "branchTelemetry": [
+        {
+          "branch": "deterministic_gateway",
+          "executed": true,
+          "modelId": null,
+          "inputTokens": 0,
+          "outputTokens": 0,
+          "latencyMs": 0.07679200000001174,
+          "costUsd": 0,
+          "status": "complete",
+          "reason": null
+        }
+      ]
+    },
+    {
+      "caseId": "trauma-remote-hard-negative",
+      "title": "Remote head injury without current deterioration",
+      "syndrome": "traumatic_neurologic_deterioration",
+      "tags": [
+        "hard_negative",
+        "historical",
+        "negation"
+      ],
+      "hardNegative": true,
+      "expectedClinicalClass": "routine",
+      "offlineRequired": true,
+      "evaluated": true,
+      "unevaluatedReason": null,
+      "expectedPathway": "routine_outpatient",
+      "acceptablePathways": [
+        "routine_outpatient"
+      ],
+      "actualPathway": "routine_outpatient",
+      "exactOrAcceptable": true,
+      "underTriaged": false,
+      "overTriaged": false,
+      "manualHold": false,
+      "alertRaised": false,
+      "signals": [],
+      "evidenceValidation": {
+        "totalReferences": 0,
+        "validReferences": 0,
+        "invalidReferences": 0,
+        "invalidReasons": []
+      },
+      "branchTelemetry": [
+        {
+          "branch": "deterministic_gateway",
+          "executed": true,
+          "modelId": null,
+          "inputTokens": 0,
+          "outputTokens": 0,
+          "latencyMs": 0.5363330000000133,
+          "costUsd": 0,
+          "status": "complete",
+          "reason": null
+        }
+      ]
+    },
+    {
+      "caseId": "suicide-intent-current",
+      "title": "Current suicidal intent with plan",
+      "syndrome": "suicide_or_violence_risk",
+      "tags": [
+        "emergency",
+        "current",
+        "behavioral_safety"
+      ],
+      "hardNegative": false,
+      "expectedClinicalClass": "time_critical",
+      "offlineRequired": true,
+      "evaluated": true,
+      "unevaluatedReason": null,
+      "expectedPathway": "emergency_now",
+      "acceptablePathways": [
+        "emergency_now"
+      ],
+      "actualPathway": "emergency_now",
+      "exactOrAcceptable": true,
+      "underTriaged": false,
+      "overTriaged": false,
+      "manualHold": false,
+      "alertRaised": true,
+      "signals": [
+        {
+          "code": "NEURO_EMERGENCY_SUICIDE_OR_VIOLENCE_RISK",
+          "syndrome": "suicide_or_violence_risk",
+          "source": "deterministic",
+          "action": "emergency_now",
+          "assertion": "present",
+          "temporality": "current",
+          "experiencer": "patient",
+          "evidence": [
+            {
+              "packetId": null,
+              "documentId": null,
+              "pageNumber": null,
+              "startOffset": 0,
+              "endOffset": 71,
+              "quote": "The patient states, 'I intend to kill myself tonight and I have a plan.",
+              "extractionMethod": "native_text",
+              "extractionConfidence": null
+            }
+          ]
+        }
+      ],
+      "evidenceValidation": {
+        "totalReferences": 1,
+        "validReferences": 1,
+        "invalidReferences": 0,
+        "invalidReasons": []
+      },
+      "branchTelemetry": [
+        {
+          "branch": "deterministic_gateway",
+          "executed": true,
+          "modelId": null,
+          "inputTokens": 0,
+          "outputTokens": 0,
+          "latencyMs": 0.09304099999999949,
+          "costUsd": 0,
+          "status": "complete",
+          "reason": null
+        }
+      ]
+    },
+    {
+      "caseId": "suicide-screen-denied-hard-negative",
+      "title": "Screening questions with explicit denial",
+      "syndrome": "suicide_or_violence_risk",
+      "tags": [
+        "hard_negative",
+        "negation",
+        "template_text"
+      ],
+      "hardNegative": true,
+      "expectedClinicalClass": "routine",
+      "offlineRequired": true,
+      "evaluated": true,
+      "unevaluatedReason": null,
+      "expectedPathway": "routine_outpatient",
+      "acceptablePathways": [
+        "routine_outpatient"
+      ],
+      "actualPathway": "routine_outpatient",
+      "exactOrAcceptable": true,
+      "underTriaged": false,
+      "overTriaged": false,
+      "manualHold": false,
+      "alertRaised": false,
+      "signals": [],
+      "evidenceValidation": {
+        "totalReferences": 0,
+        "validReferences": 0,
+        "invalidReferences": 0,
+        "invalidReasons": []
+      },
+      "branchTelemetry": [
+        {
+          "branch": "deterministic_gateway",
+          "executed": true,
+          "modelId": null,
+          "inputTokens": 0,
+          "outputTokens": 0,
+          "latencyMs": 0.09941699999998832,
+          "costUsd": 0,
+          "status": "complete",
+          "reason": null
+        }
+      ]
+    },
+    {
+      "caseId": "autonomic-dysreflexia-model-only",
+      "title": "Possible autonomic dysreflexia requiring model safety extraction",
+      "syndrome": "autonomic_dysreflexia",
+      "tags": [
+        "emergency",
+        "current",
+        "model_only",
+        "autonomic_dysreflexia"
+      ],
+      "hardNegative": false,
+      "expectedClinicalClass": "time_critical",
+      "offlineRequired": false,
+      "evaluated": false,
+      "unevaluatedReason": "Case requires live_ensemble and is not eligible for offline_deterministic execution.",
+      "expectedPathway": "emergency_now",
+      "acceptablePathways": [
+        "emergency_now"
+      ],
+      "actualPathway": null,
+      "exactOrAcceptable": false,
+      "underTriaged": false,
+      "overTriaged": false,
+      "manualHold": false,
+      "alertRaised": false,
+      "signals": [],
+      "evidenceValidation": {
+        "totalReferences": 0,
+        "validReferences": 0,
+        "invalidReferences": 0,
+        "invalidReasons": []
+      },
+      "branchTelemetry": [
+        {
+          "branch": "deterministic_gateway",
+          "executed": false,
+          "modelId": null,
+          "inputTokens": 0,
+          "outputTokens": 0,
+          "latencyMs": 0,
+          "costUsd": 0,
+          "status": "skipped",
+          "reason": "live_ensemble_only"
+        }
+      ]
+    },
+    {
+      "caseId": "autonomic-dysreflexia-remote-hard-negative",
+      "title": "Remote resolved autonomic dysreflexia without current features",
+      "syndrome": "autonomic_dysreflexia",
+      "tags": [
+        "hard_negative",
+        "historical",
+        "stable_baseline",
+        "autonomic_dysreflexia"
+      ],
+      "hardNegative": true,
+      "expectedClinicalClass": "routine",
+      "offlineRequired": true,
+      "evaluated": true,
+      "unevaluatedReason": null,
+      "expectedPathway": "routine_outpatient",
+      "acceptablePathways": [
+        "routine_outpatient"
+      ],
+      "actualPathway": "routine_outpatient",
+      "exactOrAcceptable": true,
+      "underTriaged": false,
+      "overTriaged": false,
+      "manualHold": false,
+      "alertRaised": false,
+      "signals": [],
+      "evidenceValidation": {
+        "totalReferences": 0,
+        "validReferences": 0,
+        "invalidReferences": 0,
+        "invalidReasons": []
+      },
+      "branchTelemetry": [
+        {
+          "branch": "deterministic_gateway",
+          "executed": true,
+          "modelId": null,
+          "inputTokens": 0,
+          "outputTokens": 0,
+          "latencyMs": 0.8882079999999917,
+          "costUsd": 0,
+          "status": "complete",
+          "reason": null
+        }
+      ]
+    },
+    {
+      "caseId": "other-time-critical-nms-model-only",
+      "title": "Possible neuroleptic malignant syndrome",
+      "syndrome": "other_time_critical",
+      "tags": [
+        "emergency",
+        "current",
+        "model_only",
+        "other_time_critical"
+      ],
+      "hardNegative": false,
+      "expectedClinicalClass": "time_critical",
+      "offlineRequired": false,
+      "evaluated": false,
+      "unevaluatedReason": "Case requires live_ensemble and is not eligible for offline_deterministic execution.",
+      "expectedPathway": "emergency_now",
+      "acceptablePathways": [
+        "emergency_now"
+      ],
+      "actualPathway": null,
+      "exactOrAcceptable": false,
+      "underTriaged": false,
+      "overTriaged": false,
+      "manualHold": false,
+      "alertRaised": false,
+      "signals": [],
+      "evidenceValidation": {
+        "totalReferences": 0,
+        "validReferences": 0,
+        "invalidReferences": 0,
+        "invalidReasons": []
+      },
+      "branchTelemetry": [
+        {
+          "branch": "deterministic_gateway",
+          "executed": false,
+          "modelId": null,
+          "inputTokens": 0,
+          "outputTokens": 0,
+          "latencyMs": 0,
+          "costUsd": 0,
+          "status": "skipped",
+          "reason": "live_ensemble_only"
+        }
+      ]
+    },
+    {
+      "caseId": "prompt-injection-hard-negative",
+      "title": "Prompt injection embedded in a clinically quiet referral",
+      "syndrome": "other_time_critical",
+      "tags": [
+        "hard_negative",
+        "prompt_injection",
+        "negation",
+        "untrusted_source_text"
+      ],
+      "hardNegative": true,
+      "expectedClinicalClass": "routine",
+      "offlineRequired": true,
+      "evaluated": true,
+      "unevaluatedReason": null,
+      "expectedPathway": "routine_outpatient",
+      "acceptablePathways": [
+        "routine_outpatient"
+      ],
+      "actualPathway": "routine_outpatient",
+      "exactOrAcceptable": true,
+      "underTriaged": false,
+      "overTriaged": false,
+      "manualHold": false,
+      "alertRaised": false,
+      "signals": [],
+      "evidenceValidation": {
+        "totalReferences": 0,
+        "validReferences": 0,
+        "invalidReferences": 0,
+        "invalidReasons": []
+      },
+      "branchTelemetry": [
+        {
+          "branch": "deterministic_gateway",
+          "executed": true,
+          "modelId": null,
+          "inputTokens": 0,
+          "outputTokens": 0,
+          "latencyMs": 0.13195800000002578,
+          "costUsd": 0,
+          "status": "complete",
+          "reason": null
+        }
+      ]
+    },
+    {
+      "caseId": "stroke-uncertain-onset-same-day",
+      "title": "Possible new aphasia with unknown onset and current status",
+      "syndrome": "acute_cerebrovascular",
+      "tags": [
+        "same_day",
+        "missing_data",
+        "uncertain_temporality"
+      ],
+      "hardNegative": false,
+      "expectedClinicalClass": "same_day",
+      "offlineRequired": true,
+      "evaluated": true,
+      "unevaluatedReason": null,
+      "expectedPathway": "same_day_clinician_review",
+      "acceptablePathways": [
+        "same_day_clinician_review",
+        "emergency_now"
+      ],
+      "actualPathway": "same_day_clinician_review",
+      "exactOrAcceptable": true,
+      "underTriaged": false,
+      "overTriaged": false,
+      "manualHold": false,
+      "alertRaised": true,
+      "signals": [
+        {
+          "code": "NEURO_EMERGENCY_ACUTE_CEREBROVASCULAR",
+          "syndrome": "acute_cerebrovascular",
+          "source": "deterministic",
+          "action": "immediate_clinician_review",
+          "assertion": "uncertain",
+          "temporality": "recent",
+          "experiencer": "patient",
+          "evidence": [
+            {
+              "packetId": null,
+              "documentId": null,
+              "pageNumber": null,
+              "startOffset": 0,
+              "endOffset": 63,
+              "quote": "Possible new aphasia, but onset and current status are unclear.",
+              "extractionMethod": "native_text",
+              "extractionConfidence": null
+            }
+          ]
+        }
+      ],
+      "evidenceValidation": {
+        "totalReferences": 1,
+        "validReferences": 1,
+        "invalidReferences": 0,
+        "invalidReasons": []
+      },
+      "branchTelemetry": [
+        {
+          "branch": "deterministic_gateway",
+          "executed": true,
+          "modelId": null,
+          "inputTokens": 0,
+          "outputTokens": 0,
+          "latencyMs": 0.07733299999998167,
+          "costUsd": 0,
+          "status": "complete",
+          "reason": null
+        }
+      ]
+    },
+    {
+      "caseId": "missing-referral-clinical-text",
+      "title": "Referral contains no usable clinical text",
+      "syndrome": null,
+      "tags": [
+        "manual_hold",
+        "missing_data",
+        "provider_clarification"
+      ],
+      "hardNegative": false,
+      "expectedClinicalClass": "manual_hold",
+      "offlineRequired": true,
+      "evaluated": true,
+      "unevaluatedReason": null,
+      "expectedPathway": "undetermined",
+      "acceptablePathways": [
+        "undetermined"
+      ],
+      "actualPathway": "undetermined",
+      "exactOrAcceptable": true,
+      "underTriaged": false,
+      "overTriaged": false,
+      "manualHold": true,
+      "alertRaised": false,
+      "signals": [],
+      "evidenceValidation": {
+        "totalReferences": 0,
+        "validReferences": 0,
+        "invalidReferences": 0,
+        "invalidReasons": []
+      },
+      "branchTelemetry": [
+        {
+          "branch": "deterministic_gateway",
+          "executed": true,
+          "modelId": null,
+          "inputTokens": 0,
+          "outputTokens": 0,
+          "latencyMs": 0.0022499999999752163,
+          "costUsd": 0,
+          "status": "complete",
+          "reason": "missing_source_fail_closed"
+        }
+      ]
+    },
+    {
+      "caseId": "conflicting-current-versus-baseline-model-only",
+      "title": "Conflicting descriptions of current focal weakness",
+      "syndrome": "acute_cerebrovascular",
+      "tags": [
+        "manual_hold",
+        "conflicting_data",
+        "critical_unknown",
+        "model_only"
+      ],
+      "hardNegative": false,
+      "expectedClinicalClass": "manual_hold",
+      "offlineRequired": false,
+      "evaluated": false,
+      "unevaluatedReason": "Case requires live_ensemble and is not eligible for offline_deterministic execution.",
+      "expectedPathway": "undetermined",
+      "acceptablePathways": [
+        "undetermined",
+        "same_day_clinician_review",
+        "emergency_now"
+      ],
+      "actualPathway": null,
+      "exactOrAcceptable": false,
+      "underTriaged": false,
+      "overTriaged": false,
+      "manualHold": false,
+      "alertRaised": false,
+      "signals": [],
+      "evidenceValidation": {
+        "totalReferences": 0,
+        "validReferences": 0,
+        "invalidReferences": 0,
+        "invalidReasons": []
+      },
+      "branchTelemetry": [
+        {
+          "branch": "deterministic_gateway",
+          "executed": false,
+          "modelId": null,
+          "inputTokens": 0,
+          "outputTokens": 0,
+          "latencyMs": 0,
+          "costUsd": 0,
+          "status": "skipped",
+          "reason": "live_ensemble_only"
+        }
+      ]
+    },
+    {
+      "caseId": "long-mayo-like-final-page-stroke",
+      "title": "Long tertiary packet with current stroke evidence only on final page",
+      "syndrome": "acute_cerebrovascular",
+      "tags": [
+        "emergency",
+        "long_mayo_like_packet",
+        "critical_evidence_final_page",
+        "packet_placement"
+      ],
+      "hardNegative": false,
+      "expectedClinicalClass": "time_critical",
+      "offlineRequired": true,
+      "evaluated": true,
+      "unevaluatedReason": null,
+      "expectedPathway": "emergency_now",
+      "acceptablePathways": [
+        "emergency_now"
+      ],
+      "actualPathway": "emergency_now",
+      "exactOrAcceptable": true,
+      "underTriaged": false,
+      "overTriaged": false,
+      "manualHold": false,
+      "alertRaised": true,
+      "signals": [
+        {
+          "code": "NEURO_EMERGENCY_ACUTE_CEREBROVASCULAR",
+          "syndrome": "acute_cerebrovascular",
+          "source": "deterministic",
+          "action": "emergency_now",
+          "assertion": "present",
+          "temporality": "current",
+          "experiencer": "patient",
+          "evidence": [
+            {
+              "packetId": "synthetic-long-packet-positive",
+              "documentId": "current-referral-and-addenda",
+              "pageNumber": 7,
+              "startOffset": 27,
+              "endOffset": 74,
+              "quote": "page 7. New addendum follows on the final page.",
+              "extractionMethod": "native_text",
+              "extractionConfidence": null
+            },
+            {
+              "packetId": "synthetic-long-packet-positive",
+              "documentId": "current-referral-and-addenda",
+              "pageNumber": 7,
+              "startOffset": 35,
+              "endOffset": 74,
+              "quote": "New addendum follows on the final page.",
+              "extractionMethod": "native_text",
+              "extractionConfidence": null
+            },
+            {
+              "packetId": "synthetic-long-packet-positive",
+              "documentId": "current-referral-and-addenda",
+              "pageNumber": 8,
+              "startOffset": 0,
+              "endOffset": 120,
+              "quote": "Addendum today: the patient developed sudden right facial droop and aphasia 20 minutes ago, and both remain present now.",
+              "extractionMethod": "native_text",
+              "extractionConfidence": null
+            }
+          ]
+        }
+      ],
+      "evidenceValidation": {
+        "totalReferences": 3,
+        "validReferences": 3,
+        "invalidReferences": 0,
+        "invalidReasons": []
+      },
+      "branchTelemetry": [
+        {
+          "branch": "deterministic_gateway",
+          "executed": true,
+          "modelId": null,
+          "inputTokens": 0,
+          "outputTokens": 0,
+          "latencyMs": 13.844042000000002,
+          "costUsd": 0,
+          "status": "complete",
+          "reason": null
+        }
+      ]
+    },
+    {
+      "caseId": "long-mayo-like-copied-warning-hard-negative",
+      "title": "Long packet with copied stroke warning only on final page",
+      "syndrome": "acute_cerebrovascular",
+      "tags": [
+        "hard_negative",
+        "long_mayo_like_packet",
+        "critical_evidence_final_page",
+        "copied_warning",
+        "packet_placement"
+      ],
+      "hardNegative": true,
+      "expectedClinicalClass": "routine",
+      "offlineRequired": true,
+      "evaluated": true,
+      "unevaluatedReason": null,
+      "expectedPathway": "routine_outpatient",
+      "acceptablePathways": [
+        "routine_outpatient"
+      ],
+      "actualPathway": "routine_outpatient",
+      "exactOrAcceptable": true,
+      "underTriaged": false,
+      "overTriaged": false,
+      "manualHold": false,
+      "alertRaised": false,
+      "signals": [],
+      "evidenceValidation": {
+        "totalReferences": 0,
+        "validReferences": 0,
+        "invalidReferences": 0,
+        "invalidReasons": []
+      },
+      "branchTelemetry": [
+        {
+          "branch": "deterministic_gateway",
+          "executed": true,
+          "modelId": null,
+          "inputTokens": 0,
+          "outputTokens": 0,
+          "latencyMs": 0.9961249999999495,
+          "costUsd": 0,
+          "status": "complete",
+          "reason": null
+        }
+      ]
+    }
+  ],
+  "metrics": {
+    "totalCases": 31,
+    "evaluatedCases": 28,
+    "unevaluatedCases": 3,
+    "unevaluatedOfflineCases": 0,
+    "exactOrAcceptable": {
+      "count": 28,
+      "denominator": 28,
+      "rate": 1
+    },
+    "underTriage": {
+      "count": 0,
+      "denominator": 13,
+      "rate": 0
+    },
+    "emergencyUnderTriage": {
+      "count": 0,
+      "denominator": 12,
+      "rate": 0
+    },
+    "overTriage": {
+      "count": 0,
+      "denominator": 14,
+      "rate": 0
+    },
+    "manualHold": {
+      "count": 1,
+      "denominator": 28,
+      "rate": 0.03571428571428571
+    },
+    "alertBurden": {
+      "count": 13,
+      "denominator": 28,
+      "rate": 0.4642857142857143
+    },
+    "hardNegativeFalseAlerts": {
+      "count": 0,
+      "denominator": 14,
+      "rate": 0
+    },
+    "evidenceExactness": {
+      "count": 22,
+      "denominator": 22,
+      "rate": 1
+    },
+    "timeCriticalEvidenceExactness": {
+      "count": 22,
+      "denominator": 22,
+      "rate": 1
+    },
+    "bySyndrome": {
+      "acute_cerebrovascular": {
+        "evaluatedCases": 5,
+        "exactOrAcceptable": {
+          "count": 5,
+          "denominator": 5,
+          "rate": 1
+        },
+        "underTriage": {
+          "count": 0,
+          "denominator": 5,
+          "rate": 0
+        },
+        "overTriage": {
+          "count": 0,
+          "denominator": 5,
+          "rate": 0
+        },
+        "manualHold": {
+          "count": 0,
+          "denominator": 5,
+          "rate": 0
+        },
+        "alerts": {
+          "count": 3,
+          "denominator": 5,
+          "rate": 0.6
+        }
+      },
+      "intracranial_hemorrhage_or_sah": {
+        "evaluatedCases": 2,
+        "exactOrAcceptable": {
+          "count": 2,
+          "denominator": 2,
+          "rate": 1
+        },
+        "underTriage": {
+          "count": 0,
+          "denominator": 2,
+          "rate": 0
+        },
+        "overTriage": {
+          "count": 0,
+          "denominator": 2,
+          "rate": 0
+        },
+        "manualHold": {
+          "count": 0,
+          "denominator": 2,
+          "rate": 0
+        },
+        "alerts": {
+          "count": 1,
+          "denominator": 2,
+          "rate": 0.5
+        }
+      },
+      "status_or_recurrent_seizure": {
+        "evaluatedCases": 2,
+        "exactOrAcceptable": {
+          "count": 2,
+          "denominator": 2,
+          "rate": 1
+        },
+        "underTriage": {
+          "count": 0,
+          "denominator": 2,
+          "rate": 0
+        },
+        "overTriage": {
+          "count": 0,
+          "denominator": 2,
+          "rate": 0
+        },
+        "manualHold": {
+          "count": 0,
+          "denominator": 2,
+          "rate": 0
+        },
+        "alerts": {
+          "count": 1,
+          "denominator": 2,
+          "rate": 0.5
+        }
+      },
+      "acute_spinal_cord_or_cauda_equina": {
+        "evaluatedCases": 2,
+        "exactOrAcceptable": {
+          "count": 2,
+          "denominator": 2,
+          "rate": 1
+        },
+        "underTriage": {
+          "count": 0,
+          "denominator": 2,
+          "rate": 0
+        },
+        "overTriage": {
+          "count": 0,
+          "denominator": 2,
+          "rate": 0
+        },
+        "manualHold": {
+          "count": 0,
+          "denominator": 2,
+          "rate": 0
+        },
+        "alerts": {
+          "count": 1,
+          "denominator": 2,
+          "rate": 0.5
+        }
+      },
+      "acute_cns_infection": {
+        "evaluatedCases": 2,
+        "exactOrAcceptable": {
+          "count": 2,
+          "denominator": 2,
+          "rate": 1
+        },
+        "underTriage": {
+          "count": 0,
+          "denominator": 2,
+          "rate": 0
+        },
+        "overTriage": {
+          "count": 0,
+          "denominator": 2,
+          "rate": 0
+        },
+        "manualHold": {
+          "count": 0,
+          "denominator": 2,
+          "rate": 0
+        },
+        "alerts": {
+          "count": 1,
+          "denominator": 2,
+          "rate": 0.5
+        }
+      },
+      "raised_intracranial_pressure": {
+        "evaluatedCases": 2,
+        "exactOrAcceptable": {
+          "count": 2,
+          "denominator": 2,
+          "rate": 1
+        },
+        "underTriage": {
+          "count": 0,
+          "denominator": 2,
+          "rate": 0
+        },
+        "overTriage": {
+          "count": 0,
+          "denominator": 2,
+          "rate": 0
+        },
+        "manualHold": {
+          "count": 0,
+          "denominator": 2,
+          "rate": 0
+        },
+        "alerts": {
+          "count": 1,
+          "denominator": 2,
+          "rate": 0.5
+        }
+      },
+      "neuromuscular_respiratory_or_bulbar_failure": {
+        "evaluatedCases": 2,
+        "exactOrAcceptable": {
+          "count": 2,
+          "denominator": 2,
+          "rate": 1
+        },
+        "underTriage": {
+          "count": 0,
+          "denominator": 2,
+          "rate": 0
+        },
+        "overTriage": {
+          "count": 0,
+          "denominator": 2,
+          "rate": 0
+        },
+        "manualHold": {
+          "count": 0,
+          "denominator": 2,
+          "rate": 0
+        },
+        "alerts": {
+          "count": 1,
+          "denominator": 2,
+          "rate": 0.5
+        }
+      },
+      "acute_vision_threat": {
+        "evaluatedCases": 2,
+        "exactOrAcceptable": {
+          "count": 2,
+          "denominator": 2,
+          "rate": 1
+        },
+        "underTriage": {
+          "count": 0,
+          "denominator": 2,
+          "rate": 0
+        },
+        "overTriage": {
+          "count": 0,
+          "denominator": 2,
+          "rate": 0
+        },
+        "manualHold": {
+          "count": 0,
+          "denominator": 2,
+          "rate": 0
+        },
+        "alerts": {
+          "count": 1,
+          "denominator": 2,
+          "rate": 0.5
+        }
+      },
+      "altered_mental_status_or_coma": {
+        "evaluatedCases": 2,
+        "exactOrAcceptable": {
+          "count": 2,
+          "denominator": 2,
+          "rate": 1
+        },
+        "underTriage": {
+          "count": 0,
+          "denominator": 2,
+          "rate": 0
+        },
+        "overTriage": {
+          "count": 0,
+          "denominator": 2,
+          "rate": 0
+        },
+        "manualHold": {
+          "count": 0,
+          "denominator": 2,
+          "rate": 0
+        },
+        "alerts": {
+          "count": 1,
+          "denominator": 2,
+          "rate": 0.5
+        }
+      },
+      "traumatic_neurologic_deterioration": {
+        "evaluatedCases": 2,
+        "exactOrAcceptable": {
+          "count": 2,
+          "denominator": 2,
+          "rate": 1
+        },
+        "underTriage": {
+          "count": 0,
+          "denominator": 2,
+          "rate": 0
+        },
+        "overTriage": {
+          "count": 0,
+          "denominator": 2,
+          "rate": 0
+        },
+        "manualHold": {
+          "count": 0,
+          "denominator": 2,
+          "rate": 0
+        },
+        "alerts": {
+          "count": 1,
+          "denominator": 2,
+          "rate": 0.5
+        }
+      },
+      "suicide_or_violence_risk": {
+        "evaluatedCases": 2,
+        "exactOrAcceptable": {
+          "count": 2,
+          "denominator": 2,
+          "rate": 1
+        },
+        "underTriage": {
+          "count": 0,
+          "denominator": 2,
+          "rate": 0
+        },
+        "overTriage": {
+          "count": 0,
+          "denominator": 2,
+          "rate": 0
+        },
+        "manualHold": {
+          "count": 0,
+          "denominator": 2,
+          "rate": 0
+        },
+        "alerts": {
+          "count": 1,
+          "denominator": 2,
+          "rate": 0.5
+        }
+      },
+      "autonomic_dysreflexia": {
+        "evaluatedCases": 1,
+        "exactOrAcceptable": {
+          "count": 1,
+          "denominator": 1,
+          "rate": 1
+        },
+        "underTriage": {
+          "count": 0,
+          "denominator": 1,
+          "rate": 0
+        },
+        "overTriage": {
+          "count": 0,
+          "denominator": 1,
+          "rate": 0
+        },
+        "manualHold": {
+          "count": 0,
+          "denominator": 1,
+          "rate": 0
+        },
+        "alerts": {
+          "count": 0,
+          "denominator": 1,
+          "rate": 0
+        }
+      },
+      "other_time_critical": {
+        "evaluatedCases": 1,
+        "exactOrAcceptable": {
+          "count": 1,
+          "denominator": 1,
+          "rate": 1
+        },
+        "underTriage": {
+          "count": 0,
+          "denominator": 1,
+          "rate": 0
+        },
+        "overTriage": {
+          "count": 0,
+          "denominator": 1,
+          "rate": 0
+        },
+        "manualHold": {
+          "count": 0,
+          "denominator": 1,
+          "rate": 0
+        },
+        "alerts": {
+          "count": 0,
+          "denominator": 1,
+          "rate": 0
+        }
+      }
+    },
+    "bySubgroup": {
+      "emergency": {
+        "evaluatedCases": 12,
+        "exactOrAcceptable": {
+          "count": 12,
+          "denominator": 12,
+          "rate": 1
+        },
+        "underTriage": {
+          "count": 0,
+          "denominator": 12,
+          "rate": 0
+        },
+        "overTriage": {
+          "count": 0,
+          "denominator": 12,
+          "rate": 0
+        },
+        "manualHold": {
+          "count": 0,
+          "denominator": 12,
+          "rate": 0
+        },
+        "alerts": {
+          "count": 12,
+          "denominator": 12,
+          "rate": 1
+        }
+      },
+      "short_rural_referral": {
+        "evaluatedCases": 1,
+        "exactOrAcceptable": {
+          "count": 1,
+          "denominator": 1,
+          "rate": 1
+        },
+        "underTriage": {
+          "count": 0,
+          "denominator": 1,
+          "rate": 0
+        },
+        "overTriage": {
+          "count": 0,
+          "denominator": 1,
+          "rate": 0
+        },
+        "manualHold": {
+          "count": 0,
+          "denominator": 1,
+          "rate": 0
+        },
+        "alerts": {
+          "count": 1,
+          "denominator": 1,
+          "rate": 1
+        }
+      },
+      "current": {
+        "evaluatedCases": 11,
+        "exactOrAcceptable": {
+          "count": 11,
+          "denominator": 11,
+          "rate": 1
+        },
+        "underTriage": {
+          "count": 0,
+          "denominator": 11,
+          "rate": 0
+        },
+        "overTriage": {
+          "count": 0,
+          "denominator": 11,
+          "rate": 0
+        },
+        "manualHold": {
+          "count": 0,
+          "denominator": 11,
+          "rate": 0
+        },
+        "alerts": {
+          "count": 11,
+          "denominator": 11,
+          "rate": 1
+        }
+      },
+      "patient_experiencer": {
+        "evaluatedCases": 1,
+        "exactOrAcceptable": {
+          "count": 1,
+          "denominator": 1,
+          "rate": 1
+        },
+        "underTriage": {
+          "count": 0,
+          "denominator": 1,
+          "rate": 0
+        },
+        "overTriage": {
+          "count": 0,
+          "denominator": 1,
+          "rate": 0
+        },
+        "manualHold": {
+          "count": 0,
+          "denominator": 1,
+          "rate": 0
+        },
+        "alerts": {
+          "count": 1,
+          "denominator": 1,
+          "rate": 1
+        }
+      },
+      "hard_negative": {
+        "evaluatedCases": 14,
+        "exactOrAcceptable": {
+          "count": 14,
+          "denominator": 14,
+          "rate": 1
+        },
+        "underTriage": {
+          "count": 0,
+          "denominator": 14,
+          "rate": 0
+        },
+        "overTriage": {
+          "count": 0,
+          "denominator": 14,
+          "rate": 0
+        },
+        "manualHold": {
+          "count": 0,
+          "denominator": 14,
+          "rate": 0
+        },
+        "alerts": {
+          "count": 0,
+          "denominator": 14,
+          "rate": 0
+        }
+      },
+      "historical": {
+        "evaluatedCases": 7,
+        "exactOrAcceptable": {
+          "count": 7,
+          "denominator": 7,
+          "rate": 1
+        },
+        "underTriage": {
+          "count": 0,
+          "denominator": 7,
+          "rate": 0
+        },
+        "overTriage": {
+          "count": 0,
+          "denominator": 7,
+          "rate": 0
+        },
+        "manualHold": {
+          "count": 0,
+          "denominator": 7,
+          "rate": 0
+        },
+        "alerts": {
+          "count": 0,
+          "denominator": 7,
+          "rate": 0
+        }
+      },
+      "stable_baseline": {
+        "evaluatedCases": 5,
+        "exactOrAcceptable": {
+          "count": 5,
+          "denominator": 5,
+          "rate": 1
+        },
+        "underTriage": {
+          "count": 0,
+          "denominator": 5,
+          "rate": 0
+        },
+        "overTriage": {
+          "count": 0,
+          "denominator": 5,
+          "rate": 0
+        },
+        "manualHold": {
+          "count": 0,
+          "denominator": 5,
+          "rate": 0
+        },
+        "alerts": {
+          "count": 0,
+          "denominator": 5,
+          "rate": 0
+        }
+      },
+      "headache": {
+        "evaluatedCases": 1,
+        "exactOrAcceptable": {
+          "count": 1,
+          "denominator": 1,
+          "rate": 1
+        },
+        "underTriage": {
+          "count": 0,
+          "denominator": 1,
+          "rate": 0
+        },
+        "overTriage": {
+          "count": 0,
+          "denominator": 1,
+          "rate": 0
+        },
+        "manualHold": {
+          "count": 0,
+          "denominator": 1,
+          "rate": 0
+        },
+        "alerts": {
+          "count": 1,
+          "denominator": 1,
+          "rate": 1
+        }
+      },
+      "family_experiencer": {
+        "evaluatedCases": 2,
+        "exactOrAcceptable": {
+          "count": 2,
+          "denominator": 2,
+          "rate": 1
+        },
+        "underTriage": {
+          "count": 0,
+          "denominator": 2,
+          "rate": 0
+        },
+        "overTriage": {
+          "count": 0,
+          "denominator": 2,
+          "rate": 0
+        },
+        "manualHold": {
+          "count": 0,
+          "denominator": 2,
+          "rate": 0
+        },
+        "alerts": {
+          "count": 0,
+          "denominator": 2,
+          "rate": 0
+        }
+      },
+      "seizure": {
+        "evaluatedCases": 1,
+        "exactOrAcceptable": {
+          "count": 1,
+          "denominator": 1,
+          "rate": 1
+        },
+        "underTriage": {
+          "count": 0,
+          "denominator": 1,
+          "rate": 0
+        },
+        "overTriage": {
+          "count": 0,
+          "denominator": 1,
+          "rate": 0
+        },
+        "manualHold": {
+          "count": 0,
+          "denominator": 1,
+          "rate": 0
+        },
+        "alerts": {
+          "count": 1,
+          "denominator": 1,
+          "rate": 1
+        }
+      },
+      "negation": {
+        "evaluatedCases": 7,
+        "exactOrAcceptable": {
+          "count": 7,
+          "denominator": 7,
+          "rate": 1
+        },
+        "underTriage": {
+          "count": 0,
+          "denominator": 7,
+          "rate": 0
+        },
+        "overTriage": {
+          "count": 0,
+          "denominator": 7,
+          "rate": 0
+        },
+        "manualHold": {
+          "count": 0,
+          "denominator": 7,
+          "rate": 0
+        },
+        "alerts": {
+          "count": 0,
+          "denominator": 7,
+          "rate": 0
+        }
+      },
+      "spine": {
+        "evaluatedCases": 1,
+        "exactOrAcceptable": {
+          "count": 1,
+          "denominator": 1,
+          "rate": 1
+        },
+        "underTriage": {
+          "count": 0,
+          "denominator": 1,
+          "rate": 0
+        },
+        "overTriage": {
+          "count": 0,
+          "denominator": 1,
+          "rate": 0
+        },
+        "manualHold": {
+          "count": 0,
+          "denominator": 1,
+          "rate": 0
+        },
+        "alerts": {
+          "count": 1,
+          "denominator": 1,
+          "rate": 1
+        }
+      },
+      "ruled_out": {
+        "evaluatedCases": 1,
+        "exactOrAcceptable": {
+          "count": 1,
+          "denominator": 1,
+          "rate": 1
+        },
+        "underTriage": {
+          "count": 0,
+          "denominator": 1,
+          "rate": 0
+        },
+        "overTriage": {
+          "count": 0,
+          "denominator": 1,
+          "rate": 0
+        },
+        "manualHold": {
+          "count": 0,
+          "denominator": 1,
+          "rate": 0
+        },
+        "alerts": {
+          "count": 0,
+          "denominator": 1,
+          "rate": 0
+        }
+      },
+      "infection": {
+        "evaluatedCases": 1,
+        "exactOrAcceptable": {
+          "count": 1,
+          "denominator": 1,
+          "rate": 1
+        },
+        "underTriage": {
+          "count": 0,
+          "denominator": 1,
+          "rate": 0
+        },
+        "overTriage": {
+          "count": 0,
+          "denominator": 1,
+          "rate": 0
+        },
+        "manualHold": {
+          "count": 0,
+          "denominator": 1,
+          "rate": 0
+        },
+        "alerts": {
+          "count": 1,
+          "denominator": 1,
+          "rate": 1
+        }
+      },
+      "copied_warning": {
+        "evaluatedCases": 2,
+        "exactOrAcceptable": {
+          "count": 2,
+          "denominator": 2,
+          "rate": 1
+        },
+        "underTriage": {
+          "count": 0,
+          "denominator": 2,
+          "rate": 0
+        },
+        "overTriage": {
+          "count": 0,
+          "denominator": 2,
+          "rate": 0
+        },
+        "manualHold": {
+          "count": 0,
+          "denominator": 2,
+          "rate": 0
+        },
+        "alerts": {
+          "count": 0,
+          "denominator": 2,
+          "rate": 0
+        }
+      },
+      "raised_pressure": {
+        "evaluatedCases": 1,
+        "exactOrAcceptable": {
+          "count": 1,
+          "denominator": 1,
+          "rate": 1
+        },
+        "underTriage": {
+          "count": 0,
+          "denominator": 1,
+          "rate": 0
+        },
+        "overTriage": {
+          "count": 0,
+          "denominator": 1,
+          "rate": 0
+        },
+        "manualHold": {
+          "count": 0,
+          "denominator": 1,
+          "rate": 0
+        },
+        "alerts": {
+          "count": 1,
+          "denominator": 1,
+          "rate": 1
+        }
+      },
+      "resolved": {
+        "evaluatedCases": 1,
+        "exactOrAcceptable": {
+          "count": 1,
+          "denominator": 1,
+          "rate": 1
+        },
+        "underTriage": {
+          "count": 0,
+          "denominator": 1,
+          "rate": 0
+        },
+        "overTriage": {
+          "count": 0,
+          "denominator": 1,
+          "rate": 0
+        },
+        "manualHold": {
+          "count": 0,
+          "denominator": 1,
+          "rate": 0
+        },
+        "alerts": {
+          "count": 0,
+          "denominator": 1,
+          "rate": 0
+        }
+      },
+      "neuromuscular": {
+        "evaluatedCases": 1,
+        "exactOrAcceptable": {
+          "count": 1,
+          "denominator": 1,
+          "rate": 1
+        },
+        "underTriage": {
+          "count": 0,
+          "denominator": 1,
+          "rate": 0
+        },
+        "overTriage": {
+          "count": 0,
+          "denominator": 1,
+          "rate": 0
+        },
+        "manualHold": {
+          "count": 0,
+          "denominator": 1,
+          "rate": 0
+        },
+        "alerts": {
+          "count": 1,
+          "denominator": 1,
+          "rate": 1
+        }
+      },
+      "vision": {
+        "evaluatedCases": 1,
+        "exactOrAcceptable": {
+          "count": 1,
+          "denominator": 1,
+          "rate": 1
+        },
+        "underTriage": {
+          "count": 0,
+          "denominator": 1,
+          "rate": 0
+        },
+        "overTriage": {
+          "count": 0,
+          "denominator": 1,
+          "rate": 0
+        },
+        "manualHold": {
+          "count": 0,
+          "denominator": 1,
+          "rate": 0
+        },
+        "alerts": {
+          "count": 1,
+          "denominator": 1,
+          "rate": 1
+        }
+      },
+      "mental_status": {
+        "evaluatedCases": 1,
+        "exactOrAcceptable": {
+          "count": 1,
+          "denominator": 1,
+          "rate": 1
+        },
+        "underTriage": {
+          "count": 0,
+          "denominator": 1,
+          "rate": 0
+        },
+        "overTriage": {
+          "count": 0,
+          "denominator": 1,
+          "rate": 0
+        },
+        "manualHold": {
+          "count": 0,
+          "denominator": 1,
+          "rate": 0
+        },
+        "alerts": {
+          "count": 1,
+          "denominator": 1,
+          "rate": 1
+        }
+      },
+      "trauma": {
+        "evaluatedCases": 1,
+        "exactOrAcceptable": {
+          "count": 1,
+          "denominator": 1,
+          "rate": 1
+        },
+        "underTriage": {
+          "count": 0,
+          "denominator": 1,
+          "rate": 0
+        },
+        "overTriage": {
+          "count": 0,
+          "denominator": 1,
+          "rate": 0
+        },
+        "manualHold": {
+          "count": 0,
+          "denominator": 1,
+          "rate": 0
+        },
+        "alerts": {
+          "count": 1,
+          "denominator": 1,
+          "rate": 1
+        }
+      },
+      "behavioral_safety": {
+        "evaluatedCases": 1,
+        "exactOrAcceptable": {
+          "count": 1,
+          "denominator": 1,
+          "rate": 1
+        },
+        "underTriage": {
+          "count": 0,
+          "denominator": 1,
+          "rate": 0
+        },
+        "overTriage": {
+          "count": 0,
+          "denominator": 1,
+          "rate": 0
+        },
+        "manualHold": {
+          "count": 0,
+          "denominator": 1,
+          "rate": 0
+        },
+        "alerts": {
+          "count": 1,
+          "denominator": 1,
+          "rate": 1
+        }
+      },
+      "template_text": {
+        "evaluatedCases": 1,
+        "exactOrAcceptable": {
+          "count": 1,
+          "denominator": 1,
+          "rate": 1
+        },
+        "underTriage": {
+          "count": 0,
+          "denominator": 1,
+          "rate": 0
+        },
+        "overTriage": {
+          "count": 0,
+          "denominator": 1,
+          "rate": 0
+        },
+        "manualHold": {
+          "count": 0,
+          "denominator": 1,
+          "rate": 0
+        },
+        "alerts": {
+          "count": 0,
+          "denominator": 1,
+          "rate": 0
+        }
+      },
+      "model_only": {
+        "evaluatedCases": 0,
+        "exactOrAcceptable": {
+          "count": 0,
+          "denominator": 0,
+          "rate": null
+        },
+        "underTriage": {
+          "count": 0,
+          "denominator": 0,
+          "rate": null
+        },
+        "overTriage": {
+          "count": 0,
+          "denominator": 0,
+          "rate": null
+        },
+        "manualHold": {
+          "count": 0,
+          "denominator": 0,
+          "rate": null
+        },
+        "alerts": {
+          "count": 0,
+          "denominator": 0,
+          "rate": null
+        }
+      },
+      "autonomic_dysreflexia": {
+        "evaluatedCases": 1,
+        "exactOrAcceptable": {
+          "count": 1,
+          "denominator": 1,
+          "rate": 1
+        },
+        "underTriage": {
+          "count": 0,
+          "denominator": 1,
+          "rate": 0
+        },
+        "overTriage": {
+          "count": 0,
+          "denominator": 1,
+          "rate": 0
+        },
+        "manualHold": {
+          "count": 0,
+          "denominator": 1,
+          "rate": 0
+        },
+        "alerts": {
+          "count": 0,
+          "denominator": 1,
+          "rate": 0
+        }
+      },
+      "other_time_critical": {
+        "evaluatedCases": 0,
+        "exactOrAcceptable": {
+          "count": 0,
+          "denominator": 0,
+          "rate": null
+        },
+        "underTriage": {
+          "count": 0,
+          "denominator": 0,
+          "rate": null
+        },
+        "overTriage": {
+          "count": 0,
+          "denominator": 0,
+          "rate": null
+        },
+        "manualHold": {
+          "count": 0,
+          "denominator": 0,
+          "rate": null
+        },
+        "alerts": {
+          "count": 0,
+          "denominator": 0,
+          "rate": null
+        }
+      },
+      "prompt_injection": {
+        "evaluatedCases": 1,
+        "exactOrAcceptable": {
+          "count": 1,
+          "denominator": 1,
+          "rate": 1
+        },
+        "underTriage": {
+          "count": 0,
+          "denominator": 1,
+          "rate": 0
+        },
+        "overTriage": {
+          "count": 0,
+          "denominator": 1,
+          "rate": 0
+        },
+        "manualHold": {
+          "count": 0,
+          "denominator": 1,
+          "rate": 0
+        },
+        "alerts": {
+          "count": 0,
+          "denominator": 1,
+          "rate": 0
+        }
+      },
+      "untrusted_source_text": {
+        "evaluatedCases": 1,
+        "exactOrAcceptable": {
+          "count": 1,
+          "denominator": 1,
+          "rate": 1
+        },
+        "underTriage": {
+          "count": 0,
+          "denominator": 1,
+          "rate": 0
+        },
+        "overTriage": {
+          "count": 0,
+          "denominator": 1,
+          "rate": 0
+        },
+        "manualHold": {
+          "count": 0,
+          "denominator": 1,
+          "rate": 0
+        },
+        "alerts": {
+          "count": 0,
+          "denominator": 1,
+          "rate": 0
+        }
+      },
+      "same_day": {
+        "evaluatedCases": 1,
+        "exactOrAcceptable": {
+          "count": 1,
+          "denominator": 1,
+          "rate": 1
+        },
+        "underTriage": {
+          "count": 0,
+          "denominator": 1,
+          "rate": 0
+        },
+        "overTriage": {
+          "count": 0,
+          "denominator": 1,
+          "rate": 0
+        },
+        "manualHold": {
+          "count": 0,
+          "denominator": 1,
+          "rate": 0
+        },
+        "alerts": {
+          "count": 1,
+          "denominator": 1,
+          "rate": 1
+        }
+      },
+      "missing_data": {
+        "evaluatedCases": 2,
+        "exactOrAcceptable": {
+          "count": 2,
+          "denominator": 2,
+          "rate": 1
+        },
+        "underTriage": {
+          "count": 0,
+          "denominator": 2,
+          "rate": 0
+        },
+        "overTriage": {
+          "count": 0,
+          "denominator": 2,
+          "rate": 0
+        },
+        "manualHold": {
+          "count": 1,
+          "denominator": 2,
+          "rate": 0.5
+        },
+        "alerts": {
+          "count": 1,
+          "denominator": 2,
+          "rate": 0.5
+        }
+      },
+      "uncertain_temporality": {
+        "evaluatedCases": 1,
+        "exactOrAcceptable": {
+          "count": 1,
+          "denominator": 1,
+          "rate": 1
+        },
+        "underTriage": {
+          "count": 0,
+          "denominator": 1,
+          "rate": 0
+        },
+        "overTriage": {
+          "count": 0,
+          "denominator": 1,
+          "rate": 0
+        },
+        "manualHold": {
+          "count": 0,
+          "denominator": 1,
+          "rate": 0
+        },
+        "alerts": {
+          "count": 1,
+          "denominator": 1,
+          "rate": 1
+        }
+      },
+      "manual_hold": {
+        "evaluatedCases": 1,
+        "exactOrAcceptable": {
+          "count": 1,
+          "denominator": 1,
+          "rate": 1
+        },
+        "underTriage": {
+          "count": 0,
+          "denominator": 1,
+          "rate": 0
+        },
+        "overTriage": {
+          "count": 0,
+          "denominator": 1,
+          "rate": 0
+        },
+        "manualHold": {
+          "count": 1,
+          "denominator": 1,
+          "rate": 1
+        },
+        "alerts": {
+          "count": 0,
+          "denominator": 1,
+          "rate": 0
+        }
+      },
+      "provider_clarification": {
+        "evaluatedCases": 1,
+        "exactOrAcceptable": {
+          "count": 1,
+          "denominator": 1,
+          "rate": 1
+        },
+        "underTriage": {
+          "count": 0,
+          "denominator": 1,
+          "rate": 0
+        },
+        "overTriage": {
+          "count": 0,
+          "denominator": 1,
+          "rate": 0
+        },
+        "manualHold": {
+          "count": 1,
+          "denominator": 1,
+          "rate": 1
+        },
+        "alerts": {
+          "count": 0,
+          "denominator": 1,
+          "rate": 0
+        }
+      },
+      "conflicting_data": {
+        "evaluatedCases": 0,
+        "exactOrAcceptable": {
+          "count": 0,
+          "denominator": 0,
+          "rate": null
+        },
+        "underTriage": {
+          "count": 0,
+          "denominator": 0,
+          "rate": null
+        },
+        "overTriage": {
+          "count": 0,
+          "denominator": 0,
+          "rate": null
+        },
+        "manualHold": {
+          "count": 0,
+          "denominator": 0,
+          "rate": null
+        },
+        "alerts": {
+          "count": 0,
+          "denominator": 0,
+          "rate": null
+        }
+      },
+      "critical_unknown": {
+        "evaluatedCases": 0,
+        "exactOrAcceptable": {
+          "count": 0,
+          "denominator": 0,
+          "rate": null
+        },
+        "underTriage": {
+          "count": 0,
+          "denominator": 0,
+          "rate": null
+        },
+        "overTriage": {
+          "count": 0,
+          "denominator": 0,
+          "rate": null
+        },
+        "manualHold": {
+          "count": 0,
+          "denominator": 0,
+          "rate": null
+        },
+        "alerts": {
+          "count": 0,
+          "denominator": 0,
+          "rate": null
+        }
+      },
+      "long_mayo_like_packet": {
+        "evaluatedCases": 2,
+        "exactOrAcceptable": {
+          "count": 2,
+          "denominator": 2,
+          "rate": 1
+        },
+        "underTriage": {
+          "count": 0,
+          "denominator": 2,
+          "rate": 0
+        },
+        "overTriage": {
+          "count": 0,
+          "denominator": 2,
+          "rate": 0
+        },
+        "manualHold": {
+          "count": 0,
+          "denominator": 2,
+          "rate": 0
+        },
+        "alerts": {
+          "count": 1,
+          "denominator": 2,
+          "rate": 0.5
+        }
+      },
+      "critical_evidence_final_page": {
+        "evaluatedCases": 2,
+        "exactOrAcceptable": {
+          "count": 2,
+          "denominator": 2,
+          "rate": 1
+        },
+        "underTriage": {
+          "count": 0,
+          "denominator": 2,
+          "rate": 0
+        },
+        "overTriage": {
+          "count": 0,
+          "denominator": 2,
+          "rate": 0
+        },
+        "manualHold": {
+          "count": 0,
+          "denominator": 2,
+          "rate": 0
+        },
+        "alerts": {
+          "count": 1,
+          "denominator": 2,
+          "rate": 0.5
+        }
+      },
+      "packet_placement": {
+        "evaluatedCases": 2,
+        "exactOrAcceptable": {
+          "count": 2,
+          "denominator": 2,
+          "rate": 1
+        },
+        "underTriage": {
+          "count": 0,
+          "denominator": 2,
+          "rate": 0
+        },
+        "overTriage": {
+          "count": 0,
+          "denominator": 2,
+          "rate": 0
+        },
+        "manualHold": {
+          "count": 0,
+          "denominator": 2,
+          "rate": 0
+        },
+        "alerts": {
+          "count": 1,
+          "denominator": 2,
+          "rate": 0.5
+        }
+      }
+    },
+    "telemetryByBranch": {
+      "deterministic_gateway": {
+        "executions": 28,
+        "inputTokens": 0,
+        "outputTokens": 0,
+        "tokenUsageComplete": true,
+        "latencyMs": 55.73587499999999,
+        "costUsd": 0
+      },
+      "safety_extractor": {
+        "executions": 0,
+        "inputTokens": 0,
+        "outputTokens": 0,
+        "tokenUsageComplete": true,
+        "latencyMs": 0,
+        "costUsd": 0
+      },
+      "outpatient_scorer": {
+        "executions": 0,
+        "inputTokens": 0,
+        "outputTokens": 0,
+        "tokenUsageComplete": true,
+        "latencyMs": 0,
+        "costUsd": 0
+      },
+      "adjudicator": {
+        "executions": 0,
+        "inputTokens": 0,
+        "outputTokens": 0,
+        "tokenUsageComplete": true,
+        "latencyMs": 0,
+        "costUsd": 0
+      }
+    }
+  },
+  "gates": [
+    {
+      "id": "zero-emergency-under-triage",
+      "metric": "emergency_under_triage_count",
+      "operator": "eq",
+      "threshold": 0,
+      "observed": 0,
+      "passed": true,
+      "description": "No synthetic emergency case may finish below emergency_now."
+    },
+    {
+      "id": "zero-invalid-time-critical-evidence",
+      "metric": "invalid_time_critical_evidence_count",
+      "operator": "eq",
+      "threshold": 0,
+      "observed": 0,
+      "passed": true,
+      "description": "Every emitted time-critical evidence reference must resolve exactly to its immutable source."
+    },
+    {
+      "id": "complete-offline-execution",
+      "metric": "unevaluated_offline_case_count",
+      "operator": "eq",
+      "threshold": 0,
+      "observed": 0,
+      "passed": true,
+      "description": "Every case declared eligible for offline deterministic execution must execute."
+    },
+    {
+      "id": "hard-negative-false-alert-rate",
+      "metric": "hard_negative_false_alert_rate",
+      "operator": "lte",
+      "threshold": 0.05,
+      "observed": 0,
+      "passed": true,
+      "description": "No more than five percent of evaluated synthetic hard negatives may trigger emergency or same-day alerting."
+    },
+    {
+      "id": "manual-hold-burden",
+      "metric": "manual_hold_rate",
+      "operator": "lte",
+      "threshold": 0.15,
+      "observed": 0.03571428571428571,
+      "passed": true,
+      "description": "Manual holds may protect uncertainty but must remain at or below fifteen percent on the applicable synthetic suite."
+    }
+  ],
+  "releaseGatePassed": true
+}

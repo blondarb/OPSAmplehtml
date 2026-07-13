@@ -12,17 +12,21 @@
     "test:watch": "vitest",
     "test:audio": "npx tsx tests/audio/run-pipeline-test.ts",
     "test:audio:generate": "bash tests/audio/scripts/generate-visit-audio.sh",
-    "seed:wearable": "npx tsx scripts/seed-wearable-demo.ts"
+    "seed:wearable": "npx tsx scripts/seed-wearable-demo.ts",
+    "triage:sentinel": "npx tsx scripts/triage-sentinel.ts"
   },
   "dependencies": {
     "@aws-sdk/client-bedrock-agent-runtime": "^3.1003.0",
     "@aws-sdk/client-bedrock-runtime": "^3.1003.0",
+    "@aws-sdk/client-s3": "^3.1085.0",
     "@aws-sdk/client-secrets-manager": "^3.1003.0",
+    "@aws-sdk/client-sqs": "^3.1085.0",
+    "@aws-sdk/client-textract": "^3.1085.0",
     "@aws-sdk/client-transcribe-streaming": "^3.1010.0",
     "@aws-sdk/credential-providers": "^3.1011.0",
+    "@aws-sdk/s3-request-presigner": "^3.1085.0",
     "@deepgram/sdk": "^4.11.3",
     "@sevaro/feedback": "file:./packages/feedback",
-
     "framer-motion": "^12.34.3",
     "jose": "^6.2.0",
     "lucide-react": "^0.575.0",
@@ -44,6 +48,7 @@
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3.2.0",
+    "@types/aws-lambda": "^8.10.162",
     "@types/node": "^20.19.30",
     "@types/pdf-parse": "^1.1.5",
     "@types/pg": "^8.18.0",

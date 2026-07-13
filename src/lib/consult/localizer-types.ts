@@ -29,7 +29,7 @@ export interface LocalizerRequest {
   /** UUID of the active historian session (historian_sessions.id or ephemeral). */
   sessionId: string
   /** Session type influences the localizer prompt — new patients need diagnosis; follow-ups need treatment response. */
-  sessionType: 'new_patient' | 'follow_up'
+  sessionType: 'new_patient' | 'follow_up' | 'referral_clarification'
   /**
    * Recent transcript turns to analyze. Send the last 6–10 turns for
    * efficiency; the localizer does not need the full session history.
