@@ -583,6 +583,15 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
           autoEndTimerRef.current = null
         }
         setAiSpeaking(true)
+        // If the interview is already complete (this speech is the closing),
+        // schedule a 12s hard fallback in case aiSpeechStop never arrives
+        // from the relay. aiSpeechStop will replace this with the real 400ms
+        // end if it fires; otherwise this guarantees termination.
+        if (interviewCompletedRef.current && !finalizingRef.current) {
+          autoEndTimerRef.current = setTimeout(() => {
+            endSessionRef.current()
+          }, 12000)
+        }
         break
       }
 
