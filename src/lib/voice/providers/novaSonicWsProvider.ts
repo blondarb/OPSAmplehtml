@@ -193,13 +193,18 @@ export class NovaSonicWsProvider implements VoiceProvider {
         })
         break
       case 'completion':
-        // End-of-turn. No dedicated VoiceEvent; if the AI was still flagged as
-        // speaking (no explicit aiSpeechStop arrived), close the turn out —
-        // same drain-then-emit path as the aiSpeechStop case above.
-        if (this.aiSpeaking) {
-          this.aiSpeaking = false
-          this.emitAiSpeechStopWhenDrained()
-        }
+        // End-of-turn — Nova's guaranteed turn-close signal. ALWAYS drain-then-
+        // emit aiSpeechStop, even if aiSpeaking was never flagged true for this
+        // turn. A systemText-nudged turn (the save-time closing statement) can
+        // produce a completion WITHOUT a preceding aiSpeechStart, so the old
+        // `if (this.aiSpeaking)` guard swallowed the only end-of-turn signal and
+        // the hook's isAiSpeaking stayed stuck true — auto-end never fired and
+        // the session hung after the closing. Emitting unconditionally is safe:
+        // whenDrained resolves immediately when no audio is queued, and mid-
+        // interview aiSpeechStop only clears the speaking flag (the hook's
+        // auto-end gates on interviewCompleted, so it can't end early).
+        this.aiSpeaking = false
+        this.emitAiSpeechStopWhenDrained()
         break
       case 'error':
         this.emit({ type: 'error', message: msg.message })
