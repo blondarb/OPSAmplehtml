@@ -85,10 +85,10 @@ export const RED_FLAG_BANKS: RedFlagBank[] = [
       // caller describes a hemiparesis ("right-sided weakness", "weakness in his
       // right arm and leg"), which the adjacency-only "weak arm"/"arm is weak"
       // patterns below all missed (live test, same session).
-      /\b(?:left|right|one)[\s-]?sided?\s+(?:weak(?:ness)?|numb(?:ness)?|paralysis|paresis|droop)/i,
+      /\b(?:left|right|one)[\s-]?sided?\s+(?:weak(?:ness)?|numb(?:ness)?|paralysis|paresis|droop|tingl\w*|paresthes\w*|heavi(?:ness)?)/i,
       /\bweak(?:ness)?\s+(?:in|on|of|to)\s+(?:the\s+|his\s+|her\s+|their\s+|my\s+|one\s+)?(?:right\s+|left\s+)?(?:side|arm|leg|face|hand)\b/i,
       /\bnumb(?:ness)?\s+(?:in|on|of)\s+(?:the\s+|his\s+|her\s+|their\s+|my\s+|one\s+)?(?:right\s+|left\s+)?(?:side|arm|leg|face|hand)\b/i,
-      /\b(?:right|left)\s+(?:arm|leg|hand|side|face)\s+(?:is\s+|are\s+|feels?\s+|went\s+|going\s+|has\s+gone\s+)?(?:weak|numb|paralyz|droop)/i,
+      /\b(?:right|left)\s+(?:arm|leg|hand|side|face)\s+(?:is\s+|are\s+|feels?\s+|went\s+|going\s+|has\s+gone\s+)?(?:weak|numb|paralyz|droop|tingl\w*|heav\w*)/i,
       // BE-FAST — Balance, Eyes, Face, Arm, Speech, Time
       /\bface\s+droop(?:ing|ed)?\b/i,
       /\b(?:face|mouth)\s+is\s+droop(?:ing)?\b/i,
@@ -277,9 +277,11 @@ export function isSubacuteStrokeReport(text: string): boolean {
 // confident, unambiguous, stable > 24 h onset and NONE of the danger markers.
 // ---------------------------------------------------------------------------
 
-/** Any focal-deficit / stroke signal — broad on purpose (over-firing only ever escalates, which is safe). */
+/** Any focal-deficit / stroke signal — broad on purpose (over-firing only ever escalates, which is safe).
+ *  tingling/paresthesia/heaviness added 2026-07-13 (cross-model review): common sensory/motor
+ *  stroke descriptors the guard's scope was missing. */
 const STROKE_CONTEXT =
-  /\b(stroke|weak(?:ness)?|numb(?:ness)?|paralys\w*|hemipar\w*|hemipleg\w*|facial\s+droop|droop\w*|slur\w*|aphasi\w*|dysarthr\w*|vision\s+loss|field\s+cut|neglect|ataxi\w*|can'?t\s+(?:move|speak|see)|face\s+is\s+droop)/i
+  /\b(stroke|weak(?:ness)?|numb(?:ness)?|tingl\w*|paresthes\w*|pins?\s+and\s+needles|heavi(?:ness)?|heavy\s+(?:arm|leg|side|limb)|paralys\w*|hemipar\w*|hemipleg\w*|facial\s+droop|droop\w*|slur\w*|aphasi\w*|dysarthr\w*|vision\s+loss|field\s+cut|neglect|ataxi\w*|can'?t\s+(?:move|speak|see)|face\s+is\s+droop)/i
 
 /** Uncertainty/hedging about WHEN it started → not a confident onset → keep EMERGENT. */
 const GUARD_UNCERTAINTY =

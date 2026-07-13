@@ -57,6 +57,12 @@ describe('detectRedFlag — positives (must fire)', () => {
     ['we gave tpa this morning and now he is vomiting and much more confused', 'acute_emergency'],
     ['post thrombectomy yesterday, now new weakness on the opposite side', 'acute_emergency'],
     ['he got thrombolytics an hour ago and now has a severe headache', 'acute_emergency'],
+    // Tingling / paresthesia / heaviness (2026-07-13 cross-model review): common
+    // sensory/motor stroke descriptors — lateralized forms fire the floor.
+    ['he has right sided tingling and numbness', 'stroke'],
+    ['left arm feels heavy and weak', 'stroke'],
+    ['right leg tingling since this morning', 'stroke'],
+    ['left-sided heaviness and paresthesia', 'stroke'],
   ]
 
   it.each(cases)('fires on: %s', (text) => {
@@ -122,6 +128,8 @@ describe('detectRedFlag — negatives (must NOT fire)', () => {
     'she woke up and ate breakfast this morning',
     'post thrombectomy yesterday, no new deficits, recovering well',
     'patient had tpa last month, here for a routine follow up',
+    'tingling in my fingers when i type all day',
+    'some tingling in both feet, chronic and stable for years',
   ]
   it.each(activationNegatives)('does not fire on benign stroke-adjacent phrasing: %s', (text) => {
     expect(detectRedFlag(text).isRedFlag).toBe(false)
