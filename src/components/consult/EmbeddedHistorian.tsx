@@ -312,7 +312,7 @@ export default function EmbeddedHistorian({
     if (phase !== 'active') return
     const t = setTimeout(() => {
       handleEnd()
-    }, 10000)
+    }, 30000)
     return () => clearTimeout(t)
   }, [interviewCompleted, phase, handleEnd])
 
