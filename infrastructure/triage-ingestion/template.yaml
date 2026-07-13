@@ -251,28 +251,51 @@ Resources:
         - !Ref ScannedPacketSnsDeliveryDeadLetterQueue
       PolicyDocument:
         Version: '2012-10-17'
+        # SQS queue policies require exactly one resource per statement.
         Statement:
-          - Sid: AllowOnlyConfiguredSnsTopic
+          - Sid: AllowOnlyConfiguredSnsTopicCompletion
             Effect: Allow
             Principal:
               Service: sns.amazonaws.com
             Action: sqs:SendMessage
-            Resource:
-              - !GetAtt ScannedPacketCompletionQueue.Arn
-              - !GetAtt ScannedPacketSnsDeliveryDeadLetterQueue.Arn
+            Resource: !GetAtt ScannedPacketCompletionQueue.Arn
             Condition:
               ArnEquals:
                 aws:SourceArn: !Ref TextractCompletionTopic
               StringEquals:
                 aws:SourceAccount: !Ref AWS::AccountId
-          - Sid: DenyInsecureTransport
+          - Sid: AllowOnlyConfiguredSnsTopicSnsDlq
+            Effect: Allow
+            Principal:
+              Service: sns.amazonaws.com
+            Action: sqs:SendMessage
+            Resource: !GetAtt ScannedPacketSnsDeliveryDeadLetterQueue.Arn
+            Condition:
+              ArnEquals:
+                aws:SourceArn: !Ref TextractCompletionTopic
+              StringEquals:
+                aws:SourceAccount: !Ref AWS::AccountId
+          - Sid: DenyInsecureTransportCompletion
             Effect: Deny
             Principal: '*'
             Action: sqs:*
-            Resource:
-              - !GetAtt ScannedPacketCompletionQueue.Arn
-              - !GetAtt ScannedPacketDeadLetterQueue.Arn
-              - !GetAtt ScannedPacketSnsDeliveryDeadLetterQueue.Arn
+            Resource: !GetAtt ScannedPacketCompletionQueue.Arn
+            Condition:
+              Bool:
+                aws:SecureTransport: 'false'
+          - Sid: DenyInsecureTransportDlq
+            Effect: Deny
+            Principal: '*'
+            Action: sqs:*
+            Resource: !GetAtt ScannedPacketDeadLetterQueue.Arn
+            Condition:
+              Bool:
+                aws:SecureTransport: 'false'
+          - Sid: DenyInsecureTransportSnsDlq
+            Effect: Deny
+            Principal: '*'
+            Action: sqs:*
+            Resource: !GetAtt ScannedPacketSnsDeliveryDeadLetterQueue.Arn
             Condition:
               Bool:
                 aws:SecureTransport: 'false'

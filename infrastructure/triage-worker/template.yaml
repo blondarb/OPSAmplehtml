@@ -105,14 +105,21 @@ Resources:
         - !Ref LongPacketDeadLetterQueue
       PolicyDocument:
         Version: '2012-10-17'
+        # SQS queue policies require exactly one resource per statement.
         Statement:
-          - Sid: DenyInsecureTransport
+          - Sid: DenyInsecureTransportWork
             Effect: Deny
             Principal: '*'
             Action: sqs:*
-            Resource:
-              - !GetAtt LongPacketWorkQueue.Arn
-              - !GetAtt LongPacketDeadLetterQueue.Arn
+            Resource: !GetAtt LongPacketWorkQueue.Arn
+            Condition:
+              Bool:
+                aws:SecureTransport: 'false'
+          - Sid: DenyInsecureTransportDlq
+            Effect: Deny
+            Principal: '*'
+            Action: sqs:*
+            Resource: !GetAtt LongPacketDeadLetterQueue.Arn
             Condition:
               Bool:
                 aws:SecureTransport: 'false'
@@ -206,16 +213,37 @@ Resources:
         - !Ref EmergencyAlertDeliveryDeadLetterQueue
       PolicyDocument:
         Version: '2012-10-17'
+        # SQS queue policies require exactly one resource per statement.
         Statement:
-          - Sid: DenyInsecureEmergencyAlertTransport
+          - Sid: DenyInsecureEmergencyAlertWork
             Effect: Deny
             Principal: '*'
             Action: sqs:*
-            Resource:
-              - !GetAtt EmergencyAlertWorkQueue.Arn
-              - !GetAtt EmergencyAlertWorkDeadLetterQueue.Arn
-              - !GetAtt EmergencyAlertDeliveryQueue.Arn
-              - !GetAtt EmergencyAlertDeliveryDeadLetterQueue.Arn
+            Resource: !GetAtt EmergencyAlertWorkQueue.Arn
+            Condition:
+              Bool:
+                aws:SecureTransport: 'false'
+          - Sid: DenyInsecureEmergencyAlertWorkDlq
+            Effect: Deny
+            Principal: '*'
+            Action: sqs:*
+            Resource: !GetAtt EmergencyAlertWorkDeadLetterQueue.Arn
+            Condition:
+              Bool:
+                aws:SecureTransport: 'false'
+          - Sid: DenyInsecureEmergencyAlertDelivery
+            Effect: Deny
+            Principal: '*'
+            Action: sqs:*
+            Resource: !GetAtt EmergencyAlertDeliveryQueue.Arn
+            Condition:
+              Bool:
+                aws:SecureTransport: 'false'
+          - Sid: DenyInsecureEmergencyAlertDeliveryDlq
+            Effect: Deny
+            Principal: '*'
+            Action: sqs:*
+            Resource: !GetAtt EmergencyAlertDeliveryDeadLetterQueue.Arn
             Condition:
               Bool:
                 aws:SecureTransport: 'false'
