@@ -14,6 +14,7 @@ import Link from 'next/link'
 import { Bot, ChevronDown, ChevronRight, TriangleAlert } from 'lucide-react'
 import FeatureSubHeader from '@/components/layout/FeatureSubHeader'
 import ClaraDecisionCard from './ClaraDecisionCard'
+import ClaraFeedbackReviewPanel from './ClaraFeedbackReviewPanel'
 import type { ClaraFeedbackRow } from '@/lib/clara/feedbackTypes'
 import type { ClaraTurn } from '@/hooks/useClaraVoiceSession'
 
@@ -47,6 +48,7 @@ export default function ClaraResultsHistoryView() {
   const [pendingMigration, setPendingMigration] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [expanded, setExpanded] = useState<Record<string, boolean>>({})
+  const [activeTab, setActiveTab] = useState<'history' | 'review'>('history')
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -106,97 +108,138 @@ export default function ClaraResultsHistoryView() {
           </Link>
         </div>
 
-        {pendingMigration && (
-          <div style={{ background: 'rgba(234,179,8,0.12)', border: '1px solid rgba(234,179,8,0.4)', borderRadius: 8, padding: 12, color: '#fde68a', fontSize: 13, display: 'flex', gap: 8, alignItems: 'flex-start' }}>
-            <TriangleAlert size={16} style={{ flexShrink: 0, marginTop: 1 }} />
-            <div>{pendingMigration}</div>
-          </div>
-        )}
+        <div style={{ display: 'flex', gap: 4, borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
+          <button
+            onClick={() => setActiveTab('history')}
+            style={{
+              background: 'none',
+              border: 'none',
+              borderBottom: activeTab === 'history' ? `2px solid ${ACCENT}` : '2px solid transparent',
+              color: activeTab === 'history' ? 'white' : '#94a3b8',
+              fontWeight: activeTab === 'history' ? 700 : 500,
+              fontSize: 13,
+              padding: '8px 10px',
+              cursor: 'pointer',
+              marginBottom: -1,
+            }}
+          >
+            Session History
+          </button>
+          <button
+            onClick={() => setActiveTab('review')}
+            style={{
+              background: 'none',
+              border: 'none',
+              borderBottom: activeTab === 'review' ? `2px solid ${ACCENT}` : '2px solid transparent',
+              color: activeTab === 'review' ? 'white' : '#94a3b8',
+              fontWeight: activeTab === 'review' ? 700 : 500,
+              fontSize: 13,
+              padding: '8px 10px',
+              cursor: 'pointer',
+              marginBottom: -1,
+            }}
+          >
+            Feedback Review
+          </button>
+        </div>
 
-        {error && (
-          <div style={{ background: 'rgba(239,68,68,0.12)', border: '1px solid rgba(239,68,68,0.4)', borderRadius: 8, padding: 12, color: '#fca5a5', fontSize: 13 }}>
-            {error}
-          </div>
-        )}
+        {activeTab === 'review' && <ClaraFeedbackReviewPanel />}
 
-        {loading && <div style={{ color: '#64748b', fontSize: 13 }}>Loading…</div>}
+        {activeTab === 'history' && (
+          <>
+            {pendingMigration && (
+              <div style={{ background: 'rgba(234,179,8,0.12)', border: '1px solid rgba(234,179,8,0.4)', borderRadius: 8, padding: 12, color: '#fde68a', fontSize: 13, display: 'flex', gap: 8, alignItems: 'flex-start' }}>
+                <TriangleAlert size={16} style={{ flexShrink: 0, marginTop: 1 }} />
+                <div>{pendingMigration}</div>
+              </div>
+            )}
 
-        {!loading && !pendingMigration && !error && sessions.length === 0 && (
-          <div style={{ color: '#64748b', fontSize: 13 }}>No test calls logged yet — start one from the main test page.</div>
-        )}
+            {error && (
+              <div style={{ background: 'rgba(239,68,68,0.12)', border: '1px solid rgba(239,68,68,0.4)', borderRadius: 8, padding: 12, color: '#fca5a5', fontSize: 13 }}>
+                {error}
+              </div>
+            )}
 
-        {sessions.map((session) => {
-          const isOpen = !!expanded[session.id]
-          const sessionFeedback = feedbackBySession[session.id] || []
-          const classifiedTurns = (session.turns || [])
-            .map((t, i) => ({ turn: t, index: i }))
-            .filter(({ turn }) => turn.role === 'user' && turn.classification)
+            {loading && <div style={{ color: '#64748b', fontSize: 13 }}>Loading…</div>}
 
-          return (
-            <div key={session.id} style={{ border: '1px solid rgba(255,255,255,0.1)', borderRadius: 12, overflow: 'hidden' }}>
-              <button
-                onClick={() => setExpanded((e) => ({ ...e, [session.id]: !e[session.id] }))}
-                style={{
-                  width: '100%',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  gap: 10,
-                  background: 'rgba(255,255,255,0.04)',
-                  border: 'none',
-                  color: 'white',
-                  padding: '12px 14px',
-                  cursor: 'pointer',
-                  textAlign: 'left',
-                }}
-              >
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-                  {isOpen ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
-                  <span style={{ fontWeight: 700, fontSize: 14 }}>{session.test_label || fmtDate(session.created_at)}</span>
-                  {session.consult_type && <span style={{ color: '#94a3b8', fontSize: 12 }}>{session.consult_type}</span>}
-                  {session.gate0_fired && <span style={{ color: '#fca5a5', fontSize: 12, fontWeight: 700 }}>GATE 0</span>}
-                  <span style={{ color: '#64748b', fontSize: 12 }}>{session.turn_count ?? 0} turns</span>
-                  {typeof session.duration_seconds === 'number' && (
-                    <span style={{ color: '#64748b', fontSize: 12 }}>{session.duration_seconds}s</span>
+            {!loading && !pendingMigration && !error && sessions.length === 0 && (
+              <div style={{ color: '#64748b', fontSize: 13 }}>No test calls logged yet — start one from the main test page.</div>
+            )}
+
+            {sessions.map((session) => {
+              const isOpen = !!expanded[session.id]
+              const sessionFeedback = feedbackBySession[session.id] || []
+              const classifiedTurns = (session.turns || [])
+                .map((t, i) => ({ turn: t, index: i }))
+                .filter(({ turn }) => turn.role === 'user' && turn.classification)
+
+              return (
+                <div key={session.id} style={{ border: '1px solid rgba(255,255,255,0.1)', borderRadius: 12, overflow: 'hidden' }}>
+                  <button
+                    onClick={() => setExpanded((e) => ({ ...e, [session.id]: !e[session.id] }))}
+                    style={{
+                      width: '100%',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      gap: 10,
+                      background: 'rgba(255,255,255,0.04)',
+                      border: 'none',
+                      color: 'white',
+                      padding: '12px 14px',
+                      cursor: 'pointer',
+                      textAlign: 'left',
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                      {isOpen ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
+                      <span style={{ fontWeight: 700, fontSize: 14 }}>{session.test_label || fmtDate(session.created_at)}</span>
+                      {session.consult_type && <span style={{ color: '#94a3b8', fontSize: 12 }}>{session.consult_type}</span>}
+                      {session.gate0_fired && <span style={{ color: '#fca5a5', fontSize: 12, fontWeight: 700 }}>GATE 0</span>}
+                      <span style={{ color: '#64748b', fontSize: 12 }}>{session.turn_count ?? 0} turns</span>
+                      {typeof session.duration_seconds === 'number' && (
+                        <span style={{ color: '#64748b', fontSize: 12 }}>{session.duration_seconds}s</span>
+                      )}
+                    </div>
+                    <span style={{ color: '#94a3b8', fontSize: 12 }}>
+                      {sessionFeedback.length > 0 ? `${sessionFeedback.length} feedback` : 'no feedback yet'}
+                    </span>
+                  </button>
+
+                  {isOpen && (
+                    <div style={{ padding: 14, display: 'flex', flexDirection: 'column', gap: 10 }}>
+                      {classifiedTurns.length === 0 && (
+                        <div style={{ color: '#64748b', fontSize: 13 }}>No classified turns in this call.</div>
+                      )}
+                      {classifiedTurns.map(({ turn, index }, i) => (
+                        <ClaraDecisionCard
+                          key={index}
+                          heading={`Turn ${i + 1} — "${turn.text.slice(0, 80)}${turn.text.length > 80 ? '…' : ''}"`}
+                          decision={{
+                            consultType: turn.classification!.consultType,
+                            confidence: turn.classification!.confidence,
+                            rationale: turn.classification!.rationale,
+                            urgencyLevel: turn.classification!.urgencyLevel,
+                            statLevel: turn.classification!.statLevel,
+                            redFlags: turn.classification!.redFlags,
+                            gate0Fired: !!turn.gate0?.fired,
+                          }}
+                          routingActionLabel={turn.classification!.routing?.label}
+                          sessionId={session.id}
+                          turnIndex={index}
+                          existingFeedback={sessionFeedback.filter((fb) => fb.turn_index === index)}
+                          onSubmitted={(row) =>
+                            setFeedbackBySession((prev) => ({ ...prev, [session.id]: [row, ...(prev[session.id] || [])] }))
+                          }
+                        />
+                      ))}
+                    </div>
                   )}
                 </div>
-                <span style={{ color: '#94a3b8', fontSize: 12 }}>
-                  {sessionFeedback.length > 0 ? `${sessionFeedback.length} feedback` : 'no feedback yet'}
-                </span>
-              </button>
-
-              {isOpen && (
-                <div style={{ padding: 14, display: 'flex', flexDirection: 'column', gap: 10 }}>
-                  {classifiedTurns.length === 0 && (
-                    <div style={{ color: '#64748b', fontSize: 13 }}>No classified turns in this call.</div>
-                  )}
-                  {classifiedTurns.map(({ turn, index }, i) => (
-                    <ClaraDecisionCard
-                      key={index}
-                      heading={`Turn ${i + 1} — "${turn.text.slice(0, 80)}${turn.text.length > 80 ? '…' : ''}"`}
-                      decision={{
-                        consultType: turn.classification!.consultType,
-                        confidence: turn.classification!.confidence,
-                        rationale: turn.classification!.rationale,
-                        urgencyLevel: turn.classification!.urgencyLevel,
-                        statLevel: turn.classification!.statLevel,
-                        redFlags: turn.classification!.redFlags,
-                        gate0Fired: !!turn.gate0?.fired,
-                      }}
-                      routingActionLabel={turn.classification!.routing?.label}
-                      sessionId={session.id}
-                      turnIndex={index}
-                      existingFeedback={sessionFeedback.filter((fb) => fb.turn_index === index)}
-                      onSubmitted={(row) =>
-                        setFeedbackBySession((prev) => ({ ...prev, [session.id]: [row, ...(prev[session.id] || [])] }))
-                      }
-                    />
-                  ))}
-                </div>
-              )}
-            </div>
-          )
-        })}
+              )
+            })}
+          </>
+        )}
       </div>
     </div>
   )
