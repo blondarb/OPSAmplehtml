@@ -168,6 +168,18 @@ export function getClaraSystemPrompt(): string {
         emergency, to activate their local pediatric/emergency team). If age is ambiguous (could be
         a young adult), ONE clarifying question about age is allowed before deciding.
 
+      A0c) BRAIN DEATH vs POST‑ARREST PROGNOSTICATION (Steve, 2026-07-13). Draw the line:
+        • A request for a BRAIN‑DEATH DETERMINATION / declaration exam is OUT OF SCOPE — we do not
+          provide brain‑death exams. Set consultType = ${CONSULT_TYPE.OUTPATIENT} (the "not covered"
+          bucket), urgencyLevel = low, statLevel = null, rationale "BRAIN DEATH EXAM — out of scope,
+          refer to the requesting team." (Phrases: "declare brain death", "brain death exam/testing",
+          "apnea test for brain death".)
+        • BUT post‑cardiac‑arrest NEUROLOGIC PROGNOSTICATION / neuro evaluation after an arrest IS a
+          consult we DO — treat it as a normal neuro consult, ${CONSULT_TYPE.NON_EMERGENT} on the STAT
+          line (statLevel per the STAT rules), NOT out of scope; only ${CONSULT_TYPE.EMERGENT} if there's
+          an acute change (ongoing seizure/status, herniation concern). (Phrases: "prognosis after
+          cardiac arrest", "neuro eval after a code/arrest", "will they wake up after the arrest".)
+
       A) Workflow:
         - Explicit CT, EEG, Ceribell, rounding, outpatient → classify accordingly.
         - Generic "teleneuro consult" → ${CONSULT_TYPE.EMERGENT}.
@@ -231,7 +243,7 @@ export function getClaraSystemPrompt(): string {
       F) Specific patterns:
         - MS / MS relapse ≥ 24 h no stroke → STAT 2 (contract: MS is STAT 2); sudden/onset < 24 h with a stroke‑like focal deficit → ${CONSULT_TYPE.EMERGENT}.
         - TGA → STAT 2.
-        - Acute delirium + infection → ${CONSULT_TYPE.EMERGENT}.
+        - Delirium / altered mental status + infection (suspected meningitis/encephalitis, sepsis) → a STAT‑tier consult by DEFAULT, NOT emergent (meningitis/encephalitis → STAT 1; metabolic/toxic AMS → STAT 2). Escalate to ${CONSULT_TYPE.EMERGENT} ONLY on a genuine ACUTE change — rapidly worsening consciousness, a NEW focal deficit, airway compromise, or active/ongoing seizure. (Steve 2026‑07‑13: absent an acute change, meningitis and infection‑related AMS go to the STAT line / MD2, not the emergent page.)
         - New ICH/SAH → ${CONSULT_TYPE.EMERGENT}; old → STAT 2.
         - Intrathecal baclofen pump alarm / malfunction / low-reservoir (or missed refill) + new
           rigidity/spasticity + fever/diaphoresis + altered mental status → ${CONSULT_TYPE.EMERGENT}
@@ -302,14 +314,21 @@ export function getClaraSystemPrompt(): string {
           • Any central sign, inability to walk, or sudden onset with vascular risk → EMERGENT (treat
             as posterior stroke until proven otherwise). Purely positional / isolated → STAT 2.
 
-        G5) Onset & trajectory — the universal STAT 1 vs STAT 2 lever (use when no set above applies):
-          • Trigger when: an acute or subacute neurologic deficit where STAT 1 vs STAT 2 hinges on how
-            new and how fast-moving it is, and the transcript does not already make that clear.
-          • Ask ONE question eliciting BOTH: when did it start, and is it getting worse, staying the
-            same, or improving.
-          • Rapidly progressive / hyperacute (or still worsening) → the more urgent tier (STAT 1, or
-            EMERGENT if it meets an emergent rule). Stable, subacute, or improving → STAT 2. This
-            encodes the core principle: STAT 1 is the faster, more urgent evaluation.
+        G5) Onset & trajectory — the EMERGENT‑vs‑STAT lever (use when no set above applies):
+          • This lever decides EMERGENT vs a STAT‑tier consult. It does NOT decide STAT 1 vs STAT 2 —
+            that split is purely by CONDITION (GBS / MG exacerbation / acute cord / meningitis‑encephalitis
+            → STAT 1; everything else non‑emergent → STAT 2). There is NO acuity gap between STAT 1 and
+            STAT 2 (both ≤60 min; STAT 1's only distinction is verbal recs delivered to the caller's docs),
+            so never use "how fast it's moving" to push toward STAT 1.
+          • Trigger when: a focal/neurologic deficit where it's unclear whether it's still in the acute
+            treatment window (EMERGENT) or an established, settled problem (a STAT‑tier consult), and the
+            transcript doesn't already make that clear.
+          • Ask ONE question eliciting BOTH: when did it start, and is it getting worse, staying the same,
+            or improving.
+          • Acute onset within ~24h, OR still worsening / new / progressing at any point → ${CONSULT_TYPE.EMERGENT}
+            (acute stroke window, or stroke‑in‑evolution — this dovetails with the worsening override above).
+          • Established > 24h AND stable/improving → a STAT‑tier consult, NOT emergent; the CONDITION then
+            sets STAT 1 vs STAT 2 as above.
 
         G6) Otherwise:
           • needsClarification = false; clarificationQuestions = []; confidence per normal rules.
