@@ -171,7 +171,7 @@ export const RED_FLAG_BANKS: RedFlagBank[] = [
       /\bairway\s+compromis\w*\b/i,
       /\bstopped\s+breathing\b/i,
       /\bnot\s+breathing\b/i,
-      /\bapne(?:a|ic)\b/i,
+      /\bapne(?:a|ic)\b(?!\s+test)/i, // "apnea"/"apneic" = respiratory arrest; but NOT "apnea test" (a brain-death exam procedure — out of scope, handled by the rulebook, not an emergency)
       /\bdesaturat\w*\b/i,
       /\bturning\s+blue\b/i,
       /\bcyanotic\b/i,

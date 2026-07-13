@@ -179,6 +179,9 @@ export function getClaraSystemPrompt(): string {
           line (statLevel per the STAT rules), NOT out of scope; only ${CONSULT_TYPE.EMERGENT} if there's
           an acute change (ongoing seizure/status, herniation concern). (Phrases: "prognosis after
           cardiac arrest", "neuro eval after a code/arrest", "will they wake up after the arrest".)
+          This is a CONSULT — the caller wants a neurologist's assessment/prognosis — so it is
+          ${CONSULT_TYPE.NON_EMERGENT} (STAT), NOT ${CONSULT_TYPE.EEG_READ}; only route it to the EEG
+          reader if they specifically ask for an EEG read, not for a prognostic opinion.
 
       A) Workflow:
         - Explicit CT, EEG, Ceribell, rounding, outpatient → classify accordingly.
