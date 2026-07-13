@@ -111,6 +111,15 @@ export const RED_FLAG_BANKS: RedFlagBank[] = [
       /\bhaving\s+a\s+stroke\b/i,
       /\bstroke\s+symptoms?\b/i,
       /\bfacial\s+droop\b/i,
+      // WAKE-UP / FOUND-DOWN stroke — added 2026-07-13 (red-team): "woke up
+      // this morning with weakness" fired NOTHING at the floor (the noun-form
+      // weakness patterns need a body part) and the LLM then wrongly downgraded
+      // it to STAT-2 off a stray "couple days ago". A wake-up stroke's LKW is
+      // bedtime — potentially inside the thrombectomy window — so it is a floor
+      // hit. Bounded to wake-up/found-down CO-OCCURRING with a deficit token so
+      // "woke up feeling fine" never fires.
+      /\bwoke\s+up\s+(?:this\s+morning\s+|today\s+)?with\s+(?:[a-z']+\s+){0,4}(?:weak|numb|droop|slur|paralyz|vision|speech|face|arm|leg|dizz|confus)/i,
+      /\bfound\s+(?:him|her|them|the\s+patient)?\s*(?:down|on\s+the\s+floor|unable\s+to)\b/i,
     ],
   },
   {
@@ -171,6 +180,14 @@ export const RED_FLAG_BANKS: RedFlagBank[] = [
       // ceribell-airway case: "not been able to rouse him").
       /\b(?:un(?:able\s+to\s+)?rouse|unrousable|unarousable|can'?t\s+rouse|cannot\s+rouse|couldn'?t\s+rouse|won'?t\s+rouse|not\s+(?:been\s+)?able\s+to\s+rouse)\b/i,
       /\b(?:can'?t|cannot|couldn'?t|won'?t|unable\s+to)\s+wake\s+(?:him|her|them)?\s*up\b/i,
+      // POST-THROMBOLYTIC / POST-THROMBECTOMY DETERIORATION — added 2026-07-13
+      // (red-team): "gave tpa this morning, now vomiting and more confused" is
+      // a possible hemorrhagic conversion (a code-level emergency), but it fired
+      // NOTHING at the floor — only the LLM caught it. Requires a clot-buster/
+      // thrombectomy mention CO-OCCURRING with a decline sign, so a routine
+      // "post thrombectomy, no new deficits" (which is STAT 2 / rounding) does
+      // NOT fire. Over-triage direction.
+      /\b(?:t\s*p\s*a|tnk|tenecteplase|alteplase|thrombolytic\w*|thrombolysis|thrombectomy|clot[\s-]?buster)\b[\s\S]{0,60}?\b(?:worse|worsening|deteriorat\w*|declin\w*|new\s+(?:deficit|weakness|symptom|bleed)|more\s+(?:confused|lethargic|somnolent|drowsy)|vomit\w*|severe\s+headache|unrespons\w*|unarousable|hemorrhag\w*)\b/i,
     ],
   },
 ]

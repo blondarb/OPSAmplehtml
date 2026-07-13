@@ -46,6 +46,17 @@ describe('detectRedFlag — positives (must fire)', () => {
     ['numbness in the left leg', 'stroke'],
     ['his right arm is weak and his left leg went numb', 'stroke'],
     ['one-sided facial droop', 'stroke'],
+    // Wake-up / found-down stroke (2026-07-13 red-team): "woke up with weakness"
+    // fired nothing and the LLM then downgraded it off a stray "days ago". LKW
+    // is bedtime -> potentially thrombectomy-eligible -> floor hit.
+    ['he woke up this morning with weakness', 'stroke'],
+    ['woke up with left arm weakness and slurred speech', 'stroke'],
+    ['found him down on the floor unable to speak', 'stroke'],
+    // Post-thrombolytic / post-thrombectomy deterioration = possible
+    // hemorrhagic conversion (code-level), previously caught by the LLM only.
+    ['we gave tpa this morning and now he is vomiting and much more confused', 'acute_emergency'],
+    ['post thrombectomy yesterday, now new weakness on the opposite side', 'acute_emergency'],
+    ['he got thrombolytics an hour ago and now has a severe headache', 'acute_emergency'],
   ]
 
   it.each(cases)('fires on: %s', (text) => {
@@ -106,6 +117,11 @@ describe('detectRedFlag — negatives (must NOT fire)', () => {
     'he had a stroke five years ago, doing well now',
     'wants to discuss stroke prevention and diet',
     'her arm feels a little stiff after the workout',
+    // Wake-up / post-tPA patterns must require a co-occurring deficit / decline:
+    'he woke up feeling fine and rested',
+    'she woke up and ate breakfast this morning',
+    'post thrombectomy yesterday, no new deficits, recovering well',
+    'patient had tpa last month, here for a routine follow up',
   ]
   it.each(activationNegatives)('does not fire on benign stroke-adjacent phrasing: %s', (text) => {
     expect(detectRedFlag(text).isRedFlag).toBe(false)
