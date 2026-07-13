@@ -10,6 +10,9 @@ const nextConfig: NextConfig = {
   // Amplify SSR compute does not inject app-level env vars at runtime,
   // so we inline them during the build via next.config.
   env: {
+    // Durable long-packet rollout flag (SAM worker stacks deployed 2026-07-12)
+    TRIAGE_LONG_PACKET_DURABLE_ENABLED: process.env.TRIAGE_LONG_PACKET_DURABLE_ENABLED,
+    TRIAGE_LONG_PACKET_MAX_ATTEMPTS: process.env.TRIAGE_LONG_PACKET_MAX_ATTEMPTS,
     OPENAI_API_KEY: process.env.OPENAI_API_KEY,
     DEEPGRAM_API_KEY: process.env.DEEPGRAM_API_KEY,
     RDS_HOST: process.env.RDS_HOST,
