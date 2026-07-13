@@ -259,6 +259,17 @@ describe('evaluateStrokeDowngradeGuard', () => {
     expect(evaluateStrokeDowngradeGuard('emergency stroke consult, weakness 30 minutes ago', 'emergent').forceEmergent).toBe(false)
   })
 
+  it('STANDS DOWN on recognized non-stroke STAT conditions (regression 2026-07-13)', () => {
+    // GBS/MG/cord/meningitis (STAT-1) and MS (STAT-2) share symptom words with
+    // STROKE_CONTEXT; the guard must NOT force them to emergent (the LLM tiers
+    // them correctly). Real downgraded strokes still fire (covered above).
+    expect(veto('ascending weakness and tingling from the feet up, areflexic, guillain barre')).toBe(false)
+    expect(veto('myasthenia gravis with worsening ptosis and bulbar weakness two days')).toBe(false)
+    expect(veto('bilateral leg weakness with a sensory level and urinary retention, acute cord')).toBe(false)
+    expect(veto('known MS patient with a relapse, new numbness over three days, stable')).toBe(false)
+    expect(veto('fever headache neck stiffness and confusion, concern for meningitis')).toBe(false)
+  })
+
   it('does not fire without stroke context (a non-stroke non-emergent call is untouched)', () => {
     expect(veto('just calling to reschedule his appointment for next week, not sure when')).toBe(false)
   })

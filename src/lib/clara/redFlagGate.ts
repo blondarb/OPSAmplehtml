@@ -299,6 +299,12 @@ const GUARD_WORSENING =
 /** CONFIDENT, unambiguous > 24 h onset (≥ 2 days / weeks / months, or a named day/week). Required to permit a downgrade. */
 const CONFIDENT_OVER_24H =
   /\b(?:two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|\d{1,3})\s+(?:days?|weeks?|months?)\s+ago\b|\b(?:since|last)\s+(?:monday|tuesday|wednesday|thursday|friday|saturday|sunday|week|month)\b|\ba\s+(?:week|month)\s+ago\b|\b(?:weeks?|months?)\s+ago\b/i
+/** Recognized NON-STROKE STAT conditions (GBS/MG/cord/meningitis = STAT 1; MS = STAT 2).
+ *  When the caller names one of these, the case is not a downgraded stroke — the guard stands down.
+ *  Kept specific (named syndromes, not bare "ms"/"mg") so a real stroke never matches. */
+const GUARD_NONSTROKE_CONDITION =
+  /\b(?:guillain|guillain[\s-]?barre|gbs|aidp|myasthen\w*|myasthenia\s+gravis|cord\s+syndrome|acute\s+cord|sensory\s+level|areflex\w*|transverse\s+myelitis|demyelinat\w*|multiple\s+sclerosis|\bms\b|relaps\w*|meningitis|encephalitis|ascending\s+(?:weakness|numbness|paralysis|paresthes\w*|symptoms))\b/i
+
 /** Explicitly stable / unchanged / resolved. Required (with a confident > 24 h) to permit a downgrade. */
 const STABLE_SIGNAL =
   /\b(?:stable|unchanged|no\s+change|no\s+new|baseline|resolved|back\s+to\s+(?:normal|baseline)|hasn'?t\s+changed|since\s+then\s+nothing)\b/i
@@ -325,6 +331,15 @@ export function evaluateStrokeDowngradeGuard(
   // legitimately not-emergent and are never touched.
   if (consultType !== 'non-emergent') return { forceEmergent: false, reason: null }
   if (!STROKE_CONTEXT.test(t)) return { forceEmergent: false, reason: null }
+  // NON-STROKE STAT conditions are NOT downgraded strokes — they're the
+  // recognized STAT-1/STAT-2 conditions (GBS/MG/cord/meningitis = STAT 1; MS =
+  // STAT 2) that legitimately classify non-emergent. They share symptom words
+  // (weakness/numbness/tingling/sensory) with STROKE_CONTEXT, so without this
+  // exclusion the guard forces every GBS/MG/cord/MS case to EMERGENT (regression
+  // found 2026-07-13 during the contract-tier alignment: the LLM's rationale
+  // correctly said "STAT 1"/"STAT 2" but the guard overrode it). The guard's
+  // job is a DOWNGRADED STROKE; a named non-stroke syndrome is out of scope.
+  if (GUARD_NONSTROKE_CONDITION.test(t)) return { forceEmergent: false, reason: null }
 
   const danger =
     (GUARD_UNCERTAINTY.test(t) && 'uncertain/hedged onset') ||
