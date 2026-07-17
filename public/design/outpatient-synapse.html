@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="robots" content="noindex, nofollow">
-<title>Outpatient Synapse — design review</title>
+<title>Outpatient Synapse — clickable design demo</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><text y='13' font-size='13'>🩺</text></svg>">
 <style>
   :root{
@@ -29,18 +29,20 @@
   code{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:.86em;background:var(--dark);
        padding:1px 5px;border-radius:4px;color:var(--primary-dark)}
   hr{border:0;height:1px;background:var(--bd);margin:46px 0 0}
-  .section{margin:52px 0 0;scroll-margin-top:64px}
+  .section{margin:52px 0 0;scroll-margin-top:60px}
   ul{margin:0 0 11px;padding-left:19px;color:var(--ts)} li{margin-bottom:5px}
+  button{font-family:inherit}
 
-  /* header */
-  .hdr{background:var(--white);border-bottom:1px solid var(--bd);padding:34px 0 26px;margin-bottom:0}
+  .hdr{background:var(--white);border-bottom:1px solid var(--bd);padding:34px 0 26px}
   .hdr .wrap{padding-bottom:0}
   .tagline{font-size:12px;color:var(--tm);margin-bottom:14px;letter-spacing:.04em}
   .draft{display:inline-flex;align-items:center;gap:7px;background:#FFFBEB;border:1px solid #FDE68A;
          border-radius:20px;padding:5px 13px;font-size:11.5px;color:#92400E;font-weight:600;margin-bottom:16px}
-  /* nav */
+  .live{display:inline-flex;align-items:center;gap:6px;background:#F0FDFA;border:1px solid #A7F3D0;
+        border-radius:20px;padding:5px 13px;font-size:11.5px;color:var(--primary-dark);font-weight:600;
+        margin:0 0 16px 8px}
   .nav{position:sticky;top:0;background:rgba(255,255,255,.94);backdrop-filter:blur(8px);
-       border-bottom:1px solid var(--bd);z-index:10;margin-bottom:0}
+       border-bottom:1px solid var(--bd);z-index:20}
   .nav-in{max-width:1080px;margin:0 auto;padding:0 20px;display:flex;gap:18px;overflow-x:auto}
   .nav a{font-size:12px;color:var(--ts);text-decoration:none;padding:12px 0;white-space:nowrap;
          border-bottom:2px solid transparent;font-weight:500}
@@ -55,13 +57,14 @@
   .box.w .box-t{color:#B45309} .box.g .box-t{color:#047857}
   .box p:last-child{margin-bottom:0}
 
+  .try{display:flex;align-items:center;gap:8px;background:#EFF6FF;border:1px solid #BFDBFE;
+       border-radius:7px;padding:8px 11px;margin:0 0 10px;font-size:12px;color:#1E40AF}
+  .try b{color:#1E3A8A}
+
   .badge{font-size:9px;font-weight:700;padding:2px 6px;border-radius:4px;letter-spacing:.04em;
          background:var(--dark);color:var(--tm);white-space:nowrap}
-  .badge.ex{background:#DBEAFE;color:#1D4ED8}
   .badge.hi{background:#F3E8FF;color:#7E22CE}
   .badge.new{background:#CCFBF1;color:var(--primary-dark)}
-  .badge.gap{background:#FEE2E2;color:#DC2626}
-  .badge.ok{background:#DCFCE7;color:#15803D}
   .badge.lic{background:#FEF3C7;color:#92400E}
 
   table{width:100%;border-collapse:collapse;font-size:12.5px}
@@ -70,14 +73,14 @@
   td{padding:8px 9px;border-bottom:1px solid var(--bd);color:var(--ts);vertical-align:top}
   td b{color:var(--tp);font-weight:600}
   .tbl{background:var(--white);border:1px solid var(--bd);border-radius:10px;overflow:hidden;margin:14px 0}
-  .tbl.sc{overflow-x:auto}
 
-  /* app chrome */
   .chrome{background:var(--gray);border:1px solid var(--bd);border-radius:10px;overflow:hidden;
           margin:16px 0;box-shadow:0 2px 8px rgba(0,0,0,.06)}
   .app-t{background:var(--white);border-bottom:1px solid var(--bd);padding:0 14px;display:flex;
          align-items:center;gap:20px;height:38px;overflow-x:auto}
-  .app-tab{font-size:12px;color:var(--ts);padding:11px 0;border-bottom:2px solid transparent;white-space:nowrap}
+  .app-tab{font-size:12px;color:var(--ts);padding:11px 0;border-bottom:2px solid transparent;
+           white-space:nowrap;cursor:pointer;background:none;border-top:0;border-left:0;border-right:0}
+  .app-tab:hover{color:var(--primary-dark)}
   .app-tab.on{color:var(--tp);font-weight:650;border-bottom-color:var(--tp)}
   .body{padding:14px}
   .fs{background:var(--white);border:1px solid var(--bd);border-radius:10px;padding:13px;margin-bottom:10px}
@@ -86,7 +89,8 @@
 
   .pills{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:9px}
   .pill{font-size:11.5px;font-weight:550;padding:5px 12px;border-radius:20px;border:1px solid var(--bd);
-        background:var(--white);color:var(--ts);white-space:nowrap}
+        background:var(--white);color:var(--ts);white-space:nowrap;cursor:pointer;transition:all .12s}
+  .pill:hover{border-color:var(--primary);color:var(--primary-dark)}
   .pill.on{background:var(--primary);border-color:var(--primary);color:#fff;font-weight:600}
   .pill.sub{font-size:11px;padding:4px 10px}
   .pill.srch{border-style:dashed;color:var(--primary-dark);background:#F0FDFA;border-color:#A7F3D0}
@@ -95,19 +99,47 @@
   .sub-l{font-size:9px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--tm);margin-bottom:6px}
 
   .ta{border:1px solid var(--bd);border-radius:6px;padding:8px;font-size:11.5px;color:var(--ts);
-      background:var(--white);min-height:40px;position:relative;line-height:1.8}
+      background:var(--white);min-height:40px;position:relative;line-height:1.9}
   .icons{position:absolute;right:6px;bottom:5px;display:flex;gap:5px;font-size:11px;opacity:.5}
   .hint{font-size:10.5px;color:var(--tm);margin-top:5px}
-  .norm-sp{border-bottom:1px dashed var(--bd)}
-  .abn-sp{background:#FEF3C7;color:#92400E;padding:1px 5px;border-radius:3px;font-weight:600}
+  .norm-sp{border-bottom:1px dashed var(--tm);cursor:pointer;transition:background .12s;border-radius:2px}
+  .norm-sp:hover{background:#FEF3C7;border-bottom-color:var(--warn)}
+  .abn-sp{background:#FEF3C7;color:#92400E;padding:1px 5px;border-radius:3px;font-weight:600;cursor:pointer}
+  .abn-sp:hover{background:#FDE68A}
   .cap{font-size:10.5px;color:var(--tm);text-align:center;font-style:italic;margin:-2px 0 14px}
 
   .tplbar{background:#F0FDFA;border:1px solid #A7F3D0;border-radius:7px;padding:8px 10px;margin-bottom:9px;
           display:flex;align-items:center;gap:8px;flex-wrap:wrap}
-  .tpl-l{font-size:10.5px;color:#065F46;flex:1;min-width:180px}
+  .tpl-l{font-size:10.5px;color:#065F46;flex:1;min-width:170px}
   .tpl-l b{color:#064E3B}
   .tpl-b{font-size:10px;font-weight:650;padding:4px 9px;border-radius:5px;border:1px solid #A7F3D0;
-         background:var(--white);color:var(--primary-dark);white-space:nowrap}
+         background:var(--white);color:var(--primary-dark);white-space:nowrap;cursor:pointer}
+  .tpl-b:hover{background:#CCFBF1}
+  .tpl-b.on{background:var(--primary);color:#fff;border-color:var(--primary)}
+
+  .prompt{background:var(--white);border:1px solid var(--primary);border-radius:8px;padding:11px;margin-top:9px}
+  .prompt-l{font-size:11px;color:var(--ts);margin-bottom:7px}
+  .prompt-l b{color:var(--tp)}
+  .prompt input{width:100%;border:1px solid var(--bd);border-radius:6px;padding:7px 9px;font-size:12px;
+                font-family:inherit;color:var(--tp)}
+  .prompt input:focus{outline:none;border-color:var(--primary);box-shadow:0 0 0 3px rgba(13,148,136,.12)}
+  .prompt-a{display:flex;gap:6px;margin-top:8px;flex-wrap:wrap}
+  .btn{font-size:11px;font-weight:650;padding:5px 11px;border-radius:6px;border:1px solid var(--bd);
+       background:var(--white);color:var(--ts);cursor:pointer}
+  .btn:hover{border-color:var(--primary);color:var(--primary-dark)}
+  .btn.p{background:var(--primary);border-color:var(--primary);color:#fff}
+  .btn.p:hover{background:var(--primary-dark)}
+  .sugg{font-size:10px;padding:3px 8px;border-radius:12px;border:1px solid var(--bd);background:var(--gray);
+        color:var(--ts);cursor:pointer}
+  .sugg:hover{border-color:var(--primary);color:var(--primary-dark);background:#F0FDFA}
+
+  .editrow{display:flex;gap:9px;align-items:center;padding:5px 0}
+  .editrow input[type=text]{flex:1;border:1px solid var(--bd);border-radius:5px;padding:5px 8px;
+                            font-size:11.5px;font-family:inherit;color:var(--tp)}
+  .editrow input[type=text]:focus{outline:none;border-color:var(--primary)}
+  .cbx{width:14px;height:14px;flex-shrink:0;cursor:pointer;accent-color:var(--primary)}
+  .modl{font-size:10px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--tm);
+        margin:11px 0 4px}
 
   .labwrap{overflow-x:auto;background:var(--white);border:1px solid var(--bd);border-radius:8px}
   .labt{min-width:500px;font-size:11.5px}
@@ -120,8 +152,11 @@
   .lu{font-size:9px;color:var(--tm);font-weight:400}
   .v{display:inline-block;padding:2px 7px;border-radius:4px;font-weight:600;color:var(--ts)}
   .v.hi{background:#FEE2E2;color:#B91C1C} .v.lo{background:#DBEAFE;color:#1D4ED8} .v.na{color:var(--bd)}
-  .tr{font-size:12px;font-weight:700}
-  .tr.up{color:var(--err)} .tr.dn{color:var(--ok)} .tr.fl{color:var(--tm)}
+  .trd{font-size:12px;font-weight:700}
+  .trd.up{color:var(--err)} .trd.dn{color:var(--ok)} .trd.fl{color:var(--tm)}
+  .lab-sel{background:#FEF3C7;border-bottom:1px solid var(--warn);cursor:pointer;border-radius:2px;padding:0 2px}
+  .lab-sel:hover{background:#FDE68A}
+  .lab-sel.done{background:#DCFCE7;border-bottom-color:var(--ok);color:#15803D;font-weight:600}
 
   .strip{background:#FFFBEB;border:1px solid #FDE68A;border-radius:7px;padding:8px 10px;margin-bottom:9px}
   .strip-h{font-size:9px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:#92400E;margin-bottom:6px}
@@ -129,39 +164,45 @@
   .pr .nm{font-weight:650;color:#78350F;white-space:nowrap}
   .pr .vl{color:#92400E}
   .pr .dt{margin-left:auto;font-size:10px;color:#B45309;font-variant-numeric:tabular-nums}
+  .unpin{font-size:10px;color:#B45309;cursor:pointer;border:0;background:none;padding:0 0 0 4px}
+  .unpin:hover{color:#78350F}
 
   .grp{background:var(--white);border:1px solid var(--bd);border-radius:8px;margin-bottom:7px;overflow:hidden}
   .grp-h{display:flex;align-items:center;gap:8px;padding:8px 11px;font-size:11.5px;font-weight:600;
-         color:var(--ts);background:var(--gray)}
+         color:var(--ts);background:var(--gray);cursor:pointer;width:100%;border:0;text-align:left}
+  .grp-h:hover{background:var(--dark)}
   .grp-h .cnt{font-size:9.5px;font-weight:700;background:var(--dark);color:var(--tm);padding:1px 6px;border-radius:8px}
   .grp-h .caret{margin-left:auto;color:var(--tm);font-size:10px}
-  .grp.open .grp-h{border-bottom:1px solid var(--bd)}
+  .grp.open .grp-h{border-bottom:1px solid var(--bd);background:var(--white)}
   .row{display:flex;gap:9px;align-items:baseline;padding:7px 11px;border-bottom:1px solid var(--bd);font-size:11.5px}
   .row:last-child{border-bottom:0}
   .row .dt{font-variant-numeric:tabular-nums;color:var(--tm);white-space:nowrap;font-size:10.5px;width:52px;flex-shrink:0}
   .row .nm{font-weight:600;color:var(--tp);white-space:nowrap}
   .row .fi{color:var(--ts);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1}
 
-  /* scales longitudinal */
   .sl{display:grid;grid-template-columns:160px 1fr;gap:12px}
   @media(max-width:700px){.sl{grid-template-columns:1fr}}
   .sl-left{border-right:1px solid var(--bd);padding-right:12px}
   @media(max-width:700px){.sl-left{border-right:0;padding-right:0;border-bottom:1px solid var(--bd);padding-bottom:10px}}
   .sr{display:flex;align-items:center;gap:7px;padding:6px 8px;border-radius:6px;margin-bottom:4px;
-      font-size:11.5px;border:1px solid transparent}
+      font-size:11.5px;border:1px solid transparent;cursor:pointer;width:100%;background:none;text-align:left}
+  .sr:hover{background:var(--gray)}
   .sr.on{background:#F0FDFA;border-color:#A7F3D0}
   .sr-n{font-weight:650;color:var(--tp);flex:1}
   .sr-v{font-weight:700;font-variant-numeric:tabular-nums}
   .up{color:var(--err)} .dn{color:var(--ok)} .fl{color:var(--tm)}
   .addsc{border:1px dashed var(--bd);border-radius:6px;padding:6px;text-align:center;font-size:11px;
-         color:var(--primary-dark);background:#F0FDFA;margin-top:7px}
+         color:var(--primary-dark);background:#F0FDFA;margin-top:7px;cursor:pointer;width:100%}
+  .addsc:hover{background:#CCFBF1}
   .crumb{font-size:10.5px;color:var(--tm);margin-bottom:7px}
   .crumb b{color:var(--primary-dark);font-weight:600}
-  .sl-big{font-size:28px;font-weight:700;line-height:1;font-variant-numeric:tabular-nums}
+  .sl-big{font-size:28px;font-weight:700;line-height:1;font-variant-numeric:tabular-nums;cursor:pointer;
+          border-bottom:2px dashed var(--bd)}
+  .sl-big:hover{color:var(--primary);border-bottom-color:var(--primary)}
   .sl-delta{font-size:11px;font-weight:650;padding:2px 7px;border-radius:4px;background:#DCFCE7;color:#15803D}
   .chart{height:92px;display:flex;align-items:flex-end;gap:11px;padding-top:8px;border-bottom:1px solid var(--bd);margin-top:9px}
   .cb{flex:1;display:flex;flex-direction:column;justify-content:flex-end;align-items:center;height:100%}
-  .cbar{width:100%;background:var(--primary);border-radius:3px 3px 0 0;opacity:.35}
+  .cbar{width:100%;background:var(--primary);border-radius:3px 3px 0 0;opacity:.35;transition:height .3s}
   .cb.last .cbar{opacity:1}
   .cbv{font-size:10px;font-weight:700;color:var(--ts);margin-bottom:3px;font-variant-numeric:tabular-nums}
   .cx{display:flex;gap:11px;margin-top:5px}
@@ -176,7 +217,10 @@
   .metric{background:#F0FDFA;border:1px solid #A7F3D0;border-radius:7px;padding:9px 11px;margin-top:10px}
   .metric-t{font-size:9.5px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--primary-dark);margin-bottom:3px}
   .metric-x{font-size:11.5px;color:#065F46}
-
+  .toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%) translateY(80px);
+         background:var(--tp);color:#fff;font-size:12px;font-weight:600;padding:9px 16px;border-radius:8px;
+         z-index:50;opacity:0;transition:all .25s;pointer-events:none}
+  .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
   .foot{margin-top:60px;padding-top:20px;border-top:1px solid var(--bd);font-size:11.5px;color:var(--tm)}
 </style>
 </head>
@@ -185,10 +229,14 @@
 <div class="hdr">
   <div class="wrap">
     <div class="tagline">SEVARO · INTERNAL DESIGN REVIEW</div>
-    <div class="draft">⚠️ Draft for discussion — not a build spec. Synthetic data only, no PHI.</div>
+    <div>
+      <span class="draft">⚠️ Draft for discussion — synthetic data only, no PHI</span>
+      <span class="live">● Clickable demo — everything below responds</span>
+    </div>
     <h1>Outpatient Synapse — Imaging/results &amp; Physical exams</h1>
     <p class="lede">Proposed redesign of two tabs, from the 15 July outpatient working session.
-    Everything here is a strawman intended to be argued with. Nothing is committed.</p>
+    The mockups are live: click the pills, negate an exam finding, expand the record, drill into a
+    score. Everything is a strawman intended to be argued with.</p>
   </div>
 </div>
 
@@ -198,7 +246,6 @@
   <a href="#imaging">Imaging / results</a>
   <a href="#labs">Longitudinal labs</a>
   <a href="#scales">Scales</a>
-  <a href="#drill">Drill-down</a>
   <a href="#open">Open questions</a>
 </div></div>
 
@@ -210,7 +257,6 @@
     <h3>What the working session settled</h3>
     <p class="lede">These aren't proposals — the room agreed them on 15 July. Everything below is
     built on top.</p>
-
     <div class="tbl">
       <table>
         <tr><th style="width:190px">Decision</th><th>Why</th></tr>
@@ -220,19 +266,19 @@
             nobody wants to read.</td></tr>
         <tr><td><b>Pills, not dropdowns</b></td>
           <td>A dropdown costs a click to reveal and a scan to find. Pills show the options and cost
-            one tap. This was emphatic and applies everywhere.</td></tr>
+            one tap.</td></tr>
         <tr><td><b>Free text first</b></td>
-          <td>Structure is opt-in. The default entry mode for an outpatient neurologist is prose —
-            typed, pasted, or dictated. Clickable UI has to earn its place against that.</td></tr>
+          <td>Structure is opt-in. The default entry mode is prose — typed, pasted or dictated.
+            Clickable UI has to earn its place against that.</td></tr>
         <tr><td><b>Nothing mandatory</b></td>
           <td>No required fields without a hard billing or quality reason. Forcing scales produces
             compliance behaviour, not clinical value.</td></tr>
         <tr><td><b>History ≠ documentation</b></td>
-          <td>This tab records <em>what was done</em>. It is not an ordering surface — orders live on
-            Recommendations. A 2015 study should be visible without entering today's note.</td></tr>
+          <td>This tab records <em>what was done</em>. Orders live on Recommendations. A 2015 study
+            should be visible without entering today's note.</td></tr>
         <tr><td><b>Searchable, longitudinal</b></td>
-          <td>Scales, imaging and labs must be findable by typing, and reviewable as a trend across
-            visits rather than as isolated snapshots.</td></tr>
+          <td>Scales, imaging and labs findable by typing, and reviewable as a trend rather than as
+            isolated snapshots.</td></tr>
       </table>
     </div>
   </div>
@@ -243,51 +289,58 @@
   <div class="section" id="exam">
     <h2>Tab 1</h2>
     <h3>Physical exams</h3>
-    <p class="lede">The design problem: a normal neuro exam is roughly forty assertions. An abnormal
-    one is those forty, minus three. Every clickable exam ever built makes you handle all forty to
-    express the three — <strong>which is why they always feel inefficient.</strong> The fix is to make
-    the exception the only thing that occupies space.</p>
+    <p class="lede">A normal neuro exam is roughly forty assertions. An abnormal one is those forty,
+    minus three. Every clickable exam ever built makes you handle all forty to express the three —
+    <strong>which is why they always feel inefficient.</strong> The fix is to make the exception the
+    only thing that occupies space.</p>
+
+    <div class="try">👆 <b>Try it:</b> click any underlined finding in the note to mark it abnormal.
+      Click a yellow one to revert it.</div>
 
     <div class="chrome">
-      <div class="app-t">
-        <div class="app-tab">History</div><div class="app-tab">Imaging/results</div>
-        <div class="app-tab on">Physical exams</div><div class="app-tab">Recommendation</div>
+      <div class="app-t" id="exam-tabs">
+        <button class="app-tab" data-go="#scales">History</button>
+        <button class="app-tab" data-go="#imaging">Imaging/results</button>
+        <button class="app-tab on">Physical exams</button>
+        <button class="app-tab" data-go="#open">Recommendation</button>
       </div>
       <div class="body">
         <div class="tplbar">
           <span style="font-size:13px">🩺</span>
           <div class="tpl-l"><b>Sevaro tele-neuro exam</b> — the shipped default. Reflexes, fundoscopy
-            and fine sensory are omitted: not reliably assessable over video.</div>
-          <div class="tpl-b">Edit to my voice</div>
-          <div class="tpl-b">Save as mine</div>
+            and fine sensory omitted: not reliably assessable over video.</div>
+          <button class="tpl-b" id="btn-edit">Edit to my voice</button>
+          <button class="tpl-b" id="btn-save">Save as mine</button>
         </div>
 
         <div class="fs">
-          <div class="fs-h"><div class="fs-t">Examination</div><span class="badge">Optional</span></div>
-          <div class="pills">
-            <div class="pill on">Free text exam</div><div class="pill">Clickable exam</div>
-            <div class="pill">＋ NIHSS</div><div class="pill">＋ MoCA</div><div class="pill">＋ EDSS</div>
-            <div class="pill srch">🔍 Search exam scales…</div>
+          <div class="fs-h"><div class="fs-t">Examination</div><span class="badge">Optional</span>
+            <span style="margin-left:auto;font-size:10.5px;color:var(--tm)"
+                  id="exam-stat">0 abnormal · 0 clicks</span></div>
+          <div class="pills" id="exam-pills">
+            <button class="pill on">Free text exam</button>
+            <button class="pill">Clickable exam</button>
+            <button class="pill">＋ NIHSS</button>
+            <button class="pill">＋ MoCA</button>
+            <button class="pill">＋ EDSS</button>
+            <button class="pill srch">🔍 Search exam scales…</button>
           </div>
-          <div class="ta">
-            <span class="norm-sp">Alert and oriented to person, place, time and situation</span>.
-            <span class="norm-sp">Language fluent without paraphasic error</span>.
-            <span class="norm-sp">Pupils equal and reactive</span>.
-            <span class="norm-sp">Extraocular movements intact</span>.
-            <span class="norm-sp">Face symmetric</span>.
-            Motor: <span class="abn-sp">right arm 4+/5 with pronator drift</span>, otherwise
-            <span class="norm-sp">5/5 throughout</span>.
-            <span class="norm-sp">Sensation grossly intact to light touch</span>.
-            <span class="norm-sp">Finger-nose-finger intact</span>.
-            Gait <span class="abn-sp">mildly wide-based, unsteady tandem</span>.
-            <div class="icons">🎤 ⚡ ✨</div>
-          </div>
-          <div class="hint">↳ Click any underlined normal to negate it. It asks what the abnormal is,
-            then rewrites the prose. The two highlights above took two clicks.</div>
+          <div class="ta" id="exam-prose"></div>
+          <div id="exam-prompt"></div>
+          <div class="hint">↳ Negating a normal isn't deleting it — it asks what the abnormal
+            <em>is</em>, then rewrites the prose around it.</div>
+        </div>
+
+        <div class="fs" id="exam-editor" style="display:none">
+          <div class="fs-h"><div class="fs-t">Edit my template</div>
+            <span class="badge new">authored in place</span>
+            <button class="tpl-b" id="btn-done" style="margin-left:auto">Done</button></div>
+          <div style="font-size:11px;color:var(--ts);margin-bottom:8px">Toggle what's in your normal
+            exam and edit the exact wording. Saved once, used every visit.</div>
+          <div id="editor-list"></div>
         </div>
       </div>
     </div>
-    <div class="cap">Default ships filled. Editable to your voice. Per-visit you touch only exceptions.</div>
 
     <div class="box d">
       <div class="box-t">The interaction, precisely</div>
@@ -311,17 +364,9 @@
       them deliberately — which is exactly the right friction.</p>
     </div>
 
-    <h4>Authoring — no settings screen</h4>
-    <p>The template is authored <strong>in place</strong>: do a normal exam on a real patient, get the
-    wording how you like it, hit <em>Save as mine</em>. A favourite is saved <em>from</em> something,
-    not composed in a vacuum — and a template written in a settings screen, away from a patient, is
-    written in the wrong headspace. A settings area can earn its way in later, once there are several
-    things to put in it.</p>
-
     <h4>Which scales appear on this tab</h4>
     <p>Only exam-derived, outpatient-relevant ones — roughly eight, not the whole catalog. Acute and
-    ICU scales (GCS, Hunt-Hess, FOUR, RACE, CAM-ICU, RASS, WFNS) stay out of the outpatient picker
-    even though they exist in the catalog.</p>
+    ICU scales stay out of the outpatient picker even though they exist in the catalog.</p>
     <div class="tbl">
       <table>
         <tr><th>Exam scale</th><th>For</th><th style="width:120px">Note</th></tr>
@@ -334,7 +379,6 @@
         <tr><td><b>DN4</b></td><td>Neuropathic pain</td><td></td></tr>
         <tr><td><b>Modified Ashworth</b></td><td>Spasticity</td><td></td></tr>
         <tr><td><b>House-Brackmann</b></td><td>Facial palsy</td><td><span class="badge new">available</span></td></tr>
-        <tr><td><b>MRC sum score</b>, <b>MGFA</b></td><td>Neuromuscular</td><td><span class="badge new">needs porting</span></td></tr>
       </table>
     </div>
   </div>
@@ -348,50 +392,37 @@
     <p class="lede">Replaces the yes/no list. Modality pill → subtype → free text and a date. The pill
     <em>is</em> the "add study" action; there's no separate add button.</p>
 
+    <div class="try">👆 <b>Try it:</b> switch modality, pick a subtype, then expand the older buckets
+      in the record below.</div>
+
     <div class="chrome">
       <div class="app-t">
-        <div class="app-tab">History</div><div class="app-tab on">Imaging/results</div>
-        <div class="app-tab">Physical exams</div><div class="app-tab">Recommendation</div>
+        <button class="app-tab" data-go="#scales">History</button>
+        <button class="app-tab on">Imaging/results</button>
+        <button class="app-tab" data-go="#exam">Physical exams</button>
+        <button class="app-tab" data-go="#open">Recommendation</button>
       </div>
       <div class="body">
-        <div class="strip">
-          <div class="strip-h">📌 Pinned — a personal bookmark, not shared</div>
-          <div class="pr"><span class="nm">CSF oligoclonal bands</span><span class="vl">Positive — 6 unique bands</span><span class="dt">11/03/2018</span></div>
-        </div>
+        <div class="strip" id="pin-strip"></div>
 
         <div class="fs">
           <div class="fs-h"><div class="fs-t">Diagnostic imaging</div><span class="badge">Optional</span></div>
-          <div class="pills">
-            <div class="pill on">MRI</div><div class="pill">CT</div><div class="pill">Vascular</div>
-            <div class="pill">Nuclear / PET</div><div class="pill srch">🔍 Search all imaging…</div>
-          </div>
+          <div class="pills" id="mod-pills"></div>
           <div class="sublane">
-            <div class="sub-l">MRI — select study</div>
-            <div class="pills" style="margin-bottom:8px">
-              <div class="pill sub on">Brain — MS protocol</div><div class="pill sub">Brain</div>
-              <div class="pill sub">Orbits</div><div class="pill sub">Pituitary</div>
-              <div class="pill sub">IAC</div><div class="pill sub">C-spine</div>
-              <div class="pill sub">MRA</div><div class="pill sub">MRV</div>
-            </div>
-            <div style="background:var(--white);border:1px solid var(--bd);border-radius:7px;padding:9px">
-              <div style="display:flex;justify-content:space-between;gap:8px;margin-bottom:6px">
-                <div style="font-size:11.5px;font-weight:650">MRI brain — MS protocol</div>
-                <div style="font-size:10.5px;color:var(--ts);border:1px solid var(--bd);border-radius:5px;padding:2px 7px">09/18/2025</div>
-              </div>
-              <div class="ta" style="min-height:0">Two new T2 hyperintense lesions, periventricular.
-                No enhancing lesions.<div class="icons">🎤 ⚡ ✨</div></div>
-            </div>
+            <div class="sub-l" id="sub-label">MRI — select study</div>
+            <div class="pills" id="sub-pills" style="margin-bottom:8px"></div>
+            <div id="entry-card"></div>
           </div>
         </div>
 
         <div class="fs">
           <div class="fs-h"><div class="fs-t">Diagnostic testing &amp; procedures</div><span class="badge">Optional</span></div>
           <div class="pills" style="margin-bottom:0">
-            <div class="pill">EEG</div><div class="pill">EMG / NCS</div>
-            <div class="pill">Evoked potentials</div><div class="pill">Lumbar puncture</div>
-            <div class="pill">Sleep study</div><div class="pill">OCT</div>
-            <div class="pill">Autonomic</div><div class="pill">Biopsy</div>
-            <div class="pill srch">🔍 Search all…</div>
+            <button class="pill">EEG</button><button class="pill">EMG / NCS</button>
+            <button class="pill">Evoked potentials</button><button class="pill">Lumbar puncture</button>
+            <button class="pill">Sleep study</button><button class="pill">OCT</button>
+            <button class="pill">Autonomic</button><button class="pill">Biopsy</button>
+            <button class="pill srch">🔍 Search all…</button>
           </div>
         </div>
 
@@ -400,50 +431,34 @@
             <span class="badge new">new section</span>
             <span class="badge" style="margin-left:auto">Optional</span></div>
           <div class="pills" style="margin-bottom:0">
-            <div class="pill">TTE</div><div class="pill">TEE</div><div class="pill">Holter</div>
-            <div class="pill">Event monitor</div><div class="pill">Loop recorder</div><div class="pill">Bubble study</div>
+            <button class="pill">TTE</button><button class="pill">TEE</button><button class="pill">Holter</button>
+            <button class="pill">Event monitor</button><button class="pill">Loop recorder</button>
+            <button class="pill">Bubble study</button>
           </div>
           <div class="hint">↳ Ordered by neurology, performed by cardiology. Bread-and-butter after
             TIA or unexplained syncope, and currently absent everywhere.</div>
         </div>
+
+        <div class="fs">
+          <div class="fs-h"><div class="fs-t">Prior record</div>
+            <span class="badge" id="rec-count" style="margin-left:auto"></span></div>
+          <div class="pills" id="filter-chips" style="margin-bottom:11px"></div>
+          <div id="record"></div>
+        </div>
       </div>
     </div>
-    <div class="cap">Four or five pills, not forty. Search covers the long tail without a menu.</div>
 
     <div class="box w">
       <div class="box-t">Fitting ~40 study types without a dropdown</div>
       <p>Pills for the common studies, typeahead search for everything else. A search box isn't a
       dropdown — no click to open, no list to scan; type "orb" and get MRI orbits. The pills stay
       short and cover most visits; the long tail stays reachable without ever rendering a menu.</p>
-      <p>The gap list this fixes is real: evoked potentials, OCT, cardiac workup, autonomic testing,
-      DaTscan, skin biopsy, vestibular testing, neuropsych, and the MRI protocol variants (orbits,
-      pituitary, IAC, MRV) that "MRI Brain" currently collapses together.
+      <p>The gaps this fixes are real: evoked potentials, OCT, cardiac workup, autonomic testing,
+      skin biopsy, vestibular testing, neuropsych, and the MRI protocol variants (orbits, pituitary,
+      IAC, MRV) that "MRI Brain" currently collapses together.
       <strong>The authority on what to include is Sevaro's own order volume, not a literature
-      sweep</strong> — the procedures list from the working session should override anything here.</p>
+      sweep.</strong></p>
     </div>
-
-    <h4>Taming the longitudinal record</h4>
-    <p>Filter chips plus age buckets that collapse once a group exceeds a few items. Pinned results
-    float above the collapse — which is the point.</p>
-
-    <div class="chrome"><div class="body">
-      <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-bottom:11px">
-        <span class="pill on" style="border-radius:14px;padding:4px 11px;font-size:11px">All</span>
-        <span class="pill" style="border-radius:14px;padding:4px 11px;font-size:11px">Imaging</span>
-        <span class="pill" style="border-radius:14px;padding:4px 11px;font-size:11px">Testing</span>
-        <span class="pill" style="border-radius:14px;padding:4px 11px;font-size:11px">Labs</span>
-        <span class="pill" style="border-radius:14px;padding:4px 11px;font-size:11px">Cardiac</span>
-      </div>
-      <div class="grp open">
-        <div class="grp-h">Last 12 months <span class="cnt">3</span><span class="caret">▾</span></div>
-        <div class="row"><span class="dt">01/16/26</span><span class="nm">CT head</span><span class="fi">No acute intracranial abnormality</span></div>
-        <div class="row"><span class="dt">12/02/25</span><span class="nm">EEG — routine</span><span class="fi">Normal awake and drowsy</span></div>
-        <div class="row"><span class="dt">09/18/25</span><span class="nm">MRI brain</span><span class="fi">Two new T2 lesions, periventricular</span></div>
-      </div>
-      <div class="grp"><div class="grp-h">2021 – 2024 <span class="cnt">6</span><span class="caret">▸</span></div></div>
-      <div class="grp"><div class="grp-h">2016 – 2020 <span class="cnt">4</span><span class="caret">▸</span></div></div>
-      <div class="grp"><div class="grp-h">Before 2016 <span class="cnt">2</span><span class="caret">▸</span></div></div>
-    </div></div>
 
     <div class="box d">
       <div class="box-t">The pin and the collapse are one feature</div>
@@ -452,10 +467,9 @@
       recency-collapse hides old things, and old-but-critical is the whole problem.</p>
       <p>So the pin isn't a nice-to-have next to the filter. It's the release valve that makes
       aggressive collapsing safe: you can hide fifteen years behind three counts <em>because</em>
-      anything that matters forever is already floated to the top. Build them together or neither
-      works.</p>
+      anything that matters forever is already floated to the top.</p>
       <p><strong>Pins are personal bookmarks</strong>, not shared clinical flags — unpin and repin
-      freely; the data itself never moves and stays findable in the full record. And a pinned result
+      freely; the data itself never moves and stays findable in the full record. A pinned result
       doesn't enter the note unless you ask it to.</p>
     </div>
   </div>
@@ -469,35 +483,23 @@
     <p class="lede">Labs are overwhelming and organised differently by every lab. So free text stays
     the front door. You promote only the handful worth following into a table.</p>
 
+    <div class="try">👆 <b>Try it:</b> click a highlighted value in the free text below to follow or
+      pin it.</div>
+
     <div class="chrome"><div class="body">
       <div class="fs">
-        <div class="fs-h"><div class="fs-t">Labs — followed</div><span class="badge">4 tracked</span></div>
-        <div class="labwrap">
-          <table class="labt">
-            <tr><th>Lab</th><th>11/17/24</th><th>05/02/25</th><th>11/08/25</th><th>01/16/26</th><th style="width:28px"></th></tr>
-            <tr><td><div class="ln">JCV antibody index</div><div class="lu">index</div></td>
-              <td><span class="v">0.31</span></td><td><span class="v">0.42</span></td>
-              <td><span class="v">0.88</span></td><td><span class="v hi">1.62</span></td>
-              <td><span class="tr up">↑</span></td></tr>
-            <tr><td><div class="ln">Vitamin D, 25-OH</div><div class="lu">ng/mL</div></td>
-              <td><span class="v lo">18</span></td><td><span class="v lo">24</span></td>
-              <td><span class="v">31</span></td><td><span class="v">41</span></td>
-              <td><span class="tr dn">↗</span></td></tr>
-            <tr><td><div class="ln">ALT</div><div class="lu">U/L</div></td>
-              <td><span class="v">22</span></td><td><span class="v">26</span></td>
-              <td><span class="v">24</span></td><td><span class="v">21</span></td>
-              <td><span class="tr fl">→</span></td></tr>
-            <tr><td><div class="ln">WBC</div><div class="lu">K/µL</div></td>
-              <td><span class="v">6.2</span></td><td><span class="v">5.8</span></td>
-              <td><span class="v na">—</span></td><td><span class="v">6.0</span></td>
-              <td><span class="tr fl">→</span></td></tr>
-          </table>
-        </div>
+        <div class="fs-h"><div class="fs-t">Labs — followed</div>
+          <span class="badge" id="lab-count">4 tracked</span></div>
+        <div class="labwrap"><table class="labt" id="lab-table"></table></div>
       </div>
       <div class="fs">
         <div class="fs-h"><div class="fs-t">Labs — free text</div><span class="badge">Optional</span></div>
-        <div class="ta" style="min-height:0">CMP unremarkable. TSH 2.1. B12 480 with normal MMA.
+        <div class="ta" style="min-height:0;line-height:1.9">CMP unremarkable.
+          <span class="lab-sel" data-lab="TSH" data-val="2.1" data-unit="mIU/L">TSH 2.1</span>.
+          <span class="lab-sel" data-lab="Vitamin B12" data-val="480" data-unit="pg/mL">B12 480</span> with normal MMA.
+          <span class="lab-sel" data-lab="Ferritin" data-val="88" data-unit="ng/mL">Ferritin 88</span>.
           <div class="icons">🎤 ⚡ ✨</div></div>
+        <div id="lab-prompt"></div>
         <div class="hint">↳ Select any value → <strong>📈 Follow</strong> to promote it into the table,
           or <strong>📌 Pin</strong> to bookmark it.</div>
       </div>
@@ -532,8 +534,6 @@
   <div class="section" id="scales">
     <h2>Cross-cutting</h2>
     <h3>Scales — where they live</h3>
-    <p class="lede">The rule the working session converged on, which resolves most placement
-    arguments without a vote:</p>
 
     <div class="box d">
       <div class="box-t">The classification rule</div>
@@ -550,56 +550,49 @@
     </div>
 
     <h4>Longitudinal view — bottom of the History tab</h4>
+    <div class="try">👆 <b>Try it:</b> switch scales on the left, then <b>click the big number</b> to
+      drill into its components.</div>
+
     <div class="chrome">
       <div class="app-t">
-        <div class="app-tab on">History</div><div class="app-tab">Imaging/results</div>
-        <div class="app-tab">Physical exams</div><div class="app-tab">Recommendation</div>
+        <button class="app-tab on">History</button>
+        <button class="app-tab" data-go="#imaging">Imaging/results</button>
+        <button class="app-tab" data-go="#exam">Physical exams</button>
+        <button class="app-tab" data-go="#open">Recommendation</button>
       </div>
       <div class="body">
         <div class="fs">
           <div class="fs-h"><div class="fs-t">Clinical scales</div>
             <span class="badge hi" style="margin-left:auto">history-based only</span></div>
           <div class="sl">
-            <div class="sl-left">
-              <div class="sr on"><span class="sr-n">MIDAS</span><span class="sr-v">14</span><span class="dn">↓</span></div>
-              <div class="sr"><span class="sr-n">PHQ-9</span><span class="sr-v">6</span><span class="fl">→</span></div>
-              <div class="sr"><span class="sr-n">ESS</span><span class="sr-v">9</span><span class="fl">→</span></div>
-              <div class="sr"><span class="sr-n">mRS</span><span class="sr-v">1</span><span class="fl">→</span></div>
-              <div class="addsc">🔍 Search scales…</div>
-            </div>
-            <div>
-              <div style="display:flex;align-items:baseline;gap:10px;margin-bottom:2px">
-                <div class="sl-big">14</div>
-                <div class="sl-delta">↓ 18 from baseline</div>
-                <div style="font-size:11px;color:var(--tm)">Grade II — mild disability</div>
-              </div>
-              <div class="chart">
-                <div class="cb"><div class="cbv">32</div><div class="cbar" style="height:78%"></div></div>
-                <div class="cb"><div class="cbv">27</div><div class="cbar" style="height:66%"></div></div>
-                <div class="cb"><div class="cbv">19</div><div class="cbar" style="height:46%"></div></div>
-                <div class="cb last"><div class="cbv">14</div><div class="cbar" style="height:34%"></div></div>
-              </div>
-              <div class="cx"><span>07/13/25</span><span>09/28/25</span><span>12/06/25</span><span>01/16/26</span></div>
-              <div class="metric">
-                <div class="metric-t">📈 180-day outcome</div>
-                <div class="metric-x">MIDAS fell 32 → 14 over 187 days. This is the quality measure
-                  most clinics don't capture — and it cannot exist without this view.</div>
-              </div>
-            </div>
+            <div class="sl-left" id="scale-list"></div>
+            <div id="scale-detail"></div>
           </div>
         </div>
       </div>
     </div>
     <div class="cap">Only the patient's own scales appear. Search adds; it doesn't pre-populate.</div>
 
+    <div class="box g">
+      <div class="box-t">Why the drill-down earns its build</div>
+      <p>A total says "MIDAS improved 32 → 14, treatment is working." The components say something the
+      total structurally cannot — and in this patient, <strong>work and household impact both fell
+      while social/leisure never moved.</strong> That patient is functioning at work and still not
+      going out. Different conversation, possibly different intervention.</p>
+      <p><strong>The total is the metric you report; the components are the signal you use in the
+      room.</strong> Two consumers, same data, and only one is served by the number alone. Stop at two
+      levels — below a component is a single answer at a single visit, which is just the form you
+      already filled in.</p>
+    </div>
+
     <div class="box w">
       <div class="box-t">The trend matters more than the catalog size</div>
-      <p>Twenty scales with no longitudinal view is worth less than eight scales with one. The
-      sequencing argument: <strong>build the trend against the scales that already exist</strong>,
-      prove a 180-day outcome works end to end, and only then add more. Adding scales to a product
-      that can't trend them just makes more data nobody can see.</p>
+      <p>Twenty scales with no longitudinal view is worth less than eight scales with one.
+      <strong>Build the trend against the scales that already exist</strong>, prove a 180-day outcome
+      works end to end, and only then add more. Adding scales to a product that can't trend them just
+      makes more data nobody can see.</p>
       <p>Note this also means <strong>the trend component gets mounted twice</strong> — history-based
-      scales trend on the History tab, exam-based ones on the exam tab. Build it once.</p>
+      scales trend on History, exam-based ones on the exam tab. Build it once.</p>
     </div>
 
     <div class="box">
@@ -616,63 +609,6 @@
       That converts a recurring governance debate into a demand signal — and the request counter is
       worth logging from day one even if the screen is post-MVP, because a year of demand data can't
       be backfilled.</p>
-    </div>
-  </div>
-
-  <hr>
-
-  <!-- DRILL -->
-  <div class="section" id="drill">
-    <h2>Depth</h2>
-    <h3>Drilling into a score</h3>
-    <p class="lede">A total is a summary. Sometimes the components are the story — so the score is a
-    link.</p>
-
-    <div class="chrome"><div class="body">
-      <div class="fs">
-        <div class="crumb">MIDAS &nbsp;›&nbsp; <b>components</b></div>
-        <div style="font-size:9.5px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;
-                    color:var(--tm);margin-bottom:6px">Where the 18-point drop came from</div>
-        <div class="comp">
-          <div class="comp-h"><div class="comp-n">1 · Days missed work or school</div><div class="comp-v dn">2</div></div>
-          <div class="spark"><div class="sp" style="height:100%"></div><div class="sp" style="height:75%"></div>
-            <div class="sp" style="height:38%"></div><div class="sp last" style="height:25%"></div></div>
-        </div>
-        <div class="comp">
-          <div class="comp-h"><div class="comp-n">2 · Days productivity reduced ≥50% at work</div><div class="comp-v dn">5</div></div>
-          <div class="spark"><div class="sp" style="height:100%"></div><div class="sp" style="height:80%"></div>
-            <div class="sp" style="height:60%"></div><div class="sp last" style="height:50%"></div></div>
-        </div>
-        <div class="comp">
-          <div class="comp-h"><div class="comp-n">3 · Days missed household work</div><div class="comp-v dn">3</div></div>
-          <div class="spark"><div class="sp" style="height:100%"></div><div class="sp" style="height:57%"></div>
-            <div class="sp" style="height:43%"></div><div class="sp last" style="height:43%"></div></div>
-        </div>
-        <div class="comp">
-          <div class="comp-h"><div class="comp-n">4 · Days household productivity reduced ≥50%</div><div class="comp-v dn">3</div></div>
-          <div class="spark"><div class="sp" style="height:100%"></div><div class="sp" style="height:67%"></div>
-            <div class="sp" style="height:50%"></div><div class="sp last" style="height:33%"></div></div>
-        </div>
-        <div class="comp" style="border-color:#FDE68A;background:#FFFBEB">
-          <div class="comp-h"><div class="comp-n">5 · Days missed family / social / leisure</div><div class="comp-v fl">1</div></div>
-          <div class="spark"><div class="sp" style="height:33%"></div><div class="sp" style="height:33%"></div>
-            <div class="sp" style="height:33%"></div><div class="sp last" style="height:33%"></div></div>
-          <div style="font-size:9.5px;color:#92400E;margin-top:4px">Flat throughout — the only component that never improved</div>
-        </div>
-      </div>
-    </div></div>
-    <div class="cap">Score → components, each trended. Two levels, no third.</div>
-
-    <div class="box g">
-      <div class="box-t">The last row is the argument</div>
-      <p>The total says "MIDAS improved 32 → 14, treatment is working." The components say something
-      the total structurally cannot: <strong>work and household impact both fell, and social/leisure
-      never moved.</strong> That patient is functioning at work and still not going out — a different
-      conversation, possibly a different intervention.</p>
-      <p><strong>The total is the metric you report; the components are the signal you use in the
-      room.</strong> Two consumers, same data, and only one of them is served by the number alone.
-      Stop at two levels — below a component is a single answer at a single visit, which is just the
-      form you already filled in.</p>
     </div>
   </div>
 
@@ -721,7 +657,382 @@
     Internal design draft · Sevaro · from the 15 July 2026 outpatient working session.
     Synthetic data only — no PHI. Unlisted; not indexed.
   </div>
-
 </div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+(function(){
+  var $ = function(id){ return document.getElementById(id); };
+  var toastT;
+  function toast(m){
+    var t = $('toast'); t.textContent = m; t.classList.add('show');
+    clearTimeout(toastT); toastT = setTimeout(function(){ t.classList.remove('show'); }, 1900);
+  }
+  document.addEventListener('click', function(e){
+    var g = e.target.closest('[data-go]');
+    if(g){ var el = document.querySelector(g.dataset.go); if(el) el.scrollIntoView({block:'start'}); }
+  });
+
+  /* ---------- EXAM ---------- */
+  var EX = [
+    {m:'', id:'a1', on:true, p:'Alert and oriented to person, place, time and situation', s:['Oriented to person only','Drowsy but arousable']},
+    {m:'', id:'a2', on:true, p:'Language fluent without paraphasic error', s:['Mild expressive aphasia','Frequent paraphasic errors']},
+    {m:'', id:'b1', on:true, p:'Pupils equal and reactive', s:['Left pupil 2mm, sluggish']},
+    {m:'', id:'b2', on:true, p:'Extraocular movements intact', s:['Left gaze preference','Vertical gaze palsy']},
+    {m:'', id:'b3', on:true, p:'Face symmetric', s:['Right facial droop, lower face']},
+    {m:'Motor', id:'c1', on:true, p:'5/5 throughout', s:['Right arm 4+/5 with pronator drift','Left leg 4/5']},
+    {m:'', id:'d1', on:true, p:'Sensation grossly intact to light touch', s:['Reduced pinprick, right hemibody']},
+    {m:'', id:'e1', on:true, p:'Finger-nose-finger intact', s:['Left dysmetria']},
+    {m:'Gait', id:'f1', on:true, p:'narrow-based and steady', s:['mildly wide-based, unsteady tandem','requires assistance']},
+    {m:'', id:'f2', on:false, p:'Tandem gait intact', s:['Unable to tandem']}
+  ];
+  var abn = {}, clicks = 0;
+
+  function drawExam(){
+    var h = '', out = [];
+    EX.forEach(function(f){
+      if(!f.on) return;
+      var seg;
+      if(abn[f.id] !== undefined){
+        seg = '<span class="abn-sp" data-rev="'+f.id+'">'+abn[f.id]+'</span>';
+      } else {
+        seg = '<span class="norm-sp" data-neg="'+f.id+'">'+f.p+'</span>';
+      }
+      out.push({m:f.m, seg:seg});
+    });
+    out.forEach(function(o,i){
+      var pre = o.m ? '<span style="color:var(--tm)">'+o.m+': </span>' : '';
+      h += pre + o.seg + '. ';
+    });
+    $('exam-prose').innerHTML = h + '<div class="icons">🎤 ⚡ ✨</div>';
+    var n = Object.keys(abn).length;
+    $('exam-stat').textContent = n + ' abnormal · ' + clicks + ' click' + (clicks===1?'':'s');
+    $('exam-prose').querySelectorAll('[data-neg]').forEach(function(s){
+      s.onclick = function(){ askAbn(s.dataset.neg); };
+    });
+    $('exam-prose').querySelectorAll('[data-rev]').forEach(function(s){
+      s.onclick = function(){ delete abn[s.dataset.rev]; drawExam(); toast('Reverted to normal'); };
+    });
+  }
+  function findF(id){ for(var i=0;i<EX.length;i++) if(EX[i].id===id) return EX[i]; }
+  function askAbn(id){
+    var f = findF(id);
+    var sg = (f.s||[]).map(function(x){ return '<button class="sugg" data-sg="'+encodeURIComponent(x)+'">'+x+'</button>'; }).join('');
+    $('exam-prompt').innerHTML =
+      '<div class="prompt"><div class="prompt-l">Replacing: <b>'+f.p+'</b></div>'+
+      '<input id="abn-in" placeholder="Describe the abnormal finding…" autocomplete="off">'+
+      (sg ? '<div class="prompt-a">'+sg+'</div>' : '')+
+      '<div class="prompt-a" style="margin-top:9px"><button class="btn p" id="abn-ok">Mark abnormal</button>'+
+      '<button class="btn" id="abn-no">Cancel</button></div></div>';
+    var inp = $('abn-in'); inp.focus();
+    function ok(){
+      var v = inp.value.trim();
+      if(v){ abn[id] = v; clicks++; $('exam-prompt').innerHTML=''; drawExam(); toast('Marked abnormal — prose updated'); }
+      else { inp.focus(); }
+    }
+    $('abn-ok').onclick = ok;
+    $('abn-no').onclick = function(){ $('exam-prompt').innerHTML=''; };
+    inp.onkeydown = function(e){ if(e.key==='Enter') ok(); if(e.key==='Escape') $('exam-prompt').innerHTML=''; };
+    $('exam-prompt').querySelectorAll('[data-sg]').forEach(function(b){
+      b.onclick = function(){ inp.value = decodeURIComponent(b.dataset.sg); ok(); };
+    });
+  }
+  function drawEditor(){
+    var h = '';
+    EX.forEach(function(f,i){
+      h += '<div class="editrow"><input type="checkbox" class="cbx" data-c="'+i+'"'+(f.on?' checked':'')+'>'+
+           '<input type="text" data-p="'+i+'" value="'+f.p.replace(/"/g,'&quot;')+'"></div>';
+    });
+    $('editor-list').innerHTML = h;
+    $('editor-list').querySelectorAll('[data-c]').forEach(function(c){
+      c.onchange = function(){ EX[+c.dataset.c].on = c.checked; drawExam(); };
+    });
+    $('editor-list').querySelectorAll('[data-p]').forEach(function(t){
+      t.oninput = function(){ EX[+t.dataset.p].p = t.value; drawExam(); };
+    });
+  }
+  $('btn-edit').onclick = function(){
+    var e = $('exam-editor');
+    var open = e.style.display !== 'none';
+    e.style.display = open ? 'none' : 'block';
+    this.classList.toggle('on', !open);
+    if(!open){ drawEditor(); e.scrollIntoView({block:'nearest'}); }
+  };
+  $('btn-done').onclick = function(){ $('exam-editor').style.display='none'; $('btn-edit').classList.remove('on'); toast('Template saved'); };
+  $('btn-save').onclick = function(){ toast('Saved as your default exam'); };
+  $('exam-pills').querySelectorAll('.pill').forEach(function(p){
+    p.onclick = function(){
+      if(p.classList.contains('srch')){ toast('Search — type to find any exam scale'); return; }
+      $('exam-pills').querySelectorAll('.pill').forEach(function(x){ x.classList.remove('on'); });
+      p.classList.add('on');
+      if(p.textContent.indexOf('＋')===0) toast(p.textContent.replace('＋','').trim()+' added to this exam');
+    };
+  });
+  drawExam();
+
+  /* ---------- IMAGING ---------- */
+  var MODS = {
+    'MRI':   {label:'MRI — select study', subs:['Brain — MS protocol','Brain','Orbits','Pituitary','IAC','C-spine','MRA','MRV'],
+              txt:{'Brain — MS protocol':'Two new T2 hyperintense lesions, periventricular. No enhancing lesions.',
+                   'Brain':'No acute intracranial abnormality. Chronic small-vessel change.',
+                   'Orbits':'No optic nerve enhancement. No retrobulbar mass.',
+                   'MRV':'Patent dural venous sinuses. No thrombosis.'}},
+    'CT':    {label:'CT — select study', subs:['Head','Sinus','Temporal bone','C-spine','T-spine','L-spine','CTA','Myelogram'],
+              txt:{'Head':'No acute intracranial hemorrhage. Chronic small-vessel ischemic change.',
+                   'CTA':'No large-vessel occlusion. Mild atherosclerotic irregularity.'}},
+    'Vascular': {label:'Vascular — select study', subs:['Carotid duplex','Transcranial Doppler','TCD bubble study','Catheter angiogram'],
+              txt:{'Carotid duplex':'No hemodynamically significant stenosis bilaterally.'}},
+    'Nuclear / PET': {label:'Nuclear / PET — select study', subs:['FDG-PET brain','Amyloid PET','DaTscan','Whole-body FDG-PET'],
+              txt:{'DaTscan':'Reduced striatal uptake, asymmetric, left greater than right.'}}
+  };
+  var curMod = 'MRI', curSub = 'Brain — MS protocol';
+  function drawMods(){
+    $('mod-pills').innerHTML = Object.keys(MODS).map(function(m){
+      return '<button class="pill'+(m===curMod?' on':'')+'" data-m="'+m+'">'+m+'</button>';
+    }).join('') + '<button class="pill srch" data-search="1">🔍 Search all imaging…</button>';
+    $('mod-pills').querySelectorAll('[data-m]').forEach(function(b){
+      b.onclick = function(){ curMod = b.dataset.m; curSub = MODS[curMod].subs[0]; drawSubs(); drawMods(); };
+    });
+    $('mod-pills').querySelector('[data-search]').onclick = function(){ toast('Type "orb" → MRI orbits. No menu.'); };
+  }
+  function drawSubs(){
+    var M = MODS[curMod];
+    $('sub-label').textContent = M.label;
+    $('sub-pills').innerHTML = M.subs.map(function(s){
+      return '<button class="pill sub'+(s===curSub?' on':'')+'" data-s="'+encodeURIComponent(s)+'">'+s+'</button>';
+    }).join('');
+    $('sub-pills').querySelectorAll('[data-s]').forEach(function(b){
+      b.onclick = function(){ curSub = decodeURIComponent(b.dataset.s); drawSubs(); };
+    });
+    var body = M.txt[curSub] || '';
+    $('entry-card').innerHTML =
+      '<div style="background:var(--white);border:1px solid var(--bd);border-radius:7px;padding:9px">'+
+      '<div style="display:flex;justify-content:space-between;gap:8px;margin-bottom:6px">'+
+      '<div style="font-size:11.5px;font-weight:650">'+curMod+' '+curSub.toLowerCase()+'</div>'+
+      '<div style="font-size:10.5px;color:var(--ts);border:1px solid var(--bd);border-radius:5px;padding:2px 7px">09/18/2025</div></div>'+
+      '<div class="ta" style="min-height:34px">'+(body || '<span style="color:var(--tm)">Type, paste or dictate the findings…</span>')+
+      '<div class="icons">🎤 ⚡ ✨</div></div>'+
+      '<div class="hint">↳ You picked a study — what did it show?</div></div>';
+  }
+  drawMods(); drawSubs();
+
+  /* ---------- PINS ---------- */
+  var pins = [{n:'CSF oligoclonal bands', v:'Positive — 6 unique bands', d:'11/03/2018'}];
+  function drawPins(){
+    var s = $('pin-strip');
+    if(!pins.length){ s.innerHTML = '<div class="strip-h">📌 Pinned</div>'+
+      '<div style="font-size:11px;color:#B45309">Nothing pinned. Old results still live in the full record below.</div>'; return; }
+    s.innerHTML = '<div class="strip-h">📌 Pinned — a personal bookmark, not shared</div>' +
+      pins.map(function(p,i){
+        return '<div class="pr"><span class="nm">'+p.n+'</span><span class="vl">'+p.v+'</span>'+
+               '<span class="dt">'+p.d+'</span><button class="unpin" data-u="'+i+'">unpin</button></div>';
+      }).join('');
+    s.querySelectorAll('[data-u]').forEach(function(b){
+      b.onclick = function(){ pins.splice(+b.dataset.u,1); drawPins(); toast('Unpinned — still in the record'); };
+    });
+  }
+  drawPins();
+
+  /* ---------- RECORD ---------- */
+  var REC = [
+    {d:'01/16/26', y:2026, n:'CT head', f:'No acute intracranial abnormality', c:'Imaging'},
+    {d:'12/02/25', y:2025, n:'EEG — routine', f:'Normal awake and drowsy', c:'Testing'},
+    {d:'09/18/25', y:2025, n:'MRI brain', f:'Two new T2 lesions, periventricular', c:'Imaging'},
+    {d:'06/04/24', y:2024, n:'Vitamin D', f:'24 ng/mL — low', c:'Labs'},
+    {d:'03/12/24', y:2024, n:'Carotid duplex', f:'No significant stenosis', c:'Cardiac'},
+    {d:'11/20/23', y:2023, n:'MRI c-spine', f:'Mild canal stenosis C5-6', c:'Imaging'},
+    {d:'08/02/23', y:2023, n:'EMG / NCS', f:'No large-fibre neuropathy', c:'Testing'},
+    {d:'02/14/22', y:2022, n:'TTE', f:'Normal EF, no PFO on bubble', c:'Cardiac'},
+    {d:'05/09/21', y:2021, n:'JCV antibody', f:'Index 0.31', c:'Labs'},
+    {d:'09/30/19', y:2019, n:'Lumbar puncture', f:'OCB positive, 6 bands', c:'Testing'},
+    {d:'04/22/19', y:2019, n:'NOTCH3 panel', f:'Negative', c:'Labs'},
+    {d:'06/11/18', y:2018, n:'MRI brain', f:'Unremarkable', c:'Imaging'},
+    {d:'11/03/18', y:2018, n:'CSF OCB', f:'Positive', c:'Labs'},
+    {d:'03/02/15', y:2015, n:'MRI brain', f:'Normal study', c:'Imaging'},
+    {d:'07/19/12', y:2012, n:'EEG', f:'Normal', c:'Testing'}
+  ];
+  var BUCKETS = [
+    {l:'Last 12 months', t:function(r){ return r.y>=2025; }, open:true},
+    {l:'2021 – 2024',    t:function(r){ return r.y>=2021 && r.y<=2024; }, open:false},
+    {l:'2016 – 2020',    t:function(r){ return r.y>=2016 && r.y<=2020; }, open:false},
+    {l:'Before 2016',    t:function(r){ return r.y<2016; }, open:false}
+  ];
+  var CATS = ['All','Imaging','Testing','Labs','Cardiac'], curCat = 'All';
+  function drawFilters(){
+    $('filter-chips').innerHTML = CATS.map(function(c){
+      return '<button class="pill'+(c===curCat?' on':'')+'" data-c="'+c+'" style="border-radius:14px;padding:4px 11px;font-size:11px">'+c+'</button>';
+    }).join('');
+    $('filter-chips').querySelectorAll('[data-c]').forEach(function(b){
+      b.onclick = function(){ curCat = b.dataset.c; drawFilters(); drawRecord(); };
+    });
+  }
+  function drawRecord(){
+    var rows = REC.filter(function(r){ return curCat==='All' || r.c===curCat; });
+    $('rec-count').textContent = rows.length + ' of ' + REC.length;
+    var filtering = curCat !== 'All';
+    var h = '';
+    BUCKETS.forEach(function(b,bi){
+      var rs = rows.filter(b.t);
+      if(!rs.length) return;
+      var open = filtering ? true : b.open;
+      h += '<div class="grp'+(open?' open':'')+'">'+
+           '<button class="grp-h" data-b="'+bi+'">'+b.l+' <span class="cnt">'+rs.length+'</span>'+
+           '<span class="caret">'+(open?'▾':'▸')+'</span></button>';
+      if(open){
+        h += rs.map(function(r){
+          return '<div class="row"><span class="dt">'+r.d+'</span><span class="nm">'+r.n+'</span>'+
+                 '<span class="fi">'+r.f+'</span></div>';
+        }).join('');
+      }
+      h += '</div>';
+    });
+    $('record').innerHTML = h || '<div style="font-size:11.5px;color:var(--tm);padding:8px">Nothing matches that filter.</div>';
+    $('record').querySelectorAll('[data-b]').forEach(function(b){
+      b.onclick = function(){ BUCKETS[+b.dataset.b].open = !BUCKETS[+b.dataset.b].open; drawRecord(); };
+    });
+  }
+  drawFilters(); drawRecord();
+
+  /* ---------- LABS ---------- */
+  var DATES = ['11/17/24','05/02/25','11/08/25','01/16/26'];
+  var LABS = [
+    {n:'JCV antibody index', u:'index', v:['0.31','0.42','0.88','1.62'], hi:[3], t:'up'},
+    {n:'Vitamin D, 25-OH', u:'ng/mL', v:['18','24','31','41'], lo:[0,1], t:'dn'},
+    {n:'ALT', u:'U/L', v:['22','26','24','21'], t:'fl'},
+    {n:'WBC', u:'K/µL', v:['6.2','5.8','—','6.0'], t:'fl'}
+  ];
+  function drawLabs(){
+    var h = '<tr><th>Lab</th>' + DATES.map(function(d){ return '<th>'+d+'</th>'; }).join('') + '<th style="width:28px"></th></tr>';
+    LABS.forEach(function(l){
+      h += '<tr><td><div class="ln">'+l.n+'</div><div class="lu">'+l.u+'</div></td>';
+      l.v.forEach(function(x,i){
+        var cls = 'v';
+        if(x === '—') cls += ' na';
+        else if(l.hi && l.hi.indexOf(i)>=0) cls += ' hi';
+        else if(l.lo && l.lo.indexOf(i)>=0) cls += ' lo';
+        h += '<td><span class="'+cls+'">'+x+'</span></td>';
+      });
+      var ar = l.t==='up' ? '↑' : l.t==='dn' ? '↗' : '→';
+      h += '<td><span class="trd '+l.t+'">'+ar+'</span></td></tr>';
+    });
+    $('lab-table').innerHTML = h;
+    $('lab-count').textContent = LABS.length + ' tracked';
+  }
+  document.querySelectorAll('.lab-sel').forEach(function(s){
+    s.onclick = function(){
+      if(s.classList.contains('done')) return;
+      $('lab-prompt').innerHTML =
+        '<div class="prompt"><div class="prompt-l"><b>'+s.dataset.lab+' '+s.dataset.val+'</b> — what do you want to do with it?</div>'+
+        '<div class="prompt-a"><button class="btn p" id="lab-follow">📈 Follow over time</button>'+
+        '<button class="btn" id="lab-pin">📌 Pin — remember forever</button>'+
+        '<button class="btn" id="lab-cancel">Cancel</button></div></div>';
+      $('lab-follow').onclick = function(){
+        LABS.push({n:s.dataset.lab, u:s.dataset.unit, v:['—','—','—',s.dataset.val], t:'fl'});
+        s.classList.add('done'); $('lab-prompt').innerHTML=''; drawLabs();
+        toast(s.dataset.lab + ' added to the followed table');
+      };
+      $('lab-pin').onclick = function(){
+        pins.push({n:s.dataset.lab, v:s.dataset.val+' '+s.dataset.unit, d:'01/16/2026'});
+        s.classList.add('done'); $('lab-prompt').innerHTML=''; drawPins();
+        toast(s.dataset.lab + ' pinned — scroll up to Imaging/results');
+      };
+      $('lab-cancel').onclick = function(){ $('lab-prompt').innerHTML=''; };
+    };
+  });
+  drawLabs();
+
+  /* ---------- SCALES ---------- */
+  var SCALES = [
+    {id:'midas', n:'MIDAS', full:'Migraine Disability Assessment', v:[32,27,19,14], t:'dn',
+     grade:'Grade II — mild disability',
+     metric:'MIDAS fell 32 → 14 over 187 days. This is the quality measure most clinics don\'t capture — and it cannot exist without this view.',
+     comps:[
+       {n:'1 · Days missed work or school', v:[8,6,3,2], t:'dn'},
+       {n:'2 · Days productivity reduced ≥50% at work', v:[10,8,6,5], t:'dn'},
+       {n:'3 · Days missed household work', v:[7,4,3,3], t:'dn'},
+       {n:'4 · Days household productivity reduced ≥50%', v:[6,4,3,3], t:'dn'},
+       {n:'5 · Days missed family / social / leisure', v:[1,1,1,1], t:'fl', flag:'Flat throughout — the only component that never improved'}
+     ]},
+    {id:'phq9', n:'PHQ-9', full:'Patient Health Questionnaire-9', v:[14,11,8,6], t:'dn',
+     grade:'Mild', metric:'Depression burden falling alongside headache disability.',
+     comps:[
+       {n:'Little interest or pleasure', v:[2,2,1,1], t:'dn'},
+       {n:'Feeling down, hopeless', v:[2,1,1,1], t:'dn'},
+       {n:'Sleep disturbance', v:[3,2,2,1], t:'dn'},
+       {n:'Fatigue', v:[3,3,2,2], t:'dn'}
+     ]},
+    {id:'ess', n:'ESS', full:'Epworth Sleepiness Scale', v:[12,11,10,9], t:'fl',
+     grade:'Borderline', metric:'Barely moving — worth asking whether the intervention is working.',
+     comps:[
+       {n:'Sitting and reading', v:[2,2,2,2], t:'fl'},
+       {n:'Watching television', v:[3,3,2,2], t:'dn'},
+       {n:'Passenger in a car, 1 hour', v:[3,2,2,2], t:'dn'}
+     ]},
+    {id:'mrs', n:'mRS', full:'Modified Rankin Scale', v:[3,2,1,1], t:'dn',
+     grade:'1 — no significant disability', metric:'Recovered to near-baseline function by day 187.',
+     comps:null, noComp:'Single-item scale — one 0–6 rating, no components to break out. Not every scale has a second level.'}
+  ];
+  var curScale = 'midas', showComps = false;
+  function S(){ for(var i=0;i<SCALES.length;i++) if(SCALES[i].id===curScale) return SCALES[i]; }
+  function drawScaleList(){
+    $('scale-list').innerHTML = SCALES.map(function(s){
+      var last = s.v[s.v.length-1];
+      var ar = s.t==='up'?'↑':s.t==='dn'?'↓':'→';
+      return '<button class="sr'+(s.id===curScale?' on':'')+'" data-s="'+s.id+'">'+
+             '<span class="sr-n">'+s.n+'</span><span class="sr-v">'+last+'</span>'+
+             '<span class="'+s.t+'">'+ar+'</span></button>';
+    }).join('') + '<button class="addsc" id="add-scale">🔍 Search scales…</button>';
+    $('scale-list').querySelectorAll('[data-s]').forEach(function(b){
+      b.onclick = function(){ curScale = b.dataset.s; showComps = false; drawScaleList(); drawScaleDetail(); };
+    });
+    $('add-scale').onclick = function(){ toast('Search adds a scale — it does not pre-populate'); };
+  }
+  function drawScaleDetail(){
+    var s = S(), mx = Math.max.apply(null, s.v), last = s.v[s.v.length-1];
+    var delta = s.v[0] - last;
+    var h = '';
+    if(showComps) h += '<div class="crumb"><span data-back="1" style="cursor:pointer;text-decoration:underline">'+s.n+'</span> &nbsp;›&nbsp; <b>components</b></div>';
+    else h += '<div class="crumb"><b>'+s.n+'</b> — '+s.full+'</div>';
+    h += '<div style="display:flex;align-items:baseline;gap:10px;margin-bottom:2px">'+
+         '<span class="sl-big" id="big-score" title="Click to see components">'+last+'</span>'+
+         (delta>0 ? '<span class="sl-delta">↓ '+delta+' from baseline</span>' : '')+
+         '<span style="font-size:11px;color:var(--tm)">'+s.grade+'</span></div>';
+    if(!showComps){
+      h += '<div class="chart">' + s.v.map(function(x,i){
+        return '<div class="cb'+(i===s.v.length-1?' last':'')+'"><div class="cbv">'+x+'</div>'+
+               '<div class="cbar" style="height:'+Math.round(x/mx*82)+'%"></div></div>';
+      }).join('') + '</div>';
+      h += '<div class="cx">'+DATES.map(function(d){ return '<span>'+d+'</span>'; }).join('')+'</div>';
+      h += '<div class="metric"><div class="metric-t">📈 180-day outcome</div>'+
+           '<div class="metric-x">'+s.metric+'</div></div>';
+      h += '<div class="hint" style="margin-top:9px">👆 Click the number to drill into components</div>';
+    } else if(!s.comps){
+      h += '<div class="box w" style="margin:12px 0 0"><div class="box-t">No components</div>'+
+           '<p style="margin:0;font-size:12.5px">'+s.noComp+'</p></div>';
+    } else {
+      h += '<div style="font-size:9.5px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;'+
+           'color:var(--tm);margin:12px 0 6px">Where the change came from</div>';
+      s.comps.forEach(function(c){
+        var cm = Math.max.apply(null, c.v);
+        h += '<div class="comp"'+(c.flag?' style="border-color:#FDE68A;background:#FFFBEB"':'')+'>'+
+             '<div class="comp-h"><div class="comp-n">'+c.n+'</div>'+
+             '<div class="comp-v '+c.t+'">'+c.v[c.v.length-1]+'</div></div>'+
+             '<div class="spark">'+ c.v.map(function(x,i){
+               return '<div class="sp'+(i===c.v.length-1?' last':'')+'" style="height:'+Math.max(8,Math.round(x/cm*100))+'%"></div>';
+             }).join('') +'</div>'+
+             (c.flag ? '<div style="font-size:9.5px;color:#92400E;margin-top:4px">'+c.flag+'</div>' : '')+
+             '</div>';
+      });
+    }
+    $('scale-detail').innerHTML = h;
+    var big = $('big-score');
+    if(big) big.onclick = function(){ showComps = !showComps; drawScaleDetail(); };
+    var bk = $('scale-detail').querySelector('[data-back]');
+    if(bk) bk.onclick = function(){ showComps = false; drawScaleDetail(); };
+  }
+  drawScaleList(); drawScaleDetail();
+})();
+</script>
 </body>
 </html>
