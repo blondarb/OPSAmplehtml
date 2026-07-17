@@ -217,6 +217,35 @@
   .metric{background:#F0FDFA;border:1px solid #A7F3D0;border-radius:7px;padding:9px 11px;margin-top:10px}
   .metric-t{font-size:9.5px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--primary-dark);margin-bottom:3px}
   .metric-x{font-size:11.5px;color:#065F46}
+  .vitals{display:grid;grid-template-columns:repeat(auto-fit,minmax(112px,1fr));gap:8px}
+  .vt{background:var(--gray);border:1px solid var(--bd);border-radius:7px;padding:8px 9px}
+  .vt-l{font-size:9px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--tm);margin-bottom:4px}
+  .vt-in{display:flex;align-items:baseline;gap:4px}
+  .vt-in input{width:100%;border:0;background:none;font-family:inherit;font-size:16px;font-weight:700;
+               color:var(--tp);padding:0;font-variant-numeric:tabular-nums;min-width:0}
+  .vt-in input:focus{outline:none}
+  .vt-in input::placeholder{color:var(--bd);font-weight:600}
+  .vt-u{font-size:9.5px;color:var(--tm);white-space:nowrap;flex-shrink:0}
+  .vt.calc{background:#F0FDFA;border-color:#A7F3D0}
+  .vt.calc .vt-l{color:var(--primary-dark)}
+  .vt-val{font-size:16px;font-weight:700;color:var(--primary-dark);font-variant-numeric:tabular-nums}
+  .vt-val.empty{color:#A7F3D0}
+
+  .split{background:#F5F3FF;border:1px solid #DDD6FE;border-radius:8px;padding:10px 12px}
+  .split-h{display:flex;align-items:center;gap:7px;margin-bottom:8px;flex-wrap:wrap}
+  .split-t{font-size:12px;font-weight:700;color:#5B21B6}
+  .split-b{font-size:9px;font-weight:700;padding:2px 6px;border-radius:4px;background:#EDE9FE;color:#6D28D9}
+  .part{display:flex;align-items:center;gap:8px;padding:5px 0;font-size:11.5px;border-top:1px solid #DDD6FE}
+  .part:first-of-type{border-top:0}
+  .part-n{flex:1;color:#4C1D95}
+  .part-n b{color:#2E1065}
+  .part-s{font-size:10px;font-weight:700;padding:2px 7px;border-radius:10px;white-space:nowrap}
+  .part-s.done{background:#DCFCE7;color:#15803D}
+  .part-s.here{background:#DBEAFE;color:#1D4ED8;cursor:pointer}
+  .part-s.wait{background:var(--dark);color:var(--tm)}
+  .split-f{margin-top:8px;padding-top:8px;border-top:1px solid #DDD6FE;font-size:11px;color:#5B21B6}
+  .split-f b{color:#2E1065}
+
   .toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%) translateY(80px);
          background:var(--tp);color:#fff;font-size:12px;font-weight:600;padding:9px 16px;border-radius:8px;
          z-index:50;opacity:0;transition:all .25s;pointer-events:none}
@@ -339,6 +368,16 @@
             exam and edit the exact wording. Saved once, used every visit.</div>
           <div id="editor-list"></div>
         </div>
+
+        <div class="fs">
+          <div class="fs-h"><div class="fs-t">Vital signs</div><span class="badge">Optional</span>
+            <button class="tpl-b" id="btn-epic" style="margin-left:auto">⬇ Pull from Epic</button></div>
+          <div class="vitals" id="vitals"></div>
+          <div class="hint" id="bmi-hint">↳ Height and weight compute BMI, and weight drives
+            weight-based dosing (IVIG in CIDP, MG, GBS).</div>
+        </div>
+
+        <div class="fs" id="split-card"></div>
       </div>
     </div>
 
@@ -362,6 +401,34 @@
       would be <strong>documenting an exam nobody can perform over video</strong>. Reflexes,
       fundoscopy and fine sensory are left out by construction. If a clinician wants them, they add
       them deliberately — which is exactly the right friction.</p>
+    </div>
+
+    <div class="box d">
+      <div class="box-t">Vitals — what belongs, and what quietly doesn't</div>
+      <p>Standard outpatient set: <strong>blood pressure, heart rate, temperature, weight and
+      height.</strong> Not mandatory. Height and weight earn their place twice — they compute BMI, and
+      <strong>weight drives weight-based dosing</strong>, which in outpatient neurology means IVIG for
+      CIDP, myasthenia and GBS. That's not a nice-to-have for those patients.</p>
+      <p><strong>Glucose and oxygen saturation are in the current design and are proposed for
+      removal.</strong> They're acute-stroke carryovers — glucose is a thrombolysis criterion, not an
+      ambulatory vital. Nobody named them as standard outpatient vitals. They're cheap to keep if the
+      MAs already capture them, but they're currently there by inheritance rather than intent.</p>
+      <p>Most of this lives in Epic, but the physician may not pull it — so these are quick-entry
+      fields with an explicit pull action, not free text.</p>
+    </div>
+
+    <div class="box" style="border-left:3px solid #8B5CF6">
+      <div class="box-t" style="color:#6D28D9">The split-scale problem — and it isn't hypothetical</div>
+      <p>Some instruments have an examined part and a reported part, so one scale lives on two tabs.
+      The obvious worry is that this is an edge case invented by a schema. It isn't:
+      <strong>the MDS-UPDRS is exactly this shape, and it's already in the catalog.</strong></p>
+      <p>Parts I, II and IV are interview — non-motor experiences, daily living, motor complications.
+      Part III is the motor exam. Today only Part III is built, which is why the split has stayed
+      invisible. Add the rest and the scale immediately spans History and Exam.</p>
+      <p><strong>The proposed handling:</strong> whichever tab you start on, the other shows what's
+      already captured and offers to continue. The parts carry their own scores; the total assembles
+      across both. A schema with one <code>location</code> per scale can't express that — it needs a
+      location per <em>part</em>.</p>
     </div>
 
     <h4>Which scales appear on this tab</h4>
@@ -620,27 +687,40 @@
     <h3>Not yet decided</h3>
     <div class="tbl">
       <table>
-        <tr><th style="width:210px">Question</th><th>Detail</th></tr>
-        <tr><td><b>Vital signs and fever chips</b></td>
-          <td>Present in the current design; never came up in three hours of discussion. Left
-            untouched rather than redesigned on a guess. In a tele visit with an MA assisting, it
-            isn't obvious these should be typed at all.</td></tr>
+        <tr><th style="width:190px">Question</th><th>Detail</th><th style="width:96px">Status</th></tr>
+        <tr><td><b>Vital signs</b></td>
+          <td>Settled: BP, heart rate, temperature, weight, height → BMI. Not mandatory. Quick-entry
+            fields with an Epic pull. <b>Glucose and O₂ sat proposed for removal</b> as acute
+            carryovers — that specific call is still open.</td>
+          <td><span class="badge new">answered</span></td></tr>
         <tr><td><b>Scale catalog consolidation</b></td>
-          <td>Scale definitions currently live in more than one place and have diverged. They should
-            resolve to a single catalog with a per-surface filter — an outpatient picker showing
-            outpatient scales, rather than separate catalogs per app.</td></tr>
+          <td>Settled: <b>one catalog, one source of truth</b> — not one per app. A scale can be used
+            inpatient or ambulatory; the surface filters the picker, the catalog doesn't fork. The
+            existing divergence needs reconciling into that single source.</td>
+          <td><span class="badge new">answered</span></td></tr>
+        <tr><td><b>UPDRS-III identity</b></td>
+          <td><b>Verified: it is the MDS-UPDRS.</b> 33 scored items (MDS count; the original has 27),
+            MDS numbering, Goetz 2008 citation, and it contains items the original doesn't have at all
+            — toe tapping (3.7), freezing of gait (3.11), kinetic tremor (3.16). Not ambiguous.</td>
+          <td><span class="badge new">verified</span></td></tr>
         <tr><td><b>UPDRS-III licensing</b></td>
-          <td>Needs a licensing check before build. Options are permission, a differently-licensed
-            equivalent, or no Parkinson's motor scoring.</td></tr>
-        <tr><td><b>Headache scale selection</b></td>
-          <td>MIDAS is the proposed primary. Open question is whether any payer specifically mandates
-            an alternative for prior authorisation — that would be the deciding factor.</td></tr>
+          <td>Follows from the above: the MDS operates a permission process for the MDS-UPDRS. Needs
+            legal confirmation, then a choice — obtain permission, rebuild as the original UPDRS
+            Part III, or drop Parkinson's motor scoring.</td>
+          <td><span class="badge lic">legal</span></td></tr>
         <tr><td><b>Split scales</b></td>
-          <td>At least one instrument has an examined subscale and a reported subscale. A schema that
-            assumes one location per scale can't express that.</td></tr>
+          <td>Direction agreed: start on either tab, finish on the other; the total assembles across
+            both. <b>The MDS-UPDRS is itself the worked example</b> — Parts I/II/IV interview,
+            Part III examined. Schema consequence: location belongs on the <em>part</em>, not the scale.</td>
+          <td><span class="badge new">designed</span></td></tr>
+        <tr><td><b>Headache scale selection</b></td>
+          <td>MIDAS proposed as primary over HIT-6. Steve is researching whether any payer mandates a
+            specific instrument for prior authorisation — that would be the deciding factor.</td>
+          <td><span class="badge">with Steve</span></td></tr>
         <tr><td><b>Study list authority</b></td>
           <td>The diagnostic list here is literature-derived. Sevaro's own order volume should
-            override it.</td></tr>
+            override it.</td>
+          <td><span class="badge">open</span></td></tr>
       </table>
     </div>
 
@@ -770,6 +850,91 @@
     };
   });
   drawExam();
+
+  /* ---------- VITALS ---------- */
+  var VT = [
+    {k:'bp',   l:'Blood pressure', u:'mmHg', ph:'138/82', txt:true},
+    {k:'hr',   l:'Heart rate',     u:'bpm',  ph:'72'},
+    {k:'temp', l:'Temperature',    u:'°F',   ph:'98.4'},
+    {k:'wt',   l:'Weight',         u:'lb',   ph:'168'},
+    {k:'ht',   l:'Height',         u:'in',   ph:'68'}
+  ];
+  var vals = {};
+  function bmi(){
+    var w = parseFloat(vals.wt), h = parseFloat(vals.ht);
+    if(!w || !h) return null;
+    return Math.round((703 * w / (h*h)) * 10) / 10;
+  }
+  function drawVitals(){
+    var h = VT.map(function(v){
+      return '<div class="vt"><div class="vt-l">'+v.l+'</div><div class="vt-in">'+
+             '<input data-v="'+v.k+'" placeholder="'+v.ph+'" inputmode="'+(v.txt?'text':'decimal')+'" '+
+             'value="'+(vals[v.k]||'')+'"><span class="vt-u">'+v.u+'</span></div></div>';
+    }).join('');
+    var b = bmi();
+    h += '<div class="vt calc"><div class="vt-l">BMI</div>'+
+         '<div class="vt-in"><span class="vt-val'+(b?'':' empty')+'">'+(b || '—')+'</span>'+
+         '<span class="vt-u">kg/m²</span></div></div>';
+    $('vitals').innerHTML = h;
+    $('vitals').querySelectorAll('[data-v]').forEach(function(i){
+      i.oninput = function(){ vals[i.dataset.v] = i.value; refreshBmi(); };
+    });
+    var hint = $('bmi-hint');
+    if(b) hint.innerHTML = '↳ BMI <b>'+b+'</b> computed from height and weight. Weight also drives '+
+      'weight-based dosing — IVIG in CIDP, myasthenia and GBS is dosed per kg.';
+  }
+  function refreshBmi(){
+    var b = bmi(), cell = $('vitals').querySelector('.vt.calc .vt-val');
+    if(cell){ cell.textContent = b || '—'; cell.classList.toggle('empty', !b); }
+    var hint = $('bmi-hint');
+    if(b) hint.innerHTML = '↳ BMI <b>'+b+'</b> computed from height and weight. Weight also drives '+
+      'weight-based dosing — IVIG in CIDP, myasthenia and GBS is dosed per kg.';
+    else hint.innerHTML = '↳ Height and weight compute BMI, and weight drives weight-based dosing '+
+      '(IVIG in CIDP, MG, GBS).';
+  }
+  $('btn-epic').onclick = function(){
+    vals = {bp:'138/82', hr:'72', temp:'98.4', wt:'168', ht:'68'};
+    drawVitals(); toast('Vitals pulled from Epic — editable');
+  };
+  drawVitals();
+
+  /* ---------- SPLIT SCALE ---------- */
+  var PARTS = [
+    {n:'Part I — Non-motor experiences of daily living', where:'history', score:9, done:true},
+    {n:'Part II — Motor experiences of daily living',    where:'history', score:11, done:true},
+    {n:'Part III — Motor examination',                   where:'exam',    score:null, done:false},
+    {n:'Part IV — Motor complications',                  where:'history', score:null, done:false}
+  ];
+  function drawSplit(){
+    var doneScore = PARTS.filter(function(p){ return p.done; }).reduce(function(a,p){ return a+p.score; },0);
+    var nDone = PARTS.filter(function(p){ return p.done; }).length;
+    var h = '<div class="split"><div class="split-h">'+
+      '<span class="split-t">MDS-UPDRS</span>'+
+      '<span class="split-b">SPLIT SCALE</span>'+
+      '<span class="split-b">'+nDone+' of 4 parts</span>'+
+      '<span style="margin-left:auto;font-size:10.5px;color:#6D28D9">Started in History — finish here</span>'+
+      '</div>';
+    PARTS.forEach(function(p,i){
+      var s;
+      if(p.done) s = '<span class="part-s done">'+p.score+' · done in History</span>';
+      else if(p.where==='exam') s = '<span class="part-s here" data-do="'+i+'">Do it here →</span>';
+      else s = '<span class="part-s wait">pending in History</span>';
+      h += '<div class="part"><div class="part-n"><b>'+p.n.split('—')[0].trim()+'</b> —'+
+           p.n.split('—')[1]+'</div>'+s+'</div>';
+    });
+    h += '<div class="split-f">Running total <b>'+doneScore+'</b> from '+nDone+' part'+(nDone===1?'':'s')+
+         '. The scale spans both tabs — <b>Parts I, II and IV are interview; Part III is examined.</b> '+
+         'One scale, one score, two surfaces.</div></div>';
+    $('split-card').innerHTML = h;
+    $('split-card').querySelectorAll('[data-do]').forEach(function(b){
+      b.onclick = function(){
+        var p = PARTS[+b.dataset.do];
+        p.done = true; p.score = 24;
+        drawSplit(); toast('Part III scored here — total now assembles across both tabs');
+      };
+    });
+  }
+  drawSplit();
 
   /* ---------- IMAGING ---------- */
   var MODS = {
