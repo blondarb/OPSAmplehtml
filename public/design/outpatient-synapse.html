@@ -231,6 +231,12 @@
   .vt-val{font-size:16px;font-weight:700;color:var(--primary-dark);font-variant-numeric:tabular-nums}
   .vt-val.empty{color:#A7F3D0}
 
+  .ex-sec{margin-bottom:11px}
+  .ex-sec:last-of-type{margin-bottom:0}
+  .ex-lbl{color:var(--tm);font-weight:650}
+  #free-ta:focus{outline:none}
+  #free-ta::placeholder{color:var(--bd)}
+
   .oth{display:flex;gap:6px;align-items:center;margin-top:7px}
   .oth input{flex:1;border:1px solid var(--primary);border-radius:6px;padding:6px 9px;font-size:11.5px;
              font-family:inherit;color:var(--tp);background:var(--white)}
@@ -351,8 +357,8 @@
     <strong>which is why they always feel inefficient.</strong> The fix is to make the exception the
     only thing that occupies space.</p>
 
-    <div class="try">👆 <b>Try it:</b> click any underlined finding in the note to mark it abnormal.
-      Click a yellow one to revert it.</div>
+    <div class="try">👆 <b>Try it:</b> switch to <b>Clickable exam</b>, then click any underlined
+      finding to mark it abnormal. Click a yellow one to revert.</div>
 
     <div class="chrome">
       <div class="app-t" id="exam-tabs">
@@ -364,8 +370,8 @@
       <div class="body">
         <div class="tplbar">
           <span style="font-size:13px">🩺</span>
-          <div class="tpl-l"><b>Sevaro tele-neuro exam</b> — the shipped default. Reflexes, fundoscopy
-            and fine sensory omitted: not reliably assessable over video.</div>
+          <div class="tpl-l" id="tpl-copy"></div>
+          <button class="tpl-b" id="btn-insert">⚡ Insert my normal exam</button>
           <button class="tpl-b" id="btn-edit">Edit to my voice</button>
           <button class="tpl-b" id="btn-save">Save as mine</button>
         </div>
@@ -373,10 +379,10 @@
         <div class="fs">
           <div class="fs-h"><div class="fs-t">Examination</div><span class="badge">Optional</span>
             <span style="margin-left:auto;font-size:10.5px;color:var(--tm)"
-                  id="exam-stat">0 abnormal · 0 clicks</span></div>
+                  id="exam-stat">blank</span></div>
           <div class="pills" id="exam-pills">
-            <button class="pill on">Free text exam</button>
-            <button class="pill">Clickable exam</button>
+            <button class="pill on" data-mode="free">Free text exam</button>
+            <button class="pill" data-mode="click">Clickable exam</button>
             <button class="pill">＋ NIHSS</button>
             <button class="pill">＋ MoCA</button>
             <button class="pill">＋ EDSS</button>
@@ -409,6 +415,25 @@
 
         <div class="fs" id="split-card"></div>
       </div>
+    </div>
+
+    <div class="box g">
+      <div class="box-t">Yes — free text starts blank, and that's a safety answer not a preference</div>
+      <p>An earlier draft pre-filled the free-text box with the normal exam. That's wrong, and the
+      reason matters: <strong>a pre-filled normal exam is an exam you didn't perform, already written
+      into your note.</strong> Every keystroke you don't type is an assertion you didn't make. If it's
+      sitting there by default, the failure mode is signing it without reading it — which is exactly
+      the junk-documentation problem that killed yes/no, just wearing better prose.</p>
+      <p>So the two pills do genuinely different things:</p>
+      <ul>
+        <li><strong>Free text — blank.</strong> Type, paste or dictate. Nothing is asserted unless you
+        write it. <em>⚡ Insert my normal exam</em> is there if you want the template as a starting
+        point, but you have to ask for it.</li>
+        <li><strong>Clickable — pre-filled, deliberately.</strong> Choosing this pill <em>is</em> the
+        act of invoking your template. Then you negate the exceptions.</li>
+      </ul>
+      <p>Both produce the same kind of prose. The difference is whether the normal exam arrives
+      because you asked for it or because the software decided for you.</p>
     </div>
 
     <div class="box d">
@@ -588,10 +613,10 @@
       <p>Cardiac studies are one pill under Diagnostic testing &amp; procedures, expanding to TTE,
       TEE, Holter, event monitor, loop recorder and bubble study — rather than a top-level section of
       their own. They're ordered like any other test; they don't warrant separate real estate.</p>
-      <p>One naming nit: <strong>Holter, event monitors and loop recorders aren't imaging</strong> —
-      they're rhythm monitoring. "Cardiac imaging" as a label is slightly wrong for half its own
-      subtypes; <strong>"Cardiac"</strong> or <strong>"Cardiac studies"</strong> covers both honestly.
-      Minor, but it's the sort of thing that gets copied into a schema and lives forever.</p>
+      <p>Labelled <strong>"Cardiac studies"</strong>, not "cardiac imaging" — Holter, event monitors
+      and loop recorders are rhythm monitoring, not imaging, so the imaging label would have been
+      wrong for half its own subtypes. Small thing, but schema labels outlive the conversation that
+      set them.</p>
     </div>
 
     <div class="box g">
@@ -840,34 +865,71 @@
 
   /* ---------- EXAM ---------- */
   var EX = [
-    {m:'', id:'a1', on:true, p:'Alert and oriented to person, place, time and situation', s:['Oriented to person only','Drowsy but arousable']},
-    {m:'', id:'a2', on:true, p:'Language fluent without paraphasic error', s:['Mild expressive aphasia','Frequent paraphasic errors']},
-    {m:'', id:'b1', on:true, p:'Pupils equal and reactive', s:['Left pupil 2mm, sluggish']},
-    {m:'', id:'b2', on:true, p:'Extraocular movements intact', s:['Left gaze preference','Vertical gaze palsy']},
-    {m:'', id:'b3', on:true, p:'Face symmetric', s:['Right facial droop, lower face']},
-    {m:'Motor', id:'c1', on:true, p:'5/5 throughout', s:['Right arm 4+/5 with pronator drift','Left leg 4/5']},
-    {m:'', id:'d1', on:true, p:'Sensation grossly intact to light touch', s:['Reduced pinprick, right hemibody']},
-    {m:'', id:'e1', on:true, p:'Finger-nose-finger intact', s:['Left dysmetria']},
-    {m:'Gait', id:'f1', on:true, p:'narrow-based and steady', s:['mildly wide-based, unsteady tandem','requires assistance']},
-    {m:'', id:'f2', on:false, p:'Tandem gait intact', s:['Unable to tandem']}
+    {sec:'Mental status', items:[
+      {id:'a1', on:true, p:'alert and oriented to person, place, time and situation', s:['oriented to person only','drowsy but arousable']},
+      {id:'a2', on:true, p:'language fluent without paraphasic error', s:['mild expressive aphasia','frequent paraphasic errors']},
+      {id:'a3', on:true, p:'recent and remote memory intact', s:['poor recall of recent events']}
+    ]},
+    {sec:'Cranial nerves', items:[
+      {id:'b1', on:true, p:'pupils equal and reactive', s:['left pupil 2mm, sluggish']},
+      {id:'b2', on:true, p:'extraocular movements intact', s:['left gaze preference','vertical gaze palsy']},
+      {id:'b3', on:true, p:'face symmetric', s:['right facial droop, lower face']},
+      {id:'b4', on:true, p:'visual fields full to confrontation', s:['left homonymous hemianopia']}
+    ]},
+    {sec:'Motor', items:[
+      {id:'c1', on:true, p:'strength 5/5 throughout', s:['right arm 4+/5','left leg 4/5']},
+      {id:'c2', on:true, p:'no pronator drift', s:['right pronator drift']},
+      {id:'c3', on:true, p:'bulk and tone normal', s:['increased tone, right upper extremity']}
+    ]},
+    {sec:'Sensory', items:[
+      {id:'d1', on:true, p:'grossly intact to light touch', s:['reduced pinprick, right hemibody']}
+    ]},
+    {sec:'Coordination', items:[
+      {id:'e1', on:true, p:'finger-nose-finger intact', s:['left dysmetria']},
+      {id:'e2', on:true, p:'no dysdiadochokinesia', s:['slowed rapid alternating movements, left']}
+    ]},
+    {sec:'Gait', items:[
+      {id:'f1', on:true, p:'narrow-based and steady', s:['mildly wide-based, unsteady tandem','requires assistance']},
+      {id:'f2', on:false, p:'tandem intact', s:['unable to tandem']}
+    ]}
   ];
-  var abn = {}, clicks = 0;
+  var abn = {}, clicks = 0, examMode = 'free', freeText = '';
+  function cap(x){ return x.charAt(0).toUpperCase() + x.slice(1); }
+  function eachItem(fn){ EX.forEach(function(g){ g.items.forEach(function(it){ fn(it, g); }); }); }
 
+  function templatePlain(){
+    return EX.map(function(g){
+      var on = g.items.filter(function(i){ return i.on; });
+      if(!on.length) return null;
+      return g.sec + ': ' + on.map(function(i,ix){ return ix===0 ? cap(i.p) : cap(i.p); }).join('. ') + '.';
+    }).filter(Boolean).join('\n\n');
+  }
+
+  function freeStat(){
+    var w = freeText.trim();
+    $('exam-stat').textContent = w ? 'free text · '+w.split(/\s+/).length+' words' : 'blank';
+  }
   function drawExam(){
-    var h = '', out = [];
-    EX.forEach(function(f){
-      if(!f.on) return;
-      var seg;
-      if(abn[f.id] !== undefined){
-        seg = '<span class="abn-sp" data-rev="'+f.id+'">'+abn[f.id]+'</span>';
-      } else {
-        seg = '<span class="norm-sp" data-neg="'+f.id+'">'+f.p+'</span>';
-      }
-      out.push({m:f.m, seg:seg});
-    });
-    out.forEach(function(o,i){
-      var pre = o.m ? '<span style="color:var(--tm)">'+o.m+': </span>' : '';
-      h += pre + o.seg + '. ';
+    if(examMode === 'free'){
+      $('exam-prose').innerHTML =
+        '<textarea id="free-ta" placeholder="Type, paste or dictate the exam…" '+
+        'style="width:100%;min-height:120px;border:0;background:none;font-family:inherit;font-size:11.5px;'+
+        'line-height:1.9;color:var(--tp);resize:vertical;padding:0" '+
+        'spellcheck="false">'+freeText+'</textarea><div class="icons">🎤 ⚡ ✨</div>';
+      $('free-ta').oninput = function(){ freeText = this.value; freeStat(); };
+      freeStat();
+      return;
+    }
+    var h = '';
+    EX.forEach(function(g){
+      var on = g.items.filter(function(i){ return i.on; });
+      if(!on.length) return;
+      var segs = on.map(function(f){
+        return abn[f.id] !== undefined
+          ? '<span class="abn-sp" data-rev="'+f.id+'">'+cap(abn[f.id])+'</span>'
+          : '<span class="norm-sp" data-neg="'+f.id+'">'+cap(f.p)+'</span>';
+      });
+      h += '<div class="ex-sec"><span class="ex-lbl">'+g.sec+':</span> '+segs.join('. ')+'.</div>';
     });
     $('exam-prose').innerHTML = h + '<div class="icons">🎤 ⚡ ✨</div>';
     var n = Object.keys(abn).length;
@@ -879,7 +941,7 @@
       s.onclick = function(){ delete abn[s.dataset.rev]; drawExam(); toast('Reverted to normal'); };
     });
   }
-  function findF(id){ for(var i=0;i<EX.length;i++) if(EX[i].id===id) return EX[i]; }
+  function findF(id){ var r=null; eachItem(function(it){ if(it.id===id) r=it; }); return r; }
   function askAbn(id){
     var f = findF(id);
     var sg = (f.s||[]).map(function(x){ return '<button class="sugg" data-sg="'+encodeURIComponent(x)+'">'+x+'</button>'; }).join('');
@@ -904,17 +966,34 @@
   }
   function drawEditor(){
     var h = '';
-    EX.forEach(function(f,i){
-      h += '<div class="editrow"><input type="checkbox" class="cbx" data-c="'+i+'"'+(f.on?' checked':'')+'>'+
-           '<input type="text" data-p="'+i+'" value="'+f.p.replace(/"/g,'&quot;')+'"></div>';
+    EX.forEach(function(g,gi){
+      h += '<div class="modl">'+g.sec+'</div>';
+      g.items.forEach(function(f,fi){
+        h += '<div class="editrow"><input type="checkbox" class="cbx" data-c="'+gi+'-'+fi+'"'+(f.on?' checked':'')+'>'+
+             '<input type="text" data-p="'+gi+'-'+fi+'" value="'+f.p.replace(/"/g,'&quot;')+'"></div>';
+      });
     });
     $('editor-list').innerHTML = h;
     $('editor-list').querySelectorAll('[data-c]').forEach(function(c){
-      c.onchange = function(){ EX[+c.dataset.c].on = c.checked; drawExam(); };
+      c.onchange = function(){ var x=c.dataset.c.split('-'); EX[+x[0]].items[+x[1]].on = c.checked; drawExam(); };
     });
     $('editor-list').querySelectorAll('[data-p]').forEach(function(t){
-      t.oninput = function(){ EX[+t.dataset.p].p = t.value; drawExam(); };
+      t.oninput = function(){ var x=t.dataset.p.split('-'); EX[+x[0]].items[+x[1]].p = t.value; drawExam(); };
     });
+  }
+  function drawTplBar(){
+    if(examMode === 'free'){
+      $('tpl-copy').innerHTML = '<b>Free text</b> — starts blank. Nothing is asserted unless you write it.';
+      $('btn-insert').style.display = '';
+      $('btn-edit').style.display = 'none';
+      $('btn-save').style.display = 'none';
+    } else {
+      $('tpl-copy').innerHTML = '<b>Sevaro tele-neuro exam</b> — the shipped default. Reflexes, fundoscopy '+
+        'and fine sensory omitted: not reliably assessable over video.';
+      $('btn-insert').style.display = 'none';
+      $('btn-edit').style.display = '';
+      $('btn-save').style.display = '';
+    }
   }
   $('btn-edit').onclick = function(){
     var e = $('exam-editor');
@@ -925,15 +1004,23 @@
   };
   $('btn-done').onclick = function(){ $('exam-editor').style.display='none'; $('btn-edit').classList.remove('on'); toast('Template saved'); };
   $('btn-save').onclick = function(){ toast('Saved as your default exam'); };
+  $('btn-insert').onclick = function(){
+    freeText = templatePlain(); drawExam();
+    toast('Template inserted as editable text');
+  };
   $('exam-pills').querySelectorAll('.pill').forEach(function(p){
     p.onclick = function(){
       if(p.classList.contains('srch')){ toast('Search — type to find any exam scale'); return; }
+      if(p.textContent.indexOf('＋')===0){ toast(p.textContent.replace('＋','').trim()+' added to this exam'); return; }
       $('exam-pills').querySelectorAll('.pill').forEach(function(x){ x.classList.remove('on'); });
       p.classList.add('on');
-      if(p.textContent.indexOf('＋')===0) toast(p.textContent.replace('＋','').trim()+' added to this exam');
+      examMode = p.dataset.mode || 'free';
+      $('exam-editor').style.display = 'none';
+      $('btn-edit').classList.remove('on');
+      drawTplBar(); drawExam();
     };
   });
-  drawExam();
+  drawTplBar(); drawExam();
 
   /* ---------- VITALS ---------- */
   var VT = [
@@ -1173,7 +1260,7 @@
       'Autonomic': {subs:['Tilt table','QSART','Thermoregulatory sweat test'], txt:{}},
       'Biopsy': {subs:['Skin (IENFD)','Nerve','Muscle'],
               txt:{'Skin (IENFD)':'Reduced intraepidermal nerve fibre density — small-fibre neuropathy.'}},
-      'Cardiac imaging': {subs:['TTE','TEE','Holter','Event monitor','Loop recorder','Bubble study'],
+      'Cardiac studies': {subs:['TTE','TEE','Holter','Event monitor','Loop recorder','Bubble study'],
               txt:{'TTE':'Normal ejection fraction. No intracardiac thrombus.',
                    'Bubble study':'No right-to-left shunt at rest or with Valsalva.'}},
       'Neuropsych testing': {subs:['Full battery','Screening'], txt:{}}
