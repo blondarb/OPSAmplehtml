@@ -231,6 +231,34 @@
   .vt-val{font-size:16px;font-weight:700;color:var(--primary-dark);font-variant-numeric:tabular-nums}
   .vt-val.empty{color:#A7F3D0}
 
+  .oth{display:flex;gap:6px;align-items:center;margin-top:7px}
+  .oth input{flex:1;border:1px solid var(--primary);border-radius:6px;padding:6px 9px;font-size:11.5px;
+             font-family:inherit;color:var(--tp);background:var(--white)}
+  .oth input:focus{outline:none;box-shadow:0 0 0 3px rgba(13,148,136,.12)}
+
+  .ns{background:var(--white);border:1px solid var(--bd);border-radius:8px;overflow:hidden}
+  .ns-hd{display:flex;align-items:center;gap:10px;padding:9px 11px;background:var(--gray);
+         border-bottom:1px solid var(--bd);flex-wrap:wrap}
+  .ns-t{font-size:12.5px;font-weight:700}
+  .ns-sc{font-size:22px;font-weight:700;font-variant-numeric:tabular-nums;line-height:1}
+  .ns-band{font-size:9.5px;font-weight:700;padding:2px 7px;border-radius:10px;white-space:nowrap}
+  .ns-prog{font-size:10px;color:var(--tm);margin-left:auto;white-space:nowrap}
+  .ns-grp{font-size:8.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--tm);
+          padding:8px 11px 3px;background:var(--gray)}
+  .ns-row{display:flex;align-items:center;gap:9px;padding:6px 11px;border-bottom:1px solid var(--bd)}
+  .ns-row:last-child{border-bottom:0}
+  .ns-n{font-size:11px;flex:1;min-width:0;color:var(--ts)}
+  .ns-n b{color:var(--tp);font-weight:650}
+  .ns-o{display:flex;gap:3px;flex-shrink:0}
+  .ns-b{width:26px;height:24px;border:1px solid var(--bd);border-radius:5px;background:var(--white);
+        font-size:11px;font-weight:700;color:var(--tm);cursor:pointer;font-family:inherit;padding:0}
+  .ns-b:hover{border-color:var(--primary);color:var(--primary-dark)}
+  .ns-b.on{background:var(--err);border-color:var(--err);color:#fff}
+  .ns-b.on.zero{background:var(--ok);border-color:var(--ok)}
+  .ns-b.un{width:30px;font-size:9px}
+  .ns-b.on.unt{background:var(--tm);border-color:var(--tm)}
+  .ns-ft{padding:9px 11px;background:var(--gray);border-top:1px solid var(--bd);font-size:11px;color:var(--ts)}
+
   .split{background:#F5F3FF;border:1px solid #DDD6FE;border-radius:8px;padding:10px 12px}
   .split-h{display:flex;align-items:center;gap:7px;margin-bottom:8px;flex-wrap:wrap}
   .split-t{font-size:12px;font-weight:700;color:#5B21B6}
@@ -377,6 +405,8 @@
             weight-based dosing (IVIG in CIDP, MG, GBS).</div>
         </div>
 
+        <div class="fs" id="nihss-card"></div>
+
         <div class="fs" id="split-card"></div>
       </div>
     </div>
@@ -401,6 +431,22 @@
       would be <strong>documenting an exam nobody can perform over video</strong>. Reflexes,
       fundoscopy and fine sensory are left out by construction. If a clinician wants them, they add
       them deliberately — which is exactly the right friction.</p>
+    </div>
+
+    <div class="box d">
+      <div class="box-t">What a scale looks like opened — NIHSS as the worked example</div>
+      <p>Fifteen items, one row each, options laid out horizontally so scoring is one tap per row and
+      the whole scale is one vertical scan. Running total and severity band sit in the header and move
+      as you score. Tap a selected value again to clear it.</p>
+      <p><strong>The organising choices worth arguing with:</strong> items are grouped by exam domain
+      (consciousness, cranial nerves, motor, coordination, sensory, language) rather than listed 1–11
+      flat, because that's the order you actually examine in. Laterality is paired and labelled
+      left/right explicitly — <b>5a/5b</b> and <b>6a/6b</b> are the classic place NIHSS gets
+      mis-scored. Zero renders green and non-zero red, so an abnormal scale reads at a glance without
+      reading numbers. <strong>UN</strong> is a first-class option on the items that allow it, not a
+      blank.</p>
+      <p>This is the shape any exam scale would take — MoCA, EDSS, UPDRS Part III all reduce to
+      grouped rows with a running total. Build it once, feed it a definition.</p>
     </div>
 
     <div class="box d">
@@ -484,33 +530,31 @@
 
         <div class="fs">
           <div class="fs-h"><div class="fs-t">Diagnostic testing &amp; procedures</div><span class="badge">Optional</span></div>
-          <div class="pills" style="margin-bottom:0">
-            <button class="pill">EEG</button><button class="pill">EMG / NCS</button>
-            <button class="pill">Evoked potentials</button><button class="pill">Lumbar puncture</button>
-            <button class="pill">Sleep study</button><button class="pill">OCT</button>
-            <button class="pill">Autonomic</button><button class="pill">Biopsy</button>
-            <button class="pill srch">🔍 Search all…</button>
+          <div class="pills" id="test-pills"></div>
+          <div class="sublane">
+            <div class="sub-l" id="test-sub-label"></div>
+            <div class="pills" id="test-sub-pills" style="margin-bottom:8px"></div>
+            <div id="test-entry"></div>
           </div>
         </div>
 
         <div class="fs">
-          <div class="fs-h"><div class="fs-t">Cardiac workup</div>
-            <span class="badge new">new section</span>
-            <span class="badge" style="margin-left:auto">Optional</span></div>
-          <div class="pills" style="margin-bottom:0">
-            <button class="pill">TTE</button><button class="pill">TEE</button><button class="pill">Holter</button>
-            <button class="pill">Event monitor</button><button class="pill">Loop recorder</button>
-            <button class="pill">Bubble study</button>
-          </div>
-          <div class="hint">↳ Ordered by neurology, performed by cardiology. Bread-and-butter after
-            TIA or unexplained syncope, and currently absent everywhere.</div>
+          <div class="fs-h"><div class="fs-t">Labs — followed</div>
+            <span class="badge" id="lab-count2">4 tracked</span>
+            <span class="badge" style="margin-left:auto">see the Labs section below</span></div>
+          <div style="font-size:11.5px;color:var(--tm)">Tracked lab rows live here in the real tab —
+            shown separately further down this page so the trend argument sits with its own
+            explanation.</div>
         </div>
 
         <div class="fs">
           <div class="fs-h"><div class="fs-t">Prior record</div>
-            <span class="badge" id="rec-count" style="margin-left:auto"></span></div>
+            <span class="badge" style="margin-left:auto">everything, ever</span>
+            <span class="badge" id="rec-count"></span></div>
           <div class="pills" id="filter-chips" style="margin-bottom:11px"></div>
           <div id="record"></div>
+          <div class="hint">↳ Chronological. The labs table above answers <em>how did this value
+            move</em>; this answers <em>what happened, and when</em>. Tracked labs carry 📈.</div>
         </div>
       </div>
     </div>
@@ -520,11 +564,51 @@
       <p>Pills for the common studies, typeahead search for everything else. A search box isn't a
       dropdown — no click to open, no list to scan; type "orb" and get MRI orbits. The pills stay
       short and cover most visits; the long tail stays reachable without ever rendering a menu.</p>
-      <p>The gaps this fixes are real: evoked potentials, OCT, cardiac workup, autonomic testing,
-      skin biopsy, vestibular testing, neuropsych, and the MRI protocol variants (orbits, pituitary,
-      IAC, MRV) that "MRI Brain" currently collapses together.
-      <strong>The authority on what to include is Sevaro's own order volume, not a literature
+      <p><strong>The authority on what to include is Sevaro's own order volume, not a literature
       sweep.</strong></p>
+    </div>
+
+    <div class="box g">
+      <div class="box-t">Pills are anatomy. "Other" is everything else — and that split matters</div>
+      <p>An earlier draft had <em>"MRI brain — MS protocol"</em> as a pill. That was a modelling
+      error: it mixed a <strong>protocol</strong> into a list of <strong>anatomy</strong>. Once you do
+      that the list has no natural end — MS protocol, seizure protocol, epilepsy thin-slice, tumour
+      protocol, and every site names them differently.</p>
+      <p>So: <strong>pills are the standard anatomical studies</strong> — brain, orbits, pituitary,
+      IAC, C-spine, T-spine, L-spine, MRA, MRV. <strong>Every modality also ends in "Other"</strong>,
+      which opens a text field. MS protocol goes there. So does seizure protocol, and so does CT femur.
+      The pill list stays short and stable; the tail stays typeable and never needs a product decision
+      to accommodate.</p>
+      <p>That also means the pill list can be <em>opinionated and small</em> without being wrong —
+      "Other" is the escape hatch that lets it be short.</p>
+    </div>
+
+    <div class="box d">
+      <div class="box-t">Cardiac lives under testing, not in its own section</div>
+      <p>Cardiac studies are one pill under Diagnostic testing &amp; procedures, expanding to TTE,
+      TEE, Holter, event monitor, loop recorder and bubble study — rather than a top-level section of
+      their own. They're ordered like any other test; they don't warrant separate real estate.</p>
+      <p>One naming nit: <strong>Holter, event monitors and loop recorders aren't imaging</strong> —
+      they're rhythm monitoring. "Cardiac imaging" as a label is slightly wrong for half its own
+      subtypes; <strong>"Cardiac"</strong> or <strong>"Cardiac studies"</strong> covers both honestly.
+      Minor, but it's the sort of thing that gets copied into a schema and lives forever.</p>
+    </div>
+
+    <div class="box g">
+      <div class="box-t">"Why do labs show up in the prior record?" — you spotted a real ambiguity</div>
+      <p>You read those rows as the tagged ones. They weren't — they were every lab, which is exactly
+      why it was confusing. Two things were competing to be "the labs".</p>
+      <p>The resolution: <strong>they answer different questions.</strong> The prior record is
+      <em>chronological</em> — what happened, and when — and it holds everything: imaging, testing,
+      cardiac, labs. The labs table is <em>longitudinal</em> — how did this one value move. A tracked
+      lab legitimately appears in both, so it now carries a <strong>📈</strong> marker in the record
+      to say "this one also has a trend." Nothing is duplicated in meaning; one is a timeline, the
+      other is a series.</p>
+      <p><strong>Placement: the very bottom.</strong> Entry sections first — imaging, testing, labs —
+      then the record last. You come to this tab to record what happened at this visit; the fifteen-year
+      archive is reference, not workflow. Putting it between entry sections would interrupt the thing
+      you came to do. And the pins already float the must-not-forget items to the top, which is what
+      makes it safe to bury the archive at the bottom.</p>
     </div>
 
     <div class="box d">
@@ -898,6 +982,66 @@
   };
   drawVitals();
 
+  /* ---------- NIHSS ---------- */
+  var NI = [
+    {g:'Consciousness', id:'1a', n:'Level of consciousness', max:3, v:0},
+    {g:'', id:'1b', n:'LOC questions — month, age', max:2, v:0},
+    {g:'', id:'1c', n:'LOC commands — open/close eyes, grip', max:2, v:0},
+    {g:'Cranial nerves', id:'2', n:'Best gaze', max:2, v:0},
+    {g:'', id:'3', n:'Visual fields', max:3, v:0},
+    {g:'', id:'4', n:'Facial palsy', max:3, v:2},
+    {g:'Motor', id:'5a', n:'Motor arm — <b>left</b>', max:4, un:true, v:0},
+    {g:'', id:'5b', n:'Motor arm — <b>right</b>', max:4, un:true, v:2},
+    {g:'', id:'6a', n:'Motor leg — <b>left</b>', max:4, un:true, v:0},
+    {g:'', id:'6b', n:'Motor leg — <b>right</b>', max:4, un:true, v:1},
+    {g:'Coordination', id:'7', n:'Limb ataxia', max:2, un:true, v:null},
+    {g:'Sensory', id:'8', n:'Sensory', max:2, v:1},
+    {g:'Language', id:'9', n:'Best language', max:3, v:1},
+    {g:'', id:'10', n:'Dysarthria', max:2, un:true, v:null},
+    {g:'', id:'11', n:'Extinction / inattention', max:2, v:0}
+  ];
+  function niTotal(){ return NI.reduce(function(a,i){ return a + (typeof i.v==='number'?i.v:0); },0); }
+  function niDone(){ return NI.filter(function(i){ return i.v!==null; }).length; }
+  function niBand(s){
+    if(s===0) return {t:'No stroke symptoms', bg:'#DCFCE7', c:'#15803D'};
+    if(s<=4)  return {t:'Minor', bg:'#DCFCE7', c:'#15803D'};
+    if(s<=15) return {t:'Moderate', bg:'#FEF3C7', c:'#92400E'};
+    if(s<=20) return {t:'Moderate–severe', bg:'#FFEDD5', c:'#9A3412'};
+    return {t:'Severe', bg:'#FEE2E2', c:'#B91C1C'};
+  }
+  function drawNihss(){
+    var s = niTotal(), d = niDone(), b = niBand(s);
+    var h = '<div class="fs-h" style="margin-bottom:10px"><div class="fs-t">NIHSS</div>'+
+      '<span class="badge ex">exam scale</span>'+
+      '<span class="badge" style="margin-left:auto">'+d+' of 15 scored</span></div>'+
+      '<div class="ns"><div class="ns-hd">'+
+      '<span class="ns-t">NIH Stroke Scale</span>'+
+      '<span class="ns-sc" style="color:'+b.c+'">'+s+'</span>'+
+      '<span class="ns-band" style="background:'+b.bg+';color:'+b.c+'">'+b.t+'</span>'+
+      '<span class="ns-prog">'+(d===15?'complete':(15-d)+' remaining')+'</span></div>';
+    NI.forEach(function(it){
+      if(it.g) h += '<div class="ns-grp">'+it.g+'</div>';
+      h += '<div class="ns-row"><div class="ns-n"><b>'+it.id+'</b> · '+it.n+'</div><div class="ns-o">';
+      for(var v=0; v<=it.max; v++){
+        h += '<button class="ns-b'+(it.v===v?' on'+(v===0?' zero':''):'')+'" data-i="'+it.id+'" data-v="'+v+'">'+v+'</button>';
+      }
+      if(it.un) h += '<button class="ns-b un'+(it.v==='UN'?' on unt':'')+'" data-i="'+it.id+'" data-v="UN">UN</button>';
+      h += '</div></div>';
+    });
+    h += '<div class="ns-ft">Total <b style="color:'+b.c+'">'+s+'</b> / 42 · '+b.t+
+         '. Untestable items score 0 toward the total but are recorded as UN.</div></div>';
+    $('nihss-card').innerHTML = h;
+    $('nihss-card').querySelectorAll('[data-i]').forEach(function(btn){
+      btn.onclick = function(){
+        var it = NI.filter(function(x){ return x.id===btn.dataset.i; })[0];
+        var nv = btn.dataset.v==='UN' ? 'UN' : parseInt(btn.dataset.v,10);
+        it.v = (it.v===nv) ? null : nv;
+        drawNihss();
+      };
+    });
+  }
+  drawNihss();
+
   /* ---------- SPLIT SCALE ---------- */
   var PARTS = [
     {n:'Part I — Non-motor experiences of daily living', where:'history', score:9, done:true},
@@ -936,51 +1080,105 @@
   }
   drawSplit();
 
-  /* ---------- IMAGING ---------- */
-  var MODS = {
-    'MRI':   {label:'MRI — select study', subs:['Brain — MS protocol','Brain','Orbits','Pituitary','IAC','C-spine','MRA','MRV'],
-              txt:{'Brain — MS protocol':'Two new T2 hyperintense lesions, periventricular. No enhancing lesions.',
-                   'Brain':'No acute intracranial abnormality. Chronic small-vessel change.',
+  /* ---------- SUBTYPE PICKERS (imaging + testing share this) ---------- */
+  function makePicker(cfg){
+    var st = {mod:cfg.first, sub:null, other:''};
+    st.sub = cfg.data[st.mod].subs[0];
+    function drawMod(){
+      $(cfg.pills).innerHTML = Object.keys(cfg.data).map(function(m){
+        return '<button class="pill'+(m===st.mod?' on':'')+'" data-m="'+encodeURIComponent(m)+'">'+m+'</button>';
+      }).join('') + '<button class="pill srch" data-search="1">🔍 '+cfg.search+'</button>';
+      $(cfg.pills).querySelectorAll('[data-m]').forEach(function(b){
+        b.onclick = function(){
+          st.mod = decodeURIComponent(b.dataset.m); st.sub = cfg.data[st.mod].subs[0]; st.other='';
+          drawMod(); drawSub();
+        };
+      });
+      $(cfg.pills).querySelector('[data-search]').onclick = function(){ toast(cfg.searchToast); };
+    }
+    function drawSub(){
+      var M = cfg.data[st.mod];
+      $(cfg.label).textContent = st.mod + ' — select study';
+      $(cfg.subPills).innerHTML = M.subs.concat(['Other']).map(function(s){
+        return '<button class="pill sub'+(s===st.sub?' on':'')+(s==='Other'?' srch':'')+
+               '" data-s="'+encodeURIComponent(s)+'">'+s+'</button>';
+      }).join('');
+      $(cfg.subPills).querySelectorAll('[data-s]').forEach(function(b){
+        b.onclick = function(){ st.sub = decodeURIComponent(b.dataset.s); drawSub();
+          if(st.sub==='Other'){ var i=$(cfg.entry).querySelector('.oth input'); if(i) i.focus(); } };
+      });
+      var isOther = st.sub==='Other';
+      var name = isOther ? (st.other || st.mod+' — …') : st.mod+' '+st.sub.toLowerCase();
+      var body = isOther ? '' : (M.txt[st.sub] || '');
+      var h = '<div style="background:var(--white);border:1px solid var(--bd);border-radius:7px;padding:9px">'+
+        '<div style="display:flex;justify-content:space-between;gap:8px;margin-bottom:6px">'+
+        '<div style="font-size:11.5px;font-weight:650">'+name+'</div>'+
+        '<div style="font-size:10.5px;color:var(--ts);border:1px solid var(--bd);border-radius:5px;padding:2px 7px">09/18/2025</div></div>';
+      if(isOther){
+        h += '<div class="oth"><input placeholder="'+cfg.otherPh+'" value="'+st.other.replace(/"/g,'&quot;')+'"></div>'+
+             '<div class="hint">↳ Standard anatomy stays a pill. Protocols and one-offs go here as text.</div>';
+      }
+      h += '<div class="ta" style="min-height:34px">'+(body || '<span style="color:var(--tm)">Type, paste or dictate the findings…</span>')+
+           '<div class="icons">🎤 ⚡ ✨</div></div>';
+      if(!isOther) h += '<div class="hint">↳ You picked a study — what did it show?</div>';
+      h += '</div>';
+      $(cfg.entry).innerHTML = h;
+      var oi = $(cfg.entry).querySelector('.oth input');
+      if(oi) oi.oninput = function(){
+        st.other = oi.value;
+        $(cfg.entry).querySelector('div > div > div').textContent = oi.value || st.mod+' — …';
+      };
+    }
+    drawMod(); drawSub();
+  }
+
+  makePicker({
+    pills:'mod-pills', subPills:'sub-pills', label:'sub-label', entry:'entry-card', first:'MRI',
+    search:'Search all imaging…', searchToast:'Type "orb" → MRI orbits. No menu.',
+    otherPh:'e.g. MS protocol, seizure protocol, MRI femur…',
+    data:{
+      'MRI': {subs:['Brain','Orbits','Pituitary','IAC','C-spine','T-spine','L-spine','MRA','MRV'],
+              txt:{'Brain':'Two new T2 hyperintense lesions, periventricular. No enhancing lesions.',
                    'Orbits':'No optic nerve enhancement. No retrobulbar mass.',
+                   'C-spine':'Mild canal stenosis at C5-6. No cord signal change.',
                    'MRV':'Patent dural venous sinuses. No thrombosis.'}},
-    'CT':    {label:'CT — select study', subs:['Head','Sinus','Temporal bone','C-spine','T-spine','L-spine','CTA','Myelogram'],
+      'CT':  {subs:['Head','Sinus','Temporal bone','C-spine','T-spine','L-spine','CTA','Myelogram'],
               txt:{'Head':'No acute intracranial hemorrhage. Chronic small-vessel ischemic change.',
                    'CTA':'No large-vessel occlusion. Mild atherosclerotic irregularity.'}},
-    'Vascular': {label:'Vascular — select study', subs:['Carotid duplex','Transcranial Doppler','TCD bubble study','Catheter angiogram'],
+      'Vascular': {subs:['Carotid duplex','Transcranial Doppler','TCD bubble study','Catheter angiogram'],
               txt:{'Carotid duplex':'No hemodynamically significant stenosis bilaterally.'}},
-    'Nuclear / PET': {label:'Nuclear / PET — select study', subs:['FDG-PET brain','Amyloid PET','DaTscan','Whole-body FDG-PET'],
+      'Nuclear / PET': {subs:['FDG-PET brain','Amyloid PET','DaTscan','Whole-body FDG-PET'],
               txt:{'DaTscan':'Reduced striatal uptake, asymmetric, left greater than right.'}}
-  };
-  var curMod = 'MRI', curSub = 'Brain — MS protocol';
-  function drawMods(){
-    $('mod-pills').innerHTML = Object.keys(MODS).map(function(m){
-      return '<button class="pill'+(m===curMod?' on':'')+'" data-m="'+m+'">'+m+'</button>';
-    }).join('') + '<button class="pill srch" data-search="1">🔍 Search all imaging…</button>';
-    $('mod-pills').querySelectorAll('[data-m]').forEach(function(b){
-      b.onclick = function(){ curMod = b.dataset.m; curSub = MODS[curMod].subs[0]; drawSubs(); drawMods(); };
-    });
-    $('mod-pills').querySelector('[data-search]').onclick = function(){ toast('Type "orb" → MRI orbits. No menu.'); };
-  }
-  function drawSubs(){
-    var M = MODS[curMod];
-    $('sub-label').textContent = M.label;
-    $('sub-pills').innerHTML = M.subs.map(function(s){
-      return '<button class="pill sub'+(s===curSub?' on':'')+'" data-s="'+encodeURIComponent(s)+'">'+s+'</button>';
-    }).join('');
-    $('sub-pills').querySelectorAll('[data-s]').forEach(function(b){
-      b.onclick = function(){ curSub = decodeURIComponent(b.dataset.s); drawSubs(); };
-    });
-    var body = M.txt[curSub] || '';
-    $('entry-card').innerHTML =
-      '<div style="background:var(--white);border:1px solid var(--bd);border-radius:7px;padding:9px">'+
-      '<div style="display:flex;justify-content:space-between;gap:8px;margin-bottom:6px">'+
-      '<div style="font-size:11.5px;font-weight:650">'+curMod+' '+curSub.toLowerCase()+'</div>'+
-      '<div style="font-size:10.5px;color:var(--ts);border:1px solid var(--bd);border-radius:5px;padding:2px 7px">09/18/2025</div></div>'+
-      '<div class="ta" style="min-height:34px">'+(body || '<span style="color:var(--tm)">Type, paste or dictate the findings…</span>')+
-      '<div class="icons">🎤 ⚡ ✨</div></div>'+
-      '<div class="hint">↳ You picked a study — what did it show?</div></div>';
-  }
-  drawMods(); drawSubs();
+    }
+  });
+
+  makePicker({
+    pills:'test-pills', subPills:'test-sub-pills', label:'test-sub-label', entry:'test-entry', first:'EEG',
+    search:'Search all…', searchToast:'Type "vemp" → vestibular testing. No menu.',
+    otherPh:'e.g. single-fibre EMG, vHIT, rotary chair…',
+    data:{
+      'EEG': {subs:['Routine','Sleep-deprived','Ambulatory','Video / LTM'],
+              txt:{'Routine':'Normal awake and drowsy EEG. No epileptiform discharges.',
+                   'Ambulatory':'72-hour recording. No electrographic seizures.'}},
+      'EMG / NCS': {subs:['Standard','Repetitive nerve stimulation','Single-fibre EMG'],
+              txt:{'Standard':'No evidence of large-fibre neuropathy or radiculopathy.'}},
+      'Evoked potentials': {subs:['VEP','BAEP','SSEP'],
+              txt:{'VEP':'Prolonged P100 latency on the left, consistent with prior optic neuritis.'}},
+      'Lumbar puncture': {subs:['Diagnostic','Opening pressure'],
+              txt:{'Diagnostic':'Oligoclonal bands positive, 6 unique. Protein 42. Cell count normal.'}},
+      'Sleep study': {subs:['Polysomnography','Home sleep apnea test','MSLT','MWT'],
+              txt:{'Polysomnography':'AHI 14/hr, moderate obstructive sleep apnea.'}},
+      'OCT': {subs:['Retinal nerve fibre layer','Macular'],
+              txt:{'Retinal nerve fibre layer':'RNFL thinning, temporal quadrant, left eye.'}},
+      'Autonomic': {subs:['Tilt table','QSART','Thermoregulatory sweat test'], txt:{}},
+      'Biopsy': {subs:['Skin (IENFD)','Nerve','Muscle'],
+              txt:{'Skin (IENFD)':'Reduced intraepidermal nerve fibre density — small-fibre neuropathy.'}},
+      'Cardiac imaging': {subs:['TTE','TEE','Holter','Event monitor','Loop recorder','Bubble study'],
+              txt:{'TTE':'Normal ejection fraction. No intracardiac thrombus.',
+                   'Bubble study':'No right-to-left shunt at rest or with Valsalva.'}},
+      'Neuropsych testing': {subs:['Full battery','Screening'], txt:{}}
+    }
+  });
 
   /* ---------- PINS ---------- */
   var pins = [{n:'CSF oligoclonal bands', v:'Positive — 6 unique bands', d:'11/03/2018'}];
@@ -998,6 +1196,14 @@
     });
   }
   drawPins();
+
+  var DATES = ['11/17/24','05/02/25','11/08/25','01/16/26'];
+  var LABS = [
+    {n:'JCV antibody index', u:'index', v:['0.31','0.42','0.88','1.62'], hi:[3], t:'up'},
+    {n:'Vitamin D, 25-OH', u:'ng/mL', v:['18','24','31','41'], lo:[0,1], t:'dn'},
+    {n:'ALT', u:'U/L', v:['22','26','24','21'], t:'fl'},
+    {n:'WBC', u:'K/µL', v:['6.2','5.8','—','6.0'], t:'fl'}
+  ];
 
   /* ---------- RECORD ---------- */
   var REC = [
@@ -1046,8 +1252,10 @@
            '<span class="caret">'+(open?'▾':'▸')+'</span></button>';
       if(open){
         h += rs.map(function(r){
-          return '<div class="row"><span class="dt">'+r.d+'</span><span class="nm">'+r.n+'</span>'+
-                 '<span class="fi">'+r.f+'</span></div>';
+          var tracked = LABS.some(function(l){ return l.n.indexOf(r.n)===0 || r.n.indexOf(l.n)===0; });
+          return '<div class="row"><span class="dt">'+r.d+'</span><span class="nm">'+r.n+
+                 (tracked?' <span title="tracked in the labs table" style="font-size:9px">📈</span>':'')+
+                 '</span><span class="fi">'+r.f+'</span></div>';
         }).join('');
       }
       h += '</div>';
@@ -1060,13 +1268,6 @@
   drawFilters(); drawRecord();
 
   /* ---------- LABS ---------- */
-  var DATES = ['11/17/24','05/02/25','11/08/25','01/16/26'];
-  var LABS = [
-    {n:'JCV antibody index', u:'index', v:['0.31','0.42','0.88','1.62'], hi:[3], t:'up'},
-    {n:'Vitamin D, 25-OH', u:'ng/mL', v:['18','24','31','41'], lo:[0,1], t:'dn'},
-    {n:'ALT', u:'U/L', v:['22','26','24','21'], t:'fl'},
-    {n:'WBC', u:'K/µL', v:['6.2','5.8','—','6.0'], t:'fl'}
-  ];
   function drawLabs(){
     var h = '<tr><th>Lab</th>' + DATES.map(function(d){ return '<th>'+d+'</th>'; }).join('') + '<th style="width:28px"></th></tr>';
     LABS.forEach(function(l){
