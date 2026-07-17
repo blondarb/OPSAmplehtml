@@ -231,6 +231,22 @@
   .vt-val{font-size:16px;font-weight:700;color:var(--primary-dark);font-variant-numeric:tabular-nums}
   .vt-val.empty{color:#A7F3D0}
 
+  .conf{background:#FEF2F2;border:1px solid #FECACA;border-radius:8px;padding:10px 12px;margin-bottom:9px}
+  .conf-h{font-size:11.5px;font-weight:700;color:#B91C1C;margin-bottom:2px}
+  .conf-x{font-size:10.5px;color:#DC2626;margin-bottom:8px}
+  .conf-r{display:flex;align-items:center;gap:8px;padding:6px 0;border-top:1px solid #FECACA;flex-wrap:wrap}
+  .conf-n{flex:1;min-width:150px;font-size:11px;color:#7F1D1D}
+  .conf-n b{color:#450A0A;font-weight:700}
+  .conf-v{font-size:10px;color:#DC2626;font-style:italic;margin-top:1px}
+  .conf-b{font-size:10px;font-weight:650;padding:4px 9px;border-radius:5px;border:1px solid #FECACA;
+          background:var(--white);color:#B91C1C;cursor:pointer;font-family:inherit;white-space:nowrap}
+  .conf-b:hover{background:#FEE2E2}
+  .conf-b.p{background:var(--err);border-color:var(--err);color:#fff}
+  .conf-b.p:hover{background:#B91C1C}
+  .part-w{font-size:9px;color:#7C3AED;margin-top:1px}
+  .part-s.here{border:1px solid #C4B5FD;font-family:inherit}
+  .part-s.done{cursor:pointer}
+
   .ex-sec{margin-bottom:11px}
   .ex-sec:last-of-type{margin-bottom:0}
   .ex-lbl{color:var(--tm);font-weight:650}
@@ -383,11 +399,12 @@
           <div class="pills" id="exam-pills">
             <button class="pill on" data-mode="free">Free text exam</button>
             <button class="pill" data-mode="click">Clickable exam</button>
-            <button class="pill">＋ NIHSS</button>
+            <button class="pill" data-scale="nihss">＋ NIHSS</button>
             <button class="pill">＋ MoCA</button>
             <button class="pill">＋ EDSS</button>
             <button class="pill srch">🔍 Search exam scales…</button>
           </div>
+          <div id="conflict-bar"></div>
           <div class="ta" id="exam-prose"></div>
           <div id="exam-prompt"></div>
           <div class="hint">↳ Negating a normal isn't deleting it — it asks what the abnormal
@@ -434,6 +451,31 @@
       </ul>
       <p>Both produce the same kind of prose. The difference is whether the normal exam arrives
       because you asked for it or because the software decided for you.</p>
+    </div>
+
+    <div class="box" style="border-left:3px solid var(--err)">
+      <div class="box-t" style="color:#B91C1C">The contradiction problem — a scale and an exam can disagree</div>
+      <p>Add NIHSS to a clickable exam and score facial palsy 2, and the note now says
+      <em>"Face symmetric"</em> <strong>and</strong> <em>"facial palsy = 2"</em>. Both are in the
+      chart. Both get signed. <strong>That's a note that contradicts itself</strong> — and unlike a
+      typo, a reader can't tell which one you meant.</p>
+      <p>It happens because <strong>NIHSS almost <em>is</em> the neuro exam</strong>: 1a–1c are mental
+      status, 2–4 are cranial nerves, 5–6 are motor, 7 coordination, 8 sensory, 9–11 language and
+      attention. Two surfaces, one examination. Nothing was stopping them from disagreeing.</p>
+      <p><strong>The fix: detect and force a resolution, never auto-write.</strong> Any non-zero scale
+      item whose exam finding still reads normal raises a conflict. Two ways out —
+      <em>Use the scale</em> (negates the exam finding, pre-seeded with the scale's implication) or
+      <em>Re-score to 0</em> (you meant the exam). Conflicts group by exam finding, so re-scoring
+      clears <em>every</em> contributing item at once: 5a/5b/6a/6b all bear on strength, and zeroing
+      one while another still says weakness would just look broken.</p>
+      <p><strong>Why not auto-populate the exam from the scale?</strong> Because the scale doesn't
+      carry enough. NIHSS item 4 says a facial palsy exists but not which side. Auto-writing "right
+      facial droop" would be <em>inventing laterality the scale never recorded</em> — a fabrication
+      in the chart. So it seeds the field and makes you finish the sentence.</p>
+      <p><strong>The honest limitation:</strong> this only works in clickable mode. Free text is
+      unstructured, so nothing can cross-check it — a free-text exam plus a scale is entirely the
+      clinician's consistency to keep. That's a real argument for clickable when scales are involved,
+      and the demo says so rather than pretending otherwise.</p>
     </div>
 
     <div class="box d">
@@ -500,6 +542,14 @@
       already captured and offers to continue. The parts carry their own scores; the total assembles
       across both. A schema with one <code>location</code> per scale can't express that — it needs a
       location per <em>part</em>.</p>
+      <p><strong>A part's home tab is a suggestion, not a gate.</strong> If you're in the exam and
+      want to knock out Part I — an interview part — do it there. The location says where a part is
+      <em>offered</em>, not where it's <em>permitted</em>. Forcing someone to change tabs because our
+      taxonomy says so is our problem leaking into their workflow.</p>
+      <p><strong>Partial is fine, and must be labelled.</strong> Doing only Part III is a legitimate
+      choice. But a partial total isn't comparable to a full one, so the score is always named by the
+      parts in it — "Parts III only: 24" — never bare. <strong>A partial score that reads as a total
+      is worse than no score</strong>, because someone will trend it against a real one.</p>
     </div>
 
     <h4>Which scales appear on this tab</h4>
@@ -893,7 +943,7 @@
       {id:'f2', on:false, p:'tandem intact', s:['unable to tandem']}
     ]}
   ];
-  var abn = {}, clicks = 0, examMode = 'free', freeText = '';
+  var abn = {}, clicks = 0, examMode = 'free', freeText = '', nihssOn = false;
   function cap(x){ return x.charAt(0).toUpperCase() + x.slice(1); }
   function eachItem(fn){ EX.forEach(function(g){ g.items.forEach(function(it){ fn(it, g); }); }); }
 
@@ -942,19 +992,22 @@
     });
   }
   function findF(id){ var r=null; eachItem(function(it){ if(it.id===id) r=it; }); return r; }
-  function askAbn(id){
+  function askAbn(id, seed){
     var f = findF(id);
-    var sg = (f.s||[]).map(function(x){ return '<button class="sugg" data-sg="'+encodeURIComponent(x)+'">'+x+'</button>'; }).join('');
+    var sugs = (f.s||[]).slice();
+    if(seed && sugs.indexOf(seed) === -1) sugs.unshift(seed);
+    var sg = sugs.map(function(x){ return '<button class="sugg" data-sg="'+encodeURIComponent(x)+'">'+x+'</button>'; }).join('');
     $('exam-prompt').innerHTML =
       '<div class="prompt"><div class="prompt-l">Replacing: <b>'+f.p+'</b></div>'+
-      '<input id="abn-in" placeholder="Describe the abnormal finding…" autocomplete="off">'+
+      '<input id="abn-in" placeholder="Describe the abnormal finding…" autocomplete="off" value="'+
+      (seed ? seed.replace(/"/g,'&quot;') : '')+'">'+
       (sg ? '<div class="prompt-a">'+sg+'</div>' : '')+
       '<div class="prompt-a" style="margin-top:9px"><button class="btn p" id="abn-ok">Mark abnormal</button>'+
       '<button class="btn" id="abn-no">Cancel</button></div></div>';
     var inp = $('abn-in'); inp.focus();
     function ok(){
       var v = inp.value.trim();
-      if(v){ abn[id] = v; clicks++; $('exam-prompt').innerHTML=''; drawExam(); toast('Marked abnormal — prose updated'); }
+      if(v){ abn[id] = v; clicks++; $('exam-prompt').innerHTML=''; drawExam(); drawConflicts(); toast('Marked abnormal — prose updated'); }
       else { inp.focus(); }
     }
     $('abn-ok').onclick = ok;
@@ -1011,13 +1064,24 @@
   $('exam-pills').querySelectorAll('.pill').forEach(function(p){
     p.onclick = function(){
       if(p.classList.contains('srch')){ toast('Search — type to find any exam scale'); return; }
+      if(p.dataset.scale === 'nihss'){
+        nihssOn = !nihssOn;
+        p.classList.toggle('on', nihssOn);
+        p.textContent = (nihssOn ? '✓ ' : '＋ ') + 'NIHSS';
+        drawNihss();
+        toast(nihssOn ? 'NIHSS added to this exam' : 'NIHSS removed');
+        if(nihssOn && examMode === 'click') setTimeout(function(){
+          if(conflicts().length) toast('Heads up — your NIHSS and exam disagree');
+        }, 400);
+        return;
+      }
       if(p.textContent.indexOf('＋')===0){ toast(p.textContent.replace('＋','').trim()+' added to this exam'); return; }
-      $('exam-pills').querySelectorAll('.pill').forEach(function(x){ x.classList.remove('on'); });
+      $('exam-pills').querySelectorAll('.pill[data-mode]').forEach(function(x){ x.classList.remove('on'); });
       p.classList.add('on');
       examMode = p.dataset.mode || 'free';
       $('exam-editor').style.display = 'none';
       $('btn-edit').classList.remove('on');
-      drawTplBar(); drawExam();
+      drawTplBar(); drawExam(); drawConflicts();
     };
   });
   drawTplBar(); drawExam();
@@ -1087,6 +1151,39 @@
     {g:'', id:'10', n:'Dysarthria', max:2, un:true, v:null},
     {g:'', id:'11', n:'Extinction / inattention', max:2, v:0}
   ];
+  /* Which exam finding each NIHSS item contradicts when scored non-zero.
+     `sug` is a suggested replacement; laterality the scale doesn't carry is left to the clinician. */
+  var NI_EXAM = {
+    '1a': {ex:'a1', sug:'not fully alert'},
+    '2':  {ex:'b2', sug:'gaze palsy'},
+    '3':  {ex:'b4', sug:'visual field cut'},
+    '4':  {ex:'b3', sug:'facial droop'},
+    '5a': {ex:'c1', sug:'left arm weakness'},
+    '5b': {ex:'c1', sug:'right arm weakness'},
+    '6a': {ex:'c1', sug:'left leg weakness'},
+    '6b': {ex:'c1', sug:'right leg weakness'},
+    '7':  {ex:'e1', sug:'limb ataxia'},
+    '8':  {ex:'d1', sug:'sensory loss'},
+    '9':  {ex:'a2', sug:'aphasia'}
+  };
+  /* Grouped by the exam finding they contradict — several NIHSS items can map to one
+     finding (5a/5b/6a/6b all bear on strength), so a conflict owns ALL its contributors. */
+  function conflicts(){
+    if(examMode !== 'click' || !nihssOn) return [];
+    var by = {};
+    NI.forEach(function(it){
+      var m = NI_EXAM[it.id];
+      if(!m) return;
+      if(typeof it.v !== 'number' || it.v === 0) return;
+      var f = findF(m.ex);
+      if(!f || !f.on) return;
+      if(abn[m.ex] !== undefined) return;
+      if(!by[m.ex]) by[m.ex] = {ex:m.ex, exText:f.p, items:[], sugs:[]};
+      by[m.ex].items.push(it);
+      if(by[m.ex].sugs.indexOf(m.sug) === -1) by[m.ex].sugs.push(m.sug);
+    });
+    return Object.keys(by).map(function(k){ return by[k]; });
+  }
   function niTotal(){ return NI.reduce(function(a,i){ return a + (typeof i.v==='number'?i.v:0); },0); }
   function niDone(){ return NI.filter(function(i){ return i.v!==null; }).length; }
   function niBand(s){
@@ -1096,7 +1193,40 @@
     if(s<=20) return {t:'Moderate–severe', bg:'#FFEDD5', c:'#9A3412'};
     return {t:'Severe', bg:'#FEE2E2', c:'#B91C1C'};
   }
+  function drawConflicts(){
+    var c = conflicts();
+    if(!c.length){ $('conflict-bar').innerHTML = ''; return; }
+    var h = '<div class="conf"><div class="conf-h">⚠️ '+c.length+' contradiction'+(c.length===1?'':'s')+
+      ' between your NIHSS and your exam</div>'+
+      '<div class="conf-x">The note would assert both. Resolve before signing.</div>';
+    c.forEach(function(x,i){
+      var names = x.items.map(function(it){
+        return '<b>'+it.id+'</b> '+it.n.replace(/<[^>]+>/g,'')+' = <b>'+it.v+'</b>';
+      }).join(', ');
+      h += '<div class="conf-r"><div class="conf-n">NIHSS '+names+
+        '<div class="conf-v">but the exam says "'+cap(x.exText)+'"</div></div>'+
+        '<button class="conf-b p" data-fix="'+i+'">Use the scale</button>'+
+        '<button class="conf-b" data-zero="'+i+'">Re-score '+
+        (x.items.length>1 ? 'all '+x.items.length : 'it')+' to 0</button></div>';
+    });
+    h += '</div>';
+    $('conflict-bar').innerHTML = h;
+    $('conflict-bar').querySelectorAll('[data-fix]').forEach(function(b){
+      b.onclick = function(){ var x = c[+b.dataset.fix]; askAbn(x.ex, x.sugs[0]); };
+    });
+    $('conflict-bar').querySelectorAll('[data-zero]').forEach(function(b){
+      b.onclick = function(){
+        var x = c[+b.dataset.zero];
+        x.items.forEach(function(it){ it.v = 0; });
+        drawNihss();
+        toast('NIHSS '+x.items.map(function(i){return i.id;}).join(', ')+
+              ' re-scored to 0 — exam and scale now agree');
+      };
+    });
+  }
   function drawNihss(){
+    if(!nihssOn){ $('nihss-card').innerHTML = ''; $('nihss-card').style.display='none'; drawConflicts(); return; }
+    $('nihss-card').style.display='';
     var s = niTotal(), d = niDone(), b = niBand(s);
     var h = '<div class="fs-h" style="margin-bottom:10px"><div class="fs-t">NIHSS</div>'+
       '<span class="badge ex">exam scale</span>'+
@@ -1123,9 +1253,10 @@
         var it = NI.filter(function(x){ return x.id===btn.dataset.i; })[0];
         var nv = btn.dataset.v==='UN' ? 'UN' : parseInt(btn.dataset.v,10);
         it.v = (it.v===nv) ? null : nv;
-        drawNihss();
+        drawNihss(); drawConflicts();
       };
     });
+    drawConflicts();
   }
   drawNihss();
 
@@ -1136,32 +1267,50 @@
     {n:'Part III — Motor examination',                   where:'exam',    score:null, done:false},
     {n:'Part IV — Motor complications',                  where:'history', score:null, done:false}
   ];
+  var SCORES = {0:9, 1:11, 2:24, 3:5};
   function drawSplit(){
-    var doneScore = PARTS.filter(function(p){ return p.done; }).reduce(function(a,p){ return a+p.score; },0);
-    var nDone = PARTS.filter(function(p){ return p.done; }).length;
+    var done = PARTS.filter(function(p){ return p.done; });
+    var doneScore = done.reduce(function(a,p){ return a+p.score; },0);
+    var nDone = done.length;
+    var partial = nDone > 0 && nDone < 4;
     var h = '<div class="split"><div class="split-h">'+
       '<span class="split-t">MDS-UPDRS</span>'+
       '<span class="split-b">SPLIT SCALE</span>'+
       '<span class="split-b">'+nDone+' of 4 parts</span>'+
-      '<span style="margin-left:auto;font-size:10.5px;color:#6D28D9">Started in History — finish here</span>'+
+      '<span style="margin-left:auto;font-size:10.5px;color:#6D28D9">Any part, either tab</span>'+
       '</div>';
     PARTS.forEach(function(p,i){
+      var home = p.where === 'exam' ? 'exam' : 'history';
       var s;
-      if(p.done) s = '<span class="part-s done">'+p.score+' · done in History</span>';
-      else if(p.where==='exam') s = '<span class="part-s here" data-do="'+i+'">Do it here →</span>';
-      else s = '<span class="part-s wait">pending in History</span>';
+      if(p.done){
+        s = '<span class="part-s done" data-undo="'+i+'">'+p.score+' · scored ✕</span>';
+      } else {
+        s = '<button class="part-s here" data-do="'+i+'">Complete here →</button>';
+      }
       h += '<div class="part"><div class="part-n"><b>'+p.n.split('—')[0].trim()+'</b> —'+
-           p.n.split('—')[1]+'</div>'+s+'</div>';
+           p.n.split('—')[1]+
+           '<div class="part-w">'+(home==='exam'?'examined':'interview')+' · lives on '+
+           (home==='exam'?'Exam':'History')+'</div></div>'+s+'</div>';
     });
-    h += '<div class="split-f">Running total <b>'+doneScore+'</b> from '+nDone+' part'+(nDone===1?'':'s')+
-         '. The scale spans both tabs — <b>Parts I, II and IV are interview; Part III is examined.</b> '+
-         'One scale, one score, two surfaces.</div></div>';
+    h += '<div class="split-f">';
+    if(nDone === 0) h += 'Nothing scored yet. <b>Any part can be completed from either tab</b> — the home tab is where it\'s suggested, not a gate.';
+    else if(partial) h += '<b>Partial — Part'+(nDone===1?'':'s')+' '+
+      done.map(function(p){ return p.n.match(/Part (\w+)/)[1]; }).join(', ')+' only: '+doneScore+'.</b> '+
+      'Not comparable to a full MDS-UPDRS. Scored parts are named so a partial can never be read as a total.';
+    else h += '<b>Complete — all 4 parts: '+doneScore+'.</b> One scale, one score, assembled across both tabs.';
+    h += '</div></div>';
     $('split-card').innerHTML = h;
     $('split-card').querySelectorAll('[data-do]').forEach(function(b){
       b.onclick = function(){
-        var p = PARTS[+b.dataset.do];
-        p.done = true; p.score = 24;
-        drawSplit(); toast('Part III scored here — total now assembles across both tabs');
+        var i = +b.dataset.do, p = PARTS[i];
+        p.done = true; p.score = SCORES[i];
+        drawSplit();
+        toast(p.n.split('—')[0].trim()+' scored here'+(p.where==='history'?' — an interview part, done from the exam tab':''));
+      };
+    });
+    $('split-card').querySelectorAll('[data-undo]').forEach(function(b){
+      b.onclick = function(){
+        var p = PARTS[+b.dataset.undo]; p.done = false; p.score = null; drawSplit();
       };
     });
   }
