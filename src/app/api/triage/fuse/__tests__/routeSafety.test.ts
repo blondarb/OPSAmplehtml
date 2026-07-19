@@ -7,6 +7,7 @@ const { authorizeMock, invokeClinicalMock } = vi.hoisted(() => ({
 
 vi.mock('@/lib/auth/clinicalAccess', () => ({
   authorizeClinicalAccess: authorizeMock,
+  clinicalAccessDeniedMessage: () => 'Access denied',
 }))
 vi.mock('@/lib/bedrock', () => ({
   invokeBedrockClinicalJSON: invokeClinicalMock,

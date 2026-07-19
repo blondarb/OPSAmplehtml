@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { authorizeClinicalAccess } from '@/lib/auth/clinicalAccess'
+import { authorizeClinicalAccess, clinicalAccessDeniedMessage } from '@/lib/auth/clinicalAccess'
 
 // Patient identity must be established on an immutable referral case before
 // triage processing. A session id plus caller-selected patient id is not a
@@ -14,7 +14,7 @@ export async function PATCH(
   })
   if (!access.ok) {
     return NextResponse.json(
-      { error: 'Access denied', reason: access.reason },
+      { error: clinicalAccessDeniedMessage(access.reason), reason: access.reason },
       { status: access.status },
     )
   }

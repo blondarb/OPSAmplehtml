@@ -7,7 +7,7 @@ import {
   type ClinicalExtraction,
   type ReviewRequirement,
 } from '@/lib/triage/types'
-import { authorizeClinicalAccess } from '@/lib/auth/clinicalAccess'
+import { authorizeClinicalAccess, clinicalAccessDeniedMessage } from '@/lib/auth/clinicalAccess'
 import {
   readLongPacketProgress,
   type LongPacketProgress,
@@ -411,7 +411,7 @@ export async function GET(
   })
   if (!access.ok) {
     return NextResponse.json(
-      { error: 'Access denied', reason: access.reason },
+      { error: clinicalAccessDeniedMessage(access.reason), reason: access.reason },
       { status: access.status },
     )
   }

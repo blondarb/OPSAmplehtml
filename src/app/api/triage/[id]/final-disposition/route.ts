@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 
-import { authorizeClinicalAccess } from '@/lib/auth/clinicalAccess'
+import { authorizeClinicalAccess, clinicalAccessDeniedMessage } from '@/lib/auth/clinicalAccess'
 export async function POST(
   _request: Request,
   _context: { params: Promise<{ id: string }> },
@@ -11,7 +11,7 @@ export async function POST(
   })
   if (!access.ok) {
     return NextResponse.json(
-      { error: 'Access denied', reason: access.reason },
+      { error: clinicalAccessDeniedMessage(access.reason), reason: access.reason },
       { status: access.status },
     )
   }

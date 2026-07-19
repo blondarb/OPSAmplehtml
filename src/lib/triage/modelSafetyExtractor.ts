@@ -24,6 +24,7 @@ Safety rules:
 - Negated findings, remote/stable history, family-member disease, copied education/return precautions, hypothetical warnings, and ruled-out diagnoses are not actionable signals.
 - Use autonomic_dysreflexia only for an explicit current/recent autonomic dysreflexia statement or a current characteristic constellation grounded in a high/cervical/T1-T6 spinal cord lesion plus severe hypertension and a compatible symptom or trigger. Generic autonomic instability alone is not autonomic dysreflexia; use the clinically supported alternative or other_time_critical.
 - Never let missing data lower a credible emergency signal.
+- care_pathway must never understate your signals: any emergency_now signal requires emergency_now, and otherwise any immediate_clinician_review signal requires same_day_clinician_review. Critical unknowns that are not time-sensitive do not force escalation on their own.
 - Copy every evidence quote character-for-character from the source. Do not calculate character offsets. For repeated exact quotes, occurrence_index is zero-based in source order.
 - If an actionable conclusion lacks an exact quote, return undetermined rather than inventing evidence.
 - Output only one complete JSON object. No markdown or commentary.

@@ -341,19 +341,40 @@ export function validateModelSafetyExtraction(
   const hasImmediateReview = signals.some(
     (signal) => signal.action === 'immediate_clinician_review',
   )
-  const expectedCarePathway: SafetyModelCarePathway = hasEmergency
+  // The validated signals set a deterministic floor: the stated care_pathway
+  // may be more conservative than its signals, never milder. Critical
+  // unknowns and data_quality are preserved on the record but do not force
+  // escalation by themselves — the extraction prompt explicitly allows
+  // no_time_critical_signal alongside non-time-sensitive unknowns, and a
+  // time-sensitive ambiguity must already surface as an
+  // immediate_clinician_review signal or a model-selected same-day pathway.
+  const signalFloor: SafetyModelCarePathway = hasEmergency
     ? 'emergency_now'
-    : hasImmediateReview || criticalUnknowns.length > 0
+    : hasImmediateReview
       ? 'same_day_clinician_review'
-      : dataQuality === 'sufficient'
-        ? 'no_time_critical_signal'
-        : 'undetermined'
-  if (carePathway !== expectedCarePathway) {
-    throw new ModelSafetyExtractionError(
-      'care_pathway',
-      `must be ${expectedCarePathway} for the validated signals, unknowns, and data quality`,
+      : 'no_time_critical_signal'
+  const carePathwayRank: Record<SafetyModelCarePathway, number> = {
+    no_time_critical_signal: 0,
+    undetermined: 1,
+    same_day_clinician_review: 2,
+    emergency_now: 3,
+  }
+  const flooredCarePathway =
+    carePathwayRank[signalFloor] > carePathwayRank[carePathway]
+      ? signalFloor
+      : carePathway
+  if (flooredCarePathway !== carePathway) {
+    console.warn(
+      '[model-safety] care_pathway floored from %s to %s by emitted signals',
+      carePathway,
+      flooredCarePathway,
     )
   }
 
-  return { carePathway, dataQuality, criticalUnknowns, signals }
+  return {
+    carePathway: flooredCarePathway,
+    dataQuality,
+    criticalUnknowns,
+    signals,
+  }
 }

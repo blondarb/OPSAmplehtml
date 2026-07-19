@@ -7,6 +7,7 @@ const { authorizeMock, loadMock } = vi.hoisted(() => ({
 
 vi.mock('@/lib/auth/clinicalAccess', () => ({
   authorizeClinicalAccess: authorizeMock,
+  clinicalAccessDeniedMessage: () => 'Access denied',
 }))
 vi.mock('@/lib/triage/emergencyActionRead', () => ({
   loadEmergencyActions: loadMock,

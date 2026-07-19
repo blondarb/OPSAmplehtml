@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server'
 import type { CoverageStatus, SourceType } from '@/lib/triage/types'
 import { from } from '@/lib/db-query'
 import { runInBackground } from '@/lib/triage/asyncRunner'
-import { authorizeClinicalAccess } from '@/lib/auth/clinicalAccess'
+import { authorizeClinicalAccess, clinicalAccessDeniedMessage } from '@/lib/auth/clinicalAccess'
 import {
   processTriageInBackground,
   TRIAGE_MODEL,
@@ -197,7 +197,7 @@ export async function POST(request: Request) {
   })
   if (!access.ok) {
     return NextResponse.json(
-      { error: 'Access denied', reason: access.reason },
+      { error: clinicalAccessDeniedMessage(access.reason), reason: access.reason },
       { status: access.status },
     )
   }

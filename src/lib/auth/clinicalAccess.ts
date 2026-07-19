@@ -66,6 +66,19 @@ export type ClinicalAccessResult =
       reason: 'unauthenticated' | 'forbidden' | 'authorization_unavailable'
     }
 
+export function clinicalAccessDeniedMessage(
+  reason: 'unauthenticated' | 'forbidden' | 'authorization_unavailable',
+): string {
+  switch (reason) {
+    case 'unauthenticated':
+      return 'Please sign in to continue.'
+    case 'forbidden':
+      return 'Your account is not provisioned for clinical triage access. Ask an administrator to grant it.'
+    case 'authorization_unavailable':
+      return 'Authorization is temporarily unavailable. Please try again shortly.'
+  }
+}
+
 export async function authorizeClinicalAccess(input: {
   action: ClinicalAction
   allowedRoles: readonly ClinicalRole[]

@@ -174,7 +174,7 @@ export async function processTriageInBackground(
           }))
           .catch(failedModelBranch)
 
-    const scoringBranchPromise: Promise<ScoringBranchOutcome> =
+    const invokeOutpatientScorer = () =>
       runClinicalModelWithTimeout({
         label: 'outpatient_scorer',
         timeoutMs: MODEL_BRANCH_TIMEOUT_MS,
@@ -189,6 +189,14 @@ export async function processTriageInBackground(
             signal,
           }),
       })
+    const scoringBranchPromise: Promise<ScoringBranchOutcome> =
+      invokeOutpatientScorer()
+        .catch((error: unknown) => {
+          // A deadline overrun already consumed the branch's full time
+          // budget; only transient output failures get the single retry.
+          if (error instanceof ClinicalModelTimeoutError) throw error
+          return invokeOutpatientScorer()
+        })
         .then((result): ScoringBranchOutcome => {
           const emergencyEnvelope = extractScoringEmergencyEnvelope(
             result.parsed,

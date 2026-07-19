@@ -66,13 +66,39 @@ describe('validateModelSafetyExtraction', () => {
     )
   })
 
-  it('rejects a pathway that understates an emergency signal', () => {
-    expect(() =>
+  it('floors a pathway that understates an emergency signal to emergency_now', () => {
+    expect(
       validateModelSafetyExtraction(
         { ...validOutput(), care_pathway: 'same_day_clinician_review' },
         source,
       ),
-    ).toThrow(/care_pathway/)
+    ).toMatchObject({ carePathway: 'emergency_now' })
+  })
+
+  it('floors a no-signal pathway that understates an immediate-review signal', () => {
+    const output = validOutput()
+    output.care_pathway = 'no_time_critical_signal'
+    const signal = (output.signals as Array<Record<string, unknown>>)[0]
+    signal.action = 'immediate_clinician_review'
+    signal.assertion = 'uncertain'
+
+    expect(validateModelSafetyExtraction(output, source)).toMatchObject({
+      carePathway: 'same_day_clinician_review',
+    })
+  })
+
+  it('never downgrades a stated pathway more conservative than its signals', () => {
+    expect(
+      validateModelSafetyExtraction(
+        {
+          care_pathway: 'same_day_clinician_review',
+          data_quality: 'sufficient',
+          critical_unknowns: [],
+          signals: [],
+        },
+        source,
+      ),
+    ).toMatchObject({ carePathway: 'same_day_clinician_review' })
   })
 
   it('accepts a no-signal result only with an explicit bounded contract', () => {
@@ -94,13 +120,14 @@ describe('validateModelSafetyExtraction', () => {
 
   it.each([
     [
-      'no-signal pathway with a critical unknown',
+      'no-signal pathway with a non-time-sensitive critical unknown',
       {
         care_pathway: 'no_time_critical_signal',
         data_quality: 'sufficient',
-        critical_unknowns: ['Current onset is unknown.'],
+        critical_unknowns: ['MRI brain result not yet available.'],
         signals: [],
       },
+      'no_time_critical_signal',
     ],
     [
       'no-signal pathway with incomplete data',
@@ -110,21 +137,26 @@ describe('validateModelSafetyExtraction', () => {
         critical_unknowns: [],
         signals: [],
       },
+      'no_time_critical_signal',
     ],
     [
-      'undetermined pathway with sufficient complete data',
+      'model-selected undetermined pathway with quiet signals',
       {
         care_pathway: 'undetermined',
         data_quality: 'sufficient',
         critical_unknowns: [],
         signals: [],
       },
+      'undetermined',
     ],
-  ])('rejects %s', (_label, output) => {
-    expect(() => validateModelSafetyExtraction(output, source)).toThrow(
-      /care_pathway/,
-    )
-  })
+  ])(
+    'accepts %s without forced escalation',
+    (_label, output, expectedPathway) => {
+      expect(validateModelSafetyExtraction(output, source)).toMatchObject({
+        carePathway: expectedPathway,
+      })
+    },
+  )
 
   it('accepts the specific autonomic dysreflexia syndrome with exact current evidence', () => {
     const adSource =

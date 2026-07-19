@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server'
 import { invokeBedrockClinicalJSON } from '@/lib/bedrock'
 import { FUSION_SYSTEM_PROMPT, buildFusionUserPrompt } from '@/lib/triage/extractionPrompt'
 import type { FusionResult } from '@/lib/triage/types'
-import { authorizeClinicalAccess } from '@/lib/auth/clinicalAccess'
+import { authorizeClinicalAccess, clinicalAccessDeniedMessage } from '@/lib/auth/clinicalAccess'
 
 
 export const maxDuration = 60
@@ -14,7 +14,7 @@ export async function POST(request: Request) {
   })
   if (!access.ok) {
     return NextResponse.json(
-      { error: 'Access denied', reason: access.reason },
+      { error: clinicalAccessDeniedMessage(access.reason), reason: access.reason },
       { status: access.status },
     )
   }

@@ -20,6 +20,7 @@ function harness(): StatefulTriageProductionHarness {
 
 vi.mock('@/lib/auth/clinicalAccess', () => ({
   authorizeClinicalAccess: () => harness().authorizeClinicalAccess(),
+  clinicalAccessDeniedMessage: () => 'Access denied',
 }))
 
 vi.mock('@/lib/db-query', () => ({

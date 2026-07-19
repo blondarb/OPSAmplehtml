@@ -14,6 +14,7 @@ const {
 
 vi.mock('@/lib/auth/clinicalAccess', () => ({
   authorizeClinicalAccess: authorizeMock,
+  clinicalAccessDeniedMessage: () => 'Access denied',
 }))
 vi.mock('@/lib/triage/emergencyActionLifecycle', () => ({
   claimEmergencyAction: claimMock,

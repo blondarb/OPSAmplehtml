@@ -1,5 +1,7 @@
 import { NextResponse } from 'next/server'
 
+import { clinicalAccessDeniedMessage } from '@/lib/auth/clinicalAccess'
+
 import { claimEmergencyAction } from '@/lib/triage/emergencyActionLifecycle'
 import {
   authorizeEmergencyActionMutation,
@@ -15,7 +17,7 @@ export async function POST(
   const access = await authorizeEmergencyActionMutation()
   if (!access.ok) {
     return NextResponse.json(
-      { error: 'Access denied', reason: access.reason },
+      { error: clinicalAccessDeniedMessage(access.reason), reason: access.reason },
       { status: access.status },
     )
   }

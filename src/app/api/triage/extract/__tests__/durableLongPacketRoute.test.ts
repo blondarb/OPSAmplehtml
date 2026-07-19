@@ -28,6 +28,7 @@ const {
 
 vi.mock('@/lib/auth/clinicalAccess', () => ({
   authorizeClinicalAccess: authorizeMock,
+  clinicalAccessDeniedMessage: () => 'Access denied',
 }))
 vi.mock('@/lib/db-query', () => ({ from: fromMock }))
 vi.mock('@/lib/db', () => ({ getPool: getPoolMock }))

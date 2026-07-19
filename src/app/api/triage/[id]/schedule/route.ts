@@ -5,7 +5,7 @@ import {
   canActivateOutpatientScheduling,
   type SchedulingAuthorization,
 } from '@/lib/triage/workflowPolicy'
-import { authorizeClinicalAccess } from '@/lib/auth/clinicalAccess'
+import { authorizeClinicalAccess, clinicalAccessDeniedMessage } from '@/lib/auth/clinicalAccess'
 
 /**
  * POST /api/triage/[id]/schedule
@@ -26,7 +26,7 @@ export async function POST(
     })
     if (!access.ok) {
       return NextResponse.json(
-        { error: 'Access denied', reason: access.reason },
+        { error: clinicalAccessDeniedMessage(access.reason), reason: access.reason },
         { status: access.status },
       )
     }

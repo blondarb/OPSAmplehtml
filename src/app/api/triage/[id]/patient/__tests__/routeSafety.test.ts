@@ -8,6 +8,7 @@ const { authorizeMock, getPoolMock, queryMock } = vi.hoisted(() => ({
 
 vi.mock('@/lib/auth/clinicalAccess', () => ({
   authorizeClinicalAccess: authorizeMock,
+  clinicalAccessDeniedMessage: () => 'Access denied',
 }))
 vi.mock('@/lib/db', () => ({ getPool: getPoolMock }))
 
