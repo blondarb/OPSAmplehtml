@@ -108,15 +108,59 @@ export async function POST(req: NextRequest) {
         })
 
         if (triageRes.ok) {
-          const data = await triageRes.json()
-          aiTier = data.triage_tier
-          aiScore = data.weighted_score
-          aiDimensionScores = data.dimension_scores
-          aiSubspecialty = data.subspecialty_recommendation
-          aiRedirectToNonNeuro = data.redirect_to_non_neuro || false
-          aiRedirectSpecialty = data.redirect_specialty || null
-          aiConfidence = data.confidence
-          aiSessionId = data.session_id
+          const started = await triageRes.json()
+          aiSessionId = started.session_id ?? null
+          // /api/triage is async: the POST returns 202 + session_id with NO
+          // tier. Read the tier from the response only if a legacy synchronous
+          // path ever returns it; otherwise poll the result endpoint until the
+          // pipeline reaches a terminal state. (Without this, every case is
+          // seeded with a null ai_triage_tier — the prior behavior.)
+          const applyResult = (r: {
+            triage_tier?: string | null
+            weighted_score?: number | null
+            dimension_scores?: unknown
+            subspecialty_recommendation?: string | null
+            redirect_to_non_neuro?: boolean
+            redirect_specialty?: string | null
+            confidence?: string | null
+          }) => {
+            aiTier = r.triage_tier ?? null
+            aiScore = r.weighted_score ?? null
+            aiDimensionScores = r.dimension_scores ?? null
+            aiSubspecialty = r.subspecialty_recommendation ?? null
+            aiRedirectToNonNeuro = r.redirect_to_non_neuro || false
+            aiRedirectSpecialty = r.redirect_specialty || null
+            aiConfidence = r.confidence ?? null
+          }
+          if (started.triage_tier) {
+            applyResult(started)
+          } else if (aiSessionId) {
+            const deadline = Date.now() + 90_000
+            while (Date.now() < deadline) {
+              await new Promise((resolve) => setTimeout(resolve, 1500))
+              const pollRes = await fetch(
+                `${baseUrl}/api/triage/${encodeURIComponent(aiSessionId)}`,
+                { headers: { Cookie: cookieHeader } },
+              )
+              if (!pollRes.ok) continue
+              const result = await pollRes.json()
+              if (result.status === 'pending') continue
+              if (result.status === 'error') {
+                console.warn(
+                  `AI triage error for ${scenario.id}:`,
+                  result.error,
+                )
+                break
+              }
+              applyResult(result) // status === 'complete'
+              break
+            }
+            if (aiTier === null) {
+              console.warn(
+                `AI triage did not complete within 90s for ${scenario.id}`,
+              )
+            }
+          }
         } else {
           const errData = await triageRes.json().catch(() => ({}))
           console.warn(`AI triage failed for ${scenario.id}:`, errData.error)
