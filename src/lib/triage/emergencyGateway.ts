@@ -386,6 +386,144 @@ function isRecentResolvedNonCerebroEmergency(text: string): boolean {
   return timeCriticalSeizure || timeCriticalHeadache
 }
 
+// ── Over-triage guards (2026-07-20) ───────────────────────────────────────
+// Applied at the WHOLE-NOTE level (after per-segment signal collection) because
+// the deferral context — a subacute timeframe, a resolved-ictal baseline, a
+// chronic-episodic frame — often lives in a different sentence than the segment
+// that fires. These suppress a syndrome signal ONLY when the whole note is
+// unambiguously non-acute; every genuinely-acute onset/worsening marker,
+// residual deficit, or red flag keeps the floor. Grounded in the AAN/AES +
+// ACEP first-seizure guideline and the stroke-mimics-radiculopathy literature.
+
+// Strict subset of ACUTE: only genuinely time-critical onset/worsening language
+// (excludes "progressive"/"new"/"began" and bare visit-date "today").
+const GENUINELY_ACUTE_ONSET =
+  /\b(?:sudden(?:ly)?|abrupt(?:ly)?|acutely|hyperacute|thunderclap|woke up|wake-?up|found down|\d+\s*(?:minutes?|hours?)\s+ago|within (?:minutes|hours)|rapidly progressive|acutely worse|suddenly worse|(?:worse|worsen(?:ed|ing)|onset|started|began) (?:today|this morning|overnight|over hours))\b/i
+const SUBACUTE_TIMEFRAME =
+  /\b(?:over|past|for|during) (?:the )?(?:last |past )?(?:several|few|a couple(?: of)?|many|\d+|a) (?:days?|weeks?|months?|years?)\b|\bworse over (?:the )?(?:last|past)\b|\b\d+ (?:weeks?|months?|years?) ago\b|\bgradual(?:ly)?\b|\bslowly progressive\b/i
+const OTHER_CORTICAL_STROKE_FEATURE =
+  /\b(?:facial (?:droop|asymmetry)|aphasia|dysarthria|slurred speech|gaze deviation|neglect|hemiparesis|hemiplegia|homonymous|visual field (?:cut|deficit)|diplopia|double vision)\b/i
+const ICTAL_UNRESPONSIVENESS_CONTEXT =
+  /\b(?:during (?:the|his|her|their|an?) (?:event|episode|seizure|convulsion)|ictal|post-?ictal|while (?:seizing|convulsing))\b/i
+const RETURNED_TO_BASELINE =
+  /\b(?:resolved|back to (?:baseline|normal)|returned to (?:baseline|normal)|now (?:alert|awake|oriented|at baseline)|fully recovered|recovered (?:fully|completely)|no longer (?:confused|unresponsive|altered)|alert,? (?:and )?orient(?:ed|ation)|A&Ox\d|normal (?:neuro(?:logic)? )?exam)\b/i
+// Genuine incomplete-recovery / ongoing-activity markers. The seizure-context
+// words (ongoing/recurrent/cluster) require an adjacent seizure noun so a
+// discharge return-precaution ("return to ED for any recurrent episode") or an
+// "ongoing outpatient workup" line can't false-fire the guard. Truly recurrent
+// seizures still fire via the separate RECURRENT_SEIZURE → status_or_recurrent
+// rule, so narrowing here never under-triages.
+const INCOMPLETE_RECOVERY_OR_ONGOING =
+  /\b(?:status epilepticus|still (?:seizing|convulsing|unresponsive|confused|altered|postictal)|ongoing (?:seizures?|convulsi\w+|status|postictal|ictal activity)|recurrent seizures?|seizure cluster|cluster of (?:\w+\s+){0,3}seizures?|back-to-back|persistent(?:ly)? (?:confused|altered|postictal|unresponsive)|not (?:back to|returned to|at) baseline|incomplete recovery|has not (?:fully )?recovered|multiple seizures|prolonged postictal)\b/i
+const CHRONIC_EPISODIC_FRAME =
+  /\b(?:episodic|recurrent|comes and goes|intermittent|waxing and waning|for (?:the past )?(?:several|many|\d+) (?:months?|years?)|(?:months?|years?) ago|chronic|long-?standing|(?:recurrent )?spells (?:that )?(?:began|started)|recurrent spells)\b/i
+const CHRONIC_ACUTE_ESCALATION =
+  /\b(?:acutely worse|acute(?:ly)? (?:worsening|deterioration)|rapidly progressive|now (?:unable to (?:walk|urinate)|acute|severe)|presented to (?:the )?(?:ED|emergency)|\d+ hours ago)\b/i
+const LOC_FEATURE =
+  /\b(?:loss of consciousness|lost consciousness|unconscious|\bLOC\b)\b/i
+// Genuine features that keep a resolved first seizure emergent — head injury,
+// anticoagulation, pregnancy, or a persistent deficit. Deliberately excludes
+// bare "trauma"/"injury"/"fall" (facility names like "Trauma Center" and a
+// mechanical fall without head strike are not, per AAN/AES + ACEP, reasons to
+// keep an at-baseline first seizure emergent).
+const SEIZURE_RESOLVED_BLOCKER =
+  /\b(?:pregnan(?:t|cy)|postpartum|persistent (?:\w+-sided )?(?:weakness|numbness|aphasia|confusion|deficit)|head injury|head trauma|traumatic brain|hit (?:his|her|their) head|struck (?:his|her|their) head|anticoagula(?:nt|tion|ted))\b/i
+
+// HARGROVE: isolated subacute focal limb weakness (foot drop over weeks) — no
+// genuinely-acute marker, no cortical stroke feature, no stroke/TIA dx. Isolated
+// limb weakness is usually radicular/peripheral; a lexical rule must never
+// assert "not stroke", so this defers only the explicitly-subacute case.
+function isSubacuteIsolatedFocalWeakness(text: string): boolean {
+  return (
+    FOCAL_DEFICIT.test(text) &&
+    SUBACUTE_TIMEFRAME.test(text) &&
+    !GENUINELY_ACUTE_ONSET.test(text) &&
+    !OTHER_CORTICAL_STROKE_FEATURE.test(text) &&
+    !STROKE_DIAGNOSIS.test(text) &&
+    !TIA.test(text)
+  )
+}
+
+// Suppress the traumatic-deterioration signal only when it can have fired ONLY
+// via the isolated-subacute-focal-weakness path (a mechanical fall from the
+// weakness), never when a genuine trauma emergency is also present.
+function isSubacuteFocalWeaknessWithoutTraumaEmergency(text: string): boolean {
+  return (
+    isSubacuteIsolatedFocalWeakness(text) &&
+    !LOC_FEATURE.test(text) &&
+    !DETERIORATING_MENTAL_STATUS.test(text) &&
+    !ACUTE_MENTAL_STATUS.test(text) &&
+    !(hasUnnegatedFeature(text, HEAD_TRAUMA) &&
+      hasUnnegatedFeature(text, ANTICOAGULATION))
+  )
+}
+
+// WILLIAMS/REYES: ictal unresponsiveness from a first seizure that has resolved
+// with return to baseline. Status/ongoing/incomplete-recovery/high-risk still
+// fire via status_or_recurrent_seizure (AAN/AES + ACEP: a first unprovoked
+// seizure returned to baseline need not be emergent).
+function isResolvedIctalUnresponsiveness(text: string): boolean {
+  return (
+    SEIZURE.test(text) &&
+    ICTAL_UNRESPONSIVENESS_CONTEXT.test(text) &&
+    RETURNED_TO_BASELINE.test(text) &&
+    !SEIZURE_EMERGENCY.test(text) &&
+    !hasSeizureDurationOverFiveMinutes(text) &&
+    !INCOMPLETE_RECOVERY_OR_ONGOING.test(text) &&
+    !hasUnnegatedFeature(text, SEIZURE_RESOLVED_BLOCKER)
+  )
+}
+
+// VASQUEZ: bilateral-leg complaint from a chronic/episodic presentation with no
+// acute cauda-equina red flag, acute escalation, or severe back pain. True
+// cauda anchor, bladder/saddle findings, and acute worsening are unaffected.
+function isChronicEpisodicLegComplaint(text: string): boolean {
+  return (
+    hasUnnegatedFeature(text, BILATERAL_LEGS) &&
+    CHRONIC_EPISODIC_FRAME.test(text) &&
+    !CAUDA.test(text) &&
+    !hasUnnegatedFeature(text, BLADDER) &&
+    !hasUnnegatedFeature(text, SADDLE) &&
+    !SEVERE_BACK_PAIN.test(text) &&
+    !CHRONIC_ACUTE_ESCALATION.test(text)
+  )
+}
+
+// Note-level suppression: drop a fired signal when the whole note meets the
+// corresponding guard. Returns the filtered signal list.
+function applyOverTriageGuards<T extends { syndrome: string }>(
+  signals: T[],
+  text: string,
+): T[] {
+  return signals.filter((signal) => {
+    if (
+      signal.syndrome === 'acute_cerebrovascular' &&
+      isSubacuteIsolatedFocalWeakness(text)
+    ) {
+      return false
+    }
+    if (
+      signal.syndrome === 'traumatic_neurologic_deterioration' &&
+      isSubacuteFocalWeaknessWithoutTraumaEmergency(text)
+    ) {
+      return false
+    }
+    if (
+      signal.syndrome === 'altered_mental_status_or_coma' &&
+      isResolvedIctalUnresponsiveness(text)
+    ) {
+      return false
+    }
+    if (
+      signal.syndrome === 'acute_spinal_cord_or_cauda_equina' &&
+      isChronicEpisodicLegComplaint(text)
+    ) {
+      return false
+    }
+    return true
+  })
+}
+
 const RULES: SyndromeRule[] = [
   {
     syndrome: 'autonomic_dysreflexia',
@@ -1149,7 +1287,10 @@ function runEmergencyGatewayInternal(
     }
   }
 
-  const signals = [...signalsBySyndrome.values()]
+  const signals = applyOverTriageGuards(
+    [...signalsBySyndrome.values()],
+    text,
+  )
   const hasPresentEmergency = signals.some((signal) => signal.assertion === 'present')
   const hasUncertainEmergency = signals.some((signal) => signal.assertion === 'uncertain')
 
