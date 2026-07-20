@@ -1413,3 +1413,59 @@ describe("runEmergencyGateway", () => {
     );
   });
 });
+
+/**
+ * Status / acute-repetitive-seizure under-triage regression.
+ *
+ * The gateway fired on literal "status epilepticus" and durations >5 min but
+ * missed two textbook seizure emergencies: (1) status by recurrence — seizures
+ * "without full/complete recovery between events" (a qualifier like "full"
+ * previously broke the without-recovery adjacency in SEIZURE_EMERGENCY), and
+ * (2) acute repetitive seizures / seizure cluster phrasing, which was absent
+ * from RECURRENT_SEIZURE entirely. Widened both, over-triage-safe: the cluster
+ * / multiple-seizure terms stay on the recurrent path (gated by
+ * !STABLE_SEIZURE_CONTEXT and an acute/uncertain marker in the same segment),
+ * so a well-controlled history or a seizure-cluster PMH line in a separate
+ * sentence still does not fire.
+ */
+describe("runEmergencyGateway — status / acute-repetitive-seizure recognition", () => {
+  it.each([
+    "Patient with recurrent seizures without full recovery between events.",
+    "Recurrent convulsions with no complete recovery between episodes.",
+    "Three seizures today, not returning to baseline in between.",
+    "Patient presents today with a seizure cluster.",
+    "Cluster of seizures today, brought in by family.",
+    "Now having a cluster of tonic-clonic seizures.",
+    "Acute repetitive seizures over the last few hours.",
+    "Two seizures in the past hour, now sleepy.",
+    "Multiple seizures today without full recovery in between.",
+  ])("locks a status / acute-repetitive seizure to emergency_now: %s", (text) => {
+    const result = runEmergencyGateway(text);
+
+    expect(result.carePathway).toBe("emergency_now");
+    expect(
+      result.signals.some(
+        (signal) =>
+          signal.syndrome === "status_or_recurrent_seizure" &&
+          signal.assertion === "present" &&
+          signal.action === "emergency_now",
+      ),
+    ).toBe(true);
+  });
+
+  it.each([
+    "History of seizure clusters, well controlled on levetiracetam, no recent seizures.",
+    "Chronic epilepsy with occasional seizure clusters, currently at baseline.",
+    "Remote history of recurrent seizures, seizure-free for five years.",
+    "Single seizure; denies any recurrent seizures or clusters.",
+    "Chief complaint: acute low back pain today. PMH: seizure clusters in the past.",
+    "Presents today with migraine. History of multiple seizures years ago, now stable.",
+  ])(
+    "does not treat a stable, historical, negated, or separate-sentence PMH cluster as a seizure emergency: %s",
+    (text) => {
+      const result = runEmergencyGateway(text);
+
+      expect(result.carePathway).not.toBe("emergency_now");
+    },
+  );
+});

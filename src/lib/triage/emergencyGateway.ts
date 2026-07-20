@@ -174,9 +174,14 @@ const SEVERE_BLOOD_PRESSURE =
   /\b(?:BP|blood pressure)\s*(?:of|is|=|:)?\s*(?:1[89]\d|2\d{2})\s*\/\s*(?:1[12]\d|\d{2,3})\b/i
 const SEIZURE = /\b(?:seizures?|seizing|convulsions?|convulsing|status epilepticus)\b/i
 const SEIZURE_EMERGENCY =
-  /\bstatus epilepticus\b|\b(?:continuous|ongoing|prolonged|back-to-back) (?:generalized )?seizures?\b|\bactive(?:ly)? (?:seizures?|seizing|convulsing)\b|\b(?:is|currently) (?:seizing|convulsing)\b|\b(?:seizing|convulsing) (?:now|continuous(?:ly)?)\b|\b(?:seizures?|seizing|convulsions?|convulsing)\b.{0,50}\b(?:(?:without|no) (?:recovery|regaining consciousness)|not return(?:ed|ing)? to baseline|(?:remains?|still|persistently) postictal)\b/i
+  /\bstatus epilepticus\b|\b(?:continuous|ongoing|prolonged|back-to-back) (?:generalized )?seizures?\b|\bactive(?:ly)? (?:seizures?|seizing|convulsing)\b|\b(?:is|currently) (?:seizing|convulsing)\b|\b(?:seizing|convulsing) (?:now|continuous(?:ly)?)\b|\b(?:seizures?|seizing|convulsions?|convulsing)\b.{0,60}\b(?:(?:without|no|not) (?:full(?:y)? |complete(?:ly)? |any )?(?:recovery|recovering|regaining consciousness|returning to baseline|waking)|not return(?:ed|ing)? to baseline|(?:remains?|still|persistently) postictal)\b/i
+// Recurrence / acute-repetitive phrasings. Cluster and "multiple/acute
+// repetitive seizures" are seizure emergencies (AES acute repetitive seizures),
+// but stay on the recurrent path — gated by !STABLE_SEIZURE_CONTEXT and an
+// acute/uncertain marker in the same segment — so a well-controlled history or
+// a seizure-cluster PMH line in a separate sentence does not fire.
 const RECURRENT_SEIZURE =
-  /\b(?:recurrent|repeated) seizures?\b|\b(?:two|three|four|five|six|seven|eight|nine|ten|\d+) seizures? (?:in|within)\b/i
+  /\b(?:recurrent|repeated|multiple) seizures?\b|\b(?:two|three|four|five|six|seven|eight|nine|ten|\d+) seizures? (?:in|within)\b|\bseizure cluster\b|\bcluster of (?:[\w-]+\s+){0,3}seizures?\b|\bacute repetitive seizures?\b/i
 const STABLE_SEIZURE_CONTEXT =
   /\b(?:well controlled|controlled on|seizure-free|no recent seizures?|at baseline)\b/i
 const FIRST_SEIZURE = /\b(?:first|first-ever|new-onset) seizures?\b/i
@@ -414,7 +419,7 @@ const RETURNED_TO_BASELINE =
 // seizures still fire via the separate RECURRENT_SEIZURE → status_or_recurrent
 // rule, so narrowing here never under-triages.
 const INCOMPLETE_RECOVERY_OR_ONGOING =
-  /\b(?:status epilepticus|still (?:seizing|convulsing|unresponsive|confused|altered|postictal)|ongoing (?:seizures?|convulsi\w+|status|postictal|ictal activity)|recurrent seizures?|seizure cluster|cluster of (?:\w+\s+){0,3}seizures?|back-to-back|persistent(?:ly)? (?:confused|altered|postictal|unresponsive)|not (?:back to|returned to|at) baseline|incomplete recovery|has not (?:fully )?recovered|multiple seizures|prolonged postictal)\b/i
+  /\b(?:status epilepticus|still (?:seizing|convulsing|unresponsive|confused|altered|postictal)|ongoing (?:seizures?|convulsi\w+|status|postictal|ictal activity)|recurrent seizures?|seizure cluster|cluster of (?:[\w-]+\s+){0,3}seizures?|back-to-back|persistent(?:ly)? (?:confused|altered|postictal|unresponsive)|not (?:back to|returned to|at) baseline|incomplete recovery|has not (?:fully )?recovered|multiple seizures|prolonged postictal)\b/i
 const CHRONIC_EPISODIC_FRAME =
   /\b(?:episodic|recurrent|comes and goes|intermittent|waxing and waning|for (?:the past )?(?:several|many|\d+) (?:months?|years?)|(?:months?|years?) ago|chronic|long-?standing|(?:recurrent )?spells (?:that )?(?:began|started)|recurrent spells)\b/i
 const CHRONIC_ACUTE_ESCALATION =
