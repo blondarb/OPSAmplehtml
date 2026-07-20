@@ -1,4 +1,5 @@
-import { invokeBedrockClinicalJSON } from '@/lib/bedrock'
+import { invokeBedrockClinicalTool } from '@/lib/bedrock'
+import { TRIAGE_SCORING_SCHEMA } from '@/lib/triage/scoringToolSchema'
 import { deriveChiefComplaint } from '@/lib/consult/contextBuilder'
 import { from } from '@/lib/db-query'
 import { notifyTriageUrgent } from '@/lib/notifications'
@@ -174,19 +175,29 @@ export async function processTriageInBackground(
           }))
           .catch(failedModelBranch)
 
+    // Strict tool-output path: forces one schema-validated JSON tool call
+    // instead of the text-JSON path, whose strict parse fails whenever the
+    // model wraps the payload in markdown fences or preamble (the root cause of
+    // intermittent outpatient-scoring "invalid JSON" false-holds). The schema
+    // enforces structure only; parseAndNormalizeAIResponse still owns all
+    // clinical/enum/range validation below, unchanged.
     const invokeOutpatientScorer = () =>
       runClinicalModelWithTimeout({
         label: 'outpatient_scorer',
         timeoutMs: MODEL_BRANCH_TIMEOUT_MS,
         operation: (signal) =>
-          invokeBedrockClinicalJSON<unknown>({
+          invokeBedrockClinicalTool<unknown>({
             system: TRIAGE_SYSTEM_PROMPT,
             messages: [{ role: 'user', content: userPrompt }],
-            maxTokens: 3000,
+            maxTokens: 4096,
             temperature: params.temperature,
             model: TRIAGE_MODEL,
             cacheSystem: true,
             signal,
+            toolName: 'emit_triage_scoring',
+            toolDescription:
+              'Emit the complete structured outpatient triage scoring result.',
+            inputSchema: TRIAGE_SCORING_SCHEMA,
           }),
       })
     const scoringBranchPromise: Promise<ScoringBranchOutcome> =

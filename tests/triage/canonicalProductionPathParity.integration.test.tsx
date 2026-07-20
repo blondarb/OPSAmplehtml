@@ -52,6 +52,10 @@ vi.mock('@/lib/bedrock', async (importOriginal) => {
     ...actual,
     invokeBedrockClinicalJSON: (input: unknown) =>
       harness().invokeClinicalModel(input),
+    // The outpatient scorer now uses the strict tool path; route it to the same
+    // harness clinical-model stub (the harness returns the same {parsed} shape).
+    invokeBedrockClinicalTool: (input: unknown) =>
+      harness().invokeClinicalModel(input),
   }
 })
 

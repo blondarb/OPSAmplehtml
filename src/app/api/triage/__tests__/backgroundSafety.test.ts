@@ -41,6 +41,8 @@ const {
 vi.mock('@/lib/bedrock', () => ({
   BEDROCK_MODEL: 'test-model',
   invokeBedrockClinicalJSON: invokeBedrockMock,
+  // The outpatient scorer now uses the strict tool path; same mock captures it.
+  invokeBedrockClinicalTool: invokeBedrockMock,
 }))
 vi.mock('@/lib/triage/emergencyGateway', () => ({
   runEmergencyGateway: runGatewayMock,
