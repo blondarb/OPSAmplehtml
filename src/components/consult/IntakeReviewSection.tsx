@@ -251,6 +251,49 @@ export default function IntakeReviewSection({ consult, onCorrectionsChange }: In
               onCorrectionChange={(val) => setCorrections(prev => ({ ...prev, [s.key]: val }))}
             />
           ))}
+
+        {/* Prior Studies — structured list, not part of SECTIONS (those assume string content) */}
+        {structured.prior_studies && structured.prior_studies.length > 0 && (
+          <div style={{ background: '#0F172A', border: '1px solid #334155', borderRadius: 8, padding: 14 }}>
+            <span style={{ color: '#64748B', fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+              Prior Studies
+            </span>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginTop: 8 }}>
+              {structured.prior_studies.map((s, i) => {
+                const whereWhen = [s.location, s.timeframe].filter(Boolean).join(' · ')
+                return (
+                  <div key={i}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                      <span style={{ color: '#E2E8F0', fontSize: 13, fontWeight: 600 }}>{s.study}</span>
+                      {!s.performed && (
+                        <span style={{
+                          padding: '1px 6px',
+                          borderRadius: 4,
+                          background: 'rgba(100,116,139,0.15)',
+                          color: '#94A3B8',
+                          fontSize: 10,
+                          fontWeight: 600,
+                          textTransform: 'uppercase',
+                          letterSpacing: '0.03em',
+                        }}>
+                          Not yet obtained
+                        </span>
+                      )}
+                    </div>
+                    {whereWhen && (
+                      <div style={{ color: '#94A3B8', fontSize: 12, marginTop: 2 }}>{whereWhen}</div>
+                    )}
+                    {s.results_known_to_patient && (
+                      <div style={{ color: '#CBD5E1', fontSize: 12, marginTop: 2 }}>
+                        Patient-reported result: {s.results_known_to_patient}
+                      </div>
+                    )}
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+        )}
       </div>
     </div>
   )

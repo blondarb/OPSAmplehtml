@@ -264,6 +264,55 @@ export default function LocalizerPanel({ data, isLoading }: LocalizerPanelProps)
               </section>
             )}
 
+            {/* ── Suggested for Care Team ───────────────────────────── */}
+            {data!.suggestedActions && data!.suggestedActions.length > 0 && (
+              <section>
+                <div style={{
+                  color: '#94a3b8',
+                  fontSize: '0.65rem',
+                  fontWeight: 700,
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.07em',
+                  marginBottom: '8px',
+                }}>
+                  Suggested for Care Team
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  {data!.suggestedActions.map((sa, i) => (
+                    <div key={i} style={{
+                      padding: '8px 10px',
+                      borderRadius: '7px',
+                      background: 'rgba(30,41,59,0.6)',
+                      border: '1px solid rgba(51,65,85,0.6)',
+                    }}>
+                      <div style={{ color: '#e2e8f0', fontSize: '0.78rem', fontWeight: 700, lineHeight: 1.35 }}>
+                        {sa.action}
+                      </div>
+                      {sa.rationale && (
+                        <p style={{ color: '#64748b', fontSize: '0.7rem', margin: '3px 0 6px', lineHeight: 1.35 }}>
+                          {sa.rationale}
+                        </p>
+                      )}
+                      <span style={{
+                        display: 'inline-block',
+                        padding: '1px 6px',
+                        borderRadius: '4px',
+                        background: 'rgba(51,65,85,0.5)',
+                        color: '#94a3b8',
+                        fontSize: '0.65rem',
+                        fontWeight: 600,
+                      }}>
+                        {sa.source}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+                <p style={{ color: '#64748b', fontSize: '0.68rem', margin: '8px 0 0', lineHeight: 1.4 }}>
+                  Suggestions for clinician review — not orders.
+                </p>
+              </section>
+            )}
+
             {/* ── Localization ─────────────────────────────────────── */}
             {data!.localizationHypothesis && (
               <section>

@@ -56,6 +56,18 @@ export interface HistorianStructuredOutput {
   new_symptoms?: string
   medication_changes?: string
   side_effects?: string
+  /**
+   * Prior diagnostic workup the patient reports having had (or not had) —
+   * e.g. MRI, CT, EEG, EMG, labs. Gaps here are for the physician to review;
+   * the patient is never told what studies they should get.
+   */
+  prior_studies?: Array<{
+    study: string
+    performed: boolean
+    location?: string
+    timeframe?: string
+    results_known_to_patient?: string
+  }>
 }
 
 export interface HistorianSession {

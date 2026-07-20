@@ -6,7 +6,7 @@
  * Fires every 3 completed user turns during an active historian session.
  * Runs a 3-step pipeline:
  *   1. Symptom extraction  — Bedrock Claude extracts structured symptoms from transcript
- *   2. KB retrieval        — Evidence Engine (Bedrock KB) returns relevant guideline context
+ *   2. Plan evidence       — neuro_plans DB match returns relevant guideline context
  *   3. Question generation — Bedrock Claude generates 2-3 follow-up questions + differential
  *
  * This route is designed to be:
@@ -16,20 +16,24 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server'
-import { invokeBedrockJSON, retrieveFromKB } from '@/lib/bedrock'
+import { invokeBedrockJSON } from '@/lib/bedrock'
 import { from } from '@/lib/db-query'
+import { getNeuroPlansPool } from '@/lib/db'
+import { retrievePlanEvidence } from '@/lib/consult/planEvidence'
 import type {
   LocalizerRequest,
   LocalizerResponse,
   ExtractedSymptoms,
   GeneratedQuestions,
   DifferentialEntry,
+  SuggestedAction,
 } from '@/lib/consult/localizer-types'
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
 const LOCALIZER_TIMEOUT_MS = 15000
-const KB_RESULTS = 5
+const MAX_SUGGESTED_ACTIONS = 4
+const SUGGESTED_ACTION_FIELD_MAX_LEN = 200
 
 // ── Prompts ───────────────────────────────────────────────────────────────────
 
@@ -75,7 +79,14 @@ Return JSON matching this exact shape:
   ],
   "localizationHypothesis": "string",
   "contextHint": "string",
-  "confidence": "high | medium | low"
+  "confidence": "high | medium | low",
+  "suggested_actions": [
+    {
+      "action": "string",
+      "rationale": "string",
+      "source": "string"
+    }
+  ]
 }
 
 Rules for followUpQuestions:
@@ -101,7 +112,14 @@ Rules for contextHint:
 Rules for confidence:
 - high: ≥3 turns of detailed patient history, clear symptom pattern
 - medium: 2–3 turns, some gaps in history
-- low: <2 turns or very sparse information`
+- low: <2 turns or very sparse information
+
+Rules for suggested_actions:
+- Produce up to 4 next-step actions for the care team (studies, labs, referrals, monitoring).
+- When guideline context is provided, draw actions from it and set each action's source to the source plan's title; without guideline context, include only high-confidence actions and set source to "clinical judgment".
+- Each action needs a one-sentence rationale specific to this patient.
+- Never include drug dosages.
+- These are suggestions for clinician review, not orders. Empty array if nothing warrants a suggestion.`
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -113,23 +131,18 @@ function buildTranscriptText(
     .join('\n')
 }
 
-function buildKBQuery(
-  symptoms: ExtractedSymptoms,
-  chiefComplaint?: string
-): string {
-  const parts: string[] = []
-  if (chiefComplaint) parts.push(chiefComplaint)
-  if (symptoms.primarySymptoms.length > 0) {
-    parts.push(symptoms.primarySymptoms.join(', '))
-  }
-  if (symptoms.redFlags.length > 0) {
-    parts.push(`red flags: ${symptoms.redFlags.join(', ')}`)
-  }
-  if (symptoms.clinicalSummary) parts.push(symptoms.clinicalSummary)
-  return (
-    parts.join('. ') ||
-    'neurology outpatient clinical evaluation diagnostic approach'
-  )
+/**
+ * Citation shape kept compatible with the old Bedrock KB retrieval result
+ * (text/sourceUri/documentTitle) so extractKBSources() and the
+ * evidenceSnippets derivation in the response builder keep working
+ * unchanged. Plan-evidence citations only ever populate `documentTitle`
+ * (the matched plan's title) — `text` stays '' since a plan title isn't a
+ * verbatim excerpt the way a KB chunk was.
+ */
+type LocalizerCitation = {
+  text: string
+  sourceUri?: string
+  documentTitle?: string
 }
 
 function extractKBSources(citations: { sourceUri?: string; documentTitle?: string }[]): string[] {
@@ -146,6 +159,34 @@ function extractKBSources(citations: { sourceUri?: string; documentTitle?: strin
 
   // Deduplicate
   return [...new Set(sources)]
+}
+
+/**
+ * Defensively parse the LLM's suggested_actions output into safe,
+ * bounded SuggestedAction entries. Malformed entries (missing/non-string
+ * fields) are dropped rather than surfaced — a suggestion the care team
+ * can't read is worse than a shorter list.
+ */
+function sanitizeSuggestedActions(actions: unknown): SuggestedAction[] {
+  if (!Array.isArray(actions)) return []
+
+  const clean: SuggestedAction[] = []
+  for (const entry of actions) {
+    if (clean.length >= MAX_SUGGESTED_ACTIONS) break
+    if (!entry || typeof entry !== 'object') continue
+
+    const { action, rationale, source } = entry as Record<string, unknown>
+    if (typeof action !== 'string' || !action.trim()) continue
+    if (typeof rationale !== 'string' || !rationale.trim()) continue
+    if (typeof source !== 'string' || !source.trim()) continue
+
+    clean.push({
+      action: action.trim().slice(0, SUGGESTED_ACTION_FIELD_MAX_LEN),
+      rationale: rationale.trim().slice(0, SUGGESTED_ACTION_FIELD_MAX_LEN),
+      source: source.trim().slice(0, SUGGESTED_ACTION_FIELD_MAX_LEN),
+    })
+  }
+  return clean
 }
 
 /**
@@ -234,12 +275,11 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   // Accumulated results — populated progressively so partial responses are possible
   let symptoms: ExtractedSymptoms | null = null
   let kbGeneratedText = ''
-  let kbCitations: Awaited<ReturnType<typeof retrieveFromKB>>['citations'] = []
+  let kbCitations: LocalizerCitation[] = []
   let questions: GeneratedQuestions | null = null
   let degradedReason: string | undefined
 
   const transcriptText = buildTranscriptText(transcript)
-  const kbId = process.env.BEDROCK_KB_ID
 
   try {
     // ── Step 1: Symptom Extraction ─────────────────────────────────────────
@@ -269,26 +309,29 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       degradedReason = 'Symptom extraction failed'
     }
 
-    // ── Step 2: KB Retrieval ───────────────────────────────────────────────
-    if (kbId && symptoms) {
+    // ── Step 2: Plan Evidence Retrieval (neuro_plans DB) ─────────────────────
+    // Grounds the differential/questions/suggested-actions in vetted clinical
+    // plans instead of the (deleted-in-prod, policy-blocked-from-recreation)
+    // Bedrock Knowledge Base. No env-var gate — this always runs when we have
+    // extracted symptoms to search on.
+    if (symptoms) {
       try {
-        const kbQuery = buildKBQuery(symptoms, chiefComplaint)
-        const kbResult = await retrieveFromKB({
-          knowledgeBaseId: kbId,
-          query: kbQuery,
-          numberOfResults: KB_RESULTS,
-          signal,
+        const planPool = await getNeuroPlansPool()
+        const planResult = await retrievePlanEvidence(planPool, {
+          symptomTerms: [...symptoms.primarySymptoms, ...symptoms.redFlags],
+          chiefComplaint,
+          maxPlans: 3,
         })
-        kbGeneratedText = kbResult.generatedText
-        kbCitations = kbResult.citations
+        kbGeneratedText = planResult.guidelineText
+        kbCitations = planResult.citations.map((title) => ({ documentTitle: title, text: '' }))
+        if (!planResult.guidelineText) {
+          degradedReason = degradedReason ?? 'Plan evidence retrieval unavailable'
+        }
       } catch (err) {
         if (signal.aborted) throw err
-        console.error('[localizer] Step 2 (KB retrieval) failed:', err)
-        degradedReason = degradedReason ?? 'KB retrieval failed or BEDROCK_KB_ID not configured'
+        console.error('[localizer] Step 2 (plan evidence retrieval) failed:', err)
+        degradedReason = degradedReason ?? 'Plan evidence retrieval unavailable'
       }
-    } else if (!kbId) {
-      console.warn('[localizer] BEDROCK_KB_ID not set — skipping KB retrieval (Step 2)')
-      degradedReason = degradedReason ?? 'BEDROCK_KB_ID not configured'
     }
 
     // ── Step 3: Question + Differential Generation ─────────────────────────
@@ -355,6 +398,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     confidence: questions?.confidence ?? 'low',
     localizationHypothesis: questions?.localizationHypothesis ?? '',
     kbSources,
+    suggestedActions: sanitizeSuggestedActions(questions?.suggested_actions),
     processingMs: Date.now() - startMs,
     partial: Boolean(degradedReason),
     degradedReason,
@@ -380,11 +424,13 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
 // ── GET /api/ai/historian/localizer — health check ────────────────────────────
 
 export async function GET(): Promise<NextResponse> {
-  const kbId = process.env.BEDROCK_KB_ID ?? null
+  // Grounding is sourced from the neuro_plans database (see Step 2), not a
+  // Bedrock KB — so the localizer is "ready" as long as the pipeline is
+  // deployed. BEDROCK_KB_ID is no longer consulted.
   return NextResponse.json({
-    configured: Boolean(kbId),
-    kbId: kbId ? `${kbId.slice(0, 8)}...` : null,
+    configured: true,
+    grounding: 'neuro_plans_db',
     timeout: LOCALIZER_TIMEOUT_MS,
-    status: kbId ? 'ready' : 'unconfigured (BEDROCK_KB_ID not set)',
+    status: 'ready',
   })
 }

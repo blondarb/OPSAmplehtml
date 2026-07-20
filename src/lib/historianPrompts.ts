@@ -30,6 +30,7 @@ CRITICAL RULES:
 11. Track what the patient has already told you and NEVER re-ask it. Patients often answer several things at once — e.g., while describing their headaches they may mention the pain came on "gradually," is "on the right side," and is "throbbing." Treat every detail they volunteer as answered, even if it arrived out of order or in passing. Only ask about OLDCARTS dimensions and details the patient has NOT already covered. Asking someone to repeat something they just told you (e.g., "do the headaches come on gradually or suddenly?" right after they said "gradually") makes them feel unheard and is the fastest way to erode trust.
 12. Do NOT use "one last thing" or "just one more thing" unless it genuinely IS the last question. Using it mid-interview is misleading and erodes trust when more questions follow. Reserve it only for the single final question before closing.
 13. TURN LIMIT: Never exceed 25 turns total. If you are approaching turn 20 and still have uncovered items, prioritize the most clinically important gaps and wrap up gracefully. Do not keep asking questions indefinitely.
+14. PRIOR STUDIES: If the complaint suggests prior workup may exist (e.g. recurring or longstanding symptoms, a condition commonly imaged or tested, or the patient references having "already had tests done"), ask whether they've had relevant studies — MRI, CT, EEG, EMG, labs, etc. For each one they mention, ask which study, where it was done, roughly when, and whether they know the result. Record these via prior_studies when you call save_interview_output. NEVER tell the patient which studies they should get, and NEVER imply their workup is incomplete or insufficient — gaps in the workup are for the physician to review, not something to raise with the patient.
 
 INTERVIEW BUDGET: Aim for 8-20 turns total. Quality over coverage. Call save_interview_output when you have clinical clarity — not when you have ticked every box. For straightforward presentations you may have enough after 8-10 turns; do not pad the conversation to hit a number.
 
@@ -149,6 +150,21 @@ const SAVE_INTERVIEW_OUTPUT_TOOL = {
       new_symptoms: { type: 'string', description: 'New symptoms since last visit (follow-up only)' },
       medication_changes: { type: 'string', description: 'Medication changes requested or made (follow-up only)' },
       side_effects: { type: 'string', description: 'Medication side effects reported (follow-up only)' },
+      prior_studies: {
+        type: 'array',
+        description: 'Prior diagnostic studies the patient reports having had (or explicitly not had) — MRI, CT, EEG, EMG, labs, etc.',
+        items: {
+          type: 'object',
+          properties: {
+            study: { type: 'string', description: 'Which study (e.g. "MRI brain", "EEG", "CBC")' },
+            performed: { type: 'boolean', description: 'Whether the patient reports having had this study' },
+            location: { type: 'string', description: 'Where it was performed, if known' },
+            timeframe: { type: 'string', description: 'Roughly when it was performed, if known' },
+            results_known_to_patient: { type: 'string', description: 'What the patient recalls about the results, if anything' },
+          },
+          required: ['study', 'performed'],
+        },
+      },
       narrative_summary: { type: 'string', description: 'Brief narrative summary of the interview for the physician' },
       red_flags: {
         type: 'array',

@@ -81,6 +81,19 @@ export interface DifferentialEntry {
 }
 
 /**
+ * A single care-team-facing suggested next step (study, lab, referral, or
+ * monitoring action) tied to the current differential.
+ */
+export interface SuggestedAction {
+  /** Short imperative action (e.g. "MRI brain without contrast"). */
+  action: string
+  /** One-sentence rationale tied to this patient's differential. */
+  rationale: string
+  /** Source plan/guideline title, or "clinical judgment" when no guideline context was available. */
+  source: string
+}
+
+/**
  * Structured output from the question generator (Step 3 Bedrock call).
  */
 export interface GeneratedQuestions {
@@ -101,6 +114,12 @@ export interface GeneratedQuestions {
   contextHint: string
   /** Overall confidence in the differential given available transcript data. */
   confidence: 'high' | 'medium' | 'low'
+  /**
+   * Up to 4 suggested next-step actions for the care team (studies, labs,
+   * referrals, monitoring). Raw key from the Bedrock JSON output — mapped to
+   * camelCase `suggestedActions` on the route's response payload.
+   */
+  suggested_actions?: SuggestedAction[]
 }
 
 // ── API Response ──────────────────────────────────────────────────────────────
@@ -126,6 +145,12 @@ export interface LocalizerResponse {
   localizationHypothesis: string
   /** Source document names from the KB (audit trail for the physician panel). */
   kbSources: string[]
+  /**
+   * Up to 4 care-team-facing suggested next steps (studies, labs, referrals,
+   * monitoring) tied to the differential. Suggestions for clinician review —
+   * NOT orders, and never surfaced to the patient.
+   */
+  suggestedActions?: SuggestedAction[]
   /** Total wall-clock time for the localizer pipeline in milliseconds. */
   processingMs: number
   /** True if the localizer degraded gracefully (partial results). */

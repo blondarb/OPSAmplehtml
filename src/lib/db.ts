@@ -4,6 +4,7 @@ import { RDS_CA_BUNDLE } from './rds-ca-bundle'
 
 let pool: Pool | null = null
 let wearablePool: Pool | null = null
+let neuroPlansPool: Pool | null = null
 
 // Validate the RDS server cert against the vendored AWS RDS CA bundle (prevents MITM).
 // RDS_SSL_INSECURE=true is an emergency escape hatch to disable validation without a
@@ -45,6 +46,25 @@ export async function getWearablePool(): Promise<Pool> {
     ssl: rdsSsl,
   })
   return wearablePool
+}
+
+// Clinical plan library lives in neuro_plans (synced from blondarb/neuro-plans via
+// `npm run sync-plans`), same RDS instance as the app's other databases. Used for
+// grounding the AI Historian localizer's differential/questions in vetted clinical
+// plans. Read-only use.
+export async function getNeuroPlansPool(): Promise<Pool> {
+  if (neuroPlansPool) return neuroPlansPool
+  const creds = await getRdsCredentials()
+  neuroPlansPool = new Pool({
+    host: creds.host,
+    port: parseInt(creds.port || '5432'),
+    user: creds.username,
+    password: creds.password,
+    database: 'neuro_plans',
+    max: 5,
+    ssl: rdsSsl,
+  })
+  return neuroPlansPool
 }
 
 export default getPool
