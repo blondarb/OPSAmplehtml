@@ -13,7 +13,9 @@
  * Algorithm: normalize both strings (casefold, strip non-alphanumerics to
  * whitespace — NOT delete, which is what broke "New-Onset" — collapse
  * whitespace, drop trivial connector stopwords), then match if either
- * side's token set is a subset of the other's.
+ * side's token set is a subset of the other's — EXCEPT when either side
+ * is a single token, in which case the specificity floor below requires
+ * exact equality instead.
  *
  * Negation guard: stripping "with" as a connector stopword means "X with
  * Y" tokenizes identically to "X Y", which is then a trivial SUBSET of
@@ -23,6 +25,30 @@
  * Negation words are therefore never stopwords, and a negation-word
  * asymmetry between the two sides (one has one, the other doesn't) is
  * treated as a hard non-match before the subset check ever runs.
+ *
+ * Specificity floor (single-token sides require exact equality, not
+ * subset): a single-token ground-truth entry (e.g. "TIA", "CIDP" — the
+ * gate's own fixtures carry both, each "low" likelihood) is a trivial
+ * SUBSET of almost anything containing that token — "TIA" would
+ * "match" a completely unrelated candidate like "hemispheric TIA with
+ * migraine features" purely because the word appears somewhere in a much
+ * larger, differently-focused diagnosis. Multi-token sides keep the
+ * subset rule (that's the whole point of tolerating word-order/hyphen
+ * differences); only a single-token side is required to match its
+ * counterpart exactly. Accepted trade-off: a single-token ground truth
+ * like "migraine" will no longer subset-match a multi-token candidate
+ * like "chronic migraine with aura" — deliberately stricter, since the
+ * alternative (any single distinctive word triggering a match against
+ * anything containing it) is the more dangerous failure mode for a
+ * script measuring diagnostic accuracy. In the actual gate, this floor is
+ * currently inert in practice — every persona's "high"-likelihood
+ * candidates (the only ones `highLikelihoodOrAll()` in
+ * finalDifferential.gate.test.ts feeds to the matcher) are multi-token —
+ * but `expectedDDxStrings` (personaTranscripts.ts) is a general-purpose
+ * export future callers (Tasks 4/5) could use without that filter, so the
+ * floor needs to hold on its own, not rely on today's fixture shape.
+ * This module remains interim — Task 4's ICD-10-category + adjudicated
+ * matching supersedes it.
  */
 
 const STOPWORDS = new Set(['with', 'of', 'the', 'a', 'an', 'and'])
@@ -48,6 +74,10 @@ function isSubset(a: Set<string>, b: Set<string>): boolean {
   return true
 }
 
+function setsEqual(a: Set<string>, b: Set<string>): boolean {
+  return a.size === b.size && isSubset(a, b)
+}
+
 function hasNegation(tokens: Set<string>): boolean {
   for (const t of tokens) {
     if (NEGATION_WORDS.has(t)) return true
@@ -57,13 +87,19 @@ function hasNegation(tokens: Set<string>): boolean {
 
 /**
  * True if `a` and `b` describe the same diagnosis under normalized
- * token-set matching (see module doc for the algorithm + negation guard).
- * Order of arguments doesn't matter — the match is symmetric.
+ * token-set matching (see module doc for the algorithm, negation guard,
+ * and single-token specificity floor). Order of arguments doesn't matter
+ * — the match is symmetric.
  */
 export function tokenSetMatch(a: string, b: string): boolean {
   const ta = tokenize(a)
   const tb = tokenize(b)
   if (ta.size === 0 || tb.size === 0) return false
   if (hasNegation(ta) !== hasNegation(tb)) return false
+
+  // Specificity floor — see module doc. A single-token side must match
+  // exactly; only multi-token-vs-multi-token gets subset tolerance.
+  if (ta.size === 1 || tb.size === 1) return setsEqual(ta, tb)
+
   return isSubset(ta, tb) || isSubset(tb, ta)
 }

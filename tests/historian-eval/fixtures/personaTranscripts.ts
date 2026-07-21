@@ -51,7 +51,21 @@ export interface PersonaTranscriptFixture {
   chiefComplaint: string
   /** Ground truth, likelihood preserved — some personas have multiple tied "high" entries; callers must not assume [0] is the only correct answer. */
   expectedDDx: PersonaExpectedDx[]
-  /** Convenience: just the diagnosis strings, in original order — for callers that only need names. */
+  /**
+   * Convenience: just the diagnosis strings, in original order — for
+   * callers that only need names.
+   *
+   * Caution for any caller building a matcher over this list directly
+   * (bypassing `expectedDDx`'s `likelihood` field and a filter like
+   * finalDifferential.gate.test.ts's `highLikelihoodOrAll()`): it
+   * includes every likelihood tier, including single-word "low" entries
+   * (e.g. "TIA", "CIDP"). Match these with tests/historian-eval/ddxMatch.ts's
+   * `tokenSetMatch`, not a plain substring/subset check — a single-token
+   * entry needs `tokenSetMatch`'s specificity floor (exact-match-only for
+   * single-token sides) or it will spuriously match any candidate that
+   * merely contains that word. This whole matching layer is interim —
+   * Task 4's ICD-10-category + adjudicated matching supersedes it.
+   */
   expectedDDxStrings: string[]
 }
 

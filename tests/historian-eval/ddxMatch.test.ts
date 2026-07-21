@@ -82,4 +82,29 @@ describe('tokenSetMatch', () => {
   it('treats "no" as a negation marker with the same guard as "without"', () => {
     expect(tokenSetMatch('Seizure with no recovery between events', 'Seizure recovery between events')).toBe(false)
   })
+
+  // ── Specificity floor (single-token sides require exact equality) ────
+  // Without this floor, a single-token ground truth like "TIA" or "CIDP"
+  // (both actually "low"-likelihood entries in the gate's own fixtures —
+  // acute-stroke.json / peripheral-neuropathy.json) is a trivial SUBSET of
+  // almost anything containing that token, which would let it "match" a
+  // completely unrelated candidate diagnosis. See ddxMatch.ts module doc
+  // for the full rationale and the accepted trade-off this creates.
+  it('does NOT match a single-token ground truth against an unrelated multi-token candidate that merely contains it', () => {
+    expect(tokenSetMatch('tia', 'hemispheric TIA with migraine features')).toBe(false)
+  })
+
+  it('still matches a single-token side against an exact (case-insensitive) equal', () => {
+    expect(tokenSetMatch('tia', 'TIA')).toBe(true)
+  })
+
+  it('accepted trade-off: a single-token ground truth no longer subset-matches a multi-token candidate that legitimately contains it', () => {
+    // Before the specificity floor, this matched (via subset). The floor
+    // makes it a deliberate non-match — see module doc "Accepted trade-off".
+    expect(tokenSetMatch('migraine', 'chronic migraine with aura')).toBe(false)
+  })
+
+  it('a multi-token subset case still matches (the floor only applies when a side is single-token)', () => {
+    expect(tokenSetMatch('MS relapse', 'Acute MS relapse (myelopathy / new demyelinating lesion)')).toBe(true)
+  })
 })
