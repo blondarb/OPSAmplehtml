@@ -54,7 +54,7 @@ export default function PhysicianHome({ onSelectPatient, onScheduleNew, onSchedu
       }}>
         <div>
           <h1 style={{ margin: 0, fontSize: '20px', fontWeight: 700, color: 'var(--text-primary)' }}>
-            Clinical Cockpit
+            Bridge
           </h1>
           <p style={{ margin: '2px 0 0', fontSize: '13px', color: 'var(--text-muted)' }}>
             {dateStr}

@@ -61,7 +61,7 @@ function IconSidebar({ activeIcon, setActiveIcon, viewMode, onViewModeChange, on
   const ACTIVE_ICONS = new Set(['home', 'notes', 'messages', 'chat', 'settings'])
 
   const icons = [
-    { id: 'home', tooltip: 'Clinical Cockpit', badge: viewMode === 'chart' && notificationCounts?.critical ? notificationCounts.critical : 0, badgeColor: '#EF4444', icon: (
+    { id: 'home', tooltip: 'Bridge', badge: viewMode === 'chart' && notificationCounts?.critical ? notificationCounts.critical : 0, badgeColor: '#EF4444', icon: (
       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
         <path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/>
         <polyline points="9 22 9 12 15 12 15 22"/>
@@ -97,7 +97,7 @@ function IconSidebar({ activeIcon, setActiveIcon, viewMode, onViewModeChange, on
     if (!ACTIVE_ICONS.has(iconId)) return
 
     setActiveIcon(iconId)
-    // Home icon shows the Clinical Cockpit
+    // Home icon shows the Bridge
     if (iconId === 'home') {
       onViewModeChange('cockpit')
     }

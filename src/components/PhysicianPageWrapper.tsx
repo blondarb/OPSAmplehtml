@@ -32,7 +32,7 @@ export default function PhysicianPageWrapper({
   return (
     <PlatformShell>
       <FeatureSubHeader
-        title="Clinician Cockpit"
+        title="Bridge"
         icon={Home}
         accentColor="#0D9488"
         showDemo={true}

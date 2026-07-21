@@ -4,7 +4,7 @@ import { getPool } from '@/lib/db'
 
 // ─── Demo metrics ───────────────────────────────────────────────────────────
 // Hardcoded aggregate counts used as the primary data source for the prototype.
-// Each key maps to one of the 8 status-bar tiles in the Clinical Cockpit.
+// Each key maps to one of the 8 status-bar tiles in the Bridge.
 
 const DEMO_METRICS = {
   schedule: {
@@ -60,7 +60,7 @@ const DEMO_METRICS = {
 }
 
 // ─── GET /api/command-center/metrics ─────────────────────────────────────────
-// Returns aggregate counts for the 8 status-bar tiles in the Clinical Cockpit.
+// Returns aggregate counts for the 8 status-bar tiles in the Bridge.
 //
 // Query params:
 //   view_mode  — 'my_patients' (default) | 'department' | 'all'
