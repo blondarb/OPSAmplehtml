@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import type { HistorianRedFlag, HistorianStructuredOutput, HistorianTranscriptEntry } from '@/lib/historianTypes'
 import IntakeReviewSection from './consult/IntakeReviewSection'
+import HistorianTranscriptViewer from './historian/HistorianTranscriptViewer'
 
 interface HistorianReportViewProps {
   structuredOutput: HistorianStructuredOutput | null
@@ -135,7 +136,12 @@ export default function HistorianReportView({
       {/* Tab content */}
       <div style={{ background: '#1e293b', border: '1px solid #334155', borderRadius: '12px', padding: '20px', marginBottom: '24px', minHeight: '200px' }}>
         {activeTab === 'physician' ? (
-          <PhysicianReportTab structuredOutput={structuredOutput} narrativeSummary={narrativeSummary} redFlags={redFlags} />
+          <PhysicianReportTab
+            structuredOutput={structuredOutput}
+            narrativeSummary={narrativeSummary}
+            redFlags={redFlags}
+            transcript={transcript}
+          />
         ) : (
           <PatientReportTab
             loading={patientReportLoading}
@@ -179,9 +185,10 @@ interface PhysicianReportTabProps {
   structuredOutput: HistorianStructuredOutput | null
   narrativeSummary: string | null
   redFlags: HistorianRedFlag[]
+  transcript?: HistorianTranscriptEntry[]
 }
 
-function PhysicianReportTab({ structuredOutput, narrativeSummary, redFlags }: PhysicianReportTabProps) {
+function PhysicianReportTab({ structuredOutput, narrativeSummary, redFlags, transcript }: PhysicianReportTabProps) {
   return (
     <div>
       {redFlags.length > 0 && (
@@ -213,6 +220,12 @@ function PhysicianReportTab({ structuredOutput, narrativeSummary, redFlags }: Ph
           historian_summary: narrativeSummary,
         }}
       />
+
+      {transcript && transcript.length > 0 && (
+        <div style={{ marginTop: 16 }}>
+          <HistorianTranscriptViewer entries={transcript} />
+        </div>
+      )}
     </div>
   )
 }

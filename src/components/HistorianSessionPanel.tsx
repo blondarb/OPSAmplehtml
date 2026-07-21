@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import type { HistorianSession } from '@/lib/historianTypes'
+import HistorianTranscriptViewer from './historian/HistorianTranscriptViewer'
 
 interface HistorianSessionPanelProps {
   sessions: HistorianSession[]
@@ -281,39 +282,11 @@ export default function HistorianSessionPanel({ sessions, onImport }: HistorianS
                     </div>
                   )}
 
-                  {/* Transcript */}
+                  {/* Transcript — already gated behind the sub-tab above, so
+                      render it pre-expanded rather than making the reader
+                      click through a second collapse. */}
                   {expandedSection === 'transcript' && (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', maxHeight: '300px', overflowY: 'auto' }}>
-                      {session.transcript && session.transcript.length > 0 ? (
-                        session.transcript.map((entry, i) => (
-                          <div
-                            key={i}
-                            style={{
-                              padding: '6px 10px',
-                              borderRadius: '6px',
-                              background: entry.role === 'assistant' ? 'rgba(13,148,136,0.06)' : 'rgba(139,92,246,0.06)',
-                              borderLeft: `2px solid ${entry.role === 'assistant' ? '#0d9488' : '#8B5CF6'}`,
-                            }}
-                          >
-                            <div style={{
-                              fontSize: '0.65rem',
-                              color: entry.role === 'assistant' ? '#0d9488' : '#8B5CF6',
-                              fontWeight: 600,
-                              marginBottom: '1px',
-                            }}>
-                              {entry.role === 'assistant' ? 'AI' : 'Patient'}
-                            </div>
-                            <div style={{ fontSize: '0.75rem', color: 'var(--text-primary, #1e293b)', lineHeight: 1.4 }}>
-                              {entry.text}
-                            </div>
-                          </div>
-                        ))
-                      ) : (
-                        <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary, #64748b)', fontStyle: 'italic', margin: 0 }}>
-                          No transcript available.
-                        </p>
-                      )}
-                    </div>
+                    <HistorianTranscriptViewer entries={session.transcript ?? []} defaultExpanded />
                   )}
 
                   {/* Action buttons */}
