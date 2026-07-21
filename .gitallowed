@@ -20,6 +20,10 @@ docs/clinical-safety/
 docs/superpowers/plans/
 # Vendored AWS RDS public CA bundle (PEM base64 trips the 40-char entropy pattern; not a secret)
 src/lib/rds-ca-bundle.ts
+# CLAUDE.md "Recent Changes" prose (dense technical summaries, long
+# identifiers/paths run together — trips the 40-char entropy pattern; not
+# secrets)
+CLAUDE.md
 # Data file content
 data/plans.json
 src/app/api/ai/historian/localizer/route.ts
