@@ -1,0 +1,35 @@
+{
+  "_note": "[training knowledge — Steve to vet]",
+  "version": "migraine-v1",
+  "syndrome": "migraine-chronic",
+  "vetted_by": null,
+  "vetted_date": null,
+  "critical_questions": [
+    {
+      "id": "thunderclap-onset",
+      "question": "Did any headache reach maximal intensity within seconds to minutes ('thunderclap' onset)?",
+      "severity": "critical"
+    },
+    {
+      "id": "fever-neck-stiffness",
+      "question": "Any fever or neck stiffness associated with the headaches?",
+      "severity": "critical"
+    },
+    {
+      "id": "papilledema-symptoms",
+      "question": "Any symptoms suggesting raised intracranial pressure: transient visual obscurations, pulsatile tinnitus, or headache worsening with position/Valsalva?",
+      "severity": "critical"
+    },
+    {
+      "id": "medication-overuse",
+      "question": "How many days per month is the patient using acute headache medication (triptans, NSAIDs, combination analgesics)?",
+      "severity": "critical"
+    },
+    {
+      "id": "headache-pattern-change",
+      "question": "Has the pattern, frequency, or character of the headaches changed recently?",
+      "severity": "important"
+    }
+  ],
+  "expected_dimensions": ["oldcarts", "red_flags", "pmh_meds_allergies", "fh_sh"]
+}

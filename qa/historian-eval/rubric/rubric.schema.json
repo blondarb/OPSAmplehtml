@@ -1,0 +1,74 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://sevaro.internal/schemas/historian-eval/rubric.schema.json",
+  "title": "Historian Thoroughness Rubric",
+  "description": "Shape enforced (by src/lib/historian/eval/rubric.ts's hand-rolled validator — see that file's header comment for why this is documentation rather than an ajv-driven contract) for every rubric file under qa/historian-eval/rubric/. One 'base' file (base-neuro-hpi.json, syndrome: null) applies to every session; syndromes/*.json files layer syndrome-specific critical questions on top, selected by src/lib/historian/eval/rubric.ts's loadRubric().",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["_note", "version", "syndrome", "vetted_by", "vetted_date", "critical_questions", "expected_dimensions"],
+  "properties": {
+    "_note": {
+      "type": "string",
+      "description": "Provenance disclaimer. Every rubric file ships with the literal string '[training knowledge — Steve to vet]' until a clinician signs off (see vetted_by).",
+      "const": "[training knowledge — Steve to vet]"
+    },
+    "version": {
+      "type": "string",
+      "description": "Stable identifier for this rubric file's content, e.g. 'stroke-v1' or 'base-neuro-hpi-v1'. Unique across every rubric file (base + all syndromes). Append-only: once used in a persisted historian_evaluations.rubric_version, never edit or reuse the id — bump to -v2 instead.",
+      "pattern": "^[a-z][a-z0-9-]*-v[0-9]+$"
+    },
+    "syndrome": {
+      "description": "Syndrome id this rubric targets, matching a tests/simulated-patients/personas/*.json basename — or null for the base (syndrome-agnostic) rubric.",
+      "oneOf": [
+        { "type": "null" },
+        {
+          "type": "string",
+          "enum": ["acute-stroke", "first-seizure", "migraine-chronic", "ms-relapse", "peripheral-neuropathy"]
+        }
+      ]
+    },
+    "vetted_by": {
+      "description": "Clinician name/credential once reviewed (e.g. 'Steve Arbogast, DO'), or null before vetting. thoroughnessJudge.ts sets ThoroughnessEvaluation.unvetted = true whenever any rubric contributing to a scoring pass has vetted_by === null.",
+      "type": ["string", "null"]
+    },
+    "vetted_date": {
+      "description": "ISO date (YYYY-MM-DD) of vetting, or null before vetting.",
+      "type": ["string", "null"],
+      "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+    },
+    "critical_questions": {
+      "type": "array",
+      "description": "The must-ask checklist for this rubric file. Despite the field name (kept verbatim from the task spec), entries carry a per-item severity — not every entry is severity:'critical'. thoroughnessJudge.ts's judge prompt must not award an overall score above 85 if any severity:'critical' item here was never asked/covered in the transcript.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "question", "severity"],
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Stable short identifier, unique within this file, referenced verbatim by the judge's missed_critical_questions[].rubric_id.",
+            "pattern": "^[a-z][a-z0-9-]*$"
+          },
+          "question": {
+            "type": "string",
+            "description": "Plain-language description of what must be asked/covered (not necessarily verbatim wording the historian must use)."
+          },
+          "severity": {
+            "type": "string",
+            "enum": ["critical", "important", "minor"]
+          }
+        }
+      }
+    },
+    "expected_dimensions": {
+      "type": "array",
+      "description": "Which of the judge's 6 fixed scoring dimensions this rubric file's critical_questions meaningfully bear on. Documentation/audit metadata — the judge always scores all 6 dimensions regardless of this list.",
+      "items": {
+        "type": "string",
+        "enum": ["oldcarts", "red_flags", "pmh_meds_allergies", "fh_sh", "question_quality", "closure"]
+      },
+      "minItems": 1,
+      "uniqueItems": true
+    }
+  }
+}
