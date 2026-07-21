@@ -45,3 +45,10 @@ tests/triage/
 infrastructure/triage-ingestion/
 infrastructure/triage-worker/
 qa/triage-sentinel/
+# Historian Validation Suite Task 6 — src/lib/historian/synthetic/patientAgent.ts
+# and src/lib/voice/providers/openaiWebrtcProvider.ts (referenced in comments
+# + relative imports) exceed 40 alphanumeric/slash chars, tripping the
+# 40-char entropy pattern; not secrets. Directory-level allow, same pattern
+# as the Task 2 entry above.
+src/lib/historian/synthetic/
+src/lib/voice/providers/

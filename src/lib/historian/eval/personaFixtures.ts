@@ -45,12 +45,37 @@ interface PersonaExpectedDDxJSON {
   likelihood?: string
 }
 
+interface PersonaDemographicsJSON {
+  age?: number
+  sex?: string
+  name?: string
+  date_of_birth?: string
+  email?: string
+  phone?: string
+}
+
 interface PersonaJSON {
   id?: string
+  name?: string
   intakeData?: { chief_complaint?: string }
   historyResponses?: PersonaHistoryResponseJSON[]
   expectedDDx?: PersonaExpectedDDxJSON[]
   narrativeSummary?: string
+  // Fields below this line are read only by loadPersonaProfile() (Historian
+  // Validation Suite Task 6) — buildPersonaTranscript() never touches them.
+  demographics?: PersonaDemographicsJSON
+  /**
+   * Free-form physician-authored ground-truth clinical facts (onset,
+   * location, duration, character, severity, associated_symptoms,
+   * current_medications, allergies, past_medical_history, family_history,
+   * social_history, review_of_systems, ...). Every persona fixture file
+   * uses plain string values for every key, so this stays a flat
+   * Record<string, string> rather than a typed HistorianStructuredOutput —
+   * it is a DIFFERENT, similarly-shaped object missing fields like `hpi`
+   * (see cli.ts's docstring for the same caution about this fixture
+   * field).
+   */
+  structuredHistory?: Record<string, string>
 }
 
 /** One ground-truth differential entry from a persona's `expectedDDx`. */
@@ -107,17 +132,11 @@ function resolvePersonaPath(personaFile: string): string {
 }
 
 /**
- * Build a synthetic HistorianTranscriptEntry[] transcript (plus chief
- * complaint + expected DDx) from a persona fixture file.
- *
- * `personaFile` may be a bare id ("acute-stroke") or filename
- * ("acute-stroke.json"). Each `historyResponses` Q&A pair becomes two
- * alternating entries — assistant question, then user response — with
- * synthetic monotonic offsets/seq (these personas were authored for
- * request/response test helpers, not real timed voice sessions, so there is
- * no real timing to preserve).
+ * Read + parse one persona fixture file. Shared by buildPersonaTranscript()
+ * and loadPersonaProfile() (Historian Validation Suite Task 6) so the
+ * file-path resolution + read/parse logic lives in exactly one place.
  */
-export function buildPersonaTranscript(personaFile: string): PersonaTranscriptFixture {
+function readPersonaJson(personaFile: string): PersonaJSON {
   const fullPath = resolvePersonaPath(personaFile)
   let raw: string
   try {
@@ -129,8 +148,22 @@ export function buildPersonaTranscript(personaFile: string): PersonaTranscriptFi
       }`,
     )
   }
+  return JSON.parse(raw) as PersonaJSON
+}
 
-  const persona = JSON.parse(raw) as PersonaJSON
+/**
+ * Build a synthetic HistorianTranscriptEntry[] transcript (plus chief
+ * complaint + expected DDx) from a persona fixture file.
+ *
+ * `personaFile` may be a bare id ("acute-stroke") or filename
+ * ("acute-stroke.json"). Each `historyResponses` Q&A pair becomes two
+ * alternating entries — assistant question, then user response — with
+ * synthetic monotonic offsets/seq (these personas were authored for
+ * request/response test helpers, not real timed voice sessions, so there is
+ * no real timing to preserve).
+ */
+export function buildPersonaTranscript(personaFile: string): PersonaTranscriptFixture {
+  const persona = readPersonaJson(personaFile)
   const historyResponses = persona.historyResponses ?? []
 
   const transcript: HistorianTranscriptEntry[] = []
@@ -171,5 +204,61 @@ export function buildPersonaTranscript(personaFile: string): PersonaTranscriptFi
     expectedDDx,
     expectedDDxStrings,
     ...(narrativeSummary ? { narrativeSummary } : {}),
+  }
+}
+
+// ── Persona profile (Historian Validation Suite Task 6) ──────────────────────
+//
+// The synthetic patient-conversation driver (src/lib/historian/synthetic/)
+// needs MORE of the persona fixture than buildPersonaTranscript() extracts —
+// specifically demographics and structuredHistory, so the Bedrock patient
+// agent can answer ANY question the live historian asks (not just the
+// pre-scripted historyResponses Q&A pairs) while staying consistent with the
+// case's ground-truth facts. loadPersonaProfile() is that second, additive
+// view onto the same underlying JSON files, reusing readPersonaJson() so the
+// file-path/read/parse logic is never duplicated.
+
+export interface PersonaProfileDemographics {
+  age?: number
+  sex?: string
+  name?: string
+  dateOfBirth?: string
+}
+
+export interface PersonaProfileHistoryResponse {
+  questionPattern: string
+  response: string
+}
+
+export interface PersonaProfile {
+  /** Persona fixture id, e.g. "acute-stroke". */
+  id: string
+  demographics: PersonaProfileDemographics
+  /** Pre-scripted example Q&A pairs — reference phrasing, not a verbatim script (the live historian may ask things in a different order or different words). */
+  historyResponses: PersonaProfileHistoryResponse[]
+  /** Physician-authored ground-truth clinical facts (onset, location, PMH, FH, social history, ...) the patient agent must stay consistent with for ANY question asked. */
+  structuredHistory: Record<string, string>
+  /** From intakeData.chief_complaint — used to prime the historian's referral-reason context, not the patient agent's own knowledge. */
+  chiefComplaint: string
+}
+
+export function loadPersonaProfile(personaFile: string): PersonaProfile {
+  const persona = readPersonaJson(personaFile)
+  const id = (personaFile.endsWith('.json') ? personaFile.slice(0, -'.json'.length) : personaFile)
+  const demo = persona.demographics ?? {}
+  return {
+    id: persona.id?.trim() || id,
+    demographics: {
+      ...(typeof demo.age === 'number' ? { age: demo.age } : {}),
+      ...(demo.sex ? { sex: demo.sex } : {}),
+      ...(demo.name ? { name: demo.name } : {}),
+      ...(demo.date_of_birth ? { dateOfBirth: demo.date_of_birth } : {}),
+    },
+    historyResponses: (persona.historyResponses ?? []).map((qa) => ({
+      questionPattern: qa.question_pattern,
+      response: qa.response,
+    })),
+    structuredHistory: persona.structuredHistory ?? {},
+    chiefComplaint: persona.intakeData?.chief_complaint?.trim() ?? '',
   }
 }

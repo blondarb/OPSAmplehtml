@@ -50,6 +50,44 @@ function mintNovaRelayToken(): string | null {
 export async function POST(request: Request) {
   try {
     const body = await request.json()
+
+    // Historian Validation Suite Task 1: server-minted session id + its
+    // matching transcript-flush bearer token. Hoisted to the top (was
+    // previously minted further down, after the provider branch) so
+    // textMode (below) can return it without duplicating this logic —
+    // 100% behavior-preserving for every existing caller: nothing later in
+    // this function reads sessionId/flushToken before they're used, and
+    // nothing before this point used to run before they were minted either.
+    const sessionId = crypto.randomUUID()
+    let flushToken: string | undefined
+    try {
+      flushToken = mintFlushToken(sessionId)
+    } catch (flushTokenErr) {
+      console.warn(
+        '[historian/session] mintFlushToken failed (non-fatal — durable transcript flush unavailable this session):',
+        flushTokenErr instanceof Error ? flushTokenErr.message : String(flushTokenErr),
+      )
+      flushToken = undefined
+    }
+
+    // Historian Validation Suite Task 6 (synthetic conversation driver):
+    // textMode returns ONLY {sessionId, flushToken} — no OpenAI
+    // client_secrets call, no Nova relay token, no consult-context lookup.
+    // The driver sources instructions/tools directly from
+    // buildHistorianSystemPrompt()/getHistorianToolDefinition() (the exact
+    // functions this route calls below) and drives its own OpenAI Realtime
+    // WebSocket connection, so none of the voice-credential machinery below
+    // is relevant to it. Accepts either `body.textMode === true` or the
+    // query string `?textMode=1`/`?textMode=true`. Purely additive — every
+    // existing (non-textMode) caller falls through to the unchanged code
+    // below exactly as before.
+    const requestUrl = new URL(request.url)
+    const textModeParam = requestUrl.searchParams.get('textMode')
+    const textMode = body.textMode === true || textModeParam === '1' || textModeParam === 'true'
+    if (textMode) {
+      return NextResponse.json({ sessionId, flushToken })
+    }
+
     const sessionType: HistorianSessionType = body.sessionType || 'new_patient'
     let referralReason: string | undefined = body.referralReason
     let patientContext: string | undefined = body.patientContext
@@ -80,35 +118,8 @@ export async function POST(request: Request) {
       }
     }
 
-    // Historian Validation Suite Task 1 (durable transcript): the server now
-    // mints the historian_sessions.id UUID up front, in both provider
-    // branches, instead of leaving it to the DB default on insert at /save.
-    // This lets the client start flushing transcript events to
-    // /transcript-flush immediately — well before a historian_sessions row
-    // exists — using a session id that /save will later insert AS that
-    // row's id (see save/route.ts). crypto.randomUUID() produces a standard
-    // v4 UUID string, exactly what historian_sessions.id's
-    // `DEFAULT gen_random_uuid()` would have produced — just minted here
-    // instead of by Postgres.
-    const sessionId = crypto.randomUUID()
-    // mintFlushToken() now fails closed (throws) in production when neither
-    // HISTORIAN_FLUSH_SECRET nor NOVA_RELAY_SHARED_SECRET is configured —
-    // that must never take down the whole historian session (voice
-    // interview creation is the load-bearing feature here; the durable
-    // transcript flush is a safety net on top of it). Caught non-fatally:
-    // `sessionId` is still returned either way (still useful to /save),
-    // `flushToken` is simply omitted, and the client's flushTranscript()
-    // already no-ops without a token (fail-open by design).
-    let flushToken: string | undefined
-    try {
-      flushToken = mintFlushToken(sessionId)
-    } catch (flushTokenErr) {
-      console.warn(
-        '[historian/session] mintFlushToken failed (non-fatal — durable transcript flush unavailable this session):',
-        flushTokenErr instanceof Error ? flushTokenErr.message : String(flushTokenErr),
-      )
-      flushToken = undefined
-    }
+    // (sessionId/flushToken were minted up front, above the textMode check —
+    // both provider branches below use those same values.)
 
     // ── Nova path: no OpenAI client_secrets call. Return relay config + the
     // Nova-native tool specs (Bedrock Converse toolSpec shape). The hook
