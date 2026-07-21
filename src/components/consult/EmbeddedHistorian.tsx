@@ -54,6 +54,8 @@ export default function EmbeddedHistorian({
     duration: number
     questionCount: number
     endedEarly: boolean
+    /** Server-minted historian_sessions id — see useRealtimeSession's onComplete. */
+    sessionId: string | null
   } | null>(null)
 
   const transcriptEndRef = useRef<HTMLDivElement>(null)
@@ -94,6 +96,7 @@ export default function EmbeddedHistorian({
           status: 'completed',
           interview_completion_status: data.endedEarly ? 'ended_early' : 'complete',
           consult_id: consultId,
+          sessionId: data.sessionId,
         }),
       })
       if (!res.ok) {

@@ -1,0 +1,36 @@
+-- Migration 057: historian_sessions.final_differential
+--
+-- Historian Validation Suite, Task 2 — final full-transcript differential
+-- diagnosis pass. The AI Historian interview itself never diagnoses
+-- (prompt-hardened, by design); this column stores the output of a
+-- SEPARATE, post-session Bedrock evaluation pass
+-- (src/lib/historian/eval/finalDifferential.ts) that runs the complete
+-- transcript through one schema-forced Sonnet tool call to produce a
+-- scoreable, citation-grounded differential for retrospective QA/audit
+-- review — consumed by later sprint tasks (independent scorer, batch
+-- harness) and rendered physician/QA-facing only via DifferentialCard
+-- (never on a patient-facing surface).
+--
+-- Shape (FinalDifferential, see src/lib/historian/eval/finalDifferential.ts):
+--   {
+--     differential: DifferentialItem[],  -- max 6, each with verbatim
+--                                         -- transcript-quote citations
+--     summary: string,
+--     provenance: { model_id, prompt_version, inference_params, generated_at },
+--     dropped_quotes: number
+--   }
+--
+-- Populated asynchronously, fire-and-forget, from POST /save (behind
+-- HISTORIAN_EVAL_AUTORUN — unset defaults to enabled) — NULL until that
+-- background pass completes, indefinitely NULL if it never ran or if the
+-- deterministic transcript-size guard rejected the session. UI treats NULL
+-- as a "pending" state, never as an error.
+--
+-- Additive only — no backfill, no NOT NULL, no default.
+--
+-- Run: psql $RDS_URL -f migrations/057_historian_final_differential.sql
+-- Rollback: migrations/057_historian_final_differential.down.sql
+--
+-- NOT applied here — additive only, applied by a later rollout task.
+
+ALTER TABLE historian_sessions ADD COLUMN IF NOT EXISTS final_differential JSONB;

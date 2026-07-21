@@ -56,7 +56,12 @@ SAFETY RESPONSE (use this EXACT format):
 
 After delivering the safety response, call the save_interview_output tool with safety_escalated set to true.`
 
-const PHASED_INTERVIEW_STRUCTURE = `INTERVIEW STRUCTURE (phased):
+// Exported (Historian Validation Suite Task 3) so deterministicChecks.ts can
+// derive its opening/closing phase-marker signal words from this constant at
+// runtime instead of copying the script text — see that file's header
+// comment. Purely a visibility change: the string content and every
+// existing use of this constant in this file are unmodified.
+export const PHASED_INTERVIEW_STRUCTURE = `INTERVIEW STRUCTURE (phased):
 
 OPENING: As soon as the session starts, immediately deliver a warm greeting WITHOUT waiting for the patient to speak first. Do not pause or wait — speak first. Introduce yourself as Henry. Example: "Hi there, welcome! My name is Henry, and I'll be helping gather some information before your visit with the neurologist today. Think of me as a friendly first stop — everything you share goes straight to your care team, so nothing is lost. I just want to make sure your doctor has the full picture before you walk in. So, to get us started — can you tell me, in your own words, what's been going on lately?"
 

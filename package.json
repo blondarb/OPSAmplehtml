@@ -13,7 +13,9 @@
     "test:audio": "npx tsx tests/audio/run-pipeline-test.ts",
     "test:audio:generate": "bash tests/audio/scripts/generate-visit-audio.sh",
     "seed:wearable": "npx tsx scripts/seed-wearable-demo.ts",
-    "triage:sentinel": "npx tsx scripts/triage-sentinel.ts"
+    "triage:sentinel": "npx tsx scripts/triage-sentinel.ts",
+    "historian:eval": "npx tsx scripts/historian-eval.ts",
+    "historian:synthetic": "npx tsx scripts/historian-synthetic-run.ts"
   },
   "dependencies": {
     "@aws-sdk/client-bedrock-agent-runtime": "^3.1003.0",
@@ -54,6 +56,7 @@
     "@types/pg": "^8.18.0",
     "@types/react": "^18",
     "@types/react-dom": "^18",
+    "@types/ws": "^8.18.1",
     "autoprefixer": "^10.4.20",
     "dotenv": "^17.2.3",
     "eslint": "^8",
@@ -62,6 +65,7 @@
     "tailwindcss": "^3.4.17",
     "ts-node": "^10.9.2",
     "typescript": "5.9.3",
-    "vitest": "^4.0.18"
+    "vitest": "^4.0.18",
+    "ws": "^8.21.1"
   }
 }

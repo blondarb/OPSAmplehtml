@@ -2,6 +2,9 @@
 
 import { useState } from 'react'
 import type { HistorianSession } from '@/lib/historianTypes'
+import HistorianTranscriptViewer from './historian/HistorianTranscriptViewer'
+import DifferentialCard from './historian/DifferentialCard'
+import DdxComparisonCard from './historian/DdxComparisonCard'
 
 interface HistorianSessionPanelProps {
   sessions: HistorianSession[]
@@ -22,6 +25,11 @@ function formatTime(dateStr: string): string {
 export default function HistorianSessionPanel({ sessions, onImport }: HistorianSessionPanelProps) {
   const [expandedId, setExpandedId] = useState<string | null>(null)
   const [expandedSection, setExpandedSection] = useState<string>('summary')
+  // Turn-link state: clicking a cited quote on the differential sub-tab
+  // switches to the transcript sub-tab and jumps it to that turn (see
+  // HistorianTranscriptViewer's highlightIndex prop). Shared across cards
+  // like expandedId/expandedSection — only one card is ever expanded.
+  const [highlightIndex, setHighlightIndex] = useState<number | null>(null)
 
   if (!sessions || sessions.length === 0) return null
 
@@ -188,7 +196,7 @@ export default function HistorianSessionPanel({ sessions, onImport }: HistorianS
                 <div style={{ borderTop: '1px solid var(--border-color, #e2e8f0)', padding: '12px' }}>
                   {/* Sub-tabs */}
                   <div style={{ display: 'flex', gap: '0', marginBottom: '12px', borderBottom: '1px solid var(--border-color, #e2e8f0)' }}>
-                    {['summary', 'structured', 'transcript'].map(sec => (
+                    {['summary', 'structured', 'differential', 'compare', 'transcript'].map(sec => (
                       <button
                         key={sec}
                         onClick={() => setExpandedSection(sec)}
@@ -281,39 +289,47 @@ export default function HistorianSessionPanel({ sessions, onImport }: HistorianS
                     </div>
                   )}
 
-                  {/* Transcript */}
+                  {/* Final differential (Historian Validation Suite Task 2) —
+                      physician/QA-facing only, never shown to the patient.
+                      Pending state (DifferentialCard's own default) until
+                      the async post-session evaluator completes. */}
+                  {expandedSection === 'differential' && (
+                    <DifferentialCard
+                      finalDifferential={session.final_differential}
+                      onQuoteClick={(turn) => {
+                        setExpandedSection('transcript')
+                        setHighlightIndex(turn)
+                      }}
+                    />
+                  )}
+
+                  {/* Cross-family comparison (Historian Validation Suite Task
+                      4) — pipeline (Sonnet) vs independent (DeepSeek-R1)
+                      differential + agreement metrics. independent_ddx/
+                      agreement are populated by the GET handler's enriched
+                      query when historian_evaluations exists; DdxComparisonCard
+                      renders its own pending state otherwise. */}
+                  {expandedSection === 'compare' && (
+                    <DdxComparisonCard
+                      finalDifferential={session.final_differential}
+                      independentDdx={session.independent_ddx}
+                      agreement={session.agreement}
+                      onQuoteClick={(turn) => {
+                        setExpandedSection('transcript')
+                        setHighlightIndex(turn)
+                      }}
+                    />
+                  )}
+
+                  {/* Transcript — already gated behind the sub-tab above, so
+                      render it pre-expanded rather than making the reader
+                      click through a second collapse. */}
                   {expandedSection === 'transcript' && (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', maxHeight: '300px', overflowY: 'auto' }}>
-                      {session.transcript && session.transcript.length > 0 ? (
-                        session.transcript.map((entry, i) => (
-                          <div
-                            key={i}
-                            style={{
-                              padding: '6px 10px',
-                              borderRadius: '6px',
-                              background: entry.role === 'assistant' ? 'rgba(13,148,136,0.06)' : 'rgba(139,92,246,0.06)',
-                              borderLeft: `2px solid ${entry.role === 'assistant' ? '#0d9488' : '#8B5CF6'}`,
-                            }}
-                          >
-                            <div style={{
-                              fontSize: '0.65rem',
-                              color: entry.role === 'assistant' ? '#0d9488' : '#8B5CF6',
-                              fontWeight: 600,
-                              marginBottom: '1px',
-                            }}>
-                              {entry.role === 'assistant' ? 'AI' : 'Patient'}
-                            </div>
-                            <div style={{ fontSize: '0.75rem', color: 'var(--text-primary, #1e293b)', lineHeight: 1.4 }}>
-                              {entry.text}
-                            </div>
-                          </div>
-                        ))
-                      ) : (
-                        <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary, #64748b)', fontStyle: 'italic', margin: 0 }}>
-                          No transcript available.
-                        </p>
-                      )}
-                    </div>
+                    <HistorianTranscriptViewer
+                      entries={session.transcript ?? []}
+                      defaultExpanded
+                      highlightIndex={highlightIndex}
+                    />
                   )}
 
                   {/* Action buttons */}

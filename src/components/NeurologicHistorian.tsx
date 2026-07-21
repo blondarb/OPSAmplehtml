@@ -55,6 +55,8 @@ export default function NeurologicHistorian() {
     transcript: HistorianTranscriptEntry[]
     duration: number
     questionCount: number
+    /** Server-minted historian_sessions id — see useRealtimeSession's onComplete. */
+    sessionId: string | null
   } | null>(null)
 
   const [showPhysicianPanel, setShowPhysicianPanel] = useState(false)
@@ -103,6 +105,7 @@ export default function NeurologicHistorian() {
           question_count: data.questionCount,
           status: 'completed',
           consult_id: consultIdParam || null,
+          sessionId: data.sessionId,
         }),
       })
     } catch (err) {
@@ -872,6 +875,12 @@ export default function NeurologicHistorian() {
             duration={completionData.duration}
             questionCount={completionData.questionCount}
             transcript={completionData.transcript}
+            // This is the unauthenticated patient surface (/patient/historian)
+            // — see design spec locked decision L1. DDx/thoroughness props
+            // are never passed here; `surface="patient"` is now the
+            // structural guarantee that HistorianReportView never renders
+            // them even if that ever changes.
+            surface="patient"
             onStartAnother={handleStartAnother}
             onBackToPortal={handleBackToPortal}
           />

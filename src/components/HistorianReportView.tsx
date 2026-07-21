@@ -2,7 +2,14 @@
 
 import { useEffect, useState } from 'react'
 import type { HistorianRedFlag, HistorianStructuredOutput, HistorianTranscriptEntry } from '@/lib/historianTypes'
+import type { FinalDifferential } from '@/lib/historian/eval/finalDifferential'
+import type { IndependentDifferential } from '@/lib/historian/eval/independentDdx'
+import type { AgreementResult } from '@/lib/historian/eval/agreement'
+import type { ThoroughnessEvaluation } from '@/lib/historian/eval/thoroughnessJudge'
 import IntakeReviewSection from './consult/IntakeReviewSection'
+import HistorianTranscriptViewer from './historian/HistorianTranscriptViewer'
+import DifferentialCard from './historian/DifferentialCard'
+import DdxComparisonCard from './historian/DdxComparisonCard'
 
 interface HistorianReportViewProps {
   structuredOutput: HistorianStructuredOutput | null
@@ -12,6 +19,47 @@ interface HistorianReportViewProps {
   questionCount: number
   /** Optional — included when available so the Patient Report fallback has more to work with. */
   transcript?: HistorianTranscriptEntry[]
+  /**
+   * Historian Validation Suite design spec locked decision L1: DDx/
+   * thoroughness content is physician/QA-facing ONLY, never patient-facing.
+   * REQUIRED (no default) so every call site must make an explicit choice.
+   * `'physician'` renders the DifferentialCard/DdxComparisonCard/
+   * thoroughness content below when the corresponding data is populated;
+   * `'patient'` NEVER renders them, structurally — the render gate below
+   * checks this prop directly, not whether the data props happen to be
+   * populated. See the runtime invariant in the component body.
+   */
+  surface: 'physician' | 'patient'
+  /**
+   * Historian Validation Suite Task 2 — the post-session final differential
+   * (historian_sessions.final_differential). Physician Report tab only;
+   * never surfaced on the Patient Report tab. Undefined/null renders a
+   * pending state (DifferentialCard's own default — this component doesn't
+   * poll for it, since the async evaluator typically hasn't finished by
+   * the moment this "Interview Complete" screen first renders).
+   */
+  finalDifferential?: FinalDifferential | null
+  /**
+   * Historian Validation Suite Task 4 — the independent DeepSeek-R1
+   * differential and its agreement metrics against finalDifferential above.
+   * Same optionality/pending-state handling as finalDifferential: neither
+   * is fetched by this component, and (like finalDifferential) neither is
+   * currently passed by NeurologicHistorian.tsx's call site either, since
+   * the async eval pipeline typically hasn't finished by the moment this
+   * "Interview Complete" screen first renders. DdxComparisonCard renders
+   * its own pending state for null/undefined.
+   */
+  independentDdx?: IndependentDifferential | null
+  agreement?: AgreementResult | null
+  /**
+   * Historian Validation Suite Task 3 — the thoroughness judge result. Not
+   * currently wired to any rendered card here (no thoroughness UI exists on
+   * this view yet), but included in the surface prop's contract now so a
+   * future addition is automatically covered by the same structural guard
+   * as finalDifferential/independentDdx/agreement, rather than needing a
+   * second pass to remember the DDx/thoroughness-never-patient-facing rule.
+   */
+  thoroughness?: ThoroughnessEvaluation | null
   onStartAnother: () => void
   onBackToPortal: () => void
 }
@@ -31,6 +79,11 @@ export default function HistorianReportView({
   duration,
   questionCount,
   transcript,
+  surface,
+  finalDifferential,
+  independentDdx,
+  agreement,
+  thoroughness,
   onStartAnother,
   onBackToPortal,
 }: HistorianReportViewProps) {
@@ -38,6 +91,28 @@ export default function HistorianReportView({
   const [patientReport, setPatientReport] = useState<string | null>(null)
   const [patientReportLoading, setPatientReportLoading] = useState(true)
   const [patientReportError, setPatientReportError] = useState(false)
+
+  // ── Structural DDx/thoroughness guard (design spec locked decision L1) ──
+  // The PRIMARY control is that PhysicianReportTab below gates
+  // DifferentialCard/DdxComparisonCard/thoroughness content directly on
+  // `surface === 'physician'` — never on whether these values happen to be
+  // populated. This block is a fail-safe backstop: if a future call site
+  // mistakenly threads a populated DDx/thoroughness prop into a
+  // surface="patient" instance, that is loudly caught here (console.error,
+  // no patient text) rather than silently relying on "it happens not to
+  // pass the props" — which is exactly the gap this fix closes. Never
+  // throws in prod — throwing would break the patient's report view; the
+  // refuse-to-render in PhysicianReportTab is the actual guard.
+  if (
+    surface !== 'physician' &&
+    (finalDifferential != null || independentDdx != null || agreement != null || thoroughness != null)
+  ) {
+    console.error(
+      '[HistorianReportView] SURFACE VIOLATION: surface="patient" but a physician-only prop ' +
+        '(finalDifferential/independentDdx/agreement/thoroughness) was populated — refusing to ' +
+        'render it. This must never happen; audit the call site that constructed these props.',
+    )
+  }
 
   // Generate the patient-facing recap once, on mount, so it's ready by the
   // time the patient switches to that tab. Fail-open: any error falls back
@@ -135,7 +210,16 @@ export default function HistorianReportView({
       {/* Tab content */}
       <div style={{ background: '#1e293b', border: '1px solid #334155', borderRadius: '12px', padding: '20px', marginBottom: '24px', minHeight: '200px' }}>
         {activeTab === 'physician' ? (
-          <PhysicianReportTab structuredOutput={structuredOutput} narrativeSummary={narrativeSummary} redFlags={redFlags} />
+          <PhysicianReportTab
+            surface={surface}
+            structuredOutput={structuredOutput}
+            narrativeSummary={narrativeSummary}
+            redFlags={redFlags}
+            transcript={transcript}
+            finalDifferential={finalDifferential}
+            independentDdx={independentDdx}
+            agreement={agreement}
+          />
         ) : (
           <PatientReportTab
             loading={patientReportLoading}
@@ -176,12 +260,31 @@ export default function HistorianReportView({
 // ── Physician Report tab ─────────────────────────────────────────────
 
 interface PhysicianReportTabProps {
+  surface: 'physician' | 'patient'
   structuredOutput: HistorianStructuredOutput | null
   narrativeSummary: string | null
   redFlags: HistorianRedFlag[]
+  transcript?: HistorianTranscriptEntry[]
+  finalDifferential?: FinalDifferential | null
+  independentDdx?: IndependentDifferential | null
+  agreement?: AgreementResult | null
 }
 
-function PhysicianReportTab({ structuredOutput, narrativeSummary, redFlags }: PhysicianReportTabProps) {
+function PhysicianReportTab({
+  surface,
+  structuredOutput,
+  narrativeSummary,
+  redFlags,
+  transcript,
+  finalDifferential,
+  independentDdx,
+  agreement,
+}: PhysicianReportTabProps) {
+  // Turn-link state: clicking a cited quote in DifferentialCard jumps the
+  // transcript viewer below to that turn (see HistorianTranscriptViewer's
+  // highlightIndex prop).
+  const [highlightIndex, setHighlightIndex] = useState<number | null>(null)
+
   return (
     <div>
       {redFlags.length > 0 && (
@@ -213,6 +316,40 @@ function PhysicianReportTab({ structuredOutput, narrativeSummary, redFlags }: Ph
           historian_summary: narrativeSummary,
         }}
       />
+
+      {/* Design spec locked decision L1: DDx/thoroughness content is
+          physician/QA-facing ONLY, never patient-facing. Gated directly on
+          `surface`, never on whether finalDifferential/independentDdx/
+          agreement happen to be populated — see HistorianReportView's
+          runtime invariant for the defense-in-depth backstop that catches a
+          call site which mistakenly populates these on a patient surface. */}
+      {surface === 'physician' && (
+        <>
+          <div style={{ marginTop: 16 }}>
+            <DifferentialCard
+              finalDifferential={finalDifferential}
+              onQuoteClick={(turn) => setHighlightIndex(turn)}
+            />
+          </div>
+
+          {/* Cross-family comparison (Historian Validation Suite Task 4) —
+              pipeline (Sonnet) vs independent (DeepSeek-R1) + agreement. */}
+          <div style={{ marginTop: 16 }}>
+            <DdxComparisonCard
+              finalDifferential={finalDifferential}
+              independentDdx={independentDdx}
+              agreement={agreement}
+              onQuoteClick={(turn) => setHighlightIndex(turn)}
+            />
+          </div>
+        </>
+      )}
+
+      {transcript && transcript.length > 0 && (
+        <div style={{ marginTop: 16 }}>
+          <HistorianTranscriptViewer entries={transcript} highlightIndex={highlightIndex} />
+        </div>
+      )}
     </div>
   )
 }

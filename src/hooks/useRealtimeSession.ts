@@ -52,6 +52,16 @@ interface UseRealtimeSessionOptions {
      * partial in downstream UIs and reports.
      */
     endedEarly: boolean
+    /**
+     * Server-minted historian_sessions id (Task 1: durable transcript),
+     * returned by /api/ai/historian/session as `sessionId`. Consumers must
+     * pass this through as `sessionId` on their /api/ai/historian/save
+     * POST body so the saved row's id matches the id transcript-flush
+     * events were already keyed by. Null if /session didn't return one
+     * (e.g. a test/mock response predating this field) — /save falls back
+     * to its DB-generated id in that case.
+     */
+    sessionId: string | null
   }) => void
   /** Called when the historian AI completes a scale administration via save_scale_responses tool */
   onScaleComplete?: (args: SaveScaleResponsesArgs) => void
@@ -110,6 +120,25 @@ const SAFETY_KEYWORDS = [
 /** How many patient turns between localizer runs. */
 const LOCALIZER_INTERVAL = 3
 
+/**
+ * How many unflushed transcript entries accumulate before triggering an
+ * automatic flush to /api/ai/historian/transcript-flush (Task 1: durable
+ * transcript). Kept equal to LOCALIZER_INTERVAL only by coincidence — the
+ * two are unrelated (localizer counts patient turns only; this counts both
+ * roles).
+ */
+const FLUSH_THRESHOLD = 3
+
+/**
+ * Bound on endSession's final flushTranscript() await (Task 1 fix) — long
+ * enough for a normal flush POST to complete, short enough that a slow or
+ * hanging request can never meaningfully delay the save handoff. Losing
+ * this race does NOT lose the flush attempt itself — the underlying
+ * fetch keeps running in the background and still lands if it completes
+ * late; the race only bounds how long endSession waits for it.
+ */
+const FINAL_FLUSH_TIMEOUT_MS = 2000
+
 export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealtimeSessionResult {
   const [status, setStatus] = useState<SessionStatus>('idle')
   const [transcript, setTranscript] = useState<HistorianTranscriptEntry[]>([])
@@ -138,6 +167,23 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
   const safetyEscalatedRef = useRef<boolean>(false)
   const transcriptRef = useRef<HistorianTranscriptEntry[]>([])
   const administeredScaleIdsRef = useRef<Set<string>>(new Set())
+  // ── Durable transcript flush (Task 1 of the Historian Validation Suite) ──
+  // Server-minted historian_sessions id + its matching bearer token, both
+  // returned by /api/ai/historian/session. Null until startSession's fetch
+  // resolves; flushTranscript no-ops while either is null (fail-open — the
+  // session still works exactly as before this feature if /session is an
+  // older/mocked response without these fields).
+  const serverSessionIdRef = useRef<string | null>(null)
+  const flushTokenRef = useRef<string | null>(null)
+  // Monotonic per-entry sequence number, assigned at append time (both the
+  // assistantTranscript and userTranscript branches below).
+  const seqCounterRef = useRef<number>(0)
+  // Entries appended since the last successful flush. On a failed flush
+  // these are left in place (fail-open) so the next trigger — the next
+  // threshold-of-3, a provider error, or pagehide — resends them; the
+  // flush endpoint is idempotent (ON CONFLICT (session_id, seq) DO
+  // NOTHING) so resending an already-durable batch is always safe.
+  const pendingFlushEntriesRef = useRef<HistorianTranscriptEntry[]>([])
   // Phase 5: holds the base instructions returned by /api/ai/historian/session.
   // Used by pushLocalizerContext to re-serialize BASE_PROMPT + delta (OpenAI)
   // or as the closing-line-free source text (Nova has no overwrite primitive).
@@ -322,6 +368,66 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
     }
   }, [options])
 
+  // ── Durable transcript flush (Task 1) ─────────────────────────────────
+  // Best-effort POST of up to 50 not-yet-durable entries. Returns a Promise
+  // so a caller that needs to (endSession's final flush, below) CAN await
+  // it — but every other call site (threshold trigger, provider
+  // error/disconnected, pagehide) fires it without awaiting, and it never
+  // throws — a flush failure must not interrupt the live interview.
+  // Failures simply leave the batch in pendingFlushEntriesRef so the next
+  // trigger retries it; the endpoint is idempotent so resending an
+  // already-durable batch is always safe.
+  const flushTranscript = useCallback((opts?: { keepalive?: boolean }): Promise<void> => {
+    const sessionId = serverSessionIdRef.current
+    const token = flushTokenRef.current
+    if (!sessionId || !token) return Promise.resolve() // /session didn't mint flush support — no-op
+    if (pendingFlushEntriesRef.current.length === 0) return Promise.resolve()
+
+    // Cap at 50/request (server also enforces this — see transcript-flush
+    // route.ts — this just avoids a guaranteed-413 round trip). Anything
+    // beyond 50 flushes on a later trigger once this batch clears.
+    const batch = pendingFlushEntriesRef.current.slice(0, 50)
+
+    try {
+      return fetch('/api/ai/historian/transcript-flush', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({
+          sessionId,
+          entries: batch.map(e => ({ seq: e.seq, role: e.role, text: e.text, tsOffsetS: e.timestamp })),
+        }),
+        // pagehide's flush MUST use keepalive so the browser completes the
+        // request after the page starts unloading — sendBeacon can't set
+        // an Authorization header, which this endpoint requires.
+        keepalive: opts?.keepalive === true,
+      })
+        .then(res => {
+          if (!res.ok) return // fail-open: leave batch pending for the next trigger
+          // Cross-session prune race guard: if a NEW session has already
+          // started by the time this (possibly slow/retried) response
+          // lands, pendingFlushEntriesRef was already reset for that new
+          // session and its seq numbers restart from 1 — pruning by raw
+          // seq here could delete the NEW session's not-yet-flushed
+          // entries just because they happen to share a seq value with
+          // this stale batch. Skip the prune once the session has moved
+          // on; this response already confirms the stale batch is durable
+          // server-side, it just has nothing left to prune from a buffer
+          // it's no longer part of.
+          if (serverSessionIdRef.current !== sessionId) return
+          const sentSeqs = new Set(batch.map(e => e.seq))
+          pendingFlushEntriesRef.current = pendingFlushEntriesRef.current.filter(
+            e => !sentSeqs.has(e.seq),
+          )
+        })
+        .catch(() => {
+          // Network error — fail-open, retried on the next trigger.
+        })
+    } catch {
+      // Synchronous fetch-construction failure (shouldn't happen) — fail-open.
+      return Promise.resolve()
+    }
+  }, [])
+
   // ── Tool execution: same per-tool logic that lived in handleServerEvent's
   // response.done branch pre-refactor, now keyed off the normalized `toolCall`
   // VoiceEvent and replying via provider.sendToolResult instead of writing
@@ -498,10 +604,19 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
             role: 'assistant',
             text: fullText.trim(),
             timestamp: Math.floor((Date.now() - startTimeRef.current) / 1000),
+            seq: ++seqCounterRef.current,
           }
           transcriptRef.current = [...transcriptRef.current, entry]
           setTranscript([...transcriptRef.current])
           questionCountRef.current += 1
+
+          // Durable transcript flush (Task 1): buffer + flush every
+          // FLUSH_THRESHOLD unflushed entries. Fire-and-forget — never
+          // blocks the UI.
+          pendingFlushEntriesRef.current = [...pendingFlushEntriesRef.current, entry]
+          if (pendingFlushEntriesRef.current.length >= FLUSH_THRESHOLD) {
+            flushTranscript()
+          }
         }
         setCurrentAssistantText('')
         setAiSpeaking(false)
@@ -525,9 +640,18 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
             role: 'user',
             text: userText.trim(),
             timestamp: Math.floor((Date.now() - startTimeRef.current) / 1000),
+            seq: ++seqCounterRef.current,
           }
           transcriptRef.current = [...transcriptRef.current, entry]
           setTranscript([...transcriptRef.current])
+
+          // Durable transcript flush (Task 1): buffer + flush every
+          // FLUSH_THRESHOLD unflushed entries. Fire-and-forget — never
+          // blocks the UI.
+          pendingFlushEntriesRef.current = [...pendingFlushEntriesRef.current, entry]
+          if (pendingFlushEntriesRef.current.length >= FLUSH_THRESHOLD) {
+            flushTranscript()
+          }
 
           // Safety check on user speech
           checkSafety(userText)
@@ -619,6 +743,14 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
         // session) — mirrors the pre-refactor handleDrop's sessionGen check.
         if (sessionGenRef.current !== sessionGen) break
         console.warn('[useRealtimeSession] transport disconnected —', e.reason, '— running graceful end')
+        // Durable transcript flush (Task 1 fix): a dropped transport is the
+        // headline scenario this feature protects against — flush whatever
+        // hasn't been durably saved yet BEFORE the graceful-end flow runs.
+        // endSession() also does a final flush of its own, but keep this
+        // one explicit so durability doesn't depend on the end path (which
+        // does more work — nudging the AI, tearing down the provider —
+        // and could itself stall or fail) ever completing.
+        flushTranscript()
         endSessionRef.current()
         break
       }
@@ -626,10 +758,14 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
       case 'error': {
         console.error('Voice provider error:', e.message)
         setError(e.message || 'Voice provider error')
+        // Durable transcript flush (Task 1): a transport error is exactly
+        // the kind of event that might precede losing the session — flush
+        // whatever hasn't been durably saved yet, best-effort.
+        flushTranscript()
         break
       }
     }
-  }, [checkSafety, runLocalizer, handleToolCall, options, setAiSpeaking, maybeScheduleAutoEnd])
+  }, [checkSafety, runLocalizer, handleToolCall, options, setAiSpeaking, maybeScheduleAutoEnd, flushTranscript])
 
   const startSession = useCallback(async () => {
     setStatus('connecting')
@@ -653,6 +789,11 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
     setInterviewCompleted(false)
     interviewCompletedRef.current = false
     finalizingRef.current = false
+    // Durable transcript flush (Task 1) — reset per session.
+    serverSessionIdRef.current = null
+    flushTokenRef.current = null
+    seqCounterRef.current = 0
+    pendingFlushEntriesRef.current = []
     if (autoEndTimerRef.current) {
       clearTimeout(autoEndTimerRef.current)
       autoEndTimerRef.current = null
@@ -690,7 +831,17 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
         relayUrl,
         relayToken,
         expiresAt,
+        // Task 1 (durable transcript): server-minted historian_sessions id
+        // + its matching transcript-flush bearer token. Both optional from
+        // the client's perspective — an older/mocked /session response
+        // without them just means flushTranscript stays a no-op and the
+        // session behaves exactly as it did before this feature.
+        sessionId: mintedSessionId,
+        flushToken: mintedFlushToken,
       } = sessionConfig
+
+      serverSessionIdRef.current = typeof mintedSessionId === 'string' ? mintedSessionId : null
+      flushTokenRef.current = typeof mintedFlushToken === 'string' ? mintedFlushToken : null
 
       // 2. Resolve the provider kind. The route's `provider` field wins (it
       //    minted the session for that kind); fall back to selectProvider
@@ -910,6 +1061,18 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
     // AI judged the intake complete — flag it as partial.
     const endedEarly = !interviewCompleted
 
+    // Durable transcript flush (Task 1 fix): flush whatever hasn't hit the
+    // FLUSH_THRESHOLD-of-3 auto-trigger yet — trailing entries (the
+    // "N mod 3" remainder) would otherwise never reach the durable event
+    // log on a graceful end. Bounded by a race against a short timeout so
+    // a slow/hanging flush can never meaningfully delay the save handoff
+    // below; losing the race doesn't cancel the underlying request, it
+    // just stops waiting on it.
+    await Promise.race([
+      flushTranscript(),
+      new Promise<void>(resolve => setTimeout(resolve, FINAL_FLUSH_TIMEOUT_MS)),
+    ])
+
     options.onComplete?.({
       structuredOutput: structuredOutputRef.current,
       narrativeSummary: narrativeSummaryRef.current,
@@ -919,14 +1082,29 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
       duration: finalDuration,
       questionCount: questionCountRef.current,
       endedEarly,
+      sessionId: serverSessionIdRef.current,
     })
 
     setStatus('complete')
-  }, [cleanup, options, interviewCompleted])
+  }, [cleanup, options, interviewCompleted, flushTranscript])
 
   // Keep the ref in sync so the provider's `disconnected` handler always
   // calls the latest endSession.
   useEffect(() => { endSessionRef.current = endSession }, [endSession])
+
+  // Durable transcript flush (Task 1): best-effort flush on page unload.
+  // MUST use fetch keepalive, not navigator.sendBeacon — the flush
+  // endpoint requires an Authorization header, and sendBeacon cannot set
+  // custom headers. Registered once for the component's lifetime;
+  // flushTranscript itself no-ops when there's no active session or
+  // nothing pending, so this is cheap when idle.
+  useEffect(() => {
+    const handlePageHide = () => {
+      flushTranscript({ keepalive: true })
+    }
+    window.addEventListener('pagehide', handlePageHide)
+    return () => window.removeEventListener('pagehide', handlePageHide)
+  }, [flushTranscript])
 
   // Clean up on unmount
   useEffect(() => {

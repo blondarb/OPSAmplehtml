@@ -18,6 +18,15 @@ export interface HistorianTranscriptEntry {
   role: 'assistant' | 'user'
   text: string
   timestamp: number // seconds from session start
+  /**
+   * Monotonic per-session sequence number, assigned client-side at append
+   * time. Optional so legacy transcripts (saved before the durable
+   * transcript-event log existed) keep validating cleanly. Used to key the
+   * idempotent `historian_transcript_events` flush log — see
+   * src/lib/historian/transcriptIntegrity.ts and
+   * src/app/api/ai/historian/transcript-flush/route.ts.
+   */
+  seq?: number
 }
 
 export interface HistorianRedFlag {
@@ -89,6 +98,31 @@ export interface HistorianSession {
   imported_to_note: boolean
   session_source?: string
   interview_completion_status?: 'complete' | 'ended_early' | null
+  /**
+   * Historian Validation Suite Task 2: output of the post-session final
+   * differential pass (src/lib/historian/eval/finalDifferential.ts) — a
+   * separate, physician/QA-facing-only evaluation of the complete
+   * transcript. NULL/absent means the async evaluator hasn't completed
+   * (or never ran) for this session yet; DifferentialCard renders a
+   * pending state in that case. Optional so rows saved before migration
+   * 057 keep validating cleanly (same pattern as interview_completion_status).
+   */
+  final_differential?: import('./historian/eval/finalDifferential').FinalDifferential | null
+  /**
+   * Historian Validation Suite Task 4: DeepSeek-R1's independent
+   * differential (historian_evaluations, evaluator='independent_ddx') —
+   * cross-family blind pass, physician/QA-facing only. Optional/nullable:
+   * populated only by the enriched session-list query in
+   * src/app/api/ai/historian/save/route.ts's GET handler (fails open to
+   * omitting these fields if historian_evaluations doesn't exist yet — see
+   * that route's 42P01 handling), and never present at all on the
+   * immediately-post-interview HistorianReportView screen (same as
+   * final_differential there). DdxComparisonCard renders its own pending
+   * state for null/undefined, same as DifferentialCard.
+   */
+  independent_ddx?: import('./historian/eval/independentDdx').IndependentDifferential | null
+  /** Historian Validation Suite Task 4: agreement metrics between final_differential and independent_ddx (historian_evaluations, evaluator='agreement'). Same optionality/sourcing as independent_ddx above. */
+  agreement?: import('./historian/eval/agreement').AgreementResult | null
   created_at: string
   updated_at: string
   // Joined patient data (from dashboardData query)

@@ -1,0 +1,45 @@
+{
+  "_note": "[training knowledge — Steve to vet]",
+  "version": "base-neuro-hpi-v1",
+  "syndrome": null,
+  "vetted_by": null,
+  "vetted_date": null,
+  "critical_questions": [
+    {
+      "id": "onset-timing",
+      "question": "When exactly did the symptom(s) start, and was the onset sudden or gradual?",
+      "severity": "critical"
+    },
+    {
+      "id": "trajectory",
+      "question": "Are the symptoms currently stable, improving, or actively worsening?",
+      "severity": "critical"
+    },
+    {
+      "id": "current-medications",
+      "question": "What medications (including OTC and supplements) is the patient currently taking?",
+      "severity": "important"
+    },
+    {
+      "id": "allergies",
+      "question": "Does the patient have any known drug allergies?",
+      "severity": "important"
+    },
+    {
+      "id": "past-medical-history",
+      "question": "Relevant past medical and surgical history.",
+      "severity": "important"
+    },
+    {
+      "id": "family-history",
+      "question": "Family history of neurological conditions.",
+      "severity": "important"
+    },
+    {
+      "id": "social-history",
+      "question": "Social history: occupation, smoking, alcohol, substance use.",
+      "severity": "important"
+    }
+  ],
+  "expected_dimensions": ["oldcarts", "red_flags", "pmh_meds_allergies", "fh_sh", "question_quality", "closure"]
+}
