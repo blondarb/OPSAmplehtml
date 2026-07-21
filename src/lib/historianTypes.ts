@@ -18,6 +18,15 @@ export interface HistorianTranscriptEntry {
   role: 'assistant' | 'user'
   text: string
   timestamp: number // seconds from session start
+  /**
+   * Monotonic per-session sequence number, assigned client-side at append
+   * time. Optional so legacy transcripts (saved before the durable
+   * transcript-event log existed) keep validating cleanly. Used to key the
+   * idempotent `historian_transcript_events` flush log — see
+   * src/lib/historian/transcriptIntegrity.ts and
+   * src/app/api/ai/historian/transcript-flush/route.ts.
+   */
+  seq?: number
 }
 
 export interface HistorianRedFlag {
