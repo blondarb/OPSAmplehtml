@@ -55,6 +55,8 @@ export default function NeurologicHistorian() {
     transcript: HistorianTranscriptEntry[]
     duration: number
     questionCount: number
+    /** Server-minted historian_sessions id — see useRealtimeSession's onComplete. */
+    sessionId: string | null
   } | null>(null)
 
   const [showPhysicianPanel, setShowPhysicianPanel] = useState(false)
@@ -103,6 +105,7 @@ export default function NeurologicHistorian() {
           question_count: data.questionCount,
           status: 'completed',
           consult_id: consultIdParam || null,
+          sessionId: data.sessionId,
         }),
       })
     } catch (err) {
