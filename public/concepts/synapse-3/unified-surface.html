@@ -417,7 +417,7 @@ body.show-phone .s3-phone{display:flex}
         </div>
         <div class="s3-ev ev--filed" style="left:8%"><span class="dot"></span><span class="lbl">09:58<br>LKW</span><span class="sub">witnessed onset</span></div>
         <div class="s3-ev ev--filed ev--up" style="left:14%"><span class="dot"></span><span class="lbl">10:22<br>ED arrival</span><span class="sub">Mercy General</span></div>
-        <div class="s3-ev ev--filed" style="left:20%"><span class="dot"></span><span class="lbl">10:34<br>CT head</span><span class="sub">no hemorrhage · ASPECTS 9</span></div>
+        <div class="s3-ev ev--filed ev--link" style="left:20%" data-open-chart="chart-simmons" title="Open study"><span class="dot"></span><span class="lbl">10:34<br>CT head</span><span class="sub">no hemorrhage · ASPECTS 9</span></div>
         <div class="s3-ev ev--filed ev--up" style="left:26%"><span class="dot"></span><span class="lbl">10:41<br>Labs drawn</span><span class="sub">glucose pending</span></div>
         <div class="s3-ev ev--crit" style="left:31%"><span class="dot"></span><span class="lbl">10:47<br>Consult — you</span><span class="sub">NIHSS 11</span></div>
         <div class="s3-ev ev--ai ev--up" style="left:37%"><span class="dot"></span><span class="lbl">10:52<br>✦ CT read draft</span><span class="sub">queued for over-read</span></div>
@@ -478,6 +478,7 @@ body.show-phone .s3-phone{display:flex}
         <button type="button" class="btn btn--pri">Document decision</button>
         <button type="button" class="btn btn--act">Order set — opens in EHR</button>
         <span class="pill pill--epic">EPIC</span>
+        <button type="button" class="btn btn--ghost" data-open-chart="chart-simmons">Chart — priors &amp; results</button>
         <button type="button" class="btn btn--ghost">Consult note → Mercy</button>
         <span class="pill pill--ours">OURS</span> → <span class="pill pill--final">EPIC · FINAL</span>
         <div class="auton">✦ scribe — <b>File+audit</b></div>
@@ -488,6 +489,7 @@ body.show-phone .s3-phone{display:flex}
 
     <div class="s3-realstrip">
       <span class="rt rt--exists">EXISTS · stroke timeline data model (Synapse)</span>
+      <span class="rt rt--exists">EXISTS · PACS viewer (Synapse 2.0 DICOM panel)</span>
       <span class="rt rt--exists">EXISTS · tele-consult workflow</span>
       <span class="rt rt--extend">EXTEND · criteria gates (ruleset governance)</span>
       <span class="rt rt--new">NEW · fused clock-rail chrome</span>
@@ -728,6 +730,7 @@ body[data-role="eeg"] .s3-lens[data-role="eeg"]{display:block}
       <span class="hchip">family hx — mother</span>
       <span class="hchip">sleep disruption ✦</span>
       <span class="hchip">no prior imaging on file</span>
+      <span class="hchip">outside records requested — Epic ✦</span>
     </div>
     <div class="work">
       <h4>✦ PREP BRIEF — HISTORIAN INTERVIEW 08:40 · 12 MIN</h4>
@@ -773,6 +776,7 @@ body[data-role="eeg"] .s3-lens[data-role="eeg"]{display:block}
       <button type="button" class="btn btn--pri">Approve &amp; file</button>
       <span class="pill pill--ours">OURS</span> → <span class="pill pill--final">EPIC · FINAL</span>
       <div class="capnote">files to our archive · paste finalizes in Epic</div>
+      <button type="button" class="btn btn--ghost" data-open-chart="chart-whitfield">Chart — priors &amp; results</button>
       <button type="button" class="btn btn--ghost">Edit sections</button>
       <div class="auton">✦ scribe — <b>File+audit</b></div>
       <span class="s3-pin">8</span>
@@ -785,6 +789,7 @@ body[data-role="eeg"] .s3-lens[data-role="eeg"]{display:block}
     <span class="rt rt--exists">EXISTS · plan library (487) + style engine</span>
     <span class="rt rt--exists">EXISTS · historian</span>
     <span class="rt rt--extend">EXTEND · prep wiring + note-type routing</span>
+    <span class="rt rt--extend">EXTEND · priors drawer — paste-mirrored snapshots</span>
     <span class="rt rt--new">NEW · day-rail + band</span>
   </div>
 </section>
@@ -1121,6 +1126,107 @@ After your visit: your plan, in plain words.
 </div>
 <div class="s3-note"><span class="nnum">N9 — </span>Same 10:47 consult — one person, three hats. The code is the work in Acute, pauses the census in Rounds, and puts a STAT read's SLA at risk in EEG Read, where the Manager sees a reassignment suggestion — while Clinic and Triage correctly never feel it. Multi-role days are rostered reality (acute + rounds + reads mix; inpatient and clinic never share a daytime); the lens switcher isn't a demo trick, it's the product.</div>
 </section>
+<!-- part 11y: chart drawer (styles + Simmons instance) -->
+<style>/* chart-drawer */
+.s3-chartov{display:none;position:fixed;inset:0;background:rgba(31,36,48,.5);z-index:60;align-items:center;justify-content:center;padding:24px}
+.s3-chartov.on{display:flex}
+.chartp{width:min(940px,100%);max-height:88vh;overflow:auto;background:var(--card);border-radius:var(--r-lg);box-shadow:var(--elev-2);padding:24px 28px}
+.chead{display:flex;align-items:baseline;gap:14px;border-bottom:1px solid var(--line);padding-bottom:14px;margin-bottom:16px;flex-wrap:wrap}
+.chead .cpname{font:600 24px var(--serif);color:var(--ink)}
+.chead .cpmeta{font:12.5px var(--mono);color:var(--ink-3)}
+.chead .cx{margin-left:auto}
+.cgrid{display:grid;grid-template-columns:310px 1fr;gap:22px;align-items:start}
+.crail{position:relative;padding-left:20px}
+.crail::before{content:"";position:absolute;left:5px;top:8px;bottom:8px;width:2px;background:var(--line-2)}
+.citem{position:relative;padding:8px 8px 8px 10px;font-size:13px;color:var(--ink-2)}
+.citem::before{content:"";position:absolute;left:-19px;top:14px;width:10px;height:10px;border-radius:50%;background:var(--ink-3)}
+.citem--imaging::before{background:var(--act)}
+.citem--ai::before{background:var(--ai-soft);border:2px solid var(--ai);width:7px;height:7px}
+.citem--pending::before{background:transparent;border:2px dashed var(--act);width:7px;height:7px}
+.citem .cyr{font:700 10.5px var(--mono);letter-spacing:.06em;color:var(--ink-3);display:block}
+.citem b{color:var(--ink);font-weight:650}
+.citem.sel{background:var(--well);border-radius:var(--r-sm)}
+.crail .capnote{margin-top:10px}
+.cview{background:#141821;border-radius:var(--r-md);overflow:hidden;color:#cfd6e4}
+.cview .vbar{display:flex;gap:10px;align-items:center;padding:9px 14px;font:700 10.5px var(--mono);letter-spacing:.06em;color:#8b93a1;border-bottom:1px solid #262c3a}
+.cview .vbody{height:290px;display:flex;align-items:center;justify-content:center}
+.cview .vcap{padding:10px 14px;font-size:12px;line-height:1.5;color:#8b93a1;border-top:1px solid #262c3a}
+.cpane{background:var(--well);border:1px solid var(--line);border-radius:var(--r-md);padding:16px 18px;font-size:13.5px;line-height:1.55;color:var(--ink-2)}
+.cpane h5{font:700 11.5px var(--sans);letter-spacing:.1em;text-transform:uppercase;color:var(--ink-3);margin-bottom:8px}
+.cfoot{margin-top:12px;display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.ev--link{cursor:pointer}
+.ev--link .lbl{text-decoration:underline dotted var(--ink-3);text-underline-offset:3px}
+@media (max-width:900px){.cgrid{grid-template-columns:1fr}}
+</style>
+
+<div class="s3-chartov" id="chart-simmons">
+  <div class="chartp">
+    <div class="chead">
+      <span class="cpname">Walter Simmons</span>
+      <span class="cpmeta">71M · MRN F-204871 (fictional) · chart · years-zoom</span>
+      <span class="s3-pin">16</span>
+      <button type="button" class="btn btn--ghost cx" data-close-chart>Close</button>
+    </div>
+    <div class="s3-note"><span class="nnum">N16 — </span>Every patient is a rail too: the chart drawer is the years-zoom from the thesis table, opened from any patient or any study event. Priors are events left of every now. Ownership stays honest — our notes are OURS; Epic-owned results appear as paste-mirrored snapshots in clinic; acute imaging rides the consult, where Synapse 2.0's PACS panel already exists. Imaging is still read in the dark — the viewer is Daylight's one dark room.</div>
+    <div class="cgrid">
+      <div class="crail">
+        <div class="citem"><span class="cyr">2019 · OUTSIDE RECORD</span><b>Hypertension</b> — dx, treated</div>
+        <div class="citem citem--ai"><span class="cyr">2024 · OUTSIDE RECORD</span><b>Apixaban Rx</b> — ✦ flagged from outside record · verify with family</div>
+        <div class="citem citem--imaging sel"><span class="cyr">TODAY 10:34 · MERCY GENERAL</span><b>CT head — non-contrast</b> · no hemorrhage · ASPECTS 9</div>
+        <div class="citem"><span class="cyr">TODAY 10:41</span><b>Labs</b> — glucose pending · platelets ✓ 10:59</div>
+        <div class="citem citem--pending"><span class="cyr">TODAY · EXPECTED 11:10</span><b>CTA head/neck</b> — lands on this rail when resulted</div>
+        <div class="capnote">Outside-hospital patient — priors limited to what Mercy sent. ✦ historian/record intake would deepen this rail over time.</div>
+      </div>
+      <div>
+        <div class="cview">
+          <div class="vbar">CT HEAD · NON-CONTRAST · AXIAL · 10:34 · MERCY GENERAL</div>
+          <div class="vbody"><svg viewBox="0 0 300 300" width="230" height="230" role="img" aria-label="Schematic CT head slice, viewer mock"><ellipse cx="150" cy="152" rx="106" ry="128" fill="#1d2432" stroke="#8b93a1" stroke-width="7"/><ellipse cx="150" cy="152" rx="88" ry="110" fill="#232c3e"/><path d="M150 54 v196" stroke="#2c3648" stroke-width="3"/><ellipse cx="121" cy="132" rx="13" ry="25" fill="#1a2130"/><ellipse cx="179" cy="132" rx="13" ry="25" fill="#1a2130"/><ellipse cx="150" cy="210" rx="26" ry="16" fill="#202939"/></svg></div>
+          <div class="vcap">Schematic mock — the real panel is Synapse 2.0's PACS viewer (520px DICOM sub-language). Read: no hemorrhage · ASPECTS 9 · ✦ draft read queued for over-read.</div>
+        </div>
+        <div class="cfoot">
+          <button type="button" class="btn btn--ghost">Open full viewer</button>
+          <button type="button" class="btn btn--ghost">Compare prior — none on file</button>
+          <span class="pill pill--ours">consult record: OURS</span>
+          <span class="pill pill--epic">orders/results: EPIC (Mercy)</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+<!-- part 11z: chart drawer (Whitfield instance) -->
+<div class="s3-chartov" id="chart-whitfield">
+  <div class="chartp">
+    <div class="chead">
+      <span class="cpname">James Whitfield</span>
+      <span class="cpmeta">58M · epilepsy · chart · years-zoom</span>
+      <button type="button" class="btn btn--ghost cx" data-close-chart>Close</button>
+    </div>
+    <div class="cgrid">
+      <div class="crail">
+        <div class="citem"><span class="cyr">2019</span><b>Epilepsy — dx</b> · our consult note <span class="pill pill--ours">OURS</span></div>
+        <div class="citem"><span class="cyr">2023</span><b>Med change</b> — levetiracetam started · our note <span class="pill pill--ours">OURS</span></div>
+        <div class="citem citem--imaging"><span class="cyr">2025</span><b>EEG — routine</b> · unchanged · report snapshot <span class="pill pill--epic">EPIC</span></div>
+        <div class="citem"><span class="cyr">2026 MAR</span><b>Visit — stable</b> · driving cleared · note <span class="pill pill--ours">OURS</span></div>
+        <div class="citem citem--ai sel"><span class="cyr">TODAY 08:20</span><b>Amb-EEG — signed</b> ✦ Dr. Vega · linked to this visit</div>
+        <div class="citem citem--pending"><span class="cyr">TODAY 09:00</span><b>Visit — med check</b> · scribe note in your queue</div>
+        <div class="capnote">Clinic priors are paste-mirrored snapshots — Epic stays the source for Epic-owned artifacts; our notes live here natively.</div>
+      </div>
+      <div>
+        <div class="cpane">
+          <h5>Amb-EEG report — signed 08:20 · Dr. R. Vega</h5>
+          <p>Background: well-organized for age. No electrographic seizures captured across the 48-hour recording. Interictal findings unchanged from the 2025 study.</p>
+          <p style="margin-top:8px"><span class="chip chip--ai">✦ sentence-built</span> <span class="chip chip--act">linked: chart · rounds · this visit</span></p>
+          <p class="capnote" style="margin-top:10px">CPT computed deterministically on sign — the Report Builder's coding engine, rules not a model.</p>
+        </div>
+        <div class="cfoot">
+          <button type="button" class="btn btn--ghost">Open study</button>
+          <button type="button" class="btn btn--ghost">Compare 2025</button>
+          <span class="pill pill--ours">report: OURS</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
 <!-- part 12: daylight design language -->
 <style>/* lens-local */
 .sw-row{display:flex;gap:16px;flex-wrap:wrap;margin:14px 0 22px}
@@ -1397,11 +1503,44 @@ After your visit: your plan, in plain words.
     });
   }
 
+  function closeCharts(){
+    var ovs = document.querySelectorAll('.s3-chartov.on');
+    if(ovs && ovs.length){ ovs.forEach(function(o){ o.classList.remove('on'); }); }
+  }
+
+  function initChart(){
+    var openers = document.querySelectorAll('[data-open-chart]');
+    if(openers && openers.length){
+      openers.forEach(function(el){
+        el.addEventListener('click', function(e){
+          e.stopPropagation();
+          var id = el.getAttribute('data-open-chart');
+          var ov = id ? document.getElementById(id) : null;
+          if(ov) ov.classList.add('on');
+        });
+      });
+    }
+    var closers = document.querySelectorAll('[data-close-chart]');
+    if(closers && closers.length){
+      closers.forEach(function(btn){ btn.addEventListener('click', closeCharts); });
+    }
+    var ovs = document.querySelectorAll('.s3-chartov');
+    if(ovs && ovs.length){
+      ovs.forEach(function(ov){
+        ov.addEventListener('click', function(e){ if(e.target === ov) closeCharts(); });
+      });
+    }
+    document.addEventListener('keydown', function(e){
+      if(e.key === 'Escape') closeCharts();
+    });
+  }
+
   function init(){
     initRoleSwitcher();
     initToggles();
     initBandCards();
     initPhone();
+    initChart();
   }
 
   if(document.readyState === 'loading'){
