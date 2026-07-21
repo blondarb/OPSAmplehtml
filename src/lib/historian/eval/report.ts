@@ -74,6 +74,25 @@ export interface HistorianEvalCaseOutcome {
   chiefComplaint: string | null
   syndrome: string | null
   turnCount: number
+  /**
+   * True when this case's transcript had fewer than MIN_PATIENT_TURNS
+   * non-empty patient turns (finalDifferential.ts's countPatientTurns) —
+   * cli.ts's runHydratedCase skips all four evaluators (each field below
+   * is an ok:false/skippedReason run, never a result) rather than running
+   * them against a degenerate transcript. This is the single marker that
+   * distinguishes "deliberately not evaluated" from both "evaluated"
+   * (an evaluator's ok:true) and "hard error" (an evaluator's .error set)
+   * — aggregateHistorianEvalCases excludes these cases from every gate/
+   * aggregate computation, and caseRow renders them in their own state.
+   */
+  insufficientTranscript: boolean
+  /**
+   * The observed patient-turn count that made insufficientTranscript true.
+   * Only ever set alongside insufficientTranscript: true — a dry run or a
+   * hard fetch failure never determines a patient-turn count, so it's left
+   * unset there rather than reporting a meaningless 0.
+   */
+  patientTurnCount?: number
   finalDifferential: HistorianEvalRunResult<FinalDifferential>
   thoroughness: HistorianEvalRunResult<ThoroughnessEvaluation>
   independentDdx: HistorianEvalRunResult<IndependentDifferential>
@@ -215,7 +234,12 @@ export interface RateStat {
 }
 
 export interface HistorianEvalAggregates {
+  /** ALL cases handed in, including insufficient-transcript ones. */
   totalCases: number
+  /** totalCases minus cases where insufficientTranscript is true — the denominator every sub-aggregate below and every gate is actually computed over. */
+  evaluableCaseCount: number
+  /** Cases excluded because their transcript had fewer than MIN_PATIENT_TURNS patient turns — never counted toward any mean/rate/gate below. */
+  insufficientCaseCount: number
   thoroughnessOverall: RangeStat | null
   agreementTop3Overlap: RangeStat | null
   agreementJaccardTop3: RangeStat | null
@@ -285,7 +309,8 @@ export interface HistorianEvalReport {
   banner: string
   headline: string
   selfLabel: { unvetted: boolean; label: string | null }
-  honestN: { n: number; label: string }
+  /** n = evaluated (non-insufficient-transcript) cases; excludedInsufficient = cases excluded because their transcript was insufficient. Both computed from the actual cases, never hardcoded. */
+  honestN: { n: number; excludedInsufficient: number; label: string }
   gateSetId: string
   provenance: HistorianEvalProvenanceRow[]
   cases: HistorianEvalCaseOutcome[]
@@ -312,50 +337,70 @@ function computeRate(hits: boolean[]): RateStat {
   return { count, denominator, rate: denominator > 0 ? count / denominator : null }
 }
 
-/** honest-n label — varies by mode since "development-set personas" is only true for fixtures. */
-function honestNLabel(mode: 'fixtures' | 'sessions', n: number): string {
-  if (mode === 'fixtures') {
-    return `n=${n} development-set personas; tuning permitted; no held-out claims`
-  }
-  return `n=${n} production session(s) sampled ad hoc; not a validated or held-out cohort`
+/**
+ * honest-n label — varies by mode since "development-set personas" is only
+ * true for fixtures. `evaluatedN` is evaluableCaseCount (insufficient-
+ * transcript cases excluded), so it's never inflated by degenerate 0/1-
+ * patient-turn stubs; when `excludedN` is nonzero the split is spelled out
+ * explicitly rather than silently folded into n. Byte-identical to the
+ * pre-existing label when excludedN is 0 (the common case).
+ */
+function honestNLabel(mode: 'fixtures' | 'sessions', evaluatedN: number, excludedN: number): string {
+  const base =
+    mode === 'fixtures'
+      ? `n=${evaluatedN} development-set personas; tuning permitted; no held-out claims`
+      : `n=${evaluatedN} production session(s) sampled ad hoc; not a validated or held-out cohort`
+  return excludedN > 0 ? `${base}; ${excludedN} excluded as insufficient transcript` : base
 }
 
 // ── Aggregation ──────────────────────────────────────────────────────────────
 
+/**
+ * Aggregate per-case outcomes into report-level statistics. Insufficient-
+ * transcript cases (see HistorianEvalCaseOutcome.insufficientTranscript)
+ * are excluded from EVERY sub-aggregate below — they are not evidence
+ * about historian quality (a 0/1-patient-turn stub scores as garbage, not
+ * as a genuine thoroughness floor violation), so evaluableCases, not the
+ * raw cases array, is what every mean/rate here is actually computed over.
+ */
 export function aggregateHistorianEvalCases(cases: HistorianEvalCaseOutcome[]): HistorianEvalAggregates {
+  const evaluableCases = cases.filter((c) => !c.insufficientTranscript)
+
   const thoroughnessOverall = computeRange(
-    cases.filter((c) => c.thoroughness.ok && c.thoroughness.result).map((c) => c.thoroughness.result!.overall),
+    evaluableCases.filter((c) => c.thoroughness.ok && c.thoroughness.result).map((c) => c.thoroughness.result!.overall),
   )
   const agreementTop3Overlap = computeRange(
-    cases.filter((c) => c.agreement.ok && c.agreement.result).map((c) => c.agreement.result!.top3Overlap),
+    evaluableCases.filter((c) => c.agreement.ok && c.agreement.result).map((c) => c.agreement.result!.top3Overlap),
   )
   const agreementJaccardTop3 = computeRange(
-    cases.filter((c) => c.agreement.ok && c.agreement.result).map((c) => c.agreement.result!.jaccardTop3),
+    evaluableCases.filter((c) => c.agreement.ok && c.agreement.result).map((c) => c.agreement.result!.jaccardTop3),
   )
-  const deterministicDiagnosisLeakCount = cases
+  const deterministicDiagnosisLeakCount = evaluableCases
     .filter((c) => c.thoroughness.ok && c.thoroughness.result)
     .reduce((sum, c) => sum + c.thoroughness.result!.deterministic.diagnosisLeak.matches.length, 0)
 
   const pipelineGroundTruthTop1 = computeRate(
-    cases.filter((c) => c.groundTruth?.pipeline).map((c) => c.groundTruth!.pipeline!.top1Hit),
+    evaluableCases.filter((c) => c.groundTruth?.pipeline).map((c) => c.groundTruth!.pipeline!.top1Hit),
   )
   const pipelineGroundTruthTop3 = computeRate(
-    cases.filter((c) => c.groundTruth?.pipeline).map((c) => c.groundTruth!.pipeline!.top3Hit),
+    evaluableCases.filter((c) => c.groundTruth?.pipeline).map((c) => c.groundTruth!.pipeline!.top3Hit),
   )
   const independentGroundTruthTop1 = computeRate(
-    cases.filter((c) => c.groundTruth?.independent).map((c) => c.groundTruth!.independent!.top1Hit),
+    evaluableCases.filter((c) => c.groundTruth?.independent).map((c) => c.groundTruth!.independent!.top1Hit),
   )
   const independentGroundTruthTop3 = computeRate(
-    cases.filter((c) => c.groundTruth?.independent).map((c) => c.groundTruth!.independent!.top3Hit),
+    evaluableCases.filter((c) => c.groundTruth?.independent).map((c) => c.groundTruth!.independent!.top3Hit),
   )
   const independentAgreementTop3 = computeRate(
-    cases.filter((c) => c.agreement.ok && c.agreement.result).map((c) => c.agreement.result!.top3Overlap >= 1),
+    evaluableCases.filter((c) => c.agreement.ok && c.agreement.result).map((c) => c.agreement.result!.top3Overlap >= 1),
   )
 
-  const unvetted = cases.some((c) => c.thoroughness.ok && c.thoroughness.result?.unvetted === true)
+  const unvetted = evaluableCases.some((c) => c.thoroughness.ok && c.thoroughness.result?.unvetted === true)
 
   return {
     totalCases: cases.length,
+    evaluableCaseCount: evaluableCases.length,
+    insufficientCaseCount: cases.length - evaluableCases.length,
     thoroughnessOverall,
     agreementTop3Overlap,
     agreementJaccardTop3,
@@ -393,20 +438,27 @@ function evaluateOperator(operator: HistorianEvalReleaseGate['operator'], observ
 }
 
 /**
- * Evaluate every gate in gateSet against the aggregates. When `live` is
- * false (a structure-only dry run — see cli.ts), every gate is reported as
- * NOT evaluated (observed: null, passed: null) regardless of what the
- * (necessarily empty) aggregates happen to compute — gates are evaluated in
- * fixtures/sessions mode only when --live, per the task's binding
- * constraint, never as an incidental side effect of zero data.
+ * Evaluate every gate in gateSet against the aggregates. Every gate is
+ * reported as NOT evaluated (observed: null, passed: null) when either:
+ *   - `live` is false (a structure-only dry run — see cli.ts), regardless
+ *     of what the (necessarily empty) aggregates happen to compute; or
+ *   - `live` is true but every case was excluded as insufficient-transcript
+ *     (aggregates.evaluableCaseCount === 0) — a batch that's entirely
+ *     abandoned-interview stubs has zero evidence about historian quality,
+ *     so gates read NOT EVALUATED rather than an incidental pass/fail
+ *     computed on zero data (e.g. a vacuous "0 diagnosis leaks" PASS).
+ * Gates are evaluated in fixtures/sessions mode only when --live AND there
+ * is at least one evaluable case, never as an incidental side effect of
+ * zero data.
  */
 export function evaluateHistorianEvalGates(
   aggregates: HistorianEvalAggregates,
   gateSet: HistorianEvalReleaseGateSet,
   live: boolean,
 ): HistorianEvalGateResult[] {
+  const evaluable = live && aggregates.evaluableCaseCount > 0
   return gateSet.gates.map((gate) => {
-    if (!live) {
+    if (!evaluable) {
       return {
         id: gate.id,
         metric: gate.metric,
@@ -524,6 +576,11 @@ export function buildHistorianEvalReport(input: {
   const gates = evaluateHistorianEvalGates(aggregates, input.gateSet, input.live)
   const provenance = buildHistorianEvalProvenance(input.cases)
   const costLatency = buildHistorianEvalCostLatency(input.cases)
+  // Mirrors evaluateHistorianEvalGates' own "evaluable" condition exactly —
+  // a live run with zero evaluable cases (every case insufficient-
+  // transcript) is release-gate-ineligible for the same reason a dry run
+  // is: no evidence, not an incidental pass/fail on zero data.
+  const gatesEvaluable = input.live && aggregates.evaluableCaseCount > 0
 
   return {
     schemaVersion: '1.0',
@@ -537,14 +594,18 @@ export function buildHistorianEvalReport(input: {
       unvetted: aggregates.unvetted,
       label: input.live && aggregates.unvetted ? UNVETTED_SELF_LABEL : null,
     },
-    honestN: { n: input.cases.length, label: honestNLabel(input.mode, input.cases.length) },
+    honestN: {
+      n: aggregates.evaluableCaseCount,
+      excludedInsufficient: aggregates.insufficientCaseCount,
+      label: honestNLabel(input.mode, aggregates.evaluableCaseCount, aggregates.insufficientCaseCount),
+    },
     gateSetId: input.gateSet.gateSetId,
     provenance,
     cases: input.cases,
     aggregates,
     gates,
-    releaseGateEligible: input.live,
-    releaseGatePassed: input.live ? gates.every((g) => g.passed === true) : null,
+    releaseGateEligible: gatesEvaluable,
+    releaseGatePassed: gatesEvaluable ? gates.every((g) => g.passed === true) : null,
     costLatency,
   }
 }
@@ -593,6 +654,19 @@ function runStatusText<T>(run: HistorianEvalRunResult<T>, describeOk: (result: T
 }
 
 function caseRow(c: HistorianEvalCaseOutcome): string {
+  if (c.insufficientTranscript) {
+    return [
+      `### ${c.caseId} (${c.source})`,
+      '',
+      `- Chief complaint: ${c.chiefComplaint ?? 'N/A'}`,
+      `- Syndrome: ${c.syndrome ?? 'N/A'}`,
+      `- Turns: ${c.turnCount}`,
+      `- Insufficient transcript (${c.patientTurnCount ?? 0} patient turns) — evaluators skipped`,
+      '- Excluded from gates and aggregates (see Honest n).',
+      '',
+    ].join('\n')
+  }
+
   const th = c.thoroughness.ok ? c.thoroughness.result : null
   const gt = c.groundTruth
   return [
@@ -644,9 +718,17 @@ export function formatHistorianEvalMarkdown(report: HistorianEvalReport): string
       `| ${p.evaluator} | ${p.modelIds.join(', ') || 'N/A'} | ${p.promptVersions.join(', ') || 'N/A'} | ${p.rubricVersions.join(', ') || 'N/A'} | ${p.vetted === null ? 'N/A' : p.vetted ? 'vetted' : 'UNVETTED'} | ${p.casesRun}/${p.casesRun + p.casesFailed} |`,
   )
 
+  // Two distinct reasons a gate can read NOT EVALUATED: a structure-only
+  // dry run (--live not passed), or a live run where every case was
+  // excluded as insufficient-transcript (zero evaluable cases) — never
+  // conflated, so a live run over degenerate stubs is never mislabeled
+  // "(dry run)".
+  const notEvaluatedReason = !report.live
+    ? 'NOT EVALUATED (dry run)'
+    : 'NOT EVALUATED (no evaluable cases — all insufficient transcript)'
   const gateRows = report.gates.map(
     (g) =>
-      `| ${g.id} | ${g.observed === null ? 'N/A' : g.observed} | ${g.operator} ${g.threshold} | ${!g.evaluated ? 'NOT EVALUATED (dry run)' : g.passed ? 'PASS' : 'FAIL'} |`,
+      `| ${g.id} | ${g.observed === null ? 'N/A' : g.observed} | ${g.operator} ${g.threshold} | ${!g.evaluated ? notEvaluatedReason : g.passed ? 'PASS' : 'FAIL'} |`,
   )
 
   return [
@@ -668,7 +750,9 @@ export function formatHistorianEvalMarkdown(report: HistorianEvalReport): string
     `- Mode: ${report.mode}`,
     `- Live: ${report.live ? 'yes' : 'no (dry run — structure-only, no Bedrock/DB calls made)'}`,
     `- Gate set: ${report.gateSetId}`,
-    `- Release-gate eligible: ${report.releaseGateEligible ? 'yes' : 'no (dry run)'}`,
+    `- Release-gate eligible: ${
+      report.releaseGateEligible ? 'yes' : report.live ? 'no (no evaluable cases — all insufficient transcript)' : 'no (dry run)'
+    }`,
     `- Release-gate result: ${report.releaseGatePassed === null ? 'NOT EVALUATED' : report.releaseGatePassed ? 'PASS' : 'FAIL'}`,
     '',
     '## Provenance',

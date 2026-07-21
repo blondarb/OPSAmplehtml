@@ -61,6 +61,16 @@ export interface FinalDifferential {
    * only signal surfaced for a drop.
    */
   dropped_quotes: number
+  /**
+   * 'ok' = generation actually ran (Bedrock was called; differential may
+   * still legitimately be empty if the model found nothing). 'insufficient_transcript'
+   * = the deterministic MIN_PATIENT_TURNS guard fired before any Bedrock
+   * call and differential is always []. Lets every downstream consumer
+   * (the batch harness's gate/aggregate math, DifferentialCard) tell "we
+   * looked and found nothing" apart from "we never asked" instead of both
+   * collapsing into the same empty-array shape.
+   */
+  status: 'ok' | 'insufficient_transcript'
 }
 
 /** Deterministic fail-closed guard — see generateFinalDifferential. */
@@ -80,6 +90,18 @@ export class TranscriptTooLargeError extends Error {
 
 /** Serialized-transcript size guard (JSON.stringify length, chars). Fail-closed. */
 export const MAX_TRANSCRIPT_CHARS = 60_000
+
+/**
+ * Minimum number of non-empty patient (role: 'user') turns required before
+ * attempting differential generation — see countPatientTurns and
+ * generateFinalDifferential's insufficient-transcript guard. Below this
+ * (an abandoned/greeting-only session, or a stub with a single one-word
+ * reply) the transcript cannot support a meaningful differential and the
+ * symptom-extractor prompt has been observed to return conversational
+ * prose instead of JSON on real degenerate sessions — so Bedrock is never
+ * called and status: 'insufficient_transcript' is returned instead.
+ */
+export const MIN_PATIENT_TURNS = 2
 
 const MAX_DIFFERENTIAL_ITEMS = 6
 const MAX_QUOTES_PER_ITEM = 6
@@ -205,6 +227,17 @@ function serializedTranscriptLength(transcript: HistorianTranscriptEntry[]): num
   return JSON.stringify(transcript).length
 }
 
+/**
+ * Count of non-empty patient turns (role: 'user', text.trim() non-empty) —
+ * the signal generateFinalDifferential's insufficient-transcript guard
+ * checks against MIN_PATIENT_TURNS. Exported so the batch eval harness
+ * (cli.ts) can apply the identical rule to short-circuit all four
+ * evaluators up front, without duplicating this predicate.
+ */
+export function countPatientTurns(transcript: HistorianTranscriptEntry[]): number {
+  return transcript.filter((entry) => entry.role === 'user' && entry.text.trim().length > 0).length
+}
+
 function buildNumberedTranscriptText(transcript: HistorianTranscriptEntry[]): string {
   return transcript
     .map((t, i) => `Turn ${i} (${t.role === 'user' ? 'Patient' : 'Historian'}): ${t.text}`)
@@ -308,10 +341,20 @@ export function sanitizeDifferential(
  * runFinalDifferential for the fire-and-forget persistence wrapper used by
  * POST /save.
  *
- * Fail-closed: throws TranscriptTooLargeError before invoking Bedrock at
- * all if the serialized transcript exceeds MAX_TRANSCRIPT_CHARS. Any other
- * failure (Bedrock error, DB error) propagates to the caller — callers that
- * want "never throws" semantics (the save-route hook) must catch.
+ * Fail-closed / fail-fast, both checked BEFORE any Bedrock call:
+ *   - Throws TranscriptTooLargeError if the serialized transcript exceeds
+ *     MAX_TRANSCRIPT_CHARS.
+ *   - Returns early (status: 'insufficient_transcript', differential: [],
+ *     never throws) if the transcript has fewer than MIN_PATIENT_TURNS
+ *     non-empty patient turns — a greeting-only or near-empty transcript
+ *     (an abandoned session) cannot support a meaningful differential, and
+ *     real degenerate sessions have been observed to make the symptom
+ *     extractor return conversational prose instead of JSON, breaking
+ *     JSON.parse downstream. See countPatientTurns.
+ *
+ * Any other failure (Bedrock error, DB error) propagates to the caller —
+ * callers that want "never throws" semantics (the save-route hook) must
+ * catch.
  */
 export async function generateFinalDifferential(
   transcript: HistorianTranscriptEntry[],
@@ -320,6 +363,22 @@ export async function generateFinalDifferential(
   const serializedLength = serializedTranscriptLength(transcript)
   if (serializedLength > MAX_TRANSCRIPT_CHARS) {
     throw new TranscriptTooLargeError(serializedLength, MAX_TRANSCRIPT_CHARS)
+  }
+
+  const patientTurnCount = countPatientTurns(transcript)
+  if (patientTurnCount < MIN_PATIENT_TURNS) {
+    return {
+      differential: [],
+      summary: `Insufficient transcript: fewer than ${MIN_PATIENT_TURNS} patient responses; differential not generated.`,
+      provenance: {
+        model_id: 'none',
+        prompt_version: FINAL_DDX_PROMPT_VERSION,
+        inference_params: {},
+        generated_at: new Date().toISOString(),
+      },
+      dropped_quotes: 0,
+      status: 'insufficient_transcript',
+    }
   }
 
   const numberedTranscript = buildNumberedTranscriptText(transcript)
@@ -401,6 +460,7 @@ export async function generateFinalDifferential(
       generated_at: new Date().toISOString(),
     },
     dropped_quotes: droppedQuotes,
+    status: 'ok',
   }
 }
 

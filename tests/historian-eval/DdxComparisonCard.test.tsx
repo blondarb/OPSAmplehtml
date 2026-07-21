@@ -27,6 +27,7 @@ const PIPELINE: FinalDifferential = {
     generated_at: '2026-07-21T12:00:00.000Z',
   },
   dropped_quotes: 0,
+  status: 'ok',
 }
 
 const INDEPENDENT: IndependentDifferential = {

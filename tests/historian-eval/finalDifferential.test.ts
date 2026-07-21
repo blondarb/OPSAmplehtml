@@ -31,6 +31,7 @@ import {
   generateFinalDifferential,
   TranscriptTooLargeError,
   MAX_TRANSCRIPT_CHARS,
+  MIN_PATIENT_TURNS,
 } from '@/lib/historian/eval/finalDifferential'
 import { PROMPT_VERSIONS } from '@/lib/historian/eval/constants'
 import { BEDROCK_MODEL } from '@/lib/bedrock'
@@ -118,12 +119,100 @@ describe('generateFinalDifferential', () => {
     await expect(generateFinalDifferential(SAMPLE_TRANSCRIPT)).resolves.toBeTruthy()
   })
 
+  // ── Insufficient-transcript guard ─────────────────────────────────────
+  // Real-data finding: a greeting-only / near-empty transcript fed an
+  // empty/degenerate payload to the symptom extractor, which returned
+  // conversational prose instead of JSON -> JSON.parse threw and broke the
+  // pipeline DDx for that session. This guard returns a deterministic
+  // status instead, and — critically — never calls Bedrock to get there.
+
+  describe('insufficient-transcript guard', () => {
+    it('(a) a greeting-only transcript (1 assistant turn, 0 patient turns) short-circuits to status insufficient_transcript without calling Bedrock', async () => {
+      mockHappyPath()
+      const greetingOnly: HistorianTranscriptEntry[] = [
+        entry({ role: 'assistant', text: 'Hello, what brings you in today?', timestamp: 0, seq: 1 }),
+      ]
+
+      const result = await generateFinalDifferential(greetingOnly)
+
+      expect(result.status).toBe('insufficient_transcript')
+      expect(result.differential).toEqual([])
+      expect(result.dropped_quotes).toBe(0)
+      expect(invokeBedrockJSONMock).not.toHaveBeenCalled()
+      expect(invokeBedrockClinicalToolMock).not.toHaveBeenCalled()
+    })
+
+    it('(b) an empty transcript short-circuits to status insufficient_transcript without calling Bedrock', async () => {
+      mockHappyPath()
+
+      const result = await generateFinalDifferential([])
+
+      expect(result.status).toBe('insufficient_transcript')
+      expect(result.differential).toEqual([])
+      expect(invokeBedrockJSONMock).not.toHaveBeenCalled()
+      expect(invokeBedrockClinicalToolMock).not.toHaveBeenCalled()
+    })
+
+    it('(c) exactly 1 patient turn (one short of MIN_PATIENT_TURNS) short-circuits to status insufficient_transcript without calling Bedrock', async () => {
+      mockHappyPath()
+      const onePatientTurn: HistorianTranscriptEntry[] = [
+        entry({ role: 'assistant', text: 'What brings you in today?', timestamp: 0, seq: 1 }),
+        entry({ role: 'user', text: 'I have a headache.', timestamp: 8, seq: 2 }),
+      ]
+      expect(MIN_PATIENT_TURNS).toBe(2) // guards the test's own premise against a future constant change
+
+      const result = await generateFinalDifferential(onePatientTurn)
+
+      expect(result.status).toBe('insufficient_transcript')
+      expect(result.differential).toEqual([])
+      expect(invokeBedrockJSONMock).not.toHaveBeenCalled()
+      expect(invokeBedrockClinicalToolMock).not.toHaveBeenCalled()
+    })
+
+    it('treats a whitespace-only patient turn as not counting toward MIN_PATIENT_TURNS', async () => {
+      mockHappyPath()
+      const whitespaceOnlyReply: HistorianTranscriptEntry[] = [
+        entry({ role: 'assistant', text: 'What brings you in today?', timestamp: 0, seq: 1 }),
+        entry({ role: 'user', text: '   ', timestamp: 8, seq: 2 }),
+        entry({ role: 'assistant', text: 'Take your time.', timestamp: 12, seq: 3 }),
+      ]
+
+      const result = await generateFinalDifferential(whitespaceOnlyReply)
+
+      expect(result.status).toBe('insufficient_transcript')
+      expect(invokeBedrockJSONMock).not.toHaveBeenCalled()
+    })
+
+    it('embeds a deterministic, never-Bedrock provenance (model_id "none") on an insufficient-transcript result', async () => {
+      mockHappyPath()
+
+      const result = await generateFinalDifferential([])
+
+      expect(result.provenance.model_id).toBe('none')
+      expect(result.provenance.prompt_version).toBe(PROMPT_VERSIONS['final-ddx-v1'].id)
+      expect(result.provenance.inference_params).toEqual({})
+      expect(() => new Date(result.provenance.generated_at).toISOString()).not.toThrow()
+    })
+
+    it('(d) 2+ patient turns proceeds through the normal Bedrock path unchanged, with status ok', async () => {
+      mockHappyPath()
+
+      // SAMPLE_TRANSCRIPT already has 2 patient (user) turns.
+      const result = await generateFinalDifferential(SAMPLE_TRANSCRIPT)
+
+      expect(result.status).toBe('ok')
+      expect(invokeBedrockJSONMock).toHaveBeenCalledTimes(1)
+      expect(invokeBedrockClinicalToolMock).toHaveBeenCalledTimes(1)
+    })
+  })
+
   // ── Happy path shape ─────────────────────────────────────────────────
 
   it('returns a FinalDifferential with the expected shape', async () => {
     mockHappyPath()
     const result = await generateFinalDifferential(SAMPLE_TRANSCRIPT, 'headache')
 
+    expect(result.status).toBe('ok')
     expect(result.differential).toHaveLength(1)
     expect(result.differential[0]).toMatchObject({
       diagnosis: 'Migraine without aura',

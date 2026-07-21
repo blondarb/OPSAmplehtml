@@ -48,6 +48,20 @@
  * plus real interview data, not a fixture/CLI concern. --sessions mode is
  * the natural extension point: it already reads the real
  * historian_sessions.narrative_summary column.
+ *
+ * DEGENERATE-TRANSCRIPT HANDLING (post-sprint hardening, 2026-07-21): a real
+ * --sessions --live run against ops_amplehtml surfaced two problems this
+ * harness now guards against. (1) historian_sessions.transcript is usually
+ * a JSONB array but at least one row stores it as a JSON-encoded STRING —
+ * runSessionCase's parseSessionTranscript recovers it via JSON.parse rather
+ * than silently coercing it to [] on a bare Array.isArray check. (2) a
+ * transcript with fewer than MIN_PATIENT_TURNS non-empty patient turns
+ * (an abandoned interview, or a greeting-only stub) broke the pipeline DDx
+ * with an unparseable-JSON error and made thoroughness/R1/agreement produce
+ * meaningless scores that dragged the batch report's aggregates down —
+ * runHydratedCase now short-circuits ALL FOUR evaluators up front for such
+ * a case (see insufficientRunResult / HistorianEvalCaseOutcome.insufficientTranscript)
+ * and report.ts excludes these cases from every gate/aggregate computation.
  */
 
 import {
@@ -261,6 +275,10 @@ function dryRunOutcome(input: {
     chiefComplaint: input.chiefComplaint,
     syndrome: input.syndrome,
     turnCount: input.turnCount,
+    // A dry run never evaluates the transcript, so it never determines
+    // insufficiency either — that's a --live-only decision made against
+    // real transcript content (see runHydratedCase).
+    insufficientTranscript: false,
     finalDifferential: notRunResult<FinalDifferential>(),
     thoroughness: notRunResult<ThoroughnessEvaluation>(),
     independentDdx: notRunResult<IndependentDifferential>(),
@@ -397,6 +415,22 @@ function highLikelihoodOrAll(expectedDDx: PersonaExpectedDx[]): string[] {
   return (high.length > 0 ? high : expectedDDx).map((d) => d.diagnosis)
 }
 
+/** Evaluator-agnostic "we deliberately never attempted this" wrapper — used for all four evaluators when runHydratedCase's insufficient-transcript short-circuit fires. Mirrors notRunResult/failedRunResult's shape exactly; skippedReason is what distinguishes it from a dry run's own 'dry run — pass --live to execute' and from agreement's structural-dependency skip. */
+function insufficientRunResult<T>(reason: string): HistorianEvalRunResult<T> {
+  return {
+    ok: false,
+    result: null,
+    error: null,
+    skippedReason: reason,
+    latencyMs: 0,
+    costUsd: null,
+    modelId: null,
+    promptVersion: null,
+    rubricVersion: null,
+    inferenceParams: null,
+  }
+}
+
 interface HydratedCaseInput {
   caseId: string
   source: 'fixture' | 'session'
@@ -501,6 +535,36 @@ async function runHydratedCase(
   options: HistorianEvalRunOptions,
 ): Promise<HistorianEvalCaseOutcome> {
   const deps = await loadHydratedCaseDeps()
+
+  // Degenerate-transcript short-circuit — fix for real historian_sessions
+  // rows (abandoned interviews, greeting-only stubs) that broke the
+  // pipeline DDx with "Invalid JSON in AI response" and, separately, made
+  // thoroughness/R1/agreement produce garbage scores that dragged the
+  // batch report's thoroughness floor down. Checked ONCE here, before any
+  // of the four evaluators, using the SAME MIN_PATIENT_TURNS rule
+  // generateFinalDifferential enforces internally (countPatientTurns is
+  // reused, not re-implemented, so the two guards can never drift) — but
+  // applied a level higher, so a degenerate case spends zero Bedrock calls
+  // across ALL four evaluators, not just the one finalDifferential.ts
+  // already guards on its own.
+  const patientTurnCount = deps.finalDifferentialMod.countPatientTurns(input.transcript)
+  if (patientTurnCount < deps.finalDifferentialMod.MIN_PATIENT_TURNS) {
+    const skipReason = `insufficient transcript — ${patientTurnCount} patient turn(s), below MIN_PATIENT_TURNS (${deps.finalDifferentialMod.MIN_PATIENT_TURNS})`
+    return {
+      caseId: input.caseId,
+      source: input.source,
+      chiefComplaint: input.chiefComplaint,
+      syndrome: input.syndrome,
+      turnCount: input.transcript.length,
+      insufficientTranscript: true,
+      patientTurnCount,
+      finalDifferential: insufficientRunResult(skipReason),
+      thoroughness: insufficientRunResult(skipReason),
+      independentDdx: insufficientRunResult(skipReason),
+      agreement: insufficientRunResult(skipReason),
+      groundTruth: null,
+    }
+  }
 
   // 1. Pipeline (Sonnet) final differential.
   const fdStart = Date.now()
@@ -698,6 +762,7 @@ async function runHydratedCase(
     chiefComplaint: input.chiefComplaint,
     syndrome: input.syndrome,
     turnCount: input.transcript.length,
+    insufficientTranscript: false,
     finalDifferential: finalDifferentialRun,
     thoroughness: thoroughnessRun,
     independentDdx: independentRun,
@@ -741,6 +806,33 @@ function failedRunResult<T>(error: string): HistorianEvalRunResult<T> {
   }
 }
 
+/**
+ * Recover historian_sessions.transcript into a HistorianTranscriptEntry[].
+ * Almost every row stores this as a JSONB array (the pg driver hands it
+ * back as a real JS array already), but at least one real production row
+ * (~1/113 sampled) stores it as a JSON-ENCODED STRING instead — a plain
+ * `Array.isArray(row.transcript) ? ... : []` check silently coerced that
+ * row to [], discarding its real transcript content. This recovers it: a
+ * string value is JSON.parse'd and used if (and only if) it parses to an
+ * array; an array value is used as-is; anything else — including a parse
+ * failure — degrades to [] rather than throwing (an empty transcript then
+ * fails generateFinalDifferential's/the harness's own MIN_PATIENT_TURNS
+ * guard downstream, exactly like a genuinely empty session). Never logs
+ * transcript content (may contain PHI).
+ */
+export function parseSessionTranscript(raw: unknown): HistorianTranscriptEntry[] {
+  if (Array.isArray(raw)) return raw as HistorianTranscriptEntry[]
+  if (typeof raw === 'string') {
+    try {
+      const parsed = JSON.parse(raw)
+      if (Array.isArray(parsed)) return parsed as HistorianTranscriptEntry[]
+    } catch {
+      // Malformed JSON string — degrade to [], never throw, never log content.
+    }
+  }
+  return []
+}
+
 async function runSessionCase(sessionId: string, options: HistorianEvalRunOptions): Promise<HistorianEvalCaseOutcome> {
   let row:
     | { transcript: unknown; structured_output: unknown; narrative_summary: unknown }
@@ -767,6 +859,9 @@ async function runSessionCase(sessionId: string, options: HistorianEvalRunOption
       chiefComplaint: null,
       syndrome: null,
       turnCount: 0,
+      // A hard fetch failure is distinct from an insufficient transcript —
+      // we never even saw the transcript to judge it.
+      insufficientTranscript: false,
       finalDifferential: failed,
       thoroughness: failed,
       independentDdx: failed,
@@ -775,7 +870,7 @@ async function runSessionCase(sessionId: string, options: HistorianEvalRunOption
     }
   }
 
-  const transcript = Array.isArray(row.transcript) ? (row.transcript as HistorianTranscriptEntry[]) : []
+  const transcript = parseSessionTranscript(row.transcript)
   const structuredOutput = (row.structured_output ?? null) as HistorianStructuredOutput | null
   const narrativeSummary = typeof row.narrative_summary === 'string' ? row.narrative_summary : null
 

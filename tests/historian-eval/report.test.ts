@@ -59,6 +59,7 @@ function finalDifferential(overrides: Partial<FinalDifferential> = {}): FinalDif
     summary: 'summary',
     provenance: { model_id: 'sonnet', prompt_version: 'final-ddx-v1', inference_params: { temperature: 0 }, generated_at: '2026-07-21T00:00:00.000Z' },
     dropped_quotes: 0,
+    status: 'ok',
     ...overrides,
   }
 }
@@ -131,6 +132,7 @@ function makeCase(overrides: Partial<HistorianEvalCaseOutcome> = {}): HistorianE
     chiefComplaint: 'Sudden weakness',
     syndrome: 'acute-stroke',
     turnCount: 10,
+    insufficientTranscript: false,
     finalDifferential: run<FinalDifferential>({ result: finalDifferential(), promptVersion: 'final-ddx-v1', modelId: 'sonnet' }),
     thoroughness: run<ThoroughnessEvaluation>({
       result: thoroughnessEvaluation(),
@@ -394,6 +396,134 @@ describe('buildHistorianEvalReport + formatHistorianEvalMarkdown', () => {
     it('is null (not zero) when no case produced a thoroughness result', () => {
       const aggregates = aggregateHistorianEvalCases([makeCase({ thoroughness: failedRun('boom') })])
       expect(aggregates.thoroughnessOverall).toBeNull()
+    })
+  })
+
+  describe('insufficient-transcript handling', () => {
+    // Mirrors how cli.ts's runHydratedCase actually represents a
+    // short-circuited case: all four evaluators are ok:false/skippedReason
+    // runs (never a result), groundTruth is null, insufficientTranscript
+    // is true, and patientTurnCount carries the observed count.
+    function insufficientCase(overrides: Partial<HistorianEvalCaseOutcome> = {}): HistorianEvalCaseOutcome {
+      const reason = 'insufficient transcript — 0 patient turn(s), below MIN_PATIENT_TURNS (2)'
+      return makeCase({
+        caseId: 'abandoned-stub.json',
+        turnCount: 1,
+        insufficientTranscript: true,
+        patientTurnCount: 0,
+        finalDifferential: skippedRun(reason),
+        thoroughness: skippedRun(reason),
+        independentDdx: skippedRun(reason),
+        agreement: skippedRun(reason),
+        groundTruth: null,
+        ...overrides,
+      })
+    }
+
+    it('(f) excludes an insufficient case from every gate denominator and aggregate', () => {
+      const normal = makeCase({ caseId: 'acute-stroke.json' })
+      const insufficient = insufficientCase()
+
+      const combined = aggregateHistorianEvalCases([normal, insufficient])
+      const normalOnly = aggregateHistorianEvalCases([normal])
+
+      expect(combined.totalCases).toBe(2)
+      expect(combined.evaluableCaseCount).toBe(1)
+      expect(combined.insufficientCaseCount).toBe(1)
+      // Every sub-aggregate matches the single-normal-case baseline exactly
+      // — the insufficient case contributes nothing to any of them.
+      expect(combined.thoroughnessOverall).toEqual(normalOnly.thoroughnessOverall)
+      expect(combined.deterministicDiagnosisLeakCount).toBe(normalOnly.deterministicDiagnosisLeakCount)
+      expect(combined.pipelineGroundTruthTop3).toEqual(normalOnly.pipelineGroundTruthTop3)
+      expect(combined.independentAgreementTop3).toEqual(normalOnly.independentAgreementTop3)
+
+      const gates = evaluateHistorianEvalGates(combined, GATE_SET, true)
+      const groundTruthGate = gates.find((g) => g.id === 'ddx-top3-ground-truth')!
+      // 1/1 evaluable case hits — not diluted to 1/2 by the insufficient case.
+      expect(groundTruthGate.observed).toBe(1)
+    })
+
+    it('(f) renders an insufficient case in its own distinct state, never as a differential or a per-evaluator FAILED line', () => {
+      const report = buildHistorianEvalReport({
+        mode: 'sessions',
+        live: true,
+        cases: [
+          makeCase({ source: 'session' }),
+          insufficientCase({ caseId: 'stub-session-1', source: 'session', patientTurnCount: 1 }),
+        ],
+        gateSet: GATE_SET,
+        generatedAt: '2026-07-21T00:00:00.000Z',
+      })
+      const md = formatHistorianEvalMarkdown(report)
+
+      expect(md).toContain('### stub-session-1 (session)')
+      expect(md).toContain('- Insufficient transcript (1 patient turns) — evaluators skipped')
+      expect(md).toContain('- Excluded from gates and aggregates (see Honest n).')
+      // Neither case in this report hard-failed, so report.ts's
+      // runStatusText FAILED format must never appear — in particular, the
+      // insufficient case must not render as a per-evaluator failure.
+      expect(md).not.toContain('FAILED — ')
+    })
+
+    it('(g) honest-n reflects the exclusion split, computed from the actual cases', () => {
+      const cases = [
+        makeCase({ caseId: 'a' }),
+        makeCase({ caseId: 'b' }),
+        makeCase({ caseId: 'c' }),
+        insufficientCase({ caseId: 'd' }),
+        insufficientCase({ caseId: 'e' }),
+      ]
+      const report = buildHistorianEvalReport({
+        mode: 'fixtures',
+        live: true,
+        cases,
+        gateSet: GATE_SET,
+        generatedAt: '2026-07-21T00:00:00.000Z',
+      })
+      expect(report.honestN.n).toBe(3)
+      expect(report.honestN.excludedInsufficient).toBe(2)
+      expect(report.honestN.label).toContain('n=3')
+      expect(report.honestN.label).toContain('2 excluded as insufficient transcript')
+
+      const md = formatHistorianEvalMarkdown(report)
+      expect(md).toContain('2 excluded as insufficient transcript')
+    })
+
+    it('(g) honest-n label is byte-identical to the pre-existing format when nothing is excluded', () => {
+      const report = buildHistorianEvalReport({
+        mode: 'fixtures',
+        live: true,
+        cases: [makeCase({ caseId: 'a' }), makeCase({ caseId: 'b' }), makeCase({ caseId: 'c' })],
+        gateSet: GATE_SET,
+        generatedAt: '2026-07-21T00:00:00.000Z',
+      })
+      expect(report.honestN.excludedInsufficient).toBe(0)
+      expect(report.honestN.label).toBe('n=3 development-set personas; tuning permitted; no held-out claims')
+    })
+
+    it('(h) all cases insufficient -> every gate reads NOT EVALUATED, not an incidental pass/fail on zero data', () => {
+      const report = buildHistorianEvalReport({
+        mode: 'sessions',
+        live: true,
+        cases: [insufficientCase({ caseId: 'a' }), insufficientCase({ caseId: 'b' })],
+        gateSet: GATE_SET,
+        generatedAt: '2026-07-21T00:00:00.000Z',
+      })
+
+      expect(report.releaseGateEligible).toBe(false)
+      expect(report.releaseGatePassed).toBeNull()
+      for (const gate of report.gates) {
+        expect(gate.evaluated).toBe(false)
+        expect(gate.observed).toBeNull()
+        expect(gate.passed).toBeNull()
+      }
+
+      const md = formatHistorianEvalMarkdown(report)
+      expect(md).toContain('NOT EVALUATED')
+      // This was a LIVE run with zero evaluable cases, not a dry run — the
+      // two NOT EVALUATED reasons must never be conflated.
+      expect(md).not.toContain('NOT EVALUATED (dry run)')
+      expect(md).toMatch(/no evaluable cases/i)
     })
   })
 

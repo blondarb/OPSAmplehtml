@@ -176,6 +176,10 @@ export default function DifferentialCard({ finalDifferential, onQuoteClick }: Di
         <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary, #64748b)', fontStyle: 'italic', margin: 0 }}>
           Final differential pending — the post-session review pass has not completed yet.
         </p>
+      ) : finalDifferential.status === 'insufficient_transcript' ? (
+        <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary, #64748b)', fontStyle: 'italic', margin: 0 }}>
+          Insufficient transcript — differential not generated.
+        </p>
       ) : finalDifferential.differential.length === 0 ? (
         <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary, #64748b)', fontStyle: 'italic', margin: 0 }}>
           No differential was generated for this session.

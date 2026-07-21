@@ -34,6 +34,7 @@ const SAMPLE: FinalDifferential = {
     generated_at: '2026-07-20T12:00:00.000Z',
   },
   dropped_quotes: 0,
+  status: 'ok',
 }
 
 describe('DifferentialCard', () => {
@@ -87,6 +88,18 @@ describe('DifferentialCard', () => {
     const empty: FinalDifferential = { ...SAMPLE, differential: [] }
     const markup = renderToStaticMarkup(<DifferentialCard finalDifferential={empty} />)
     expect(markup).toMatch(/no differential/i)
+    expect(markup).not.toMatch(/pending/i)
+  })
+
+  it('renders a distinct insufficient-transcript note (not the generic empty-differential message) when status is insufficient_transcript', () => {
+    const insufficient: FinalDifferential = {
+      ...SAMPLE,
+      differential: [],
+      status: 'insufficient_transcript',
+    }
+    const markup = renderToStaticMarkup(<DifferentialCard finalDifferential={insufficient} />)
+    expect(markup).toMatch(/insufficient transcript/i)
+    expect(markup).not.toMatch(/no differential was generated/i)
     expect(markup).not.toMatch(/pending/i)
   })
 })

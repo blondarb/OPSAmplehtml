@@ -14,6 +14,7 @@ import {
   runHistorianEvalCli,
   parseHistorianEvalCliArgs,
   resolveOutputDirectory,
+  parseSessionTranscript,
   type HistorianEvalCliRuntime,
 } from '@/lib/historian/eval/cli'
 import type { HistorianEvalCaseOutcome, HistorianEvalRunResult } from '@/lib/historian/eval/report'
@@ -43,6 +44,7 @@ function fakeOutcome(caseId: string, source: 'fixture' | 'session', overrides: P
     chiefComplaint: null,
     syndrome: null,
     turnCount: 0,
+    insufficientTranscript: false,
     finalDifferential: notRun(),
     thoroughness: notRun(),
     independentDdx: notRun(),
@@ -147,6 +149,60 @@ describe('resolveOutputDirectory', () => {
     ])
     const resolved = resolveOutputDirectory('qa/historian-eval/results/2026-07-21', (p) => existing.has(p))
     expect(resolved).toBe('qa/historian-eval/results/2026-07-21-v3')
+  })
+})
+
+describe('parseSessionTranscript', () => {
+  // (e) Real-data finding: 1 of ~113 historian_sessions rows stores
+  // `transcript` as a JSON-encoded STRING instead of a JSONB array. The old
+  // `Array.isArray(row.transcript) ? ... : []` check silently coerced that
+  // row to [], losing real content. This suite proves the recovery path.
+
+  it('returns an array value as-is', () => {
+    const arr = [{ role: 'user', text: 'hi', timestamp: 0 }]
+    expect(parseSessionTranscript(arr)).toEqual(arr)
+  })
+
+  it('recovers a JSON-string-encoded array (the ~1/113 prod row shape) into a real array', () => {
+    const entries = [
+      { role: 'assistant', text: 'What brings you in today?', timestamp: 0, seq: 1 },
+      { role: 'user', text: 'Headaches for a week.', timestamp: 5, seq: 2 },
+      { role: 'assistant', text: 'Any nausea?', timestamp: 10, seq: 3 },
+      { role: 'user', text: 'Yes, some.', timestamp: 15, seq: 4 },
+    ]
+
+    const recovered = parseSessionTranscript(JSON.stringify(entries))
+
+    expect(recovered).toEqual(entries)
+    // The recovered content is genuinely evaluable, not just structurally
+    // an array — at least MIN_PATIENT_TURNS (2) non-empty patient turns,
+    // so this session would proceed through the harness's evaluators
+    // rather than being short-circuited as insufficient.
+    const patientTurns = recovered.filter((e) => e.role === 'user' && e.text.trim().length > 0)
+    expect(patientTurns.length).toBeGreaterThanOrEqual(2)
+  })
+
+  it('recovers a JSON-string-encoded array with fewer than 2 patient turns (still an array, just insufficient downstream)', () => {
+    const entries = [{ role: 'assistant', text: 'Hello, what brings you in today?', timestamp: 0, seq: 1 }]
+    const recovered = parseSessionTranscript(JSON.stringify(entries))
+    expect(recovered).toEqual(entries)
+    const patientTurns = recovered.filter((e) => e.role === 'user' && e.text.trim().length > 0)
+    expect(patientTurns.length).toBeLessThan(2)
+  })
+
+  it('degrades a malformed JSON string to [] without throwing', () => {
+    expect(() => parseSessionTranscript('{not valid json')).not.toThrow()
+    expect(parseSessionTranscript('{not valid json')).toEqual([])
+  })
+
+  it('degrades a JSON string that parses but does not encode an array (e.g. an object) to []', () => {
+    expect(parseSessionTranscript(JSON.stringify({ not: 'an array' }))).toEqual([])
+  })
+
+  it('degrades null/undefined/non-string-non-array values to [] without throwing', () => {
+    expect(parseSessionTranscript(null)).toEqual([])
+    expect(parseSessionTranscript(undefined)).toEqual([])
+    expect(parseSessionTranscript(42)).toEqual([])
   })
 })
 
