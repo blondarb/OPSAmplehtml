@@ -4,6 +4,7 @@ import { useState } from 'react'
 import type { HistorianSession } from '@/lib/historianTypes'
 import HistorianTranscriptViewer from './historian/HistorianTranscriptViewer'
 import DifferentialCard from './historian/DifferentialCard'
+import DdxComparisonCard from './historian/DdxComparisonCard'
 
 interface HistorianSessionPanelProps {
   sessions: HistorianSession[]
@@ -195,7 +196,7 @@ export default function HistorianSessionPanel({ sessions, onImport }: HistorianS
                 <div style={{ borderTop: '1px solid var(--border-color, #e2e8f0)', padding: '12px' }}>
                   {/* Sub-tabs */}
                   <div style={{ display: 'flex', gap: '0', marginBottom: '12px', borderBottom: '1px solid var(--border-color, #e2e8f0)' }}>
-                    {['summary', 'structured', 'differential', 'transcript'].map(sec => (
+                    {['summary', 'structured', 'differential', 'compare', 'transcript'].map(sec => (
                       <button
                         key={sec}
                         onClick={() => setExpandedSection(sec)}
@@ -295,6 +296,24 @@ export default function HistorianSessionPanel({ sessions, onImport }: HistorianS
                   {expandedSection === 'differential' && (
                     <DifferentialCard
                       finalDifferential={session.final_differential}
+                      onQuoteClick={(turn) => {
+                        setExpandedSection('transcript')
+                        setHighlightIndex(turn)
+                      }}
+                    />
+                  )}
+
+                  {/* Cross-family comparison (Historian Validation Suite Task
+                      4) — pipeline (Sonnet) vs independent (DeepSeek-R1)
+                      differential + agreement metrics. independent_ddx/
+                      agreement are populated by the GET handler's enriched
+                      query when historian_evaluations exists; DdxComparisonCard
+                      renders its own pending state otherwise. */}
+                  {expandedSection === 'compare' && (
+                    <DdxComparisonCard
+                      finalDifferential={session.final_differential}
+                      independentDdx={session.independent_ddx}
+                      agreement={session.agreement}
                       onQuoteClick={(turn) => {
                         setExpandedSection('transcript')
                         setHighlightIndex(turn)

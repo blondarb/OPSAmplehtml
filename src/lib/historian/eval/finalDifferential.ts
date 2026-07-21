@@ -257,8 +257,17 @@ function sanitizeIcd10(value: unknown): string | null {
   return typeof value === 'string' && value.trim() ? value.trim() : null
 }
 
-/** Defensively normalize + validate the model's raw tool output into safe DifferentialItem[]. */
-function sanitizeDifferential(
+/**
+ * Defensively normalize + validate a model's raw differential-array output
+ * into safe DifferentialItem[] — verbatim-quote-checks every citation
+ * against the transcript, caps at MAX_DIFFERENTIAL_ITEMS, drops blank-
+ * diagnosis entries, normalizes likelihood/likelihood_pct/icd10. Exported
+ * (Task 4) so independentDdx.ts's DeepSeek-R1 pass — which produces the
+ * SAME DifferentialItem[] shape from the SAME transcript, just via a
+ * different model — reuses this exact, already-tested sanitization instead
+ * of a second hand-rolled copy that could silently drift from this one.
+ */
+export function sanitizeDifferential(
   transcript: HistorianTranscriptEntry[],
   raw: unknown,
 ): { items: DifferentialItem[]; droppedQuotes: number } {

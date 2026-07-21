@@ -59,6 +59,18 @@ export const PROMPT_VERSIONS: Record<string, PromptVersionInfo> = {
       'Thoroughness judge: deterministic pre-layer (diagnosis-leak lexicon, phase-marker presence, turn cap, structured-output shape) appended to one schema-forced Sonnet tool call scoring 6 dimensions against an inlined syndrome-matched rubric, plus missed-critical-question and diagnosis-leak findings and an optional report-fidelity screen.',
     introducedAt: '2026-07-20',
   },
+  'independent-ddx-r1-v1': {
+    id: 'independent-ddx-r1-v1',
+    description:
+      'Independent full-transcript differential diagnosis pass via DeepSeek-R1 (cross-family independence check for final-ddx-v1) — transcript + chief complaint ONLY as input (blind to the Sonnet pipeline\'s structured output, localizer output, final_differential, rubrics, and persona ground truth), native-format Bedrock InvokeModel call (R1 has no tool-use on Bedrock), hand-rolled shape validation with one retry on shape-invalid, then fail-closed. Reuses finalDifferential.ts\'s verbatim-quote sanitization against the SAME DifferentialItem[] shape.',
+    introducedAt: '2026-07-21',
+  },
+  'agreement-icd10-adjudicated-v1': {
+    id: 'agreement-icd10-adjudicated-v1',
+    description:
+      'Cross-model agreement metrics between final-ddx-v1 (Sonnet) and independent-ddx-r1-v1 (DeepSeek-R1): ICD-10 3-character category match as the deterministic fast path, Haiku-adjudicated synonym resolution (batched into one call) for pairs where either side lacks a usable ICD-10 code.',
+    introducedAt: '2026-07-21',
+  },
 }
 
 // ── Model pricing (for historian_evaluations.cost_usd) ───────────────────────

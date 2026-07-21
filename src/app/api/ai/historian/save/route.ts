@@ -7,6 +7,7 @@ import { notifyHistorianRedFlag } from '@/lib/notifications'
 import { validateTranscript } from '@/lib/historian/transcriptIntegrity'
 import { runFinalDifferential } from '@/lib/historian/eval/finalDifferential'
 import { runThoroughnessJudge } from '@/lib/historian/eval/thoroughnessJudge'
+import { runIndependentDdxAndAgreement } from '@/lib/historian/eval/independentDdx'
 import type { HistorianTranscriptEntry } from '@/lib/historianTypes'
 
 export async function POST(request: Request) {
@@ -70,28 +71,31 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: error.message }, { status: 500 })
     }
 
-    // ── Historian Validation Suite Task 2+3: post-session eval pipeline ────
+    // ── Historian Validation Suite Task 2+3+4: post-session eval pipeline ──
     // Fire-and-forget — separate, post-session Bedrock evaluations of the
-    // COMPLETE transcript (the historian agent itself never diagnoses; both
+    // COMPLETE transcript (the historian agent itself never diagnoses; all
     // are independent QA/audit passes, physician/QA-facing only). Never
-    // awaited, so neither can delay or fail this response. Gated by
+    // awaited, so none can delay or fail this response. Gated by
     // HISTORIAN_EVAL_AUTORUN: unset defaults to enabled; the literal string
-    // 'false' disables both (e.g. for hermetic test runs that don't mock
-    // Bedrock — see tests/historian-eval/saveRouteIntegrityCheck.test.ts).
+    // 'false' disables all three (e.g. for hermetic test runs that don't
+    // mock Bedrock — see tests/historian-eval/saveRouteIntegrityCheck.test.ts).
     //
     // Task 3's thoroughness judge runs AFTER Task 2's final differential,
-    // sequentially: chained off the SAME promise (via .then(), after
-    // runFinalDifferential's own .catch() has already recovered it) rather
-    // than nested inside one async function, so runFinalDifferential's
-    // existing error-handling/test coverage (saveRouteFinalDifferentialHook
-    // .test.ts) is untouched — that promise still resolves (never rejects)
-    // whether or not the final-differential call itself succeeded, so the
-    // judge always gets its turn. Each stage owns its own .catch(), so a
-    // judge failure can never be misattributed to (or, going the other
-    // direction, suppressed by) the final-differential stage. Both
-    // runFinalDifferential and runThoroughnessJudge already catch
-    // everything internally; the .catch() calls here are defense-in-depth
-    // backstops only.
+    // and Task 4's independent-ddx-plus-agreement pass runs AFTER Task 3's
+    // judge — each stage chained off the SAME promise (via .then(), after
+    // the previous stage's own .catch() has already recovered it) rather
+    // than nested inside one async function, so each earlier stage's
+    // existing error-handling/test coverage is untouched — that promise
+    // still resolves (never rejects) regardless of whether the previous
+    // stage itself succeeded, so the next stage always gets its turn. Each
+    // stage owns its own .catch(), so a later-stage failure can never be
+    // misattributed to (or suppressed by) an earlier one. runFinalDifferential,
+    // runThoroughnessJudge, and runIndependentDdxAndAgreement all already
+    // catch everything internally; the .catch() calls here are
+    // defense-in-depth backstops only. Task 4's own internals additionally
+    // re-fetch historian_sessions.final_differential (rather than trust an
+    // in-memory value from the Task 2 stage above) so agreement runs only
+    // when that column is actually populated — skipping quietly otherwise.
     if (data && process.env.HISTORIAN_EVAL_AUTORUN !== 'false') {
       const transcriptForEval: HistorianTranscriptEntry[] = Array.isArray(body.transcript)
         ? body.transcript
@@ -112,7 +116,7 @@ export async function POST(request: Request) {
         console.error('[historian/save] final differential eval error (non-fatal):', err)
       })
 
-      void finalDifferentialSettled
+      const thoroughnessSettled = finalDifferentialSettled
         .then(() =>
           runThoroughnessJudge(data.id, transcriptForEval, {
             chiefComplaint: chiefComplaintForEval,
@@ -130,6 +134,14 @@ export async function POST(request: Request) {
         )
         .catch((err) => {
           console.error('[historian/save] thoroughness judge eval error (non-fatal):', err)
+        })
+
+      void thoroughnessSettled
+        .then(() =>
+          runIndependentDdxAndAgreement(data.id, transcriptForEval, chiefComplaintForEval),
+        )
+        .catch((err) => {
+          console.error('[historian/save] independent ddx / agreement eval error (non-fatal):', err)
         })
     }
 
@@ -251,7 +263,7 @@ export async function GET(request: Request) {
       values.push(patientId)
     }
 
-    const sql = `
+    const baseSql = `
       SELECT
         hs.*,
         CASE WHEN p."id" IS NOT NULL THEN json_build_object(
@@ -263,7 +275,61 @@ export async function GET(request: Request) {
       ORDER BY hs."created_at" DESC
       LIMIT 10
     `
-    const { rows } = await pool.query(sql, values)
+
+    // Historian Validation Suite Task 4: enrich each session with its latest
+    // independent_ddx/agreement evaluator rows (historian_evaluations —
+    // migration 058), same wiring pattern as final_differential (a plain
+    // column on historian_sessions, always present via `hs.*`). Unlike that
+    // column, historian_evaluations is a separate table, so a plain
+    // `SELECT hs.*` can't pick this up for free — a LEFT JOIN LATERAL is
+    // required, and unlike a missing COLUMN (a silent no-op under
+    // `SELECT *`), a JOIN against a table that doesn't exist yet is a hard
+    // SQL error. Try the enriched query first; if historian_evaluations
+    // isn't there yet (migration 058 not applied — expected until the
+    // rollout task applies it), fall back to the base query so the session
+    // list keeps working exactly as it did before this change, with
+    // independent_ddx/agreement simply absent (DdxComparisonCard renders
+    // its own pending state for that, same as DifferentialCard for a
+    // missing final_differential).
+    const enrichedSql = `
+      SELECT
+        hs.*,
+        CASE WHEN p."id" IS NOT NULL THEN json_build_object(
+          'id', p."id", 'first_name', p."first_name", 'last_name', p."last_name", 'mrn', p."mrn"
+        ) ELSE NULL END AS patient,
+        ddx.result AS independent_ddx,
+        agr.result AS agreement
+      FROM "historian_sessions" hs
+      LEFT JOIN "patients" p ON p."id" = hs."patient_id"
+      LEFT JOIN LATERAL (
+        SELECT result FROM historian_evaluations
+        WHERE session_id = hs.id::text AND evaluator = 'independent_ddx'
+        ORDER BY created_at DESC LIMIT 1
+      ) ddx ON true
+      LEFT JOIN LATERAL (
+        SELECT result FROM historian_evaluations
+        WHERE session_id = hs.id::text AND evaluator = 'agreement'
+        ORDER BY created_at DESC LIMIT 1
+      ) agr ON true
+      WHERE ${conditions.join(' AND ')}
+      ORDER BY hs."created_at" DESC
+      LIMIT 10
+    `
+
+    let rows: unknown[]
+    try {
+      ;({ rows } = await pool.query(enrichedSql, values))
+    } catch (enrichErr: unknown) {
+      const pgCode = (enrichErr as { code?: string } | undefined)?.code
+      if (pgCode === '42P01') {
+        console.info(
+          '[historian/list] historian_evaluations table not present yet (migration 058 not applied) — falling back to the base session query',
+        )
+        ;({ rows } = await pool.query(baseSql, values))
+      } else {
+        throw enrichErr
+      }
+    }
 
     return NextResponse.json({ sessions: rows || [] })
   } catch (error: any) {

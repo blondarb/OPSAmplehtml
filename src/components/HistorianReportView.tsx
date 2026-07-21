@@ -3,9 +3,12 @@
 import { useEffect, useState } from 'react'
 import type { HistorianRedFlag, HistorianStructuredOutput, HistorianTranscriptEntry } from '@/lib/historianTypes'
 import type { FinalDifferential } from '@/lib/historian/eval/finalDifferential'
+import type { IndependentDifferential } from '@/lib/historian/eval/independentDdx'
+import type { AgreementResult } from '@/lib/historian/eval/agreement'
 import IntakeReviewSection from './consult/IntakeReviewSection'
 import HistorianTranscriptViewer from './historian/HistorianTranscriptViewer'
 import DifferentialCard from './historian/DifferentialCard'
+import DdxComparisonCard from './historian/DdxComparisonCard'
 
 interface HistorianReportViewProps {
   structuredOutput: HistorianStructuredOutput | null
@@ -24,6 +27,18 @@ interface HistorianReportViewProps {
    * the moment this "Interview Complete" screen first renders).
    */
   finalDifferential?: FinalDifferential | null
+  /**
+   * Historian Validation Suite Task 4 — the independent DeepSeek-R1
+   * differential and its agreement metrics against finalDifferential above.
+   * Same optionality/pending-state handling as finalDifferential: neither
+   * is fetched by this component, and (like finalDifferential) neither is
+   * currently passed by NeurologicHistorian.tsx's call site either, since
+   * the async eval pipeline typically hasn't finished by the moment this
+   * "Interview Complete" screen first renders. DdxComparisonCard renders
+   * its own pending state for null/undefined.
+   */
+  independentDdx?: IndependentDifferential | null
+  agreement?: AgreementResult | null
   onStartAnother: () => void
   onBackToPortal: () => void
 }
@@ -44,6 +59,8 @@ export default function HistorianReportView({
   questionCount,
   transcript,
   finalDifferential,
+  independentDdx,
+  agreement,
   onStartAnother,
   onBackToPortal,
 }: HistorianReportViewProps) {
@@ -154,6 +171,8 @@ export default function HistorianReportView({
             redFlags={redFlags}
             transcript={transcript}
             finalDifferential={finalDifferential}
+            independentDdx={independentDdx}
+            agreement={agreement}
           />
         ) : (
           <PatientReportTab
@@ -200,6 +219,8 @@ interface PhysicianReportTabProps {
   redFlags: HistorianRedFlag[]
   transcript?: HistorianTranscriptEntry[]
   finalDifferential?: FinalDifferential | null
+  independentDdx?: IndependentDifferential | null
+  agreement?: AgreementResult | null
 }
 
 function PhysicianReportTab({
@@ -208,6 +229,8 @@ function PhysicianReportTab({
   redFlags,
   transcript,
   finalDifferential,
+  independentDdx,
+  agreement,
 }: PhysicianReportTabProps) {
   // Turn-link state: clicking a cited quote in DifferentialCard jumps the
   // transcript viewer below to that turn (see HistorianTranscriptViewer's
@@ -249,6 +272,17 @@ function PhysicianReportTab({
       <div style={{ marginTop: 16 }}>
         <DifferentialCard
           finalDifferential={finalDifferential}
+          onQuoteClick={(turn) => setHighlightIndex(turn)}
+        />
+      </div>
+
+      {/* Cross-family comparison (Historian Validation Suite Task 4) —
+          pipeline (Sonnet) vs independent (DeepSeek-R1) + agreement. */}
+      <div style={{ marginTop: 16 }}>
+        <DdxComparisonCard
+          finalDifferential={finalDifferential}
+          independentDdx={independentDdx}
+          agreement={agreement}
           onQuoteClick={(turn) => setHighlightIndex(turn)}
         />
       </div>
