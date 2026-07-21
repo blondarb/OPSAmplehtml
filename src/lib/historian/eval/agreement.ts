@@ -96,6 +96,102 @@ export interface AgreementResult {
 
 const TOP_N = 3
 
+// Above this size on either side, exact matching falls back to greedy
+// (factorial blow-up guard) — never hit today, since every current caller
+// pre-slices to TOP_N=3, but kept as an explicit, documented safety net
+// rather than an unstated assumption.
+const MAX_EXACT_MATCH_SIZE = 8
+
+/**
+ * Greedy one-to-one assignment (row-major, first-available-column) — the
+ * MAX_EXACT_MATCH_SIZE fallback only. Can under-count vs the true maximum
+ * matching; see maxBipartiteMatching's doc comment for the failure case.
+ */
+function greedyBipartiteMatching(truth: boolean[][], rows: number, cols: number): [number, number][] {
+  const consumedCols = new Set<number>()
+  const pairs: [number, number][] = []
+  for (let i = 0; i < rows; i++) {
+    for (let j = 0; j < cols; j++) {
+      if (consumedCols.has(j)) continue
+      if (truth[i][j]) {
+        pairs.push([i, j])
+        consumedCols.add(j)
+        break
+      }
+    }
+  }
+  return pairs
+}
+
+/**
+ * Maximum bipartite matching by pair COUNT — exact, via brute-force search
+ * over the padded permutation space (rows/cols are both trivially small
+ * here, capped at TOP_N=3 by every current caller; MAX_EXACT_MATCH_SIZE
+ * guards against this ever being called with a larger input).
+ *
+ * Greedy row-major assignment (the prior implementation) can UNDER-COUNT
+ * when one candidate matches multiple items but another candidate matches
+ * only one of them: e.g. truth = [[true,true],[true,false]] — row 0
+ * matches BOTH columns, row 1 matches ONLY column 0. Greedy processes row 0
+ * first, takes the first available column (0), and consumes it — leaving
+ * row 1 with no available column even though row 1's ONLY possible match
+ * was column 0. The true maximum matching is 2 (row 0 -> column 1, row 1
+ * -> column 0), not greedy's 1. This function always finds the true
+ * maximum by exhaustively scoring every possible one-to-one assignment
+ * (via a permutation of the padded index space) and keeping the
+ * highest-scoring one — a tie among multiple maximum matchings is broken
+ * by whichever permutation the search visits first (deterministic given a
+ * fixed input, but not intended to encode any particular preference among
+ * equally-sized maximum matchings).
+ */
+function maxBipartiteMatching(truth: boolean[][], rows: number, cols: number): [number, number][] {
+  if (rows > MAX_EXACT_MATCH_SIZE || cols > MAX_EXACT_MATCH_SIZE) {
+    return greedyBipartiteMatching(truth, rows, cols)
+  }
+  if (rows === 0 || cols === 0) return []
+
+  // Pad the index space to a square of size n = max(rows, cols) so every
+  // permutation is a full bijection; positions that fall outside the real
+  // rows/cols (padding artifacts) simply never score.
+  const n = Math.max(rows, cols)
+  const indices = Array.from({ length: n }, (_, i) => i)
+  let bestAssignment: number[] = indices.slice()
+  let bestScore = -1
+
+  function scoreOf(assignment: number[]): number {
+    let score = 0
+    for (let i = 0; i < rows; i++) {
+      if (assignment[i] < cols && truth[i][assignment[i]]) score++
+    }
+    return score
+  }
+
+  function permute(arr: number[], k: number): void {
+    if (k === arr.length) {
+      const score = scoreOf(arr)
+      if (score > bestScore) {
+        bestScore = score
+        bestAssignment = arr.slice()
+      }
+      return
+    }
+    for (let i = k; i < arr.length; i++) {
+      ;[arr[k], arr[i]] = [arr[i], arr[k]]
+      permute(arr, k + 1)
+      ;[arr[k], arr[i]] = [arr[i], arr[k]]
+    }
+  }
+  permute(indices, 0)
+
+  const pairs: [number, number][] = []
+  for (let i = 0; i < rows; i++) {
+    if (bestAssignment[i] < cols && truth[i][bestAssignment[i]]) {
+      pairs.push([i, bestAssignment[i]])
+    }
+  }
+  return pairs
+}
+
 async function batchAdjudicate(
   pairs: [string, string][],
   adjudicate: Adjudicator | undefined,
@@ -160,24 +256,18 @@ export async function computeAgreement(
   // — independent of whatever greedy assignment happens below.
   const top1Match = topA.length > 0 && topB.length > 0 ? truth[0][0] : false
 
-  // Greedy one-to-one assignment (row-major) purely for a clean, deduped
-  // matchedPairs listing and the overlap/Jaccard counts — top1Match above
+  // Exact maximum one-to-one assignment (see maxBipartiteMatching's doc
+  // comment for why greedy can under-count) — used for the clean, deduped
+  // matchedPairs listing and the overlap/Jaccard counts. top1Match above
   // never depends on this assignment's outcome.
-  const consumedA = new Set<number>()
-  const consumedB = new Set<number>()
-  const matchedPairs: AgreementResult['matchedPairs'] = []
-  for (let i = 0; i < topA.length; i++) {
-    if (consumedA.has(i)) continue
-    for (let j = 0; j < topB.length; j++) {
-      if (consumedB.has(j)) continue
-      if (truth[i][j]) {
-        matchedPairs.push({ a: topA[i].diagnosis, b: topB[j].diagnosis, via: via[i][j] })
-        consumedA.add(i)
-        consumedB.add(j)
-        break
-      }
-    }
-  }
+  const bestPairs = maxBipartiteMatching(truth, topA.length, topB.length)
+  const consumedA = new Set<number>(bestPairs.map(([i]) => i))
+  const consumedB = new Set<number>(bestPairs.map(([, j]) => j))
+  const matchedPairs: AgreementResult['matchedPairs'] = bestPairs.map(([i, j]) => ({
+    a: topA[i].diagnosis,
+    b: topB[j].diagnosis,
+    via: via[i][j],
+  }))
 
   const top3Overlap = matchedPairs.length
   const unionSize = topA.length + topB.length - top3Overlap

@@ -116,6 +116,33 @@ describe('generateIndependentDdx', () => {
     expect(bodyText).not.toContain('"messages"')
   })
 
+  // ── Request parameters (review fix, 2026-07-21) ───────────────────────
+
+  it('sends temperature 0.6, matching DeepSeek\'s own recommended value — never greedy decoding (0)', async () => {
+    bedrockRuntime.send.mockResolvedValueOnce(r1Response(VALID_DDX_JSON))
+    await generateIndependentDdx(SAMPLE_TRANSCRIPT)
+
+    const sentInput = bedrockRuntime.send.mock.calls[0][0].input as { body: Uint8Array }
+    const parsedBody = JSON.parse(new TextDecoder().decode(sentInput.body))
+    expect(parsedBody.temperature).toBe(0.6)
+  })
+
+  it('places ALL instructional content inside the <｜User｜>...<｜Assistant｜> turn — nothing between begin-of-sentence and User (R1 has no system-prompt slot)', async () => {
+    bedrockRuntime.send.mockResolvedValueOnce(r1Response(VALID_DDX_JSON))
+    await generateIndependentDdx(SAMPLE_TRANSCRIPT, 'right-sided weakness')
+
+    const sentInput = bedrockRuntime.send.mock.calls[0][0].input as { body: Uint8Array }
+    const parsedBody = JSON.parse(new TextDecoder().decode(sentInput.body)) as { prompt: string }
+    // Mirrors AWS's own canonical InvokeModel example structure exactly.
+    expect(parsedBody.prompt.startsWith('<｜begin▁of▁sentence｜><｜User｜>')).toBe(true)
+    // The instructional content (system-style prompt) must appear AFTER
+    // <｜User｜>, not before it.
+    const userMarkerIndex = parsedBody.prompt.indexOf('<｜User｜>')
+    const instructionIndex = parsedBody.prompt.indexOf('neurologist producing an INDEPENDENT differential')
+    expect(userMarkerIndex).toBeGreaterThanOrEqual(0)
+    expect(instructionIndex).toBeGreaterThan(userMarkerIndex)
+  })
+
   it('calls DeepSeek-R1 (not Claude) as the model', async () => {
     bedrockRuntime.send.mockResolvedValueOnce(r1Response(VALID_DDX_JSON))
     await generateIndependentDdx(SAMPLE_TRANSCRIPT)

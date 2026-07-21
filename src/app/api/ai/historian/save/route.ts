@@ -10,6 +10,24 @@ import { runThoroughnessJudge } from '@/lib/historian/eval/thoroughnessJudge'
 import { runIndependentDdxAndAgreement } from '@/lib/historian/eval/independentDdx'
 import type { HistorianTranscriptEntry } from '@/lib/historianTypes'
 
+// ── Auth boundary (binding — read before adding a new handler here) ─────────
+// POST = patient-portal pattern, intentionally UNAUTHENTICATED (same bar as
+// /api/ai/historian/session and /transcript-flush — a patient mid-interview
+// has no Cognito session; those routes are token/session-id-scoped instead,
+// not physician-authed). Never add a getUser() check to POST without first
+// re-auditing every patient-facing caller (NeurologicHistorian.tsx,
+// EmbeddedHistorian.tsx) for a login requirement that doesn't exist today.
+//
+// GET = physician-only, Cognito-authenticated. It returns patient names,
+// MRNs, full interview transcripts, and (Historian Validation Suite Task 4)
+// both the pipeline and independent differentials — never acceptable
+// unauthenticated. Confirmed callers (2026-07-21 review fix): ClinicalNote.tsx
+// (mounted only via PhysicianPageWrapper/EhrPageWrapper — the /physician and
+// /ehr clinician surfaces) and home/HistorianSessionsList.tsx (mounted only
+// via PhysicianHome.tsx). Both are physician-authed pages; the route-level
+// check below is the real security boundary regardless (client-side page
+// gating is never sufficient on its own — a direct API call bypasses it).
+
 export async function POST(request: Request) {
   try {
     const body = await request.json()
@@ -248,6 +266,12 @@ export async function POST(request: Request) {
 
 export async function GET(request: Request) {
   try {
+    // Physician-only — see the auth-boundary comment above the POST handler.
+    const user = await getUser()
+    if (!user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
     const { searchParams } = new URL(request.url)
     const tenant = searchParams.get('tenant_id') || getTenantServer()
     const patientId = searchParams.get('patient_id')

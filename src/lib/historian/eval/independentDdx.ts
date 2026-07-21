@@ -32,10 +32,8 @@
  * / us-east-2) before writing this module: an Anthropic-shaped request body
  * returns a hard `ValidationException` from Bedrock — not a parse quirk,
  * a rejected request. R1's actual native request body is
- * `{prompt, max_tokens, temperature}`, where DeepSeek's own chat-template
- * markers (`<｜begin▁of▁sentence｜>{system}<｜User｜>{user}<｜Assistant｜>`)
- * take the place of separate system/messages fields, and its response body
- * is `{choices: [{text, stop_reason}]}` with NO usage/token-count field
+ * `{prompt, max_tokens, temperature}`. Its response body is
+ * `{choices: [{text, stop_reason}]}` with NO usage/token-count field
  * anywhere — confirmed against both the raw HTTP response and the JS SDK's
  * CommandOutput (only body/contentType/$metadata, no token headers). `text`
  * also embeds the model's chain-of-thought inline as a leading
@@ -43,6 +41,31 @@
  * content block the way that might be assumed; it is plain text prefixed
  * onto the same string, stripped below before JSON parsing. `stop_reason`
  * is `"stop"` (complete) or `"length"` (truncated).
+ *
+ * PROMPT STRUCTURE (fixed 2026-07-21 review round — read before changing):
+ * R1 has NO system-prompt support. AWS's own canonical InvokeModel example
+ * for this exact model
+ * (https://docs.aws.amazon.com/bedrock/latest/userguide/model-parameters-deepseek.html,
+ * fetched/verified 2026-07-21) embeds a prompt as
+ * `<｜begin▁of▁sentence｜><｜User｜>{prompt}<｜Assistant｜>` — nothing at all
+ * between `<｜begin▁of▁sentence｜>` and `<｜User｜>`. An earlier version of
+ * this file put the instructions block BEFORE `<｜User｜>` (mimicking a
+ * system-prompt slot DeepSeek's chat template doesn't have); that has been
+ * corrected — ALL instructional content (INDEPENDENT_DDX_INSTRUCTIONS) now
+ * lives inside the `<｜User｜>...<｜Assistant｜>` turn, immediately followed
+ * by the transcript/chief-complaint content, exactly mirroring AWS's
+ * example structure.
+ *
+ * TEMPERATURE (fixed same round): was `0` (greedy decoding). DeepSeek's own
+ * officially published R1 usage recommendation
+ * (https://api-docs.deepseek.com/guides/reasoning_model, corroborated via
+ * DeepSeek's R1 model-card guidance) is temperature 0.6 (with top_p 0.95)
+ * and explicitly warns that greedy decoding (temperature 0) "can lead to
+ * performance degradation and endless repetitions" for this model. AWS's
+ * own InvokeModel example above uses `temperature: 0.5` — within DeepSeek's
+ * stated ~0.5-0.7 usable range but not their specific recommendation.
+ * `DEEPSEEK_R1_TEMPERATURE` is now `0.6`, DeepSeek's own recommended value.
+ * `top_p` is left unset (Bedrock default) — outside this fix's scope.
  *
  * Given this, independentDdx.ts calls Bedrock directly via a small
  * dedicated invoke helper (invokeDeepSeekR1Json below) that mirrors
@@ -144,13 +167,25 @@ const AGREEMENT_PROMPT_VERSION = PROMPT_VERSIONS['agreement-icd10-adjudicated-v1
 // answer (confirmed live: a trivial one-line prompt used >150 reasoning
 // tokens before producing anything). Generous by design per the task brief.
 const DEEPSEEK_R1_MAX_TOKENS = 8000
-const DEEPSEEK_R1_TEMPERATURE = 0
+// DeepSeek's own published R1 usage recommendation is temperature 0.6 (with
+// top_p 0.95) — see this module's WIRE-FORMAT NOTE / TEMPERATURE section for
+// the verified sources. Greedy decoding (temperature 0, the prior value
+// here) is explicitly warned against for this model: DeepSeek's own
+// guidance says it "can lead to performance degradation and endless
+// repetitions." AWS's own InvokeModel example for us.deepseek.r1-v1:0 uses
+// 0.5 — within DeepSeek's ~0.5-0.7 usable range, not their specific
+// recommendation. Using DeepSeek's own recommended value here.
+const DEEPSEEK_R1_TEMPERATURE = 0.6
 const MAX_RETRIES = 1 // i.e. up to 2 total attempts
 
 const MAX_DIFFERENTIAL_ITEMS = 6
 const MAX_QUOTES_PER_ITEM = 6
 
-const INDEPENDENT_DDX_SYSTEM_PROMPT = `You are a neurologist producing an INDEPENDENT differential diagnosis from a patient intake transcript, for retrospective quality-review purposes. You have not seen any other clinician's or AI system's analysis of this case — form your own opinion from the transcript alone.
+// Instructional content for the R1 call — NOT a system prompt (R1's chat
+// template has no system-role slot; see this module's WIRE-FORMAT NOTE).
+// This text is concatenated inside the <｜User｜>...<｜Assistant｜> turn by
+// invokeDeepSeekR1Json below, never placed before <｜User｜>.
+const INDEPENDENT_DDX_INSTRUCTIONS = `You are a neurologist producing an INDEPENDENT differential diagnosis from a patient intake transcript, for retrospective quality-review purposes. You have not seen any other clinician's or AI system's analysis of this case — form your own opinion from the transcript alone.
 
 You will receive the full numbered transcript (each line prefixed "Turn N (Patient|Historian): ...") and, if available, the stated chief complaint.
 
@@ -245,7 +280,12 @@ interface R1InvokeResult {
  * function.
  */
 async function invokeDeepSeekR1Json(userText: string): Promise<R1InvokeResult> {
-  const prompt = `<｜begin▁of▁sentence｜>${INDEPENDENT_DDX_SYSTEM_PROMPT}<｜User｜>${userText}<｜Assistant｜>`
+  // ALL instructional content lives inside the <｜User｜>...<｜Assistant｜>
+  // turn, immediately followed by the transcript/chief-complaint content —
+  // nothing between <｜begin▁of▁sentence｜> and <｜User｜> — mirroring AWS's
+  // own canonical InvokeModel example for this model exactly. See this
+  // module's WIRE-FORMAT NOTE / PROMPT STRUCTURE section.
+  const prompt = `<｜begin▁of▁sentence｜><｜User｜>${INDEPENDENT_DDX_INSTRUCTIONS}\n\n${userText}<｜Assistant｜>`
   const body = JSON.stringify({
     prompt,
     max_tokens: DEEPSEEK_R1_MAX_TOKENS,

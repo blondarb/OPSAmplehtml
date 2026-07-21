@@ -220,6 +220,38 @@ describe('computeAgreement', () => {
     expect(result.top1Match).toBe(true)
   })
 
+  // ── Optimal (not greedy) matching — review fix, 2026-07-21 ─────────────
+
+  it('finds the true maximum matching when one candidate matches two options but another matches only one of them (greedy under-counts this)', async () => {
+    // truth: X matches BOTH P and Q; Y matches ONLY P (Y-Q is false).
+    // A greedy row-major assignment processes X first, takes the first
+    // available column (P), and consumes it — leaving Y with no available
+    // column even though Y's only possible match was P. That under-counts
+    // at 1. The true maximum matching is 2 (X-Q, Y-P).
+    const adjudicate = vi.fn(async (pairs: [string, string][]) =>
+      pairs.map(([a, b]) => !(a === 'Y' && b === 'Q')),
+    )
+    const a = [item({ diagnosis: 'X', icd10: null }), item({ diagnosis: 'Y', icd10: null })]
+    const b = [item({ diagnosis: 'P', icd10: null }), item({ diagnosis: 'Q', icd10: null })]
+
+    const result = await computeAgreement(a, b, adjudicate)
+
+    expect(result.top3Overlap).toBe(2)
+    expect(result.matchedPairs).toHaveLength(2)
+    expect(result.disagreements).toEqual([])
+
+    // A valid matching: every A/B item used exactly once.
+    const usedA = new Set(result.matchedPairs.map((p) => p.a))
+    const usedB = new Set(result.matchedPairs.map((p) => p.b))
+    expect(usedA).toEqual(new Set(['X', 'Y']))
+    expect(usedB).toEqual(new Set(['P', 'Q']))
+
+    // Y can only be matched with P (Y-Q is false) — its pair must be P,
+    // which forces X's pair to be Q.
+    const yPair = result.matchedPairs.find((p) => p.a === 'Y')
+    expect(yPair?.b).toBe('P')
+  })
+
   // ── Jaccard / overlap math ────────────────────────────────────────────
 
   it('computes jaccardTop3 and top3Overlap for a partial-overlap 3-vs-3 case', async () => {
