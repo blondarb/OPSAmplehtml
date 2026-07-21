@@ -1,0 +1,612 @@
+<title>Outpatient Synapse — Diagnostics v2: gaps, filters, labs</title>
+<style>
+  :root{
+    --primary:#0D9488; --primary-light:#14B8A6; --primary-dark:#0F766E;
+    --white:#fff; --gray:#F9FAFB; --dark:#F3F4F6;
+    --tp:#111827; --ts:#6B7280; --tm:#9CA3AF; --bd:#E5E7EB;
+    --err:#EF4444; --ok:#10B981; --warn:#F59E0B;
+    --f:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--dark);color:var(--tp);font-family:var(--f);
+       font-size:14px;line-height:1.5;-webkit-font-smoothing:antialiased}
+  .wrap{max-width:1150px;margin:0 auto;padding:44px 22px 90px}
+  h1{font-size:28px;font-weight:700;letter-spacing:-.02em;margin:0 0 8px}
+  h2{font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;
+     color:var(--primary);margin:0 0 5px}
+  h3{font-size:20px;font-weight:650;letter-spacing:-.01em;margin:0 0 6px}
+  h4{font-size:15px;font-weight:650;margin:22px 0 6px}
+  p{margin:0 0 11px;color:var(--ts)}
+  .lede{font-size:15.5px;max-width:76ch}
+  strong{color:var(--tp);font-weight:650}
+  em.q{color:var(--tp);font-style:italic}
+  code{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:.87em;
+       background:var(--dark);padding:1px 5px;border-radius:4px;color:var(--primary-dark)}
+  hr{border:0;height:1px;background:var(--bd);margin:50px 0 0}
+  .section{margin:58px 0 0}
+
+  .box{background:var(--white);border:1px solid var(--bd);border-radius:10px;
+       padding:16px 18px;margin:18px 0;box-shadow:0 1px 3px rgba(0,0,0,.04)}
+  .box.d{border-left:3px solid var(--primary)}
+  .box.w{border-left:3px solid var(--warn)}
+  .box.g{border-left:3px solid var(--ok)}
+  .box.r{border-left:3px solid var(--err)}
+  .box-t{font-size:10.5px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;
+         color:var(--primary);margin-bottom:6px}
+  .box.w .box-t{color:#B45309} .box.g .box-t{color:#047857} .box.r .box-t{color:#B91C1C}
+  .box p:last-child{margin-bottom:0}
+
+  table{width:100%;border-collapse:collapse;font-size:12.5px}
+  th{text-align:left;font-size:9.5px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;
+     color:var(--tm);padding:7px 9px;border-bottom:1px solid var(--bd)}
+  td{padding:8px 9px;border-bottom:1px solid var(--bd);color:var(--ts);vertical-align:top}
+  td b{color:var(--tp);font-weight:600}
+  .tbl{background:var(--white);border:1px solid var(--bd);border-radius:10px;overflow:hidden;margin:14px 0}
+  .rank{display:inline-flex;width:17px;height:17px;border-radius:50%;background:var(--dark);
+        color:var(--ts);font-size:9.5px;font-weight:700;align-items:center;justify-content:center}
+  .rank.hi{background:#FEE2E2;color:#DC2626}
+
+  .badge{font-size:9px;font-weight:700;padding:2px 6px;border-radius:4px;letter-spacing:.04em;
+         background:var(--dark);color:var(--tm);white-space:nowrap}
+  .badge.new{background:#CCFBF1;color:var(--primary-dark)}
+  .badge.has{background:#DCFCE7;color:#15803D}
+  .badge.gap{background:#FEE2E2;color:#DC2626}
+  .badge.unv{background:#FEF3C7;color:#92400E}
+  .badge.ai{background:#EDE9FE;color:#6D28D9}
+
+  /* app */
+  .app{background:var(--gray);border:1px solid var(--bd);border-radius:10px;overflow:hidden;
+       margin:16px 0;box-shadow:0 2px 8px rgba(0,0,0,.06)}
+  .app-t{background:var(--white);border-bottom:1px solid var(--bd);padding:0 18px;
+         display:flex;align-items:center;gap:22px;height:44px}
+  .app-tab{font-size:12.5px;color:var(--ts);padding:13px 0;border-bottom:2px solid transparent;font-weight:500}
+  .app-tab.on{color:var(--tp);font-weight:650;border-bottom-color:var(--tp)}
+  .app-b{padding:16px;background:var(--gray)}
+
+  .fs{background:var(--white);border:1px solid var(--bd);border-radius:10px;padding:14px;margin-bottom:11px}
+  .fs-h{display:flex;align-items:center;gap:8px;margin-bottom:10px}
+  .fs-t{font-size:13px;font-weight:650}
+
+  .pills{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:9px}
+  .pill{font-size:11.5px;font-weight:550;padding:5px 12px;border-radius:20px;
+        border:1px solid var(--bd);background:var(--white);color:var(--ts);white-space:nowrap}
+  .pill.on{background:var(--primary);border-color:var(--primary);color:#fff;font-weight:600}
+  .pill.sub{font-size:11px;padding:4px 10px}
+  .pill.sub.on{background:var(--primary-dark);border-color:var(--primary-dark)}
+  .pill.srch{border-style:dashed;color:var(--primary-dark);background:#F0FDFA;border-color:#A7F3D0}
+  .sublane{background:var(--gray);border-radius:8px;padding:9px;margin-bottom:8px;
+           border-left:2px solid var(--primary)}
+  .sub-l{font-size:9px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;
+         color:var(--tm);margin-bottom:6px}
+
+  .zone-l{font-size:9.5px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;
+          color:var(--tm);margin:0 0 7px;display:flex;align-items:center;gap:7px}
+  .zone-l:after{content:'';flex:1;height:1px;background:var(--bd)}
+
+  /* filter bar */
+  .fbar{display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-bottom:11px}
+  .fchip{font-size:11px;font-weight:600;padding:4px 11px;border-radius:14px;border:1px solid var(--bd);
+         background:var(--white);color:var(--ts)}
+  .fchip.on{background:var(--tp);border-color:var(--tp);color:#fff}
+  .fsearch{flex:1;min-width:130px;border:1px solid var(--bd);border-radius:14px;padding:4px 11px;
+           font-size:11px;color:var(--tm);background:var(--white)}
+
+  /* age groups */
+  .grp{background:var(--white);border:1px solid var(--bd);border-radius:8px;margin-bottom:7px;overflow:hidden}
+  .grp-h{display:flex;align-items:center;gap:8px;padding:8px 11px;font-size:11.5px;font-weight:600;
+         color:var(--ts);background:var(--gray);border-bottom:1px solid var(--bd)}
+  .grp-h .cnt{font-size:9.5px;font-weight:700;background:var(--dark);color:var(--tm);
+              padding:1px 6px;border-radius:8px}
+  .grp-h .caret{margin-left:auto;color:var(--tm);font-size:10px}
+  .grp.closed .grp-h{border-bottom:0}
+  .row{display:flex;gap:9px;align-items:baseline;padding:7px 11px;border-bottom:1px solid var(--bd);font-size:11.5px}
+  .row:last-child{border-bottom:0}
+  .row .dt{font-variant-numeric:tabular-nums;color:var(--tm);white-space:nowrap;font-size:10.5px;width:52px;flex-shrink:0}
+  .row .nm{font-weight:600;color:var(--tp);white-space:nowrap}
+  .row .fi{color:var(--ts);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1}
+  .row.pin{background:#FFFBEB}
+
+  /* pinned */
+  .pinbox{background:#FFFBEB;border:1px solid #FDE68A;border-radius:8px;padding:10px 12px;margin-bottom:11px}
+  .pin-h{font-size:9.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;
+         color:#92400E;margin-bottom:7px;display:flex;align-items:center;gap:5px}
+  .pin-r{display:flex;gap:8px;align-items:baseline;font-size:11.5px;padding:3px 0}
+  .pin-r .nm{font-weight:650;color:#78350F;white-space:nowrap}
+  .pin-r .vl{color:#92400E}
+  .pin-r .dt{margin-left:auto;font-size:10px;color:#B45309;font-variant-numeric:tabular-nums;white-space:nowrap}
+
+  /* lab table */
+  .labwrap{overflow-x:auto;background:var(--white);border:1px solid var(--bd);border-radius:8px}
+  .labt{min-width:520px;font-size:11.5px}
+  .labt th{padding:7px 8px;font-size:9px;text-align:center;font-variant-numeric:tabular-nums}
+  .labt th:first-child{text-align:left;min-width:130px}
+  .labt td{padding:7px 8px;text-align:center;font-variant-numeric:tabular-nums;border-bottom:1px solid var(--bd)}
+  .labt td:first-child{text-align:left}
+  .labt tr:last-child td{border-bottom:0}
+  .ln{font-weight:600;color:var(--tp);font-size:11.5px}
+  .lu{font-size:9px;color:var(--tm);font-weight:400}
+  .v{display:inline-block;padding:2px 7px;border-radius:4px;font-weight:600;color:var(--ts)}
+  .v.hi{background:#FEE2E2;color:#B91C1C}
+  .v.lo{background:#DBEAFE;color:#1D4ED8}
+  .v.ok{color:var(--ts)}
+  .v.na{color:var(--bd)}
+  .tr{font-size:12px;font-weight:700}
+  .tr.up{color:var(--err)} .tr.dn{color:var(--ok)} .tr.fl{color:var(--tm)}
+
+  .ta{border:1px solid var(--bd);border-radius:6px;padding:8px;font-size:11.5px;color:var(--tm);
+      background:var(--white);min-height:42px;position:relative}
+  .ta.f{color:var(--ts)}
+  .icons{position:absolute;right:6px;bottom:5px;display:flex;gap:5px;font-size:11px;opacity:.5}
+  .hint{font-size:10.5px;color:var(--tm);margin-top:5px}
+  .cap{font-size:10.5px;color:var(--tm);text-align:center;font-style:italic;margin:-2px 0 14px}
+
+  .qq{border-left:2px solid var(--bd);padding-left:12px;margin:0 0 12px;font-size:13.5px;
+      color:var(--ts);font-style:italic}
+  .qq b{font-style:normal;color:var(--tp);font-weight:650}
+  ul{margin:0 0 11px;padding-left:19px;color:var(--ts)} li{margin-bottom:5px}
+  .two{display:grid;gap:14px} @media(min-width:860px){.two{grid-template-columns:1fr 1fr}}
+</style>
+
+<div class="wrap">
+
+  <h1>Diagnostics v2 — gaps, filters, and the lab table</h1>
+  <p class="lede">Answering your three points: what's missing, how to tame the longitudinal list,
+  and labs as a tabular trend. Plus an honest answer on the exam page.</p>
+
+  <div class="box g">
+    <div class="box-t">Your labs instinct was better than my design</div>
+    <p>I held the flowsheet grid for imaging because it needs an inferred normal/abnormal flag.
+    <strong>Labs don't have that problem — a lab value <em>is</em> already structured.</strong> A titer
+    of 1:640 or a JCV index of 1.62 needs no inference. The grid fails for imaging for exactly the
+    reason it works for labs. You spotted that; I'd drawn the grid on the wrong noun.</p>
+  </div>
+
+  <!-- ============ GAPS ============ -->
+  <div class="section">
+    <h2>Your question 1</h2>
+    <h3>What diagnostics are we missing?</h3>
+    <p class="lede">Short answer: <strong>a lot</strong>, and EMG wasn't one of them — it was already
+    in. The shipped OPS list is nine studies total. Here's what a practicing neurologist would notice
+    is absent, ranked by how often it's ordered.</p>
+
+    <div class="box d">
+      <div class="box-t">What's actually built today</div>
+      <p><code>ALL_STUDY_TYPES</code> in <code>ImagingResultsTab.tsx</code> is the only real vocabulary
+      in the codebase — nine items: <strong>MRI Brain, CT Head, CTA Head &amp; Neck, MRA Head, MRI
+      Spine, EEG, EMG/NCS, VEP, Sleep Study.</strong> Nothing in synapse-teleencounter or
+      sevaro-scribe competes with it, so this is the single source of truth to extend rather than
+      replace. Note VEP is already there — evoked potentials are half-built.</p>
+    </div>
+
+    <div class="tbl">
+      <table>
+        <tr><th style="width:26px"></th><th>Missing</th><th>Why it matters</th><th style="width:88px">Status</th></tr>
+        <tr><td><span class="rank hi">1</span></td>
+          <td><b>Evoked potentials — BAEP, SSEP</b></td>
+          <td>VEP exists; its two siblings don't. MS and neuro-otology order these routinely.</td>
+          <td><span class="badge has">HALF THERE</span></td></tr>
+        <tr><td><span class="rank hi">2</span></td>
+          <td><b>OCT</b> (optical coherence tomography)</td>
+          <td>Arguably as common as an evoked potential in a modern MS practice. RNFL thinning precedes visual-field change.</td>
+          <td><span class="badge gap">ABSENT</span></td></tr>
+        <tr><td><span class="rank hi">3</span></td>
+          <td><b>Cardiac workup</b> — TTE, TEE, Holter, event monitor, loop recorder, bubble study</td>
+          <td>Bread-and-butter after any TIA/stroke or unexplained syncope. Ordered by neurology, read by cardiology.</td>
+          <td><span class="badge gap">ABSENT</span></td></tr>
+        <tr><td><span class="rank">4</span></td>
+          <td><b>Autonomic testing</b> — tilt table, QSART, HRV/Valsalva</td>
+          <td>POTS/dysautonomia/syncope are common general-neuro referrals.</td>
+          <td><span class="badge gap">ABSENT</span></td></tr>
+        <tr><td><span class="rank">5</span></td>
+          <td><b>DaTscan</b>, and nuclear medicine generally</td>
+          <td>Distinguishes PD from essential tremor. Lost inside a generic "PET" pill — different study, different scanner.</td>
+          <td><span class="badge gap">ABSENT</span></td></tr>
+        <tr><td><span class="rank">6</span></td>
+          <td><b>Skin biopsy (IENFD)</b></td>
+          <td><em>The</em> diagnostic test for small-fiber neuropathy — a very common referral. No biopsy field exists at all.</td>
+          <td><span class="badge gap">ABSENT</span></td></tr>
+        <tr><td><span class="rank">7</span></td>
+          <td><b>Vestibular testing</b> — VNG, VEMP, rotary chair</td>
+          <td>General neurologists co-manage dizziness constantly.</td>
+          <td><span class="badge gap">ABSENT</span></td></tr>
+        <tr><td><span class="rank">8</span></td>
+          <td><b>Neuropsychological testing</b></td>
+          <td>Standard referral out of any cognitive workup. Distinct from an in-office MoCA.</td>
+          <td><span class="badge gap">ABSENT</span></td></tr>
+        <tr><td><span class="rank">9</span></td>
+          <td><b>MRI subtypes</b> — orbits, pituitary, IAC, MRV, MS protocol, whole spine</td>
+          <td>"MRI Brain" and "MRI Spine" collapse a dozen genuinely different protocols. MRV for venous sinus thrombosis isn't an MRA.</td>
+          <td><span class="badge gap">COLLAPSED</span></td></tr>
+        <tr><td><span class="rank">10</span></td>
+          <td><b>EEG variants</b> — routine / sleep-deprived / ambulatory / video-LTM</td>
+          <td>You asked for discrete EEG tracking. One "EEG" field can't distinguish a 20-min routine from a 3-day ambulatory.</td>
+          <td><span class="badge gap">COLLAPSED</span></td></tr>
+        <tr><td><span class="rank">11</span></td>
+          <td><b>Sleep study variants</b> — PSG, HSAT, MSLT, MWT</td>
+          <td>MSLT is the narcolepsy gold standard and always follows a PSG. Different study, different result shape.</td>
+          <td><span class="badge gap">COLLAPSED</span></td></tr>
+        <tr><td><span class="rank">12</span></td>
+          <td><b>DEXA</b>, <b>CT myelogram/SIH protocol</b>, <b>nerve/muscle biopsy</b>, <b>EMG variants</b> (SFEMG, RNS)</td>
+          <td>Lower frequency, but each is guideline-recognized. DEXA in particular is a real AED bone-health monitoring need.</td>
+          <td><span class="badge gap">ABSENT</span></td></tr>
+      </table>
+    </div>
+
+    <div class="box w">
+      <div class="box-t">Read this before treating the list as authoritative</div>
+      <p>This is web-grounded research, not clinical sign-off, and I'm a design tool — you're the
+      neurologist. A few items I'd flag as genuinely uncertain rather than let them pass:
+      <strong>MIBG scintigraphy</strong> (evidence base is much stronger in Japan/Europe than the US),
+      <strong>fMRI/DTI/MR spectroscopy</strong> and <strong>ictal SPECT</strong> (tertiary
+      epilepsy-center work, probably not ambulatory), <strong>MRI muscle</strong> and
+      <strong>CT sinus</strong> (unclear how often <em>neurologists</em> order these vs. rheum/ENT),
+      and <strong>vHIT</strong> (standard in specialty practice per general knowledge, but I couldn't
+      pin a source). Those are marked <span class="badge unv">UNVERIFIED</span> below and want your
+      eye, not mine.</p>
+      <p><strong>Prachi's list is the reconciliation authority here,</strong> not this one. She
+      committed in the meeting: <em class="q">"I have a list of procedures… between MRI, CT, PET, and
+      neuro diagnostic procedures and sleep procedures that are commonly ordered from neurologists
+      specifically."</em> Diff this against hers and take hers where they conflict — it's drawn from
+      actual Sevaro order volume, which beats a literature sweep for the question of what your
+      physicians actually order.</p>
+    </div>
+
+    <h4>The obvious problem: ~40 studies won't fit in a pill row</h4>
+    <p>And you've banned the escape hatch — <em class="q">"Please, please not a drop down."</em>
+    But Melanie already named the answer for scales, and it generalizes:
+    <em class="q">"Why don't we have this searchable? …like the scale, like they can pick, click it and
+    it opens it up."</em></p>
+    <p><strong>Pills for the common studies, typeahead search for the long tail.</strong> A search
+    box isn't a dropdown — no click to open, no scrolling a list, you just type "orb" and get MRI
+    orbits. The pills stay short and cover 90% of visits; the other 40 studies stay reachable without
+    ever rendering a menu.</p>
+
+    <div class="app">
+      <div class="app-t">
+        <div class="app-tab">History</div>
+        <div class="app-tab on">Imaging/results</div>
+        <div class="app-tab">Physical exams</div>
+        <div class="app-tab">Recommendation</div>
+      </div>
+      <div class="app-b">
+        <div class="fs">
+          <div class="fs-h"><div class="fs-t">Diagnostic imaging</div><span class="badge">Optional</span></div>
+          <div class="pills">
+            <div class="pill on">MRI</div><div class="pill">CT</div>
+            <div class="pill">Vascular</div><div class="pill">Nuclear / PET</div>
+            <div class="pill srch">🔍 Search all imaging…</div>
+          </div>
+          <div class="sublane">
+            <div class="sub-l">MRI — select study</div>
+            <div class="pills" style="margin-bottom:0">
+              <div class="pill sub on">Brain</div>
+              <div class="pill sub">Brain — MS protocol <span class="badge new">NEW</span></div>
+              <div class="pill sub">Orbits <span class="badge new">NEW</span></div>
+              <div class="pill sub">Pituitary <span class="badge new">NEW</span></div>
+              <div class="pill sub">IAC <span class="badge new">NEW</span></div>
+              <div class="pill sub">C-spine</div><div class="pill sub">T-spine</div>
+              <div class="pill sub">L-spine</div>
+              <div class="pill sub">MRA</div>
+              <div class="pill sub">MRV <span class="badge new">NEW</span></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="fs">
+          <div class="fs-h"><div class="fs-t">Diagnostic testing &amp; procedures</div><span class="badge">Optional</span></div>
+          <div class="pills">
+            <div class="pill">EEG</div><div class="pill">EMG / NCS</div>
+            <div class="pill">Evoked potentials <span class="badge new">NEW</span></div>
+            <div class="pill">Lumbar puncture</div><div class="pill">Sleep study</div>
+            <div class="pill">OCT <span class="badge new">NEW</span></div>
+            <div class="pill">Autonomic <span class="badge new">NEW</span></div>
+            <div class="pill">Biopsy <span class="badge new">NEW</span></div>
+            <div class="pill srch">🔍 Search all…</div>
+          </div>
+        </div>
+
+        <div class="fs">
+          <div class="fs-h"><div class="fs-t">Cardiac workup</div>
+            <span class="badge new">NEW SECTION</span>
+            <span class="badge" style="margin-left:auto">Optional</span></div>
+          <div class="pills" style="margin-bottom:0">
+            <div class="pill">TTE</div><div class="pill">TEE</div>
+            <div class="pill">Holter</div><div class="pill">Event monitor</div>
+            <div class="pill">Loop recorder</div><div class="pill">Bubble study</div>
+          </div>
+          <div class="hint">↳ Ordered by neurology, performed by cardiology — and the result shape
+            differs (a loop recorder yields months of AF burden, not one impression)</div>
+        </div>
+      </div>
+    </div>
+    <div class="cap">Four or five pills, not forty. Search covers the tail without a menu.</div>
+  </div>
+
+  <hr>
+
+  <!-- ============ FILTERS ============ -->
+  <div class="section">
+    <h2>Your question 2</h2>
+    <h3>Taming the longitudinal list</h3>
+    <p class="qq"><b>You:</b> "It's a little bit unwieldy… we may have to have some filters… once it
+    gets over three items, we start ordering it back in the years, grouping them by older, or five
+    years, something like that."</p>
+    <p class="lede">Built as: filter chips, then age buckets that collapse once a group exceeds three
+    items. Plus one addition you didn't ask for — <strong>pinned results float above the collapse
+    entirely</strong>, which is what makes your "flag it forever" idea actually work.</p>
+
+    <div class="app">
+      <div class="app-t">
+        <div class="app-tab">History</div>
+        <div class="app-tab on">Imaging/results</div>
+        <div class="app-tab">Physical exams</div>
+        <div class="app-tab">Recommendation</div>
+      </div>
+      <div class="app-b">
+        <div class="zone-l">Prior record</div>
+
+        <div class="fbar">
+          <div class="fchip on">All</div>
+          <div class="fchip">Imaging</div>
+          <div class="fchip">Testing</div>
+          <div class="fchip">Labs</div>
+          <div class="fchip">Cardiac</div>
+          <div class="fsearch">🔍 Filter by study or finding…</div>
+        </div>
+
+        <div class="pinbox">
+          <div class="pin-h">📌 Pinned — always shown, never collapses</div>
+          <div class="pin-r"><span class="nm">CSF oligoclonal bands</span>
+            <span class="vl">Positive — 6 unique bands</span><span class="dt">11/03/2018</span></div>
+          <div class="pin-r"><span class="nm">NOTCH3 genetic panel</span>
+            <span class="vl">Negative</span><span class="dt">04/22/2019</span></div>
+        </div>
+
+        <div class="grp">
+          <div class="grp-h">Last 12 months <span class="cnt">3</span><span class="caret">▾</span></div>
+          <div class="row"><span class="dt">01/16/26</span><span class="nm">CT head</span>
+            <span class="fi">No acute intracranial abnormality</span></div>
+          <div class="row"><span class="dt">12/02/25</span><span class="nm">EEG — routine</span>
+            <span class="fi">Normal awake and drowsy. No epileptiform discharges</span></div>
+          <div class="row"><span class="dt">09/18/25</span><span class="nm">MRI brain — MS protocol</span>
+            <span class="fi">Two new T2 lesions, periventricular. No enhancement</span></div>
+        </div>
+
+        <div class="grp closed">
+          <div class="grp-h">2021 – 2024 <span class="cnt">6</span><span class="caret">▸</span></div>
+        </div>
+
+        <div class="grp closed">
+          <div class="grp-h">2016 – 2020 <span class="cnt">4</span><span class="caret">▸</span></div>
+        </div>
+
+        <div class="grp closed">
+          <div class="grp-h">Before 2016 <span class="cnt">2</span><span class="caret">▸</span></div>
+        </div>
+      </div>
+    </div>
+    <div class="cap">Recent expanded; older buckets collapse to a count. Pinned defeats the collapse.</div>
+
+    <div class="box d">
+      <div class="box-t">Why the pin matters more than it looks</div>
+      <p>Your two ideas turn out to be the same idea. You wanted age-grouping so the list stops being
+      unwieldy — but age-grouping is exactly what would <em>bury</em> the thing you said you most need
+      to remember: <em class="q">"the crazy antibody that I found five years ago."</em> A five-year-old
+      result is precisely what a recency-collapse hides.</p>
+      <p>So the pin isn't a nice-to-have sitting next to the filter — <strong>it's the release valve
+      that makes aggressive collapsing safe.</strong> You can hide fifteen years behind three
+      counts <em>because</em> anything that matters forever is already floated to the top. Build them
+      together or neither works.</p>
+    </div>
+  </div>
+
+  <hr>
+
+  <!-- ============ LABS ============ -->
+  <div class="section">
+    <h2>Your question 3</h2>
+    <h3>Labs as a table</h3>
+    <p class="qq"><b>You:</b> "I'm still kinda concerned about labs because we're gonna follow labs
+    longitudinally, and then we have the same lab that titers change or the values change over time…
+    I still think it might be a tabular view of labs."</p>
+
+    <p class="lede">You're right, and the meeting decision doesn't have to break for it.
+    <strong>Free text stays the default — you just promote the handful you actually want to follow.</strong>
+    That respects <em class="q">"labs can be really overwhelming"</em> (you're not structuring 40 lab
+    values) while giving titers somewhere real to live.</p>
+
+    <div class="app">
+      <div class="app-t">
+        <div class="app-tab">History</div>
+        <div class="app-tab on">Imaging/results</div>
+        <div class="app-tab">Physical exams</div>
+        <div class="app-tab">Recommendation</div>
+      </div>
+      <div class="app-b">
+        <div class="fs">
+          <div class="fs-h"><div class="fs-t">Labs — tracked</div>
+            <span class="badge">4 followed</span>
+            <span class="badge ai" style="margin-left:auto">AI EXTRACTED</span></div>
+          <div class="labwrap">
+            <table class="labt">
+              <tr><th>Lab</th><th>11/17/24</th><th>05/02/25</th><th>11/08/25</th><th>01/16/26</th><th style="width:30px"></th></tr>
+              <tr>
+                <td><div class="ln">JCV antibody index</div><div class="lu">index</div></td>
+                <td><span class="v ok">0.31</span></td><td><span class="v ok">0.42</span></td>
+                <td><span class="v ok">0.88</span></td><td><span class="v hi">1.62</span></td>
+                <td><span class="tr up">↑</span></td>
+              </tr>
+              <tr>
+                <td><div class="ln">Vitamin D, 25-OH</div><div class="lu">ng/mL</div></td>
+                <td><span class="v lo">18</span></td><td><span class="v lo">24</span></td>
+                <td><span class="v ok">31</span></td><td><span class="v ok">41</span></td>
+                <td><span class="tr dn">↗</span></td>
+              </tr>
+              <tr>
+                <td><div class="ln">ALT</div><div class="lu">U/L</div></td>
+                <td><span class="v ok">22</span></td><td><span class="v ok">26</span></td>
+                <td><span class="v ok">24</span></td><td><span class="v ok">21</span></td>
+                <td><span class="tr fl">→</span></td>
+              </tr>
+              <tr>
+                <td><div class="ln">WBC</div><div class="lu">K/µL</div></td>
+                <td><span class="v ok">6.2</span></td><td><span class="v ok">5.8</span></td>
+                <td><span class="v na">—</span></td><td><span class="v ok">6.0</span></td>
+                <td><span class="tr fl">→</span></td>
+              </tr>
+            </table>
+          </div>
+          <div class="hint">↳ Same lab, same row, values across time — the thing free text structurally cannot do</div>
+        </div>
+
+        <div class="fs">
+          <div class="fs-h"><div class="fs-t">Labs — free text</div>
+            <span class="badge">Optional</span>
+            <span class="badge" style="margin-left:auto">UNCHANGED</span></div>
+          <div class="ta f">CMP unremarkable. TSH 2.1. B12 480 with normal MMA. Lipids at goal.
+            <div class="icons">🎤 ⚡ ✨</div>
+          </div>
+          <div class="hint">↳ Dump everything here as decided. Select any value → <strong>📈 Follow this
+            lab</strong> to promote it into the table above, or <strong>📌 Pin</strong> to remember it forever.</div>
+        </div>
+      </div>
+    </div>
+    <div class="cap">Free text is still the front door. The table is opt-in, per lab.</div>
+
+    <div class="box r">
+      <div class="box-t">Why this row is the whole argument</div>
+      <p>Look at the JCV antibody index: <strong>0.31 → 0.42 → 0.88 → 1.62.</strong> That's an MS
+      patient on natalizumab whose PML risk is climbing. In free text those four numbers live in four
+      different visit notes across fifteen months, and <em>nobody sees the slope</em> — each individual
+      value looks unremarkable in isolation. One row makes it obvious.</p>
+      <p>That's the strongest case for your instinct, and it generalizes: AChR titer in myasthenia,
+      ESR/CRP through a giant-cell-arteritis steroid taper, CK in myopathy, AED levels in pregnancy.
+      <strong>The clinical value isn't the value — it's the delta</strong>, and free text has no
+      concept of a delta.</p>
+      <p><strong>What I will not do is hardcode the thresholds.</strong> The JCV index risk cutoffs are
+      widely cited around 0.9 and 1.5, but my research pass could not confirm them against a primary
+      source, so the mockup shows the value rising and flags it — it does not assert a risk
+      stratification. Same for every reference range here. Those need your sign-off or a pharmacy
+      source before they go anywhere near a real screen.</p>
+    </div>
+
+    <h4>Serial vs. one-time — and why it can't be a fixed property</h4>
+    <p>The research surfaced a clean split that turns out not to be clean:</p>
+
+    <div class="two">
+      <div class="box" style="margin:0">
+        <div class="box-t">📈 Serially tracked — the table</div>
+        <ul>
+          <li><strong>AChR / MuSK antibody titer</strong> — myasthenia; serial monitoring at 3 and 6 months is recommended practice</li>
+          <li><strong>JCV antibody index</strong> — MS on natalizumab; checked at baseline then roughly every 6 months</li>
+          <li><strong>AED levels</strong> — phenytoin (free + total), valproate, carbamazepine, levetiracetam (essential in pregnancy)</li>
+          <li><strong>ESR + CRP</strong> — GCA steroid taper. Caveat: both are suppressed by tocilizumab regardless of disease activity</li>
+          <li><strong>CK</strong> — myopathy, statin myopathy</li>
+          <li><strong>Vitamin D, CBC, LFTs</strong> — AED safety and bone health</li>
+          <li><strong>HbA1c</strong> — diabetic neuropathy</li>
+        </ul>
+      </div>
+      <div class="box" style="margin:0">
+        <div class="box-t">📌 One-time — the pin</div>
+        <ul>
+          <li><strong>CSF oligoclonal bands / IgG index</strong> — once positive, essentially permanent</li>
+          <li><strong>Genetic results</strong> — HD CAG repeat, SCA panel, ALS panel, NOTCH3/CADASIL. Germline; literally never changes</li>
+          <li><strong>Paraneoplastic / autoimmune encephalitis panel</strong> — NMDAR, LGI1, CASPR2, anti-Hu/Yo/Ri</li>
+          <li><strong>Myositis-specific antibodies</strong> — Jo-1, Mi-2, MDA5, HMGCR. CK is the serial companion, not the antibody</li>
+          <li><strong>Ceruloplasmin / copper</strong> — Wilson's workup</li>
+          <li><strong>HIV, RPR, celiac, ANA, SPEP/IFE</strong> — one-time screens</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="box w">
+      <div class="box-t">The design consequence — don't hardcode the classification</div>
+      <p>Several labs refuse the binary. <strong>AQP4-IgG titer</strong> tracks severity during an
+      attack but not between them. <strong>B12/MMA</strong> is one-time at workup but re-checked after
+      repletion. <strong>24-hour urine copper</strong> is one-time for diagnosis but serial once you're
+      chelating. <strong>Oligoclonal bands</strong> can actually disappear on natalizumab over years.</p>
+      <p>So: <strong>ship a sensible default per lab and let the physician override it.</strong> Any
+      lab can be pinned, followed, both, or neither — the classification is a suggestion, not a schema.
+      Hardcoding it as a field type per lab will be wrong often enough to be annoying, and the
+      exceptions are exactly the interesting patients.</p>
+    </div>
+
+    <div class="box d">
+      <div class="box-t">Where this lands you with Prachi</div>
+      <p>Worth noticing: <strong>this quietly hands Prachi some of what she wanted without breaking
+      your free-text position.</strong> Her objection was <em class="q">"free texting every piece of
+      this is going to be challenging for data mining."</em> Tracked labs are structured
+      name/value/unit/date rows — genuinely mineable, trendable, reportable. And they got that way
+      because a physician chose to follow a lab for clinical reasons, not because a form demanded it.</p>
+      <p>That's a better outcome than either side argued for in the meeting. It's also a real answer
+      to your MIDAS quality-metric ambition — <em class="q">"has the patient's MIDAS score gotten
+      better over time?"</em> — which needs exactly this shape of data.</p>
+    </div>
+  </div>
+
+  <hr>
+
+  <!-- ============ EXAM ============ -->
+  <div class="section">
+    <h2>Your question 4</h2>
+    <h3>"Is the exam page pretty easy already?"</h3>
+    <p class="lede"><strong>No.</strong> The shell is easy — pill order, timestamp removal, AI nudge,
+    those are settled and drawn. The clickable exam is the hardest thing in this project, and it's
+    still sitting on your desk, not mine.</p>
+
+    <p>Two things are blocking it, and neither is a design problem I can solve alone:</p>
+
+    <ul>
+      <li><strong>You haven't shot down the ratio theory.</strong> My whole recommendation rests on
+      the claim that clickable exams fail because they make you handle forty findings to express
+      three. If that's wrong, Option C is wrong with it, and B is where you'd land.</li>
+      <li><strong>The UPDRS/EDSS/MoCA question is yours</strong> — <em class="q">"I'll have to actually
+      kind of think about that a little bit."</em> It changes which tab things live on, so both tabs
+      wait on it.</li>
+    </ul>
+
+    <div class="box r">
+      <div class="box-t">But the codebase already answered your open question — differently than you did</div>
+      <p>I found <code>SCALE_LOCATION_MAP</code> in <code>scale-definitions.ts</code>. It already
+      classifies all 20 scales as exam or history, and <strong>it contradicts the working answer you
+      gave in the meeting.</strong></p>
+      <p>You said NIHSS is exam-embedded and essentially everything else is a historical scale. The
+      shipped code says <strong>eight</strong> scales are exam: <code>nihss</code>,
+      <code>modified_ashworth</code>, <code>moca</code>, <code>mini_cog</code>,
+      <code>updrs_motor</code>, <code>hoehn_yahr</code>, <code>edss</code>, <code>dn4</code> — and
+      twelve are history: <code>phq9</code>, <code>gad7</code>, <code>midas</code>, <code>hit6</code>,
+      <code>ess</code>, <code>abcd2</code>, <code>dhi</code>, <code>isi</code>,
+      <code>cha2ds2_vasc</code>, <code>has_bled</code>, <code>odi</code>, <code>ndi</code>.</p>
+      <p>So <strong>UPDRS, EDSS and MoCA are already classified as exam</strong> — the three you
+      specifically couldn't place. Someone made that call once and shipped it. That's not proof it's
+      right, but it means your decision is really <em>ratify or override</em>, not decide from scratch
+      — and if you override it, something already in production changes behavior. Worth knowing before
+      you pick.</p>
+    </div>
+
+    <div class="box w">
+      <div class="box-t">Two scales you and Melanie both asked for don't exist</div>
+      <p><strong>Modified Rankin and the ICH score are not among the 20.</strong> You floated mRS
+      explicitly — <em class="q">"I would probably put the modified ranking score under more of a
+      score"</em> — and Melanie agreed she wants it searchable and dislikes it sitting in the exam.
+      Neither is built. If mRS is going to carry the stroke-follow-up quality metric Melanie described
+      (<em class="q">"this patient had a stroke three months ago, you should do your modified
+      Rankin"</em>), it has to be authored first. That's a small, concrete, unowned task that nobody
+      named in the meeting.</p>
+    </div>
+
+    <div class="box d">
+      <div class="box-t">What I'd do next</div>
+      <p>Fastest path to unblocking both tabs: <strong>react to the ratio theory</strong> (one
+      sentence — right, wrong, or "let me see it working"), and <strong>ratify or override
+      SCALE_LOCATION_MAP</strong> now that you know it exists. Those two answers unlock the exam
+      design and the scales placement simultaneously, and then the brief for Annie writes itself
+      against decisions instead of guesses.</p>
+      <p>If it'd help you judge the ratio theory, I can build Option C as a clickable prototype rather
+      than a picture — you'd feel whether marking two exceptions and watching the prose assemble
+      actually beats what you've built before. That's the kind of thing that's hard to evaluate from a
+      mockup and obvious in ten seconds of use.</p>
+    </div>
+  </div>
+
+</div>

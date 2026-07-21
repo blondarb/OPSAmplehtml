@@ -1,0 +1,807 @@
+<title>Synapse — Exam & Diagnostics Tab Design Options</title>
+<style>
+  :root{
+    --bg950:#0c0f14; --bg900:#1a1d23; --bg800:#2a2d34; --bg700:#333;
+    --t650:#696a70; --t450:#acacaf; --t200:#f1f1f1;
+    --blue:#3b82f6; --green:#22c55e; --red:#ef4444; --yellow:#eab308;
+    --orange:#fb923c; --purple:#8b5cf6; --teal:#24c3b8;
+    --font:-apple-system,BlinkMacSystemFont,'SF Pro','Segoe UI',Roboto,sans-serif;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg950);color:var(--t200);font-family:var(--font);
+       line-height:1.55;-webkit-font-smoothing:antialiased}
+  .wrap{max-width:1240px;margin:0 auto;padding:48px 24px 96px}
+
+  /* ---- typography ---- */
+  h1{font-size:31px;font-weight:650;letter-spacing:-.02em;margin:0 0 8px}
+  h2{font-size:13px;font-weight:600;letter-spacing:.09em;text-transform:uppercase;
+     color:var(--blue);margin:0 0 6px}
+  h3{font-size:21px;font-weight:600;letter-spacing:-.01em;margin:0 0 6px}
+  p{margin:0 0 12px;color:var(--t450);font-size:14.5px}
+  .lede{font-size:16px;color:var(--t450);max-width:74ch}
+  strong{color:var(--t200);font-weight:600}
+  code{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:.88em;
+       background:var(--bg800);padding:1px 5px;border-radius:4px;color:var(--teal)}
+
+  /* ---- layout ---- */
+  .section{margin:72px 0 0;scroll-margin-top:24px}
+  .divider{height:1px;background:var(--bg800);margin:56px 0 0;border:0}
+  .grid{display:grid;gap:20px;margin-top:28px}
+  @media(min-width:900px){ .grid.three{grid-template-columns:repeat(3,1fr)} }
+
+  /* ---- callouts ---- */
+  .note{background:var(--bg900);border:1px solid var(--bg800);border-left:3px solid var(--blue);
+        border-radius:8px;padding:16px 18px;margin:20px 0}
+  .note.warn{border-left-color:var(--yellow)}
+  .note.pick{border-left-color:var(--green)}
+  .note-t{font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;
+          color:var(--blue);margin-bottom:6px}
+  .note.warn .note-t{color:var(--yellow)} .note.pick .note-t{color:var(--green)}
+  .note p:last-child{margin-bottom:0}
+
+  /* ---- option column ---- */
+  .opt{background:var(--bg900);border:1px solid var(--bg800);border-radius:12px;
+       padding:18px;display:flex;flex-direction:column;min-width:0}
+  .opt.rec{border-color:rgba(34,197,94,.45);box-shadow:0 0 0 1px rgba(34,197,94,.12)}
+  .opt-h{display:flex;align-items:center;gap:8px;margin-bottom:2px;flex-wrap:wrap}
+  .opt-l{font-size:10px;font-weight:700;letter-spacing:.1em;color:var(--t650)}
+  .opt-n{font-size:17px;font-weight:600;letter-spacing:-.01em}
+  .tag{font-size:9.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;
+       padding:2px 7px;border-radius:4px;background:rgba(34,197,94,.16);color:var(--green)}
+  .opt-d{font-size:13.5px;color:var(--t450);margin:8px 0 16px}
+  .pc{margin-top:auto;padding-top:14px;border-top:1px solid var(--bg800);font-size:12.5px}
+  .pc div{display:flex;gap:8px;margin-bottom:5px;color:var(--t450)}
+  .pc span{flex-shrink:0;font-weight:700}
+  .pc .p span{color:var(--green)} .pc .con span{color:var(--orange)}
+
+  /* ---- panel mockup (mimics the real 380px Synapse dock) ---- */
+  .panel{background:var(--bg950);border:1px solid var(--bg800);border-radius:8px;
+         overflow:hidden;margin-bottom:16px;font-size:11px}
+  .ptabs{display:flex;border-bottom:1px solid var(--bg800);padding:0 4px}
+  .ptab{flex:1;padding:7px 2px;text-align:center;font-size:9px;font-weight:500;
+        color:var(--t650);border-bottom:2px solid transparent}
+  .ptab.on{color:var(--blue);border-bottom-color:var(--blue)}
+  .ptab i{display:block;font-size:12px;margin-bottom:1px;font-style:normal}
+  .pbody{padding:12px}
+
+  /* clock rail */
+  .clock{background:rgba(251,146,60,.08);border:1px solid rgba(251,146,60,.25);
+         border-radius:6px;padding:8px 10px;margin-bottom:10px}
+  .clock-r{display:flex;justify-content:space-between;align-items:baseline}
+  .clock-l{font-size:9px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:var(--orange)}
+  .clock-v{font-size:15px;font-weight:700;color:var(--orange);font-variant-numeric:tabular-nums}
+  .clock-s{font-size:9.5px;color:var(--t650);margin-top:2px}
+  .rail{height:4px;background:var(--bg800);border-radius:2px;margin-top:7px;position:relative;overflow:hidden}
+  .rail-f{position:absolute;left:0;top:0;bottom:0;background:var(--orange);border-radius:2px}
+  .rail-p{position:absolute;top:-2px;width:2px;height:8px;background:var(--t450);border-radius:1px}
+
+  /* card */
+  .c{background:var(--bg900);border:1px solid var(--bg800);border-radius:6px;
+     padding:9px 10px;margin-bottom:7px}
+  .c-h{display:flex;justify-content:space-between;align-items:center;gap:6px}
+  .c-t{font-size:10px;font-weight:600;color:var(--t200);display:flex;align-items:center;gap:5px;min-width:0}
+  .c-s{font-size:9.5px;color:var(--t650);margin-top:3px}
+
+  /* badges + dots */
+  .b{font-size:8.5px;font-weight:700;padding:1.5px 5px;border-radius:3px;white-space:nowrap;letter-spacing:.03em}
+  .b.gr{background:rgba(34,197,94,.18);color:var(--green)}
+  .b.rd{background:rgba(239,68,68,.18);color:var(--red)}
+  .b.ye{background:rgba(234,179,8,.18);color:var(--yellow)}
+  .b.bl{background:rgba(59,130,246,.18);color:var(--blue)}
+  .b.gy{background:var(--bg800);color:var(--t650)}
+  .b.pu{background:rgba(139,92,246,.18);color:var(--purple)}
+  .dot{width:6px;height:6px;border-radius:50%;flex-shrink:0}
+  .dot.g{background:var(--green)} .dot.y{background:var(--yellow)}
+  .dot.r{background:var(--red)} .dot.e{background:var(--bg700)}
+
+  /* nihss driver */
+  .drv{background:var(--bg900);border:1px solid var(--blue);border-radius:6px;padding:11px;margin-bottom:8px}
+  .drv-p{font-size:9px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:var(--blue)}
+  .drv-q{font-size:12.5px;font-weight:600;color:var(--t200);margin:5px 0 3px}
+  .drv-c{font-size:10px;color:var(--t450);font-style:italic;padding:6px 8px;background:var(--bg950);
+         border-radius:4px;border-left:2px solid var(--bg700);margin:7px 0 9px}
+  .scores{display:flex;gap:5px}
+  .sc{flex:1;padding:8px 0;text-align:center;background:var(--bg800);border-radius:4px;
+      font-size:13px;font-weight:700;color:var(--t450);border:1px solid transparent}
+  .sc.on{background:rgba(59,130,246,.2);border-color:var(--blue);color:var(--blue)}
+  .sc small{display:block;font-size:7.5px;font-weight:500;color:var(--t650);margin-top:1px;letter-spacing:.02em}
+  .sc.on small{color:var(--blue)}
+
+  /* running score */
+  .run{display:flex;align-items:center;justify-content:space-between;
+       background:var(--bg800);border-radius:6px;padding:8px 10px;margin-bottom:9px}
+  .run-n{font-size:22px;font-weight:700;color:var(--yellow);line-height:1;font-variant-numeric:tabular-nums}
+  .run-l{font-size:8.5px;color:var(--t650);letter-spacing:.06em;text-transform:uppercase}
+  .pips{display:flex;gap:2.5px}
+  .pip{width:5px;height:5px;border-radius:1px;background:var(--bg700)}
+  .pip.f{background:var(--yellow)} .pip.cur{background:var(--blue)}
+
+  /* exam grid */
+  .acc{background:var(--bg900);border:1px solid var(--bg800);border-radius:6px;margin-bottom:6px;overflow:hidden}
+  .acc-h{display:flex;align-items:center;gap:6px;padding:7px 9px;font-size:10px;font-weight:600}
+  .acc-b{padding:0 9px 9px;display:grid;grid-template-columns:1fr 1fr;gap:4px}
+  .chk{display:flex;align-items:center;gap:4px;font-size:9px;color:var(--t450);
+       background:var(--bg950);border:1px solid var(--bg800);border-radius:3px;padding:4px 5px}
+  .chk.on{border-color:rgba(34,197,94,.4);color:var(--t200);background:rgba(34,197,94,.07)}
+  .box{width:8px;height:8px;border-radius:2px;border:1px solid var(--bg700);flex-shrink:0}
+  .chk.on .box{background:var(--green);border-color:var(--green)}
+  .fill{background:linear-gradient(135deg,var(--blue),var(--purple));border-radius:5px;
+        padding:7px;text-align:center;font-size:10px;font-weight:600;color:#fff;margin-bottom:9px}
+
+  /* gate */
+  .gate{border-radius:6px;padding:10px;margin-bottom:7px;border:1px solid}
+  .gate.g{background:rgba(34,197,94,.06);border-color:rgba(34,197,94,.3)}
+  .gate.y{background:rgba(234,179,8,.06);border-color:rgba(234,179,8,.3)}
+  .gate.r{background:rgba(239,68,68,.06);border-color:rgba(239,68,68,.3)}
+  .gate-h{display:flex;align-items:center;justify-content:space-between;gap:6px;margin-bottom:7px}
+  .gate-t{font-size:10.5px;font-weight:700;display:flex;align-items:center;gap:5px}
+  .gate.g .gate-t{color:var(--green)} .gate.y .gate-t{color:var(--yellow)} .gate.r .gate-t{color:var(--red)}
+  .crit{display:flex;justify-content:space-between;align-items:center;padding:3.5px 0;
+        font-size:9.5px;border-top:1px solid rgba(255,255,255,.05)}
+  .crit-l{display:flex;align-items:center;gap:5px;color:var(--t450);min-width:0}
+  .crit-v{font-weight:600;color:var(--t200);font-variant-numeric:tabular-nums;white-space:nowrap}
+
+  /* timeline */
+  .tl{position:relative;padding-left:16px;margin-bottom:8px}
+  .tl:before{content:'';position:absolute;left:4px;top:6px;bottom:6px;width:1px;background:var(--bg800)}
+  .ev{position:relative;padding:5px 0}
+  .ev:before{content:'';position:absolute;left:-14px;top:9px;width:7px;height:7px;border-radius:50%;
+             background:var(--bg700);border:2px solid var(--bg950)}
+  .ev.d:before{background:var(--green)} .ev.p:before{background:var(--bg700)}
+  .ev.n:before{background:var(--blue);box-shadow:0 0 0 3px rgba(59,130,246,.2)}
+  .ev-r{display:flex;justify-content:space-between;align-items:baseline;gap:6px}
+  .ev-t{font-size:10px;font-weight:600;color:var(--t200)}
+  .ev.p .ev-t{color:var(--t650);font-weight:500}
+  .ev-m{font-size:9px;color:var(--t650);font-variant-numeric:tabular-nums;white-space:nowrap}
+  .ev-s{font-size:9px;color:var(--t650);margin-top:1px}
+
+  /* study card */
+  .st{background:var(--bg900);border:1px solid var(--bg800);border-radius:6px;padding:8px 9px;margin-bottom:6px}
+  .st-h{display:flex;justify-content:space-between;align-items:center;gap:6px}
+  .st-n{font-size:10px;font-weight:600;display:flex;align-items:center;gap:5px}
+  .st-s{font-size:9px;color:var(--t650);margin-top:3px}
+  .st-b{margin-top:7px;padding-top:7px;border-top:1px solid var(--bg800);font-size:9.5px;color:var(--t450)}
+  .prior{background:var(--bg950);border-radius:4px;padding:5px 6px;margin-top:5px;opacity:.75}
+  .prior-l{font-size:8px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--t650)}
+  .prior-x{font-size:9px;color:var(--t650);font-style:italic;margin-top:1px}
+
+  /* ai capture */
+  .cap{background:linear-gradient(135deg,rgba(36,195,184,.09),rgba(59,130,246,.06));
+       border:1px solid rgba(36,195,184,.28);border-radius:6px;padding:9px 10px;margin-bottom:8px}
+  .cap-h{display:flex;align-items:center;gap:5px;font-size:9.5px;font-weight:700;
+         color:var(--teal);letter-spacing:.05em;text-transform:uppercase;margin-bottom:6px}
+  .cap-r{display:flex;justify-content:space-between;align-items:center;padding:3px 0;font-size:9.5px}
+  .cap-i{color:var(--t450);display:flex;align-items:center;gap:5px;min-width:0}
+  .cap-v{display:flex;align-items:center;gap:5px;flex-shrink:0}
+  .conf{font-size:7.5px;font-weight:700;padding:1px 4px;border-radius:2px;letter-spacing:.03em}
+  .conf.h{background:rgba(34,197,94,.18);color:var(--green)}
+  .conf.m{background:rgba(234,179,8,.18);color:var(--yellow)}
+  .gap{background:rgba(239,68,68,.07);border:1px dashed rgba(239,68,68,.35);border-radius:5px;
+       padding:7px 9px;font-size:9.5px;color:var(--t450);margin-bottom:7px}
+  .gap b{color:var(--red);font-weight:700;display:block;font-size:8.5px;letter-spacing:.05em;
+         text-transform:uppercase;margin-bottom:2px}
+
+  .cap-l{font-size:10px;color:var(--t650);text-align:center;margin-top:-6px;margin-bottom:18px;font-style:italic}
+  ul{margin:0 0 12px;padding-left:18px;color:var(--t450);font-size:14.5px}
+  li{margin-bottom:5px}
+  .q{background:var(--bg900);border:1px solid var(--bg800);border-radius:8px;padding:16px 18px;margin-bottom:10px}
+  .q-t{font-size:14.5px;font-weight:600;color:var(--t200);margin-bottom:4px}
+  .q-s{font-size:13.5px;color:var(--t650);margin:0}
+</style>
+
+<div class="wrap">
+
+  <h1>Synapse — Exam &amp; Diagnostics tabs</h1>
+  <p class="lede">Three design options each, built to react to. Rendered in the real Synapse
+  panel chrome at its actual 380px dock width, using the live <code>sevaro-*</code> palette.</p>
+
+  <div class="note warn">
+    <div class="note-t">Read this first — what I'm missing</div>
+    <p>I don't have what you actually laid out with Smriti, Nia, and Pradji. Your note said you
+    <em>discussed</em> the two tabs, not what you landed on — and there's no transcript or meeting
+    doc anywhere in the repos or context. <strong>So none of this reflects the meeting.</strong>
+    It's built from the OPS prior art plus acute-stroke workflow reasoning. Treat it as strawmen
+    to knock down, and tell me where the meeting went somewhere different.</p>
+  </div>
+
+  <div class="note">
+    <div class="note-t">Two findings that shaped every option below</div>
+    <p><strong>1. Both tabs are empty today.</strong> Synapse's Exam tab renders the string
+    "Exam tab — coming soon." There is no Diagnostics tab at all — just a decorative
+    <code>Imaging | Labs</code> row on the queue screen with no click handlers. This is greenfield,
+    not a refactor, which means we can pick the right shape rather than inherit one.</p>
+    <p><strong>2. OPS is outpatient. Synapse is a stroke code.</strong> This is the load-bearing
+    distinction. OPS optimizes for "document a normal exam in one click" across a 20-minute
+    outpatient visit. Synapse is a physician on live video with a 4.5-hour tPA clock running.
+    Synapse's data model already carries <code>lkw</code>, <code>edArrival</code>,
+    <code>treatmentWindowMinutes</code>, and a <code>timeline[]</code> — the clock is a first-class
+    concept here in a way it never was in OPS. <strong>Porting the OPS tabs over verbatim would be
+    the obvious move and I think it would be the wrong one.</strong></p>
+  </div>
+
+  <hr class="divider">
+
+  <!-- ============ EXAM ============ -->
+  <div class="section">
+    <h2>Tab 1</h2>
+    <h3>Exam</h3>
+    <p class="lede">The core question: in a tele-stroke encounter, <strong>is the exam a form to fill
+    out, or a procedure to perform?</strong> Each option answers that differently.</p>
+
+    <div class="grid three">
+
+      <!-- A -->
+      <div class="opt">
+        <div class="opt-h"><span class="opt-l">OPTION A</span></div>
+        <div class="opt-n">Guided NIHSS Driver</div>
+        <div class="opt-d">The exam <em>is</em> the NIHSS. One item at a time, big targets,
+        auto-advance, running score always visible. Scripts the command for the bedside presenter.</div>
+
+        <div class="panel">
+          <div class="ptabs">
+            <div class="ptab"><i>✍️</i>Scribe</div>
+            <div class="ptab on"><i>🩺</i>Exam</div>
+            <div class="ptab"><i>📊</i>Scales</div>
+            <div class="ptab"><i>📋</i>Evidence</div>
+            <div class="ptab"><i>💬</i>Phrases</div>
+          </div>
+          <div class="pbody">
+            <div class="run">
+              <div>
+                <div class="run-l">NIHSS running</div>
+                <div class="run-n">12</div>
+              </div>
+              <div style="text-align:right">
+                <div class="b ye" style="margin-bottom:5px;display:inline-block">MODERATE</div>
+                <div class="pips">
+                  <div class="pip f"></div><div class="pip f"></div><div class="pip f"></div>
+                  <div class="pip f"></div><div class="pip f"></div><div class="pip f"></div>
+                  <div class="pip cur"></div><div class="pip"></div><div class="pip"></div>
+                  <div class="pip"></div><div class="pip"></div>
+                </div>
+              </div>
+            </div>
+
+            <div class="drv">
+              <div class="drv-p">Item 7 of 11 · Limb Ataxia</div>
+              <div class="drv-q">Finger–nose–finger, heel–shin, both sides</div>
+              <div class="drv-c">"Ask them to touch their nose, then my finger. Now the other hand."</div>
+              <div class="scores">
+                <div class="sc on">0<small>ABSENT</small></div>
+                <div class="sc">1<small>ONE LIMB</small></div>
+                <div class="sc">2<small>TWO LIMBS</small></div>
+                <div class="sc">UN<small>N/T</small></div>
+              </div>
+            </div>
+
+            <div class="c">
+              <div class="c-h">
+                <div class="c-t"><span class="dot g"></span>6b · Right Leg</div>
+                <span class="b gy">2</span>
+              </div>
+              <div class="c-s">Falls to bed before 5 sec, some effort vs gravity</div>
+            </div>
+            <div class="c">
+              <div class="c-h">
+                <div class="c-t"><span class="dot g"></span>6a · Left Leg</div>
+                <span class="b gy">0</span>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="cap-l">Linear, one item at a time, score always on screen</div>
+
+        <div class="pc">
+          <div class="p"><span>+</span>Mirrors what the physician is physically doing. No translation step.</div>
+          <div class="p"><span>+</span>The command script doubles as coaching for an inexperienced bedside presenter — real value on a tele link.</div>
+          <div class="p"><span>+</span>Running score + severity band makes the tPA conversation immediate.</div>
+          <div class="con"><span>−</span>Rigid. Physicians who jump around or re-check an item will fight the sequence.</div>
+          <div class="con"><span>−</span>Only fits stroke. Seizure/AMS/EEG consults get nothing.</div>
+        </div>
+      </div>
+
+      <!-- B -->
+      <div class="opt">
+        <div class="opt-h"><span class="opt-l">OPTION B</span></div>
+        <div class="opt-n">Structured Grid (OPS port)</div>
+        <div class="opt-d">Lift the OPS pattern: accordions per system, normal-defaulted checkbox
+        grid, one-click template fill. NIHSS demoted to a scale chip.</div>
+
+        <div class="panel">
+          <div class="ptabs">
+            <div class="ptab"><i>✍️</i>Scribe</div>
+            <div class="ptab on"><i>🩺</i>Exam</div>
+            <div class="ptab"><i>📊</i>Scales</div>
+            <div class="ptab"><i>📋</i>Evidence</div>
+            <div class="ptab"><i>💬</i>Phrases</div>
+          </div>
+          <div class="pbody">
+            <div class="fill">⚡ Fill Stroke Exam Template</div>
+
+            <div style="display:flex;gap:4px;margin-bottom:9px">
+              <span class="b bl">Stroke</span><span class="b gy">Seizure</span>
+              <span class="b gy">AMS</span><span class="b gy">Headache</span>
+            </div>
+
+            <div class="acc">
+              <div class="acc-h"><span class="dot g"></span>Mental Status<span style="margin-left:auto;color:var(--t650)">▾</span></div>
+              <div class="acc-b">
+                <div class="chk on"><span class="box"></span>Awake</div>
+                <div class="chk on"><span class="box"></span>Oriented ×3</div>
+                <div class="chk"><span class="box"></span>Follows cmds</div>
+                <div class="chk on"><span class="box"></span>Attentive</div>
+              </div>
+            </div>
+
+            <div class="acc">
+              <div class="acc-h"><span class="dot g"></span>Cranial Nerves<span style="margin-left:auto;color:var(--t650)">▾</span></div>
+              <div class="acc-b">
+                <div class="chk on"><span class="box"></span>PERRL</div>
+                <div class="chk"><span class="box"></span>EOMI</div>
+                <div class="chk"><span class="box"></span>Face symm.</div>
+                <div class="chk on"><span class="box"></span>Fields full</div>
+              </div>
+            </div>
+
+            <div class="acc">
+              <div class="acc-h"><span class="dot y"></span>Motor<span style="margin-left:auto;color:var(--t650)">▾</span></div>
+              <div class="acc-b">
+                <div class="chk"><span class="box"></span>5/5 all ext.</div>
+                <div class="chk on"><span class="box"></span>R drift</div>
+                <div class="chk on"><span class="box"></span>Tone normal</div>
+                <div class="chk"><span class="box"></span>No asterixis</div>
+              </div>
+            </div>
+
+            <div class="acc"><div class="acc-h"><span class="dot e"></span>Sensation<span style="margin-left:auto;color:var(--t650)">▸</span></div></div>
+            <div class="acc"><div class="acc-h"><span class="dot e"></span>Coordination<span style="margin-left:auto;color:var(--t650)">▸</span></div></div>
+            <div class="acc"><div class="acc-h"><span class="dot e"></span>Gait<span style="margin-left:auto;color:var(--t650)">▸</span></div></div>
+
+            <div class="c" style="border-color:rgba(234,179,8,.35)">
+              <div class="c-h">
+                <div class="c-t"><span class="dot y"></span>NIHSS</div>
+                <span class="b ye">12 · IN PROGRESS</span>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="cap-l">Proven pattern — but built for a 20-min outpatient visit</div>
+
+        <div class="pc">
+          <div class="p"><span>+</span>Already built and battle-tested in OPS. Fastest to ship, real code to lift.</div>
+          <div class="p"><span>+</span>Covers every consult type, not just stroke.</div>
+          <div class="p"><span>+</span>Status dots give an at-a-glance completeness read.</div>
+          <div class="con"><span>−</span>Normal-defaults is an <em>outpatient</em> optimization. In a stroke code the exam is abnormal — you're documenting deficits, not asserting normals.</div>
+          <div class="con"><span>−</span>2-col checkbox grid at 380px is cramped; OPS had a full page.</div>
+          <div class="con"><span>−</span>Clock-blind. Burying NIHSS as a chip inverts what matters.</div>
+        </div>
+      </div>
+
+      <!-- C -->
+      <div class="opt rec">
+        <div class="opt-h"><span class="opt-l">OPTION C</span><span class="tag">Recommended</span></div>
+        <div class="opt-n">Listen-First, Confirm-Fast</div>
+        <div class="opt-d">The scribe is already listening. It extracts NIHSS items live with
+        confidence, and the tab becomes a <em>gap list</em> — you only touch what's missing or unsure.</div>
+
+        <div class="panel">
+          <div class="ptabs">
+            <div class="ptab"><i>✍️</i>Scribe</div>
+            <div class="ptab on"><i>🩺</i>Exam</div>
+            <div class="ptab"><i>📊</i>Scales</div>
+            <div class="ptab"><i>📋</i>Evidence</div>
+            <div class="ptab"><i>💬</i>Phrases</div>
+          </div>
+          <div class="pbody">
+            <div class="run">
+              <div>
+                <div class="run-l">NIHSS provisional</div>
+                <div class="run-n">12</div>
+              </div>
+              <div style="text-align:right">
+                <div class="b ye" style="margin-bottom:5px;display:inline-block">MODERATE</div>
+                <div style="font-size:8.5px;color:var(--t650)">9 of 11 captured</div>
+              </div>
+            </div>
+
+            <div class="gap">
+              <b>2 items still needed</b>
+              Ataxia and Dysarthria weren't heard in the exam. Tap to score — or say it out loud.
+            </div>
+
+            <div class="drv">
+              <div class="drv-p">Needed · Item 7 Limb Ataxia</div>
+              <div class="drv-c">"Touch your nose, then my finger."</div>
+              <div class="scores">
+                <div class="sc">0</div><div class="sc">1</div><div class="sc">2</div><div class="sc">UN</div>
+              </div>
+            </div>
+
+            <div class="cap">
+              <div class="cap-h">✨ Captured from exam</div>
+              <div class="cap-r">
+                <div class="cap-i"><span class="dot g"></span>1a LOC — Alert</div>
+                <div class="cap-v"><span class="conf h">HIGH</span><span class="b gy">0</span></div>
+              </div>
+              <div class="cap-r">
+                <div class="cap-i"><span class="dot g"></span>4 Facial Palsy — R droop</div>
+                <div class="cap-v"><span class="conf h">HIGH</span><span class="b gy">2</span></div>
+              </div>
+              <div class="cap-r">
+                <div class="cap-i"><span class="dot y"></span>5b R Arm — drifts</div>
+                <div class="cap-v"><span class="conf m">MED</span><span class="b gy">2</span></div>
+              </div>
+              <div class="cap-r">
+                <div class="cap-i"><span class="dot g"></span>9 Language — mild aphasia</div>
+                <div class="cap-v"><span class="conf h">HIGH</span><span class="b gy">1</span></div>
+              </div>
+              <div style="font-size:8.5px;color:var(--t650);margin-top:6px;text-align:center">
+                Tap any row to hear the source audio
+              </div>
+            </div>
+
+            <div class="c" style="border-color:rgba(59,130,246,.4)">
+              <div class="c-h">
+                <div class="c-t">🔒 Attest &amp; lock score</div>
+                <span class="b bl">2 LEFT</span>
+              </div>
+              <div class="c-s">Physician confirmation required before the score enters the note</div>
+            </div>
+          </div>
+        </div>
+        <div class="cap-l">Zero-friction when it works, explicit about what it doesn't know</div>
+
+        <div class="pc">
+          <div class="p"><span>+</span>Hands stay free. During a stroke code you're talking and watching, not typing.</div>
+          <div class="p"><span>+</span>Builds on Scribe — the one tab that actually exists.</div>
+          <div class="p"><span>+</span>The gap list is the honest UI: it says what it <em>doesn't</em> know rather than presenting a confident-looking form.</div>
+          <div class="p"><span>+</span>Tap-to-hear-source makes verification cheap enough to actually do.</div>
+          <div class="con"><span>−</span>The hard one: a NIHSS drives tPA. An AI-suggested score carries real medico-legal weight — hence the explicit attest-and-lock gate, and why "provisional" is on screen until you sign.</div>
+          <div class="con"><span>−</span>Needs an extraction eval before it goes near a patient.</div>
+        </div>
+      </div>
+
+    </div>
+
+    <div class="note pick">
+      <div class="note-t">My read on Exam</div>
+      <p><strong>C, with A's driver embedded inside it</strong> — they're not really rivals. C is A
+      with the items you already said out loud pre-filled. Ship A's guided driver first (it's the
+      honest, deterministic core and needs no AI), then layer C's extraction on top as a flag-gated
+      pre-fill. That sequencing means the exam tab is useful on day one and never <em>depends</em>
+      on the model being right.</p>
+      <p>B I'd argue against as the primary — but its template chips should survive into whatever we
+      pick, because non-stroke consults (Seizure, AMS, EEG) still need somewhere to go and the NIHSS
+      driver has nothing for them.</p>
+    </div>
+  </div>
+
+  <hr class="divider">
+
+  <!-- ============ DIAGNOSTICS ============ -->
+  <div class="section">
+    <h2>Tab 2</h2>
+    <h3>Diagnostics</h3>
+    <p class="lede">The core question: <strong>is this a filing cabinet or a decision surface?</strong>
+    In an outpatient visit you browse results. In a stroke code you're asking exactly two questions —
+    <em>can I give tPA</em>, and <em>is this a thrombectomy</em>. Every result matters only insofar as
+    it answers one of them.</p>
+
+    <div class="grid three">
+
+      <!-- A -->
+      <div class="opt">
+        <div class="opt-h"><span class="opt-l">OPTION A</span></div>
+        <div class="opt-n">Time Rail</div>
+        <div class="opt-d">Everything anchored to last-known-well. Diagnostics as a sequence of
+        events against the clock, not a list of documents.</div>
+
+        <div class="panel">
+          <div class="ptabs">
+            <div class="ptab"><i>✍️</i>Scribe</div>
+            <div class="ptab"><i>🩺</i>Exam</div>
+            <div class="ptab on"><i>🔬</i>Dx</div>
+            <div class="ptab"><i>📋</i>Evidence</div>
+            <div class="ptab"><i>💬</i>Phrases</div>
+          </div>
+          <div class="pbody">
+            <div class="clock">
+              <div class="clock-r">
+                <div>
+                  <div class="clock-l">tPA window</div>
+                  <div class="clock-s">LKW 13:45 · now 15:52</div>
+                </div>
+                <div class="clock-v">2:23</div>
+              </div>
+              <div class="rail">
+                <div class="rail-f" style="width:46%"></div>
+                <div class="rail-p" style="left:46%"></div>
+              </div>
+            </div>
+
+            <div class="tl">
+              <div class="ev d">
+                <div class="ev-r"><div class="ev-t">Last known well</div><div class="ev-m">13:45</div></div>
+              </div>
+              <div class="ev d">
+                <div class="ev-r"><div class="ev-t">ED arrival</div><div class="ev-m">14:10 · +25</div></div>
+              </div>
+              <div class="ev d">
+                <div class="ev-r"><div class="ev-t">Labs drawn</div><div class="ev-m">14:18 · +33</div></div>
+                <div class="ev-s">Glucose 112 · INR 1.0 · Plt 244k</div>
+              </div>
+              <div class="ev d">
+                <div class="ev-r"><div class="ev-t">CT head non-con</div><div class="ev-m">14:32 · +47</div></div>
+                <div class="ev-s">No hemorrhage · ASPECTS 8</div>
+              </div>
+              <div class="ev d">
+                <div class="ev-r"><div class="ev-t">CTA head &amp; neck</div><div class="ev-m">14:51 · +66</div></div>
+                <div class="ev-s">L M1 occlusion</div>
+              </div>
+              <div class="ev n">
+                <div class="ev-r"><div class="ev-t">Neuro consult</div><div class="ev-m">15:40 · +115</div></div>
+                <div class="ev-s" style="color:var(--blue)">You are here</div>
+              </div>
+              <div class="ev p">
+                <div class="ev-r"><div class="ev-t">CT perfusion</div><div class="ev-m">pending</div></div>
+              </div>
+            </div>
+
+            <div class="c">
+              <div class="c-h">
+                <div class="c-t">⏱ Door-to-needle if given now</div>
+                <span class="b ye">102 min</span>
+              </div>
+              <div class="c-s">Target &lt; 60 min · this encounter is over target</div>
+            </div>
+          </div>
+        </div>
+        <div class="cap-l">The clock is the organizing principle, not the modality</div>
+
+        <div class="pc">
+          <div class="p"><span>+</span>Sequence <em>is</em> the clinical question in acute stroke — what came back, when, what's still out.</div>
+          <div class="p"><span>+</span>Maps onto the existing <code>timeline[]</code> in the data model. Almost free.</div>
+          <div class="p"><span>+</span>Doubles as the quality metric surface (door-to-needle) the ops side already tracks.</div>
+          <div class="con"><span>−</span>Weak for browsing detail — where does a full radiology impression live?</div>
+          <div class="con"><span>−</span>Unfamiliar. Nobody's EHR looks like this.</div>
+          <div class="con"><span>−</span>Useless for the non-acute consults (Rounding, Outpatient, EEG).</div>
+        </div>
+      </div>
+
+      <!-- B -->
+      <div class="opt rec">
+        <div class="opt-h"><span class="opt-l">OPTION B</span><span class="tag">Recommended</span></div>
+        <div class="opt-n">Decision Gates</div>
+        <div class="opt-d">Organize by <em>the decision the result unblocks</em>, not by modality.
+        Each gate shows its criteria and what's outstanding. It surfaces — it does not decide.</div>
+
+        <div class="panel">
+          <div class="ptabs">
+            <div class="ptab"><i>✍️</i>Scribe</div>
+            <div class="ptab"><i>🩺</i>Exam</div>
+            <div class="ptab on"><i>🔬</i>Dx</div>
+            <div class="ptab"><i>📋</i>Evidence</div>
+            <div class="ptab"><i>💬</i>Phrases</div>
+          </div>
+          <div class="pbody">
+            <div class="clock">
+              <div class="clock-r">
+                <div><div class="clock-l">tPA window</div><div class="clock-s">LKW 13:45</div></div>
+                <div class="clock-v">2:23</div>
+              </div>
+              <div class="rail"><div class="rail-f" style="width:46%"></div></div>
+            </div>
+
+            <div class="gate g">
+              <div class="gate-h">
+                <div class="gate-t">✓ Thrombolysis criteria</div>
+                <span class="b gr">ALL CLEAR</span>
+              </div>
+              <div class="crit" style="border:0">
+                <div class="crit-l"><span class="dot g"></span>No hemorrhage on CT</div>
+                <div class="crit-v">14:32</div>
+              </div>
+              <div class="crit"><div class="crit-l"><span class="dot g"></span>Glucose</div><div class="crit-v">112</div></div>
+              <div class="crit"><div class="crit-l"><span class="dot g"></span>INR</div><div class="crit-v">1.0</div></div>
+              <div class="crit"><div class="crit-l"><span class="dot g"></span>Platelets</div><div class="crit-v">244k</div></div>
+              <div class="crit"><div class="crit-l"><span class="dot g"></span>BP</div><div class="crit-v">162/88</div></div>
+              <div class="crit"><div class="crit-l"><span class="dot g"></span>Within 4.5h of LKW</div><div class="crit-v">2:07</div></div>
+            </div>
+
+            <div class="gate y">
+              <div class="gate-h">
+                <div class="gate-t">◐ Thrombectomy criteria</div>
+                <span class="b ye">1 PENDING</span>
+              </div>
+              <div class="crit" style="border:0">
+                <div class="crit-l"><span class="dot g"></span>LVO on CTA</div>
+                <div class="crit-v">L M1</div>
+              </div>
+              <div class="crit"><div class="crit-l"><span class="dot g"></span>ASPECTS</div><div class="crit-v">8</div></div>
+              <div class="crit"><div class="crit-l"><span class="dot g"></span>NIHSS ≥ 6</div><div class="crit-v">12</div></div>
+              <div class="crit">
+                <div class="crit-l"><span class="dot y"></span>CT perfusion</div>
+                <div class="crit-v" style="color:var(--yellow)">PENDING</div>
+              </div>
+              <div class="crit"><div class="crit-l"><span class="dot g"></span>Pre-stroke mRS</div><div class="crit-v">0</div></div>
+            </div>
+
+            <div class="gate r">
+              <div class="gate-h">
+                <div class="gate-t">⚠ Needs your attention</div>
+                <span class="b rd">1</span>
+              </div>
+              <div class="crit" style="border:0">
+                <div class="crit-l" style="color:var(--t200)">Anticoagulant use unconfirmed</div>
+              </div>
+              <div class="c-s" style="margin-top:3px">Chart lists apixaban. Last dose not documented — ask.</div>
+            </div>
+
+            <div style="font-size:8.5px;color:var(--t650);text-align:center;padding:6px 4px;
+                        border-top:1px solid var(--bg800);margin-top:4px">
+              Criteria checklist · decision support only · not an eligibility determination
+            </div>
+          </div>
+        </div>
+        <div class="cap-l">Data reorganized around the two questions you're actually asking</div>
+
+        <div class="pc">
+          <div class="p"><span>+</span>Matches how the decision is actually made. Nobody browses imaging in a stroke code — they're checking a mental list, and this externalizes it.</div>
+          <div class="p"><span>+</span>The "needs attention" gate is the real win: it surfaces the <em>missing</em> thing (unconfirmed anticoag) that a modality-organized tab structurally cannot show.</div>
+          <div class="p"><span>+</span>Every criterion stays traceable to its source result and timestamp.</div>
+          <div class="con"><span>−</span>Automation bias is the genuine risk. A green "ALL CLEAR" invites not looking. Hence: it renders criteria, never a verdict — no "patient is eligible" string anywhere.</div>
+          <div class="con"><span>−</span>Criteria are institution-specific and drift with guidelines. Needs an owned, versioned rule set — that's a real maintenance commitment, not a one-time build.</div>
+          <div class="con"><span>−</span>Stroke-shaped. Other consult types need a different gate set or a fallback.</div>
+        </div>
+      </div>
+
+      <!-- C -->
+      <div class="opt">
+        <div class="opt-h"><span class="opt-l">OPTION C</span></div>
+        <div class="opt-n">Modality Cards (OPS port)</div>
+        <div class="opt-d">The shipped OPS <code>ImagingResultsTab</code>: a card per study,
+        impression badge, expand for findings, prior study nested inline for comparison.</div>
+
+        <div class="panel">
+          <div class="ptabs">
+            <div class="ptab"><i>✍️</i>Scribe</div>
+            <div class="ptab"><i>🩺</i>Exam</div>
+            <div class="ptab on"><i>🔬</i>Dx</div>
+            <div class="ptab"><i>📋</i>Evidence</div>
+            <div class="ptab"><i>💬</i>Phrases</div>
+          </div>
+          <div class="pbody">
+            <div style="font-size:9px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;
+                        color:var(--t650);margin-bottom:6px">Imaging</div>
+
+            <div class="st">
+              <div class="st-h">
+                <div class="st-n">🧠 CT Head non-contrast</div>
+                <span class="b gr">NO ACUTE</span>
+              </div>
+              <div class="st-s">14:32 · ASPECTS 8</div>
+              <div class="st-b">
+                No acute intracranial hemorrhage. Early ischemic change in the left
+                MCA territory involving the insula and M2. ASPECTS 8.
+                <div class="prior">
+                  <div class="prior-l">Prior · 2024-11-03</div>
+                  <div class="prior-x">Chronic small-vessel ischemic change. No acute…</div>
+                </div>
+              </div>
+            </div>
+
+            <div class="st">
+              <div class="st-h">
+                <div class="st-n">🩸 CTA head &amp; neck</div>
+                <span class="b rd">ABNORMAL</span>
+              </div>
+              <div class="st-s">14:51 · L M1 occlusion</div>
+            </div>
+
+            <div class="st">
+              <div class="st-h">
+                <div class="st-n">💧 CT perfusion</div>
+                <span class="b ye">PENDING</span>
+              </div>
+              <div class="st-s">Ordered 15:38</div>
+            </div>
+
+            <div style="font-size:9px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;
+                        color:var(--t650);margin:11px 0 6px">Labs</div>
+
+            <div class="st">
+              <div class="st-h">
+                <div class="st-n">🧪 Coags</div>
+                <span class="b gr">NORMAL</span>
+              </div>
+              <div class="st-s">INR 1.0 · PTT 28 · Plt 244k</div>
+            </div>
+
+            <div class="st">
+              <div class="st-h">
+                <div class="st-n">🧪 BMP</div>
+                <span class="b gr">NORMAL</span>
+              </div>
+              <div class="st-s">Glu 112 · Cr 0.9 · Na 139</div>
+            </div>
+
+            <div class="st" style="border-style:dashed;text-align:center;color:var(--t650)">
+              <div style="font-size:9.5px">+ Add study</div>
+            </div>
+          </div>
+        </div>
+        <div class="cap-l">Familiar, complete, modality-organized — the safe choice</div>
+
+        <div class="pc">
+          <div class="p"><span>+</span>Already shipped in OPS. Lowest risk, real code, known to work.</div>
+          <div class="p"><span>+</span>Familiar to any clinician — it's how every EHR does it.</div>
+          <div class="p"><span>+</span>Prior-study-inline is genuinely good and worth keeping regardless of which option wins.</div>
+          <div class="p"><span>+</span>Works for every consult type, acute or not.</div>
+          <div class="con"><span>−</span>Optimized for a problem Synapse doesn't have. OPS needed 8 collapsible study types; a stroke code has three studies and two labs.</div>
+          <div class="con"><span>−</span>Makes you do the synthesis. All the data's there; the question "can I treat" is still entirely in your head.</div>
+          <div class="con"><span>−</span>Clock-blind. A timestamp is just a label here, not a constraint.</div>
+        </div>
+      </div>
+
+    </div>
+
+    <div class="note pick">
+      <div class="note-t">My read on Diagnostics</div>
+      <p><strong>B as the default view, A's clock as a persistent header, C as the detail layer
+      underneath.</strong> These stack rather than compete: the gate tells you where you stand, the
+      rail tells you how long you have, and tapping any criterion drops you into C's study card for
+      the full impression. One tab, three depths.</p>
+      <p>The thing I'd flag hardest for the group: <strong>B is the highest-value and highest-risk
+      option in this document.</strong> A criteria checklist that quietly goes stale against
+      guidelines is worse than no checklist. If we build it, someone owns that rule set with a
+      version and a review cadence — that's a standing commitment, and it should be a deliberate yes,
+      not a side effect of liking the mockup.</p>
+    </div>
+  </div>
+
+  <hr class="divider">
+
+  <!-- ============ QUESTIONS ============ -->
+  <div class="section">
+    <h2>Back to you</h2>
+    <h3>What I need to formalize this</h3>
+    <p class="lede">All at once, so you can answer in one pass — and the first one matters more than
+    the rest combined.</p>
+
+    <div class="q">
+      <div class="q-t">1. What did the meeting actually land on?</div>
+      <p class="q-s">This whole document is my inference. If you and Smriti/Nia/Pradji converged on
+      something, that overrides all of it — paste the notes or just talk at me and I'll rebuild.</p>
+    </div>
+
+    <div class="q">
+      <div class="q-t">2. Is Synapse stroke-only, or all five queues?</div>
+      <p class="q-s">The top bar has Acute Care / Rounding / EEG / Outpatient / Rescue. Nearly every
+      design call above flips depending on whether these tabs serve a stroke code or all five. If
+      it's all five, the clock- and gate-centric options need a graceful non-acute fallback.</p>
+    </div>
+
+    <div class="q">
+      <div class="q-t">3. Does the 380px dock stay fixed?</div>
+      <p class="q-s">It's the binding constraint on every mockup here — it's why B's checkbox grid
+      feels cramped. If the panel can widen or pop out during the exam, option B gets substantially
+      more viable and I'd redraw it.</p>
+    </div>
+
+    <div class="q">
+      <div class="q-t">4. Where do the diagnostics actually come from?</div>
+      <p class="q-s">Everything above is mock data. Gates and time rails are only honest if results
+      arrive structured with timestamps. If it's a human pasting a radiology impression, C is the
+      only option that survives contact with reality.</p>
+    </div>
+
+    <div class="q">
+      <div class="q-t">5. How much AI in the exam is too much?</div>
+      <p class="q-s">Option C recommends AI-extracted NIHSS behind an explicit attest-and-lock gate.
+      That's a clinical-risk call more than a design one, and it's the one place here I don't want to
+      auto-adopt my own recommendation. If the answer is "not yet," option A stands alone fine and we
+      lose nothing structural.</p>
+    </div>
+  </div>
+
+</div>

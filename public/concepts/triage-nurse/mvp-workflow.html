@@ -1,0 +1,130 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Triage Nurse MVP — the Epic-hybrid workflow</title>
+<style>
+:root{--s950:#0c0f14;--s900:#1a1d23;--s800:#2a2d34;--text:#f1f1f1;--muted:#acacaf;--faint:#696a70;
+--blue:#3b82f6;--red:#ef4444;--orange:#f97316;--green:#22c55e;--teal:#24c3b8;
+--f:-apple-system,BlinkMacSystemFont,'SF Pro','Segoe UI',Roboto,sans-serif}
+*{box-sizing:border-box}
+body{margin:0;background:var(--s950);color:var(--text);font-family:var(--f);font-size:14px;line-height:1.6;-webkit-font-smoothing:antialiased}
+.wrap{max-width:860px;margin:0 auto;padding:44px 22px 90px}
+h1{font-size:27px;font-weight:700;letter-spacing:-.02em;margin:0 0 8px}
+h2{font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--blue);margin:0 0 5px}
+h3{font-size:19px;font-weight:650;margin:0 0 6px}
+p{margin:0 0 11px;color:var(--muted)}
+.lede{font-size:15.5px;max-width:74ch}
+strong{color:var(--text);font-weight:650}
+.section{margin:52px 0 0}
+.box{background:var(--s900);border:1px solid var(--s800);border-radius:10px;padding:15px 17px;margin:16px 0}
+.box.b{border-left:3px solid var(--blue)}
+.box.r{border-left:3px solid var(--red)}
+.box-t{font-size:10.5px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--blue);margin-bottom:6px}
+.box.r .box-t{color:#fca5a5}
+table{width:100%;border-collapse:collapse;font-size:12.5px;margin:14px 0}
+th{text-align:left;font-size:9.5px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--faint);padding:7px 9px;border-bottom:1px solid var(--s800)}
+td{padding:8px 9px;border-bottom:1px solid rgba(42,45,52,.5);color:var(--muted);vertical-align:top}
+td b{color:var(--text);font-weight:600}
+.pill{display:inline-block;font-size:9px;font-weight:700;padding:2px 7px;border-radius:4px;letter-spacing:.03em;white-space:nowrap}
+.pill.ours{background:rgba(36,195,184,.2);color:var(--teal)}
+.pill.epic{background:rgba(59,130,246,.2);color:#93bbfd}
+.mvp{background:var(--s900);border:1px solid var(--s800);border-radius:10px;overflow:hidden;margin:16px 0}
+.mvp-r{display:flex;gap:12px;padding:12px 16px;border-bottom:1px solid rgba(42,45,52,.5);align-items:flex-start}
+.mvp-r:last-child{border-bottom:0}
+.mvp-n{flex-shrink:0;width:20px;height:20px;border-radius:50%;background:rgba(59,130,246,.2);color:#93bbfd;font-size:10px;font-weight:700;display:flex;align-items:center;justify-content:center;margin-top:2px}
+.mvp-x{font-size:13px;color:var(--muted)}
+.mvp-x b{color:var(--text)}
+ul{margin:0 0 11px;padding-left:19px;color:var(--muted)}
+li{margin-bottom:5px}
+.ft{margin-top:56px;padding-top:14px;border-top:1px solid var(--s800);font-size:11px;color:var(--faint)}
+a{color:#93bbfd;text-decoration:none}
+.nav{font-size:12px;margin-bottom:22px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="nav"><a href="./outpatient-triage-nurse-demo.html">← working demo</a> · <a href="./outpatient-triage-nurse.html">concept overview</a></div>
+
+  <h1>Triage Nurse MVP — the Epic-hybrid workflow</h1>
+  <p class="lede">The MVP constraint set: no integrations. Patients call and message the <strong>local
+  health system</strong>, not Sevaro — so the inbound channels, the In Basket, the orders, and the
+  filed note all live in the client's Epic. Our system runs beside it. This page is the operating
+  model that keeps the two paths sane.</p>
+
+  <div class="box b">
+    <div class="box-t">The reframe</div>
+    <p><strong>Epic = system of record and system of contact.</strong> <strong>Our system = system of
+    tracking and intelligence.</strong> We don't compete with Epic for anything in its lane — we make
+    the triage nurse faster beside it. And for MVP, <strong>copy/paste is the integration</strong> —
+    deliberately. It's the same muscle the scribe already proved: author in our system, paste into
+    the EHR.</p>
+  </div>
+
+  <div class="section">
+    <h2>Anti-drift rules</h2>
+    <h3>Every artifact has exactly one owner</h3>
+    <p>The failure mode of hybrid systems is double documentation — two half-true versions of the
+    truth. One owner per artifact, one-way flows:</p>
+    <table>
+      <tr><th>Artifact</th><th>Our system</th><th>Epic</th></tr>
+      <tr><td><b>Triage / visit note</b></td><td>Authored + archived here <span class="pill ours">OURS</span></td><td>Pasted in — <b>Epic copy is final</b> <span class="pill epic">EPIC FINAL</span></td></tr>
+      <tr><td><b>Orders, results, patient messages</b></td><td>Only what she pastes in for assist</td><td>Lives here, period <span class="pill epic">EPIC</span></td></tr>
+      <tr><td><b>Worklist / status / next-action</b></td><td>Lives here, period <span class="pill ours">OURS</span></td><td>Doesn't exist there</td></tr>
+      <tr><td><b>Schedule</b></td><td>Paste-parsed snapshot</td><td>Source <span class="pill epic">EPIC</span></td></tr>
+    </table>
+    <p>Our worklist is <strong>operational tracking, never a shadow chart</strong>.</p>
+  </div>
+
+  <div class="section">
+    <h2>The MVP</h2>
+    <h3>Five pieces, all buildable without integration</h3>
+    <div class="mvp">
+      <div class="mvp-r"><div class="mvp-n">1</div><div class="mvp-x"><b>This-week worklist.</b>
+        Patients seen / to-see per site with statuses (to prep · seen · awaiting orders · follow-up
+        due). Populated by pasting the Epic schedule — AI parses it into rows.</div></div>
+      <div class="mvp-r"><div class="mvp-n">2</div><div class="mvp-x"><b>Per-site quick-launch.</b>
+        A tile per covered site: login links, contacts, site protocols, coverage notes — same
+        pattern as the current inpatient site launching.</div></div>
+      <div class="mvp-r"><div class="mvp-n">3</div><div class="mvp-x"><b>Paste-based triage assist.</b>
+        Paste the message or call text (plus a chart snippet if useful) → the existing engine returns
+        tier + pathway + a drafted response → paste back into Epic. The nurse disposes; nothing fires
+        on its own.</div></div>
+      <div class="mvp-r"><div class="mvp-n">4</div><div class="mvp-x"><b>Our-notes lookup.</b>
+        Instant access to everything <b>we</b> authored on a patient — prior notes, plans, triage
+        history — so she isn't digging through Epic for context we already have.</div></div>
+      <div class="mvp-r"><div class="mvp-n">5</div><div class="mvp-x"><b>Follow-up tickler.</b>
+        "Call back Thursday" / "check if the MRI resulted" — lightweight, ours only.</div></div>
+    </div>
+  </div>
+
+  <div class="section">
+    <h2>Out of MVP</h2>
+    <h3>What the concept demo showed that this cut removes</h3>
+    <ul>
+      <li><strong>Native portal inbox</strong> — patients message the health system, not us; the In Basket is Epic's.</li>
+      <li><strong>Call-center lane</strong> — calls land at the health system; nothing routes to us automatically.</li>
+      <li><strong>SMS callbacks</strong> — outbound patient comms stay on the health system's rails for MVP.</li>
+      <li><strong>Automatic chart feed into the engine</strong> — context enters by paste, with provenance, until there's an integration.</li>
+    </ul>
+    <p>The demo's <em>queue</em> becomes a <em>worklist</em> — fed by the nurse, not by patients.</p>
+  </div>
+
+  <div class="section">
+    <div class="box r">
+      <div class="box-t">Hard gate before real use</div>
+      <p>The moment the worklist holds real names or MRNs, PHI enters this system — and the deferred
+      security audit findings (systemic API-auth gap) become a <strong>blocking prerequisite, not a
+      someday</strong>. The real-build kickoff starts with a security-remediation phase, before any
+      live patient tracking.</p>
+    </div>
+  </div>
+
+  <div class="ft">Captured 2026-07-21 from the MVP working discussion (Steve). Companion pages:
+  <a href="./outpatient-triage-nurse-demo.html">working demo</a> ·
+  <a href="./outpatient-triage-nurse.html">concept overview</a>. Trial-and-error concept material —
+  not product.</div>
+</div>
+</body>
+</html>
