@@ -5,6 +5,7 @@ import {
   checkPhaseMarkers,
   checkTurnCap,
   checkStructuredOutputValidity,
+  computeCriticalCoverage,
   runDeterministicChecks,
   DIAGNOSIS_LEAK_PATTERNS,
   OPENING_SIGNAL_WORDS,
@@ -244,5 +245,72 @@ describe('runDeterministicChecks (aggregator)', () => {
     }
     const result = runDeterministicChecks(transcript, structuredOutput, 'Patient reports a week of headaches.')
     expect(result.issues).toHaveLength(0)
+  })
+
+  it('defaults criticalCoverage to an empty array when no critical questions are passed', () => {
+    const result = runDeterministicChecks([entry()])
+    expect(result.criticalCoverage).toEqual([])
+  })
+
+  it('threads a 4th criticalQuestions param through to criticalCoverage', () => {
+    const transcript = [entry({ role: 'user', text: 'I take warfarin for my heart.' })]
+    const result = runDeterministicChecks(transcript, null, null, [
+      { id: 'anticoagulant-use', severity: 'critical', coverage_hints: ['warfarin', 'eliquis'] },
+    ])
+    expect(result.criticalCoverage).toEqual([{ rubric_id: 'anticoagulant-use', hint_matched: true }])
+  })
+})
+
+describe('computeCriticalCoverage (review fix, Important #1b)', () => {
+  it('reports hint_matched: true when a PATIENT (user-role) turn contains a hint — coverage scans ALL turns, not just assistant', () => {
+    const transcript = [entry({ role: 'user', text: 'I was on warfarin before this happened.' })]
+    const result = computeCriticalCoverage(transcript, [
+      { id: 'anticoagulant-use', severity: 'critical', coverage_hints: ['blood thinner', 'warfarin'] },
+    ])
+    expect(result).toEqual([{ rubric_id: 'anticoagulant-use', hint_matched: true }])
+  })
+
+  it('reports hint_matched: true when an ASSISTANT turn contains a hint', () => {
+    const transcript = [entry({ role: 'assistant', text: 'Are you taking a blood thinner?' })]
+    const result = computeCriticalCoverage(transcript, [
+      { id: 'anticoagulant-use', severity: 'critical', coverage_hints: ['blood thinner', 'warfarin'] },
+    ])
+    expect(result).toEqual([{ rubric_id: 'anticoagulant-use', hint_matched: true }])
+  })
+
+  it('reports hint_matched: false when coverage_hints are defined but none appear anywhere in the transcript', () => {
+    const transcript = [entry({ role: 'user', text: 'My arm has been weak since yesterday.' })]
+    const result = computeCriticalCoverage(transcript, [
+      { id: 'anticoagulant-use', severity: 'critical', coverage_hints: ['blood thinner', 'warfarin'] },
+    ])
+    expect(result).toEqual([{ rubric_id: 'anticoagulant-use', hint_matched: false }])
+  })
+
+  it('reports hint_matched: null (unknown, never false) when the item has no coverage_hints defined', () => {
+    const transcript = [entry({ role: 'user', text: 'anything' })]
+    const result = computeCriticalCoverage(transcript, [{ id: 'no-hints-item', severity: 'critical' }])
+    expect(result).toEqual([{ rubric_id: 'no-hints-item', hint_matched: null }])
+  })
+
+  it('excludes important/minor severity items from the output entirely', () => {
+    const transcript = [entry({ role: 'user', text: 'anything' })]
+    const result = computeCriticalCoverage(transcript, [
+      { id: 'critical-item', severity: 'critical', coverage_hints: ['x', 'y'] },
+      { id: 'important-item', severity: 'important', coverage_hints: ['x', 'y'] },
+      { id: 'minor-item', severity: 'minor' },
+    ])
+    expect(result.map((r) => r.rubric_id)).toEqual(['critical-item'])
+  })
+
+  it('matches case-insensitively', () => {
+    const transcript = [entry({ role: 'user', text: 'I take WARFARIN daily.' })]
+    const result = computeCriticalCoverage(transcript, [
+      { id: 'anticoagulant-use', severity: 'critical', coverage_hints: ['warfarin'] },
+    ])
+    expect(result[0].hint_matched).toBe(true)
+  })
+
+  it('returns an empty array for an empty criticalQuestions input', () => {
+    expect(computeCriticalCoverage([entry()], [])).toEqual([])
   })
 })

@@ -56,6 +56,13 @@
           "severity": {
             "type": "string",
             "enum": ["critical", "important", "minor"]
+          },
+          "coverage_hints": {
+            "type": "array",
+            "description": "Optional 2-5 conservative lexical substrings (matched casefolded, anywhere in the transcript, any speaker) used ONLY as an independent, imperfect coverage screen (src/lib/historian/eval/deterministicChecks.ts computeCriticalCoverage) — never to clamp the judge's overall score by themselves (see thoroughnessJudge.ts's trust-boundary comment on the 85-point cap). Present only on some severity:'critical' items in the 5 syndromes/*.json files (never on the base rubric, never on important/minor items). Absent means 'no lexical screen defined' (hint_matched: null) — that is NOT a claim the item was missed.",
+            "items": { "type": "string", "minLength": 1 },
+            "minItems": 2,
+            "maxItems": 5
           }
         }
       }

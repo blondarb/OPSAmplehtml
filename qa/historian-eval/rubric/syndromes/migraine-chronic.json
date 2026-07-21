@@ -8,22 +8,26 @@
     {
       "id": "thunderclap-onset",
       "question": "Did any headache reach maximal intensity within seconds to minutes ('thunderclap' onset)?",
-      "severity": "critical"
+      "severity": "critical",
+      "coverage_hints": ["thunderclap", "worst headache", "sudden onset", "seconds"]
     },
     {
       "id": "fever-neck-stiffness",
       "question": "Any fever or neck stiffness associated with the headaches?",
-      "severity": "critical"
+      "severity": "critical",
+      "coverage_hints": ["fever", "neck stiff", "stiff neck", "neck pain"]
     },
     {
       "id": "papilledema-symptoms",
       "question": "Any symptoms suggesting raised intracranial pressure: transient visual obscurations, pulsatile tinnitus, or headache worsening with position/Valsalva?",
-      "severity": "critical"
+      "severity": "critical",
+      "coverage_hints": ["blurry vision", "vision changes", "tinnitus", "ringing"]
     },
     {
       "id": "medication-overuse",
       "question": "How many days per month is the patient using acute headache medication (triptans, NSAIDs, combination analgesics)?",
-      "severity": "critical"
+      "severity": "critical",
+      "coverage_hints": ["sumatriptan", "triptan", "ibuprofen", "excedrin", "days a month"]
     },
     {
       "id": "headache-pattern-change",

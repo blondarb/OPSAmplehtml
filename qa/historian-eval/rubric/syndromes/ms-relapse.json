@@ -8,12 +8,14 @@
     {
       "id": "prior-episodes-optic-neuritis",
       "question": "Any prior distinct neurological episodes (e.g. optic neuritis, sensory changes, weakness) consistent with a previous demyelinating event?",
-      "severity": "critical"
+      "severity": "critical",
+      "coverage_hints": ["optic neuritis", "vision loss", "prior episode", "eye pain"]
     },
     {
       "id": "bladder-symptoms",
       "question": "Any new bladder or bowel symptoms (urgency, retention, incontinence)?",
-      "severity": "critical"
+      "severity": "critical",
+      "coverage_hints": ["bladder", "urinary", "incontinence", "urgency"]
     },
     {
       "id": "symptom-course",

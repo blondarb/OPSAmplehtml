@@ -118,6 +118,13 @@ export async function POST(request: Request) {
             chiefComplaint: chiefComplaintForEval,
             structuredOutput: structuredOutputForEval,
             narrativeSummary: narrativeSummaryForEval,
+            // SCOPE (Task 3 review): narrative_summary is the only report
+            // that exists at save time — other physician/QA-facing reports
+            // (the patient-report tab, a future printed chart note, Task
+            // 2's FinalDifferential.summary) are generated later, at VIEW
+            // time, not here. Task 5's batch harness is the intended
+            // extension point for passing additional reports into the
+            // fidelity screen; this route deliberately stays narrow.
             reports: narrativeSummaryForEval ? { narrative_summary: narrativeSummaryForEval } : undefined,
           }),
         )

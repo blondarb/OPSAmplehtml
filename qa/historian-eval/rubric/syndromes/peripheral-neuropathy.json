@@ -8,22 +8,26 @@
     {
       "id": "distribution-pattern",
       "question": "What is the distribution of symptoms — length-dependent stocking-glove, focal/mononeuropathy, or asymmetric/multifocal?",
-      "severity": "critical"
+      "severity": "critical",
+      "coverage_hints": ["stocking", "glove", "both sides", "one side"]
     },
     {
       "id": "diabetes-status",
       "question": "Does the patient have diabetes or prediabetes, and if so, how well controlled is it?",
-      "severity": "critical"
+      "severity": "critical",
+      "coverage_hints": ["diabetes", "diabetic", "blood sugar", "a1c"]
     },
     {
       "id": "b12-alcohol-nutritional",
       "question": "Any B12 deficiency risk factors: alcohol use, restrictive diet, bariatric surgery, or known low B12?",
-      "severity": "critical"
+      "severity": "critical",
+      "coverage_hints": ["b12", "vitamin b12", "alcohol", "bariatric"]
     },
     {
       "id": "weight-loss",
       "question": "Any unintentional weight loss?",
-      "severity": "critical"
+      "severity": "critical",
+      "coverage_hints": ["weight loss", "lost weight", "losing weight"]
     },
     {
       "id": "symptom-progression-timeline",

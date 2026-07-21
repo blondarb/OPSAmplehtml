@@ -20,6 +20,7 @@ const { queryMock, getPoolMock } = vi.hoisted(() => {
 vi.mock('@/lib/db', () => ({ getPool: getPoolMock }))
 
 import { persistEvaluation } from '@/lib/historian/eval/persistEvaluation'
+import { computeCostUsd, MODEL_PRICING } from '@/lib/historian/eval/constants'
 import { BEDROCK_MODEL } from '@/lib/bedrock'
 
 function baseInput(overrides: Partial<Parameters<typeof persistEvaluation>[0]> = {}) {
@@ -145,5 +146,36 @@ describe('persistEvaluation', () => {
     )
     const errorText = errorSpy.mock.calls.map((c) => c.join(' ')).join('\n')
     expect(errorText).not.toContain(secret)
+  })
+})
+
+describe('computeCostUsd (review fix, minor c)', () => {
+  // Exercises the arithmetic itself, via an injected fake MODEL_PRICING
+  // entry, so this test's expected value is independent of whatever the
+  // real BEDROCK_MODEL price happens to be (that value is separately
+  // covered by "computes cost_usd from usage for a known (priced) model"
+  // above, and would need updating if real pricing ever changes — this
+  // test wouldn't).
+  const FAKE_MODEL_ID = '__test_fake_model_for_cost_math__'
+
+  afterEach(() => {
+    delete MODEL_PRICING[FAKE_MODEL_ID]
+  })
+
+  it('computes inputTokens/1000*inputPer1k + outputTokens/1000*outputPer1k for a fake pricing entry', () => {
+    MODEL_PRICING[FAKE_MODEL_ID] = { inputPer1k: 2, outputPer1k: 10 }
+    const cost = computeCostUsd(FAKE_MODEL_ID, { inputTokens: 500, outputTokens: 250 })
+    // 500 input tokens @ $2/1k = $1.00; 250 output tokens @ $10/1k = $2.50
+    expect(cost).toBeCloseTo(1.0 + 2.5, 6)
+  })
+
+  it('treats a missing token count as 0 rather than NaN', () => {
+    MODEL_PRICING[FAKE_MODEL_ID] = { inputPer1k: 2, outputPer1k: 10 }
+    const cost = computeCostUsd(FAKE_MODEL_ID, { outputTokens: 100 })
+    expect(cost).toBeCloseTo(1.0, 6) // 100/1000 * 10
+  })
+
+  it('returns null (never throws, never a fabricated number) for a model with no pricing entry', () => {
+    expect(computeCostUsd('definitely-not-a-priced-model', { inputTokens: 1000, outputTokens: 1000 })).toBeNull()
   })
 })

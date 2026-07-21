@@ -5,6 +5,7 @@ import {
   detectSyndrome,
   validateRubric,
   listAllRubricFiles,
+  assertUniqueRubricVersions,
   KNOWN_SYNDROMES,
   type RubricFile,
 } from '@/lib/historian/eval/rubric'
@@ -112,6 +113,121 @@ describe('validateRubric', () => {
       /expected_dimensions/,
     )
   })
+
+  // ── additionalProperties: false (review fix, minor b) ──────────────────
+  it('rejects an unrecognized top-level property', () => {
+    expect(() =>
+      validateRubric({ ...(validRubric() as Record<string, unknown>), extra_field: 'nope' }, 'test'),
+    ).toThrow(/unrecognized property/)
+  })
+
+  it('rejects an unrecognized critical_questions item property', () => {
+    expect(() =>
+      validateRubric(
+        validRubric({
+          critical_questions: [
+            { id: 'onset', question: 'q1', severity: 'critical', made_up_field: 'nope' },
+          ] as never,
+        }),
+        'test',
+      ),
+    ).toThrow(/unrecognized property/)
+  })
+
+  // ── coverage_hints (review fix, Important #1a) ──────────────────────────
+  describe('coverage_hints', () => {
+    it('is optional — a critical_questions entry with no coverage_hints still validates', () => {
+      const result = validateRubric(validRubric(), 'test')
+      expect(result.critical_questions[0].coverage_hints).toBeUndefined()
+    })
+
+    it('accepts a 2-5 item array of non-empty strings', () => {
+      const result = validateRubric(
+        validRubric({
+          critical_questions: [
+            { id: 'onset', question: 'q1', severity: 'critical', coverage_hints: ['last known well', 'when did this start'] },
+          ],
+        }),
+        'test',
+      )
+      expect(result.critical_questions[0].coverage_hints).toEqual(['last known well', 'when did this start'])
+    })
+
+    it('rejects a 1-item array (below the 2-5 bound)', () => {
+      expect(() =>
+        validateRubric(
+          validRubric({
+            critical_questions: [{ id: 'onset', question: 'q1', severity: 'critical', coverage_hints: ['only one'] }],
+          }),
+          'test',
+        ),
+      ).toThrow(/coverage_hints/)
+    })
+
+    it('rejects a 6-item array (above the 2-5 bound)', () => {
+      expect(() =>
+        validateRubric(
+          validRubric({
+            critical_questions: [
+              {
+                id: 'onset',
+                question: 'q1',
+                severity: 'critical',
+                coverage_hints: ['a', 'b', 'c', 'd', 'e', 'f'],
+              },
+            ],
+          }),
+          'test',
+        ),
+      ).toThrow(/coverage_hints/)
+    })
+
+    it('rejects a non-string entry', () => {
+      expect(() =>
+        validateRubric(
+          validRubric({
+            critical_questions: [
+              { id: 'onset', question: 'q1', severity: 'critical', coverage_hints: ['ok', 123] },
+            ] as never,
+          }),
+          'test',
+        ),
+      ).toThrow(/coverage_hints/)
+    })
+
+    it('rejects an empty-string entry', () => {
+      expect(() =>
+        validateRubric(
+          validRubric({
+            critical_questions: [
+              { id: 'onset', question: 'q1', severity: 'critical', coverage_hints: ['ok', ''] },
+            ],
+          }),
+          'test',
+        ),
+      ).toThrow(/coverage_hints/)
+    })
+  })
+})
+
+describe('assertUniqueRubricVersions', () => {
+  it('does not throw when every version is unique', () => {
+    expect(() =>
+      assertUniqueRubricVersions([
+        { label: 'a.json', version: 'a-v1' },
+        { label: 'b.json', version: 'b-v1' },
+      ]),
+    ).not.toThrow()
+  })
+
+  it('throws, naming both files, when two entries share a version', () => {
+    expect(() =>
+      assertUniqueRubricVersions([
+        { label: 'a.json', version: 'shared-v1' },
+        { label: 'b.json', version: 'shared-v1' },
+      ]),
+    ).toThrow(/a\.json/)
+  })
 })
 
 describe('the real rubric files on disk', () => {
@@ -125,6 +241,29 @@ describe('the real rubric files on disk', () => {
     for (const { label, rubric } of all) {
       expect(rubric.critical_questions.length, `${label} should have at least one critical_questions entry`).toBeGreaterThan(0)
       expect(rubric.expected_dimensions.length, `${label} should have at least one expected_dimensions entry`).toBeGreaterThan(0)
+    }
+  })
+
+  it('every syndrome file has coverage_hints (2-5 entries) on every severity:"critical" item, and never on important/minor items', () => {
+    const syndromeFiles = all.filter((f) => f.label !== 'base-neuro-hpi.json')
+    expect(syndromeFiles.length).toBeGreaterThan(0)
+    for (const { label, rubric } of syndromeFiles) {
+      for (const q of rubric.critical_questions) {
+        if (q.severity === 'critical') {
+          expect(q.coverage_hints, `${label} critical item "${q.id}" should declare coverage_hints`).toBeDefined()
+          expect(q.coverage_hints!.length, `${label} "${q.id}".coverage_hints length`).toBeGreaterThanOrEqual(2)
+          expect(q.coverage_hints!.length, `${label} "${q.id}".coverage_hints length`).toBeLessThanOrEqual(5)
+        } else {
+          expect(q.coverage_hints, `${label} non-critical item "${q.id}" should NOT declare coverage_hints`).toBeUndefined()
+        }
+      }
+    }
+  })
+
+  it('the base rubric never declares coverage_hints (scope: syndrome files only)', () => {
+    const base = all.find((f) => f.label === 'base-neuro-hpi.json')!
+    for (const q of base.rubric.critical_questions) {
+      expect(q.coverage_hints).toBeUndefined()
     }
   })
 

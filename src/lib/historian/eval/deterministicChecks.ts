@@ -250,6 +250,47 @@ export function checkStructuredOutputValidity(
   return { valid: issues.length === 0, issues }
 }
 
+// ── 5. Critical-item lexical coverage screen (review fix, Important #1) ─────
+//
+// NOT a coverage verdict and NEVER used (by itself) to clamp the judge's
+// score — see thoroughnessJudge.ts's trust-boundary comment on the
+// overall-capping logic. This is a fast, imperfect lexical screen: a real
+// conversation can cover a topic in wording no hint anticipates
+// (false-negative risk), so its only uses downstream are (1) naming
+// unmatched criticals for the LLM judge to specifically double-check, and
+// (2) flagging a coverage_disagreement audit signal if the judge still
+// doesn't list an unmatched item as missed. Enforcement stays with the
+// judge's own (sanitized) self-report.
+
+export interface CriticalCoverageEntry {
+  rubric_id: string
+  /** true = at least one coverage_hints substring found anywhere in the transcript (any role); false = hints exist but none matched; null = this item declares no coverage_hints (unknown — NOT a claim the item was missed). */
+  hint_matched: boolean | null
+}
+
+/**
+ * Scans ALL turns (patient answers count as coverage evidence, unlike the
+ * assistant-only diagnosis-leak scan) for a casefolded substring match
+ * against each severity:"critical" item's coverage_hints. Items without
+ * severity "critical" are excluded from the output entirely (hints are
+ * only ever authored for critical items — see rubric.ts).
+ */
+export function computeCriticalCoverage(
+  transcript: HistorianTranscriptEntry[],
+  criticalQuestions: { id: string; severity: string; coverage_hints?: string[] }[],
+): CriticalCoverageEntry[] {
+  const combinedText = transcript.map((t) => t.text).join('\n').toLowerCase()
+  return criticalQuestions
+    .filter((q) => q.severity === 'critical')
+    .map((q) => {
+      if (!q.coverage_hints || q.coverage_hints.length === 0) {
+        return { rubric_id: q.id, hint_matched: null }
+      }
+      const matched = q.coverage_hints.some((hint) => combinedText.includes(hint.toLowerCase()))
+      return { rubric_id: q.id, hint_matched: matched }
+    })
+}
+
 // ── Aggregator ────────────────────────────────────────────────────────────────
 
 export interface DeterministicCheckResult {
@@ -257,7 +298,8 @@ export interface DeterministicCheckResult {
   phaseMarkers: PhaseMarkerCheckResult
   turnCap: TurnCapCheckResult
   structuredOutput: StructuredOutputCheckResult
-  /** Flattened human-readable issue strings across all four checks — appended into the judge's final result. */
+  criticalCoverage: CriticalCoverageEntry[]
+  /** Flattened human-readable issue strings across all four boolean-style checks (NOT criticalCoverage — that is a separate, deliberately non-authoritative signal consumed directly by thoroughnessJudge.ts, not summarized here to avoid implying it's a scoring verdict). */
   issues: string[]
 }
 
@@ -265,11 +307,13 @@ export function runDeterministicChecks(
   transcript: HistorianTranscriptEntry[],
   structuredOutput?: HistorianStructuredOutput | null,
   narrativeSummary?: string | null,
+  criticalQuestions: { id: string; severity: string; coverage_hints?: string[] }[] = [],
 ): DeterministicCheckResult {
   const diagnosisLeak = scanForDiagnosisLeak(transcript)
   const phaseMarkers = checkPhaseMarkers(transcript)
   const turnCap = checkTurnCap(transcript)
   const structuredOutputResult = checkStructuredOutputValidity(structuredOutput, narrativeSummary)
+  const criticalCoverage = computeCriticalCoverage(transcript, criticalQuestions)
 
   const issues: string[] = []
   if (diagnosisLeak.leaked) {
@@ -286,5 +330,5 @@ export function runDeterministicChecks(
   }
   issues.push(...structuredOutputResult.issues)
 
-  return { diagnosisLeak, phaseMarkers, turnCap, structuredOutput: structuredOutputResult, issues }
+  return { diagnosisLeak, phaseMarkers, turnCap, structuredOutput: structuredOutputResult, criticalCoverage, issues }
 }

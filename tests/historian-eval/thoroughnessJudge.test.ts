@@ -210,6 +210,70 @@ describe('generateThoroughnessEvaluation', () => {
     expect(result.overall).toBe(95)
   })
 
+  // ── coverage_hints / coverage_disagreement (review fix, Important #1) ───
+  // STROKE_TRANSCRIPT + syndrome 'acute-stroke': turn 2 ("Are you currently
+  // taking any blood thinners like warfarin?") lexically matches
+  // anticoagulant-use's real coverage_hints, but nothing in the transcript
+  // matches onset-time's or thrombolysis-contraindications' hints — so
+  // those two are the real, deterministically-derived "unmatched critical"
+  // set for this fixture (verified independently in deterministicChecks
+  // .test.ts; asserted here via generateThoroughnessEvaluation's real,
+  // unmocked rubric.ts + deterministicChecks.ts wiring, not a stub).
+
+  it('injects verify_specifically (unmatched-hint criticals only) into the Bedrock call payload', async () => {
+    mockHappyPath()
+    await generateThoroughnessEvaluation(STROKE_TRANSCRIPT, { syndrome: 'acute-stroke' })
+
+    const call = invokeBedrockClinicalToolMock.mock.calls[0][0]
+    const payload = JSON.parse(call.messages[0].content as string)
+    const verifyIds = (payload.verify_specifically ?? []).map((v: { id: string }) => v.id)
+    expect(verifyIds).toContain('onset-time')
+    expect(verifyIds).toContain('thrombolysis-contraindications')
+    expect(verifyIds).not.toContain('anticoagulant-use')
+  })
+
+  it('omits verify_specifically entirely when there are no unmatched-hint criticals (base-only rubric — base items carry no coverage_hints, so hint_matched is always null, never false)', async () => {
+    mockHappyPath()
+    await generateThoroughnessEvaluation(STROKE_TRANSCRIPT)
+    const call = invokeBedrockClinicalToolMock.mock.calls[0][0]
+    const payload = JSON.parse(call.messages[0].content as string)
+    expect(payload.verify_specifically).toBeUndefined()
+  })
+
+  it('sets coverage_disagreement: true when an unmatched-hint critical is NOT in the model-reported missed list', async () => {
+    mockHappyPath({ missed_critical_questions: [] })
+    const result = await generateThoroughnessEvaluation(STROKE_TRANSCRIPT, { syndrome: 'acute-stroke' })
+    expect(result.coverage_disagreement).toBe(true)
+  })
+
+  it('sets coverage_disagreement: false when the model agrees on every unmatched-hint critical', async () => {
+    mockHappyPath({
+      missed_critical_questions: [
+        { rubric_id: 'onset-time', severity: 'critical', why_it_matters: 'not asked' },
+        { rubric_id: 'thrombolysis-contraindications', severity: 'critical', why_it_matters: 'not asked' },
+      ],
+    })
+    const result = await generateThoroughnessEvaluation(STROKE_TRANSCRIPT, { syndrome: 'acute-stroke' })
+    expect(result.coverage_disagreement).toBe(false)
+  })
+
+  it('sets coverage_disagreement: false when there are no unmatched-hint criticals at all', async () => {
+    mockHappyPath()
+    const result = await generateThoroughnessEvaluation(STROKE_TRANSCRIPT)
+    expect(result.coverage_disagreement).toBe(false)
+  })
+
+  it('does NOT clamp overall on an unmatched coverage hint alone — only the model-self-reported missed list can clamp (this is the trust-boundary the review fix requires)', async () => {
+    mockHappyPath({ missed_critical_questions: [], overall: 95 })
+    const result = await generateThoroughnessEvaluation(STROKE_TRANSCRIPT, { syndrome: 'acute-stroke' })
+    // Two hint_matched:false criticals exist for this fixture (asserted
+    // above), yet the model reported nothing missing — the score must
+    // stay exactly what the model said, uncapped, while the disagreement
+    // is still surfaced separately.
+    expect(result.overall).toBe(95)
+    expect(result.coverage_disagreement).toBe(true)
+  })
+
   // ── diagnosis_leak quote verbatim validation ─────────────────────────────
 
   it('drops a model-claimed leak quote that is not a verbatim substring of the cited assistant turn', async () => {

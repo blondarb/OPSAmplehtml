@@ -8,17 +8,20 @@
     {
       "id": "onset-time",
       "question": "Exact time of symptom onset / last known well.",
-      "severity": "critical"
+      "severity": "critical",
+      "coverage_hints": ["last known well", "last seen normal", "when did the symptoms start", "when did this start"]
     },
     {
       "id": "anticoagulant-use",
       "question": "Is the patient currently taking an anticoagulant or antiplatelet (e.g. warfarin, a DOAC, aspirin, clopidogrel)?",
-      "severity": "critical"
+      "severity": "critical",
+      "coverage_hints": ["blood thinner", "warfarin", "eliquis", "xarelto", "aspirin"]
     },
     {
       "id": "thrombolysis-contraindications",
       "question": "Any factors that would contraindicate thrombolysis: recent major surgery or trauma, recent bleeding or hemorrhage history, prior intracranial hemorrhage, or current pregnancy?",
-      "severity": "critical"
+      "severity": "critical",
+      "coverage_hints": ["recent surgery", "recent trauma", "bleeding", "pregnant"]
     },
     {
       "id": "prior-stroke-tia-history",

@@ -93,6 +93,16 @@ export interface RubricCriticalQuestion {
   id: string
   question: string
   severity: RubricSeverity
+  /**
+   * Optional 2-5 conservative lexical substrings (see
+   * qa/historian-eval/rubric/rubric.schema.json for the full contract).
+   * Populated only on some severity:'critical' items in the syndrome
+   * files. Consumed by deterministicChecks.ts's computeCriticalCoverage as
+   * an independent, imperfect coverage screen — thoroughnessJudge.ts never
+   * clamps the judge's score on this alone (see its trust-boundary
+   * comment); it only surfaces a coverage_disagreement signal.
+   */
+  coverage_hints?: string[]
 }
 
 export interface RubricFile {
@@ -141,6 +151,27 @@ function fail(path: string, reason: string): never {
   throw new Error(`Invalid rubric ${path}: ${reason}`)
 }
 
+/** additionalProperties:false enforcement (mirrors rubric.schema.json) — rejects any key not in `allowedKeys`. */
+function assertNoUnknownKeys(value: Record<string, unknown>, allowedKeys: readonly string[], path: string): void {
+  for (const key of Object.keys(value)) {
+    if (!allowedKeys.includes(key)) {
+      fail(path, `has unrecognized property "${key}"`)
+    }
+  }
+}
+
+const TOP_LEVEL_KEYS = [
+  '_note',
+  'version',
+  'syndrome',
+  'vetted_by',
+  'vetted_date',
+  'critical_questions',
+  'expected_dimensions',
+] as const
+
+const CRITICAL_QUESTION_KEYS = ['id', 'question', 'severity', 'coverage_hints'] as const
+
 const REQUIRED_NOTE = '[training knowledge — Steve to vet]'
 
 /**
@@ -151,6 +182,7 @@ const REQUIRED_NOTE = '[training knowledge — Steve to vet]'
  */
 export function validateRubric(value: unknown, sourceLabel: string): RubricFile {
   if (!isRecord(value)) fail(sourceLabel, 'must be an object')
+  assertNoUnknownKeys(value, TOP_LEVEL_KEYS, sourceLabel)
 
   if (value._note !== REQUIRED_NOTE) {
     fail(`${sourceLabel}._note`, `must be the literal string "${REQUIRED_NOTE}"`)
@@ -186,6 +218,7 @@ export function validateRubric(value: unknown, sourceLabel: string): RubricFile 
   const critical_questions: RubricCriticalQuestion[] = value.critical_questions.map((raw, i) => {
     const path = `${sourceLabel}.critical_questions[${i}]`
     if (!isRecord(raw)) fail(path, 'must be an object')
+    assertNoUnknownKeys(raw, CRITICAL_QUESTION_KEYS, path)
     if (typeof raw.id !== 'string' || !/^[a-z][a-z0-9-]*$/.test(raw.id)) {
       fail(`${path}.id`, 'must be a lowercase-kebab-case string')
     }
@@ -197,7 +230,26 @@ export function validateRubric(value: unknown, sourceLabel: string): RubricFile 
     if (typeof raw.severity !== 'string' || !(KNOWN_SEVERITIES as readonly string[]).includes(raw.severity)) {
       fail(`${path}.severity`, `must be one of ${KNOWN_SEVERITIES.join(', ')}`)
     }
-    return { id: raw.id, question: raw.question, severity: raw.severity as RubricSeverity }
+
+    let coverage_hints: string[] | undefined
+    if (raw.coverage_hints !== undefined) {
+      if (!Array.isArray(raw.coverage_hints) || raw.coverage_hints.length < 2 || raw.coverage_hints.length > 5) {
+        fail(`${path}.coverage_hints`, 'must be an array of 2 to 5 strings when present')
+      }
+      coverage_hints = raw.coverage_hints.map((h: unknown, hi: number) => {
+        if (typeof h !== 'string' || !h.trim()) {
+          fail(`${path}.coverage_hints[${hi}]`, 'must be a non-empty string')
+        }
+        return h
+      })
+    }
+
+    return {
+      id: raw.id,
+      question: raw.question,
+      severity: raw.severity as RubricSeverity,
+      ...(coverage_hints ? { coverage_hints } : {}),
+    }
   })
 
   if (!Array.isArray(value.expected_dimensions) || value.expected_dimensions.length === 0) {
@@ -221,6 +273,28 @@ export function validateRubric(value: unknown, sourceLabel: string): RubricFile 
     vetted_date: value.vetted_date as string | null,
     critical_questions,
     expected_dimensions,
+  }
+}
+
+/**
+ * Throws if two entries share a `version` string (review fix, minor b) —
+ * rubric_version is a stable provenance id (historian_evaluations.
+ * rubric_version); a collision would make two DIFFERENT rubric contents
+ * indistinguishable in that column. Exported so it's independently unit-
+ * testable with a synthetic duplicate (rubric.test.ts) in addition to
+ * being enforced for real by ensureLoaded() below on every real load.
+ */
+export function assertUniqueRubricVersions(entries: { label: string; version: string }[]): void {
+  const seen = new Map<string, string>()
+  for (const entry of entries) {
+    const existing = seen.get(entry.version)
+    if (existing) {
+      fail(
+        'rubric versions',
+        `duplicate version "${entry.version}" used by both "${existing}" and "${entry.label}"`,
+      )
+    }
+    seen.set(entry.version, entry.label)
   }
 }
 
@@ -255,6 +329,10 @@ function ensureLoaded(): { base: RubricFile; syndromes: Record<SyndromeId, Rubri
         'qa/historian-eval/rubric/syndromes/peripheral-neuropathy.json',
       ),
     }
+    assertUniqueRubricVersions([
+      { label: 'base-neuro-hpi.json', version: base.version },
+      ...KNOWN_SYNDROMES.map((id) => ({ label: `syndromes/${id}.json`, version: syndromes[id].version })),
+    ])
     _base = base
     _syndromes = syndromes
     return { base, syndromes }

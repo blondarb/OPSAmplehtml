@@ -111,6 +111,17 @@ export type ThoroughnessEvaluation = {
   deterministic: DeterministicCheckResult
   /** Count of LLM-claimed findings dropped by defensive sanitization (invalid rubric_id refs, non-verbatim leak quotes, unrecognized report labels, out-of-bounds evidence_turns). */
   dropped_findings: number
+  /**
+   * True when at least one severity:"critical" rubric item has an
+   * unmatched coverage_hints lexical screen (deterministicChecks.ts's
+   * computeCriticalCoverage — hint_matched === false) that the model
+   * nonetheless did NOT list in missed_critical_questions. This is an
+   * AUDIT signal only — Task 5's reports surface it for human review — and
+   * never affects `overall` (see the trust-boundary comment above the
+   * overall-capping logic below). False when every unmatched hint was
+   * also flagged by the model, or when there were no unmatched hints.
+   */
+  coverage_disagreement: boolean
   provenance: ThoroughnessProvenance
 }
 
@@ -120,7 +131,20 @@ export interface ThoroughnessJudgeOptions {
   syndrome?: string
   structuredOutput?: HistorianStructuredOutput | null
   narrativeSummary?: string | null
-  /** label -> report text. Fidelity dimension is included in the schema/result only when this is non-empty. */
+  /**
+   * label -> report text. Fidelity dimension is included in the
+   * schema/result only when this is non-empty.
+   *
+   * SCOPE (as of Task 3): at save time, `narrative_summary` is the ONLY
+   * report that exists — save/route.ts is the sole current caller and
+   * only ever passes `{narrative_summary}`. Other physician/QA-facing
+   * reports (the patient-report tab, a future printed chart note, Task 2's
+   * FinalDifferential.summary) are generated later, at VIEW time, not at
+   * save time — this option deliberately does not reach for them. Task
+   * 5's batch harness is the natural extension point: it runs after a
+   * session is already complete and CAN generate + pass additional
+   * reports here without any change to this module.
+   */
   reports?: Record<string, string>
 }
 
@@ -141,13 +165,13 @@ const THOROUGHNESS_TOOL_DESCRIPTION =
   'against the supplied rubric. Called exactly once as a retrospective QA/audit artifact — never shown ' +
   'to the patient and never used to alter or gate the interview itself.'
 
-function buildSystemPrompt(includeFidelity: boolean): string {
+function buildSystemPrompt(includeFidelity: boolean, hasVerifySpecifically: boolean): string {
   return `You are a neurologist acting as a thoroughness judge for a COMPLETED AI patient-intake interview transcript, for retrospective quality-review purposes. You are not conducting the interview and cannot ask questions — you only score what already happened.
 
 You will receive:
   1. The full numbered transcript (each line prefixed "Turn N (Patient|Historian): ...").
   2. A rubric: a base checklist plus (when applicable) syndrome-specific critical questions, each with a stable id and a severity of "critical", "important", or "minor".
-${includeFidelity ? '  3. One or more physician/QA-facing reports generated from this same interview, each labeled with a report key.\n' : ''}
+${includeFidelity ? '  3. One or more physician/QA-facing reports generated from this same interview, each labeled with a report key.\n' : ''}${hasVerifySpecifically ? '  4. A verify_specifically list of critical rubric item ids/questions that a fast, imperfect keyword screen found no lexical trace of anywhere in the transcript.\n' : ''}
 Score exactly these 6 dimensions, each 0-100 with supporting evidence_turns (the integer N from "Turn N" for every turn that supports your score — never leave this empty unless the transcript truly has zero relevant turns) and brief notes:
   - oldcarts: onset, location, duration, character, aggravating/relieving factors, timing, severity coverage
   - red_flags: whether syndrome-appropriate red-flag/critical questions were asked
@@ -161,7 +185,7 @@ CRITICAL — grounding and rubric fidelity:
 - missed_critical_questions MUST reference rubric ids EXACTLY as given in the rubric below — never invent an id, never reference an id not present in the rubric.
 - Do NOT award an overall score above ${CRITICAL_MISS_OVERALL_CAP} if ANY severity:"critical" rubric item was never asked about or covered in the transcript.
 - diagnosis_leak flags the HISTORIAN (assistant) telling or implying to the patient what their diagnosis is — the patient reporting a PRIOR diagnosis from another clinician is NOT a leak. Only cite turns/quotes where the historian itself asserts a diagnosis.
-${includeFidelity ? '- fidelity: for each supplied report, flag fabricated_claims (stated in the report but not supported anywhere in the transcript, citing the report key you were given) and material_omissions (clinically important transcript content missing from every report). Only flag genuine, clinically material discrepancies — do not flag ordinary summarization/paraphrasing.\n' : ''}- confidence reflects how confident YOU are in this scoring (e.g. lower for a very short or ambiguous transcript), not the historian's performance.
+${includeFidelity ? '- fidelity: for each supplied report, flag fabricated_claims (stated in the report but not supported anywhere in the transcript, citing the report key you were given) and material_omissions (clinically important transcript content missing from every report). Only flag genuine, clinically material discrepancies — do not flag ordinary summarization/paraphrasing.\n' : ''}${hasVerifySpecifically ? '- verify_specifically lists critical items a KEYWORD screen could not find — that screen is fast and imperfect (a topic can be covered in wording it did not anticipate), so it is NOT proof those items were missed. Look closely at the transcript yourself for each one and decide independently, exactly as you would for any other rubric item; if you conclude it truly was not covered, include it in missed_critical_questions as usual with your own turn evidence. Do not treat verify_specifically as an instruction to mark these missed.\n' : ''}- confidence reflects how confident YOU are in this scoring (e.g. lower for a very short or ambiguous transcript), not the historian's performance.
 - Never invent clinical content that is not present in the transcript.`
 }
 
@@ -347,10 +371,10 @@ async function generateThoroughnessEvaluationWithUsage(
     throw new TranscriptTooLargeError(serializedLength, MAX_TRANSCRIPT_CHARS)
   }
 
-  // ── Layer 1: deterministic pre-layer — always runs, never skipped ───────
-  const deterministic = runDeterministicChecks(transcript, options.structuredOutput, options.narrativeSummary)
-
-  // ── Rubric selection + inlining ──────────────────────────────────────────
+  // ── Rubric selection (loaded before the deterministic layer now, since
+  //    the critical-coverage screen below needs each critical item's
+  //    coverage_hints — still entirely synchronous/deterministic, still
+  //    entirely before the one Bedrock call) ───────────────────────────────
   const loaded = loadRubric({ syndrome: options.syndrome, chiefComplaint: options.chiefComplaint })
   const rubricForPrompt = {
     base_dimensions: loaded.base.expected_dimensions,
@@ -364,13 +388,35 @@ async function generateThoroughnessEvaluationWithUsage(
     })),
   }
 
+  // ── Layer 1: deterministic pre-layer — always runs, never skipped ───────
+  const deterministic = runDeterministicChecks(
+    transcript,
+    options.structuredOutput,
+    options.narrativeSummary,
+    loaded.criticalQuestions.map((q) => ({ id: q.id, severity: q.severity, coverage_hints: q.coverage_hints })),
+  )
+
+  // Critical rubric items the lexical coverage screen found no trace of —
+  // named for the model to specifically double-check (never an instruction
+  // to mark them missed; see buildSystemPrompt's verify_specifically
+  // wording and the trust-boundary comment on the overall cap below).
+  const unmatchedCriticalIds = deterministic.criticalCoverage
+    .filter((c) => c.hint_matched === false)
+    .map((c) => c.rubric_id)
+  const verifySpecifically =
+    unmatchedCriticalIds.length > 0
+      ? loaded.criticalQuestions
+          .filter((q) => unmatchedCriticalIds.includes(q.id))
+          .map((q) => ({ id: q.id, question: q.question }))
+      : undefined
+
   const numberedTranscript = buildNumberedTranscriptText(transcript)
   const reports = options.reports ?? {}
   const includeFidelity = Object.keys(reports).length > 0
 
   // ── Layer 2: one schema-forced Sonnet tool call ──────────────────────────
   const { result: raw, modelId, usage } = await invokeBedrockClinicalToolWithMeta<RawThoroughnessToolOutput>({
-    system: buildSystemPrompt(includeFidelity),
+    system: buildSystemPrompt(includeFidelity, verifySpecifically !== undefined),
     messages: [
       {
         role: 'user',
@@ -378,6 +424,7 @@ async function generateThoroughnessEvaluationWithUsage(
           chiefComplaint: options.chiefComplaint ?? null,
           rubric: rubricForPrompt,
           reports: includeFidelity ? reports : undefined,
+          verify_specifically: verifySpecifically,
           numberedTranscript,
         }),
       },
@@ -494,13 +541,37 @@ async function generateThoroughnessEvaluationWithUsage(
     fidelity = { fabricated_claims, material_omissions }
   }
 
-  // ── overall: clamp, then apply the critical-item ceiling as a
-  //    deterministic backstop to the same instruction given to the model ──
+  // ── overall: clamp to CRITICAL_MISS_OVERALL_CAP when a critical-severity
+  //    item is in the MODEL'S OWN (sanitized) missed_critical_questions.
+  //
+  //    TRUST BOUNDARY — read before touching this (review fix, Important
+  //    #1d): this clamp fires ONLY on what the model itself self-reports
+  //    missing. It is NOT independent verification that the item was
+  //    actually covered, and it must stay that way. The
+  //    coverage_hints/computeCriticalCoverage/coverage_disagreement
+  //    mechanism above and below is a SEPARATE signal surfaced ALONGSIDE
+  //    the score (via verify_specifically in the prompt and
+  //    coverage_disagreement on the result) — deliberately NOT folded into
+  //    this clamp — because lexical hints carry real false-negative risk: a
+  //    topic can be genuinely covered in wording no hint anticipated.
+  //    Clamping on a hint miss alone would unfairly punish a thorough
+  //    interview that simply used different words, corrupting the score
+  //    distribution. Full independent coverage verification (an evaluator
+  //    that doesn't trust the judge's own self-report at all) is future
+  //    work, not this cap. See thoroughnessJudge.test.ts's "does NOT clamp
+  //    overall on an unmatched coverage hint alone" test, which fails if
+  //    this boundary is ever crossed. ─────────────────────────────────────
   let overall = sanitizeScore(raw.overall)
   const hasUnaddressedCritical = missedCriticalQuestions.some((q) => q.severity === 'critical')
   if (hasUnaddressedCritical) {
     overall = Math.min(overall, CRITICAL_MISS_OVERALL_CAP)
   }
+
+  // Audit-only disagreement signal (see coverage_disagreement's own
+  // doc-comment on ThoroughnessEvaluation) — computed from, but never
+  // feeding back into, the score above.
+  const missedIds = new Set(missedCriticalQuestions.map((q) => q.rubric_id))
+  const coverageDisagreement = unmatchedCriticalIds.some((id) => !missedIds.has(id))
 
   const confidence = sanitizeConfidence(raw.confidence)
 
@@ -514,6 +585,7 @@ async function generateThoroughnessEvaluationWithUsage(
     unvetted: loaded.unvetted,
     deterministic,
     dropped_findings: droppedFindings,
+    coverage_disagreement: coverageDisagreement,
     provenance: {
       model_id: modelId,
       prompt_version: THOROUGHNESS_PROMPT_VERSION,
