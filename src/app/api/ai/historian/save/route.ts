@@ -256,11 +256,10 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ session: data, consult_id: consultId || null })
   } catch (error: any) {
+    // Detailed message stays server-side only — the raw Postgres error can
+    // leak table/column/constraint detail. Client gets a generic body.
     console.error('Historian save API error:', error)
-    return NextResponse.json(
-      { error: error?.message || 'Failed to save historian session' },
-      { status: 500 },
-    )
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }
 
@@ -355,7 +354,14 @@ export async function GET(request: Request) {
       }
     }
 
-    return NextResponse.json({ sessions: rows || [] })
+    // PHI-shaped response (patient names, MRNs, full transcripts, both
+    // differentials) — no-store so a shared proxy/CDN/browser cache can
+    // never retain it. GET only; POST's response carries no query-string-
+    // cacheable GET semantics and is left untouched.
+    return NextResponse.json(
+      { sessions: rows || [] },
+      { headers: { 'Cache-Control': 'no-store', Pragma: 'no-cache' } },
+    )
   } catch (error: any) {
     console.error('Historian list API error:', error)
     return NextResponse.json(

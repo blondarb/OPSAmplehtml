@@ -1,4 +1,28 @@
 /**
+ * ═══ MATCHER SCOPE — READ BEFORE REUSING OR COMPARING NUMBERS ═══════════════
+ * This is the TASK-2 INTERIM STRING HEURISTIC. It is used ONLY by this
+ * Task 2 module's own live gate (tests/historian-eval/finalDifferential.gate.test.ts)
+ * and this file's own unit tests (ddxMatch.test.ts) — grep confirms no
+ * production code imports it. It is NOT the authoritative ground-truth
+ * matcher for release-gate purposes.
+ *
+ * The AUTHORITATIVE matcher is src/lib/historian/eval/agreement.ts's
+ * `scoreAgainstGroundTruth` (ICD-10 3-character category match as the
+ * deterministic fast path, Haiku-adjudicated synonym resolution as the
+ * fallback for everything else) — that is what Task 5's batch harness and
+ * release gates (qa/historian-eval/release-gates.json's
+ * `ddx-top3-ground-truth` gate) actually use in the artifact Steve reviews
+ * for QI/IRB purposes.
+ *
+ * tokenSetMatch (here) and scoreAgainstGroundTruth (agreement.ts)
+ * implement DIFFERENT matching policies and will legitimately produce
+ * DIFFERENT, NON-COMPARABLE hit numbers on the same transcript/persona —
+ * by design, not by bug. Do not treat this gate's hit-rate as confirming or
+ * contradicting Task 5's report, and do not port this module's numbers
+ * into a release-gate decision. See the matching cross-reference comment at
+ * finalDifferential.gate.test.ts's `tokenSetMatch` import.
+ * ═════════════════════════════════════════════════════════════════════════
+ *
  * Deterministic normalized token-set matcher for grading the final
  * differential live gate (finalDifferential.gate.test.ts) against a
  * persona fixture's ground-truth expectedDDx.

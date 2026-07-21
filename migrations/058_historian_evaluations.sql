@@ -42,7 +42,7 @@
 --
 -- NOT applied here — additive only, applied by a later rollout task.
 
-CREATE TABLE historian_evaluations (
+CREATE TABLE IF NOT EXISTS historian_evaluations (
   id BIGSERIAL PRIMARY KEY,
   session_id TEXT NOT NULL,
   evaluator TEXT NOT NULL,          -- 'thoroughness' | 'independent_ddx' | 'agreement'
@@ -55,4 +55,4 @@ CREATE TABLE historian_evaluations (
   latency_ms INTEGER,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
-CREATE INDEX idx_he_session ON historian_evaluations (session_id, evaluator, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_he_session ON historian_evaluations (session_id, evaluator, created_at DESC);

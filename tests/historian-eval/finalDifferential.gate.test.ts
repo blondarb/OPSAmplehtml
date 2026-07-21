@@ -30,6 +30,16 @@ import { describe, it, expect } from 'vitest'
 
 import { listPersonaFiles, buildPersonaTranscript, type PersonaExpectedDx } from './fixtures/personaTranscripts'
 import { generateFinalDifferential } from '@/lib/historian/eval/finalDifferential'
+// MATCHER SCOPE (see ddxMatch.ts's module doc for the full cross-reference):
+// tokenSetMatch is the TASK-2 INTERIM STRING HEURISTIC, used only by this
+// gate and ddxMatch.test.ts — never production code. The AUTHORITATIVE
+// ground-truth matcher for release-gate purposes is
+// src/lib/historian/eval/agreement.ts's `scoreAgainstGroundTruth`
+// (ICD-10 category match + Haiku-adjudicated fallback), which is what
+// Task 5's batch harness / qa/historian-eval/release-gates.json's
+// `ddx-top3-ground-truth` gate actually uses for the QI/IRB artifact. This
+// gate's hit numbers and Task 5's are NON-COMPARABLE by design — do not
+// treat one as confirming or contradicting the other.
 import { tokenSetMatch } from './ddxMatch'
 
 const LIVE_GATE_TIMEOUT_MS = 60_000

@@ -875,6 +875,12 @@ export default function NeurologicHistorian() {
             duration={completionData.duration}
             questionCount={completionData.questionCount}
             transcript={completionData.transcript}
+            // This is the unauthenticated patient surface (/patient/historian)
+            // — see design spec locked decision L1. DDx/thoroughness props
+            // are never passed here; `surface="patient"` is now the
+            // structural guarantee that HistorianReportView never renders
+            // them even if that ever changes.
+            surface="patient"
             onStartAnother={handleStartAnother}
             onBackToPortal={handleBackToPortal}
           />

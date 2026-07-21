@@ -114,11 +114,27 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ accepted: rowCount ?? 0 })
   } catch (error: unknown) {
-    // Structural/DB error only — never include request body content.
-    console.error(
-      '[historian/transcript-flush] error:',
-      error instanceof Error ? error.message : String(error),
-    )
+    const pgCode = (error as { code?: string } | undefined)?.code
+    if (pgCode === '42P01') {
+      // historian_transcript_events doesn't exist yet — expected and benign
+      // until the rollout task applies migration 056, same precedent as
+      // every other new write path this sprint (save/route.ts's integrity
+      // cross-check and GET handler, finalDifferential.ts's
+      // runFinalDifferential, persistEvaluation.ts). Quiet informational
+      // line only — this is NOT a DB failure and must not read as one in
+      // logs. The client (useRealtimeSession's flushTranscript) already
+      // treats any non-ok response as retry-later and leaves the batch
+      // pending for the next flush trigger, so the response is unchanged.
+      console.info(
+        '[historian/transcript-flush] historian_transcript_events table not present yet (migration 056 not applied) — skipping flush',
+      )
+    } else {
+      // Structural/DB error only — never include request body content.
+      console.error(
+        '[historian/transcript-flush] error:',
+        error instanceof Error ? error.message : String(error),
+      )
+    }
     return NextResponse.json({ error: 'Failed to flush transcript entries' }, { status: 500 })
   }
 }
