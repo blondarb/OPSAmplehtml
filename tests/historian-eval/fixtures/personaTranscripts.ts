@@ -39,10 +39,20 @@ interface PersonaJSON {
   expectedDDx?: PersonaExpectedDDxJSON[]
 }
 
+/** One ground-truth differential entry from a persona's `expectedDDx`. */
+export interface PersonaExpectedDx {
+  diagnosis: string
+  /** e.g. "high" | "medium" | "low" — as authored in the persona JSON, lowercased. Absent if the source entry didn't specify one. */
+  likelihood?: string
+}
+
 export interface PersonaTranscriptFixture {
   transcript: HistorianTranscriptEntry[]
   chiefComplaint: string
-  expectedDDx: string[]
+  /** Ground truth, likelihood preserved — some personas have multiple tied "high" entries; callers must not assume [0] is the only correct answer. */
+  expectedDDx: PersonaExpectedDx[]
+  /** Convenience: just the diagnosis strings, in original order — for callers that only need names. */
+  expectedDDxStrings: string[]
 }
 
 /** List every persona fixture file (basenames, e.g. "acute-stroke.json"). */
@@ -100,9 +110,15 @@ export function buildPersonaTranscript(personaFile: string): PersonaTranscriptFi
   })
 
   const chiefComplaint = persona.intakeData?.chief_complaint?.trim() ?? ''
-  const expectedDDx = (persona.expectedDDx ?? [])
-    .map((d) => d.diagnosis)
-    .filter((d): d is string => typeof d === 'string' && d.trim().length > 0)
+  const expectedDDx: PersonaExpectedDx[] = (persona.expectedDDx ?? [])
+    .filter((d) => typeof d?.diagnosis === 'string' && d.diagnosis.trim().length > 0)
+    .map((d) => ({
+      diagnosis: d.diagnosis.trim(),
+      ...(typeof d.likelihood === 'string' && d.likelihood.trim()
+        ? { likelihood: d.likelihood.trim().toLowerCase() }
+        : {}),
+    }))
+  const expectedDDxStrings = expectedDDx.map((d) => d.diagnosis)
 
-  return { transcript, chiefComplaint, expectedDDx }
+  return { transcript, chiefComplaint, expectedDDx, expectedDDxStrings }
 }

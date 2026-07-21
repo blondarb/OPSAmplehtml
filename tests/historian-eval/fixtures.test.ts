@@ -24,7 +24,7 @@ describe('buildPersonaTranscript', () => {
 
   for (const file of personaFiles) {
     describe(file, () => {
-      const { transcript, chiefComplaint, expectedDDx } = buildPersonaTranscript(file)
+      const { transcript, chiefComplaint, expectedDDx, expectedDDxStrings } = buildPersonaTranscript(file)
 
       it('produces at least 8 turns', () => {
         expect(transcript.length).toBeGreaterThanOrEqual(8)
@@ -40,11 +40,29 @@ describe('buildPersonaTranscript', () => {
         expect(chiefComplaint.trim().length).toBeGreaterThan(0)
       })
 
-      it('has a non-empty expectedDDx list of diagnosis strings', () => {
+      it('has a non-empty expectedDDx list, each with a diagnosis and optional likelihood', () => {
         expect(expectedDDx.length).toBeGreaterThan(0)
         for (const dx of expectedDDx) {
-          expect(typeof dx).toBe('string')
-          expect(dx.trim().length).toBeGreaterThan(0)
+          expect(typeof dx.diagnosis).toBe('string')
+          expect(dx.diagnosis.trim().length).toBeGreaterThan(0)
+          if (dx.likelihood !== undefined) {
+            expect(typeof dx.likelihood).toBe('string')
+            expect(dx.likelihood.trim().length).toBeGreaterThan(0)
+          }
+        }
+      })
+
+      it('expectedDDxStrings mirrors expectedDDx diagnosis names, in order', () => {
+        expect(expectedDDxStrings).toEqual(expectedDDx.map((d) => d.diagnosis))
+      })
+
+      it('preserves likelihood from the source persona file (not silently dropped)', () => {
+        // Every persona fixture in this repo annotates likelihood on every
+        // entry today — this pins that so a future fixture change that
+        // drops it is caught, not silently accepted (this is exactly the
+        // field a prior version of this module used to strip).
+        for (const dx of expectedDDx) {
+          expect(dx.likelihood, `${file}: "${dx.diagnosis}" has no likelihood`).toBeDefined()
         }
       })
 

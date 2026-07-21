@@ -22,11 +22,10 @@
  *      transcript turn it cites.
  */
 
-import { invokeBedrockJSON } from '@/lib/bedrock'
 import { getNeuroPlansPool } from '@/lib/db'
 import { retrievePlanEvidence } from '@/lib/consult/planEvidence'
 import { SYMPTOM_EXTRACTOR_PROMPT } from '@/lib/consult/symptomExtractorPrompt'
-import { invokeBedrockClinicalToolWithMeta } from './bedrockMeta'
+import { invokeBedrockClinicalToolWithMeta, invokeBedrockJSONWithMeta } from './bedrockMeta'
 import { PROMPT_VERSIONS } from './constants'
 import type { HistorianTranscriptEntry } from '@/lib/historianTypes'
 import type { ExtractedSymptoms } from '@/lib/consult/localizer-types'
@@ -317,7 +316,11 @@ export async function generateFinalDifferential(
   const numberedTranscript = buildNumberedTranscriptText(transcript)
 
   // ── Step 1: symptom extraction (shared prompt with the live localizer) ──
-  const { parsed: symptoms } = await invokeBedrockJSON<ExtractedSymptoms>({
+  // Routed through the WithMeta wrapper (like Step 3) for symmetric
+  // provenance capture across both calls, even though Step 1's usage/
+  // latency isn't persisted anywhere yet — keeps both call sites on the
+  // same invocation path rather than one raw and one wrapped.
+  const { result: symptoms } = await invokeBedrockJSONWithMeta<ExtractedSymptoms>({
     system: SYMPTOM_EXTRACTOR_PROMPT,
     messages: [
       {

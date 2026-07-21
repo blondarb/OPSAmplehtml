@@ -7,40 +7,49 @@
  *   HISTORIAN_EVAL_LIVE=1 AWS_PROFILE=sevaro-sandbox npx vitest run \
  *     tests/historian-eval/finalDifferential.gate.test.ts
  *
- * For each of the 5 simulated-patient personas: build a synthetic
- * transcript, run generateFinalDifferential, and check whether that
- * persona's PRIMARY expected diagnosis (expectedDDx[0] — the highest-
- * likelihood entry in every persona fixture) appears in the model's
- * top-3 ranked differential, via a normalized casefold substring match
- * (ICD-10 category matching is a Task 4 concern — normalizeIcd10 doesn't
- * exist yet, so substring-only per the brief).
+ * Actual policy (corrected 2026-07-20 — see task-2-report.md fix-report
+ * section for what the previous version got wrong):
  *
- * Gate: >= 4/5 personas hit. This test does NOT tune prompts to pass —
- * it reports the actual numbers either way.
+ *   For each of the 5 simulated-patient personas: build a synthetic
+ *   transcript, run generateFinalDifferential, then HIT if ANY
+ *   high-likelihood ground-truth entry from that persona's expectedDDx
+ *   (falling back to ALL entries if none are marked "high" — two of the
+ *   five personas have multiple tied-high entries, e.g. first-seizure.json
+ *   lists both "Epilepsy (new onset)" and "Provoked seizure" as high) is a
+ *   normalized TOKEN-SET match (see ./ddxMatch.ts — casefold, punctuation
+ *   as a word boundary not a deletion, connector-stopword-tolerant,
+ *   negation-safe) against ANY of the model's top-3 ranked diagnoses.
+ *
+ *   This is still an interim, no-LLM matcher — Task 4's ICD-10/adjudicated
+ *   matching (normalizeIcd10 + a real independent scorer) supersedes it.
+ *
+ * Gate: >= 4/5 personas hit. This test does NOT tune prompts (or the
+ * matcher) to pass — it reports the actual numbers either way.
  */
 import { describe, it, expect } from 'vitest'
 
-import { listPersonaFiles, buildPersonaTranscript } from './fixtures/personaTranscripts'
+import { listPersonaFiles, buildPersonaTranscript, type PersonaExpectedDx } from './fixtures/personaTranscripts'
 import { generateFinalDifferential } from '@/lib/historian/eval/finalDifferential'
+import { tokenSetMatch } from './ddxMatch'
 
 const LIVE_GATE_TIMEOUT_MS = 60_000
 const TOP_N = 3
 const PASS_THRESHOLD = 4
 
-function normalize(s: string): string {
-  return s.toLowerCase().replace(/[^a-z0-9\s]/g, '').trim()
-}
-
-function casefoldSubstringMatch(a: string, b: string): boolean {
-  const na = normalize(a)
-  const nb = normalize(b)
-  if (!na || !nb) return false
-  return na.includes(nb) || nb.includes(na)
+/**
+ * The ground-truth candidates a HIT is judged against: every entry marked
+ * "high" likelihood, or every entry at all if the fixture marks none
+ * "high" (defensive fallback — every current persona does mark at least
+ * one "high", but a future fixture shouldn't silently pass 0 candidates).
+ */
+function highLikelihoodOrAll(expectedDDx: PersonaExpectedDx[]): PersonaExpectedDx[] {
+  const high = expectedDDx.filter((d) => d.likelihood === 'high')
+  return high.length > 0 ? high : expectedDDx
 }
 
 interface GateResult {
   persona: string
-  expected: string
+  expectedCandidates: string[]
   top3: string[]
   hit: boolean
 }
@@ -51,20 +60,21 @@ describe('Final differential — live gate (HISTORIAN_EVAL_LIVE)', () => {
 
   for (const file of personaFiles) {
     it.skipIf(!process.env.HISTORIAN_EVAL_LIVE)(
-      `${file}: primary expected diagnosis appears in top-3`,
+      `${file}: a high-likelihood expected diagnosis appears in top-3`,
       async () => {
         const { transcript, chiefComplaint, expectedDDx } = buildPersonaTranscript(file)
         expect(expectedDDx.length, `${file} fixture has no expectedDDx entries`).toBeGreaterThan(0)
-        const primaryExpected = expectedDDx[0]
+        const candidates = highLikelihoodOrAll(expectedDDx)
 
         const result = await generateFinalDifferential(transcript, chiefComplaint)
         const top3 = result.differential.slice(0, TOP_N).map((d) => d.diagnosis)
-        const hit = top3.some((dx) => casefoldSubstringMatch(dx, primaryExpected))
+        const hit = candidates.some((c) => top3.some((dx) => tokenSetMatch(dx, c.diagnosis)))
 
-        results.push({ persona: file, expected: primaryExpected, top3, hit })
+        const expectedCandidates = candidates.map((c) => c.diagnosis)
+        results.push({ persona: file, expectedCandidates, top3, hit })
 
         console.log(
-          `[gate] ${file}: expected "${primaryExpected}" — top3 [${top3.join(' | ')}] — ${
+          `[gate] ${file}: expected [${expectedCandidates.join(' | ')}] — top3 [${top3.join(' | ')}] — ${
             hit ? 'HIT' : 'MISS'
           } — dropped_quotes=${result.dropped_quotes}`,
         )
