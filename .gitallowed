@@ -36,3 +36,5 @@ tests/triage/
 infrastructure/triage-ingestion/
 infrastructure/triage-worker/
 qa/triage-sentinel/
+# CLAUDE.md prose: triage pipeline-stage phrase trips the 40-char entropy pattern (not a secret)
+gateway\+safety\+scorer\+fusion\+adjudicator
