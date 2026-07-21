@@ -130,7 +130,12 @@ export function assertBaseUrlAllowed(baseUrl: string, iKnowThisIsNotLocalhost: b
     throw new Error(`--base-url is not a valid URL: "${baseUrl}".`)
   }
 
-  const isLocal = hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '::1'
+  // '[::1]' (bracketed) is what URL.hostname actually returns for an IPv6
+  // literal host per the WHATWG URL spec — the bare '::1' form below never
+  // matches a real parsed URL and was dead code; kept alongside the
+  // bracketed form in case some future URL implementation differs.
+  const isLocal =
+    hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '::1' || hostname === '[::1]'
   if (!isLocal) {
     throw new Error(
       `Refusing to run against non-localhost --base-url "${baseUrl}". OpenAI direct has no BAA — this driver ` +

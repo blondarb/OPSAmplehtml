@@ -3,28 +3,55 @@
  * WebSocket (Historian Validation Suite Task 6 — synthetic patient
  * conversation driver).
  *
- * This talks to the SAME wire protocol as
- * src/lib/voice/providers/openaiWebrtcProvider.ts (that file's WebRTC data
- * channel and this file's raw WebSocket carry the identical Realtime event
- * JSON — only the transport differs), so the event names and payload
- * shapes below (`session.update` needing `session.type`, `response.create`
- * with an empty `response: {}` object, `response.done`'s
- * `response.output[]` array for both message text and function calls) are
- * drawn from that already-live-verified code, not guessed. See that file's
- * header comment for the specific fixes (#142 no response.modalities,
- * session.type required on every session.update) this mirrors.
+ * WIRE-SHAPE PROVENANCE (read before touching the parsing code below —
+ * corrected 2026-07-21 review round, this section was previously
+ * overclaiming):
+ *   - FUNCTION-CALL parsing (`response.done`'s `response.output[]` array,
+ *     `{type:'function_call', name, call_id, arguments}` items) DOES mirror
+ *     src/lib/voice/providers/openaiWebrtcProvider.ts's own `response.done`
+ *     handler exactly — that file's WebRTC data channel and this file's raw
+ *     WebSocket carry the identical Realtime event JSON, and that handler's
+ *     function-call extraction is already live-verified production code.
+ *   - TEXT-MESSAGE parsing (`response.output[]`'s `{type:'message',
+ *     content:[{type:'output_text', text}]}` shape) is NOT mirrored from
+ *     that file — it only handles AUDIO-modality transcript events
+ *     (`response.audio_transcript.*`), which do not exist in a text-only
+ *     session and say nothing about the text-modality message-item shape.
+ *     The text-shape parsing below is written per OpenAI's GA Realtime API
+ *     documentation/schema conventions (a `message` item with `content[]`
+ *     parts, `output_text` for model-generated text). It has NOT been
+ *     exercised against a real live response as of this writing — every
+ *     live attempt (2026-07-21) failed before generating one: first on a
+ *     stale `OpenAI-Beta: realtime=v1` header (fixed — see
+ *     historian-synthetic-run.ts's call-site comment), then on an
+ *     account-level `insufficient_quota` block on the production OpenAI
+ *     key. This is a documented, tracked assumption, not a verified fact —
+ *     `session.update` needing `session.type`, and `response.create` with
+ *     an empty `response: {}` object, ARE both confirmed live via that same
+ *     already-tested WebRTC code path, independent of the text-shape
+ *     question. See the module's DEFENSIVE PARSING note below for how this
+ *     client protects itself against that shape assumption being wrong.
+ *
+ * DEFENSIVE PARSING — never trust an empty/failed turn as a real reply:
+ * because the text-message shape above is unverified, this client refuses
+ * to let a wrong assumption there silently look like a normal quiet turn.
+ * `RealtimeTurnResult` always surfaces `status` (from `response.status`)
+ * and `id` (from `response.id`) alongside `assistantText`/`functionCalls`
+ * so the ORCHESTRATOR (historian-synthetic-run.ts) can detect and hard-fail
+ * on a response that didn't complete, or that completed with neither text
+ * nor a function call — see that file's `processTurn` for the actual
+ * warn/count/abort logic. This client itself stays a faithful, non-
+ * judgmental protocol layer: it parses accurately and reports what it saw,
+ * it does not decide what counts as a failure.
  *
  * DESIGN — response.done is authoritative, deltas are best-effort only:
- * the production code above only handles AUDIO-modality transcript events
- * (`response.audio_transcript.*`), which do not apply to a text-only
- * session. The brief names `response.output_text.*` for text-modality
- * streaming deltas; this client accumulates those opportunistically (only
- * used as a fallback if a response ever finishes with no message item in
- * its output array) but always prefers the text extracted from
- * `response.done`'s own `response.output[]` — the one event whose shape is
- * confirmed by the code above and whose arrival this client already must
- * wait for regardless. This hedges against any minor drift in the exact
- * delta event name without weakening correctness.
+ * `response.output_text.delta` (named in the original task brief for
+ * text-modality streaming) is accumulated opportunistically and used ONLY
+ * as a fallback if a response ever finishes with no message item in its
+ * output array — the authoritative source is always
+ * `response.done`'s own `response.output[]`, the one event this client
+ * already must wait for regardless. This hedges against any minor drift in
+ * the exact delta event name without weakening correctness.
  *
  * TIMEOUTS: a 30s ceiling on every individual exchange (sendUserText /
  * sendFunctionCallOutput / requestGreeting — anything that awaits a
@@ -42,7 +69,8 @@
  * the CLIENT usable for the orchestrator's next call; it does not and
  * cannot restore lost conversation context. The orchestrator's own
  * whole-session retry (documented in the CLI) is a separate, higher-level
- * concern.
+ * concern. A second unexpected close (after the one-time reconnect already
+ * happened) is terminal — no further reconnect is attempted.
  */
 import WebSocket, { type RawData } from 'ws'
 
@@ -77,8 +105,10 @@ export interface RealtimeTurnResult {
   assistantText: string
   /** Every function_call item in this response, in order. */
   functionCalls: RealtimeFunctionCall[]
-  /** response.status from response.done ("completed" | "failed" | "incomplete" | ...), or null if unavailable. */
+  /** response.status from response.done ("completed" | "failed" | "incomplete" | ...), or null if unavailable. Callers MUST check this — a non-"completed" status means the response text/calls may be partial or absent; see the module doc's DEFENSIVE PARSING note. */
   status: string | null
+  /** response.id from response.done, for correlating warning/error logs back to the specific OpenAI response. Null if unavailable. */
+  id: string | null
 }
 
 export type WireEventDirection = 'out' | 'in'
@@ -320,7 +350,8 @@ export class RealtimeTextClient {
     this.pendingTurn = null
     clearTimeout(turn.timer)
     const status = typeof response.status === 'string' ? response.status : null
-    turn.resolve({ assistantText, functionCalls, status })
+    const id = typeof response.id === 'string' ? response.id : null
+    turn.resolve({ assistantText, functionCalls, status, id })
   }
 
   private failPendingTurn(err: Error): void {
@@ -436,6 +467,14 @@ export class RealtimeTextClient {
     this.intentionalClose = true
     this.clearConnectTimer()
     if (this.pendingTurn) this.failPendingTurn(new Error('Client closed while a response was in flight'))
+    // If close() lands while the one-time auto-reconnect is mid-handshake,
+    // its openAndHandshake() promise has a live connectSettle waiting on
+    // session.created/session.updated that will now never arrive (the
+    // socket is about to be torn down, and handleClose()/handleSocketError()
+    // both no-op once intentionalClose is true) — reject it explicitly so
+    // that promise is never abandoned. Optional-chained: a no-op when there
+    // is no in-flight connect (the common case).
+    this.connectSettle?.reject(new Error('Client closed while reconnecting'))
     try {
       this.ws?.close()
     } catch {

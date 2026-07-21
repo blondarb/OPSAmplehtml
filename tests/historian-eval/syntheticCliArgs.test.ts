@@ -86,6 +86,14 @@ describe('assertBaseUrlAllowed', () => {
     expect(() => assertBaseUrlAllowed('http://127.0.0.1:3111', false)).not.toThrow()
   })
 
+  it('allows the IPv6 loopback literal (URL.hostname returns it bracketed as "[::1]")', () => {
+    // Confirms new URL(...).hostname actually returns the bracketed form —
+    // asserting on the real URL API's behavior, not just feeding a literal
+    // string, so this test would have caught the original bare-'::1' bug.
+    expect(new URL('http://[::1]:3111').hostname).toBe('[::1]')
+    expect(() => assertBaseUrlAllowed('http://[::1]:3111', false)).not.toThrow()
+  })
+
   it('rejects a non-localhost URL without the override flag', () => {
     expect(() => assertBaseUrlAllowed('https://staging.neuroplans.app', false)).toThrow(/Refusing to run/)
   })
