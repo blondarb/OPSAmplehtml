@@ -78,4 +78,45 @@ describe('flushToken', () => {
     vi.setSystemTime(new Date(Date.now() + (FLUSH_TOKEN_TTL_SECONDS + 5) * 1000))
     expect(verifyFlushToken(token)).toBeNull()
   })
+
+  describe('production fail-closed behavior', () => {
+    afterEach(() => {
+      vi.unstubAllEnvs()
+    })
+
+    it('mintFlushToken throws in production when neither secret env var is set', () => {
+      delete process.env.HISTORIAN_FLUSH_SECRET
+      delete process.env.NOVA_RELAY_SHARED_SECRET
+      vi.stubEnv('NODE_ENV', 'production')
+      expect(() => mintFlushToken('abc')).toThrow()
+    })
+
+    it('verifyFlushToken returns null in production when neither secret env var is set, even for a token minted earlier under a real secret', () => {
+      process.env.HISTORIAN_FLUSH_SECRET = 'a-real-secret'
+      vi.stubEnv('NODE_ENV', 'development')
+      const token = mintFlushToken('abc')
+      // Sanity check: works before the production flip.
+      expect(verifyFlushToken(token)).toEqual({ sessionId: 'abc' })
+
+      delete process.env.HISTORIAN_FLUSH_SECRET
+      delete process.env.NOVA_RELAY_SHARED_SECRET
+      vi.stubEnv('NODE_ENV', 'production')
+      expect(verifyFlushToken(token)).toBeNull()
+    })
+
+    it('mint and verify both work normally in production when a real secret IS configured', () => {
+      process.env.HISTORIAN_FLUSH_SECRET = 'a-real-prod-secret'
+      vi.stubEnv('NODE_ENV', 'production')
+      const token = mintFlushToken('prod-session')
+      expect(verifyFlushToken(token)).toEqual({ sessionId: 'prod-session' })
+    })
+
+    it('falls back to the dev-only secret outside production when neither env var is set', () => {
+      delete process.env.HISTORIAN_FLUSH_SECRET
+      delete process.env.NOVA_RELAY_SHARED_SECRET
+      vi.stubEnv('NODE_ENV', 'test')
+      const token = mintFlushToken('dev-session')
+      expect(verifyFlushToken(token)).toEqual({ sessionId: 'dev-session' })
+    })
+  })
 })

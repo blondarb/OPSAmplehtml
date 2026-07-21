@@ -91,7 +91,24 @@ export async function POST(request: Request) {
     // `DEFAULT gen_random_uuid()` would have produced — just minted here
     // instead of by Postgres.
     const sessionId = crypto.randomUUID()
-    const flushToken = mintFlushToken(sessionId)
+    // mintFlushToken() now fails closed (throws) in production when neither
+    // HISTORIAN_FLUSH_SECRET nor NOVA_RELAY_SHARED_SECRET is configured —
+    // that must never take down the whole historian session (voice
+    // interview creation is the load-bearing feature here; the durable
+    // transcript flush is a safety net on top of it). Caught non-fatally:
+    // `sessionId` is still returned either way (still useful to /save),
+    // `flushToken` is simply omitted, and the client's flushTranscript()
+    // already no-ops without a token (fail-open by design).
+    let flushToken: string | undefined
+    try {
+      flushToken = mintFlushToken(sessionId)
+    } catch (flushTokenErr) {
+      console.warn(
+        '[historian/session] mintFlushToken failed (non-fatal — durable transcript flush unavailable this session):',
+        flushTokenErr instanceof Error ? flushTokenErr.message : String(flushTokenErr),
+      )
+      flushToken = undefined
+    }
 
     // ── Nova path: no OpenAI client_secrets call. Return relay config + the
     // Nova-native tool specs (Bedrock Converse toolSpec shape). The hook

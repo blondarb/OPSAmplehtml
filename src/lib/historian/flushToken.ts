@@ -5,21 +5,29 @@
  * Mirrors the mint pattern in
  * src/app/api/ai/historian/session/route.ts:28-47 (mintNovaRelayToken):
  * `${base64url(JSON.stringify(payload))}.${base64url(HMAC_SHA256(secret, payload))}`.
- * Differs in one deliberate way: mintNovaRelayToken returns `string | null`
- * and fails closed when no secret is configured, because a leaked relay
- * token can hijack a live, costly Bedrock voice stream. The flush token
- * protects a synthetic-data transcript-append endpoint that is explicitly
- * spec'd as "no auth beyond token (patient-portal pattern)" — the same bar
- * as /save and /session already sit at (no Cognito auth). So this module's
- * public signature is intentionally non-nullable (`mintFlushToken(...): string`)
- * and falls back to a fixed dev-only secret when neither
- * HISTORIAN_FLUSH_SECRET nor NOVA_RELAY_SHARED_SECRET is configured, so
- * mint/verify stay symmetric in local dev/test without live secrets.
- * Production MUST set one of the two real env vars (NOVA_RELAY_SHARED_SECRET
- * is already required there for the Nova voice path).
+ *
+ * Secret resolution: HISTORIAN_FLUSH_SECRET, falling back to
+ * NOVA_RELAY_SHARED_SECRET (already required in production for the Nova
+ * voice path) — either real secret always wins when set. If NEITHER is
+ * set:
+ *   - Outside production: falls back to a fixed dev-only secret so
+ *     mint/verify round-trip locally without any secrets configured.
+ *   - In production (NODE_ENV === 'production'): FAILS CLOSED. The
+ *     dev-only fallback is never reachable there. mintFlushToken THROWS
+ *     (its signature stays the non-nullable `string` later tasks rely on —
+ *     throwing, not returning an unusable value, is how it fails to
+ *     produce one) and verifyFlushToken returns null for every token,
+ *     including one minted earlier under a real secret that has since gone
+ *     missing — nothing should be trusted once production has no
+ *     configured secret to check against.
  */
 import crypto from 'crypto'
 
+/**
+ * Dev/test-only fallback secret. Reachable ONLY when NODE_ENV is not
+ * 'production' AND neither real secret env var is configured — see
+ * resolveSecret() below. Never reachable in production.
+ */
 const DEV_FALLBACK_SECRET = 'historian-flush-token-dev-only-insecure-default'
 
 /**
@@ -35,12 +43,18 @@ interface FlushTokenPayload {
   exp: number // unix seconds
 }
 
-function getSecret(): string {
-  return (
-    process.env.HISTORIAN_FLUSH_SECRET ||
-    process.env.NOVA_RELAY_SHARED_SECRET ||
-    DEV_FALLBACK_SECRET
-  )
+/**
+ * Resolves the signing/verification secret. A configured real secret
+ * (HISTORIAN_FLUSH_SECRET, falling back to NOVA_RELAY_SHARED_SECRET)
+ * always wins. If neither is configured: returns the dev-only fallback
+ * outside production, or null in production — the fail-closed signal both
+ * mintFlushToken and verifyFlushToken key off of below.
+ */
+function resolveSecret(): string | null {
+  const configured = process.env.HISTORIAN_FLUSH_SECRET || process.env.NOVA_RELAY_SHARED_SECRET
+  if (configured) return configured
+  if (process.env.NODE_ENV === 'production') return null
+  return DEV_FALLBACK_SECRET
 }
 
 function toBase64Url(input: Buffer | string): string {
@@ -61,24 +75,37 @@ function sign(payloadB64: string, secret: string): string {
 }
 
 export function mintFlushToken(sessionId: string): string {
+  const secret = resolveSecret()
+  if (!secret) {
+    // Fail closed: production with neither HISTORIAN_FLUSH_SECRET nor
+    // NOVA_RELAY_SHARED_SECRET configured. Refuse to mint rather than
+    // silently signing with a fallback secret in production.
+    throw new Error(
+      '[historian/flushToken] Refusing to mint a transcript-flush token in production: ' +
+        'neither HISTORIAN_FLUSH_SECRET nor NOVA_RELAY_SHARED_SECRET is configured.',
+    )
+  }
   const payload: FlushTokenPayload = {
     sessionId,
     exp: Math.floor(Date.now() / 1000) + FLUSH_TOKEN_TTL_SECONDS,
   }
   const payloadB64 = toBase64Url(JSON.stringify(payload))
-  const sig = sign(payloadB64, getSecret())
+  const sig = sign(payloadB64, secret)
   return `${payloadB64}.${sig}`
 }
 
 export function verifyFlushToken(token: string): { sessionId: string } | null {
   if (!token || typeof token !== 'string') return null
 
+  const secret = resolveSecret()
+  if (!secret) return null // fail closed — no configured secret to verify against
+
   const parts = token.split('.')
   if (parts.length !== 2) return null
   const [payloadB64, sig] = parts
   if (!payloadB64 || !sig) return null
 
-  const expectedSig = sign(payloadB64, getSecret())
+  const expectedSig = sign(payloadB64, secret)
 
   const sigBuf = Buffer.from(sig)
   const expectedBuf = Buffer.from(expectedSig)
