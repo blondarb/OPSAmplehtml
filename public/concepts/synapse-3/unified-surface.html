@@ -354,7 +354,7 @@ body.show-phone .s3-phone{display:flex}
     </thead>
     <tbody>
       <tr><td>Acute neurologist</td><td>Minutes (LKW-anchored)</td><td>The consult</td><td>activate, order, document, sign</td></tr>
-      <tr><td>Neuro hospitalist</td><td>Half-day blocks</td><td>The rounding list</td><td>round, reconcile, handoff</td></tr>
+      <tr><td>Neuro hospitalist</td><td>A 12-hour shift</td><td>The rounding list</td><td>round, reconcile, handoff</td></tr>
       <tr><td>EEG reader</td><td>Study queue (SLA hours)</td><td>The study</td><td>read, report, link, sign</td></tr>
       <tr><td>Clinic neurologist</td><td>A clinic day</td><td>The encounter</td><td>prep, see, sign, route</td></tr>
       <tr><td>Triage nurse</td><td>Continuous (contact age)</td><td>The inbound contact</td><td>triage, schedule, escalate, close the loop</td></tr>
@@ -1112,7 +1112,7 @@ After your visit: your plan, in plain words.
 <h2>Seven lenses, one day <span class="s3-pin">9</span></h2>
 <div class="lens5">
 <div class="bcard"><div class="bname">Acute</div><div class="bask">The parked time-rail returns as a zoom level: LKW clock fused to the now-line, criteria gates that render missing data, never verdicts. Fastest loop, same primitives.</div></div>
-<div class="bcard"><div class="bname">Rounds</div><div class="bask">The census is a worklist with a now-line: seen recedes left, the code pauses the list mid-round, and the ✦ discharge draft queues for review. Same rail, half-day zoom.</div></div>
+<div class="bcard"><div class="bname">Rounds</div><div class="bask">The census is a worklist with a now-line: seen recedes left, the code pauses the list mid-round, and the ✦ discharge draft queues for review. Same rail, twelve-hour zoom.</div></div>
 <div class="bcard"><div class="bname">EEG Read</div><div class="bask">Studies age toward SLA like triage contacts; the report is sentence-built with deterministic CPT — the real Report Builder — and a signed read links itself to the chart, the rounds list, and this afternoon's clinic visit.</div></div>
 <div class="bcard"><div class="bname">Clinic MD</div><div class="bask">A day is a rail: filed mornings left, ✦ prep and drafts landing as events, the band holding what actually needs the physician. The scribe files; the paste finalizes.</div></div>
 <div class="bcard"><div class="bname">Triage RN</div><div class="bask">Contacts age along the rail toward SLA, the engine drafts in Queue autonomy, and human-first holds close as RN decisions with the record saying so.</div></div>
@@ -1227,12 +1227,12 @@ After your visit: your plan, in plain words.
   <p class="eyebrow">UNRESOLVED</p>
   <h2>Open questions for the Lab</h2>
   <ol style="font-size:14px;color:var(--ink);padding-left:22px">
-    <li style="margin-bottom:10px">Autonomy defaults at launch — which engines start at Queue vs Draft, and who may raise a dial?</li>
-    <li style="margin-bottom:10px">Gate rulesets — who owns thrombolysis criteria content, with what version cadence and sign-off? (Unanswered since the parked doc; it blocks the acute lens.)</li>
-    <li style="margin-bottom:10px">How much AI in the exam is too much? (Carried forward verbatim — still not auto-adopting a recommendation.)</li>
-    <li style="margin-bottom:10px">Does the patient lens live inside Synapse or ship as a companion product on the same primitives?</li>
-    <li style="margin-bottom:10px">Migration for today's 2.0 acute users — lens-by-lens beside the console, or a switchover?</li>
-    <li style="margin-bottom:10px">Manager visibility into individual clinician metrics — where is the line between operations and surveillance?</li>
+    <li style="margin-bottom:10px">Autonomy defaults — every engine has a stop: <em>Draft</em> (writes a draft you have to open), <em>Queue</em> (finished work waits in your band for sign-off), <em>File+audit</em> (files itself, logged, always reviewable). Today’s scribe effectively runs File+audit; triage runs Queue. Which stop does each engine <em>launch</em> at — and can a practice raise its own dial, or is raising autonomy a governance action?</li>
+    <li style="margin-bottom:10px">Gate rulesets — who maintains the thrombolysis criteria <em>content</em> over time? (Steve 7/21: the physician owns the criteria decision; the tool supports it. Open sub-question is maintenance: who signs a ruleset update when guidelines change, on what review cadence — the parked doc’s stale-checklist warning.)</li>
+    <li style="margin-bottom:10px">How much AI in the exam is too much? (Steve 7/21: today’s scribe pattern is the seed — it listens to the exam and fills NIHSS plus recommended scales, and the physician manually selects to add them. Getting this workflow right matters; never-auto-score stands.)</li>
+    <li style="margin-bottom:10px">The patient lens — the phone view in this concept (✦ historian interview status, visit updates, the plan in plain words). Does that ship <em>inside</em> Synapse or as a companion patient app on the same data? In today’s terms: where does the historian’s patient-facing side live?</li>
+    <li style="margin-bottom:10px">Migration for today's 2.0 acute users. (Steve 7/21: not a worry yet — eventually a big bang; lay it out and build it first. Aspirational, and it runs through product.)</li>
+    <li style="margin-bottom:10px">Manager visibility into individual clinician metrics. (Steve 7/21: physicians should see their own data — quality reviews included; the fine line is what gets surfaced to managers.)</li>
     <li style="margin-bottom:10px">Role rostering — where do legal same-day combinations live (acute + rounds + reads: yes; either + reads: yes; inpatient + clinic in daytime: never), and does the surface enforce them or just display them?</li>
   </ol>
 </section>
