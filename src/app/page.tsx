@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { Bot, ClipboardList, Workflow, Layers, Sparkles } from 'lucide-react'
+import { Bot, ClipboardList, Workflow, Layers, Sparkles, Orbit } from 'lucide-react'
 import PlatformShell from '@/components/layout/PlatformShell'
 import HeroSection from '@/components/homepage/HeroSection'
 import JourneyTrack from '@/components/homepage/JourneyTrack'
@@ -67,6 +67,20 @@ export default function Home() {
           </div>
           <div className="grid gap-3 sm:grid-cols-2">
             <a
+              href="/concepts/synapse-3/unified-surface.html"
+              className="flex items-center gap-3 rounded-xl border border-slate-700 bg-slate-800/60 px-5 py-4 transition hover:border-orange-500 hover:bg-slate-800"
+            >
+              <span className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-orange-500/15">
+                <Orbit size={20} className="text-orange-300" />
+              </span>
+              <span>
+                <span className="block text-sm font-semibold text-white">Synapse 3.0 — One Surface</span>
+                <span className="block text-xs text-slate-400">
+                  Acute, rounds, EEG reads, clinic, triage, MA &amp; manager as role lenses on one time-spine. Working switcher, new &ldquo;Daylight&rdquo; design language.
+                </span>
+              </span>
+            </a>
+            <a
               href="/concepts/triage-nurse/outpatient-triage-nurse-demo.html"
               className="flex items-center gap-3 rounded-xl border border-slate-700 bg-slate-800/60 px-5 py-4 transition hover:border-sky-500 hover:bg-slate-800"
             >
@@ -118,7 +132,7 @@ export default function Home() {
               <span>
                 <span className="block text-sm font-semibold text-white">Synapse 3.0?</span>
                 <span className="block text-xs text-slate-400">
-                  The parked acute time-rail exploration — a framing question, not a plan.
+                  The parked acute time-rail exploration that seeded One Surface — kept for provenance.
                 </span>
               </span>
             </a>

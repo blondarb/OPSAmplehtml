@@ -1,0 +1,1415 @@
+<!-- part 01: head -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Synapse 3.0 — One Surface · Sevaro concept</title>
+<style>
+/* reset */
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+img,svg{display:block;max-width:100%}
+button{font:inherit;color:inherit;background:none;border:0;cursor:pointer}
+table{border-collapse:collapse;width:100%}
+
+:root{
+  --paper:#f6f3ee; --card:#fdfbf7; --well:#efeae2; --frame:#fbf9f4;
+  --line:#e3ddd2; --line-2:#d5cec1;
+  --ink:#1f2430; --ink-2:#555e6e; --ink-3:#8b93a1; --ink-inv:#f6f3ee;
+  --act:#1e40af; --act-soft:rgba(30,64,175,.09);
+  --ember:#c2410c; --ember-soft:rgba(194,65,12,.10);
+  --ai:#9333ea; --ai-soft:rgba(147,51,234,.08);
+  --ok:#047857; --ok-soft:rgba(4,120,87,.10);
+  --warn:#a16207; --warn-soft:rgba(161,98,7,.12);
+  --crit:#be123c; --crit-soft:rgba(190,18,60,.09);
+  --elev-1:0 1px 2px rgba(31,36,48,.05),0 4px 14px rgba(31,36,48,.06);
+  --elev-2:0 2px 6px rgba(31,36,48,.08),0 10px 30px rgba(31,36,48,.10);
+  --elev-now:0 2px 6px rgba(194,65,12,.16),0 10px 28px rgba(31,36,48,.10);
+  --r-lg:16px; --r-md:10px; --r-sm:7px; --pill:999px;
+  --sans:'Seravek','Avenir Next','Segoe UI',system-ui,-apple-system,sans-serif;
+  --serif:'New York','Iowan Old Style',Palatino,Georgia,serif;
+  --mono:'SF Mono',ui-monospace,Menlo,'Cascadia Code',monospace;
+}
+
+body{
+  font:14.5px/1.55 var(--sans);
+  color:var(--ink);
+  background:var(--paper);
+  -webkit-font-smoothing:antialiased;
+  text-rendering:optimizeLegibility;
+}
+::selection{background:var(--ember-soft);color:var(--ink)}
+
+h1,h2{font-family:var(--serif);font-weight:600;color:var(--ink);letter-spacing:-.01em}
+h1{font-size:34px;line-height:1.15}
+h2{font-size:24px;line-height:1.25}
+h3{font-family:var(--sans);font-weight:650;font-size:16.5px;color:var(--ink)}
+
+.eyebrow{font-size:11.5px;font-weight:700;text-transform:uppercase;letter-spacing:.12em;color:var(--ink-3)}
+
+a{color:var(--act);text-decoration:none}
+a:hover{text-decoration:underline}
+a:focus-visible,button:focus-visible,[tabindex]:focus-visible{outline:2px solid var(--act);outline-offset:2px;border-radius:4px}
+</style>
+<!-- part 02: page / sections / toggles / chrome / roles / frame -->
+<style>
+.wrap{max-width:1140px;margin:0 auto;padding:0 28px}
+
+.sect{max-width:1140px;margin:84px auto 0;padding:0 28px}
+.sect .eyebrow{margin-bottom:8px}
+.sect h2{margin-bottom:14px}
+.sect h3{margin-top:32px;margin-bottom:8px}
+.sect p{margin-top:12px;color:var(--ink-2);line-height:1.6;max-width:72ch}
+.sect ul,.sect ol{margin-top:12px;padding-left:22px}
+.sect li{margin-bottom:8px;line-height:1.55}
+.sect svg{margin-top:24px}
+.sect table{margin-top:20px}
+
+.dek{font-size:17px;line-height:1.6;color:var(--ink-2);max-width:68ch;margin-top:14px}
+
+/* bare footer (part-13) gets the same reading width without fighting its inline padding */
+footer{max-width:1140px;margin:0 auto}
+
+/* page header layout (used by part-04) */
+.pagehead{display:flex;align-items:baseline;justify-content:space-between;gap:24px;flex-wrap:wrap;padding-top:56px}
+.tglrow{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.tglhint{font-size:12px;color:var(--ink-3);margin-top:10px;max-width:60ch}
+.provenance{font-size:12.5px;color:var(--ink-3);margin-top:6px}
+
+/* toggles */
+.tgl{
+  display:inline-flex;align-items:center;gap:6px;
+  padding:8px 15px;border:1px solid var(--line-2);border-radius:var(--pill);
+  background:var(--card);color:var(--ink-2);
+  font-size:12.5px;font-weight:650;
+  transition:background .15s ease,color .15s ease,border-color .15s ease,transform .15s ease,box-shadow .15s ease;
+}
+.tgl:hover{border-color:var(--ink-3);color:var(--ink);transform:translateY(-1px);box-shadow:var(--elev-1)}
+.tgl[aria-pressed="true"]{background:var(--ink);color:var(--paper);border-color:var(--ink)}
+.tgl[aria-pressed="true"]:hover{transform:none;box-shadow:none}
+
+/* demo frame */
+.s3-frame{max-width:1280px;margin:40px auto;background:var(--frame);border:1px solid var(--line);border-radius:var(--r-lg);box-shadow:var(--elev-1);overflow:hidden}
+
+/* chrome */
+.s3-chrome{display:flex;align-items:center;gap:12px;row-gap:8px;flex-wrap:wrap;min-height:56px;padding:10px 20px;border-bottom:1px solid var(--line);background:var(--card)}
+.s3-brand{display:flex;align-items:center;gap:10px}
+.s3-mark{width:28px;height:28px;flex:0 0 auto;border-radius:8px;background:var(--ink);color:var(--paper);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;letter-spacing:-.02em}
+.s3-word{font-size:15px;font-weight:700;color:var(--ink)}
+.s3-ctx{font-family:var(--mono);font-size:12.5px;color:var(--ink-3);font-variant-numeric:tabular-nums}
+
+/* role switcher */
+.s3-roles{display:flex;align-items:center;gap:4px;padding:4px;margin-left:auto;background:var(--well);border-radius:var(--pill);border:1px solid var(--line);flex-wrap:wrap}
+.seg{padding:6px 11px;border-radius:var(--pill);font-size:12px;font-weight:650;color:var(--ink-2);white-space:nowrap;transition:background .15s ease,color .15s ease}
+.seg:hover{color:var(--ink)}
+.seg[aria-selected="true"]{background:var(--ink);color:var(--paper)}
+.seg--ghost{border:1px dashed var(--ai);color:var(--ai);background:transparent}
+.seg--ghost:hover{color:var(--ai)}
+.seg--ghost[aria-selected="true"]{background:var(--ai);color:var(--ink-inv);border-style:solid}
+
+/* persona + dial chips */
+.s3-user{display:flex;align-items:center;gap:8px}
+.s3-user .initial{width:26px;height:26px;flex:0 0 auto;border-radius:50%;background:var(--ink);color:var(--ink-inv);display:flex;align-items:center;justify-content:center;font-size:10.5px;font-weight:700}
+.s3-user .uname{font-size:12.5px;font-weight:600;color:var(--ink-2)}
+.s3-dial{display:inline-flex;align-items:center;gap:4px;padding:5px 11px;border-radius:var(--pill);border:1px solid var(--ai);background:var(--ai-soft);color:var(--ai);font-size:11.5px;font-weight:700}
+
+@media (max-width:640px){
+  .s3-frame{margin:24px 16px;max-width:calc(100% - 32px)}
+  .s3-chrome{flex-wrap:wrap;height:auto;padding:12px}
+  .s3-roles{margin-left:0}
+}
+</style>
+<!-- part 03: rail / band / canvas / buttons / chips / pills / gate / tiles / lanes -->
+<style>
+/* lens visibility */
+.s3-lens{display:none}
+body[data-role="acute"] .s3-lens[data-role="acute"]{display:block}
+body[data-role="op"] .s3-lens[data-role="op"]{display:block}
+body[data-role="triage"] .s3-lens[data-role="triage"]{display:block}
+body[data-role="ma"] .s3-lens[data-role="ma"]{display:block}
+body[data-role="pm"] .s3-lens[data-role="pm"]{display:block}
+
+/* RAIL */
+.s3-rail{padding:18px 26px 8px}
+.s3-zoom{font-size:11.5px;font-variant:small-caps;letter-spacing:.04em;color:var(--ink-3);text-align:right;margin-bottom:4px}
+.s3-track{position:relative;height:118px;min-width:1150px}
+.s3-track::before{content:"";position:absolute;left:0;right:0;top:64px;height:2px;background:var(--line-2)}
+
+.s3-now{position:absolute;left:38%;top:6px;bottom:6px;width:2px;background:var(--ember);box-shadow:var(--elev-now)}
+.s3-now .tag{position:absolute;top:-20px;left:50%;transform:translateX(-50%);font-family:var(--mono);font-size:11px;font-weight:700;letter-spacing:.02em;color:var(--ember);white-space:nowrap;font-variant-numeric:tabular-nums}
+
+.s3-ev{position:absolute;top:52px;transform:translateX(-50%);text-align:center;width:88px}
+.s3-ev.ev--up{top:14px}
+.s3-ev .dot{width:12px;height:12px;border-radius:50%;margin:0 auto 6px}
+.s3-ev .lbl{font-size:11.5px;color:var(--ink-2);line-height:1.4}
+.s3-ev .lbl::first-line{font-family:var(--mono);font-weight:650;color:var(--ink);font-variant-numeric:tabular-nums}
+.s3-ev .sub{display:block;font-size:10.5px;color:var(--ink-3);margin-top:2px}
+
+.ev--filed .dot{background:var(--ink-3)}
+.ev--due .dot{background:var(--act)}
+.ev--future .dot{background:transparent;border:2px dashed var(--act)}
+.ev--ai .dot{background:var(--ai-soft);border:2px solid var(--ai)}
+.ev--crit .dot{width:16px;height:16px;background:var(--crit-soft);border:2px solid var(--crit);box-shadow:0 0 0 3px var(--card),0 0 0 4px var(--crit)}
+
+/* BAND */
+.s3-band{display:flex;gap:12px;padding:10px 26px 18px;flex-wrap:wrap}
+.bcard{min-width:230px;flex:1 1 230px;background:var(--card);border:1px solid var(--line);border-radius:var(--r-md);padding:12px 14px;transition:box-shadow .15s ease,border-color .15s ease,transform .15s ease}
+.bcard--top{border-left:3px solid var(--ember);box-shadow:var(--elev-2)}
+.bcard[data-canvas]{cursor:pointer}
+.bcard[data-canvas]:hover{transform:translateY(-1px);box-shadow:var(--elev-1);border-color:var(--line-2)}
+.bcard.sel{border-color:var(--act)}
+.brow{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:8px}
+.bage{font-family:var(--mono);font-size:11px;color:var(--ink-3);margin-left:auto;font-variant-numeric:tabular-nums}
+.bname{font-size:14.5px;font-weight:650;color:var(--ink);margin-bottom:3px}
+.bask{font-size:13px;color:var(--ink-2);margin-bottom:10px;line-height:1.5}
+.bverbs{display:flex;gap:6px;flex-wrap:wrap}
+
+/* BUTTONS */
+.btn{display:inline-flex;align-items:center;gap:6px;font-size:13px;font-weight:650;padding:8px 14px;border-radius:9px;transition:transform .15s ease,box-shadow .15s ease,background .15s ease,border-color .15s ease}
+.btn:hover{transform:translateY(-1px);box-shadow:var(--elev-1)}
+.btn--pri{background:var(--ink);color:var(--paper)}
+.btn--act{background:var(--act);color:var(--paper)}
+.btn--ghost{background:transparent;border:1px solid var(--line-2);color:var(--ink-2)}
+.btn--ghost:hover{border-color:var(--ink-3);color:var(--ink)}
+
+/* CHIPS — neutral default (well/ink-2) so bare .chip usage still reads; variants override */
+.chip{display:inline-flex;align-items:center;gap:4px;font-size:11.5px;font-weight:700;padding:3px 9px;border-radius:var(--pill);letter-spacing:.02em;white-space:nowrap;background:var(--well);color:var(--ink-2)}
+.chip--ok{background:var(--ok-soft);color:var(--ok)}
+.chip--warn{background:var(--warn-soft);color:var(--warn)}
+.chip--crit{background:var(--crit-soft);color:var(--crit)}
+.chip--ai{background:var(--ai-soft);color:var(--ai)}
+.chip--act{background:var(--act-soft);color:var(--act)}
+.chip--time{background:var(--ember-soft);color:var(--ember);font-family:var(--mono);font-variant-numeric:tabular-nums}
+
+/* PILLS */
+.pill{display:inline-flex;align-items:center;font-size:10.5px;font-weight:800;font-variant:small-caps;letter-spacing:.03em;padding:2px 8px;border-radius:4px;border:1px solid}
+.pill--ours{background:var(--ok-soft);color:var(--ok);border-color:var(--ok)}
+.pill--epic{background:var(--act-soft);color:var(--act);border-color:var(--act)}
+.pill--final{background:var(--act);color:var(--paper);border-color:var(--act)}
+
+/* AUTONOMY */
+.auton{font-size:12px;color:var(--ink-2);display:flex;align-items:center;gap:5px;margin-top:8px}
+.auton b{color:var(--ink);font-weight:700}
+.auton--gate{font-family:var(--mono);font-size:11.5px;color:var(--ink-3);margin-top:8px}
+
+/* GATE */
+.gate{margin-top:4px}
+.g{font-size:13.5px;padding:7px 0;display:flex;align-items:center;gap:8px;flex-wrap:wrap;color:var(--ink);border-bottom:1px dashed var(--line)}
+.g:last-child{border-bottom:0}
+.gate-foot{font-size:11.5px;color:var(--ink-3);font-style:italic;margin-top:8px}
+
+/* TILES */
+.tiles{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
+.tile{background:var(--card);border:1px solid var(--line);border-radius:var(--r-md);padding:16px 18px}
+.tnum{font-family:var(--mono);font-size:30px;font-weight:700;color:var(--ink);line-height:1.1;font-variant-numeric:tabular-nums}
+.tlab{font-size:11.5px;font-weight:700;text-transform:uppercase;letter-spacing:.12em;color:var(--ink-3);margin-top:6px}
+.tdelta{margin-top:10px}
+
+/* CANVAS */
+.s3-canvas{display:none;grid-template-columns:270px 1fr 250px;gap:0;border-top:1px solid var(--line);background:var(--card)}
+.s3-canvas.on{display:grid}
+.s3-canvas .ctx,.s3-canvas .work,.s3-canvas .acts{padding:22px 24px}
+.s3-canvas .ctx{border-right:1px solid var(--line)}
+.s3-canvas .acts{border-left:1px solid var(--line)}
+.ctx .pname{font-family:var(--serif);font-size:24px;font-weight:600;color:var(--ink)}
+.ctx .pmeta{font-family:var(--mono);font-size:12.5px;color:var(--ink-3);margin-top:4px;font-variant-numeric:tabular-nums}
+.hchip{display:inline-block;background:var(--well);font-size:12px;border-radius:var(--r-sm);margin:3px 3px 0 0;padding:3px 8px;color:var(--ink-2)}
+.work h4{font-size:11.5px;font-weight:700;text-transform:uppercase;letter-spacing:.12em;color:var(--ink-3);margin-bottom:10px}
+.work p{font-size:13.5px;color:var(--ink-2);line-height:1.6;margin-top:10px}
+.acts .btn{width:100%;display:flex;justify-content:center;margin-bottom:8px}
+
+/* MA LANES */
+.lane{display:flex;align-items:center;gap:14px;padding:8px 0}
+.lname{width:120px;flex:0 0 120px;font-size:13px;font-weight:650;color:var(--ink)}
+.lrail{flex:1;position:relative;height:54px;border-bottom:1px solid var(--line)}
+.mev{position:absolute;top:8px;padding:4px 8px;border-radius:6px;font-size:11.5px;font-weight:600;white-space:nowrap}
+.mev--done{background:transparent;color:var(--ink-3);border:1px solid var(--line-2)}
+.mev--now{background:var(--act-soft);color:var(--act);border:1px solid var(--act)}
+.mev--next{background:transparent;color:var(--ink-2);border:1px dashed var(--line-2)}
+.mev--warn{background:var(--warn-soft);color:var(--warn);border:1px solid var(--warn)}
+
+@media (max-width:1080px){
+  .s3-canvas.on{grid-template-columns:1fr}
+  .s3-canvas .ctx{border-right:0;border-bottom:1px solid var(--line)}
+  .s3-canvas .acts{border-left:0;border-top:1px solid var(--line)}
+  .s3-rail{overflow-x:auto}
+  .tiles{grid-template-columns:repeat(2,1fr)}
+}
+.g--met::before{content:"✓";color:var(--ok);font-weight:800;flex:0 0 auto}
+.g--miss::before{content:"○";color:var(--crit);font-weight:800;flex:0 0 auto}
+</style>
+<!-- part 04: pins / notes / realstrip / ledger / swatches / phone / responsive, then body open + page header -->
+<style>
+/* PINS + NOTES (rationale layer) */
+.s3-pin{display:none;width:18px;height:18px;flex:0 0 auto;border-radius:50%;background:var(--ember);color:var(--paper);font-size:11px;font-weight:800;align-items:center;justify-content:center;cursor:default;vertical-align:middle}
+body.show-notes .s3-pin{display:inline-flex}
+
+.s3-note{display:none;background:#fdf8f3;border:1px solid var(--line-2);border-left:3px solid var(--ember);border-radius:var(--r-sm);padding:12px 16px;margin:14px 0;font-size:13px;line-height:1.6;color:var(--ink-2)}
+body.show-notes .s3-note{display:block}
+.s3-note .nnum{font-family:var(--mono);font-weight:800;color:var(--ember)}
+
+/* WHAT'S-REAL layer */
+.rt,.rt-inline{display:inline-flex;align-items:center;gap:5px;font-size:11.5px;font-weight:650;color:var(--ink-2)}
+.rt::before,.rt-inline::before{content:"●";font-size:9px}
+.rt--exists::before{color:var(--ok)}
+.rt--extend::before{color:var(--warn)}
+.rt--new::before{color:var(--ai)}
+.rt-inline{display:none;margin-top:6px}
+body.show-real .rt-inline{display:inline-flex}
+
+.s3-realstrip{display:none;gap:10px;padding:12px 26px;border-top:1px dashed var(--line-2);background:var(--well);flex-wrap:wrap}
+body.show-real .s3-realstrip{display:flex}
+
+/* LEDGER — reused as a generic simple table (departure ledger + PM site table),
+   kept neutral rather than position-colored so it reads correctly in both contexts */
+.ledger,.loop-table{font-size:13.5px;width:100%}
+.ledger th,.loop-table th{font-size:11.5px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--ink-3);text-align:left;padding:8px 12px;border-bottom:1px solid var(--line-2)}
+.ledger td,.loop-table td{padding:10px 12px;border-bottom:1px solid var(--line);color:var(--ink-2);vertical-align:top}
+.ledger tr:last-child td,.loop-table tr:last-child td{border-bottom:0}
+.ledger td:first-child,.loop-table td:first-child{color:var(--ink);font-weight:650}
+
+/* SWATCHES (fallback base — part-12 defines its own local sw-row/sw-block/sw-name/sw-hex) */
+.sw{display:flex;align-items:center;gap:10px;padding:8px 0;flex-wrap:wrap}
+.sw .blk{width:44px;height:44px;border-radius:var(--r-sm);border:1px solid var(--line)}
+.sw .name{font-family:var(--mono);font-size:12px;color:var(--ink)}
+.sw .hex{font-size:11px;color:var(--ink-3)}
+
+/* PATIENT OVERLAY */
+.s3-phone{display:none;position:fixed;inset:0;background:rgba(31,36,48,.45);align-items:center;justify-content:center;z-index:50;padding:20px}
+body.show-phone .s3-phone{display:flex}
+.phone{width:340px;max-width:100%;border-radius:26px;background:var(--card);box-shadow:var(--elev-2);padding:22px;position:relative}
+.phone::before{content:"";display:block;width:56px;height:5px;border-radius:var(--pill);background:var(--line-2);margin:0 auto 18px}
+.phone h3{margin-top:6px}
+.phone .btn{margin-top:16px;width:100%;justify-content:center}
+
+@media (max-width:1080px){
+  .s3-realstrip{padding:12px 16px}
+}
+@media (max-width:640px){
+  .wrap,.sect{padding:0 18px}
+  .pagehead{padding-top:36px}
+}
+</style>
+</head>
+<body data-role="op">
+<div class="wrap">
+  <div class="pagehead">
+    <div>
+      <p class="eyebrow">SEVARO SYNAPSE LAB · CONCEPT · JUL 21, 2026</p>
+      <h1>Synapse 3.0 — One Surface</h1>
+    </div>
+    <div class="tglrow">
+      <button type="button" class="tgl" id="tglNotes" aria-pressed="false">✎ Design rationale</button>
+      <button type="button" class="tgl" id="tglReal" aria-pressed="false">◈ What's real</button>
+    </div>
+  </div>
+  <p class="dek">Acute, scribe, and outpatient aren't three products. They're one loop — something arrives, intelligence enriches it, a clinician decides, the work files, the follow-through is tracked — run at eight different timescales. Synapse 3.0 is that loop given one surface: a time spine every role reads at their own zoom.</p>
+  <p class="tglhint">Rationale pins explain the design decisions. What's-real maps every element to EXISTS / EXTEND / NEW against today's products.</p>
+  <p class="provenance">A concept exploration uniting the acute time-rail, the scribe platform, and the outpatient tool set. Fictional data throughout.</p>
+</div>
+<!-- part 05: thesis -->
+<section class="sect">
+  <p class="eyebrow">THE ARGUMENT</p>
+  <h2>One loop, eight timescales <span class="s3-pin">1</span></h2>
+
+  <svg viewBox="0 0 980 120" width="100%" role="img" aria-label="Loop diagram: arrives, then enriched, then decided by a human, then filed, then tracked, looping back to arrives via follow-through">
+    <title>One loop: arrives → enriched → decided → filed → tracked → (follow-through) → arrives</title>
+    <defs>
+      <marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse">
+        <path d="M0,0 L10,5 L0,10 z" style="fill:var(--ink-3)"></path>
+      </marker>
+    </defs>
+
+    <path d="M874,58 C874,106 106,106 106,58" style="fill:none;stroke:var(--ink-3);stroke-width:1.5" stroke-dasharray="4 4" marker-end="url(#arrow)"></path>
+    <text x="490" y="116" text-anchor="middle" style="font:600 10px var(--sans);letter-spacing:.04em;fill:var(--ink-3)">follow-through</text>
+
+    <line x1="174" y1="39" x2="224" y2="39" style="stroke:var(--ink-3);stroke-width:2" marker-end="url(#arrow)"></line>
+    <line x1="366" y1="39" x2="416" y2="39" style="stroke:var(--ink-3);stroke-width:2" marker-end="url(#arrow)"></line>
+    <line x1="558" y1="39" x2="608" y2="39" style="stroke:var(--ink-3);stroke-width:2" marker-end="url(#arrow)"></line>
+    <line x1="750" y1="39" x2="800" y2="39" style="stroke:var(--ink-3);stroke-width:2" marker-end="url(#arrow)"></line>
+
+    <rect x="38" y="20" width="136" height="38" rx="10" style="fill:var(--card);stroke:var(--ink-2);stroke-width:1.4"></rect>
+    <text x="106" y="43.5" text-anchor="middle" style="font:650 13px var(--sans);fill:var(--ink)">arrives</text>
+
+    <rect x="230" y="20" width="136" height="38" rx="10" style="fill:var(--card);stroke:var(--ai);stroke-width:1.6"></rect>
+    <text x="298" y="43.5" text-anchor="middle" style="font:650 13px var(--sans);fill:var(--ai)">✦ enriched</text>
+
+    <rect x="422" y="20" width="136" height="38" rx="10" style="fill:var(--ink);stroke:var(--ink);stroke-width:1.4"></rect>
+    <text x="490" y="43.5" text-anchor="middle" style="font:650 13px var(--sans);fill:var(--paper)">decided</text>
+    <text x="490" y="71" text-anchor="middle" style="font:9.5px var(--sans);fill:var(--ink-3)">always a human</text>
+
+    <rect x="614" y="20" width="136" height="38" rx="10" style="fill:var(--card);stroke:var(--ink-2);stroke-width:1.4"></rect>
+    <text x="682" y="43.5" text-anchor="middle" style="font:650 13px var(--sans);fill:var(--ink)">filed</text>
+    <rect x="634" y="63" width="96" height="15" rx="4" style="fill:var(--act-soft);stroke:var(--act);stroke-width:1"></rect>
+    <text x="682" y="73.5" text-anchor="middle" style="font:700 8.5px var(--mono);fill:var(--act)">OURS → EPIC</text>
+
+    <rect x="806" y="20" width="136" height="38" rx="10" style="fill:var(--card);stroke:var(--ink-2);stroke-width:1.4"></rect>
+    <text x="874" y="43.5" text-anchor="middle" style="font:650 13px var(--sans);fill:var(--ink)">tracked</text>
+  </svg>
+
+  <table class="loop-table">
+    <thead>
+      <tr><th>Role</th><th>Timescale</th><th>Unit of work</th><th>Verbs</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>Acute neurologist</td><td>Minutes (LKW-anchored)</td><td>The consult</td><td>activate, order, document, sign</td></tr>
+      <tr><td>Neuro hospitalist</td><td>Half-day blocks</td><td>The rounding list</td><td>round, reconcile, handoff</td></tr>
+      <tr><td>EEG reader</td><td>Study queue (SLA hours)</td><td>The study</td><td>read, report, link, sign</td></tr>
+      <tr><td>Clinic neurologist</td><td>A clinic day</td><td>The encounter</td><td>prep, see, sign, route</td></tr>
+      <tr><td>Triage nurse</td><td>Continuous (contact age)</td><td>The inbound contact</td><td>triage, schedule, escalate, close the loop</td></tr>
+      <tr><td>Medical assistant</td><td>Real-time flow</td><td>The rooming step</td><td>room, capture, complete, flag</td></tr>
+      <tr><td>Practice manager</td><td>Day / week</td><td>The exception</td><td>rebalance, staff, intervene</td></tr>
+      <tr><td>Patient</td><td>Episodic → years</td><td>Their own story</td><td>share, confirm, follow</td></tr>
+    </tbody>
+  </table>
+
+  <div class="s3-note"><span class="nnum">N1 — </span>Eight rows, one architecture. What changes between roles is zoom, unit of work, and verbs — not the system. This table is the whole pitch; everything below is it, rendered. Rows can share one human: acute + rounds + reads is a single rostered day.</div>
+</section>
+<!-- part 06a: acute lens (demo frame open + chrome + rail) -->
+<style>/* lens-local */
+.acuteclock{position:absolute;left:38%;bottom:100%;transform:translateX(-50%);width:210px;margin-bottom:8px;text-align:center;line-height:1.3}
+.acuteclock .actime{display:block;font:700 30px var(--mono);color:var(--ember)}
+.acuteclock .acrem{display:block;font-size:11px;color:var(--ink-2)}
+.acuteclock .acdtn{display:block;font-size:11px;color:var(--ink-3)}
+.acuteclock .s3-pin{position:absolute;top:-6px;right:-6px}
+.cbar{height:6px;background:var(--well);border-radius:var(--pill);overflow:hidden;margin:10px 0 4px}
+.cbarfill{display:block;height:100%;background:var(--ok)}
+.capnote{font-size:11.5px;color:var(--ink-3);margin:4px 0 10px}
+.textwell{background:var(--well);border:1px solid var(--line-2);border-radius:var(--r-sm);padding:12px 14px;font-size:13.5px;color:var(--ink-2);margin:10px 0}
+.textwell--quote{font-style:italic}
+.s3-lens[data-role="acute"] .s3-track{margin-top:64px}
+.s3-lens[data-role="acute"] .s3-zoom{text-align:left}
+</style>
+<div class="s3-frame" id="demo">
+  <div class="s3-chrome">
+    <div class="s3-brand">
+      <span class="s3-mark">S3</span>
+      <span class="s3-word">Synapse 3</span>
+      <span class="s3-ctx">Riverview Neurology · Wed Jul 22 · 11:02</span>
+    </div>
+    <div class="s3-roles">
+      <button type="button" class="seg" data-role-btn="acute" aria-selected="false">Acute</button>
+      <button type="button" class="seg" data-role-btn="hosp" aria-selected="false">Rounds</button>
+      <button type="button" class="seg" data-role-btn="eeg" aria-selected="false">EEG Read</button>
+      <button type="button" class="seg" data-role-btn="op" aria-selected="true">Clinic MD</button>
+      <button type="button" class="seg" data-role-btn="triage" aria-selected="false">Triage RN</button>
+      <button type="button" class="seg" data-role-btn="ma" aria-selected="false">MA Flow</button>
+      <button type="button" class="seg" data-role-btn="pm" aria-selected="false">Manager</button>
+      <button type="button" class="seg seg--ghost" data-role-btn="patient">✦ Patient</button>
+    </div>
+    <span class="s3-dial">✦ Autonomy: tuned</span><span class="s3-pin">5</span>
+    <span class="s3-user"><span class="initial">SC</span><span class="uname">Dr. S. Chen</span></span>
+    <span class="s3-stack" id="rolestack">today: clinic</span><span class="s3-pin">15</span>
+  </div>
+  <div class="s3-note"><span class="nnum">N15 — </span>Roles are rostered per day. Acute + rounds + reads is a legal combination; reads stack onto either side; inpatient and clinic never share a daytime — the schedule doesn't fit. The role-stack chip shows which hats this login wears today; switching lenses never re-authenticates.</div>
+  <div class="s3-note"><span class="nnum">N5 — </span>Per-engine autonomy — Draft → Queue → File+audit. The dial makes governance visible instead of burying it in settings. The deterministic safety gate deliberately has no dial.</div>
+
+  <section class="s3-lens" data-role="acute">
+    <div class="s3-rail">
+      <div class="s3-zoom">ACUTE ZOOM · LKW 09:58 · minute scale <span class="s3-pin">7</span></div>
+      <div class="s3-track">
+        <div class="s3-now"></div>
+        <div class="acuteclock"><span class="s3-pin">2</span>
+          <span class="actime">2:56</span>
+          <span class="acrem">remaining in 4.5h window</span>
+          <span class="acdtn">door-to-needle if treated now: 40 min · target &lt; 60</span>
+        </div>
+        <div class="s3-ev ev--filed" style="left:8%"><span class="dot"></span><span class="lbl">09:58<br>LKW</span><span class="sub">witnessed onset</span></div>
+        <div class="s3-ev ev--filed ev--up" style="left:14%"><span class="dot"></span><span class="lbl">10:22<br>ED arrival</span><span class="sub">Mercy General</span></div>
+        <div class="s3-ev ev--filed" style="left:20%"><span class="dot"></span><span class="lbl">10:34<br>CT head</span><span class="sub">no hemorrhage · ASPECTS 9</span></div>
+        <div class="s3-ev ev--filed ev--up" style="left:26%"><span class="dot"></span><span class="lbl">10:41<br>Labs drawn</span><span class="sub">glucose pending</span></div>
+        <div class="s3-ev ev--crit" style="left:31%"><span class="dot"></span><span class="lbl">10:47<br>Consult — you</span><span class="sub">NIHSS 11</span></div>
+        <div class="s3-ev ev--ai ev--up" style="left:37%"><span class="dot"></span><span class="lbl">10:52<br>✦ CT read draft</span><span class="sub">queued for over-read</span></div>
+        <div class="s3-ev ev--future" style="left:46%"><span class="dot"></span><span class="lbl">11:10<br>CTA result</span><span class="sub">expected</span></div>
+        <div class="s3-ev ev--future" style="left:58%"><span class="dot"></span><span class="lbl">11:25<br>Decision point</span><span class="sub">criteria review</span></div>
+      </div>
+      <div class="s3-note"><span class="nnum">N7 — </span>This zoom level IS the parked Synapse 3.0 time-rail — LKW anchor, offsets, derived door-to-needle. The parked exploration didn't die; it turned out to be the seed of the whole information architecture. (its clock header + gates + detail cards became Rail → Band → Card, platform-wide)</div>
+      <div class="s3-note"><span class="nnum">N2 — </span>'The clock is the organizing principle, not the modality' — written about stroke codes, promoted to the platform spine. Every lens is a zoom preset on one plane; past files left, work approaches from the right.</div>
+    </div>
+<!-- part 06b: acute lens (band + canvas + realstrip, closes section) -->
+    <div class="s3-band">
+      <div class="bcard bcard--top" data-canvas="cv-acute-1">
+        <div class="brow"><span class="chip chip--crit">▲ STROKE CODE</span><span class="bage">+15 min</span></div>
+        <div class="bname">Walter Simmons · 71M</div>
+        <div class="bask">Criteria review blocked by 2 items — glucose, anticoag hx</div>
+        <div class="bverbs"><button type="button" class="btn btn--pri">Open workup</button><button type="button" class="btn btn--ghost">Call ED back</button></div>
+      </div>
+      <div class="bcard">
+        <div class="brow"><span class="chip chip--ai">✦ DRAFT</span><span class="bage">+10 min</span></div>
+        <div class="bname">CT over-read</div>
+        <div class="bask">✦ radiology draft awaiting your co-sign</div>
+        <div class="bverbs"><button type="button" class="btn btn--ghost">Review draft</button></div>
+      </div>
+      <div class="bcard">
+        <div class="brow"><span class="chip chip--time">⏱ NEXT</span><span class="bage">in 8 min</span></div>
+        <div class="bname">CTA result expected</div>
+        <div class="bask">auto-lands on this rail when resulted</div>
+      </div>
+    </div>
+    <span class="s3-pin">3</span>
+    <div class="s3-note"><span class="nnum">N3 — </span>Temporal position under-orders priority, so the region around now renders as a ranked attention band — the worklist absorbed into the timeline's geometry. Rail answers when; the band answers what needs you.</div>
+
+    <div class="s3-canvas on" id="cv-acute-1">
+      <div class="ctx">
+        <div class="pname">Walter Simmons</div>
+        <div class="pmeta">71M · MRN F-204871 (fictional) · Mercy General ED</div>
+        <span class="hchip">HTN</span>
+        <span class="hchip">AFib — hx unclear</span>
+        <span class="hchip">apixaban Rx 2024? ✦ found in outside record</span>
+        <span class="hchip">NIHSS 11 @ 10:47</span>
+        <span class="hchip">BP 168/94</span>
+      </div>
+      <div class="work">
+        <h4>THROMBOLYSIS CRITERIA — DISPLAY ONLY</h4>
+        <div class="gate">
+          <div class="g g--met">Within treatment window — LKW +64 min</div>
+          <div class="g g--met">Disabling deficit documented — NIHSS 11</div>
+          <div class="g g--met">CT: no hemorrhage · ASPECTS 9</div>
+          <div class="g g--miss">Serum glucose — pending <span class="chip chip--crit">BLOCKS REVIEW</span></div>
+          <div class="g g--miss">Anticoagulant use — unconfirmed (✦ apixaban Rx flagged from outside record — verify with family) <span class="chip chip--crit">BLOCKS REVIEW</span></div>
+          <div class="g g--met">Platelets — resulted 10:59, within range</div>
+          <div class="gate-foot">Criteria checklist · decision support only · not an eligibility determination · ruleset v0 — ownership TBD</div>
+        </div>
+        <span class="s3-pin">6</span>
+        <div class="s3-note"><span class="nnum">N6 — </span>Criteria, never verdicts — carried verbatim from the parked doc. Missing data is a first-class state: the gate renders what blocks review, not a recommendation. The unanswered question from that doc stands: who owns this ruleset, with a version and a review cadence?</div>
+      </div>
+      <div class="acts">
+        <button type="button" class="btn btn--pri">Document decision</button>
+        <button type="button" class="btn btn--act">Order set — opens in EHR</button>
+        <span class="pill pill--epic">EPIC</span>
+        <button type="button" class="btn btn--ghost">Consult note → Mercy</button>
+        <span class="pill pill--ours">OURS</span> → <span class="pill pill--final">EPIC · FINAL</span>
+        <div class="auton">✦ scribe — <b>File+audit</b></div>
+        <div class="auton">✦ CT draft — <b>Queue</b></div>
+        <div class="auton--gate">gate: deterministic — no dial</div>
+      </div>
+    </div>
+
+    <div class="s3-realstrip">
+      <span class="rt rt--exists">EXISTS · stroke timeline data model (Synapse)</span>
+      <span class="rt rt--exists">EXISTS · tele-consult workflow</span>
+      <span class="rt rt--extend">EXTEND · criteria gates (ruleset governance)</span>
+      <span class="rt rt--new">NEW · fused clock-rail chrome</span>
+    </div>
+  </section>
+<!-- part 06x: neuro hospitalist (rounds) lens -->
+<style>/* lens-local: hosp + eeg */
+.s3-stack{font:11.5px/1 var(--mono);color:var(--ink-3);border:1px solid var(--line);border-radius:999px;padding:5px 10px;white-space:nowrap}
+body[data-role="hosp"] .s3-lens[data-role="hosp"]{display:block}
+body[data-role="eeg"] .s3-lens[data-role="eeg"]{display:block}
+.cptwell{background:var(--well);border:1px solid var(--line-2);border-radius:var(--r-sm);padding:12px 14px;font:12.5px var(--mono);color:var(--ink-2);margin:10px 0}
+</style>
+<section class="s3-lens" data-role="hosp">
+  <div class="s3-rail">
+    <div class="s3-zoom">ROUNDING ZOOM · census 9 · Mercy General ICU + 4W</div>
+    <div class="s3-track">
+      <div class="s3-now"><span class="tag">NOW 11:02</span></div>
+      <div class="s3-ev ev--filed" style="left:8%"><span class="dot"></span><span class="lbl">07:40<br>ICU huddle</span><span class="sub">9 on list · 2 new overnight</span></div>
+      <div class="s3-ev ev--filed" style="left:15%"><span class="dot"></span><span class="lbl">08:10<br>ICU-3 Novak</span><span class="sub">✓ seen · cEEG day 2</span></div>
+      <div class="s3-ev ev--filed ev--up" style="left:21%"><span class="dot"></span><span class="lbl">08:50<br>4W-12 Grant</span><span class="sub">✓ seen · post-thrombectomy d1</span></div>
+      <div class="s3-ev ev--filed" style="left:27%"><span class="dot"></span><span class="lbl">09:30<br>4W-15 Baptiste</span><span class="sub">✓ seen · MG flare, improving</span></div>
+      <div class="s3-ev ev--ai ev--up" style="left:32%"><span class="dot"></span><span class="lbl">10:31<br>✦ cEEG event</span><span class="sub">Novak — flagged by reader</span></div>
+      <div class="s3-ev ev--crit" style="left:36%"><span class="dot"></span><span class="lbl">10:47<br>Acute consult</span><span class="sub">rounds paused · 3 of 9 left</span></div>
+      <div class="s3-ev ev--future" style="left:47%"><span class="dot"></span><span class="lbl">11:40<br>Resume rounds</span><span class="sub">next: 4W-20 Ferreira</span></div>
+      <div class="s3-ev ev--future ev--up" style="left:58%"><span class="dot"></span><span class="lbl">12:15<br>✦ discharge draft</span><span class="sub">Grant — review queued</span></div>
+      <div class="s3-ev ev--future" style="left:70%"><span class="dot"></span><span class="lbl">14:00<br>Family meeting</span><span class="sub">Novak · ICU consult room</span></div>
+    </div>
+  </div>
+
+  <div class="s3-band">
+    <div class="bcard bcard--top" data-canvas="cv-hosp-1">
+      <div class="brow"><span class="chip chip--act">CENSUS</span><span class="bage">3 of 9 left</span></div>
+      <div class="bname">Resume rounds — 4W-20 Ferreira next</div>
+      <div class="bask">paused 10:47 for the acute consult · est. resume 11:40</div>
+      <div class="bverbs"><button type="button" class="btn btn--pri">Open list</button><button type="button" class="btn btn--ghost">Handoff view</button></div>
+    </div>
+    <div class="bcard">
+      <div class="brow"><span class="chip chip--ai">✦ DRAFT</span><span class="bage">12:15</span></div>
+      <div class="bname">Grant discharge summary</div>
+      <div class="bask">drafted from rounds dictation — review before 4W accepts</div>
+      <div class="bverbs"><button type="button" class="btn btn--ghost">Review</button></div>
+    </div>
+    <div class="bcard">
+      <div class="brow"><span class="chip chip--warn">● EVENT</span><span class="bage">10:31</span></div>
+      <div class="bname">Novak cEEG flag</div>
+      <div class="bask">✦ reader flagged a burst — linked here and to the chart</div>
+      <div class="bverbs"><button type="button" class="btn btn--ghost">Open study</button></div>
+    </div>
+  </div>
+
+  <div class="s3-canvas on" id="cv-hosp-1">
+    <div class="ctx">
+      <div class="pname">Mercy census</div>
+      <div class="pmeta">9 patients · ICU 3 · 4W 6 · Dr. R. Vega</div>
+      <span class="hchip">2 new overnight</span>
+      <span class="hchip">1 discharge today (Grant)</span>
+      <span class="hchip">cEEG running: 1 (Novak)</span>
+      <span class="hchip">acute consult active (Simmons)</span>
+    </div>
+    <div class="work">
+      <h4>ROUNDING LIST — SEEN / TO SEE</h4>
+      <div class="gate">
+        <div class="g">ICU-1 · R. Okonkwo · vasospasm watch d4 · ✓ 07:55</div>
+        <div class="g">ICU-2 · P. Marsh · post-arrest — cEEG pending · ✓ 08:05</div>
+        <div class="g">ICU-3 · T. Novak · status epilepticus — cEEG d2 · ✦ event 10:31 · ✓ 08:10</div>
+        <div class="g">4W-12 · H. Grant · post-thrombectomy d1 — d/c planned · ✓ 08:50</div>
+        <div class="g">4W-15 · L. Baptiste · MG flare, improving · ✓ 09:30</div>
+        <div class="g">4W-18 · S. Whitcomb · new-onset seizure w/u · ✓ 10:15</div>
+        <div class="g">4W-20 · M. Ferreira · TIA obs <span class="chip chip--act">NEXT</span></div>
+        <div class="g">4W-22 · D. Aluko · migraine status obs · to see</div>
+        <div class="g">4W-24 · C. Reyes · consult f/u · to see</div>
+      </div>
+    </div>
+    <div class="acts">
+      <button type="button" class="btn btn--pri">Resume rounds</button>
+      <button type="button" class="btn btn--ghost">✦ Handoff note — draft</button>
+      <button type="button" class="btn btn--ghost">Message ICU charge</button>
+      <span class="pill pill--ours">worklist: OURS</span>
+      <span class="pill pill--epic">orders: EPIC</span>
+      <div class="auton">✦ rounding scribe — <b>File+audit</b></div>
+      <div class="auton">✦ discharge drafts — <b>Queue</b></div>
+    </div>
+  </div>
+
+  <div class="s3-realstrip">
+    <span class="rt rt--exists">EXISTS · rounding workflows (Synapse queues, multi-patient rounding)</span>
+    <span class="rt rt--extend">EXTEND · census sync by paste (Epic-hybrid)</span>
+    <span class="rt rt--new">NEW · cross-hat continuity — code ↔ rounds ↔ reads on one rail</span>
+  </div>
+</section>
+<!-- part 06y: EEG reader lens -->
+<section class="s3-lens" data-role="eeg">
+  <div class="s3-rail">
+    <div class="s3-zoom">READ QUEUE ZOOM · study age · STAT SLA 1h · routine 4h</div>
+    <div class="s3-track">
+      <div class="s3-now"><span class="tag">NOW 11:02</span></div>
+      <div class="s3-ev ev--filed" style="left:8%"><span class="dot"></span><span class="lbl">08:20<br>Whitfield amb-EEG</span><span class="sub">✓ signed → linked to 11:15 clinic visit</span></div>
+      <div class="s3-ev ev--filed ev--up" style="left:16%"><span class="dot"></span><span class="lbl">09:05<br>Routine — Lakewood</span><span class="sub">✓ signed</span></div>
+      <div class="s3-ev ev--filed" style="left:24%"><span class="dot"></span><span class="lbl">10:15<br>Ceribell — ICU-2 Marsh</span><span class="sub">✓ signed · post-arrest</span></div>
+      <div class="s3-ev ev--ai ev--up" style="left:31%"><span class="dot"></span><span class="lbl">10:31<br>✦ cEEG event — Novak</span><span class="sub">burst flag → pushed to rounds</span></div>
+      <div class="s3-ev ev--crit" style="left:36%"><span class="dot"></span><span class="lbl">10:47<br>Acute consult</span><span class="sub">queue paused</span></div>
+      <div class="s3-ev ev--due" style="left:45%"><span class="dot"></span><span class="lbl">11:20<br>STAT Ceribell — ED</span><span class="sub">SLA 1h · due while in code</span></div>
+      <div class="s3-ev ev--future" style="left:60%"><span class="dot"></span><span class="lbl">12:30<br>Routine ×4</span><span class="sub">oldest 2.9h</span></div>
+      <div class="s3-ev ev--future ev--up" style="left:74%"><span class="dot"></span><span class="lbl">15:00<br>Novak cEEG daily read</span><span class="sub">day-2 report</span></div>
+    </div>
+  </div>
+
+  <div class="s3-band">
+    <div class="bcard bcard--top" data-canvas="cv-eeg-1">
+      <div class="brow"><span class="chip chip--crit">▲ STAT</span><span class="bage">due 11:20</span></div>
+      <div class="bname">ED Ceribell — new patient</div>
+      <div class="bask">SLA at risk — you're in a code · suggested: reassign → Dr. Imai</div>
+      <div class="bverbs"><button type="button" class="btn btn--pri">Open study</button><button type="button" class="btn btn--ghost">Reassign → Imai</button></div>
+    </div>
+    <div class="bcard" data-canvas="cv-eeg-2">
+      <div class="brow"><span class="chip chip--ai">✦ FLAG</span><span class="bage">10:31</span></div>
+      <div class="bname">Novak cEEG burst</div>
+      <div class="bask">auto-flag queued into the day-2 report · linked to rounds</div>
+      <div class="bverbs"><button type="button" class="btn btn--ghost">Review flag</button></div>
+    </div>
+    <div class="bcard">
+      <div class="brow"><span class="chip chip--time">⏱ QUEUE</span></div>
+      <div class="bname">4 routine reads</div>
+      <div class="bask">oldest 2.9h · target 4h</div>
+    </div>
+  </div>
+
+  <div class="s3-canvas on" id="cv-eeg-1">
+    <div class="ctx">
+      <div class="pname">ED Ceribell</div>
+      <div class="pmeta">new patient · hookup 10:35 · ordered by ED (Dr. Song)</div>
+      <span class="hchip">indication: unresponsive — ? NCSE</span>
+      <span class="hchip">STAT · SLA 1h</span>
+      <span class="hchip">prior studies: none on file</span>
+    </div>
+    <div class="work">
+      <h4>REPORT — STRUCTURED BUILDER</h4>
+      <div class="gate">
+        <div class="g g--met">Background — sentence-built (library)</div>
+        <div class="g g--met">Technical — Ceribell montage · quality adequate</div>
+        <div class="g g--miss">Events + Impression — reader required <span class="chip chip--crit">UNREAD</span></div>
+      </div>
+      <div class="cptwell">CPT — computed deterministically by the coding engine on sign · hard stops enforced</div>
+      <div class="capnote">rules, not a model — same architecture as the triage gateway</div>
+    </div>
+    <div class="acts">
+      <button type="button" class="btn btn--pri">Read now</button>
+      <button type="button" class="btn btn--act">Reassign → Dr. Imai</button>
+      <button type="button" class="btn btn--ghost">Call ED</button>
+      <span class="pill pill--ours">report: OURS</span>
+      <div class="capnote">signed report links: chart · rounds · clinic</div>
+      <div class="auton">✦ pre-read — <b>Draft</b></div>
+      <div class="auton--gate">CPT engine: deterministic — no dial</div>
+    </div>
+  </div>
+
+  <div class="s3-canvas" id="cv-eeg-2">
+    <div class="ctx">
+      <div class="pname">T. Novak</div>
+      <div class="pmeta">ICU-3 · cEEG day 2 · status epilepticus f/u</div>
+      <span class="hchip">✦ burst flag 10:31</span>
+      <span class="hchip">cEEG since Mon</span>
+      <span class="hchip">daily read due 15:00</span>
+    </div>
+    <div class="work">
+      <h4>✦ EVENT FLAG — QUEUED TO DAY-2 REPORT</h4>
+      <p>Auto-flag: rhythmic burst 10:31:12–10:31:47 — queued for reader confirmation, pushed to the rounding list and the chart.</p>
+      <div class="brow">
+        <span class="chip chip--ai">✦ unconfirmed</span>
+        <span class="chip chip--act">linked: rounds · chart</span>
+      </div>
+      <div class="capnote">flags are drafts — nothing enters the record until the reader signs the daily report.</div>
+    </div>
+    <div class="acts">
+      <button type="button" class="btn btn--ghost">Open full study</button>
+      <button type="button" class="btn btn--ghost">Dismiss flag (logged)</button>
+      <div class="auton">✦ event detection — <b>Queue</b></div>
+    </div>
+  </div>
+
+  <div class="s3-realstrip">
+    <span class="rt rt--exists">EXISTS · EEG Report Builder — sentence library + deterministic CPT (eeg.neuroplans.app)</span>
+    <span class="rt rt--extend">EXTEND · signed-report auto-linking (chart · rounds · clinic)</span>
+    <span class="rt rt--new">NEW · ✦ pre-read + event flags + SLA queue rail</span>
+  </div>
+</section>
+<!-- part 07: clinic md (op) lens -->
+<section class="s3-lens" data-role="op">
+  <div class="s3-rail">
+    <div class="s3-zoom">CLINIC DAY ZOOM · 08:00 – 17:00</div>
+    <div class="s3-track">
+      <div class="s3-now"><span class="tag">NOW 11:02</span></div>
+      <div class="s3-ev ev--filed" style="left:8%"><span class="dot"></span><span class="lbl">08:00<br>L. Martinez</span><span class="sub">✓ filed 08:26 · Parkinson's f/u</span></div>
+      <div class="s3-ev ev--filed ev--up" style="left:15%"><span class="dot"></span><span class="lbl">08:30<br>C. Delgado</span><span class="sub">no-show → task</span></div>
+      <div class="s3-ev ev--filed" style="left:23%"><span class="dot"></span><span class="lbl">09:00<br>J. Whitfield</span><span class="sub">note in queue</span></div>
+      <div class="s3-ev ev--filed ev--up" style="left:29%"><span class="dot"></span><span class="lbl">09:30<br>G. Okafor</span><span class="sub">✓ filed · post-stroke f/u</span></div>
+      <div class="s3-ev ev--due" style="left:41%"><span class="dot"></span><span class="lbl">11:15<br>E. Park</span><span class="sub">✦ prep ready</span></div>
+      <div class="s3-ev ev--future ev--up" style="left:52%"><span class="dot"></span><span class="lbl">11:45<br>M. Tran</span><span class="sub">prep pending</span></div>
+      <div class="s3-ev ev--future" style="left:62%"><span class="dot"></span><span class="lbl">13:30<br>P. Sandoval</span><span class="sub">MS infusion check</span></div>
+      <div class="s3-ev ev--future ev--up" style="left:72%"><span class="dot"></span><span class="lbl">14:30<br>D. Kling</span><span class="sub">same-day · booked by triage 10:41</span></div>
+      <div class="s3-ev ev--future" style="left:84%"><span class="dot"></span><span class="lbl">16:15<br>panel review</span><span class="sub">✦ 3 drafts will queue</span></div>
+    </div>
+    <span class="s3-pin">4</span>
+    <div class="s3-note"><span class="nnum">N4 — </span>AI outputs land as events — the historian interview, the drafted note, the CT read arrive on the rail like lab results. No chat box as the primary metaphor: the engines work ambiently and their finished work lands in time, reviewed at the now-line. This is the prompting-direction departure from 2.0.</div>
+  </div>
+
+  <div class="s3-band">
+    <div class="bcard bcard--top" data-canvas="cv-op-1">
+      <div class="brow"><span class="chip chip--act">NEXT VISIT</span><span class="bage">11:15</span></div>
+      <div class="bname">Evelyn Park · 34F</div>
+      <div class="bask">New migraine consult — ✦ prep brief ready, 3 flags</div>
+      <div class="bverbs"><button type="button" class="btn btn--pri">Open prep</button><button type="button" class="btn btn--ghost">Start visit</button></div>
+    </div>
+    <div class="bcard" data-canvas="cv-op-2">
+      <div class="brow"><span class="chip chip--ai">✦ NOTE READY</span><span class="bage">since 09:24</span></div>
+      <div class="bname">James Whitfield · 58M</div>
+      <div class="bask">Scribe note awaiting your review — 96% complete</div>
+      <div class="bverbs"><button type="button" class="btn btn--ghost">Review note</button></div>
+    </div>
+    <div class="bcard">
+      <div class="brow"><span class="chip chip--warn">● FOLLOW-UP</span><span class="bage">08:30</span></div>
+      <div class="bname">Carlos Delgado · 45M</div>
+      <div class="bask">No-show — reschedule task with MA, GBS f/u overdue</div>
+      <div class="bverbs"><button type="button" class="btn btn--ghost">Route to MA</button></div>
+    </div>
+    <div class="bcard">
+      <div class="brow"><span class="chip chip--ai">✦ LINKED</span></div>
+      <div class="bname">Whitfield amb-EEG</div>
+      <div class="bask">report signed by Dr. Vega 08:20 — attached to today's med-check</div>
+    </div>
+  </div>
+
+  <div class="s3-canvas on" id="cv-op-1">
+    <div class="ctx">
+      <div class="pname">Evelyn Park</div>
+      <div class="pmeta">34F · new consult · self-referred</div>
+      <span class="hchip">migraine w/ aura — pt reported</span>
+      <span class="hchip">family hx — mother</span>
+      <span class="hchip">sleep disruption ✦</span>
+      <span class="hchip">no prior imaging on file</span>
+    </div>
+    <div class="work">
+      <h4>✦ PREP BRIEF — HISTORIAN INTERVIEW 08:40 · 12 MIN</h4>
+      <p>Eight months of recurrent unilateral throbbing headache, 1–2 per week, with visual scintillations preceding onset by ~20 minutes. Photophobia and nausea during episodes; resolution with sleep.</p>
+      <p>Triggers reported: sleep disruption (new shift schedule), skipped meals. No thunderclap onset, no focal weakness, no fever. ✦ flagged for you: aura description atypical on one episode — worth characterizing.</p>
+      <p>OTC use escalating — pt counts 12 analgesic days last month ✦.</p>
+      <span class="rt-inline rt--exists">EXISTS · historian</span>
+      <span class="rt-inline rt--extend">EXTEND · historian → prep wiring</span>
+      <div class="brow"><span class="chip chip--ai">✦ plan library — migraine, new consult (487-plan set)</span></div>
+    </div>
+    <div class="acts">
+      <button type="button" class="btn btn--pri">Start visit — ambient scribe on</button>
+      <button type="button" class="btn btn--ghost">Edit prep</button>
+      <button type="button" class="btn btn--ghost">Defer flags</button>
+      <span class="pill pill--ours">prep: OURS</span>
+      <div class="auton">✦ historian — <b>Queue</b></div>
+      <div class="auton">✦ scribe — <b>File+audit</b></div>
+      <div class="auton">✦ plans — <b>Draft</b></div>
+    </div>
+  </div>
+
+  <div class="s3-canvas" id="cv-op-2">
+    <div class="ctx">
+      <div class="pname">James Whitfield</div>
+      <div class="pmeta">58M · epilepsy · med check</div>
+      <span class="hchip">levetiracetam — stable</span>
+      <span class="hchip">amb-EEG read today ✦ linked (Vega 08:20)</span>
+      <span class="hchip">driving cleared 2025</span>
+    </div>
+    <div class="work">
+      <h4>✦ SCRIBE NOTE — VISIT 09:00 · READY 09:24</h4>
+      <div class="cbar"><span class="cbarfill" style="width:96%"></span></div>
+      <div class="capnote">96% · 1 pending item: seizure frequency — say or type to resolve</div>
+      <div class="gate">
+        <div class="g g--met">HPI</div>
+        <div class="g g--met">Exam</div>
+        <div class="g g--met">Assessment <span class="chip">dictated, not inferred</span></div>
+        <div class="g g--met">Plan <span class="chip">from library · edited</span></div>
+      </div>
+      <div class="textwell">Interval history: no events since last visit per patient and spouse. Medication adherence confirmed…</div>
+    </div>
+    <div class="acts">
+      <button type="button" class="btn btn--pri">Approve &amp; file</button>
+      <span class="pill pill--ours">OURS</span> → <span class="pill pill--final">EPIC · FINAL</span>
+      <div class="capnote">files to our archive · paste finalizes in Epic</div>
+      <button type="button" class="btn btn--ghost">Edit sections</button>
+      <div class="auton">✦ scribe — <b>File+audit</b></div>
+      <span class="s3-pin">8</span>
+      <div class="s3-note"><span class="nnum">N8 — </span>The Epic-hybrid rule from the triage MVP, generalized: every artifact wears its single owner. OURS is authored here; EPIC · FINAL means the paste filed it; Epic-only artifacts (orders, results, patient messages) never pretend to live here.</div>
+    </div>
+  </div>
+
+  <div class="s3-realstrip">
+    <span class="rt rt--exists">EXISTS · ambient scribe (desktop)</span>
+    <span class="rt rt--exists">EXISTS · plan library (487) + style engine</span>
+    <span class="rt rt--exists">EXISTS · historian</span>
+    <span class="rt rt--extend">EXTEND · prep wiring + note-type routing</span>
+    <span class="rt rt--new">NEW · day-rail + band</span>
+  </div>
+</section>
+<!-- part 08: triage rn lens -->
+<section class="s3-lens" data-role="triage">
+  <div class="s3-rail">
+    <div class="s3-zoom">WORKLIST ZOOM · contact age · SLA</div>
+    <div class="s3-track">
+      <div class="s3-now"><span class="tag">NOW 11:02</span></div>
+      <div class="s3-ev ev--filed" style="left:10%"><span class="dot"></span><span class="lbl">09:48<br>M. Osei</span><span class="sub">✓ replied 10:35 · MS pathway</span></div>
+      <div class="s3-ev ev--filed ev--up" style="left:17%"><span class="dot"></span><span class="lbl">10:12<br>D. Barnes</span><span class="sub">→ ED · locked 10:19</span></div>
+      <div class="s3-ev ev--filed" style="left:24%"><span class="dot"></span><span class="lbl">10:41<br>D. Kling</span><span class="sub">✓ same-day 14:30 · RN decision</span></div>
+      <div class="s3-ev ev--ai" style="left:33%"><span class="dot"></span><span class="lbl">10:55<br>✦ R. Alvarez</span><span class="sub">engine done — needs RN</span></div>
+      <div class="s3-ev ev--future" style="left:47%"><span class="dot"></span><span class="lbl">11:20<br>callback due</span><span class="sub">Patel pt · med question</span></div>
+      <div class="s3-ev ev--future ev--up" style="left:60%"><span class="dot"></span><span class="lbl">12:00<br>Delgado resched</span><span class="sub">shared with MA</span></div>
+    </div>
+  </div>
+
+  <div class="s3-band">
+    <div class="bcard bcard--top" data-canvas="cv-tri-1">
+      <div class="brow"><span class="chip chip--warn">● ELEVATED</span><span class="bage">7 min old</span></div>
+      <div class="bname">Ruth Alvarez · 63F</div>
+      <div class="bask">Portal msg pasted — engine: expedited ≤72h, draft reply ready</div>
+      <div class="bverbs"><button type="button" class="btn btn--pri">Review &amp; dispose</button><button type="button" class="btn btn--ghost">See reasoning</button></div>
+    </div>
+    <div class="bcard" data-canvas="cv-tri-2">
+      <div class="brow"><span class="chip chip--ok">✓ CLOSED</span><span class="bage">10:19</span></div>
+      <div class="bname">David Barnes · 57M</div>
+      <div class="bask">Gateway fired → ED script read → 911/ED locked</div>
+      <div class="bverbs"><button type="button" class="btn btn--ghost">View record</button></div>
+    </div>
+    <div class="bcard">
+      <div class="brow"><span class="chip chip--time">⏱ DUE 11:20</span></div>
+      <div class="bname">Callback — Patel patient</div>
+      <div class="bask">med question · owner: you</div>
+      <div class="bverbs"><button type="button" class="btn btn--ghost">Open</button></div>
+    </div>
+  </div>
+
+  <div class="s3-canvas on" id="cv-tri-1">
+    <div class="ctx">
+      <div class="pname">Ruth Alvarez</div>
+      <div class="pmeta">63F · portal message · pasted 10:55</div>
+      <span class="hchip">lumbar stenosis 2023</span>
+      <span class="hchip">HTN</span>
+      <span class="hchip">last visit 03/2026 — Dr. Patel</span>
+    </div>
+    <div class="work">
+      <h4>PASTED MESSAGE + ✦ ENGINE ASSESSMENT</h4>
+      <div class="textwell textwell--quote">"My left leg has been numb on the outside since Tuesday. No pain, walking fine, no accidents. Should I come in?"</div>
+      <div class="brow">
+        <span class="chip chip--warn">TIER · ELEVATED</span>
+        <span class="chip chip--act">PATHWAY · EXPEDITED ≤72h</span>
+        <span class="chip chip--ok">GATEWAY · no red-flag cluster</span>
+      </div>
+      <ul style="font-size:13px;color:var(--ink-2)">
+        <li>isolated sensory change, 2-day duration, ambulation intact</li>
+        <li>no bowel/bladder involvement reported — gateway checked negation</li>
+        <li>hx lumbar stenosis — correlates with distribution</li>
+      </ul>
+      <div class="textwell">Thanks for writing, Ms. Alvarez. We'd like to see you within the next 2–3 days rather than wait…</div>
+      <div class="brow">
+        <span class="chip">Thu 9:20 · Patel</span>
+        <span class="chip">Thu 15:40 · Rivera</span>
+      </div>
+    </div>
+    <div class="acts">
+      <button type="button" class="btn btn--pri">Approve — copy reply to Epic</button>
+      <span class="pill pill--epic">EPIC</span>
+      <div class="capnote">message returns via Epic</div>
+      <button type="button" class="btn btn--ghost">Adjust tier</button>
+      <button type="button" class="btn btn--ghost">Book slot</button>
+      <div class="auton">✦ triage — <b>Queue</b> (drafts never auto-send)</div>
+      <div class="auton--gate">gateway: deterministic — no dial</div>
+    </div>
+  </div>
+
+  <div class="s3-canvas" id="cv-tri-2">
+    <div class="ctx">
+      <div class="pname">Dorothy Kling</div>
+      <div class="pmeta">66F · phone callback 10:41</div>
+      <span class="hchip">recurrent BPPV 2024</span>
+      <span class="hchip">lives alone</span>
+    </div>
+    <div class="work">
+      <h4>RN DECISION RECORD</h4>
+      <p style="font-size:13.5px">Engine returned: undetermined — human-first hold (dizziness cluster, low confidence).</p>
+      <p style="font-size:13.5px">RN assessment on callback: symptoms positional, resolving, no red flags — same-day visit appropriate rather than ED.</p>
+      <div class="brow">
+        <span class="chip chip--ok">DISPOSED · same-day 14:30 — Dr. Chen</span>
+        <span class="chip chip--ai">✦ engine deferred</span>
+      </div>
+      <span class="s3-pin">10</span>
+      <div class="s3-note"><span class="nnum">N10 — </span>Human-first holds survive 3.0: the engine deferred, the nurse decided, and the record says exactly that. AI proposes, clinician disposes — the same contract in every lens, at every autonomy setting.</div>
+    </div>
+    <div class="acts">
+      <button type="button" class="btn btn--ghost">Reopen</button>
+      <button type="button" class="btn btn--ghost">View pathway</button>
+      <span class="pill pill--ours">worklist: OURS</span>
+    </div>
+  </div>
+
+  <div class="s3-realstrip">
+    <span class="rt rt--exists">EXISTS · triage engine — tiers + pathways</span>
+    <span class="rt rt--exists">EXISTS · gateway (12 syndrome classes, negation-aware)</span>
+    <span class="rt rt--extend">EXTEND · paste-assist workflow (MVP)</span>
+    <span class="rt rt--new">NEW · SLA rail rendering</span>
+  </div>
+</section>
+<!-- part 09: MA Flow lens -->
+<style>/* lens-local */
+.ma-track{position:relative;padding-top:6px;min-width:1150px}
+.ma-track .lane{margin:14px 0}
+.ready{font-size:13px;margin-top:8px}
+.pm-feed{margin-top:10px}
+.pm-feed div{font-size:13px;padding:4px 0}
+.pm-feed b{font-family:var(--mono);font-weight:400;color:var(--ink-3);margin-right:8px}
+.pcard{background:var(--well);border-radius:var(--r-sm);padding:10px 12px;margin:8px 0;font-size:13.5px}
+.pcard .cap{display:block;font-size:11.5px;color:var(--ink-3);margin-top:6px}
+.skel{height:9px;background:var(--line);border-radius:4px;margin:6px 0;width:88%}
+.skel.s2{width:62%}
+.lens5{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px}
+.lens5 .bcard{cursor:default}
+</style>
+<section class="s3-lens" data-role="ma">
+<div class="s3-rail">
+<div class="s3-zoom">FLOW ZOOM · rooms + rooming state · morning block <span class="s3-pin">11</span></div>
+<div class="ma-track">
+<div class="s3-now"><span class="tag">NOW 11:02</span></div>
+<div class="lane">
+<div class="lname">Dr. Chen</div>
+<div class="lrail">
+<div class="mev mev--done" style="left:10%">08:00 Martinez ✓</div>
+<div class="mev mev--done" style="left:22%">09:00 Whitfield ✓</div>
+<div class="mev mev--done" style="left:31%">10:40 admin ✓</div>
+<div class="mev mev--next" style="left:41%">11:15 Park · room 11:10</div>
+<div class="mev mev--next" style="left:58%">11:45 Tran</div>
+</div>
+</div>
+<div class="lane">
+<div class="lname">Dr. Patel</div>
+<div class="lrail">
+<div class="mev mev--done" style="left:14%">08:30 ✓</div>
+<div class="mev mev--now" style="left:35%">11:00 in room 2</div>
+<div class="mev mev--next" style="left:47%">11:30</div>
+</div>
+</div>
+<div class="lane">
+<div class="lname">Dr. Rivera</div>
+<div class="lrail">
+<div class="mev mev--done" style="left:18%">09:15 ✓</div>
+<div class="mev mev--now" style="left:33%">11:00 · roomed 11:08</div>
+<div class="mev mev--next" style="left:52%">11:45</div>
+</div>
+</div>
+</div>
+</div>
+<div class="s3-note"><span class="nnum">N11 — </span>AI-readiness per visit — historian done? prep built? — is the MA's actual question about every upcoming patient. Straight from the Feb role-based design's flow board, re-expressed on the shared rail: same events, flow-state rendering.</div>
+<div class="s3-band">
+<div class="bcard bcard--top" data-canvas="cv-ma-1">
+<div class="brow"><span class="chip chip--act">ROOM NEXT</span><span class="bage">11:10</span></div>
+<div class="bname">Evelyn Park · Chen</div>
+<div class="bask">✦ prep ready · vitals + headache diary intake</div>
+<div class="bverbs"><button class="btn btn--pri">Room + vitals</button><button class="btn btn--ghost">Intake checklist</button></div>
+</div>
+<div class="bcard">
+<div class="brow"><span class="chip chip--time">⏱ TURNOVER</span></div>
+<div class="bname">Room 3 by 11:05</div>
+<div class="bask">turnover before Park's rooming — Whitfield out at 10:58</div>
+<div class="bverbs"><button class="btn btn--ghost">Mark done</button></div>
+</div>
+<div class="bcard">
+<div class="brow"><span class="chip chip--warn">● TASK</span><span class="bage">by 12:00</span></div>
+<div class="bname">Delgado reschedule</div>
+<div class="bask">no-show call #2 — GBS f/u overdue</div>
+<div class="bverbs"><button class="btn btn--ghost">Call log</button></div>
+</div>
+<div class="bcard">
+<div class="brow"><span class="chip chip--time">⏱ FAX</span></div>
+<div class="bname">Tran outside records</div>
+<div class="bask">received — upload before 11:45 visit</div>
+<div class="bverbs"><button class="btn btn--ghost">Upload</button></div>
+</div>
+</div>
+<div class="s3-canvas on" id="cv-ma-1">
+<div class="ctx">
+<div class="pname">Evelyn Park</div>
+<div class="pmeta">34F · 11:15 · Dr. Chen · room 3</div>
+<span class="hchip">✦ historian done 08:40</span>
+<span class="hchip">✦ prep built</span>
+<span class="hchip">headache diary — bring-in</span>
+<span class="hchip">insurance verified ✓</span>
+</div>
+<div class="work">
+<h4>ROOMING CHECKLIST</h4>
+<div class="gate">
+<div class="g g--met">Insurance + demographics verified</div>
+<div class="g g--met">✦ Historian interview complete — 12 min</div>
+<div class="g g--miss">Vitals at rooming</div>
+<div class="g g--miss">Headache diary photographed → attach</div>
+<div class="g g--met">Room 3 ready</div>
+</div>
+<div class="ready">Readiness: ✦ story ✓ · prep ✓ · forms ✓ · vitals ○</div>
+</div>
+<div class="acts">
+<button class="btn btn--pri">Mark roomed</button>
+<button class="btn btn--ghost">Message Dr. Chen</button>
+<button class="btn btn--ghost">Reassign room</button>
+<span class="pill pill--ours">flow state: OURS</span>
+<div class="auton">✦ historian — <b>Queue</b></div>
+</div>
+</div>
+<div class="s3-realstrip">
+<span class="rt rt--exists">EXISTS · flow-board design (Feb 2026, approved)</span>
+<span class="rt rt--extend">EXTEND · readiness from historian/prep signals</span>
+<span class="rt rt--new">NEW · ripple propagation across lenses</span>
+</div>
+</section>
+<!-- part 10: Manager (PM) lens -->
+<section class="s3-lens" data-role="pm">
+<div class="s3-rail">
+<div class="s3-zoom">AGGREGATE ZOOM · Riverview · today vs 4-week norm</div>
+<div class="s3-track">
+<div class="s3-now"><span class="tag">NOW 11:02</span></div>
+<div class="s3-ev ev--filed" style="left:12%"><div class="dot"></div><div class="lbl">08:00<br>✓ clinic open</div><div class="sub">3 providers · 9 rooms</div></div>
+<div class="s3-ev ev--filed ev--up" style="left:25%"><div class="dot"></div><div class="lbl">09:40<br>✓ flow normal</div><div class="sub">on-time 94%</div></div>
+<div class="s3-ev ev--crit" style="left:33%"><div class="dot"></div><div class="lbl">10:47<br>coverage event</div><div class="sub">Vega → acute (rounds paused)</div></div>
+<div class="s3-ev ev--due" style="left:41%"><div class="dot"></div><div class="lbl">11:02<br>now</div><div class="sub">on-time 92% —</div></div>
+<div class="s3-ev ev--future" style="left:55%"><div class="dot"></div><div class="lbl">12:30<br>midday review</div><div class="sub">✦ digest queues</div></div>
+<div class="s3-ev ev--future ev--up" style="left:78%"><div class="dot"></div><div class="lbl">16:15<br>day close</div><div class="sub">✦ notes audit</div></div>
+</div>
+</div>
+<div class="s3-band">
+<div class="bcard bcard--top" data-canvas="cv-pm-1">
+<div class="brow"><span class="chip chip--warn">● COVERAGE</span><span class="bage">15 min</span></div>
+<div class="bname">Vega in acute consult</div>
+<div class="bask">rounds paused at 3 of 9 · STAT Ceribell due 11:20 — suggest reassign read → Dr. Imai (Lakewood)</div>
+<div class="bverbs"><button class="btn btn--pri">Review suggestion</button><button class="btn btn--ghost">Dismiss</button></div>
+</div>
+<div class="bcard">
+<div class="brow"><span class="chip chip--ok">✓ SLA</span></div>
+<div class="bname">Triage worklist</div>
+<div class="bask">2 open · oldest 7 min · within target</div>
+<div class="bverbs"><button class="btn btn--ghost">Open triage view</button></div>
+</div>
+<div class="bcard">
+<div class="brow"><span class="chip chip--time">⏱ TREND</span></div>
+<div class="bname">No-show risk</div>
+<div class="bask">1 today (Delgado) · wk avg 6% · flagged: 2 tomorrow ✦</div>
+<div class="bverbs"><button class="btn btn--ghost">See list</button></div>
+</div>
+</div>
+<div class="s3-canvas on" id="cv-pm-1">
+<div class="ctx">
+<div class="pname">Riverview — today</div>
+<div class="pmeta">Wed Jul 22 · 11:02 · vs 4-wk norm</div>
+<span class="hchip">3 providers on site</span>
+<span class="hchip">2 virtual MAs</span>
+<span class="hchip">9 rooms · 8 staffed</span>
+</div>
+<div class="work">
+<div class="tiles">
+<div class="tile"><div class="tnum">92%</div><div class="tlab">ON-TIME STARTS</div><div class="tdelta chip chip--ok">— steady</div></div>
+<div class="tile"><div class="tnum">2</div><div class="tlab">TRIAGE OPEN</div><div class="tdelta chip chip--ok">oldest 7 min</div></div>
+<div class="tile"><div class="tnum">3.1h</div><div class="tlab">EEG READ P50</div><div class="tdelta chip chip--warn">▲ STAT SLA at risk</div></div>
+<div class="tile"><div class="tnum">3.8m</div><div class="tlab">NOTE LAG · MEDIAN</div><div class="tdelta chip chip--ok">▼ 0.6 · ✦ scribe</div></div>
+</div>
+<table class="ledger">
+<thead><tr><th>Site</th><th>On-time</th><th>Open triage</th></tr></thead>
+<tbody>
+<tr><td>Riverview</td><td>92% —</td><td>2</td></tr>
+<tr><td>Lakewood</td><td>93% —</td><td>0</td></tr>
+</tbody>
+</table>
+<div class="pm-feed">
+<div><b>10:47</b> — coverage: Dr. Vega pulled to acute (rounds 3/9 remain · STAT read due 11:20)</div>
+<div><b>10:19</b> — triage: ED disposition locked (Barnes) ✓ closed</div>
+<div><b>08:31</b> — first note filed 5 min post-visit ✦</div>
+</div>
+<span class="s3-pin">12</span>
+<div class="s3-note"><span class="nnum">N12 — </span>Aggregates are the same events, summed — the manager lens runs on the identical stream, so there is no separate reporting product to keep honest. Note-lag comes straight from the scribe's noteReadyAt; the coverage suggestion is Draft-autonomy: it proposes, a human rebalances.</div>
+</div>
+<div class="acts">
+<button class="btn btn--pri">Approve read reassignment → Imai</button>
+<button class="btn btn--ghost">Message front desk</button>
+<button class="btn btn--ghost">Export day summary</button>
+<span class="pill pill--ours">metrics: OURS</span>
+<div class="auton">✦ ops digest — <b>Draft</b></div>
+</div>
+</div>
+<div class="s3-realstrip">
+<span class="rt rt--exists">EXISTS · PM dashboard design (Feb 2026, approved)</span>
+<span class="rt rt--extend">EXTEND · noteReadyAt + triage SLA as live metrics</span>
+<span class="rt rt--new">NEW · same-stream aggregation (no reporting silo)</span>
+</div>
+</section>
+<!-- part 11: patient phone overlay + five lenses section -->
+<div class="s3-phone" id="phone">
+<div class="phone">
+<div class="eyebrow">EVELYN'S PHONE · 10:58 AM</div>
+<h3>Your visit today</h3>
+<div class="pcard">
+✦ You told your story — 8:40 AM, 12 minutes. Dr. Chen has it.<br>
+<span class="chip chip--ai">sleep pattern</span> <span class="chip chip--ai">aura details</span> <span class="chip chip--ai">medication days</span>
+<span class="cap">3 things flagged for today's conversation</span>
+</div>
+<div class="pcard">
+Your visit is on time — 11:15 with Dr. Chen.
+<span class="chip chip--time">confirmed 10:45</span>
+</div>
+<div class="pcard">
+After your visit: your plan, in plain words.
+<div class="skel"></div>
+<div class="skel s2"></div>
+<i>We'll likely start a daily preventive — details after you and Dr. Chen decide.</i>
+</div>
+<span class="s3-pin">14</span>
+<div class="s3-note"><span class="nnum">N14 — </span>The historian's other end. The patient tells the story once and watches it get used — the loop's 'arrives' step seen from outside. Whether this lives inside Synapse or ships as a companion with the same primitives is an open question below.</div>
+<button class="btn btn--ghost" data-close-phone>Close</button>
+</div>
+</div>
+</div>
+<section class="sect">
+<div class="eyebrow">THE PROOF</div>
+<h2>Seven lenses, one day <span class="s3-pin">9</span></h2>
+<div class="lens5">
+<div class="bcard"><div class="bname">Acute</div><div class="bask">The parked time-rail returns as a zoom level: LKW clock fused to the now-line, criteria gates that render missing data, never verdicts. Fastest loop, same primitives.</div></div>
+<div class="bcard"><div class="bname">Rounds</div><div class="bask">The census is a worklist with a now-line: seen recedes left, the code pauses the list mid-round, and the ✦ discharge draft queues for review. Same rail, half-day zoom.</div></div>
+<div class="bcard"><div class="bname">EEG Read</div><div class="bask">Studies age toward SLA like triage contacts; the report is sentence-built with deterministic CPT — the real Report Builder — and a signed read links itself to the chart, the rounds list, and this afternoon's clinic visit.</div></div>
+<div class="bcard"><div class="bname">Clinic MD</div><div class="bask">A day is a rail: filed mornings left, ✦ prep and drafts landing as events, the band holding what actually needs the physician. The scribe files; the paste finalizes.</div></div>
+<div class="bcard"><div class="bname">Triage RN</div><div class="bask">Contacts age along the rail toward SLA, the engine drafts in Queue autonomy, and human-first holds close as RN decisions with the record saying so.</div></div>
+<div class="bcard"><div class="bname">MA Flow</div><div class="bask">Three provider lanes, one now-line: rooming states, readiness dots, and the acute ripple applied — the Feb flow board living on the shared spine.</div></div>
+<div class="bcard"><div class="bname">Manager</div><div class="bask">The same stream, summed: coverage events, SLA, note lag. Suggestions arrive at Draft autonomy; a human rebalances.</div></div>
+</div>
+<div class="s3-note"><span class="nnum">N9 — </span>Same 10:47 consult — one person, three hats. The code is the work in Acute, pauses the census in Rounds, and puts a STAT read's SLA at risk in EEG Read, where the Manager sees a reassignment suggestion — while Clinic and Triage correctly never feel it. Multi-role days are rostered reality (acute + rounds + reads mix; inpatient and clinic never share a daytime); the lens switcher isn't a demo trick, it's the product.</div>
+</section>
+<!-- part 12: daylight design language -->
+<style>/* lens-local */
+.sw-row{display:flex;gap:16px;flex-wrap:wrap;margin:14px 0 22px}
+.sw-block{display:block;width:44px;height:44px;border-radius:var(--r-sm);border:1px solid var(--line-2);margin-bottom:6px}
+.sw-name{display:block;font:12px var(--mono);color:var(--ink)}
+.sw-hex{display:block;font:11px var(--mono);color:var(--ink-3)}
+.gram{margin:16px 0 20px}
+.grow{display:flex;align-items:baseline;gap:10px;margin:8px 0;font-size:14px;color:var(--ink-2)}
+.grow b{color:var(--ink);letter-spacing:.02em}
+.gdot{width:10px;height:10px;border-radius:50%;flex:none;display:inline-block;position:relative;top:-1px}
+.gdot--tri{background:linear-gradient(90deg,var(--crit) 0 33%,var(--warn) 33% 66%,var(--ok) 66% 100%)}
+.specimen{display:flex;gap:34px;flex-wrap:wrap;margin:16px 0 22px;padding:20px 22px;background:var(--card);border:1px solid var(--line);border-radius:var(--r-md)}
+.spec-item{display:flex;flex-direction:column;gap:6px}
+.spec-cap{font-size:11.5px;color:var(--ink-3)}
+.note-sm{font-size:12.5px;color:var(--ink-3);margin:10px 0 26px;max-width:70ch}
+</style>
+<section class="sect">
+  <p class="eyebrow">THE LANGUAGE</p>
+  <h2>Daylight — a full departure <span class="s3-pin">13</span></h2>
+  <p class="dek">Synapse 2.0 is a command-center console: near-black tonal steps, 9–11px density, one expert user, no shadows. Daylight leaves it entirely — warm paper, real elevation, an editorial serif for human names, and color reduced to a strict grammar.</p>
+
+  <div class="sw sw-row">
+    <div><span class="sw-block" style="background:var(--paper)"></span><span class="sw-name">paper</span><span class="sw-hex">#f6f3ee</span></div>
+    <div><span class="sw-block" style="background:var(--card)"></span><span class="sw-name">card</span><span class="sw-hex">#fdfbf7</span></div>
+    <div><span class="sw-block" style="background:var(--well)"></span><span class="sw-name">well</span><span class="sw-hex">#efeae2</span></div>
+    <div><span class="sw-block" style="background:var(--line)"></span><span class="sw-name">line</span><span class="sw-hex">#e3ddd2</span></div>
+  </div>
+  <div class="sw sw-row">
+    <div><span class="sw-block" style="background:var(--ink)"></span><span class="sw-name">ink</span><span class="sw-hex">#1f2430</span></div>
+    <div><span class="sw-block" style="background:var(--ink-2)"></span><span class="sw-name">ink-2</span><span class="sw-hex">#555e6e</span></div>
+    <div><span class="sw-block" style="background:var(--ink-3)"></span><span class="sw-name">ink-3</span><span class="sw-hex">#8b93a1</span></div>
+  </div>
+  <div class="sw sw-row">
+    <div><span class="sw-block" style="background:var(--act)"></span><span class="sw-name">action</span><span class="sw-hex">#1e40af</span></div>
+    <div><span class="sw-block" style="background:var(--ember)"></span><span class="sw-name">ember</span><span class="sw-hex">#c2410c</span></div>
+    <div><span class="sw-block" style="background:var(--ai)"></span><span class="sw-name">AI</span><span class="sw-hex">#9333ea</span></div>
+    <div><span class="sw-block" style="background:var(--ok)"></span><span class="sw-name">ok</span><span class="sw-hex">#047857</span></div>
+    <div><span class="sw-block" style="background:var(--warn)"></span><span class="sw-name">warn</span><span class="sw-hex">#a16207</span></div>
+    <div><span class="sw-block" style="background:var(--crit)"></span><span class="sw-name">critical</span><span class="sw-hex">#be123c</span></div>
+  </div>
+
+  <div class="gram">
+    <p class="grow"><span class="gdot" style="background:var(--ink)"></span><b>INK</b> — structure and action.</p>
+    <p class="grow"><span class="gdot" style="background:var(--ember)"></span><b>EMBER</b> — time. The now-line, the countdown, never a data dot.</p>
+    <p class="grow"><span class="gdot" style="background:var(--ai)"></span><b>VIOLET</b> — AI provenance. If ✦ touched it, it's violet. (The one piece of 2.0 kept on purpose.)</p>
+    <p class="grow"><span class="gdot gdot--tri"></span><b>RED/AMBER/GREEN</b> — clinical state, always with a label, never color alone.</p>
+  </div>
+
+  <div class="specimen">
+    <div class="spec-item">
+      <span style="font:600 24px var(--serif);color:var(--ink)">Walter Simmons</span>
+      <span class="spec-cap">patients get the serif — people, not data</span>
+    </div>
+    <div class="spec-item">
+      <span style="font:14.5px/1.55 var(--sans);color:var(--ink)">This is the body sans — 14.5px, humane, easy at a glance.</span>
+      <span class="spec-cap">everything that isn't a name or a time is sans</span>
+    </div>
+    <div class="spec-item">
+      <span style="font:20px var(--mono);color:var(--ember)">2:56</span>
+      <span class="spec-cap">time is mono, tabular, ember</span>
+    </div>
+  </div>
+
+  <p class="note-sm">Mark palette validated all-pairs (OKLab CVD simulation): navy/violet/rose/green pass; warm hues are restricted to structure and labeled chips by rule — red-green pairs carry shape + label redundancy (crit = double ring, AI = ✦ ring, filed = ✓).</p>
+
+  <h3>What changed, and why</h3>
+  <table class="ledger">
+    <thead>
+      <tr><th>Synapse 2.0</th><th>Daylight / 3.0</th><th>why</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>near-black tonal stack, no shadows</td><td>warm paper + real elevation</td><td>only the now and the top-ranked card cast a shadow — elevation is meaning, not decoration</td></tr>
+      <tr><td>9–13px dense type, uncontrolled scale</td><td>13px floor, 5-step scale</td><td>time-pressured reading punishes microtype; density moves to progressive disclosure</td></tr>
+      <tr><td>fixed 260 / 380 / 520px rails</td><td>zoom presets on one plane</td><td>layout adapts to role, not to one hand-fit desktop</td></tr>
+      <tr><td>queue tabs (Acute · Rounding · EEG · Outpatient)</td><td>role lenses on one stream</td><td>the switch is who you are, not which list you watch</td></tr>
+      <tr><td>emoji as icons</td><td>12-glyph inline SVG set</td><td>themeable, consistent, prints</td></tr>
+      <tr><td>blue #3b82f6 everywhere</td><td>navy #1e40af, used sparingly</td><td>action stands out only because almost nothing else is blue</td></tr>
+      <tr><td>purple = AI (✦)</td><td>KEPT — violet, re-lit for daylight</td><td>the equity worth keeping: everyone already reads violet as 'AI touched this'</td></tr>
+      <tr><td>20%-tint badges</td><td>kept as chips — always labeled</td><td>the badge DNA survives; color-alone semantics don't</td></tr>
+      <tr><td>chat/copilot as AI metaphor</td><td>AI work lands as events in time</td><td>ambient engines, reviewed at the now-line — the dial governs how far they run</td></tr>
+    </tbody>
+  </table>
+
+  <div class="s3-note"><span class="nnum">N13 — </span>The 2.0 audit drove every row: 9–11px type, fixed 260/380/520px rails, emoji icons, a single-role data model. Daylight inverts each deliberately. One survivor by choice: violet still means 'AI touched this.'</div>
+</section>
+<!-- part 13: convergence path + open questions + footer -->
+<section class="sect">
+  <p class="eyebrow">THE PATH</p>
+  <h2>How we get there</h2>
+
+  <h3>Today's products are the lenses' ancestors</h3>
+  <p>The acute console (Synapse 2.0), the desktop scribe, the OPS triage engine, the historian, the plan library, the EEG Report Builder (eeg.neuroplans.app) — each already runs one arc of the loop. Nothing here requires a new capability; it requires the same capabilities on one spine.</p>
+
+  <h3>The Feb role-based dashboards are the first lenses</h3>
+  <p>The approved MA flow board and practice-manager views ship as OPS pages first. When they land, they are Daylight lenses in waiting — same events, same primitives. The triage-nurse MVP (Epic-hybrid, paste as the bridge) is the triage lens's v1, and its boundary rule generalizes platform-wide.</p>
+
+  <h3>The boundary stays honest</h3>
+  <p>Epic remains record + contact for outpatient; Sevaro remains tracking + intelligence. 3.0 does not assume integration — it renders ownership on every artifact and gets better, not different, if deeper integration ever arrives.</p>
+
+  <div style="background:var(--well);border-radius:var(--r-md);padding:16px;font-size:13px;color:var(--ink-2);margin:20px 0 4px">Frame-stage discipline: this page is concept fuel for the unified-app architecture doc cycling through the Wednesday deep-dives. Per the portfolio card — nothing else should couple to this direction yet.</div>
+</section>
+
+<section class="sect">
+  <p class="eyebrow">UNRESOLVED</p>
+  <h2>Open questions for the Lab</h2>
+  <ol style="font-size:14px;color:var(--ink);padding-left:22px">
+    <li style="margin-bottom:10px">Autonomy defaults at launch — which engines start at Queue vs Draft, and who may raise a dial?</li>
+    <li style="margin-bottom:10px">Gate rulesets — who owns thrombolysis criteria content, with what version cadence and sign-off? (Unanswered since the parked doc; it blocks the acute lens.)</li>
+    <li style="margin-bottom:10px">How much AI in the exam is too much? (Carried forward verbatim — still not auto-adopting a recommendation.)</li>
+    <li style="margin-bottom:10px">Does the patient lens live inside Synapse or ship as a companion product on the same primitives?</li>
+    <li style="margin-bottom:10px">Migration for today's 2.0 acute users — lens-by-lens beside the console, or a switchover?</li>
+    <li style="margin-bottom:10px">Manager visibility into individual clinician metrics — where is the line between operations and surveillance?</li>
+    <li style="margin-bottom:10px">Role rostering — where do legal same-day combinations live (acute + rounds + reads: yes; either + reads: yes; inpatient + clinic in daytime: never), and does the surface enforce them or just display them?</li>
+  </ol>
+</section>
+
+<footer style="border-top:1px solid var(--line);margin-top:84px;padding:28px 0 60px;font-size:12.5px;color:var(--ink-3)">
+  <p>Sources: <a href='/concepts/synapse-3-0.html' style="color:var(--act)">the parked acute 3.0 time-rail</a> · <a href='/concepts/triage-nurse/mvp-workflow.html' style="color:var(--act)">Epic-hybrid triage MVP</a> · <a href='/concepts/triage-nurse/outpatient-triage-nurse-demo.html' style="color:var(--act)">triage demo</a> · <a href='/concepts/outpatient-design/outpatient-synapse-tabs.html' style="color:var(--act)">outpatient tab series</a> · role-based dashboards design (docs/plans/2026-02-25, approved). Source of truth for design documents: the synapse-outpatient-design series in the docs repo.</p>
+  <p style="margin-top:10px">All patients, clinicians, sites, times, and results on this page are fictional. Concept exploration only — not a product, not medical advice. Criteria displays are illustrations of decision support, not eligibility determinations. Fictional cast continuity: demo patients from the Feb 2026 role-based dashboard design and the triage-nurse concept reappear here on purpose.</p>
+  <p style="margin-top:10px">Synapse Lab · concept session 2026-07-21 · built with fictional data · Daylight v0</p>
+</footer>
+<!-- part 14: behavior -->
+<script>
+(function(){
+  'use strict';
+
+  var personaMap = {
+    acute: 'Dr. R. Vega',
+    hosp: 'Dr. R. Vega',
+    eeg: 'Dr. R. Vega',
+    op: 'Dr. S. Chen',
+    triage: 'M. Kowalski, RN',
+    ma: 'T. Reyes, MA',
+    pm: 'J. Moreno, PM'
+  };
+
+  var initialsMap = {
+    acute: 'RV',
+    hosp: 'RV',
+    eeg: 'RV',
+    op: 'SC',
+    triage: 'MK',
+    ma: 'TR',
+    pm: 'JM'
+  };
+
+  var stackMap = {
+    acute: 'today: acute · rounds · reads',
+    hosp: 'today: acute · rounds · reads',
+    eeg: 'today: acute · rounds · reads',
+    op: 'today: clinic',
+    triage: 'today: triage',
+    ma: 'today: clinic flow',
+    pm: 'today: Riverview + Lakewood'
+  };
+
+  function setPersona(role){
+    var name = personaMap[role];
+    if(name){
+      var unames = document.querySelectorAll('.s3-user .uname');
+      if(unames && unames.length){
+        unames.forEach(function(el){ el.textContent = name; });
+      }
+    }
+
+    var initials = initialsMap[role];
+    if(initials){
+      var inits = document.querySelectorAll('.s3-user .initial');
+      if(inits && inits.length){
+        inits.forEach(function(el){ el.textContent = initials; });
+      }
+    }
+
+    var stack = stackMap[role];
+    if(stack){
+      var stackEl = document.getElementById('rolestack');
+      if(stackEl) stackEl.textContent = stack;
+    }
+  }
+
+  function selectRole(btn){
+    if(!btn) return;
+    var role = btn.getAttribute('data-role-btn');
+    if(!role) return;
+
+    if(role === 'patient'){
+      if(document.body) document.body.classList.add('show-phone');
+      return;
+    }
+
+    if(!document.body) return;
+    document.body.setAttribute('data-role', role);
+
+    var allBtns = document.querySelectorAll('[data-role-btn]');
+    if(allBtns && allBtns.length){
+      allBtns.forEach(function(b){
+        if(b.getAttribute('data-role-btn') === 'patient') return;
+        b.setAttribute('aria-selected', b === btn ? 'true' : 'false');
+      });
+    }
+    setPersona(role);
+  }
+
+  function initRoleSwitcher(){
+    var btns = document.querySelectorAll('[data-role-btn]');
+    if(!btns || !btns.length) return;
+    btns.forEach(function(btn){
+      btn.addEventListener('click', function(){ selectRole(btn); });
+    });
+  }
+
+  function initToggle(id, cls){
+    var el = document.getElementById(id);
+    if(!el || !document.body) return;
+    el.addEventListener('click', function(){
+      var on = document.body.classList.toggle(cls);
+      el.setAttribute('aria-pressed', on ? 'true' : 'false');
+    });
+  }
+
+  function initToggles(){
+    initToggle('tglNotes', 'show-notes');
+    initToggle('tglReal', 'show-real');
+  }
+
+  function initBandCards(){
+    var cards = document.querySelectorAll('.bcard[data-canvas]');
+    if(!cards || !cards.length) return;
+    cards.forEach(function(card){
+      card.addEventListener('click', function(){
+        var targetId = card.getAttribute('data-canvas');
+        if(!targetId) return;
+        var lens = card.closest ? card.closest('.s3-lens') : null;
+        if(!lens) return;
+        var target = document.getElementById(targetId);
+        if(!target) return;
+
+        var canvases = lens.querySelectorAll('.s3-canvas');
+        if(canvases && canvases.length){
+          canvases.forEach(function(c){ c.classList.remove('on'); });
+        }
+        target.classList.add('on');
+
+        var siblings = lens.querySelectorAll('.bcard[data-canvas]');
+        if(siblings && siblings.length){
+          siblings.forEach(function(c){ c.classList.remove('sel'); });
+        }
+        card.classList.add('sel');
+      });
+    });
+  }
+
+  function closePhone(){
+    if(document.body) document.body.classList.remove('show-phone');
+  }
+
+  function initPhone(){
+    var closers = document.querySelectorAll('[data-close-phone]');
+    if(closers && closers.length){
+      closers.forEach(function(btn){
+        btn.addEventListener('click', closePhone);
+      });
+    }
+
+    var overlay = document.querySelector('.s3-phone');
+    if(overlay){
+      overlay.addEventListener('click', function(e){
+        if(e.target === overlay) closePhone();
+      });
+    }
+
+    document.addEventListener('keydown', function(e){
+      if(e.key === 'Escape') closePhone();
+    });
+  }
+
+  function init(){
+    initRoleSwitcher();
+    initToggles();
+    initBandCards();
+    initPhone();
+  }
+
+  if(document.readyState === 'loading'){
+    document.addEventListener('DOMContentLoaded', init);
+  } else {
+    init();
+  }
+})();
+</script>
+</body>
+</html>
