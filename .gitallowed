@@ -30,6 +30,11 @@ src/app/api/ai/historian/localizer/route.ts
 src/app/api/ai/historian/evidence-query/route.ts
 src/components/consult/EmbeddedHistorian
 docs/superpowers/specs/
+# Historian Validation Suite Task 2 — src/lib/historian/eval/finalDifferential
+# is exactly 40 alphanumeric/slash chars, tripping the 40-char entropy
+# pattern; not a secret. Directory-level allow so later sprint tasks'
+# similarly-long filenames in this same new directory don't retrip it.
+src/lib/historian/eval/
 # triage safety architecture (long identifiers + sha256 digests, not secrets)
 src/lib/triage/
 src/app/triage/

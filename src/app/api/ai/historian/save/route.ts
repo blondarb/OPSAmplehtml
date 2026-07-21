@@ -5,6 +5,8 @@ import { from } from '@/lib/db-query'
 import { linkHistorianToConsult } from '@/lib/consult/pipeline'
 import { notifyHistorianRedFlag } from '@/lib/notifications'
 import { validateTranscript } from '@/lib/historian/transcriptIntegrity'
+import { runFinalDifferential } from '@/lib/historian/eval/finalDifferential'
+import type { HistorianTranscriptEntry } from '@/lib/historianTypes'
 
 export async function POST(request: Request) {
   try {
@@ -65,6 +67,27 @@ export async function POST(request: Request) {
     if (error) {
       console.error('Error saving historian session:', error)
       return NextResponse.json({ error: error.message }, { status: 500 })
+    }
+
+    // ── Historian Validation Suite Task 2: final full-transcript DDx pass ──
+    // Fire-and-forget — a separate, post-session Bedrock evaluation of the
+    // COMPLETE transcript (the historian agent itself never diagnoses; this
+    // is an independent QA/audit pass, physician/QA-facing only). Never
+    // awaited, so it can never delay or fail this response. Gated by
+    // HISTORIAN_EVAL_AUTORUN: unset defaults to enabled; the literal string
+    // 'false' disables it (e.g. for hermetic test runs that don't mock
+    // Bedrock — see tests/historian-eval/saveRouteIntegrityCheck.test.ts).
+    // runFinalDifferential catches everything internally already; the
+    // .catch() here is a defense-in-depth backstop only.
+    if (data && process.env.HISTORIAN_EVAL_AUTORUN !== 'false') {
+      const transcriptForEval: HistorianTranscriptEntry[] = Array.isArray(body.transcript)
+        ? body.transcript
+        : []
+      const chiefComplaintForEval: string | undefined =
+        body.structured_output?.chief_complaint || body.referral_reason || undefined
+      void runFinalDifferential(data.id, transcriptForEval, chiefComplaintForEval).catch((err) => {
+        console.error('[historian/save] final differential eval error (non-fatal):', err)
+      })
     }
 
     // Phase 1 pipeline: link the saved historian session back to the consult

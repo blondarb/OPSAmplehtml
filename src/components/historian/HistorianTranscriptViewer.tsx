@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { HistorianTranscriptEntry } from '@/lib/historianTypes'
 
 interface HistorianTranscriptViewerProps {
@@ -12,6 +12,15 @@ interface HistorianTranscriptViewerProps {
    * two clicks. Default false — collapsed until the reader opts in.
    */
   defaultExpanded?: boolean
+  /**
+   * Array index (into `entries`, matching DifferentialItem quote `turn`
+   * numbers — see finalDifferential.ts) to force open and scroll to. Wired
+   * from DifferentialCard's cited-turn links (see HistorianReportView /
+   * HistorianSessionPanel) so a physician can jump from a quoted diagnosis
+   * straight to the transcript turn it cites. Optional/null — the viewer
+   * behaves exactly as before when omitted.
+   */
+  highlightIndex?: number | null
 }
 
 function formatOffset(seconds: number): string {
@@ -30,8 +39,21 @@ function formatOffset(seconds: number): string {
 export default function HistorianTranscriptViewer({
   entries,
   defaultExpanded = false,
+  highlightIndex = null,
 }: HistorianTranscriptViewerProps) {
   const [expanded, setExpanded] = useState(defaultExpanded)
+  const entryRefs = useRef<Array<HTMLDivElement | null>>([])
+
+  // A highlighted turn forces the viewer open, even if it started collapsed.
+  useEffect(() => {
+    if (highlightIndex != null) setExpanded(true)
+  }, [highlightIndex])
+
+  // Scroll the highlighted turn into view once it (and the list) is rendered.
+  useEffect(() => {
+    if (highlightIndex == null || !expanded) return
+    entryRefs.current[highlightIndex]?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+  }, [highlightIndex, expanded])
 
   return (
     <div>
@@ -85,11 +107,16 @@ export default function HistorianTranscriptViewer({
             entries.map((entry, i) => (
               <div
                 key={entry.seq ?? i}
+                ref={(el) => {
+                  entryRefs.current[i] = el
+                }}
                 style={{
                   padding: '8px 12px',
                   borderRadius: 8,
                   background: entry.role === 'assistant' ? 'rgba(13,148,136,0.06)' : 'rgba(139,92,246,0.06)',
                   borderLeft: `2px solid ${entry.role === 'assistant' ? '#0d9488' : '#8B5CF6'}`,
+                  outline: i === highlightIndex ? '2px solid #f59e0b' : 'none',
+                  outlineOffset: 1,
                 }}
               >
                 <div

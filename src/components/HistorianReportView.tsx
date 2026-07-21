@@ -2,8 +2,10 @@
 
 import { useEffect, useState } from 'react'
 import type { HistorianRedFlag, HistorianStructuredOutput, HistorianTranscriptEntry } from '@/lib/historianTypes'
+import type { FinalDifferential } from '@/lib/historian/eval/finalDifferential'
 import IntakeReviewSection from './consult/IntakeReviewSection'
 import HistorianTranscriptViewer from './historian/HistorianTranscriptViewer'
+import DifferentialCard from './historian/DifferentialCard'
 
 interface HistorianReportViewProps {
   structuredOutput: HistorianStructuredOutput | null
@@ -13,6 +15,15 @@ interface HistorianReportViewProps {
   questionCount: number
   /** Optional — included when available so the Patient Report fallback has more to work with. */
   transcript?: HistorianTranscriptEntry[]
+  /**
+   * Historian Validation Suite Task 2 — the post-session final differential
+   * (historian_sessions.final_differential). Physician Report tab only;
+   * never surfaced on the Patient Report tab. Undefined/null renders a
+   * pending state (DifferentialCard's own default — this component doesn't
+   * poll for it, since the async evaluator typically hasn't finished by
+   * the moment this "Interview Complete" screen first renders).
+   */
+  finalDifferential?: FinalDifferential | null
   onStartAnother: () => void
   onBackToPortal: () => void
 }
@@ -32,6 +43,7 @@ export default function HistorianReportView({
   duration,
   questionCount,
   transcript,
+  finalDifferential,
   onStartAnother,
   onBackToPortal,
 }: HistorianReportViewProps) {
@@ -141,6 +153,7 @@ export default function HistorianReportView({
             narrativeSummary={narrativeSummary}
             redFlags={redFlags}
             transcript={transcript}
+            finalDifferential={finalDifferential}
           />
         ) : (
           <PatientReportTab
@@ -186,9 +199,21 @@ interface PhysicianReportTabProps {
   narrativeSummary: string | null
   redFlags: HistorianRedFlag[]
   transcript?: HistorianTranscriptEntry[]
+  finalDifferential?: FinalDifferential | null
 }
 
-function PhysicianReportTab({ structuredOutput, narrativeSummary, redFlags, transcript }: PhysicianReportTabProps) {
+function PhysicianReportTab({
+  structuredOutput,
+  narrativeSummary,
+  redFlags,
+  transcript,
+  finalDifferential,
+}: PhysicianReportTabProps) {
+  // Turn-link state: clicking a cited quote in DifferentialCard jumps the
+  // transcript viewer below to that turn (see HistorianTranscriptViewer's
+  // highlightIndex prop).
+  const [highlightIndex, setHighlightIndex] = useState<number | null>(null)
+
   return (
     <div>
       {redFlags.length > 0 && (
@@ -221,9 +246,16 @@ function PhysicianReportTab({ structuredOutput, narrativeSummary, redFlags, tran
         }}
       />
 
+      <div style={{ marginTop: 16 }}>
+        <DifferentialCard
+          finalDifferential={finalDifferential}
+          onQuoteClick={(turn) => setHighlightIndex(turn)}
+        />
+      </div>
+
       {transcript && transcript.length > 0 && (
         <div style={{ marginTop: 16 }}>
-          <HistorianTranscriptViewer entries={transcript} />
+          <HistorianTranscriptViewer entries={transcript} highlightIndex={highlightIndex} />
         </div>
       )}
     </div>

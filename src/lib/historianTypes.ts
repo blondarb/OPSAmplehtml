@@ -98,6 +98,16 @@ export interface HistorianSession {
   imported_to_note: boolean
   session_source?: string
   interview_completion_status?: 'complete' | 'ended_early' | null
+  /**
+   * Historian Validation Suite Task 2: output of the post-session final
+   * differential pass (src/lib/historian/eval/finalDifferential.ts) — a
+   * separate, physician/QA-facing-only evaluation of the complete
+   * transcript. NULL/absent means the async evaluator hasn't completed
+   * (or never ran) for this session yet; DifferentialCard renders a
+   * pending state in that case. Optional so rows saved before migration
+   * 057 keep validating cleanly (same pattern as interview_completion_status).
+   */
+  final_differential?: import('./historian/eval/finalDifferential').FinalDifferential | null
   created_at: string
   updated_at: string
   // Joined patient data (from dashboardData query)

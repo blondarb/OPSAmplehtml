@@ -13,6 +13,14 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
  * (cognito/server, tenant, consult/pipeline, notifications) — all mocked
  * here so this test exercises only the save handler + the real
  * validateTranscript/integrity-check logic against a mocked pg pool.
+ *
+ * HISTORIAN_EVAL_AUTORUN is forced to 'false' for every test in this file
+ * (see beforeEach) — save/route.ts also fires a fire-and-forget final-
+ * differential eval (Task 2) after a successful insert, which calls real
+ * Bedrock via @/lib/historian/eval/finalDifferential. This suite doesn't
+ * mock that module, so autorun must stay off here to keep these tests
+ * hermetic; the eval hook's own behavior is covered separately in
+ * saveRouteFinalDifferentialHook.test.ts.
  */
 const { queryMock, getPoolMock, fromMock } = vi.hoisted(() => {
   const queryMock = vi.fn()
@@ -66,14 +74,19 @@ describe('save/route.ts integrity cross-check', () => {
   let warnSpy: ReturnType<typeof vi.spyOn>
   let errorSpy: ReturnType<typeof vi.spyOn>
 
+  const originalAutorun = process.env.HISTORIAN_EVAL_AUTORUN
+
   beforeEach(() => {
     queryMock.mockReset()
+    process.env.HISTORIAN_EVAL_AUTORUN = 'false'
     infoSpy = vi.spyOn(console, 'info').mockImplementation(() => {})
     warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
     errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
   })
 
   afterEach(() => {
+    if (originalAutorun === undefined) delete process.env.HISTORIAN_EVAL_AUTORUN
+    else process.env.HISTORIAN_EVAL_AUTORUN = originalAutorun
     infoSpy.mockRestore()
     warnSpy.mockRestore()
     errorSpy.mockRestore()

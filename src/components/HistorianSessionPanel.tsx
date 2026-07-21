@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import type { HistorianSession } from '@/lib/historianTypes'
 import HistorianTranscriptViewer from './historian/HistorianTranscriptViewer'
+import DifferentialCard from './historian/DifferentialCard'
 
 interface HistorianSessionPanelProps {
   sessions: HistorianSession[]
@@ -23,6 +24,11 @@ function formatTime(dateStr: string): string {
 export default function HistorianSessionPanel({ sessions, onImport }: HistorianSessionPanelProps) {
   const [expandedId, setExpandedId] = useState<string | null>(null)
   const [expandedSection, setExpandedSection] = useState<string>('summary')
+  // Turn-link state: clicking a cited quote on the differential sub-tab
+  // switches to the transcript sub-tab and jumps it to that turn (see
+  // HistorianTranscriptViewer's highlightIndex prop). Shared across cards
+  // like expandedId/expandedSection — only one card is ever expanded.
+  const [highlightIndex, setHighlightIndex] = useState<number | null>(null)
 
   if (!sessions || sessions.length === 0) return null
 
@@ -189,7 +195,7 @@ export default function HistorianSessionPanel({ sessions, onImport }: HistorianS
                 <div style={{ borderTop: '1px solid var(--border-color, #e2e8f0)', padding: '12px' }}>
                   {/* Sub-tabs */}
                   <div style={{ display: 'flex', gap: '0', marginBottom: '12px', borderBottom: '1px solid var(--border-color, #e2e8f0)' }}>
-                    {['summary', 'structured', 'transcript'].map(sec => (
+                    {['summary', 'structured', 'differential', 'transcript'].map(sec => (
                       <button
                         key={sec}
                         onClick={() => setExpandedSection(sec)}
@@ -282,11 +288,29 @@ export default function HistorianSessionPanel({ sessions, onImport }: HistorianS
                     </div>
                   )}
 
+                  {/* Final differential (Historian Validation Suite Task 2) —
+                      physician/QA-facing only, never shown to the patient.
+                      Pending state (DifferentialCard's own default) until
+                      the async post-session evaluator completes. */}
+                  {expandedSection === 'differential' && (
+                    <DifferentialCard
+                      finalDifferential={session.final_differential}
+                      onQuoteClick={(turn) => {
+                        setExpandedSection('transcript')
+                        setHighlightIndex(turn)
+                      }}
+                    />
+                  )}
+
                   {/* Transcript — already gated behind the sub-tab above, so
                       render it pre-expanded rather than making the reader
                       click through a second collapse. */}
                   {expandedSection === 'transcript' && (
-                    <HistorianTranscriptViewer entries={session.transcript ?? []} defaultExpanded />
+                    <HistorianTranscriptViewer
+                      entries={session.transcript ?? []}
+                      defaultExpanded
+                      highlightIndex={highlightIndex}
+                    />
                   )}
 
                   {/* Action buttons */}
