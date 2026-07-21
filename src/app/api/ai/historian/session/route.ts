@@ -7,6 +7,7 @@ import { getOpenAIKey } from '@/lib/secrets'
 import { getConsult, markHistorianStarted } from '@/lib/consult/pipeline'
 import { buildHistorianContextFromConsult } from '@/lib/consult/contextBuilder'
 import { buildWhisperBiasPrompt, isAsrBiasingEnabled } from '@/lib/asr/clinical-lexicon'
+import { mintFlushToken } from '@/lib/historian/flushToken'
 
 /**
  * Mint a short-lived relay auth token for the Nova Sonic WS relay
@@ -79,6 +80,19 @@ export async function POST(request: Request) {
       }
     }
 
+    // Historian Validation Suite Task 1 (durable transcript): the server now
+    // mints the historian_sessions.id UUID up front, in both provider
+    // branches, instead of leaving it to the DB default on insert at /save.
+    // This lets the client start flushing transcript events to
+    // /transcript-flush immediately — well before a historian_sessions row
+    // exists — using a session id that /save will later insert AS that
+    // row's id (see save/route.ts). crypto.randomUUID() produces a standard
+    // v4 UUID string, exactly what historian_sessions.id's
+    // `DEFAULT gen_random_uuid()` would have produced — just minted here
+    // instead of by Postgres.
+    const sessionId = crypto.randomUUID()
+    const flushToken = mintFlushToken(sessionId)
+
     // ── Nova path: no OpenAI client_secrets call. Return relay config + the
     // Nova-native tool specs (Bedrock Converse toolSpec shape). The hook
     // builds a NovaSonicWsProvider from this — no ephemeral key needed.
@@ -98,6 +112,10 @@ export async function POST(request: Request) {
         // base_instructions kept for client parity (localizer push channel).
         base_instructions: instructions,
         consult_id: consultId || null,
+        // Additive (Task 1): server-minted historian_sessions id + its
+        // matching transcript-flush bearer token.
+        sessionId,
+        flushToken,
       })
     }
 
@@ -198,9 +216,19 @@ export async function POST(request: Request) {
       tools,
       // Shape unchanged from client's perspective
       ephemeralKey: data.value ?? data.client_secret?.value,
-      sessionId: data.session_id ?? data.id,
+      // OpenAI's own Realtime session id. Renamed from the historical
+      // `sessionId` (verified 2026-07: no client or test reads this field
+      // by that name — useRealtimeSession.ts's startSession destructure
+      // never included it) to free up `sessionId` for the server-minted
+      // historian_sessions UUID below (Task 1: durable transcript).
+      providerSessionId: data.session_id ?? data.id,
       expiresAt: data.expires_at ?? data.client_secret?.expires_at,
       consult_id: consultId || null,
+      // Additive (Task 1): server-minted historian_sessions id + its
+      // matching transcript-flush bearer token. Same values as the Nova
+      // branch above — minted once per POST regardless of provider.
+      sessionId,
+      flushToken,
       // Pass the resolved model + turn detection mode back so the client knows
       // exactly which configuration is active (for debugging + analytics)
       model,
