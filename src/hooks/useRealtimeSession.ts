@@ -129,6 +129,16 @@ const LOCALIZER_INTERVAL = 3
  */
 const FLUSH_THRESHOLD = 3
 
+/**
+ * Bound on endSession's final flushTranscript() await (Task 1 fix) — long
+ * enough for a normal flush POST to complete, short enough that a slow or
+ * hanging request can never meaningfully delay the save handoff. Losing
+ * this race does NOT lose the flush attempt itself — the underlying
+ * fetch keeps running in the background and still lands if it completes
+ * late; the race only bounds how long endSession waits for it.
+ */
+const FINAL_FLUSH_TIMEOUT_MS = 2000
+
 export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealtimeSessionResult {
   const [status, setStatus] = useState<SessionStatus>('idle')
   const [transcript, setTranscript] = useState<HistorianTranscriptEntry[]>([])
@@ -359,17 +369,19 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
   }, [options])
 
   // ── Durable transcript flush (Task 1) ─────────────────────────────────
-  // Best-effort, fire-and-forget POST of up to 50 not-yet-durable entries.
-  // Never awaited by callers and never throws — a flush failure must not
-  // interrupt the live interview. Failures simply leave the batch in
-  // pendingFlushEntriesRef so the next trigger (threshold, provider error,
-  // or pagehide) retries it; the endpoint is idempotent so resending an
+  // Best-effort POST of up to 50 not-yet-durable entries. Returns a Promise
+  // so a caller that needs to (endSession's final flush, below) CAN await
+  // it — but every other call site (threshold trigger, provider
+  // error/disconnected, pagehide) fires it without awaiting, and it never
+  // throws — a flush failure must not interrupt the live interview.
+  // Failures simply leave the batch in pendingFlushEntriesRef so the next
+  // trigger retries it; the endpoint is idempotent so resending an
   // already-durable batch is always safe.
-  const flushTranscript = useCallback((opts?: { keepalive?: boolean }) => {
+  const flushTranscript = useCallback((opts?: { keepalive?: boolean }): Promise<void> => {
     const sessionId = serverSessionIdRef.current
     const token = flushTokenRef.current
-    if (!sessionId || !token) return // /session didn't mint flush support — no-op
-    if (pendingFlushEntriesRef.current.length === 0) return
+    if (!sessionId || !token) return Promise.resolve() // /session didn't mint flush support — no-op
+    if (pendingFlushEntriesRef.current.length === 0) return Promise.resolve()
 
     // Cap at 50/request (server also enforces this — see transcript-flush
     // route.ts — this just avoids a guaranteed-413 round trip). Anything
@@ -377,7 +389,7 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
     const batch = pendingFlushEntriesRef.current.slice(0, 50)
 
     try {
-      fetch('/api/ai/historian/transcript-flush', {
+      return fetch('/api/ai/historian/transcript-flush', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
         body: JSON.stringify({
@@ -391,6 +403,17 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
       })
         .then(res => {
           if (!res.ok) return // fail-open: leave batch pending for the next trigger
+          // Cross-session prune race guard: if a NEW session has already
+          // started by the time this (possibly slow/retried) response
+          // lands, pendingFlushEntriesRef was already reset for that new
+          // session and its seq numbers restart from 1 — pruning by raw
+          // seq here could delete the NEW session's not-yet-flushed
+          // entries just because they happen to share a seq value with
+          // this stale batch. Skip the prune once the session has moved
+          // on; this response already confirms the stale batch is durable
+          // server-side, it just has nothing left to prune from a buffer
+          // it's no longer part of.
+          if (serverSessionIdRef.current !== sessionId) return
           const sentSeqs = new Set(batch.map(e => e.seq))
           pendingFlushEntriesRef.current = pendingFlushEntriesRef.current.filter(
             e => !sentSeqs.has(e.seq),
@@ -401,6 +424,7 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
         })
     } catch {
       // Synchronous fetch-construction failure (shouldn't happen) — fail-open.
+      return Promise.resolve()
     }
   }, [])
 
@@ -719,6 +743,14 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
         // session) — mirrors the pre-refactor handleDrop's sessionGen check.
         if (sessionGenRef.current !== sessionGen) break
         console.warn('[useRealtimeSession] transport disconnected —', e.reason, '— running graceful end')
+        // Durable transcript flush (Task 1 fix): a dropped transport is the
+        // headline scenario this feature protects against — flush whatever
+        // hasn't been durably saved yet BEFORE the graceful-end flow runs.
+        // endSession() also does a final flush of its own, but keep this
+        // one explicit so durability doesn't depend on the end path (which
+        // does more work — nudging the AI, tearing down the provider —
+        // and could itself stall or fail) ever completing.
+        flushTranscript()
         endSessionRef.current()
         break
       }
@@ -1029,6 +1061,18 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
     // AI judged the intake complete — flag it as partial.
     const endedEarly = !interviewCompleted
 
+    // Durable transcript flush (Task 1 fix): flush whatever hasn't hit the
+    // FLUSH_THRESHOLD-of-3 auto-trigger yet — trailing entries (the
+    // "N mod 3" remainder) would otherwise never reach the durable event
+    // log on a graceful end. Bounded by a race against a short timeout so
+    // a slow/hanging flush can never meaningfully delay the save handoff
+    // below; losing the race doesn't cancel the underlying request, it
+    // just stops waiting on it.
+    await Promise.race([
+      flushTranscript(),
+      new Promise<void>(resolve => setTimeout(resolve, FINAL_FLUSH_TIMEOUT_MS)),
+    ])
+
     options.onComplete?.({
       structuredOutput: structuredOutputRef.current,
       narrativeSummary: narrativeSummaryRef.current,
@@ -1042,7 +1086,7 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
     })
 
     setStatus('complete')
-  }, [cleanup, options, interviewCompleted])
+  }, [cleanup, options, interviewCompleted, flushTranscript])
 
   // Keep the ref in sync so the provider's `disconnected` handler always
   // calls the latest endSession.

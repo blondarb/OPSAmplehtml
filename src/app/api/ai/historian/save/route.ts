@@ -107,6 +107,12 @@ export async function POST(request: Request) {
     // Both the validation issues and the mismatch log line are built from
     // counts/indices/roles only — patient utterance text is never logged
     // server-side, in this block or anywhere else.
+    //
+    // The client now performs a final flushTranscript() before calling
+    // /save (useRealtimeSession.ts endSession), so by the time this runs
+    // the durable event log should already hold every entry in
+    // `transcript` — a mismatch here is a genuine signal, not noise from
+    // trailing not-yet-flushed entries.
     try {
       const transcript = Array.isArray(body.transcript) ? body.transcript : []
       const { valid, issues } = validateTranscript(transcript)
@@ -115,20 +121,37 @@ export async function POST(request: Request) {
       }
 
       if (sessionId) {
-        const { getPool } = await import('@/lib/db')
-        const pool = await getPool()
-        const { rows } = await pool.query(
-          'SELECT COUNT(*)::int AS count FROM historian_transcript_events WHERE session_id = $1',
-          [sessionId],
-        )
-        const eventCount = rows[0]?.count ?? 0
-        if (eventCount !== transcript.length) {
-          console.warn(
-            '[historian/save] transcript event-count mismatch for session',
-            sessionId,
-            '— events:', eventCount,
-            'transcript entries:', transcript.length,
+        try {
+          const { getPool } = await import('@/lib/db')
+          const pool = await getPool()
+          const { rows } = await pool.query(
+            'SELECT COUNT(*)::int AS count FROM historian_transcript_events WHERE session_id = $1',
+            [sessionId],
           )
+          const eventCount = rows[0]?.count ?? 0
+          if (eventCount !== transcript.length) {
+            console.warn(
+              '[historian/save] transcript event-count mismatch for session',
+              sessionId,
+              '— events:', eventCount,
+              'transcript entries:', transcript.length,
+            )
+          }
+        } catch (eventCountErr: unknown) {
+          const pgCode = (eventCountErr as { code?: string } | undefined)?.code
+          if (pgCode === '42P01') {
+            // historian_transcript_events doesn't exist yet — expected
+            // and benign until the rollout task applies migration 056.
+            // Quiet informational line only; this is NOT a DB failure and
+            // must not read as one in logs.
+            console.info(
+              '[historian/save] transcript-events table not present yet (migration 056 not applied) — skipping event-count cross-check',
+            )
+          } else {
+            // Any other DB error here IS worth surfacing loudly — re-throw
+            // so the outer catch below logs it at error level.
+            throw eventCountErr
+          }
         }
       }
     } catch (integrityErr) {
