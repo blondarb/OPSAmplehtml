@@ -87,6 +87,34 @@ describe('validateModelSafetyExtraction', () => {
     })
   })
 
+  // Invariant that bounded adjudicator-release depends on: a validated safety
+  // result can NEVER be `undetermined` while carrying a grounded emergency (or
+  // immediate-review) signal — the floor promotes it. So a `complete` +
+  // `undetermined` safety branch provably has zero grounded time-critical
+  // signals, which is what makes releasing such a hold safe. (A malformed
+  // emergency signal throws instead — the branch fails, never reaching
+  // `complete`.) See docs/plans/2026-07-20-bounded-adjudicator-release.md.
+  it('floors stated undetermined with an emergency signal to emergency_now (never stays undetermined)', () => {
+    expect(
+      validateModelSafetyExtraction(
+        { ...validOutput(), care_pathway: 'undetermined' },
+        source,
+      ),
+    ).toMatchObject({ carePathway: 'emergency_now' })
+  })
+
+  it('floors stated undetermined with an immediate-review signal to same_day (never stays undetermined)', () => {
+    const output = validOutput()
+    output.care_pathway = 'undetermined'
+    const signal = (output.signals as Array<Record<string, unknown>>)[0]
+    signal.action = 'immediate_clinician_review'
+    signal.assertion = 'uncertain'
+
+    expect(validateModelSafetyExtraction(output, source)).toMatchObject({
+      carePathway: 'same_day_clinician_review',
+    })
+  })
+
   it('never downgrades a stated pathway more conservative than its signals', () => {
     expect(
       validateModelSafetyExtraction(

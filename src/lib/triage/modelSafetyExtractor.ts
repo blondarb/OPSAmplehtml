@@ -156,28 +156,61 @@ export async function runModelSafetyExtractor(
 ): Promise<ValidatedModelSafetyExtraction> {
   const model =
     options.model ?? resolveTriageModelRegistry().safetyExtractor
-  const result = await invokeBedrockClinicalTool<unknown>({
-    system: MODEL_SAFETY_EXTRACTION_SYSTEM_PROMPT,
-    messages: [
-      {
-        role: 'user',
-        content: `Extract time-critical neurology safety evidence from this exact source.\n\n--- SOURCE START ---\n${sourceText}\n--- SOURCE END ---`,
-      },
-    ],
-    maxTokens: 4_000,
-    temperature: 0,
-    model,
-    signal: options.signal,
-    toolName: 'emit_neurology_safety_result',
-    toolDescription:
-      'Emit the complete source-grounded neurology safety extraction.',
-    inputSchema: SAFETY_EXTRACTION_SCHEMA,
-  })
-  options.onUsage?.(copyBedrockTokenUsage(result))
 
-  return validateModelSafetyExtraction(
-    result.parsed,
-    sourceText,
-    options.context,
-  )
+  // Transient-failure retry (parallels the outpatient scorer retry). The strict
+  // tool + source-exact-quote validation occasionally rejects an otherwise-fine
+  // extraction — e.g. the model paraphrases a quote by a character so it is no
+  // longer an exact source substring. Without a retry, one such transient
+  // ModelSafetyExtractionError fails the whole safety branch, which fusion then
+  // converts to `undetermined` = a manual hold. Retrying re-runs the extraction
+  // and almost always lands a valid grounding on the next attempt. Fail-safe:
+  // if every attempt fails the branch still fails (→ hold), never a silent
+  // downgrade. Cancellation / deadline (options.signal) is never retried — the
+  // branch timeout is the hard budget.
+  const MAX_ATTEMPTS = 3
+  let lastError: unknown
+  for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
+    try {
+      const result = await invokeBedrockClinicalTool<unknown>({
+        system: MODEL_SAFETY_EXTRACTION_SYSTEM_PROMPT,
+        messages: [
+          {
+            role: 'user',
+            content: `Extract time-critical neurology safety evidence from this exact source.\n\n--- SOURCE START ---\n${sourceText}\n--- SOURCE END ---`,
+          },
+        ],
+        maxTokens: 4_000,
+        temperature: 0,
+        model,
+        signal: options.signal,
+        toolName: 'emit_neurology_safety_result',
+        toolDescription:
+          'Emit the complete source-grounded neurology safety extraction.',
+        inputSchema: SAFETY_EXTRACTION_SCHEMA,
+      })
+      options.onUsage?.(copyBedrockTokenUsage(result))
+      return validateModelSafetyExtraction(
+        result.parsed,
+        sourceText,
+        options.context,
+      )
+    } catch (error) {
+      lastError = error
+      // Never retry a cancellation/timeout — respect the branch deadline.
+      const aborted =
+        options.signal?.aborted ||
+        (error instanceof Error && error.name === 'AbortError')
+      if (aborted || attempt === MAX_ATTEMPTS - 1) {
+        throw error
+      }
+      console.warn(
+        '[model-safety] extraction attempt %d/%d failed (%s) — retrying',
+        attempt + 1,
+        MAX_ATTEMPTS,
+        error instanceof Error ? error.name : 'unknown',
+      )
+      await new Promise((resolve) => setTimeout(resolve, 400 * (attempt + 1)))
+    }
+  }
+  throw lastError
 }

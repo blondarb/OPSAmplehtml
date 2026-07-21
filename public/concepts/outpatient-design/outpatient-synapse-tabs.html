@@ -1,0 +1,770 @@
+<title>Outpatient Synapse — Imaging/results & Physical exams redesign</title>
+<style>
+  :root{
+    --primary:#0D9488; --primary-light:#14B8A6; --primary-dark:#0F766E;
+    --white:#fff; --gray:#F9FAFB; --dark:#F3F4F6;
+    --tp:#111827; --ts:#6B7280; --tm:#9CA3AF; --bd:#E5E7EB;
+    --err:#EF4444; --ok:#10B981; --warn:#F59E0B;
+    --f:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--dark);color:var(--tp);font-family:var(--f);
+       font-size:14px;line-height:1.5;-webkit-font-smoothing:antialiased}
+  .wrap{max-width:1180px;margin:0 auto;padding:44px 22px 90px}
+
+  h1{font-size:29px;font-weight:700;letter-spacing:-.02em;margin:0 0 8px}
+  h2{font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;
+     color:var(--primary);margin:0 0 5px}
+  h3{font-size:20px;font-weight:650;letter-spacing:-.01em;margin:0 0 6px}
+  h4{font-size:15px;font-weight:650;margin:0 0 5px}
+  p{margin:0 0 11px;color:var(--ts)}
+  .lede{font-size:15.5px;max-width:76ch}
+  strong{color:var(--tp);font-weight:650}
+  em.q{color:var(--tp);font-style:italic}
+  code{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:.87em;
+       background:var(--dark);padding:1px 5px;border-radius:4px;color:var(--primary-dark)}
+  hr{border:0;height:1px;background:var(--bd);margin:52px 0 0}
+  .section{margin:64px 0 0}
+
+  /* callouts */
+  .box{background:var(--white);border:1px solid var(--bd);border-radius:10px;
+       padding:16px 18px;margin:18px 0;box-shadow:0 1px 3px rgba(0,0,0,.04)}
+  .box.d{border-left:3px solid var(--primary)}
+  .box.w{border-left:3px solid var(--warn)}
+  .box.g{border-left:3px solid var(--ok)}
+  .box-t{font-size:10.5px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;
+         color:var(--primary);margin-bottom:6px}
+  .box.w .box-t{color:#B45309} .box.g .box-t{color:#047857}
+  .box p:last-child{margin-bottom:0}
+
+  /* decided list */
+  .dec{background:var(--white);border:1px solid var(--bd);border-radius:10px;overflow:hidden;margin:18px 0}
+  .dec-r{display:flex;gap:12px;padding:11px 16px;border-bottom:1px solid var(--bd);align-items:flex-start}
+  .dec-r:last-child{border-bottom:0}
+  .dec-i{flex-shrink:0;width:16px;height:16px;border-radius:50%;background:var(--ok);
+         color:#fff;font-size:10px;font-weight:700;display:flex;align-items:center;
+         justify-content:center;margin-top:3px}
+  .dec-x{font-size:13.5px;color:var(--ts)}
+  .dec-x b{color:var(--tp)}
+
+  /* app mockup */
+  .app{background:var(--gray);border:1px solid var(--bd);border-radius:10px;overflow:hidden;
+       margin:16px 0;box-shadow:0 2px 8px rgba(0,0,0,.06)}
+  .app-t{background:var(--white);border-bottom:1px solid var(--bd);padding:0 18px;
+         display:flex;align-items:center;gap:22px;height:44px}
+  .app-tab{font-size:12.5px;color:var(--ts);padding:13px 0;border-bottom:2px solid transparent;font-weight:500}
+  .app-tab.on{color:var(--tp);font-weight:650;border-bottom-color:var(--tp)}
+  .app-b{padding:18px;background:var(--gray)}
+
+  /* form section */
+  .fs{background:var(--white);border:1px solid var(--bd);border-radius:10px;padding:15px;margin-bottom:12px}
+  .fs-h{display:flex;align-items:center;gap:8px;margin-bottom:11px}
+  .fs-t{font-size:13.5px;font-weight:650}
+  .badge{font-size:9px;font-weight:700;padding:2px 6px;border-radius:4px;letter-spacing:.04em;
+         background:var(--dark);color:var(--tm)}
+  .badge.req{background:#FEE2E2;color:#DC2626}
+  .badge.new{background:#CCFBF1;color:var(--primary-dark)}
+  .badge.ai{background:#EDE9FE;color:#6D28D9}
+
+  /* pills */
+  .pills{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px}
+  .pill{font-size:12px;font-weight:550;padding:6px 13px;border-radius:20px;
+        border:1px solid var(--bd);background:var(--white);color:var(--ts);white-space:nowrap}
+  .pill.on{background:var(--primary);border-color:var(--primary);color:#fff;font-weight:600}
+  .pill.sub{font-size:11.5px;padding:5px 11px}
+  .pill.sub.on{background:var(--primary-dark);border-color:var(--primary-dark)}
+  .pill.add{border-style:dashed;color:var(--tm)}
+  .sublane{background:var(--gray);border-radius:8px;padding:10px;margin-bottom:9px;
+           border-left:2px solid var(--primary)}
+  .sub-l{font-size:9.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;
+         color:var(--tm);margin-bottom:6px}
+
+  /* entry */
+  .entry{background:var(--white);border:1px solid var(--bd);border-radius:7px;padding:10px;margin-top:8px}
+  .entry-h{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:7px}
+  .entry-n{font-size:12px;font-weight:650;display:flex;align-items:center;gap:6px}
+  .date{font-size:11px;color:var(--ts);border:1px solid var(--bd);border-radius:5px;
+        padding:3px 8px;background:var(--white);font-variant-numeric:tabular-nums}
+  .ta{border:1px solid var(--bd);border-radius:6px;padding:8px;font-size:11.5px;color:var(--ts);
+      background:var(--white);min-height:46px;position:relative}
+  .ta.f{color:var(--tp)}
+  .icons{position:absolute;right:6px;bottom:5px;display:flex;gap:5px;font-size:11px;opacity:.5}
+  .hint{font-size:10.5px;color:var(--tm);margin-top:5px;display:flex;align-items:center;gap:4px}
+
+  /* zones */
+  .zone-l{font-size:10px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;
+          color:var(--tm);margin:0 0 7px;display:flex;align-items:center;gap:6px}
+  .zone-l:after{content:'';flex:1;height:1px;background:var(--bd)}
+
+  /* history table */
+  table{width:100%;border-collapse:collapse;font-size:11.5px}
+  th{text-align:left;font-size:9.5px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;
+     color:var(--tm);padding:6px 8px;border-bottom:1px solid var(--bd)}
+  td{padding:7px 8px;border-bottom:1px solid var(--bd);color:var(--ts);vertical-align:top}
+  td.d{font-variant-numeric:tabular-nums;white-space:nowrap;color:var(--tm)}
+  td b{color:var(--tp);font-weight:600}
+  tr.new td{background:#F0FDFA}
+
+  /* flowsheet */
+  .flow{overflow-x:auto}
+  .flow table{min-width:520px}
+  .flow th{text-align:center;font-variant-numeric:tabular-nums}
+  .flow th:first-child{text-align:left}
+  .flow td{text-align:center;padding:5px 6px}
+  .flow td:first-child{text-align:left;font-weight:600;color:var(--tp);white-space:nowrap}
+  .cell{display:inline-block;width:9px;height:9px;border-radius:2px;background:var(--bd)}
+  .cell.n{background:var(--ok)} .cell.a{background:var(--err)} .cell.p{background:var(--warn)}
+
+  /* exception builder */
+  .norm{display:flex;align-items:center;gap:9px;background:#F0FDF4;border:1px solid #BBF7D0;
+        border-radius:7px;padding:10px 12px;margin-bottom:9px}
+  .norm-t{font-size:12.5px;font-weight:600;color:#15803D;flex:1}
+  .norm-a{font-size:10.5px;color:var(--primary-dark);font-weight:600;white-space:nowrap}
+  .exc{background:#FEF2F2;border:1px solid #FECACA;border-radius:7px;padding:9px 11px;margin-bottom:6px}
+  .exc-h{display:flex;justify-content:space-between;align-items:center;gap:8px}
+  .exc-t{font-size:12px;font-weight:650;color:#B91C1C}
+  .exc-s{font-size:10.5px;color:var(--ts);margin-top:2px}
+  .exc-x{font-size:13px;color:var(--tm)}
+  .addexc{border:1px dashed var(--bd);border-radius:7px;padding:9px;text-align:center;
+          font-size:11.5px;color:var(--tm);background:var(--white)}
+
+  /* module chips */
+  .mods{display:flex;gap:5px;flex-wrap:wrap;margin-bottom:10px}
+  .mod{font-size:11px;font-weight:600;padding:6px 11px;border-radius:16px;border:1px solid;
+       display:flex;align-items:center;gap:5px;white-space:nowrap}
+  .mod.n{background:#F0FDF4;border-color:#BBF7D0;color:#15803D}
+  .mod.a{background:#FEF2F2;border-color:#FECACA;color:#B91C1C}
+  .mod.e{background:var(--white);border-color:var(--bd);color:var(--tm)}
+  .mod.open{background:var(--primary);border-color:var(--primary);color:#fff}
+  .mdot{width:6px;height:6px;border-radius:50%;flex-shrink:0}
+  .mdot.n{background:var(--ok)} .mdot.a{background:var(--err)} .mdot.e{background:var(--bd)}
+  .mod.open .mdot{background:#fff}
+  .modpanel{background:var(--gray);border:1px solid var(--bd);border-radius:8px;padding:11px}
+  .modgrid{display:grid;grid-template-columns:1fr 1fr;gap:5px}
+  .opt{display:flex;align-items:center;gap:6px;font-size:11px;background:var(--white);
+       border:1px solid var(--bd);border-radius:5px;padding:6px 8px;color:var(--ts)}
+  .opt.on{border-color:#BBF7D0;background:#F0FDF4;color:#15803D}
+  .opt.off{border-color:#FECACA;background:#FEF2F2;color:#B91C1C;text-decoration:line-through;
+           text-decoration-color:rgba(185,28,28,.4)}
+  .cb{width:11px;height:11px;border-radius:3px;border:1px solid var(--bd);flex-shrink:0;
+      display:flex;align-items:center;justify-content:center;font-size:8px;color:#fff}
+  .opt.on .cb{background:var(--ok);border-color:var(--ok)}
+  .opt.off .cb{background:var(--white);border-color:var(--err)}
+
+  /* split view */
+  .split{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  .prose{background:var(--white);border:1px solid var(--bd);border-radius:7px;padding:11px;
+         font-size:11px;line-height:1.65;color:var(--ts)}
+  .prose b{color:var(--tp)}
+  .prose .hl{background:#FEF3C7;color:#92400E;font-weight:600;border-radius:2px;padding:0 2px}
+  .prose-l{font-size:9px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;
+           color:var(--tm);margin-bottom:6px;display:flex;align-items:center;gap:5px}
+
+  /* nudge */
+  .nudge{background:linear-gradient(135deg,#F0FDFA,#ECFDF5);border:1px solid #A7F3D0;
+         border-radius:7px;padding:9px 11px;margin-bottom:10px;display:flex;
+         align-items:center;gap:9px}
+  .nudge-x{font-size:11.5px;color:#065F46;flex:1}
+  .nudge-x b{color:#064E3B}
+  .nudge-b{font-size:10.5px;font-weight:650;color:#fff;background:var(--primary);
+           border-radius:5px;padding:5px 10px;white-space:nowrap}
+
+  /* trend */
+  .trend{background:var(--white);border:1px solid var(--bd);border-radius:7px;padding:11px}
+  .trend-h{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:8px}
+  .trend-n{font-size:12px;font-weight:650}
+  .trend-v{font-size:17px;font-weight:700;color:var(--primary);font-variant-numeric:tabular-nums}
+  .spark{display:flex;align-items:flex-end;gap:5px;height:38px}
+  .bar{flex:1;background:var(--primary);border-radius:2px 2px 0 0;opacity:.75;position:relative}
+  .bar:last-child{opacity:1}
+  .spark-x{display:flex;gap:5px;margin-top:4px}
+  .spark-x span{flex:1;font-size:8px;color:var(--tm);text-align:center}
+
+  /* option grid */
+  .opts{display:grid;gap:18px;margin-top:22px}
+  @media(min-width:920px){.opts.three{grid-template-columns:repeat(3,1fr)}}
+  .ocard{background:var(--white);border:1px solid var(--bd);border-radius:11px;padding:16px;
+         display:flex;flex-direction:column;min-width:0;box-shadow:0 1px 3px rgba(0,0,0,.04)}
+  .ocard.rec{border-color:var(--primary);box-shadow:0 0 0 1px rgba(13,148,136,.14)}
+  .oh{display:flex;align-items:center;gap:7px;flex-wrap:wrap;margin-bottom:3px}
+  .ol{font-size:9.5px;font-weight:700;letter-spacing:.1em;color:var(--tm)}
+  .on-{font-size:16px;font-weight:650;letter-spacing:-.01em}
+  .tag{font-size:9px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;
+       padding:2px 7px;border-radius:4px;background:#CCFBF1;color:var(--primary-dark)}
+  .od{font-size:12.5px;color:var(--ts);margin:6px 0 12px}
+  .mini{background:var(--gray);border:1px solid var(--bd);border-radius:8px;padding:10px;margin-bottom:12px}
+  .pc{margin-top:auto;padding-top:12px;border-top:1px solid var(--bd);font-size:12px}
+  .pc>div{display:flex;gap:7px;margin-bottom:5px;color:var(--ts)}
+  .pc span{flex-shrink:0;font-weight:700}
+  .pc .p span{color:var(--ok)} .pc .con span{color:var(--warn)}
+  .cap{font-size:10.5px;color:var(--tm);text-align:center;font-style:italic;margin:-4px 0 12px}
+
+  ul{margin:0 0 11px;padding-left:19px;color:var(--ts)}
+  li{margin-bottom:5px}
+  .qq{border-left:2px solid var(--bd);padding-left:12px;margin:0 0 12px;font-size:13.5px;
+      color:var(--ts);font-style:italic}
+  .qq b{font-style:normal;color:var(--tp);font-weight:650}
+</style>
+
+<div class="wrap">
+
+  <h1>Outpatient Synapse — Imaging/results &amp; Physical exams</h1>
+  <p class="lede">Redesign grounded in the 7/15 Outpatient Working Session transcript.
+  Where the meeting decided, I built it. Where it didn't, there are options.</p>
+
+  <div class="box g">
+    <div class="box-t">This version is grounded — the last one wasn't</div>
+    <p>I pulled the full 3-hour transcript. My first pass was for acute tele-stroke and was wrong on
+    the premise; this one is built against what you, Melanie, Prachi, Neha, Smriti and Dr. Peeyoosh
+    actually said. The time rail is parked for the Synapse 3.0 acute conversation.</p>
+  </div>
+
+  <!-- DECIDED -->
+  <div class="section">
+    <h2>Settled in the meeting</h2>
+    <h3>Not re-litigating these</h3>
+    <p class="lede">Nine calls the room actually made. They're baked into the mockups below rather
+    than offered as choices.</p>
+
+    <div class="dec">
+      <div class="dec-r"><div class="dec-i">✓</div><div class="dec-x">
+        <b>Yes/No dies.</b> It manufactures junk documentation — <em class="q">"in my note, it says,
+        was that scan done? No. Why the hell did I even click that?"</em></div></div>
+      <div class="dec-r"><div class="dec-i">✓</div><div class="dec-x">
+        <b>Pills, never dropdowns.</b> <em class="q">"Please, please not a drop down, please not a
+        drop down, please… I hate drop down[s]. I'm trying to get rid of that click."</em></div></div>
+      <div class="dec-r"><div class="dec-i">✓</div><div class="dec-x">
+        <b>Three groups:</b> diagnostic imaging · diagnostic testing/procedures · labs. Labs are free
+        text only — <em class="q">"labs can be really overwhelming and can be organised differently."</em></div></div>
+      <div class="dec-r"><div class="dec-i">✓</div><div class="dec-x">
+        <b>Pill → subtype → free text + date.</b> Type, paste, or dictate. No "Add study" button —
+        the pill <em>is</em> the add.</div></div>
+      <div class="dec-r"><div class="dec-i">✓</div><div class="dec-x">
+        <b>This tab is history, not orders.</b> <em class="q">"This is not ordering. This is all about
+        recording."</em> That's what resolves Prachi's data-mining concern — the mineable structure
+        lives on Recommendations.</div></div>
+      <div class="dec-r"><div class="dec-i">✓</div><div class="dec-x">
+        <b>New fields:</b> EEG as its own discrete trackable field (<em class="q">"EEG is not under MRI.
+        EEG is its own thing"</em>) and spine imaging across CT/MRI — cervical, thoracic, lumbar.</div></div>
+      <div class="dec-r"><div class="dec-i">✓</div><div class="dec-x">
+        <b>Exam timestamp removed.</b> <em class="q">"The timestamp is not relevant any longer…
+        that's irrelevant."</em></div></div>
+      <div class="dec-r"><div class="dec-i">✓</div><div class="dec-x">
+        <b>Exam pill order: free text → clickable → scales.</b> <em class="q">"I would have free text
+        first and then the score pills afterwards."</em></div></div>
+      <div class="dec-r"><div class="dec-i">✓</div><div class="dec-x">
+        <b>Nothing mandatory.</b> You: <em class="q">"I personally wouldn't make anything mandatory."</em>
+        Melanie: <em class="q">"I despise them."</em> Scales surface by AI nudge, never by requirement.</div></div>
+    </div>
+  </div>
+
+  <hr>
+
+  <!-- DIAGNOSTICS -->
+  <div class="section">
+    <h2>Tab 1</h2>
+    <h3>Imaging / results</h3>
+    <p class="lede">The entry model is settled. What's open is the half you flagged as missing
+    entirely — <em class="q">"In an actual EHR, in Epic, I go to the diagnostics tab and I can see
+    everything that they've had forever. We don't have that."</em></p>
+
+    <h4 style="margin-top:26px">The entry model — built to spec</h4>
+
+    <div class="app">
+      <div class="app-t">
+        <div class="app-tab">History</div>
+        <div class="app-tab on">Imaging/results</div>
+        <div class="app-tab">Physical exams</div>
+        <div class="app-tab">Recommendation</div>
+      </div>
+      <div class="app-b">
+
+        <div class="zone-l">New this visit</div>
+
+        <div class="fs">
+          <div class="fs-h"><div class="fs-t">Diagnostic imaging</div><span class="badge">Optional</span></div>
+          <div class="pills">
+            <div class="pill on">CT</div>
+            <div class="pill">MRI</div>
+            <div class="pill">Vascular imaging</div>
+            <div class="pill">PET</div>
+            <div class="pill">Other imaging</div>
+          </div>
+
+          <div class="sublane">
+            <div class="sub-l">CT — select study</div>
+            <div class="pills" style="margin-bottom:0">
+              <div class="pill sub on">CT head</div>
+              <div class="pill sub">CT cervical spine <span class="badge new" style="margin-left:3px">NEW</span></div>
+              <div class="pill sub">CT thoracic spine <span class="badge new" style="margin-left:3px">NEW</span></div>
+              <div class="pill sub">CT lumbar spine <span class="badge new" style="margin-left:3px">NEW</span></div>
+            </div>
+
+            <div class="entry">
+              <div class="entry-h">
+                <div class="entry-n">CT head</div>
+                <div class="date">01/16/2026</div>
+              </div>
+              <div class="ta f">No acute intracranial abnormality. Chronic small-vessel ischemic
+                change, stable from prior.
+                <div class="icons">🎤 ⚡ ✨</div>
+              </div>
+              <div class="hint">↳ You picked a study — what did it show?</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="fs">
+          <div class="fs-h"><div class="fs-t">Diagnostic testing &amp; procedures</div><span class="badge">Optional</span></div>
+          <div class="pills">
+            <div class="pill on">EEG <span class="badge new" style="margin-left:3px">NEW</span></div>
+            <div class="pill">EMG / NCS</div>
+            <div class="pill">Lumbar puncture</div>
+            <div class="pill">Sleep study</div>
+          </div>
+          <div class="sublane">
+            <div class="entry" style="margin-top:0">
+              <div class="entry-h">
+                <div class="entry-n">EEG — routine</div>
+                <div class="date">12/02/2025</div>
+              </div>
+              <div class="ta f">Normal awake and drowsy EEG. No epileptiform discharges.
+                <div class="icons">🎤 ⚡ ✨</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="fs">
+          <div class="fs-h"><div class="fs-t">Labs</div><span class="badge">Optional</span>
+            <span class="badge" style="margin-left:auto">FREE TEXT ONLY</span></div>
+          <div class="ta">Type, paste, or dictate any labs worth keeping…
+            <div class="icons">🎤 ⚡ ✨</div>
+          </div>
+          <div class="hint">🔖 Flag a result to carry forward to every future visit
+            <span class="badge" style="margin-left:5px">CONCEPT</span></div>
+        </div>
+
+      </div>
+    </div>
+    <div class="cap">Pill → subtype → free text + date. No yes/no. No dropdowns. Nothing required.</div>
+
+    <div class="box w">
+      <div class="box-t">One concept I drew that you parked without a mechanism</div>
+      <p>The 🔖 flag on labs is your <em class="q">"save this, this is important… so it always is
+      always flagged visit to visit"</em> — the genetic test, the <em class="q">"crazy antibody that
+      I found five years ago."</em> No mechanism was decided in the meeting, so treat this as a
+      strawman for one: a per-result pin that survives into every future encounter's header, separate
+      from the note body. It's a small build with outsized clinical value, and it's the only idea in
+      the session that had no owner when the meeting ended.</p>
+    </div>
+
+    <h4 style="margin-top:32px">The open half — displaying longitudinal data</h4>
+    <p class="lede">Smriti asked for exactly this: <em class="q">"We should discuss this with the UI UX
+    team… we should maybe suggest a couple of the ways."</em> So — three ways. Your constraint on all
+    of them: <em class="q">"That doesn't need to go into my note from 2015, but I still want to
+    remember that they had it in 2010. So that's the history versus the documentation."</em></p>
+
+    <div class="opts three">
+
+      <div class="ocard rec">
+        <div class="oh"><span class="ol">OPTION A</span><span class="tag">Recommended</span></div>
+        <div class="on-">Two zones</div>
+        <div class="od">Literally what you described: what's new sits on top, everything ever done
+        sits below it in one scrollable record.</div>
+        <div class="mini">
+          <div class="zone-l" style="font-size:8.5px">New this visit</div>
+          <div class="entry" style="margin-top:0;margin-bottom:9px">
+            <div class="entry-h"><div class="entry-n" style="font-size:11px">CT head</div>
+              <div class="date" style="font-size:10px">01/16/26</div></div>
+            <div class="ta f" style="min-height:0;font-size:10px">No acute abnormality…</div>
+          </div>
+          <div class="zone-l" style="font-size:8.5px">Prior record</div>
+          <table>
+            <tr class="new"><td class="d">01/16/26</td><td><b>CT head</b> — no acute</td></tr>
+            <tr><td class="d">12/02/25</td><td><b>EEG</b> — normal</td></tr>
+            <tr><td class="d">08/14/24</td><td><b>MRI brain</b> — 2 T2 lesions</td></tr>
+            <tr><td class="d">03/02/21</td><td><b>MRI c-spine</b> — mild sten.</td></tr>
+            <tr><td class="d">06/11/18</td><td><b>MRI brain</b> — unremarkable</td></tr>
+            <tr><td class="d">09/30/10</td><td><b>LP</b> — OCB positive</td></tr>
+          </table>
+        </div>
+        <div class="pc">
+          <div class="p"><span>+</span>Your own words, drawn. Lowest risk of missing the intent.</div>
+          <div class="p"><span>+</span>Cleanly separates history from documentation — the top zone is what enters the note, the bottom never does.</div>
+          <div class="p"><span>+</span>Scrolls back to 2010 without a mode switch.</div>
+          <div class="con"><span>−</span>Long list gets unwieldy for a 15-year patient with 40 studies.</div>
+          <div class="con"><span>−</span>Comparing two MRIs four years apart means scanning, not reading side by side.</div>
+        </div>
+      </div>
+
+      <div class="ocard">
+        <div class="oh"><span class="ol">OPTION B</span></div>
+        <div class="on-">Flowsheet grid</div>
+        <div class="od">Modality down, time across — the Epic diagnostics view you said Sevaro
+        doesn't have. Tap any cell for the report.</div>
+        <div class="mini">
+          <div class="flow">
+            <table>
+              <tr><th>Study</th><th>'10</th><th>'18</th><th>'21</th><th>'24</th><th>'25</th><th>'26</th></tr>
+              <tr><td>MRI brain</td><td></td><td><span class="cell n"></span></td><td></td>
+                  <td><span class="cell a"></span></td><td></td><td></td></tr>
+              <tr><td>MRI c-spine</td><td></td><td></td><td><span class="cell a"></span></td>
+                  <td></td><td></td><td></td></tr>
+              <tr><td>CT head</td><td></td><td></td><td></td><td></td><td></td>
+                  <td><span class="cell n"></span></td></tr>
+              <tr><td>EEG</td><td></td><td></td><td></td><td></td>
+                  <td><span class="cell n"></span></td><td></td></tr>
+              <tr><td>LP</td><td><span class="cell a"></span></td><td></td><td></td><td></td><td></td><td></td></tr>
+              <tr><td>EMG/NCS</td><td></td><td></td><td></td><td></td><td></td><td><span class="cell p"></span></td></tr>
+            </table>
+          </div>
+          <div style="display:flex;gap:10px;margin-top:9px;font-size:8.5px;color:var(--tm)">
+            <span><span class="cell n"></span> Normal</span>
+            <span><span class="cell a"></span> Abnormal</span>
+            <span><span class="cell p"></span> Pending</span>
+          </div>
+        </div>
+        <div class="pc">
+          <div class="p"><span>+</span>Fifteen years fits on one screen. Density no list can match.</div>
+          <div class="p"><span>+</span>Gaps are as visible as data — "never had an MRI" reads instantly.</div>
+          <div class="p"><span>+</span>Closest thing to the Epic view you said you miss.</div>
+          <div class="con"><span>−</span>Needs a normal/abnormal flag per study, which means one structured field you don't have today and said you didn't want.</div>
+          <div class="con"><span>−</span>Every cell is a click to read anything. Density costs depth.</div>
+          <div class="con"><span>−</span>Sparse early years waste most of the grid.</div>
+        </div>
+      </div>
+
+      <div class="ocard">
+        <div class="oh"><span class="ol">OPTION C</span></div>
+        <div class="on-">Stack with inline priors</div>
+        <div class="od">Group by study type; the current entry shows, with every prior of the same
+        type nested dimmed underneath. Already shipped in OPS.</div>
+        <div class="mini">
+          <div class="entry" style="margin-top:0">
+            <div class="entry-h"><div class="entry-n" style="font-size:11px">MRI brain</div>
+              <div class="date" style="font-size:10px">08/14/24</div></div>
+            <div class="ta f" style="min-height:0;font-size:10px">Two new T2 hyperintense lesions,
+              periventricular.</div>
+            <div style="background:var(--gray);border-radius:5px;padding:6px 7px;margin-top:6px;opacity:.8">
+              <div style="font-size:8px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--tm)">Prior · 06/11/18</div>
+              <div style="font-size:9.5px;color:var(--tm);font-style:italic;margin-top:1px">Unremarkable. No demyelinating…</div>
+            </div>
+            <div style="background:var(--gray);border-radius:5px;padding:6px 7px;margin-top:4px;opacity:.65">
+              <div style="font-size:8px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--tm)">Prior · 09/30/10</div>
+              <div style="font-size:9.5px;color:var(--tm);font-style:italic;margin-top:1px">Normal study…</div>
+            </div>
+          </div>
+        </div>
+        <div class="pc">
+          <div class="p"><span>+</span>Already built and shipped in OPS. Cheapest path by far.</div>
+          <div class="p"><span>+</span>Best in the set for the actual clinical question — "is this MRI different from the last one?" Priors sit right under the current text.</div>
+          <div class="p"><span>+</span>No new structured fields needed. Pure free text, as you want.</div>
+          <div class="con"><span>−</span>No cross-modality view. Can't see the whole patient at once.</div>
+          <div class="con"><span>−</span>Answers "what changed" but not "what have they ever had" — which is the thing you said is missing.</div>
+        </div>
+      </div>
+
+    </div>
+
+    <div class="box d">
+      <div class="box-t">My read</div>
+      <p><strong>A as the page, C as the behavior inside it.</strong> They're complementary rather
+      than rival: two zones structure the page, and expanding any row in the prior record gives you
+      C's inline-prior comparison. That covers both questions — <em>what have they ever had</em>
+      (the list) and <em>is this one different</em> (the nesting) — with no new structured fields.</p>
+      <p>I'd hold B. It's the most impressive view here and the one that most looks like Epic, but it
+      only works if every study carries a normal/abnormal flag, and that's a structured field you
+      explicitly said you didn't want to force. <strong>B is worth revisiting only if the AI can infer
+      that flag from the free text reliably</strong> — which is testable, and worth testing before
+      anyone commits to the grid.</p>
+    </div>
+  </div>
+
+  <hr>
+
+  <!-- EXAM -->
+  <div class="section">
+    <h2>Tab 2</h2>
+    <h3>Physical exams</h3>
+    <p class="lede">The pill order is settled. The clickable exam is the thing you've built repeatedly
+    and never liked — so that gets the real work.</p>
+
+    <h4 style="margin-top:26px">The shell — built to spec</h4>
+
+    <div class="app">
+      <div class="app-t">
+        <div class="app-tab">History</div>
+        <div class="app-tab">Imaging/results</div>
+        <div class="app-tab on">Physical exams</div>
+        <div class="app-tab">Recommendation</div>
+      </div>
+      <div class="app-b">
+
+        <div class="nudge">
+          <span style="font-size:14px">✨</span>
+          <div class="nudge-x"><b>Seen for stroke 60 days ago.</b> Add the NIH Stroke Scale?</div>
+          <div class="nudge-b">Add NIHSS</div>
+          <div style="font-size:14px;color:var(--tm)">✕</div>
+        </div>
+
+        <div class="fs">
+          <div class="fs-h"><div class="fs-t">Examination</div><span class="badge">Optional</span></div>
+          <div class="pills">
+            <div class="pill on">Free text exam</div>
+            <div class="pill">Clickable exam</div>
+            <div class="pill">＋ NIHSS</div>
+            <div class="pill">＋ EDSS</div>
+            <div class="pill">＋ UPDRS</div>
+            <div class="pill add">＋ Search scales…</div>
+          </div>
+          <div class="ta f" style="min-height:76px">Alert and oriented to person, place, time and
+            situation. Language fluent without paraphasic error. Cranial nerves II–XII intact.
+            Motor 5/5 throughout with no pronator drift. Sensation intact to light touch…
+            <div class="icons">🎤 ⚡ ✨</div>
+          </div>
+          <div class="hint">↳ Free text first, exactly as specified — clickable and scales are opt-in</div>
+        </div>
+
+        <div class="fs">
+          <div class="fs-h"><div class="fs-t">NIHSS</div><span class="badge ai">AI SUGGESTED</span>
+            <span class="badge" style="margin-left:auto">LONGITUDINAL</span></div>
+          <div class="trend">
+            <div class="trend-h">
+              <div class="trend-n">NIH Stroke Scale — trend</div>
+              <div class="trend-v">3</div>
+            </div>
+            <div class="spark">
+              <div class="bar" style="height:100%"></div>
+              <div class="bar" style="height:58%"></div>
+              <div class="bar" style="height:33%"></div>
+              <div class="bar" style="height:25%"></div>
+            </div>
+            <div class="spark-x">
+              <span>11/17<br>12</span><span>12/09<br>7</span><span>01/02<br>4</span><span>Today<br>3</span>
+            </div>
+          </div>
+          <div class="hint">↳ <em>"I want to be able to see the old values and then… enter the new
+            values and see those trend lines over time."</em></div>
+        </div>
+
+        <div class="fs" style="opacity:.55">
+          <div class="fs-h"><div class="fs-t">Vital signs</div>
+            <span class="badge" style="background:#FEF3C7;color:#92400E">NEVER DISCUSSED</span></div>
+          <div style="font-size:11.5px;color:var(--tm)">Glucose · BP · O₂ sat · Pulse · Febrile/Afebrile —
+            these survive from the current build untouched. They didn't come up once in three hours.</div>
+        </div>
+
+      </div>
+    </div>
+    <div class="cap">Timestamp gone. Free text first. Scales opt-in via nudge, never required.</div>
+
+    <h4 style="margin-top:32px">The hard one — why your clickable exams keep disappointing you</h4>
+
+    <div class="box w">
+      <div class="box-t">A theory, offered for you to shoot down</div>
+      <p>You said it twice: <em class="q">"I've built this several times and I'm never really satisfied…
+      it's never very efficient for some reason, and I struggle with that"</em> and
+      <em class="q">"my most recent AI build was a million different click boxes… ugly as sin. And I
+      hate it."</em></p>
+      <p><strong>Here's my read on the "some reason": every clickable exam is built around the wrong
+      ratio.</strong> A normal neuro exam is roughly forty assertions. An abnormal one is those same
+      forty, minus three. So the information you're actually adding is <em>three items</em> — but every
+      design makes you handle all forty to express them. Your own instinct already names the fix —
+      <em class="q">"save as their favorite… and then they can just pull up their favourite and then
+      unselect the items that are abnormal"</em> — but a saved template still <em>renders</em> forty
+      rows, so the screen stays as noisy as before even though the clicking got cheaper. The clicks
+      went away; the cognitive load didn't.</p>
+      <p><strong>The efficient design makes the exception the only thing that occupies space.</strong>
+      All three options below are variations on that, differing in how much of the normal stays visible
+      — which matters, because what you're attesting to has to stay legible.</p>
+    </div>
+
+    <div class="opts three">
+
+      <div class="ocard">
+        <div class="oh"><span class="ol">OPTION A</span></div>
+        <div class="on-">Exception-only</div>
+        <div class="od">The entire normal exam collapses to one green line. You add only what's
+        abnormal. Forty rows become one plus your exceptions.</div>
+        <div class="mini">
+          <div class="norm">
+            <span style="font-size:13px">✓</span>
+            <div class="norm-t">Normal general neuro exam</div>
+            <div class="norm-a">View 41 findings</div>
+          </div>
+          <div class="exc">
+            <div class="exc-h"><div>
+              <div class="exc-t">Motor — right arm</div>
+              <div class="exc-s">4+/5 with pronator drift</div>
+            </div><div class="exc-x">✕</div></div>
+          </div>
+          <div class="exc">
+            <div class="exc-h"><div>
+              <div class="exc-t">Gait</div>
+              <div class="exc-s">Mildly wide-based, unsteady tandem</div>
+            </div><div class="exc-x">✕</div></div>
+          </div>
+          <div class="addexc">＋ Add abnormal finding</div>
+        </div>
+        <div class="pc">
+          <div class="p"><span>+</span>Fixes the ratio outright. Two exceptions cost two interactions and two rows.</div>
+          <div class="p"><span>+</span>The screen finally matches the clinical reality — normal is the boring default, abnormal is the story.</div>
+          <div class="p"><span>+</span>Scales to a 41-item exam without ever looking like 41 items.</div>
+          <div class="con"><span>−</span>The real objection: one click asserts 41 findings you never looked at. That's a lot of documentation behind a checkbox, and it's a genuine medico-legal exposure — hence "View 41 findings" being permanently on screen rather than buried.</div>
+          <div class="con"><span>−</span>Needs a good finding-search or "add abnormal" becomes its own dropdown hell.</div>
+        </div>
+      </div>
+
+      <div class="ocard">
+        <div class="oh"><span class="ol">OPTION B</span></div>
+        <div class="on-">Module chips</div>
+        <div class="od">Your seven modules as chips, green by default from your favorite. Open one at
+        a time. You never see more than one module's boxes.</div>
+        <div class="mini">
+          <div class="mods">
+            <div class="mod n"><span class="mdot n"></span>Mental status</div>
+            <div class="mod n"><span class="mdot n"></span>Cranial nerves</div>
+            <div class="mod open"><span class="mdot"></span>Motor</div>
+            <div class="mod n"><span class="mdot n"></span>Coordination</div>
+            <div class="mod e"><span class="mdot e"></span>Reflexes</div>
+            <div class="mod n"><span class="mdot n"></span>Sensory</div>
+            <div class="mod a"><span class="mdot a"></span>Gait</div>
+          </div>
+          <div class="modpanel">
+            <div style="font-size:9px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--tm);margin-bottom:6px">Motor</div>
+            <div class="modgrid">
+              <div class="opt on"><span class="cb">✓</span>Bulk &amp; tone normal</div>
+              <div class="opt off"><span class="cb"></span>5/5 throughout</div>
+              <div class="opt off"><span class="cb"></span>No pronator drift</div>
+              <div class="opt on"><span class="cb">✓</span>No fasciculations</div>
+            </div>
+            <div class="ta" style="margin-top:6px;min-height:0;font-size:10px">
+              Right arm 4+/5 with drift…</div>
+          </div>
+        </div>
+        <div class="pc">
+          <div class="p"><span>+</span>Preserves the mental model you dictated — the seven modules, in your order.</div>
+          <div class="p"><span>+</span>Bounded pixels: one module open means four to six boxes, never forty.</div>
+          <div class="p"><span>+</span>Chip color makes an abnormal module findable from across the page. Reflexes can just stay grey — <em>"reflexes on video are like worthless."</em></div>
+          <div class="p"><span>+</span>Per-module free text keeps you "relatively broad" and lets granularity go in prose.</div>
+          <div class="con"><span>−</span>Still seven interactions to review a normal exam, even if each is cheap.</div>
+          <div class="con"><span>−</span>The closest to what you've built before — which is the honest warning, since that's the thing that keeps disappointing you.</div>
+        </div>
+      </div>
+
+      <div class="ocard rec">
+        <div class="oh"><span class="ol">OPTION C</span><span class="tag">Recommended</span></div>
+        <div class="on-">Live prose mirror</div>
+        <div class="od">Exception-only on the left; the actual note text renders live on the right,
+        with your changes highlighted. You attest to prose, not checkboxes.</div>
+        <div class="mini">
+          <div class="split">
+            <div>
+              <div class="norm" style="padding:7px 8px;margin-bottom:6px">
+                <div class="norm-t" style="font-size:10.5px">Normal exam</div>
+              </div>
+              <div class="exc" style="padding:6px 8px">
+                <div class="exc-t" style="font-size:10.5px">Motor — R arm</div>
+                <div class="exc-s" style="font-size:9.5px">4+/5, drift</div>
+              </div>
+              <div class="exc" style="padding:6px 8px">
+                <div class="exc-t" style="font-size:10.5px">Gait</div>
+                <div class="exc-s" style="font-size:9.5px">Wide-based</div>
+              </div>
+              <div class="addexc" style="padding:6px;font-size:10px">＋ Add finding</div>
+            </div>
+            <div class="prose">
+              <div class="prose-l">📄 Note preview</div>
+              Alert, oriented ×4. Language fluent. CN II–XII intact.
+              Motor: <span class="hl">right arm 4+/5 with pronator drift</span>, otherwise 5/5.
+              Sensation intact. Coordination intact.
+              Gait <span class="hl">mildly wide-based with unsteady tandem</span>.
+            </div>
+          </div>
+        </div>
+        <div class="pc">
+          <div class="p"><span>+</span>Solves A's trust problem without paying B's pixel cost. You see every word you're signing, so the collapsed normal stops being a leap of faith.</div>
+          <div class="p"><span>+</span>The output <em>is</em> the interface. No mental translation from checkbox to note text — which I suspect is the other half of why clickable exams feel wrong.</div>
+          <div class="p"><span>+</span>Highlighting makes your three exceptions pop out of the prose instantly.</div>
+          <div class="p"><span>+</span>The prose stays editable — free text and structure stop being a either/or.</div>
+          <div class="con"><span>−</span>Needs the full page width. Fine for outpatient; wouldn't survive a narrow panel.</div>
+          <div class="con"><span>−</span>Most build effort of the three: a real template→prose renderer that has to sound like a neurologist wrote it, not a form.</div>
+        </div>
+      </div>
+
+    </div>
+
+    <div class="box d">
+      <div class="box-t">My read on the clickable exam</div>
+      <p><strong>C.</strong> Your stated preference is free text, and every clickable exam you've built
+      has fought that preference instead of serving it. C doesn't fight it — the structure is just a
+      fast way to produce prose you can still edit, and you always see the prose. If my theory about
+      the ratio is right, C is the one that fixes both halves of it: the exception is the only thing
+      you touch, <em>and</em> you never have to imagine what the checkboxes will read like.</p>
+      <p>If C is too much build, <strong>B is the safe fallback</strong> — but I'd say plainly that B
+      is closest to what you've built before, so if the theory is wrong, B is where you'd find out by
+      being disappointed a fourth time.</p>
+    </div>
+  </div>
+
+  <hr>
+
+  <!-- OPEN -->
+  <div class="section">
+    <h2>Still open</h2>
+    <h3>What the meeting didn't settle</h3>
+
+    <div class="box">
+      <h4>1. Where do UPDRS, EDSS and MoCA live? — you own this</h4>
+      <p class="qq"><b>You:</b> "I'm thinking like the UPDRS — is that an exam or is that a scale? …
+      similar with the EDSS for MS. Where do we put those kind of things? And I'll have to actually
+      kind of think about that a little bit."</p>
+      <p>Your working answer was NIHSS stays exam-embedded, everything else goes to Scales under
+      History. The mockups above assume exactly that. It's the one structural assumption I'd most
+      like you to confirm or break, since it changes both tabs.</p>
+    </div>
+
+    <div class="box">
+      <h4>2. Vital signs and the fever chips — a real gap</h4>
+      <p>Glucose, BP, O₂ sat, Pulse, and Febrile/Afebrile are in the current Figma and were
+      <strong>never mentioned once</strong> in three hours. I left them untouched and greyed rather
+      than redesign something nobody discussed. Worth a direct question to Neha and Smriti — in a
+      tele-outpatient visit where an MA is assisting, it's not obvious these should be typed at all.</p>
+    </div>
+
+    <div class="box">
+      <h4>3. The "flag forever" mechanism had no owner</h4>
+      <p>The genetic-test / five-year-old-antibody problem was raised, agreed to be valuable, and then
+      the conversation moved on without a mechanism or an owner. My 🔖 pin above is a strawman, not a
+      decision.</p>
+    </div>
+
+    <div class="box">
+      <h4>4. The tension worth naming out loud</h4>
+      <p class="qq"><b>Prachi:</b> "This needs to be positioned in a way where we can mine data off of
+      it quickly… it can't be all these free text."</p>
+      <p>Your history-vs-orders split resolves this cleanly on paper, and I've built to it. But note
+      what it costs: <strong>Option B for diagnostics (the flowsheet) dies under that split</strong>,
+      because a grid needs a structured normal/abnormal flag that pure free text can't give it. That's
+      the one place where "free text everywhere" has a visible price, and it's worth deciding with
+      eyes open rather than discovering later.</p>
+    </div>
+
+    <div class="box w">
+      <div class="box-t">One thing I'd flag about the Scrum Launch plan</div>
+      <p>You framed the ambition deliberately: <em class="q">"can we push it further and faster and
+      harder than we would our own internal people?"</em> Prachi's counterweight was equally
+      deliberate: <em class="q">"we still have to maintain this internally. So we need to be
+      reasonable."</em></p>
+      <p>Both are right, and the split isn't 50/50 across this document. <strong>The diagnostics tab
+      is mostly cheap</strong> — pills and free text are ordinary work, and Option A is a list.
+      <strong>The exam tab is where the real money is</strong>, and Option C's prose renderer is the
+      single most expensive thing here. If something gets handed to an external team, C is the
+      candidate that actually justifies it — it's self-contained, spec-able, and it's the piece your
+      internal team would most likely descope under pressure. The pills you could ship yourselves next
+      sprint.</p>
+    </div>
+  </div>
+
+</div>

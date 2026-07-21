@@ -52,3 +52,5 @@ qa/triage-sentinel/
 # as the Task 2 entry above.
 src/lib/historian/synthetic/
 src/lib/voice/providers/
+# CLAUDE.md prose: triage pipeline-stage phrase trips the 40-char entropy pattern (not a secret)
+gateway\+safety\+scorer\+fusion\+adjudicator

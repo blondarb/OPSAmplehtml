@@ -42,7 +42,7 @@ export const clinicianTrack: JourneyTrackData = {
     },
     {
       phase: 'My Day',
-      name: 'Clinician Cockpit',
+      name: 'Bridge',
       route: '/physician',
       icon: CalendarClock,
       status: 'live',

@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { Bot } from 'lucide-react'
+import { Bot, ClipboardList, Workflow, Layers, Sparkles, Orbit } from 'lucide-react'
 import PlatformShell from '@/components/layout/PlatformShell'
 import HeroSection from '@/components/homepage/HeroSection'
 import JourneyTrack from '@/components/homepage/JourneyTrack'
@@ -54,6 +54,91 @@ export default function Home() {
           </div>
         </div>
       )}
+
+      <div className="bg-slate-950 px-6 py-12">
+        <div className="mx-auto max-w-4xl">
+          <div className="mb-5 flex items-center gap-2">
+            <span className="rounded bg-sky-500/20 px-2 py-1 text-xs font-semibold uppercase tracking-wide text-sky-300">
+              Concepts
+            </span>
+            <span className="text-xs text-slate-400">
+              Design explorations &amp; MVP thinking — trial and error, not product
+            </span>
+          </div>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <a
+              href="/concepts/synapse-3/unified-surface.html"
+              className="flex items-center gap-3 rounded-xl border border-slate-700 bg-slate-800/60 px-5 py-4 transition hover:border-orange-500 hover:bg-slate-800"
+            >
+              <span className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-orange-500/15">
+                <Orbit size={20} className="text-orange-300" />
+              </span>
+              <span>
+                <span className="block text-sm font-semibold text-white">Synapse 3.0 — One Surface</span>
+                <span className="block text-xs text-slate-400">
+                  Acute, rounds, EEG reads, clinic, triage, MA &amp; manager as role lenses on one time-spine. Working switcher, new &ldquo;Daylight&rdquo; design language.
+                </span>
+              </span>
+            </a>
+            <a
+              href="/concepts/triage-nurse/outpatient-triage-nurse-demo.html"
+              className="flex items-center gap-3 rounded-xl border border-slate-700 bg-slate-800/60 px-5 py-4 transition hover:border-sky-500 hover:bg-slate-800"
+            >
+              <span className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-sky-500/15">
+                <ClipboardList size={20} className="text-sky-300" />
+              </span>
+              <span>
+                <span className="block text-sm font-semibold text-white">Outpatient Triage Nurse — working demo</span>
+                <span className="block text-xs text-slate-400">
+                  Clickable queue, pathway, and dispositions in the Synapse 2.0 chrome. Fictional patients.
+                </span>
+              </span>
+            </a>
+            <a
+              href="/concepts/triage-nurse/mvp-workflow.html"
+              className="flex items-center gap-3 rounded-xl border border-slate-700 bg-slate-800/60 px-5 py-4 transition hover:border-sky-500 hover:bg-slate-800"
+            >
+              <span className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-teal-500/15">
+                <Workflow size={20} className="text-teal-300" />
+              </span>
+              <span>
+                <span className="block text-sm font-semibold text-white">Triage Nurse MVP — Epic-hybrid workflow</span>
+                <span className="block text-xs text-slate-400">
+                  No integrations: Epic is record + contact, ours is tracking + intelligence. Paste is the bridge.
+                </span>
+              </span>
+            </a>
+            <a
+              href="/concepts/outpatient-design/outpatient-mockups.html"
+              className="flex items-center gap-3 rounded-xl border border-slate-700 bg-slate-800/60 px-5 py-4 transition hover:border-sky-500 hover:bg-slate-800"
+            >
+              <span className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-indigo-500/15">
+                <Layers size={20} className="text-indigo-300" />
+              </span>
+              <span>
+                <span className="block text-sm font-semibold text-white">Outpatient Synapse — tab redesign</span>
+                <span className="block text-xs text-slate-400">
+                  Exam, imaging/results &amp; scales series from the 7/15 working session, with the decisions ledger.
+                </span>
+              </span>
+            </a>
+            <a
+              href="/concepts/synapse-3-0.html"
+              className="flex items-center gap-3 rounded-xl border border-slate-700 bg-slate-800/60 px-5 py-4 transition hover:border-amber-500 hover:bg-slate-800"
+            >
+              <span className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-amber-500/15">
+                <Sparkles size={20} className="text-amber-300" />
+              </span>
+              <span>
+                <span className="block text-sm font-semibold text-white">Synapse 3.0?</span>
+                <span className="block text-xs text-slate-400">
+                  The parked acute time-rail exploration that seeded One Surface — kept for provenance.
+                </span>
+              </span>
+            </a>
+          </div>
+        </div>
+      </div>
 
       <Footer />
     </PlatformShell>

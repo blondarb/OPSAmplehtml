@@ -1,0 +1,794 @@
+<meta charset="utf-8">
+<title>Outpatient Synapse — Triage nurse dashboard</title>
+<style>
+  :root{
+    --primary:#3b82f6; --primary-light:#60a5fa; --primary-dark:#2563eb;
+    --white:#1a1d23; --gray:#0c0f14; --dark:#0c0f14;
+    --tp:#f1f1f1; --ts:#acacaf; --tm:#696a70; --bd:#2a2d34;
+    --err:#ef4444; --ok:#22c55e; --warn:#f97316;
+    --f:-apple-system,BlinkMacSystemFont,'SF Pro','Segoe UI',Roboto,sans-serif;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--dark);color:var(--tp);font-family:var(--f);
+       font-size:14px;line-height:1.5;-webkit-font-smoothing:antialiased}
+  .wrap{max-width:1180px;margin:0 auto;padding:44px 22px 90px}
+
+  h1{font-size:29px;font-weight:700;letter-spacing:-.02em;margin:0 0 8px}
+  h2{font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;
+     color:var(--primary);margin:0 0 5px}
+  h3{font-size:20px;font-weight:650;letter-spacing:-.01em;margin:0 0 6px}
+  h4{font-size:15px;font-weight:650;margin:0 0 5px}
+  p{margin:0 0 11px;color:var(--ts)}
+  .lede{font-size:15.5px;max-width:76ch}
+  strong{color:var(--tp);font-weight:650}
+  em.q{color:var(--tp);font-style:italic}
+  code{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:.87em;
+       background:#2a2d34;padding:1px 5px;border-radius:4px;color:#93bbfd}
+  hr{border:0;height:1px;background:var(--bd);margin:52px 0 0}
+  .section{margin:64px 0 0}
+
+  /* callouts */
+  .box{background:var(--white);border:1px solid var(--bd);border-radius:10px;
+       padding:16px 18px;margin:18px 0;box-shadow:0 1px 3px rgba(0,0,0,.2)}
+  .box.d{border-left:3px solid var(--primary)}
+  .box.w{border-left:3px solid var(--warn)}
+  .box.g{border-left:3px solid var(--ok)}
+  .box-t{font-size:10.5px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;
+         color:var(--primary);margin-bottom:6px}
+  .box.w .box-t{color:#f97316} .box.g .box-t{color:#22c55e}
+  .box p:last-child{margin-bottom:0}
+
+  /* decided list */
+  .dec{background:var(--white);border:1px solid var(--bd);border-radius:10px;overflow:hidden;margin:18px 0}
+  .dec-r{display:flex;gap:12px;padding:11px 16px;border-bottom:1px solid var(--bd);align-items:flex-start}
+  .dec-r:last-child{border-bottom:0}
+  .dec-i{flex-shrink:0;width:16px;height:16px;border-radius:50%;background:var(--ok);
+         color:#fff;font-size:10px;font-weight:700;display:flex;align-items:center;
+         justify-content:center;margin-top:3px}
+  .dec-x{font-size:13.5px;color:var(--ts)}
+  .dec-x b{color:var(--tp)}
+
+  /* app mockup */
+  .app{background:var(--gray);border:1px solid var(--bd);border-radius:10px;overflow:hidden;
+       margin:16px 0;box-shadow:0 2px 8px rgba(0,0,0,.3)}
+  .app-t{background:var(--white);border-bottom:1px solid var(--bd);padding:0 18px;
+         display:flex;align-items:center;gap:14px;height:40px}
+  .app-logo{width:16px;height:16px;border-radius:4px;flex-shrink:0;
+            background:linear-gradient(135deg,#22c55e,#3b82f6);color:#fff;font-weight:700;
+            font-size:9px;display:flex;align-items:center;justify-content:center}
+  .app-brand{font-size:11px;font-weight:600;margin-right:2px}
+  .app-tab{font-size:11px;color:var(--ts);padding:13px 0;border-bottom:2px solid transparent;font-weight:500}
+  .app-tab.on{color:var(--tp);font-weight:650;border-bottom-color:var(--tp)}
+  .app-b{padding:18px;background:var(--gray)}
+
+  /* form section */
+  .fs{background:var(--white);border:1px solid var(--bd);border-radius:10px;padding:15px;margin-bottom:12px}
+  .fs-h{display:flex;align-items:center;gap:8px;margin-bottom:11px}
+  .fs-t{font-size:13.5px;font-weight:650}
+  .badge{font-size:9px;font-weight:700;padding:2px 6px;border-radius:4px;letter-spacing:.04em;
+         background:rgba(105,106,112,.2);color:var(--ts)}
+  .badge.req{background:rgba(239,68,68,.2);color:#ef4444}
+  .badge.new{background:rgba(36,195,184,.2);color:#24c3b8}
+  .badge.ai{background:rgba(139,92,246,.2);color:#c4b5fd}
+
+  /* pills */
+  .pills{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px}
+  .pill{font-size:12px;font-weight:550;padding:6px 13px;border-radius:20px;
+        border:1px solid var(--bd);background:var(--white);color:var(--ts);white-space:nowrap}
+  .pill.on{background:var(--primary);border-color:var(--primary);color:#fff;font-weight:600}
+  .pill.sub{font-size:11.5px;padding:5px 11px}
+  .pill.sub.on{background:var(--primary-dark);border-color:var(--primary-dark)}
+  .pill.add{border-style:dashed;color:var(--tm)}
+  .sublane{background:var(--gray);border-radius:8px;padding:10px;margin-bottom:9px;
+           border-left:2px solid var(--primary)}
+  .sub-l{font-size:9.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;
+         color:var(--tm);margin-bottom:6px}
+
+  /* entry */
+  .entry{background:var(--white);border:1px solid var(--bd);border-radius:7px;padding:10px;margin-top:8px}
+  .entry-h{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:7px}
+  .entry-n{font-size:12px;font-weight:650;display:flex;align-items:center;gap:6px}
+  .date{font-size:11px;color:var(--ts);border:1px solid var(--bd);border-radius:5px;
+        padding:3px 8px;background:var(--white);font-variant-numeric:tabular-nums}
+  .ta{border:1px solid var(--bd);border-radius:6px;padding:8px;font-size:11.5px;color:var(--ts);
+      background:var(--white);min-height:46px;position:relative}
+  .ta.f{color:var(--tp)}
+  .icons{position:absolute;right:6px;bottom:5px;display:flex;gap:5px;font-size:11px;opacity:.5}
+  .hint{font-size:10.5px;color:var(--tm);margin-top:5px;display:flex;align-items:center;gap:4px}
+
+  /* zones */
+  .zone-l{font-size:10px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;
+          color:var(--tm);margin:0 0 7px;display:flex;align-items:center;gap:6px}
+  .zone-l:after{content:'';flex:1;height:1px;background:var(--bd)}
+
+  /* tables */
+  table{width:100%;border-collapse:collapse;font-size:11.5px}
+  th{text-align:left;font-size:9.5px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;
+     color:var(--tm);padding:6px 8px;border-bottom:1px solid var(--bd)}
+  td{padding:7px 8px;border-bottom:1px solid var(--bd);color:var(--ts);vertical-align:top}
+  td.d{font-variant-numeric:tabular-nums;white-space:nowrap;color:var(--tm)}
+  td b{color:var(--tp);font-weight:600}
+  tr.new td{background:rgba(59,130,246,.08)}
+
+  /* split view */
+  .split{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  .prose{background:var(--white);border:1px solid var(--bd);border-radius:7px;padding:11px;
+         font-size:11px;line-height:1.65;color:var(--ts)}
+  .prose b{color:var(--tp)}
+  .prose .hl{background:rgba(234,179,8,.25);color:#fde047;font-weight:600;border-radius:2px;padding:0 2px}
+  .prose-l{font-size:9px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;
+           color:var(--tm);margin-bottom:6px;display:flex;align-items:center;gap:5px}
+
+  /* option grid */
+  .opts{display:grid;gap:18px;margin-top:22px}
+  @media(min-width:920px){.opts.three{grid-template-columns:repeat(3,1fr)}}
+  @media(min-width:760px){.opts.two{grid-template-columns:repeat(2,1fr)}}
+  .ocard{background:var(--white);border:1px solid var(--bd);border-radius:11px;padding:16px;
+         display:flex;flex-direction:column;min-width:0;box-shadow:0 1px 3px rgba(0,0,0,.2)}
+  .ocard.rec{border-color:var(--primary);box-shadow:0 0 0 1px rgba(59,130,246,.18)}
+  .oh{display:flex;align-items:center;gap:7px;flex-wrap:wrap;margin-bottom:3px}
+  .ol{font-size:9.5px;font-weight:700;letter-spacing:.1em;color:var(--tm)}
+  .on-{font-size:16px;font-weight:650;letter-spacing:-.01em}
+  .tag{font-size:9px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;
+       padding:2px 7px;border-radius:4px;background:rgba(59,130,246,.2);color:#3b82f6}
+  .od{font-size:12.5px;color:var(--ts);margin:6px 0 12px}
+  .mini{background:var(--gray);border:1px solid var(--bd);border-radius:8px;padding:10px;margin-bottom:12px}
+  .pc{margin-top:auto;padding-top:12px;border-top:1px solid var(--bd);font-size:12px}
+  .pc>div{display:flex;gap:7px;margin-bottom:5px;color:var(--ts)}
+  .pc span{flex-shrink:0;font-weight:700}
+  .pc .p span{color:var(--ok)} .pc .con span{color:var(--warn)}
+  .cap{font-size:10.5px;color:var(--tm);text-align:center;font-style:italic;margin:-4px 0 12px}
+
+  ul{margin:0 0 11px;padding-left:19px;color:var(--ts)}
+  li{margin-bottom:5px}
+  .qq{border-left:2px solid var(--bd);padding-left:12px;margin:0 0 12px;font-size:13.5px;
+      color:var(--ts);font-style:italic}
+  .qq b{font-style:normal;color:var(--tp);font-weight:650}
+
+  /* ===== triage-specific additions below ===== */
+
+  /* tier chips — engine's TIER_DISPLAY colors */
+  .tchip{font-size:10px;font-weight:700;letter-spacing:.03em;padding:3px 8px;border-radius:5px;
+         display:inline-flex;align-items:center;gap:5px;white-space:nowrap;color:#fff}
+  .tchip.emergent{background:#000;border:1.5px solid #ef4444;animation:tpulse 1.7s ease-in-out infinite}
+  .tchip.urgent{background:rgba(239,68,68,.2);color:#ef4444}
+  .tchip.semi{background:rgba(234,88,12,.2);color:#EA580C}
+  .tchip.rp{background:rgba(234,179,8,.2);color:#eab308}
+  .tchip.routine{background:rgba(34,197,94,.2);color:#22c55e}
+  .tchip.nonurgent{background:rgba(59,130,246,.2);color:#3b82f6}
+  .tchip.idata{background:rgba(105,106,112,.2);color:var(--ts)}
+  @keyframes tpulse{0%,100%{opacity:1}50%{opacity:.55}}
+
+  /* queue rows */
+  .qrow{background:var(--white);border:1px solid var(--bd);border-left:3px solid var(--bd);
+        border-radius:7px;padding:10px 12px;margin-top:8px}
+  .qrow.red{border-left-color:#ef4444} .qrow.orange{border-left-color:#EA580C}
+  .qrow.green{border-left-color:#22c55e} .qrow.gray{border-left-color:var(--tm)}
+  .qrow-h{display:flex;justify-content:space-between;align-items:baseline;gap:8px;margin-bottom:4px}
+  .qrow-n{font-size:12.5px;font-weight:650}
+  .qrow-n span{font-weight:500;color:var(--ts);font-size:11.5px}
+  .qrow-src{font-size:10.5px;color:var(--tm);white-space:nowrap}
+  .qrow-q{font-size:11.5px;color:var(--ts);margin:5px 0;line-height:1.5}
+  .qrow-q .hl{background:rgba(234,179,8,.25);color:#fde047;font-weight:600;border-radius:2px;padding:0 2px}
+  .qrow-c{display:flex;align-items:center;gap:7px;flex-wrap:wrap;margin:6px 0}
+  .qrow-f{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-top:7px}
+  .qrow-note{font-size:10.5px;color:var(--tm)}
+  .evid{font-size:9.5px;color:var(--tm);white-space:nowrap}
+  .ldot{width:8px;height:8px;border-radius:50%;display:inline-block;flex-shrink:0}
+
+  /* emergency strip */
+  .estrip{background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.25);border-left:3px solid #ef4444;
+          border-radius:8px;padding:11px 14px;margin:14px 0;display:flex;gap:11px;align-items:flex-start}
+  .estrip-x{font-size:12px;color:#fca5a5;flex:1;line-height:1.55}
+  .estrip-x b{color:#fecaca}
+
+  /* chart context rows + source tags */
+  .src{font-size:9px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--tm);
+       background:var(--dark);border-radius:4px;padding:2px 6px;white-space:nowrap}
+  .ctxrow{display:flex;justify-content:space-between;align-items:baseline;gap:8px;padding:6px 0;
+          border-bottom:1px solid var(--bd);font-size:11.5px;color:var(--ts)}
+  .ctxrow:last-child{border-bottom:0}
+  .ctxrow b{color:var(--tp)}
+
+  /* pathway branches */
+  .pway-q{font-size:11.5px;color:var(--tp);font-weight:600;margin-bottom:5px}
+  .pway-q .ok-{color:var(--ok);font-weight:700;margin-right:5px}
+  .pway-a{font-size:11px;color:var(--ts);margin:0 0 10px 16px}
+  .branch{border-left:2px dashed var(--bd);margin:8px 0 0 6px;padding-left:12px}
+  .branch div{font-size:10.5px;color:var(--tm);font-style:italic;margin-bottom:4px}
+  .branch b{color:var(--ts);font-style:normal;font-weight:600}
+
+  /* buttons */
+  .btn{font-size:11px;font-weight:650;border-radius:6px;padding:6px 13px;white-space:nowrap;
+       display:inline-block;border:1px solid transparent;color:#fff}
+  .btn.ghost{background:var(--white);border-color:var(--bd);color:var(--ts)}
+  .btn.red{background:#ef4444} .btn.orange{background:#EA580C}
+  .btn.green{background:#22c55e} .btn.teal{background:var(--primary)}
+
+  /* EXISTS / EXTEND / NEW chip cloud */
+  .gchip{font-size:9px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;padding:3px 8px;
+         border-radius:4px;display:inline-block;margin:3px 6px 3px 0}
+  .gchip.exists{background:rgba(36,195,184,.2);color:#24c3b8}
+  .gchip.extend{background:rgba(234,88,12,.2);color:#EA580C}
+  .gchip.new{background:rgba(105,106,112,.2);color:var(--ts)}
+
+  .dec-i.mk{background:rgba(36,195,184,.2);color:#24c3b8;width:22px;border-radius:8px;font-size:8px}
+  .badge.extend{background:rgba(234,88,12,.2);color:#EA580C}
+
+  /* demo-link callout */
+  .demolink{background:var(--white);border:1px solid var(--primary);border-radius:10px;
+            padding:14px 18px;margin:18px 0;display:flex;align-items:center;
+            justify-content:space-between;gap:14px;flex-wrap:wrap}
+  .demolink span{font-size:13.5px;color:var(--tp);font-weight:550}
+  .demolink a{background:#3b82f6;color:#fff;border-radius:6px;padding:8px 14px;font-size:12px;
+              font-weight:650;white-space:nowrap;text-decoration:none;flex-shrink:0}
+</style>
+
+<div class="wrap">
+
+  <h1>Outpatient Synapse — Triage nurse dashboard</h1>
+  <p class="lede">Grounded in Mary Kate Banks' email "Triaging Technology Ideas" (Sun 7/19, to Steve
+  and Sam, cc Prachi), written after the Friday 7/17 NYC conversation. Her front-line asks, mapped onto
+  the AI triage engine already built and safety-hardened in the OP sample — with mockups of the
+  combined thing in the outpatient Synapse frame.</p>
+
+  <div class="box g">
+    <div class="box-t">Built from her words and a verified repo</div>
+    <p>The email is the requirements source. Every "exists today" claim below was checked against the
+    OP-sample code on 7/20. Where she offered options — 1–5 levels vs. ER-style colors — this doc
+    recommends one and says why.</p>
+  </div>
+
+  <div class="demolink">
+    <span>▶ Working demo — click through the queue, pathway, and dispositions</span>
+    <a href="./outpatient-triage-nurse-demo.html">Open working demo ↗</a>
+  </div>
+
+  <!-- SECTION 1 -->
+  <div class="section">
+    <h2>Section 1</h2>
+    <h3>What Mary Kate asked for</h3>
+    <p class="lede">Four asks, straight from the email. The teal <b>MK</b> chip marks these as hers,
+    not decisions made in a room.</p>
+
+    <div class="dec">
+      <div class="dec-r"><div class="dec-i mk">MK</div><div class="dec-x">
+        <b>Portal messages carry no urgency signal.</b> <em class="q">"We have to go through each
+        patient message manually to make sure we are getting to those urgent messages first."</em></div></div>
+      <div class="dec-r"><div class="dec-i mk">MK</div><div class="dec-x">
+        <b>Red-flag lists exist but are applied hit-or-miss by non-clinical staff.</b> <em class="q">"I
+        have developed some neurology specific 'red flags' or panic words… This is all done by
+        non-clinical staff and it's hit or miss if it's done accurately."</em></div></div>
+      <div class="dec-r"><div class="dec-i mk">MK</div><div class="dec-x">
+        <b>Risk-tier every inbound contact from the chart, not just the message.</b> <em class="q">"…categorized
+        into different levels of risk based on their clinical history, neurological conditions, labs,
+        imaging, and current issue they are reaching out about"</em> — as 1–5 levels or ER-style colors.</div></div>
+      <div class="dec-r"><div class="dec-i mk">MK</div><div class="dec-x">
+        <b>Turn triage dot phrases into if/then pathways.</b> <em class="q">"Based on the patient
+        answers or nursing assessment either more triaging questions are created OR the nurse is given
+        next steps (send to ER, contact provider, etc)."</em></div></div>
+    </div>
+  </div>
+
+  <hr>
+  <!-- SECTION 2 -->
+  <div class="section">
+    <h2>Section 2</h2>
+    <h3>Most of the dangerous part is already built</h3>
+    <p class="lede">Line up her four asks against the OP-sample repo as it stands today, and the gap
+    is much smaller — and much less dangerous — than it looks from the outside.</p>
+
+    <table>
+      <tr><th>Her ask</th><th>In the OP sample today</th><th>The gap</th></tr>
+      <tr>
+        <td><b>Urgency-tier every inbound contact</b></td>
+        <td>7-tier classifier + care-pathway layer (<code>emergency_now</code> /
+          <code>same_day_clinician_review</code> / expedited / routine / redirect / undetermined) —
+          display colors already in the code.</td>
+        <td>Triages <b>referral documents</b> only, not portal messages or call-center encounters —
+          new input lanes, same machinery.</td>
+      </tr>
+      <tr>
+        <td><b>Red flags applied consistently, not hit-or-miss</b></td>
+        <td>12-syndrome emergency gateway: deterministic anchors with negation/temporality suppression
+          + exact quoted evidence, cross-checked by an independent extractor; disagreement escalates,
+          never silently downgrades.</td>
+        <td>Her call-center word lists become seed anchors + test cases; a nurse-editable library view
+          doesn't exist yet.</td>
+      </tr>
+      <tr>
+        <td><b>Tier from chart context</b> — history, labs, imaging</td>
+        <td>The app holds the chart (history, meds, prior visits, imaging reports); the engine accepts
+          only age/sex/referrer today — text-only otherwise.</td>
+        <td>Wire chart context into the engine's structured input, with provenance shown.</td>
+      </tr>
+      <tr>
+        <td><b>If/then pathways</b>, not static questions</td>
+        <td>Flat dot phrases exist; a governed pre-approved clarification-question mechanism already
+          exists for the AI historian.</td>
+        <td>The branching pathway builder itself is new; the governance pattern to build it on already
+          exists.</td>
+      </tr>
+      <tr>
+        <td><b>A nurse queue, worst first</b></td>
+        <td>Batch panel sorted by severity exists — for referral batches.</td>
+        <td>A persistent multi-source queue UI is new.</td>
+      </tr>
+      <tr>
+        <td><b>Patient comms</b> — acknowledgment, follow-up</td>
+        <td>Portal inbox (patient side), Twilio SMS/voice follow-up agent, and voice historian intake
+          all exist.</td>
+        <td>None for the demo — staff-side wiring only.</td>
+      </tr>
+    </table>
+
+    <div class="box d">
+      <div class="box-t">The takeaway</div>
+      <p>The hard, dangerous part — a safety-gated classifier with an emergency gateway, independent
+      cross-check, adjudication, holds, and a release-gate eval harness — exists and survived
+      adversarial review. What's missing is her front door: the sources, the queue, and the
+      pathways.</p>
+    </div>
+  </div>
+
+  <hr>
+
+  <!-- MOCKUP 1 -->
+  <div class="section">
+    <h2>Mockup 1</h2>
+    <h3>One queue — every inbound contact, worst first</h3>
+    <p class="lede">Every source lands in one place, sorted by the engine's care pathway — not by
+    which system it arrived through.</p>
+
+    <div class="app">
+      <div class="app-t">
+        <div class="app-logo">S</div>
+        <span class="app-brand">Synapse</span>
+        <div class="app-tab">Acute Care</div>
+        <div class="app-tab">Rounding</div>
+        <div class="app-tab">EEG</div>
+        <div class="app-tab">Outpatient</div>
+        <div class="app-tab on">Triage</div>
+        <div class="app-tab">History</div>
+        <div class="app-tab">Imaging/results</div>
+      </div>
+      <div class="app-b">
+
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:12px;flex-wrap:wrap">
+          <div class="pills" style="margin-bottom:0">
+            <div class="pill on">All 7</div>
+            <div class="pill">💬 Portal 4</div>
+            <div class="pill">📞 Call center 2</div>
+            <div class="pill">📄 Referral 1</div>
+            <div class="pill" style="margin-left:6px">My queue</div>
+          </div>
+          <div class="qrow-src">Mon 7:42 AM</div>
+        </div>
+
+        <div class="estrip">
+          <span style="font-size:15px">🚨</span>
+          <div class="estrip-x">
+            <span class="badge new" style="margin-right:6px">EXISTS TODAY</span>
+            <b>Emergency gateway · 7:33 AM</b> — call-center contact matched acute-cerebrovascular red
+            flags. Scheduling locked · 911/ED guidance script shown to rep · covering neurologist
+            paged · awaiting nurse confirmation.
+          </div>
+        </div>
+        <div class="qrow-note" style="margin:-6px 0 16px 2px">Mirrors the real gateway → lock →
+          EmergencyActionPanel behavior.</div>
+
+        <div class="zone-l"><span class="ldot" style="background:#DC2626"></span>Contact now —
+          <code>emergency_now</code> (1)</div>
+        <div class="qrow red">
+          <div class="qrow-h">
+            <div class="qrow-n">David Okafor, 67 <span>· post-TIA (2 wks)</span></div>
+            <div class="qrow-src">📞 Call center 7:31 AM</div>
+          </div>
+          <div class="qrow-q">"<span class="hl">face drooping</span> again since breakfast,
+            <span class="hl">speech slurred</span>"</div>
+          <div class="qrow-c">
+            <span class="tchip emergent">EMERGENT — Redirect to ED Immediately</span>
+            <span class="evid">🔎 evidence quoted</span>
+          </div>
+          <div class="qrow-f">
+            <span class="date">11 min</span>
+            <span class="btn red">Open now</span>
+          </div>
+          <div class="qrow-note">Gateway fired — see strip above.</div>
+        </div>
+
+        <div class="zone-l" style="margin-top:22px"><span class="ldot" style="background:#EA580C"></span>Same-day —
+          <code>same_day_clinician_review</code> (2)</div>
+        <div class="qrow orange">
+          <div class="qrow-h">
+            <div class="qrow-n">Margaret Ellison, 41 <span>· MS — ocrelizumab</span></div>
+            <div class="qrow-src">💬 Portal 6:58 AM</div>
+          </div>
+          <div class="qrow-q">"new <span class="hl">numbness in both legs</span> since yesterday,
+            <span class="hl">tripping</span> when I walk"</div>
+          <div class="qrow-c">
+            <span class="tchip semi">SEMI-URGENT</span>
+            <span class="qrow-note">possible relapse; infusion overdue</span>
+          </div>
+          <div class="qrow-f">
+            <span class="date">44 min</span>
+            <span class="btn orange">Start pathway</span>
+          </div>
+        </div>
+        <div class="qrow orange">
+          <div class="qrow-h">
+            <div class="qrow-n">Robert Chen, 72 <span>· Parkinson's</span></div>
+            <div class="qrow-src">📞 6:15 AM</div>
+          </div>
+          <div class="qrow-q">"fell twice this morning, no injury — carbidopa-levodopa ran out
+            Friday"</div>
+          <div class="qrow-c">
+            <span class="tchip semi">SEMI-URGENT</span>
+            <span class="qrow-note">fall risk + abrupt med stop</span>
+          </div>
+          <div class="qrow-f">
+            <span class="date">1 h 27 m</span>
+            <span class="btn orange">Start pathway</span>
+          </div>
+        </div>
+
+        <div class="zone-l" style="margin-top:22px"><span class="ldot" style="background:#16A34A"></span>Routine —
+          <code>routine_outpatient</code> (3)</div>
+        <div class="qrow green">
+          <div class="qrow-h">
+            <div class="qrow-n">Ana Reyes, 31 <span>· migraine</span></div>
+            <div class="qrow-src">💬 yesterday 9:12 PM</div>
+          </div>
+          <div class="qrow-q">"topiramate refill before travel next month"</div>
+          <div class="qrow-c"><span class="tchip routine">ROUTINE</span></div>
+          <div class="qrow-f" style="justify-content:flex-end"><span class="btn teal">Open</span></div>
+        </div>
+        <div class="qrow green">
+          <div class="qrow-h">
+            <div class="qrow-n">Tom Whitfield, 58 <span>· neuropathy</span></div>
+            <div class="qrow-src">💬 yesterday 6:40 PM</div>
+          </div>
+          <div class="qrow-q">"question about sleep study results"</div>
+          <div class="qrow-c"><span class="tchip routine">ROUTINE</span></div>
+          <div class="qrow-f" style="justify-content:flex-end"><span class="btn teal">Open</span></div>
+        </div>
+        <div class="qrow green">
+          <div class="qrow-h">
+            <div class="qrow-n">Priya Nasser, 45 <span>· epilepsy f/u</span></div>
+            <div class="qrow-src">📄 Referral 8:10 AM</div>
+          </div>
+          <div class="qrow-q">Routine neurology referral — seizure-free 14 months, requesting
+            continuity visit.</div>
+          <div class="qrow-c"><span class="tchip routine">ROUTINE</span></div>
+          <div class="qrow-f" style="justify-content:flex-end"><span class="btn teal">Open</span></div>
+        </div>
+
+        <div class="zone-l" style="margin-top:22px"><span class="ldot" style="background:#6B7280"></span>Human first —
+          <code>undetermined</code> (1)</div>
+        <div class="qrow gray">
+          <div class="qrow-h">
+            <div class="qrow-n">Dorothy Klein, 79 <span>· complex hx</span></div>
+            <div class="qrow-src">💬 7:05 AM</div>
+          </div>
+          <div class="qrow-q">"long message — multiple symptoms over weeks, some conflicting with
+            chart"</div>
+          <div class="qrow-c"><span class="tchip idata">INSUFFICIENT DATA — no tier assigned</span></div>
+        </div>
+        <div class="qrow-note" style="margin:8px 2px 0;line-height:1.6">When the branches disagree or
+          the text isn't enough, the engine already refuses to guess — it holds the case for a human.
+          Same behavior it has for referrals today; nothing silently defaults to "low risk."</div>
+
+      </div>
+    </div>
+    <div class="cap">Fake demo patients. Tier chips and colors are the engine's own display set,
+      unchanged.</div>
+  </div>
+
+  <hr>
+  <!-- MOCKUP 2 -->
+  <div class="section">
+    <h2>Mockup 2</h2>
+    <h3>Margaret's message — what the nurse sees when she opens it</h3>
+    <p class="lede">Same engine, two layers shown together: the care pathway that drives urgency, and
+    the pathway questions that drive what happens next.</p>
+
+    <div class="app">
+      <div class="app-t">
+        <div class="app-logo">S</div>
+        <span class="app-brand">Synapse</span>
+        <div class="app-tab">Acute Care</div>
+        <div class="app-tab">Rounding</div>
+        <div class="app-tab">EEG</div>
+        <div class="app-tab">Outpatient</div>
+        <div class="app-tab on">Triage</div>
+        <div class="app-tab">History</div>
+        <div class="app-tab">Imaging/results</div>
+      </div>
+      <div class="app-b">
+        <div class="split">
+
+          <!-- LEFT -->
+          <div>
+            <div class="prose">
+              <div class="prose-l">💬 PORTAL MESSAGE · TODAY 6:58 AM</div>
+              Since yesterday I've had <span class="hl">numbness in both legs</span> and I keep
+              <span class="hl">tripping when I walk</span>. No fever, no new medicines. It feels like
+              before my last flare but not as strong. Should I worry or wait for my October
+              appointment?
+            </div>
+
+            <div class="fs" style="margin-top:10px">
+              <div class="fs-h"><div class="fs-t">From the chart — wired in (the extend step)</div>
+                <span class="badge extend">EXTEND</span></div>
+              <div class="ctxrow"><span><b>MS</b>, dx 2019</span><span class="src">Problem list</span></div>
+              <div class="ctxrow"><span><b>Ocrelizumab</b> — last infusion 5 mo ago, overdue</span>
+                <span class="src">Meds</span></div>
+              <div class="ctxrow"><span>Last visit 3/12/26 — stable, gait normal</span>
+                <span class="src">Note</span></div>
+              <div class="ctxrow"><span><b>MRI brain</b> 1/2026 — no new lesions</span>
+                <span class="src">Imaging report</span></div>
+              <div class="hint">Today the engine only reads submitted text; the chart feed is the
+                wiring this design adds — with provenance on every fact, extracted never invented.</div>
+            </div>
+
+            <div class="fs" style="margin-top:10px">
+              <div class="fs-h"><div class="fs-t">AI assessment</div><span class="badge ai">AI</span></div>
+              <div style="font-size:12.5px;font-weight:650;margin-bottom:6px">Pathway: SAME-DAY
+                <code>same_day_clinician_review</code></div>
+              <div class="qrow-c" style="margin-top:0"><span class="tchip semi">SEMI-URGENT (seen ≤2 wks)</span></div>
+              <p style="font-size:11.5px;margin:9px 0">New bilateral sensory symptoms + gait change in
+                a patient with MS — relapse vs. pseudo-relapse. No emergency red-flag features in the
+                message; the overdue infusion raises suspicion.</p>
+              <div class="ctxrow"><span>"numbness in both legs"</span><span class="src">Message</span></div>
+              <div class="ctxrow"><span>"tripping when I walk"</span><span class="src">Message</span></div>
+              <div class="ctxrow"><span>Ocrelizumab overdue 5 mo</span><span class="src">Meds</span></div>
+              <div class="ctxrow"><span>Stable, gait normal 3/12/26</span><span class="src">Note</span></div>
+              <div style="display:flex;gap:8px;margin-top:11px">
+                <span class="btn teal">Confirm</span>
+                <span class="btn ghost">Change</span>
+              </div>
+              <div class="hint">The AI proposes; the nurse disposes. Overrides carry reason codes and
+                land in the calibration dashboard — both already exist in the OP sample.</div>
+            </div>
+          </div>
+
+          <!-- RIGHT -->
+          <div>
+            <div class="fs">
+              <div class="fs-h"><div class="fs-t">Pathway — MS: new/worsening sensory symptoms</div>
+                <span class="badge">DRAFT — ILLUSTRATIVE</span></div>
+              <div class="pway-q"><span class="ok-">✓</span>Fever, infection symptoms, or recent
+                illness?</div>
+              <div class="pway-a">→ No</div>
+              <div class="pway-q">Any new bladder or bowel changes?</div>
+              <div class="pills" style="margin-bottom:0">
+                <div class="pill sub">Yes</div>
+                <div class="pill sub">No</div>
+              </div>
+              <div class="branch">
+                <div><b>Yes</b> → escalate to provider now + infection screen</div>
+                <div><b>No</b> → "Symptoms &gt;24 h?" → provider callback today</div>
+              </div>
+            </div>
+
+            <div class="fs">
+              <div class="fs-h"><div class="fs-t">Disposition</div></div>
+              <div style="display:flex;gap:7px;flex-wrap:wrap">
+                <span class="btn red">911 / ED now</span>
+                <span class="btn orange">Same-day provider</span>
+                <span class="btn teal">Nurse advice + follow-up</span>
+                <span class="btn green">Routine schedule</span>
+              </div>
+            </div>
+
+            <div class="fs">
+              <div class="fs-h"><div class="fs-t">Auto-drafted triage note</div>
+                <span class="badge ai">AI</span></div>
+              <div class="ta f" style="min-height:0">
+                Source: portal message, 6:58 AM. Symptoms: new bilateral leg numbness + gait
+                unsteadiness since yesterday, no fever, no med changes. Pathway: infection screen
+                negative (patient-reported); bladder/bowel question pending. Working disposition:
+                same-day clinician review — pending nurse confirmation.
+                <div class="icons">🎤 ⚡ ✨</div>
+              </div>
+            </div>
+
+            <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:2px">
+              <span class="btn teal">Send to provider — with note</span>
+              <span class="btn ghost">Schedule callback · SMS confirm</span>
+              <span class="src">SMS/voice follow-up agent already in the OP sample</span>
+            </div>
+          </div>
+
+        </div>
+      </div>
+    </div>
+
+    <div class="box w">
+      <div class="box-t">Illustrative, not clinical</div>
+      <p>Pathway content here is illustrative, not clinical guidance. Real pathways are versioned
+      clinical assets — authored by the triage RN + physician, pre-approved the same way the
+      historian's clarification questions already are, and run through the sentinel-style release gate
+      before any patient contact.</p>
+    </div>
+  </div>
+
+  <hr>
+  <!-- MOCKUP 3 -->
+  <div class="section">
+    <h2>Mockup 3</h2>
+    <h3>Her red-flag lists become a governed clinical asset</h3>
+    <p class="lede">Same anchors she already uses, formalized into the structure the gateway already
+    runs on — versioned, owned, and tested rather than typed from memory.</p>
+
+    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:10px">
+      <span class="badge">v3</span>
+      <span class="qrow-src">Owner: triage RN + physician sign-off</span>
+      <span class="qrow-src">· Applied to every message and call, identically, every time</span>
+    </div>
+
+    <div class="app">
+      <div class="app-t">
+        <div class="app-logo">S</div>
+        <span class="app-brand">Synapse</span>
+        <div class="app-tab">Acute Care</div>
+        <div class="app-tab">Rounding</div>
+        <div class="app-tab">EEG</div>
+        <div class="app-tab">Outpatient</div>
+        <div class="app-tab on">Triage</div>
+        <div class="app-tab">History</div>
+        <div class="app-tab">Imaging/results</div>
+      </div>
+      <div class="app-b">
+        <table>
+          <tr><th>Phrase anchors</th><th>Syndrome class</th><th>Behavior</th></tr>
+          <tr><td>"worst headache of my life", "thunderclap"</td>
+            <td>Intracranial hemorrhage / SAH</td><td>Gateway: contact now</td></tr>
+          <tr><td>"face drooping", "slurred speech", "one side weak"</td>
+            <td>Acute cerebrovascular</td><td>Gateway: contact now</td></tr>
+          <tr><td>"curtain over my eye", "vision went black"</td>
+            <td>Acute vision threat</td><td>Gateway: contact now</td></tr>
+          <tr><td>"first ever seizure"</td>
+            <td>Status / recurrent seizure</td><td>Gateway: same-day floor</td></tr>
+        </table>
+      </div>
+    </div>
+
+    <p>This is not naive string match — the deployed gateway already handles negation ('no facial
+    droop' doesn't fire), temporality ('droop last year, resolved'), and quotes its exact evidence
+    offsets. And a second, independent AI reads the same text; if the two disagree, the case escalates
+    or holds — it never silently downgrades. Her lists make the anchors better and become test cases in
+    the release gate; the model layer catches phrasings no list anticipates.</p>
+  </div>
+
+  <hr>
+
+  <!-- SECTION 6 -->
+  <div class="section">
+    <h2>Section 6</h2>
+    <h3>Her two tier schemes</h3>
+    <p class="lede">She offered two ways to color-code risk. One means building a taxonomy the engine
+    doesn't have; the other means displaying the one it already does.</p>
+
+    <div class="opts two">
+      <div class="ocard">
+        <div class="oh"><span class="ol">OPTION A</span></div>
+        <div class="on-">1–5 numeric</div>
+        <div class="od">Granular, sortable, a familiar acuity feel — the ER-triage instinct in its
+          most literal form.</div>
+        <div class="pc">
+          <div class="p"><span>+</span>Granular and sortable; matches how she already thinks about
+            acuity.</div>
+          <div class="con"><span>−</span>Five levels invite false precision — validation reruns showed
+            borderline cases flip between adjacent tiers on identical inputs, and a 5-way split doubles
+            the borderlands.</div>
+          <div class="con"><span>−</span>"3 vs 4" tells a nurse nothing about what to DO.</div>
+          <div class="con"><span>−</span>Duplicates a taxonomy the engine already has.</div>
+        </div>
+      </div>
+
+      <div class="ocard rec">
+        <div class="oh"><span class="ol">OPTION B</span><span class="tag">Recommended</span></div>
+        <div class="on-">Colors = the engine's care-pathway layer</div>
+        <div class="od">Don't invent a new scale — the engine already outputs two: a care pathway
+          (response time: contact now / same-day / routine / human-first) and a 7-tier scheduling
+          depth (ED-now → 6 months, colors already defined). The nurse queue runs on the pathway layer
+          — every lane IS an action — with the tier chip alongside for scheduling depth.</div>
+        <div class="pc">
+          <div class="p"><span>+</span>Her ER-triage instinct maps 1:1 onto what's built.</div>
+          <div class="p"><span>+</span>Zero new taxonomy to build, govern, or explain — it's already
+            shipped and display-ready.</div>
+          <div class="p"><span>+</span><em class="q">"although in an outpatient setting it is far less
+            dramatic"</em> — her own caveat, acknowledged: muted chips, pulsing reserved for the true
+            emergent case.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <hr>
+
+  <!-- SECTION 7 -->
+  <div class="section">
+    <h2>Section 7</h2>
+    <h3>What combines from where</h3>
+    <p class="lede">Sorting every piece of this doc into three buckets: what's shipped, what's shipped
+    but needs a new wire, and what doesn't exist yet.</p>
+
+    <div class="dec">
+      <div class="dec-r">
+        <div class="dec-i">✓</div>
+        <div class="dec-x">
+          <b>Exists</b><br>
+          <span class="gchip exists">Safety-gated classifier (gateway → cross-check → fusion →
+            adjudication → holds)</span>
+          <span class="gchip exists">Tier + pathway taxonomies with display colors</span>
+          <span class="gchip exists">Scheduling locks + emergency action log</span>
+          <span class="gchip exists">Override w/ reason codes + blind-review calibration console</span>
+          <span class="gchip exists">Sentinel release-gate harness</span>
+          <span class="gchip exists">Patient chart in-app</span>
+          <span class="gchip exists">Flat dot phrases</span>
+          <span class="gchip exists">Governed pre-approved question mechanism (historian)</span>
+          <span class="gchip exists">Portal inbox (patient side)</span>
+          <span class="gchip exists">SMS/voice follow-up agent</span>
+          <span class="gchip exists">Plans library (127, ICD-10-matched) for next-step content</span>
+        </div>
+      </div>
+      <div class="dec-r">
+        <div class="dec-i" style="background:#EA580C">↗</div>
+        <div class="dec-x">
+          <b>Extend</b><br>
+          <span class="gchip extend">Two new input lanes — portal messages + call-center encounters —
+            into the same engine</span>
+          <span class="gchip extend">Chart context wired into the engine's structured input (with
+            provenance)</span>
+          <span class="gchip extend">Care-pathway lanes as the queue's organizing axis</span>
+          <span class="gchip extend">Rerun the sentinel gate against the new input types before live
+            use</span>
+        </div>
+      </div>
+      <div class="dec-r">
+        <div class="dec-i" style="background:#6B7280">+</div>
+        <div class="dec-x">
+          <b>New</b><br>
+          <span class="gchip new">The nurse queue UI (multi-source, persistent, assignment +
+            timers)</span>
+          <span class="gchip new">The pathway builder (dot phrases → branching questions →
+            dispositions)</span>
+          <span class="gchip new">Red-flag library manager view</span>
+          <span class="gchip new">Callback scheduling + timers on queue rows</span>
+          <span class="gchip new">Portal auto-acknowledgment with standing 911 safety text</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <hr>
+
+  <!-- SECTION 8 -->
+  <div class="section">
+    <h2>Section 8</h2>
+    <h3>Open questions</h3>
+
+    <div class="qq"><b>1. Where does this live first?</b> Recommend: prove it in the OP sample — the
+      engine, chart data, and comms plumbing are already there and it's the established demo ring —
+      then port the validated design into Synapse outpatient. Synapse is the destination; the OP
+      sample is the fastest honest prototype.</div>
+    <div class="qq"><b>2. The call-center lane.</b> Near-term the rep types the encounter (as today)
+      and it tiers on entry; the phone-agent R&amp;D work (Kiran's red-flag gate) gives a hands-free
+      path later. Sequencing question, not scope.</div>
+    <div class="qq"><b>3. Red-flag library governance.</b> Owner (triage RN lead + physician
+      sign-off?), review cadence, versioning. Cheap to decide now, painful later.</div>
+    <div class="qq"><b>4. Pilot data for the eval gate.</b> A de-identified sample of real portal
+      messages + call-center encounters, so the sentinel-style gate runs against the new input types
+      before anyone triages live traffic. (The sentinel is a release gate, not clinical validation —
+      same rule here.)</div>
+  </div>
+
+  <hr>
+  <p style="text-align:center;color:var(--tm);font-size:11px;margin-top:16px">Sources: Mary Kate
+    Banks, "Triaging Technology Ideas" (email, 2026-07-19) · NYC conversation 2026-07-17 (Steve, Sam)
+    · OP-sample repo verified 2026-07-20. Fake demo patients throughout. Series:
+    outpatient-synapse-tabs.html · outpatient-mockups.html · this file · outpatient-triage-nurse-demo.html.</p>
+
+</div>
