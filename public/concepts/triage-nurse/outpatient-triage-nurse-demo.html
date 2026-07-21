@@ -1,0 +1,819 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Outpatient Triage — Synapse 2.0 (working demo)</title>
+<style>
+:root{
+  --s950:#0c0f14;--s900:#1a1d23;--s800:#2a2d34;--s700:#333740;
+  --hair:rgba(42,45,52,.5);
+  --text:#f1f1f1;--muted:#acacaf;--faint:#696a70;
+  --blue:#3b82f6;--red:#ef4444;--orange:#f97316;--semi:#EA580C;
+  --gold:#eab308;--green:#22c55e;--purple:#8b5cf6;--teal:#24c3b8;
+  --f:-apple-system,BlinkMacSystemFont,'SF Pro','Segoe UI',Roboto,sans-serif;
+}
+*{box-sizing:border-box}
+html,body{height:100%}
+body{margin:0;background:var(--s950);color:var(--text);font-family:var(--f);
+     font-size:13px;line-height:1.5;-webkit-font-smoothing:antialiased;
+     display:flex;flex-direction:column;min-height:100vh}
+a{color:inherit;text-decoration:none}
+button{font-family:inherit;cursor:pointer;border:none;background:none;color:inherit}
+textarea{font-family:inherit}
+
+/* ===== TOP BAR ===== */
+.topbar{height:48px;background:var(--s900);border-bottom:1px solid var(--s800);
+        display:flex;align-items:center;gap:12px;padding:0 16px;flex-shrink:0}
+.logo{width:28px;height:28px;border-radius:6px;flex-shrink:0;
+      background:linear-gradient(135deg,#22c55e,#3b82f6);
+      display:flex;align-items:center;justify-content:center;
+      color:#fff;font-weight:700;font-size:14px}
+.brand{font-size:14px;font-weight:600;margin-right:6px;white-space:nowrap}
+.navtabs{display:flex;gap:4px}
+.navtab{position:relative;padding:6px 12px;border-radius:6px;font-size:12px;
+        font-weight:500;color:var(--faint);white-space:nowrap}
+.navtab.active{color:var(--text);background:var(--s800)}
+.navbadge{position:absolute;top:-4px;right:-4px;min-width:15px;height:15px;
+          border-radius:50%;font-size:9px;font-weight:700;color:#fff;
+          display:flex;align-items:center;justify-content:center;padding:0 3px}
+.tb-spacer{flex:1}
+.tb-search{background:var(--s800);border:1px solid var(--s700);border-radius:6px;
+           padding:5px 10px;font-size:12px;color:var(--faint);width:200px;outline:none}
+.tb-search::placeholder{color:var(--faint)}
+.tb-link{font-size:12px;color:var(--muted);white-space:nowrap;padding:0 2px}
+.tb-link:hover{color:var(--text)}
+.tb-icon{width:28px;height:28px;border-radius:6px;background:var(--s800);
+         display:flex;align-items:center;justify-content:center;font-size:12px;flex-shrink:0}
+.tb-phi{width:28px;height:28px;border-radius:6px;background:rgba(59,130,246,.2);
+        color:var(--blue);display:flex;align-items:center;justify-content:center;
+        font-size:9px;font-weight:700;flex-shrink:0}
+.tb-avatar{width:28px;height:28px;border-radius:50%;background:var(--s800);
+           display:flex;align-items:center;justify-content:center;
+           font-size:11px;color:var(--muted);flex-shrink:0}
+
+/* ===== SHELL ===== */
+.shell{flex:1;min-height:0;display:flex}
+.sidebar{width:290px;flex-shrink:0;background:var(--s900);border-right:1px solid var(--s800);
+         display:flex;flex-direction:column;min-height:0}
+.sidebar-hd{display:flex;align-items:center;justify-content:space-between;padding:14px 16px 10px}
+.sidebar-title{font-size:14px;font-weight:600}
+.countpill{background:var(--s800);color:var(--muted);font-size:10px;font-weight:600;
+           padding:2px 9px;border-radius:999px}
+.filterpills{display:flex;gap:6px;padding:0 16px 10px;flex-wrap:wrap}
+.filterpill{font-size:11px;font-weight:500;color:var(--muted);background:var(--s800);
+            padding:4px 10px;border-radius:999px;cursor:pointer}
+.filterpill.active{background:var(--blue);color:#fff;font-weight:600}
+.estrip{background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.25);
+        border-left:3px solid var(--red);border-radius:6px;margin:0 12px 10px;
+        padding:8px 10px;font-size:11px;line-height:1.5;color:#fca5a5}
+.estrip b{color:#fecaca}
+.estrip-chip{display:inline-block;background:rgba(36,195,184,.2);color:var(--teal);
+             font-size:8.5px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;
+             padding:1.5px 6px;border-radius:4px;margin-top:5px}
+.cardlist{flex:1;overflow-y:auto;min-height:0}
+.lane-header{display:flex;align-items:center;gap:6px;font-size:10px;font-weight:700;
+             letter-spacing:.06em;text-transform:uppercase;color:var(--faint);
+             padding:12px 16px 6px}
+.lane-dot{width:7px;height:7px;border-radius:50%;flex-shrink:0}
+.pcard{padding:10px 16px;border-bottom:1px solid var(--hair);cursor:pointer;
+       border-left:3px solid transparent}
+.pcard:hover{background:rgba(42,45,52,.3)}
+.pcard.selected{background:rgba(59,130,246,.1);border-left-color:var(--blue)}
+.pcard.lane-red{border-left-color:var(--red)}
+.pcard.lane-orange{border-left-color:var(--semi)}
+.pcard.lane-green{border-left-color:var(--green)}
+.pcard.lane-gray{border-left-color:var(--faint)}
+.pcard.selected.lane-red,.pcard.selected.lane-orange,
+.pcard.selected.lane-green,.pcard.selected.lane-gray{border-left-color:var(--blue)}
+.pcard-row1{display:flex;align-items:center;gap:8px;margin-bottom:3px}
+.pcard-avatar{width:28px;height:28px;border-radius:50%;flex-shrink:0;color:#fff;
+              font-size:10px;font-weight:600;display:flex;align-items:center;justify-content:center}
+.pcard-name{font-size:13px;font-weight:600;flex:1;min-width:0;overflow:hidden;
+            text-overflow:ellipsis;white-space:nowrap}
+.pcard-ack{color:var(--green);font-weight:700;margin-right:3px}
+.pcard-wait{font-size:10px;color:var(--faint);font-variant-numeric:tabular-nums;white-space:nowrap}
+.pcard-row2{font-size:11px;color:var(--faint);margin-left:36px}
+.pcard-row3{display:flex;gap:5px;margin:5px 0 0 36px;flex-wrap:wrap}
+.srcchip{font-size:9px;font-weight:600;background:var(--s800);color:var(--muted);
+         padding:1.5px 6px;border-radius:4px;white-space:nowrap}
+.tchip{font-size:9px;font-weight:700;padding:1.5px 6px;border-radius:4px;white-space:nowrap;
+       letter-spacing:.02em}
+.tchip.emergent{background:#000;color:#fff;border:1.5px solid var(--red);
+                animation:tpulse 1.7s ease-in-out infinite}
+.tchip.semi{background:rgba(234,88,12,.2);color:var(--semi)}
+.tchip.routine{background:rgba(34,197,94,.2);color:var(--green)}
+.tchip.idata{background:rgba(105,106,112,.2);color:var(--muted)}
+@keyframes tpulse{0%,100%{opacity:1}50%{opacity:.55}}
+.statuschip{font-size:9px;font-weight:600;background:rgba(34,197,94,.2);color:var(--green);
+            padding:1.5px 6px;border-radius:4px;white-space:nowrap}
+.sidebar-ft{padding:10px 16px;border-top:1px solid var(--s800);flex-shrink:0}
+.rflink{font-size:11px;color:var(--muted);cursor:pointer}
+.rflink:hover{color:var(--text)}
+/* ===== MAIN PANEL ===== */
+.main{flex:1;min-width:0;overflow-y:auto;display:flex;flex-direction:column}
+.main-hd{display:flex;justify-content:flex-end;padding:10px 20px 0}
+.wr-toggle{font-size:11px;color:var(--muted);background:var(--s900);border:1px solid var(--s800);
+           padding:5px 10px;border-radius:6px}
+.wr-toggle:hover{color:var(--text)}
+.wr-strip{display:none;margin:8px 20px 0;background:var(--s900);border:1px solid var(--s800);
+          border-radius:8px;padding:12px 14px}
+.wr-strip.open{display:block}
+.wr-row{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap;margin-bottom:8px}
+.wr-row:last-child{margin-bottom:0}
+.wr-label{font-size:9px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;
+          flex-shrink:0;width:52px}
+.wr-label.exists{color:var(--teal)}
+.wr-label.extend{color:var(--orange)}
+.wr-label.new{color:var(--faint)}
+.gchip{font-size:9px;font-weight:600;padding:2px 7px;border-radius:4px;white-space:nowrap}
+.gchip.exists{background:rgba(36,195,184,.2);color:var(--teal)}
+.gchip.extend{background:rgba(249,115,22,.2);color:var(--orange)}
+.gchip.new{background:rgba(105,106,112,.2);color:var(--muted)}
+.detail{padding:16px 20px 24px;flex:1}
+.phdr{display:flex;align-items:baseline;justify-content:space-between;gap:12px;
+      margin-bottom:14px;flex-wrap:wrap}
+.phdr-name{font-size:17px;font-weight:650}
+.phdr-meta{font-size:12px;color:var(--muted);margin-left:8px;font-weight:400}
+.phdr-src{font-size:11px;color:var(--faint);white-space:nowrap}
+.cols{display:grid;grid-template-columns:1fr;gap:12px}
+@media(min-width:900px){.cols{grid-template-columns:1fr 1fr}}
+.card{background:var(--s900);border:1px solid var(--s800);border-radius:8px;
+      padding:13px 14px;margin-bottom:10px}
+.card-hd{display:flex;align-items:center;gap:8px;margin-bottom:9px}
+.card-title{font-size:13px;font-weight:650;flex:1}
+.badge{font-size:9px;font-weight:700;padding:2px 6px;border-radius:4px;letter-spacing:.03em}
+.badge.ai{background:rgba(139,92,246,.2);color:#c4b5fd}
+.badge.draft{background:rgba(105,106,112,.2);color:var(--muted)}
+.badge.extend{background:rgba(249,115,22,.2);color:var(--orange)}
+.badge.new{background:rgba(105,106,112,.2);color:var(--muted)}
+.msg-label{font-size:9px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;
+           color:var(--faint);margin-bottom:6px}
+.msg-body{font-size:12px;line-height:1.6;color:var(--muted)}
+.hl{background:rgba(234,179,8,.25);color:#fde047;font-weight:600;border-radius:2px;padding:0 2px}
+.ctxrow{display:flex;justify-content:space-between;align-items:baseline;gap:8px;
+        padding:6px 0;border-bottom:1px solid var(--hair);font-size:11.5px;color:var(--muted)}
+.ctxrow:last-child{border-bottom:0}
+.ctxrow b{color:var(--text)}
+.srctag{font-size:8.5px;font-weight:700;letter-spacing:.03em;text-transform:uppercase;
+        color:var(--faint);background:var(--s800);border-radius:4px;padding:2px 6px;
+        white-space:nowrap;flex-shrink:0}
+.hint{font-size:10.5px;color:var(--faint);margin-top:8px;line-height:1.5}
+.rationale{font-size:11.5px;color:var(--muted);margin:8px 0}
+.pway-line{font-size:12px;font-weight:600;margin-bottom:8px}
+.btnrow{display:flex;gap:8px;margin-top:10px;flex-wrap:wrap;align-items:center}
+.btn{font-size:11px;font-weight:650;border-radius:6px;padding:7px 13px;white-space:nowrap;
+     display:inline-flex;align-items:center;gap:5px;border:1px solid transparent;color:#fff}
+.btn:disabled{opacity:.35;cursor:not-allowed}
+.btn.ghost{background:transparent;border-color:var(--s800);color:var(--muted)}
+.btn.ghost:hover{color:var(--text);border-color:var(--s700)}
+.btn.blue{background:var(--blue)}
+.btn.red{background:var(--red)}
+.btn.orange{background:var(--semi)}
+.btn.green{background:var(--green)}
+.btn.teal{background:var(--teal);color:#0c0f14}
+
+.pway-q{font-size:12px;color:var(--text);font-weight:600;margin-bottom:6px;
+        display:flex;align-items:center;gap:6px}
+.pway-q .ok{color:var(--green);font-weight:700}
+.pway-a{font-size:11px;color:var(--muted);margin:0 0 10px 18px}
+.pway-btns{display:flex;gap:7px;margin-bottom:10px}
+.pway-rec{border-left:3px solid var(--blue);background:rgba(59,130,246,.08);
+          border-radius:6px;padding:9px 11px;font-size:11.5px;color:var(--muted);margin-top:8px}
+.pway-rec b{color:var(--text)}
+.pway-rec.orange{border-left-color:var(--semi);background:rgba(234,88,12,.1)}
+.restart{font-size:10.5px;color:var(--faint);margin-top:10px;display:inline-block;cursor:pointer}
+.restart:hover{color:var(--muted)}
+.honesty{border:1px dashed var(--s700);border-radius:8px;padding:12px;
+         font-size:11.5px;color:var(--muted);line-height:1.5}
+
+.disprow{display:flex;gap:7px;flex-wrap:wrap}
+.dispbtn{font-size:11px;font-weight:650;border-radius:6px;padding:7px 12px;color:#fff;
+         border:1px solid transparent;white-space:nowrap}
+.dispbtn:disabled{opacity:.3;cursor:not-allowed}
+.dispbtn.red{background:var(--red)}
+.dispbtn.orange{background:var(--semi)}
+.dispbtn.teal{background:var(--teal);color:#0c0f14}
+.dispbtn.green{background:var(--green)}
+
+.notearea{width:100%;background:var(--s950);border:1px solid var(--s800);border-radius:6px;
+          padding:9px;font-size:11.5px;color:var(--text);min-height:110px;resize:vertical;
+          line-height:1.55;outline:none}
+.notearea:focus{border-color:var(--blue)}
+
+.overlay-wrap{position:relative}
+.emergent-card{border:2px solid var(--red);border-radius:10px;background:#000;
+               padding:20px;margin-bottom:14px;animation:epulse 1.8s ease-in-out infinite}
+@keyframes epulse{0%,100%{border-color:var(--red)}50%{border-color:rgba(239,68,68,.4)}}
+.emergent-title{font-size:19px;font-weight:750;color:#fff;margin-bottom:4px}
+.emergent-sub{font-size:11.5px;color:#f0a3a3;margin-bottom:14px}
+.evid-label{font-size:9.5px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;
+            color:#f0a3a3;margin-bottom:6px}
+.evid-quote{font-size:13px;font-style:italic;color:#fff;border-left:2px solid var(--red);
+            padding-left:10px;margin-bottom:6px}
+.emergent-rationale{font-size:11.5px;color:#f0a3a3;margin:10px 0 14px}
+.ack-banner{background:rgba(239,68,68,.12);border:1px solid rgba(239,68,68,.3);
+            border-left:3px solid var(--red);border-radius:6px;padding:10px 12px;
+            font-size:11.5px;color:#fca5a5;margin-bottom:12px;line-height:1.55}
+.ack-banner b{color:#fecaca}
+.lockchip{display:inline-block;background:rgba(239,68,68,.2);color:var(--red);
+          font-size:9px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;
+          padding:2.5px 7px;border-radius:4px;margin-bottom:6px}
+.locknote{font-size:10.5px;color:var(--faint);font-style:italic;margin-bottom:12px}
+.declined-panel{border-left:3px solid var(--faint);background:var(--s900);
+                border:1px solid var(--s800);border-radius:8px;padding:13px 14px;
+                font-size:12px;color:var(--muted);line-height:1.6;margin-bottom:12px}
+.declined-panel b{color:var(--text)}
+.modal-backdrop{position:fixed;inset:0;background:rgba(0,0,0,.65);display:none;
+                align-items:center;justify-content:center;z-index:100;padding:20px}
+.modal-backdrop.open{display:flex}
+.modal{background:var(--s900);border:1px solid var(--s800);border-radius:10px;
+       padding:18px 20px;max-width:560px;width:100%;max-height:82vh;overflow-y:auto;
+       box-shadow:0 20px 60px rgba(0,0,0,.5)}
+.modal-hd{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}
+.modal-title{font-size:15px;font-weight:650}
+.modal-close{font-size:18px;color:var(--faint);line-height:1;padding:2px 6px;border-radius:4px}
+.modal-close:hover{color:var(--text);background:var(--s800)}
+.modal-chips{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px}
+.modal-chip{font-size:10px;color:var(--muted);background:var(--s800);padding:3px 8px;
+            border-radius:999px}
+.rftable{width:100%;border-collapse:collapse;font-size:11.5px;margin-bottom:10px}
+.rftable th{text-align:left;font-size:9.5px;font-weight:700;letter-spacing:.04em;
+            text-transform:uppercase;color:var(--faint);padding:6px 8px;
+            border-bottom:1px solid var(--s800)}
+.rftable td{padding:8px;border-bottom:1px solid var(--s800);color:var(--muted);vertical-align:top}
+.rftable td b{color:var(--text)}
+.scriptlines{margin:0 0 12px;padding-left:20px;font-size:12px;color:var(--muted);line-height:1.7}
+.scriptlines li{margin-bottom:6px}
+.scriptlines b{color:var(--text)}
+
+#toastRoot{position:fixed;bottom:18px;right:18px;display:flex;flex-direction:column;
+           gap:8px;z-index:200}
+.toast{background:var(--s900);border:1px solid var(--s800);border-left:3px solid var(--blue);
+       border-radius:6px;padding:10px 14px;font-size:12px;color:var(--text);
+       max-width:340px;box-shadow:0 8px 24px rgba(0,0,0,.4);animation:toastin .2s ease-out}
+@keyframes toastin{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
+
+.appfooter{font-size:10px;color:var(--faint);padding:8px 16px;border-top:1px solid var(--s800);
+           flex-shrink:0;background:var(--s900)}
+</style>
+</head>
+<body>
+<div class="topbar">
+  <div class="logo">S</div>
+  <span class="brand">Synapse</span>
+  <div class="navtabs">
+    <div class="navtab">Acute Care<span class="navbadge" style="background:var(--red)">12</span></div>
+    <div class="navtab">Rounding<span class="navbadge" style="background:var(--blue)">3</span></div>
+    <div class="navtab">EEG</div>
+    <div class="navtab">Outpatient<span class="navbadge" style="background:var(--faint)">8</span></div>
+    <div class="navtab">Rescue<span class="navbadge" style="background:var(--red)">5</span></div>
+    <div class="navtab active">Triage<span class="navbadge" style="background:var(--semi)">7</span></div>
+  </div>
+  <div class="tb-spacer"></div>
+  <input class="tb-search" placeholder="Search patient name or MRN" readonly>
+  <a class="tb-link" href="./outpatient-triage-nurse.html">Concept overview ↗</a>
+  <div class="tb-icon">🔔</div>
+  <div class="tb-icon">⚙️</div>
+  <div class="tb-phi">PHI</div>
+  <div class="tb-avatar">MK</div>
+</div>
+<div class="shell">
+  <aside class="sidebar">
+    <div class="sidebar-hd">
+      <span class="sidebar-title">Outpatient triage</span>
+      <span class="countpill" id="queueCount">7 open</span>
+    </div>
+    <div class="filterpills" id="filterPills">
+      <div class="filterpill active" onclick="setFilter('all',event)">All</div>
+      <div class="filterpill" onclick="setFilter('portal',event)">Portal</div>
+      <div class="filterpill" onclick="setFilter('call',event)">Call center</div>
+      <div class="filterpill" onclick="setFilter('referral',event)">Referral</div>
+    </div>
+    <div class="estrip">
+      <b>⚠ Emergency gateway · 7:33 AM</b> — call-center contact matched acute-cerebrovascular
+      red flags. Scheduling locked · 911/ED script shown to rep · covering neurologist paged.
+      <div class="estrip-chip">Exists today</div>
+    </div>
+    <div class="cardlist" id="cardList"></div>
+    <div class="sidebar-ft">
+      <span class="rflink" onclick="openRedFlagModal()">📋 Red-flag library · v3</span>
+    </div>
+  </aside>
+  <main class="main">
+    <div class="main-hd">
+      <button class="wr-toggle" onclick="toggleWhatsReal()">ℹ What's real</button>
+    </div>
+    <div class="wr-strip" id="wrStrip">
+      <div class="wr-row"><span class="wr-label exists">EXISTS</span>
+        <span class="gchip exists">Engine</span><span class="gchip exists">Gateway</span>
+        <span class="gchip exists">Holds</span><span class="gchip exists">Override + calibration</span>
+        <span class="gchip exists">Sentinel gate</span><span class="gchip exists">Portal inbox</span>
+        <span class="gchip exists">SMS agent</span><span class="gchip exists">Dot phrases</span></div>
+      <div class="wr-row"><span class="wr-label extend">EXTEND</span>
+        <span class="gchip extend">Message/call input lanes</span>
+        <span class="gchip extend">Chart→engine wiring</span>
+        <span class="gchip extend">Pathway-lane queue</span></div>
+      <div class="wr-row"><span class="wr-label new">NEW</span>
+        <span class="gchip new">This queue UI</span><span class="gchip new">Pathway builder</span>
+        <span class="gchip new">Red-flag library manager</span>
+        <span class="gchip new">Callback timers</span></div>
+    </div>
+    <div class="detail" id="detail"></div>
+  </main>
+</div>
+<div class="appfooter">Demo — fake patients, illustrative pathway content. Clinical pathways
+  require RN+physician authorship + sentinel-gate eval before live use.</div>
+<div class="modal-backdrop" id="modalBackdrop" onclick="if(event.target===this)closeModal()">
+  <div class="modal" id="modalBody"></div>
+</div>
+<div id="toastRoot"></div>
+<script>
+var LANES = [
+  {id:'emergency_now', label:'CONTACT NOW', code:'emergency_now', dot:'var(--red)', cls:'red'},
+  {id:'same_day_clinician_review', label:'SAME-DAY', code:'same_day_clinician_review', dot:'var(--semi)', cls:'orange'},
+  {id:'routine_outpatient', label:'ROUTINE', code:'routine_outpatient', dot:'var(--green)', cls:'green'},
+  {id:'undetermined', label:'HUMAN FIRST', code:'undetermined', dot:'var(--faint)', cls:'gray'}
+];
+
+var PATIENTS = [
+  { id:'okafor', name:'David Okafor', initials:'DO', avatarColor:'var(--red)',
+    age:67, sex:'M', condition:'post-TIA (2 wks)', mrn:'118820',
+    source:'call', sourceLabel:'📞 Call center 7:31 AM', waitTime:'11m',
+    lane:'emergency_now', tier:'emergent', tierLabel:'EMERGENT',
+    message:"Wife called: his face is drooping again since breakfast and his speech is slurred. She's with him now.",
+    flags:['face drooping','speech slurred'],
+    rationale:'Acute cerebrovascular red flags + recent TIA.',
+    quotes:['his face is drooping again since breakfast','his speech is slurred'],
+    notePrefix:"Source: call-center encounter, 7:31 AM (caller: spouse).",
+    noteSymptoms:"Symptoms: recurrent facial drooping since breakfast, slurred speech.",
+    pathwayType:'emergent' },
+
+  { id:'ellison', name:'Margaret Ellison', initials:'ME', avatarColor:'var(--orange)',
+    age:41, sex:'F', condition:'MS — ocrelizumab', mrn:'224417',
+    source:'portal', sourceLabel:'💬 Portal 6:58 AM', waitTime:'44m',
+    lane:'same_day_clinician_review', tier:'semi', tierLabel:'SEMI-URGENT (seen ≤2 wks)',
+    message:"Since yesterday I've had numbness in both legs and I keep tripping when I walk. "+
+      "No fever, no new medicines. It feels like before my last flare but not as strong. "+
+      "Should I worry or wait for my October appointment?",
+    flags:['numbness in both legs','tripping when I walk'],
+    chart:[ {label:'<b>MS</b>, dx 2019', source:'Problem list'},
+      {label:'<b>Ocrelizumab</b> — last infusion 5 mo ago, overdue', source:'Meds'},
+      {label:'Last visit 3/12/26 — stable, gait normal', source:'Note'},
+      {label:'<b>MRI brain</b> 1/2026 — no new lesions', source:'Imaging report'} ],
+    rationale:'New bilateral sensory + gait change in MS — relapse vs. pseudo-relapse; no '+
+      'emergency red-flag features in the message; the overdue infusion raises suspicion.',
+    evidence:[ {text:'"numbness in both legs"', source:'Message'},
+      {text:'"tripping when I walk"', source:'Message'},
+      {text:'Ocrelizumab overdue 5 mo', source:'Meds'},
+      {text:'Stable, gait normal 3/12/26', source:'Note'} ],
+    notePrefix:"Source: portal message, 6:58 AM.",
+    noteSymptoms:"Symptoms: new bilateral leg numbness + gait unsteadiness since yesterday, "+
+      "no fever, no med changes.",
+    pathwayType:'stateMachine' },
+
+  { id:'chen', name:'Robert Chen', initials:'RC', avatarColor:'var(--gold)',
+    age:72, sex:'M', condition:"Parkinson's", mrn:'336291',
+    source:'call', sourceLabel:'📞 6:15 AM', waitTime:'1h 27m',
+    lane:'same_day_clinician_review', tier:'semi', tierLabel:'SEMI-URGENT',
+    message:'Fell twice this morning, no injury — his carbidopa-levodopa ran out Friday.',
+    flags:['fell twice','ran out'],
+    rationale:'Fall risk + abrupt dopaminergic stop.',
+    evidence:[ {text:'"fell twice this morning"', source:'Message'},
+      {text:'"carbidopa-levodopa ran out Friday"', source:'Message'} ],
+    notePrefix:"Source: call-center encounter, 6:15 AM.",
+    noteSymptoms:"Symptoms: fell twice this morning (no injury); carbidopa-levodopa ran out Friday.",
+    pathwayType:'honesty' },
+
+  { id:'reyes', name:'Ana Reyes', initials:'AR', avatarColor:'var(--green)',
+    age:31, sex:'F', condition:'migraine', mrn:'441905',
+    source:'portal', sourceLabel:'💬 yesterday 9:12 PM', waitTime:'10h',
+    lane:'routine_outpatient', tier:'routine', tierLabel:'ROUTINE',
+    message:"I'm traveling next month and need my topiramate refilled before I go.",
+    flags:[],
+    rationale:'Routine medication refill request; no red-flag features.',
+    evidence:[ {text:'"topiramate refilled before I go"', source:'Message'} ],
+    notePrefix:"Source: portal message, yesterday 9:12 PM.",
+    noteSymptoms:"Symptoms: none reported — routine topiramate refill request before travel.",
+    pathwayType:'honesty' },
+
+  { id:'whitfield', name:'Tom Whitfield', initials:'TW', avatarColor:'var(--blue)',
+    age:58, sex:'M', condition:'neuropathy', mrn:'552733',
+    source:'portal', sourceLabel:'💬 yesterday 6:40 PM', waitTime:'13h',
+    lane:'routine_outpatient', tier:'routine', tierLabel:'ROUTINE',
+    message:"Wanted to follow up on my sleep study results from a few weeks ago — haven't heard back.",
+    flags:[],
+    rationale:'Routine results question; no urgent symptoms reported.',
+    evidence:[ {text:'"follow up on my sleep study results"', source:'Message'} ],
+    notePrefix:"Source: portal message, yesterday 6:40 PM.",
+    noteSymptoms:"Symptoms: none reported — question about outstanding sleep study results.",
+    pathwayType:'honesty' },
+
+  { id:'nasser', name:'Priya Nasser', initials:'PN', avatarColor:'var(--purple)',
+    age:45, sex:'F', condition:'epilepsy f/u', mrn:'663148',
+    source:'referral', sourceLabel:"📠 Referral (OCR'd packet)", waitTime:'—',
+    lane:'routine_outpatient', tier:'routine', tierLabel:'ROUTINE',
+    message:'Referral letter: routine neurology follow-up for medication-stable epilepsy. '+
+      'Referring provider reports patient seizure-free; continuity-of-care visit requested.',
+    flags:[],
+    rationale:'Medication-stable epilepsy referral; no acute features.',
+    evidence:[ {text:'Referring provider reports seizure-free', source:'Referral'} ],
+    notePrefix:"Source: referral document (OCR'd packet).",
+    noteSymptoms:"Symptoms: none — routine continuity follow-up, seizure-free per referring provider.",
+    pathwayType:'honesty' },
+
+  { id:'klein', name:'Dorothy Klein', initials:'DK', avatarColor:'var(--teal)',
+    age:79, sex:'F', condition:'complex hx', mrn:'774062',
+    source:'portal', sourceLabel:'💬 7:05 AM', waitTime:'37m',
+    lane:'undetermined', tier:'idata', tierLabel:'INSUFFICIENT DATA',
+    message:"I don't know where to start. My legs have been weak on and off for maybe three "+
+      "weeks, and now my hands are tingling too. I also feel dizzy sometimes when I stand up, "+
+      "and I've had headaches almost every day but they're not like migraines. My daughter "+
+      "thinks it might be my blood pressure medicine but I haven't changed anything. I also "+
+      "missed my last two follow-ups because of transportation. Please let me know if I need "+
+      "to come in.",
+    flags:[],
+    notePrefix:"Source: portal message, 7:05 AM.",
+    noteSymptoms:"Symptoms: multi-symptom (leg weakness, hand tingling, dizziness, headaches) "+
+      "over ~3 weeks — patient-reported, not yet clinically reviewed.",
+    pathwayType:'declined' }
+];
+
+var STATE = {
+  selected:'ellison',
+  filter:'all',
+  david:{ acknowledged:false },
+  margaret:{ confirmed:false, changing:false, appliedOverride:null,
+    q1:null, q2:null, q3:null, recDone:false },
+  dorothy:{ manualStarted:false },
+  disposition:{},
+  notes:{}
+};
+
+function byId(id){ for(var i=0;i<PATIENTS.length;i++){ if(PATIENTS[i].id===id) return PATIENTS[i]; } return null; }
+function laneOf(id){ for(var i=0;i<LANES.length;i++){ if(LANES[i].id===id) return LANES[i]; } return null; }
+function escHtml(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+function initNote(p){ if(STATE.notes[p.id]===undefined){ STATE.notes[p.id]=p.notePrefix+'\n'+p.noteSymptoms; } }
+function renderAll(){ renderSidebar(); renderDetail(); }
+
+function renderSidebar(){
+  var html='';
+  for(var i=0;i<LANES.length;i++){
+    var lane=LANES[i];
+    var pats=PATIENTS.filter(function(p){
+      return p.lane===lane.id && (STATE.filter==='all' || p.source===STATE.filter);
+    });
+    if(pats.length===0) continue;
+    html+='<div class="lane-header"><span class="lane-dot" style="background:'+lane.dot+'"></span>'+
+      lane.label+' — '+lane.code+' ('+pats.length+')</div>';
+    for(var j=0;j<pats.length;j++){ html+=buildCardHTML(pats[j]); }
+  }
+  document.getElementById('cardList').innerHTML=html;
+}
+
+function sourceChipLabel(s){
+  if(s==='portal') return '💬 Portal';
+  if(s==='call') return '📞 Call';
+  return '📠 Referral';
+}
+
+function buildCardHTML(p){
+  var lane=laneOf(p.lane);
+  var cls='pcard lane-'+lane.cls+(STATE.selected===p.id?' selected':'');
+  var ack=(p.id==='okafor' && STATE.david.acknowledged)?'<span class="pcard-ack">✓</span>':'';
+  var status=STATE.disposition[p.id]?'<span class="statuschip">'+STATE.disposition[p.id]+'</span>':'';
+  return '<div class="'+cls+'" onclick="selectPatient(\''+p.id+'\')">'+
+    '<div class="pcard-row1"><div class="pcard-avatar" style="background:'+p.avatarColor+'">'+p.initials+'</div>'+
+    '<span class="pcard-name">'+ack+p.name+'</span><span class="pcard-wait">'+p.waitTime+'</span></div>'+
+    '<div class="pcard-row2">'+p.age+p.sex+' · '+p.condition+' · MRN '+p.mrn+'</div>'+
+    '<div class="pcard-row3"><span class="srcchip">'+sourceChipLabel(p.source)+'</span>'+
+    '<span class="tchip '+p.tier+'">'+p.tierLabel.split(' (')[0]+'</span>'+status+'</div></div>';
+}
+
+function patientHeaderHTML(p){
+  return '<div class="phdr"><div><span class="phdr-name">'+p.name+'</span>'+
+    '<span class="phdr-meta">'+p.age+p.sex+' · '+p.condition+' · MRN '+p.mrn+'</span></div>'+
+    '<span class="phdr-src">'+p.sourceLabel+'</span></div>';
+}
+
+function highlightFlags(p){
+  var t=p.message;
+  if(p.flags){ for(var i=0;i<p.flags.length;i++){ t=t.split(p.flags[i]).join('<span class="hl">'+p.flags[i]+'</span>'); } }
+  return t;
+}
+
+function messageCardHTML(p){
+  return '<div class="card"><div class="msg-label">'+p.sourceLabel+'</div>'+
+    '<div class="msg-body">'+highlightFlags(p)+'</div></div>';
+}
+
+function chartCardHTML(p){
+  if(!p.chart) return '';
+  var rows=p.chart.map(function(c){return '<div class="ctxrow"><span>'+c.label+'</span><span class="srctag">'+c.source+'</span></div>';}).join('');
+  return '<div class="card"><div class="card-hd"><span class="card-title">From the chart — wired in (the extend step)</span>'+
+    '<span class="badge extend">EXTEND</span></div>'+rows+
+    '<div class="hint">Today the engine only reads submitted text; the chart feed is the wiring this '+
+    'design adds — with provenance on every fact, extracted never invented.</div></div>';
+}
+
+function assessmentCardHTML(p){
+  var laneObj=(p.id==='ellison' && STATE.margaret.appliedOverride)?STATE.margaret.appliedOverride:laneOf(p.lane);
+  var actions='';
+  if(p.id==='ellison'){
+    if(STATE.margaret.changing){ actions=changePathwayFormHTML(); }
+    else if(STATE.margaret.confirmed){
+      actions='<div class="btnrow"><span class="statuschip">Nurse-confirmed ✓</span>'+
+        '<span class="restart" onclick="startChangePathway()">Change</span></div>';
+    } else {
+      actions='<div class="btnrow"><button class="btn blue" onclick="confirmPathway()">Confirm</button>'+
+        '<button class="btn ghost" onclick="startChangePathway()">Change</button></div>';
+    }
+  }
+  var overrideNote=(p.id==='ellison' && STATE.margaret.overrideNote)?'<div class="hint">'+STATE.margaret.overrideNote+'</div>':'';
+  var evid=(p.evidence||[]).map(function(e){return '<div class="ctxrow"><span>'+e.text+'</span><span class="srctag">'+e.source+'</span></div>';}).join('');
+  return '<div class="card"><div class="card-hd"><span class="card-title">AI assessment</span>'+
+    '<span class="badge ai">AI</span></div>'+
+    '<div class="pway-line">Pathway: '+laneObj.label+' <span style="font-weight:400;color:var(--faint)">'+laneObj.code+'</span></div>'+
+    '<span class="tchip '+p.tier+'" style="display:inline-flex;margin-bottom:8px">'+p.tierLabel+'</span>'+
+    '<div class="rationale">'+p.rationale+'</div>'+evid+actions+overrideNote+
+    '<div class="hint">The AI proposes; the nurse disposes. Overrides carry reason codes and land in the '+
+    'calibration dashboard — both already exist in the OP sample.</div></div>';
+}
+
+function dispositionRowHTML(p){
+  var lock=(p.id==='okafor');
+  function b(key,label,cls){
+    var dis=(lock && key!=='911')?' disabled':'';
+    return '<button class="dispbtn '+cls+'"'+dis+' onclick="chooseDisposition(\''+p.id+'\',\''+label+'\')">'+label+'</button>';
+  }
+  return '<div class="card"><div class="card-hd"><span class="card-title">Disposition</span></div>'+
+    '<div class="disprow">'+b('911','911/ED now','red')+b('samedy','Same-day provider','orange')+
+    b('advice','Nurse advice + follow-up','teal')+b('routine','Routine schedule','green')+'</div></div>';
+}
+
+function noteCardHTML(p){
+  initNote(p);
+  return '<div class="card"><div class="card-hd"><span class="card-title">Auto-drafted triage note</span>'+
+    '<span class="badge ai">AI</span></div><textarea class="notearea" '+
+    'oninput="STATE.notes[\''+p.id+'\']=this.value">'+escHtml(STATE.notes[p.id])+'</textarea></div>';
+}
+
+function actionStripHTML(){
+  return '<div class="btnrow"><button class="btn blue" onclick="sendToProvider()">Send to provider — with note</button>'+
+    '<button class="btn ghost" onclick="scheduleCallback()">Schedule callback · SMS confirm</button></div>';
+}
+function collapsedLineHTML(q,ans){
+  return '<div class="pway-q"><span class="ok">✓</span>'+q+'</div><div class="pway-a">→ '+ans+'</div>';
+}
+function pathwayQuestionHTML(key,q){
+  return '<div class="pway-q">'+q+'</div><div class="pway-btns">'+
+    '<button class="btn ghost" onclick="answerPathway(\''+key+'\',\'Yes\')">Yes</button>'+
+    '<button class="btn ghost" onclick="answerPathway(\''+key+'\',\'No\')">No</button></div>';
+}
+function recPanelHTML(text,orange){
+  return '<div class="pway-rec'+(orange?' orange':'')+'"><b>Recommendation:</b> '+text+'</div>';
+}
+
+function pathwayStateMachineHTML(){
+  var m=STATE.margaret, lines='', current='';
+  if(m.q1===null){
+    current=pathwayQuestionHTML('q1','Fever, infection symptoms, or recent illness?');
+  } else {
+    lines+=collapsedLineHTML('Fever, infection symptoms, or recent illness?', m.q1);
+    if(m.q1==='Yes'){
+      current=recPanelHTML('Screen for infection / pseudo-relapse — provider callback today', false);
+    } else if(m.q2===null){
+      current=pathwayQuestionHTML('q2','Any new bladder or bowel changes?');
+    } else {
+      lines+=collapsedLineHTML('Any new bladder or bowel changes?', m.q2);
+      if(m.q2==='Yes'){
+        current=recPanelHTML('Escalate to provider NOW + infection screen', true);
+      } else if(m.q3===null){
+        current=pathwayQuestionHTML('q3','Symptoms &gt;24 h?');
+      } else {
+        lines+=collapsedLineHTML('Symptoms &gt;24 h?', m.q3);
+        current=recPanelHTML('Provider callback today', false);
+      }
+    }
+  }
+  var restart=(m.q1!==null)?'<div class="restart" onclick="restartPathway()">↺ restart pathway</div>':'';
+  return '<div class="card"><div class="card-hd"><span class="card-title">Pathway — MS: new/worsening '+
+    'sensory symptoms</span><span class="badge draft">DRAFT — ILLUSTRATIVE</span></div>'+
+    lines+current+restart+'</div>';
+}
+
+function honestyPanelHTML(){
+  return '<div class="card"><div class="card-hd"><span class="card-title">Pathway</span>'+
+    '<span class="badge new">NEW</span></div><div class="honesty">No authored pathway for this '+
+    'presentation yet — <b style="color:var(--text)">NEW build item</b>. Manual triage note and '+
+    'disposition still work below.</div></div>';
+}
+
+function renderDetail(){
+  var p=byId(STATE.selected);
+  var el=document.getElementById('detail');
+  if(p.pathwayType==='emergent'){ el.innerHTML=renderDavid(p); }
+  else if(p.pathwayType==='stateMachine'){ el.innerHTML=renderMargaret(p); }
+  else if(p.pathwayType==='honesty'){ el.innerHTML=renderHonesty(p); }
+  else { el.innerHTML=renderDorothy(p); }
+}
+
+function renderDavid(p){
+  var lockBlock='<div class="lockchip">Scheduling locked</div><div class="locknote">Mandatory human '+
+    'review — engine cannot unlock this itself (existing behavior).</div>';
+  var body;
+  if(!STATE.david.acknowledged){
+    var quotes=p.quotes.map(function(q){return '<div class="evid-quote">“'+q+'”</div>';}).join('');
+    body='<div class="emergent-card"><div class="emergent-title">EMERGENT — Redirect to ED Immediately</div>'+
+      '<div class="emergent-sub">'+p.name+' · '+p.age+p.sex+' · '+p.condition+' · '+p.sourceLabel+'</div>'+
+      '<div class="evid-label">Gateway evidence — exact patient words</div>'+quotes+
+      '<div class="emergent-rationale">'+p.rationale+'</div>'+
+      '<div class="btnrow"><button class="btn ghost" onclick="openEdScript()">Open ED handoff script</button>'+
+      '<button class="btn red" onclick="acknowledgeDavid()">Acknowledge — rep has caller on line</button>'+
+      '</div></div>';
+  } else {
+    body='<div class="ack-banner"><b>✓ Acknowledged — EMERGENT.</b> Scheduling locked · 911/ED script '+
+      'shown to rep · covering neurologist paged. <span style="text-decoration:underline;cursor:pointer" '+
+      'onclick="openEdScript()">Open ED handoff script</span></div>';
+  }
+  return patientHeaderHTML(p)+body+lockBlock+dispositionRowHTML(p)+noteCardHTML(p)+actionStripHTML();
+}
+
+function renderMargaret(p){
+  var left=messageCardHTML(p)+chartCardHTML(p)+assessmentCardHTML(p);
+  var right=pathwayStateMachineHTML()+dispositionRowHTML(p)+noteCardHTML(p)+actionStripHTML();
+  return patientHeaderHTML(p)+'<div class="cols"><div>'+left+'</div><div>'+right+'</div></div>';
+}
+
+function renderHonesty(p){
+  var left=messageCardHTML(p)+assessmentCardHTML(p);
+  var right=honestyPanelHTML()+dispositionRowHTML(p)+noteCardHTML(p)+actionStripHTML();
+  return patientHeaderHTML(p)+'<div class="cols"><div>'+left+'</div><div>'+right+'</div></div>';
+}
+
+function renderDorothy(p){
+  var declined='<div class="declined-panel"><b>AI declined to tier</b> — insufficient/conflicting data. '+
+    'Human reads first (existing hold behavior). Nothing defaults to low-risk.</div>';
+  var msg=messageCardHTML(p);
+  if(!STATE.dorothy.manualStarted){
+    return patientHeaderHTML(p)+declined+msg+
+      '<button class="btn blue" onclick="startManualTriage()">Start manual triage</button>';
+  }
+  return patientHeaderHTML(p)+'<div class="cols"><div>'+declined+msg+'</div>'+
+    '<div>'+dispositionRowHTML(p)+noteCardHTML(p)+actionStripHTML()+'</div></div>';
+}
+function nowTime(){
+  var d=new Date(), h=d.getHours()%12||12, m=('0'+d.getMinutes()).slice(-2);
+  return h+':'+m+' '+(d.getHours()<12?'AM':'PM');
+}
+
+function appendNoteLine(pid,line){
+  initNote(byId(pid));
+  STATE.notes[pid]=STATE.notes[pid]+'\n'+line;
+}
+
+function pathwaySegments(m){
+  var segs=[];
+  if(m.q1!==null) segs.push('fever '+(m.q1==='Yes'?'Y':'N'));
+  if(m.q1==='No' && m.q2!==null) segs.push('bladder/bowel '+(m.q2==='Yes'?'Y':'N'));
+  if(m.q1==='No' && m.q2==='No' && m.q3!==null) segs.push('>24h '+(m.q3==='Yes'?'Y':'N'));
+  return segs;
+}
+
+function upsertPathwayNoteLine(pid){
+  initNote(byId(pid));
+  var segs=pathwaySegments(STATE.margaret);
+  var line='Pathway: '+segs.join('; ');
+  var text=STATE.notes[pid];
+  var re=/^Pathway:.*$/m;
+  STATE.notes[pid]=re.test(text)?text.replace(re,line):text+'\n'+line;
+}
+
+function selectPatient(id){ STATE.selected=id; renderAll(); }
+
+function setFilter(key,evt){
+  STATE.filter=key;
+  var pills=document.querySelectorAll('.filterpill');
+  for(var i=0;i<pills.length;i++){ pills[i].classList.remove('active'); }
+  if(evt && evt.target){ evt.target.classList.add('active'); }
+  renderSidebar();
+}
+
+function answerPathway(key,val){
+  STATE.margaret[key]=val;
+  upsertPathwayNoteLine('ellison');
+  renderAll();
+}
+
+function restartPathway(){
+  STATE.margaret.q1=null; STATE.margaret.q2=null; STATE.margaret.q3=null;
+  initNote(byId('ellison'));
+  STATE.notes['ellison']=STATE.notes['ellison'].replace(/\nPathway:.*$/m,'');
+  renderAll();
+}
+
+function confirmPathway(){ STATE.margaret.confirmed=true; renderAll(); }
+function startChangePathway(){ STATE.margaret.changing=true; renderAll(); }
+function cancelChangePathway(){ STATE.margaret.changing=false; renderAll(); }
+
+function changePathwayFormHTML(){
+  var opts=LANES.map(function(l){return '<option value="'+l.id+'">'+l.label+' — '+l.code+'</option>';}).join('');
+  var reasons=['clinical judgment — sicker than text suggests','patient context known to me','other'];
+  var rOpts=reasons.map(function(r){return '<option value="'+r+'">'+r+'</option>';}).join('');
+  var selStyle='background:var(--s950);color:var(--text);border:1px solid var(--s800);'+
+    'border-radius:6px;padding:6px;font-size:11px;margin-bottom:6px;width:100%';
+  return '<div style="margin-top:8px"><select id="changePathwaySel" style="'+selStyle+'">'+opts+'</select>'+
+    '<select id="changeReasonSel" style="'+selStyle+'">'+rOpts+'</select>'+
+    '<div class="btnrow" style="margin-top:0"><button class="btn blue" onclick="applyOverride()">Apply</button>'+
+    '<button class="btn ghost" onclick="cancelChangePathway()">Cancel</button></div></div>';
+}
+
+function applyOverride(){
+  var sel=document.getElementById('changePathwaySel');
+  var lane=laneOf(sel.value);
+  var reasonSel=document.getElementById('changeReasonSel');
+  var reason=reasonSel.options[reasonSel.selectedIndex].text;
+  STATE.margaret.appliedOverride=lane;
+  STATE.margaret.changing=false;
+  STATE.margaret.confirmed=true;
+  STATE.margaret.overrideNote='Override recorded → calibration dashboard (existing).';
+  appendNoteLine('ellison','Override: pathway changed to '+lane.label+' ('+lane.code+') — reason: '+
+    reason+'. Override recorded → calibration dashboard (existing).');
+  renderAll();
+}
+
+function chooseDisposition(pid,label){
+  if(pid==='okafor' && label!=='911/ED now'){ return; }
+  STATE.disposition[pid]=label;
+  appendNoteLine(pid,'Disposition: '+label+' — recorded '+nowTime()+'.');
+  showToast('Disposition recorded — triage note filed (demo)');
+  renderAll();
+}
+
+function sendToProvider(){ showToast('Sent to Dr. on-call (demo)'); }
+function scheduleCallback(){ showToast('Callback scheduled 11:00 AM · SMS confirmation queued (uses existing follow-up agent)'); }
+
+function acknowledgeDavid(){
+  STATE.david.acknowledged=true;
+  appendNoteLine('okafor','Gateway: EMERGENT — acute cerebrovascular red flags. Scheduling locked, '+
+    '911/ED script provided, covering neurologist paged. Acknowledged by nurse '+nowTime()+'.');
+  renderAll();
+}
+
+function startManualTriage(){
+  STATE.dorothy.manualStarted=true;
+  appendNoteLine('klein','Manual triage initiated by nurse — no AI tier assigned (insufficient/conflicting data).');
+  renderAll();
+}
+function toggleWhatsReal(){ document.getElementById('wrStrip').classList.toggle('open'); }
+
+function openModal(titleHtml,bodyHtml){
+  document.getElementById('modalBody').innerHTML=
+    '<div class="modal-hd"><span class="modal-title">'+titleHtml+'</span>'+
+    '<span class="modal-close" onclick="closeModal()">✕</span></div>'+bodyHtml;
+  document.getElementById('modalBackdrop').classList.add('open');
+}
+function closeModal(){ document.getElementById('modalBackdrop').classList.remove('open'); }
+
+function openEdScript(){
+  var body='<ol class="scriptlines">'+
+    '<li><b>Call 911</b> or direct to the nearest Emergency Department now — do not delay.</li>'+
+    '<li><b>Do not drive</b> the patient yourself — request the fastest available transport.</li>'+
+    '<li>Confirm the <b>last-known-well time</b> — the single most time-critical fact for the ED team.</li>'+
+    '<li>Time-window therapies are highly time-dependent; the <b>ED determines eligibility on arrival</b>.</li>'+
+    '<li><b>Stay on the line</b> until transport is confirmed en route; document call time + '+
+    'last-known-well time in the note.</li></ol>';
+  openModal('ED handoff script',body);
+}
+
+function openRedFlagModal(){
+  var chips='<div class="modal-chips"><span class="modal-chip">v3</span>'+
+    '<span class="modal-chip">Owner: triage RN + physician sign-off</span>'+
+    '<span class="modal-chip">Applied identically to every message and call</span></div>';
+  var rows=[
+    ['"worst headache of my life", "thunderclap"','Intracranial hemorrhage / SAH','Gateway: contact now'],
+    ['"face drooping", "slurred speech", "one side weak"','Acute cerebrovascular','Gateway: contact now'],
+    ['"curtain over my eye", "vision went black"','Acute vision threat','Gateway: contact now'],
+    ['"first ever seizure"','Status / recurrent seizure','Gateway: same-day floor']
+  ];
+  var table='<table class="rftable"><tr><th>Phrase anchors</th><th>Syndrome class</th><th>Behavior</th></tr>'+
+    rows.map(function(r){return '<tr><td>'+r[0]+'</td><td>'+r[1]+'</td><td>'+r[2]+'</td></tr>';}).join('')+
+    '</table>';
+  var note='<div class="hint">Not naive string match — negation/temporality-aware, independently '+
+    'cross-checked; disagreement escalates, never silently downgrades (existing gateway behavior).</div>';
+  openModal('Red-flag library · v3',chips+table+note);
+}
+
+function showToast(msg){
+  var root=document.getElementById('toastRoot');
+  var t=document.createElement('div');
+  t.className='toast';
+  t.textContent=msg;
+  root.appendChild(t);
+  setTimeout(function(){ t.remove(); },4200);
+}
+
+renderAll();
+</script>
+</body>
+</html>
