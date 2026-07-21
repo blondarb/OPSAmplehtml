@@ -352,17 +352,23 @@ function isVerbatimAssistantQuote(
 // ── Public entry point ────────────────────────────────────────────────────────
 
 /**
- * Internal: generates the evaluation AND returns the raw Bedrock token
- * usage alongside it, so runThoroughnessJudge can pass real usage to
+ * Generates the evaluation AND returns the raw Bedrock token usage
+ * alongside it, so runThoroughnessJudge can pass real usage to
  * persistEvaluation for cost_usd computation without a second Bedrock
- * call. generateThoroughnessEvaluation (the public entry point) wraps this
- * and drops usage — it is not part of the documented judge result shape.
+ * call. generateThoroughnessEvaluation (the public wrapper) calls this and
+ * drops usage — it is not part of the documented judge result shape.
+ *
+ * Exported (Historian Validation Suite Task 5) so the batch harness
+ * (src/lib/historian/eval/cli.ts) can compute a real cost_usd for the
+ * thoroughness dimension in its report the same way the production
+ * fire-and-forget pipeline does, without a second Bedrock call — purely
+ * additive, no existing caller's behavior changes.
  *
  * Fail-closed: throws TranscriptTooLargeError before invoking Bedrock at
  * all if the serialized transcript exceeds MAX_TRANSCRIPT_CHARS (reused
  * from finalDifferential.ts — same guard, same threshold, one definition).
  */
-async function generateThoroughnessEvaluationWithUsage(
+export async function generateThoroughnessEvaluationWithUsage(
   transcript: HistorianTranscriptEntry[],
   options: ThoroughnessJudgeOptions = {},
 ): Promise<{ evaluation: ThoroughnessEvaluation; usage: BedrockTokenUsage }> {

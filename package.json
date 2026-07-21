@@ -13,7 +13,8 @@
     "test:audio": "npx tsx tests/audio/run-pipeline-test.ts",
     "test:audio:generate": "bash tests/audio/scripts/generate-visit-audio.sh",
     "seed:wearable": "npx tsx scripts/seed-wearable-demo.ts",
-    "triage:sentinel": "npx tsx scripts/triage-sentinel.ts"
+    "triage:sentinel": "npx tsx scripts/triage-sentinel.ts",
+    "historian:eval": "npx tsx scripts/historian-eval.ts"
   },
   "dependencies": {
     "@aws-sdk/client-bedrock-agent-runtime": "^3.1003.0",
