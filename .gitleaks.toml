@@ -1,0 +1,18 @@
+# Gitleaks config — extends the default ruleset only.
+#
+# This repo already has a .gitallowed file, used by the existing local
+# secret-scanning pipeline. Its entries are not in gitleaks' native allowlist
+# syntax ([allowlist] paths vs. regexes vs. stopwords) and several are bare
+# literal strings (e.g. a Figma file key) or ambiguous fragments whose correct
+# scope isn't obvious from the file alone. Translating them blind risks
+# writing an allowlist regex broader than intended — which would silently
+# suppress a real secret, not just a false positive. That's a worse outcome
+# than a noisy first CI run, so no entries were carried over automatically.
+#
+# To finish this: run `gitleaks detect --source . -v` locally, confirm each
+# finding is genuinely benign, then add scoped entries under [allowlist]
+# below (prefer `paths` for whole-file/whole-directory exclusions and
+# `regexes` only for the specific matched string, not broad patterns).
+
+[extend]
+useDefault = true
