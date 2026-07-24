@@ -1,3 +1,11 @@
+# Single-package repo. pnpm still requires `packages` whenever this file exists —
+# without it, `pnpm store path` fails with "packages field missing or empty",
+# which breaks the pnpm cache step in setup-node and takes CI down before any
+# test runs. That happened when this file was added on 2026-07-21 for allowBuilds;
+# CI was red on main from then until 2026-07-23.
+packages:
+  - '.'
+
 allowBuilds:
   sharp: true
   unrs-resolver: true
