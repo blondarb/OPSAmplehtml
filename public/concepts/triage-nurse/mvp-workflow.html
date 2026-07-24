@@ -30,7 +30,8 @@ td b{color:var(--text);font-weight:600}
 .pill{display:inline-block;font-size:9px;font-weight:700;padding:2px 7px;border-radius:4px;letter-spacing:.03em;white-space:nowrap}
 .pill.ours{background:rgba(36,195,184,.2);color:var(--teal)}
 .pill.epic{background:rgba(59,130,246,.2);color:#93bbfd}
-td.gap{color:var(--red);font-weight:700;white-space:nowrap}
+td.ok{color:var(--green);font-weight:600}
+td.gap{color:var(--red);font-weight:700}
 .mvp{background:var(--s900);border:1px solid var(--s800);border-radius:10px;overflow:hidden;margin:16px 0}
 .mvp-r{display:flex;gap:12px;padding:12px 16px;border-bottom:1px solid rgba(42,45,52,.5);align-items:flex-start}
 .mvp-r:last-child{border-bottom:0}
@@ -167,9 +168,57 @@ a{color:#93bbfd;text-decoration:none}
       live patient tracking.</p>
     </div>
 
-    <h3 style="margin-top:26px">Open risks — ranked by what would actually bite</h3>
-    <p>Regulatory and operational calls, flagged for counsel and clinical leadership rather than
-    settled here. Ordered by how early each one could stop the program.</p>
+    <h3 style="margin-top:26px">Risk register — status as of 7/24</h3>
+    <p>Seven risks raised; five now have answers. Ordered by how early each could stop the program.</p>
+    <table>
+      <tr><th>Risk</th><th>Status</th></tr>
+      <tr><td><b>Cross-state licensure</b></td><td class="ok">✓ Resolved — the RN will be licensed across the covered states</td></tr>
+      <tr><td><b>BAA coverage per site</b></td><td class="ok">✓ Resolved — coverage will be in place</td></tr>
+      <tr><td><b>Physician standing orders</b></td><td class="gap">✕ OPEN — do not exist yet. Must be authored, with a policy document around them. <b>Gates live use.</b></td></tr>
+      <tr><td><b>Loop-closure escalation</b></td><td class="ok">✓ Adopted — ticklers escalate, not just remind</td></tr>
+      <tr><td><b>Emergency at distance</b></td><td class="ok">✓ Adopted — ED script is now location-first (see below)</td></tr>
+      <tr><td><b>Call consent</b></td><td class="ok">✓ Decided — transcribe, don't record; disclose at call open</td></tr>
+      <tr><td><b>Return path for the patient</b></td><td class="ok">✓ Decided — script always routes back to the local org</td></tr>
+    </table>
+
+    <div class="box r">
+      <div class="box-t">The one that gates going live</div>
+      <p><strong>Standing orders don't exist yet.</strong> A nurse issuing dispositions practices
+      under physician-approved protocol — and our pathways <em>are</em> that protocol. They need to
+      be authored, signed by a named physician owner, given a review cadence, and wrapped in a
+      policy document. This is now a tracked work item in its own right, not a checkbox on the
+      build.</p>
+    </div>
+
+    <h3 style="margin-top:26px">Transcribe — don't record</h3>
+    <p>Audio is captured only long enough to produce the AI transcript, then discarded. The
+    transcript and the note are what persist. That materially shrinks the retention and
+    discoverability surface versus keeping call recordings.</p>
+    <div class="box b">
+      <div class="box-t">But disclose anyway</div>
+      <p>Not retaining audio does <strong>not</strong> cleanly remove the consent duty — many state
+      statutes turn on <em>intercepting</em> a conversation, not on storing it. So the disclosure is
+      read at the top of every outbound call regardless.<br><br>
+      <strong>Wording matters:</strong> "quality review and care improvement" sits inside HIPAA
+      health-care operations. "Data analytics" is broader, and using patient transcripts to train
+      models is a separate authorization question — worth deciding deliberately rather than
+      inheriting from the disclosure sentence.</p>
+    </div>
+
+    <h3 style="margin-top:26px">Emergency at distance — who dials</h3>
+    <p>911 routes to the <strong>caller's</strong> location. A virtual nurse cannot dispatch to a
+    patient. So the ED script now establishes location before anything else, then names who dials:
+    the person with the patient, or the local site, or the patient themselves — and if the patient
+    is alone and can't dial, the nurse calls that jurisdiction's <strong>10-digit emergency
+    dispatch</strong>, because dialing 911 herself reaches her own area, not theirs.</p>
+
+    <h3 style="margin-top:26px">The return path</h3>
+    <p>Recommendation adopted: <strong>the script always routes the patient back to the local
+    organization.</strong> A dedicated Sevaro return number is only worth adding if it will actually
+    be <em>answered</em> — an unanswered return line is worse than none, because an urgent patient
+    leaves a voicemail nobody hears in time.</p>
+
+    <h3 style="margin-top:26px">Still open</h3>
     <div class="mvp">
       <div class="mvp-r"><div class="mvp-n">1</div><div class="mvp-x"><b>Cross-state licensure.</b>
         She advises patients in the <b>patient's</b> state. If covered sites span states she needs

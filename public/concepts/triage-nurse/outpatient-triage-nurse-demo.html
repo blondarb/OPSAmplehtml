@@ -436,6 +436,9 @@ textarea,input{font-family:inherit;font-size:inherit}
 .rftable td{padding:9px;border-bottom:1px solid var(--hair);color:var(--text);vertical-align:top}
 .rftable td b{color:var(--text)}
 .scriptlines{margin:0 0 12px;padding-left:20px;font-size:13px;color:var(--text);line-height:1.75}
+.scriptwarn{background:var(--red-bg);border-radius:11px;padding:11px 13px;margin-bottom:13px;
+            font-size:12.5px;line-height:1.6;color:#8A1620}
+.scriptwarn b{color:var(--red)}
 .scriptlines li{margin-bottom:6px}
 .scriptlines b{color:var(--text)}
 
@@ -1365,7 +1368,8 @@ function noteCardHTML(p){
 }
 function actionStripHTML(){
   return '<div class="btnrow"><button class="btn blue" onclick="sendToProvider()">Send to provider — with note</button>'+
-    '<button class="btn ghost" onclick="scheduleCallback()">Schedule callback · SMS confirm</button></div>';
+    '<button class="btn ghost" onclick="scheduleCallback()">Schedule callback · SMS confirm</button>'+
+    '<button class="btn ghost" onclick="openCallScript()">\u260E Call opening script</button></div>';
 }
 function collapsedLineHTML(q,ans){
   return '<div class="pway-q"><span class="ok">'+ICONS.check+'</span>'+q+'</div><div class="pway-a">→ '+ans+'</div>';
@@ -1615,14 +1619,42 @@ function openModal(titleHtml,bodyHtml){
 function closeModal(){ document.getElementById('modalBackdrop').classList.remove('open'); }
 
 function openEdScript(){
-  var body='<ol class="scriptlines">'+
-    '<li><b>Call 911</b> or direct to the nearest Emergency Department now — do not delay.</li>'+
-    '<li><b>Do not drive</b> the patient yourself — request the fastest available transport.</li>'+
-    '<li>Confirm the <b>last-known-well time</b> — the single most time-critical fact for the ED team.</li>'+
+  var body='<div class="scriptwarn"><b>You are remote.</b> 911 routes to <i>your</i> location, not '+
+    'the patient\u2019s \u2014 you cannot dispatch to them. Establish location first, then name who dials.</div>'+
+    '<ol class="scriptlines">'+
+    '<li><b>Where is the patient right now?</b> Get the street address, or confirm they are at the '+
+    'clinic. Nothing else happens until this is answered.</li>'+
+    '<li><b>Who is with them?</b> If someone is present \u2014 or they are at the local site \u2014 '+
+    '<b>that person calls 911</b> while you stay on the line.</li>'+
+    '<li>If the patient is <b>alone</b>: instruct them to hang up and dial 911 themselves. If they '+
+    'cannot, call that jurisdiction\u2019s <b>10-digit emergency dispatch</b> \u2014 dialing 911 '+
+    'yourself reaches your own area, not theirs.</li>'+
+    '<li><b>Do not let them drive</b> themselves \u2014 request the fastest available transport.</li>'+
+    '<li>Confirm the <b>last-known-well time</b> \u2014 the single most time-critical fact for the ED team.</li>'+
     '<li>Time-window therapies are highly time-dependent; the <b>ED determines eligibility on arrival</b>.</li>'+
-    '<li><b>Stay on the line</b> until transport is confirmed en route; document call time + '+
-    'last-known-well time in the note.</li></ol>';
+    '<li><b>Stay on the line</b> until transport is confirmed en route. Notify the local site, and '+
+    'document location, who dialed, call time, and last-known-well time in the note.</li></ol>';
   openModal('ED handoff script',body);
+}
+function openCallScript(){
+  var body='<div class="scriptwarn"><b>Read at the top of every outbound call</b>, before any '+
+    'clinical discussion. Disclosure is required whether or not audio is retained.</div>'+
+    '<ol class="scriptlines">'+
+    '<li><b>Identify:</b> \u201cThis is [name], a nurse calling on behalf of [site] neurology.\u201d</li>'+
+    '<li><b>Verify identity</b> before discussing anything clinical \u2014 name plus date of birth. '+
+    'They did not initiate this call and may not expect it.</li>'+
+    '<li><b>Disclosure:</b> \u201cThis call is transcribed by an AI assistant for quality review and '+
+    'care improvement. Let me know if you\u2019d prefer I not use it.\u201d</li>'+
+    '<li><b>Return path:</b> \u201cIf we get disconnected, call [local organization] back on '+
+    '[number] \u2014 they\u2019ll reach me.\u201d Never leave them without a way back.</li></ol>'+
+    '<div class="hint"><b>Transcribe, don\u2019t record.</b> Audio is captured only to produce the '+
+    'transcript and is then discarded \u2014 the transcript and the note are what persist. That '+
+    'shrinks the retention and discoverability surface, but it does <i>not</i> remove the duty to '+
+    'disclose: many state statutes turn on intercepting the conversation, not on storing it. '+
+    'Wording note \u2014 \u201cquality review and care improvement\u201d sits inside HIPAA '+
+    'health-care operations; \u201cdata analytics\u201d or model training is a separate '+
+    'authorization question.</div>';
+  openModal('Call opening \u2014 identity + disclosure',body);
 }
 function openRedFlagModal(){
   var chips='<div class="modal-chips"><span class="modal-chip">v3</span>'+
