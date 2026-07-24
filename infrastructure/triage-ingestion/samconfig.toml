@@ -1,0 +1,73 @@
+# SAM deploy config for the scanned-packet ingestion foundation stack.
+#
+# WHY THIS FILE EXISTS
+# --------------------
+# This stack was exposed to the exact same silent-no-op deploy failure that
+# just bit the triage worker stack (see infrastructure/triage-worker/
+# samconfig.toml): with no samconfig.toml, `sam deploy` has no stack name and
+# `ClinicalDataKmsKeyArn` is a required parameter with no default, so a bare
+# `sam deploy` either drops into interactive `--guided` mode or errors out
+# before ever contacting CloudFormation. This file removes that failure mode.
+#
+# USAGE
+#   cd infrastructure/triage-ingestion
+#   sam validate --lint
+#   sam build
+#   sam deploy                # shows a changeset and asks before applying
+#
+# Add --no-confirm-changeset for a non-interactive deploy (CI, scripted runs).
+#
+# The values below were read off the live `sevaro-triage-ingestion-sandbox`
+# stack on 2026-07-24 via:
+#   aws cloudformation describe-stacks --stack-name sevaro-triage-ingestion-sandbox \
+#     --region us-east-2 --profile sevaro-sandbox --query "Stacks[0].Parameters"
+# and match what is deployed today. Every parameter is pinned explicitly
+# (not just the ones with no template default) so a redeploy can never
+# silently drift onto a stale default:
+#   - ClinicalDataKmsKeyArn has NO template default at all (required) — this
+#     is the parameter that causes the --guided/error trap this file exists
+#     to prevent.
+#   - AllowedUploadOrigin's template default is http://localhost:3000, but the
+#     live stack is pinned to the real Amplify origin. Omitting it here would
+#     not break `sam deploy`, but a redeploy would silently revert the
+#     upload-bucket CORS policy to the dev-only localhost origin.
+#
+# This is a NON-PRODUCTION foundation stack (see README.md) — no upload API is
+# wired to it yet, and the safety boundary documented there (no PHI-bearing
+# identifiers in S3 keys/metadata/logs, no control-plane binding without a
+# durable tenant/auth database record) is unaffected by this file.
+#
+# Nothing secret lives in this file — the KMS key ARN is a resource
+# identifier, not a credential.
+
+version = 0.1
+
+[default]
+[default.global.parameters]
+stack_name = "sevaro-triage-ingestion-sandbox"
+
+[default.validate.parameters]
+lint = true
+
+[default.build.parameters]
+cached = true
+parallel = true
+
+[default.deploy.parameters]
+stack_name = "sevaro-triage-ingestion-sandbox"
+region = "us-east-2"
+profile = "sevaro-sandbox"
+capabilities = "CAPABILITY_IAM CAPABILITY_AUTO_EXPAND"
+resolve_s3 = true
+# Safety gate: a production Lambda/resource deploy always shows its changeset
+# first. Override with --no-confirm-changeset when running non-interactively.
+confirm_changeset = true
+fail_on_empty_changeset = false
+parameter_overrides = "Environment=\"sandbox\" ClinicalDataKmsKeyArn=\"arn:aws:kms:us-east-2:873370528823:key/8f898ba5-0955-4c14-abea-c448eb208310\" AllowedUploadOrigin=\"https://main.d3ietjwgco4g2t.amplifyapp.com\" QuarantineRetentionDays=\"30\" TextractOutputRetentionDays=\"30\" ResultRetentionDays=\"365\" WorkerMaximumConcurrency=\"2\" WorkerMaximumResultRequests=\"10000\""
+
+[default.sync.parameters]
+watch = false
+
+[default.local_invoke.parameters]
+region = "us-east-2"
+profile = "sevaro-sandbox"
