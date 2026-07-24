@@ -20,6 +20,7 @@ import { invokeBedrockJSON } from '@/lib/bedrock'
 import { from } from '@/lib/db-query'
 import { getNeuroPlansPool } from '@/lib/db'
 import { retrievePlanEvidence } from '@/lib/consult/planEvidence'
+import { SYMPTOM_EXTRACTOR_PROMPT } from '@/lib/consult/symptomExtractorPrompt'
 import type {
   LocalizerRequest,
   LocalizerResponse,
@@ -36,27 +37,11 @@ const MAX_SUGGESTED_ACTIONS = 4
 const SUGGESTED_ACTION_FIELD_MAX_LEN = 200
 
 // ── Prompts ───────────────────────────────────────────────────────────────────
-
-const SYMPTOM_EXTRACTOR_PROMPT = `You are a clinical neurologist reviewing a patient intake transcript.
-Extract a structured list of symptoms and clinical features from the conversation.
-
-Return JSON matching this exact shape:
-{
-  "primarySymptoms": ["string"],
-  "location": ["string"],
-  "temporalPattern": ["string"],
-  "severity": ["string"],
-  "associatedFeatures": ["string"],
-  "redFlags": ["string"],
-  "clinicalSummary": "string"
-}
-
-Rules:
-- Extract only what the patient has explicitly stated — do not infer or assume.
-- redFlags: include only features that suggest serious pathology (thunderclap onset, fever, focal deficits, papilledema, progressive, meningismus, etc.).
-- clinicalSummary: 1–2 sentences maximum describing the current clinical picture.
-- If a field has no data, use an empty array [].
-- Do not include assistant questions — only patient-reported content.`
+//
+// SYMPTOM_EXTRACTOR_PROMPT lives in src/lib/consult/symptomExtractorPrompt.ts
+// (shared with the Historian Validation Suite's final differential pass —
+// see src/lib/historian/eval/finalDifferential.ts) so both call sites stay
+// byte-identical instead of drifting. Imported above.
 
 const QUESTION_GENERATOR_PROMPT = `You are a clinical neurologist reviewing an in-progress patient intake.
 You have been given:

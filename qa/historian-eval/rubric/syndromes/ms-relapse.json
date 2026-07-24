@@ -1,0 +1,32 @@
+{
+  "_note": "[training knowledge — Steve to vet]",
+  "version": "ms-v1",
+  "syndrome": "ms-relapse",
+  "vetted_by": null,
+  "vetted_date": null,
+  "critical_questions": [
+    {
+      "id": "prior-episodes-optic-neuritis",
+      "question": "Any prior distinct neurological episodes (e.g. optic neuritis, sensory changes, weakness) consistent with a previous demyelinating event?",
+      "severity": "critical",
+      "coverage_hints": ["optic neuritis", "vision loss", "prior episode", "eye pain"]
+    },
+    {
+      "id": "bladder-symptoms",
+      "question": "Any new bladder or bowel symptoms (urgency, retention, incontinence)?",
+      "severity": "critical",
+      "coverage_hints": ["bladder", "urinary", "incontinence", "urgency"]
+    },
+    {
+      "id": "symptom-course",
+      "question": "Are symptoms progressive, or did they evolve over hours-to-days consistent with a relapse pattern?",
+      "severity": "important"
+    },
+    {
+      "id": "prior-ms-diagnosis-treatment",
+      "question": "Does the patient have a known MS diagnosis, and if so, what disease-modifying therapy are they on?",
+      "severity": "important"
+    }
+  ],
+  "expected_dimensions": ["oldcarts", "red_flags", "pmh_meds_allergies", "fh_sh"]
+}

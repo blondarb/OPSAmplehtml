@@ -1,0 +1,39 @@
+{
+  "_note": "[training knowledge — Steve to vet]",
+  "version": "seizure-v1",
+  "syndrome": "first-seizure",
+  "vetted_by": null,
+  "vetted_date": null,
+  "critical_questions": [
+    {
+      "id": "first-vs-recurrent",
+      "question": "Is this the patient's first seizure, or have they had prior seizures / a known seizure disorder?",
+      "severity": "critical",
+      "coverage_hints": ["first seizure", "seizure before", "prior seizure", "seizure disorder"]
+    },
+    {
+      "id": "ictal-features",
+      "question": "Did the episode include tongue-biting or urinary/bowel incontinence?",
+      "severity": "critical",
+      "coverage_hints": ["tongue", "bit my tongue", "incontinence", "wet myself"]
+    },
+    {
+      "id": "alcohol-withdrawal-risk",
+      "question": "Any history of alcohol use, recent heavy drinking, or abrupt cessation (withdrawal risk)? Any illicit substance use?",
+      "severity": "critical",
+      "coverage_hints": ["alcohol", "drinking", "withdrawal", "drugs"]
+    },
+    {
+      "id": "driving-safety",
+      "question": "Has the patient been counseled on driving safety / applicable state seizure-reporting requirements following this event?",
+      "severity": "critical",
+      "coverage_hints": ["driving", "drive", "dmv", "license"]
+    },
+    {
+      "id": "post-ictal-state",
+      "question": "Was there a post-ictal confusion period, and how long did it last?",
+      "severity": "important"
+    }
+  ],
+  "expected_dimensions": ["oldcarts", "red_flags", "pmh_meds_allergies", "fh_sh"]
+}

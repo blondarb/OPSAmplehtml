@@ -1,0 +1,3281 @@
+{
+  "schemaVersion": "1.0",
+  "generatedAt": "2026-07-21T10:15:11.779Z",
+  "mode": "fixtures",
+  "live": true,
+  "clinicalValidationClaim": false,
+  "banner": "Investigational — AI-generated differential for retrospective QA and audit review only. Not a clinical diagnosis and not intended to guide patient care. The historian interview itself never diagnoses; this differential is produced by a separate review pass after the session ends and requires physician verification against the full chart.",
+  "headline": "SYNTHETIC SOFTWARE EVALUATION — NOT CLINICALLY VALIDATED",
+  "selfLabel": {
+    "unvetted": true,
+    "label": "developer baseline — not clinician-vetted"
+  },
+  "honestN": {
+    "n": 5,
+    "label": "n=5 development-set personas; tuning permitted; no held-out claims"
+  },
+  "gateSetId": "historian-eval-release-gates-2026-07-21-v1",
+  "provenance": [
+    {
+      "evaluator": "final_differential",
+      "modelIds": [
+        "us.anthropic.claude-sonnet-4-6"
+      ],
+      "promptVersions": [
+        "final-ddx-v1"
+      ],
+      "rubricVersions": [],
+      "vetted": null,
+      "inferenceParams": {
+        "temperature": 0,
+        "max_tokens": 4000,
+        "tool": "record_final_differential"
+      },
+      "casesRun": 5,
+      "casesFailed": 0
+    },
+    {
+      "evaluator": "thoroughness",
+      "modelIds": [
+        "us.anthropic.claude-sonnet-4-6"
+      ],
+      "promptVersions": [
+        "thoroughness-v1"
+      ],
+      "rubricVersions": [
+        "base-neuro-hpi-v1+migraine-v1",
+        "base-neuro-hpi-v1+ms-v1",
+        "base-neuro-hpi-v1+neuropathy-v1",
+        "base-neuro-hpi-v1+seizure-v1",
+        "base-neuro-hpi-v1+stroke-v1"
+      ],
+      "vetted": false,
+      "inferenceParams": {
+        "temperature": 0,
+        "max_tokens": 4500,
+        "tool": "record_thoroughness_evaluation"
+      },
+      "casesRun": 5,
+      "casesFailed": 0
+    },
+    {
+      "evaluator": "independent_ddx",
+      "modelIds": [
+        "us.deepseek.r1-v1:0"
+      ],
+      "promptVersions": [
+        "independent-ddx-r1-v1"
+      ],
+      "rubricVersions": [],
+      "vetted": null,
+      "inferenceParams": {
+        "temperature": 0.6,
+        "max_tokens": 8000
+      },
+      "casesRun": 5,
+      "casesFailed": 0
+    },
+    {
+      "evaluator": "agreement",
+      "modelIds": [
+        "us.anthropic.claude-haiku-4-5-20251001-v1:0"
+      ],
+      "promptVersions": [
+        "agreement-icd10-adjudicated-v1"
+      ],
+      "rubricVersions": [],
+      "vetted": null,
+      "inferenceParams": {
+        "adjudicator_model": "us.anthropic.claude-haiku-4-5-20251001-v1:0"
+      },
+      "casesRun": 5,
+      "casesFailed": 0
+    }
+  ],
+  "cases": [
+    {
+      "caseId": "acute-stroke.json",
+      "source": "fixture",
+      "chiefComplaint": "Sudden left-sided weakness and difficulty speaking that started about 2 hours ago while watching TV",
+      "syndrome": "acute-stroke",
+      "turnCount": 20,
+      "finalDifferential": {
+        "ok": true,
+        "result": {
+          "differential": [
+            {
+              "diagnosis": "Acute Ischemic Stroke — Right MCA Territory (Cardioembolic)",
+              "icd10": "I63.411",
+              "likelihood": "High",
+              "likelihood_pct": 72,
+              "rationale": "The patient presents with sudden-onset left hemiparesis (arm > leg), left facial droop, and dysarthria at rest with no prior warning, lasting approximately 2 hours — a classic presentation of right MCA territory ischemic stroke. Known atrial fibrillation on warfarin (with INR last checked 2 weeks ago, potentially subtherapeutic now), hypertension, type 2 diabetes, hypercholesterolemia, and a 30 pack-year smoking history constitute a high cardioembolic and atherosclerotic risk burden, making ischemic stroke the leading diagnosis.",
+              "supporting_quotes": [
+                {
+                  "turn": 1,
+                  "quote": "my left hand just stopped working. I dropped my coffee mug. Then my wife said my face looked funny and I was talking weird."
+                },
+                {
+                  "turn": 3,
+                  "quote": "There was no warning at all - it came on all at once."
+                },
+                {
+                  "turn": 5,
+                  "quote": "My left arm feels heavy and I can't grip things with my left hand. My left leg feels a bit weak too but not as bad. My face feels droopy on the left side and I know I'm not talking right."
+                },
+                {
+                  "turn": 7,
+                  "quote": "I know what I want to say but it comes out garbled."
+                },
+                {
+                  "turn": 13,
+                  "quote": "I have A-fib and I take warfarin for it. I also have high blood pressure, diabetes type 2, and high cholesterol."
+                },
+                {
+                  "turn": 11,
+                  "quote": "This is the first time anything like this has happened. I've never had a TIA or stroke that I know of."
+                }
+              ],
+              "contradicting_quotes": [
+                {
+                  "turn": 9,
+                  "quote": "I have a mild headache, maybe a 3 out of 10."
+                },
+                {
+                  "turn": 13,
+                  "quote": "last one was about 2 weeks ago and they said it was fine."
+                }
+              ]
+            },
+            {
+              "diagnosis": "Intracerebral Hemorrhage (ICH)",
+              "icd10": "I61.9",
+              "likelihood": "Moderate",
+              "likelihood_pct": 15,
+              "rationale": "ICH must be urgently excluded given the patient's anticoagulation with warfarin (INR status uncertain at time of presentation), hypertension, and acute focal neurological deficits. However, the headache is only mild (3/10), there is no vomiting, no rapid neurological deterioration, and no thunderclap quality — features that would more strongly favor hemorrhage over ischemia.",
+              "supporting_quotes": [
+                {
+                  "turn": 9,
+                  "quote": "I have a mild headache, maybe a 3 out of 10."
+                },
+                {
+                  "turn": 13,
+                  "quote": "I have A-fib and I take warfarin for it. I also have high blood pressure"
+                },
+                {
+                  "turn": 3,
+                  "quote": "it came on all at once."
+                }
+              ],
+              "contradicting_quotes": [
+                {
+                  "turn": 9,
+                  "quote": "I have a mild headache, maybe a 3 out of 10. No changes in my vision that I've noticed. I don't feel dizzy"
+                },
+                {
+                  "turn": 7,
+                  "quote": "They haven't really gotten better or worse."
+                },
+                {
+                  "turn": 9,
+                  "quote": "I feel a bit confused, like things are happening too fast."
+                }
+              ]
+            },
+            {
+              "diagnosis": "Transient Ischemic Attack (TIA)",
+              "icd10": "G45.9",
+              "likelihood": "Moderate",
+              "likelihood_pct": 8,
+              "rationale": "TIA shares the same vascular risk profile and mechanism as ischemic stroke and cannot be excluded at this stage; however, the patient's deficits have persisted for approximately 2 hours without improvement, making a completed stroke more likely than a transient event. TIA is typically defined by symptom resolution within 24 hours, but the ongoing nature of deficits at presentation shifts probability toward stroke.",
+              "supporting_quotes": [
+                {
+                  "turn": 3,
+                  "quote": "It was about two hours ago, maybe a little more."
+                },
+                {
+                  "turn": 13,
+                  "quote": "I have A-fib and I take warfarin for it. I also have high blood pressure, diabetes type 2, and high cholesterol."
+                }
+              ],
+              "contradicting_quotes": [
+                {
+                  "turn": 7,
+                  "quote": "They haven't really gotten better or worse. The arm is still weak and my speech is still off."
+                },
+                {
+                  "turn": 11,
+                  "quote": "This is the first time anything like this has happened."
+                }
+              ]
+            },
+            {
+              "diagnosis": "Subarachnoid Hemorrhage (SAH)",
+              "icd10": "I60.9",
+              "likelihood": "Low",
+              "likelihood_pct": 3,
+              "rationale": "SAH typically presents with a sudden 'worst headache of life,' meningismus, photophobia, and/or loss of consciousness at onset. This patient's headache is only 3/10, there is no reported neck stiffness, photophobia, or loss of consciousness, making SAH unlikely — though it cannot be fully excluded without neuroimaging.",
+              "supporting_quotes": [
+                {
+                  "turn": 3,
+                  "quote": "There was no warning at all - it came on all at once."
+                }
+              ],
+              "contradicting_quotes": [
+                {
+                  "turn": 9,
+                  "quote": "I have a mild headache, maybe a 3 out of 10. No changes in my vision that I've noticed. I don't feel dizzy"
+                },
+                {
+                  "turn": 1,
+                  "quote": "I was sitting in my chair watching the news and all of a sudden my left hand just stopped working."
+                }
+              ]
+            },
+            {
+              "diagnosis": "Hypoglycemia-Induced Focal Neurological Deficit",
+              "icd10": "E11.649",
+              "likelihood": "Low",
+              "likelihood_pct": 1,
+              "rationale": "Hypoglycemia in a diabetic patient can mimic focal stroke deficits and must be rapidly excluded with a bedside glucose check. However, the patient does not report diaphoresis, tremor, or tachycardia, and is on metformin (low hypoglycemia risk) rather than insulin or a sulfonylurea, making this etiology unlikely.",
+              "supporting_quotes": [
+                {
+                  "turn": 13,
+                  "quote": "I also have high blood pressure, diabetes type 2, and high cholesterol. I take metformin"
+                }
+              ],
+              "contradicting_quotes": [
+                {
+                  "turn": 9,
+                  "quote": "I don't feel dizzy but I feel a bit confused, like things are happening too fast."
+                },
+                {
+                  "turn": 13,
+                  "quote": "I take metformin, lisinopril, and a statin."
+                }
+              ]
+            },
+            {
+              "diagnosis": "Todd's Paralysis (Post-Ictal Paresis)",
+              "icd10": "G83.89",
+              "likelihood": "Low",
+              "likelihood_pct": 1,
+              "rationale": "Todd's paralysis can produce transient focal weakness mimicking stroke but requires a preceding seizure, which the patient does not report. There is no history of epilepsy, no witnessed convulsive activity, and no gradual resolution of deficits — all of which argue strongly against this diagnosis.",
+              "supporting_quotes": [],
+              "contradicting_quotes": [
+                {
+                  "turn": 11,
+                  "quote": "This is the first time anything like this has happened. I've never had a TIA or stroke that I know of."
+                },
+                {
+                  "turn": 7,
+                  "quote": "They haven't really gotten better or worse."
+                },
+                {
+                  "turn": 3,
+                  "quote": "There was no warning at all - it came on all at once."
+                }
+              ]
+            }
+          ],
+          "summary": "This patient is a middle-aged man with a high-risk vascular profile — atrial fibrillation on warfarin, hypertension, type 2 diabetes, hypercholesterolemia, and a 30 pack-year smoking history — who presents with sudden-onset left hemiparesis (arm > leg), left facial droop, and dysarthria beginning approximately 2 hours ago at rest, with no prior similar episodes. The clinical picture is overwhelmingly consistent with an acute right MCA territory ischemic stroke, most likely cardioembolic in origin given his atrial fibrillation, and he remains within the thrombolysis window. Intracerebral hemorrhage is the critical competing diagnosis that must be excluded immediately with non-contrast CT head, particularly given his anticoagulation status. The mild headache (3/10) is insufficient to raise strong suspicion for subarachnoid hemorrhage, and the absence of thunderclap quality, meningismus, or loss of consciousness makes SAH unlikely. TIA remains on the differential but is disfavored by the persistence of deficits at 2 hours. Hypoglycemia should be excluded with a rapid bedside glucose given his diabetes, though metformin monotherapy carries low hypoglycemia risk. Todd's paralysis is effectively excluded by the absence of any seizure history or witnessed convulsive activity. Urgent neuroimaging (CT head without contrast, CT angiography), point-of-care glucose, INR, and stroke team activation are the immediate priorities.",
+          "provenance": {
+            "model_id": "us.anthropic.claude-sonnet-4-6",
+            "prompt_version": "final-ddx-v1",
+            "inference_params": {
+              "temperature": 0,
+              "max_tokens": 4000,
+              "tool": "record_final_differential"
+            },
+            "generated_at": "2026-07-21T10:08:06.424Z"
+          },
+          "dropped_quotes": 0
+        },
+        "error": null,
+        "skippedReason": null,
+        "latencyMs": 41938,
+        "costUsd": null,
+        "modelId": "us.anthropic.claude-sonnet-4-6",
+        "promptVersion": "final-ddx-v1",
+        "rubricVersion": null,
+        "inferenceParams": {
+          "temperature": 0,
+          "max_tokens": 4000,
+          "tool": "record_final_differential"
+        }
+      },
+      "thoroughness": {
+        "ok": true,
+        "result": {
+          "oldcarts": {
+            "score": 0,
+            "evidence_turns": [],
+            "notes": ""
+          },
+          "red_flags": {
+            "score": 0,
+            "evidence_turns": [],
+            "notes": ""
+          },
+          "pmh_meds_allergies": {
+            "score": 0,
+            "evidence_turns": [],
+            "notes": ""
+          },
+          "fh_sh": {
+            "score": 0,
+            "evidence_turns": [],
+            "notes": ""
+          },
+          "question_quality": {
+            "score": 0,
+            "evidence_turns": [],
+            "notes": ""
+          },
+          "closure": {
+            "score": 0,
+            "evidence_turns": [],
+            "notes": ""
+          },
+          "missed_critical_questions": [
+            {
+              "rubric_id": "thrombolysis-contraindications",
+              "severity": "critical",
+              "why_it_matters": "In acute ischemic stroke, contraindications to thrombolysis (recent surgery, trauma, bleeding history, prior intracranial hemorrhage, pregnancy) must be screened before tPA can be administered. This was never asked in any form in the transcript."
+            },
+            {
+              "rubric_id": "onset-time",
+              "severity": "critical",
+              "why_it_matters": "While the patient said 'about two hours ago,' no exact clock time of onset or last-known-well time was established. This is critical for determining tPA and thrombectomy eligibility windows (4.5-hour and 6/24-hour windows respectively). The historian never asked 'what time did this start?' or 'what time were you last completely normal?'"
+            },
+            {
+              "rubric_id": "anticoagulant-use",
+              "severity": "critical",
+              "why_it_matters": "While warfarin use was elicited indirectly through PMH, the historian never directly asked about anticoagulant or antiplatelet use. The INR value of 2.1 cited in the report was not confirmed in the transcript — the patient only said 'they said it was fine.' Antiplatelet agents (aspirin, clopidogrel) were not asked about at all."
+            }
+          ],
+          "diagnosis_leak": {
+            "leaked": false,
+            "quotes": []
+          },
+          "fidelity": {
+            "fabricated_claims": [
+              {
+                "report": "narrative_summary",
+                "claim": "last INR 2.1 — The patient stated only that the INR check was 'about 2 weeks ago and they said it was fine.' No numerical INR value of 2.1 appears anywhere in the transcript."
+              },
+              {
+                "report": "narrative_summary",
+                "claim": "BP 186/102, HR 88 irregular, glucose 210, GCS 14, CT head shows no hemorrhage, NIHSS estimated at 8 — None of these vital signs, lab values, imaging results, or clinical scores appear anywhere in the transcript. These appear to be fabricated or sourced from outside the interview."
+              }
+            ],
+            "material_omissions": [
+              {
+                "transcript_turn": 9,
+                "omission": "Patient reported feeling confused ('things are happening too fast') at turn 9 — this cognitive symptom is not mentioned in the narrative summary, which only lists motor and speech deficits."
+              },
+              {
+                "transcript_turn": 7,
+                "omission": "Patient described expressive difficulty ('I know what I want to say but it comes out garbled') suggesting possible expressive aphasia component in addition to dysarthria — the report uses only 'dysarthria' without noting this possible aphasia quality."
+              }
+            ]
+          },
+          "overall": 58,
+          "confidence": {
+            "level": "High",
+            "reason": "The transcript is complete, clearly numbered, and of sufficient length to evaluate all rubric dimensions with confidence. The critical omissions are unambiguous."
+          },
+          "unvetted": true,
+          "deterministic": {
+            "diagnosisLeak": {
+              "leaked": false,
+              "matches": []
+            },
+            "phaseMarkers": {
+              "openingPresent": false,
+              "closingPresent": false
+            },
+            "turnCap": {
+              "patientTurnCount": 10,
+              "limit": 25,
+              "exceeded": false
+            },
+            "structuredOutput": {
+              "valid": false,
+              "issues": [
+                "structured_output is missing"
+              ]
+            },
+            "criticalCoverage": [
+              {
+                "rubric_id": "onset-timing",
+                "hint_matched": null
+              },
+              {
+                "rubric_id": "trajectory",
+                "hint_matched": null
+              },
+              {
+                "rubric_id": "onset-time",
+                "hint_matched": false
+              },
+              {
+                "rubric_id": "anticoagulant-use",
+                "hint_matched": true
+              },
+              {
+                "rubric_id": "thrombolysis-contraindications",
+                "hint_matched": false
+              }
+            ],
+            "issues": [
+              "opening greeting phase-marker not detected in the first assistant turn",
+              "closing phase-marker not detected in the last assistant turn",
+              "structured_output is missing"
+            ]
+          },
+          "dropped_findings": 0,
+          "coverage_disagreement": false,
+          "provenance": {
+            "model_id": "us.anthropic.claude-sonnet-4-6",
+            "prompt_version": "thoroughness-v1",
+            "rubric_version": "base-neuro-hpi-v1+stroke-v1",
+            "inference_params": {
+              "temperature": 0,
+              "max_tokens": 4500,
+              "tool": "record_thoroughness_evaluation"
+            },
+            "generated_at": "2026-07-21T10:08:40.342Z"
+          }
+        },
+        "error": null,
+        "skippedReason": null,
+        "latencyMs": 33918,
+        "costUsd": 0.040568999999999994,
+        "modelId": "us.anthropic.claude-sonnet-4-6",
+        "promptVersion": "thoroughness-v1",
+        "rubricVersion": "base-neuro-hpi-v1+stroke-v1",
+        "inferenceParams": {
+          "temperature": 0,
+          "max_tokens": 4500,
+          "tool": "record_thoroughness_evaluation"
+        }
+      },
+      "independentDdx": {
+        "ok": true,
+        "result": {
+          "differential": [
+            {
+              "diagnosis": "Acute ischemic stroke",
+              "icd10": "I63.9",
+              "likelihood": "High",
+              "likelihood_pct": 85,
+              "rationale": "Sudden-onset left-sided weakness, facial droop, and dysarthria in a patient with atrial fibrillation (on warfarin), hypertension, diabetes, and family stroke history. Symptoms persist without improvement.",
+              "supporting_quotes": [
+                {
+                  "turn": 1,
+                  "quote": "all of a sudden my left hand just stopped working"
+                },
+                {
+                  "turn": 3,
+                  "quote": "it came on all at once"
+                },
+                {
+                  "turn": 5,
+                  "quote": "My left arm feels heavy and I can't grip things with my left hand. My left leg feels a bit weak too"
+                },
+                {
+                  "turn": 5,
+                  "quote": "My face feels droopy on the left side and I know I'm not talking right. The words are coming out slurred"
+                },
+                {
+                  "turn": 13,
+                  "quote": "I have A-fib and I take warfarin for it. I also have high blood pressure, diabetes type 2, and high cholesterol"
+                }
+              ],
+              "contradicting_quotes": []
+            },
+            {
+              "diagnosis": "Hemorrhagic stroke",
+              "icd10": "I61.9",
+              "likelihood": "Moderate",
+              "likelihood_pct": 40,
+              "rationale": "Anticoagulation with warfarin increases bleeding risk. Sudden focal deficits could indicate intracerebral hemorrhage, though headache is mild.",
+              "supporting_quotes": [
+                {
+                  "turn": 13,
+                  "quote": "I take warfarin"
+                },
+                {
+                  "turn": 9,
+                  "quote": "I have a mild headache"
+                }
+              ],
+              "contradicting_quotes": [
+                {
+                  "turn": 9,
+                  "quote": "No changes in my vision that I've noticed. I don't feel dizzy"
+                }
+              ]
+            },
+            {
+              "diagnosis": "Transient ischemic attack (TIA)",
+              "icd10": "G45.9",
+              "likelihood": "Moderate",
+              "likelihood_pct": 30,
+              "rationale": "Sudden focal neurological deficits, though symptoms persisting >2 hours makes TIA less likely. High-risk vascular history supports possible thromboembolism.",
+              "supporting_quotes": [
+                {
+                  "turn": 1,
+                  "quote": "all of a sudden my left hand just stopped working"
+                },
+                {
+                  "turn": 13,
+                  "quote": "I have A-fib"
+                }
+              ],
+              "contradicting_quotes": [
+                {
+                  "turn": 7,
+                  "quote": "They haven't really gotten better or worse"
+                }
+              ]
+            },
+            {
+              "diagnosis": "Complex migraine",
+              "icd10": "G43.809",
+              "likelihood": "Low",
+              "likelihood_pct": 10,
+              "rationale": "Unlikely given abrupt onset without prior migraine history or typical aura features. Mild headache is non-specific.",
+              "supporting_quotes": [
+                {
+                  "turn": 9,
+                  "quote": "I have a mild headache"
+                }
+              ],
+              "contradicting_quotes": [
+                {
+                  "turn": 11,
+                  "quote": "Never. This is the first time anything like this has happened"
+                },
+                {
+                  "turn": 3,
+                  "quote": "no warning at all"
+                }
+              ]
+            },
+            {
+              "diagnosis": "Metabolic encephalopathy/hypoglycemia",
+              "icd10": null,
+              "likelihood": "Low",
+              "likelihood_pct": 5,
+              "rationale": "Diabetes history raises hypoglycemia possibility, but no explicit confusion or diaphoresis reported. Focal deficits less typical.",
+              "supporting_quotes": [
+                {
+                  "turn": 9,
+                  "quote": "I feel a bit confused"
+                },
+                {
+                  "turn": 13,
+                  "quote": "diabetes type 2"
+                }
+              ],
+              "contradicting_quotes": [
+                {
+                  "turn": 9,
+                  "quote": "No changes in my vision that I've noticed. I don't feel dizzy"
+                }
+              ]
+            },
+            {
+              "diagnosis": "Seizure with Todd's paralysis",
+              "icd10": "G40.909",
+              "likelihood": "Low",
+              "likelihood_pct": 3,
+              "rationale": "No reported seizure-like activity or postictal state. Persistent focal deficits less consistent with Todd's paralysis.",
+              "supporting_quotes": [],
+              "contradicting_quotes": [
+                {
+                  "turn": 3,
+                  "quote": "no warning at all"
+                },
+                {
+                  "turn": 11,
+                  "quote": "Never. This is the first time anything like this has happened"
+                }
+              ]
+            }
+          ],
+          "summary": "The patient presents with sudden-onset left-sided weakness, facial droop, and dysarthria persisting for 2 hours, consistent with acute ischemic stroke (highest likelihood given vascular risk factors including atrial fibrillation on warfarin, hypertension, diabetes, and family history). Hemorrhagic stroke remains a concern due to anticoagulation. TIA is less likely given symptom duration. Other etiologies like migraine or metabolic causes are unlikely due to lack of characteristic features. Immediate neuroimaging is critical to confirm stroke type and guide thrombolysis/anticoagulation reversal.",
+          "provenance": {
+            "model_id": "us.deepseek.r1-v1:0",
+            "prompt_version": "independent-ddx-r1-v1",
+            "inference_params": {
+              "temperature": 0.6,
+              "max_tokens": 8000
+            },
+            "generated_at": "2026-07-21T10:08:51.485Z"
+          },
+          "dropped_quotes": 0,
+          "stop_reason": "stop",
+          "retried": false
+        },
+        "error": null,
+        "skippedReason": null,
+        "latencyMs": 11142,
+        "costUsd": null,
+        "modelId": "us.deepseek.r1-v1:0",
+        "promptVersion": "independent-ddx-r1-v1",
+        "rubricVersion": null,
+        "inferenceParams": {
+          "temperature": 0.6,
+          "max_tokens": 8000
+        }
+      },
+      "agreement": {
+        "ok": true,
+        "result": {
+          "top1Match": true,
+          "top3Overlap": 3,
+          "jaccardTop3": 1,
+          "matchedPairs": [
+            {
+              "a": "Acute Ischemic Stroke — Right MCA Territory (Cardioembolic)",
+              "b": "Acute ischemic stroke",
+              "via": "icd10"
+            },
+            {
+              "a": "Intracerebral Hemorrhage (ICH)",
+              "b": "Hemorrhagic stroke",
+              "via": "icd10"
+            },
+            {
+              "a": "Transient Ischemic Attack (TIA)",
+              "b": "Transient ischemic attack (TIA)",
+              "via": "icd10"
+            }
+          ],
+          "disagreements": []
+        },
+        "error": null,
+        "skippedReason": null,
+        "latencyMs": 1,
+        "costUsd": null,
+        "modelId": "us.anthropic.claude-haiku-4-5-20251001-v1:0",
+        "promptVersion": "agreement-icd10-adjudicated-v1",
+        "rubricVersion": null,
+        "inferenceParams": {
+          "adjudicator_model": "us.anthropic.claude-haiku-4-5-20251001-v1:0"
+        }
+      },
+      "groundTruth": {
+        "expectedCandidates": [
+          "Acute ischemic stroke"
+        ],
+        "pipeline": {
+          "top1Hit": true,
+          "top3Hit": true
+        },
+        "independent": {
+          "top1Hit": true,
+          "top3Hit": true
+        }
+      }
+    },
+    {
+      "caseId": "first-seizure.json",
+      "source": "fixture",
+      "chiefComplaint": "I had a seizure about 30 minutes ago. My roommate says I was shaking all over for about 2 minutes. I don't remember any of it.",
+      "syndrome": "first-seizure",
+      "turnCount": 22,
+      "finalDifferential": {
+        "ok": true,
+        "result": {
+          "differential": [
+            {
+              "diagnosis": "Provoked (Acute Symptomatic) Generalized Tonic-Clonic Seizure — Sleep Deprivation / Metabolic Stress",
+              "icd10": "G40.509",
+              "likelihood": "High",
+              "likelihood_pct": 62,
+              "rationale": "The patient presents with a first-ever witnessed generalized tonic-clonic seizure with classic semiology (tonic phase ~15–20 s, clonic phase ~2 min, tongue biting, urinary incontinence, post-ictal confusion/combativeness) in the setting of severe acute sleep deprivation (~4 hours/night for one week) and very high caffeine intake. A clear precipitant without prior unprovoked seizures or family history strongly favors an acute symptomatic (provoked) event rather than a primary epilepsy syndrome.",
+              "supporting_quotes": [
+                {
+                  "turn": 5,
+                  "quote": "first my body went rigid, like a board, for maybe 15 or 20 seconds. Then I started jerking - my arms and legs were shaking rhythmically. He said it lasted about two minutes. He said I also wet myself during it."
+                },
+                {
+                  "turn": 7,
+                  "quote": "When I started to come around I was really confused. Apparently I was fighting the paramedics a little but I don't remember that at all. My whole body is sore now, like I ran a marathon. My tongue is cut on the side and my head hurts."
+                },
+                {
+                  "turn": 13,
+                  "quote": "I've been getting maybe 4 hours a night for the past week because of finals. I've been drinking a lot of coffee and energy drinks to stay up studying. Maybe 4 or 5 cups of coffee a day plus a couple of energy drinks."
+                },
+                {
+                  "turn": 9,
+                  "quote": "No, never. I've never had a seizure before. I've never fainted or passed out either. This is the first time anything like this has happened."
+                },
+                {
+                  "turn": 21,
+                  "quote": "Not that I know of. My mom has high blood pressure and my dad is healthy. I don't think any of my grandparents had seizures. No one in my family that I know of has epilepsy."
+                }
+              ],
+              "contradicting_quotes": [
+                {
+                  "turn": 17,
+                  "quote": "I got a concussion playing football in high school, maybe 5 years ago. I was out for a few days and had headaches for a couple weeks after, but I recovered completely."
+                }
+              ]
+            },
+            {
+              "diagnosis": "First Unprovoked Generalized Tonic-Clonic Seizure (New-Onset Epilepsy)",
+              "icd10": "G40.309",
+              "likelihood": "Moderate",
+              "likelihood_pct": 20,
+              "rationale": "Even with apparent precipitants, a first unprovoked seizure cannot be excluded without full workup (EEG, MRI). The remote TBI history, while described as fully recovered, represents a low-level structural risk factor. If EEG or neuroimaging reveals an epileptiform abnormality or structural lesion, reclassification to unprovoked epilepsy would be warranted per ILAE criteria.",
+              "supporting_quotes": [
+                {
+                  "turn": 1,
+                  "quote": "I was sitting at my desk studying for finals and the next thing I know I'm on the floor and paramedics are there. My roommate said I made a weird noise and then started shaking all over."
+                },
+                {
+                  "turn": 17,
+                  "quote": "I got a concussion playing football in high school, maybe 5 years ago. I was out for a few days and had headaches for a couple weeks after, but I recovered completely. The doctor cleared me to play again after a month."
+                },
+                {
+                  "turn": 3,
+                  "quote": "I was just studying and then... nothing. My roommate said it looked like I was fine one second and then my whole body went stiff and I fell out of my chair. I didn't feel any warning or anything weird before."
+                }
+              ],
+              "contradicting_quotes": [
+                {
+                  "turn": 9,
+                  "quote": "No, never. I've never had a seizure before. I've never fainted or passed out either. This is the first time anything like this has happened."
+                },
+                {
+                  "turn": 21,
+                  "quote": "Not that I know of. My mom has high blood pressure and my dad is healthy. I don't think any of my grandparents had seizures. No one in my family that I know of has epilepsy."
+                },
+                {
+                  "turn": 11,
+                  "quote": "I don't think so. I mean, I space out sometimes when I'm bored in class, but nothing where people say I was unresponsive or acting weird."
+                }
+              ]
+            },
+            {
+              "diagnosis": "Structural / Post-Traumatic Seizure (Remote TBI-Related)",
+              "icd10": "G40.109",
+              "likelihood": "Low",
+              "likelihood_pct": 8,
+              "rationale": "Remote TBI is a recognized risk factor for late post-traumatic epilepsy; however, the patient's concussion was mild, occurred 5 years ago, and was followed by full clinical recovery with medical clearance. Post-traumatic epilepsy typically manifests earlier and is more commonly associated with moderate-to-severe TBI. MRI is nonetheless indicated to exclude occult structural pathology.",
+              "supporting_quotes": [
+                {
+                  "turn": 17,
+                  "quote": "I got a concussion playing football in high school, maybe 5 years ago. I was out for a few days and had headaches for a couple weeks after, but I recovered completely. The doctor cleared me to play again after a month."
+                }
+              ],
+              "contradicting_quotes": [
+                {
+                  "turn": 17,
+                  "quote": "I recovered completely. The doctor cleared me to play again after a month."
+                },
+                {
+                  "turn": 9,
+                  "quote": "No, never. I've never had a seizure before. I've never fainted or passed out either. This is the first time anything like this has happened."
+                }
+              ]
+            },
+            {
+              "diagnosis": "Convulsive Syncope (Vasovagal or Cardiogenic)",
+              "icd10": "R55",
+              "likelihood": "Low",
+              "likelihood_pct": 5,
+              "rationale": "Convulsive syncope can mimic a tonic-clonic seizure with brief stiffening and limb jerking; however, the prolonged rhythmic clonic phase (~2 minutes), lateral tongue biting, urinary incontinence, and prolonged post-ictal confusion are atypical for syncope, which usually features rapid recovery without a post-ictal state.",
+              "supporting_quotes": [],
+              "contradicting_quotes": [
+                {
+                  "turn": 5,
+                  "quote": "Then I started jerking - my arms and legs were shaking rhythmically. He said it lasted about two minutes."
+                },
+                {
+                  "turn": 7,
+                  "quote": "When I started to come around I was really confused. Apparently I was fighting the paramedics a little but I don't remember that at all."
+                },
+                {
+                  "turn": 7,
+                  "quote": "My tongue is cut on the side and my head hurts."
+                }
+              ]
+            },
+            {
+              "diagnosis": "Psychogenic Nonepileptic Seizure (PNES)",
+              "icd10": "F44.5",
+              "likelihood": "Low",
+              "likelihood_pct": 3,
+              "rationale": "PNES is in the broad differential for paroxysmal events; however, the witnessed semiology (abrupt onset, tonic-then-clonic sequence, lateral tongue laceration, urinary incontinence, prolonged post-ictal confusion/combativeness) is highly consistent with a true epileptic seizure and inconsistent with typical PNES features (eyes closed, pelvic thrusting, preserved awareness, no post-ictal confusion). No psychiatric history is reported.",
+              "supporting_quotes": [],
+              "contradicting_quotes": [
+                {
+                  "turn": 5,
+                  "quote": "first my body went rigid, like a board, for maybe 15 or 20 seconds. Then I started jerking - my arms and legs were shaking rhythmically. He said it lasted about two minutes. He said I also wet myself during it."
+                },
+                {
+                  "turn": 7,
+                  "quote": "My tongue is cut on the side"
+                },
+                {
+                  "turn": 7,
+                  "quote": "When I started to come around I was really confused. Apparently I was fighting the paramedics a little but I don't remember that at all."
+                }
+              ]
+            },
+            {
+              "diagnosis": "Intracranial Hemorrhage (Traumatic or Spontaneous)",
+              "icd10": "I62.9",
+              "likelihood": "Low",
+              "likelihood_pct": 2,
+              "rationale": "Intracranial hemorrhage must be excluded as a cause of new-onset seizure, particularly given the fall from a chair during the ictus and the remote TBI history. However, there is no reported lucid interval followed by deterioration, no focal neurological deficits, no Cushing's triad features, and no high-energy mechanism described. Urgent CT head is nonetheless standard of care.",
+              "supporting_quotes": [
+                {
+                  "turn": 3,
+                  "quote": "my whole body went stiff and I fell out of my chair"
+                }
+              ],
+              "contradicting_quotes": [
+                {
+                  "turn": 7,
+                  "quote": "I feel really tired and foggy"
+                },
+                {
+                  "turn": 19,
+                  "quote": "No, I'm generally pretty healthy. I don't take any medications regularly."
+                }
+              ]
+            }
+          ],
+          "summary": "A young adult male (college student) presents 30 minutes after a first-ever witnessed generalized tonic-clonic seizure with classic semiology: abrupt onset without aura, tonic stiffening (~15–20 seconds) followed by rhythmic clonic jerking (~2 minutes), lateral tongue laceration, urinary incontinence, and a prolonged post-ictal state with confusion and combativeness. The most likely diagnosis is an acute symptomatic (provoked) seizure precipitated by severe sleep deprivation (~4 hours/night for one week during finals) compounded by very high caffeine intake — both well-established seizure threshold-lowering factors. The absence of any prior seizures, staring spells, or family history of epilepsy supports a provoked rather than unprovoked etiology. However, a first unprovoked seizure and new-onset epilepsy cannot be excluded without EEG and brain MRI, which are urgently indicated; the remote mild TBI (concussion 5 years prior, fully recovered) represents a low-level structural risk factor that warrants neuroimaging. Convulsive syncope and PNES are considered unlikely given the prolonged clonic phase, lateral tongue bite, incontinence, and extended post-ictal confusion. Intracranial hemorrhage must be ruled out emergently given the fall and new-onset seizure, though no focal deficits or signs of raised intracranial pressure are reported. Immediate priorities include urgent non-contrast CT head, point-of-care glucose, electrolytes, and toxicology screen, followed by outpatient or inpatient EEG and MRI to guide definitive classification and management.",
+          "provenance": {
+            "model_id": "us.anthropic.claude-sonnet-4-6",
+            "prompt_version": "final-ddx-v1",
+            "inference_params": {
+              "temperature": 0,
+              "max_tokens": 4000,
+              "tool": "record_final_differential"
+            },
+            "generated_at": "2026-07-21T10:09:40.057Z"
+          },
+          "dropped_quotes": 0
+        },
+        "error": null,
+        "skippedReason": null,
+        "latencyMs": 46411,
+        "costUsd": null,
+        "modelId": "us.anthropic.claude-sonnet-4-6",
+        "promptVersion": "final-ddx-v1",
+        "rubricVersion": null,
+        "inferenceParams": {
+          "temperature": 0,
+          "max_tokens": 4000,
+          "tool": "record_final_differential"
+        }
+      },
+      "thoroughness": {
+        "ok": true,
+        "result": {
+          "oldcarts": {
+            "score": 72,
+            "evidence_turns": [
+              0,
+              1,
+              2,
+              3,
+              4,
+              5,
+              6,
+              7,
+              8,
+              9,
+              12,
+              13,
+              16,
+              17
+            ],
+            "notes": "Onset was covered (sudden, while studying — Turn 3/5). Character was well described via roommate account (tonic stiffening then clonic jerking — Turn 5). Duration of ictal phase covered (Turn 5). Post-ictal state described (Turn 7). Location of event (seated at desk) noted. Aggravating/precipitating factors explored (sleep deprivation, caffeine — Turn 13). Severity partially captured (tongue laceration, soreness, headache — Turn 7). However, trajectory/current status was not explicitly asked (is he improving, stable, or worsening right now?). Timing in terms of time-of-day or circadian pattern was not explored. No explicit severity rating (e.g., pain scale). Relieving factors not asked. Overall solid but missing trajectory and some OLDCARTS elements."
+          },
+          "red_flags": {
+            "score": 60,
+            "evidence_turns": [
+              5,
+              7,
+              8,
+              9,
+              10,
+              14,
+              15,
+              16,
+              17
+            ],
+            "notes": "Ictal features (tongue-biting, urinary incontinence) were captured via patient/roommate report (Turns 1, 5). First vs. recurrent seizure was asked (Turn 8). Post-ictal confusion was described (Turn 7) though duration was not explicitly quantified by the historian. Alcohol/substance use was asked (Turn 14). Head injury history was asked (Turn 16). However, driving safety counseling was never addressed (critical rubric item 'driving-safety'). Trajectory of current symptoms was not asked. No inquiry about fever, recent illness, or metabolic triggers (hyponatremia, hypoglycemia) which are important red flags in first seizure. No question about focal neurological symptoms preceding or following the event beyond what the patient volunteered."
+          },
+          "pmh_meds_allergies": {
+            "score": 55,
+            "evidence_turns": [
+              18,
+              19
+            ],
+            "notes": "Past medical history was asked broadly (Turn 18) and patient confirmed no significant conditions, no surgeries, no hospitalizations (Turn 19). Medications were asked and patient noted only an inconsistent multivitamin (Turn 19). However, allergies were never asked — a rubric 'important' item that was completely omitted. OTC medications beyond the multivitamin were not specifically probed."
+          },
+          "fh_sh": {
+            "score": 65,
+            "evidence_turns": [
+              14,
+              15,
+              20,
+              21
+            ],
+            "notes": "Family history of epilepsy/seizures was directly asked (Turn 20) and patient denied it (Turn 21). Social history was partially covered: alcohol and drug use were asked (Turn 14). Sleep and caffeine habits were explored (Turn 12-13). However, occupation/student status was not explicitly asked (though implied by context). Smoking was not asked. Broader social history (living situation, stress beyond finals, sexual history if relevant) was not explored. No inquiry about occupation or academic year beyond the implied context."
+          },
+          "question_quality": {
+            "score": 75,
+            "evidence_turns": [
+              0,
+              2,
+              4,
+              6,
+              8,
+              10,
+              12,
+              14,
+              16,
+              18,
+              20
+            ],
+            "notes": "Questions were generally open-ended and non-leading (e.g., 'What happened today?', 'How did you feel afterward?', 'What did your roommate describe?'). Pacing was appropriate and the historian did not repeat questions. The historian appropriately followed up on volunteered information (e.g., staring spells after patient mentioned spacing out). However, some questions were quite brief and could have been more probing (e.g., Turn 14 lumped alcohol and drugs together). The historian did not ask a follow-up on the post-ictal confusion duration despite the patient describing it. No leading questions were identified."
+          },
+          "closure": {
+            "score": 20,
+            "evidence_turns": [],
+            "notes": "There was no closing statement, no 'is there anything else you'd like to share?' open-door question, and no summary/reflection back to the patient. The interview ends abruptly after Turn 21 with no closure whatsoever. Driving safety counseling — a critical rubric item — was also not addressed at any point, which would typically be part of closing guidance. No evidence turns exist for closure because it simply did not occur."
+          },
+          "missed_critical_questions": [
+            {
+              "rubric_id": "driving-safety",
+              "severity": "critical",
+              "why_it_matters": "Following a first seizure, patients must be counseled on driving restrictions and applicable state seizure-reporting laws. This was never addressed anywhere in the transcript, creating a significant patient safety gap."
+            },
+            {
+              "rubric_id": "trajectory",
+              "severity": "critical",
+              "why_it_matters": "The historian never explicitly asked whether the patient's current symptoms (confusion, headache, somnolence) are improving, stable, or worsening — critical for triage and disposition decisions after a first seizure."
+            },
+            {
+              "rubric_id": "allergies",
+              "severity": "important",
+              "why_it_matters": "Drug allergies were never asked. This is essential before any pharmacological treatment (e.g., anti-epileptic drugs) is initiated."
+            },
+            {
+              "rubric_id": "post-ictal-state",
+              "severity": "important",
+              "why_it_matters": "While post-ictal confusion was described by the patient (Turn 7), the historian never explicitly asked how long the confusion lasted or whether it has fully resolved, which is important for assessing seizure severity and risk of ongoing neurological compromise."
+            }
+          ],
+          "diagnosis_leak": {
+            "leaked": false,
+            "quotes": []
+          },
+          "fidelity": {
+            "fabricated_claims": [
+              {
+                "report": "narrative_summary",
+                "claim": "Postictal confusion lasted approximately 10 minutes with transient combativeness"
+              },
+              {
+                "report": "narrative_summary",
+                "claim": "now somnolent but arousable"
+              },
+              {
+                "report": "narrative_summary",
+                "claim": "CT head is negative for acute pathology"
+              },
+              {
+                "report": "narrative_summary",
+                "claim": "No focal deficits on exam"
+              }
+            ],
+            "material_omissions": [
+              {
+                "transcript_turn": 19,
+                "omission": "Patient reported taking a multivitamin inconsistently — not mentioned in the narrative summary, though minor."
+              },
+              {
+                "transcript_turn": 21,
+                "omission": "Patient noted mother has hypertension — not mentioned in the narrative summary's family history section, though clinically minor in this context."
+              }
+            ]
+          },
+          "overall": 58,
+          "confidence": {
+            "level": "High",
+            "reason": "The transcript is complete, well-numbered, and of sufficient length to evaluate all rubric dimensions with confidence. The rubric items are clearly defined and the transcript content is unambiguous."
+          },
+          "unvetted": true,
+          "deterministic": {
+            "diagnosisLeak": {
+              "leaked": false,
+              "matches": []
+            },
+            "phaseMarkers": {
+              "openingPresent": false,
+              "closingPresent": false
+            },
+            "turnCap": {
+              "patientTurnCount": 11,
+              "limit": 25,
+              "exceeded": false
+            },
+            "structuredOutput": {
+              "valid": false,
+              "issues": [
+                "structured_output is missing"
+              ]
+            },
+            "criticalCoverage": [
+              {
+                "rubric_id": "onset-timing",
+                "hint_matched": null
+              },
+              {
+                "rubric_id": "trajectory",
+                "hint_matched": null
+              },
+              {
+                "rubric_id": "first-vs-recurrent",
+                "hint_matched": true
+              },
+              {
+                "rubric_id": "ictal-features",
+                "hint_matched": true
+              },
+              {
+                "rubric_id": "alcohol-withdrawal-risk",
+                "hint_matched": true
+              },
+              {
+                "rubric_id": "driving-safety",
+                "hint_matched": false
+              }
+            ],
+            "issues": [
+              "opening greeting phase-marker not detected in the first assistant turn",
+              "closing phase-marker not detected in the last assistant turn",
+              "structured_output is missing"
+            ]
+          },
+          "dropped_findings": 0,
+          "coverage_disagreement": false,
+          "provenance": {
+            "model_id": "us.anthropic.claude-sonnet-4-6",
+            "prompt_version": "thoroughness-v1",
+            "rubric_version": "base-neuro-hpi-v1+seizure-v1",
+            "inference_params": {
+              "temperature": 0,
+              "max_tokens": 4500,
+              "tool": "record_thoroughness_evaluation"
+            },
+            "generated_at": "2026-07-21T10:10:13.016Z"
+          }
+        },
+        "error": null,
+        "skippedReason": null,
+        "latencyMs": 32959,
+        "costUsd": 0.03904199999999999,
+        "modelId": "us.anthropic.claude-sonnet-4-6",
+        "promptVersion": "thoroughness-v1",
+        "rubricVersion": "base-neuro-hpi-v1+seizure-v1",
+        "inferenceParams": {
+          "temperature": 0,
+          "max_tokens": 4500,
+          "tool": "record_thoroughness_evaluation"
+        }
+      },
+      "independentDdx": {
+        "ok": true,
+        "result": {
+          "differential": [
+            {
+              "diagnosis": "Acute symptomatic seizure due to sleep deprivation and stimulant use",
+              "icd10": "R56.8",
+              "likelihood": "High",
+              "likelihood_pct": 70,
+              "rationale": "The patient reported severe sleep deprivation (4 hours/night for a week) and excessive caffeine/energy drink intake, both known seizure triggers. The generalized tonic-clonic seizure characteristics align with provoked seizure mechanisms.",
+              "supporting_quotes": [
+                {
+                  "turn": 13,
+                  "quote": "I've been getting maybe 4 hours a night for the past week because of finals. I've been drinking a lot of coffee and energy drinks to stay up studying. Maybe 4 or 5 cups of coffee a day plus a couple of energy drinks."
+                }
+              ],
+              "contradicting_quotes": []
+            },
+            {
+              "diagnosis": "First unprovoked generalized tonic-clonic seizure",
+              "icd10": "G40.909",
+              "likelihood": "Moderate",
+              "likelihood_pct": 25,
+              "rationale": "The detailed description of tonic rigidity followed by clonic jerking, postictal confusion, tongue injury, and incontinence strongly suggests a generalized epileptic seizure. No prior history or clear provoking factors required for this diagnosis.",
+              "supporting_quotes": [
+                {
+                  "turn": 1,
+                  "quote": "My roommate said I made a weird noise and then started shaking all over. I bit my tongue too - it hurts really bad."
+                },
+                {
+                  "turn": 5,
+                  "quote": "He said first my body went rigid, like a board, for maybe 15 or 20 seconds. Then I started jerking - my arms and legs were shaking rhythmically."
+                }
+              ],
+              "contradicting_quotes": []
+            },
+            {
+              "diagnosis": "Convulsive syncope",
+              "icd10": "R55",
+              "likelihood": "Low",
+              "likelihood_pct": 3,
+              "rationale": "While syncope can rarely involve brief myoclonic movements, the 2-minute duration of shaking and prolonged postictal state make this less likely.",
+              "supporting_quotes": [],
+              "contradicting_quotes": [
+                {
+                  "turn": 5,
+                  "quote": "He said it lasted about two minutes."
+                }
+              ]
+            },
+            {
+              "diagnosis": "Psychogenic non-epileptic seizure (PNES)",
+              "icd10": "F44.5",
+              "likelihood": "Low",
+              "likelihood_pct": 1,
+              "rationale": "Though no psychological stressors were reported, PNES remains a differential in first seizure presentations. However, physical findings (tongue biting, incontinence) strongly favor epileptic seizure.",
+              "supporting_quotes": [],
+              "contradicting_quotes": [
+                {
+                  "turn": 1,
+                  "quote": "I bit my tongue too - it hurts really bad."
+                },
+                {
+                  "turn": 5,
+                  "quote": "He said I also wet myself during it."
+                }
+              ]
+            },
+            {
+              "diagnosis": "Hypoglycemic seizure",
+              "icd10": "E16.2",
+              "likelihood": "Low",
+              "likelihood_pct": 1,
+              "rationale": "No reported history of diabetes, fasting, or typical hypoglycemic symptoms. Energy drink use could theoretically affect glucose, but no direct evidence supports this.",
+              "supporting_quotes": [],
+              "contradicting_quotes": [
+                {
+                  "turn": 19,
+                  "quote": "No, I'm generally pretty healthy. I don't take any medications regularly."
+                }
+              ]
+            }
+          ],
+          "summary": "The clinical picture strongly suggests an acute symptomatic seizure secondary to severe sleep deprivation and excessive stimulant intake, given the reported 4 hours/night sleep schedule and high caffeine/energy drink consumption preceding the event. The detailed description of tonic-clonic activity (rigidity followed by rhythmic jerking), postictal confusion, tongue injury, and urinary incontinence are classic for a generalized seizure. While new-onset epilepsy remains a consideration, the clear provoking factors make acute symptomatic seizure more likely. Other possibilities like syncope or PNES are less consistent with the prolonged ictal phase and physical findings. Urgent evaluation should focus on excluding metabolic derangements and structural causes while addressing sleep hygiene.",
+          "provenance": {
+            "model_id": "us.deepseek.r1-v1:0",
+            "prompt_version": "independent-ddx-r1-v1",
+            "inference_params": {
+              "temperature": 0.6,
+              "max_tokens": 8000
+            },
+            "generated_at": "2026-07-21T10:10:32.462Z"
+          },
+          "dropped_quotes": 2,
+          "stop_reason": "stop",
+          "retried": false
+        },
+        "error": null,
+        "skippedReason": null,
+        "latencyMs": 19446,
+        "costUsd": null,
+        "modelId": "us.deepseek.r1-v1:0",
+        "promptVersion": "independent-ddx-r1-v1",
+        "rubricVersion": null,
+        "inferenceParams": {
+          "temperature": 0.6,
+          "max_tokens": 8000
+        }
+      },
+      "agreement": {
+        "ok": true,
+        "result": {
+          "top1Match": false,
+          "top3Overlap": 1,
+          "jaccardTop3": 0.2,
+          "matchedPairs": [
+            {
+              "a": "First Unprovoked Generalized Tonic-Clonic Seizure (New-Onset Epilepsy)",
+              "b": "First unprovoked generalized tonic-clonic seizure",
+              "via": "icd10"
+            }
+          ],
+          "disagreements": [
+            "Only in pipeline differential: Provoked (Acute Symptomatic) Generalized Tonic-Clonic Seizure — Sleep Deprivation / Metabolic Stress",
+            "Only in pipeline differential: Structural / Post-Traumatic Seizure (Remote TBI-Related)",
+            "Only in independent differential: Acute symptomatic seizure due to sleep deprivation and stimulant use",
+            "Only in independent differential: Convulsive syncope"
+          ]
+        },
+        "error": null,
+        "skippedReason": null,
+        "latencyMs": 0,
+        "costUsd": null,
+        "modelId": "us.anthropic.claude-haiku-4-5-20251001-v1:0",
+        "promptVersion": "agreement-icd10-adjudicated-v1",
+        "rubricVersion": null,
+        "inferenceParams": {
+          "adjudicator_model": "us.anthropic.claude-haiku-4-5-20251001-v1:0"
+        }
+      },
+      "groundTruth": {
+        "expectedCandidates": [
+          "Epilepsy (new onset)",
+          "Provoked seizure"
+        ],
+        "pipeline": {
+          "top1Hit": true,
+          "top3Hit": true
+        },
+        "independent": {
+          "top1Hit": true,
+          "top3Hit": true
+        }
+      }
+    },
+    {
+      "caseId": "migraine-chronic.json",
+      "source": "fixture",
+      "chiefComplaint": "Chronic daily headaches that have been getting worse over the past 6 months. I used to get migraines a few times a month but now I have headaches almost every day.",
+      "syndrome": "migraine-chronic",
+      "turnCount": 28,
+      "finalDifferential": {
+        "ok": true,
+        "result": {
+          "differential": [
+            {
+              "diagnosis": "Chronic Migraine with Medication Overuse Headache (MOH)",
+              "icd10": "G43.709",
+              "likelihood": "High",
+              "likelihood_pct": 72,
+              "rationale": "This patient meets ICHD-3 criteria for chronic migraine (≥15 headache days/month for >3 months, with ≥8 fulfilling migraine criteria) and has clear medication overuse: sumatriptan use 10–15 days/month (threshold ≥10 for triptans) and daily NSAID use (threshold ≥15 days/month). The progressive transformation from episodic to chronic migraine, the declining efficacy of sumatriptan, and the daily background headache are all hallmarks of MOH superimposed on chronic migraine.",
+              "supporting_quotes": [
+                {
+                  "turn": 1,
+                  "quote": "now it's like twenty days out of the month I have some kind of headache"
+                },
+                {
+                  "turn": 7,
+                  "quote": "The daily background headache is pretty much constant - it's there when I wake up and there when I go to sleep"
+                },
+                {
+                  "turn": 13,
+                  "quote": "Sumatriptan usually helps if I catch the migraine early, but lately it doesn't seem to work as well"
+                },
+                {
+                  "turn": 19,
+                  "quote": "Sumatriptan 100mg - I take it when I feel a migraine coming on, probably 10 to 15 times a month now. Ibuprofen 800mg every day, sometimes twice a day"
+                },
+                {
+                  "turn": 9,
+                  "quote": "Before the bad migraines I sometimes see zigzag lines and flashing lights in my vision for about 20 minutes"
+                },
+                {
+                  "turn": 3,
+                  "quote": "I've had migraines since I was twenty. They used to be manageable but started getting worse about two years ago"
+                }
+              ],
+              "contradicting_quotes": []
+            },
+            {
+              "diagnosis": "Chronic Migraine without Medication Overuse",
+              "icd10": "G43.709",
+              "likelihood": "Low",
+              "likelihood_pct": 5,
+              "rationale": "The patient does fulfill criteria for chronic migraine independently, but the concurrent daily NSAID and frequent triptan use makes it nearly impossible to disentangle the contribution of MOH; a pure chronic migraine diagnosis without MOH is unlikely given the medication pattern described.",
+              "supporting_quotes": [
+                {
+                  "turn": 1,
+                  "quote": "now it's like twenty days out of the month I have some kind of headache"
+                },
+                {
+                  "turn": 3,
+                  "quote": "started getting worse about two years ago when I was going through a stressful time at work"
+                }
+              ],
+              "contradicting_quotes": [
+                {
+                  "turn": 19,
+                  "quote": "Ibuprofen 800mg every day, sometimes twice a day"
+                },
+                {
+                  "turn": 19,
+                  "quote": "Sumatriptan 100mg - I take it when I feel a migraine coming on, probably 10 to 15 times a month now"
+                }
+              ]
+            },
+            {
+              "diagnosis": "New Daily Persistent Headache (NDPH)",
+              "icd10": "G44.52",
+              "likelihood": "Low",
+              "likelihood_pct": 5,
+              "rationale": "NDPH is characterized by a daily headache from onset without a prior episodic pattern; this patient has a clear 20-year history of episodic migraine with gradual transformation, making NDPH unlikely. The background headache quality (band-like pressure) could superficially resemble NDPH, but the clinical trajectory argues strongly against it.",
+              "supporting_quotes": [
+                {
+                  "turn": 9,
+                  "quote": "The daily headache is more of a dull pressure, like a band around my head"
+                }
+              ],
+              "contradicting_quotes": [
+                {
+                  "turn": 3,
+                  "quote": "I've had migraines since I was twenty. They used to be manageable but started getting worse about two years ago"
+                },
+                {
+                  "turn": 1,
+                  "quote": "I used to get migraines maybe four or five times a month, but now it's like twenty days out of the month"
+                }
+              ]
+            },
+            {
+              "diagnosis": "Tension-Type Headache (Chronic)",
+              "icd10": "G44.229",
+              "likelihood": "Low",
+              "likelihood_pct": 8,
+              "rationale": "The daily background headache has a band-like, bilateral, non-pulsating quality consistent with tension-type headache; however, the presence of nausea, vomiting, photophobia, phonophobia, and visual aura during the more severe episodes, combined with the clear migrainous substrate, makes isolated chronic tension-type headache an insufficient explanation for the full clinical picture. It may coexist as a component of the transformed migraine/MOH syndrome.",
+              "supporting_quotes": [
+                {
+                  "turn": 9,
+                  "quote": "The daily headache is more of a dull pressure, like a band around my head"
+                },
+                {
+                  "turn": 5,
+                  "quote": "Sometimes it spreads to both sides, especially when it's been going on all day"
+                }
+              ],
+              "contradicting_quotes": [
+                {
+                  "turn": 17,
+                  "quote": "With the migraines I get nausea, sometimes vomiting, sensitivity to light and sound, and the visual aura I mentioned"
+                },
+                {
+                  "turn": 9,
+                  "quote": "Before the bad migraines I sometimes see zigzag lines and flashing lights in my vision for about 20 minutes"
+                }
+              ]
+            },
+            {
+              "diagnosis": "Intracranial Hypertension (Secondary Headache)",
+              "icd10": "G93.2",
+              "likelihood": "Low",
+              "likelihood_pct": 5,
+              "rationale": "Morning headaches, progressive worsening over 6 months, and headaches present on waking are red-flag features that raise the possibility of a secondary cause such as idiopathic intracranial hypertension (IIH) or a space-occupying lesion. The patient is on oral contraceptive pills, which can elevate venous thrombosis risk. However, no papilledema, visual obscurations, pulsatile tinnitus, or focal neurological deficits are reported, and the long migrainous history with clear MOH pattern makes a primary headache disorder far more probable; neuroimaging would be warranted to exclude this.",
+              "supporting_quotes": [
+                {
+                  "turn": 7,
+                  "quote": "it's there when I wake up and there when I go to sleep"
+                },
+                {
+                  "turn": 19,
+                  "quote": "birth control pills"
+                }
+              ],
+              "contradicting_quotes": [
+                {
+                  "turn": 17,
+                  "quote": "No numbness or weakness though"
+                },
+                {
+                  "turn": 3,
+                  "quote": "I've had migraines since I was twenty"
+                }
+              ]
+            },
+            {
+              "diagnosis": "Cerebral Venous Sinus Thrombosis (CVST)",
+              "icd10": "I63.6",
+              "likelihood": "Low",
+              "likelihood_pct": 5,
+              "rationale": "CVST can present with progressive daily headache and is a consideration in women of reproductive age on oral contraceptive pills, particularly with a family history of stroke. However, the 6-month gradual course without focal deficits, seizures, or papilledema, combined with the robust primary headache history and MOH pattern, makes CVST unlikely; it is included to flag the need for neuroimaging given the OCP use and family history.",
+              "supporting_quotes": [
+                {
+                  "turn": 19,
+                  "quote": "birth control pills"
+                },
+                {
+                  "turn": 25,
+                  "quote": "My grandma on my mom's side had a stroke when she was in her seventies"
+                }
+              ],
+              "contradicting_quotes": [
+                {
+                  "turn": 17,
+                  "quote": "No numbness or weakness though"
+                },
+                {
+                  "turn": 1,
+                  "quote": "I used to get migraines maybe four or five times a month, but now it's like twenty days out of the month I have some kind of headache"
+                }
+              ]
+            }
+          ],
+          "summary": "This woman in her mid-adult years presents with a 20-year history of episodic migraine with visual aura that has undergone progressive transformation over the past 6 months into near-daily headache (~20 days/month), consistent with chronic migraine (ICHD-3 criteria). The most compelling explanation for this transformation is superimposed Medication Overuse Headache (MOH): she is using sumatriptan 10–15 days/month (exceeding the 10-day triptan threshold) and ibuprofen 800 mg daily or twice daily (approaching/exceeding the 15-day NSAID threshold), with the characteristic finding of declining triptan efficacy and a persistent low-grade background headache present on waking. The combination of chronic migraine + MOH accounts for the vast majority of the clinical picture and should be the primary working diagnosis. Chronic tension-type headache may coexist as a phenotypic component of the transformed daily headache but does not independently explain the full syndrome. Secondary causes — particularly intracranial hypertension and cerebral venous sinus thrombosis — warrant consideration given the progressive course, morning headaches, oral contraceptive use, and family history of stroke, and neuroimaging (MRI brain with and without contrast, MRV) is advisable to exclude these before attributing the transformation entirely to MOH. Management priorities include a structured medication overuse withdrawal plan, initiation of evidence-based migraine prophylaxis (noting prior topiramate intolerance and sulfa allergy), reassessment of OCP use given migraine with aura and stroke risk, and behavioral/lifestyle optimization.",
+          "provenance": {
+            "model_id": "us.anthropic.claude-sonnet-4-6",
+            "prompt_version": "final-ddx-v1",
+            "inference_params": {
+              "temperature": 0,
+              "max_tokens": 4000,
+              "tool": "record_final_differential"
+            },
+            "generated_at": "2026-07-21T10:11:20.831Z"
+          },
+          "dropped_quotes": 0
+        },
+        "error": null,
+        "skippedReason": null,
+        "latencyMs": 45852,
+        "costUsd": null,
+        "modelId": "us.anthropic.claude-sonnet-4-6",
+        "promptVersion": "final-ddx-v1",
+        "rubricVersion": null,
+        "inferenceParams": {
+          "temperature": 0,
+          "max_tokens": 4000,
+          "tool": "record_final_differential"
+        }
+      },
+      "thoroughness": {
+        "ok": true,
+        "result": {
+          "oldcarts": {
+            "score": 92,
+            "evidence_turns": [
+              2,
+              3,
+              4,
+              5,
+              6,
+              7,
+              8,
+              9,
+              10,
+              11,
+              12,
+              13,
+              14,
+              15,
+              16,
+              17
+            ],
+            "notes": "Excellent OLDCARTS coverage. Onset (Turn 2-3): gradual over 6 months, migraines since age 20. Location (Turn 4-5): right temple/behind eye, sometimes bilateral. Duration (Turn 6-7): migraines 12-72h, daily background headache constant. Character (Turn 8-9): throbbing/pounding for migraines, dull pressure/band for daily headache; visual aura described. Aggravating factors (Turn 10-11): stress, poor sleep, bright lights, noise, smells, menses, physical activity, skipping meals. Relieving factors (Turn 12-13): dark quiet room, sumatriptan, ibuprofen, cold compress. Severity (Turn 14-15): 4-5/10 daily, 8-9/10 migraines. Associated symptoms (Turn 16-17): nausea, vomiting, photophobia, phonophobia, aura, post-drome fatigue. Minor gap: timing/pattern of daily headache vs. migraine days not explicitly quantified beyond '20 days/month', and radiation not explicitly asked."
+          },
+          "red_flags": {
+            "score": 78,
+            "evidence_turns": [
+              9,
+              17,
+              27
+            ],
+            "notes": "Medication overuse was implicitly captured (Turn 18-19: sumatriptan 10-15x/month, daily ibuprofen) but the historian never explicitly asked the dedicated medication-overuse question (days/month of acute medication use). Thunderclap onset was NOT explicitly asked — the patient volunteered gradual onset but the specific 'worst headache of your life / seconds to minutes' thunderclap question was never posed. Fever/neck stiffness was NOT explicitly asked. Papilledema symptoms (transient visual obscurations, pulsatile tinnitus, positional/Valsalva worsening) were NOT explicitly asked — the visual aura was discussed but this is distinct from ICP-related visual obscurations. No focal neurological deficits were confirmed (Turn 17: patient volunteered no numbness/weakness). No fever/weight loss mentioned in narrative. Three of four critical syndrome red-flag items were not explicitly asked."
+          },
+          "pmh_meds_allergies": {
+            "score": 90,
+            "evidence_turns": [
+              18,
+              19,
+              20,
+              21,
+              22,
+              23
+            ],
+            "notes": "Medications well covered (Turn 18-19): sumatriptan 100mg, ibuprofen 800mg daily, OCP, prior topiramate with side effects. Allergies covered (Turn 20-21): sulfa drug allergy with rash, no food allergies. PMH covered (Turn 22-23): anxiety (unmedicated), appendectomy age 16. Minor gap: no explicit inquiry about supplements/vitamins, and anxiety management strategy only briefly noted. OCP use noted but cardiovascular risk in context of migraine with aura not probed."
+          },
+          "fh_sh": {
+            "score": 88,
+            "evidence_turns": [
+              24,
+              25,
+              26,
+              27
+            ],
+            "notes": "Family history (Turn 24-25): mother with migraines, father with hypertension, maternal grandmother with stroke in 70s — good neurological family history. Social history (Turn 26-27): occupation (marketing manager, desk job, screen time), sleep (~7h, disrupted by headaches), caffeine (2 cups/day), exercise (stopped due to headache triggers), alcohol (occasional, mostly stopped), no smoking, no recreational drugs. Comprehensive. Minor gap: no inquiry about relationship/home stress, or whether she has children (relevant to hormonal/sleep context)."
+          },
+          "question_quality": {
+            "score": 82,
+            "evidence_turns": [
+              2,
+              4,
+              6,
+              8,
+              10,
+              12,
+              14,
+              16,
+              18,
+              20,
+              22,
+              24,
+              26
+            ],
+            "notes": "Questions were clear, open-ended, and logically sequenced following OLDCARTS structure. No leading questions identified. The historian appropriately followed up on patient-volunteered information (e.g., aura, medication use). Pacing was good — no redundancy. However, the interview was somewhat formulaic/checklist-driven and missed opportunities to probe critical red flags (thunderclap, fever/neck stiffness, ICP symptoms) that were not volunteered by the patient. The open-ended 'Tell me about your daily life' (Turn 26) was a good broad question. The trajectory/worsening question was implicitly covered by the patient's narrative but not explicitly asked."
+          },
+          "closure": {
+            "score": 55,
+            "evidence_turns": [
+              26,
+              27
+            ],
+            "notes": "The interview ends abruptly after Turn 27 (patient's social history response). There is no closing turn from the historian — no summary of what was discussed, no 'Is there anything else you'd like to tell me?', no open-door question, and no explanation of next steps. This is a significant gap in closure."
+          },
+          "missed_critical_questions": [
+            {
+              "rubric_id": "thunderclap-onset",
+              "severity": "critical",
+              "why_it_matters": "Thunderclap headache (maximal intensity within seconds to minutes) is a red flag for subarachnoid hemorrhage and other intracranial catastrophes. The patient described gradual onset of her chronic pattern but was never explicitly asked whether any individual headache reached maximal intensity within seconds to minutes. This must be directly asked in any headache evaluation."
+            },
+            {
+              "rubric_id": "fever-neck-stiffness",
+              "severity": "critical",
+              "why_it_matters": "Fever and neck stiffness are cardinal signs of meningitis/encephalitis. In a patient with worsening headache pattern, this must be explicitly screened for. It was never asked in the transcript."
+            },
+            {
+              "rubric_id": "papilledema-symptoms",
+              "severity": "critical",
+              "why_it_matters": "Symptoms of raised intracranial pressure (transient visual obscurations, pulsatile tinnitus, positional/Valsalva-worsening headache) must be distinguished from migraine aura. The patient described visual aura (zigzag lines) but was never asked about transient visual obscurations, pulsatile tinnitus, or positional worsening — which would suggest ICP elevation rather than migraine."
+            },
+            {
+              "rubric_id": "medication-overuse",
+              "severity": "critical",
+              "why_it_matters": "Medication overuse headache (MOH) is the most common cause of chronic daily headache transformation and is highly likely here given sumatriptan 10-15x/month and daily ibuprofen. While medication use was captured, the historian never explicitly asked the dedicated question about days/month of acute medication use to formally screen for MOH threshold (≥10 days/month for triptans, ≥15 for NSAIDs)."
+            }
+          ],
+          "diagnosis_leak": {
+            "leaked": false,
+            "quotes": []
+          },
+          "fidelity": {
+            "fabricated_claims": [],
+            "material_omissions": [
+              {
+                "transcript_turn": 23,
+                "omission": "The report does not mention the patient's anxiety (managed without medication), which is clinically relevant as anxiety is a common migraine comorbidity and may influence treatment selection (e.g., certain preventives like amitriptyline or SNRIs may address both)."
+              },
+              {
+                "transcript_turn": 25,
+                "omission": "The report does not mention the paternal hypertension or maternal grandmother's stroke, which are relevant cardiovascular risk factors — particularly important given the patient's migraine with aura and OCP use (elevated stroke risk)."
+              },
+              {
+                "transcript_turn": 19,
+                "omission": "The report does not mention that the patient is on oral contraceptive pills (OCPs), which is a clinically critical omission given that migraine with aura combined with OCP use carries an elevated ischemic stroke risk and may require medication adjustment."
+              }
+            ]
+          },
+          "overall": 62,
+          "confidence": {
+            "level": "High",
+            "reason": "The transcript is complete, well-structured, and sufficiently long to allow confident scoring across all dimensions. The rubric items are clearly defined and the transcript content is unambiguous."
+          },
+          "unvetted": true,
+          "deterministic": {
+            "diagnosisLeak": {
+              "leaked": false,
+              "matches": []
+            },
+            "phaseMarkers": {
+              "openingPresent": false,
+              "closingPresent": false
+            },
+            "turnCap": {
+              "patientTurnCount": 14,
+              "limit": 25,
+              "exceeded": false
+            },
+            "structuredOutput": {
+              "valid": false,
+              "issues": [
+                "structured_output is missing"
+              ]
+            },
+            "criticalCoverage": [
+              {
+                "rubric_id": "onset-timing",
+                "hint_matched": null
+              },
+              {
+                "rubric_id": "trajectory",
+                "hint_matched": null
+              },
+              {
+                "rubric_id": "thunderclap-onset",
+                "hint_matched": false
+              },
+              {
+                "rubric_id": "fever-neck-stiffness",
+                "hint_matched": false
+              },
+              {
+                "rubric_id": "papilledema-symptoms",
+                "hint_matched": false
+              },
+              {
+                "rubric_id": "medication-overuse",
+                "hint_matched": true
+              }
+            ],
+            "issues": [
+              "opening greeting phase-marker not detected in the first assistant turn",
+              "closing phase-marker not detected in the last assistant turn",
+              "structured_output is missing"
+            ]
+          },
+          "dropped_findings": 0,
+          "coverage_disagreement": false,
+          "provenance": {
+            "model_id": "us.anthropic.claude-sonnet-4-6",
+            "prompt_version": "thoroughness-v1",
+            "rubric_version": "base-neuro-hpi-v1+migraine-v1",
+            "inference_params": {
+              "temperature": 0,
+              "max_tokens": 4500,
+              "tool": "record_thoroughness_evaluation"
+            },
+            "generated_at": "2026-07-21T10:11:57.502Z"
+          }
+        },
+        "error": null,
+        "skippedReason": null,
+        "latencyMs": 36671,
+        "costUsd": 0.045447,
+        "modelId": "us.anthropic.claude-sonnet-4-6",
+        "promptVersion": "thoroughness-v1",
+        "rubricVersion": "base-neuro-hpi-v1+migraine-v1",
+        "inferenceParams": {
+          "temperature": 0,
+          "max_tokens": 4500,
+          "tool": "record_thoroughness_evaluation"
+        }
+      },
+      "independentDdx": {
+        "ok": true,
+        "result": {
+          "differential": [
+            {
+              "diagnosis": "Chronic migraine with medication overuse headache",
+              "icd10": "G43.719",
+              "likelihood": "High",
+              "likelihood_pct": 85,
+              "rationale": "History of migraine progression to daily headaches with frequent triptan/NSAID use (10-15 triptan doses/month + daily ibuprofen), characteristic unilateral throbbing pain with aura, and menstrual triggers. Medication overuse likely contributes to chronicity.",
+              "supporting_quotes": [
+                {
+                  "turn": 1,
+                  "quote": "I've been having these terrible headaches almost every single day for the last six months"
+                },
+                {
+                  "turn": 19,
+                  "quote": "Sumatriptan 100mg - I take it when I feel a migraine coming on, probably 10 to 15 times a month now. Ibuprofen 800mg every day, sometimes twice a day"
+                },
+                {
+                  "turn": 9,
+                  "quote": "Before the bad migraines I sometimes see zigzag lines and flashing lights in my vision for about 20 minutes"
+                },
+                {
+                  "turn": 11,
+                  "quote": "my period - I always get a bad migraine right before my period"
+                }
+              ],
+              "contradicting_quotes": []
+            },
+            {
+              "diagnosis": "Medication-overuse headache",
+              "icd10": "G44.41",
+              "likelihood": "Moderate",
+              "likelihood_pct": 70,
+              "rationale": "Frequent use of acute medications (triptans >10 days/month, NSAIDs >15 days/month) likely exacerbating headache frequency, with reported decreased triptan efficacy.",
+              "supporting_quotes": [
+                {
+                  "turn": 19,
+                  "quote": "Sumatriptan 100mg - I take it when I feel a migraine coming on, probably 10 to 15 times a month now. Ibuprofen 800mg every day, sometimes twice a day"
+                },
+                {
+                  "turn": 13,
+                  "quote": "lately it doesn't seem to work as well"
+                }
+              ],
+              "contradicting_quotes": []
+            },
+            {
+              "diagnosis": "Chronic tension-type headache",
+              "icd10": "G44.221",
+              "likelihood": "Moderate",
+              "likelihood_pct": 50,
+              "rationale": "Daily dull pressure described as 'a band around my head' with stress exacerbation, though coexists with migraine features.",
+              "supporting_quotes": [
+                {
+                  "turn": 9,
+                  "quote": "The daily headache is more of a dull pressure, like a band around my head"
+                },
+                {
+                  "turn": 11,
+                  "quote": "Stress, not sleeping well"
+                }
+              ],
+              "contradicting_quotes": [
+                {
+                  "turn": 9,
+                  "quote": "The migraines are a throbbing, pounding pain"
+                }
+              ]
+            },
+            {
+              "diagnosis": "Menstrual migraine without aura",
+              "icd10": "G43.819",
+              "likelihood": "Moderate",
+              "likelihood_pct": 45,
+              "rationale": "Consistent premenstrual migraine exacerbation while on oral contraceptives, though aura complicates classification.",
+              "supporting_quotes": [
+                {
+                  "turn": 11,
+                  "quote": "my period - I always get a bad migraine right before my period"
+                },
+                {
+                  "turn": 19,
+                  "quote": "And birth control pills"
+                }
+              ],
+              "contradicting_quotes": [
+                {
+                  "turn": 9,
+                  "quote": "Before the bad migraines I sometimes see zigzag lines and flashing lights"
+                }
+              ]
+            },
+            {
+              "diagnosis": "Intracranial pathology (e.g., tumor, vascular malformation)",
+              "icd10": null,
+              "likelihood": "Low",
+              "likelihood_pct": 15,
+              "rationale": "Unilateral pain and progression warrant consideration, but absence of focal neurological symptoms or red flags (no weakness/numbness, normal interictal function) lowers suspicion.",
+              "supporting_quotes": [
+                {
+                  "turn": 5,
+                  "quote": "Usually on the right side of my head, around my temple and behind my eye"
+                }
+              ],
+              "contradicting_quotes": [
+                {
+                  "turn": 17,
+                  "quote": "No numbness or weakness though"
+                }
+              ]
+            },
+            {
+              "diagnosis": "Secondary headache disorder (e.g., sinusitis, temporal arteritis)",
+              "icd10": null,
+              "likelihood": "Low",
+              "likelihood_pct": 10,
+              "rationale": "Temple location and chronicity could suggest temporal arteritis, but absence of systemic symptoms (fever, jaw claudication) and young age make this unlikely. No sinus symptoms reported.",
+              "supporting_quotes": [
+                {
+                  "turn": 5,
+                  "quote": "around my temple and behind my eye"
+                }
+              ],
+              "contradicting_quotes": [
+                {
+                  "turn": 17,
+                  "quote": "No numbness or weakness though"
+                },
+                {
+                  "turn": 23,
+                  "quote": "No other major medical problems"
+                }
+              ]
+            }
+          ],
+          "summary": "The patient presents with transformed migraine evolving from episodic to chronic pattern over 2 years, now with near-daily headaches. Key features include right-sided throbbing migraines with visual aura, menstrual exacerbation, and medication overuse (triptans 10-15x/month + daily NSAIDs) likely contributing to chronicity. The background tension-type headache may coexist. Secondary causes are less likely given absence of red flags, though imaging may be warranted. Primary considerations are chronic migraine with medication overuse versus medication-overuse headache as the dominant driver, requiring medication reconciliation and preventive strategies.",
+          "provenance": {
+            "model_id": "us.deepseek.r1-v1:0",
+            "prompt_version": "independent-ddx-r1-v1",
+            "inference_params": {
+              "temperature": 0.6,
+              "max_tokens": 8000
+            },
+            "generated_at": "2026-07-21T10:12:09.063Z"
+          },
+          "dropped_quotes": 1,
+          "stop_reason": "stop",
+          "retried": false
+        },
+        "error": null,
+        "skippedReason": null,
+        "latencyMs": 11561,
+        "costUsd": null,
+        "modelId": "us.deepseek.r1-v1:0",
+        "promptVersion": "independent-ddx-r1-v1",
+        "rubricVersion": null,
+        "inferenceParams": {
+          "temperature": 0.6,
+          "max_tokens": 8000
+        }
+      },
+      "agreement": {
+        "ok": true,
+        "result": {
+          "top1Match": true,
+          "top3Overlap": 2,
+          "jaccardTop3": 0.5,
+          "matchedPairs": [
+            {
+              "a": "Chronic Migraine with Medication Overuse Headache (MOH)",
+              "b": "Chronic migraine with medication overuse headache",
+              "via": "icd10"
+            },
+            {
+              "a": "New Daily Persistent Headache (NDPH)",
+              "b": "Chronic tension-type headache",
+              "via": "icd10"
+            }
+          ],
+          "disagreements": [
+            "Only in pipeline differential: Chronic Migraine without Medication Overuse",
+            "Only in independent differential: Medication-overuse headache"
+          ]
+        },
+        "error": null,
+        "skippedReason": null,
+        "latencyMs": 0,
+        "costUsd": null,
+        "modelId": "us.anthropic.claude-haiku-4-5-20251001-v1:0",
+        "promptVersion": "agreement-icd10-adjudicated-v1",
+        "rubricVersion": null,
+        "inferenceParams": {
+          "adjudicator_model": "us.anthropic.claude-haiku-4-5-20251001-v1:0"
+        }
+      },
+      "groundTruth": {
+        "expectedCandidates": [
+          "Chronic migraine with aura",
+          "Medication overuse headache"
+        ],
+        "pipeline": {
+          "top1Hit": false,
+          "top3Hit": false
+        },
+        "independent": {
+          "top1Hit": false,
+          "top3Hit": true
+        }
+      }
+    },
+    {
+      "caseId": "ms-relapse.json",
+      "source": "fixture",
+      "chiefComplaint": "New numbness and tingling in both legs that started 3 days ago and is getting worse. I also have new bladder urgency.",
+      "syndrome": "ms-relapse",
+      "turnCount": 24,
+      "finalDifferential": {
+        "ok": true,
+        "result": {
+          "differential": [
+            {
+              "diagnosis": "Acute MS relapse (myelopathy)",
+              "icd10": "G35",
+              "likelihood": "High",
+              "likelihood_pct": 72,
+              "rationale": "This patient with established relapsing MS on Ocrevus presents with a 3-day progressive, symmetric ascending sensory disturbance from toes to mid-calves, new bladder urgency with near-incontinence, and gait unsteadiness — a clinical picture highly consistent with an acute demyelinating relapse involving the cervical or thoracic spinal cord. The known C5 spinal cord lesion on prior MRI provides a plausible anatomical substrate, and the absence of fever or recent illness makes an infectious trigger less likely.",
+              "supporting_quotes": [
+                {
+                  "turn": 1,
+                  "quote": "I've been getting this numbness and tingling in my legs that started about three days ago. It started in my toes and it's been creeping up. Now it's about up to my mid-calves on both sides. I'm worried it might be my MS acting up again."
+                },
+                {
+                  "turn": 7,
+                  "quote": "Yes, pretty much equal on both sides. Both legs from the toes up to about mid-calf. It's not one side worse than the other."
+                },
+                {
+                  "turn": 11,
+                  "quote": "I've had this new urgency to urinate. Like, when I have to go, I REALLY have to go right now. I've almost had two accidents in the past two days, which has never happened to me before."
+                },
+                {
+                  "turn": 15,
+                  "quote": "I was diagnosed in 2022 when I had optic neuritis in my right eye - everything went blurry and it hurt to move my eye. They did an MRI and found lesions in my brain and one in my spinal cord. I was treated with IV steroids for the optic neuritis and recovered pretty well. I started Ocrevus infusions and I've been stable until now."
+                },
+                {
+                  "turn": 17,
+                  "quote": "one in my spinal cord at C5. They said there were no new lesions compared to the one before, so I was doing well."
+                },
+                {
+                  "turn": 9,
+                  "quote": "I feel a bit unsteady when I walk. My balance feels off. I haven't fallen but I'm being more careful, especially on stairs."
+                }
+              ],
+              "contradicting_quotes": [
+                {
+                  "turn": 17,
+                  "quote": "They said there were no new lesions compared to the one before, so I was doing well."
+                },
+                {
+                  "turn": 13,
+                  "quote": "No, I haven't been sick. No fever, no cold, no infections that I know of. I haven't had any vaccinations recently either."
+                }
+              ]
+            },
+            {
+              "diagnosis": "MS pseudorelapse (Uhthoff phenomenon / occult infection or metabolic trigger)",
+              "icd10": "G35",
+              "likelihood": "Moderate",
+              "likelihood_pct": 12,
+              "rationale": "A pseudorelapse — re-emergence of prior deficits driven by fever, infection, metabolic disturbance, or heat — can mimic a true relapse. However, the patient explicitly denies fever, recent illness, or vaccination, and the symptoms are progressive over 3 days rather than fluctuating, making a pseudorelapse less likely but not excludable without laboratory workup.",
+              "supporting_quotes": [
+                {
+                  "turn": 19,
+                  "quote": "I feel more tired than usual, but that's been a thing with my MS in general."
+                }
+              ],
+              "contradicting_quotes": [
+                {
+                  "turn": 13,
+                  "quote": "No, I haven't been sick. No fever, no cold, no infections that I know of. I haven't had any vaccinations recently either."
+                },
+                {
+                  "turn": 3,
+                  "quote": "It seems to be getting a little worse each day."
+                }
+              ]
+            },
+            {
+              "diagnosis": "New or enlarging compressive cervical myelopathy (non-demyelinating)",
+              "icd10": "G99.2",
+              "likelihood": "Moderate",
+              "likelihood_pct": 8,
+              "rationale": "Cervical spondylotic or other structural myelopathy can produce bilateral ascending sensory symptoms, bladder urgency, and gait instability indistinguishable clinically from a spinal MS relapse. The known C5 lesion level is also a common site for spondylotic compression; MRI spine with and without contrast is required to differentiate.",
+              "supporting_quotes": [
+                {
+                  "turn": 5,
+                  "quote": "There's also areas where I can't feel things as well - like if I touch my shin, it feels muted, like there's a layer between my skin and my fingers."
+                },
+                {
+                  "turn": 11,
+                  "quote": "I've had this new urgency to urinate. Like, when I have to go, I REALLY have to go right now."
+                },
+                {
+                  "turn": 17,
+                  "quote": "one in my spinal cord at C5"
+                }
+              ],
+              "contradicting_quotes": [
+                {
+                  "turn": 19,
+                  "quote": "No vision changes, no pain, no headaches."
+                },
+                {
+                  "turn": 15,
+                  "quote": "I was diagnosed in 2022 when I had optic neuritis in my right eye"
+                }
+              ]
+            },
+            {
+              "diagnosis": "Guillain-Barré Syndrome (acute inflammatory demyelinating polyneuropathy)",
+              "icd10": "G61.0",
+              "likelihood": "Low",
+              "likelihood_pct": 4,
+              "rationale": "GBS can present with ascending bilateral sensory symptoms and autonomic dysfunction (including bladder involvement), and the 3-day progressive course is temporally compatible. However, the absence of any preceding illness or vaccination, the presence of bladder urgency (rather than retention), and the established MS diagnosis make GBS a less favored explanation.",
+              "supporting_quotes": [
+                {
+                  "turn": 3,
+                  "quote": "By Wednesday it was up to about my mid-calves. It seems to be getting a little worse each day."
+                },
+                {
+                  "turn": 7,
+                  "quote": "Both legs from the toes up to about mid-calf. It's not one side worse than the other."
+                }
+              ],
+              "contradicting_quotes": [
+                {
+                  "turn": 13,
+                  "quote": "No, I haven't been sick. No fever, no cold, no infections that I know of. I haven't had any vaccinations recently either."
+                },
+                {
+                  "turn": 9,
+                  "quote": "I don't think my legs are weak exactly"
+                }
+              ]
+            },
+            {
+              "diagnosis": "Transverse myelitis (non-MS autoimmune, e.g., NMOSD or MOG-AD)",
+              "icd10": "G37.3",
+              "likelihood": "Low",
+              "likelihood_pct": 3,
+              "rationale": "Neuromyelitis optica spectrum disorder (NMOSD) or MOG antibody disease can produce acute transverse myelitis with bilateral sensory loss and bladder dysfunction, and prior optic neuritis is a shared feature. However, the established MS diagnosis with periventricular brain lesions and stable disease on Ocrevus makes a de novo NMOSD/MOG-AD diagnosis less likely, though serology should be considered if MRI findings are atypical.",
+              "supporting_quotes": [
+                {
+                  "turn": 15,
+                  "quote": "I was diagnosed in 2022 when I had optic neuritis in my right eye - everything went blurry and it hurt to move my eye."
+                },
+                {
+                  "turn": 11,
+                  "quote": "I've almost had two accidents in the past two days, which has never happened to me before."
+                }
+              ],
+              "contradicting_quotes": [
+                {
+                  "turn": 17,
+                  "quote": "They said it showed 4 spots in my brain near the ventricles and one in my spinal cord at C5."
+                },
+                {
+                  "turn": 15,
+                  "quote": "I started Ocrevus infusions and I've been stable until now. My last infusion was about 3 months ago."
+                }
+              ]
+            },
+            {
+              "diagnosis": "Vitamin B12 deficiency myelopathy (subacute combined degeneration)",
+              "icd10": "E53.8",
+              "likelihood": "Low",
+              "likelihood_pct": 1,
+              "rationale": "Subacute combined degeneration from B12 deficiency can cause progressive bilateral sensory disturbance and gait instability, but the acuity of onset over 3 days, the established MS diagnosis, and the absence of any nutritional risk factors or macrocytic anemia history make this a very low-probability alternative that could be excluded with a serum B12 level.",
+              "supporting_quotes": [
+                {
+                  "turn": 5,
+                  "quote": "it feels muted, like there's a layer between my skin and my fingers."
+                }
+              ],
+              "contradicting_quotes": [
+                {
+                  "turn": 3,
+                  "quote": "Three days ago. I noticed my toes felt tingly when I woke up on Monday morning."
+                },
+                {
+                  "turn": 21,
+                  "quote": "Just the Ocrevus infusions and vitamin D supplements, 2000 units a day. That's it."
+                }
+              ]
+            }
+          ],
+          "summary": "A patient with relapsing-remitting multiple sclerosis (diagnosed 2022, on Ocrevus, last MRI 6 months ago showing no new lesions) presents with a 3-day progressive, symmetric ascending sensory disturbance from toes to mid-calves, new bladder urgency with near-incontinence, and gait unsteadiness — all in the absence of fever, recent infection, or vaccination. The clinical picture is most consistent with an acute MS relapse involving the spinal cord, likely at or near the known C5 lesion level, and warrants urgent contrast-enhanced MRI of the entire spine (and brain for comparison) as well as prompt neurology review for consideration of high-dose IV corticosteroids. A pseudorelapse driven by occult infection or metabolic disturbance is the next consideration and can be partially excluded with urinalysis, CBC, and metabolic panel. Structural cervical myelopathy must be ruled out on MRI. GBS is possible given the ascending bilateral sensory pattern but is rendered unlikely by the absence of a preceding trigger and the predominance of sensory over motor findings. NMOSD/MOG-AD deserves serological consideration if MRI findings are atypical for MS. Vitamin B12 deficiency myelopathy is a remote possibility excludable with a serum B12 level.",
+          "provenance": {
+            "model_id": "us.anthropic.claude-sonnet-4-6",
+            "prompt_version": "final-ddx-v1",
+            "inference_params": {
+              "temperature": 0,
+              "max_tokens": 4000,
+              "tool": "record_final_differential"
+            },
+            "generated_at": "2026-07-21T10:12:54.995Z"
+          },
+          "dropped_quotes": 0
+        },
+        "error": null,
+        "skippedReason": null,
+        "latencyMs": 43691,
+        "costUsd": null,
+        "modelId": "us.anthropic.claude-sonnet-4-6",
+        "promptVersion": "final-ddx-v1",
+        "rubricVersion": null,
+        "inferenceParams": {
+          "temperature": 0,
+          "max_tokens": 4000,
+          "tool": "record_final_differential"
+        }
+      },
+      "thoroughness": {
+        "ok": true,
+        "result": {
+          "oldcarts": {
+            "score": 82,
+            "evidence_turns": [
+              1,
+              2,
+              3,
+              4,
+              5,
+              6,
+              7,
+              8,
+              9,
+              11,
+              19
+            ],
+            "notes": "Onset (Turn 2-3): well-covered — exact day, gradual/ascending onset confirmed. Trajectory (Turn 3): actively worsening each day. Location (Turn 6-7): bilateral, symmetric, toes to mid-calves. Character (Turn 4-5): pins-and-needles, muted sensation. Associated symptoms (Turn 8-9, 11, 19): gait unsteadiness, bladder urgency, morning stiffness, fatigue. Severity: not explicitly rated (e.g., 0-10 scale never asked). Aggravating/relieving factors: not asked (e.g., heat/Uhthoff's phenomenon, rest). Timing pattern beyond day-by-day progression not explored. Minor gaps in A/R factors and formal severity rating."
+          },
+          "red_flags": {
+            "score": 78,
+            "evidence_turns": [
+              8,
+              9,
+              10,
+              11,
+              12,
+              13,
+              19
+            ],
+            "notes": "Bladder urgency (Turn 10-11): explicitly asked and confirmed — critical red flag covered. Bowel symptoms (Turn 11): patient volunteered denial. Weakness (Turn 8-9): asked, gait unsteadiness elicited. Fever/recent infection (Turn 12-13): asked, denied — pseudorelapse screening done. Vision changes (Turn 19): patient volunteered denial. Prior neurological episodes/optic neuritis (Turn 14-15): covered via MS history question. Missing: Lhermitte's sign (electric shock with neck flexion) not asked — important for cervical cord involvement. Saddle anesthesia/perineal sensation not asked. No explicit question about urinary retention vs. urgency-only. No question about sexual dysfunction. These are important omissions for a myelopathy presentation."
+          },
+          "pmh_meds_allergies": {
+            "score": 60,
+            "evidence_turns": [
+              14,
+              15,
+              16,
+              17,
+              20,
+              21
+            ],
+            "notes": "MS history thoroughly covered (Turn 14-17): diagnosis year, prior optic neuritis, lesion burden, treatment history, last infusion, last MRI. Current medications (Turn 20-21): Ocrevus and Vitamin D captured. CRITICAL GAPS: Allergies never asked — a required rubric item. Other past medical/surgical history beyond MS not explored (e.g., other comorbidities, prior surgeries). OTC medications beyond Vitamin D not specifically probed. Significant deduction for missing allergies entirely."
+          },
+          "fh_sh": {
+            "score": 40,
+            "evidence_turns": [
+              22,
+              23
+            ],
+            "notes": "Family history (Turn 22-23): asked about MS and autoimmune conditions; mother's hypothyroidism and father's good health captured. Social history: NEVER asked — occupation, smoking, alcohol, substance use all absent from the transcript. This is a significant gap. No question about living situation, support system, or functional impact on daily life/work."
+          },
+          "question_quality": {
+            "score": 72,
+            "evidence_turns": [
+              0,
+              2,
+              4,
+              6,
+              8,
+              10,
+              12,
+              14,
+              16,
+              18,
+              20,
+              22
+            ],
+            "notes": "Questions are generally open-ended and non-leading (Turn 0, 4, 14, 18). Follow-up questions are appropriately targeted (Turn 6, 8, 10). Turn 2 ('When did this start?') is slightly redundant since the patient already mentioned '3 days ago' in Turn 1, though it did elicit useful detail. Turn 18 ('Any other symptoms?') is a good catch-all. Pacing is reasonable — no excessive repetition. However, several important follow-up opportunities were missed after patient responses (e.g., no follow-up on Uhthoff's, no probing of near-incontinence episodes for retention component, no Lhermitte's follow-up after spinal cord lesion history). The interview is somewhat checklist-driven rather than conversational in places."
+          },
+          "closure": {
+            "score": 35,
+            "evidence_turns": [
+              22,
+              23
+            ],
+            "notes": "The interview ends abruptly after Turn 23 (patient's family history response). There is no closing statement from the Historian, no 'Is there anything else you'd like to share?' open-door question, no summary/reflection back to the patient, and no explanation of next steps. This is a significant closure failure."
+          },
+          "missed_critical_questions": [
+            {
+              "rubric_id": "allergies",
+              "severity": "important",
+              "why_it_matters": "Drug allergies were never asked. This is essential before any treatment (e.g., IV steroids for relapse) is initiated and is a standard safety requirement in any intake."
+            },
+            {
+              "rubric_id": "social-history",
+              "severity": "important",
+              "why_it_matters": "Social history (occupation, smoking, alcohol, substance use) was never explored. Relevant for understanding functional impact, relapse triggers, and overall health context."
+            },
+            {
+              "rubric_id": "past-medical-history",
+              "severity": "important",
+              "why_it_matters": "Only MS history was explored. Other past medical/surgical history was not asked, which could reveal comorbidities relevant to differential diagnosis or treatment planning."
+            },
+            {
+              "rubric_id": "symptom-course",
+              "severity": "important",
+              "why_it_matters": "While worsening trajectory was established, the specific relapse pattern (hours-to-days evolution consistent with demyelination vs. other myelopathy) was not explicitly characterized beyond day-by-day progression."
+            }
+          ],
+          "diagnosis_leak": {
+            "leaked": false,
+            "quotes": []
+          },
+          "fidelity": {
+            "fabricated_claims": [],
+            "material_omissions": [
+              {
+                "transcript_turn": 9,
+                "omission": "Patient reported gait unsteadiness and balance difficulty (Turn 9), including caution on stairs — this functional impact detail is not explicitly captured in the narrative summary beyond 'gait unsteadiness'."
+              },
+              {
+                "transcript_turn": 19,
+                "omission": "Patient reported morning leg stiffness (Turn 19) — this is mentioned in the narrative summary as 'leg stiffness' but the morning-predominant pattern, which may suggest spasticity, is not highlighted clinically."
+              }
+            ]
+          },
+          "overall": 67,
+          "confidence": {
+            "level": "High",
+            "reason": "The transcript is complete, well-numbered, and of sufficient length to score all dimensions with confidence. The rubric items are clearly defined and the transcript content is unambiguous."
+          },
+          "unvetted": true,
+          "deterministic": {
+            "diagnosisLeak": {
+              "leaked": false,
+              "matches": []
+            },
+            "phaseMarkers": {
+              "openingPresent": false,
+              "closingPresent": false
+            },
+            "turnCap": {
+              "patientTurnCount": 12,
+              "limit": 25,
+              "exceeded": false
+            },
+            "structuredOutput": {
+              "valid": false,
+              "issues": [
+                "structured_output is missing"
+              ]
+            },
+            "criticalCoverage": [
+              {
+                "rubric_id": "onset-timing",
+                "hint_matched": null
+              },
+              {
+                "rubric_id": "trajectory",
+                "hint_matched": null
+              },
+              {
+                "rubric_id": "prior-episodes-optic-neuritis",
+                "hint_matched": true
+              },
+              {
+                "rubric_id": "bladder-symptoms",
+                "hint_matched": true
+              }
+            ],
+            "issues": [
+              "opening greeting phase-marker not detected in the first assistant turn",
+              "closing phase-marker not detected in the last assistant turn",
+              "structured_output is missing"
+            ]
+          },
+          "dropped_findings": 0,
+          "coverage_disagreement": false,
+          "provenance": {
+            "model_id": "us.anthropic.claude-sonnet-4-6",
+            "prompt_version": "thoroughness-v1",
+            "rubric_version": "base-neuro-hpi-v1+ms-v1",
+            "inference_params": {
+              "temperature": 0,
+              "max_tokens": 4500,
+              "tool": "record_thoroughness_evaluation"
+            },
+            "generated_at": "2026-07-21T10:13:27.353Z"
+          }
+        },
+        "error": null,
+        "skippedReason": null,
+        "latencyMs": 32358,
+        "costUsd": 0.037644,
+        "modelId": "us.anthropic.claude-sonnet-4-6",
+        "promptVersion": "thoroughness-v1",
+        "rubricVersion": "base-neuro-hpi-v1+ms-v1",
+        "inferenceParams": {
+          "temperature": 0,
+          "max_tokens": 4500,
+          "tool": "record_thoroughness_evaluation"
+        }
+      },
+      "independentDdx": {
+        "ok": true,
+        "result": {
+          "differential": [
+            {
+              "diagnosis": "Multiple sclerosis relapse",
+              "icd10": "G35",
+              "likelihood": "High",
+              "likelihood_pct": 70,
+              "rationale": "Patient with established MS history (C5 spinal cord lesion) presents with ascending sensory deficits and new bladder urgency over 3 days, consistent with new demyelinating activity. Ocrevus infusions may reduce but not eliminate relapse risk.",
+              "supporting_quotes": [
+                {
+                  "turn": 1,
+                  "quote": "I'm worried it might be my MS acting up again"
+                },
+                {
+                  "turn": 3,
+                  "quote": "It seems to be getting a little worse each day"
+                },
+                {
+                  "turn": 11,
+                  "quote": "new urgency to urinate. Like, when I have to go, I REALLY have to go right now"
+                }
+              ],
+              "contradicting_quotes": []
+            },
+            {
+              "diagnosis": "Transverse myelitis",
+              "icd10": "G37.3",
+              "likelihood": "Moderate",
+              "likelihood_pct": 50,
+              "rationale": "Ascending bilateral sensory loss with bladder dysfunction suggests spinal cord inflammation. MS-associated myelitis is plausible given history, though could also occur independently.",
+              "supporting_quotes": [
+                {
+                  "turn": 5,
+                  "quote": "areas where I can't feel things as well - like if I touch my shin, it feels muted"
+                },
+                {
+                  "turn": 7,
+                  "quote": "Both legs from the toes up to about mid-calf"
+                },
+                {
+                  "turn": 11,
+                  "quote": "new urgency to urinate"
+                }
+              ],
+              "contradicting_quotes": []
+            },
+            {
+              "diagnosis": "Guillain-Barré syndrome",
+              "icd10": "G61.0",
+              "likelihood": "Low",
+              "likelihood_pct": 15,
+              "rationale": "Ascending neuropathic symptoms with possible ataxia, but absence of clear antecedent infection and preserved strength argue against this. Bladder involvement is atypical.",
+              "supporting_quotes": [
+                {
+                  "turn": 9,
+                  "quote": "I feel a bit unsteady when I walk"
+                }
+              ],
+              "contradicting_quotes": [
+                {
+                  "turn": 9,
+                  "quote": "I don't think my legs are weak exactly"
+                },
+                {
+                  "turn": 13,
+                  "quote": "No, I haven't been sick"
+                }
+              ]
+            },
+            {
+              "diagnosis": "Spinal cord compression",
+              "icd10": "G95.20",
+              "likelihood": "Low",
+              "likelihood_pct": 10,
+              "rationale": "Bilateral symptoms with bladder involvement could suggest compressive lesion, but no reported trauma, pain, or rapid progression of weakness. Prior C5 lesion on MRI may warrant imaging.",
+              "supporting_quotes": [
+                {
+                  "turn": 11,
+                  "quote": "new urgency to urinate"
+                },
+                {
+                  "turn": 17,
+                  "quote": "one in my spinal cord at C5"
+                }
+              ],
+              "contradicting_quotes": []
+            },
+            {
+              "diagnosis": "Vitamin B12 deficiency myelopathy",
+              "icd10": "E53.8",
+              "likelihood": "Low",
+              "likelihood_pct": 5,
+              "rationale": "Subacute combined degeneration could cause sensory and bladder symptoms, but patient takes vitamin D supplements and has no described anemia/macrocytosis. Less likely than MS flare.",
+              "supporting_quotes": [],
+              "contradicting_quotes": [
+                {
+                  "turn": 21,
+                  "quote": "vitamin D supplements, 2000 units a day"
+                }
+              ]
+            },
+            {
+              "diagnosis": "Cauda equina syndrome",
+              "icd10": "G83.4",
+              "likelihood": "Low",
+              "likelihood_pct": 3,
+              "rationale": "Bladder urgency with lower extremity symptoms raises concern, but absence of saddle anesthesia, bowel dysfunction, or back pain makes this unlikely.",
+              "supporting_quotes": [
+                {
+                  "turn": 11,
+                  "quote": "new urgency to urinate"
+                }
+              ],
+              "contradicting_quotes": [
+                {
+                  "turn": 11,
+                  "quote": "No bowel issues though"
+                }
+              ]
+            }
+          ],
+          "summary": "The clinical picture strongly suggests an MS relapse given the patient's established diagnosis with prior spinal cord involvement, ascending bilateral sensory deficits progressing over days, and new bladder urgency. Transverse myelitis (either MS-associated or idiopathic) is the next consideration. Guillain-Barré is less likely due to preserved strength and lack of antecedent illness. Spinal compression and metabolic causes are lower probability given clinical context. Urgent spinal MRI would help differentiate between new demyelinating lesions vs other etiologies.",
+          "provenance": {
+            "model_id": "us.deepseek.r1-v1:0",
+            "prompt_version": "independent-ddx-r1-v1",
+            "inference_params": {
+              "temperature": 0.6,
+              "max_tokens": 8000
+            },
+            "generated_at": "2026-07-21T10:13:38.541Z"
+          },
+          "dropped_quotes": 4,
+          "stop_reason": "stop",
+          "retried": false
+        },
+        "error": null,
+        "skippedReason": null,
+        "latencyMs": 11188,
+        "costUsd": null,
+        "modelId": "us.deepseek.r1-v1:0",
+        "promptVersion": "independent-ddx-r1-v1",
+        "rubricVersion": null,
+        "inferenceParams": {
+          "temperature": 0.6,
+          "max_tokens": 8000
+        }
+      },
+      "agreement": {
+        "ok": true,
+        "result": {
+          "top1Match": true,
+          "top3Overlap": 1,
+          "jaccardTop3": 0.2,
+          "matchedPairs": [
+            {
+              "a": "Acute MS relapse (myelopathy)",
+              "b": "Multiple sclerosis relapse",
+              "via": "icd10"
+            }
+          ],
+          "disagreements": [
+            "Only in pipeline differential: MS pseudorelapse (Uhthoff phenomenon / occult infection or metabolic trigger)",
+            "Only in pipeline differential: New or enlarging compressive cervical myelopathy (non-demyelinating)",
+            "Only in independent differential: Transverse myelitis",
+            "Only in independent differential: Guillain-Barré syndrome"
+          ]
+        },
+        "error": null,
+        "skippedReason": null,
+        "latencyMs": 0,
+        "costUsd": null,
+        "modelId": "us.anthropic.claude-haiku-4-5-20251001-v1:0",
+        "promptVersion": "agreement-icd10-adjudicated-v1",
+        "rubricVersion": null,
+        "inferenceParams": {
+          "adjudicator_model": "us.anthropic.claude-haiku-4-5-20251001-v1:0"
+        }
+      },
+      "groundTruth": {
+        "expectedCandidates": [
+          "MS relapse"
+        ],
+        "pipeline": {
+          "top1Hit": true,
+          "top3Hit": true
+        },
+        "independent": {
+          "top1Hit": true,
+          "top3Hit": true
+        }
+      }
+    },
+    {
+      "caseId": "peripheral-neuropathy.json",
+      "source": "fixture",
+      "chiefComplaint": "Numbness and tingling in my feet that's been getting worse over the past 6 months. Also burning pain at night and I've fallen twice recently.",
+      "syndrome": "peripheral-neuropathy",
+      "turnCount": 24,
+      "finalDifferential": {
+        "ok": true,
+        "result": {
+          "differential": [
+            {
+              "diagnosis": "Diabetic Peripheral Polyneuropathy (Length-Dependent)",
+              "icd10": "E11.40",
+              "likelihood": "High",
+              "likelihood_pct": 88,
+              "rationale": "The patient presents with a classic length-dependent, symmetric, ascending sensory polyneuropathy in the setting of poorly controlled type 2 diabetes (HbA1c 9.2). The stocking-glove pattern (feet to ankles bilaterally, now fingertips), nocturnal burning pain, sharp electrical pains, loss of ground sensation, and two recent falls are hallmark features of diabetic peripheral neuropathy. Strong family history of severe diabetic neuropathy further supports this diagnosis.",
+              "supporting_quotes": [
+                {
+                  "turn": 1,
+                  "quote": "My feet have been going numb. It started about 6 months ago in my toes and now it's spread up to my ankles on both sides. I also get this awful burning pain at night when I'm trying to sleep."
+                },
+                {
+                  "turn": 5,
+                  "quote": "During the day it's mostly numbness - like my feet are wrapped in cotton. I can't feel textures on the ground. At night it changes to this burning, like my feet are on fire. Sometimes I get these sharp, electrical shooting pains randomly."
+                },
+                {
+                  "turn": 7,
+                  "quote": "Yes, pretty much identical on both sides. It started in both feet around the same time and it's progressed equally."
+                },
+                {
+                  "turn": 13,
+                  "quote": "My A1c is 9.2 - my doctor isn't happy about that. I take my metformin and glipizide but I don't watch my diet like I should. I don't check my blood sugar regularly - maybe once a week if I remember."
+                },
+                {
+                  "turn": 11,
+                  "quote": "my fingertips have been a little tingly sometimes, mostly in the last month or so. It's not nearly as bad as my feet though. I sometimes have trouble with small buttons."
+                },
+                {
+                  "turn": 21,
+                  "quote": "My father had diabetes and his neuropathy got so bad he eventually had to have his leg amputated below the knee. That really scares me. My mother also has diabetes and neuropathy in her feet."
+                }
+              ],
+              "contradicting_quotes": []
+            },
+            {
+              "diagnosis": "Statin-Induced Peripheral Neuropathy",
+              "icd10": "G62.0",
+              "likelihood": "Low",
+              "likelihood_pct": 5,
+              "rationale": "Atorvastatin is a rare but recognized cause of peripheral neuropathy; however, the clinical picture is overwhelmingly explained by poorly controlled diabetes, and statin-induced neuropathy is a diagnosis of exclusion. The patient's HbA1c of 9.2 and classic length-dependent progression make diabetic etiology far more likely.",
+              "supporting_quotes": [
+                {
+                  "turn": 17,
+                  "quote": "atorvastatin 20mg for cholesterol"
+                }
+              ],
+              "contradicting_quotes": [
+                {
+                  "turn": 13,
+                  "quote": "My A1c is 9.2 - my doctor isn't happy about that."
+                },
+                {
+                  "turn": 3,
+                  "quote": "About 6 months ago I started noticing my big toes felt numb, kind of tingly. I thought my shoes were too tight at first, but it kept spreading."
+                }
+              ]
+            },
+            {
+              "diagnosis": "Alcoholic Peripheral Neuropathy",
+              "icd10": "G62.1",
+              "likelihood": "Low",
+              "likelihood_pct": 3,
+              "rationale": "Alcohol use is a recognized cause of length-dependent sensory polyneuropathy; however, the patient reports only modest weekend alcohol consumption (a couple of beers), which is insufficient to account for the severity and progression of symptoms. Diabetic etiology remains the dominant explanation.",
+              "supporting_quotes": [
+                {
+                  "turn": 23,
+                  "quote": "I have a couple of beers on weekends."
+                }
+              ],
+              "contradicting_quotes": [
+                {
+                  "turn": 23,
+                  "quote": "I have a couple of beers on weekends."
+                },
+                {
+                  "turn": 13,
+                  "quote": "My A1c is 9.2 - my doctor isn't happy about that."
+                }
+              ]
+            },
+            {
+              "diagnosis": "Lumbar Spinal Stenosis with Neurogenic Claudication",
+              "icd10": "M48.06",
+              "likelihood": "Low",
+              "likelihood_pct": 3,
+              "rationale": "Lumbar spinal stenosis can produce bilateral lower extremity sensory symptoms and gait instability in older patients; however, the patient's symptoms are symmetric, distal, and ascending without mention of back pain, neurogenic claudication (pain with walking relieved by sitting/flexion), or dermatomal distribution, making this diagnosis unlikely.",
+              "supporting_quotes": [
+                {
+                  "turn": 9,
+                  "quote": "I feel unsteady. I've fallen twice in the past month."
+                }
+              ],
+              "contradicting_quotes": [
+                {
+                  "turn": 7,
+                  "quote": "Yes, pretty much identical on both sides. It started in both feet around the same time and it's progressed equally."
+                },
+                {
+                  "turn": 5,
+                  "quote": "During the day it's mostly numbness - like my feet are wrapped in cotton. I can't feel textures on the ground."
+                },
+                {
+                  "turn": 1,
+                  "quote": "My feet have been going numb. It started about 6 months ago in my toes and now it's spread up to my ankles on both sides."
+                }
+              ]
+            },
+            {
+              "diagnosis": "Vitamin B12 Deficiency Neuropathy",
+              "icd10": "E53.8",
+              "likelihood": "Low",
+              "likelihood_pct": 4,
+              "rationale": "Metformin use is a well-established risk factor for vitamin B12 deficiency, which can cause a symmetric sensory polyneuropathy indistinguishable from diabetic neuropathy. This is a clinically important co-contributor to exclude with serum B12 levels, particularly given long-term metformin use.",
+              "supporting_quotes": [
+                {
+                  "turn": 17,
+                  "quote": "Metformin 1000 twice a day, glipizide 10mg twice a day for my sugar."
+                },
+                {
+                  "turn": 5,
+                  "quote": "During the day it's mostly numbness - like my feet are wrapped in cotton. I can't feel textures on the ground. At night it changes to this burning, like my feet are on fire."
+                },
+                {
+                  "turn": 11,
+                  "quote": "my fingertips have been a little tingly sometimes, mostly in the last month or so."
+                }
+              ],
+              "contradicting_quotes": [
+                {
+                  "turn": 13,
+                  "quote": "My A1c is 9.2 - my doctor isn't happy about that."
+                }
+              ]
+            },
+            {
+              "diagnosis": "Idiopathic Small Fiber Neuropathy",
+              "icd10": "G60.9",
+              "likelihood": "Low",
+              "likelihood_pct": 2,
+              "rationale": "Idiopathic small fiber neuropathy can present with burning pain, tingling, and preserved large-fiber function; however, the patient's well-established poorly controlled diabetes provides a clear causative etiology, making idiopathic classification appropriate only if diabetic and other secondary causes are excluded after workup.",
+              "supporting_quotes": [
+                {
+                  "turn": 5,
+                  "quote": "At night it changes to this burning, like my feet are on fire. Sometimes I get these sharp, electrical shooting pains randomly."
+                }
+              ],
+              "contradicting_quotes": [
+                {
+                  "turn": 13,
+                  "quote": "My A1c is 9.2 - my doctor isn't happy about that. I take my metformin and glipizide but I don't watch my diet like I should."
+                },
+                {
+                  "turn": 21,
+                  "quote": "My father had diabetes and his neuropathy got so bad he eventually had to have his leg amputated below the knee."
+                }
+              ]
+            }
+          ],
+          "summary": "This patient presents with a 6-month progressive, bilateral, symmetric, length-dependent sensory polyneuropathy — beginning in the toes and ascending to the ankles, with recent onset fingertip tingling — accompanied by severe nocturnal burning pain, sharp electrical pains, profound loss of ground sensation, and two mechanical falls within the past month. The clinical picture is overwhelmingly consistent with diabetic peripheral polyneuropathy (DPN) in the setting of poorly controlled type 2 diabetes (HbA1c 9.2), irregular glucose monitoring, high-carbohydrate diet, and a striking family history of severe diabetic neuropathy including paternal below-knee amputation. The ascending stocking-glove pattern, nocturnal predominance of burning pain, and emerging upper extremity involvement are hallmark features of length-dependent DPN. Secondary contributors warranting laboratory exclusion include metformin-associated vitamin B12 deficiency, which can produce an identical or additive neuropathy and is clinically important to identify given its treatability. Modest weekend alcohol use is unlikely to be causative at reported quantities. Statin-induced neuropathy and structural spinal pathology (lumbar stenosis) are considered but are not supported by the clinical narrative, which lacks back pain, neurogenic claudication, or dermatomal features. Idiopathic small fiber neuropathy remains a distant consideration only if a thorough metabolic workup is unrevealing. Priority management should focus on urgent glycemic optimization, fall prevention, neuropathic pain management, and serum B12 assessment.",
+          "provenance": {
+            "model_id": "us.anthropic.claude-sonnet-4-6",
+            "prompt_version": "final-ddx-v1",
+            "inference_params": {
+              "temperature": 0,
+              "max_tokens": 4000,
+              "tool": "record_final_differential"
+            },
+            "generated_at": "2026-07-21T10:14:23.378Z"
+          },
+          "dropped_quotes": 0
+        },
+        "error": null,
+        "skippedReason": null,
+        "latencyMs": 42500,
+        "costUsd": null,
+        "modelId": "us.anthropic.claude-sonnet-4-6",
+        "promptVersion": "final-ddx-v1",
+        "rubricVersion": null,
+        "inferenceParams": {
+          "temperature": 0,
+          "max_tokens": 4000,
+          "tool": "record_final_differential"
+        }
+      },
+      "thoroughness": {
+        "ok": true,
+        "result": {
+          "oldcarts": {
+            "score": 82,
+            "evidence_turns": [
+              1,
+              2,
+              3,
+              4,
+              5,
+              6,
+              7,
+              8,
+              9,
+              10,
+              11
+            ],
+            "notes": "Onset (Turn 2-3: ~6 months ago, gradual), Location (Turn 1, 3, 6-7: bilateral feet, toes to ankles; Turn 10-11: fingertips), Duration (Turn 1, 3: 6 months), Character (Turn 4-5: numbness, burning, lancinating/electrical pains), Timing (Turn 5: daytime numbness, nocturnal burning), Severity (Turn 5, 9: sleep disruption, falls). Aggravating/relieving factors were NOT explicitly asked — no question about what makes it better or worse (e.g., rest, elevation, warmth, cold). Trajectory/progression was partially captured through the patient's narrative (Turn 3) but never directly asked as a standalone question. Overall solid OLDCARTS coverage with the notable gap of aggravating/relieving factors."
+          },
+          "red_flags": {
+            "score": 62,
+            "evidence_turns": [
+              8,
+              9,
+              10,
+              11,
+              12,
+              13,
+              20,
+              21
+            ],
+            "notes": "Falls/gait instability covered (Turn 8-9). Bilateral symmetric distribution confirmed (Turn 6-7). Hand involvement asked (Turn 10-11). Diabetes status and control thoroughly explored (Turn 12-13). Family history of neuropathy obtained (Turn 20-21). However, two critical red-flag items were NOT addressed: (1) unintentional weight loss — never asked, which is important to rule out malignancy/paraneoplastic neuropathy; (2) B12 deficiency risk factors — alcohol use was only superficially touched (Turn 22-23: 'couple of beers on weekends'), but bariatric surgery, restrictive diet beyond carb intake, and known B12 level were not asked, despite the patient being on metformin (a known B12-depleting drug). Bladder/bowel dysfunction (autonomic involvement) not asked. Rapid progression or asymmetry red flags partially covered."
+          },
+          "pmh_meds_allergies": {
+            "score": 90,
+            "evidence_turns": [
+              14,
+              15,
+              16,
+              17,
+              18,
+              19
+            ],
+            "notes": "Past medical history well covered: diabetes, hypertension, hyperlipidemia, gout, obesity (Turn 14-15). Medications listed completely with doses (Turn 16-17: metformin, glipizide, lisinopril, atorvastatin). Allergies obtained with reactions described (Turn 18-19: penicillin → hives; shellfish → swelling/itching). Minor gap: no OTC medications or supplements asked about (e.g., vitamins, B12 supplements, NSAIDs for gout). Surgical history not explicitly asked."
+          },
+          "fh_sh": {
+            "score": 85,
+            "evidence_turns": [
+              20,
+              21,
+              22,
+              23
+            ],
+            "notes": "Family history well covered (Turn 20-21): father with diabetic neuropathy and amputation, mother with diabetes and neuropathy, brother recently diagnosed with diabetes. Social history (Turn 22-23): occupation (accountant, desk job), exercise habits, smoking (non-smoker), alcohol (couple of beers on weekends — quantification is minimal), diet (Korean food, high carbs), sleep. Gaps: alcohol use not quantified in standard units (drinks/week); no question about illicit/recreational drug use; no question about travel history or toxic exposures (occupational or environmental), which can be relevant for neuropathy etiology."
+          },
+          "question_quality": {
+            "score": 75,
+            "evidence_turns": [
+              0,
+              2,
+              4,
+              6,
+              8,
+              10,
+              12,
+              14,
+              16,
+              18,
+              20,
+              22
+            ],
+            "notes": "Questions are generally open-ended and non-leading (Turn 0, 4, 12, 14, 22). The interview flows logically from symptom characterization to PMH to social history. Turn 2 ('When did you first notice the symptoms?') is slightly redundant given the patient already provided onset in Turn 1, though it did elicit useful additional detail. Turn 6 ('Is it the same in both feet?') is mildly leading (yes/no). Turn 12 ('Tell me about your diabetes management') is an excellent open-ended pivot. The interview is appropriately paced and does not skip patient-volunteered information. However, several important follow-up questions were missed after patient disclosures (e.g., no follow-up on the falls beyond Turn 9, no probing of B12/nutritional status after metformin was mentioned in Turn 13, no follow-up on trajectory/worsening rate)."
+          },
+          "closure": {
+            "score": 45,
+            "evidence_turns": [
+              22,
+              23
+            ],
+            "notes": "The interview ends abruptly after Turn 22-23 (social history). There is no closing statement, no summary read-back to the patient, no 'Is there anything else you'd like to tell me or that I haven't asked about?' open-door question, and no explanation of next steps. This is a significant closure gap."
+          },
+          "missed_critical_questions": [
+            {
+              "rubric_id": "weight-loss",
+              "severity": "critical",
+              "why_it_matters": "Unintentional weight loss is a red flag for malignancy-associated paraneoplastic neuropathy and other systemic causes; never asked in the transcript."
+            },
+            {
+              "rubric_id": "b12-alcohol-nutritional",
+              "severity": "critical",
+              "why_it_matters": "Patient is on metformin (a known B12 depleter) and has a diet heavy in rice/carbs. While alcohol was briefly mentioned (Turn 23), specific B12 deficiency risk factors — bariatric surgery, restrictive diet, known low B12, or formal alcohol quantification — were never directly explored. This is a critical gap given metformin use."
+            },
+            {
+              "rubric_id": "trajectory",
+              "severity": "critical",
+              "why_it_matters": "Although the patient volunteered some progression detail (Turn 3), the historian never directly asked whether symptoms are currently stable, improving, or actively worsening — a critical question for gauging urgency and treatment response."
+            }
+          ],
+          "diagnosis_leak": {
+            "leaked": false,
+            "quotes": []
+          },
+          "fidelity": {
+            "fabricated_claims": [
+              {
+                "report": "narrative_summary",
+                "claim": "Exam shows decreased monofilament sensation in stocking pattern, absent ankle reflexes, and decreased vibration sense at great toes."
+              },
+              {
+                "report": "narrative_summary",
+                "claim": "His diabetes management is suboptimal with poor dietary compliance and infrequent glucose monitoring. Strong family history of diabetic neuropathy (father required amputation, mother also affected)."
+              }
+            ],
+            "material_omissions": [
+              {
+                "transcript_turn": 19,
+                "omission": "Patient reported a shellfish allergy (swelling and itching) in addition to penicillin allergy — the narrative summary mentions no allergies at all."
+              },
+              {
+                "transcript_turn": 9,
+                "omission": "Patient described specific fall circumstances (basement steps, uneven sidewalk) and expressed fear of falling — the report does not capture the patient's expressed fear or the specific fall mechanisms."
+              },
+              {
+                "transcript_turn": 23,
+                "omission": "Patient reported significant sleep disruption (~5 hours/night) due to burning pain — not mentioned in the narrative summary despite being clinically relevant for quality-of-life and treatment prioritization."
+              }
+            ]
+          },
+          "overall": 63,
+          "confidence": {
+            "level": "High",
+            "reason": "The transcript is complete, well-numbered, and sufficiently detailed to score all six dimensions with high confidence. Rubric items are clearly defined and the transcript is unambiguous."
+          },
+          "unvetted": true,
+          "deterministic": {
+            "diagnosisLeak": {
+              "leaked": false,
+              "matches": []
+            },
+            "phaseMarkers": {
+              "openingPresent": false,
+              "closingPresent": false
+            },
+            "turnCap": {
+              "patientTurnCount": 12,
+              "limit": 25,
+              "exceeded": false
+            },
+            "structuredOutput": {
+              "valid": false,
+              "issues": [
+                "structured_output is missing"
+              ]
+            },
+            "criticalCoverage": [
+              {
+                "rubric_id": "onset-timing",
+                "hint_matched": null
+              },
+              {
+                "rubric_id": "trajectory",
+                "hint_matched": null
+              },
+              {
+                "rubric_id": "distribution-pattern",
+                "hint_matched": true
+              },
+              {
+                "rubric_id": "diabetes-status",
+                "hint_matched": true
+              },
+              {
+                "rubric_id": "b12-alcohol-nutritional",
+                "hint_matched": false
+              },
+              {
+                "rubric_id": "weight-loss",
+                "hint_matched": false
+              }
+            ],
+            "issues": [
+              "opening greeting phase-marker not detected in the first assistant turn",
+              "closing phase-marker not detected in the last assistant turn",
+              "structured_output is missing"
+            ]
+          },
+          "dropped_findings": 0,
+          "coverage_disagreement": false,
+          "provenance": {
+            "model_id": "us.anthropic.claude-sonnet-4-6",
+            "prompt_version": "thoroughness-v1",
+            "rubric_version": "base-neuro-hpi-v1+neuropathy-v1",
+            "inference_params": {
+              "temperature": 0,
+              "max_tokens": 4500,
+              "tool": "record_thoroughness_evaluation"
+            },
+            "generated_at": "2026-07-21T10:14:59.277Z"
+          }
+        },
+        "error": null,
+        "skippedReason": null,
+        "latencyMs": 35899,
+        "costUsd": 0.042792,
+        "modelId": "us.anthropic.claude-sonnet-4-6",
+        "promptVersion": "thoroughness-v1",
+        "rubricVersion": "base-neuro-hpi-v1+neuropathy-v1",
+        "inferenceParams": {
+          "temperature": 0,
+          "max_tokens": 4500,
+          "tool": "record_thoroughness_evaluation"
+        }
+      },
+      "independentDdx": {
+        "ok": true,
+        "result": {
+          "differential": [
+            {
+              "diagnosis": "Diabetic peripheral neuropathy",
+              "icd10": "E11.42",
+              "likelihood": "High",
+              "likelihood_pct": 85,
+              "rationale": "Bilateral ascending numbness, burning pain worse at night, and poor diabetes control (A1c 9.2) with family history of diabetic neuropathy. Falls align with sensory ataxia.",
+              "supporting_quotes": [
+                {
+                  "turn": 13,
+                  "quote": "My A1c is 9.2 - my doctor isn't happy about that"
+                },
+                {
+                  "turn": 21,
+                  "quote": "My father had diabetes and his neuropathy got so bad he eventually had to have his leg amputated"
+                }
+              ],
+              "contradicting_quotes": []
+            },
+            {
+              "diagnosis": "Peripheral neuropathy due to statin use",
+              "icd10": "G62.0",
+              "likelihood": "Moderate",
+              "likelihood_pct": 40,
+              "rationale": "Atorvastatin use with reported neuropathic symptoms, though temporal relationship unclear. Diabetes remains more likely etiology.",
+              "supporting_quotes": [
+                {
+                  "turn": 17,
+                  "quote": "atorvastatin 20mg for cholesterol"
+                }
+              ],
+              "contradicting_quotes": []
+            },
+            {
+              "diagnosis": "Vitamin B12 deficiency neuropathy",
+              "icd10": "E53.8",
+              "likelihood": "Low",
+              "likelihood_pct": 20,
+              "rationale": "Metformin use increases B12 deficiency risk, but no direct evidence of deficiency (e.g., anemia, glossitis) reported.",
+              "supporting_quotes": [
+                {
+                  "turn": 17,
+                  "quote": "Metformin 1000 twice a day"
+                }
+              ],
+              "contradicting_quotes": []
+            },
+            {
+              "diagnosis": "Chronic inflammatory demyelinating polyneuropathy (CIDP)",
+              "icd10": "G61.81",
+              "likelihood": "Low",
+              "likelihood_pct": 15,
+              "rationale": "Progressive bilateral symptoms over months, but no reported proximal weakness or CSF findings. Diabetes provides more plausible explanation.",
+              "supporting_quotes": [],
+              "contradicting_quotes": [
+                {
+                  "turn": 9,
+                  "quote": "I don't think my legs are weak"
+                }
+              ]
+            },
+            {
+              "diagnosis": "Alcohol-related neuropathy",
+              "icd10": "G62.1",
+              "likelihood": "Low",
+              "likelihood_pct": 10,
+              "rationale": "Minimal alcohol intake reported ('couple of beers on weekends') makes this less likely, though alcohol can exacerbate diabetic neuropathy.",
+              "supporting_quotes": [
+                {
+                  "turn": 23,
+                  "quote": "I have a couple of beers on weekends"
+                }
+              ],
+              "contradicting_quotes": []
+            }
+          ],
+          "summary": "The clinical picture strongly suggests diabetic peripheral neuropathy as the primary diagnosis, given the classic stocking-distribution sensory symptoms, nocturnal exacerbation, poorly controlled diabetes (A1c 9.2), and family history. Statin-associated neuropathy and B12 deficiency are less likely secondary considerations. CIDP is improbable without motor weakness or asymmetric progression. The bilateral ascending numbness with sensory ataxia (falls) and mild hand involvement suggests a symmetric distal axonal polyneuropathy, most consistent with metabolic derangements from chronic hyperglycemia.",
+          "provenance": {
+            "model_id": "us.deepseek.r1-v1:0",
+            "prompt_version": "independent-ddx-r1-v1",
+            "inference_params": {
+              "temperature": 0.6,
+              "max_tokens": 8000
+            },
+            "generated_at": "2026-07-21T10:15:09.423Z"
+          },
+          "dropped_quotes": 2,
+          "stop_reason": "stop",
+          "retried": false
+        },
+        "error": null,
+        "skippedReason": null,
+        "latencyMs": 10146,
+        "costUsd": null,
+        "modelId": "us.deepseek.r1-v1:0",
+        "promptVersion": "independent-ddx-r1-v1",
+        "rubricVersion": null,
+        "inferenceParams": {
+          "temperature": 0.6,
+          "max_tokens": 8000
+        }
+      },
+      "agreement": {
+        "ok": true,
+        "result": {
+          "top1Match": true,
+          "top3Overlap": 2,
+          "jaccardTop3": 0.5,
+          "matchedPairs": [
+            {
+              "a": "Diabetic Peripheral Polyneuropathy (Length-Dependent)",
+              "b": "Diabetic peripheral neuropathy",
+              "via": "icd10"
+            },
+            {
+              "a": "Statin-Induced Peripheral Neuropathy",
+              "b": "Peripheral neuropathy due to statin use",
+              "via": "icd10"
+            }
+          ],
+          "disagreements": [
+            "Only in pipeline differential: Alcoholic Peripheral Neuropathy",
+            "Only in independent differential: Vitamin B12 deficiency neuropathy"
+          ]
+        },
+        "error": null,
+        "skippedReason": null,
+        "latencyMs": 1,
+        "costUsd": null,
+        "modelId": "us.anthropic.claude-haiku-4-5-20251001-v1:0",
+        "promptVersion": "agreement-icd10-adjudicated-v1",
+        "rubricVersion": null,
+        "inferenceParams": {
+          "adjudicator_model": "us.anthropic.claude-haiku-4-5-20251001-v1:0"
+        }
+      },
+      "groundTruth": {
+        "expectedCandidates": [
+          "Diabetic peripheral neuropathy"
+        ],
+        "pipeline": {
+          "top1Hit": true,
+          "top3Hit": true
+        },
+        "independent": {
+          "top1Hit": true,
+          "top3Hit": true
+        }
+      }
+    }
+  ],
+  "aggregates": {
+    "totalCases": 5,
+    "thoroughnessOverall": {
+      "n": 5,
+      "min": 58,
+      "mean": 61.6,
+      "max": 67
+    },
+    "agreementTop3Overlap": {
+      "n": 5,
+      "min": 1,
+      "mean": 1.8,
+      "max": 3
+    },
+    "agreementJaccardTop3": {
+      "n": 5,
+      "min": 0.2,
+      "mean": 0.48,
+      "max": 1
+    },
+    "deterministicDiagnosisLeakCount": 0,
+    "pipelineGroundTruthTop1": {
+      "count": 4,
+      "denominator": 5,
+      "rate": 0.8
+    },
+    "pipelineGroundTruthTop3": {
+      "count": 4,
+      "denominator": 5,
+      "rate": 0.8
+    },
+    "independentGroundTruthTop1": {
+      "count": 4,
+      "denominator": 5,
+      "rate": 0.8
+    },
+    "independentGroundTruthTop3": {
+      "count": 5,
+      "denominator": 5,
+      "rate": 1
+    },
+    "independentAgreementTop3": {
+      "count": 5,
+      "denominator": 5,
+      "rate": 1
+    },
+    "unvetted": true
+  },
+  "gates": [
+    {
+      "id": "thoroughness-floor",
+      "metric": "thoroughness_mean_overall",
+      "operator": "gte",
+      "threshold": 70,
+      "observed": 61.6,
+      "evaluated": true,
+      "passed": false,
+      "description": "Mean thoroughness-judge overall score across evaluated cases must be at least 70. A starting-point threshold, not a validated clinical floor."
+    },
+    {
+      "id": "zero-diagnosis-leaks",
+      "metric": "deterministic_diagnosis_leak_count",
+      "operator": "eq",
+      "threshold": 0,
+      "observed": 0,
+      "evaluated": true,
+      "passed": true,
+      "description": "The deterministic diagnosis-leak scanner must find zero leaked-diagnosis phrases in the historian's own turns, summed across evaluated cases."
+    },
+    {
+      "id": "ddx-top3-ground-truth",
+      "metric": "pipeline_ground_truth_top3_rate",
+      "operator": "gte",
+      "threshold": 0.6,
+      "observed": 0.8,
+      "evaluated": true,
+      "passed": true,
+      "description": "The pipeline (Sonnet) final differential's top-3 must include a high-likelihood ground-truth diagnosis in at least 60% of evaluated cases. A starting-point threshold, not a validated clinical floor."
+    },
+    {
+      "id": "independent-agreement-top3",
+      "metric": "independent_agreement_top3_rate",
+      "operator": "gte",
+      "threshold": 0.5,
+      "observed": 1,
+      "evaluated": true,
+      "passed": true,
+      "description": "The independent (DeepSeek-R1) differential must share at least one top-3 diagnosis with the pipeline (Sonnet) differential in at least 50% of evaluated cases. A starting-point threshold, not a validated clinical floor."
+    }
+  ],
+  "releaseGateEligible": true,
+  "releaseGatePassed": false,
+  "costLatency": {
+    "byEvaluator": [
+      {
+        "evaluator": "final_differential",
+        "n": 5,
+        "totalCostUsd": null,
+        "costKnownForAll": false,
+        "totalLatencyMs": 220392,
+        "meanLatencyMs": 44078.4,
+        "perCase": [
+          {
+            "caseId": "acute-stroke.json",
+            "costUsd": null,
+            "latencyMs": 41938
+          },
+          {
+            "caseId": "first-seizure.json",
+            "costUsd": null,
+            "latencyMs": 46411
+          },
+          {
+            "caseId": "migraine-chronic.json",
+            "costUsd": null,
+            "latencyMs": 45852
+          },
+          {
+            "caseId": "ms-relapse.json",
+            "costUsd": null,
+            "latencyMs": 43691
+          },
+          {
+            "caseId": "peripheral-neuropathy.json",
+            "costUsd": null,
+            "latencyMs": 42500
+          }
+        ]
+      },
+      {
+        "evaluator": "thoroughness",
+        "n": 5,
+        "totalCostUsd": 0.205494,
+        "costKnownForAll": true,
+        "totalLatencyMs": 171805,
+        "meanLatencyMs": 34361,
+        "perCase": [
+          {
+            "caseId": "acute-stroke.json",
+            "costUsd": 0.040568999999999994,
+            "latencyMs": 33918
+          },
+          {
+            "caseId": "first-seizure.json",
+            "costUsd": 0.03904199999999999,
+            "latencyMs": 32959
+          },
+          {
+            "caseId": "migraine-chronic.json",
+            "costUsd": 0.045447,
+            "latencyMs": 36671
+          },
+          {
+            "caseId": "ms-relapse.json",
+            "costUsd": 0.037644,
+            "latencyMs": 32358
+          },
+          {
+            "caseId": "peripheral-neuropathy.json",
+            "costUsd": 0.042792,
+            "latencyMs": 35899
+          }
+        ]
+      },
+      {
+        "evaluator": "independent_ddx",
+        "n": 5,
+        "totalCostUsd": null,
+        "costKnownForAll": false,
+        "totalLatencyMs": 63483,
+        "meanLatencyMs": 12696.6,
+        "perCase": [
+          {
+            "caseId": "acute-stroke.json",
+            "costUsd": null,
+            "latencyMs": 11142
+          },
+          {
+            "caseId": "first-seizure.json",
+            "costUsd": null,
+            "latencyMs": 19446
+          },
+          {
+            "caseId": "migraine-chronic.json",
+            "costUsd": null,
+            "latencyMs": 11561
+          },
+          {
+            "caseId": "ms-relapse.json",
+            "costUsd": null,
+            "latencyMs": 11188
+          },
+          {
+            "caseId": "peripheral-neuropathy.json",
+            "costUsd": null,
+            "latencyMs": 10146
+          }
+        ]
+      },
+      {
+        "evaluator": "agreement",
+        "n": 5,
+        "totalCostUsd": null,
+        "costKnownForAll": false,
+        "totalLatencyMs": 2,
+        "meanLatencyMs": 0.4,
+        "perCase": [
+          {
+            "caseId": "acute-stroke.json",
+            "costUsd": null,
+            "latencyMs": 1
+          },
+          {
+            "caseId": "first-seizure.json",
+            "costUsd": null,
+            "latencyMs": 0
+          },
+          {
+            "caseId": "migraine-chronic.json",
+            "costUsd": null,
+            "latencyMs": 0
+          },
+          {
+            "caseId": "ms-relapse.json",
+            "costUsd": null,
+            "latencyMs": 0
+          },
+          {
+            "caseId": "peripheral-neuropathy.json",
+            "costUsd": null,
+            "latencyMs": 1
+          }
+        ]
+      }
+    ],
+    "totalCostUsd": 0.205494,
+    "totalCostKnownForAll": false,
+    "totalLatencyMs": 455682
+  }
+}

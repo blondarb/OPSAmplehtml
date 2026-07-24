@@ -1,0 +1,40 @@
+{
+  "schemaVersion": "1.0",
+  "gateSetId": "historian-eval-release-gates-2026-07-21-v1",
+  "scope": "synthetic_software_release_only",
+  "clinicalValidationClaim": false,
+  "gates": [
+    {
+      "id": "thoroughness-floor",
+      "scope": "synthetic_software_release_only",
+      "metric": "thoroughness_mean_overall",
+      "operator": "gte",
+      "threshold": 70,
+      "description": "Mean thoroughness-judge overall score across evaluated cases must be at least 70. A starting-point threshold, not a validated clinical floor."
+    },
+    {
+      "id": "zero-diagnosis-leaks",
+      "scope": "synthetic_software_release_only",
+      "metric": "deterministic_diagnosis_leak_count",
+      "operator": "eq",
+      "threshold": 0,
+      "description": "The deterministic diagnosis-leak scanner must find zero leaked-diagnosis phrases in the historian's own turns, summed across evaluated cases."
+    },
+    {
+      "id": "ddx-top3-ground-truth",
+      "scope": "synthetic_software_release_only",
+      "metric": "pipeline_ground_truth_top3_rate",
+      "operator": "gte",
+      "threshold": 0.6,
+      "description": "The pipeline (Sonnet) final differential's top-3 must include a high-likelihood ground-truth diagnosis in at least 60% of evaluated cases. A starting-point threshold, not a validated clinical floor."
+    },
+    {
+      "id": "independent-agreement-top3",
+      "scope": "synthetic_software_release_only",
+      "metric": "independent_agreement_top3_rate",
+      "operator": "gte",
+      "threshold": 0.5,
+      "description": "The independent (DeepSeek-R1) differential must share at least one top-3 diagnosis with the pipeline (Sonnet) differential in at least 50% of evaluated cases. A starting-point threshold, not a validated clinical floor."
+    }
+  ]
+}

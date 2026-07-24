@@ -7,6 +7,7 @@ import { getOpenAIKey } from '@/lib/secrets'
 import { getConsult, markHistorianStarted } from '@/lib/consult/pipeline'
 import { buildHistorianContextFromConsult } from '@/lib/consult/contextBuilder'
 import { buildWhisperBiasPrompt, isAsrBiasingEnabled } from '@/lib/asr/clinical-lexicon'
+import { mintFlushToken } from '@/lib/historian/flushToken'
 
 /**
  * Mint a short-lived relay auth token for the Nova Sonic WS relay
@@ -49,6 +50,44 @@ function mintNovaRelayToken(): string | null {
 export async function POST(request: Request) {
   try {
     const body = await request.json()
+
+    // Historian Validation Suite Task 1: server-minted session id + its
+    // matching transcript-flush bearer token. Hoisted to the top (was
+    // previously minted further down, after the provider branch) so
+    // textMode (below) can return it without duplicating this logic —
+    // 100% behavior-preserving for every existing caller: nothing later in
+    // this function reads sessionId/flushToken before they're used, and
+    // nothing before this point used to run before they were minted either.
+    const sessionId = crypto.randomUUID()
+    let flushToken: string | undefined
+    try {
+      flushToken = mintFlushToken(sessionId)
+    } catch (flushTokenErr) {
+      console.warn(
+        '[historian/session] mintFlushToken failed (non-fatal — durable transcript flush unavailable this session):',
+        flushTokenErr instanceof Error ? flushTokenErr.message : String(flushTokenErr),
+      )
+      flushToken = undefined
+    }
+
+    // Historian Validation Suite Task 6 (synthetic conversation driver):
+    // textMode returns ONLY {sessionId, flushToken} — no OpenAI
+    // client_secrets call, no Nova relay token, no consult-context lookup.
+    // The driver sources instructions/tools directly from
+    // buildHistorianSystemPrompt()/getHistorianToolDefinition() (the exact
+    // functions this route calls below) and drives its own OpenAI Realtime
+    // WebSocket connection, so none of the voice-credential machinery below
+    // is relevant to it. Accepts either `body.textMode === true` or the
+    // query string `?textMode=1`/`?textMode=true`. Purely additive — every
+    // existing (non-textMode) caller falls through to the unchanged code
+    // below exactly as before.
+    const requestUrl = new URL(request.url)
+    const textModeParam = requestUrl.searchParams.get('textMode')
+    const textMode = body.textMode === true || textModeParam === '1' || textModeParam === 'true'
+    if (textMode) {
+      return NextResponse.json({ sessionId, flushToken })
+    }
+
     const sessionType: HistorianSessionType = body.sessionType || 'new_patient'
     let referralReason: string | undefined = body.referralReason
     let patientContext: string | undefined = body.patientContext
@@ -79,6 +118,9 @@ export async function POST(request: Request) {
       }
     }
 
+    // (sessionId/flushToken were minted up front, above the textMode check —
+    // both provider branches below use those same values.)
+
     // ── Nova path: no OpenAI client_secrets call. Return relay config + the
     // Nova-native tool specs (Bedrock Converse toolSpec shape). The hook
     // builds a NovaSonicWsProvider from this — no ephemeral key needed.
@@ -98,6 +140,10 @@ export async function POST(request: Request) {
         // base_instructions kept for client parity (localizer push channel).
         base_instructions: instructions,
         consult_id: consultId || null,
+        // Additive (Task 1): server-minted historian_sessions id + its
+        // matching transcript-flush bearer token.
+        sessionId,
+        flushToken,
       })
     }
 
@@ -198,9 +244,19 @@ export async function POST(request: Request) {
       tools,
       // Shape unchanged from client's perspective
       ephemeralKey: data.value ?? data.client_secret?.value,
-      sessionId: data.session_id ?? data.id,
+      // OpenAI's own Realtime session id. Renamed from the historical
+      // `sessionId` (verified 2026-07: no client or test reads this field
+      // by that name — useRealtimeSession.ts's startSession destructure
+      // never included it) to free up `sessionId` for the server-minted
+      // historian_sessions UUID below (Task 1: durable transcript).
+      providerSessionId: data.session_id ?? data.id,
       expiresAt: data.expires_at ?? data.client_secret?.expires_at,
       consult_id: consultId || null,
+      // Additive (Task 1): server-minted historian_sessions id + its
+      // matching transcript-flush bearer token. Same values as the Nova
+      // branch above — minted once per POST regardless of provider.
+      sessionId,
+      flushToken,
       // Pass the resolved model + turn detection mode back so the client knows
       // exactly which configuration is active (for debugging + analytics)
       model,

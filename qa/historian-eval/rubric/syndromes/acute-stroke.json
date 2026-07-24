@@ -1,0 +1,38 @@
+{
+  "_note": "[training knowledge — Steve to vet]",
+  "version": "stroke-v1",
+  "syndrome": "acute-stroke",
+  "vetted_by": null,
+  "vetted_date": null,
+  "critical_questions": [
+    {
+      "id": "onset-time",
+      "question": "Exact time of symptom onset / last known well.",
+      "severity": "critical",
+      "coverage_hints": ["last known well", "last seen normal", "when did the symptoms start", "when did this start"]
+    },
+    {
+      "id": "anticoagulant-use",
+      "question": "Is the patient currently taking an anticoagulant or antiplatelet (e.g. warfarin, a DOAC, aspirin, clopidogrel)?",
+      "severity": "critical",
+      "coverage_hints": ["blood thinner", "warfarin", "eliquis", "xarelto", "aspirin"]
+    },
+    {
+      "id": "thrombolysis-contraindications",
+      "question": "Any factors that would contraindicate thrombolysis: recent major surgery or trauma, recent bleeding or hemorrhage history, prior intracranial hemorrhage, or current pregnancy?",
+      "severity": "critical",
+      "coverage_hints": ["recent surgery", "recent trauma", "bleeding", "pregnant"]
+    },
+    {
+      "id": "prior-stroke-tia-history",
+      "question": "Any personal history of a prior stroke or TIA?",
+      "severity": "important"
+    },
+    {
+      "id": "vascular-risk-factors",
+      "question": "Vascular risk factors: hypertension, diabetes, atrial fibrillation, hyperlipidemia, smoking history.",
+      "severity": "important"
+    }
+  ],
+  "expected_dimensions": ["oldcarts", "red_flags", "pmh_meds_allergies", "fh_sh"]
+}
