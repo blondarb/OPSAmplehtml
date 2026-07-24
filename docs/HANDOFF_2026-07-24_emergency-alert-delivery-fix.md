@@ -11,7 +11,22 @@
 
 Two SQL type-mismatch bugs meant **zero emergency-alert critical-UI notifications had ever been delivered** — a 100% failure rate on a clinical safety path, running silently for 4 days. Both are fixed and pushed, along with two *latent* instances of the same bug class found in sibling failure paths. No production data was modified.
 
-The single most important open item: **confirm a delivery actually reaches `delivered` after the Amplify build lands.** That had not yet happened at the time this was written.
+> ## ⚠️ THE FIX IS NOT LIVE YET — READ THIS FIRST
+>
+> **Pushing to `main` does NOT deploy this fix.** The emergency-alert workers are **standalone Lambdas deployed by SAM** from `infrastructure/triage-worker/template.yaml` (stack `sevaro-triage-worker-sandbox`) — Amplify only deploys the Next.js app. The four running worker Lambdas were **last modified 2026-07-13** and are still executing the broken SQL right now.
+>
+> ```
+> sevaro-triage-worker-sand-EmergencyAlertPublisherF-…    2026-07-13
+> sevaro-triage-worker-sand-EmergencyAlertDeliveryWo-…    2026-07-13
+> sevaro-triage-worker-sand-EmergencyAlertDeliveryDi-…    2026-07-13
+> sevaro-triage-worker-sand-EmergencyAlertDispatcher-…    2026-07-13
+> ```
+>
+> **A SAM build + deploy is required, and it needs Steve's explicit approval** (production Lambda deploy — per `command-approvals.md`, and Lambda deploys are blocked in auto mode). Until then the errors will keep firing.
+>
+> This is the same class of gotcha already recorded for the SEE repo: *"7 Lambdas bundle `src/lib/neuroscribe`; Amplify merge does NOT redeploy them → stale code."* Same trap, different repo.
+
+An earlier version of this handoff said the fix would "self-heal on the next alert cycle after deploy." **That was wrong** — it assumed Amplify deployment. Corrected above.
 
 ---
 
@@ -108,8 +123,12 @@ Added 4 SQL-shape regression tests. **Proven non-vacuous** by reverting the sour
 
 ## 7. Needs another look — prioritized
 
-### P0 — Verify the fix actually works in production
-The 371 `terminal_failure` rows are terminal and will **not** self-retry. Recovery depends on the outbox emitting a *new* alert for the still-open action (escalation ~15 min), which then creates a fresh delivery row.
+### P0 — **Deploy the worker Lambdas** (needs Steve's explicit approval), then verify
+Nothing below matters until the SAM stack is redeployed — see the banner at the top. Per `infrastructure/triage-worker/README.md`, run `sam validate --lint` and `sam build` before any change set. This is a **production Lambda deploy**, so it is an explicit-approval action, not an auto-run one.
+
+Secondary observation worth checking during the deploy: **new alert creation appears to have stalled independently.** `next_escalation_at` was `2026-07-24 02:03:16` and had passed by `02:04:09` with no new alert row (last alert `01:48:17`), despite the dispatchers being on `rate(1 minute)` schedules. Escalation is *not* exhausted — `LEAST(3, level+1)` caps the level at 3 but keeps alerting. So either a dispatcher is failing, the schedule is disabled, or something else is wrong upstream. **Worth a CloudWatch look at the four `EmergencyAlert*` Lambdas' logs and their EventBridge schedule state.**
+
+After deploy, verify: the 371 `terminal_failure` rows are terminal and will **not** self-retry. Recovery depends on the outbox emitting a *new* alert for the still-open action, which then creates a fresh delivery row.
 ```sql
 SELECT status, count(*), count(*) FILTER (WHERE delivered_at IS NOT NULL) AS delivered
 FROM triage_emergency_alert_notification_deliveries GROUP BY 1;
