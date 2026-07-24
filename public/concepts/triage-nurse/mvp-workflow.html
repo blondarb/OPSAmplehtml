@@ -30,6 +30,7 @@ td b{color:var(--text);font-weight:600}
 .pill{display:inline-block;font-size:9px;font-weight:700;padding:2px 7px;border-radius:4px;letter-spacing:.03em;white-space:nowrap}
 .pill.ours{background:rgba(36,195,184,.2);color:var(--teal)}
 .pill.epic{background:rgba(59,130,246,.2);color:#93bbfd}
+td.gap{color:var(--red);font-weight:700;white-space:nowrap}
 .mvp{background:var(--s900);border:1px solid var(--s800);border-radius:10px;overflow:hidden;margin:16px 0}
 .mvp-r{display:flex;gap:12px;padding:12px 16px;border-bottom:1px solid rgba(42,45,52,.5);align-items:flex-start}
 .mvp-r:last-child{border-bottom:0}
@@ -100,6 +101,52 @@ a{color:#93bbfd;text-decoration:none}
   </div>
 
   <div class="section">
+    <h2>Communication topology</h2>
+    <h3>Who can reach whom — and the one gap that shapes everything</h3>
+    <p>The triage nurse is <strong>virtual</strong>. Patients sit at their home clinics. There is no
+    integration and no Sevaro patient portal, so the message lanes are asymmetric — and the
+    asymmetry is the design constraint, not a temporary annoyance.</p>
+    <table>
+      <tr><th>Lane</th><th>Direction</th><th>How it works in MVP</th></tr>
+      <tr><td><b>Site MA → triage RN</b></td><td>→</td><td>Message in Synapse <span class="pill ours">OURS</span></td></tr>
+      <tr><td><b>Physician / nurse ↔ triage RN</b></td><td>↔</td><td>Message in Synapse, both directions <span class="pill ours">OURS</span></td></tr>
+      <tr><td><b>Patient → triage RN</b></td><td class="gap">✕ none</td><td>Patient calls the <b>local organization</b>. The local org relays to her, or she reads the <b>local portal</b> with her site login.</td></tr>
+      <tr><td><b>Triage RN → patient</b></td><td>→</td><td>She <b>calls the patient</b> and/or writes a message in the <b>local portal</b>; our system logs that contact. <span class="pill epic">LOCAL FILED</span></td></tr>
+    </table>
+    <div class="box b">
+      <div class="box-t">Consequence</div>
+      <p>Patients cannot reach us directly, so <strong>every inbound path runs through the local
+      organization</strong> — which means the per-site portal logins aren't a convenience feature,
+      they're load-bearing infrastructure. And the local-portal message is the <strong>filed
+      copy</strong>; ours records only that we sent it. Same one-owner rule as the note.</p>
+    </div>
+    <p>During the call she should be able to run the triage pathway live — or pull it up fast enough
+    to answer in the moment — and the call is recorded with the same ambient AI the scribe already
+    uses.</p>
+  </div>
+
+  <div class="section">
+    <h2>What we keep, and for how long</h2>
+    <h3>Derive and discard, on one uniform clock</h3>
+    <p>The principle: <strong>keep the clinical conclusion, discard the raw material on a
+    schedule.</strong> The note is the record; everything upstream of it is working material.</p>
+    <table>
+      <tr><th>Artifact</th><th>Retention</th><th>Why</th></tr>
+      <tr><td><b>Triage note</b> — disposition + what she knew</td><td>Full medical-record retention, matched to the local org's policy</td><td>Clinical documentation, and the defense if an outcome is questioned</td></tr>
+      <tr><td><b>Call recording + transcript</b></td><td>One short fixed window (~30–90 days), then automatic purge</td><td>QA and dispute window. A recording that outlives its purpose is discoverable and can contradict the note.</td></tr>
+      <tr><td><b>Pasted chart context</b></td><td>Purge at encounter close</td><td>It's a copy of Epic's data — Epic is the record</td></tr>
+      <tr><td><b>Worklist status, ticklers</b></td><td>Short — operational only</td><td>Unless a status encodes a clinical decision, in which case it belongs in the note</td></tr>
+    </table>
+    <div class="box r">
+      <div class="box-t">Two traps</div>
+      <p><strong>Backups silently extend real retention.</strong> If PITR or snapshots hold 35 days,
+      a 30-day purge policy is fiction unless it covers them.<br>
+      <strong>Selective retention is worse than either extreme.</strong> Keeping some calls and not
+      others reads as spoliation. One automatic clock, applied uniformly, no human deletion.</p>
+    </div>
+  </div>
+
+  <div class="section">
     <h2>Out of MVP</h2>
     <h3>What the concept demo showed that this cut removes</h3>
     <ul>
@@ -118,6 +165,37 @@ a{color:#93bbfd;text-decoration:none}
       security audit findings (systemic API-auth gap) become a <strong>blocking prerequisite, not a
       someday</strong>. The real-build kickoff starts with a security-remediation phase, before any
       live patient tracking.</p>
+    </div>
+
+    <h3 style="margin-top:26px">Open risks — ranked by what would actually bite</h3>
+    <p>Regulatory and operational calls, flagged for counsel and clinical leadership rather than
+    settled here. Ordered by how early each one could stop the program.</p>
+    <div class="mvp">
+      <div class="mvp-r"><div class="mvp-n">1</div><div class="mvp-x"><b>Cross-state licensure.</b>
+        She advises patients in the <b>patient's</b> state. If covered sites span states she needs
+        licensure in each — the Nurse Licensure Compact covers many states but not all. This can
+        stop the program before any technical question matters.</div></div>
+      <div class="mvp-r"><div class="mvp-n">2</div><div class="mvp-x"><b>Standing orders.</b>
+        A nurse issuing dispositions practices under physician-approved protocol. The pathways
+        <b>are</b> that protocol — so they need a named physician owner, a signature, and a review
+        cadence as a policy document, not only a code gate.</div></div>
+      <div class="mvp-r"><div class="mvp-n">3</div><div class="mvp-x"><b>Loop closure.</b>
+        The classic triage-malpractice pattern isn't a wrong disposition — it's an urgent callback
+        that never got returned. Ticklers must <b>escalate</b> (N attempts → notify local site +
+        covering physician), not merely remind.</div></div>
+      <div class="mvp-r"><div class="mvp-n">4</div><div class="mvp-x"><b>Emergency at distance.</b>
+        911 is location-routed and she is remote — she cannot dispatch to the patient. The ED script
+        must confirm patient location first and state explicitly <b>who dials</b>.</div></div>
+      <div class="mvp-r"><div class="mvp-n">5</div><div class="mvp-x"><b>Recording consent.</b>
+        Two-party-consent states, governed by where the patient is. Needs a verbal consent line at
+        call open, captured inside the recording itself.</div></div>
+      <div class="mvp-r"><div class="mvp-n">6</div><div class="mvp-x"><b>No inbound path back.</b>
+        If she calls from a number that won't accept inbound and the patient misses it, that's a
+        dead end — patients don't answer unknown numbers. Either an inbound-capable number, or the
+        script always routes them back to the local org.</div></div>
+      <div class="mvp-r"><div class="mvp-n">7</div><div class="mvp-x"><b>BAA + identity.</b>
+        Confirm BAA coverage per site for triage activity specifically, and verify patient identity
+        before discussing PHI on an outbound call the patient never initiated.</div></div>
     </div>
   </div>
 
