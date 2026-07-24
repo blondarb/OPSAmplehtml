@@ -451,3 +451,32 @@ describe('Postgres emergency-action alert outbox', () => {
     ).rejects.toBeInstanceOf(EmergencyActionAlertOutboxError)
   })
 })
+
+describe('sql type safety', () => {
+  it('pins the next_attempt_at bind parameter to timestamptz inside the bare CASE...THEN', async () => {
+    const { pool, calls } = mockDirectPool(() =>
+      result(
+        [
+          {
+            id: ALERT_ID,
+            status: 'terminal_failure',
+            attempt_count: 5,
+            max_attempts: 5,
+          },
+        ],
+        1,
+      ),
+    )
+
+    await expect(
+      service(pool).failEmergencyAlert({
+        alertId: ALERT_ID,
+        actionId: ACTION_ID,
+        leaseToken: LEASE_TOKEN,
+        error: new Error('synthetic publisher failure'),
+        nextRetryAt: new Date('2026-07-11T12:01:00.000Z'),
+      }),
+    ).resolves.toEqual({ status: 'terminal_failure' })
+    expect(calls[0].sql).toContain('$8::timestamptz')
+  })
+})

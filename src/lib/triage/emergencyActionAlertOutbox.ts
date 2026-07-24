@@ -628,7 +628,7 @@ export function createPostgresEmergencyActionAlertOutbox(
                   ELSE 'failed'
                 END,
                 next_attempt_at = CASE
-                  WHEN attempt_count < max_attempts THEN $8
+                  WHEN attempt_count < max_attempts THEN $8::timestamptz
                   ELSE NULL
                 END,
                 outcome_lease_token = $3,

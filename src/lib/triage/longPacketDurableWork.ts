@@ -1815,7 +1815,7 @@ export function createPostgresLongPacketDurableWorkService(
                 last_error_at = $4,
                 last_error_lease_token = $3,
                 next_retry_at = CASE
-                  WHEN attempt_count < max_attempts THEN $7
+                  WHEN attempt_count < max_attempts THEN $7::timestamptz
                   ELSE NULL
                 END,
                 finished_at = $4,

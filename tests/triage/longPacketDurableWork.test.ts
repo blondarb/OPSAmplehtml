@@ -1836,3 +1836,42 @@ describe('Postgres long-packet durable work service', () => {
     ).rejects.toBeInstanceOf(LongPacketDurableWorkError)
   })
 })
+
+describe('sql type safety', () => {
+  it('pins the next_retry_at bind parameter to timestamptz inside the bare CASE...THEN', async () => {
+    const { pool, calls } = mockTransactionalPool((sql) => {
+      if (/BEGIN|COMMIT|ROLLBACK/.test(sql)) return result()
+      if (/UPDATE triage_long_packet_chunk_jobs/.test(sql)) {
+        return result(
+          [
+            {
+              id: 'job-1',
+              run_id: 'run-1',
+              status: 'failed',
+              attempt_count: 1,
+              max_attempts: 3,
+            },
+          ],
+          1,
+        )
+      }
+      throw new Error(`Unexpected query: ${sql}`)
+    })
+    const service = createPostgresLongPacketDurableWorkService(pool, {
+      now: () => new Date('2026-07-11T12:00:00.000Z'),
+    })
+
+    await service.failChunkJob({
+      jobId: 'job-1',
+      tenantId: 'tenant-1',
+      leaseToken: '05240000-0000-4000-8000-000000000001',
+      error: new Error('synthetic timeout'),
+      nextRetryAt: new Date('2026-07-11T12:01:00.000Z'),
+    })
+
+    const failureMutation = calls.find((call) =>
+      call.sql.includes('UPDATE triage_long_packet_chunk_jobs'),
+    )
+    expect(failureMutation?.sql).toContain('$7::timestamptz')
+  })
+})

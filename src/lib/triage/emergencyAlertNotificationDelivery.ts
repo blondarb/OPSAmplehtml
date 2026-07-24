@@ -711,7 +711,17 @@ export function createPostgresEmergencyAlertNotificationDelivery(
            metadata
          )
          SELECT session.tenant_id,
-                action.owner_user_id,
+                -- owner_user_id is an unconstrained text column; notifications.recipient_user_id
+                -- is uuid. Guard the cast so a malformed/non-UUID owner id can never throw
+                -- (22P02) and block delivery of a critical emergency alert. recipient_user_id is
+                -- nullable and the notifications read path filters by tenant only, never by
+                -- recipient, so a NULL recipient here still surfaces the alert in the feed —
+                -- strictly better than failing to deliver it at all.
+                CASE
+                  WHEN action.owner_user_id ~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
+                  THEN action.owner_user_id::uuid
+                  ELSE NULL
+                END,
                 'triage_result',
                 $5,
                 NULL,
@@ -836,7 +846,7 @@ export function createPostgresEmergencyAlertNotificationDelivery(
                   ELSE 'failed'
                 END,
                 next_attempt_at = CASE
-                  WHEN attempt_count < max_attempts THEN $8
+                  WHEN attempt_count < max_attempts THEN $8::timestamptz
                   ELSE NULL
                 END,
                 outcome_lease_token = $3,

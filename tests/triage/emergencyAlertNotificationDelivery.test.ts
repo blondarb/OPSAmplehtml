@@ -429,3 +429,79 @@ describe('Postgres emergency alert critical-UI notification delivery', () => {
     )
   })
 })
+
+describe('sql type safety', () => {
+  it('guards the owner_user_id -> recipient_user_id uuid cast instead of casting it bare', async () => {
+    const { pool, calls } = transactionalPool((sql) => {
+      if (/BEGIN|COMMIT|ROLLBACK/.test(sql)) return result()
+      if (/SELECT alert.id AS alert_id/.test(sql)) {
+        return result([bindingRow()])
+      }
+      if (/SELECT delivery.status AS delivery_status/.test(sql)) {
+        return result([
+          {
+            delivery_status: 'leased',
+            lease_token: LEASE_TOKEN,
+            lease_expires_at: new Date('2026-07-11T12:02:00.000Z'),
+          },
+        ])
+      }
+      if (/INSERT INTO notifications/.test(sql)) {
+        return result([{ id: 'notification-1' }], 1)
+      }
+      if (/UPDATE triage_emergency_alert_notification_deliveries/.test(sql)) {
+        return result([{ status: 'delivered' }], 1)
+      }
+      throw new Error(`Unexpected query: ${sql}`)
+    })
+
+    await expect(
+      service(pool).deliverCriticalUiNotification({
+        alertId: ALERT_ID,
+        actionId: ACTION_ID,
+        severity: 'emergency',
+        level: 2,
+        leaseToken: LEASE_TOKEN,
+        attemptCount: 1,
+        tenantId: 'tenant-alert',
+        triageSessionId: SESSION_ID,
+        ownerTeam: 'clinical-triage',
+        ownerUserId: 'clinician-1',
+      }),
+    ).resolves.toEqual({ status: 'delivered' })
+
+    const insertion = calls.find((call) =>
+      call.sql.includes('INSERT INTO notifications'),
+    )
+    expect(insertion?.sql).toContain('action.owner_user_id::uuid')
+    expect(insertion?.sql).toContain('~*')
+    expect(insertion?.sql).not.toContain(
+      '                action.owner_user_id,',
+    )
+  })
+
+  it('pins the next_attempt_at bind parameter to timestamptz inside the bare CASE...THEN', async () => {
+    const { pool, calls } = transactionalPool((sql) => {
+      if (/BEGIN|COMMIT|ROLLBACK/.test(sql)) return result()
+      if (/UPDATE triage_emergency_alert_notification_deliveries/.test(sql)) {
+        return result([{ status: 'terminal_failure' }], 1)
+      }
+      throw new Error(`Unexpected query: ${sql}`)
+    })
+
+    await expect(
+      service(pool).failCriticalUiDelivery({
+        alertId: ALERT_ID,
+        actionId: ACTION_ID,
+        leaseToken: LEASE_TOKEN,
+        error: new Error('synthetic failure'),
+        nextRetryAt: new Date('2026-07-11T12:01:00.000Z'),
+      }),
+    ).resolves.toEqual({ status: 'terminal_failure' })
+
+    const mutation = calls.find((call) =>
+      call.sql.includes('UPDATE triage_emergency_alert_notification_deliveries'),
+    )
+    expect(mutation?.sql).toContain('$8::timestamptz')
+  })
+})
