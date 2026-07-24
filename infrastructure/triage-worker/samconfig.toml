@@ -1,0 +1,64 @@
+# SAM deploy config for the triage worker Lambdas.
+#
+# WHY THIS FILE EXISTS
+# --------------------
+# These workers are NOT deployed by Amplify. Amplify only deploys the Next.js
+# app; the six Lambdas defined in template.yaml bundle `src/lib/triage/*` at
+# build time and ship as a separate SAM stack. A merge to `main` therefore
+# leaves them running stale code until someone deploys this stack explicitly.
+#
+# On 2026-07-24 that gap let a SQL type-mismatch fix sit merged-but-inert while
+# the emergency-alert notification path kept failing in production. The deploy
+# was attempted and silently never reached CloudFormation, because there was no
+# samconfig.toml and `RdsSecretArn` / `RdsDatabase` are required parameters with
+# no defaults — so a bare `sam deploy` drops into `--guided` or errors out
+# before contacting AWS. This file removes that failure mode.
+#
+# USAGE
+#   cd infrastructure/triage-worker
+#   sam validate --lint
+#   sam build
+#   sam deploy                # shows a changeset and asks before applying
+#
+# Add --no-confirm-changeset for a non-interactive deploy (CI, scripted runs).
+#
+# The values below were read off the live `sevaro-triage-worker-sandbox` stack
+# on 2026-07-24 and match what is deployed today. Note RdsDatabase in
+# particular: the shared `sevaro/rds/credentials` secret's own `database` field
+# is a stale default (`github_showcase`, a different app's DB), so the correct
+# database MUST be passed explicitly here. Do not remove it.
+#
+# Nothing secret lives in this file — the RDS ARN is a resource identifier, and
+# the credentials themselves stay in Secrets Manager and are read at runtime.
+
+version = 0.1
+
+[default]
+[default.global.parameters]
+stack_name = "sevaro-triage-worker-sandbox"
+
+[default.validate.parameters]
+lint = true
+
+[default.build.parameters]
+cached = true
+parallel = true
+
+[default.deploy.parameters]
+stack_name = "sevaro-triage-worker-sandbox"
+region = "us-east-2"
+profile = "sevaro-sandbox"
+capabilities = "CAPABILITY_IAM CAPABILITY_AUTO_EXPAND"
+resolve_s3 = true
+# Safety gate: a production Lambda deploy always shows its changeset first.
+# Override with --no-confirm-changeset when running non-interactively.
+confirm_changeset = true
+fail_on_empty_changeset = false
+parameter_overrides = "Environment=\"sandbox\" RdsSecretArn=\"arn:aws:secretsmanager:us-east-2:873370528823:secret:sevaro/rds/credentials-1A4ZXr\" RdsSecretId=\"sevaro/rds/credentials\" RdsDatabase=\"ops_amplehtml\" WorkerMaximumConcurrency=\"6\" EmergencyAlertMaximumConcurrency=\"4\""
+
+[default.sync.parameters]
+watch = false
+
+[default.local_invoke.parameters]
+region = "us-east-2"
+profile = "sevaro-sandbox"

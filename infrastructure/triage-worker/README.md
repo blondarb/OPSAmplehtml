@@ -44,3 +44,44 @@ that verified handoff stops later reminders. The selected private subnets must
 have tested access to RDS, Secrets Manager, SQS, Bedrock Runtime, CloudWatch
 Logs, and X-Ray through VPC endpoints or controlled egress. Use
 `sam validate --lint` and `sam build` before any change set.
+
+## Deploying
+
+**These Lambdas are not deployed by Amplify.** Amplify deploys only the Next.js
+app. The functions here bundle `src/lib/triage/*` at build time and ship as this
+separate SAM stack, so a merge to `main` leaves them running stale code until
+this stack is deployed explicitly. Check what is actually live before assuming a
+merged change has shipped:
+
+```bash
+aws lambda list-functions --region us-east-2 --profile sevaro-sandbox \
+  --query "Functions[?contains(FunctionName,'mergencyAlert')].[FunctionName,LastModified]" \
+  --output text
+```
+
+Deploy settings live in `samconfig.toml` (stack, region, profile, capabilities,
+and the required parameters), so the full sequence is:
+
+```bash
+cd infrastructure/triage-worker
+sam validate --lint
+sam build
+sam deploy                 # prints a changeset and asks before applying
+```
+
+Add `--no-confirm-changeset` for a non-interactive run.
+
+`samconfig.toml` exists because `RdsSecretArn` and `RdsDatabase` are required
+parameters with **no defaults** — before it, a bare `sam deploy` dropped into
+`--guided` or errored out before ever contacting CloudFormation, which is a
+silent no-op that looks like a successful deploy. `RdsDatabase` must stay
+explicit: the shared `sevaro/rds/credentials` secret's own `database` field is a
+stale default (`github_showcase`, a different app's DB).
+
+> Recorded because it actually bit us: on 2026-07-24 a SQL type-mismatch fix on
+> the emergency-alert notification path sat merged-but-inert while the deploy
+> silently never reached CloudFormation. See
+> `docs/HANDOFF_2026-07-24_emergency-alert-delivery-fix.md`.
+
+Note that the sibling `infrastructure/triage-ingestion` stack has no
+`samconfig.toml` and is exposed to the same failure mode.
