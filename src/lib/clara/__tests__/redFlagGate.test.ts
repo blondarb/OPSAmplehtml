@@ -92,6 +92,50 @@ describe('detectRedFlag — positives (must fire)', () => {
   })
 })
 
+describe('Gate 0 — passive suicidal ideation + self-harm acts (eval corpus regression, 2026-07-23)', () => {
+  // Provenance: running the 50-case Gate-0 corpus from sevaro-voice-agent
+  // (eval/datasets/gate0-redflags.json) against this gate found two red flags
+  // that did not fire. The bank covered active intent but not the hopelessness
+  // phrasings families actually use, nor the commonest self-harm term.
+  const mustFire: Array<[string, string]> = [
+    // The two corpus cases that missed, verbatim:
+    ['Family is worried, she keeps saying she\'s better off dead and has no reason to live.', 'rf-036'],
+    ['He\'s calm and cooperative but casually mentioned he\'s been cutting himself this week.', 'rf-037'],
+    // Close variants a phone operator would plausibly hear:
+    ['she says she has nothing to live for anymore', 'nothing to live for'],
+    ['he told his daughter he wishes he was dead', 'wishes he was dead'],
+    ['the family thinks he might take his own life', 'take his own life'],
+    ['she has been cutting herself again', 'cutting herself'],
+    ['he admitted to harming himself last night', 'harming himself'],
+    ['there are signs of self-injury on both arms', 'self-injury'],
+  ]
+
+  it.each(mustFire)('fires on %s (%s)', (text) => {
+    const result = detectRedFlag(text)
+    expect(result.isRedFlag).toBe(true)
+    expect(result.category).toBe('self_harm')
+  })
+
+  // False-positive guards. These are the reason the cut/harm patterns require a
+  // reflexive pronoun — a bare /cut/ or /harm/ would fire on all of these, and
+  // they are ordinary traffic on a neurology triage line.
+  const mustNotFire = [
+    'we are cutting back on his seizure medication next month',
+    'she cut her finger while cooking, nothing neurological',
+    'the plan is cutting his dose in half',
+    'he cut his hand on a door frame last week',
+    'the medication is harmless at this dose',
+    'no harm done, the scan was negative',
+    'he would be better off staying home tonight',
+    'there is no reason to worry about the tremor',
+  ]
+
+  it.each(mustNotFire)('does not fire on: %s', (text) => {
+    const result = detectRedFlag(text)
+    expect(result.isRedFlag).toBe(false)
+  })
+})
+
 describe('detectRedFlag — negatives (must NOT fire)', () => {
   const clearNegatives = [
     'the patient would like to schedule a follow-up visit next month',
