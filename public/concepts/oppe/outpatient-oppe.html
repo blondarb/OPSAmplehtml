@@ -1,0 +1,101 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Outpatient OPPE — concept placeholder</title>
+<style>
+:root{--s950:#0c0f14;--s900:#1a1d23;--s800:#2a2d34;--text:#f1f1f1;--muted:#acacaf;--faint:#696a70;
+--blue:#3b82f6;--red:#ef4444;--orange:#f97316;--green:#22c55e;--teal:#24c3b8;--amber:#f59e0b;
+--f:-apple-system,BlinkMacSystemFont,'SF Pro','Segoe UI',Roboto,sans-serif}
+*{box-sizing:border-box}
+body{margin:0;background:var(--s950);color:var(--text);font-family:var(--f);font-size:14px;line-height:1.6;-webkit-font-smoothing:antialiased}
+.wrap{max-width:860px;margin:0 auto;padding:44px 22px 90px}
+h1{font-size:27px;font-weight:700;letter-spacing:-.02em;margin:0 0 8px}
+h2{font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--blue);margin:0 0 5px}
+h3{font-size:19px;font-weight:650;margin:0 0 6px}
+p{margin:0 0 11px;color:var(--muted)}
+.lede{font-size:15.5px;max-width:74ch}
+strong{color:var(--text);font-weight:650}
+.section{margin:52px 0 0}
+.box{background:var(--s900);border:1px solid var(--s800);border-radius:10px;padding:15px 17px;margin:16px 0}
+.box.b{border-left:3px solid var(--blue)}
+.box.a{border-left:3px solid var(--amber)}
+.box-t{font-size:10.5px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--blue);margin-bottom:6px}
+.box.a .box-t{color:#fcd34d}
+table{width:100%;border-collapse:collapse;font-size:12.5px;margin:14px 0}
+th{text-align:left;font-size:9.5px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--faint);padding:7px 9px;border-bottom:1px solid var(--s800)}
+td{padding:8px 9px;border-bottom:1px solid rgba(42,45,52,.5);color:var(--muted);vertical-align:top}
+td b{color:var(--text);font-weight:600}
+.pill{display:inline-block;font-size:9px;font-weight:700;padding:2px 7px;border-radius:4px;letter-spacing:.03em;white-space:nowrap}
+.pill.exists{background:rgba(34,197,94,.2);color:#86efac}
+.pill.extend{background:rgba(59,130,246,.2);color:#93bbfd}
+.pill.new{background:rgba(249,115,22,.2);color:#fdba74}
+.stub{background:rgba(245,158,11,.12);border:1px solid rgba(245,158,11,.35);border-radius:10px;padding:14px 17px;margin:0 0 26px}
+.stub-t{font-size:10.5px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#fcd34d;margin-bottom:5px}
+.stub p{margin:0;color:#e8d9b5}
+ul{margin:0 0 11px;padding-left:19px;color:var(--muted)}
+li{margin-bottom:5px}
+.ft{margin-top:56px;padding-top:14px;border-top:1px solid var(--s800);font-size:11px;color:var(--faint)}
+a{color:#93bbfd;text-decoration:none}
+.nav{font-size:12px;margin-bottom:22px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="nav"><a href="/">← demo home</a> · <a href="/concepts/billing-coding/billing-and-coding.html">billing &amp; coding →</a></div>
+
+  <h1>Outpatient OPPE</h1>
+  <p class="lede">Ongoing Professional Practice Evaluation for the outpatient neurology line — continuous, exception-based review of clinician performance rather than a periodic chart-pull scramble.</p>
+
+  <div class="stub">
+    <div class="stub-t">Placeholder — not yet written</div>
+    <p>This page is a deliberate stub. It exists so the concept has a home and a link from the demo hub; the content below is a frame for the real write-up, not the write-up itself. Nothing here is wired to an engine, and no figures, metrics, or scoring rules have been decided.</p>
+  </div>
+
+  <div class="section">
+    <h2>What this is for</h2>
+    <h3>The problem shape</h3>
+    <p>OPPE is a standing regulatory obligation, and today it is satisfied by periodic manual chart review — expensive, retrospective, and sampled thinly enough that it rarely changes anyone's practice. The interesting question is whether the same review can run <strong>continuously and by exception</strong>, surfacing only the cases that actually warrant a human reviewer's attention.</p>
+    <p>That is the same operating principle already used elsewhere in this demo: the machine does the sweep, a clinician adjudicates the exceptions, and the reviewer's judgment feeds back into the rubric.</p>
+  </div>
+
+  <div class="section">
+    <h2>Frame</h2>
+    <h3>What would need to exist</h3>
+    <table>
+      <tr><th>Piece</th><th>Status</th><th>Note</th></tr>
+      <tr><td><b>Case sampling</b></td><td><span class="pill new">NEW</span></td><td>Which encounters enter review, and on what cadence. Exception-driven, not random-sample.</td></tr>
+      <tr><td><b>Review rubric</b></td><td><span class="pill new">NEW</span></td><td>The dimensions a reviewer scores. Must be defined by clinicians before anything is built against it.</td></tr>
+      <tr><td><b>Reviewer surface</b></td><td><span class="pill extend">EXTEND</span></td><td>A blind-review queue with structured feedback — conceptually adjacent to the audit tooling that already exists.</td></tr>
+      <tr><td><b>Inter-rater calibration</b></td><td><span class="pill new">NEW</span></td><td>Overlapping assignments so reviewer drift is measurable rather than assumed.</td></tr>
+      <tr><td><b>Trend reporting</b></td><td><span class="pill new">NEW</span></td><td>Per-clinician and per-cohort movement over time — the actual OPPE deliverable.</td></tr>
+    </table>
+  </div>
+
+  <div class="section">
+    <h2>Open questions</h2>
+    <div class="box a">
+      <div class="box-t">Needs a decision before this page becomes real</div>
+      <ul>
+        <li>What are the scored dimensions, and who signs off on the rubric?</li>
+        <li>What triggers a case into review — a quality signal, a random sample, or a clinician flag?</li>
+        <li>Is the output advisory to the clinician, or does it feed a formal credentialing record? The two imply very different accuracy bars.</li>
+        <li>How does this relate to the FPPE side of the same program — shared surface, or separate?</li>
+        <li>What is the evidence standard for a finding, and what is the appeal path for a contested one?</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="section">
+    <h2>Deliberately not here</h2>
+    <p>No sample scores, no clinician names, no synthetic performance data. Fabricated numbers on a page like this get quoted back as if they were real, and a performance-evaluation surface is the worst possible place for that to happen. The figures arrive when the rubric does.</p>
+  </div>
+
+  <div class="ft">
+    Concept placeholder · not a product · not wired to any engine · no PHI.
+    Created 2026-07-24 as a stub to be filled in.
+  </div>
+</div>
+</body>
+</html>

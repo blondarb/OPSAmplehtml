@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { Bot, ClipboardList, Workflow, Layers, Sparkles, Orbit } from 'lucide-react'
+import { Bot, ClipboardList, Workflow, Layers, Sparkles, Orbit, Gauge, Receipt } from 'lucide-react'
 import PlatformShell from '@/components/layout/PlatformShell'
 import HeroSection from '@/components/homepage/HeroSection'
 import JourneyTrack from '@/components/homepage/JourneyTrack'
@@ -133,6 +133,34 @@ export default function Home() {
                 <span className="block text-sm font-semibold text-white">Synapse 3.0?</span>
                 <span className="block text-xs text-slate-400">
                   The parked acute time-rail exploration that seeded One Surface — kept for provenance.
+                </span>
+              </span>
+            </a>
+            <a
+              href="/concepts/oppe/outpatient-oppe.html"
+              className="flex items-center gap-3 rounded-xl border border-slate-700 bg-slate-800/60 px-5 py-4 transition hover:border-emerald-500 hover:bg-slate-800"
+            >
+              <span className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-emerald-500/15">
+                <Gauge size={20} className="text-emerald-300" />
+              </span>
+              <span>
+                <span className="block text-sm font-semibold text-white">Outpatient OPPE</span>
+                <span className="block text-xs text-slate-400">
+                  Continuous, exception-based practice evaluation instead of a periodic chart-pull. Placeholder — frame only.
+                </span>
+              </span>
+            </a>
+            <a
+              href="/concepts/billing-coding/billing-and-coding.html"
+              className="flex items-center gap-3 rounded-xl border border-slate-700 bg-slate-800/60 px-5 py-4 transition hover:border-rose-500 hover:bg-slate-800"
+            >
+              <span className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-rose-500/15">
+                <Receipt size={20} className="text-rose-300" />
+              </span>
+              <span>
+                <span className="block text-sm font-semibold text-white">Billing &amp; Coding</span>
+                <span className="block text-xs text-slate-400">
+                  Code capture and documentation sufficiency at the point of care. Placeholder — frame only.
                 </span>
               </span>
             </a>
