@@ -313,7 +313,7 @@ describe('canonical no-cloud production-path PDF/paste parity', () => {
     )
     expect(normalizedMarkup(pdfMarkup)).toBe(normalizedMarkup(pasteMarkup))
     for (const markup of [pdfMarkup, pasteMarkup]) {
-      expect(markup).toContain('Triage Recommendation')
+      expect(markup).toContain('How this was scored')
       expect(markup).toContain('Emergency evaluation now')
       expect(markup).toContain('Closed-loop emergency action')
       expect(markup).toContain('Missing information — active action remains')

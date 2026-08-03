@@ -137,18 +137,22 @@ describe('triage page single-referral contract', () => {
 
   it('keeps referral inputs mounted through review and wires an explicit governed new-referral boundary', () => {
     const inputRenderScope = scope(
-      "{(pageState === 'input'",
-      '{/* Review state */}',
+      'aria-label="Referral input"',
+      '{/* Result pane */}',
     )
     const startNewScope = scope(
       'function handleStartNewReferral()',
       '// Cancel in-flight AI requests',
     )
 
-    expect(inputRenderScope).toContain("pageState === 'review'")
+    // Two-pane layout: the input panel is mounted UNCONDITIONALLY (no
+    // pageState gate wraps it — a strictly stronger guarantee than the old
+    // mounted-through-review rule) and only its visibility toggles, hidden
+    // during extraction review.
     expect(inputRenderScope).toContain('ref={triageInputPanelRef}')
+    expect(inputRenderScope).not.toContain("{(pageState === 'input'")
     expect(inputRenderScope).toContain(
-      "pageState === 'triaging' || pageState === 'review'",
+      "display: pageState === 'review' ? 'none' : undefined",
     )
     expect(pageSource).toContain(
       'onStartNewReferral={handleStartNewReferral}',

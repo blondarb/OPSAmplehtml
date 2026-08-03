@@ -61,17 +61,17 @@ export default function PhysicianOverridePanel({ sessionId, currentTier }: Props
     return (
       <div style={{
         padding: '12px 16px',
-        background: 'rgba(22, 163, 74, 0.1)',
-        border: '1px solid #16A34A',
-        borderRadius: '8px',
+        background: 'var(--nn-accent-wash)',
+        border: '1px solid var(--nn-accent)',
+        borderRadius: 'var(--nn-radius)',
         display: 'flex',
         alignItems: 'center',
         gap: '8px',
       }}>
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#16A34A" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--nn-accent)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
           <polyline points="20 6 9 17 4 12" />
         </svg>
-        <span style={{ color: '#16A34A', fontSize: '0.85rem', fontWeight: 500 }}>
+        <span style={{ color: 'var(--nn-accent-ink)', fontSize: 'var(--nn-fs-sm)', fontWeight: 500 }}>
           Escalation recorded: {selectedTier && TIER_DISPLAY[selectedTier].label}
         </span>
       </div>
@@ -80,8 +80,8 @@ export default function PhysicianOverridePanel({ sessionId, currentTier }: Props
 
   return (
     <div style={{
-      border: '1px solid #334155',
-      borderRadius: '8px',
+      border: '1px solid var(--nn-line)',
+      borderRadius: 'var(--nn-radius)',
       overflow: 'hidden',
     }}>
       <button
@@ -89,10 +89,10 @@ export default function PhysicianOverridePanel({ sessionId, currentTier }: Props
         style={{
           width: '100%',
           padding: '12px 16px',
-          background: '#1e293b',
+          background: 'var(--nn-surface-2)',
           border: 'none',
-          color: '#94a3b8',
-          fontSize: '0.8rem',
+          color: 'var(--nn-ink-2)',
+          fontSize: 'var(--nn-fs-sm)',
           fontWeight: 500,
           cursor: 'pointer',
           display: 'flex',
@@ -103,6 +103,7 @@ export default function PhysicianOverridePanel({ sessionId, currentTier }: Props
         Clinician Escalation
         <svg
           width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"
+          aria-hidden="true"
           style={{ transform: expanded ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.2s' }}
         >
           <polyline points="6 9 12 15 18 9" />
@@ -110,24 +111,17 @@ export default function PhysicianOverridePanel({ sessionId, currentTier }: Props
       </button>
 
       {expanded && (
-        <div style={{ padding: '16px', background: '#0f172a' }}>
+        <div style={{ padding: '16px', background: 'var(--nn-surface)' }}>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
             <div>
-              <label style={{ color: '#94a3b8', fontSize: '0.75rem', display: 'block', marginBottom: '4px' }}>
+              <label htmlFor="nn-override-tier" className="nn-label">
                 Higher Urgency Tier
               </label>
               <select
+                id="nn-override-tier"
                 value={selectedTier}
                 onChange={(e) => setSelectedTier(e.target.value as TriageTier)}
-                style={{
-                  width: '100%',
-                  padding: '8px 12px',
-                  borderRadius: '6px',
-                  background: '#1e293b',
-                  color: '#e2e8f0',
-                  border: '1px solid #475569',
-                  fontSize: '0.85rem',
-                }}
+                className="nn-select"
               >
                 <option value="">Select tier...</option>
                 {escalationTiers.map(t => (
@@ -137,21 +131,14 @@ export default function PhysicianOverridePanel({ sessionId, currentTier }: Props
             </div>
 
             <div>
-              <label style={{ color: '#94a3b8', fontSize: '0.75rem', display: 'block', marginBottom: '4px' }}>
+              <label htmlFor="nn-override-reason" className="nn-label">
                 Reason for Override
               </label>
               <select
+                id="nn-override-reason"
                 value={selectedReason}
                 onChange={(e) => setSelectedReason(e.target.value as OverrideCategory)}
-                style={{
-                  width: '100%',
-                  padding: '8px 12px',
-                  borderRadius: '6px',
-                  background: '#1e293b',
-                  color: '#e2e8f0',
-                  border: '1px solid #475569',
-                  fontSize: '0.85rem',
-                }}
+                className="nn-select"
               >
                 <option value="">Select reason...</option>
                 {OVERRIDE_CATEGORIES.map(c => (
@@ -161,23 +148,13 @@ export default function PhysicianOverridePanel({ sessionId, currentTier }: Props
             </div>
 
             {error && (
-              <p style={{ color: '#DC2626', fontSize: '0.8rem', margin: 0 }}>{error}</p>
+              <p style={{ color: 'var(--nn-t1)', fontSize: 'var(--nn-fs-sm)', margin: 0 }}>{error}</p>
             )}
 
             <button
               onClick={handleSubmit}
               disabled={!selectedTier || !selectedReason || submitting}
-              style={{
-                padding: '10px 20px',
-                borderRadius: '8px',
-                background: (!selectedTier || !selectedReason) ? '#334155' : '#EA580C',
-                color: '#fff',
-                border: 'none',
-                fontSize: '0.85rem',
-                fontWeight: 600,
-                cursor: (!selectedTier || !selectedReason) ? 'not-allowed' : 'pointer',
-                opacity: submitting ? 0.6 : 1,
-              }}
+              className="nn-btn"
             >
               {submitting ? 'Submitting...' : 'Escalate Priority'}
             </button>

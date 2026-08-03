@@ -105,30 +105,30 @@ export default function FileUploadZone({
         onDragLeave={handleDragLeave}
         onClick={() => !disabled && inputRef.current?.click()}
         style={{
-          border: `2px dashed ${dragOver ? '#0D9488' : '#475569'}`,
-          borderRadius: '12px',
+          border: `2px dashed ${dragOver ? 'var(--nn-accent)' : 'var(--nn-line)'}`,
+          borderRadius: 'var(--nn-radius)',
           padding: '32px 24px',
           textAlign: 'center',
           cursor: disabled ? 'not-allowed' : 'pointer',
-          backgroundColor: dragOver ? 'rgba(13, 148, 136, 0.08)' : disabled ? '#0f172a' : '#1e293b',
+          backgroundColor: dragOver ? 'var(--nn-accent-wash)' : disabled ? 'var(--nn-surface-2)' : 'var(--nn-surface)',
           transition: 'all 0.2s ease',
           opacity: disabled ? 0.5 : 1,
         }}
       >
         <div style={{ marginBottom: '8px' }}>
-          <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke={dragOver ? '#0D9488' : '#94a3b8'} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+          <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke={dragOver ? 'var(--nn-accent)' : 'var(--nn-ink-3)'} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
             <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
             <polyline points="17 8 12 3 7 8" />
             <line x1="12" y1="3" x2="12" y2="15" />
           </svg>
         </div>
-        <p style={{ color: '#e2e8f0', fontWeight: 500, marginBottom: '4px', margin: '0 0 4px 0' }}>
+        <p style={{ color: 'var(--nn-ink)', fontWeight: 500, marginBottom: '4px', margin: '0 0 4px 0' }}>
           {dragOver ? 'Drop referral file here' : 'Drag & drop a referral file here'}
         </p>
-        <p style={{ color: '#94a3b8', fontSize: '0.85rem', marginBottom: '12px', margin: '0 0 12px 0' }}>
+        <p style={{ color: 'var(--nn-ink-3)', fontSize: 'var(--nn-fs-sm)', marginBottom: '12px', margin: '0 0 12px 0' }}>
           or click to browse
         </p>
-        <p style={{ color: '#64748b', fontSize: '0.75rem', margin: 0 }}>
+        <p style={{ color: 'var(--nn-ink-3)', fontSize: 'var(--nn-fs-xs)', margin: 0 }}>
           PDF, DOCX, or TXT &mdash; one referral packet up to {FILE_CONSTRAINTS.MAX_FILE_SIZE_DISPLAY}
         </p>
         <input
@@ -145,7 +145,7 @@ export default function FileUploadZone({
       {errors.length > 0 && (
         <div style={{ marginTop: '8px' }}>
           {errors.map((err, i) => (
-            <p key={i} style={{ color: '#EF4444', fontSize: '0.8rem', marginBottom: '2px', margin: '0 0 2px 0' }}>
+            <p key={i} className="nn-alert" style={{ margin: '0 0 6px' }}>
               {err}
             </p>
           ))}
@@ -165,9 +165,9 @@ export default function FileUploadZone({
                   alignItems: 'center',
                   justifyContent: 'space-between',
                   padding: '8px 12px',
-                  borderRadius: '8px',
-                  backgroundColor: '#1e293b',
-                  border: '1px solid #334155',
+                  borderRadius: 'var(--nn-radius)',
+                  backgroundColor: 'var(--nn-surface-2)',
+                  border: '1px solid var(--nn-line)',
                 }}
               >
                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0 }}>
@@ -187,15 +187,15 @@ export default function FileUploadZone({
                     {badge.label}
                   </span>
                   <span style={{
-                    fontSize: '0.85rem',
-                    color: '#e2e8f0',
+                    fontSize: 'var(--nn-fs-sm)',
+                    color: 'var(--nn-ink)',
                     overflow: 'hidden',
                     textOverflow: 'ellipsis',
                     whiteSpace: 'nowrap',
                   }}>
                     {file.name}
                   </span>
-                  <span style={{ fontSize: '0.75rem', color: '#64748b', flexShrink: 0 }}>
+                  <span style={{ fontSize: 'var(--nn-fs-xs)', color: 'var(--nn-ink-3)', flexShrink: 0 }}>
                     {formatFileSize(file.size)}
                   </span>
                 </div>
@@ -206,7 +206,7 @@ export default function FileUploadZone({
                     background: 'none',
                     border: 'none',
                     cursor: disabled ? 'not-allowed' : 'pointer',
-                    color: '#94a3b8',
+                    color: 'var(--nn-ink-3)',
                     fontSize: '18px',
                     padding: '0 4px',
                     lineHeight: 1,
@@ -215,7 +215,7 @@ export default function FileUploadZone({
                   }}
                   title="Remove file"
                 >
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                     <line x1="18" y1="6" x2="6" y2="18" />
                     <line x1="6" y1="6" x2="18" y2="18" />
                   </svg>
@@ -223,7 +223,7 @@ export default function FileUploadZone({
               </div>
             )
           })}
-          <p style={{ fontSize: '0.75rem', color: '#64748b', textAlign: 'right', margin: 0 }}>
+          <p style={{ fontSize: 'var(--nn-fs-xs)', color: 'var(--nn-ink-3)', textAlign: 'right', margin: 0 }}>
             Referral file selected
           </p>
         </div>

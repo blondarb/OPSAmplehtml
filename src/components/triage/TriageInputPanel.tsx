@@ -184,9 +184,6 @@ const TriageInputPanel = forwardRef<TriageInputPanelHandle, Props>(
   const textInput = assessReferralTextInput(text)
   const isLongNote = textInput.requiresExtraction
   const hasFiles = uploadedFiles.length === 1
-  const needsExtraction =
-    (activeMode === 'paste' && textInput.canSubmit) ||
-    (activeMode === 'upload' && hasFiles)
 
   function beginReferralLifecycle(
     event: 'clear' | 'source_replacement',
@@ -337,22 +334,17 @@ const TriageInputPanel = forwardRef<TriageInputPanelHandle, Props>(
   }
 
   return (
-    <div style={{
-      background: '#0f172a',
-      borderRadius: '12px',
-      border: '1px solid #334155',
-      padding: '24px',
-    }}>
+    <div>
       {/* Header row */}
       <div style={{
         display: 'flex',
         justifyContent: 'space-between',
         alignItems: 'center',
-        marginBottom: '16px',
+        marginBottom: '14px',
         flexWrap: 'wrap',
         gap: '8px',
       }}>
-        <h2 style={{ color: '#e2e8f0', fontSize: '1rem', fontWeight: 600, margin: 0 }}>
+        <h2 className="nn-card-title" style={{ margin: 0 }}>
           {activeMode === 'paste'
             ? 'Paste Referral Note or Intake Summary'
             : 'Upload Referral File'}
@@ -370,32 +362,13 @@ const TriageInputPanel = forwardRef<TriageInputPanelHandle, Props>(
       </div>
 
       {/* Tab switcher */}
-      <div style={{
-        display: 'flex',
-        gap: '4px',
-        marginBottom: '16px',
-        background: '#1e293b',
-        borderRadius: '8px',
-        padding: '4px',
-        width: 'fit-content',
-      }}>
+      <div className="nn-tabs" role="tablist" aria-label="Referral input mode">
         <button
           onClick={() => handleInputModeChange('paste')}
           disabled={loading}
-          style={{
-            padding: '8px 20px',
-            borderRadius: '6px',
-            border: 'none',
-            fontSize: '0.85rem',
-            fontWeight: 500,
-            cursor: loading ? 'not-allowed' : 'pointer',
-            background: activeMode === 'paste' ? '#334155' : 'transparent',
-            color: activeMode === 'paste' ? '#e2e8f0' : '#94a3b8',
-            transition: 'all 0.15s ease',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '6px',
-          }}
+          role="tab"
+          aria-selected={activeMode === 'paste'}
+          className={`nn-tab${activeMode === 'paste' ? ' on' : ''}`}
         >
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2" />
@@ -406,20 +379,9 @@ const TriageInputPanel = forwardRef<TriageInputPanelHandle, Props>(
         <button
           onClick={() => handleInputModeChange('upload')}
           disabled={loading}
-          style={{
-            padding: '8px 20px',
-            borderRadius: '6px',
-            border: 'none',
-            fontSize: '0.85rem',
-            fontWeight: 500,
-            cursor: loading ? 'not-allowed' : 'pointer',
-            background: activeMode === 'upload' ? '#334155' : 'transparent',
-            color: activeMode === 'upload' ? '#e2e8f0' : '#94a3b8',
-            transition: 'all 0.15s ease',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '6px',
-          }}
+          role="tab"
+          aria-selected={activeMode === 'upload'}
+          className={`nn-tab${activeMode === 'upload' ? ' on' : ''}`}
         >
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
@@ -429,7 +391,7 @@ const TriageInputPanel = forwardRef<TriageInputPanelHandle, Props>(
           Upload Referral File
           {hasFiles && activeMode !== 'upload' && (
             <span style={{
-              backgroundColor: '#EA580C',
+              backgroundColor: 'var(--nn-accent)',
               color: '#fff',
               fontSize: '0.65rem',
               fontWeight: 700,
@@ -453,46 +415,30 @@ const TriageInputPanel = forwardRef<TriageInputPanelHandle, Props>(
             placeholder="Paste referral note, intake summary, or describe the clinical scenario..."
             rows={8}
             disabled={loading}
-            style={{
-              width: '100%',
-              padding: '14px',
-              borderRadius: '8px',
-              background: '#1e293b',
-              color: '#e2e8f0',
-              border: '1px solid #475569',
-              fontSize: '0.9rem',
-              lineHeight: 1.6,
-              resize: 'vertical',
-              minHeight: '160px',
-              fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif",
-              boxSizing: 'border-box',
-              opacity: loading ? 0.5 : 1,
-            }}
+            aria-label="Referral note"
+            className="nn-textarea"
+            style={{ opacity: loading ? 0.6 : 1 }}
           />
 
           {/* Character count */}
-          <div style={{
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-            marginTop: '8px',
-          }}>
-            <span style={{
-              color: pasteOverLimit
-                ? '#F87171'
-                : textInput.belowMinimum
-                  ? '#94a3b8'
-                  : '#16A34A',
-              fontSize: '0.75rem',
-            }}>
+          <div className="nn-count">
+            <span
+              className="nn-num"
+              style={{
+                color: pasteOverLimit
+                  ? 'var(--nn-t1)'
+                  : textInput.belowMinimum
+                    ? 'var(--nn-ink-3)'
+                    : 'var(--nn-accent-ink)',
+              }}
+            >
               {charCount.toLocaleString()}/{FILE_CONSTRAINTS.MAX_TEXT_LENGTH.toLocaleString()} characters
               {charCount > 0 && textInput.belowMinimum &&
                 ` (minimum ${MIN_REFERRAL_TEXT_LENGTH} required)`}
             </span>
             {isLongNote && !pasteOverLimit && (
               <span style={{
-                color: '#0D9488',
-                fontSize: '0.75rem',
+                color: 'var(--nn-accent-ink)',
                 display: 'flex',
                 alignItems: 'center',
                 gap: '4px',
@@ -507,19 +453,7 @@ const TriageInputPanel = forwardRef<TriageInputPanelHandle, Props>(
             )}
           </div>
           {pasteOverLimit && !textInput.exceedsVerifiedPacketLimit && (
-            <div
-              role="alert"
-              style={{
-                marginTop: '8px',
-                padding: '10px 12px',
-                borderRadius: '6px',
-                border: '1px solid #DC2626',
-                background: 'rgba(220, 38, 38, 0.12)',
-                color: '#FECACA',
-                fontSize: '0.78rem',
-                lineHeight: 1.5,
-              }}
-            >
+            <div role="alert" className="nn-alert">
               This note is {charCount.toLocaleString()} characters — over the{' '}
               {FILE_CONSTRAINTS.MAX_TEXT_LENGTH.toLocaleString()}-character limit for pasted
               text. Nothing was truncated. Shorten the paste, or upload the full packet as a
@@ -527,38 +461,14 @@ const TriageInputPanel = forwardRef<TriageInputPanelHandle, Props>(
             </div>
           )}
           {textInput.canRunSafetyScreen && (
-            <div
-              role="alert"
-              style={{
-                marginTop: '8px',
-                padding: '10px 12px',
-                borderRadius: '6px',
-                border: '1px solid #D97706',
-                background: 'rgba(217, 119, 6, 0.12)',
-                color: '#FDE68A',
-                fontSize: '0.78rem',
-                lineHeight: 1.5,
-              }}
-            >
+            <div role="alert" className="nn-note" style={{ marginTop: 10, marginBottom: 0 }}>
               This note is too short for outpatient scoring. Run the server
               safety check so explicit emergency or same-day language is not
               missed; a negative check will still require more information.
             </div>
           )}
           {textInput.exceedsVerifiedPacketLimit && (
-            <div
-              role="alert"
-              style={{
-                marginTop: '8px',
-                padding: '10px 12px',
-                borderRadius: '6px',
-                border: '1px solid #DC2626',
-                background: 'rgba(220, 38, 38, 0.12)',
-                color: '#FECACA',
-                fontSize: '0.78rem',
-                lineHeight: 1.5,
-              }}
-            >
+            <div role="alert" className="nn-alert">
               This referral exceeds the verified packet limit. Nothing was
               truncated; keep it on manual review and use the controlled
               large-packet ingestion workflow.
@@ -585,10 +495,10 @@ const TriageInputPanel = forwardRef<TriageInputPanelHandle, Props>(
           marginTop: '8px',
           padding: '6px 10px',
           borderRadius: '6px',
-          background: 'rgba(234, 88, 12, 0.1)',
-          border: '1px solid rgba(234, 88, 12, 0.3)',
-          fontSize: '0.8rem',
-          color: '#fdba74',
+          background: 'var(--nn-accent-wash)',
+          border: '1px solid var(--nn-accent)',
+          fontSize: 'var(--nn-fs-sm)',
+          color: 'var(--nn-accent-ink)',
           display: 'flex',
           alignItems: 'center',
           gap: '6px',
@@ -604,13 +514,10 @@ const TriageInputPanel = forwardRef<TriageInputPanelHandle, Props>(
       {/* Metadata toggle */}
       <button
         onClick={() => setShowMetadata(!showMetadata)}
+        aria-expanded={showMetadata}
+        className="nn-btn--quiet"
         style={{
           marginTop: '12px',
-          background: 'transparent',
-          border: 'none',
-          color: '#94a3b8',
-          fontSize: '0.8rem',
-          cursor: 'pointer',
           display: 'flex',
           alignItems: 'center',
           gap: '4px',
@@ -635,8 +542,9 @@ const TriageInputPanel = forwardRef<TriageInputPanelHandle, Props>(
           flexWrap: 'wrap',
         }}>
           <div style={{ flex: '1 1 100px' }}>
-            <label style={{ color: '#94a3b8', fontSize: '0.75rem', display: 'block', marginBottom: '4px' }}>Age</label>
+            <label htmlFor="nn-triage-age" className="nn-label">Age</label>
             <input
+              id="nn-triage-age"
               type="number"
               min={0}
               max={130}
@@ -644,32 +552,16 @@ const TriageInputPanel = forwardRef<TriageInputPanelHandle, Props>(
               value={age}
               onChange={(e) => handleAgeChange(e.target.value)}
               placeholder="e.g., 65"
-              style={{
-                width: '100%',
-                padding: '8px 12px',
-                borderRadius: '6px',
-                background: '#1e293b',
-                color: '#e2e8f0',
-                border: '1px solid #475569',
-                fontSize: '0.85rem',
-                boxSizing: 'border-box',
-              }}
+              className="nn-input"
             />
           </div>
           <div style={{ flex: '1 1 120px' }}>
-            <label style={{ color: '#94a3b8', fontSize: '0.75rem', display: 'block', marginBottom: '4px' }}>Sex</label>
+            <label htmlFor="nn-triage-sex" className="nn-label">Sex</label>
             <select
+              id="nn-triage-sex"
               value={sex}
               onChange={(e) => handleSexChange(e.target.value)}
-              style={{
-                width: '100%',
-                padding: '8px 12px',
-                borderRadius: '6px',
-                background: '#1e293b',
-                color: '#e2e8f0',
-                border: '1px solid #475569',
-                fontSize: '0.85rem',
-              }}
+              className="nn-select"
             >
               <option value="">Not specified</option>
               <option value="Male">Male</option>
@@ -677,14 +569,14 @@ const TriageInputPanel = forwardRef<TriageInputPanelHandle, Props>(
               <option value="Other">Other</option>
             </select>
           </div>
-          <p style={{ flex: '1 1 100%', color: '#94a3b8', fontSize: '0.72rem', margin: 0 }}>
+          <p className="nn-hint" style={{ flex: '1 1 100%', margin: 0 }}>
             Referring-provider type is unavailable until a reviewed provenance schema can persist and verify its source.
           </p>
         </div>
       )}
 
       {metadataError && (
-        <div role="alert" style={{ marginTop: '12px', color: '#FCA5A5', fontSize: '0.78rem' }}>
+        <div role="alert" style={{ marginTop: '12px', color: 'var(--nn-t1)', fontSize: 'var(--nn-fs-sm)' }}>
           {metadataError}
         </div>
       )}
@@ -699,22 +591,8 @@ const TriageInputPanel = forwardRef<TriageInputPanelHandle, Props>(
         <button
           onClick={handleSubmit}
           disabled={!canSubmit}
-          style={{
-            padding: '12px 32px',
-            borderRadius: '8px',
-            background: canSubmit
-              ? (needsExtraction ? '#0D9488' : '#EA580C')
-              : '#334155',
-            color: '#fff',
-            border: 'none',
-            fontSize: '0.9rem',
-            fontWeight: 600,
-            cursor: canSubmit ? 'pointer' : 'not-allowed',
-            opacity: loading ? 0.6 : 1,
-            display: 'flex',
-            alignItems: 'center',
-            gap: '8px',
-          }}
+          className="nn-btn"
+          style={{ opacity: loading ? 0.7 : 1 }}
         >
           {loading ? (
             <>
@@ -729,36 +607,12 @@ const TriageInputPanel = forwardRef<TriageInputPanelHandle, Props>(
         </button>
 
         {loading && onCancel ? (
-          <button
-            onClick={onCancel}
-            style={{
-              padding: '12px 20px',
-              borderRadius: '8px',
-              background: 'transparent',
-              color: '#f87171',
-              border: '1px solid #DC2626',
-              fontSize: '0.85rem',
-              fontWeight: 500,
-              cursor: 'pointer',
-            }}
-          >
+          <button onClick={onCancel} className="nn-btn nn-btn--sec">
             Cancel
           </button>
         ) : (
           ((activeMode === 'paste' && text.length > 0) || (activeMode === 'upload' && hasFiles)) && !loading && (
-            <button
-              onClick={handleReset}
-              style={{
-                padding: '12px 20px',
-                borderRadius: '8px',
-                background: 'transparent',
-                color: '#94a3b8',
-                border: '1px solid #475569',
-                fontSize: '0.85rem',
-                fontWeight: 500,
-                cursor: 'pointer',
-              }}
-            >
+            <button onClick={handleReset} className="nn-btn nn-btn--sec">
               Clear
             </button>
           )

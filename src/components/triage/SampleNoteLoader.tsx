@@ -34,26 +34,14 @@ export default function SampleNoteLoader({ onSelect }: Props) {
     <div ref={ref} style={{ position: 'relative', display: 'inline-block' }}>
       <button
         onClick={() => setOpen(!open)}
-        style={{
-          padding: '8px 16px',
-          borderRadius: '8px',
-          background: '#334155',
-          color: '#e2e8f0',
-          border: '1px solid #475569',
-          fontSize: '0.8rem',
-          fontWeight: 500,
-          cursor: 'pointer',
-          display: 'flex',
-          alignItems: 'center',
-          gap: '6px',
-        }}
+        className="nn-btn nn-btn--sec"
       >
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
           <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
           <polyline points="14 2 14 8 20 8" />
         </svg>
         Load Sample
-        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
           <polyline points="6 9 12 15 18 9" />
         </svg>
       </button>
@@ -67,10 +55,10 @@ export default function SampleNoteLoader({ onSelect }: Props) {
           width: '380px',
           maxHeight: '400px',
           overflowY: 'auto',
-          background: '#1e293b',
-          border: '1px solid #475569',
-          borderRadius: '8px',
-          boxShadow: '0 8px 32px rgba(0,0,0,0.4)',
+          background: 'var(--nn-surface)',
+          border: '1px solid var(--nn-line)',
+          borderRadius: 'var(--nn-radius)',
+          boxShadow: '0 4px 16px rgba(20,24,26,0.08)',
           zIndex: 50,
         }}>
           {SAMPLE_NOTES.map((note) => {
@@ -88,11 +76,11 @@ export default function SampleNoteLoader({ onSelect }: Props) {
                   padding: '10px 14px',
                   background: 'transparent',
                   border: 'none',
-                  borderBottom: '1px solid #334155',
+                  borderBottom: '1px solid var(--nn-line-2)',
                   cursor: 'pointer',
                   textAlign: 'left',
-                  color: '#e2e8f0',
-                  fontSize: '0.8rem',
+                  color: 'var(--nn-ink)',
+                  fontSize: 'var(--nn-fs-sm)',
                 }}
               >
                 {tierConfig && (

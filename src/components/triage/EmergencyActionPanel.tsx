@@ -124,37 +124,36 @@ export default function EmergencyActionPanel({
   return (
     <section
       aria-label="Emergency action workflow"
+      className="nn-flag"
       style={{
         marginBottom: '16px',
         padding: '16px',
-        borderRadius: '8px',
-        border: '2px solid #dc2626',
-        background: 'rgba(127, 29, 29, 0.2)',
+        border: '2px solid var(--nn-t1)',
       }}
     >
-      <h3 style={{ margin: 0, color: '#fee2e2', fontSize: '0.95rem' }}>
+      <h3 style={{ margin: 0, color: 'var(--nn-t1)', fontSize: 'var(--nn-fs-base)' }}>
         Closed-loop emergency action
       </h3>
-      <p style={{ color: '#fecaca', fontSize: '0.78rem', lineHeight: 1.5 }}>
+      <p style={{ color: 'var(--nn-t1)', fontSize: 'var(--nn-fs-xs)', lineHeight: 1.5 }}>
         Acknowledging an alert does not close this action. Record ownership,
         contact evidence, and a confirmed disposition. Outpatient scheduling
         remains locked.
       </p>
 
       {error && (
-        <div role="alert" style={{ color: '#fef2f2', fontSize: '0.78rem' }}>
+        <div role="alert" style={{ color: 'var(--nn-t1)', fontSize: 'var(--nn-fs-xs)' }}>
           {error}
         </div>
       )}
 
       {actions === null && !error && (
-        <div style={{ color: '#cbd5e1', fontSize: '0.78rem' }}>
+        <div style={{ color: 'var(--nn-ink-2)', fontSize: 'var(--nn-fs-xs)' }}>
           Loading the durable action record…
         </div>
       )}
 
       {actions?.length === 0 && (
-        <div role="alert" style={{ color: '#fef2f2', fontSize: '0.78rem' }}>
+        <div role="alert" style={{ color: 'var(--nn-t1)', fontSize: 'var(--nn-fs-xs)' }}>
           No durable emergency action was found. Maintain the manual hold and
           escalate to the triage team immediately.
         </div>
@@ -167,8 +166,8 @@ export default function EmergencyActionPanel({
               display: 'flex',
               flexWrap: 'wrap',
               gap: '8px',
-              color: '#e2e8f0',
-              fontSize: '0.75rem',
+              color: 'var(--nn-ink)',
+              fontSize: 'var(--nn-fs-xs)',
             }}
           >
             <span>Action: {latest.id}</span>
@@ -178,7 +177,7 @@ export default function EmergencyActionPanel({
           </div>
 
           {latest.status === 'closed' ? (
-            <div style={{ marginTop: '12px', color: '#86efac', fontSize: '0.78rem' }}>
+            <div style={{ marginTop: '12px', color: 'var(--nn-ink)', fontSize: 'var(--nn-fs-xs)' }}>
               Emergency action closed with disposition evidence
               {latest.closureCode ? ` (${latest.closureCode.replace(/_/g, ' ')})` : ''}.
               The triage workflow remains locked until final clinician review.
@@ -189,17 +188,18 @@ export default function EmergencyActionPanel({
                 type="button"
                 disabled={busy || Boolean(latest.ownerUserId)}
                 onClick={() => void command(latest.id, 'claim')}
-                style={{ marginTop: '12px', padding: '8px 12px' }}
+                className="nn-btn"
+                style={{ marginTop: '12px' }}
               >
                 {latest.ownerUserId ? 'Action claimed' : 'Claim emergency action'}
               </button>
 
-              <details style={{ marginTop: '14px', color: '#e2e8f0' }}>
-                <summary style={{ cursor: 'pointer', fontSize: '0.8rem' }}>
+              <details style={{ marginTop: '14px', color: 'var(--nn-ink)' }}>
+                <summary style={{ cursor: 'pointer', fontSize: 'var(--nn-fs-sm)' }}>
                   Record contact attempt
                 </summary>
                 <div style={{ display: 'grid', gap: '8px', marginTop: '10px' }}>
-                  <select value={channel} onChange={(event) => setChannel(event.target.value)}>
+                  <select value={channel} onChange={(event) => setChannel(event.target.value)} className="nn-select">
                     <option value="patient_phone">Patient phone</option>
                     <option value="caregiver_phone">Caregiver phone</option>
                     <option value="referring_provider">Referring provider</option>
@@ -216,6 +216,7 @@ export default function EmergencyActionPanel({
                         event.target.value as EmergencyContactOutcome,
                       )
                     }
+                    className="nn-select"
                   >
                     <option value="instructions_delivered">Instructions delivered</option>
                     <option value="handoff_initiated">Handoff initiated</option>
@@ -231,12 +232,16 @@ export default function EmergencyActionPanel({
                     value={instruction}
                     onChange={(event) => setInstruction(event.target.value)}
                     placeholder="Exact instruction given"
+                    className="nn-textarea"
+                    style={{ minHeight: '70px', fontFamily: 'var(--nn-font)', fontSize: 'var(--nn-fs-sm)' }}
                   />
                   <textarea
                     aria-label="Contact outcome summary"
                     value={outcomeSummary}
                     onChange={(event) => setOutcomeSummary(event.target.value)}
                     placeholder="What happened and who confirmed it"
+                    className="nn-textarea"
+                    style={{ minHeight: '70px', fontFamily: 'var(--nn-font)', fontSize: 'var(--nn-fs-sm)' }}
                   />
                   <button
                     type="button"
@@ -254,20 +259,22 @@ export default function EmergencyActionPanel({
                         outcome_summary: outcomeSummary,
                       })
                     }}
+                    className="nn-btn"
                   >
                     Save contact evidence
                   </button>
                 </div>
               </details>
 
-              <details style={{ marginTop: '14px', color: '#e2e8f0' }}>
-                <summary style={{ cursor: 'pointer', fontSize: '0.8rem' }}>
+              <details style={{ marginTop: '14px', color: 'var(--nn-ink)' }}>
+                <summary style={{ cursor: 'pointer', fontSize: 'var(--nn-fs-sm)' }}>
                   Close after confirmed disposition
                 </summary>
                 <div style={{ display: 'grid', gap: '8px', marginTop: '10px' }}>
                   <select
                     value={dispositionCode}
                     onChange={(event) => setDispositionCode(event.target.value)}
+                    className="nn-select"
                   >
                     <option value="emergency_evaluation_handoff_confirmed">Emergency evaluation handoff confirmed</option>
                     <option value="emergency_services_handoff_confirmed">Emergency services handoff confirmed</option>
@@ -280,18 +287,22 @@ export default function EmergencyActionPanel({
                     value={dispositionEvidence}
                     onChange={(event) => setDispositionEvidence(event.target.value)}
                     placeholder="Evidence supporting the disposition"
+                    className="nn-textarea"
+                    style={{ minHeight: '70px', fontFamily: 'var(--nn-font)', fontSize: 'var(--nn-fs-sm)' }}
                   />
                   <input
                     aria-label="Recipient or agency"
                     value={recipientOrAgency}
                     onChange={(event) => setRecipientOrAgency(event.target.value)}
                     placeholder="Recipient or agency"
+                    className="nn-input"
                   />
                   <input
                     aria-label="Destination"
                     value={destination}
                     onChange={(event) => setDestination(event.target.value)}
                     placeholder="Destination"
+                    className="nn-input"
                   />
                   <button
                     type="button"
@@ -311,6 +322,7 @@ export default function EmergencyActionPanel({
                         destination,
                       })
                     }}
+                    className="nn-btn nn-btn--danger"
                   >
                     Close with disposition evidence
                   </button>

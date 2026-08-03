@@ -1,5 +1,6 @@
 'use client'
 
+import '@/styles/neuro-navigator.css'
 import { useState, useRef, useEffect } from 'react'
 import { flushSync } from 'react-dom'
 import type {
@@ -27,6 +28,7 @@ import TriageInputPanel, {
   type TriageInputPanelHandle,
 } from '@/components/triage/TriageInputPanel'
 import TriageOutputPanel from '@/components/triage/TriageOutputPanel'
+import TriageProgress from '@/components/triage/TriageProgress'
 import ExtractionReviewPanel from '@/components/triage/ExtractionReviewPanel'
 import DisclaimerBanner from '@/components/triage/DisclaimerBanner'
 import ExtractionIngressSafetyAlert, {
@@ -613,54 +615,25 @@ export default function TriagePage() {
     <FeatureSubHeader
       title="Neuro Navigator"
       icon={Brain}
-      accentColor="#F59E0B"
+      accentColor="#12706e"
       showDemo={false}
       nextStep={{ label: 'Physician Workspace', route: '/physician' }}
     />
-    <div style={{
-      minHeight: '100vh',
-      background: 'linear-gradient(135deg, #0f172a 0%, #1e293b 100%)',
-      fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif",
-    }}>
-
-      {/* Main content */}
-      <div style={{
-        maxWidth: '800px',
-        margin: '0 auto',
-        padding: '32px 24px',
-      }}>
-        {/* Intro text */}
-        <div style={{ marginBottom: '24px', textAlign: 'center' }}>
-          <p style={{
-            color: '#94a3b8',
-            fontSize: '0.85rem',
-            lineHeight: 1.6,
-            maxWidth: '600px',
-            margin: '0 auto',
-          }}>
+    <div className="nn">
+      <div className="nn-container">
+        <div className="nn-intro">
+          <p>
             Paste a referral note or upload one referral packet. The AI scores five fixed dimensions with published
             weights, and the weighted total maps to a triage tier. Borderline notes may score differently across runs;
             tier boundaries and red-flag overrides do not. Every recommendation shows its full score breakdown.
           </p>
           <Link
             href="/triage/validate"
-            style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '6px',
-              marginTop: '12px',
-              padding: '6px 14px',
-              background: 'rgba(139, 92, 246, 0.1)',
-              border: '1px solid rgba(139, 92, 246, 0.3)',
-              borderRadius: '6px',
-              color: '#8B5CF6',
-              fontSize: '0.75rem',
-              fontWeight: 500,
-              textDecoration: 'none',
-            }}
+            className="nn-link"
+            style={{ display: 'inline-flex', alignItems: 'center', gap: 6, whiteSpace: 'nowrap' }}
           >
-            <ClipboardCheck size={13} />
-            Independent Reviewers — Click Here for Validation Study
+            <ClipboardCheck size={13} aria-hidden="true" />
+            Independent reviewers — validation study
           </Link>
         </div>
 
@@ -686,132 +659,98 @@ export default function TriagePage() {
           />
         )}
 
-        {/* Keep intake mounted through triage and extraction review so Back preserves the exact source and metadata. */}
-        {(pageState === 'input' || pageState === 'extracting' || pageState === 'triaging' || pageState === 'review') && (
-          <div style={{ display: pageState === 'triaging' || pageState === 'review' ? 'none' : undefined }}>
-            <TriageInputPanel
-              ref={triageInputPanelRef}
-              onSubmit={handleSubmit}
-              loading={isInputLoading}
-              onSubmitFiles={handleSubmitFiles}
-              inputMode={inputMode}
-              onInputModeChange={setInputMode}
-              loadingMessage={loadingMessage}
-              onCancel={isInputLoading ? handleCancel : undefined}
-              onReferralLifecycle={handleReferralLifecycle}
-            />
+        {/* Two-pane layout: the referral stays beside the recommendation so a
+            clinician sees the note and the reasoning together (brief Part 3). */}
+        <div className="nn-panes">
+          {/* Input pane — kept mounted through every state so Back / Try
+              Another / source replacement preserve the exact source and
+              metadata. Hidden only during extraction review, which takes the
+              full-width row below. */}
+          <section className="nn-pane" aria-label="Referral input">
+            <h2 className="nn-eyebrow">Referral</h2>
+            <div style={{ display: pageState === 'review' ? 'none' : undefined }}>
+              <TriageInputPanel
+                ref={triageInputPanelRef}
+                onSubmit={handleSubmit}
+                loading={isInputLoading}
+                onSubmitFiles={handleSubmitFiles}
+                inputMode={inputMode}
+                onInputModeChange={setInputMode}
+                loadingMessage={loadingMessage}
+                onCancel={isInputLoading ? handleCancel : undefined}
+                onReferralLifecycle={handleReferralLifecycle}
+              />
 
-            {/* Error message */}
-            {error && (
-              <div style={{
-                marginTop: '16px',
-                padding: '14px 16px',
-                background: 'rgba(220, 38, 38, 0.1)',
-                border: '1px solid #DC2626',
-                borderRadius: '8px',
-                display: 'flex',
-                alignItems: 'flex-start',
-                gap: '8px',
-              }}>
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#DC2626" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0, marginTop: '1px' }}>
-                  <circle cx="12" cy="12" r="10" />
-                  <line x1="15" y1="9" x2="9" y2="15" />
-                  <line x1="9" y1="9" x2="15" y2="15" />
-                </svg>
-                <p style={{ color: '#fca5a5', fontSize: '0.85rem', margin: 0, lineHeight: 1.5 }}>
+              {error && (
+                <div role="alert" className="nn-alert" style={{ marginTop: 14 }}>
                   {error}
-                </p>
+                </div>
+              )}
+
+              <div style={{ marginTop: 14 }}>
+                <DisclaimerBanner />
+              </div>
+            </div>
+          </section>
+
+          {/* Result pane */}
+          <section className="nn-pane nn-pane--result" aria-label="Recommendation">
+            <h2 className="nn-eyebrow">Recommendation</h2>
+
+            {pageState === 'input' && !result && (
+              <div className="nn-placeholder">
+                The tier, its score breakdown, subspecialty routing, and
+                pre-visit workup appear here once a referral is triaged.
               </div>
             )}
 
-            <DisclaimerBanner />
-          </div>
-        )}
+            {(pageState === 'extracting' || pageState === 'triaging') && (
+              <TriageProgress
+                mode={pageState}
+                detail={
+                  pageState === 'extracting' && longPacketProgress
+                    ? formatLongPacketProgress(longPacketProgress)
+                    : undefined
+                }
+                onCancel={handleCancel}
+              />
+            )}
 
-        {/* Review state */}
-        {pageState === 'review' && extraction && (
-          <>
-            <ExtractionReviewPanel
-              extraction={extraction}
-              originalText={originalText}
-              onApprove={handleApproveExtraction}
-              onBack={handleBackFromReview}
-              approvalBlockedReason={coordinatedExtraction?.decision.approvalBlockedReason ?? undefined}
-            />
-
-            {/* Error message */}
-            {error && (
-              <div style={{
-                marginTop: '16px',
-                padding: '14px 16px',
-                background: 'rgba(220, 38, 38, 0.1)',
-                border: '1px solid #DC2626',
-                borderRadius: '8px',
-                display: 'flex',
-                alignItems: 'flex-start',
-                gap: '8px',
-              }}>
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#DC2626" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0, marginTop: '1px' }}>
-                  <circle cx="12" cy="12" r="10" />
-                  <line x1="15" y1="9" x2="9" y2="15" />
-                  <line x1="9" y1="9" x2="15" y2="15" />
-                </svg>
-                <p style={{ color: '#fca5a5', fontSize: '0.85rem', margin: 0, lineHeight: 1.5 }}>
-                  {error}
-                </p>
+            {pageState === 'review' && (
+              <div className="nn-placeholder">
+                Confirm the extracted clinical summary below to continue to
+                scoring.
               </div>
             )}
 
-            <DisclaimerBanner />
-          </>
-        )}
+            {pageState === 'result' && result && (
+              <TriageOutputPanel result={result} onTryAnother={handleTryAnother} />
+            )}
+          </section>
 
-        {/* Triaging state (standalone loading) */}
-        {pageState === 'triaging' && !result && (
-          <div style={{
-            background: '#0f172a',
-            borderRadius: '12px',
-            border: '1px solid #334155',
-            padding: '48px 24px',
-            textAlign: 'center',
-          }}>
-            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#EA580C" strokeWidth="2" style={{ animation: 'spin 1s linear infinite', marginBottom: '16px' }}>
-              <path d="M21 12a9 9 0 1 1-6.219-8.56" />
-            </svg>
-            <p style={{ color: '#e2e8f0', fontSize: '0.95rem', fontWeight: 500, margin: '0 0 4px' }}>
-              Scoring triage dimensions...
-            </p>
-            <p style={{ color: '#94a3b8', fontSize: '0.8rem', margin: '0 0 16px' }}>
-              The AI is analyzing clinical features and generating a recommendation.
-            </p>
-            <button
-              onClick={handleCancel}
-              style={{
-                padding: '8px 24px',
-                borderRadius: '8px',
-                background: 'transparent',
-                color: '#94a3b8',
-                border: '1px solid #475569',
-                fontSize: '0.8rem',
-                fontWeight: 500,
-                cursor: 'pointer',
-              }}
-            >
-              Cancel
-            </button>
-            <style>{`
-              @keyframes spin {
-                from { transform: rotate(0deg); }
-                to { transform: rotate(360deg); }
-              }
-            `}</style>
-          </div>
-        )}
+          {/* Extraction review — full-width row beneath both panes */}
+          {pageState === 'review' && extraction && (
+            <section className="nn-pane nn-pane--full" aria-label="Extraction review">
+              <ExtractionReviewPanel
+                extraction={extraction}
+                originalText={originalText}
+                onApprove={handleApproveExtraction}
+                onBack={handleBackFromReview}
+                approvalBlockedReason={coordinatedExtraction?.decision.approvalBlockedReason ?? undefined}
+              />
 
-        {/* Result state */}
-        {pageState === 'result' && result && (
-          <TriageOutputPanel result={result} onTryAnother={handleTryAnother} />
-        )}
+              {error && (
+                <div role="alert" className="nn-alert" style={{ marginTop: 14 }}>
+                  {error}
+                </div>
+              )}
+
+              <div style={{ marginTop: 14 }}>
+                <DisclaimerBanner />
+              </div>
+            </section>
+          )}
+        </div>
       </div>
     </div>
     </PlatformShell>

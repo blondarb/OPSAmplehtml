@@ -1,5 +1,7 @@
 'use client'
 
+import { useEffect } from 'react'
+
 interface Props {
   open: boolean
   onClose: () => void
@@ -64,63 +66,54 @@ const DIMENSIONS = [
 ]
 
 const TIER_THRESHOLDS = [
-  { range: 'Emergent Override', tier: 'Emergent', time: 'Redirect to ED', color: '#DC2626' },
-  { range: '4.0 – 5.0', tier: 'Urgent', time: 'Within 1 week', color: '#DC2626' },
-  { range: '3.0 – 3.9', tier: 'Semi-urgent', time: 'Within 2 weeks', color: '#EA580C' },
-  { range: '2.5 – 2.9', tier: 'Routine-priority', time: 'Within 4-6 weeks', color: '#CA8A04' },
-  { range: '1.5 – 2.4', tier: 'Routine', time: 'Within 8-12 weeks', color: '#16A34A' },
-  { range: '1.0 – 1.4', tier: 'Non-urgent', time: 'Within 6 months', color: '#2563EB' },
+  { range: 'Emergent Override', tier: 'Tier 1 · Emergent', time: 'Redirect to ED', colorVar: 'var(--nn-t1)', bgVar: 'var(--nn-t1-bg)' },
+  { range: '4.0 – 5.0', tier: 'Tier 2 · Urgent', time: 'Within 1 week', colorVar: 'var(--nn-t2)', bgVar: 'var(--nn-t2-bg)' },
+  { range: '3.0 – 3.9', tier: 'Tier 3 · Semi-urgent', time: 'Within 2 weeks', colorVar: 'var(--nn-t3)', bgVar: 'var(--nn-t3-bg)' },
+  { range: '2.5 – 2.9', tier: 'Tier 4 · Routine-priority', time: 'Within 4-6 weeks', colorVar: 'var(--nn-t4)', bgVar: 'var(--nn-t4-bg)' },
+  { range: '1.5 – 2.4', tier: 'Tier 5 · Routine', time: 'Within 8-12 weeks', colorVar: 'var(--nn-t5)', bgVar: 'var(--nn-t5-bg)' },
+  { range: '1.0 – 1.4', tier: 'Tier 6 · Non-urgent', time: 'Within 6 months', colorVar: 'var(--nn-t6)', bgVar: 'var(--nn-t6-bg)' },
+  { range: 'Unable to score', tier: 'Tier 7 · Insufficient information', time: 'Return to referrer', colorVar: 'var(--nn-t7)', bgVar: 'var(--nn-t7-bg)' },
 ]
 
 export default function AlgorithmModal({ open, onClose }: Props) {
+  useEffect(() => {
+    if (!open) return
+    function handleKeyDown(e: KeyboardEvent) {
+      if (e.key === 'Escape') onClose()
+    }
+    document.addEventListener('keydown', handleKeyDown)
+    return () => document.removeEventListener('keydown', handleKeyDown)
+  }, [open, onClose])
+
   if (!open) return null
 
   return (
     <div
       onClick={onClose}
-      style={{
-        position: 'fixed',
-        inset: 0,
-        zIndex: 1000,
-        background: 'rgba(0,0,0,0.7)',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        padding: '24px',
-      }}
+      className="nn-modal-backdrop"
     >
       <div
         onClick={(e) => e.stopPropagation()}
-        style={{
-          maxWidth: '720px',
-          width: '100%',
-          maxHeight: '80vh',
-          overflowY: 'auto',
-          background: '#0f172a',
-          borderRadius: '12px',
-          border: '1px solid #334155',
-          padding: '32px',
-        }}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="nn-algorithm-title"
+        className="nn-modal"
       >
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
-          <h2 style={{ color: '#e2e8f0', fontSize: '1.2rem', fontWeight: 700, margin: 0 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+          <h2 id="nn-algorithm-title" style={{ fontSize: 'var(--nn-fs-lg)', fontWeight: 700, margin: 0 }}>
             Triage Algorithm
           </h2>
           <button
             onClick={onClose}
-            style={{
-              background: 'transparent',
-              border: 'none',
-              color: '#94a3b8',
-              cursor: 'pointer',
-              fontSize: '1.2rem',
-            }}
+            aria-label="Close"
+            className="nn-btn--quiet"
+            style={{ fontSize: '1.2rem', lineHeight: 1 }}
           >
             &times;
           </button>
         </div>
 
-        <p style={{ color: '#94a3b8', fontSize: '0.8rem', marginBottom: '20px', lineHeight: 1.5 }}>
+        <p style={{ color: 'var(--nn-ink-2)', fontSize: 'var(--nn-fs-sm)', marginBottom: '16px', lineHeight: 1.55 }}>
           The AI scores each clinical dimension 1-5 against the fixed rubric below. The application
           combines those scores using the published weights and maps the weighted total to a triage
           tier. Red flags and emergent conditions can override the calculated score. The rubric,
@@ -128,28 +121,23 @@ export default function AlgorithmModal({ open, onClose }: Props) {
           of a borderline note may.
         </p>
 
-        <p style={{ color: '#94a3b8', fontSize: '0.75rem', marginBottom: '24px', fontStyle: 'italic' }}>
+        <p className="nn-num" style={{ color: 'var(--nn-ink-3)', fontSize: 'var(--nn-fs-xs)', marginBottom: '20px' }}>
           Formula: (Acuity &times; 0.30) + (Concern &times; 0.25) + (Progression &times; 0.20) + (Impairment &times; 0.15) + (Red Flags &times; 0.10)
         </p>
 
         {/* Dimensions */}
         {DIMENSIONS.map((dim) => (
-          <div key={dim.name} style={{ marginBottom: '20px' }}>
-            <h3 style={{ color: '#e2e8f0', fontSize: '0.85rem', fontWeight: 600, margin: '0 0 8px' }}>
-              {dim.name} <span style={{ color: '#94a3b8', fontWeight: 400 }}>({dim.weight})</span>
+          <div key={dim.name} style={{ marginBottom: '18px' }}>
+            <h3 style={{ fontSize: 'var(--nn-fs-sm)', fontWeight: 650, margin: '0 0 8px', color: 'var(--nn-ink)' }}>
+              {dim.name} <span style={{ color: 'var(--nn-ink-3)', fontWeight: 400 }}>({dim.weight})</span>
             </h3>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
               {dim.criteria.map((c) => (
-                <div key={c.score} style={{ display: 'flex', gap: '10px', fontSize: '0.78rem' }}>
-                  <span style={{
-                    color: '#e2e8f0',
-                    fontWeight: 700,
-                    minWidth: '16px',
-                    textAlign: 'right',
-                  }}>
+                <div key={c.score} style={{ display: 'flex', gap: '10px', fontSize: 'var(--nn-fs-sm)' }}>
+                  <span className="nn-num" style={{ color: 'var(--nn-ink)', fontWeight: 700, minWidth: '16px', textAlign: 'right' }}>
                     {c.score}
                   </span>
-                  <span style={{ color: '#94a3b8' }}>{c.desc}</span>
+                  <span style={{ color: 'var(--nn-ink-2)' }}>{c.desc}</span>
                 </div>
               ))}
             </div>
@@ -157,7 +145,7 @@ export default function AlgorithmModal({ open, onClose }: Props) {
         ))}
 
         {/* Tier mapping */}
-        <h3 style={{ color: '#e2e8f0', fontSize: '0.9rem', fontWeight: 600, margin: '24px 0 12px' }}>
+        <h3 style={{ fontSize: 'var(--nn-fs-base)', fontWeight: 650, margin: '22px 0 12px', color: 'var(--nn-ink)' }}>
           Score &rarr; Tier Mapping
         </h3>
         <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
@@ -166,40 +154,32 @@ export default function AlgorithmModal({ open, onClose }: Props) {
               display: 'flex',
               alignItems: 'center',
               gap: '12px',
-              fontSize: '0.8rem',
+              fontSize: 'var(--nn-fs-sm)',
+              flexWrap: 'wrap',
             }}>
               <span style={{
                 padding: '2px 10px',
                 borderRadius: '4px',
-                background: t.color,
-                color: '#fff',
+                background: t.bgVar,
+                color: t.colorVar,
+                border: `1px solid ${t.colorVar}`,
                 fontWeight: 700,
-                minWidth: '110px',
-                textAlign: 'center',
-                fontSize: '0.7rem',
+                minWidth: '190px',
+                textAlign: 'left',
+                fontSize: 'var(--nn-fs-xs)',
               }}>
                 {t.tier}
               </span>
-              <span style={{ color: '#94a3b8', minWidth: '100px' }}>{t.range}</span>
-              <span style={{ color: '#cbd5e1' }}>{t.time}</span>
+              <span className="nn-num" style={{ color: 'var(--nn-ink-3)', minWidth: '100px' }}>{t.range}</span>
+              <span style={{ color: 'var(--nn-ink-2)' }}>{t.time}</span>
             </div>
           ))}
         </div>
 
         <button
           onClick={onClose}
-          style={{
-            marginTop: '28px',
-            padding: '10px 24px',
-            borderRadius: '8px',
-            background: '#334155',
-            color: '#e2e8f0',
-            border: '1px solid #475569',
-            fontSize: '0.85rem',
-            fontWeight: 500,
-            cursor: 'pointer',
-            width: '100%',
-          }}
+          className="nn-btn nn-btn--sec nn-btn--block"
+          style={{ marginTop: '24px' }}
         >
           Close
         </button>

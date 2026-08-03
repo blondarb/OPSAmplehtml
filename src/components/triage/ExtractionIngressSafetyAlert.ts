@@ -288,13 +288,11 @@ export default function ExtractionIngressSafetyAlert({
     {
       role: 'alert',
       'aria-live': 'assertive',
+      className: 'nn-flag',
       style: {
-        marginBottom: '20px',
+        margin: '0 0 20px',
         padding: '16px',
-        border: '2px solid #DC2626',
-        borderRadius: '10px',
-        background: 'rgba(127, 29, 29, 0.22)',
-        color: '#FEE2E2',
+        border: '2px solid var(--nn-t1)',
       },
     },
     h(
@@ -308,7 +306,7 @@ export default function ExtractionIngressSafetyAlert({
           height: 22,
           viewBox: '0 0 24 24',
           fill: 'none',
-          stroke: '#FCA5A5',
+          stroke: 'var(--nn-t1)',
           strokeWidth: 2,
           strokeLinecap: 'round',
           strokeLinejoin: 'round',
@@ -325,12 +323,12 @@ export default function ExtractionIngressSafetyAlert({
         null,
         h(
           'div',
-          { style: { fontSize: '0.95rem', fontWeight: 700 } },
+          { style: { fontSize: 'var(--nn-fs-base)', fontWeight: 700, color: 'var(--nn-t1)' } },
           heading,
         ),
         h(
           'p',
-          { style: { margin: '4px 0 0', fontSize: '0.84rem', lineHeight: 1.5 } },
+          { style: { margin: '4px 0 0', fontSize: 'var(--nn-fs-sm)', lineHeight: 1.5 } },
           sourceLabel ? `${sourceLabel}: ` : '',
           description,
         ),
@@ -340,7 +338,7 @@ export default function ExtractionIngressSafetyAlert({
               {
                 style: {
                   margin: '8px 0 0',
-                  fontSize: '0.84rem',
+                  fontSize: 'var(--nn-fs-sm)',
                   lineHeight: 1.5,
                   fontWeight: 600,
                 },
@@ -354,7 +352,7 @@ export default function ExtractionIngressSafetyAlert({
               {
                 style: {
                   margin: '8px 0 0',
-                  fontSize: '0.84rem',
+                  fontSize: 'var(--nn-fs-sm)',
                   lineHeight: 1.5,
                   fontWeight: 600,
                 },
@@ -370,7 +368,7 @@ export default function ExtractionIngressSafetyAlert({
               {
                 style: {
                   margin: '8px 0 0',
-                  fontSize: '0.84rem',
+                  fontSize: 'var(--nn-fs-sm)',
                   lineHeight: 1.5,
                   fontWeight: 600,
                 },
@@ -384,7 +382,7 @@ export default function ExtractionIngressSafetyAlert({
               {
                 style: {
                   margin: '8px 0 0',
-                  fontSize: '0.84rem',
+                  fontSize: 'var(--nn-fs-sm)',
                   lineHeight: 1.5,
                   fontWeight: 600,
                 },
@@ -398,7 +396,7 @@ export default function ExtractionIngressSafetyAlert({
               {
                 style: {
                   margin: '8px 0 0',
-                  fontSize: '0.84rem',
+                  fontSize: 'var(--nn-fs-sm)',
                   lineHeight: 1.5,
                   fontWeight: 700,
                 },
@@ -408,7 +406,7 @@ export default function ExtractionIngressSafetyAlert({
           : null,
         h(
           'p',
-          { style: { margin: '8px 0 0', fontSize: '0.78rem', color: '#FCA5A5' } },
+          { style: { margin: '8px 0 0', fontSize: 'var(--nn-fs-xs)', color: 'var(--nn-t1)' } },
           safetyTriageSessionId
             ? `Safety workflow ID: ${safetyTriageSessionId}`
             : 'Safety workflow ID unavailable — maintain the manual safety hold.',
@@ -420,7 +418,7 @@ export default function ExtractionIngressSafetyAlert({
                 style: {
                   marginTop: '12px',
                   paddingTop: '12px',
-                  borderTop: '1px solid rgba(252, 165, 165, 0.45)',
+                  borderTop: '1px solid var(--nn-t1)',
                 },
               },
               h(
@@ -428,7 +426,7 @@ export default function ExtractionIngressSafetyAlert({
                 {
                   style: {
                     margin: '0 0 8px',
-                    fontSize: '0.78rem',
+                    fontSize: 'var(--nn-fs-xs)',
                     lineHeight: 1.5,
                   },
                 },
@@ -441,11 +439,11 @@ export default function ExtractionIngressSafetyAlert({
                   onClick: onStartNewReferral,
                   style: {
                     padding: '8px 12px',
-                    borderRadius: '6px',
-                    border: '1px solid #FCA5A5',
+                    borderRadius: 'var(--nn-radius)',
+                    border: '1px solid var(--nn-t1)',
                     background: 'transparent',
-                    color: '#FEE2E2',
-                    fontSize: '0.78rem',
+                    color: 'var(--nn-t1)',
+                    fontSize: 'var(--nn-fs-xs)',
                     fontWeight: 700,
                     cursor: 'pointer',
                   },

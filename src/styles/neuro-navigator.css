@@ -1,0 +1,531 @@
+/*
+ * Neuro Navigator / Health Interview — shared clinical design system.
+ * Single token source for /triage and /patient/historian (redesign brief Part 2).
+ *
+ * Everything is scoped under `.nn` so the rest of the app (dark slate theme)
+ * is untouched. Visual reference: docs/design/neuro-navigator-reference-mockup.html.
+ *
+ * Rules encoded here:
+ *  - Neutral, low-chroma clinical palette; ONE accent, actions/active states only.
+ *  - Tier colors are lightness-ordered (t1 darkest → t7 lightest) so tiers stay
+ *    distinguishable in grayscale and under color-vision deficiency. Tier is
+ *    clinical information: color is never its only carrier — always pair with
+ *    the tier number, name, and timeframe in text.
+ *  - Type: one family (system stack), five sizes only (xs/sm/base/lg/xl).
+ *  - Elevation: hairline borders + whitespace. No shadows, gradients, or glass.
+ *  - WCAG 2.1 AA: all ink/wash pairs below hold ≥4.5:1 on their surfaces.
+ */
+
+.nn {
+  /* surfaces */
+  --nn-page: #f4f6f7;
+  --nn-surface: #ffffff;
+  --nn-surface-2: #fafbfb;
+  --nn-line: #dfe4e6;
+  --nn-line-2: #eef1f2;
+  /* text */
+  --nn-ink: #14181a;
+  --nn-ink-2: #4a5257;
+  --nn-ink-3: #666f78; /* ≥4.7:1 on page, surface, and surface-2 (AA) */
+  /* brand accent — primary actions and active states ONLY */
+  --nn-accent: #12706e;
+  --nn-accent-ink: #0d5250;
+  --nn-accent-wash: #e8f2f1;
+  /* tiers, lightness-ordered (1 = most acute, darkest) */
+  --nn-t1: #8c1a12; --nn-t1-bg: #fbecea;
+  --nn-t2: #a8500f; --nn-t2-bg: #fdf1e6;
+  --nn-t3: #7d6800; --nn-t3-bg: #fbf6e0;
+  --nn-t4: #3f6b3a; --nn-t4-bg: #eef5ec;
+  --nn-t5: #2b6076; --nn-t5-bg: #eaf2f6;
+  --nn-t6: #4c5966; --nn-t6-bg: #eff2f4;
+  --nn-t7: #5f5f5f; --nn-t7-bg: #f1f1f1;
+  /* type scale — exactly five sizes */
+  --nn-fs-xs: 0.72rem;   /* 11.5px — eyebrows, metadata */
+  --nn-fs-sm: 0.845rem;  /* 13.5px — supporting copy, table text */
+  --nn-fs-base: 0.9375rem; /* 15px — body */
+  --nn-fs-lg: 1.25rem;   /* 20px — section/question headings */
+  --nn-fs-xl: 1.7rem;    /* 27px — the tier name, one per page */
+  --nn-radius: 9px;
+  --nn-font: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+
+  background: var(--nn-page);
+  color: var(--nn-ink);
+  font-family: var(--nn-font);
+  font-size: var(--nn-fs-base);
+  line-height: 1.55;
+  min-height: 100vh;
+}
+
+/* ---------- focus: visible ring on every interactive control ---------- */
+.nn :is(a, button, input, select, textarea, [tabindex]):focus-visible {
+  outline: 2px solid var(--nn-accent);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+.nn :is(input, textarea, select):focus-visible {
+  outline-offset: 1px;
+}
+
+/* ---------- layout ---------- */
+.nn-container {
+  max-width: 1160px;
+  margin: 0 auto;
+  padding: 20px 24px 48px;
+}
+.nn-intro {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+  margin: 0 0 16px;
+}
+.nn-intro p {
+  margin: 0;
+  color: var(--nn-ink-2);
+  font-size: var(--nn-fs-sm);
+  max-width: 760px;
+}
+.nn-panes {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.05fr);
+  background: var(--nn-surface);
+  border: 1px solid var(--nn-line);
+  border-radius: var(--nn-radius);
+}
+.nn-pane {
+  padding: 22px;
+  min-width: 0;
+}
+.nn-pane--result {
+  border-left: 1px solid var(--nn-line);
+  background: var(--nn-surface-2);
+  border-radius: 0 var(--nn-radius) var(--nn-radius) 0;
+}
+.nn-pane--full {
+  grid-column: 1 / -1;
+  border-top: 1px solid var(--nn-line);
+}
+@media (max-width: 860px) {
+  .nn-panes { grid-template-columns: 1fr; }
+  .nn-pane--result {
+    border-left: 0;
+    border-top: 1px solid var(--nn-line);
+    border-radius: 0 0 var(--nn-radius) var(--nn-radius);
+  }
+}
+
+/* ---------- text primitives ---------- */
+.nn-eyebrow {
+  font-size: var(--nn-fs-xs);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--nn-ink-3);
+  font-weight: 700;
+  margin: 0 0 10px;
+}
+.nn-hint {
+  color: var(--nn-ink-3);
+  font-size: var(--nn-fs-xs);
+  margin: 0 0 14px;
+}
+.nn-link {
+  color: var(--nn-accent-ink);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  font-size: var(--nn-fs-sm);
+}
+.nn-num { font-variant-numeric: tabular-nums; }
+
+/* ---------- cards ---------- */
+.nn-card {
+  border: 1px solid var(--nn-line);
+  border-radius: var(--nn-radius);
+  background: var(--nn-surface);
+  padding: 16px 18px;
+  margin: 0 0 14px;
+}
+.nn-card-title {
+  margin: 0 0 3px;
+  font-size: var(--nn-fs-base);
+  font-weight: 650;
+  letter-spacing: -0.01em;
+  color: var(--nn-ink);
+}
+.nn-caveat {
+  border: 1px solid var(--nn-line);
+  border-radius: var(--nn-radius);
+  background: var(--nn-surface-2);
+  padding: 12px 14px;
+  font-size: var(--nn-fs-xs);
+  color: var(--nn-ink-2);
+  margin: 0 0 14px;
+  line-height: 1.5;
+}
+.nn-caveat b, .nn-caveat strong { color: var(--nn-ink); }
+
+/* ---------- buttons ---------- */
+.nn-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 12px 18px;
+  border: 0;
+  border-radius: var(--nn-radius);
+  background: var(--nn-accent);
+  color: #fff;
+  font-family: var(--nn-font);
+  font-size: var(--nn-fs-base);
+  font-weight: 650;
+  letter-spacing: 0.01em;
+  cursor: pointer;
+}
+.nn-btn:hover { background: var(--nn-accent-ink); }
+.nn-btn:disabled {
+  background: var(--nn-line);
+  color: var(--nn-ink-3);
+  cursor: not-allowed;
+}
+.nn-btn--block { width: 100%; }
+.nn-btn--sec {
+  background: var(--nn-surface);
+  color: var(--nn-ink-2);
+  border: 1px solid var(--nn-line);
+  font-weight: 550;
+  padding: 9px 14px;
+  font-size: var(--nn-fs-sm);
+}
+.nn-btn--sec:hover {
+  background: var(--nn-surface);
+  border-color: var(--nn-accent);
+  color: var(--nn-accent-ink);
+}
+.nn-btn--sec:disabled {
+  background: var(--nn-surface-2);
+  color: var(--nn-ink-3);
+  border-color: var(--nn-line-2);
+}
+.nn-btn--danger {
+  background: var(--nn-t1);
+}
+.nn-btn--danger:hover { background: #6e130c; }
+.nn-btn--quiet {
+  background: transparent;
+  border: 0;
+  color: var(--nn-ink-3);
+  font-size: var(--nn-fs-sm);
+  cursor: pointer;
+  padding: 6px 8px;
+}
+.nn-btn--quiet:hover { color: var(--nn-ink); }
+.nn-actions { display: flex; gap: 9px; flex-wrap: wrap; }
+
+/* ---------- tabs (input mode switcher) ---------- */
+.nn-tabs {
+  display: inline-flex;
+  gap: 4px;
+  background: var(--nn-line-2);
+  border-radius: 8px;
+  padding: 3px;
+  margin: 0 0 14px;
+}
+.nn-tab {
+  padding: 7px 16px;
+  border-radius: 6px;
+  border: 0;
+  background: transparent;
+  color: var(--nn-ink-2);
+  font-family: var(--nn-font);
+  font-size: var(--nn-fs-sm);
+  font-weight: 550;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.nn-tab.on {
+  background: var(--nn-surface);
+  color: var(--nn-ink);
+  font-weight: 650;
+  border: 1px solid var(--nn-line);
+}
+.nn-tab:disabled { cursor: not-allowed; color: var(--nn-ink-3); }
+
+/* ---------- form controls ---------- */
+.nn-label {
+  display: block;
+  font-size: var(--nn-fs-xs);
+  color: var(--nn-ink-2);
+  margin-bottom: 5px;
+  font-weight: 600;
+}
+.nn-textarea, .nn-input, .nn-select {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 12px 14px;
+  border: 1px solid var(--nn-line);
+  border-radius: var(--nn-radius);
+  background: var(--nn-surface);
+  color: var(--nn-ink);
+  font-family: var(--nn-font);
+  font-size: var(--nn-fs-base);
+}
+.nn-textarea {
+  min-height: 230px;
+  resize: vertical;
+  font: 0.875rem/1.6 ui-monospace, SFMono-Regular, Menlo, monospace;
+  color: var(--nn-ink);
+}
+.nn-count {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  font-size: var(--nn-fs-xs);
+  color: var(--nn-ink-3);
+  margin: 6px 2px 0;
+}
+
+/* ---------- alerts & notices ---------- */
+.nn-alert {
+  margin-top: 10px;
+  padding: 10px 12px;
+  border-radius: var(--nn-radius);
+  border: 1px solid var(--nn-t1);
+  background: var(--nn-t1-bg);
+  color: var(--nn-t1);
+  font-size: var(--nn-fs-sm);
+  line-height: 1.5;
+}
+.nn-note {
+  margin: 0 0 14px;
+  padding: 12px 14px;
+  border-radius: var(--nn-radius);
+  border: 1px solid var(--nn-t3);
+  background: var(--nn-t3-bg);
+  color: var(--nn-t3);
+  font-size: var(--nn-fs-sm);
+  line-height: 1.5;
+}
+.nn-note h3, .nn-alert h3 {
+  margin: 0 0 4px;
+  font-size: var(--nn-fs-xs);
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+}
+
+/* ---------- red flag / override ---------- */
+.nn-flag {
+  border: 1px solid var(--nn-t1);
+  background: var(--nn-t1-bg);
+  border-radius: var(--nn-radius);
+  padding: 12px 14px;
+  margin: 0 0 14px;
+}
+.nn-flag h4 {
+  margin: 0 0 4px;
+  font-size: var(--nn-fs-xs);
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--nn-t1);
+}
+.nn-flag p, .nn-flag li { margin: 0; font-size: var(--nn-fs-sm); color: var(--nn-t1); }
+.nn-flag ul { margin: 4px 0 0; padding-left: 18px; }
+
+/* ---------- tier card ---------- */
+.nn-tier {
+  border: 1px solid var(--nn-line);
+  border-left: 5px solid var(--nn-tier-color, var(--nn-ink-3));
+  border-radius: var(--nn-radius);
+  background: var(--nn-surface);
+  padding: 16px 18px;
+  margin: 0 0 16px;
+}
+.nn-tier-num {
+  display: inline-block;
+  font-size: var(--nn-fs-xs);
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  color: var(--nn-tier-color);
+  background: var(--nn-tier-bg);
+  border: 1px solid var(--nn-line);
+  border-radius: 4px;
+  padding: 2px 7px;
+  margin-bottom: 8px;
+}
+.nn-tier-name {
+  font-size: var(--nn-fs-xl);
+  font-weight: 750;
+  letter-spacing: -0.02em;
+  line-height: 1.1;
+  color: var(--nn-tier-color);
+  margin: 0 0 3px;
+}
+.nn-tier-time {
+  font-size: var(--nn-fs-base);
+  color: var(--nn-ink-2);
+  margin: 0;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---------- rubric / dimension bars ---------- */
+.nn-dim {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 4px 10px;
+  align-items: baseline;
+  margin: 0 0 11px;
+}
+.nn-dim-name { font-size: var(--nn-fs-sm); color: var(--nn-ink-2); }
+.nn-dim-name sup {
+  font-size: 0.65rem;
+  color: var(--nn-ink-3);
+  font-weight: 600;
+  margin-left: 4px;
+}
+.nn-dim-val {
+  font-size: var(--nn-fs-sm);
+  font-weight: 650;
+  font-variant-numeric: tabular-nums;
+  color: var(--nn-ink);
+}
+.nn-bar {
+  grid-column: 1 / -1;
+  height: 6px;
+  border-radius: 3px;
+  background: var(--nn-line-2);
+  overflow: hidden;
+}
+.nn-bar i {
+  display: block;
+  height: 100%;
+  background: var(--nn-accent);
+  border-radius: 3px;
+}
+.nn-dim-rationale {
+  grid-column: 1 / -1;
+  margin: 2px 0 0;
+  font-size: var(--nn-fs-xs);
+  color: var(--nn-ink-3);
+  line-height: 1.5;
+}
+.nn-total {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  flex-wrap: wrap;
+  border-top: 1px solid var(--nn-line);
+  margin-top: 13px;
+  padding-top: 11px;
+  font-size: var(--nn-fs-sm);
+  color: var(--nn-ink-2);
+}
+.nn-total b { color: var(--nn-ink); font-variant-numeric: tabular-nums; }
+
+/* ---------- key-value + lists ---------- */
+.nn-kv {
+  display: grid;
+  grid-template-columns: 130px 1fr;
+  gap: 9px 14px;
+  font-size: var(--nn-fs-sm);
+  margin: 0;
+}
+.nn-kv dt { color: var(--nn-ink-3); }
+.nn-kv dd { margin: 0; color: var(--nn-ink); }
+.nn-list {
+  margin: 0;
+  padding-left: 19px;
+  font-size: var(--nn-fs-sm);
+  color: var(--nn-ink);
+}
+.nn-list li { margin: 0 0 6px; }
+.nn-list li:last-child { margin-bottom: 0; }
+
+/* ---------- emergent takeover ---------- */
+.nn-emerg {
+  border: 2px solid var(--nn-t1);
+  border-radius: 11px;
+  background: var(--nn-t1-bg);
+  padding: 20px 22px;
+}
+.nn-emerg .nn-tier-num {
+  color: var(--nn-t1);
+  background: var(--nn-surface);
+}
+.nn-emerg .nn-tier-name { color: var(--nn-t1); font-size: calc(var(--nn-fs-xl) * 1.15); }
+.nn-emerg p { font-size: var(--nn-fs-base); color: var(--nn-t1); margin: 10px 0 0; font-weight: 600; line-height: 1.5; }
+
+/* ---------- modal ---------- */
+.nn-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  background: rgba(20, 24, 26, 0.55);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+}
+.nn-modal {
+  max-width: 720px;
+  width: 100%;
+  max-height: 85vh;
+  overflow-y: auto;
+  background: var(--nn-surface);
+  border-radius: 12px;
+  border: 1px solid var(--nn-line);
+  padding: 28px;
+  color: var(--nn-ink);
+}
+
+/* ---------- progress (the 50–60s model call) ---------- */
+.nn-progress { padding: 4px 0; }
+.nn-stage {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 2px;
+  font-size: var(--nn-fs-sm);
+  color: var(--nn-ink-3);
+}
+.nn-stage-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--nn-line);
+  flex: none;
+}
+.nn-stage.done { color: var(--nn-ink-2); }
+.nn-stage.done .nn-stage-dot { background: var(--nn-accent); }
+.nn-stage.active { color: var(--nn-accent-ink); font-weight: 650; }
+.nn-stage.active .nn-stage-dot {
+  background: var(--nn-accent);
+  animation: nn-pulse 1.4s ease-in-out infinite;
+}
+@keyframes nn-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.35; }
+}
+.nn-progress-meta {
+  font-size: var(--nn-fs-xs);
+  color: var(--nn-ink-3);
+  font-variant-numeric: tabular-nums;
+  margin: 10px 0 0;
+}
+
+/* ---------- idle placeholder in the result pane ---------- */
+.nn-placeholder {
+  border: 1px dashed var(--nn-line);
+  border-radius: var(--nn-radius);
+  padding: 28px 20px;
+  text-align: center;
+  color: var(--nn-ink-3);
+  font-size: var(--nn-fs-sm);
+  background: var(--nn-surface);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .nn *, .nn *::before, .nn *::after { animation: none !important; transition: none !important; }
+}

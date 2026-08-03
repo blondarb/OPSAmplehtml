@@ -42,71 +42,27 @@ export default function MissingInformationPanel({
   return (
     <section
       aria-label="Missing information with active triage action"
-      style={{
-        padding: '16px',
-        background: 'rgba(180, 83, 9, 0.12)',
-        borderRadius: '8px',
-        border: '1px solid #D97706',
-      }}
+      className="nn-note"
+      style={{ margin: 0 }}
     >
-      <h3
-        style={{
-          color: '#FDE68A',
-          fontSize: '0.9rem',
-          fontWeight: 700,
-          margin: '0 0 8px',
-        }}
-      >
-        Missing information — active action remains
-      </h3>
+      <h3>Missing information — active action remains</h3>
       {humanReviewHold && (
-        <p
-          style={{
-            color: '#FCD34D',
-            fontSize: '0.8rem',
-            fontWeight: 700,
-            lineHeight: 1.5,
-            margin: '0 0 8px',
-          }}
-        >
+        <p style={{ fontWeight: 700, margin: '0 0 8px' }}>
           Human review hold: reconcile the conflicting source information
           before final disposition.
         </p>
       )}
-      <p
-        style={{
-          color: '#E2E8F0',
-          fontSize: '0.8rem',
-          lineHeight: 1.5,
-          margin: '0 0 8px',
-        }}
-      >
+      <p style={{ margin: '0 0 8px' }}>
         {copy.action} {copy.noDelay}
       </p>
-      <p
-        style={{
-          color: schedulingLocked ? '#FCA5A5' : '#CBD5E1',
-          fontSize: '0.78rem',
-          fontWeight: 700,
-          margin: '0 0 10px',
-        }}
-      >
+      <p style={{ fontWeight: 700, margin: '0 0 10px', color: schedulingLocked ? 'var(--nn-t1)' : undefined }}>
         {schedulingLocked
           ? 'Scheduling remains locked.'
           : 'Scheduling is not currently locked.'}
       </p>
       <ul style={{ margin: 0, paddingLeft: '20px' }}>
         {missingInformation.map((item, index) => (
-          <li
-            key={`${item}-${index}`}
-            style={{
-              color: '#E2E8F0',
-              fontSize: '0.82rem',
-              lineHeight: 1.6,
-              marginBottom:
-                index < missingInformation.length - 1 ? '4px' : 0,
-            }}
-          >
+          <li key={`${item}-${index}`} style={{ marginBottom: index < missingInformation.length - 1 ? '4px' : 0 }}>
             {item}
           </li>
         ))}

@@ -226,8 +226,8 @@ describe('canonical complete-result paste/PDF runtime parity', () => {
       normalizeSafetyMarkup(pdfMarkup),
     )
     for (const markup of [pastedMarkup, pdfMarkup]) {
-      expect(markup).toContain('Triage Recommendation')
-      expect(markup).toContain('Dimension Scores')
+      expect(markup).toContain('How this was scored')
+      expect(markup).toContain('Weighted total')
       expect(markup).toContain('Emergency evaluation now')
       expect(markup).toContain('Closed-loop emergency action')
       expect(markup).toContain('Missing information — active action remains')

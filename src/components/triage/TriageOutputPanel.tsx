@@ -11,6 +11,11 @@ import {
   INSUFFICIENT_DATA_INFORMATION,
   triageOutputPolicy,
 } from '@/lib/triage/triageOutputPolicy'
+import {
+  DIMENSION_PRESENTATION,
+  TIER_COUNT,
+  TIER_PRESENTATION,
+} from '@/lib/triage/tierPresentation'
 import TriageTierBadge from './TriageTierBadge'
 import ClinicalReasons from './ClinicalReasons'
 import RedFlagAlert from './RedFlagAlert'
@@ -64,6 +69,11 @@ export default function TriageOutputPanel({ result, onTryAnother }: Props) {
     (presentationResult.triage_tier === 'insufficient_data' ||
       presentationResult.care_pathway === 'undetermined')
 
+  const tierPresentation = TIER_PRESENTATION[presentationResult.triage_tier]
+  const hasDimensionScores = DIMENSION_PRESENTATION.some(
+    (dim) => presentationResult.dimension_scores?.[dim.key],
+  )
+
   return (
     <>
       {/* Full-screen emergent alert */}
@@ -74,96 +84,12 @@ export default function TriageOutputPanel({ result, onTryAnother }: Props) {
         />
       )}
 
-      <div style={{
-        background: '#0f172a',
-        borderRadius: '12px',
-        border: '1px solid #334155',
-        padding: '24px',
-      }}>
-        {/* Header row */}
-        <div style={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'flex-start',
-          marginBottom: '24px',
-          flexWrap: 'wrap',
-          gap: '12px',
-        }}>
-          <h2 style={{ color: '#e2e8f0', fontSize: '1rem', fontWeight: 600, margin: 0 }}>
-            Triage Recommendation
-          </h2>
-          <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-            <CopyReportButton result={presentationResult} />
-            <button
-              onClick={() => setAlgorithmOpen(true)}
-              style={{
-                padding: '8px 16px',
-                borderRadius: '8px',
-                background: '#334155',
-                color: '#e2e8f0',
-                border: '1px solid #475569',
-                fontSize: '0.8rem',
-                fontWeight: 500,
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '6px',
-              }}
-            >
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <circle cx="12" cy="12" r="10" />
-                <line x1="12" y1="16" x2="12" y2="12" />
-                <line x1="12" y1="8" x2="12.01" y2="8" />
-              </svg>
-              View Algorithm
-            </button>
-            <button
-              onClick={onTryAnother}
-              style={{
-                padding: '8px 16px',
-                borderRadius: '8px',
-                background: '#334155',
-                color: '#e2e8f0',
-                border: '1px solid #475569',
-                fontSize: '0.8rem',
-                fontWeight: 500,
-                cursor: 'pointer',
-              }}
-            >
-              Try Another
-            </button>
-          </div>
-        </div>
-
+      <div>
         <SafetyReviewPanel result={presentationResult} />
         {outputPolicy.safetyConflict && (
-          <div
-            role="alert"
-            style={{
-              marginBottom: '16px',
-              padding: '16px',
-              borderRadius: '8px',
-              border: '2px solid #DC2626',
-              background: 'rgba(127, 29, 29, 0.24)',
-            }}
-          >
-            <h3
-              style={{
-                color: '#FEE2E2',
-                fontSize: '0.95rem',
-                margin: '0 0 6px',
-              }}
-            >
-              Safety conflict — human review hold
-            </h3>
-            <p
-              style={{
-                color: '#FECACA',
-                fontSize: '0.8rem',
-                lineHeight: 1.5,
-                margin: 0,
-              }}
-            >
+          <div role="alert" className="nn-flag">
+            <h4>Safety conflict — human review hold</h4>
+            <p>
               Emergency markers conflict with the projected care pathway.
               Emergency evaluation now remains active; outpatient disposition
               and scheduling remain blocked pending clinician reconciliation.
@@ -171,33 +97,9 @@ export default function TriageOutputPanel({ result, onTryAnother }: Props) {
           </div>
         )}
         {!isEmergent && outputPolicy.insufficientDataHold && (
-          <div
-            role="alert"
-            style={{
-              marginBottom: '16px',
-              padding: '16px',
-              borderRadius: '8px',
-              border: '2px solid #D97706',
-              background: 'rgba(120, 53, 15, 0.22)',
-            }}
-          >
-            <h3
-              style={{
-                color: '#FDE68A',
-                fontSize: '0.95rem',
-                margin: '0 0 6px',
-              }}
-            >
-              Insufficient or undetermined data — human review hold
-            </h3>
-            <p
-              style={{
-                color: '#FCD34D',
-                fontSize: '0.8rem',
-                lineHeight: 1.5,
-                margin: '0 0 6px',
-              }}
-            >
+          <div role="alert" className="nn-note">
+            <h3>Insufficient or undetermined data — human review hold</h3>
+            <p style={{ margin: '0 0 6px' }}>
               {isSameDay
                 ? 'Same-day clinician review remains the active action. '
                 : ''}
@@ -205,14 +107,7 @@ export default function TriageOutputPanel({ result, onTryAnother }: Props) {
               until a clinician reviews the available source evidence and
               resolves the decision-critical gaps.
             </p>
-            <p
-              style={{
-                color: '#FCA5A5',
-                fontSize: '0.78rem',
-                fontWeight: 700,
-                margin: 0,
-              }}
-            >
+            <p style={{ fontWeight: 700, margin: 0, color: 'var(--nn-t1)' }}>
               Scheduling remains locked.
             </p>
           </div>
@@ -231,15 +126,22 @@ export default function TriageOutputPanel({ result, onTryAnother }: Props) {
           </div>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-            {/* Tier badge — centered */}
-            <div style={{ textAlign: 'center', padding: '8px 0' }}>
-              <TriageTierBadge
-                tier={presentationResult.triage_tier}
-                weightedScore={presentationResult.weighted_score}
-                isRedFlagOverride={presentationResult.red_flag_override}
-                timeframeOverride={outputPolicy.timeframe}
-              />
-            </div>
+            {/* Red flags first — an override supersedes the score, so it must
+                read above the score breakdown (brief Part 3). */}
+            <RedFlagAlert redFlags={presentationResult.red_flags} />
+            {presentationResult.red_flags.length > 0 && (
+              <p className="nn-hint" style={{ margin: 0 }}>
+                {RED_FLAG_DISCLAIMER}
+              </p>
+            )}
+
+            {/* Tier — number, name, timeframe; never color alone */}
+            <TriageTierBadge
+              tier={presentationResult.triage_tier}
+              weightedScore={presentationResult.weighted_score}
+              isRedFlagOverride={presentationResult.red_flag_override}
+              timeframeOverride={outputPolicy.timeframe}
+            />
 
             {outputPolicy.showMissingInformation && (
               <MissingInformationPanel
@@ -250,95 +152,67 @@ export default function TriageOutputPanel({ result, onTryAnother }: Props) {
               />
             )}
 
-            {/* Confidence */}
-            <div style={{
-              textAlign: 'center',
-              padding: '4px 0',
-            }}>
-              <span style={{
-                color: presentationResult.confidence === 'high' ? '#16A34A' : presentationResult.confidence === 'moderate' ? '#CA8A04' : '#DC2626',
-                fontSize: '0.85rem',
-                fontWeight: 600,
-              }}>
-                Confidence: {presentationResult.confidence.charAt(0).toUpperCase() + presentationResult.confidence.slice(1)}
-              </span>
-            </div>
-
-            {/* Low confidence disclaimer */}
-            {presentationResult.confidence === 'low' && (
-              <div style={{
-                padding: '10px 14px',
-                background: 'rgba(220, 38, 38, 0.08)',
-                border: '1px solid #DC2626',
-                borderRadius: '8px',
-              }}>
-                <p style={{ color: '#fca5a5', fontSize: '0.8rem', margin: 0, lineHeight: 1.5 }}>
-                  {LOW_CONFIDENCE_DISCLAIMER}
+            {/* How this was scored — the rubric is the credibility of the
+                product: five dimensions, published weights, weighted total,
+                and the mapping to the tier. */}
+            {hasDimensionScores && (
+              <div className="nn-card" style={{ margin: 0 }}>
+                <h3 className="nn-card-title">How this was scored</h3>
+                <p className="nn-hint">
+                  Five fixed dimensions. Weights are published and do not
+                  change between runs.
+                </p>
+                {DIMENSION_PRESENTATION.map(({ key, label, weight }) => {
+                  const dim = presentationResult.dimension_scores?.[key]
+                  if (!dim) return null
+                  return (
+                    <div className="nn-dim" key={key}>
+                      <span className="nn-dim-name">
+                        {label} <sup>{weight}</sup>
+                      </span>
+                      <span className="nn-dim-val">{dim.score} / 5</span>
+                      <span className="nn-bar" aria-hidden="true">
+                        <i style={{ width: `${Math.max(0, Math.min(5, dim.score)) * 20}%` }} />
+                      </span>
+                      {dim.rationale && (
+                        <p className="nn-dim-rationale">{dim.rationale}</p>
+                      )}
+                    </div>
+                  )
+                })}
+                <div className="nn-total">
+                  <span>Weighted total</span>
+                  <b>
+                    {typeof presentationResult.weighted_score === 'number' &&
+                    Number.isFinite(presentationResult.weighted_score)
+                      ? `${presentationResult.weighted_score.toFixed(2)} / 5 → Tier ${tierPresentation.num} of ${TIER_COUNT} — ${tierPresentation.name}`
+                      : `Tier ${tierPresentation.num} of ${TIER_COUNT} — ${tierPresentation.name}`}
+                  </b>
+                </div>
+                {presentationResult.red_flag_override && (
+                  <p style={{ color: 'var(--nn-t1)', fontSize: 'var(--nn-fs-sm)', fontWeight: 600, margin: '8px 0 0' }}>
+                    A red-flag override applied — the override supersedes the
+                    weighted score.
+                  </p>
+                )}
+                <p style={{ marginTop: 10, marginBottom: 0, fontSize: 'var(--nn-fs-sm)', color: 'var(--nn-ink-2)' }}>
+                  Confidence:{' '}
+                  <strong>
+                    {presentationResult.confidence.charAt(0).toUpperCase() + presentationResult.confidence.slice(1)}
+                  </strong>
                 </p>
               </div>
             )}
 
-            {/* Red flag disclaimer */}
-            {presentationResult.red_flags.length > 0 && (
-              <div style={{
-                padding: '10px 14px',
-                background: 'rgba(220, 38, 38, 0.05)',
-                border: '1px solid #991B1B',
-                borderRadius: '8px',
-              }}>
-                <p style={{ color: '#fca5a5', fontSize: '0.8rem', margin: 0, lineHeight: 1.5 }}>
-                  {RED_FLAG_DISCLAIMER}
-                </p>
+            {/* Low confidence disclaimer */}
+            {presentationResult.confidence === 'low' && (
+              <div className="nn-note" style={{ margin: 0 }}>
+                {LOW_CONFIDENCE_DISCLAIMER}
               </div>
             )}
 
             {/* Clinical reasons */}
             <ClinicalReasons reasons={presentationResult.clinical_reasons} />
-
-            {/* Red flags */}
-            <RedFlagAlert redFlags={presentationResult.red_flags} />
-
-            {/* Suggested workup */}
-            {outputPolicy.showPreVisitWorkup && (
-              <>
-                {isSameDay && presentationResult.suggested_workup.length > 0 && (
-                  <div
-                    aria-label="Same-day non-blocking workup notice"
-                    style={{
-                      padding: '12px 14px',
-                      background: 'rgba(217, 119, 6, 0.12)',
-                      border: '1px solid #D97706',
-                      borderRadius: '8px',
-                    }}
-                  >
-                    <h3
-                      style={{
-                        color: '#FDE68A',
-                        fontSize: '0.85rem',
-                        margin: '0 0 4px',
-                      }}
-                    >
-                      Non-blocking workup
-                    </h3>
-                    <p
-                      style={{
-                        color: '#FCD34D',
-                        fontSize: '0.78rem',
-                        lineHeight: 1.5,
-                        margin: 0,
-                      }}
-                    >
-                      Any suggested workup is optional before review and must
-                      not delay same-day clinician review.
-                    </p>
-                  </div>
-                )}
-                <PreVisitWorkup workup={presentationResult.suggested_workup} />
-              </>
-            )}
-
-            {/* Failed therapies */}
-            <FailedTherapiesList therapies={presentationResult.failed_therapies} />
 
             {/* Subspecialty routing */}
             {outputPolicy.showOutpatientRouting && (
@@ -351,59 +225,59 @@ export default function TriageOutputPanel({ result, onTryAnother }: Props) {
               />
             )}
 
-            {/* Dimension scores breakdown */}
-            <div style={{
-              padding: '16px',
-              background: '#1e293b',
-              borderRadius: '8px',
-              border: '1px solid #334155',
-            }}>
-              <h3 style={{ color: '#e2e8f0', fontSize: '0.9rem', fontWeight: 600, margin: '0 0 12px' }}>
-                Dimension Scores
-              </h3>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                {Object.entries(presentationResult.dimension_scores).map(([key, dim]) => (
-                  <div key={key} style={{ display: 'flex', alignItems: 'flex-start', gap: '10px' }}>
-                    <span style={{
-                      color: '#e2e8f0',
-                      fontWeight: 700,
-                      fontSize: '0.85rem',
-                      minWidth: '24px',
-                      textAlign: 'right',
-                    }}>
-                      {dim.score}/5
-                    </span>
-                    <div>
-                      <span style={{ color: '#cbd5e1', fontSize: '0.8rem', fontWeight: 600 }}>
-                        {key.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())}
-                      </span>
-                      <p style={{ color: '#94a3b8', fontSize: '0.78rem', margin: '2px 0 0', lineHeight: 1.5 }}>
-                        {dim.rationale}
-                      </p>
-                    </div>
+            {/* Suggested workup */}
+            {outputPolicy.showPreVisitWorkup && (
+              <>
+                {isSameDay && presentationResult.suggested_workup.length > 0 && (
+                  <div
+                    aria-label="Same-day non-blocking workup notice"
+                    className="nn-note"
+                    style={{ margin: 0 }}
+                  >
+                    <h3>Non-blocking workup</h3>
+                    <p style={{ margin: 0 }}>
+                      Any suggested workup is optional before review and must
+                      not delay same-day clinician review.
+                    </p>
                   </div>
-                ))}
-              </div>
-            </div>
+                )}
+                <PreVisitWorkup workup={presentationResult.suggested_workup} />
+              </>
+            )}
+
+            {/* Failed therapies */}
+            <FailedTherapiesList therapies={presentationResult.failed_therapies} />
 
             {/* Stability caveat — the rubric is fixed; the model's reading is not */}
-            <div style={{
-              padding: '12px 16px',
-              background: 'rgba(30, 41, 59, 0.6)',
-              borderRadius: '8px',
-              border: '1px solid #334155',
-            }}>
-              <p style={{ color: '#94a3b8', fontSize: '0.78rem', lineHeight: 1.5, margin: 0 }}>
-                <span style={{ color: '#cbd5e1', fontWeight: 600 }}>Stability. </span>
-                The five dimensions, their published weights, the tier boundaries, and the
-                red-flag overrides are fixed and do not change between runs. The AI&apos;s reading
-                of a borderline note may vary between runs and can shift the tier on close calls.
-                Final triage decisions rest with the reviewing clinician.
-              </p>
+            <div className="nn-caveat" style={{ margin: 0 }}>
+              <b>Stability. </b>
+              The five dimensions, their published weights, the tier boundaries, and the
+              red-flag overrides are fixed and do not change between runs. The AI&apos;s reading
+              of a borderline note may vary between runs and can shift the tier on close calls.
+              Final triage decisions rest with the reviewing clinician.
             </div>
 
           </div>
         )}
+
+        {/* Actions on the result */}
+        <div className="nn-actions" style={{ marginTop: 16 }}>
+          <CopyReportButton result={presentationResult} />
+          <button
+            onClick={() => setAlgorithmOpen(true)}
+            className="nn-btn nn-btn--sec"
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <circle cx="12" cy="12" r="10" />
+              <line x1="12" y1="16" x2="12" y2="12" />
+              <line x1="12" y1="8" x2="12.01" y2="8" />
+            </svg>
+            View Algorithm
+          </button>
+          <button onClick={onTryAnother} className="nn-btn nn-btn--sec">
+            Try Another
+          </button>
+        </div>
 
         {/* Human review actions remain available even when data is insufficient. */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', marginTop: '16px' }}>

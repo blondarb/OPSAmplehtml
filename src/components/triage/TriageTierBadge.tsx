@@ -1,6 +1,7 @@
 'use client'
 
 import { TriageTier, TIER_DISPLAY } from '@/lib/triage/types'
+import { TIER_COUNT, TIER_PRESENTATION } from '@/lib/triage/tierPresentation'
 
 interface Props {
   tier: TriageTier
@@ -10,6 +11,15 @@ interface Props {
   timeframeOverride?: string
 }
 
+/**
+ * Tier rendering. Tier is clinical information, so color is never its only
+ * carrier: the card always shows the tier number ("Tier N of 7"), the tier
+ * name, and the timeframe as text. Colors come from the lightness-ordered
+ * nn tokens so tiers separate in grayscale and under color-vision deficiency.
+ *
+ * The `compact` variant keeps the legacy TIER_DISPLAY styling — it renders on
+ * the dark validate/batch surfaces outside the nn design system.
+ */
 export default function TriageTierBadge({
   tier,
   weightedScore,
@@ -38,41 +48,32 @@ export default function TriageTierBadge({
     )
   }
 
+  const presentation = TIER_PRESENTATION[tier]
+  const isEmergent = tier === 'emergent'
+
   return (
-    <>
-      {config.pulsing && (
-        <style>{`
-          @keyframes triagePulse {
-            0%, 100% { box-shadow: 0 0 0 0 rgba(220, 38, 38, 0.7); }
-            50% { box-shadow: 0 0 0 12px rgba(220, 38, 38, 0); }
-          }
-        `}</style>
+    <div
+      className={isEmergent ? 'nn-emerg' : 'nn-tier'}
+      style={{
+        ['--nn-tier-color' as string]: presentation.colorVar,
+        ['--nn-tier-bg' as string]: presentation.bgVar,
+        margin: 0,
+        textAlign: 'left',
+      }}
+    >
+      <span className="nn-tier-num nn-num">Tier {presentation.num} of {TIER_COUNT}</span>
+      <p className="nn-tier-name">
+        {isEmergent ? 'Emergent — do not schedule' : presentation.name}
+      </p>
+      <p className="nn-tier-time nn-num">
+        {timeframeOverride ?? config.timeframe}
+        {isRedFlagOverride && ' · Red-flag override'}
+      </p>
+      {!isEmergent && typeof weightedScore === 'number' && Number.isFinite(weightedScore) && (
+        <p style={{ color: 'var(--nn-ink-3)', fontSize: 'var(--nn-fs-xs)', margin: '6px 0 0' }} className="nn-num">
+          Weighted score {weightedScore.toFixed(2)} / 5
+        </p>
       )}
-      <div style={{
-        display: 'inline-flex',
-        flexDirection: 'column',
-        alignItems: 'center',
-        gap: '4px',
-        padding: '16px 32px',
-        borderRadius: '12px',
-        background: config.bgColor,
-        border: `3px solid ${config.borderColor}`,
-        color: config.textColor,
-        animation: config.pulsing ? 'triagePulse 2s ease-in-out infinite' : undefined,
-      }}>
-        <span style={{ fontSize: '1.5rem', fontWeight: 800, letterSpacing: '0.05em' }}>
-          {config.label}
-        </span>
-        <span style={{ fontSize: '0.9rem', fontWeight: 500, opacity: 0.9 }}>
-          {timeframeOverride ?? config.timeframe}
-          {isRedFlagOverride && ' (Red Flag Override)'}
-        </span>
-        {typeof weightedScore === 'number' && Number.isFinite(weightedScore) && (
-          <span style={{ fontSize: '0.75rem', opacity: 0.7, marginTop: '2px' }}>
-            Weighted Score: {weightedScore.toFixed(2)}
-          </span>
-        )}
-      </div>
-    </>
+    </div>
   )
 }

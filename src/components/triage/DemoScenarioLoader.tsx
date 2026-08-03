@@ -200,25 +200,13 @@ function DemoScenarioLoader({ onBeginLoad, onLoadFiles }, forwardedRef) {
       {/* Trigger button */}
       <button
         onClick={() => setOpen(!open)}
-        style={{
-          padding: '8px 16px',
-          borderRadius: '8px',
-          background: '#EA580C',
-          color: '#fff',
-          border: 'none',
-          fontSize: '0.8rem',
-          fontWeight: 600,
-          cursor: 'pointer',
-          display: 'flex',
-          alignItems: 'center',
-          gap: '6px',
-        }}
+        className="nn-btn nn-btn--sec"
       >
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
           <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" />
         </svg>
         Try a Demo
-        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
           <polyline points="6 9 12 15 18 9" />
         </svg>
       </button>
@@ -234,10 +222,10 @@ function DemoScenarioLoader({ onBeginLoad, onLoadFiles }, forwardedRef) {
           maxHeight: '520px',
           display: 'flex',
           flexDirection: 'column',
-          background: '#0f172a',
-          border: '1px solid #475569',
-          borderRadius: '12px',
-          boxShadow: '0 8px 32px rgba(0,0,0,0.5)',
+          background: 'var(--nn-surface)',
+          border: '1px solid var(--nn-line)',
+          borderRadius: 'var(--nn-radius)',
+          boxShadow: '0 4px 16px rgba(20,24,26,0.08)',
           zIndex: 50,
           overflow: 'hidden',
         }}>
@@ -246,7 +234,7 @@ function DemoScenarioLoader({ onBeginLoad, onLoadFiles }, forwardedRef) {
             display: 'flex',
             gap: '2px',
             padding: '8px 8px 0',
-            borderBottom: '1px solid #334155',
+            borderBottom: '1px solid var(--nn-line)',
             flexShrink: 0,
           }}>
             {DEMO_CATEGORIES.map((cat) => (
@@ -258,12 +246,12 @@ function DemoScenarioLoader({ onBeginLoad, onLoadFiles }, forwardedRef) {
                   padding: '8px 4px 10px',
                   borderRadius: '6px 6px 0 0',
                   border: 'none',
-                  fontSize: '0.75rem',
+                  fontSize: 'var(--nn-fs-xs)',
                   fontWeight: 600,
                   cursor: 'pointer',
-                  background: activeTab === cat.key ? '#1e293b' : 'transparent',
-                  color: activeTab === cat.key ? '#e2e8f0' : '#94a3b8',
-                  borderBottom: activeTab === cat.key ? '2px solid #EA580C' : '2px solid transparent',
+                  background: activeTab === cat.key ? 'var(--nn-accent-wash)' : 'transparent',
+                  color: activeTab === cat.key ? 'var(--nn-accent-ink)' : 'var(--nn-ink-3)',
+                  borderBottom: activeTab === cat.key ? '2px solid var(--nn-accent)' : '2px solid transparent',
                   transition: 'all 0.15s ease',
                 }}
               >
@@ -288,13 +276,13 @@ function DemoScenarioLoader({ onBeginLoad, onLoadFiles }, forwardedRef) {
                     padding: '12px 14px',
                     background: 'transparent',
                     border: 'none',
-                    borderBottom: '1px solid #1e293b',
+                    borderBottom: '1px solid var(--nn-line-2)',
                     cursor: 'pointer',
                     textAlign: 'left',
-                    color: '#e2e8f0',
+                    color: 'var(--nn-ink)',
                     transition: 'background 0.1s',
                   }}
-                  onMouseEnter={(e) => (e.currentTarget.style.background = '#1e293b')}
+                  onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--nn-line-2)')}
                   onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
                 >
                   {/* Tier badge */}
@@ -316,21 +304,21 @@ function DemoScenarioLoader({ onBeginLoad, onLoadFiles }, forwardedRef) {
                   {/* Content */}
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '2px', flexWrap: 'wrap' }}>
-                      <span style={{ fontWeight: 600, fontSize: '0.82rem' }}>
+                      <span style={{ fontWeight: 600, fontSize: 'var(--nn-fs-sm)' }}>
                         {scenario.patientName}
                       </span>
-                      <span style={{ color: '#94a3b8', fontSize: '0.75rem' }}>
+                      <span style={{ color: 'var(--nn-ink-3)', fontSize: 'var(--nn-fs-xs)' }}>
                         {scenario.age}{scenario.sex}
                       </span>
-                      <span style={{ color: '#64748b', fontSize: '0.7rem' }}>
+                      <span style={{ color: 'var(--nn-ink-3)', fontSize: 'var(--nn-fs-xs)' }}>
                         {scenario.referringSpecialty}
                       </span>
                       {scenario.files.length > 1 && (
                         <span style={{
                           padding: '1px 6px',
                           borderRadius: '10px',
-                          background: 'rgba(234, 88, 12, 0.2)',
-                          color: '#fdba74',
+                          background: 'var(--nn-line-2)',
+                          color: 'var(--nn-ink-2)',
                           fontSize: '0.6rem',
                           fontWeight: 700,
                         }}>
@@ -338,13 +326,13 @@ function DemoScenarioLoader({ onBeginLoad, onLoadFiles }, forwardedRef) {
                         </span>
                       )}
                     </div>
-                    <p style={{ color: '#94a3b8', fontSize: '0.75rem', margin: 0, lineHeight: 1.4 }}>
+                    <p style={{ color: 'var(--nn-ink-3)', fontSize: 'var(--nn-fs-xs)', margin: 0, lineHeight: 1.4 }}>
                       {scenario.clinicalHighlight}
                     </p>
                   </div>
 
                   {/* Arrow */}
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#64748b" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0, marginTop: '4px' }}>
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--nn-ink-3)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" style={{ flexShrink: 0, marginTop: '4px' }}>
                     <polyline points="9 18 15 12 9 6" />
                   </svg>
                 </button>
