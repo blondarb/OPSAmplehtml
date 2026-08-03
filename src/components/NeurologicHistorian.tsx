@@ -1,5 +1,6 @@
 'use client'
 
+import '@/styles/neuro-navigator.css'
 import { useState, useCallback, useEffect, useRef } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
 import { useRealtimeSession } from '@/hooks/useRealtimeSession'
@@ -7,7 +8,7 @@ import { DEMO_SCENARIOS, type DemoScenario, type HistorianStructuredOutput, type
 import { getTenantClient } from '@/lib/tenant'
 import HistorianReportView from './HistorianReportView'
 import HistorianConsentDisclosure from './HistorianConsentDisclosure'
-import LocalizerPanel from './LocalizerPanel'
+import HistorianInterviewStep from './historian/HistorianInterviewStep'
 import PlatformShell from '@/components/layout/PlatformShell'
 import FeatureSubHeader from '@/components/layout/FeatureSubHeader'
 import VoiceProviderToggle from '@/components/voice/VoiceProviderToggle'
@@ -25,6 +26,11 @@ interface SessionConfig {
   patientContext?: string
 }
 
+/** The interview's question cap, mirrored from the historian system prompt. */
+const QUESTION_CAP = 23
+
+const STEP_LABELS = ['Your visit', 'Consent & identity', 'Interview', 'Summary'] as const
+
 function formatTime(seconds: number): string {
   const m = Math.floor(seconds / 60)
   const s = seconds % 60
@@ -37,6 +43,11 @@ export default function NeurologicHistorian() {
   const scenarioParam = searchParams.get('scenario')
   const patientIdParam = searchParams.get('patient_id')
   const consultIdParam = searchParams.get('consult_id')
+  // Developer control (redesign brief Part 4): the voice-engine selector is
+  // internal-only on this patient-facing page. Reach it with ?internal=1
+  // (the ?voice=nova deep link keeps working regardless via
+  // useVoiceProviderPreference).
+  const showEngineToggle = searchParams.get('internal') === '1'
 
   const [phase, setPhase] = useState<Phase>(patientIdParam ? 'loading_context' : 'scenario_select')
   const [selectedScenario, setSelectedScenario] = useState<DemoScenario | null>(null)
@@ -59,9 +70,8 @@ export default function NeurologicHistorian() {
     sessionId: string | null
   } | null>(null)
 
-  const [showPhysicianPanel, setShowPhysicianPanel] = useState(false)
   const transcriptEndRef = useRef<HTMLDivElement>(null)
-  // Stable consult ID for localizer logging — generated once per component mount
+  // Stable consult ID for session logging — generated once per component mount
   const consultIdRef = useRef<string>(
     typeof crypto !== 'undefined' && crypto.randomUUID
       ? crypto.randomUUID()
@@ -126,8 +136,6 @@ export default function NeurologicHistorian() {
     isUserSpeaking,
     duration,
     error,
-    localizerData,
-    localizerLoading,
     interviewCompleted,
     startSession,
     endSession,
@@ -138,7 +146,10 @@ export default function NeurologicHistorian() {
     patientContext: activeConfig.patientContext,
     consultId: consultIdRef.current,
     provider: voiceProvider,
-    enableLocalizer: true,
+    // Patient-facing surface: the localizer drives a physician-only panel and
+    // must not run here (redesign brief Part 4 — no diagnostic content on the
+    // patient page). The /consult clinician surface keeps its own localizer.
+    enableLocalizer: false,
     onComplete: handleComplete,
     onSafetyEscalation: handleSafetyEscalation,
   })
@@ -271,6 +282,25 @@ export default function NeurologicHistorian() {
     router.push('/patient')
   }
 
+  // ── Presentation-only derivations for the stepped patient flow ──
+  const currentStep: 1 | 2 | 3 | 4 =
+    phase === 'complete'
+      ? 4
+      : phase === 'connecting' || phase === 'active' || phase === 'ending'
+        ? 3
+        : showConsentDisclosure
+          ? 2
+          : 1
+  const lastAssistantText = [...transcript].reverse().find(e => e.role === 'assistant')?.text
+  const displayedQuestion = currentAssistantText || lastAssistantText || null
+  const lastUserText = [...transcript].reverse().find(e => e.role === 'user')?.text
+  const displayedHeard = currentUserText || lastUserText || null
+  const assistantTurns = transcript.filter(e => e.role === 'assistant').length
+  const currentQuestionNumber = Math.min(
+    QUESTION_CAP,
+    Math.max(1, assistantTurns + (currentAssistantText ? 1 : 0)),
+  )
+
   // ============= RENDER =============
 
   // Safety Escalation overlay
@@ -347,201 +377,125 @@ export default function NeurologicHistorian() {
 
   return (
     <PlatformShell>
-    {showConsentDisclosure && (
-      <HistorianConsentDisclosure
-        onConfirm={handleConsentConfirm}
-        onCancel={handleConsentCancel}
-        requireIdentity
-      />
-    )}
     <FeatureSubHeader
       title="AI Health Interview"
       icon={Mic}
-      accentColor="#0D9488"
+      accentColor="#12706e"
       showDemo={false}
       nextStep={{ label: 'Patient Messaging', route: '/patient/messages' }}
     />
-    <div style={{
-      minHeight: '100vh',
-      background: 'linear-gradient(135deg, #0f172a 0%, #1e293b 100%)',
-      fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif",
-      display: 'flex',
-      flexDirection: 'column',
-    }}>
+    <div className="nn">
+      <div className="nn-hist">
 
-      {/* Main content */}
-      <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
+        {/* Step indicator — one screen per step, always visible */}
+        <div className="nn-step" aria-hidden="true">
+          {[1, 2, 3, 4].map(n => (
+            <i key={n} className={n <= currentStep ? 'on' : ''} />
+          ))}
+        </div>
+        <p className="nn-hint" style={{ textAlign: 'center', marginBottom: 18 }}>
+          Step {currentStep} of 4 — {STEP_LABELS[currentStep - 1]}
+        </p>
 
         {/* ====== LOADING CONTEXT ====== */}
         {phase === 'loading_context' && (
-          <div style={{
-            flex: 1,
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            justifyContent: 'center',
-            padding: '32px 24px',
-          }}>
+          <div className="nn-card" style={{ textAlign: 'center', padding: '40px 20px' }}>
             <div style={{
-              width: 48, height: 48, borderRadius: '50%',
-              border: '3px solid #334155', borderTopColor: '#0d9488',
-              animation: 'spin 1s linear infinite',
-              marginBottom: '16px',
+              width: 44, height: 44, borderRadius: '50%',
+              border: '3px solid var(--nn-line)', borderTopColor: 'var(--nn-accent)',
+              animation: 'nn-spin 1s linear infinite',
+              margin: '0 auto 14px',
             }} />
-            <p style={{ color: '#94a3b8', fontSize: '0.875rem' }}>Loading patient information...</p>
-            <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+            <p style={{ color: 'var(--nn-ink-2)', margin: 0 }}>Loading patient information...</p>
+            <style>{`@keyframes nn-spin { to { transform: rotate(360deg); } }`}</style>
           </div>
         )}
 
-        {/* ====== SCENARIO SELECT ====== */}
-        {phase === 'scenario_select' && (
-          <div style={{ maxWidth: '640px', margin: '0 auto', padding: '32px 24px', width: '100%' }}>
-            <h2 style={{ color: '#fff', margin: '0 0 4px', fontSize: '1.25rem' }}>
-              Start an AI Interview
-            </h2>
-            <p style={{ color: '#94a3b8', margin: '0 0 24px', fontSize: '0.875rem' }}>
+        {/* ====== STEP 2 — CONSENT & IDENTITY (before the microphone) ====== */}
+        {phase === 'scenario_select' && showConsentDisclosure && (
+          <HistorianConsentDisclosure
+            presentation="page"
+            requireIdentity
+            onConfirm={handleConsentConfirm}
+            onCancel={handleConsentCancel}
+          />
+        )}
+
+        {/* ====== STEP 1 — VISIT CONTEXT ====== */}
+        {phase === 'scenario_select' && !showConsentDisclosure && (
+          <>
+            <h2 className="nn-hist-title">Start an AI Interview</h2>
+            <p className="nn-lede">
               {sessionConfig
                 ? 'Review your information below and begin your intake interview.'
                 : 'Select a demo scenario to begin. The AI will conduct a structured neurological intake interview via voice.'}
             </p>
 
             {error && (
-              <div style={{
-                background: 'rgba(239,68,68,0.15)',
-                border: '1px solid rgba(239,68,68,0.3)',
-                borderRadius: '8px',
-                padding: '12px 16px',
-                color: '#fca5a5',
-                fontSize: '0.875rem',
-                marginBottom: '16px',
-              }}>
+              <div role="alert" className="nn-alert" style={{ marginTop: 0, marginBottom: 16 }}>
                 {error}
               </div>
             )}
 
             {/* Real patient context card */}
             {sessionConfig && (
-              <div style={{
-                padding: '20px',
-                borderRadius: '12px',
-                border: '2px solid #0d9488',
-                background: 'rgba(13, 148, 136, 0.1)',
-                marginBottom: '24px',
-              }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px' }}>
-                  <div style={{
-                    width: 36, height: 36, borderRadius: '50%',
-                    background: 'linear-gradient(135deg, #0d9488, #14b8a6)',
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    color: '#fff', fontWeight: 700, fontSize: '0.9rem',
-                  }}>
-                    {sessionConfig.patientName.charAt(0).toUpperCase()}
-                  </div>
-                  <div>
-                    <div style={{ color: '#fff', fontWeight: 600, fontSize: '1rem' }}>
-                      {sessionConfig.patientName}
-                    </div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                      <span style={{
-                        display: 'inline-block',
-                        padding: '1px 6px',
-                        borderRadius: '4px',
-                        background: sessionConfig.sessionType === 'new_patient' ? 'rgba(139,92,246,0.2)' : 'rgba(13,148,136,0.2)',
-                        color: sessionConfig.sessionType === 'new_patient' ? '#a78bfa' : '#5eead4',
-                        fontSize: '0.65rem',
-                        fontWeight: 600,
-                        textTransform: 'uppercase',
-                      }}>
-                        {sessionConfig.sessionType === 'new_patient' ? 'New Patient' : 'Follow-up'}
-                      </span>
-                    </div>
-                  </div>
-                </div>
+              <div className="nn-choice on" style={{ marginBottom: 20, cursor: 'default' }}>
+                <span className="nn-choice-tag">
+                  {sessionConfig.sessionType === 'new_patient' ? 'New patient' : 'Follow-up'}
+                </span>
+                <span style={{ display: 'block', fontWeight: 650, marginBottom: 4 }}>
+                  {sessionConfig.patientName}
+                </span>
                 {sessionConfig.referralReason && (
-                  <div style={{ fontSize: '0.8rem', color: '#94a3b8', marginBottom: '4px' }}>
-                    <span style={{ fontWeight: 600, color: '#cbd5e1' }}>Referral: </span>
-                    {sessionConfig.referralReason}
-                  </div>
+                  <span style={{ display: 'block', fontSize: 'var(--nn-fs-sm)', color: 'var(--nn-ink-2)' }}>
+                    Referral: {sessionConfig.referralReason}
+                  </span>
                 )}
                 {sessionConfig.patientContext && sessionConfig.patientContext.includes('Last visit:') && (
-                  <div style={{ fontSize: '0.8rem', color: '#94a3b8' }}>
-                    <span style={{ fontWeight: 600, color: '#cbd5e1' }}>Prior visit: </span>
-                    {sessionConfig.patientContext.split('Last visit: ')[1]?.split('\n')[0] || ''}
-                  </div>
+                  <span style={{ display: 'block', fontSize: 'var(--nn-fs-sm)', color: 'var(--nn-ink-2)' }}>
+                    Prior visit: {sessionConfig.patientContext.split('Last visit: ')[1]?.split('\n')[0] || ''}
+                  </span>
                 )}
               </div>
             )}
 
-            {/* Demo scenario grid (show when no real patient, or as fallback) */}
+            {/* Demo scenario cards (show when no real patient) */}
             {!sessionConfig && (
-              <div style={{ display: 'grid', gap: '12px', marginBottom: '24px' }}>
+              <div style={{ display: 'grid', gap: '12px', marginBottom: '20px' }}>
                 {DEMO_SCENARIOS.map(scenario => (
                   <button
                     key={scenario.id}
                     onClick={() => handleSelectScenario(scenario)}
-                    style={{
-                      textAlign: 'left',
-                      padding: '16px 20px',
-                      borderRadius: '12px',
-                      border: selectedScenario?.id === scenario.id
-                        ? '2px solid #0d9488'
-                        : '1px solid #334155',
-                      background: selectedScenario?.id === scenario.id
-                        ? 'rgba(13, 148, 136, 0.1)'
-                        : '#1e293b',
-                      cursor: 'pointer',
-                      transition: 'all 0.15s ease',
-                    }}
+                    aria-pressed={selectedScenario?.id === scenario.id}
+                    className={`nn-choice${selectedScenario?.id === scenario.id ? ' on' : ''}`}
                   >
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
-                      <span style={{
-                        display: 'inline-block',
-                        padding: '2px 8px',
-                        borderRadius: '4px',
-                        background: scenario.session_type === 'new_patient' ? 'rgba(139,92,246,0.2)' : 'rgba(13,148,136,0.2)',
-                        color: scenario.session_type === 'new_patient' ? '#a78bfa' : '#5eead4',
-                        fontSize: '0.7rem',
-                        fontWeight: 600,
-                        textTransform: 'uppercase',
-                      }}>
-                        {scenario.session_type === 'new_patient' ? 'New' : 'Follow-up'}
-                      </span>
-                    </div>
-                    <div style={{ color: '#fff', fontWeight: 600, fontSize: '0.95rem', marginBottom: '4px' }}>
+                    <span className="nn-choice-tag">
+                      {scenario.session_type === 'new_patient' ? 'New' : 'Follow-up'}
+                    </span>
+                    <span style={{ display: 'block', fontWeight: 650, marginBottom: 4 }}>
                       {scenario.label}
-                    </div>
-                    <div style={{ color: '#94a3b8', fontSize: '0.8rem', lineHeight: 1.4 }}>
+                    </span>
+                    <span style={{ display: 'block', fontSize: 'var(--nn-fs-sm)', color: 'var(--nn-ink-2)' }}>
                       {scenario.description}
-                    </div>
+                    </span>
                   </button>
                 ))}
               </div>
             )}
 
-            <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 10 }}>
-              <VoiceProviderToggle value={voiceProvider} onChange={setVoiceProvider} />
-            </div>
+            {/* Internal-only engine selector (?internal=1) — never a patient control */}
+            {showEngineToggle && (
+              <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 10 }}>
+                <VoiceProviderToggle value={voiceProvider} onChange={setVoiceProvider} />
+              </div>
+            )}
 
             <button
               onClick={handleStartInterview}
               disabled={!selectedScenario && !sessionConfig}
-              style={{
-                width: '100%',
-                padding: '14px',
-                borderRadius: '10px',
-                background: (selectedScenario || sessionConfig) ? '#0d9488' : '#334155',
-                color: (selectedScenario || sessionConfig) ? '#fff' : '#64748b',
-                border: 'none',
-                fontWeight: 700,
-                fontSize: '1rem',
-                cursor: (selectedScenario || sessionConfig) ? 'pointer' : 'not-allowed',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: '8px',
-              }}
+              className="nn-btn nn-btn--block"
             >
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                 <path d="M12 1a3 3 0 00-3 3v8a3 3 0 006 0V4a3 3 0 00-3-3z" />
                 <path d="M19 10v2a7 7 0 01-14 0v-2" />
                 <line x1="12" y1="19" x2="12" y2="23" />
@@ -550,325 +504,53 @@ export default function NeurologicHistorian() {
               Start Voice Interview
             </button>
 
-            <p style={{ color: '#64748b', fontSize: '0.75rem', textAlign: 'center', marginTop: '12px' }}>
-              Requires microphone access. Interview is conducted entirely by voice.
+            <p className="nn-prog">
+              Takes about 8 minutes · Requires microphone access · You can pause or stop at any time
             </p>
-          </div>
+          </>
         )}
 
         {/* ====== CONNECTING ====== */}
         {phase === 'connecting' && (
-          <div style={{
-            flex: 1,
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            justifyContent: 'center',
-            padding: '32px 24px',
-          }}>
+          <div className="nn-card" style={{ textAlign: 'center', padding: '40px 20px' }}>
             <div style={{
-              width: 80, height: 80, borderRadius: '50%',
-              background: 'rgba(13, 148, 136, 0.15)',
+              width: 64, height: 64, borderRadius: '50%',
+              background: 'var(--nn-accent-wash)',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
-              marginBottom: '24px',
-              animation: 'pulse 2s infinite',
+              margin: '0 auto 16px',
+              animation: 'nn-pulse 2s infinite',
             }}>
-              <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#0d9488" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="var(--nn-accent-ink)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                 <path d="M12 1a3 3 0 00-3 3v8a3 3 0 006 0V4a3 3 0 00-3-3z" />
                 <path d="M19 10v2a7 7 0 01-14 0v-2" />
               </svg>
             </div>
-            <h3 style={{ color: '#fff', margin: '0 0 8px', fontSize: '1.125rem' }}>Connecting...</h3>
-            <p style={{ color: '#94a3b8', fontSize: '0.875rem' }}>Setting up your voice interview</p>
-            <style>{`
-              @keyframes pulse {
-                0%, 100% { transform: scale(1); opacity: 1; }
-                50% { transform: scale(1.1); opacity: 0.7; }
-              }
-            `}</style>
+            <h3 style={{ color: 'var(--nn-ink)', margin: '0 0 6px', fontSize: 'var(--nn-fs-lg)' }}>Connecting...</h3>
+            <p style={{ color: 'var(--nn-ink-2)', margin: 0 }}>Setting up your voice interview</p>
           </div>
         )}
 
-        {/* ====== ACTIVE INTERVIEW ====== */}
+        {/* ====== STEP 3 — INTERVIEW ====== */}
         {(phase === 'active' || phase === 'ending') && (
-          <div style={{
-            flex: 1,
-            display: 'flex',
-            gap: '24px',
-            padding: '0 24px',
-            justifyContent: 'center',
-            alignItems: 'flex-start',
-          }}>
-            {/* Main interview column */}
-            <div style={{
-              flex: '0 0 auto',
-              width: '100%',
-              maxWidth: '640px',
-              display: 'flex',
-              flexDirection: 'column',
-            }}>
-            {/* Timer */}
-            <div style={{
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              padding: '16px',
-              gap: '12px',
-              position: 'relative',
-            }}>
-              <span style={{
-                color: '#64748b',
-                fontSize: '0.8rem',
-                fontFamily: 'monospace',
-              }}>
-                {formatTime(duration)}
-              </span>
-              <span style={{
-                display: 'inline-block',
-                width: 8, height: 8, borderRadius: '50%',
-                background: phase === 'active' ? '#22c55e' : '#f59e0b',
-                animation: phase === 'active' ? 'blink 1.5s infinite' : 'none',
-              }} />
-              <span style={{ color: '#94a3b8', fontSize: '0.8rem' }}>
-                {phase === 'ending' ? 'Ending...' : isAiSpeaking ? 'AI Speaking' : isUserSpeaking ? 'Listening' : 'Ready'}
-              </span>
-
-              {/* Physician panel toggle */}
-              <button
-                onClick={() => setShowPhysicianPanel(p => !p)}
-                title={showPhysicianPanel ? 'Hide physician view' : 'Show physician view'}
-                style={{
-                  position: 'absolute',
-                  right: 0,
-                  padding: '5px 10px',
-                  borderRadius: '6px',
-                  border: `1px solid ${showPhysicianPanel ? 'rgba(13,148,136,0.5)' : 'rgba(51,65,85,0.6)'}`,
-                  background: showPhysicianPanel ? 'rgba(13,148,136,0.1)' : 'transparent',
-                  color: showPhysicianPanel ? '#5eead4' : '#64748b',
-                  fontSize: '0.7rem',
-                  fontWeight: 600,
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '4px',
-                }}
-              >
-                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <circle cx="12" cy="12" r="3" />
-                  <path d="M12 1v4M12 19v4M4.22 4.22l2.83 2.83M16.95 16.95l2.83 2.83M1 12h4M19 12h4M4.22 19.78l2.83-2.83M16.95 7.05l2.83-2.83" />
-                </svg>
-                {showPhysicianPanel ? 'Hide' : 'MD View'}
-                {localizerLoading && (
-                  <span style={{
-                    width: 5, height: 5, borderRadius: '50%',
-                    background: '#0d9488',
-                    animation: 'blink 1s infinite',
-                    flexShrink: 0,
-                  }} />
-                )}
-              </button>
-            </div>
-
-            {/* Voice Orb */}
-            <div style={{
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              padding: '24px 0',
-            }}>
-              <div style={{
-                width: 120,
-                height: 120,
-                borderRadius: '50%',
-                background: isAiSpeaking
-                  ? 'radial-gradient(circle, rgba(13,148,136,0.4) 0%, rgba(13,148,136,0.1) 60%, transparent 100%)'
-                  : isUserSpeaking
-                    ? 'radial-gradient(circle, rgba(139,92,246,0.4) 0%, rgba(139,92,246,0.1) 60%, transparent 100%)'
-                    : 'radial-gradient(circle, rgba(100,116,139,0.2) 0%, rgba(100,116,139,0.05) 60%, transparent 100%)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                transition: 'all 0.3s ease',
-                boxShadow: isAiSpeaking
-                  ? '0 0 40px rgba(13,148,136,0.3), 0 0 80px rgba(13,148,136,0.15)'
-                  : isUserSpeaking
-                    ? '0 0 40px rgba(139,92,246,0.3), 0 0 80px rgba(139,92,246,0.15)'
-                    : 'none',
-                animation: (isAiSpeaking || isUserSpeaking) ? 'orbPulse 1.5s ease-in-out infinite' : 'none',
-              }}>
-                <div style={{
-                  width: 64,
-                  height: 64,
-                  borderRadius: '50%',
-                  background: isAiSpeaking
-                    ? 'linear-gradient(135deg, #0d9488, #14b8a6)'
-                    : isUserSpeaking
-                      ? 'linear-gradient(135deg, #8B5CF6, #A78BFA)'
-                      : '#334155',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  transition: 'all 0.3s ease',
-                }}>
-                  <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    {isAiSpeaking ? (
-                      <>
-                        <path d="M9 18V5l12-2v13" />
-                        <circle cx="6" cy="18" r="3" />
-                        <circle cx="18" cy="16" r="3" />
-                      </>
-                    ) : (
-                      <>
-                        <path d="M12 1a3 3 0 00-3 3v8a3 3 0 006 0V4a3 3 0 00-3-3z" />
-                        <path d="M19 10v2a7 7 0 01-14 0v-2" />
-                        <line x1="12" y1="19" x2="12" y2="23" />
-                        <line x1="8" y1="23" x2="16" y2="23" />
-                      </>
-                    )}
-                  </svg>
-                </div>
-              </div>
-            </div>
-
-            {/* Streaming text */}
-            {(currentAssistantText || currentUserText) && (
-              <div style={{
-                padding: '16px',
-                borderRadius: '12px',
-                background: currentAssistantText ? 'rgba(13,148,136,0.1)' : 'rgba(139,92,246,0.1)',
-                border: `1px solid ${currentAssistantText ? 'rgba(13,148,136,0.2)' : 'rgba(139,92,246,0.2)'}`,
-                marginBottom: '16px',
-              }}>
-                <div style={{
-                  color: currentAssistantText ? '#5eead4' : '#c4b5fd',
-                  fontSize: '0.75rem',
-                  fontWeight: 600,
-                  marginBottom: '4px',
-                  textTransform: 'uppercase',
-                }}>
-                  {currentAssistantText ? 'AI Historian' : 'You'}
-                </div>
-                <div style={{ color: '#e2e8f0', fontSize: '0.9rem', lineHeight: 1.5 }}>
-                  {currentAssistantText || currentUserText}
-                </div>
-              </div>
-            )}
-
-            {/* Transcript toggle */}
-            <button
-              onClick={() => setShowTranscript(!showTranscript)}
-              style={{
-                background: 'none',
-                border: 'none',
-                color: '#64748b',
-                fontSize: '0.8rem',
-                cursor: 'pointer',
-                padding: '8px',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '4px',
-                alignSelf: 'center',
-              }}
-            >
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
-                style={{ transform: showTranscript ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }}>
-                <polyline points="6 9 12 15 18 9" />
-              </svg>
-              {showTranscript ? 'Hide' : 'Show'} Transcript ({transcript.length})
-            </button>
-
-            {/* Transcript */}
-            {showTranscript && (
-              <div style={{
-                flex: 1,
-                overflowY: 'auto',
-                padding: '12px 0',
-                display: 'flex',
-                flexDirection: 'column',
-                gap: '8px',
-                maxHeight: '300px',
-              }}>
-                {transcript.map((entry, i) => (
-                  <div
-                    key={i}
-                    style={{
-                      padding: '10px 14px',
-                      borderRadius: '10px',
-                      background: entry.role === 'assistant' ? 'rgba(13,148,136,0.08)' : 'rgba(139,92,246,0.08)',
-                      borderLeft: `3px solid ${entry.role === 'assistant' ? '#0d9488' : '#8B5CF6'}`,
-                    }}
-                  >
-                    <div style={{
-                      fontSize: '0.7rem',
-                      color: entry.role === 'assistant' ? '#5eead4' : '#c4b5fd',
-                      fontWeight: 600,
-                      marginBottom: '2px',
-                    }}>
-                      {entry.role === 'assistant' ? 'AI Historian' : 'Patient'} - {formatTime(entry.timestamp)}
-                    </div>
-                    <div style={{ color: '#cbd5e1', fontSize: '0.85rem', lineHeight: 1.4 }}>
-                      {entry.text}
-                    </div>
-                  </div>
-                ))}
-                <div ref={transcriptEndRef} />
-              </div>
-            )}
-
-            {/* Bottom controls */}
-            <div style={{
-              padding: '24px 0',
-              display: 'flex',
-              justifyContent: 'center',
-              marginTop: 'auto',
-              flexShrink: 0,
-            }}>
-              <button
-                onClick={handleEndInterview}
-                disabled={phase === 'ending'}
-                style={{
-                  padding: '14px 32px',
-                  borderRadius: '10px',
-                  background: phase === 'ending' ? '#334155' : '#ef4444',
-                  color: '#fff',
-                  border: 'none',
-                  fontWeight: 700,
-                  fontSize: '1rem',
-                  cursor: phase === 'ending' ? 'not-allowed' : 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '8px',
-                }}
-              >
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
-                  <rect x="4" y="4" width="16" height="16" rx="2" />
-                </svg>
-                {phase === 'ending' ? 'Ending...' : 'End Interview'}
-              </button>
-            </div>
-
-            <style>{`
-              @keyframes orbPulse {
-                0%, 100% { transform: scale(1); }
-                50% { transform: scale(1.05); }
-              }
-              @keyframes blink {
-                0%, 100% { opacity: 1; }
-                50% { opacity: 0.3; }
-              }
-            `}</style>
-            </div>{/* end main interview column */}
-
-            {/* Physician panel — shown when toggle is active */}
-            {showPhysicianPanel && (
-              <div style={{ paddingTop: '16px' }}>
-                <LocalizerPanel data={localizerData} isLoading={localizerLoading} />
-              </div>
-            )}
-          </div>
+          <HistorianInterviewStep
+            phase={phase}
+            questionNumber={currentQuestionNumber}
+            questionCap={QUESTION_CAP}
+            displayedQuestion={displayedQuestion}
+            displayedHeard={displayedHeard}
+            isAiSpeaking={isAiSpeaking}
+            isUserSpeaking={isUserSpeaking}
+            durationLabel={formatTime(duration)}
+            transcript={transcript}
+            showTranscript={showTranscript}
+            onToggleTranscript={() => setShowTranscript(!showTranscript)}
+            onEndInterview={handleEndInterview}
+            transcriptEndRef={transcriptEndRef}
+            formatTime={formatTime}
+          />
         )}
 
-        {/* ====== COMPLETE ====== */}
+        {/* ====== STEP 4 — SUMMARY ====== */}
         {phase === 'complete' && completionData && (
           <HistorianReportView
             structuredOutput={completionData.structuredOutput}
@@ -883,6 +565,7 @@ export default function NeurologicHistorian() {
             // structural guarantee that HistorianReportView never renders
             // them even if that ever changes.
             surface="patient"
+            theme="clinical"
             onStartAnother={handleStartAnother}
             onBackToPortal={handleBackToPortal}
           />

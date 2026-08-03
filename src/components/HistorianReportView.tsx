@@ -60,6 +60,13 @@ interface HistorianReportViewProps {
    * second pass to remember the DDx/thoroughness-never-patient-facing rule.
    */
   thoroughness?: ThoroughnessEvaluation | null
+  /**
+   * Visual theme. 'dark' (default) — the original slate styling used on the
+   * clinician /consult surfaces. 'clinical' — the light nn design system for
+   * the patient-facing /patient/historian page (must render inside a `.nn`
+   * scope). Content and structure are identical in both themes.
+   */
+  theme?: 'dark' | 'clinical'
   onStartAnother: () => void
   onBackToPortal: () => void
 }
@@ -84,10 +91,16 @@ export default function HistorianReportView({
   independentDdx,
   agreement,
   thoroughness,
+  theme = 'dark',
   onStartAnother,
   onBackToPortal,
 }: HistorianReportViewProps) {
-  const [activeTab, setActiveTab] = useState<ReportTab>('physician')
+  // Patients land on their own plain-language summary; the intake detail
+  // stays one tab away. Clinicians keep the physician report first.
+  const [activeTab, setActiveTab] = useState<ReportTab>(
+    surface === 'patient' ? 'patient' : 'physician',
+  )
+  const clinical = theme === 'clinical'
   const [patientReport, setPatientReport] = useState<string | null>(null)
   const [patientReportLoading, setPatientReportLoading] = useState(true)
   const [patientReportError, setPatientReportError] = useState(false)
@@ -152,53 +165,60 @@ export default function HistorianReportView({
   ]
 
   return (
-    <div style={{ maxWidth: '720px', margin: '0 auto', padding: '32px 24px', width: '100%' }}>
+    <div style={clinical
+      ? { width: '100%' }
+      : { maxWidth: '720px', margin: '0 auto', padding: '32px 24px', width: '100%' }}>
       {/* Success header */}
       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center', marginBottom: '24px' }}>
         <div style={{
           width: 64, height: 64, borderRadius: '50%',
-          background: 'rgba(34, 197, 94, 0.15)',
+          background: clinical ? 'var(--nn-accent-wash)' : 'rgba(34, 197, 94, 0.15)',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
           marginBottom: '16px',
         }}>
-          <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#22c55e" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke={clinical ? 'var(--nn-accent-ink)' : '#22c55e'} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
             <polyline points="20 6 9 17 4 12" />
           </svg>
         </div>
-        <h2 style={{ color: '#fff', fontSize: '1.375rem', fontWeight: 700, margin: '0 0 8px' }}>
+        <h2 style={{ color: clinical ? 'var(--nn-ink)' : '#fff', fontSize: '1.375rem', fontWeight: 700, margin: '0 0 8px' }}>
           Interview Complete
         </h2>
-        <p style={{ color: '#94a3b8', fontSize: '0.9rem', margin: '0 0 16px', maxWidth: '440px' }}>
+        <p style={{ color: clinical ? 'var(--nn-ink-2)' : '#94a3b8', fontSize: '0.9rem', margin: '0 0 16px', maxWidth: '440px' }}>
           Thank you for completing the intake interview. Your physician will review this information before your appointment.
         </p>
 
         <div style={{ display: 'flex', gap: '32px' }}>
           <div>
-            <div style={{ color: '#0d9488', fontSize: '1.25rem', fontWeight: 700 }}>{formatDuration(duration)}</div>
-            <div style={{ color: '#64748b', fontSize: '0.7rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Duration</div>
+            <div style={{ color: clinical ? 'var(--nn-accent-ink)' : '#0d9488', fontSize: '1.25rem', fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>{formatDuration(duration)}</div>
+            <div style={{ color: clinical ? 'var(--nn-ink-3)' : '#64748b', fontSize: '0.7rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Duration</div>
           </div>
           <div>
-            <div style={{ color: '#0d9488', fontSize: '1.25rem', fontWeight: 700 }}>{questionCount}</div>
-            <div style={{ color: '#64748b', fontSize: '0.7rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Questions</div>
+            <div style={{ color: clinical ? 'var(--nn-accent-ink)' : '#0d9488', fontSize: '1.25rem', fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>{questionCount}</div>
+            <div style={{ color: clinical ? 'var(--nn-ink-3)' : '#64748b', fontSize: '0.7rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Questions</div>
           </div>
         </div>
       </div>
 
       {/* Tabs */}
-      <div style={{ display: 'flex', gap: '4px', marginBottom: '16px', borderBottom: '1px solid #334155' }}>
+      <div style={{ display: 'flex', gap: '4px', marginBottom: '16px', borderBottom: clinical ? '1px solid var(--nn-line)' : '1px solid #334155' }}>
         {TABS.map(tab => (
           <button
             key={tab.key}
             onClick={() => setActiveTab(tab.key)}
+            aria-pressed={activeTab === tab.key}
             style={{
               padding: '10px 16px',
               border: 'none',
               background: 'transparent',
-              color: activeTab === tab.key ? '#5eead4' : '#94a3b8',
+              color: activeTab === tab.key
+                ? (clinical ? 'var(--nn-accent-ink)' : '#5eead4')
+                : (clinical ? 'var(--nn-ink-3)' : '#94a3b8'),
               fontSize: '0.875rem',
               fontWeight: 600,
               cursor: 'pointer',
-              borderBottom: activeTab === tab.key ? '2px solid #0d9488' : '2px solid transparent',
+              borderBottom: activeTab === tab.key
+                ? (clinical ? '2px solid var(--nn-accent)' : '2px solid #0d9488')
+                : '2px solid transparent',
               marginBottom: '-1px',
             }}
           >
@@ -208,7 +228,9 @@ export default function HistorianReportView({
       </div>
 
       {/* Tab content */}
-      <div style={{ background: '#1e293b', border: '1px solid #334155', borderRadius: '12px', padding: '20px', marginBottom: '24px', minHeight: '200px' }}>
+      <div style={clinical
+        ? { background: 'var(--nn-surface)', border: '1px solid var(--nn-line)', borderRadius: '12px', padding: '20px', marginBottom: '24px', minHeight: '200px' }
+        : { background: '#1e293b', border: '1px solid #334155', borderRadius: '12px', padding: '20px', marginBottom: '24px', minHeight: '200px' }}>
         {activeTab === 'physician' ? (
           <PhysicianReportTab
             surface={surface}
@@ -226,6 +248,7 @@ export default function HistorianReportView({
             error={patientReportError}
             report={patientReport}
             narrativeSummary={narrativeSummary}
+            clinical={clinical}
           />
         )}
       </div>
@@ -234,7 +257,8 @@ export default function HistorianReportView({
       <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', justifyContent: 'center' }}>
         <button
           onClick={onStartAnother}
-          style={{
+          className={clinical ? 'nn-btn nn-btn--sec' : undefined}
+          style={clinical ? undefined : {
             padding: '12px 24px', borderRadius: '8px',
             background: '#1e293b', border: '1px solid #334155',
             color: '#e2e8f0', fontWeight: 600, fontSize: '0.875rem', cursor: 'pointer',
@@ -244,7 +268,8 @@ export default function HistorianReportView({
         </button>
         <button
           onClick={onBackToPortal}
-          style={{
+          className={clinical ? 'nn-btn' : undefined}
+          style={clinical ? undefined : {
             padding: '12px 24px', borderRadius: '8px',
             background: '#0d9488', border: 'none',
             color: '#fff', fontWeight: 600, fontSize: '0.875rem', cursor: 'pointer',
@@ -361,19 +386,21 @@ interface PatientReportTabProps {
   error: boolean
   report: string | null
   narrativeSummary: string | null
+  clinical?: boolean
 }
 
-function PatientReportTab({ loading, error, report, narrativeSummary }: PatientReportTabProps) {
+function PatientReportTab({ loading, error, report, narrativeSummary, clinical = false }: PatientReportTabProps) {
   if (loading) {
     return (
       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '32px 0' }}>
         <div style={{
           width: 36, height: 36, borderRadius: '50%',
-          border: '3px solid #334155', borderTopColor: '#0d9488',
+          border: clinical ? '3px solid var(--nn-line)' : '3px solid #334155',
+          borderTopColor: clinical ? 'var(--nn-accent)' : '#0d9488',
           animation: 'spin 1s linear infinite',
           marginBottom: '12px',
         }} />
-        <p style={{ color: '#94a3b8', fontSize: '0.85rem' }}>Preparing your summary...</p>
+        <p style={{ color: clinical ? 'var(--nn-ink-2)' : '#94a3b8', fontSize: '0.85rem' }}>Preparing your summary...</p>
         <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
       </div>
     )
@@ -384,35 +411,39 @@ function PatientReportTab({ loading, error, report, narrativeSummary }: PatientR
   return (
     <div>
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#0D9488" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={clinical ? 'var(--nn-accent-ink)' : '#0D9488'} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
           <path d="M20.42 4.58a5.4 5.4 0 00-7.65 0L12 5.35l-.77-.77a5.4 5.4 0 10-7.65 7.65L4.35 13l7.65 7.65L19.65 13l.77-.77a5.4 5.4 0 000-7.65z" />
         </svg>
-        <h4 style={{ color: '#E2E8F0', fontSize: 14, fontWeight: 700, margin: 0 }}>
+        <h4 style={{ color: clinical ? 'var(--nn-ink)' : '#E2E8F0', fontSize: clinical ? 15 : 14, fontWeight: 700, margin: 0 }}>
           Here&apos;s a Summary of What You Shared
         </h4>
       </div>
 
       {text ? (
-        <div style={{ background: '#0F172A', border: '1px solid rgba(13,148,136,0.3)', borderRadius: 8, padding: 16 }}>
-          <p style={{ color: '#CBD5E1', fontSize: 13.5, margin: 0, lineHeight: 1.7, whiteSpace: 'pre-wrap' }}>
+        <div style={clinical
+          ? { background: 'var(--nn-surface-2)', border: '1px solid var(--nn-line)', borderRadius: 8, padding: 16 }
+          : { background: '#0F172A', border: '1px solid rgba(13,148,136,0.3)', borderRadius: 8, padding: 16 }}>
+          <p style={{ color: clinical ? 'var(--nn-ink)' : '#CBD5E1', fontSize: clinical ? 15 : 13.5, margin: 0, lineHeight: 1.7, whiteSpace: 'pre-wrap' }}>
             {text}
           </p>
         </div>
       ) : (
-        <div style={{ background: '#0F172A', border: '1px solid #334155', borderRadius: 8, padding: 16, textAlign: 'center' }}>
-          <p style={{ color: '#64748B', fontSize: 13, margin: 0 }}>
+        <div style={clinical
+          ? { background: 'var(--nn-surface-2)', border: '1px solid var(--nn-line)', borderRadius: 8, padding: 16, textAlign: 'center' as const }
+          : { background: '#0F172A', border: '1px solid #334155', borderRadius: 8, padding: 16, textAlign: 'center' as const }}>
+          <p style={{ color: clinical ? 'var(--nn-ink-3)' : '#64748B', fontSize: 13, margin: 0 }}>
             No summary is available for this interview yet.
           </p>
         </div>
       )}
 
       {error && (
-        <p style={{ color: '#64748b', fontSize: '0.7rem', marginTop: 10 }}>
+        <p style={{ color: clinical ? 'var(--nn-ink-3)' : '#64748b', fontSize: '0.7rem', marginTop: 10 }}>
           We couldn&apos;t generate a personalized summary right now, so we&apos;re showing your interview notes instead.
         </p>
       )}
 
-      <p style={{ color: '#64748b', fontSize: '0.75rem', marginTop: 14, lineHeight: 1.5 }}>
+      <p style={{ color: clinical ? 'var(--nn-ink-2)' : '#64748b', fontSize: clinical ? '0.845rem' : '0.75rem', marginTop: 14, lineHeight: 1.5 }}>
         Your neurologist will review this information before your visit. If you have questions, please contact your doctor&apos;s office. If this is a medical emergency, call 911.
       </p>
     </div>

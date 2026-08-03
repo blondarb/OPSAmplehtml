@@ -15,6 +15,14 @@ interface HistorianConsentDisclosureProps {
    * browser.
    */
   requireIdentity?: boolean
+  /**
+   * 'modal' (default) — the original dark overlay, used by the clinician-side
+   * /consult EmbeddedHistorian. 'page' — renders the same gate inline as a
+   * full step of the patient flow, styled by the nn design system (the caller
+   * must render it inside a `.nn` scope). Same fields, same strings, same
+   * gating logic in both presentations.
+   */
+  presentation?: 'modal' | 'page'
 }
 
 /**
@@ -31,6 +39,7 @@ export default function HistorianConsentDisclosure({
   onConfirm,
   onCancel,
   requireIdentity = false,
+  presentation = 'modal',
 }: HistorianConsentDisclosureProps) {
   const [agreed, setAgreed] = useState(false)
   const [fullName, setFullName] = useState('')
@@ -42,6 +51,118 @@ export default function HistorianConsentDisclosure({
   const identityComplete =
     !requireIdentity || (fullName.trim().length > 1 && dateOfBirth.length > 0)
   const canContinue = agreed && identityComplete
+
+  if (presentation === 'page') {
+    return (
+      <div>
+        <h2 className="nn-hist-title">Before we begin</h2>
+        <p className="nn-lede">
+          This interview is conducted by an automated AI assistant — not a physician or
+          nurse. Your voice is recorded and transcribed. What you share becomes a draft
+          summary that your clinician reviews before your visit. It is not a diagnosis,
+          and the assistant will not give you medical advice.
+        </p>
+
+        <div className="nn-flag" role="note" aria-label="This is not for emergencies">
+          <h4>This is not for emergencies</h4>
+          <p style={{ fontSize: '0.9375rem', lineHeight: 1.55 }}>
+            If you have sudden weakness or numbness, trouble speaking, a seizure, or the
+            worst headache of your life — stop now and call 911 or go to the nearest
+            emergency department.
+          </p>
+        </div>
+
+        <div className="nn-card">
+          <label
+            htmlFor={consentId}
+            style={{
+              display: 'flex',
+              gap: '12px',
+              alignItems: 'flex-start',
+              fontSize: '1rem',
+              lineHeight: 1.5,
+              cursor: 'pointer',
+              color: 'var(--nn-ink)',
+            }}
+          >
+            <input
+              id={consentId}
+              type="checkbox"
+              checked={agreed}
+              onChange={(e) => setAgreed(e.target.checked)}
+              style={{
+                width: 22,
+                height: 22,
+                flexShrink: 0,
+                marginTop: '1px',
+                accentColor: 'var(--nn-accent)',
+              }}
+            />
+            <span>
+              I understand an AI assistant will ask me questions, my voice will be recorded
+              and transcribed, and a clinician will review my answers before my visit. This
+              is not a diagnosis.
+            </span>
+          </label>
+        </div>
+
+        {requireIdentity && (
+          <div style={{ margin: '0 0 16px' }}>
+            <div style={{ margin: '0 0 14px' }}>
+              <label htmlFor={nameId} className="nn-label">Your full name</label>
+              <input
+                id={nameId}
+                type="text"
+                autoComplete="off"
+                value={fullName}
+                onChange={(e) => setFullName(e.target.value)}
+                placeholder="First and last name"
+                className="nn-input"
+              />
+            </div>
+            <div>
+              <label htmlFor={dobId} className="nn-label">Date of birth</label>
+              <input
+                id={dobId}
+                type="date"
+                autoComplete="off"
+                value={dateOfBirth}
+                onChange={(e) => setDateOfBirth(e.target.value)}
+                className="nn-input"
+              />
+            </div>
+            <p className="nn-hint" style={{ margin: '8px 0 0' }}>
+              Used only to confirm who is completing this interview. It is not saved and is
+              not shared with the AI assistant.
+            </p>
+          </div>
+        )}
+
+        <button
+          onClick={onConfirm}
+          disabled={!canContinue}
+          aria-disabled={!canContinue}
+          className="nn-btn nn-btn--block"
+        >
+          Begin interview
+        </button>
+
+        {onCancel && (
+          <button
+            onClick={onCancel}
+            className="nn-btn--quiet nn-btn--block"
+            style={{ width: '100%', marginTop: 8, padding: '12px' }}
+          >
+            Cancel
+          </button>
+        )}
+
+        <p style={{ color: 'var(--nn-ink-3)', fontSize: 'var(--nn-fs-sm)', textAlign: 'center', margin: '16px 0 0' }}>
+          You can pause or end the interview at any time.
+        </p>
+      </div>
+    )
+  }
 
   return (
     <div
