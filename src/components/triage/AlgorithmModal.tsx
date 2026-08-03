@@ -121,9 +121,11 @@ export default function AlgorithmModal({ open, onClose }: Props) {
         </div>
 
         <p style={{ color: '#94a3b8', fontSize: '0.8rem', marginBottom: '20px', lineHeight: 1.5 }}>
-          The AI scores each clinical dimension 1-5. The application calculates a weighted score
-          deterministically and maps it to a triage tier. Red flags and emergent conditions
-          can override the calculated score.
+          The AI scores each clinical dimension 1-5 against the fixed rubric below. The application
+          combines those scores using the published weights and maps the weighted total to a triage
+          tier. Red flags and emergent conditions can override the calculated score. The rubric,
+          weights, tier boundaries, and overrides never change between runs; the AI&apos;s reading
+          of a borderline note may.
         </p>
 
         <p style={{ color: '#94a3b8', fontSize: '0.75rem', marginBottom: '24px', fontStyle: 'italic' }}>

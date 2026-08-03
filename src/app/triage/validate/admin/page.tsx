@@ -767,7 +767,7 @@ export default function AdminPage() {
                 </h3>
                 <p style={{ color: '#64748b', fontSize: '0.75rem', margin: 0, lineHeight: 1.6 }}>
                   Run each case through the triage algorithm multiple times to measure AI self-consistency.
-                  Includes a deterministic baseline run at temperature=0 plus N standard runs at temperature=0.2.
+                  Includes a temperature=0 baseline run (lowest variance — not fully repeatable on borderline cases) plus N standard runs at temperature=0.2.
                 </p>
               </div>
 
@@ -808,7 +808,7 @@ export default function AdminPage() {
                       <div>
                         <span style={{ color: '#e2e8f0', fontSize: '0.8rem', fontWeight: 600 }}>Include baseline (temp=0)</span>
                         <span style={{ color: '#64748b', fontSize: '0.7rem', display: 'block' }}>
-                          Deterministic reference run
+                          Temperature=0 reference run
                         </span>
                       </div>
                     </label>

@@ -105,6 +105,16 @@ describe('referral text input policy', () => {
       "let buttonLabel = 'Extract & Triage'",
     )
     expect(componentSource).not.toContain('Triage This Patient')
-    expect(componentSource).toContain('{isLongNote && (')
+    expect(componentSource).toContain('{isLongNote && !pasteOverLimit && (')
+    // Client-side paste cap (input hardening): submit is blocked above
+    // MAX_TEXT_LENGTH with a visible message — the text itself is never
+    // truncated (no slice/substring, asserted above).
+    expect(componentSource).toContain(
+      'const pasteOverLimit = charCount > FILE_CONSTRAINTS.MAX_TEXT_LENGTH',
+    )
+    expect(componentSource).toContain('!pasteOverLimit &&')
+    expect(componentSource).toContain(
+      'FILE_CONSTRAINTS.MAX_TEXT_LENGTH.toLocaleString()',
+    )
   })
 })

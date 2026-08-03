@@ -317,8 +317,13 @@ const TriageInputPanel = forwardRef<TriageInputPanelHandle, Props>(
   }
 
   const charCount = textInput.characterCount
+  // Client-side paste cap: pasted notes are limited to MAX_TEXT_LENGTH (50k).
+  // Never silently truncate a referral — block submit and say so instead.
+  const pasteOverLimit = charCount > FILE_CONSTRAINTS.MAX_TEXT_LENGTH
   const canSubmitPaste =
-    (textInput.canSubmit || textInput.canRunSafetyScreen) && !loading
+    (textInput.canSubmit || textInput.canRunSafetyScreen) &&
+    !pasteOverLimit &&
+    !loading
   const canSubmitUpload = hasFiles && !loading
   const canSubmit = activeMode === 'paste' ? canSubmitPaste : canSubmitUpload
 
@@ -473,18 +478,18 @@ const TriageInputPanel = forwardRef<TriageInputPanelHandle, Props>(
             marginTop: '8px',
           }}>
             <span style={{
-              color: textInput.exceedsVerifiedPacketLimit
+              color: pasteOverLimit
                 ? '#F87171'
                 : textInput.belowMinimum
                   ? '#94a3b8'
                   : '#16A34A',
               fontSize: '0.75rem',
             }}>
-              {charCount.toLocaleString()}/{FILE_CONSTRAINTS.MAX_PACKET_TEXT_LENGTH.toLocaleString()} characters
+              {charCount.toLocaleString()}/{FILE_CONSTRAINTS.MAX_TEXT_LENGTH.toLocaleString()} characters
               {charCount > 0 && textInput.belowMinimum &&
                 ` (minimum ${MIN_REFERRAL_TEXT_LENGTH} required)`}
             </span>
-            {isLongNote && (
+            {isLongNote && !pasteOverLimit && (
               <span style={{
                 color: '#0D9488',
                 fontSize: '0.75rem',
@@ -501,6 +506,26 @@ const TriageInputPanel = forwardRef<TriageInputPanelHandle, Props>(
               </span>
             )}
           </div>
+          {pasteOverLimit && !textInput.exceedsVerifiedPacketLimit && (
+            <div
+              role="alert"
+              style={{
+                marginTop: '8px',
+                padding: '10px 12px',
+                borderRadius: '6px',
+                border: '1px solid #DC2626',
+                background: 'rgba(220, 38, 38, 0.12)',
+                color: '#FECACA',
+                fontSize: '0.78rem',
+                lineHeight: 1.5,
+              }}
+            >
+              This note is {charCount.toLocaleString()} characters — over the{' '}
+              {FILE_CONSTRAINTS.MAX_TEXT_LENGTH.toLocaleString()}-character limit for pasted
+              text. Nothing was truncated. Shorten the paste, or upload the full packet as a
+              PDF, DOCX, or TXT file (up to {FILE_CONSTRAINTS.MAX_FILE_SIZE_DISPLAY}).
+            </div>
+          )}
           {textInput.canRunSafetyScreen && (
             <div
               role="alert"

@@ -386,6 +386,22 @@ export default function TriageOutputPanel({ result, onTryAnother }: Props) {
               </div>
             </div>
 
+            {/* Stability caveat — the rubric is fixed; the model's reading is not */}
+            <div style={{
+              padding: '12px 16px',
+              background: 'rgba(30, 41, 59, 0.6)',
+              borderRadius: '8px',
+              border: '1px solid #334155',
+            }}>
+              <p style={{ color: '#94a3b8', fontSize: '0.78rem', lineHeight: 1.5, margin: 0 }}>
+                <span style={{ color: '#cbd5e1', fontWeight: 600 }}>Stability. </span>
+                The five dimensions, their published weights, the tier boundaries, and the
+                red-flag overrides are fixed and do not change between runs. The AI&apos;s reading
+                of a borderline note may vary between runs and can shift the tier on close calls.
+                Final triage decisions rest with the reviewing clinician.
+              </p>
+            </div>
+
           </div>
         )}
 

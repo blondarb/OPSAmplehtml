@@ -26,7 +26,7 @@ export const clinicianTrack: JourneyTrackData = {
   cards: [
     {
       phase: 'Referral Triage',
-      name: 'AI-Powered Triage',
+      name: 'Neuro Navigator',
       route: '/triage',
       icon: Brain,
       status: 'live',

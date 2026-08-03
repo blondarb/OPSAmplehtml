@@ -520,8 +520,8 @@ export default function ResultsPage() {
                     AI Self-Consistency (Intra-Rater Reliability)
                   </h3>
                   <p style={{ color: '#64748b', fontSize: '0.72rem', margin: '0 0 16px', lineHeight: 1.5 }}>
-                    Each case was run through the triage algorithm multiple times. A &quot;baseline&quot; run uses temperature=0 (near-deterministic),
-                    while standard runs use temperature=0.2. Perfect agreement means all runs produced the same tier.
+                    Each case was run through the triage algorithm multiple times. A &quot;baseline&quot; run uses temperature=0 (the lowest-variance
+                    setting — borderline cases can still change tier between runs), while standard runs use temperature=0.2. Perfect agreement means all runs produced the same tier.
                   </p>
 
                   {/* Summary stats */}
@@ -978,7 +978,7 @@ export default function ResultsPage() {
                       <li><strong style={{ color: '#cbd5e1' }}>Krippendorff&apos;s Alpha</strong> — Handles missing data and ordinal scales. Penalizes large disagreements more than small ones.</li>
                       <li><strong style={{ color: '#cbd5e1' }}>Weighted Kappa</strong> — Pairwise agreement that accounts for the ordered nature of triage tiers (being off by 1 tier is less severe than being off by 3).</li>
                       <li><strong style={{ color: '#cbd5e1' }}>Consensus</strong> — Determined by majority vote among all reviewers for each case.</li>
-                      <li><strong style={{ color: '#cbd5e1' }}>AI Self-Consistency</strong> — Measures how often the AI produces the same tier across multiple runs. A baseline run (temp=0) is near-deterministic; standard runs (temp=0.2) measure real-world variance.</li>
+                      <li><strong style={{ color: '#cbd5e1' }}>AI Self-Consistency</strong> — Measures how often the AI produces the same tier across multiple runs. A baseline run (temp=0) minimizes run-to-run variance but does not eliminate it — borderline cases can still change tier; standard runs (temp=0.2) measure real-world variance.</li>
                       <li><strong style={{ color: '#cbd5e1' }}>Redirect</strong> — Indicates when AI or a reviewer flagged the case as belonging to a non-neurology specialty (e.g. Orthopedics, Psychiatry).</li>
                     </ul>
                   </div>

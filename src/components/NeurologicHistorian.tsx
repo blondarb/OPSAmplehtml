@@ -351,12 +351,14 @@ export default function NeurologicHistorian() {
       <HistorianConsentDisclosure
         onConfirm={handleConsentConfirm}
         onCancel={handleConsentCancel}
+        requireIdentity
       />
     )}
     <FeatureSubHeader
       title="AI Health Interview"
       icon={Mic}
       accentColor="#0D9488"
+      showDemo={false}
       nextStep={{ label: 'Patient Messaging', route: '/patient/messages' }}
     />
     <div style={{

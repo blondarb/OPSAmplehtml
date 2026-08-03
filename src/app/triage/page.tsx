@@ -29,7 +29,6 @@ import TriageInputPanel, {
 import TriageOutputPanel from '@/components/triage/TriageOutputPanel'
 import ExtractionReviewPanel from '@/components/triage/ExtractionReviewPanel'
 import DisclaimerBanner from '@/components/triage/DisclaimerBanner'
-import TriageHelpGuide from '@/components/triage/TriageHelpGuide'
 import ExtractionIngressSafetyAlert, {
   mergeExtractionIngressSafetyNotice,
   retainExtractionIngressSafetyNotice,
@@ -612,9 +611,10 @@ export default function TriagePage() {
   return (
     <PlatformShell>
     <FeatureSubHeader
-      title="AI Triage Tool"
+      title="Neuro Navigator"
       icon={Brain}
       accentColor="#F59E0B"
+      showDemo={false}
       nextStep={{ label: 'Physician Workspace', route: '/physician' }}
     />
     <div style={{
@@ -638,8 +638,9 @@ export default function TriagePage() {
             maxWidth: '600px',
             margin: '0 auto',
           }}>
-            Paste a referral note or upload one referral packet. The AI analyzes clinical features, scores five dimensions,
-            and the application calculates a triage tier deterministically. All scoring is transparent and auditable.
+            Paste a referral note or upload one referral packet. The AI scores five fixed dimensions with published
+            weights, and the weighted total maps to a triage tier. Borderline notes may score differently across runs;
+            tier boundaries and red-flag overrides do not. Every recommendation shows its full score breakdown.
           </p>
           <Link
             href="/triage/validate"
@@ -813,7 +814,6 @@ export default function TriagePage() {
         )}
       </div>
     </div>
-    <TriageHelpGuide />
     </PlatformShell>
   )
 }

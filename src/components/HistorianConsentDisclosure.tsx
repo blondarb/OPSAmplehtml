@@ -1,8 +1,20 @@
 'use client'
 
+import { useId, useState } from 'react'
+
 interface HistorianConsentDisclosureProps {
   onConfirm: () => void
   onCancel?: () => void
+  /**
+   * When true (the patient-facing /patient/historian surface), the gate also
+   * requires full name + date of birth before the interview can begin
+   * (SAFE-1/SAFE-2 identity confirmation). The typed identity is an
+   * attestation gate only: it lives in this component's state and is never
+   * sent to the voice model, the transcript, or the database — neither voice
+   * engine is under a Sevaro BAA, so no new data path may carry it out of the
+   * browser.
+   */
+  requireIdentity?: boolean
 }
 
 /**
@@ -18,7 +30,19 @@ interface HistorianConsentDisclosureProps {
 export default function HistorianConsentDisclosure({
   onConfirm,
   onCancel,
+  requireIdentity = false,
 }: HistorianConsentDisclosureProps) {
+  const [agreed, setAgreed] = useState(false)
+  const [fullName, setFullName] = useState('')
+  const [dateOfBirth, setDateOfBirth] = useState('')
+  const nameId = useId()
+  const dobId = useId()
+  const consentId = useId()
+
+  const identityComplete =
+    !requireIdentity || (fullName.trim().length > 1 && dateOfBirth.length > 0)
+  const canContinue = agreed && identityComplete
+
   return (
     <div
       role="dialog"
@@ -34,12 +58,15 @@ export default function HistorianConsentDisclosure({
         justifyContent: 'center',
         padding: '24px',
         zIndex: 1000,
+        overflowY: 'auto',
       }}
     >
       <div
         style={{
           width: '100%',
-          maxWidth: '440px',
+          maxWidth: '480px',
+          maxHeight: '90vh',
+          overflowY: 'auto',
           borderRadius: '16px',
           border: '1px solid #334155',
           background: '#1e293b',
@@ -51,33 +78,180 @@ export default function HistorianConsentDisclosure({
           id="historian-consent-title"
           style={{ color: '#fff', fontSize: '1.25rem', fontWeight: 700, margin: '0 0 12px' }}
         >
-          Before you begin
+          Before we begin
         </h2>
         <p
           id="historian-consent-body"
-          style={{ color: '#cbd5e1', fontSize: '0.9rem', lineHeight: 1.6, margin: '0 0 20px' }}
+          style={{ color: '#cbd5e1', fontSize: '0.9rem', lineHeight: 1.6, margin: '0 0 16px' }}
         >
-          You&apos;ll be talking with an AI assistant — not a physician or nurse. It cannot
-          diagnose you, give medical advice, or help in an emergency. If this is an emergency,
-          call 911 now. Your conversation is recorded and transcribed so your care team can
-          review it.
+          This interview is conducted by an automated AI assistant — not a physician or
+          nurse. Your voice is recorded and transcribed. What you share becomes a draft
+          summary that your clinician reviews before your visit. It is not a diagnosis,
+          and the assistant will not give you medical advice.
         </p>
+
+        {/* Emergency redirect — must be visible before any interview can start */}
+        <div
+          role="note"
+          aria-label="This is not for emergencies"
+          style={{
+            border: '1px solid rgba(239, 68, 68, 0.5)',
+            background: 'rgba(239, 68, 68, 0.12)',
+            borderRadius: '10px',
+            padding: '14px 16px',
+            margin: '0 0 16px',
+          }}
+        >
+          <p style={{
+            color: '#fca5a5',
+            fontSize: '0.75rem',
+            fontWeight: 700,
+            letterSpacing: '0.05em',
+            textTransform: 'uppercase',
+            margin: '0 0 6px',
+          }}>
+            This is not for emergencies
+          </p>
+          <p style={{ color: '#fecaca', fontSize: '0.875rem', lineHeight: 1.55, margin: 0 }}>
+            If you have sudden weakness or numbness, trouble speaking, a seizure, or the
+            worst headache of your life — stop now and call 911 or go to the nearest
+            emergency department.
+          </p>
+        </div>
+
+        {/* Explicit consent — never pre-checked */}
+        <div
+          style={{
+            border: '1px solid #334155',
+            background: '#0f172a',
+            borderRadius: '10px',
+            padding: '14px 16px',
+            margin: '0 0 16px',
+          }}
+        >
+          <label
+            htmlFor={consentId}
+            style={{
+              display: 'flex',
+              gap: '12px',
+              alignItems: 'flex-start',
+              color: '#e2e8f0',
+              fontSize: '0.875rem',
+              lineHeight: 1.55,
+              cursor: 'pointer',
+            }}
+          >
+            <input
+              id={consentId}
+              type="checkbox"
+              checked={agreed}
+              onChange={(e) => setAgreed(e.target.checked)}
+              style={{
+                width: 20,
+                height: 20,
+                flexShrink: 0,
+                marginTop: '1px',
+                accentColor: '#0d9488',
+              }}
+            />
+            <span>
+              I understand an AI assistant will ask me questions, my voice will be recorded
+              and transcribed, and a clinician will review my answers before my visit. This
+              is not a diagnosis.
+            </span>
+          </label>
+        </div>
+
+        {/* Identity confirmation — required before any clinical question is asked */}
+        {requireIdentity && (
+          <div style={{ margin: '0 0 16px' }}>
+            <div style={{ margin: '0 0 12px' }}>
+              <label
+                htmlFor={nameId}
+                style={{
+                  display: 'block',
+                  color: '#cbd5e1',
+                  fontSize: '0.8rem',
+                  fontWeight: 600,
+                  marginBottom: '5px',
+                }}
+              >
+                Your full name
+              </label>
+              <input
+                id={nameId}
+                type="text"
+                autoComplete="off"
+                value={fullName}
+                onChange={(e) => setFullName(e.target.value)}
+                placeholder="First and last name"
+                style={{
+                  width: '100%',
+                  boxSizing: 'border-box',
+                  padding: '12px 14px',
+                  borderRadius: '10px',
+                  border: '1px solid #475569',
+                  background: '#0f172a',
+                  color: '#e2e8f0',
+                  fontSize: '1rem',
+                }}
+              />
+            </div>
+            <div>
+              <label
+                htmlFor={dobId}
+                style={{
+                  display: 'block',
+                  color: '#cbd5e1',
+                  fontSize: '0.8rem',
+                  fontWeight: 600,
+                  marginBottom: '5px',
+                }}
+              >
+                Date of birth
+              </label>
+              <input
+                id={dobId}
+                type="date"
+                autoComplete="off"
+                value={dateOfBirth}
+                onChange={(e) => setDateOfBirth(e.target.value)}
+                style={{
+                  width: '100%',
+                  boxSizing: 'border-box',
+                  padding: '12px 14px',
+                  borderRadius: '10px',
+                  border: '1px solid #475569',
+                  background: '#0f172a',
+                  color: '#e2e8f0',
+                  fontSize: '1rem',
+                }}
+              />
+            </div>
+            <p style={{ color: '#64748b', fontSize: '0.72rem', lineHeight: 1.5, margin: '8px 0 0' }}>
+              Used only to confirm who is completing this interview. It is not saved and is
+              not shared with the AI assistant.
+            </p>
+          </div>
+        )}
 
         <button
           onClick={onConfirm}
+          disabled={!canContinue}
+          aria-disabled={!canContinue}
           style={{
             width: '100%',
             padding: '14px',
             borderRadius: '10px',
-            background: '#0d9488',
-            color: '#fff',
+            background: canContinue ? '#0d9488' : '#334155',
+            color: canContinue ? '#fff' : '#64748b',
             border: 'none',
             fontWeight: 700,
             fontSize: '1rem',
-            cursor: 'pointer',
+            cursor: canContinue ? 'pointer' : 'not-allowed',
           }}
         >
-          I understand — start the interview
+          Begin interview
         </button>
 
         {onCancel && (
@@ -101,7 +275,7 @@ export default function HistorianConsentDisclosure({
         )}
 
         <p style={{ color: '#64748b', fontSize: '0.75rem', textAlign: 'center', margin: '16px 0 0' }}>
-          You can end the interview at any time.
+          You can pause or end the interview at any time.
         </p>
       </div>
     </div>
