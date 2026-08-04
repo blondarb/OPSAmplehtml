@@ -16,6 +16,7 @@ import {
   TIER_COUNT,
   TIER_PRESENTATION,
 } from '@/lib/triage/tierPresentation'
+import { buildFloorDisclosure } from '@/lib/triage/floorDisclosure'
 import TriageTierBadge from './TriageTierBadge'
 import ClinicalReasons from './ClinicalReasons'
 import RedFlagAlert from './RedFlagAlert'
@@ -73,6 +74,13 @@ export default function TriageOutputPanel({ result, onTryAnother }: Props) {
   const hasDimensionScores = DIMENSION_PRESENTATION.some(
     (dim) => presentationResult.dimension_scores?.[dim.key],
   )
+  // Disclose when a single-dimension safety floor, not the weighted total,
+  // decided the tier (audit 2026-08-04).
+  const floorDisclosure = buildFloorDisclosure({
+    dimensionScores: presentationResult.dimension_scores,
+    redFlagOverride: Boolean(presentationResult.red_flag_override),
+    finalTier: presentationResult.triage_tier,
+  })
 
   return (
     <>
@@ -189,6 +197,28 @@ export default function TriageOutputPanel({ result, onTryAnother }: Props) {
                       : `Tier ${tierPresentation.num} of ${TIER_COUNT} — ${tierPresentation.name}`}
                   </b>
                 </div>
+                {floorDisclosure && (
+                  <div
+                    className="nn-note"
+                    style={{ margin: '10px 0 0' }}
+                    role="note"
+                    aria-label="Safety floor applied"
+                  >
+                    <h3>Safety floor applied — the tier is not from the weighted total</h3>
+                    <p style={{ margin: '0 0 6px' }}>
+                      The weighted total maps to{' '}
+                      <strong>{floorDisclosure.scoreTierName}</strong>, but a single-dimension
+                      safety floor raised it to <strong>{tierPresentation.name}</strong>. The
+                      floor is deliberate: it prevents a high score on one dimension from being
+                      averaged away.
+                    </p>
+                    <ul style={{ margin: 0, paddingLeft: 18 }}>
+                      {floorDisclosure.reasons.map((reason) => (
+                        <li key={reason}>{reason}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
                 {presentationResult.red_flag_override && (
                   <p style={{ color: 'var(--nn-t1)', fontSize: 'var(--nn-fs-sm)', fontWeight: 600, margin: '8px 0 0' }}>
                     A red-flag override applied — the override supersedes the

@@ -33,7 +33,7 @@ export const DEMO_SCENARIOS: DemoScenario[] = [
     "referringSpecialty": "Internal Medicine",
     "briefDescription": "Transformation from episodic to chronic daily migraine with medication-overuse headache, with an inadequate and side-effect-limited topiramate trial.",
     "clinicalHighlight": "Chronic migraine, med overuse",
-    "expectedTier": "routine_priority",
+    "expectedTier": "semi_urgent",
     "files": [
       {
         "filename": "02_Gutierrez_Maria.pdf",

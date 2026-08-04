@@ -2,6 +2,7 @@ import {
   AITriageResponse,
   CarePathway,
   DataQuality,
+  DimensionScores,
   NEURO_SUBSPECIALTIES,
   NON_NEURO_SPECIALTIES,
   NonNeuroSpecialtyType,
@@ -549,13 +550,34 @@ function moreUrgentOutpatientTier(
   return OUTPATIENT_ORDER.indexOf(a) <= OUTPATIENT_ORDER.indexOf(b) ? a : b
 }
 
-export function calculateTriageDecision(aiResponse: AITriageResponse): TriageDecisionState {
-  const weightedScore = calculateWeightedScore(aiResponse.dimension_scores)
-  let outpatientPriority = mapScoreToTier(weightedScore)
-  const appliedFloors: string[] = []
-  const scores = aiResponse.dimension_scores
+/**
+ * The single-dimension floors, computed as a PURE function of the dimension
+ * scores plus the red-flag override.
+ *
+ * Extracted so the UI can disclose a floor-driven tier without duplicating the
+ * rules (audit 2026-08-04: a floor can raise the tier above what the published
+ * weighted score maps to, and the result panel previously showed the weighted
+ * total → tier line with no indication a floor had overridden it, which reads
+ * as an arithmetic contradiction against the published thresholds).
+ *
+ * Behavior is identical to the inline logic this replaced — see
+ * tests/triage/floorParity.test.ts, which checks every one of the 5^5 x 2 score
+ * combinations against a reference implementation.
+ */
+export interface AppliedFloorBreakdown {
+  /** Floor identifiers, urgent-level floors first. */
+  appliedFloors: string[]
+  hasUrgentFloor: boolean
+  hasSemiUrgentFloor: boolean
+}
 
-  if (aiResponse.red_flag_override) {
+export function computeAppliedFloors(
+  scores: DimensionScores,
+  redFlagOverride: boolean,
+): AppliedFloorBreakdown {
+  const appliedFloors: string[] = []
+
+  if (redFlagOverride) {
     appliedFloors.push('red_flag_override')
   }
   if (scores.red_flag_presence.score >= 4) {
@@ -580,8 +602,20 @@ export function calculateTriageDecision(aiResponse: AITriageResponse): TriageDec
     appliedFloors.push('diagnostic_concern_4_semi_urgent')
   }
 
-  const hasUrgentFloor = urgentFloorCount > 0
-  const hasSemiUrgentFloor = appliedFloors.length > urgentFloorCount
+  return {
+    appliedFloors,
+    hasUrgentFloor: urgentFloorCount > 0,
+    hasSemiUrgentFloor: appliedFloors.length > urgentFloorCount,
+  }
+}
+
+export function calculateTriageDecision(aiResponse: AITriageResponse): TriageDecisionState {
+  const weightedScore = calculateWeightedScore(aiResponse.dimension_scores)
+  let outpatientPriority = mapScoreToTier(weightedScore)
+  const { appliedFloors, hasUrgentFloor, hasSemiUrgentFloor } = computeAppliedFloors(
+    aiResponse.dimension_scores,
+    Boolean(aiResponse.red_flag_override),
+  )
 
   if (hasUrgentFloor) {
     outpatientPriority = moreUrgentOutpatientTier(outpatientPriority, 'urgent')
