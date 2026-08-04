@@ -284,8 +284,12 @@ export default function NeurologicHistorian() {
   }
 
   const handleStartInterview = () => {
-    // Allow start if we have a real patient config OR a selected demo scenario
-    if (!selectedScenario && !sessionConfig) return
+    // Allow start with a real patient config, a selected demo scenario, OR a
+    // loaded referral. This guard must stay in step with the Start button's
+    // `disabled` condition — when they disagreed, the button was enabled by a
+    // loaded referral while the handler returned early, so Start silently did
+    // nothing (caught on prod 2026-08-04).
+    if (!selectedScenario && !sessionConfig && !referralInput) return
     // Gate: show the consent/disclosure step before any session/mic start.
     // startSession() is invoked only from handleConsentConfirm.
     if (!consentAcknowledged) {
