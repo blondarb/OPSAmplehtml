@@ -1,0 +1,238 @@
+<meta charset="utf-8">
+<style>
+  :root {
+    --bg: #ffffff; --fg: #1a2333; --muted2: #64748b;
+    --card: #f8fafc; --border: #cbd5e1;
+    --live: #15803d; --partial: #b45309; --gap: #dc2626; --mayo: #2563eb;
+    --mayo-tint: rgba(37,99,235,.06); --chip: #eef2ff;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0f172a; --fg: #e2e8f0; --muted2: #94a3b8;
+      --card: #1e293b; --border: #475569;
+      --live: #4ade80; --partial: #fbbf24; --gap: #f87171; --mayo: #60a5fa;
+      --mayo-tint: rgba(96,165,250,.08); --chip: #1e2c4f;
+    }
+  }
+  body { background: var(--bg); color: var(--fg); font-family: system-ui, -apple-system, sans-serif; margin: 24px; }
+  h1 { font-size: 22px; margin: 0 0 4px; }
+  .sub { color: var(--muted2); font-size: 13px; margin-bottom: 18px; }
+  .wrap { overflow-x: auto; }
+  svg { width: 100%; max-width: 1220px; height: auto; display: block; }
+  .box { fill: var(--card); stroke: var(--border); stroke-width: 1.4; }
+  .opt-box { fill: var(--card); stroke: var(--muted2); stroke-width: 1.6; stroke-dasharray: 7 5; }
+  .bt { font-size: 16px; font-weight: 600; fill: var(--fg); text-anchor: middle; }
+  .bs { font-size: 12.5px; fill: var(--muted2); text-anchor: middle; }
+  .bsw { font-size: 12.5px; fill: var(--partial); text-anchor: middle; }
+  .band-label { font-size: 12px; font-weight: 700; letter-spacing: .12em; fill: var(--muted2); }
+  .sep { stroke: var(--border); stroke-width: 1; stroke-dasharray: 2 5; opacity: .7; }
+  .a-live { stroke: var(--live); stroke-width: 2.2; fill: none; }
+  .a-live-thick { stroke: var(--live); stroke-width: 3.5; fill: none; }
+  .a-partial { stroke: var(--partial); stroke-width: 2.2; fill: none; }
+  .a-gap { stroke: var(--gap); stroke-width: 2.2; stroke-dasharray: 6 5; fill: none; }
+  .a-opt { stroke: var(--muted2); stroke-width: 2.2; stroke-dasharray: 3 5; fill: none; }
+  .lbl { font-size: 12px; font-weight: 500; text-anchor: middle; paint-order: stroke; stroke: var(--bg); stroke-width: 5px; }
+  .l-live { fill: var(--live); } .l-partial { fill: var(--partial); } .l-gap { fill: var(--gap); } .l-mayo { fill: var(--mayo); }
+  .mayo-halo { fill: var(--mayo-tint); stroke: var(--mayo); stroke-width: 1.5; stroke-dasharray: 8 6; }
+  .container-box { fill: none; stroke: var(--muted2); stroke-width: 1.2; stroke-dasharray: 4 4; }
+  .chip { fill: var(--chip); stroke: var(--border); }
+  .chip-t { font-size: 12.5px; fill: var(--fg); text-anchor: middle; font-weight: 500; }
+  table { border-collapse: collapse; font-size: 13px; margin-top: 26px; max-width: 1220px; width: 100%; }
+  th, td { text-align: left; padding: 7px 12px; border-bottom: 1px solid var(--border); vertical-align: top; }
+  th { font-size: 12px; letter-spacing: .06em; color: var(--muted2); }
+  code { font-size: 12px; background: var(--card); padding: 1px 5px; border-radius: 4px; }
+  .pill { font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 999px; white-space: nowrap; }
+  .p-live { color: var(--live); border: 1px solid var(--live); }
+  .p-partial { color: var(--partial); border: 1px solid var(--partial); }
+  .p-gap { color: var(--gap); border: 1px solid var(--gap); }
+  .p-plan { color: var(--mayo); border: 1px solid var(--mayo); }
+  .p-opt { color: var(--muted2); border: 1px solid var(--muted2); }
+  .note { color: var(--muted2); font-size: 12.5px; max-width: 1220px; margin-top: 14px; }
+</style>
+
+<h1>OPSAmple — Patient Journey &amp; Data Flow</h1>
+<div class="sub">v2 &#183; Target architecture annotated with what exists in code today (repo: <code>OPSAmplehtml</code>, verified 2026-08-04). Scheduling = local site&#8217;s team; Sevaro Desktop Scribe shown as a candidate note surface.</div>
+
+<div class="wrap">
+<svg viewBox="0 0 1220 1366" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <marker id="mLive" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="var(--live)"/>
+    </marker>
+    <marker id="mPartial" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="var(--partial)"/>
+    </marker>
+    <marker id="mGap" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="var(--gap)"/>
+    </marker>
+    <marker id="mOpt" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="var(--muted2)"/>
+    </marker>
+  </defs>
+
+  <!-- Mayo demo path halo (behind everything) -->
+  <rect class="mayo-halo" x="340" y="46" width="460" height="522" rx="14"/>
+  <rect x="410" y="556" width="320" height="24" rx="12" fill="var(--bg)" stroke="var(--mayo)" stroke-width="1.5"/>
+  <text x="570" y="572" class="lbl l-mayo" style="font-weight:700">MAYO DEMO PATH — already wired today</text>
+
+  <!-- Bands -->
+  <text x="20" y="38" class="band-label">INTAKE</text>
+  <line class="sep" x1="20" y1="368" x2="1200" y2="368"/>
+  <text x="20" y="392" class="band-label">PRE-VISIT</text>
+  <line class="sep" x1="20" y1="600" x2="1200" y2="600"/>
+  <text x="20" y="624" class="band-label">VISIT NOTE</text>
+  <line class="sep" x1="20" y1="1010" x2="1200" y2="1010"/>
+  <text x="20" y="1034" class="band-label">POST-VISIT</text>
+  <line class="sep" x1="20" y1="1250" x2="1200" y2="1250"/>
+
+  <!-- INTAKE -->
+  <rect class="box" x="60" y="56" width="270" height="104" rx="10"/>
+  <text x="195" y="88" class="bt">Referring partner site</text>
+  <text x="195" y="112" class="bs">e.g. Mayo — may use triage only,</text>
+  <text x="195" y="130" class="bs">push/pull over secure APIs</text>
+
+  <rect class="box" x="460" y="56" width="330" height="104" rx="10"/>
+  <text x="625" y="88" class="bt">Referral note / patient info</text>
+  <text x="625" y="112" class="bs">today: paste or file upload in-app</text>
+  <text x="625" y="130" class="bs">fax/OCR ingester built, not deployed</text>
+
+  <!-- Legend -->
+  <rect class="box" x="860" y="46" width="300" height="225" rx="10"/>
+  <text x="880" y="74" style="font-size:13.5px;font-weight:700" fill="var(--fg)">Legend</text>
+  <line class="a-live" x1="880" y1="98" x2="935" y2="98" marker-end="url(#mLive)"/>
+  <text x="945" y="102" style="font-size:12.5px" fill="var(--fg)">wired in code today</text>
+  <line class="a-partial" x1="880" y1="128" x2="935" y2="128" marker-end="url(#mPartial)"/>
+  <text x="945" y="132" style="font-size:12.5px" fill="var(--fg)">human process + code assist</text>
+  <line class="a-gap" x1="880" y1="158" x2="935" y2="158" marker-end="url(#mGap)"/>
+  <text x="945" y="162" style="font-size:12.5px" fill="var(--fg)">gap — to build / planned</text>
+  <line class="a-opt" x1="880" y1="188" x2="935" y2="188" marker-end="url(#mOpt)"/>
+  <text x="945" y="192" style="font-size:12.5px" fill="var(--fg)">option under consideration</text>
+  <rect x="880" y="206" width="55" height="18" rx="9" class="mayo-halo"/>
+  <text x="945" y="219" style="font-size:12.5px" fill="var(--fg)">Mayo demo path</text>
+
+  <rect class="box" x="460" y="220" width="330" height="110" rx="10"/>
+  <text x="625" y="254" class="bt">AI TRIAGE — /triage</text>
+  <text x="625" y="278" class="bs">tier &#183; red flags &#183; chief complaint &#183; summary</text>
+  <text x="625" y="296" class="bs">routes the patient to the right place</text>
+
+  <path class="a-live-thick" d="M625,160 L625,215" marker-end="url(#mLive)"/>
+  <path class="a-gap" d="M330,108 C 395,108 395,260 455,260" marker-start="url(#mGap)" marker-end="url(#mGap)"/>
+  <text x="368" y="176" class="lbl l-gap">push referral / pull results</text>
+  <text x="368" y="192" class="lbl l-gap">secure partner API — to build</text>
+
+  <!-- PRE-VISIT -->
+  <rect class="box" x="50" y="430" width="270" height="130" rx="10"/>
+  <text x="185" y="462" class="bt">LOCAL SCHEDULERS</text>
+  <text x="185" y="486" class="bs">partner site&#8217;s scheduling team</text>
+  <text x="185" y="504" class="bs">books the visit from triage routing</text>
+  <text x="185" y="524" class="bsw">code assist: auto-draft appt</text>
+  <text x="185" y="540" class="bsw">(urgent tier only, pending review)</text>
+
+  <rect class="box" x="350" y="430" width="330" height="130" rx="10"/>
+  <text x="515" y="462" class="bt">AI HISTORIAN — /consult</text>
+  <text x="515" y="486" class="bs">conversational history with the patient</text>
+  <text x="515" y="504" class="bs">opens pre-briefed with triage context</text>
+  <text x="515" y="522" class="bs">(chief complaint, red flags, tier)</text>
+
+  <rect class="box" x="820" y="430" width="300" height="130" rx="10"/>
+  <text x="970" y="462" class="bt">SENSE EXAM — /sdne</text>
+  <text x="970" y="486" class="bs">XR digital neuro exam (SDNE app,</text>
+  <text x="970" y="504" class="bs">embedded iframe); results post</text>
+  <text x="970" y="522" class="bs">back automatically (postMessage)</text>
+
+  <path class="a-partial" d="M480,330 C 400,375 250,390 190,426" marker-end="url(#mPartial)"/>
+  <text x="308" y="382" class="lbl l-partial">tier + routing packet</text>
+  <path class="a-live-thick" d="M600,330 L532,426" marker-end="url(#mLive)"/>
+  <path class="a-live" d="M684,470 L816,470" marker-end="url(#mLive)"/>
+  <text x="750" y="458" class="lbl l-live">then</text>
+
+  <!-- VISIT: note production -->
+  <rect class="container-box" x="60" y="640" width="860" height="340" rx="12"/>
+  <text x="80" y="964" style="font-size:13.5px;font-weight:700" fill="var(--fg)">NOTE PRODUCTION — two parallel pipelines today</text>
+
+  <rect class="box" x="90" y="720" width="340" height="170" rx="10"/>
+  <text x="260" y="754" class="bt">AI CONSULT REPORT</text>
+  <text x="260" y="778" class="bs">/consult &#183; consult_reports</text>
+  <text x="260" y="800" class="bs">auto-drafted: triage + historian +</text>
+  <text x="260" y="818" class="bs">SENSE results + generated A&amp;P</text>
+
+  <rect class="box" x="490" y="720" width="390" height="170" rx="10"/>
+  <text x="685" y="754" class="bt">SIGNED CLINICAL NOTE</text>
+  <text x="685" y="778" class="bs">/ehr &#183; visits + clinical_notes</text>
+  <text x="685" y="800" class="bs">physician completes, edits + signs</text>
+  <text x="685" y="818" class="bs">— the note of record</text>
+
+  <rect class="opt-box" x="950" y="720" width="220" height="170" rx="10"/>
+  <text x="1060" y="752" class="bt">SEVARO DESKTOP</text>
+  <text x="1060" y="772" class="bt">SCRIBE</text>
+  <text x="1060" y="798" class="bs">candidate dictation surface;</text>
+  <text x="1060" y="814" class="bs">would pull visit context</text>
+  <text x="1060" y="830" class="bs">(triage/historian/SENSE);</text>
+  <text x="1060" y="846" class="bs">not integrated today</text>
+
+  <path class="a-live" d="M440,560 L292,716" marker-end="url(#mLive)"/>
+  <text x="365" y="594" class="lbl l-live">summary + structured output</text>
+  <path class="a-live" d="M560,560 L628,716" marker-end="url(#mLive)"/>
+  <text x="680" y="596" class="lbl l-live">import-historian &#8594; HPI/ROS</text>
+  <path class="a-live" d="M880,560 L880,614 L300,614 L300,716" marker-end="url(#mLive)"/>
+  <text x="700" y="606" class="lbl l-live">exam results (auto-link)</text>
+  <path class="a-gap" d="M960,560 L960,664 L770,664 L770,716" marker-end="url(#mGap)"/>
+  <text x="890" y="690" class="lbl l-gap">planned — see SENSE plan</text>
+  <path class="a-gap" d="M430,800 L486,800" marker-end="url(#mGap)"/>
+  <text x="458" y="786" class="lbl l-gap">no bridge yet</text>
+  <path class="a-opt" d="M946,805 L886,805" marker-end="url(#mOpt)"/>
+
+  <!-- POST-VISIT -->
+  <rect class="box" x="140" y="1080" width="380" height="130" rx="10"/>
+  <text x="330" y="1112" class="bt">FOLLOW-UP AGENT — /follow-up</text>
+  <text x="330" y="1136" class="bs">AI check-on-the-patient via SMS + voice;</text>
+  <text x="330" y="1154" class="bs">seeded from signed note (A&amp;P, meds,</text>
+  <text x="330" y="1172" class="bs">demographics) — can act / escalate</text>
+
+  <rect class="box" x="620" y="1080" width="220" height="110" rx="10"/>
+  <text x="730" y="1112" class="bt">SevaroMonitor</text>
+  <text x="730" y="1136" class="bs">watch + iOS app</text>
+  <text x="730" y="1154" class="bs">writes to its own DB</text>
+
+  <rect class="box" x="880" y="1080" width="280" height="130" rx="10"/>
+  <text x="1020" y="1112" class="bt">RPM DASHBOARDS</text>
+  <text x="1020" y="1136" class="bs">/rpm &#183; /wearable</text>
+  <text x="1020" y="1154" class="bs">read wearable data only —</text>
+  <text x="1020" y="1172" class="bs">no patient/visit link</text>
+
+  <path class="a-live" d="M600,890 C 520,990 430,1020 360,1076" marker-end="url(#mLive)"/>
+  <text x="475" y="995" class="lbl l-live">on sign &#8594; auto-trigger</text>
+  <path class="a-gap" d="M800,890 C 920,960 1000,1010 1020,1076" marker-end="url(#mGap)"/>
+  <text x="985" y="978" class="lbl l-gap">isolated — outpatient</text>
+  <text x="985" y="994" class="lbl l-gap">RPM plan drafted</text>
+  <path class="a-live" d="M840,1130 L876,1130" marker-end="url(#mLive)"/>
+
+  <!-- Footer: modular adoption -->
+  <text x="20" y="1284" style="font-size:13.5px;font-weight:700" fill="var(--fg)">&#192;-la-carte adoption — each module standalone for partners (needs the secure partner API layer):</text>
+  <rect class="chip" x="20" y="1300" width="150" height="34" rx="17"/>
+  <text x="95" y="1321" class="chip-t">Triage only</text>
+  <rect class="chip" x="185" y="1300" width="150" height="34" rx="17"/>
+  <text x="260" y="1321" class="chip-t">Historian only</text>
+  <rect class="chip" x="350" y="1300" width="150" height="34" rx="17"/>
+  <text x="425" y="1321" class="chip-t">SENSE only</text>
+  <rect class="chip" x="515" y="1300" width="170" height="34" rx="17"/>
+  <text x="600" y="1321" class="chip-t">Follow-up / RPM only</text>
+  <rect class="chip" x="700" y="1300" width="150" height="34" rx="17"/>
+  <text x="775" y="1321" class="chip-t">Full journey</text>
+</svg>
+</div>
+
+<table>
+  <tr><th>#</th><th>DATA FLOW</th><th>STATUS</th><th>WHERE IT LIVES</th></tr>
+  <tr><td>1</td><td>Referral / patient info → Triage</td><td><span class="pill p-live">LIVE</span></td><td><code>TriageInputPanel.tsx</code> (paste/upload) → <code>/api/triage</code>. Fax/OCR ingester (<code>infrastructure/triage-ingestion</code>) built, not deployed. No partner-facing API yet.</td></tr>
+  <tr><td>2</td><td>Triage → Local schedulers</td><td><span class="pill p-partial">HUMAN + ASSIST</span></td><td>Booking is the partner site&#8217;s own scheduling team, guided by triage tier/routing. Code assist exists: <code>autoSchedule.ts</code> auto-drafts a pending-review appointment for the urgent tier.</td></tr>
+  <tr><td>3</td><td>Triage → Historian</td><td><span class="pill p-live">LIVE</span></td><td><code>contextBuilder.ts</code> — historian opens pre-briefed with chief complaint, red flags, tier. <b>This is the Mayo demo path, end-to-end.</b></td></tr>
+  <tr><td>4</td><td>Referral note → note engine</td><td><span class="pill p-live">LIVE</span></td><td><code>report-builder.ts</code> — report&#8217;s first section is built from the triage/referral data.</td></tr>
+  <tr><td>5</td><td>Historian → note engine</td><td><span class="pill p-live">LIVE ×2</span></td><td>Feeds <em>both</em> pipelines: consult report (<code>report-builder.ts</code>) and signed note (<code>import-historian</code> API → HPI/ROS/history). The two pipelines themselves aren&#8217;t bridged.</td></tr>
+  <tr><td>6</td><td>SENSE exam → signed note</td><td><span class="pill p-plan">PLANNED</span></td><td>Auto-links into consult report + historian context today (postMessage). Import into the signed <code>/ehr</code> note is scoped in the <b>SENSE integration plan</b>.</td></tr>
+  <tr><td>7</td><td>Signed note → Follow-up agent</td><td><span class="pill p-live">LIVE</span></td><td><code>sign/route.ts</code> → <code>triggerFollowUpFromVisit()</code> — fires automatically on signing, non-blocking.</td></tr>
+  <tr><td>8</td><td>Visit → RPM</td><td><span class="pill p-plan">PLANNED</span></td><td>RPM data fully isolated today (own DB, read-only dashboards). Enrollment + monitoring loop scoped in the <b>Outpatient RPM plan</b>.</td></tr>
+  <tr><td>9</td><td>Desktop Scribe → signed note</td><td><span class="pill p-opt">OPTION</span></td><td>Sevaro Desktop Scribe as the dictation surface for the visit — separate product today; integration approach TBD.</td></tr>
+</table>
+
+<p class="note">Sources: <code>~/dev/repos/OPSAmplehtml</code> (routes, libs, API handlers), <code>SDNE</code>, <code>SevaroMonitor</code>, <code>sevaro-scribe-companion</code>. Companion docs: <code>docs/plans/2026-08-04-sense-to-signed-note-plan.md</code> &#183; <code>docs/plans/2026-08-04-outpatient-rpm-plan.md</code>.</p>
