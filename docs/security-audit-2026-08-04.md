@@ -170,15 +170,20 @@ silent-failure pass:
 | N2 | FIXED | `ALLOW_ALL_ADMIN = false` in both feedback routes. |
 | N3 | FIXED | DB error → 503; empty-but-healthy DB still seeds demo data (the two are no longer indistinguishable). |
 | N4 | FIXED | Six headers on every route, verified on a live response. CSP intentionally scoped — see the note at its definition before tightening. |
+| R2 | FIXED | **HIGH:** Bridge tile provenance — see the Section 3 note below; was actively mis-reporting a clinical alert count on prod. |
 | R1 | FIXED | **CRITICAL (silent-failure pass):** no `pool.on('error')` on any of the three `pg.Pool`s — an idle-client fault during RDS failover was an unhandled EventEmitter error that crashes the process and every in-flight request. Now logged and self-healing. |
 
 ### Section 3 findings NOT fixed (deferred, with reasons)
 
-- **HIGH — `command-center/metrics/route.ts:94-117`**: the wearables tile falls back to
-  hardcoded `DEMO_METRICS` (`total: 5, urgent: 2`) on query failure with no field marking it as
-  fallback — the N3 pattern in a second place, on a *clinical alert count*. Not fixed here only
-  because it needs a `dataSource: 'live' | 'demo_fallback'` contract change the dashboard must
-  render. **Do this next**; the file's own TODO says 7 more tiles are about to copy the pattern.
+- ~~**HIGH — `command-center/metrics/route.ts:94-117`**~~ — **FIXED 2026-08-04 (`5da295d`).**
+  Every tile now carries `dataSource: 'live' | 'demo'`; `StatusTile` renders a "Sample data"
+  marker for anything not explicitly live, and the client's own fetch-error fallback (which had
+  the same hole) marks all eight. **The `total > 0` gate was mis-reporting on production**: the
+  wearables query succeeds and returns 0 unread alerts, so the tile was displaying the hardcoded
+  "5 total / 2 urgent" — a fabricated clinical alert count, live, verified against prod at the
+  time of the fix. It now reads `0 — No unread alerts`. Failed queries log at error. Regression
+  test pins both marker states. NOTE for whoever wires the remaining 7 tiles: each must set its
+  own `dataSource` on success or it re-creates this bug per tile.
 - **HIGH — `lib/triage/emergencyGateway.ts:1410`**: outer catch returns fail-closed with zero
   logging. Safe by construction (mandatory human review, no downgrade) but a systemic malfunction
   in the non-bypassable safety floor would be invisible. One `console.error`.
