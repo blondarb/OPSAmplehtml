@@ -5,6 +5,7 @@ import { Phone, Video, CheckCircle, MapPin, Clock, Stethoscope, FileText, Activi
 import { WidgetCard, Avatar, Tag, Timeline, PillButton } from '@/components/ui';
 import PatientToolsPanel from '@/components/PatientToolsPanel';
 import WearableSummaryPanel from '@/components/WearableSummaryPanel';
+import HistorianSessionPanel from '@/components/HistorianSessionPanel';
 
 interface AcutePatientPanelProps {
   patient: any;
@@ -12,6 +13,8 @@ interface AcutePatientPanelProps {
   scoreHistory?: any[];
   medications?: any[];
   allergies?: any[];
+  historianSessions?: any[];
+  onImportHistorian?: (session: any) => void;
 }
 
 export default function AcutePatientPanel({
@@ -20,6 +23,8 @@ export default function AcutePatientPanel({
   scoreHistory = [],
   medications = [],
   allergies = [],
+  historianSessions = [],
+  onImportHistorian,
 }: AcutePatientPanelProps) {
   const patientName = patient
     ? `${patient.first_name || ''} ${patient.last_name || ''}`.trim() || patient.name || 'Patient'
@@ -175,6 +180,15 @@ export default function AcutePatientPanel({
           <span style={{ fontWeight: 500, fontSize: '16px', color: 'var(--text-body, #0c0f14)' }}>Medical History</span>
         </div>
       </WidgetCard>
+
+      {/* AI Historian sessions — panel renders its own header and returns
+          null when the patient has no sessions, so gate the card on length
+          to avoid an empty shell. */}
+      {historianSessions.length > 0 && (
+        <WidgetCard padding="12px 16px 4px">
+          <HistorianSessionPanel sessions={historianSessions} onImport={onImportHistorian} />
+        </WidgetCard>
+      )}
 
       {/* Recent Consults */}
       <WidgetCard title="Recent Consults" collapsible defaultOpen={false} padding="16px 8px">
