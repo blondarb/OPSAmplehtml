@@ -1,8 +1,9 @@
 import { NextResponse } from 'next/server'
-import { invokeBedrockClinicalJSON } from '@/lib/bedrock'
+import { ClinicalModelOutputError, invokeBedrockClinicalJSON } from '@/lib/bedrock'
 import { FUSION_SYSTEM_PROMPT, buildFusionUserPrompt } from '@/lib/triage/extractionPrompt'
 import type { FusionResult } from '@/lib/triage/types'
 import { authorizeClinicalAccess, clinicalAccessDeniedMessage } from '@/lib/auth/clinicalAccess'
+import { describeError } from '@/lib/logging/safeError'
 
 
 export const maxDuration = 60
@@ -72,7 +73,16 @@ export async function POST(request: Request) {
           { status: 504 }
         )
       }
-      console.error('[triage/fuse] clinical output failed validation')
+      // Distinguish a genuine model-output problem from an infrastructure
+      // failure. These were previously logged under one "failed validation"
+      // message, so a Bedrock auth/throttle/network outage was indistinguishable
+      // in the logs from the model returning bad JSON — two very different
+      // pages at 2am (audit 2026-08-04).
+      if (parseErr instanceof ClinicalModelOutputError) {
+        console.error('[triage/fuse] clinical output failed validation', describeError(parseErr))
+      } else {
+        console.error('[triage/fuse] Bedrock fusion call failed', describeError(parseErr))
+      }
       return NextResponse.json(
         { error: 'The fusion system returned an invalid response. Please try again.' },
         { status: 500 }

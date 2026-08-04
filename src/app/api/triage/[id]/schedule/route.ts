@@ -6,6 +6,7 @@ import {
   type SchedulingAuthorization,
 } from '@/lib/triage/workflowPolicy'
 import { authorizeClinicalAccess, clinicalAccessDeniedMessage } from '@/lib/auth/clinicalAccess'
+import { describeError } from '@/lib/logging/safeError'
 
 /**
  * POST /api/triage/[id]/schedule
@@ -177,8 +178,8 @@ export async function POST(
       },
       { status: 201 },
     )
-  } catch {
-    console.error('[triage/schedule] request failed')
+  } catch (error) {
+    console.error('[triage/schedule] request failed', describeError(error))
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 },

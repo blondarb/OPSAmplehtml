@@ -17,6 +17,7 @@ import {
   type EmergencyGatewayResult,
 } from '@/lib/triage/emergencyGateway'
 import { persistEmergencyGatewayResult } from '@/lib/triage/gatewayPersistence'
+import { describeError } from '@/lib/logging/safeError'
 import {
   validatePersistedSourceExtractionAuthority,
   type GovernedSourceSafetyPathway,
@@ -453,7 +454,14 @@ export async function POST(request: Request) {
           modelProfile: TRIAGE_MODEL,
           coverageStatus: shortCoverageStatus,
         })
-      } catch {
+      } catch (error) {
+        // The caller turns this into a 503 human-review hold, but the reason
+        // used to vanish entirely — a schema/connection fault looked identical
+        // to an ordinary rejection (audit 2026-08-04).
+        console.error(
+          '[triage] short-referral session start threw during persistence',
+          describeError(error),
+        )
         shortStart = { ok: false, reason: 'persistence_failed' }
       }
       if (!shortStart.ok || shortStart.processingStatus !== 'pending') {
@@ -474,8 +482,11 @@ export async function POST(request: Request) {
           shortGateway,
           shortStart.processingAttemptCount,
         )
-      } catch {
-        console.error('[triage] short-referral safety workflow was not persisted')
+      } catch (error) {
+        console.error(
+          '[triage] short-referral safety workflow was not persisted',
+          describeError(error),
+        )
       }
       const scoringBlockPersisted = await markShortReferralScoringBlocked({
         triageSessionId: shortStart.triageSessionId,
@@ -558,8 +569,8 @@ export async function POST(request: Request) {
       modelProfile: TRIAGE_MODEL,
       coverageStatus,
     })
-  } catch {
-    console.error('[triage] session start rejected')
+  } catch (error) {
+    console.error('[triage] session start rejected', describeError(error))
     return sourceAuthorityHoldResponse({
       error:
         'The authoritative triage workflow could not be started. Maintain the human-review hold.',
