@@ -7,6 +7,8 @@
  * earlier pipeline stages.
  */
 
+import { buildHistorianReferralContext } from '@/lib/historian/referralContext'
+
 import type { NeurologyConsult, ConsultIntakeContext, HistorianConsultContext } from './types'
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -80,40 +82,41 @@ export function buildTriageSummaryText(consult: NeurologyConsult): string {
 export function buildHistorianContextFromConsult(
   consult: NeurologyConsult,
 ): HistorianConsultContext {
-  // Referral reason — drives the historian's opening question
-  const referralReason =
-    consult.triage_chief_complaint ||
-    (consult.triage_summary
-      ? consult.triage_summary.substring(0, 200)
-      : 'Neurological consultation')
+  // Triage-derived context comes from the shared builder so /consult and the
+  // note entry point on /patient/historian cannot drift apart.
+  const shared = buildHistorianReferralContext({
+    steer: 'directive',
+    noteText: consult.referral_text ?? undefined,
+    triage: {
+      tierDisplay: consult.triage_tier_display ?? undefined,
+      urgency: consult.triage_urgency ?? undefined,
+      subspecialty: consult.triage_subspecialty ?? undefined,
+      clinicalReasons: consult.triage_chief_complaint
+        ? [consult.triage_chief_complaint]
+        : undefined,
+      redFlags: consult.triage_red_flags ?? undefined,
+    },
+  })
 
-  // Build the patient context block line by line
-  const lines: string[] = []
+  const referralReason = consult.triage_chief_complaint
+    ? shared.referralReason
+    : consult.triage_summary
+      ? consult.triage_summary.substring(0, 200)
+      : shared.referralReason
+
+  // Consult-only context the shared builder does not model: triage summary,
+  // intake, SDNE. Appended verbatim so /consult loses nothing.
+  const lines: string[] = [shared.patientContext]
 
   if (consult.triage_tier_display && consult.triage_urgency) {
-    lines.push(`TRIAGE PRIORITY: ${consult.triage_tier_display} (${consult.triage_urgency})`)
     lines.push(
       `NOTE: This patient has been triaged as ${consult.triage_tier_display.toLowerCase()}. ` +
         `Pay particular attention to any findings that could explain or escalate this urgency.`,
     )
   }
 
-  if (consult.triage_subspecialty) {
-    lines.push(`REFERRED TO: ${consult.triage_subspecialty}`)
-  }
-
   if (consult.triage_summary) {
     lines.push(`\nTRIAGE SUMMARY (from referring clinician):\n${consult.triage_summary}`)
-  }
-
-  // Red flags from triage — instruct historian to probe these specifically
-  if (consult.triage_red_flags && consult.triage_red_flags.length > 0) {
-    lines.push(`\nRED FLAGS IDENTIFIED BY TRIAGE:`)
-    consult.triage_red_flags.forEach(flag => lines.push(`  • ${flag}`))
-    lines.push(
-      `Ask targeted follow-up questions to characterize each of these red flags ` +
-        `(onset, severity, progression, associated symptoms).`,
-    )
   }
 
   // Intake agent findings, if the intake step was completed first
