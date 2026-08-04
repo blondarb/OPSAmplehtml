@@ -170,6 +170,7 @@ silent-failure pass:
 | N2 | FIXED | `ALLOW_ALL_ADMIN = false` in both feedback routes. |
 | N3 | FIXED | DB error → 503; empty-but-healthy DB still seeds demo data (the two are no longer indistinguishable). |
 | N4 | FIXED | Six headers on every route, verified on a live response. CSP intentionally scoped — see the note at its definition before tightening. |
+| R5 | FIXED | **MEDIUM:** triage-handler logging (5 sites) via a PHI-safe `describeError()`; fuse no longer mislabels infra failures as validation. |
 | R4 | FIXED | **MEDIUM:** `clinicalAccess` 503 path now logs the caught error — it fronts every clinically-gated route. |
 | R3 | FIXED | **HIGH:** emergency-gateway fail-closed paths now logged (two of them, not one). |
 | R2 | FIXED | **HIGH:** Bridge tile provenance — see the Section 3 note below; was actively mis-reporting a clinical alert count on prod. |
@@ -191,15 +192,24 @@ silent-failure pass:
   `gateway_execution_failed`: a null return AND a thrown error. Now logged distinctly (null = a
   logic gap inside the gateway; throw = a crash in it). Behavior unchanged — the guard uses
   `verdict == null` to stay exactly equivalent to the `??` it replaced.
-- **MEDIUM** — ~~`clinicalAccess.ts:120` logs without the error object~~ **FIXED 2026-08-04
-  (`9ce15d5`)** — the 503 path now includes the caught error. STILL OPEN: several triage handlers
-  log static strings and discard the caught error (`triage/[id]/schedule/route.ts:180`,
-  `triage/fuse/route.ts:68` — which also mislabels infra/timeout failures as validation errors,
-  `triage/route.ts:456/477/561`); and `extract/route.ts:1324` uses a thrown exception as a
-  not-found sentinel, so a real `TypeError` is indistinguishable from "nothing to escalate" (the
-  cleanest fix is a discriminated return rather than an exception-as-sentinel). All are
-  log-quality issues on paths that already fail safe — no behavior risk, but they are what a
-  production incident would be diagnosed from.
+- **MEDIUM** — ~~`clinicalAccess.ts:120`~~ **FIXED (`9ce15d5`)**; ~~triage handlers logging static
+  strings~~ **FIXED 2026-08-04 (`ee37ac4`)** — all five sites now log via `describeError()`, and
+  `triage/fuse` no longer labels Bedrock infra/auth/throttle failures as "validation" errors.
+
+  **A PHI constraint surfaced while fixing this and is now encoded in the helper:** the audit's
+  suggested fix ("pass the caught error as a second argument") is *not* safe verbatim on these
+  paths. node-postgres errors carry `detail`/`where`/`internalQuery`, and a constraint violation
+  puts the failing row values in `detail` — on triage tables those are referral-derived, so a raw
+  `console.error(msg, error)` would write clinical text to CloudWatch. `src/lib/logging/safeError.ts`
+  keeps name/message/SQLSTATE (plus `ClinicalModelOutputError`'s code/stopReason, verified to carry
+  only a stop reason and never model output) and drops the value-bearing fields; tests assert the
+  stripping. **Use `describeError()` for any new catch on a PHI-adjacent path — do not log raw
+  error objects there.**
+
+  STILL OPEN: `extract/route.ts:1324` uses a thrown exception as a not-found sentinel, so a real
+  `TypeError` is indistinguishable from "nothing to escalate". The fix is a discriminated return
+  rather than a log line — a small refactor on a safety-adjacent path, deliberately deferred past
+  the Aug 7/12 demos rather than rushed.
 
 ### Test-suite health (not a security finding, but it blocks gating)
 
