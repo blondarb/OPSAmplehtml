@@ -95,8 +95,9 @@ New optional block appended by `buildHistorianSystemPrompt()` when a focus is pr
 - Phase 1 leads with questions that establish or refute the referral focus.
 - **The emergency red-flag screen runs regardless and does not count against the directive
   budget.** Non-negotiable; it is the existing safety floor.
-- The 23-question cap is unchanged. ~6–8 questions are reserved for the directive pass so it
-  cannot consume the interview.
+- The engine's **25-turn** limit (`historianPrompts.ts` CRITICAL RULE 13) is unchanged. ~6–8
+  questions are reserved for the directive pass so it cannot consume the interview.
+  (The UI currently displays "of 23", which matches neither the number nor the unit — see plan Task 6.)
 - After the directive pass, the standard phased history continues on the remaining budget.
 
 Opening line must read naturally, e.g. *"You were sent to the neurologist to discuss the
@@ -143,7 +144,7 @@ documented switch, so the change is one line when real data arrives.
 Paste a synthetic referral on `/patient/historian`, and the historian opens with a line in
 the shape of *"you were sent to the neurologist to discuss…"*, then asks its first several
 questions against that focus — while the emergency screen still runs and the interview still
-completes within the 23-question cap.
+completes within the engine's 25-turn limit.
 
 ## Files
 
