@@ -1,6 +1,6 @@
 # Release Checklist - Sevaro Clinical
 
-> Use this for every deploy to production. Preview deploys need only Pre-Deploy.
+> Use this for every deploy to production (push to `main`). Local-only verification passes need only Pre-Deploy.
 
 ---
 
@@ -9,7 +9,7 @@
 ### Build & Code
 - [ ] **Build passes**: `npm run build` exits 0, no TS errors
 - [ ] **Unit tests pass**: `npm test` exits 0 — includes the historian structured_output ↔ note-import contract test (schema drift guard)
-- [ ] **Branch pushed**: Feature branch pushed, Vercel preview created
+- [ ] **Local dev verified**: change exercised on `npm run dev` before pushing to `main`
 - [ ] **Migration reviewed**: Any new RDS migration reviewed and applied to staging
 - [ ] **No secrets in code**: No `.env` values, API keys, or credentials committed
 - [ ] **No console errors**: Browser console clean on dashboard and portal pages
@@ -30,7 +30,7 @@
 - [ ] **P2**: Switch to Desktop View works
 
 ### Spot Checks
-- [ ] **Dark mode**: F1 verified on preview
+- [ ] **Dark mode**: F1 verified on local dev
 - [ ] **One AI feature**: B1 or B4 works correctly
 - [ ] **Focus area tested**: Mission brief focus cases executed
 
@@ -38,13 +38,13 @@
 
 ## Deploy
 
-- [ ] **Merge PR** to `main` (triggers Vercel production deploy)
-- [ ] **Supabase migration applied** to production (if applicable)
-- [ ] **Vercel deploy completes** without error (check Vercel dashboard)
+- [ ] **Push or merge PR** to `main` (triggers Amplify production deploy)
+- [ ] **RDS migration applied** to production (if applicable)
+- [ ] **Amplify build completes** without error (check Amplify console)
 
 ---
 
-## Post-Deploy (production URL: ops-amplehtml.vercel.app)
+## Post-Deploy (production URL: app.neuroplans.app)
 
 ### Core Functionality
 - [ ] **Desktop app loads**: Production URL returns login or dashboard
@@ -69,7 +69,7 @@
 ## Rollback Plan
 
 If post-deploy checks fail:
-1. **Revert via Vercel**: Redeploy previous commit from Vercel dashboard
+1. **Revert**: `git revert` the offending commit and push `main` (Amplify redeploys), or redeploy a previous build from the Amplify console
 2. **If migration was applied**: Assess if rollback SQL is needed (never drop columns in panic)
 3. **Document issue**: Create bug report in `qa/runs/` using BUG_TEMPLATE.md
 4. **Notify team**: Alert stakeholders of rollback
