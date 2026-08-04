@@ -184,6 +184,11 @@ const TriageInputPanel = forwardRef<TriageInputPanelHandle, Props>(
   const textInput = assessReferralTextInput(text)
   const isLongNote = textInput.requiresExtraction
   const hasFiles = uploadedFiles.length === 1
+  // A multi-document packet loads several files but the referral pipeline is
+  // source-bound to exactly ONE. Without this the submit button just sits
+  // disabled with no explanation — which is how the 4 Diagnostic Packet demo
+  // cards silently dead-ended (found 2026-08-04, three days before a demo).
+  const tooManyFiles = uploadedFiles.length > 1
 
   function beginReferralLifecycle(
     event: 'clear' | 'source_replacement',
@@ -582,6 +587,16 @@ const TriageInputPanel = forwardRef<TriageInputPanelHandle, Props>(
       )}
 
       {/* Action buttons */}
+      {tooManyFiles && (
+        <div role="alert" className="nn-note" style={{ marginTop: 16, marginBottom: 0 }}>
+          <h3>{uploadedFiles.length} documents selected — triage takes one</h3>
+          <p style={{ margin: 0 }}>
+            A referral is scored against a single source document so every finding stays
+            traceable to it. Combine these into one PDF and upload that, or triage the
+            primary document on its own.
+          </p>
+        </div>
+      )}
       <div style={{
         display: 'flex',
         gap: '12px',
@@ -593,6 +608,11 @@ const TriageInputPanel = forwardRef<TriageInputPanelHandle, Props>(
           disabled={!canSubmit}
           className="nn-btn"
           style={{ opacity: loading ? 0.7 : 1 }}
+          title={
+            tooManyFiles
+              ? 'This referral has multiple documents. Combine them into one PDF to triage them together.'
+              : undefined
+          }
         >
           {loading ? (
             <>
