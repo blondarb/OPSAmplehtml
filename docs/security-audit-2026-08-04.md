@@ -170,13 +170,17 @@ silent-failure pass:
 | N2 | FIXED | `ALLOW_ALL_ADMIN = false` in both feedback routes. |
 | N3 | FIXED | DB error → 503; empty-but-healthy DB still seeds demo data (the two are no longer indistinguishable). |
 | N4 | FIXED | Six headers on every route, verified on a live response. CSP intentionally scoped — see the note at its definition before tightening. |
+| R6 | FIXED | **MEDIUM:** mapper exception-as-sentinel replaced with a discriminated return; defects no longer read as clean chunks. |
 | R5 | FIXED | **MEDIUM:** triage-handler logging (5 sites) via a PHI-safe `describeError()`; fuse no longer mislabels infra failures as validation. |
 | R4 | FIXED | **MEDIUM:** `clinicalAccess` 503 path now logs the caught error — it fronts every clinically-gated route. |
 | R3 | FIXED | **HIGH:** emergency-gateway fail-closed paths now logged (two of them, not one). |
 | R2 | FIXED | **HIGH:** Bridge tile provenance — see the Section 3 note below; was actively mis-reporting a clinical alert count on prod. |
 | R1 | FIXED | **CRITICAL (silent-failure pass):** no `pool.on('error')` on any of the three `pg.Pool`s — an idle-client fault during RDS failover was an unhandled EventEmitter error that crashes the process and every in-flight request. Now logged and self-healing. |
 
-### Section 3 findings NOT fixed (deferred, with reasons)
+### Section 3 — ALL FINDINGS CLOSED (2026-08-04)
+
+Every reliability/silent-failure finding from the agent pass is now fixed. Detail retained below
+for the record.
 
 - ~~**HIGH — `command-center/metrics/route.ts:94-117`**~~ — **FIXED 2026-08-04 (`5da295d`).**
   Every tile now carries `dataSource: 'live' | 'demo'`; `StatusTile` renders a "Sample data"
@@ -206,10 +210,14 @@ silent-failure pass:
   stripping. **Use `describeError()` for any new catch on a PHI-adjacent path — do not log raw
   error objects there.**
 
-  STILL OPEN: `extract/route.ts:1324` uses a thrown exception as a not-found sentinel, so a real
-  `TypeError` is indistinguishable from "nothing to escalate". The fix is a discriminated return
-  rather than a log line — a small refactor on a safety-adjacent path, deliberately deferred past
-  the Aug 7/12 demos rather than rushed.
+  ~~STILL OPEN: `extract/route.ts:1324` exception-as-sentinel~~ — **FIXED 2026-08-04 (`080bc4c`).**
+  `tryDeriveLongPacketMapperSafetyFloor` now returns `escalate | no_actionable_findings |
+  unusable_outcome`; only genuine defects throw, and the route logs those via `describeError`.
+  The throwing form is retained and unchanged — three of the four call sites are
+  persisted-projection validation paths where a claimed-but-unreproducible mapper floor MUST fail
+  closed rather than return empty, so it is now implemented in terms of the new function and keeps
+  `invalidHold()` for every non-escalation outcome. Contract tests pin both forms, including that
+  malformed facts still throw rather than reading as a clean chunk.
 
 ### Test-suite health (not a security finding, but it blocks gating)
 
