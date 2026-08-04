@@ -156,3 +156,40 @@ logging at `ai/visit-ai/route.ts:111`, 21 hard-coded Bedrock/Anthropic model IDs
 
 **Gated on the PHI decision (unchanged):** the 38-critical auth net. If real patient data is ever
 pointed at this deployment, that work becomes blocking and precedes everything above.
+
+---
+
+## Remediation log — 2026-08-04 (commit `9dbf410`)
+
+**N1–N4 closed** before the partner demos, plus one CRITICAL from the
+silent-failure pass:
+
+| ID | Status | What shipped |
+|---|---|---|
+| N1 | FIXED | `src/lib/api/publicRouteGuard.ts` — origin allowlist + per-IP window (12/5min) on `ai/historian/session`. Live-verified: same-origin 200, forged origin 403, 13th call 429. 8 unit tests. |
+| N2 | FIXED | `ALLOW_ALL_ADMIN = false` in both feedback routes. |
+| N3 | FIXED | DB error → 503; empty-but-healthy DB still seeds demo data (the two are no longer indistinguishable). |
+| N4 | FIXED | Six headers on every route, verified on a live response. CSP intentionally scoped — see the note at its definition before tightening. |
+| R1 | FIXED | **CRITICAL (silent-failure pass):** no `pool.on('error')` on any of the three `pg.Pool`s — an idle-client fault during RDS failover was an unhandled EventEmitter error that crashes the process and every in-flight request. Now logged and self-healing. |
+
+### Section 3 findings NOT fixed (deferred, with reasons)
+
+- **HIGH — `command-center/metrics/route.ts:94-117`**: the wearables tile falls back to
+  hardcoded `DEMO_METRICS` (`total: 5, urgent: 2`) on query failure with no field marking it as
+  fallback — the N3 pattern in a second place, on a *clinical alert count*. Not fixed here only
+  because it needs a `dataSource: 'live' | 'demo_fallback'` contract change the dashboard must
+  render. **Do this next**; the file's own TODO says 7 more tiles are about to copy the pattern.
+- **HIGH — `lib/triage/emergencyGateway.ts:1410`**: outer catch returns fail-closed with zero
+  logging. Safe by construction (mandatory human review, no downgrade) but a systemic malfunction
+  in the non-bypassable safety floor would be invisible. One `console.error`.
+- **MEDIUM** — `clinicalAccess.ts:120` logs without the error object; several triage handlers log
+  static strings and discard the caught error; `extract/route.ts:1324` uses a thrown exception as
+  a not-found sentinel so a real `TypeError` is indistinguishable from "nothing to escalate".
+
+### Test-suite health (not a security finding, but it blocks gating)
+
+The suite is **flaky at the default 5 s timeout**: several exhaustive triage-engine tests are
+legitimately slow and lose the race under parallel load. The clean tree reproduces it (15
+failures one run, 0 the next), so it predates this work. All 2,751 pass at
+`--testTimeout=30000`. Until the slow tests get an explicit per-test timeout, a red suite here
+means nothing and a green one proves little — worth fixing before it masks a real regression.
