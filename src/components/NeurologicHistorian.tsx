@@ -16,6 +16,10 @@ import { useVoiceProviderPreference } from '@/lib/voice/useVoiceProviderPreferen
 import { Mic } from 'lucide-react'
 import { REFERRAL_NOTE_SAMPLES } from '@/lib/historian/referralNoteSamples'
 import type { HistorianReferralInput } from '@/lib/historian/referralContext'
+import {
+  readHistorianHandoff,
+  type HistorianHandoffDisplay,
+} from '@/lib/historian/referralHandoff'
 import { postExtractJSON } from '@/lib/triage/pollClient'
 import type { ClinicalExtraction } from '@/lib/triage/types'
 
@@ -63,6 +67,10 @@ export default function NeurologicHistorian() {
   const [showTranscript, setShowTranscript] = useState(false)
   const [referralNote, setReferralNote] = useState('')
   const [referralInput, setReferralInput] = useState<HistorianReferralInput | null>(null)
+  // Display-only fields from a triage handoff (tier + focus). Separate from
+  // referralInput because the paste path also sets referralInput but has no
+  // handoff display to show — see the "Referral loaded" message below.
+  const [handoffDisplay, setHandoffDisplay] = useState<HistorianHandoffDisplay | null>(null)
   const [extracting, setExtracting] = useState(false)
   // Consent/disclosure gate — must be acknowledged before startSession() can run.
   // See handleStartInterview / handleConsentConfirm below: startSession() is only
@@ -227,6 +235,37 @@ export default function NeurologicHistorian() {
     }
   }, [scenarioParam, selectedScenario])
 
+  // One-shot pickup of a triage → historian handoff (sessionStorage). A ref
+  // guard — not just the dependency array — makes this genuinely one-shot:
+  // React StrictMode double-invokes effects in dev (mount → cleanup →
+  // mount), and readHistorianHandoff() removes the key on read, so a naive
+  // effect would silently find nothing on the second invocation even though
+  // production (single mount) works fine.
+  const handoffAppliedRef = useRef(false)
+  useEffect(() => {
+    if (handoffAppliedRef.current) return
+    handoffAppliedRef.current = true
+    // ALWAYS read — reading is what deletes the key. An early return here
+    // would leave a payload sitting in sessionStorage for up to 30 minutes,
+    // so a later plain visit to this page could silently pick up a previous
+    // patient's referral and steer an unrelated interview with it. Consume
+    // first, decide second.
+    const payload = readHistorianHandoff()
+    // A `?scenario=` deep link still wins over a handoff arriving in the same
+    // visit — but the payload is now consumed either way. Check the raw query
+    // param rather than `selectedScenario` state: the scenario auto-select
+    // effect above may have called setState this same flush without that
+    // update having committed yet, so the state read here could be stale.
+    if (scenarioParam) return
+    if (!payload) return
+    // Note: the "Or use a referral note" card (and this message) only
+    // renders when `!sessionConfig` — a visit that somehow arrives with both
+    // `?patient_id=` and a handoff would set this state with nowhere to
+    // display it. Not reachable from the triage → historian button today.
+    setReferralInput(payload.referral)
+    setHandoffDisplay(payload.display)
+  }, [scenarioParam])
+
   // Sync hook status to phase
   useEffect(() => {
     if (status === 'connecting') setPhase('connecting')
@@ -279,8 +318,10 @@ export default function NeurologicHistorian() {
   const handleSelectScenario = (scenario: DemoScenario) => {
     setSelectedScenario(scenario)
     // The two entry points are mutually exclusive — a canned scenario and a
-    // pasted referral would otherwise both steer the same interview.
+    // pasted referral (or a triage handoff) would otherwise both steer the
+    // same interview.
     setReferralInput(null)
+    setHandoffDisplay(null)
   }
 
   const handleStartInterview = () => {
@@ -556,8 +597,12 @@ export default function NeurologicHistorian() {
                   value={referralNote}
                   onChange={(e) => {
                     setReferralNote(e.target.value)
-                    // Editing invalidates a previously prepared referral.
+                    // Editing invalidates a previously prepared referral —
+                    // including its handoff display, so a stale "Referral
+                    // loaded from triage" line can't sit over freshly typed
+                    // text.
                     if (referralInput) setReferralInput(null)
+                    if (handoffDisplay) setHandoffDisplay(null)
                   }}
                   placeholder="Paste a synthetic referral note…"
                 />
@@ -575,7 +620,9 @@ export default function NeurologicHistorian() {
                     role="status"
                     style={{ marginTop: 8, color: 'var(--nn-accent-ink)' }}
                   >
-                    Referral loaded — start the interview below.
+                    {handoffDisplay
+                      ? `Referral loaded from triage${handoffDisplay.tierDisplay ? ` — ${handoffDisplay.tierDisplay}` : ''}${handoffDisplay.focusHint ? `: ${handoffDisplay.focusHint}` : ''}. Start the interview below.`
+                      : 'Referral loaded — start the interview below.'}
                   </p>
                 )}
               </div>

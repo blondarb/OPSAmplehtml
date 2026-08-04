@@ -2,6 +2,7 @@
 
 import '@/styles/neuro-navigator.css'
 import { useState, useRef, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
 import { flushSync } from 'react-dom'
 import type {
   ClinicalExtraction,
@@ -61,8 +62,14 @@ import {
   preserveSafetyNoticeOnCancel,
   preserveSafetyNoticeOnSourceReplacement,
 } from '@/lib/triage/referralSafetyNoticeLifecycle'
+import {
+  buildTriageHandoffReferral,
+  writeHistorianHandoff,
+} from '@/lib/historian/referralHandoff'
+import { buildHistorianReferralContext } from '@/lib/historian/referralContext'
 
 export default function TriagePage() {
+  const router = useRouter()
   const [pageState, setPageState] = useState<TriagePageState>('input')
   const [result, setResult] = useState<TriageResult | null>(null)
   const [extraction, setExtraction] = useState<ClinicalExtraction | null>(null)
@@ -592,6 +599,31 @@ export default function TriagePage() {
     handleReferralLifecycle('clear')
   }
 
+  // Hand the triage result off to the patient historian so the interview
+  // opens already directed by this referral. Suppression on the emergency
+  // path lives in TriageOutputPanel (its own `isEmergent`) — this handler is
+  // only ever reachable when that button renders, so it does not repeat the
+  // check here.
+  function handleStartPatientInterview() {
+    if (!result) return
+    // Shape lives in referralHandoff.ts as a pure, unit-tested function —
+    // an inline object here could silently lose a field and produce an
+    // unsteered interview that looks identical on screen.
+    const referral = buildTriageHandoffReferral(result, extraction, originalText)
+    // Reuse the historian's own focus derivation so the display line matches
+    // exactly what will steer the interview, instead of a second copy of the
+    // "subspecialty — first reason" formatting.
+    const focusHint = buildHistorianReferralContext(referral).referralFocus ?? undefined
+    // Best-effort: a failed write (private-mode Safari, quota) should not
+    // block navigation — the historian just falls back to its ordinary,
+    // undirected interview.
+    writeHistorianHandoff(referral, {
+      tierDisplay: result.triage_tier_display,
+      focusHint,
+    })
+    router.push('/patient/historian')
+  }
+
   // Go back from review to input
   function handleBackFromReview() {
     setExtraction(null)
@@ -724,7 +756,11 @@ export default function TriagePage() {
             )}
 
             {pageState === 'result' && result && (
-              <TriageOutputPanel result={result} onTryAnother={handleTryAnother} />
+              <TriageOutputPanel
+                result={result}
+                onTryAnother={handleTryAnother}
+                onStartPatientInterview={handleStartPatientInterview}
+              />
             )}
           </section>
 

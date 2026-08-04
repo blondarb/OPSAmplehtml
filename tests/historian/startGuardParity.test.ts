@@ -50,3 +50,33 @@ describe('start-interview guard matches the Start button', () => {
     }
   })
 })
+
+/**
+ * A triage → historian handoff (sessionStorage, see
+ * src/lib/historian/referralHandoff.ts) is a THIRD way `referralInput` gets
+ * set, alongside the demo-scenario picker and the paste-a-referral-note
+ * flow. It must not become a fourth, parallel entry point that the guard
+ * above doesn't know about — the whole lesson of the 2026-08-04 defect is
+ * that a new way to reach the interview has to feed the *same* state the
+ * guard already checks, not grow its own bypass.
+ *
+ * This mirrors startGuardParity rather than duplicating its assertions: it
+ * only checks that the handoff pickup effect writes into `referralInput`
+ * (the exact name in ENTRY_POINTS above), so the existing guard/button
+ * parity tests automatically cover the handoff path too.
+ */
+describe('handoff-loaded referral feeds the same guarded state', () => {
+  it('readHistorianHandoff\'s payload is applied via setReferralInput, not a separate state variable', () => {
+    const readCall = SOURCE.indexOf('const payload = readHistorianHandoff()')
+    expect(readCall, 'mount-time handoff read not found').toBeGreaterThan(-1)
+    // Scan to the END of the enclosing effect rather than a fixed character
+    // window: comments and guards legitimately sit between the read and the
+    // setter (the read was deliberately hoisted above the `?scenario=` return
+    // so the key is always consumed), and a fixed window made this test fail
+    // on a correct change.
+    const effectEnd = SOURCE.indexOf('}, [scenarioParam])', readCall)
+    expect(effectEnd, 'handoff effect terminator not found').toBeGreaterThan(readCall)
+    const effectBody = SOURCE.slice(readCall, effectEnd)
+    expect(effectBody).toContain('setReferralInput(payload.referral)')
+  })
+})

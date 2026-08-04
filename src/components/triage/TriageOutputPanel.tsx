@@ -38,9 +38,11 @@ const SAME_DAY_TIMEFRAME = 'Same-day clinician review'
 interface Props {
   result: TriageResult
   onTryAnother: () => void
+  /** Optional — omitting it keeps every existing call site and test unchanged. */
+  onStartPatientInterview?: () => void
 }
 
-export default function TriageOutputPanel({ result, onTryAnother }: Props) {
+export default function TriageOutputPanel({ result, onTryAnother, onStartPatientInterview }: Props) {
   const [emergentAcknowledged, setEmergentAcknowledged] = useState(false)
   const [algorithmOpen, setAlgorithmOpen] = useState(false)
   const displayedResult = result
@@ -307,6 +309,15 @@ export default function TriageOutputPanel({ result, onTryAnother }: Props) {
           <button onClick={onTryAnother} className="nn-btn nn-btn--sec">
             Try Another
           </button>
+          {/* Suppressed on the emergency/emergent path — routing a possible
+              emergency into a leisurely patient-history interview is exactly
+              the wrong affordance. Reuses this file's own `isEmergent`, not a
+              second copy of the emergency-marker logic. */}
+          {!isEmergent && onStartPatientInterview && (
+            <button onClick={onStartPatientInterview} className="nn-btn nn-btn--sec">
+              Continue to patient interview
+            </button>
+          )}
         </div>
 
         {/* Human review actions remain available even when data is insufficient. */}

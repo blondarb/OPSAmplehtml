@@ -285,12 +285,15 @@ function DemoScenarioLoader({ onBeginLoad, onLoadFiles }, forwardedRef) {
                   onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--nn-line-2)')}
                   onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
                 >
-                  {/* Tier badge */}
+                  {/* Tier badge. Suppressed on do-not-demo cards: the badge is
+                      the half of the contradiction we control, and showing a
+                      tier we know the run will not produce is the actual
+                      failure mode. */}
                   <span style={{
                     padding: '2px 6px',
                     borderRadius: '4px',
-                    background: tierConfig.bgColor,
-                    color: tierConfig.textColor,
+                    background: scenario.doNotDemo ? 'var(--nn-line-2)' : tierConfig.bgColor,
+                    color: scenario.doNotDemo ? 'var(--nn-ink-3)' : tierConfig.textColor,
                     fontSize: '0.6rem',
                     fontWeight: 700,
                     flexShrink: 0,
@@ -298,7 +301,7 @@ function DemoScenarioLoader({ onBeginLoad, onLoadFiles }, forwardedRef) {
                     textAlign: 'center',
                     marginTop: '2px',
                   }}>
-                    {tierConfig.label}
+                    {scenario.doNotDemo ? 'SCREENS' : tierConfig.label}
                   </span>
 
                   {/* Content */}
@@ -329,6 +332,17 @@ function DemoScenarioLoader({ onBeginLoad, onLoadFiles }, forwardedRef) {
                     <p style={{ color: 'var(--nn-ink-3)', fontSize: 'var(--nn-fs-xs)', margin: 0, lineHeight: 1.4 }}>
                       {scenario.clinicalHighlight}
                     </p>
+                    {scenario.doNotDemo && (
+                      <p style={{
+                        color: 'var(--nn-ink-2)',
+                        fontSize: 'var(--nn-fs-xs)',
+                        margin: '4px 0 0',
+                        lineHeight: 1.4,
+                        fontWeight: 600,
+                      }}>
+                        Not for rubric demos — {scenario.doNotDemo.reason}
+                      </p>
+                    )}
                   </div>
 
                   {/* Arrow */}

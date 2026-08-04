@@ -316,6 +316,22 @@ export interface DemoScenario {
   expectedTier: TriageTier
   files: DemoScenarioFile[]
   demoPoints: string[]
+  /**
+   * Set when this card must NOT be used to demonstrate the rubric on stage.
+   *
+   * These cards display an `expectedTier` badge BEFORE the run, but the
+   * deterministic emergency gateway short-circuits scoring and shows the
+   * full-screen takeover instead — so the badge and the result visibly
+   * contradict each other in front of an audience.
+   *
+   * This is a PRESENTATION guard only. It does not change triage logic, and
+   * the card is still runnable — a reviewer who wants to reproduce the
+   * contradiction can. See qa/triage-validation/BAKEOFF_2026-08-04.md.
+   */
+  doNotDemo?: {
+    /** Short, shown on the card. */
+    reason: string
+  }
 }
 
 // Tier display configuration
