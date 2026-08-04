@@ -74,3 +74,18 @@ describe('buildHistorianContextFromConsult (adapter)', () => {
     expect(() => buildHistorianContextFromConsult(bare)).not.toThrow()
   })
 })
+
+describe('deriveConsultReferralFocus', () => {
+  it('derives the same focus the shared builder would', async () => {
+    const { deriveConsultReferralFocus } = await import('@/lib/consult/contextBuilder')
+    expect(deriveConsultReferralFocus(CONSULT)).toBe(
+      'Neuromuscular — Progressive proximal weakness',
+    )
+  })
+
+  it('returns null when the consult has no triage routing', async () => {
+    const { deriveConsultReferralFocus } = await import('@/lib/consult/contextBuilder')
+    const bare = { id: 'c3' } as unknown as NeurologyConsult
+    expect(deriveConsultReferralFocus(bare)).toBeNull()
+  })
+})

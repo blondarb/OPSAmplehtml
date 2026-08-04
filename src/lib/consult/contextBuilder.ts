@@ -79,6 +79,26 @@ export function buildTriageSummaryText(consult: NeurologyConsult): string {
  *   3. Avoid re-asking information already collected by the intake agent
  *   4. Flag findings that contradict or confirm triage observations
  */
+/**
+ * The consult's referral focus, for referral-directed steering.
+ *
+ * Separate from `buildHistorianContextFromConsult` so that function keeps its
+ * documented `{ referralReason, patientContext }` shape (guarded by
+ * tests/historian/consultAdapterParity.test.ts). Both read the same triage
+ * fields through the same shared builder, so they cannot disagree.
+ */
+export function deriveConsultReferralFocus(consult: NeurologyConsult): string | null {
+  return buildHistorianReferralContext({
+    steer: 'directive',
+    triage: {
+      subspecialty: consult.triage_subspecialty ?? undefined,
+      clinicalReasons: consult.triage_chief_complaint
+        ? [consult.triage_chief_complaint]
+        : undefined,
+    },
+  }).referralFocus
+}
+
 export function buildHistorianContextFromConsult(
   consult: NeurologyConsult,
 ): HistorianConsultContext {

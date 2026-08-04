@@ -4,6 +4,8 @@
 resolution:.*integrity:.*sha512-
 "integrity": "sha512-
 # Source file paths containing 40+ char strings
+src/app/api/ai/historian/
+@/app/api/ai/historian/
 src/components/neuroscribe/
 src/components/triage/
 @/components/triage/

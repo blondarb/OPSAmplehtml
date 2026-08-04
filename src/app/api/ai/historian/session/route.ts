@@ -5,10 +5,14 @@ import type { HistorianSessionType } from '@/lib/historianTypes'
 import { getTurnDetectionConfig, getNoiseReductionConfig } from '@/lib/historianTypes'
 import { getOpenAIKey } from '@/lib/secrets'
 import { getConsult, markHistorianStarted } from '@/lib/consult/pipeline'
-import { buildHistorianContextFromConsult } from '@/lib/consult/contextBuilder'
+import {
+  buildHistorianContextFromConsult,
+  deriveConsultReferralFocus,
+} from '@/lib/consult/contextBuilder'
 import { buildWhisperBiasPrompt, isAsrBiasingEnabled } from '@/lib/asr/clinical-lexicon'
 import { mintFlushToken } from '@/lib/historian/flushToken'
 import { allowedAppOrigins, checkPublicRouteAbuse } from '@/lib/api/publicRouteGuard'
+import { resolveReferralPayload } from './referralPayload'
 
 /**
  * Mint a short-lived relay auth token for the Nova Sonic WS relay
@@ -115,6 +119,18 @@ export async function POST(request: Request) {
     let referralReason: string | undefined = body.referralReason
     let patientContext: string | undefined = body.patientContext
 
+    // A referral payload (from /consult or the note entry point on
+    // /patient/historian) overrides caller-supplied context and supplies the
+    // directive focus. Malformed payloads resolve to null and the interview
+    // proceeds exactly as it does today.
+    const referralContext = resolveReferralPayload(body)
+    let referralFocus: string | null = null
+    if (referralContext) {
+      referralReason = referralContext.referralReason
+      patientContext = referralContext.patientContext
+      referralFocus = referralContext.referralFocus
+    }
+
     // Provider selection: explicit client `provider` field wins, else the
     // server-side VOICE_PROVIDER env var, else default to 'openai' — today's
     // production path. Only 'nova' opts into the WS-relay/Bedrock path; any
@@ -133,6 +149,10 @@ export async function POST(request: Request) {
           const consultContext = buildHistorianContextFromConsult(consult)
           referralReason = consultContext.referralReason
           patientContext = consultContext.patientContext
+          // Keep the directive steer in step with the context we just adopted —
+          // without this, /consult sessions would get referral context but no
+          // referral-directed priority.
+          referralFocus = deriveConsultReferralFocus(consult)
           // Pre-tenancy caller: migration 048 backfills tenant_id 'default'
           await markHistorianStarted(consultId, 'default')
         }
@@ -148,7 +168,7 @@ export async function POST(request: Request) {
     // Nova-native tool specs (Bedrock Converse toolSpec shape). The hook
     // builds a NovaSonicWsProvider from this — no ephemeral key needed.
     if (provider === 'nova') {
-      const instructions = buildHistorianSystemPrompt(sessionType, referralReason, patientContext)
+      const instructions = buildHistorianSystemPrompt(sessionType, referralReason, patientContext, undefined, referralFocus)
       return NextResponse.json({
         provider: 'nova',
         instructions,
@@ -179,7 +199,7 @@ export async function POST(request: Request) {
       )
     }
 
-    const instructions = buildHistorianSystemPrompt(sessionType, referralReason, patientContext)
+    const instructions = buildHistorianSystemPrompt(sessionType, referralReason, patientContext, undefined, referralFocus)
     const tools = getHistorianToolDefinition()
     const model = process.env.OPENAI_HISTORIAN_REALTIME_MODEL || 'gpt-realtime-2'
     const turnDetection = getTurnDetectionConfig(process.env.HISTORIAN_TURN_DETECTION_MODE)
