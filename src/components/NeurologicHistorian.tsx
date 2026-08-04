@@ -14,6 +14,10 @@ import FeatureSubHeader from '@/components/layout/FeatureSubHeader'
 import VoiceProviderToggle from '@/components/voice/VoiceProviderToggle'
 import { useVoiceProviderPreference } from '@/lib/voice/useVoiceProviderPreference'
 import { Mic } from 'lucide-react'
+import { REFERRAL_NOTE_SAMPLES } from '@/lib/historian/referralNoteSamples'
+import type { HistorianReferralInput } from '@/lib/historian/referralContext'
+import { postExtractJSON } from '@/lib/triage/pollClient'
+import type { ClinicalExtraction } from '@/lib/triage/types'
 
 type Phase = 'loading_context' | 'scenario_select' | 'connecting' | 'active' | 'ending' | 'complete' | 'safety_escalation'
 
@@ -26,8 +30,12 @@ interface SessionConfig {
   patientContext?: string
 }
 
-/** The interview's question cap, mirrored from the historian system prompt. */
-const QUESTION_CAP = 23
+/**
+ * Interview turn limit, mirrored from CRITICAL RULE 13 in the historian system
+ * prompt ("Never exceed 25 turns total"). A turn is one exchange, not one
+ * question — keep the label wording in step with that.
+ */
+const TURN_CAP = 25
 
 const STEP_LABELS = ['Your visit', 'Consent & identity', 'Interview', 'Summary'] as const
 
@@ -53,6 +61,9 @@ export default function NeurologicHistorian() {
   const [selectedScenario, setSelectedScenario] = useState<DemoScenario | null>(null)
   const [sessionConfig, setSessionConfig] = useState<SessionConfig | null>(null)
   const [showTranscript, setShowTranscript] = useState(false)
+  const [referralNote, setReferralNote] = useState('')
+  const [referralInput, setReferralInput] = useState<HistorianReferralInput | null>(null)
+  const [extracting, setExtracting] = useState(false)
   // Consent/disclosure gate — must be acknowledged before startSession() can run.
   // See handleStartInterview / handleConsentConfirm below: startSession() is only
   // ever called from handleConsentConfirm, never directly from the button handler.
@@ -146,6 +157,7 @@ export default function NeurologicHistorian() {
     patientContext: activeConfig.patientContext,
     consultId: consultIdRef.current,
     provider: voiceProvider,
+    referral: referralInput ?? undefined,
     // Patient-facing surface: the localizer drives a physician-only panel and
     // must not run here (redesign brief Part 4 — no diagnostic content on the
     // patient page). The /consult clinician surface keeps its own localizer.
@@ -240,8 +252,35 @@ export default function NeurologicHistorian() {
     return () => clearTimeout(t)
   }, [interviewCompleted, isAiSpeaking, phase, endSession])
 
+  async function handleUseReferralNote() {
+    if (referralNote.trim().length < 50) return
+    setExtracting(true)
+    try {
+      // /api/triage/extract is 202 + POLL, not a synchronous JSON response.
+      // postExtractJSON posts, reads extraction_id and polls to completion —
+      // a hand-rolled fetch here would read findings off the 202 ack.
+      const extraction = await postExtractJSON<ClinicalExtraction>({
+        referral_text: referralNote,
+      })
+      setReferralInput({
+        steer: 'directive',
+        noteText: referralNote,
+        extraction: extraction.key_findings,
+      })
+    } catch {
+      // Extraction is an enhancement, not a gate: fall back to the raw note so
+      // the interview is still referral-directed.
+      setReferralInput({ steer: 'directive', noteText: referralNote })
+    } finally {
+      setExtracting(false)
+    }
+  }
+
   const handleSelectScenario = (scenario: DemoScenario) => {
     setSelectedScenario(scenario)
+    // The two entry points are mutually exclusive — a canned scenario and a
+    // pasted referral would otherwise both steer the same interview.
+    setReferralInput(null)
   }
 
   const handleStartInterview = () => {
@@ -297,7 +336,7 @@ export default function NeurologicHistorian() {
   const displayedHeard = currentUserText || lastUserText || null
   const assistantTurns = transcript.filter(e => e.role === 'assistant').length
   const currentQuestionNumber = Math.min(
-    QUESTION_CAP,
+    TURN_CAP,
     Math.max(1, assistantTurns + (currentAssistantText ? 1 : 0)),
   )
 
@@ -428,7 +467,7 @@ export default function NeurologicHistorian() {
             <p className="nn-lede">
               {sessionConfig
                 ? 'Review your information below and begin your intake interview.'
-                : 'Select a demo scenario to begin. The AI will conduct a structured neurological intake interview via voice.'}
+                : 'Pick a demo scenario, or paste a referral note below and the interview will lead with what the patient was referred for.'}
             </p>
 
             {error && (
@@ -483,6 +522,61 @@ export default function NeurologicHistorian() {
               </div>
             )}
 
+            {/* Referral-note entry point — the interview leads with what the
+                referral was for, instead of a canned scenario. */}
+            {!sessionConfig && (
+              <div className="nn-card" style={{ marginBottom: 20 }}>
+                <h3 className="nn-card-title">Or use a referral note</h3>
+                <p className="nn-hint">
+                  Paste a synthetic referral. The interview will open with what the patient
+                  was referred for, and ask about that first.
+                </p>
+                <div className="nn-actions" style={{ marginBottom: 10 }}>
+                  {REFERRAL_NOTE_SAMPLES.map((sample) => (
+                    <button
+                      key={sample.id}
+                      className="nn-btn nn-btn--sec"
+                      onClick={() => setReferralNote(sample.text)}
+                    >
+                      {sample.label}
+                    </button>
+                  ))}
+                </div>
+                <label htmlFor="nn-referral-note" className="nn-label">
+                  Referral note
+                </label>
+                <textarea
+                  id="nn-referral-note"
+                  className="nn-textarea"
+                  style={{ minHeight: 160 }}
+                  value={referralNote}
+                  onChange={(e) => {
+                    setReferralNote(e.target.value)
+                    // Editing invalidates a previously prepared referral.
+                    if (referralInput) setReferralInput(null)
+                  }}
+                  placeholder="Paste a synthetic referral note…"
+                />
+                <button
+                  className="nn-btn nn-btn--block"
+                  style={{ marginTop: 10 }}
+                  disabled={extracting || referralNote.trim().length < 50}
+                  onClick={handleUseReferralNote}
+                >
+                  {extracting ? 'Reading the referral… (about 30–45s)' : 'Use this referral'}
+                </button>
+                {referralInput && (
+                  <p
+                    className="nn-hint"
+                    role="status"
+                    style={{ marginTop: 8, color: 'var(--nn-accent-ink)' }}
+                  >
+                    Referral loaded — start the interview below.
+                  </p>
+                )}
+              </div>
+            )}
+
             {/* Internal-only engine selector (?internal=1) — never a patient control */}
             {showEngineToggle && (
               <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 10 }}>
@@ -492,7 +586,7 @@ export default function NeurologicHistorian() {
 
             <button
               onClick={handleStartInterview}
-              disabled={!selectedScenario && !sessionConfig}
+              disabled={!selectedScenario && !sessionConfig && !referralInput}
               className="nn-btn nn-btn--block"
             >
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
@@ -534,8 +628,8 @@ export default function NeurologicHistorian() {
         {(phase === 'active' || phase === 'ending') && (
           <HistorianInterviewStep
             phase={phase}
-            questionNumber={currentQuestionNumber}
-            questionCap={QUESTION_CAP}
+            turnNumber={currentQuestionNumber}
+            turnCap={TURN_CAP}
             displayedQuestion={displayedQuestion}
             displayedHeard={displayedHeard}
             isAiSpeaking={isAiSpeaking}
