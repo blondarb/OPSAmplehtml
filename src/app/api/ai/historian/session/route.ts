@@ -8,6 +8,7 @@ import { getConsult, markHistorianStarted } from '@/lib/consult/pipeline'
 import { buildHistorianContextFromConsult } from '@/lib/consult/contextBuilder'
 import { buildWhisperBiasPrompt, isAsrBiasingEnabled } from '@/lib/asr/clinical-lexicon'
 import { mintFlushToken } from '@/lib/historian/flushToken'
+import { allowedAppOrigins, checkPublicRouteAbuse } from '@/lib/api/publicRouteGuard'
 
 /**
  * Mint a short-lived relay auth token for the Nova Sonic WS relay
@@ -49,6 +50,28 @@ function mintNovaRelayToken(): string | null {
 
 export async function POST(request: Request) {
   try {
+    // Audit 2026-08-04 N1. This route mints PAID OpenAI Realtime credentials
+    // and is reachable anonymously from the public /patient/historian demo
+    // URL. Cheap abuse brake (origin allowlist + per-IP window) so a scraped
+    // path can't drain the Realtime quota out from under a live partner demo.
+    // Not a substitute for the deferred platform auth net.
+    const guard = checkPublicRouteAbuse(request, 'historian-session', {
+      limit: 12,
+      windowMs: 5 * 60 * 1000,
+      allowedOrigins: allowedAppOrigins(),
+    })
+    if (!guard.ok) {
+      return NextResponse.json(
+        { error: guard.error },
+        {
+          status: guard.status,
+          ...(guard.retryAfterSeconds
+            ? { headers: { 'Retry-After': String(guard.retryAfterSeconds) } }
+            : {}),
+        },
+      )
+    }
+
     const body = await request.json()
 
     // Historian Validation Suite Task 1: server-minted session id + its

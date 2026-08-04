@@ -4,9 +4,9 @@ import { from } from '@/lib/db-query'
 
 const SEED_ADMIN_EMAIL = 'steve@sevaro.com'
 
-// Temporary: allow all authenticated users admin access for feedback review
-// TODO: Set to false once admin roles are fully configured in production
-const ALLOW_ALL_ADMIN = true
+// See src/app/api/feedback/route.ts — same gate, same rationale. Local-debug
+// only; true means any authenticated user is a feedback admin (audit N2).
+const ALLOW_ALL_ADMIN = false
 
 async function getAuthenticatedAdmin() {
   const user = await getUser()

@@ -122,6 +122,11 @@ export async function GET(request: NextRequest) {
     `
 
     let appointments: any[] = []
+    // A DB FAILURE and an EMPTY DB are different answers and must not collapse
+    // into the same response. Seeding demo appointments for an empty range is
+    // intended demo behavior; doing it after a query error shows a clinician a
+    // plausible schedule while the database is down (audit 2026-07-12 / N3).
+    let dbFailed = false
     try {
       const pool = await getPool()
       const { rows } = await pool.query(sql, values)
@@ -163,7 +168,18 @@ export async function GET(request: NextRequest) {
         } : null,
       }))
     } catch (dbError) {
-      console.error('DB query failed, using demo data:', dbError)
+      console.error('Appointments DB query failed:', dbError)
+      dbFailed = true
+    }
+
+    if (dbFailed) {
+      return NextResponse.json(
+        {
+          error: 'Schedule is temporarily unavailable',
+          detail: 'The appointment database could not be reached. No schedule is shown rather than an inaccurate one.',
+        },
+        { status: 503 },
+      )
     }
 
     // Fallback: generate demo appointments when DB has none for the requested range

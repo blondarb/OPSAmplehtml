@@ -15,6 +15,21 @@ const rdsSsl = {
   rejectUnauthorized: process.env.RDS_SSL_INSECURE === 'true' ? false : true,
 }
 
+/**
+ * node-postgres emits 'error' on the POOL when an idle client dies (RDS
+ * failover, connection reset, security-group blip). With no listener that is
+ * an unhandled EventEmitter error, which crashes the whole Node process and
+ * kills every in-flight request on the container — not just the one that
+ * touched the bad connection. The pool self-heals by discarding the client;
+ * all it needs is for someone to be listening. (Audit 2026-08-04.)
+ */
+function attachPoolErrorHandler(p: Pool, label: string): Pool {
+  p.on('error', (err) => {
+    console.error(`[db:${label}] idle client error (pool will discard it):`, err)
+  })
+  return p
+}
+
 export async function getPool(): Promise<Pool> {
   if (pool) return pool
   const creds = await getRdsCredentials()
@@ -27,6 +42,7 @@ export async function getPool(): Promise<Pool> {
     max: 5,
     ssl: rdsSsl,
   })
+  attachPoolErrorHandler(pool, 'default')
   return pool
 }
 
@@ -45,6 +61,7 @@ export async function getWearablePool(): Promise<Pool> {
     max: 5,
     ssl: rdsSsl,
   })
+  attachPoolErrorHandler(wearablePool, 'wearable')
   return wearablePool
 }
 
@@ -64,6 +81,7 @@ export async function getNeuroPlansPool(): Promise<Pool> {
     max: 5,
     ssl: rdsSsl,
   })
+  attachPoolErrorHandler(neuroPlansPool, 'neuro_plans')
   return neuroPlansPool
 }
 

@@ -5,9 +5,11 @@ import { from } from '@/lib/db-query'
 // Seed admin - always has admin access and cannot be removed
 const SEED_ADMIN_EMAIL = 'steve@sevaro.com'
 
-// Temporary: allow all authenticated users admin access for feedback review
-// TODO: Set to false once admin roles are fully configured in production
-const ALLOW_ALL_ADMIN = true
+// Admin access is governed by SEED_ADMIN_EMAIL + FEEDBACK_ADMIN_EMAILS + the
+// app_settings elevated-admin list below. Set to true ONLY for local debugging:
+// it lets any authenticated user add/remove admins and read the internal AI
+// system-prompt inventory (2026-07-12 audit S6 / 2026-08-04 N2).
+const ALLOW_ALL_ADMIN = false
 
 // Get list of elevated admin emails from app_settings
 async function getElevatedAdmins(): Promise<string[]> {

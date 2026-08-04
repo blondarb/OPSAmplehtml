@@ -1,10 +1,46 @@
 import type { NextConfig } from "next";
 
+// Security response headers (audit 2026-08-04 N4). Applied to every route.
+//
+// SCOPE NOTE — the CSP here is deliberately NOT a full default-src policy.
+// This app opens WebRTC/WSS connections to OpenAI Realtime, the Nova Sonic
+// relay, and Deepgram from the patient historian, and renders inline <style>
+// blocks throughout. A `default-src 'self'` policy would break the voice
+// interview, so the directives below are limited to the ones that close real
+// vectors without touching connect/script/style: clickjacking (frame-ancestors,
+// backed by X-Frame-Options), plugin injection (object-src), base-tag hijack
+// (base-uri), and form exfiltration (form-action). Tightening to a nonce-based
+// script-src/connect-src allowlist is a follow-up that needs its own
+// verification pass against the live voice path — do NOT add default-src here
+// without testing an end-to-end historian session first.
+const SECURITY_HEADERS = [
+  {
+    key: 'Content-Security-Policy',
+    value: [
+      "frame-ancestors 'none'",
+      "object-src 'none'",
+      "base-uri 'self'",
+      "form-action 'self'",
+      'upgrade-insecure-requests',
+    ].join('; '),
+  },
+  // 2 years, preload-eligible. All traffic is already HTTPS via Amplify.
+  { key: 'Strict-Transport-Security', value: 'max-age=63072000; includeSubDomains; preload' },
+  { key: 'X-Frame-Options', value: 'DENY' },
+  { key: 'X-Content-Type-Options', value: 'nosniff' },
+  { key: 'Referrer-Policy', value: 'strict-origin-when-cross-origin' },
+  // Microphone stays enabled for this origin — the historian needs it.
+  { key: 'Permissions-Policy', value: 'camera=(), geolocation=(), payment=(), usb=(), microphone=(self)' },
+]
+
 const nextConfig: NextConfig = {
   experimental: {
     serverActions: {
       bodySizeLimit: '12mb',
     },
+  },
+  async headers() {
+    return [{ source: '/:path*', headers: SECURITY_HEADERS }]
   },
   // Pass build-time env vars to the server runtime.
   // Amplify SSR compute does not inject app-level env vars at runtime,
