@@ -15,6 +15,13 @@ interface TileMetric {
   total: number
   sublabel: string
   trend?: 'up' | 'down' | 'flat'
+  /**
+   * Whether this tile's numbers came from a live query or are placeholders.
+   * Absent is treated as 'demo' — a tile that doesn't say it's live isn't.
+   * (Audit 2026-08-04: a failed wearable-alert query used to leave hardcoded
+   * "2 urgent" on screen with nothing distinguishing it from a real count.)
+   */
+  dataSource?: 'live' | 'demo'
   [key: string]: unknown // extra fields like urgent, overdue, etc.
 }
 
@@ -35,15 +42,17 @@ const TILE_CONFIG = [
 
 // ─── Demo fallback data ─────────────────────────────────────────────────────
 
+// Used only when the metrics request itself fails. Every entry is explicitly
+// marked demo so a transport failure can never render as live clinical counts.
 const DEMO_METRICS: MetricsMap = {
-  schedule: { total: 9, sublabel: '2 new, 1 cancelled', trend: 'flat' },
-  messages: { total: 4, sublabel: '1 urgent, 2 days old', trend: 'up' },
-  refills: { total: 3, sublabel: '1 overdue', trend: 'flat' },
-  results: { total: 2, sublabel: '1 MRI > 14 days', trend: 'down' },
-  wearables: { total: 5, sublabel: '2 urgent', trend: 'up' },
-  followups: { total: 3, sublabel: '1 same-day', trend: 'flat' },
-  triage: { total: 8, sublabel: '2 emergent', trend: 'down' },
-  ehr: { total: 6, sublabel: '3 results to sign', trend: 'flat' },
+  schedule: { total: 9, sublabel: '2 new, 1 cancelled', trend: 'flat', dataSource: 'demo' },
+  messages: { total: 4, sublabel: '1 urgent, 2 days old', trend: 'up', dataSource: 'demo' },
+  refills: { total: 3, sublabel: '1 overdue', trend: 'flat', dataSource: 'demo' },
+  results: { total: 2, sublabel: '1 MRI > 14 days', trend: 'down', dataSource: 'demo' },
+  wearables: { total: 5, sublabel: '2 urgent', trend: 'up', dataSource: 'demo' },
+  followups: { total: 3, sublabel: '1 same-day', trend: 'flat', dataSource: 'demo' },
+  triage: { total: 8, sublabel: '2 emergent', trend: 'down', dataSource: 'demo' },
+  ehr: { total: 6, sublabel: '3 results to sign', trend: 'flat', dataSource: 'demo' },
 }
 
 // ─── Skeleton tile for loading state ────────────────────────────────────────
@@ -162,6 +171,7 @@ export default function StatusBar({ viewMode, timeRange, onCategoryFilter }: Sta
                   sublabel={m?.sublabel ?? ''}
                   color={tile.color}
                   trend={m?.trend}
+                  isDemo={m?.dataSource !== 'live'}
                   onClick={() => onCategoryFilter(tile.category)}
                 />
               )

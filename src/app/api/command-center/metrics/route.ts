@@ -5,6 +5,13 @@ import { getPool } from '@/lib/db'
 // ─── Demo metrics ───────────────────────────────────────────────────────────
 // Hardcoded aggregate counts used as the primary data source for the prototype.
 // Each key maps to one of the 8 status-bar tiles in the Bridge.
+//
+// EVERY tile carries an explicit `dataSource`. A clinician looking at "2 urgent
+// wearable alerts" must be able to tell a real signal from a static placeholder
+// left behind by a failed query — the two used to be indistinguishable in this
+// response (audit 2026-08-04). When the remaining 7 tiles get live queries, each
+// must flip its own `dataSource` to 'live' on success; do not add a live query
+// without it.
 
 const DEMO_METRICS = {
   schedule: {
@@ -89,7 +96,14 @@ export async function GET(request: NextRequest) {
     //   triage     — triage_sessions WHERE status = 'pending_review'
     //   ehr        — always demo data (simulated EHR integration)
 
-    const metrics = { ...DEMO_METRICS }
+    // Every tile starts as demo; a tile that successfully loads live data
+    // overwrites its own entry AND its dataSource.
+    const metrics = Object.fromEntries(
+      Object.entries(DEMO_METRICS).map(([key, tile]) => [
+        key,
+        { ...tile, dataSource: 'demo' as const },
+      ]),
+    ) as Record<string, Record<string, unknown>>
 
     // Wire wearable_alerts to real data from the notifications table
     try {
@@ -103,17 +117,27 @@ export async function GET(request: NextRequest) {
       )
       const total = rows[0]?.count ?? 0
       const urgent = rows[0]?.urgent ?? 0
-      if (total > 0) {
-        metrics.wearables = {
-          total,
-          sublabel: urgent > 0 ? `${urgent} urgent` : `${total} alert${total === 1 ? '' : 's'}`,
-          urgent,
-          trend: 'up' as const,
-        }
+      // A successful query answers the question even when the answer is zero.
+      // Gating this on `total > 0` used to show the hardcoded "5 alerts, 2
+      // urgent" whenever there were genuinely no alerts — the most misleading
+      // possible output for a clinical alert count.
+      metrics.wearables = {
+        total,
+        sublabel:
+          total === 0
+            ? 'No unread alerts'
+            : urgent > 0
+              ? `${urgent} urgent`
+              : `${total} alert${total === 1 ? '' : 's'}`,
+        urgent,
+        trend: 'up' as const,
+        dataSource: 'live' as const,
       }
     } catch (err) {
-      // Non-fatal: fall back to demo wearable metrics
-      console.warn('Command Center wearable alerts query failed:', (err as Error).message)
+      // Non-fatal for the dashboard, but a failing clinical-alert query is an
+      // error, not a warning — and the tile stays marked `demo` so the UI can
+      // say so rather than passing placeholders off as live counts.
+      console.error('Command Center wearable alerts query failed:', err)
     }
 
     return NextResponse.json(metrics)

@@ -8,10 +8,17 @@ interface StatusTileProps {
   sublabel: string
   color: string
   trend?: 'up' | 'down' | 'flat'
+  /**
+   * True when these numbers are placeholders rather than a live query result.
+   * Renders a visible marker so a static count can never be mistaken for a
+   * real clinical signal — including the case where a live tile silently
+   * degrades to placeholders because its query failed (audit 2026-08-04).
+   */
+  isDemo?: boolean
   onClick?: () => void
 }
 
-export default function StatusTile({ label, total, sublabel, color, trend, onClick }: StatusTileProps) {
+export default function StatusTile({ label, total, sublabel, color, trend, isDemo, onClick }: StatusTileProps) {
   const [hovered, setHovered] = useState(false)
 
   const trendArrow = trend === 'up' ? '\u2191' : trend === 'down' ? '\u2193' : trend === 'flat' ? '\u2192' : null
@@ -96,6 +103,36 @@ export default function StatusTile({ label, total, sublabel, color, trend, onCli
       >
         {sublabel}
       </div>
+
+      {/* Provenance marker — a number without it is a live query result. */}
+      {isDemo && (
+        <div
+          title="Sample data — not a live query result"
+          style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '4px',
+            marginTop: '6px',
+            fontSize: '0.65rem',
+            letterSpacing: '0.04em',
+            textTransform: 'uppercase',
+            fontWeight: 600,
+            color: '#94a3b8',
+          }}
+        >
+          <span
+            aria-hidden="true"
+            style={{
+              width: '5px',
+              height: '5px',
+              borderRadius: '50%',
+              border: '1px solid #94a3b8',
+              flexShrink: 0,
+            }}
+          />
+          Sample data
+        </div>
+      )}
     </div>
   )
 }
