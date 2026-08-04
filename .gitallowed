@@ -3,6 +3,18 @@
 # Lockfile integrity hashes (not secrets)
 resolution:.*integrity:.*sha512-
 "integrity": "sha512-
+# Source/doc paths and GitHub URLs that trip the generic [0-9a-zA-Z/+]{40}
+# base64 heuristic. All are file paths or URLs, never secrets. (2026-08-04:
+# a deletion-only commit makes git-secrets scan the whole tree, which is how
+# these long-standing false positives surface.)
+github.com/blondarb/OPSAmplehtml/blob/
+/Users/stevearbogast/dev/repos/
+src/components/
+@/components/
+src/lib/voice/
+src/app/wearable/
+docs/PRD_
+qa/CLARA_
 # Source file paths containing 40+ char strings
 src/app/api/ai/historian/
 @/app/api/ai/historian/
