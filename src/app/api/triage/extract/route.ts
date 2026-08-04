@@ -15,6 +15,7 @@ import { from } from '@/lib/db-query'
 import { getPool } from '@/lib/db'
 import { runInBackground } from '@/lib/triage/asyncRunner'
 import { authorizeClinicalAccess, clinicalAccessDeniedMessage } from '@/lib/auth/clinicalAccess'
+import { describeError } from '@/lib/logging/safeError'
 import { validateClinicalExtractionOutput } from '@/lib/triage/extractionValidation'
 import {
   buildLongPacketIngestionArtifacts,
@@ -45,7 +46,7 @@ import {
   type LongPacketSafetyEscalationResult,
 } from '@/lib/triage/longPacketSafetyEscalation'
 import {
-  deriveLongPacketMapperSafetyFloor,
+  tryDeriveLongPacketMapperSafetyFloor,
   persistLongPacketPartialSafetyHold,
   persistLongPacketSafetyPersistenceFailureFloor,
   persistValidatedLongPacketAggregateFailure,
@@ -1323,12 +1324,25 @@ async function processExtractionInBackground(
             },
             onMapperOutcome: async (mapper) => {
               if (!mapper.result) return
-              let mapperSafety
+              // "This chunk has nothing to escalate" is the common case and is
+              // now a VALUE, not a thrown sentinel — so the catch below no
+              // longer swallows it and can mean exactly one thing: a defect in
+              // the derivation itself (audit 2026-08-04). Behavior on both
+              // paths is unchanged (skip this chunk, never block extraction);
+              // what changed is that a real bug is now visible instead of
+              // looking like a clean chunk.
+              let derived
               try {
-                mapperSafety = deriveLongPacketMapperSafetyFloor(mapper)
-              } catch {
+                derived = tryDeriveLongPacketMapperSafetyFloor(mapper)
+              } catch (error) {
+                console.error(
+                  '[triage/extract] mapper safety floor threw unexpectedly — chunk not escalated',
+                  { chunkId: mapper.chunkId, ...describeError(error) },
+                )
                 return
               }
+              if (derived.kind !== 'escalate') return
+              const mapperSafety = derived.safetyResult
               await checkpointThenEscalateLongPacketSafety({
                 extractionId,
                 tenantId,

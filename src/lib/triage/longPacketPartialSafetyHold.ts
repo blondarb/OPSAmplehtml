@@ -218,10 +218,34 @@ function validateProjectionBinding(
   }
 }
 
-export function deriveLongPacketMapperSafetyFloor(
+/**
+ * Outcome of deriving the mapper safety floor for one chunk.
+ *
+ * `no_actionable_findings` is the COMMON, EXPECTED case — most chunks of a long
+ * packet contain no red flags, no critical unknowns, and no conflicts, so there
+ * is simply nothing to escalate. It is not an error.
+ *
+ * This union exists because that benign case used to be signalled by throwing
+ * (audit 2026-08-04): callers wrapped the call in `try { } catch { return }`,
+ * which made "this chunk is clean" indistinguishable from "this function has a
+ * bug" — a real `TypeError` on malformed facts was silently swallowed as
+ * routine. Expected outcomes are values; only defects throw.
+ */
+export type LongPacketMapperSafetyFloorOutcome =
+  | { kind: 'escalate'; safetyResult: UrgentLongPacketSafetyResult }
+  | { kind: 'no_actionable_findings' }
+  | { kind: 'unusable_outcome' }
+
+/**
+ * Non-throwing form. Prefer this at call sites that must distinguish a clean
+ * chunk from a defect. `deriveLongPacketMapperSafetyFloor` below is the
+ * throwing form and is unchanged in behavior — it remains correct for
+ * validation paths, where anything other than an escalation must fail closed.
+ */
+export function tryDeriveLongPacketMapperSafetyFloor(
   outcome: LongPacketMapperBranchOutcome,
-): UrgentLongPacketSafetyResult {
-  if (!outcome.result) invalidHold()
+): LongPacketMapperSafetyFloorOutcome {
+  if (!outcome.result) return { kind: 'unusable_outcome' }
   const actionableFacts = outcome.result.facts
     .filter(
       (fact) =>
@@ -247,7 +271,7 @@ export function deriveLongPacketMapperSafetyFloor(
     .map((reason) => reason.slice(0, 2_000))
     .filter(Boolean)
     .slice(0, 50)
-  if (reviewReasons.length === 0) invalidHold()
+  if (reviewReasons.length === 0) return { kind: 'no_actionable_findings' }
   const signals = [
     ...actionableFacts.map((fact, index) => ({
       code: `mapper_red_flag_${index}`,
@@ -291,11 +315,28 @@ export function deriveLongPacketMapperSafetyFloor(
     })),
   ].slice(0, 50)
   return {
-    carePathway: 'same_day_clinician_review',
-    dataQuality: conflicts.length > 0 ? 'conflicting' : 'partial',
-    criticalUnknowns: reviewReasons,
-    signals,
+    kind: 'escalate',
+    safetyResult: {
+      carePathway: 'same_day_clinician_review',
+      dataQuality: conflicts.length > 0 ? 'conflicting' : 'partial',
+      criticalUnknowns: reviewReasons,
+      signals,
+    },
   }
+}
+
+/**
+ * Throwing form — unchanged contract. Every non-escalation outcome (no result,
+ * nothing actionable) raises `invalidHold()` exactly as before, which is what
+ * the persisted-projection validation paths require: a projection that claims a
+ * mapper safety floor it cannot reproduce must fail closed, not return empty.
+ */
+export function deriveLongPacketMapperSafetyFloor(
+  outcome: LongPacketMapperBranchOutcome,
+): UrgentLongPacketSafetyResult {
+  const derived = tryDeriveLongPacketMapperSafetyFloor(outcome)
+  if (derived.kind !== 'escalate') invalidHold()
+  return derived.safetyResult
 }
 
 function validateProjection(input: {
