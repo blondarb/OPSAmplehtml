@@ -22,6 +22,14 @@ const MODEL = args.find(a => !a.startsWith('--')) || 'us.anthropic.claude-sonnet
 const START_CASE = Number(args.find(a => a.startsWith('--start-case='))?.split('=')[1] || 1)
 const NO_CLEAR = args.includes('--no-clear')
 const SKIP_EXISTING = args.includes('--skip-existing')
+/**
+ * Which validation study to run. REQUIRED in practice: `case_number` is NOT
+ * unique across studies — every number 1-26 exists in both `default` (current
+ * demo content) and `default_prescramble_20260720` (superseded). Without this
+ * filter the runner selects BOTH, doubling cost and mixing superseded content
+ * into the results. (Found 2026-08-04 while re-baselining.)
+ */
+const STUDY = args.find(a => a.startsWith('--study='))?.split('=')[1] || 'default'
 const RUN_COUNT = 3
 const INCLUDE_BASELINE = true
 
@@ -142,13 +150,16 @@ async function callBedrock(referralText: string, patientAge: number | null, pati
 async function main() {
   console.log(`\n=== Validation Runner: ${MODEL} ===`)
   console.log(`Runs per case: ${RUN_COUNT} standard + ${INCLUDE_BASELINE ? '1 baseline' : 'no baseline'}`)
+  console.log(`Study: ${STUDY}`)
   console.log(`Starting from case ${START_CASE}, ${NO_CLEAR ? 'preserving' : 'clearing'} previous runs`)
   console.log(`Running SEQUENTIALLY to avoid throttling\n`)
 
   const { rows: cases } = await pool.query(
     `SELECT id, case_number, title, referral_text, patient_age, patient_sex
-     FROM validation_cases WHERE active = true AND case_number >= $1 ORDER BY case_number`,
-    [START_CASE]
+     FROM validation_cases
+     WHERE active = true AND case_number >= $1 AND study_name = $2
+     ORDER BY case_number`,
+    [START_CASE, STUDY]
   )
   console.log(`Found ${cases.length} cases to process (starting from case ${START_CASE})\n`)
 

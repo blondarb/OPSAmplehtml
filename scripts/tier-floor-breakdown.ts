@@ -155,11 +155,24 @@ async function main() {
 
   console.log(`\n=== Tier / Floor Breakdown — study "${STUDY}" (OFFLINE, no Bedrock calls) ===\n`)
 
+  // Dimension scores are written to validation_AI_RUNS, not validation_cases —
+  // both the live runner (scripts/run-validation.ts) and the UI rerun/auto
+  // endpoints write there. Reading validation_cases.ai_dimension_scores returns
+  // all-NULL and makes a perfectly good live run look like it produced nothing.
+  // (Found 2026-08-04.) One row per case: the most recent BASELINE run
+  // (temperature 0) when present, else the most recent run of any temperature.
   const { rows } = await pool.query<Row>(
-    `SELECT scenario_id, case_number, title, ai_dimension_scores, ai_weighted_score, ai_triage_tier
-     FROM validation_cases
-     WHERE study_name = $1 AND active = true
-     ORDER BY case_number`,
+    `SELECT DISTINCT ON (vc.case_number)
+            vc.scenario_id, vc.case_number, vc.title,
+            r.ai_dimension_scores, r.ai_weighted_score, r.ai_triage_tier,
+            r.model, r.temperature, r.created_at
+     FROM validation_cases vc
+     JOIN validation_ai_runs r ON r.case_id = vc.id
+     WHERE vc.study_name = $1 AND vc.active = true
+       AND r.error IS NULL AND r.ai_dimension_scores IS NOT NULL
+     ORDER BY vc.case_number,
+              (r.temperature = 0) DESC,
+              r.created_at DESC`,
     [STUDY],
   )
   await pool.end()
