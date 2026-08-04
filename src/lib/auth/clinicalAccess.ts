@@ -117,9 +117,15 @@ export async function authorizeClinicalAccess(input: {
         role: membership.role,
       },
     }
-  } catch {
+  } catch (error) {
+    // This gate sits in front of every clinically-gated route. It fails closed
+    // (503), so a store outage denies access rather than granting it — but
+    // without the underlying error a fleet-wide failure (bad migration,
+    // connection exhaustion, credential rotation) gives no clue why, on the one
+    // function everything else depends on. (Audit 2026-08-04.)
     console.error('[clinical-access] authorization store unavailable', {
       action: input.action,
+      error,
     })
     return {
       ok: false,

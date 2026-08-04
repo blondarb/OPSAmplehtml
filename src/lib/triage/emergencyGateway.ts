@@ -1407,10 +1407,33 @@ export function runEmergencyGateway(
     }
   }
 
+  // This is the deterministic, non-bypassable safety floor: it is supposed to
+  // be a pure function that always returns a verdict and never throws. Both
+  // failure paths below are SAFE (fail-closed → undetermined + mandatory human
+  // review, never a downgrade to routine), but until now they were also
+  // INVISIBLE — a systemic malfunction here would look identical in the data to
+  // a legitimately ambiguous referral, silently piling up manual-review cases
+  // with nothing pointing at the gateway. Logging only; no behavior change.
+  // The two paths are logged distinctly because they mean different things:
+  // a null return is a logic gap inside the gateway, a throw is a crash in it.
+  // (Audit 2026-08-04.)
   try {
-    return runEmergencyGatewayInternal(text, source, limits) ??
-      failClosed('gateway_execution_failed')
-  } catch {
+    const verdict = runEmergencyGatewayInternal(text, source, limits)
+    // `== null` (not `!verdict`) to stay EXACTLY equivalent to the `??` this
+    // replaced — nullish only, never other falsy values.
+    if (verdict == null) {
+      console.error(
+        '[emergency-gateway] returned no verdict — failing closed to mandatory review',
+        { extractionMethod: source?.extractionMethod },
+      )
+      return failClosed('gateway_execution_failed')
+    }
+    return verdict
+  } catch (error) {
+    console.error(
+      '[emergency-gateway] threw during execution — failing closed to mandatory review',
+      { extractionMethod: source?.extractionMethod, error },
+    )
     return failClosed('gateway_execution_failed')
   }
 }
