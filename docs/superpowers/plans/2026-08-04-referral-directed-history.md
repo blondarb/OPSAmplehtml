@@ -12,7 +12,12 @@
 
 ## Global Constraints
 
-- **Do NOT start before Aug 12.** `/triage` and `/patient/historian` are QA-verified and frozen for Mayo (Aug 7) and Novant (Aug 12).
+- **Work on branch `feat/referral-directed-history`. Do NOT push to `main`.** `main`
+  auto-deploys to app.neuroplans.app, and Tasks 5 and 6 modify `/patient/historian` — the page
+  being demoed to Mayo on Aug 7. Open a PR and stop; Steve merges when he chooses.
+- **Before that PR is merged, re-run the historian portion of `qa/runs/RUN-2026-08-03-001.md`**
+  (consent gate blocks until checkbox + name + DOB, mic never requested early, 375px, zero
+  console errors). Tasks 5 and 6 touch the page that run verified.
 - **No triage logic changes** — rubric, weights, tier thresholds, red-flag overrides are untouchable. Presentation and context only.
 - **Synthetic data only.** Every sample note must be obviously fictional.
 - **UI label is "Referral focus"** — never "presumed diagnosis", "working diagnosis", or "dx". Subspecialty + a clinical reason is not a diagnosis.
@@ -644,6 +649,58 @@ git commit -m "feat(historian): session route accepts a referral context payload
 
 ---
 
+### Task 4b: Forward the referral through useRealtimeSession
+
+**Files:**
+- Modify: `src/hooks/useRealtimeSession.ts` (options interface ~line 14; session POST body ~line 330)
+
+**Interfaces:**
+- Consumes: `HistorianReferralInput` (Task 1).
+- Produces: `UseRealtimeSessionOptions.referral?: HistorianReferralInput`, forwarded as
+  `referral` in the POST body to `/api/ai/historian/session`. Task 5 sets it.
+
+Context: the hook's options interface is explicit and its request body is hand-built, so an
+unknown `referral` option is silently dropped. Both need the field.
+
+- [ ] **Step 1: Add the option to the interface**
+
+In `src/hooks/useRealtimeSession.ts`, add to `interface UseRealtimeSessionOptions` (after
+`patientContext?: string`):
+
+```ts
+  /** Referral context that makes the interview referral-directed (see Task 1). */
+  referral?: HistorianReferralInput
+```
+
+and add the import:
+
+```ts
+import type { HistorianReferralInput } from '@/lib/historian/referralContext'
+```
+
+- [ ] **Step 2: Forward it in the session request body**
+
+In the `body: JSON.stringify({ ... })` for the session start (~line 330, the object containing
+`sessionType` and `referralReason`), add:
+
+```ts
+          referral: options.referral,
+```
+
+- [ ] **Step 3: Typecheck**
+
+Run: `npx tsc --noEmit`
+Expected: clean.
+
+- [ ] **Step 4: Commit**
+
+```bash
+git add src/hooks/useRealtimeSession.ts
+git commit -m "feat(historian): forward referral context from the session hook"
+```
+
+---
+
 ### Task 5: "Use a referral note" entry point
 
 **Files:**
@@ -747,6 +804,8 @@ Add imports:
 ```ts
 import { REFERRAL_NOTE_SAMPLES } from '@/lib/historian/referralNoteSamples'
 import type { HistorianReferralInput } from '@/lib/historian/referralContext'
+import { postExtractJSON } from '@/lib/triage/pollClient'
+import type { ClinicalExtraction } from '@/lib/triage/types'
 ```
 
 Add state beside the existing `selectedScenario` state:
@@ -764,16 +823,17 @@ Add the extraction handler beside `handleSelectScenario`:
     if (referralNote.trim().length < 50) return
     setExtracting(true)
     try {
-      const res = await fetch('/api/triage/extract', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ referral_text: referralNote }),
+      // /api/triage/extract is 202 + POLL, not a synchronous JSON response.
+      // postExtractJSON posts, reads extraction_id, and polls to completion —
+      // do NOT hand-roll a fetch here, it will read findings off the 202 ack.
+      // Takes ~30-45s in practice (measured on prod 2026-08-03).
+      const extraction = await postExtractJSON<ClinicalExtraction>({
+        referral_text: referralNote,
       })
-      const data = await res.json().catch(() => ({}))
       setReferralInput({
         steer: 'directive',
         noteText: referralNote,
-        extraction: data?.key_findings ?? undefined,
+        extraction: extraction.key_findings,
       })
     } catch {
       // Extraction is an enhancement, not a gate: fall back to the raw note so
@@ -791,7 +851,8 @@ In the existing `useRealtimeSession({...})` options object, add:
     referral: referralInput ?? undefined,
 ```
 
-and confirm `useRealtimeSession` forwards unknown options into the session-route request body; if it does not, add `referral` to the body it posts in `src/hooks/useRealtimeSession.ts`.
+`useRealtimeSession` does NOT forward unknown options — its options interface and its POST
+body are both explicit (verified 2026-08-04). Task 4b adds the pass-through; do that first.
 
 In the Step 1 render block, after the demo scenario grid, add a third option:
 
@@ -830,7 +891,7 @@ In the Step 1 render block, after the demo scenario grid, add a third option:
                 disabled={extracting || referralNote.trim().length < 50}
                 onClick={handleUseReferralNote}
               >
-                {extracting ? 'Reading the referral…' : 'Use this referral'}
+                {extracting ? 'Reading the referral… (about 30-45s)' : 'Use this referral'}
               </button>
               {referralInput && (
                 <p className="nn-hint" style={{ marginTop: 8 }}>
@@ -984,6 +1045,12 @@ does. Testing §1–4 → Tasks 1, 2, 3, 7. Acceptance criterion (opening line) 
 `buildHistorianReferralContext` / `referralFocus` are used with identical names and shapes in
 Tasks 1–5, 7. `TURN_CAP` (Task 6) replaces `QUESTION_CAP` in one file only.
 
-**Known gap, deliberate:** Task 5 Step 5 says to check whether `useRealtimeSession` forwards the
-`referral` option into the POST body and to add it if not. This was not verified during planning;
-the implementer must confirm it against `src/hooks/useRealtimeSession.ts` before wiring the UI.
+**Corrections applied 2026-08-04 after a pre-execution verification pass:**
+1. `/api/triage/extract` is 202 + poll, not synchronous — Task 5 now uses `postExtractJSON`.
+   The original step would have read `key_findings` off a 202 acknowledgement.
+2. `useRealtimeSession` does not forward unknown options — added Task 4b.
+3. Extraction takes ~30-45s (measured on prod), not the ~15s originally estimated. The spec's
+   "extraction only (~15s)" line is optimistic; the asymmetry argument still holds, since the
+   full scoring chain is ~60s on top of extraction.
+4. Execution moved to a branch + PR because `main` auto-deploys and Tasks 5/6 touch the page
+   being demoed Thursday.
