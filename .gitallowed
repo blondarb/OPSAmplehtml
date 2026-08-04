@@ -56,3 +56,9 @@ src/lib/historian/synthetic/
 src/lib/voice/providers/
 # CLAUDE.md prose: triage pipeline-stage phrase trips the 40-char entropy pattern (not a secret)
 gateway\+safety\+scorer\+fusion\+adjudicator
+# structured_output contract test — tests/historian/structuredOutputContract
+# is exactly 40 alphanumeric/slash chars, tripping the 40-char entropy
+# pattern; not a secret. Directory-level allow, same pattern as the
+# src/lib/historian/eval/ entry above.
+tests/historian/
+src/lib/historian/

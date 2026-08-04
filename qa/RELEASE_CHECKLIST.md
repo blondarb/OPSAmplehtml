@@ -8,6 +8,7 @@
 
 ### Build & Code
 - [ ] **Build passes**: `npm run build` exits 0, no TS errors
+- [ ] **Unit tests pass**: `npm test` exits 0 — includes the historian structured_output ↔ note-import contract test (schema drift guard)
 - [ ] **Branch pushed**: Feature branch pushed, Vercel preview created
 - [ ] **Migration reviewed**: Any new RDS migration reviewed and applied to staging
 - [ ] **No secrets in code**: No `.env` values, API keys, or credentials committed
