@@ -170,6 +170,8 @@ silent-failure pass:
 | N2 | FIXED | `ALLOW_ALL_ADMIN = false` in both feedback routes. |
 | N3 | FIXED | DB error → 503; empty-but-healthy DB still seeds demo data (the two are no longer indistinguishable). |
 | N4 | FIXED | Six headers on every route, verified on a live response. CSP intentionally scoped — see the note at its definition before tightening. |
+| R4 | FIXED | **MEDIUM:** `clinicalAccess` 503 path now logs the caught error — it fronts every clinically-gated route. |
+| R3 | FIXED | **HIGH:** emergency-gateway fail-closed paths now logged (two of them, not one). |
 | R2 | FIXED | **HIGH:** Bridge tile provenance — see the Section 3 note below; was actively mis-reporting a clinical alert count on prod. |
 | R1 | FIXED | **CRITICAL (silent-failure pass):** no `pool.on('error')` on any of the three `pg.Pool`s — an idle-client fault during RDS failover was an unhandled EventEmitter error that crashes the process and every in-flight request. Now logged and self-healing. |
 
@@ -184,12 +186,20 @@ silent-failure pass:
   time of the fix. It now reads `0 — No unread alerts`. Failed queries log at error. Regression
   test pins both marker states. NOTE for whoever wires the remaining 7 tiles: each must set its
   own `dataSource` on success or it re-creates this bug per tile.
-- **HIGH — `lib/triage/emergencyGateway.ts:1410`**: outer catch returns fail-closed with zero
-  logging. Safe by construction (mandatory human review, no downgrade) but a systemic malfunction
-  in the non-bypassable safety floor would be invisible. One `console.error`.
-- **MEDIUM** — `clinicalAccess.ts:120` logs without the error object; several triage handlers log
-  static strings and discard the caught error; `extract/route.ts:1324` uses a thrown exception as
-  a not-found sentinel so a real `TypeError` is indistinguishable from "nothing to escalate".
+- ~~**HIGH — `lib/triage/emergencyGateway.ts:1410`**~~ — **FIXED 2026-08-04 (`9ce15d5`).** Found
+  on fixing it that there were *two* silent paths collapsing into the same unlogged
+  `gateway_execution_failed`: a null return AND a thrown error. Now logged distinctly (null = a
+  logic gap inside the gateway; throw = a crash in it). Behavior unchanged — the guard uses
+  `verdict == null` to stay exactly equivalent to the `??` it replaced.
+- **MEDIUM** — ~~`clinicalAccess.ts:120` logs without the error object~~ **FIXED 2026-08-04
+  (`9ce15d5`)** — the 503 path now includes the caught error. STILL OPEN: several triage handlers
+  log static strings and discard the caught error (`triage/[id]/schedule/route.ts:180`,
+  `triage/fuse/route.ts:68` — which also mislabels infra/timeout failures as validation errors,
+  `triage/route.ts:456/477/561`); and `extract/route.ts:1324` uses a thrown exception as a
+  not-found sentinel, so a real `TypeError` is indistinguishable from "nothing to escalate" (the
+  cleanest fix is a discriminated return rather than an exception-as-sentinel). All are
+  log-quality issues on paths that already fail safe — no behavior risk, but they are what a
+  production incident would be diagnosed from.
 
 ### Test-suite health (not a security finding, but it blocks gating)
 
