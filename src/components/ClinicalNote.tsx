@@ -4,7 +4,6 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import { signOut as cognitoSignOut } from '@/lib/cognito/client'
 import { useRouter } from 'next/navigation'
 import TopNav from './TopNav'
-import LeftSidebar from './LeftSidebar'
 import CenterPanel from './CenterPanel'
 import { AcuteIconNav, AcuteTopBar, AcuteActionBar, AcutePatientPanel, AcuteBreadcrumb } from './acute-care'
 import AiDrawer from './AiDrawer'
@@ -1474,6 +1473,8 @@ export default function ClinicalNote({
               scoreHistory={scoreHistory}
               medications={medications}
               allergies={allergies}
+              historianSessions={patientHistorianSessions}
+              onImportHistorian={handleImportHistorian}
             />
           )}
 
