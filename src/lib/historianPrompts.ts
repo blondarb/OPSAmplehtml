@@ -308,6 +308,7 @@ export function buildHistorianSystemPrompt(
   referralReason?: string,
   patientContext?: string,
   approvedQuestions?: readonly ReferralClarificationQuestion[],
+  referralFocus?: string | null,
 ): string {
   if (sessionType === 'referral_clarification') {
     if (!approvedQuestions?.length) {
@@ -347,6 +348,33 @@ PATIENT CONTEXT: ${patientContext ?? 'Not provided'}`
 
   if (patientContext) {
     prompt += `\n\nPATIENT CONTEXT:\n${patientContext}`
+  }
+
+  // Referral-directed steering. Only appended when a focus was derived; without
+  // one the interview behaves exactly as it always has. Never reached by
+  // referral_clarification, which returns above — that mode is scope-locked to
+  // clinician-approved questions and must not gain a second priority system.
+  if (referralFocus) {
+    prompt += `
+
+REFERRAL-DIRECTED PRIORITY:
+This patient was referred for: ${referralFocus}
+
+Open by naming that reason in plain language — for example, "you were sent to the
+neurologist to discuss ..." — then lead Phase 1 with 6 to 8 questions that establish
+or refute it. Ask them one at a time and characterize onset, progression, severity and
+associated features.
+
+After those questions, continue the standard phased interview as written above; do not
+abandon the rest of the history.
+
+The emergency red-flag screen runs exactly as specified regardless of this priority and
+does NOT count toward the referral-directed questions. Never trade a safety question for
+a referral-directed one.
+
+The referral is the referring clinician's framing, not a confirmed diagnosis. Do not
+state or imply a diagnosis, and if the patient describes something that does not fit the
+referral, follow the patient.`
   }
 
   return prompt

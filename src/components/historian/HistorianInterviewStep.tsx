@@ -18,8 +18,8 @@ import type { HistorianTranscriptEntry } from '@/lib/historianTypes'
 
 export interface HistorianInterviewStepProps {
   phase: 'active' | 'ending'
-  questionNumber: number
-  questionCap: number
+  turnNumber: number
+  turnCap: number
   /** The current question as text; null before the first question arrives. */
   displayedQuestion: string | null
   /** The latest patient utterance the system heard; null before the first. */
@@ -37,8 +37,8 @@ export interface HistorianInterviewStepProps {
 
 export default function HistorianInterviewStep({
   phase,
-  questionNumber,
-  questionCap,
+  turnNumber,
+  turnCap,
   displayedQuestion,
   displayedHeard,
   isAiSpeaking,
@@ -56,7 +56,7 @@ export default function HistorianInterviewStep({
       {/* The current question, always visible as text — never voice-only */}
       <div className="nn-q">
         <p className="nn-eyebrow nn-num" style={{ marginBottom: 8 }}>
-          Question {questionNumber} of up to {questionCap}
+          Question {turnNumber} of about {turnCap}
         </p>
         <p className="nn-q-text" aria-live="polite">
           {displayedQuestion ?? 'Waiting for the first question…'}
@@ -162,7 +162,7 @@ export default function HistorianInterviewStep({
       )}
 
       <p className="nn-prog">
-        Question {questionNumber} of up to {questionCap} · you can stop at any time
+        Question {turnNumber} of about {turnCap} · you can stop at any time
       </p>
     </>
   )
