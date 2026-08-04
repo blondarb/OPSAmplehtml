@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { from } from '@/lib/db-query'
+import { wearableFrom as from } from '@/lib/db-query'
 
 export async function GET(request: NextRequest) {
   try {
