@@ -24,6 +24,7 @@ import {
 import { deriveReferredCardContent } from '@/lib/historian/referredCardContent'
 import { postExtractJSON } from '@/lib/triage/pollClient'
 import type { ClinicalExtraction } from '@/lib/triage/types'
+import LocalizerPanel from '@/components/LocalizerPanel'
 
 type Phase = 'loading_context' | 'scenario_select' | 'connecting' | 'active' | 'ending' | 'complete' | 'safety_escalation'
 
@@ -64,9 +65,21 @@ interface NeurologicHistorianProps {
    * referred card out of nothing — that's deliberate.
    */
   initialMode?: 'referred'
+  /**
+   * Clinician mirror. Turns the Localizer back on and renders the physician
+   * differential panel alongside the interview.
+   *
+   * MUST stay false on every /patient/* route — the redesign brief (Part 4)
+   * bars diagnostic content from the patient's screen, which is why
+   * enableLocalizer is hard-off below by default. Only a clinician-facing,
+   * auth-gated route may pass this (see /consult/triage-historian). It is a
+   * prop rather than a query param precisely so a patient cannot turn it on
+   * by editing the URL.
+   */
+  clinicianMirror?: boolean
 }
 
-export default function NeurologicHistorian({ initialMode }: NeurologicHistorianProps = {}) {
+export default function NeurologicHistorian({ initialMode, clinicianMirror = false }: NeurologicHistorianProps = {}) {
   const searchParams = useSearchParams()
   const router = useRouter()
   const scenarioParam = searchParams.get('scenario')
@@ -184,6 +197,8 @@ export default function NeurologicHistorian({ initialMode }: NeurologicHistorian
     duration,
     error,
     interviewCompleted,
+    localizerData,
+    localizerLoading,
     startSession,
     endSession,
   } = useRealtimeSession({
@@ -197,7 +212,9 @@ export default function NeurologicHistorian({ initialMode }: NeurologicHistorian
     // Patient-facing surface: the localizer drives a physician-only panel and
     // must not run here (redesign brief Part 4 — no diagnostic content on the
     // patient page). The /consult clinician surface keeps its own localizer.
-    enableLocalizer: false,
+    // `clinicianMirror` is the single, explicit opt-in for a clinician-facing
+    // route that wants the differential mirrored — never set on /patient/*.
+    enableLocalizer: clinicianMirror,
     onComplete: handleComplete,
     onSafetyEscalation: handleSafetyEscalation,
   })
@@ -790,6 +807,26 @@ export default function NeurologicHistorian({ initialMode }: NeurologicHistorian
             transcriptEndRef={transcriptEndRef}
             formatTime={formatTime}
           />
+        )}
+
+        {/* ====== CLINICIAN MIRROR — physician differential ======
+            Rendered only for an auth-gated clinician route. Updates on the
+            Localizer's own cadence (every LOCALIZER_INTERVAL patient turns),
+            which is the "watch it think" behaviour the /consult surface has. */}
+        {clinicianMirror && (phase === 'active' || phase === 'ending') && (
+          <div style={{ marginTop: 16 }}>
+            <div style={{
+              fontSize: '0.7rem',
+              fontWeight: 700,
+              letterSpacing: '0.06em',
+              textTransform: 'uppercase',
+              color: 'var(--nn-ink-3, #6b7280)',
+              marginBottom: 8,
+            }}>
+              Physician view — not shown to the patient
+            </div>
+            <LocalizerPanel data={localizerData} isLoading={localizerLoading} />
+          </div>
         )}
 
         {/* ====== STEP 4 — SUMMARY ====== */}

@@ -5,6 +5,20 @@ import { SAMPLE_NOTES } from '@/lib/triage/sampleNotes'
 import { TIER_DISPLAY, TriageTier } from '@/lib/triage/types'
 
 interface Props {
+  /**
+   * Show each sample's expected-tier badge.
+   *
+   * Default OFF. The badge is an authoring aid — the tier the sample was
+   * WRITTEN to produce — not a prediction of what the engine will return on
+   * any given run. The model supplies the five dimension scores; a single
+   * dimension at 5 trips a deterministic urgent floor (see computeAppliedFloors
+   * in lib/triage/scoring.ts), so a sample labelled "Routine-priority" can
+   * legitimately come back Urgent. Shown next to the result during a live demo
+   * that reads as the engine contradicting itself, when it is actually a floor
+   * doing its job. Turn it on for QA, where comparing intent against output is
+   * the point.
+   */
+  showTierHints?: boolean
   onSelect: (text: string) => void
 }
 
@@ -18,7 +32,7 @@ const HINT_TO_TIER: Record<string, TriageTier> = {
   'Insufficient Data': 'insufficient_data',
 }
 
-export default function SampleNoteLoader({ onSelect }: Props) {
+export default function SampleNoteLoader({ onSelect, showTierHints = false }: Props) {
   const [open, setOpen] = useState(false)
   const ref = useRef<HTMLDivElement>(null)
 
@@ -83,7 +97,7 @@ export default function SampleNoteLoader({ onSelect }: Props) {
                   fontSize: 'var(--nn-fs-sm)',
                 }}
               >
-                {tierConfig && (
+                {showTierHints && tierConfig && (
                   <span style={{
                     padding: '2px 8px',
                     borderRadius: '4px',
