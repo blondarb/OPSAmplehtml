@@ -23,30 +23,105 @@ Referral Text
 [5] Report (POST /api/neuro-consults/[id]/report) ---> unified clinical report
 ```
 
+## This suite is opt-in, and it skips rather than fails
+
+`runner.test.ts` drives a **live, authenticated app** over HTTP and takes ~14 minutes,
+so it is **excluded from a default `npx vitest run`**. Without `RUN_SIMULATED_PATIENTS=1`
+it skips, and the reporter prints why.
+
+Authentication is not optional. Every clinical endpoint sits behind
+`authorizeClinicalAccess`; only the `/triage` **page** is in middleware `PUBLIC_ROUTES`,
+**not** `/api/triage/*`. Unauthenticated, every call returns 401.
+
+The harness therefore keeps three states strictly apart:
+
+| State | What you see | Why |
+|-------|--------------|-----|
+| Precondition unmet (not opted in, app down, no session, no clinical role) | **SKIP**, with the reason in the test name | Nothing clinical ran. An unmet precondition is not a safety failure. |
+| Request rejected (401 / 403 / 503 / 5xx / network) | **FAIL**, prefixed `TRANSPORT (not a clinical result)` | The app refused the call. Nothing was graded. |
+| 200 with a scored body | Clinical assertions and grading | The only state where a failure means the pipeline actually got something wrong. |
+
+This split is the point of the harness. It previously reported a plain 401 as
+`SAFETY: Emergent case "Acute Ischemic Stroke Presentation" was not triaged correctly`
+across 6 tests — a gate that cries wolf is a gate everyone ignores, which is exactly
+how a real safety regression would slip through unnoticed.
+
+`transport.test.ts` covers that boundary with pure unit tests and **does** run in the
+default suite.
+
 ## Prerequisites
 
-1. **App running** at `http://localhost:3000` (or set `TEST_BASE_URL`)
-2. **Database accessible** from the running app (RDS or local PostgreSQL)
-3. **Cognito credentials** (optional but recommended):
-   - `TEST_EMAIL` — test user email
-   - `TEST_PASSWORD` — test user password
-4. **Bedrock configured** — for triage scoring and localizer (requires AWS credentials in app env)
+1. **Opt in** — `RUN_SIMULATED_PATIENTS=1`
+2. **App running** at `http://localhost:3000` (or set `TEST_BASE_URL`)
+3. **An authenticated session** — see [Authenticating](#authenticating) below
+4. **Clinical access for the test account** — an active `clinical_access_memberships`
+   row with role `clinician` or `admin` for the tenant, or every call 403s
+5. **Database accessible** from the running app (RDS or local PostgreSQL)
+6. **Bedrock configured** — for triage scoring and localizer (requires AWS credentials in app env)
+
+## Authenticating
+
+### `TEST_SESSION_COOKIE` (preferred — this is the one that works)
+
+The app signs in through the Cognito **Hosted UI (OAuth + PKCE)**. Its app client
+generally does **not** enable the `USER_PASSWORD_AUTH` flow, so there is no reliable
+way to mint a token from credentials alone. Copy a real session cookie instead:
+
+1. Sign in to the target environment in a browser.
+2. DevTools → Application → Cookies → copy the value of the **`id_token`** cookie.
+3. Export it:
+
+```bash
+export TEST_SESSION_COOKIE='id_token=eyJraWQiOi...'
+```
+
+A bare token works too — it is wrapped in `id_token=` automatically. A full Cookie
+header (`id_token=...; other=...`) is passed through as-is.
+
+The cookie name matters: the app reads `id_token` (`src/lib/cognito/server.ts`,
+`src/middleware.ts`). Any other name authenticates nothing and every call 401s.
+ID tokens last 1 hour — a mid-run expiry surfaces as a `TRANSPORT ... HTTP 401`
+failure, not as a clinical one.
+
+### `TEST_EMAIL` / `TEST_PASSWORD` (fallback)
+
+Uses Cognito `USER_PASSWORD_AUTH` directly. This only works if that flow is enabled
+on the app client; otherwise `getAuthToken()` logs the Cognito error, returns null,
+and preflight skips the suite with a 401 reason.
 
 ## How to Run
 
 ```bash
-# Run all simulated patient tests
-npx vitest tests/simulated-patients/
+# Default suite — runner.test.ts SKIPS with a reason; transport.test.ts runs
+npx vitest run tests/simulated-patients/
 
-# Run a specific test
-npx vitest tests/simulated-patients/runner.test.ts
-
-# Run with verbose output
-npx vitest tests/simulated-patients/ --reporter=verbose
-
-# Run with environment variables
-TEST_EMAIL=test@example.com TEST_PASSWORD=secret123 npx vitest tests/simulated-patients/
+# The real thing: opted in, against a running authenticated app
+RUN_SIMULATED_PATIENTS=1 \
+TEST_BASE_URL=http://localhost:3000 \
+TEST_SESSION_COOKIE='id_token=eyJ...' \
+  npx vitest run tests/simulated-patients/runner.test.ts --reporter=verbose
 ```
+
+### Environment variables
+
+| Variable | Default | Purpose |
+|----------|---------|---------|
+| `RUN_SIMULATED_PATIENTS` | *(unset)* | Opt in. `1`/`true`/`yes`. Without it the suite skips. |
+| `TEST_BASE_URL` | `http://localhost:3000` | Target app |
+| `TEST_SESSION_COOKIE` | *(unset)* | Authenticated `id_token` cookie (preferred) |
+| `TEST_EMAIL` / `TEST_PASSWORD` | *(unset)* | `USER_PASSWORD_AUTH` fallback |
+| `TEST_TIMEOUT` | `60000` | Per-step timeout, ms |
+| `TEST_TRIAGE_POLL_TIMEOUT` | `180000` | Max wait for async triage scoring, ms |
+| `TEST_TENANT_ID` | `test-tenant` | Tenant for historian session saves |
+
+## Triage is asynchronous
+
+`POST /api/triage` returns **202** with `{ session_id, status }` — no scores. The
+scored body only exists on `GET /api/triage/{id}` once `status === 'complete'`
+(SSE was reverted in PR #111 over the ~28s Amplify gateway timeout). `runTriage()`
+submits, then polls to completion, and returns the shape the old synchronous POST
+used to. A harness that reads `triage_tier` straight off the POST response gets
+`undefined` and fails every case — even fully authenticated.
 
 ## Patient Personas
 
@@ -124,9 +199,10 @@ Overall Score: 85/100
 tests/simulated-patients/
   config.ts          -- Base URL, auth, timeouts, endpoint paths
   types.ts           -- TypeScript interfaces for personas, results, grading
-  helpers.ts         -- API call wrappers, auth, retry logic, validators
+  helpers.ts         -- API call wrappers, auth, preflight, transport guard, validators
   grading.ts         -- Scoring rubric (5 dimensions)
-  runner.test.ts     -- Vitest test suite (the entry point)
+  runner.test.ts     -- Live E2E suite (OPT-IN: needs RUN_SIMULATED_PATIENTS=1 + a live app)
+  transport.test.ts  -- Unit tests for the transport/clinical boundary (runs by default)
   README.md          -- This file
   personas/          -- Patient scenario JSON files
     migraine-chronic.json
@@ -136,20 +212,21 @@ tests/simulated-patients/
     peripheral-neuropathy.json
 ```
 
-## Environment Variables
-
-| Variable | Required | Default | Description |
-|----------|----------|---------|-------------|
-| `TEST_BASE_URL` | No | `http://localhost:3000` | App URL |
-| `TEST_EMAIL` | No | — | Cognito test user email |
-| `TEST_PASSWORD` | No | — | Cognito test user password |
-| `TEST_TIMEOUT` | No | `60000` | Per-step timeout (ms) |
-| `TEST_TENANT_ID` | No | `test-tenant` | Tenant for historian sessions |
-
 ## Notes
 
-- The **triage** and **intake chat** endpoints do NOT require authentication
-- The **historian save**, **localizer**, and **report** endpoints may require auth depending on deployment configuration
-- The **localizer** has a 2-second internal timeout and will degrade gracefully (partial results are expected)
-- The **intake conversation** requires multiple AI round-trips and may take 30-60 seconds per persona
-- Tests are designed to **soft-skip** steps that fail due to infrastructure issues (e.g., missing database tables) while still validating what they can
+- **Every endpoint in this pipeline requires authentication.** `/api/triage`,
+  `/api/follow-up/message`, historian save, localizer, and report all call
+  `authorizeClinicalAccess`. Only the `/triage` **page** is public. An earlier
+  version of this file claimed triage and intake chat were unauthenticated —
+  that was wrong, and believing it is what made a wall of 401s look like a
+  clinical failure.
+- **Triage is asynchronous** — 202 + poll. See [Triage is asynchronous](#triage-is-asynchronous).
+- The **localizer** has a 2-second internal timeout and will degrade gracefully
+  (partial results are expected). A *rejected* localizer call is not degradation —
+  it is asserted as a transport failure before that path is credited.
+- The **intake conversation** requires multiple AI round-trips and may take 30-60
+  seconds per persona.
+- Steps still tolerate genuine partial results (a degraded localizer, a report
+  with no data) — but **not** rejected requests. A 401/403/503/5xx always fails
+  loudly with a `TRANSPORT` message rather than soft-passing, because a step that
+  soft-passes on a server error is indistinguishable from one that worked.

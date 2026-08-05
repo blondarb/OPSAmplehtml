@@ -2,19 +2,49 @@
  * Simulated Patient E2E Test Runner
  *
  * Runs each patient persona through the full clinical pipeline at the API level:
- *   1. Triage — POST referral text, assert urgency and red flags
+ *   1. Triage — POST referral text, poll to completion, assert urgency and red flags
  *   2. Intake — Simulate multi-turn intake conversation, verify field collection
  *   3. Historian — Save pre-built structured output, verify OLDCARTS completeness
  *   4. Localizer — Generate differential diagnosis, verify expected diagnoses
  *   5. Report — Generate unified report, verify completeness and accuracy
  *
- * Usage:
- *   npx vitest tests/simulated-patients/runner.test.ts
+ * ── THIS SUITE NEEDS A LIVE, AUTHENTICATED APP ───────────────────────────────
+ *
+ * Every step is a real HTTP call against a running instance, and every clinical
+ * endpoint sits behind `authorizeClinicalAccess` (only the /triage PAGE is in
+ * middleware PUBLIC_ROUTES — /api/triage/* is not). Without credentials the API
+ * returns 401 and nothing clinical is evaluated at all.
+ *
+ * So the suite is OPT-IN and it SKIPS rather than fails when its preconditions
+ * are unmet. That is deliberate: a 401 that surfaced as
+ *   "SAFETY: Emergent case ... was not triaged correctly"
+ * reads like a stroke-triage regression when the request was simply rejected —
+ * and a gate that cries wolf is a gate everyone learns to ignore, which is
+ * exactly how a real safety regression would slip through. An unmet
+ * precondition is a skip; a rejected request is a TRANSPORT failure; only a
+ * 200-with-a-body is ever graded clinically.
+ *
+ * ── How to run ───────────────────────────────────────────────────────────────
+ *
+ *   RUN_SIMULATED_PATIENTS=1 \
+ *   TEST_BASE_URL=http://localhost:3000 \
+ *   TEST_SESSION_COOKIE='id_token=eyJ...' \
+ *     npx vitest run tests/simulated-patients/runner.test.ts
  *
  * Prerequisites:
- *   - App running at localhost:3000 (or TEST_BASE_URL)
- *   - Cognito credentials in TEST_EMAIL / TEST_PASSWORD (for authenticated endpoints)
- *   - Database accessible from the app (RDS or local)
+ *   - RUN_SIMULATED_PATIENTS=1 — opt in. Omitted, the whole file skips with a
+ *     reason. It is excluded from a default `npx vitest run` on purpose: it
+ *     needs a live authenticated app and takes ~14 minutes.
+ *   - App running at localhost:3000 (or TEST_BASE_URL).
+ *   - An authenticated session. Preferred: TEST_SESSION_COOKIE, the value of the
+ *     app's httpOnly `id_token` cookie from a signed-in browser (DevTools →
+ *     Application → Cookies). TEST_EMAIL / TEST_PASSWORD is a fallback that
+ *     only works if the Cognito app client has USER_PASSWORD_AUTH enabled —
+ *     this app signs in through the Hosted UI (OAuth + PKCE), where it usually
+ *     is not. See README.md for both paths.
+ *   - The account needs an active `clinical_access_memberships` row with role
+ *     `clinician` or `admin` for the tenant, or every call 403s.
+ *   - Database accessible from the app (RDS or local).
  */
 
 import { describe, it, expect, beforeAll } from 'vitest'
@@ -25,16 +55,17 @@ import type {
   TriageAPIResponse,
   LocalizerResponse,
   ReportResponse,
-  StepResult,
 } from './types'
 import {
+  preflight,
+  assertTransportOk,
+  TRANSPORT_PREFIX,
   runTriage,
   initiateIntake,
   runIntakeConversation,
   saveHistorianSession,
   runLocalizer,
   generateReport,
-  getAuthToken,
   triageUrgencyMatches,
   redFlagMatches,
   ddxContains,
@@ -56,48 +87,28 @@ function loadPersonas(): PatientPersona[] {
 
 const personas = loadPersonas()
 
-// ── Health Check ──────────────────────────────────────────────────────────────
+// ── Precondition Gate ─────────────────────────────────────────────────────────
 
-beforeAll(async () => {
-  // Verify the app is running
-  try {
-    const res = await fetch(`${config.baseUrl}/api/triage`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ referral_text: 'health check' }),
-    })
-    // We expect a 400 (text too short) — that's fine, it means the server is up
-    if (res.status === 0) {
-      throw new Error('Server not reachable')
-    }
-  } catch (err) {
-    const msg = err instanceof Error ? err.message : String(err)
-    console.error(
-      `\n[SETUP] Cannot reach app at ${config.baseUrl}. Is the dev server running?\n` +
-      `  Start with: npm run dev\n` +
-      `  Or set TEST_BASE_URL to your running instance.\n` +
-      `  Error: ${msg}\n`,
-    )
-    throw new Error(`App not reachable at ${config.baseUrl}`)
-  }
-
-  // Attempt auth (non-fatal — some endpoints don't require it)
-  const token = await getAuthToken()
-  if (token) {
-    console.log('[SETUP] Authenticated with Cognito successfully')
-  } else {
-    console.warn(
-      '[SETUP] Running without authentication. Some endpoints may fail.\n' +
-      '  Set TEST_EMAIL and TEST_PASSWORD for full pipeline testing.',
-    )
-  }
-
-  console.log(`[SETUP] Loaded ${personas.length} persona(s): ${personas.map((p) => p.id).join(', ')}`)
-})
+// Resolved before the suite is registered so an unmet precondition produces a
+// SKIP carrying its own reason, not a failing file. See the header for why.
+const gate = await preflight()
 
 // ── Test Suite ────────────────────────────────────────────────────────────────
 
-describe('Simulated Patient E2E', () => {
+if (!gate.ok) {
+  // A single named, skipped test — the reporter prints the reason, so a run that
+  // proves nothing says so out loud instead of looking green or looking broken.
+  describe('Simulated Patient E2E', () => {
+    it.skip(`SKIPPED — ${gate.reason}`, () => {})
+  })
+}
+
+describe.skipIf(!gate.ok)('Simulated Patient E2E', () => {
+  beforeAll(() => {
+    console.log(`[SETUP] Preflight OK — ${gate.ok ? gate.detail : ''}`)
+    console.log(`[SETUP] Loaded ${personas.length} persona(s): ${personas.map((p) => p.id).join(', ')}`)
+  })
+
   for (const persona of personas) {
     describe(persona.name, () => {
       // Shared state across tests within a persona
@@ -117,8 +128,22 @@ describe('Simulated Patient E2E', () => {
           sex: persona.demographics.sex,
         })
 
-        expect(result.error).toBeNull()
-        expect(result.data).toBeTruthy()
+        // Transport first — a rejected request must never read as a bad score.
+        assertTransportOk(
+          `Triage (${result.stage})`,
+          result.stage === 'submit'
+            ? `POST ${config.endpoints.triage}`
+            : `GET ${config.endpoints.triageById(result.sessionId ?? '{id}')}`,
+          result,
+        )
+
+        // Past this point we have a 2xx. Anything still missing is the pipeline
+        // failing to produce a scored result, which IS worth failing on.
+        expect(
+          result.error,
+          `Triage did not produce a scored result (HTTP ${result.status}, stage: ${result.stage})`,
+        ).toBeNull()
+        expect(result.data, 'Triage returned a 2xx with no scored body').toBeTruthy()
 
         triageResult = result.data!
         consultId = triageResult.consult_id
@@ -168,7 +193,9 @@ describe('Simulated Patient E2E', () => {
           `consult: ${consultId || 'none'}, ` +
           `duration: ${Date.now() - start}ms`,
         )
-      }, config.stepTimeout)
+        // Must outlast the poll itself, or a slow-but-correct triage would fail
+        // the test as a vitest timeout instead of reporting its own deadline.
+      }, config.triagePollTimeout + 30_000)
 
       // ── Step 2: Intake ────────────────────────────────────────────────
 
@@ -182,6 +209,11 @@ describe('Simulated Patient E2E', () => {
         let intakeContext: Record<string, unknown> | null = null
         if (consultId) {
           const intakeInit = await initiateIntake(consultId)
+          assertTransportOk(
+            'Intake initiation',
+            `POST ${config.endpoints.initiateIntake(consultId)}`,
+            intakeInit,
+          )
           if (intakeInit.error) {
             console.warn(`[${persona.id}] Intake initiation warning: ${intakeInit.error}`)
           } else if (intakeInit.data) {
@@ -197,6 +229,11 @@ describe('Simulated Patient E2E', () => {
           intakeSessionId,
           intakeContext,
         )
+
+        assertTransportOk('Intake conversation', `POST ${config.endpoints.followUpMessage}`, {
+          status: intakeResult.errorStatus,
+          error: intakeResult.error,
+        })
 
         expect(intakeResult.error).toBeNull()
 
@@ -231,6 +268,8 @@ describe('Simulated Patient E2E', () => {
         const start = Date.now()
 
         const saveResult = await saveHistorianSession(persona, consultId || undefined)
+
+        assertTransportOk('Historian save', `POST ${config.endpoints.historianSave}`, saveResult)
 
         expect(saveResult.error).toBeNull()
         expect(saveResult.data).toBeTruthy()
@@ -278,6 +317,11 @@ describe('Simulated Patient E2E', () => {
         const sessionId = historianSessionId || 'test-session-' + persona.id
 
         const result = await runLocalizer(sessionId, persona)
+
+        // Before crediting the localizer's "graceful degradation" path below:
+        // a rejected request also produces an empty differential, and that is
+        // not the localizer degrading — it is the call never happening.
+        assertTransportOk('Localizer', `POST ${config.endpoints.localizer}`, result)
 
         // Localizer may partially degrade — that's by design
         if (result.data?.partial && result.data?.degradedReason) {
@@ -344,23 +388,27 @@ describe('Simulated Patient E2E', () => {
       // ── Step 5: Report Generation ─────────────────────────────────────
 
       it('Report is complete and accurate', async () => {
-        // Report requires a consult ID
+        // Report requires a consult ID. This used to soft-pass, which made a
+        // run where triage never happened report a green report step — the same
+        // "silently proves nothing" pattern this harness exists to avoid.
         if (!consultId) {
-          console.warn(`[${persona.id}] Skipping report — no consult ID from triage`)
-          expect(true).toBe(true) // Soft skip
-          return
+          throw new Error(
+            `${TRANSPORT_PREFIX}: no consult ID for "${persona.name}", so the report step ` +
+            `evaluated nothing. Triage did not return a consult_id (it is requested with ` +
+            `create_consult: true) — fix the Triage step failure above.`,
+          )
         }
 
         const start = Date.now()
         const result = await generateReport(consultId)
 
+        // A 5xx used to soft-pass here ("maybe the schema is missing"), which
+        // made a broken report endpoint indistinguishable from a working one.
+        // It is a transport failure: the report step evaluated nothing.
+        assertTransportOk('Report generation', `POST ${config.endpoints.report(consultId)}`, result)
+
         if (result.error) {
           console.warn(`[${persona.id}] Report generation warning: ${result.error}`)
-          // Don't hard-fail if the database doesn't have the required schema
-          if (result.status === 500) {
-            expect(true).toBe(true) // Soft skip on server errors
-            return
-          }
         }
 
         if (result.data && result.data.report) {
@@ -399,6 +447,18 @@ describe('Simulated Patient E2E', () => {
       // ── Grading Summary ───────────────────────────────────────────────
 
       it('Grade summary', () => {
+        // Without a scored triage body there is nothing to grade. `computeGrade`
+        // would score the absence as `pass: false`, and the SAFETY assertion
+        // below would then announce a stroke-triage failure that never happened.
+        // Say what actually went wrong instead.
+        if (!triageResult) {
+          throw new Error(
+            `${TRANSPORT_PREFIX}: no scored triage body for "${persona.name}", ` +
+            `so nothing was graded. Fix the Triage step failure above — this is NOT evidence ` +
+            `that triage scored the case incorrectly.`,
+          )
+        }
+
         const structuredOutput = persona.structuredHistory as unknown as Record<string, unknown>
 
         const grade = computeGrade(
