@@ -588,8 +588,7 @@ export const DEMO_SCENARIOS: DemoScenario[] = [
     "referringSpecialty": "Family Medicine",
     "briefDescription": "Subacute bilateral leg weakness, prior optic neuritis, and new urinary symptoms; the MRI, CSF, and VEP workup confirms multiple sclerosis by McDonald 2017 criteria, including two actively enhancing lesions.",
     "clinicalHighlight": "Confirmed multiple sclerosis",
-    "expectedTier": "urgent",
-    "doNotDemo": { "reason": "Emergency gateway fires before scoring — shows EMERGENCY, not this tier" },
+    "expectedTier": "emergent",
     "files": [
       {
         "filename": "01_PCP_Referral.pdf",
