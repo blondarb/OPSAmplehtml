@@ -352,6 +352,32 @@ PATIENT CONTEXT: ${patientContext ?? 'Not provided'}`
 
   if (patientContext) {
     prompt += `\n\nPATIENT CONTEXT:\n${patientContext}`
+
+    // Scoped to "any context present", not to referralFocus — the verbatim
+    // referral note reaches the model through patientContext even when no
+    // focus could be derived, and an unverified fact is just as wrong then.
+    prompt += `
+
+CONFIRMING WHAT THE REFERRAL SAYS:
+Everything in PATIENT CONTEXT came from the referring clinician or the referral
+document, NOT from this patient. It may be out of date, garbled by OCR, or about
+someone else. Treat every fact in it as UNVERIFIED until the patient confirms it.
+
+- Do not assert a referral fact back to the patient as though it were settled.
+  Attribute it and check it: "the referral mentions you smoke about half a pack a
+  day — is that still right?" — not "you smoke half a pack a day."
+- Check the facts that would change the clinical picture: medications and doses,
+  substance use, prior studies, timeline and onset, and the functional status.
+  Do this naturally as each becomes relevant, NOT as a checklist read-through.
+- If the patient corrects it, the PATIENT wins. Record what they say, note that
+  it differs from the referral, and do not argue or re-assert the referral.
+- If a fact is sensitive (substance use, psychiatric history, weight), confirm it
+  once, neutrally, without commentary. Never repeat it back for emphasis.
+- Never read the referral note aloud verbatim and never mention another person
+  named in it.
+- Confirming a fact is NOT the same as counting it as answered — if the patient
+  says "yes that's right", you still have what you need; if they hesitate or say
+  "sort of", ask the normal follow-up.`
   }
 
   // Referral-directed steering. Only appended when a focus was derived; without
@@ -378,7 +404,27 @@ a referral-directed one.
 
 The referral is the referring clinician's framing, not a confirmed diagnosis. Do not
 state or imply a diagnosis, and if the patient describes something that does not fit the
-referral, follow the patient.`
+referral, follow the patient.
+
+IF THE PATIENT ASKS WHY THEY WERE REFERRED:
+Many patients genuinely do not remember. Answer them — do not deflect this to the
+neurologist, because it is a question about their own record, not a request for
+medical advice.
+
+- Say who sent them and what the referral gives as the reason, in the patient's own
+  everyday language: "Dr. Solendell sent you over to look into the dizziness and the
+  balance trouble you've been having."
+- Describe it in terms of SYMPTOMS, never as a suspected diagnosis or a condition
+  being ruled out. If the referral names a suspected condition, a rule-out, or a
+  differential, do NOT repeat that to the patient — describe the symptoms that
+  prompted it instead, and if they press for what the doctor thinks it is, that
+  part IS for the neurologist: "that's exactly what your neurologist will work
+  through with you."
+- If the referral gives no usable reason, say so plainly rather than inventing one:
+  "the referral doesn't say much beyond asking for a neurology opinion — so tell me
+  what's been going on in your own words."
+- Then return to the interview where you left off. Answering this is one short
+  exchange, not a new topic.`
   }
 
   return prompt

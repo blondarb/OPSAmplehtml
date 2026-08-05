@@ -81,6 +81,76 @@ describe('buildHistorianSystemPrompt', () => {
     expect(prompt).toContain('72M, retired machinist')
   })
 
+  // ── Referral-fact validation ────────────────────────────────────────────
+  // The whole referral note reaches the model verbatim via patientContext, so
+  // it can state referral facts as though the patient had confirmed them.
+
+  it('tells the historian to treat referral facts as unverified until confirmed', () => {
+    const prompt = buildHistorianSystemPrompt('new_patient', undefined, 'Smokes half a pack a day')
+    expect(prompt).toMatch(/UNVERIFIED until the patient confirms/i)
+    expect(prompt).toMatch(/NOT from this patient/i)
+  })
+
+  it('attaches the confirmation rule whenever context is present, not just for a referral focus', () => {
+    // Scope regression guard: patientContext can carry the verbatim note even
+    // when no referralFocus could be derived, and the facts are just as
+    // unverified in that case.
+    const noFocus = buildHistorianSystemPrompt('new_patient', undefined, '72M, retired machinist')
+    expect(noFocus).toMatch(/CONFIRMING WHAT THE REFERRAL SAYS/)
+  })
+
+  it('does not attach the confirmation rule when there is no context at all', () => {
+    const bare = buildHistorianSystemPrompt('new_patient')
+    expect(bare).not.toMatch(/CONFIRMING WHAT THE REFERRAL SAYS/)
+  })
+
+  it('makes the patient authoritative over the referral on a conflict', () => {
+    const prompt = buildHistorianSystemPrompt('new_patient', undefined, 'ctx')
+    expect(prompt).toMatch(/the PATIENT wins/)
+    expect(prompt).toMatch(/do not argue or re-assert the referral/i)
+  })
+
+  it('forbids reading the note verbatim or naming third parties in it', () => {
+    const prompt = buildHistorianSystemPrompt('new_patient', undefined, 'ctx')
+    expect(prompt).toMatch(/[Nn]ever read the referral note aloud verbatim/)
+    expect(prompt).toMatch(/never mention another person\s+named in it/i)
+  })
+
+  // ── "Why was I referred?" ───────────────────────────────────────────────
+
+  it('answers why-was-I-referred instead of deflecting to the neurologist', () => {
+    const prompt = buildHistorianSystemPrompt(
+      'new_patient', 'dizziness', 'ctx', undefined, 'dizziness and balance trouble',
+    )
+    expect(prompt).toMatch(/IF THE PATIENT ASKS WHY THEY WERE REFERRED/)
+    expect(prompt).toMatch(/do not deflect this to the\s+neurologist/i)
+  })
+
+  it('requires the reason be given as symptoms, never as a suspected diagnosis', () => {
+    // The referral can name a rule-out ("r/o ALS"). An AI must not be the one
+    // to disclose a suspected serious diagnosis to a patient.
+    const prompt = buildHistorianSystemPrompt(
+      'new_patient', 'weakness', 'ctx', undefined, 'progressive weakness',
+    )
+    expect(prompt).toMatch(/in terms of\s+SYMPTOMS, never as a suspected diagnosis/i)
+    expect(prompt).toMatch(/do NOT repeat that to the patient/)
+  })
+
+  it('tells the historian to say so rather than invent a reason when none is given', () => {
+    const prompt = buildHistorianSystemPrompt(
+      'new_patient', 'x', 'ctx', undefined, 'focus',
+    )
+    expect(prompt).toMatch(/rather than inventing one/i)
+  })
+
+  it('keeps the no-diagnosis rule intact alongside the new answer path', () => {
+    const prompt = buildHistorianSystemPrompt(
+      'new_patient', 'x', 'ctx', undefined, 'focus',
+    )
+    expect(prompt).toMatch(/not a confirmed diagnosis/)
+    expect(prompt).toMatch(/Do not\s+state or imply a diagnosis/)
+  })
+
   it('locks referral clarification to the clinician-approved question IDs', () => {
     const prompt = buildHistorianSystemPrompt(
       'referral_clarification',
