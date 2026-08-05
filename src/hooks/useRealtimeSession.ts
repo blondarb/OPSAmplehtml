@@ -9,6 +9,14 @@ import { detectRedFlags } from '@/lib/consult/red-flags/red-flag-detector'
 import type { DetectedFlag } from '@/lib/consult/red-flags/red-flag-types'
 import type { VoiceEvent, VoiceProvider } from '@/lib/voice/providerTypes'
 import { selectProvider, makeProvider } from '@/lib/voice/selectProvider'
+import {
+  createUnresponsivenessMonitor,
+  DEFAULT_UNRESPONSIVENESS_CONFIG,
+  UNRESPONSIVE_CHECK_IN_NUDGE,
+  UNRESPONSIVE_SIGN_OFF_NUDGE,
+  type UnresponsivenessConfig,
+  type UnresponsivenessMonitor,
+} from '@/lib/voice/unresponsiveness'
 
 type SessionStatus = 'idle' | 'connecting' | 'active' | 'ending' | 'complete' | 'error' | 'safety_escalation'
 
@@ -68,6 +76,13 @@ interface UseRealtimeSessionOptions {
   }) => void
   /** Called when the historian AI completes a scale administration via save_scale_responses tool */
   onScaleComplete?: (args: SaveScaleResponsesArgs) => void
+  /**
+   * Unresponsive-patient handling. Defaults to
+   * DEFAULT_UNRESPONSIVENESS_CONFIG. Pass `{ enabled: false, ... }` to make
+   * the ladder inert (e.g. automated eval runs that drive the session
+   * synthetically and have no real patient to check in on).
+   */
+  unresponsiveness?: UnresponsivenessConfig
 }
 
 interface UseRealtimeSessionResult {
@@ -112,6 +127,14 @@ interface UseRealtimeSessionResult {
    * after the AI finishes its closing message.
    */
   interviewCompleted: boolean
+  /**
+   * True when the session ended because the patient stopped responding (see
+   * src/lib/voice/unresponsiveness.ts). Advisory only — it is NOT persisted to
+   * /api/ai/historian/save, so nothing acts on it yet. Surfacing an
+   * unresponsive session to a human is a clinical decision that has not been
+   * made; this flag is the hook telling the truth about why it ended.
+   */
+  endedUnresponsive: boolean
 }
 
 const SAFETY_KEYWORDS = [
@@ -141,6 +164,13 @@ const FLUSH_THRESHOLD = 3
  * late; the race only bounds how long endSession waits for it.
  */
 const FINAL_FLUSH_TIMEOUT_MS = 2000
+
+/**
+ * Upper bound on how long the unresponsive sign-off gets to play before the
+ * session is torn down anyway. If the patient is gone the audio may never
+ * drain and aiSpeechStop may never arrive, so this must not depend on either.
+ */
+const UNRESPONSIVE_SIGN_OFF_GRACE_MS = 8000
 
 export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealtimeSessionResult {
   const [status, setStatus] = useState<SessionStatus>('idle')
@@ -229,6 +259,46 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
     setIsAiSpeaking(speaking)
   }, [])
 
+  // ── Unresponsiveness ladder (src/lib/voice/unresponsiveness.ts) ──────────
+  // Silence is never treated as an emergency; this only checks in once and
+  // then ends the session through the normal graceful path.
+  const [endedUnresponsive, setEndedUnresponsive] = useState(false)
+  const endedUnresponsiveRef = useRef<boolean>(false)
+  const signOffTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const unresponsiveRef = useRef<UnresponsivenessMonitor | null>(null)
+  if (unresponsiveRef.current === null) {
+    unresponsiveRef.current = createUnresponsivenessMonitor({
+      config: options.unresponsiveness ?? DEFAULT_UNRESPONSIVENESS_CONFIG,
+      onCheckIn: () => {
+        const provider = providerRef.current
+        if (!provider?.isOpen()) return
+        provider.injectSystemText(UNRESPONSIVE_CHECK_IN_NUDGE)
+        // OpenAI needs the explicit turn; Nova self-triggers off the injected
+        // user-role text and no-ops here.
+        provider.requestResponse()
+      },
+      onGiveUp: () => {
+        // Suspend FIRST: the sign-off utterance produces another aiSpeechStop,
+        // which would otherwise re-arm the ladder against a departed patient.
+        unresponsiveRef.current?.suspend()
+        endedUnresponsiveRef.current = true
+        setEndedUnresponsive(true)
+        console.warn('[useRealtimeSession] patient unresponsive — ending session gracefully')
+        const provider = providerRef.current
+        if (provider?.isOpen()) {
+          provider.injectSystemText(UNRESPONSIVE_SIGN_OFF_NUDGE)
+          provider.requestResponse()
+        }
+        // Bounded: fires whether or not the sign-off ever plays.
+        if (signOffTimerRef.current) clearTimeout(signOffTimerRef.current)
+        signOffTimerRef.current = setTimeout(() => {
+          signOffTimerRef.current = null
+          endSessionRef.current()
+        }, UNRESPONSIVE_SIGN_OFF_GRACE_MS)
+      },
+    })
+  }
+
   const sessionTypeRef = useRef<string>('new_patient')
 
   // Localizer-specific refs
@@ -242,6 +312,8 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
     for (const kw of SAFETY_KEYWORDS) {
       if (lower.includes(kw)) {
         safetyEscalatedRef.current = true
+        // A safety escalation must never be interrupted by a check-in.
+        unresponsiveRef.current?.suspend()
         setStatus('safety_escalation')
         options.onSafetyEscalation?.()
         return true
@@ -263,6 +335,11 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
       clearTimeout(autoEndTimerRef.current)
       autoEndTimerRef.current = null
     }
+    if (signOffTimerRef.current) {
+      clearTimeout(signOffTimerRef.current)
+      signOffTimerRef.current = null
+    }
+    unresponsiveRef.current?.suspend()
   }, [])
 
   /**
@@ -636,7 +713,9 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
       }
 
       case 'userTranscript': {
-        // User finished speaking (was input_audio_transcription.completed)
+        // User finished speaking (was input_audio_transcription.completed).
+        // Emitted by BOTH providers — this is the reset the ladder relies on.
+        unresponsiveRef.current?.patientActivity()
         const userText = e.text || ''
         if (userText.trim()) {
           const entry: HistorianTranscriptEntry = {
@@ -685,6 +764,9 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
       }
 
       case 'userSpeechStart': {
+        // Best-effort early reset. OpenAI-only, so the ladder must never
+        // DEPEND on it — userTranscript above is the load-bearing signal.
+        unresponsiveRef.current?.patientActivity()
         // NOTE: emitted only by the OpenAI provider (input_audio_buffer.
         // speech_started). Nova does not forward user-speech VAD boundaries, so
         // under Nova isUserSpeaking stays false — best-effort indicator only.
@@ -731,6 +813,12 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
         // out the tool-call branch's generous fallback.
         setAiSpeaking(false)
         maybeScheduleAutoEnd(400)
+        // The turn is now the patient's — start the unresponsiveness ladder.
+        // Suppressed once the interview is complete or finalizing so a closing
+        // message is never followed by "are you still there?".
+        if (!interviewCompletedRef.current && !finalizingRef.current) {
+          unresponsiveRef.current?.agentTurnEnded()
+        }
         break
       }
 
@@ -1138,5 +1226,6 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
     administeredScaleIds,
     detectedRedFlags,
     interviewCompleted,
+    endedUnresponsive,
   }
 }

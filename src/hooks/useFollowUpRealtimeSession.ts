@@ -3,10 +3,24 @@
 import { useState, useRef, useCallback, useEffect } from 'react'
 import type { TranscriptEntry, PatientScenario, EscalationFlag } from '@/lib/follow-up/types'
 import { scanForEscalationTriggers, escalationFlagFromToolOutput } from '@/lib/follow-up/escalationRules'
+import {
+  createUnresponsivenessMonitor,
+  DEFAULT_UNRESPONSIVENESS_CONFIG,
+  UNRESPONSIVE_CHECK_IN_NUDGE,
+  UNRESPONSIVE_SIGN_OFF_NUDGE,
+  type UnresponsivenessConfig,
+  type UnresponsivenessMonitor,
+} from '@/lib/voice/unresponsiveness'
 import type { VoiceEvent, VoiceProvider } from '@/lib/voice/providerTypes'
 import { selectProvider, makeProvider } from '@/lib/voice/selectProvider'
 
 type SessionStatus = 'idle' | 'connecting' | 'active' | 'ending' | 'complete' | 'error' | 'safety_escalation'
+
+/**
+ * Upper bound on how long the unresponsive sign-off gets to play before the
+ * call is torn down anyway — must not depend on audio ever draining.
+ */
+const UNRESPONSIVE_SIGN_OFF_GRACE_MS = 8000
 
 export interface UseFollowUpRealtimeSessionOptions {
   scenario: PatientScenario
@@ -21,6 +35,12 @@ export interface UseFollowUpRealtimeSessionOptions {
   provider?: 'nova' | 'openai'
   onSafetyEscalation?: () => void
   onEscalation?: (flag: EscalationFlag) => void
+  /**
+   * Unresponsive-patient handling. Defaults to
+   * DEFAULT_UNRESPONSIVENESS_CONFIG; pass `{ enabled: false, ... }` to make
+   * the ladder inert.
+   */
+  unresponsiveness?: UnresponsivenessConfig
   onComplete?: (data: {
     transcript: TranscriptEntry[]
     duration: number
@@ -39,6 +59,13 @@ interface UseFollowUpRealtimeSessionResult {
   error: string | null
   startSession: () => Promise<void>
   endSession: () => void
+  /**
+   * True when the call ended because the patient stopped responding (see
+   * src/lib/voice/unresponsiveness.ts). Advisory only — not persisted, and
+   * nothing escalates on it. Routing an unresponsive call to a human is a
+   * clinical decision that has not been made.
+   */
+  endedUnresponsive: boolean
 }
 
 const SAFETY_KEYWORDS = [
@@ -115,8 +142,57 @@ export function useFollowUpRealtimeSession(
         micTrackRef.current.enabled = true
       }
       unmuteTimerRef.current = null
+      // Mic live again => the turn is the patient's. Arm the ladder here
+      // rather than at response.done, so a long agent utterance does not eat
+      // into the patient's silence window.
+      unresponsiveRef.current?.agentTurnEnded()
     }, delayMs)
   }, [])
+
+  // ── Unresponsiveness ladder (src/lib/voice/unresponsiveness.ts) ──────────
+  // Wired on BOTH transports. The OpenAI path arms when the mic is actually
+  // re-enabled (the patient's turn genuinely begins); the Nova path arms on
+  // aiSpeechStop. Silence never triggers the safety protocol.
+  const [endedUnresponsive, setEndedUnresponsive] = useState(false)
+  const signOffTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const unresponsiveRef = useRef<UnresponsivenessMonitor | null>(null)
+
+  /** Speak `nudge` on whichever transport is live. */
+  const speakNudge = useCallback((nudge: string) => {
+    if (novaProviderRef.current) {
+      // Nova's injectSystemText lands a user-role turn, which self-triggers a
+      // response — the same mechanism nudgeClosing uses.
+      novaProviderRef.current.injectSystemText(nudge)
+      return
+    }
+    if (dcRef.current?.readyState === 'open') {
+      dcRef.current.send(JSON.stringify({
+        type: 'conversation.item.create',
+        item: { type: 'message', role: 'user', content: [{ type: 'input_text', text: nudge }] },
+      }))
+      dcRef.current.send(JSON.stringify({ type: 'response.create', response: {} }))
+    }
+  }, [])
+
+  if (unresponsiveRef.current === null) {
+    unresponsiveRef.current = createUnresponsivenessMonitor({
+      config: options.unresponsiveness ?? DEFAULT_UNRESPONSIVENESS_CONFIG,
+      onCheckIn: () => speakNudge(UNRESPONSIVE_CHECK_IN_NUDGE),
+      onGiveUp: () => {
+        // Suspend first — the sign-off utterance would otherwise re-arm the
+        // ladder against a patient who has already gone.
+        unresponsiveRef.current?.suspend()
+        setEndedUnresponsive(true)
+        console.warn('[useFollowUpRealtimeSession] patient unresponsive — ending call gracefully')
+        speakNudge(UNRESPONSIVE_SIGN_OFF_NUDGE)
+        if (signOffTimerRef.current) clearTimeout(signOffTimerRef.current)
+        signOffTimerRef.current = setTimeout(() => {
+          signOffTimerRef.current = null
+          endSessionRef.current()
+        }, UNRESPONSIVE_SIGN_OFF_GRACE_MS)
+      },
+    })
+  }
 
   // Safety keyword check (secondary defense)
   const checkSafety = useCallback((text: string) => {
@@ -124,6 +200,7 @@ export function useFollowUpRealtimeSession(
     for (const kw of SAFETY_KEYWORDS) {
       if (lower.includes(kw)) {
         safetyEscalatedRef.current = true
+        unresponsiveRef.current?.suspend()
         setStatus('safety_escalation')
         onSafetyEscalationRef.current?.()
         return true
@@ -144,6 +221,11 @@ export function useFollowUpRealtimeSession(
   }, [])
 
   const cleanup = useCallback(() => {
+    if (signOffTimerRef.current) {
+      clearTimeout(signOffTimerRef.current)
+      signOffTimerRef.current = null
+    }
+    unresponsiveRef.current?.suspend()
     if (unmuteTimerRef.current) {
       clearTimeout(unmuteTimerRef.current)
       unmuteTimerRef.current = null
@@ -207,6 +289,8 @@ export function useFollowUpRealtimeSession(
         break
       }
       case 'userTranscript': {
+        // Emitted by BOTH providers — the load-bearing reset signal.
+        unresponsiveRef.current?.patientActivity()
         const userText = e.text || ''
         if (userText.trim()) {
           const entry: TranscriptEntry = {
@@ -224,6 +308,8 @@ export function useFollowUpRealtimeSession(
         break
       }
       case 'userSpeechStart': {
+        // Best-effort early reset (OpenAI-only event; never load-bearing).
+        unresponsiveRef.current?.patientActivity()
         setIsUserSpeaking(true)
         setCurrentUserText('(listening...)')
         break
@@ -238,6 +324,7 @@ export function useFollowUpRealtimeSession(
       }
       case 'aiSpeechStop': {
         setIsAiSpeaking(false)
+        unresponsiveRef.current?.agentTurnEnded()
         break
       }
       case 'toolCall': {
@@ -311,6 +398,7 @@ export function useFollowUpRealtimeSession(
 
       // ── User speech events ────────────────────────────────────
       case 'conversation.item.input_audio_transcription.completed': {
+        unresponsiveRef.current?.patientActivity()
         // User finished speaking — their audio was transcribed
         const userText = msg.transcript || ''
         if (userText.trim()) {
@@ -332,6 +420,7 @@ export function useFollowUpRealtimeSession(
       }
 
       case 'input_audio_buffer.speech_started': {
+        unresponsiveRef.current?.patientActivity()
         setIsUserSpeaking(true)
         setCurrentUserText('(listening...)')
         break
@@ -607,5 +696,7 @@ export function useFollowUpRealtimeSession(
     error,
     startSession,
     endSession,
+    /** True when the call ended because the patient stopped responding. */
+    endedUnresponsive,
   }
 }
