@@ -66,6 +66,37 @@ npm run build
 
 ## Known Gotchas
 
+- **Amplify route rules: `next.config` cannot route anything in `public/`.** Amplify
+  `WEB_COMPUTE` splits the deploy into a **static CDN origin** (everything in `public/`)
+  and a **compute origin** (the Next server), and they cannot see each other. Two
+  consequences, both measured against a real branch deployment on 2026-08-05:
+  (1) a `redirects()` entry whose *source* is a `public/` asset **never fires** — that
+  request is answered by the CDN and never reaches the Next routing layer; (2) a
+  `rewrites()` entry whose *target* is a `public/` asset **404s** — the extensionless
+  source does reach the compute, but the compute bundle has no copy of `public/`.
+  Diagnostic: `curl -I` the path. A `public/` asset comes back with an S3-style `etag`
+  and **none** of the `next.config` security headers; a compute-served route carries
+  `x-powered-by: Next.js` and the full CSP set. If the security headers are missing,
+  no `next.config` route rule can ever apply to that path. Moving the file (e.g. to
+  `public/triage-demo/index.html`) does not help — only the literal `/…/index.html`
+  path works; the bare directory URL still 404s at the compute.
+  **The fix is Amplify Console custom rules** (`aws amplify update-app --custom-rules`,
+  or App settings → Rewrites and redirects), which run at the CDN layer above both
+  origins. `/triage-demo` is wired this way: a `301` from
+  `/concepts/triage-nurse/outpatient-triage-nurse-demo.html` plus a `200` rewrite from
+  `/triage-demo` to that file. A `200` rewrite does **not** re-enter the rule chain, so
+  that pair does not loop (verified — exactly one hop, final 200). Note `customRules` is
+  **app-level, not per-branch**: editing it changes production immediately and applies to
+  every branch at once. The mirrored rules in `next.config.ts` exist only so local dev
+  matches; they are not load-bearing.
+- **This app has no PR previews.** `enableAutoBranchCreation` is `false` and no PR-preview
+  config exists, so opening a PR produces no Amplify preview URL — only `main` and
+  manually-connected branches ever build. To QA a branch before merge you must connect it
+  yourself (`aws amplify create-branch … --stage DEVELOPMENT --framework "Next.js - SSR"`,
+  then `start-job --job-type RELEASE`), and delete it afterwards. New branches inherit only
+  the two app-level env vars, **not** `main`'s branch-level set — including `RDS_DATABASE`,
+  so a connected branch does not automatically point at `ops_amplehtml`.
+
 - **Bind-parameter type inference in `CASE` arms.** A parameter that appears *only* inside a
   `CASE ... THEN $n END` has no type context: Postgres defaults it to `text` and rejects the
   assignment to a `timestamptz` column, so the statement fails at parse time on every

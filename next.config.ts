@@ -43,10 +43,19 @@ const nextConfig: NextConfig = {
     return [{ source: '/:path*', headers: SECURITY_HEADERS }]
   },
   // Standalone public URL for the outpatient referral-triage demo.
-  // The file itself stays at public/concepts/triage-nurse/... (git history,
-  // sibling concept pages); only the URL is promoted. Next evaluates
-  // redirects BEFORE rewrites, and a rewrite destination is not re-run
-  // through redirects, so these two rules do not loop.
+  //
+  // ⚠️ THESE TWO RULES ARE LOCAL-DEV PARITY ONLY. They do NOT work on Amplify,
+  // and they are NOT what serves /triage-demo in production — the Amplify
+  // custom rules do (see "Amplify route rules" in the Known Gotchas of
+  // CLAUDE.md). Verified against a real branch deployment 2026-08-05:
+  //   · the 301 never fires — a public/ asset is served straight from the
+  //     static CDN origin and never reaches this routing layer at all
+  //   · the rewrite 404s — /triage-demo does reach the compute, but the
+  //     compute bundle contains no copy of public/, so Next cannot resolve
+  //     the destination
+  // Keep them so `npm run dev` behaves like production. Do not delete them
+  // assuming they are load-bearing, and do not add more public/-targeting
+  // route rules here expecting them to ship.
   async redirects() {
     return [
       {
