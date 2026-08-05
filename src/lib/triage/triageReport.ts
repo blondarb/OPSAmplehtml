@@ -2,8 +2,10 @@ import { TIER_DISPLAY, type TriageResult } from './types'
 import {
   DATA_CONFLICT_INFORMATION,
   INSUFFICIENT_DATA_INFORMATION,
+  INTERNAL_SAFETY_FAILURE_INFORMATION,
   triageOutputPolicy,
 } from './triageOutputPolicy'
+import { hasModelSafetyFailure } from './safetyReviewView'
 
 export function buildTriageReport(result: TriageResult): string {
   const policy = triageOutputPolicy(result)
@@ -53,14 +55,24 @@ export function buildTriageReport(result: TriageResult): string {
     lines.push('')
   }
 
+  // Mirrors InsufficientDataPanel's discrimination exactly. The copied report
+  // leaves the app — it is pasted into charts and sent back to referring
+  // providers — so the fallback bullet must not blame the referral when the
+  // hold was caused by our own safety check failing and the scoring model
+  // named no concrete gap. A run that is BOTH thin and internally failed keeps
+  // its real missing items; only the generic fallback swaps.
+  const internalSafetyFailure = hasModelSafetyFailure(result.safety_review)
+  const insufficientDataBullet =
+    internalSafetyFailure && !result.missing_information?.length
+      ? INTERNAL_SAFETY_FAILURE_INFORMATION
+      : INSUFFICIENT_DATA_INFORMATION
+
   const missingInformation = result.missing_information?.length
     ? result.missing_information
     : Array.from(
         new Set([
           ...(policy.dataConflict ? [DATA_CONFLICT_INFORMATION] : []),
-          ...(policy.insufficientDataHold
-            ? [INSUFFICIENT_DATA_INFORMATION]
-            : []),
+          ...(policy.insufficientDataHold ? [insufficientDataBullet] : []),
         ]),
       )
 

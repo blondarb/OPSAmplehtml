@@ -17,6 +17,7 @@ import { Mic } from 'lucide-react'
 import { REFERRAL_NOTE_SAMPLES } from '@/lib/historian/referralNoteSamples'
 import type { HistorianReferralInput } from '@/lib/historian/referralContext'
 import {
+  formatHandoffLoadedMessage,
   readHistorianHandoff,
   type HistorianHandoffDisplay,
 } from '@/lib/historian/referralHandoff'
@@ -620,9 +621,7 @@ export default function NeurologicHistorian() {
                     role="status"
                     style={{ marginTop: 8, color: 'var(--nn-accent-ink)' }}
                   >
-                    {handoffDisplay
-                      ? `Referral loaded from triage${handoffDisplay.tierDisplay ? ` — ${handoffDisplay.tierDisplay}` : ''}${handoffDisplay.focusHint ? `: ${handoffDisplay.focusHint}` : ''}. Start the interview below.`
-                      : 'Referral loaded — start the interview below.'}
+                    {formatHandoffLoadedMessage(handoffDisplay)}
                   </p>
                 )}
               </div>

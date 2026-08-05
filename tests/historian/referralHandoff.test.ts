@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 
 import {
   HISTORIAN_REFERRAL_HANDOFF_KEY,
+  formatHandoffLoadedMessage,
   readHistorianHandoff,
   writeHistorianHandoff,
   type HandoffStorage,
@@ -134,6 +135,61 @@ describe('readHistorianHandoff — staleness', () => {
     const writtenAt = 0
     writeHistorianHandoff(REFERRAL, {}, storage, writtenAt)
     expect(readHistorianHandoff(storage, THIRTY_MIN + 1)).toBeNull()
+  })
+})
+
+describe('formatHandoffLoadedMessage', () => {
+  // Production incident 2026-08-05: an AI-generated `focusHint` that already
+  // ended in a period concatenated against the hardcoded trailing sentence
+  // and produced "...MS evaluation.. Start the interview below." — this
+  // suite locks in the fix so it cannot regress silently.
+  it('strips a trailing period from focusHint so the punctuation is not doubled', () => {
+    const message = formatHandoffLoadedMessage({
+      tierDisplay: 'Tier 2 of 7 — Urgent',
+      focusHint: 'General Neurology — MS evaluation.',
+    })
+    expect(message).not.toContain('..')
+    expect(message).toBe(
+      'Referral loaded from triage — Tier 2 of 7 — Urgent: General Neurology — MS evaluation. Start the interview below.',
+    )
+  })
+
+  it('strips multiple trailing periods, not just one', () => {
+    const message = formatHandoffLoadedMessage({
+      focusHint: 'MS evaluation...',
+    })
+    expect(message).not.toContain('..')
+  })
+
+  it('keeps BOTH the tier and the focus visible — the focus is the whole point of the handoff', () => {
+    const message = formatHandoffLoadedMessage({
+      tierDisplay: 'URGENT',
+      focusHint: 'Movement Disorders',
+    })
+    expect(message).toContain('URGENT')
+    expect(message).toContain('Movement Disorders')
+  })
+
+  it('falls back to the tier alone when there is no focus', () => {
+    const message = formatHandoffLoadedMessage({ tierDisplay: 'URGENT' })
+    expect(message).toBe('Referral loaded from triage — URGENT. Start the interview below.')
+  })
+
+  it('falls back to the focus alone when there is no tier', () => {
+    const message = formatHandoffLoadedMessage({ focusHint: 'Movement Disorders' })
+    expect(message).toBe('Referral loaded from triage — Movement Disorders. Start the interview below.')
+  })
+
+  it('falls back to the plain message when display is null', () => {
+    expect(formatHandoffLoadedMessage(null)).toBe(
+      'Referral loaded — start the interview below.',
+    )
+  })
+
+  it('falls back to the plain message when display carries neither field', () => {
+    expect(formatHandoffLoadedMessage({})).toBe(
+      'Referral loaded — start the interview below.',
+    )
   })
 })
 

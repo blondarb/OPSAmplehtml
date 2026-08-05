@@ -138,6 +138,32 @@ export function readHistorianHandoff(
 }
 
 /**
+ * The "Referral loaded from triage" status line shown next to the historian's
+ * "Use this referral" button. Pulled into its own pure function because the
+ * failure mode here is easy to reintroduce silently: `focusHint` is often an
+ * AI-generated clinical-reason sentence that already ends in a period, and
+ * concatenating it directly against a hardcoded trailing sentence doubled
+ * the punctuation ("...MS evaluation.. Start the interview below.") —
+ * observed in production 2026-08-05. Keeps both the tier AND the focus
+ * visible; the focus is the whole point of the handoff, and its silent
+ * absence is the failure mode `tests/historian/triageHandoffPayload.test.ts`
+ * guards against.
+ */
+export function formatHandoffLoadedMessage(
+  display: HistorianHandoffDisplay | null,
+): string {
+  if (!display) return 'Referral loaded — start the interview below.'
+
+  const tier = display.tierDisplay?.trim()
+  const focus = display.focusHint?.trim().replace(/\.+$/, '')
+  const detail = [tier, focus].filter(Boolean).join(': ')
+
+  return detail
+    ? `Referral loaded from triage — ${detail}. Start the interview below.`
+    : 'Referral loaded — start the interview below.'
+}
+
+/**
  * Build the referral payload a scored triage run hands to the historian.
  *
  * Extracted from the click handler ON PURPOSE. The dangerous failure here is

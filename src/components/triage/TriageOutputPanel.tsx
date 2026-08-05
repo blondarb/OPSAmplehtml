@@ -32,6 +32,7 @@ import AlgorithmModal from './AlgorithmModal'
 import PhysicianOverridePanel from './PhysicianOverridePanel'
 import SafetyReviewPanel from './SafetyReviewPanel'
 import EmergencyActionPanel from './EmergencyActionPanel'
+import { hasModelSafetyFailure } from '@/lib/triage/safetyReviewView'
 
 const EMERGENCY_TIMEFRAME = 'Emergency evaluation now'
 const SAME_DAY_TIMEFRAME = 'Same-day clinician review'
@@ -66,6 +67,12 @@ export default function TriageOutputPanel({ result, onTryAnother, onStartPatient
         )
   const isEmergent = outputPolicy.timeframe === EMERGENCY_TIMEFRAME
   const isSameDay = outputPolicy.timeframe === SAME_DAY_TIMEFRAME
+  // Cause-honest copy: distinguishes a genuinely thin referral from our own
+  // independent safety-model check failing to complete, so InsufficientDataPanel
+  // never blames the referral for an internal failure (production incident
+  // 2026-08-05).
+  const internalSafetyFailure = hasModelSafetyFailure(presentationResult.safety_review)
+  const hasGenuineMissingItems = Boolean(presentationResult.missing_information?.length)
   const isInsufficientData =
     !isEmergent &&
     !isSameDay &&
@@ -130,6 +137,8 @@ export default function TriageOutputPanel({ result, onTryAnother, onStartPatient
           <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
             <InsufficientDataPanel
               missingInformation={displayedMissingInformation}
+              internalFailure={internalSafetyFailure}
+              hasGenuineMissingItems={hasGenuineMissingItems}
             />
             <ClinicalReasons reasons={presentationResult.clinical_reasons} />
             <RedFlagAlert redFlags={presentationResult.red_flags} />

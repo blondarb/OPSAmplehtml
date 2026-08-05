@@ -64,6 +64,17 @@ function collectEvidence(
   return result
 }
 
+/**
+ * Whether the hold (if any) was caused, at least in part, by OUR independent
+ * safety-model check failing to complete — not by a genuinely thin referral.
+ * Exported standalone so a caller that only needs this one fact (e.g.
+ * InsufficientDataPanel's cause-honest copy) doesn't have to build the full
+ * view model and re-derive it from `warnings` text.
+ */
+export function hasModelSafetyFailure(safetyReview: unknown): boolean {
+  return isRecord(safetyReview) && Boolean(safetyReview.modelSafetyFailure)
+}
+
 export function buildSafetyReviewViewModel(
   safetyReview: unknown,
 ): SafetyReviewViewModel {

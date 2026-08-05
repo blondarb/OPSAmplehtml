@@ -17,6 +17,21 @@ export const DATA_CONFLICT_INFORMATION =
 export const INSUFFICIENT_DATA_INFORMATION =
   'Referral information is insufficient for a safe outpatient disposition.'
 
+/**
+ * Used INSTEAD of INSUFFICIENT_DATA_INFORMATION when the hold came from our own
+ * independent safety check failing rather than from a thin referral, and the
+ * scoring model named no concrete missing items.
+ *
+ * The distinction is not cosmetic. The copied report is pasted into charts and
+ * sent back to referring providers; telling a PCP their referral was inadequate
+ * when our model call simply failed is both false and a reason for them to stop
+ * referring. Production incident 2026-08-05: a transient safety-extractor
+ * failure on a complete MS workup (UMN signs, RAPD, Babinski, posterior column
+ * findings) produced exactly that message.
+ */
+export const INTERNAL_SAFETY_FAILURE_INFORMATION =
+  'The independent safety check did not complete. This is a system issue, not a gap in the referral — no additional information has been identified as missing.'
+
 export function triageOutputPolicy(
   result: Pick<
     TriageResult,

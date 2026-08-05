@@ -75,6 +75,7 @@ vi.mock('@/lib/triage/autoSchedule', () => ({
 }))
 
 import { processTriageInBackground } from '@/lib/triage/processTriageInBackground'
+import { ClinicalModelTimeoutError } from '@/lib/triage/modelTimeout'
 
 const routineModelResponse = {
   emergent_override: false,
@@ -588,7 +589,7 @@ describe('triage background safety ordering', () => {
     expect(autoScheduleMock).not.toHaveBeenCalled()
   })
 
-  it('fails closed to an undetermined hold when the independent safety model fails', async () => {
+  it('fails closed to an undetermined hold when the independent safety model fails on BOTH the original attempt and its retry', async () => {
     runGatewayMock.mockReturnValueOnce({
       status: 'completed',
       failureCode: null,
@@ -599,7 +600,12 @@ describe('triage background safety ordering', () => {
       lexicalHits: [],
       version: 'neurology-emergency-gateway-v1',
     })
-    runSafetyMock.mockRejectedValueOnce(new Error('synthetic timeout'))
+    // Every call rejects (not just the first) — this is the fail-closed
+    // regression guard: the safety branch now retries once, and a real
+    // retry against this test's unconfigured mock default would otherwise
+    // silently resolve to `undefined` and look "complete", defeating this
+    // assertion. Both attempts must fail for the hold to be a true one.
+    runSafetyMock.mockRejectedValue(new Error('synthetic persistent failure'))
 
     await processTriageInBackground('triage-1', {
       gatewayText:
@@ -614,6 +620,8 @@ describe('triage background safety ordering', () => {
       tenantId: 'tenant-1',
     })
 
+    // Proves the retry actually ran (not just that the outcome looks right).
+    expect(runSafetyMock).toHaveBeenCalledTimes(2)
     expect(persistModelSafetyMock).toHaveBeenCalledWith(
       expect.objectContaining({
         safetyResult: null,
@@ -628,6 +636,85 @@ describe('triage background safety ordering', () => {
       expect.objectContaining({
         proposedCarePathway: 'undetermined',
         scoringTier: 'insufficient_data',
+      }),
+    )
+  })
+
+  it('retries the safety branch once on a transient failure and recovers to a normal disposition (no false hold)', async () => {
+    runGatewayMock.mockReturnValueOnce({
+      status: 'completed',
+      failureCode: null,
+      carePathway: 'routine_outpatient',
+      reviewRequirement: 'clinician_confirmation',
+      schedulingLocked: true,
+      signals: [],
+      lexicalHits: [],
+      version: 'neurology-emergency-gateway-v1',
+    })
+    // The first attempt fails transiently; the retry falls through to the
+    // suite's default successful resolution set in beforeEach.
+    runSafetyMock.mockRejectedValueOnce(new Error('synthetic transient failure'))
+
+    await processTriageInBackground('triage-1', {
+      gatewayText:
+        'Synthetic referral with stable symptoms and enough text for the safety-retry-success test.',
+      textForScoring:
+        'Synthetic referral with stable symptoms and enough text for the safety-retry-success test.',
+      referral_text:
+        'Synthetic referral with stable symptoms and enough text for the safety-retry-success test.',
+      temperature: 0,
+      createConsultFlag: false,
+      coverageStatus: 'not_applicable',
+      tenantId: 'tenant-1',
+    })
+
+    expect(runSafetyMock).toHaveBeenCalledTimes(2)
+    expect(persistModelSafetyMock).toHaveBeenCalledWith(
+      expect.objectContaining({ safetyFailure: null }),
+    )
+    expect(finalizeTriageAttemptMock).toHaveBeenCalledWith(
+      expect.objectContaining({ proposedCarePathway: 'routine_outpatient' }),
+    )
+  })
+
+  it('does not retry a ClinicalModelTimeoutError on the safety branch', async () => {
+    runGatewayMock.mockReturnValueOnce({
+      status: 'completed',
+      failureCode: null,
+      carePathway: 'routine_outpatient',
+      reviewRequirement: 'clinician_confirmation',
+      schedulingLocked: true,
+      signals: [],
+      lexicalHits: [],
+      version: 'neurology-emergency-gateway-v1',
+    })
+    // A deadline overrun already consumed the branch's full time budget —
+    // retrying it would double the worst-case latency for no benefit.
+    runSafetyMock.mockRejectedValueOnce(
+      new ClinicalModelTimeoutError('safety_extractor', 45_000),
+    )
+
+    await processTriageInBackground('triage-1', {
+      gatewayText:
+        'Synthetic referral with stable symptoms and enough text for the safety-timeout-no-retry test.',
+      textForScoring:
+        'Synthetic referral with stable symptoms and enough text for the safety-timeout-no-retry test.',
+      referral_text:
+        'Synthetic referral with stable symptoms and enough text for the safety-timeout-no-retry test.',
+      temperature: 0,
+      createConsultFlag: false,
+      coverageStatus: 'not_applicable',
+      tenantId: 'tenant-1',
+    })
+
+    expect(runSafetyMock).toHaveBeenCalledTimes(1)
+    expect(persistModelSafetyMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        safetyResult: null,
+        safetyFailure: 'deadline_exceeded',
+        fusion: expect.objectContaining({
+          carePathway: 'undetermined',
+        }),
       }),
     )
   })

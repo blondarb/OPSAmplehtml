@@ -153,6 +153,16 @@ export async function processTriageInBackground(
       referringProviderType: params.referring_provider_type,
     })
 
+    const invokeSafetyExtractor = () =>
+      runClinicalModelWithTimeout({
+        label: 'safety_extractor',
+        timeoutMs: MODEL_BRANCH_TIMEOUT_MS,
+        operation: (signal) =>
+          runModelSafetyExtractor(params.gatewayText, {
+            model: TRIAGE_MODELS.safetyExtractor,
+            signal,
+          }),
+      })
     const safetyBranchPromise: Promise<
       ClinicalBranch<ValidatedModelSafetyExtraction>
     > = params.precomputedSafetyResult
@@ -160,15 +170,19 @@ export async function processTriageInBackground(
           status: 'complete',
           result: params.precomputedSafetyResult,
         })
-      : runClinicalModelWithTimeout({
-          label: 'safety_extractor',
-          timeoutMs: MODEL_BRANCH_TIMEOUT_MS,
-          operation: (signal) =>
-            runModelSafetyExtractor(params.gatewayText, {
-              model: TRIAGE_MODELS.safetyExtractor,
-              signal,
-            }),
-        })
+      : invokeSafetyExtractor()
+          .catch((error: unknown) => {
+            // A transient safety-extractor failure was manufacturing false
+            // "Insufficient Data" holds on referrals that were not thin
+            // (production incident 2026-08-05: a complete, textbook MS
+            // workup collapsed to an undetermined hold on one dropped call).
+            // Mirrors the scoring branch's existing single retry below, same
+            // reasoning: a deadline overrun already consumed the branch's
+            // full time budget, so only transient output failures get the
+            // single retry.
+            if (error instanceof ClinicalModelTimeoutError) throw error
+            return invokeSafetyExtractor()
+          })
           .then((safetyResult) => ({
             status: 'complete' as const,
             result: safetyResult,
