@@ -3,9 +3,10 @@
  * the Simulated Patient E2E Test Agent.
  */
 
-import { config } from './config'
+import { config, OPT_IN_ENV, SESSION_COOKIE_NAME } from './config'
 import type {
   TriageAPIResponse,
+  TriagePollResponse,
   ConsultCreateResponse,
   InitiateIntakeResponse,
   HistorianSaveResponse,
@@ -80,6 +81,29 @@ export async function getAuthToken(): Promise<string | null> {
 }
 
 /**
+ * Resolve the Cookie header this suite should send, or null if it has no
+ * credentials at all.
+ *
+ * TEST_SESSION_COOKIE wins: the app authenticates via Cognito Hosted UI
+ * (OAuth + PKCE), whose app client generally does not enable the
+ * USER_PASSWORD_AUTH flow that `getAuthToken()` needs — so a copied browser
+ * cookie is the path that actually works. See the README for how to get one.
+ */
+async function buildAuthCookie(): Promise<string | null> {
+  if (config.sessionCookie) {
+    // Accept a full Cookie header ("id_token=eyJ...; other=x") or a bare token.
+    return config.sessionCookie.includes('=')
+      ? config.sessionCookie
+      : `${SESSION_COOKIE_NAME}=${config.sessionCookie}`
+  }
+
+  const token = await getAuthToken()
+  // The app reads `id_token` (src/lib/cognito/server.ts, src/middleware.ts).
+  // Any other cookie name authenticates nothing and every call 401s.
+  return token ? `${SESSION_COOKIE_NAME}=${token}` : null
+}
+
+/**
  * Build headers for API requests, including auth cookie if available.
  */
 async function buildHeaders(extraHeaders?: Record<string, string>): Promise<Record<string, string>> {
@@ -88,9 +112,9 @@ async function buildHeaders(extraHeaders?: Record<string, string>): Promise<Reco
     ...extraHeaders,
   }
 
-  const token = await getAuthToken()
-  if (token) {
-    headers['Cookie'] = `cognito-id-token=${token}`
+  const cookie = await buildAuthCookie()
+  if (cookie) {
+    headers['Cookie'] = cookie
   }
 
   return headers
@@ -197,16 +221,176 @@ function delay(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms))
 }
 
+// ── Preflight ─────────────────────────────────────────────────────────────────
+
+export type PreflightResult =
+  | { ok: true; detail: string }
+  | { ok: false; reason: string }
+
+const AUTH_HELP =
+  `Provide credentials with TEST_SESSION_COOKIE (an authenticated \`${SESSION_COOKIE_NAME}\` ` +
+  `cookie — see tests/simulated-patients/README.md), or point TEST_BASE_URL at an ` +
+  `environment where this suite's account is signed in.`
+
+/**
+ * Decide whether this suite is allowed to make clinical assertions at all.
+ *
+ * The suite grades a live model over HTTP. If the app is down, or the caller is
+ * unauthenticated, or the account lacks clinical access, then NOTHING clinical
+ * was ever evaluated — and a failing assertion in that state is a lie that looks
+ * exactly like a real triage regression. So those states resolve to a SKIP with
+ * a reason, never to a failure.
+ *
+ * The probe is a deliberately invalid `POST /api/triage`: it clears the same
+ * `triage.create` clinical-access gate the suite depends on, then the route
+ * rejects it at parameter validation — before any model call, DB write, or
+ * background job. An authenticated, authorized caller therefore gets a cheap
+ * 400 back; an unauthorized one gets the 401/403/503 we need to detect.
+ */
+export async function preflight(): Promise<PreflightResult> {
+  if (!config.optIn) {
+    return {
+      ok: false,
+      reason:
+        `${OPT_IN_ENV} is not set. This suite drives a live, authenticated app over HTTP ` +
+        `and takes ~14 minutes, so it is opt-in. Run it with ${OPT_IN_ENV}=1.`,
+    }
+  }
+
+  const probe = await apiFetch<{ error?: string; reason?: string }>(config.endpoints.triage, {
+    method: 'POST',
+    body: { referral_text: '', source_extraction_id: '' },
+    retries: 0,
+    timeout: 15_000,
+  })
+
+  const serverSaid = probe.error ? ` Server said: ${probe.error}` : ''
+
+  switch (probe.status) {
+    case 0:
+      return {
+        ok: false,
+        reason:
+          `App not reachable at ${config.baseUrl} (${probe.error ?? 'no response'}). ` +
+          `Start it with \`npm run dev\`, or set TEST_BASE_URL to a running instance.`,
+      }
+    case 401:
+      return {
+        ok: false,
+        reason: `Not authenticated against ${config.baseUrl} — POST /api/triage returned 401.${serverSaid} ${AUTH_HELP}`,
+      }
+    case 403:
+      return {
+        ok: false,
+        reason:
+          `Authenticated against ${config.baseUrl}, but the account is not provisioned for ` +
+          `clinical access — POST /api/triage returned 403.${serverSaid} The test account needs an ` +
+          `active \`clinical_access_memberships\` row with role \`clinician\` or \`admin\` for this tenant.`,
+      }
+    case 503:
+      return {
+        ok: false,
+        reason: `Authorization store unavailable at ${config.baseUrl} — POST /api/triage returned 503.${serverSaid}`,
+      }
+    case 404:
+      return {
+        ok: false,
+        reason: `POST ${config.endpoints.triage} returned 404 at ${config.baseUrl} — has the route moved? This harness is out of date.`,
+      }
+  }
+
+  if (probe.status >= 500) {
+    return {
+      ok: false,
+      reason: `App at ${config.baseUrl} returned HTTP ${probe.status} on the preflight probe.${serverSaid}`,
+    }
+  }
+
+  return {
+    ok: true,
+    detail: `authenticated against ${config.baseUrl} (clinical-access probe → HTTP ${probe.status})`,
+  }
+}
+
+// ── Transport vs. Clinical ────────────────────────────────────────────────────
+
+/** Marks a failure as HTTP-layer, so it can never be read as a clinical verdict. */
+export const TRANSPORT_PREFIX = 'TRANSPORT (not a clinical result)'
+
+/**
+ * Fail on the HTTP layer before anything clinical is read.
+ *
+ * A rejected request and a wrong clinical answer are different findings with
+ * different fixes, and only one of them is a safety signal. Every step asserts
+ * transport first so a 401 can never surface as "the stroke case was not
+ * triaged correctly".
+ *
+ * Statuses that are NOT transport failures (2xx, 4xx other than 401/403) fall
+ * through untouched — a 400 or 404 is the app answering, and the step's own
+ * clinical assertions are the right judge of that answer.
+ */
+export function assertTransportOk(
+  step: string,
+  endpoint: string,
+  result: { status: number; error: string | null },
+): void {
+  const rejected = `${TRANSPORT_PREFIX}: ${step} — ${endpoint}`
+  const nothingGraded =
+    'The request was rejected before any clinical reasoning ran, so nothing was graded.'
+  const said = result.error ? ` Server said: ${result.error}.` : ''
+
+  switch (result.status) {
+    case 401:
+      throw new Error(
+        `${rejected} returned HTTP 401. ${nothingGraded}${said} ` +
+        `The session expired, or TEST_SESSION_COOKIE is unset/stale.`,
+      )
+    case 403:
+      throw new Error(
+        `${rejected} returned HTTP 403. ${nothingGraded}${said} ` +
+        `The account authenticated but lacks clinical access for this action — it needs an ` +
+        `active \`clinical_access_memberships\` row with an allowed role for this tenant.`,
+      )
+    case 503:
+      throw new Error(
+        `${rejected} returned HTTP 503. ${nothingGraded}${said} The authorization store is unavailable.`,
+      )
+    case 0:
+      throw new Error(
+        `${rejected} did not complete — network error or timeout. ${nothingGraded}${said}`,
+      )
+  }
+
+  if (result.status >= 500) {
+    throw new Error(`${rejected} returned HTTP ${result.status}. ${nothingGraded}${said}`)
+  }
+}
+
 // ── Pipeline Step Helpers ─────────────────────────────────────────────────────
+
+export interface TriageRunResult {
+  data: TriageAPIResponse | null
+  status: number
+  error: string | null
+  /** Which HTTP call produced `status`/`error`. Lets callers name the failing hop. */
+  stage: 'submit' | 'poll'
+  /** The triage session, once submitted — useful in failure messages. */
+  sessionId: string | null
+}
 
 /**
  * Step 1: Run triage on referral text with create_consult flag.
+ *
+ * `POST /api/triage` is asynchronous (202 + `session_id`; see PR #111 — SSE was
+ * reverted because of the ~28s Amplify gateway timeout). The scored body only
+ * exists on `GET /api/triage/{id}` once `status === 'complete'`, so this polls
+ * to completion and returns the same shape the old synchronous POST did.
  */
 export async function runTriage(
   referralText: string,
   demographics?: { age?: number; sex?: string },
-): Promise<{ data: TriageAPIResponse | null; status: number; error: string | null }> {
-  return apiFetch<TriageAPIResponse>(config.endpoints.triage, {
+): Promise<TriageRunResult> {
+  const submit = await apiFetch<{ session_id?: string; status?: string }>(config.endpoints.triage, {
     method: 'POST',
     body: {
       referral_text: referralText,
@@ -216,6 +400,69 @@ export async function runTriage(
     },
     timeout: config.stepTimeout,
   })
+
+  if (submit.error || !submit.data?.session_id) {
+    return {
+      data: null,
+      status: submit.status,
+      error: submit.error ?? `Triage submit (HTTP ${submit.status}) returned no session_id`,
+      stage: 'submit',
+      sessionId: null,
+    }
+  }
+
+  const sessionId = submit.data.session_id
+  const deadline = Date.now() + config.triagePollTimeout
+
+  while (Date.now() < deadline) {
+    const poll = await apiFetch<TriagePollResponse>(config.endpoints.triageById(sessionId), {
+      method: 'GET',
+      timeout: 30_000,
+      retries: 0,
+    })
+
+    // An auth/authorization failure mid-run is a transport problem, not a
+    // clinical one — surface it immediately rather than polling to timeout.
+    if (poll.status === 401 || poll.status === 403 || poll.status === 503) {
+      return {
+        data: null,
+        status: poll.status,
+        error: poll.error ?? `HTTP ${poll.status}`,
+        stage: 'poll',
+        sessionId,
+      }
+    }
+
+    if (poll.data?.status === 'complete') {
+      return {
+        data: poll.data as TriageAPIResponse,
+        status: poll.status,
+        error: null,
+        stage: 'poll',
+        sessionId,
+      }
+    }
+
+    if (poll.data?.status === 'error') {
+      return {
+        data: null,
+        status: poll.status,
+        error: `Triage processing failed: ${poll.data.error ?? 'no reason given'}`,
+        stage: 'poll',
+        sessionId,
+      }
+    }
+
+    await delay(config.triagePollInterval)
+  }
+
+  return {
+    data: null,
+    status: 0,
+    error: `Triage session ${sessionId} did not reach status=complete within ${config.triagePollTimeout}ms`,
+    stage: 'poll',
+    sessionId,
+  }
 }
 
 /**
@@ -338,6 +585,8 @@ export async function runIntakeConversation(
   turnCount: number
   isComplete: boolean
   error: string | null
+  /** HTTP status behind `error`, so callers can tell a rejected call from a bad answer. */
+  errorStatus: number
 }> {
   const intakeData = persona.intakeData
   const conversationHistory: Array<{ role: string; text: string }> = []
@@ -419,6 +668,7 @@ export async function runIntakeConversation(
       turnCount: 0,
       isComplete: false,
       error: firstResult.error || 'No response from intake chat',
+      errorStatus: firstResult.status,
     }
   }
 
@@ -473,6 +723,7 @@ export async function runIntakeConversation(
         turnCount,
         isComplete: false,
         error: result.error || 'No response from intake chat',
+        errorStatus: result.status,
       }
     }
 
@@ -512,6 +763,7 @@ export async function runIntakeConversation(
     turnCount,
     isComplete,
     error: null,
+    errorStatus: 200,
   }
 }
 

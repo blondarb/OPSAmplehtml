@@ -113,6 +113,20 @@ export interface TriageAPIResponse {
   consult_id: string | null
 }
 
+/**
+ * What `GET /api/triage/{id}` returns while the async pipeline runs.
+ *
+ * `POST /api/triage` is a 202 that only carries `session_id` + `status`; the
+ * scored fields land on the poll response once `status === 'complete'`.
+ * Everything from `TriageAPIResponse` is therefore optional until then.
+ */
+export interface TriagePollResponse extends Partial<TriageAPIResponse> {
+  session_id: string
+  status: 'pending' | 'complete' | 'error'
+  /** Present when status === 'error' — why the background scoring failed. */
+  error?: string
+}
+
 export interface ConsultCreateResponse {
   consult: {
     id: string
