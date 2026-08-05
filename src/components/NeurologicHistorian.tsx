@@ -21,6 +21,7 @@ import {
   readHistorianHandoff,
   type HistorianHandoffDisplay,
 } from '@/lib/historian/referralHandoff'
+import { deriveReferredCardContent } from '@/lib/historian/referredCardContent'
 import { postExtractJSON } from '@/lib/triage/pollClient'
 import type { ClinicalExtraction } from '@/lib/triage/types'
 
@@ -50,7 +51,22 @@ function formatTime(seconds: number): string {
   return `${m}:${s.toString().padStart(2, '0')}`
 }
 
-export default function NeurologicHistorian() {
+interface NeurologicHistorianProps {
+  /**
+   * Set by /patient/triage-historian to pre-declare intent: this route is
+   * meant to open in referred mode. This is intent only, NOT the mode
+   * itself — actual referred-mode rendering is always derived from
+   * `handoffDisplay !== null` (see `referredMode` below), never from this
+   * prop directly. A cold open (no handoff in sessionStorage) on this route
+   * therefore falls through to the ordinary picker, just like
+   * /patient/historian, plus one route-specific hint (see cold-open
+   * handling in the render below). The prop cannot manufacture a fake
+   * referred card out of nothing — that's deliberate.
+   */
+  initialMode?: 'referred'
+}
+
+export default function NeurologicHistorian({ initialMode }: NeurologicHistorianProps = {}) {
   const searchParams = useSearchParams()
   const router = useRouter()
   const scenarioParam = searchParams.get('scenario')
@@ -101,6 +117,17 @@ export default function NeurologicHistorian() {
   // Voice engine selection — defaults to 'openai' (today's production path);
   // Nova only engages via an explicit ?voice=nova link or a toggle click.
   const [voiceProvider, setVoiceProvider] = useVoiceProviderPreference()
+
+  // Referred mode: a triage handoff was picked up on mount. `handoffDisplay`
+  // is set in exactly one place (the handoff-pickup effect below) and
+  // nowhere else sets it truthy — the paste-a-referral path sets
+  // `referralInput` but never `handoffDisplay`, so pasting a note can never
+  // trigger this. This is the sole discriminator; `initialMode` only sets
+  // intent for the dedicated route's cold-open copy, never the mode itself.
+  const referredMode = handoffDisplay !== null
+  // Card copy derivation — pure function, unit-tested without a DOM (see
+  // src/lib/historian/referredCardContent.ts).
+  const referredCardContent = deriveReferredCardContent(handoffDisplay)
 
   // Derive active config from either real patient or demo scenario
   const activeConfig: SessionConfig = sessionConfig || {
@@ -367,6 +394,92 @@ export default function NeurologicHistorian() {
     router.push('/patient')
   }
 
+  // ── Demo-scenario + paste-a-referral picker, factored into variables so
+  // referred mode can collapse it behind a disclosure without duplicating
+  // this JSX (a duplicate copy is the one that drifts and stops being
+  // tested — see the "do not fork" steer for this feature). Rendered either
+  // directly (today's /patient/historian behavior, unchanged) or inside a
+  // closed-by-default <details> when a triage handoff is already loaded. ──
+  const demoScenarioCards = (
+    <div style={{ display: 'grid', gap: '12px', marginBottom: '20px' }}>
+      {DEMO_SCENARIOS.map(scenario => (
+        <button
+          key={scenario.id}
+          onClick={() => handleSelectScenario(scenario)}
+          aria-pressed={selectedScenario?.id === scenario.id}
+          className={`nn-choice${selectedScenario?.id === scenario.id ? ' on' : ''}`}
+        >
+          <span className="nn-choice-tag">
+            {scenario.session_type === 'new_patient' ? 'New' : 'Follow-up'}
+          </span>
+          <span style={{ display: 'block', fontWeight: 650, marginBottom: 4 }}>
+            {scenario.label}
+          </span>
+          <span style={{ display: 'block', fontSize: 'var(--nn-fs-sm)', color: 'var(--nn-ink-2)' }}>
+            {scenario.description}
+          </span>
+        </button>
+      ))}
+    </div>
+  )
+
+  const referralNoteCard = (
+    <div className="nn-card" style={{ marginBottom: 20 }}>
+      <h3 className="nn-card-title">Or use a referral note</h3>
+      <p className="nn-hint">
+        Paste a synthetic referral. The interview will open with what the patient
+        was referred for, and ask about that first.
+      </p>
+      <div className="nn-actions" style={{ marginBottom: 10 }}>
+        {REFERRAL_NOTE_SAMPLES.map((sample) => (
+          <button
+            key={sample.id}
+            className="nn-btn nn-btn--sec"
+            onClick={() => setReferralNote(sample.text)}
+          >
+            {sample.label}
+          </button>
+        ))}
+      </div>
+      <label htmlFor="nn-referral-note" className="nn-label">
+        Referral note
+      </label>
+      <textarea
+        id="nn-referral-note"
+        className="nn-textarea"
+        style={{ minHeight: 160 }}
+        value={referralNote}
+        onChange={(e) => {
+          setReferralNote(e.target.value)
+          // Editing invalidates a previously prepared referral —
+          // including its handoff display, so a stale "Referral
+          // loaded from triage" line can't sit over freshly typed
+          // text.
+          if (referralInput) setReferralInput(null)
+          if (handoffDisplay) setHandoffDisplay(null)
+        }}
+        placeholder="Paste a synthetic referral note…"
+      />
+      <button
+        className="nn-btn nn-btn--block"
+        style={{ marginTop: 10 }}
+        disabled={extracting || referralNote.trim().length < 50}
+        onClick={handleUseReferralNote}
+      >
+        {extracting ? 'Reading the referral… (about 30–45s)' : 'Use this referral'}
+      </button>
+      {referralInput && (
+        <p
+          className="nn-hint"
+          role="status"
+          style={{ marginTop: 8, color: 'var(--nn-accent-ink)' }}
+        >
+          {formatHandoffLoadedMessage(handoffDisplay)}
+        </p>
+      )}
+    </div>
+  )
+
   // ── Presentation-only derivations for the stepped patient flow ──
   const currentStep: 1 | 2 | 3 | 4 =
     phase === 'complete'
@@ -513,12 +626,43 @@ export default function NeurologicHistorian() {
             <p className="nn-lede">
               {sessionConfig
                 ? 'Review your information below and begin your intake interview.'
-                : 'Pick a demo scenario, or paste a referral note below and the interview will lead with what the patient was referred for.'}
+                : referredMode
+                  ? 'Loaded from triage — review below and start when ready.'
+                  : 'Pick a demo scenario, or paste a referral note below and the interview will lead with what the patient was referred for.'}
             </p>
 
             {error && (
               <div role="alert" className="nn-alert" style={{ marginTop: 0, marginBottom: 16 }}>
                 {error}
+              </div>
+            )}
+
+            {/* Referred-mode card — the primary confirmation surface that a
+                triage → historian handoff succeeded. Occupies the same slot
+                as the real-patient-context card below; mutually exclusive
+                with it since sessionConfig (patient_id lookup) and a triage
+                handoff are different entry sources. Tier and focus are
+                rendered as opaque plain text — never color-coded or
+                parsed — a self-contradictory tierDisplay string is shown
+                verbatim rather than suppressed or reinterpreted. */}
+            {!sessionConfig && referredMode && (
+              <div
+                className="nn-choice on"
+                style={{ marginBottom: 20, cursor: 'default' }}
+                data-testid="referred-mode-card"
+              >
+                <span className="nn-choice-tag">Referred from Triage</span>
+                <span style={{ display: 'block', fontWeight: 650, marginBottom: 4 }}>
+                  {referredCardContent.patientLabel}
+                </span>
+                {referredCardContent.tierLine && (
+                  <span style={{ display: 'block', marginBottom: 4 }}>
+                    {referredCardContent.tierLine}
+                  </span>
+                )}
+                <span style={{ display: 'block' }}>
+                  {referredCardContent.focusText}
+                </span>
               </div>
             )}
 
@@ -544,87 +688,41 @@ export default function NeurologicHistorian() {
               </div>
             )}
 
-            {/* Demo scenario cards (show when no real patient) */}
-            {!sessionConfig && (
-              <div style={{ display: 'grid', gap: '12px', marginBottom: '20px' }}>
-                {DEMO_SCENARIOS.map(scenario => (
-                  <button
-                    key={scenario.id}
-                    onClick={() => handleSelectScenario(scenario)}
-                    aria-pressed={selectedScenario?.id === scenario.id}
-                    className={`nn-choice${selectedScenario?.id === scenario.id ? ' on' : ''}`}
-                  >
-                    <span className="nn-choice-tag">
-                      {scenario.session_type === 'new_patient' ? 'New' : 'Follow-up'}
-                    </span>
-                    <span style={{ display: 'block', fontWeight: 650, marginBottom: 4 }}>
-                      {scenario.label}
-                    </span>
-                    <span style={{ display: 'block', fontSize: 'var(--nn-fs-sm)', color: 'var(--nn-ink-2)' }}>
-                      {scenario.description}
-                    </span>
-                  </button>
-                ))}
-              </div>
-            )}
-
-            {/* Referral-note entry point — the interview leads with what the
-                referral was for, instead of a canned scenario. */}
-            {!sessionConfig && (
-              <div className="nn-card" style={{ marginBottom: 20 }}>
-                <h3 className="nn-card-title">Or use a referral note</h3>
-                <p className="nn-hint">
-                  Paste a synthetic referral. The interview will open with what the patient
-                  was referred for, and ask about that first.
-                </p>
-                <div className="nn-actions" style={{ marginBottom: 10 }}>
-                  {REFERRAL_NOTE_SAMPLES.map((sample) => (
-                    <button
-                      key={sample.id}
-                      className="nn-btn nn-btn--sec"
-                      onClick={() => setReferralNote(sample.text)}
-                    >
-                      {sample.label}
-                    </button>
-                  ))}
-                </div>
-                <label htmlFor="nn-referral-note" className="nn-label">
-                  Referral note
-                </label>
-                <textarea
-                  id="nn-referral-note"
-                  className="nn-textarea"
-                  style={{ minHeight: 160 }}
-                  value={referralNote}
-                  onChange={(e) => {
-                    setReferralNote(e.target.value)
-                    // Editing invalidates a previously prepared referral —
-                    // including its handoff display, so a stale "Referral
-                    // loaded from triage" line can't sit over freshly typed
-                    // text.
-                    if (referralInput) setReferralInput(null)
-                    if (handoffDisplay) setHandoffDisplay(null)
-                  }}
-                  placeholder="Paste a synthetic referral note…"
-                />
-                <button
-                  className="nn-btn nn-btn--block"
-                  style={{ marginTop: 10 }}
-                  disabled={extracting || referralNote.trim().length < 50}
-                  onClick={handleUseReferralNote}
-                >
-                  {extracting ? 'Reading the referral… (about 30–45s)' : 'Use this referral'}
-                </button>
-                {referralInput && (
-                  <p
-                    className="nn-hint"
-                    role="status"
-                    style={{ marginTop: 8, color: 'var(--nn-accent-ink)' }}
-                  >
-                    {formatHandoffLoadedMessage(handoffDisplay)}
+            {/* Demo scenario cards + paste-a-referral, unchanged and always
+                visible — today's exact /patient/historian behavior. Not
+                rendered when a triage handoff is already loaded (referred
+                mode collapses this behind a disclosure below instead). */}
+            {!sessionConfig && !referredMode && (
+              <>
+                {initialMode === 'referred' && (
+                  <p className="nn-hint" style={{ marginBottom: 14 }}>
+                    No referral is loaded yet — score one on Triage, then continue here,
+                    or start a demo below.
                   </p>
                 )}
-              </div>
+                {demoScenarioCards}
+                {referralNoteCard}
+              </>
+            )}
+
+            {/* Referred mode: same picker, collapsed behind a single
+                disclosure (one escape hatch, not two) so a demo operator can
+                still recover to the ordinary picker without it competing
+                with the referred card above for attention. Closed by
+                default. Picking a demo card here calls handleSelectScenario,
+                which nulls referralInput/handoffDisplay — referredMode then
+                goes false and the next render falls into the branch above
+                instead of a separate state flag. */}
+            {!sessionConfig && referredMode && (
+              <details className="nn-card" style={{ marginBottom: 20 }}>
+                <summary style={{ cursor: 'pointer', fontWeight: 600, color: 'var(--nn-accent-ink)' }}>
+                  Use a different demo instead
+                </summary>
+                <div style={{ marginTop: 16 }}>
+                  {demoScenarioCards}
+                  {referralNoteCard}
+                </div>
+              </details>
             )}
 
             {/* Internal-only engine selector (?internal=1) — never a patient control */}

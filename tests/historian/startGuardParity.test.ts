@@ -80,3 +80,45 @@ describe('handoff-loaded referral feeds the same guarded state', () => {
     expect(effectBody).toContain('setReferralInput(payload.referral)')
   })
 })
+
+/**
+ * Referred mode (the triage → historian redesign, 2026-08-05) adds a new
+ * TOP-OF-PAGE card and collapses the demo/paste picker behind a disclosure —
+ * but per the same lesson as above, it must not add a new way to *start* the
+ * interview. `referredMode` is presentation-only: it changes what renders,
+ * never the Start button's `onClick`/`disabled` wiring or the guard inside
+ * `handleStartInterview`. This pins that referred mode is layout-only by
+ * asserting the guard/button parity above still holds unchanged AND that
+ * `referredMode` never appears inside either condition — if it ever does,
+ * that is a fourth entry point the 2026-08-04 lesson exists to prevent.
+ */
+describe('referred mode does not become a fourth, ungated entry point', () => {
+  it('referredMode is derived from handoffDisplay, which is set only by the handoff pickup effect (feeding the SAME referralInput the guard already checks)', () => {
+    expect(SOURCE).toContain('const referredMode = handoffDisplay !== null')
+  })
+
+  it('the Start button disabled condition does not reference referredMode directly', () => {
+    const marker = 'disabled={!selectedScenario'
+    const start = SOURCE.indexOf(marker)
+    expect(start).toBeGreaterThan(-1)
+    const condition = SOURCE.slice(start, start + 120)
+    expect(condition).not.toContain('referredMode')
+  })
+
+  it('handleStartInterview\'s guard does not reference referredMode directly', () => {
+    const body = SOURCE.slice(
+      SOURCE.indexOf('const handleStartInterview'),
+      SOURCE.indexOf('const handleConsentConfirm'),
+    )
+    const guardLine = body
+      .split('\n')
+      .find((line) => line.trim().startsWith('if (!selectedScenario'))
+    expect(guardLine).toBeDefined()
+    expect(guardLine).not.toContain('referredMode')
+  })
+
+  it('startSession() is invoked from exactly the same two guarded call sites as before referred mode shipped', () => {
+    const callSites = SOURCE.split('void startSession()').length - 1
+    expect(callSites).toBe(2)
+  })
+})
