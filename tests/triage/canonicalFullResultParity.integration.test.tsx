@@ -281,7 +281,7 @@ describe('canonical complete-result paste/PDF runtime parity', () => {
     expect(markup).toContain(
       'Missing extraction data does not weaken this action',
     )
-    expect(markup).toContain('Outpatient/model scoring is blocked')
+    expect(markup).toContain('Any model score shown is decision support only')
     expect(markup).toContain('maintain the manual safety hold')
     expect(markup).not.toContain('An unexpected error occurred')
   })

@@ -54,7 +54,7 @@ describe('ExtractionIngressSafetyAlert', () => {
 
     expect(html).toContain('Emergency evaluation now')
     expect(html).toContain('Missing extraction data does not weaken this action')
-    expect(html).toContain('Outpatient/model scoring is blocked')
+    expect(html).toContain('Any model score shown is decision support only')
     expect(html).toContain('Routine scheduling remains blocked')
     expect(html).toContain('triage-emergency-1')
   })
@@ -90,7 +90,7 @@ describe('ExtractionIngressSafetyAlert', () => {
 
     expect(html).toContain('Same-day clinician review')
     expect(html).toContain('Missing extraction data does not weaken this action')
-    expect(html).toContain('Outpatient/model scoring is blocked')
+    expect(html).toContain('Any model score shown is decision support only')
     expect(html).toContain('Routine scheduling remains blocked')
   })
 
@@ -129,7 +129,7 @@ describe('ExtractionIngressSafetyAlert', () => {
 
     expect(html).toContain('Emergency evaluation now')
     expect(html).toContain('Missing extraction data does not weaken this action')
-    expect(html).toContain('Outpatient/model scoring is blocked')
+    expect(html).toContain('Any model score shown is decision support only')
     expect(html).toContain('Safety workflow ID unavailable')
   })
 
@@ -145,7 +145,7 @@ describe('ExtractionIngressSafetyAlert', () => {
 
     expect(html).toContain('Human review required — scoring blocked')
     expect(html).not.toContain('Immediate clinician review required')
-    expect(html).toContain('Outpatient/model scoring is blocked')
+    expect(html).toContain('Any model score shown is decision support only')
     expect(html).toContain('Routine scheduling remains blocked')
   })
 

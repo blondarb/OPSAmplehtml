@@ -357,9 +357,20 @@ export default function ExtractionIngressSafetyAlert({
                   fontWeight: 600,
                 },
               },
+              // "Any model score shown" — NOT "the score below". This same flag
+              // fires in two different states: after scoring completed (the
+              // score renders underneath this banner), and on an ingestion-time
+              // hold that fires BEFORE scoring starts, where pageState never
+              // reaches 'result' and there is no score on the page at all.
+              // Wording that presupposes a visible score is false in the second
+              // state. Neither sentence may claim scoring was blocked: the
+              // Bedrock scoring call runs unconditionally on every pathway
+              // (processTriageInBackground.ts) — what is actually held is
+              // scheduling and disposition (workflowPolicy.ts,
+              // outpatientFinalDisposition.ts).
               governedPathway
-                ? 'Outpatient/model scoring is blocked.'
-                : 'Outpatient/model scoring is blocked. Routine scheduling remains blocked until a clinician resolves this human-review hold.',
+                ? 'Any model score shown is decision support only. It does not unlock scheduling or disposition.'
+                : 'Any model score shown is decision support only. Routine scheduling remains blocked until a clinician resolves this human-review hold.',
             )
           : null,
         holdReason === SAFETY_WORKFLOW_IDENTITY_CONFLICT_REASON
