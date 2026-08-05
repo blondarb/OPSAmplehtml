@@ -6,7 +6,12 @@ const APP_URL = process.env.NEXT_PUBLIC_APP_URL || ''
 // src/lib/clara/testGate.ts) — deliberately public here so it works as a
 // standalone internal test link independent of Cognito login state; access
 // is controlled entirely by its own password gate, not this middleware.
-const PUBLIC_ROUTES = ['/', '/login', '/about', '/patient', '/triage', '/rnd/clara']
+// '/triage-demo' is the standalone outpatient referral-triage demo. It rewrites
+// to public/concepts/triage-nurse/outpatient-triage-nurse-demo.html, which is
+// already served unauthenticated today (the isStatic check below lets any
+// dotted path through). The extensionless URL needs an explicit entry to keep
+// the same access. Synthetic data only — no PHI on that page.
+const PUBLIC_ROUTES = ['/', '/login', '/about', '/patient', '/triage', '/triage-demo', '/rnd/clara']
 
 const COGNITO_REGION = process.env.NEXT_PUBLIC_COGNITO_REGION || 'us-east-2'
 const COGNITO_POOL_ID = process.env.NEXT_PUBLIC_COGNITO_USER_POOL_ID || 'us-east-2_9y6XyJnXC'

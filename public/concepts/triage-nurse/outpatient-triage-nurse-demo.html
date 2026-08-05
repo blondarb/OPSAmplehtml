@@ -3,548 +3,650 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Outpatient Triage — Synapse AI (working demo)</title>
+<title>Referral Triage — Sevaro (demo)</title>
+<meta name="robots" content="noindex">
 <style>
+/* =========================================================================
+   Sevaro outpatient triage — clinical neutral theme (Aug 2026 restyle)
+   Rules of the system, applied everywhere below:
+     · one surface family: near-white page, white cards, one hairline border
+     · one accent (--accent). No second brand hue anywhere.
+     · semantic colour is reserved for URGENCY TIERS ONLY (4 tokens)
+     · no gradients, no drop shadows — a 1px border is the only elevation
+     · type scale: 11 / 12 / 13 / 14 / 15 / 16 / 20 / 26. Weights 400/500/600/700.
+     · radius scale: 4 (chips) / 6 (controls) / 10 (cards) / 12 (intake console)
+   ========================================================================= */
 :root{
-  --bg:#F5F5F7;--card:#FFFFFF;
-  --text:#1F2024;--muted:#6E7079;--faint:#9A9CA4;
-  --teal:#12B5A5;--teal-bg:#E6F7F5;
-  --purple:#6D5BF5;
-  --blue:#2F80ED;--blue-bg:#E8F2FE;
-  --red:#F5333F;--red-bg:#FCE7EA;--red-text:#D6203C;
-  --amber:#F08000;--amber-bg:#FEF1E1;--amber-text:#C2710C;
-  --purple-bg:#F0EBFE;
-  --ink:#101114;
-  --border:#E3E4E8;--hair:#ECEDF1;
-  --gray-bg:#F1F1F3;
-  --f:ui-rounded,'SF Pro Rounded','Nunito',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+  /* surfaces + line */
+  --bg:#FAFAFB;
+  --surface:#FFFFFF;
+  --surface-2:#F2F3F5;
+  --line:#E3E5E9;
+  --line-strong:#CFD2D8;
+
+  /* ink */
+  --text:#16181C;
+  --ink:#16181C;
+  --muted:#575B63;
+  --faint:#83878F;
+
+  /* the single accent */
+  --accent:#1F5C99;
+  --accent-hover:#17456F;
+  --accent-weak:#EDF3F9;
+  --accent-line:#BED2E4;
+
+  /* urgency semantics — the only other colour permitted */
+  --t-emergent:#A02418;      --t-emergent-bg:#FBEEEC;   --t-emergent-line:#E8C6C1;
+  --t-semi:#8A5200;          --t-semi-bg:#FBF4E9;       --t-semi-line:#E7D5B4;
+  --t-routine:#1F6B4F;       --t-routine-bg:#EEF5F1;    --t-routine-line:#C7DED3;
+  --t-hold:#4A4F58;          --t-hold-bg:#F1F2F4;       --t-hold-line:#DCDEE3;
+
+  --f:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif;
 }
 *{box-sizing:border-box}
 html,body{height:100%;margin:0}
 body{background:var(--bg);color:var(--text);font-family:var(--f);font-size:14px;
-     line-height:1.5;-webkit-font-smoothing:antialiased;display:flex}
+     line-height:1.55;-webkit-font-smoothing:antialiased;display:flex}
 a{color:inherit;text-decoration:none}
 button{font-family:inherit;cursor:pointer;border:none;background:none;color:inherit}
-textarea,input{font-family:inherit;font-size:inherit}
-::-webkit-scrollbar{width:9px;height:9px}
-::-webkit-scrollbar-thumb{background:#D8D9DE;border-radius:9px}
+textarea,input,select{font-family:inherit;font-size:inherit}
+::-webkit-scrollbar{width:10px;height:10px}
+::-webkit-scrollbar-thumb{background:#D5D7DC;border-radius:6px}
 ::-webkit-scrollbar-track{background:transparent}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 
 /* ===== RAIL ===== */
-.rail{width:64px;flex-shrink:0;background:#fff;display:flex;flex-direction:column;
-      align-items:center;padding:16px 0 14px;gap:6px;height:100vh;position:relative;
-      z-index:5;border-right:1px solid var(--hair)}
-.rail-logo{width:38px;height:38px;border-radius:11px;background:linear-gradient(160deg,#19CCBB,#0EA396);
-           display:flex;align-items:center;justify-content:center;margin-bottom:16px;flex-shrink:0}
-.rail-icon{width:40px;height:36px;border-radius:11px;display:flex;align-items:center;justify-content:center;
-           color:var(--faint);flex-shrink:0;position:relative}
-.rail-icon svg{width:19px;height:19px}
-.rail-icon:hover{background:#F4F4F6;color:var(--muted)}
-.rail-icon.on{background:var(--teal-bg);color:var(--ink)}
-.rail-icon.on::before{content:'';position:absolute;left:-12px;top:50%;transform:translateY(-50%);
-                       width:3px;height:26px;background:var(--ink);border-radius:0 3px 3px 0}
+.rail{width:60px;flex-shrink:0;background:var(--surface);display:flex;flex-direction:column;
+      align-items:center;padding:16px 0 14px;gap:4px;height:100vh;position:relative;
+      z-index:5;border-right:1px solid var(--line)}
+.rail-logo{width:34px;height:34px;border-radius:8px;background:var(--accent);
+           display:flex;align-items:center;justify-content:center;margin-bottom:18px;flex-shrink:0}
+.rail-icon{width:38px;height:34px;border-radius:6px;display:flex;align-items:center;justify-content:center;
+           color:var(--faint);flex-shrink:0;position:relative;cursor:pointer}
+.rail-icon svg{width:18px;height:18px}
+.rail-icon:hover{background:var(--surface-2);color:var(--muted)}
+.rail-icon.on{background:var(--accent-weak);color:var(--accent)}
 .rail-spacer{flex:1}
-.rail-chevron{width:26px;height:26px;border-radius:50%;border:1px solid var(--border);
+.rail-chevron{width:26px;height:26px;border-radius:6px;border:1px solid var(--line);
               display:flex;align-items:center;justify-content:center;color:var(--faint);
-              flex-shrink:0;margin-top:4px}
+              flex-shrink:0;margin-top:4px;cursor:pointer}
 .rail-chevron svg{width:11px;height:11px}
-.rail-chevron:hover{background:#F4F4F6;color:var(--muted)}
+.rail-chevron:hover{background:var(--surface-2);color:var(--muted)}
 
 /* ===== APP SHELL / TOPBAR ===== */
 .appshell{flex:1;min-width:0;display:flex;flex-direction:column;height:100vh;overflow:hidden}
-.topbar{flex-shrink:0;height:72px;display:flex;align-items:center;gap:10px;padding:0 22px;flex-wrap:nowrap}
-.pill{background:#fff;border-radius:999px;display:flex;align-items:center}
-.searchpill{flex:1 1 260px;min-width:150px;max-width:340px;gap:8px;padding:9px 14px;color:var(--faint);
-           font-size:13px;box-shadow:0 1px 2px rgba(16,17,20,.05)}
+.topbar{flex-shrink:0;height:60px;display:flex;align-items:center;gap:10px;padding:0 24px;
+        flex-wrap:nowrap;background:var(--surface);border-bottom:1px solid var(--line)}
+.pill{background:var(--surface);border-radius:6px;display:flex;align-items:center}
+.searchpill{flex:1 1 250px;min-width:150px;max-width:320px;gap:8px;padding:8px 12px;color:var(--faint);
+           font-size:13px;border:1px solid var(--line)}
 .searchpill svg{flex-shrink:0;width:15px;height:15px;color:var(--faint)}
 .searchpill span{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .searchpill .pperson{width:15px;height:15px;color:var(--faint);flex-shrink:0}
 
-.segwrap{padding:4px;gap:2px;box-shadow:0 1px 2px rgba(16,17,20,.05);flex-shrink:0}
-.seg{display:flex;align-items:center;gap:6px;padding:7px 13px;border-radius:999px;
-     font-size:12.5px;font-weight:600;color:var(--muted);white-space:nowrap}
-.seg.on{background:var(--ink);color:#fff}
-.segcount{font-size:10.5px;font-weight:700;border-radius:999px;min-width:17px;height:17px;
-          padding:0 5px;display:flex;align-items:center;justify-content:center}
-.seg:not(.on) .segcount{background:var(--red-bg);color:var(--red-text)}
-.seg.on .segcount{background:#fff;color:var(--ink)}
+.segwrap{padding:2px;gap:2px;flex-shrink:0;border:1px solid var(--line);background:var(--surface-2)}
+.seg{display:flex;align-items:center;gap:6px;padding:6px 12px;border-radius:4px;
+     font-size:12.5px;font-weight:600;color:var(--muted);white-space:nowrap;cursor:default}
+.seg.on{background:var(--surface);color:var(--text);border:1px solid var(--line)}
+.segcount{font-size:11px;font-weight:600;border-radius:4px;min-width:18px;height:17px;
+          padding:0 5px;display:flex;align-items:center;justify-content:center;
+          background:var(--surface-2);color:var(--muted)}
+.seg.on .segcount{background:var(--accent-weak);color:var(--accent)}
 
-.timerchip{padding:6px 12px 6px 6px;gap:7px;box-shadow:0 1px 2px rgba(16,17,20,.05);flex-shrink:0}
-.timerbadge{background:var(--blue);color:#fff;font-size:9.5px;font-weight:800;letter-spacing:.02em;
-            padding:3px 7px;border-radius:999px}
+.timerchip{padding:5px 10px;gap:8px;flex-shrink:0;border:1px solid var(--line)}
+.timerbadge{background:var(--surface-2);color:var(--muted);font-size:11px;font-weight:700;
+            letter-spacing:.02em;padding:2px 6px;border-radius:4px}
 .timerclock{font-variant-numeric:tabular-nums;font-size:12.5px;font-weight:600;color:var(--text)}
 .timerchip svg{width:12px;height:12px;color:var(--faint)}
 
 .tb-spacer{flex:1;min-width:6px}
-.whatsnew{display:flex;align-items:center;gap:5px;font-size:12.5px;font-weight:600;color:var(--text);
-          white-space:nowrap;flex-shrink:0}
-.whatsnew span{text-decoration:underline}
-.whatsnew svg{width:14px;height:14px;color:#F5A623}
+.whatsnew{display:flex;align-items:center;gap:6px;font-size:12.5px;font-weight:500;color:var(--muted);
+          white-space:nowrap;flex-shrink:0;cursor:pointer}
+.whatsnew svg{width:13px;height:13px;color:var(--faint)}
+.whatsnew:hover{color:var(--text)}
 
-.phitoggle{display:flex;align-items:center;gap:8px;padding:5px 6px 5px 12px;width:74px;
-           border:1px solid var(--border);box-shadow:0 1px 2px rgba(16,17,20,.05);flex-shrink:0;
-           background:#fff;transition:background .15s ease,border-color .15s ease}
-.phidot{width:20px;height:20px;border-radius:50%;background:#fff;border:1px solid var(--border);
-        margin-left:auto;transition:background .15s ease,border-color .15s ease;flex-shrink:0}
-.phitoggle.on{background:var(--teal);border-color:var(--teal)}
-.phitoggle.on .phidot{background:#fff;border-color:var(--teal)}
-.philabel{font-size:11px;font-weight:700;color:var(--muted);letter-spacing:.02em;transition:color .15s ease}
-.phitoggle.on .philabel{color:#fff}
+.phitoggle{display:flex;align-items:center;gap:8px;padding:4px 5px 4px 10px;width:70px;
+           border:1px solid var(--line);flex-shrink:0;background:var(--surface);cursor:pointer;
+           transition:background .12s ease,border-color .12s ease}
+.phidot{width:18px;height:18px;border-radius:4px;background:var(--surface-2);border:1px solid var(--line);
+        margin-left:auto;transition:background .12s ease,border-color .12s ease;flex-shrink:0}
+.phitoggle.on{background:var(--accent-weak);border-color:var(--accent-line)}
+.phitoggle.on .phidot{background:var(--accent);border-color:var(--accent)}
+.philabel{font-size:11px;font-weight:700;color:var(--muted);letter-spacing:.03em}
+.phitoggle.on .philabel{color:var(--accent)}
 
-.tb-icon{width:34px;height:34px;border-radius:50%;display:flex;align-items:center;justify-content:center;
-         color:var(--muted);flex-shrink:0;position:relative}
-.tb-icon:hover{background:#EDEDF0}
+.tb-icon{width:32px;height:32px;border-radius:6px;display:flex;align-items:center;justify-content:center;
+         color:var(--muted);flex-shrink:0;position:relative;cursor:pointer}
+.tb-icon:hover{background:var(--surface-2)}
 .tb-icon svg{width:17px;height:17px}
-.tb-dot{position:absolute;top:6px;right:7px;width:7px;height:7px;border-radius:50%;background:var(--red);
-        border:1.5px solid var(--bg)}
-.tb-avatar{display:flex;align-items:center;gap:3px;flex-shrink:0;padding:2px 5px 2px 2px;border-radius:999px}
-.tb-avatar:hover{background:#fff}
-.avcircle{width:32px;height:32px;border-radius:50%;background:#FBCB6B;display:flex;align-items:center;
-          justify-content:center;font-size:15px;position:relative;flex-shrink:0}
-.avdot{position:absolute;bottom:0;right:0;width:9px;height:9px;border-radius:50%;background:#2ECC71;
-       border:2px solid #fff}
-.tb-avatar svg{width:13px;height:13px;color:var(--faint)}
+.tb-dot{position:absolute;top:5px;right:6px;width:6px;height:6px;border-radius:50%;
+        background:var(--t-emergent);border:1.5px solid var(--surface)}
+.tb-avatar{display:flex;align-items:center;gap:3px;flex-shrink:0;padding:2px 4px 2px 2px;border-radius:6px}
+.tb-avatar:hover{background:var(--surface-2)}
+.avcircle{width:30px;height:30px;border-radius:6px;background:var(--surface-2);display:flex;
+          align-items:center;justify-content:center;font-size:14px;position:relative;flex-shrink:0}
+.avdot{position:absolute;bottom:-1px;right:-1px;width:8px;height:8px;border-radius:50%;
+       background:var(--t-routine);border:2px solid var(--surface)}
+.tb-avatar svg{width:12px;height:12px;color:var(--faint)}
 
 /* ===== BODY ROW / LEFT COLUMN ===== */
-.bodyrow{flex:1;min-height:0;display:flex;gap:16px;padding:0 22px;overflow:hidden}
-.leftcol{width:372px;flex-shrink:0;overflow-y:auto;display:flex;flex-direction:column;
-         gap:12px;padding:2px 2px 24px}
-.card2{background:var(--card);border-radius:17px;border:1px solid rgba(16,17,20,.05);
-       box-shadow:0 1px 2px rgba(16,17,20,.05);padding:16px 17px;position:relative}
-.hr2{height:1px;background:var(--hair);margin:12px 0}
+.bodyrow{flex:1;min-height:0;display:flex;gap:20px;padding:0 24px;overflow:hidden}
+.leftcol{width:330px;flex-shrink:0;overflow-y:auto;display:flex;flex-direction:column;
+         gap:14px;padding:20px 0 28px}
+.card2{background:var(--surface);border-radius:10px;border:1px solid var(--line);padding:18px}
+.hr2{height:1px;background:var(--line);margin:14px 0}
 
 /* site card */
 .sitehd{display:flex;align-items:center;gap:10px}
-.sitelogo{width:34px;height:34px;border-radius:9px;flex-shrink:0;
-          background:linear-gradient(135deg,#6D5BF5,#2F80ED);position:relative;overflow:hidden}
-.sitelogo svg{position:absolute;inset:0;margin:auto;width:20px;height:20px;color:#fff}
+.sitelogo{width:32px;height:32px;border-radius:6px;flex-shrink:0;background:var(--accent);position:relative}
+.sitelogo svg{position:absolute;inset:0;margin:auto;width:18px;height:18px;color:#fff}
 .sitetxt{flex:1;min-width:0}
-.sitename{font-size:15px;font-weight:700;line-height:1.25}
-.sitesub{font-size:10.5px;font-weight:700;letter-spacing:.06em;color:var(--faint);text-transform:uppercase}
-.sitearrow{width:26px;height:26px;border-radius:50%;display:flex;align-items:center;justify-content:center;
-           color:var(--faint);flex-shrink:0}
-.sitearrow:hover{background:var(--gray-bg);color:var(--muted)}
+.sitename{font-size:15px;font-weight:600;line-height:1.3}
+.sitesub{font-size:11px;font-weight:600;letter-spacing:.06em;color:var(--faint);text-transform:uppercase;margin-top:1px}
+.sitearrow{width:26px;height:26px;border-radius:6px;display:flex;align-items:center;justify-content:center;
+           color:var(--faint);flex-shrink:0;cursor:pointer}
+.sitearrow:hover{background:var(--surface-2);color:var(--muted)}
 .sitearrow svg{width:14px;height:14px}
-.quicklinks{font-size:12.5px;line-height:1.9;color:var(--text)}
-.quicklinks a{font-weight:650;color:var(--text)}
-.quicklinks a:hover{color:var(--blue)}
-.quicklinks .sep{color:var(--faint);font-weight:400;margin:0 5px}
-.sites-caption{font-size:10.5px;font-weight:700;letter-spacing:.04em;color:var(--faint);
-               text-transform:uppercase;margin:12px 0 8px}
+.quicklinks{font-size:13px;line-height:1.9;color:var(--muted)}
+.quicklinks a{font-weight:500;color:var(--muted);cursor:pointer}
+.quicklinks a:hover{color:var(--accent)}
+.quicklinks .sep{color:var(--line-strong);margin:0 6px}
+.sites-caption{font-size:11px;font-weight:600;letter-spacing:.06em;color:var(--faint);
+               text-transform:uppercase;margin:16px 0 8px}
 .sitechips{display:flex;gap:6px;flex-wrap:wrap}
-.sitechip{font-size:12px;font-weight:600;padding:5px 12px;border-radius:8px;
-          border:1px solid var(--border);color:var(--muted);background:#fff}
-.sitechip.on{background:var(--teal-bg);border-color:var(--teal);color:var(--teal)}
+.sitechip{font-size:12.5px;font-weight:500;padding:5px 11px;border-radius:6px;
+          border:1px solid var(--line);color:var(--muted);background:var(--surface)}
+.sitechip.on{background:var(--accent-weak);border-color:var(--accent-line);color:var(--accent);font-weight:600}
 
 /* selected patient card */
 .pc-row{display:flex;align-items:center;gap:10px}
-.pc-avatar{width:38px;height:38px;border-radius:50%;flex-shrink:0;color:#fff;font-size:13px;
-          font-weight:700;display:flex;align-items:center;justify-content:center}
+.pc-avatar{width:36px;height:36px;border-radius:6px;flex-shrink:0;color:#fff;font-size:12.5px;
+          font-weight:600;display:flex;align-items:center;justify-content:center;background:var(--accent)}
 .pc-txt{flex:1;min-width:0}
-.pc-name{font-size:15px;font-weight:700}
-.pc-meta{font-size:12px;color:var(--muted);margin-top:1px}
-.pc-edit{width:26px;height:26px;border-radius:50%;display:flex;align-items:center;justify-content:center;
-         color:var(--faint);flex-shrink:0}
-.pc-edit:hover{background:var(--gray-bg);color:var(--muted)}
+.pc-name{font-size:15px;font-weight:600}
+.pc-meta{font-size:12.5px;color:var(--muted);margin-top:1px}
+.pc-edit{width:26px;height:26px;border-radius:6px;display:flex;align-items:center;justify-content:center;
+         color:var(--faint);flex-shrink:0;cursor:pointer}
+.pc-edit:hover{background:var(--surface-2);color:var(--muted)}
 .pc-edit svg{width:14px;height:14px}
-.tierpill{display:inline-flex;align-items:center;gap:5px;background:var(--blue-bg);color:var(--blue);
-          font-size:12.5px;font-weight:650;padding:6px 11px;border-radius:9px;margin:11px 0}
+.tierpill{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:600;
+          padding:5px 10px;border-radius:4px;margin:12px 0;letter-spacing:.02em}
 .tierpill svg{width:11px;height:11px}
-.pc-actions{display:flex;gap:8px;margin-bottom:11px}
-.videopill{display:flex;align-items:center;gap:6px;background:var(--purple);color:#fff;font-size:13px;
-           font-weight:650;padding:8px 16px;border-radius:999px}
+.pc-actions{display:flex;gap:8px;margin-bottom:12px}
+.videopill{display:flex;align-items:center;gap:7px;background:var(--accent);color:#fff;font-size:13px;
+           font-weight:600;padding:8px 14px;border-radius:6px;cursor:pointer}
 .videopill svg{width:14px;height:14px}
-.phonebtn{width:34px;height:34px;border-radius:50%;background:var(--teal);color:#fff;
-          display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.phonebtn{width:34px;height:34px;border-radius:6px;background:var(--surface);border:1px solid var(--line);
+          color:var(--muted);display:flex;align-items:center;justify-content:center;flex-shrink:0;cursor:pointer}
+.phonebtn:hover{border-color:var(--line-strong);color:var(--text)}
 .phonebtn svg{width:14px;height:14px}
-.pclinks{font-size:12.5px;font-weight:650;color:var(--text);line-height:1.8}
-.pclinks a:hover{color:var(--blue)}
-.pclinks .sep{color:var(--faint);font-weight:400;margin:0 5px}
-.pc-empty{font-size:12.5px;color:var(--faint);padding:6px 0;line-height:1.6}
+.pclinks{font-size:13px;font-weight:500;color:var(--muted);line-height:1.8}
+.pclinks a{cursor:pointer}
+.pclinks a:hover{color:var(--accent)}
+.pclinks .sep{color:var(--line-strong);margin:0 6px}
+.pc-empty{font-size:13px;color:var(--faint);padding:6px 0;line-height:1.6}
 
 /* today card */
-.todayhd{display:flex;align-items:baseline;justify-content:space-between;margin-bottom:13px}
-.todaytitle{font-size:15px;font-weight:700}
-.todaylink{font-size:12px;font-weight:650;color:var(--blue)}
-.statrow{display:flex;gap:0;margin-bottom:12px}
+.todayhd{display:flex;align-items:baseline;justify-content:space-between;margin-bottom:16px}
+.todaytitle{font-size:15px;font-weight:600}
+.todaylink{font-size:12.5px;font-weight:500;color:var(--accent);cursor:pointer}
+.statrow{display:flex;gap:0;margin-bottom:14px}
 .statitem{flex:1;text-align:left}
-.statnum{font-size:21px;font-weight:750;letter-spacing:-.01em}
-.statlabel{font-size:11px;color:var(--faint);font-weight:600;margin-top:1px}
-.pbartrack{height:6px;border-radius:99px;background:var(--gray-bg);overflow:hidden;margin-bottom:12px}
-.pbarfill{height:100%;background:var(--teal);border-radius:99px}
-.nextup{background:var(--bg);border-radius:11px;padding:9px 12px;font-size:12px;color:var(--muted)}
-.nextup b{color:var(--text);font-weight:650}
-.today-honesty{font-size:10.5px;color:var(--faint);margin-top:10px;line-height:1.5}
+.statnum{font-size:22px;font-weight:600;letter-spacing:-.01em;font-variant-numeric:tabular-nums}
+.statlabel{font-size:12px;color:var(--faint);font-weight:500;margin-top:2px}
+.pbartrack{height:5px;border-radius:3px;background:var(--surface-2);overflow:hidden;margin-bottom:14px}
+.pbarfill{height:100%;background:var(--accent);border-radius:3px}
+.nextup{background:var(--bg);border:1px solid var(--line);border-radius:6px;padding:10px 12px;
+        font-size:12.5px;color:var(--muted)}
+.nextup b{color:var(--text);font-weight:600}
+.today-honesty{font-size:12px;color:var(--faint);margin-top:12px;line-height:1.5}
 
 /* recently seen — timeline */
-.rs-title{font-size:15px;font-weight:700;margin-bottom:2px}
-.rs-grouplabel{font-size:10px;font-weight:700;letter-spacing:.06em;color:var(--faint);
-               text-transform:uppercase;margin:13px 0 4px}
+.rs-title{font-size:15px;font-weight:600;margin-bottom:2px}
+.rs-grouplabel{font-size:11px;font-weight:600;letter-spacing:.06em;color:var(--faint);
+               text-transform:uppercase;margin:16px 0 6px}
 .tl-item{display:flex;gap:10px;position:relative;padding-bottom:14px}
 .tl-item:last-child{padding-bottom:0}
 .tl-rail{display:flex;flex-direction:column;align-items:center;flex-shrink:0}
-.tl-dot{width:22px;height:22px;border-radius:50%;background:var(--gray-bg);display:flex;
+.tl-dot{width:20px;height:20px;border-radius:4px;background:var(--surface-2);display:flex;
         align-items:center;justify-content:center;color:var(--muted);flex-shrink:0}
 .tl-dot svg{width:11px;height:11px}
-.tl-line{flex:1;width:1px;background-image:linear-gradient(var(--border) 60%,transparent 0);
-         background-size:2px 5px;background-repeat:repeat-y;margin-top:2px}
-.tl-body{flex:1;min-width:0;padding-top:2px}
+.tl-line{flex:1;width:1px;background:var(--line);margin-top:3px}
+.tl-body{flex:1;min-width:0;padding-top:1px}
 .tl-top{display:flex;justify-content:space-between;gap:6px}
-.tl-name{font-size:12.5px;font-weight:650}
-.tl-time{font-size:11px;color:var(--faint);white-space:nowrap;font-variant-numeric:tabular-nums}
-.tl-reason{font-size:11.5px;color:var(--muted);margin-top:1px}
+.tl-name{font-size:13px;font-weight:600}
+.tl-time{font-size:12px;color:var(--faint);white-space:nowrap;font-variant-numeric:tabular-nums}
+.tl-reason{font-size:12px;color:var(--muted);margin-top:1px}
 .tl-item.muted .tl-name,.tl-item.muted .tl-reason{color:var(--faint)}
-.rs-viewall{font-size:12px;font-weight:650;color:var(--blue);margin-top:10px;display:inline-block}
+.rs-viewall{font-size:12.5px;font-weight:500;color:var(--accent);margin-top:12px;
+            display:inline-block;cursor:pointer}
 
 /* generic chips / buttons reused across tabs */
-.chip{display:inline-flex;align-items:center;font-size:13px;font-weight:600;color:var(--text);
-      background:#fff;border:1px solid var(--border);border-radius:9px;padding:9px 15px;
+.chip{display:inline-flex;align-items:center;font-size:13px;font-weight:500;color:var(--text);
+      background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:8px 14px;
       cursor:pointer;white-space:nowrap}
-.chip:hover{border-color:#C9CACF}
-.chip.sel{background:var(--teal-bg);border-color:var(--teal);color:var(--teal)}
+.chip:hover{border-color:var(--line-strong)}
+.chip.sel{background:var(--accent-weak);border-color:var(--accent-line);color:var(--accent)}
 .chipgrid{display:flex;flex-wrap:wrap;gap:8px}
-.ynrow{display:inline-flex;border:1px solid var(--border);border-radius:9px;overflow:hidden}
-.ynrow .yn{padding:9px 18px;font-size:13px;font-weight:600;color:var(--text);background:#fff}
-.ynrow .yn+.yn{border-left:1px solid var(--border)}
-.ynrow .yn.sel{background:var(--teal-bg);color:var(--teal)}
-.reqtag{position:absolute;top:-9px;right:16px;background:var(--red);color:#fff;font-size:10px;
-        font-weight:700;padding:3.5px 11px;border-radius:7px;letter-spacing:.02em;
-        box-shadow:0 1px 2px rgba(0,0,0,.12)}
-.filterpill2{font-size:12.5px;font-weight:600;color:var(--muted);background:#fff;
-             border:1px solid var(--border);padding:6px 13px;border-radius:999px;cursor:pointer}
-.filterpill2.on{background:var(--ink);color:#fff;border-color:var(--ink)}
-.honesty2{font-size:11.5px;color:var(--faint);margin:8px 0 14px;line-height:1.5}
+.ynrow{display:inline-flex;border:1px solid var(--line);border-radius:6px;overflow:hidden}
+.ynrow .yn{padding:8px 18px;font-size:13px;font-weight:500;color:var(--text);background:var(--surface)}
+.ynrow .yn+.yn{border-left:1px solid var(--line)}
+.ynrow .yn.sel{background:var(--accent-weak);color:var(--accent)}
+.reqtag{position:absolute;top:-8px;right:16px;background:var(--surface);border:1px solid var(--t-emergent-line);
+        color:var(--t-emergent);font-size:11px;font-weight:600;padding:2px 9px;border-radius:4px;
+        letter-spacing:.02em}
+.filterpill2{font-size:12.5px;font-weight:500;color:var(--muted);background:var(--surface);
+             border:1px solid var(--line);padding:6px 12px;border-radius:6px;cursor:pointer}
+.filterpill2.on{background:var(--accent-weak);color:var(--accent);border-color:var(--accent-line)}
+.honesty2{font-size:12.5px;color:var(--faint);margin:10px 0 16px;line-height:1.55}
 
 /* ===== MAIN / TABROW ===== */
 .main{flex:1;min-width:0;display:flex;flex-direction:column;overflow:hidden}
 .tabrow{flex-shrink:0;display:flex;align-items:center;justify-content:space-between;
-        padding:12px 2px 14px;flex-wrap:wrap;gap:10px;border-bottom:1px solid var(--hair)}
-.tabs{display:flex;gap:22px}
-.tabbtn{font-size:14.5px;font-weight:600;color:var(--faint);padding-bottom:12px;
-        border-bottom:2px solid transparent;margin-bottom:-13px}
-.tabbtn.on{color:var(--text);font-weight:700;border-bottom-color:var(--ink)}
-.tabactions{display:flex;align-items:center;gap:4px}
-.iconbtn{width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;
-         color:var(--muted);flex-shrink:0}
-.iconbtn:hover{background:var(--gray-bg)}
+        padding:16px 0 0;flex-wrap:wrap;gap:10px;border-bottom:1px solid var(--line)}
+.tabs{display:flex;gap:26px}
+.tabbtn{font-size:14px;font-weight:500;color:var(--muted);padding-bottom:12px;cursor:pointer;
+        border-bottom:2px solid transparent;margin-bottom:-1px}
+.tabbtn:hover{color:var(--text)}
+.tabbtn.on{color:var(--accent);font-weight:600;border-bottom-color:var(--accent)}
+.tabactions{display:flex;align-items:center;gap:4px;padding-bottom:10px}
+.iconbtn{width:30px;height:30px;border-radius:6px;display:flex;align-items:center;justify-content:center;
+         color:var(--muted);flex-shrink:0;cursor:pointer}
+.iconbtn:hover{background:var(--surface-2)}
 .iconbtn svg{width:16px;height:16px}
-.sparklebtn{width:32px;height:32px;border-radius:50%;background:linear-gradient(135deg,#4F7CFE,#8B5CF6);
-            display:flex;align-items:center;justify-content:center;flex-shrink:0}
-.sparklebtn svg{width:15px;height:15px;color:#fff}
-.pendbtn{font-size:13px;font-weight:650;color:var(--text);background:#fff;border:1.5px solid var(--border);
-         padding:8px 18px;border-radius:999px;margin-left:6px}
-.pendbtn:hover{border-color:#C9CACF}
-.signbtn{font-size:13px;font-weight:650;color:#fff;background:var(--ink);padding:8px 18px;
-         border-radius:999px;margin-left:8px}
-.signbtn:hover{background:#000}
-.content{flex:1;overflow-y:auto;padding:16px 2px 30px}
+.sparklebtn{width:30px;height:30px;border-radius:6px;background:var(--accent-weak);
+            border:1px solid var(--accent-line);display:flex;align-items:center;
+            justify-content:center;flex-shrink:0;cursor:pointer}
+.sparklebtn svg{width:14px;height:14px;color:var(--accent)}
+.pendbtn{font-size:13px;font-weight:500;color:var(--text);background:var(--surface);
+         border:1px solid var(--line);padding:7px 16px;border-radius:6px;margin-left:8px}
+.pendbtn:hover{border-color:var(--line-strong)}
+.signbtn{font-size:13px;font-weight:600;color:#fff;background:var(--accent);padding:8px 16px;
+         border-radius:6px;margin-left:8px}
+.signbtn:hover{background:var(--accent-hover)}
+.content{flex:1;overflow-y:auto;padding:24px 2px 40px}
 
-/* ===== PAGE HEADER + FILTER BAR (table-based queue pattern) ===== */
-.pagehd{font-size:23px;font-weight:750;letter-spacing:-.01em;margin:2px 0 14px}
-.filterbar{display:flex;align-items:center;flex-wrap:wrap;gap:8px;background:#fff;
-           border-radius:12px;padding:12px 18px;margin-bottom:14px;
-           border:1px solid rgba(16,17,20,.05);box-shadow:0 1px 2px rgba(16,17,20,.04)}
+/* ===== PAGE HEADER + FILTER BAR ===== */
+.pagehd{font-size:26px;font-weight:600;letter-spacing:-.015em;margin:0 0 6px}
+.pagesub{font-size:13.5px;color:var(--muted);margin-bottom:20px;max-width:70ch;line-height:1.6}
+.filterbar{display:flex;align-items:center;flex-wrap:wrap;gap:8px;background:var(--surface);
+           border-radius:10px;padding:12px 18px;margin-bottom:14px;border:1px solid var(--line)}
 .dropdownbtn{display:flex;align-items:center;gap:6px;font-size:13px;color:var(--muted);
-             font-weight:500;padding:6px 0;margin-right:28px;cursor:pointer;white-space:nowrap}
-.dropdownbtn b{color:var(--text);font-weight:650}
+             font-weight:400;padding:6px 0;margin-right:28px;cursor:pointer;white-space:nowrap}
+.dropdownbtn b{color:var(--text);font-weight:600}
 .dropdownbtn svg{width:10px;height:10px;color:var(--faint)}
 .fb-spacer{flex:1;min-width:4px}
-.blackbtn{background:var(--ink);color:#fff;font-size:13px;font-weight:650;padding:9px 18px;
-          border-radius:999px;white-space:nowrap;flex-shrink:0}
-.blackbtn:hover{background:#000}
+.blackbtn{background:var(--surface);border:1px solid var(--line-strong);color:var(--text);font-size:13px;
+          font-weight:500;padding:8px 16px;border-radius:6px;white-space:nowrap;flex-shrink:0}
+.blackbtn:hover{border-color:var(--muted)}
 
-/* ===== DATA TABLE (queue tables — Today + Triage) ===== */
-.tablecard{background:var(--card);border-radius:16px;border:1px solid rgba(16,17,20,.05);
-          box-shadow:0 1px 2px rgba(16,17,20,.04);overflow:hidden;margin-bottom:14px}
+/* =========================================================================
+   REFERRAL INTAKE CONSOLE — the demo's primary surface
+   ========================================================================= */
+.intake{background:var(--surface);border:1px solid var(--line-strong);border-radius:12px;
+        padding:24px 26px 26px;margin-bottom:26px}
+.intake-hd{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;flex-wrap:wrap}
+.intake-title{font-size:20px;font-weight:600;letter-spacing:-.01em}
+.intake-sub{font-size:13.5px;color:var(--muted);margin-top:5px;max-width:74ch;line-height:1.6}
+.intake-badge{font-size:11px;font-weight:600;letter-spacing:.05em;text-transform:uppercase;
+              color:var(--muted);background:var(--surface-2);border:1px solid var(--line);
+              padding:4px 9px;border-radius:4px;white-space:nowrap;flex-shrink:0}
+.microlabel{font-size:11px;font-weight:600;letter-spacing:.07em;text-transform:uppercase;color:var(--faint)}
+.samplewrap{margin:20px 0 10px}
+.samplerow{display:flex;flex-wrap:wrap;gap:8px;margin-top:9px}
+.samplebtn{font-size:12.5px;font-weight:500;color:var(--muted);background:var(--surface);
+           border:1px solid var(--line);border-radius:6px;padding:8px 13px;text-align:left;
+           line-height:1.35;white-space:nowrap}
+.samplebtn:hover{border-color:var(--accent-line);background:var(--accent-weak);color:var(--accent)}
+.samplebtn b{display:block;font-weight:600;color:var(--text);font-size:12.5px}
+.samplebtn:hover b{color:var(--accent)}
+.intake-ta{width:100%;background:var(--surface);border:1px solid var(--line-strong);border-radius:8px;
+           padding:14px 16px;font-size:14px;color:var(--text);min-height:180px;resize:vertical;
+           line-height:1.7;outline:none;display:block}
+.intake-ta::placeholder{color:var(--faint)}
+.intake-ta:focus{border-color:var(--accent)}
+.intake-actions{display:flex;align-items:center;gap:10px;margin-top:14px;flex-wrap:wrap}
+.btn-primary{background:var(--accent);color:#fff;font-size:14px;font-weight:600;padding:11px 26px;
+             border-radius:6px;white-space:nowrap}
+.btn-primary:hover{background:var(--accent-hover)}
+.btn-primary:disabled{opacity:.4;cursor:not-allowed}
+.btn-secondary{background:var(--surface);border:1px solid var(--line);color:var(--muted);font-size:13.5px;
+               font-weight:500;padding:10px 18px;border-radius:6px;white-space:nowrap}
+.btn-secondary:hover{border-color:var(--line-strong);color:var(--text)}
+.intake-count{font-size:12.5px;color:var(--faint);margin-left:auto;font-variant-numeric:tabular-nums}
+
+/* result block */
+.res{margin-top:24px;border-top:1px solid var(--line);padding-top:22px}
+.res-banner{display:flex;align-items:flex-start;gap:14px;border:1px solid;border-left-width:3px;
+            border-radius:8px;padding:15px 17px}
+.res-banner .rb-tier{font-size:16px;font-weight:700;letter-spacing:.01em;white-space:nowrap}
+.res-banner .rb-lane{font-size:12px;font-weight:500;margin-top:3px;opacity:.85}
+.res-banner .rb-why{font-size:13.5px;line-height:1.6;flex:1;min-width:220px}
+.rb-div{width:1px;align-self:stretch;opacity:.35;background:currentColor;flex-shrink:0}
+.tier-emergent{background:var(--t-emergent-bg);border-color:var(--t-emergent-line);color:var(--t-emergent)}
+.tier-semi{background:var(--t-semi-bg);border-color:var(--t-semi-line);color:var(--t-semi)}
+.tier-routine{background:var(--t-routine-bg);border-color:var(--t-routine-line);color:var(--t-routine)}
+.tier-hold{background:var(--t-hold-bg);border-color:var(--t-hold-line);color:var(--t-hold)}
+.res-banner .rb-why{color:var(--text)}
+
+.res-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:14px}
+@media(min-width:1180px){.res-grid{grid-template-columns:1fr 1.15fr}}
+.res-cell{border:1px solid var(--line);border-radius:8px;padding:16px 18px;background:var(--surface)}
+.res-cell-label{font-size:11px;font-weight:600;letter-spacing:.07em;text-transform:uppercase;
+                color:var(--faint);margin-bottom:9px}
+.res-cell-value{font-size:15.5px;font-weight:600;line-height:1.4}
+.res-cell-note{font-size:12.5px;color:var(--muted);margin-top:6px;line-height:1.55}
+.worklist{margin:0;padding-left:18px;font-size:13.5px;line-height:1.75;color:var(--text)}
+.worklist li{margin-bottom:3px}
+.res-route{display:flex;align-items:flex-start;gap:11px;margin-top:14px;border:1px solid var(--line);
+           border-radius:8px;padding:14px 17px;background:var(--surface)}
+.res-route.hold{background:var(--t-hold-bg);border-color:var(--t-hold-line)}
+.res-route.auto{background:var(--t-routine-bg);border-color:var(--t-routine-line)}
+.rr-mark{font-size:14px;font-weight:700;line-height:1.5;flex-shrink:0}
+.res-route.hold .rr-mark{color:var(--t-hold)}
+.res-route.auto .rr-mark{color:var(--t-routine)}
+.rr-title{font-size:13.5px;font-weight:600}
+.rr-body{font-size:13px;color:var(--muted);margin-top:3px;line-height:1.6}
+.res-evid{margin-top:14px}
+.evrow{display:flex;justify-content:space-between;align-items:baseline;gap:10px;padding:8px 0;
+       border-bottom:1px solid var(--line);font-size:13px}
+.evrow:last-child{border-bottom:0}
+.evrow q{font-style:normal;color:var(--text)}
+.res-foot{font-size:12px;color:var(--faint);margin-top:14px;line-height:1.6}
+
+/* ===== DATA TABLE ===== */
+.tablecard{background:var(--surface);border-radius:10px;border:1px solid var(--line);
+          overflow:hidden;margin-bottom:14px}
 .datatable{width:100%;border-collapse:collapse}
-.datatable th{text-align:left;font-size:13px;font-weight:500;color:var(--muted);
-             padding:12px 14px;border-bottom:1px solid var(--hair);white-space:nowrap}
-.datatable td{padding:15px 14px;border-bottom:1px solid var(--hair);vertical-align:middle}
+.datatable th{text-align:left;font-size:11.5px;font-weight:600;color:var(--faint);letter-spacing:.05em;
+             text-transform:uppercase;padding:12px 16px;border-bottom:1px solid var(--line);white-space:nowrap}
+.datatable td{padding:14px 16px;border-bottom:1px solid var(--line);vertical-align:middle}
 .datatable tbody tr:last-child td{border-bottom:none}
 .datatable tbody tr.datarow{cursor:pointer}
-.datatable tbody tr.datarow:hover td{background:#FAFAFB}
-.datatable tbody tr.datarow.selected td{background:var(--bg)}
-.lanegrouprow td{padding:11px 14px 7px;border-bottom:none;background:#fff}
-.lanegrouprow-inner{display:flex;align-items:center;gap:7px;font-size:10.5px;font-weight:700;
-                    letter-spacing:.05em;text-transform:uppercase;color:var(--faint)}
-.lane-dot{width:7px;height:7px;border-radius:50%;flex-shrink:0}
-.pd-name{font-size:13.5px;font-weight:650;color:var(--text)}
-.pd-meta{font-size:11.5px;color:var(--faint);margin-top:2px}
-.td-strong{font-size:12.5px;font-weight:650;color:var(--text)}
-.td-faint{font-size:11px;color:var(--faint);margin-top:2px}
-.loadmorebtn{display:block;margin:0 auto 4px;background:var(--ink);color:#fff;font-size:12.5px;
-             font-weight:650;padding:9px 22px;border-radius:999px}
-.loadmorebtn:hover{background:#000}
+.datatable tbody tr.datarow:hover td{background:var(--bg)}
+.datatable tbody tr.datarow.selected td{background:var(--accent-weak)}
+.lanegrouprow td{padding:12px 16px 6px;border-bottom:none;background:var(--surface)}
+.lanegrouprow-inner{display:flex;align-items:center;gap:8px;font-size:11px;font-weight:600;
+                    letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+.lane-dot{width:7px;height:7px;border-radius:2px;flex-shrink:0}
+.pd-name{font-size:13.5px;font-weight:600;color:var(--text)}
+.pd-meta{font-size:12px;color:var(--faint);margin-top:2px}
+.td-strong{font-size:13px;font-weight:600;color:var(--text);font-variant-numeric:tabular-nums}
+.td-faint{font-size:11.5px;color:var(--faint);margin-top:2px}
+.loadmorebtn{display:block;margin:0 auto 4px;background:var(--surface);border:1px solid var(--line);
+             color:var(--muted);font-size:12.5px;font-weight:500;padding:8px 20px;border-radius:6px}
+.loadmorebtn:hover{border-color:var(--line-strong);color:var(--text)}
 .loadmorewrap{text-align:center;padding:14px 0 4px}
 
 /* chips reused inside table cells */
-.srcchip{font-size:10.5px;font-weight:650;background:var(--gray-bg);color:var(--muted);
-         padding:3px 9px;border-radius:999px;white-space:nowrap;display:inline-flex;
+.srcchip{font-size:11.5px;font-weight:500;background:var(--surface-2);color:var(--muted);
+         padding:3px 9px;border-radius:4px;white-space:nowrap;display:inline-flex;
          align-items:center;gap:4px}
-.tchip{font-size:10.5px;font-weight:650;padding:4px 10px;border-radius:8px;white-space:nowrap;
-       letter-spacing:.01em;display:inline-flex;align-items:center;gap:5px}
-.tchip.emergent{background:var(--red-bg);color:var(--red-text);animation:tpulse 1.7s ease-in-out infinite}
-.tchip.semi{background:var(--amber-bg);color:var(--amber-text)}
-.tchip.routine{background:var(--teal-bg);color:var(--teal)}
-.tchip.idata{background:var(--gray-bg);color:var(--muted)}
-@keyframes tpulse{0%,100%{opacity:1}50%{opacity:.55}}
-.statuschip{font-size:10.5px;font-weight:650;background:var(--gray-bg);color:var(--muted);
-            padding:4px 10px;border-radius:8px;white-space:nowrap;display:inline-flex;
-            align-items:center;gap:4px}
-.statuschip.done{background:var(--teal-bg);color:var(--teal)}
-.qc-ack{color:var(--teal);font-weight:700;margin-right:3px}
-.flagtext{font-size:11.5px;color:var(--muted)}
+.tchip{font-size:11px;font-weight:600;padding:4px 9px;border-radius:4px;white-space:nowrap;
+       letter-spacing:.03em;display:inline-flex;align-items:center;gap:5px;border:1px solid}
+.tchip.emergent{background:var(--t-emergent-bg);color:var(--t-emergent);border-color:var(--t-emergent-line)}
+.tchip.semi{background:var(--t-semi-bg);color:var(--t-semi);border-color:var(--t-semi-line)}
+.tchip.routine{background:var(--t-routine-bg);color:var(--t-routine);border-color:var(--t-routine-line)}
+.tchip.idata{background:var(--t-hold-bg);color:var(--t-hold);border-color:var(--t-hold-line)}
+.statuschip{font-size:11.5px;font-weight:500;background:var(--surface-2);color:var(--muted);
+            padding:4px 9px;border-radius:4px;white-space:nowrap;display:inline-flex;
+            align-items:center;gap:5px}
+.statuschip.done{background:var(--t-routine-bg);color:var(--t-routine)}
+.qc-ack{color:var(--t-routine);font-weight:700;margin-right:4px}
+.qc-ack svg{width:11px;height:11px;vertical-align:-1px}
+.flagtext{font-size:12px;color:var(--muted)}
 
-/* ===== "What's real" strip (Triage tab) ===== */
-.wr-toggle2{font-size:12px;font-weight:650;color:var(--muted);background:#fff;
-            border:1px solid var(--border);padding:6px 12px;border-radius:999px;margin-bottom:10px;
-            display:inline-block}
-.wr-toggle2:hover{color:var(--text)}
-.wr-strip2{display:none;background:var(--card);border:1px solid var(--border);border-radius:13px;
-           padding:12px 14px;margin-bottom:12px}
+/* ===== "What's real" strip ===== */
+.wr-toggle2{font-size:12.5px;font-weight:500;color:var(--muted);background:var(--surface);
+            border:1px solid var(--line);padding:6px 12px;border-radius:6px;margin-bottom:10px;
+            display:inline-block;cursor:pointer}
+.wr-toggle2:hover{color:var(--text);border-color:var(--line-strong)}
+.wr-strip2{display:none;background:var(--surface);border:1px solid var(--line);border-radius:10px;
+           padding:14px 16px;margin-bottom:14px}
 .wr-strip2.open{display:block}
-.wr-row2{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap;margin-bottom:8px}
+.wr-row2{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap;margin-bottom:9px}
 .wr-row2:last-child{margin-bottom:0}
-.wr-label2{font-size:9.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;
-           flex-shrink:0;width:52px}
-.wr-label2.exists{color:var(--teal)}
-.wr-label2.extend{color:var(--amber-text)}
-.wr-label2.new{color:var(--faint)}
-.gchip2{font-size:10px;font-weight:650;padding:2.5px 8px;border-radius:999px;white-space:nowrap}
-.gchip2.exists{background:var(--teal-bg);color:var(--teal)}
-.gchip2.extend{background:var(--amber-bg);color:var(--amber-text)}
-.gchip2.new{background:var(--gray-bg);color:var(--muted)}
+.wr-label2{font-size:10.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;
+           flex-shrink:0;width:56px;color:var(--faint)}
+.gchip2{font-size:11.5px;font-weight:500;padding:3px 9px;border-radius:4px;white-space:nowrap;
+        background:var(--surface-2);color:var(--muted);border:1px solid var(--line)}
+.gchip2.exists{background:var(--accent-weak);color:var(--accent);border-color:var(--accent-line)}
 
-.estrip{background:var(--red-bg);border-radius:12px;padding:10px 12px;font-size:11.5px;
-        line-height:1.55;color:#8A1620;margin-bottom:12px}
-.estrip b{color:var(--red-text)}
-.estrip-chip{display:inline-block;background:var(--teal-bg);color:var(--teal);font-size:9px;
-             font-weight:700;letter-spacing:.03em;text-transform:uppercase;padding:2px 7px;
-             border-radius:999px;margin-top:6px}
-.rflink{font-size:12px;font-weight:600;color:var(--muted);cursor:pointer;padding:4px 2px;
+.estrip{background:var(--t-emergent-bg);border:1px solid var(--t-emergent-line);border-left-width:3px;
+        border-radius:8px;padding:12px 14px;font-size:12.5px;line-height:1.6;
+        color:var(--text);margin-bottom:14px}
+.estrip b{color:var(--t-emergent)}
+.estrip-chip{display:inline-block;background:var(--surface);border:1px solid var(--line);
+             color:var(--muted);font-size:10.5px;font-weight:600;letter-spacing:.04em;
+             text-transform:uppercase;padding:2px 7px;border-radius:4px;margin-top:7px}
+.rflink{font-size:12.5px;font-weight:500;color:var(--muted);cursor:pointer;padding:4px 2px;
         display:inline-block;margin-top:2px}
-.rflink:hover{color:var(--text)}
+.rflink:hover{color:var(--accent)}
 
 .phdr{display:flex;align-items:baseline;justify-content:space-between;gap:12px;
-      margin-bottom:14px;flex-wrap:wrap}
-.phdr-name{font-size:19px;font-weight:750}
-.phdr-meta{font-size:12.5px;color:var(--muted);margin-left:8px;font-weight:500}
-.phdr-src{font-size:11.5px;color:var(--faint);white-space:nowrap}
-.cols{display:grid;grid-template-columns:1fr;gap:12px}
+      margin-bottom:16px;flex-wrap:wrap}
+.phdr-name{font-size:19px;font-weight:600}
+.phdr-meta{font-size:13px;color:var(--muted);margin-left:8px;font-weight:400}
+.phdr-src{font-size:12.5px;color:var(--faint);white-space:nowrap}
+.cols{display:grid;grid-template-columns:1fr;gap:14px}
 @media(min-width:1180px){.cols{grid-template-columns:1fr 1fr}}
-.card{background:var(--card);border:1px solid rgba(16,17,20,.05);border-radius:16px;
-      box-shadow:0 1px 2px rgba(16,17,20,.04);padding:15px 16px;margin-bottom:12px;position:relative}
-.card-hd{display:flex;align-items:center;gap:8px;margin-bottom:10px}
-.card-title{font-size:14px;font-weight:700;flex:1}
-.badge{font-size:9.5px;font-weight:700;padding:3px 8px;border-radius:999px;letter-spacing:.02em}
-.badge.ai{background:#F0ECFE;color:#7C5CF0}
-.badge.draft{background:var(--gray-bg);color:var(--muted)}
-.badge.extend{background:var(--amber-bg);color:var(--amber)}
-.badge.new{background:var(--gray-bg);color:var(--muted)}
-.msg-label{font-size:10px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;
-           color:var(--faint);margin-bottom:7px}
-.msg-body{font-size:13px;line-height:1.65;color:var(--text)}
-.hl{background:#FFE9A8;color:#6B4E00;font-weight:650;border-radius:3px;padding:0 2px}
-.ctxrow{display:flex;justify-content:space-between;align-items:baseline;gap:8px;
-        padding:7px 0;border-bottom:1px solid var(--hair);font-size:12px;color:var(--text)}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:10px;
+      padding:16px 18px;margin-bottom:14px;position:relative}
+.card-hd{display:flex;align-items:center;gap:8px;margin-bottom:12px}
+.card-title{font-size:14px;font-weight:600;flex:1}
+.badge{font-size:10.5px;font-weight:600;padding:3px 8px;border-radius:4px;letter-spacing:.04em;
+       text-transform:uppercase;border:1px solid var(--line);background:var(--surface-2);color:var(--muted)}
+.badge.ai{background:var(--accent-weak);color:var(--accent);border-color:var(--accent-line)}
+.msg-label{font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;
+           color:var(--faint);margin-bottom:8px}
+.msg-body{font-size:13.5px;line-height:1.7;color:var(--text)}
+.hl{background:var(--t-semi-bg);color:var(--t-semi);font-weight:600;border-radius:3px;
+    padding:0 3px;box-shadow:inset 0 -1px 0 var(--t-semi-line)}
+.ctxrow{display:flex;justify-content:space-between;align-items:baseline;gap:10px;
+        padding:8px 0;border-bottom:1px solid var(--line);font-size:12.5px;color:var(--text)}
 .ctxrow:last-child{border-bottom:0}
-.ctxrow b{color:var(--text)}
-.srctag{font-size:9px;font-weight:700;letter-spacing:.02em;text-transform:uppercase;
-        color:var(--faint);background:var(--gray-bg);border-radius:999px;padding:2.5px 8px;
+.ctxrow b{color:var(--text);font-weight:600}
+.srctag{font-size:10.5px;font-weight:600;letter-spacing:.03em;text-transform:uppercase;
+        color:var(--faint);background:var(--surface-2);border-radius:4px;padding:2px 8px;
         white-space:nowrap;flex-shrink:0}
-.hint{font-size:11px;color:var(--faint);margin-top:9px;line-height:1.55}
-.rationale{font-size:12.5px;color:var(--text);margin:8px 0}
-.pway-line{font-size:13px;font-weight:650;margin-bottom:8px}
-.btnrow{display:flex;gap:8px;margin-top:10px;flex-wrap:wrap;align-items:center}
-.btn{font-size:12px;font-weight:650;border-radius:999px;padding:8px 15px;white-space:nowrap;
-     display:inline-flex;align-items:center;gap:5px;border:1.5px solid transparent;color:#fff}
+.hint{font-size:12px;color:var(--faint);margin-top:11px;line-height:1.6}
+.rationale{font-size:13px;color:var(--text);margin:10px 0;line-height:1.6}
+.pway-line{font-size:13.5px;font-weight:600;margin-bottom:9px}
+.btnrow{display:flex;gap:8px;margin-top:12px;flex-wrap:wrap;align-items:center}
+.btn{font-size:12.5px;font-weight:600;border-radius:6px;padding:8px 15px;white-space:nowrap;
+     display:inline-flex;align-items:center;gap:5px;border:1px solid transparent;color:#fff}
 .btn:disabled{opacity:.35;cursor:not-allowed}
-.btn.ghost{background:transparent;border-color:var(--border);color:var(--muted)}
-.btn.ghost:hover{color:var(--text);border-color:#C9CACF}
-.btn.blue{background:var(--blue)}
-.btn.red{background:var(--red)}
-.btn.orange{background:var(--amber)}
-.btn.teal{background:var(--teal)}
-.btn.dark{background:var(--ink)}
+.btn.ghost{background:var(--surface);border-color:var(--line);color:var(--muted);font-weight:500}
+.btn.ghost:hover{color:var(--text);border-color:var(--line-strong)}
+.btn.blue{background:var(--accent)}
+.btn.blue:hover{background:var(--accent-hover)}
+.btn.dark{background:var(--surface);border-color:var(--line-strong);color:var(--text);font-weight:500}
+.btn.red{background:var(--t-emergent)}
+.btn.orange{background:var(--t-semi)}
+.btn.teal{background:var(--t-routine)}
 
-.pway-q{font-size:13px;color:var(--text);font-weight:650;margin-bottom:7px;
-        display:flex;align-items:center;gap:6px}
-.pway-q .ok{color:var(--teal);font-weight:700}
-.pway-a{font-size:12px;color:var(--muted);margin:0 0 11px 18px}
-.pway-btns{display:flex;gap:7px;margin-bottom:11px}
-.pway-rec{border-left:3px solid var(--blue);background:var(--blue-bg);
-          border-radius:9px;padding:10px 12px;font-size:12.5px;color:var(--text);margin-top:8px}
-.pway-rec b{color:var(--text)}
-.pway-rec.orange{border-left-color:var(--amber);background:var(--amber-bg)}
-.restart{font-size:11px;color:var(--faint);margin-top:11px;display:inline-block;cursor:pointer}
+.pway-q{font-size:13.5px;color:var(--text);font-weight:600;margin-bottom:9px;
+        display:flex;align-items:center;gap:7px}
+.pway-q .ok{color:var(--t-routine);font-weight:700;display:inline-flex}
+.pway-q .ok svg{width:12px;height:12px}
+.pway-a{font-size:12.5px;color:var(--muted);margin:0 0 12px 19px}
+.pway-btns{display:flex;gap:8px;margin-bottom:12px}
+.pway-rec{border:1px solid var(--accent-line);border-left-width:3px;background:var(--accent-weak);
+          border-radius:8px;padding:12px 14px;font-size:13px;color:var(--text);margin-top:8px;line-height:1.6}
+.pway-rec b{color:var(--accent);font-weight:600}
+.pway-rec.orange{border-color:var(--t-semi-line);background:var(--t-semi-bg)}
+.pway-rec.orange b{color:var(--t-semi)}
+.restart{font-size:12px;color:var(--faint);margin-top:12px;display:inline-block;cursor:pointer}
 .restart:hover{color:var(--muted)}
-.honesty{border:1.5px dashed var(--border);border-radius:12px;padding:13px;
-         font-size:12px;color:var(--muted);line-height:1.55}
+.honesty{border:1px dashed var(--line-strong);border-radius:8px;padding:14px;
+         font-size:12.5px;color:var(--muted);line-height:1.6}
 
-.disprow{display:flex;gap:7px;flex-wrap:wrap}
-.dispbtn{font-size:12px;font-weight:650;border-radius:999px;padding:8px 14px;color:#fff;
+.disprow{display:flex;gap:8px;flex-wrap:wrap}
+.dispbtn{font-size:12.5px;font-weight:600;border-radius:6px;padding:9px 15px;color:#fff;
          border:1px solid transparent;white-space:nowrap}
 .dispbtn:disabled{opacity:.3;cursor:not-allowed}
-.dispbtn.red{background:var(--red)}
-.dispbtn.orange{background:var(--amber)}
-.dispbtn.teal{background:var(--teal)}
-.dispbtn.dark{background:var(--ink)}
+.dispbtn.red{background:var(--t-emergent)}
+.dispbtn.orange{background:var(--t-semi)}
+.dispbtn.teal{background:var(--t-routine)}
+.dispbtn.dark{background:var(--surface);border-color:var(--line-strong);color:var(--text);font-weight:500}
 
-.notearea{width:100%;background:var(--bg);border:1.5px solid var(--border);border-radius:11px;
-          padding:11px;font-size:12.5px;color:var(--text);min-height:110px;resize:vertical;
-          line-height:1.6;outline:none}
-.notearea:focus{border-color:var(--teal)}
+.notearea{width:100%;background:var(--surface);border:1px solid var(--line-strong);border-radius:8px;
+          padding:12px 14px;font-size:13px;color:var(--text);min-height:120px;resize:vertical;
+          line-height:1.7;outline:none;display:block}
+.notearea:focus{border-color:var(--accent)}
 
-.emergent-card{border:2.5px solid var(--red);border-radius:17px;background:#fff;
-               padding:20px;margin-bottom:14px;animation:epulse 1.8s ease-in-out infinite}
-@keyframes epulse{0%,100%{border-color:var(--red)}50%{border-color:#F5AAAE}}
-.emergent-title{font-size:19px;font-weight:750;color:var(--red);margin-bottom:4px}
-.emergent-sub{font-size:12px;color:var(--muted);margin-bottom:14px}
-.evid-label{font-size:10px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;
-            color:var(--red);margin-bottom:6px}
-.evid-quote{font-size:13.5px;font-style:italic;color:var(--text);border-left:2.5px solid var(--red);
-            padding-left:10px;margin-bottom:6px}
-.emergent-rationale{font-size:12px;color:var(--muted);margin:10px 0 14px}
-.ack-banner{background:var(--red-bg);border-left:3px solid var(--red);border-radius:11px;
-            padding:11px 13px;font-size:12.5px;color:#8A1620;margin-bottom:12px;line-height:1.55}
-.ack-banner b{color:var(--red)}
-.lockchip{display:inline-block;background:var(--red-bg);color:var(--red);
-          font-size:9.5px;font-weight:700;letter-spacing:.03em;text-transform:uppercase;
-          padding:3px 8px;border-radius:999px;margin-bottom:6px}
-.locknote{font-size:11px;color:var(--faint);font-style:italic;margin-bottom:12px}
-.declined-panel{border-left:3px solid var(--faint);background:var(--card);
-                border:1px solid var(--border);border-radius:14px;padding:14px 15px;
-                font-size:12.5px;color:var(--text);line-height:1.6;margin-bottom:12px}
-.declined-panel b{color:var(--text)}
+.emergent-card{border:1px solid var(--t-emergent-line);border-left:3px solid var(--t-emergent);
+               border-radius:10px;background:var(--t-emergent-bg);padding:20px;margin-bottom:14px}
+.emergent-title{font-size:18px;font-weight:700;color:var(--t-emergent);margin-bottom:4px;letter-spacing:-.01em}
+.emergent-sub{font-size:12.5px;color:var(--muted);margin-bottom:16px}
+.evid-label{font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;
+            color:var(--t-emergent);margin-bottom:8px}
+.evid-quote{font-size:13.5px;color:var(--text);border-left:2px solid var(--t-emergent-line);
+            padding-left:11px;margin-bottom:7px}
+.emergent-rationale{font-size:12.5px;color:var(--muted);margin:12px 0 16px;line-height:1.6}
+.ack-banner{background:var(--t-emergent-bg);border:1px solid var(--t-emergent-line);
+            border-left:3px solid var(--t-emergent);border-radius:8px;
+            padding:12px 14px;font-size:13px;color:var(--text);margin-bottom:14px;line-height:1.6}
+.ack-banner b{color:var(--t-emergent)}
+.lockchip{display:inline-block;background:var(--surface);border:1px solid var(--t-emergent-line);
+          color:var(--t-emergent);font-size:10.5px;font-weight:600;letter-spacing:.04em;
+          text-transform:uppercase;padding:3px 8px;border-radius:4px;margin-bottom:7px}
+.locknote{font-size:12px;color:var(--faint);margin-bottom:14px;line-height:1.6}
+.declined-panel{border:1px solid var(--t-hold-line);border-left:3px solid var(--t-hold);
+                background:var(--t-hold-bg);border-radius:8px;padding:14px 16px;
+                font-size:13px;color:var(--text);line-height:1.65;margin-bottom:14px}
+.declined-panel b{color:var(--text);font-weight:600}
 
-.modal-backdrop{position:fixed;inset:0;background:rgba(15,16,20,.45);display:none;
+.modal-backdrop{position:fixed;inset:0;background:rgba(22,24,28,.42);display:none;
                 align-items:center;justify-content:center;z-index:100;padding:20px}
 .modal-backdrop.open{display:flex}
-.modal{background:var(--card);border-radius:18px;padding:20px 22px;max-width:580px;width:100%;
-       max-height:82vh;overflow-y:auto;box-shadow:0 24px 64px rgba(16,17,20,.25)}
-.modal-hd{display:flex;align-items:center;justify-content:space-between;margin-bottom:13px}
-.modal-title{font-size:16px;font-weight:700}
-.modal-close{font-size:19px;color:var(--faint);line-height:1;padding:3px 8px;border-radius:8px}
-.modal-close:hover{color:var(--text);background:var(--gray-bg)}
-.modal-chips{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:13px}
-.modal-chip{font-size:10.5px;font-weight:600;color:var(--muted);background:var(--gray-bg);
-            padding:4px 10px;border-radius:999px}
-.rftable{width:100%;border-collapse:collapse;font-size:12px;margin-bottom:10px}
-.rftable th{text-align:left;font-size:10px;font-weight:700;letter-spacing:.03em;
-            text-transform:uppercase;color:var(--faint);padding:7px 9px;
-            border-bottom:1px solid var(--hair)}
-.rftable td{padding:9px;border-bottom:1px solid var(--hair);color:var(--text);vertical-align:top}
-.rftable td b{color:var(--text)}
-.scriptlines{margin:0 0 12px;padding-left:20px;font-size:13px;color:var(--text);line-height:1.75}
-.scriptwarn{background:var(--red-bg);border-radius:11px;padding:11px 13px;margin-bottom:13px;
-            font-size:12.5px;line-height:1.6;color:#8A1620}
-.scriptwarn b{color:var(--red)}
-.scriptlines li{margin-bottom:6px}
-.scriptlines b{color:var(--text)}
+.modal{background:var(--surface);border:1px solid var(--line-strong);border-radius:12px;
+       padding:22px 24px;max-width:600px;width:100%;max-height:84vh;overflow-y:auto}
+.modal-hd{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px}
+.modal-title{font-size:16px;font-weight:600}
+.modal-close{font-size:18px;color:var(--faint);line-height:1;padding:3px 8px;border-radius:6px}
+.modal-close:hover{color:var(--text);background:var(--surface-2)}
+.modal-chips{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px}
+.modal-chip{font-size:11.5px;font-weight:500;color:var(--muted);background:var(--surface-2);
+            border:1px solid var(--line);padding:4px 9px;border-radius:4px}
+.rftable{width:100%;border-collapse:collapse;font-size:12.5px;margin-bottom:10px}
+.rftable th{text-align:left;font-size:10.5px;font-weight:600;letter-spacing:.05em;
+            text-transform:uppercase;color:var(--faint);padding:8px 9px;
+            border-bottom:1px solid var(--line)}
+.rftable td{padding:10px 9px;border-bottom:1px solid var(--line);color:var(--text);vertical-align:top}
+.rftable td b{color:var(--text);font-weight:600}
+.scriptlines{margin:0 0 12px;padding-left:20px;font-size:13.5px;color:var(--text);line-height:1.8}
+.scriptwarn{background:var(--t-emergent-bg);border:1px solid var(--t-emergent-line);
+            border-left:3px solid var(--t-emergent);border-radius:8px;padding:12px 14px;
+            margin-bottom:14px;font-size:13px;line-height:1.65;color:var(--text)}
+.scriptwarn b{color:var(--t-emergent)}
+.scriptlines li{margin-bottom:7px}
+.scriptlines b{color:var(--text);font-weight:600}
 
-#toastRoot{position:fixed;bottom:18px;right:18px;display:flex;flex-direction:column;
+#toastRoot{position:fixed;bottom:20px;right:20px;display:flex;flex-direction:column;
            gap:8px;z-index:200}
-.toast{background:var(--card);border:1px solid var(--border);border-left:3px solid var(--teal);
-       border-radius:12px;padding:11px 15px;font-size:12.5px;color:var(--text);
-       max-width:340px;box-shadow:0 8px 24px rgba(16,17,20,.14);animation:toastin .2s ease-out}
-@keyframes toastin{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
+.toast{background:var(--surface);border:1px solid var(--line-strong);border-left:3px solid var(--accent);
+       border-radius:8px;padding:11px 15px;font-size:12.5px;color:var(--text);
+       max-width:340px;animation:toastin .16s ease-out}
+@keyframes toastin{from{opacity:0}to{opacity:1}}
 
-.appfooter{flex-shrink:0;padding:10px 22px 14px;font-size:10.5px;color:var(--faint);
-           line-height:1.5;border-top:1px solid var(--hair)}
+.appfooter{flex-shrink:0;padding:12px 24px 14px;font-size:11.5px;color:var(--faint);
+           line-height:1.6;border-top:1px solid var(--line);background:var(--surface)}
 .appfooter a{text-decoration:underline;color:var(--muted)}
 .appfooter a:hover{color:var(--text)}
 
 /* ===== TODAY TAB ===== */
-.today-secthd{display:flex;align-items:baseline;justify-content:space-between;margin:4px 0 4px}
-.today-secttitle{font-size:15.5px;font-weight:700}
-.sr-avatar{width:30px;height:30px;border-radius:50%;flex-shrink:0;color:#fff;font-size:11px;
-           font-weight:700;display:flex;align-items:center;justify-content:center}
-.mchip{font-size:10.5px;font-weight:650;padding:4px 10px;border-radius:8px;white-space:nowrap;
-       display:inline-flex;align-items:center;gap:4px}
-.mchip.type-new{background:var(--blue-bg);color:var(--blue)}
-.mchip.type-followup{background:var(--purple-bg);color:var(--purple)}
-.mchip.type-urgent{background:var(--red-bg);color:var(--red-text)}
-.mchip.loc{background:var(--gray-bg);color:var(--muted)}
-.mchip.prov{background:var(--gray-bg);color:var(--muted)}
-.mchip.prep-ready{background:var(--teal-bg);color:var(--teal)}
-.mchip.prep-needs{background:var(--amber-bg);color:var(--amber-text)}
-.mchip.prep-seen{background:var(--gray-bg);color:var(--muted)}
-.seenrow{display:flex;align-items:center;gap:10px;padding:8px 4px;font-size:12.5px;color:var(--muted)}
-.seenrow .ck{color:var(--teal);font-weight:700}
-.seenrow b{color:var(--text);font-weight:650}
-.collapsehd{display:flex;align-items:center;gap:7px;cursor:pointer;font-size:10.5px;font-weight:700;
-            letter-spacing:.07em;color:var(--faint);text-transform:uppercase;margin:16px 0 6px}
-.collapsehd svg{width:11px;height:11px;transition:transform .15s ease}
+.today-secthd{display:flex;align-items:baseline;justify-content:space-between;margin:22px 0 6px}
+.today-secttitle{font-size:15px;font-weight:600}
+.sr-avatar{width:30px;height:30px;border-radius:6px;flex-shrink:0;color:#fff;font-size:11px;
+           font-weight:600;display:flex;align-items:center;justify-content:center;background:var(--accent)}
+.mchip{font-size:11.5px;font-weight:500;padding:4px 9px;border-radius:4px;white-space:nowrap;
+       display:inline-flex;align-items:center;gap:5px;background:var(--surface-2);color:var(--muted)}
+.mchip.type-new{background:var(--accent-weak);color:var(--accent)}
+.mchip.type-followup{background:var(--surface-2);color:var(--muted)}
+.mchip.type-urgent{background:var(--t-emergent-bg);color:var(--t-emergent)}
+.mchip.loc,.mchip.prov{background:var(--surface-2);color:var(--muted)}
+.mchip.prep-ready{background:var(--t-routine-bg);color:var(--t-routine)}
+.mchip.prep-needs{background:var(--t-semi-bg);color:var(--t-semi)}
+.mchip.prep-seen{background:var(--surface-2);color:var(--faint)}
+.mchip svg{width:11px;height:11px}
+.seenrow{display:flex;align-items:center;gap:10px;padding:8px 2px;font-size:13px;color:var(--muted)}
+.seenrow .ck{color:var(--t-routine);font-weight:700;display:inline-flex}
+.seenrow .ck svg{width:12px;height:12px}
+.seenrow b{color:var(--text);font-weight:600}
+.collapsehd{display:flex;align-items:center;gap:8px;cursor:pointer;font-size:11px;font-weight:600;
+            letter-spacing:.07em;color:var(--faint);text-transform:uppercase;margin:20px 0 6px}
+.collapsehd svg{width:11px;height:11px;transition:transform .12s ease}
 .collapsehd.open svg{transform:rotate(90deg)}
 .collapsebody{display:none}
 .collapsebody.open{display:block}
 .empty-today{font-size:13px;color:var(--faint);padding:30px 0;text-align:center}
 
 /* ===== CALENDAR TAB ===== */
-.calShell{display:flex;gap:16px;align-items:flex-start}
+.calShell{display:flex;gap:20px;align-items:flex-start}
 .calMain{flex:1;min-width:0}
-.calRail{width:220px;flex-shrink:0}
+.calRail{width:230px;flex-shrink:0}
 .weekstrip{display:grid;grid-template-columns:repeat(7,1fr);gap:8px;margin-bottom:12px}
 .daycolhd{text-align:center;padding:6px 0 10px}
-.daycolhd .dname{font-size:10.5px;font-weight:700;letter-spacing:.04em;color:var(--faint);
+.daycolhd .dname{font-size:11px;font-weight:600;letter-spacing:.06em;color:var(--faint);
                  text-transform:uppercase;margin-bottom:6px}
 .daynum{display:inline-flex;align-items:center;justify-content:center;width:30px;height:30px;
-        border-radius:50%;font-size:14px;font-weight:650;color:var(--text)}
-.daynum.today{background:var(--ink);color:#fff}
-.daycol{background:var(--card);border-radius:14px;border:1px solid rgba(16,17,20,.05);
-        box-shadow:0 1px 2px rgba(16,17,20,.04);padding:8px;min-height:360px;cursor:pointer;
-        display:flex;flex-direction:column;gap:6px;position:relative}
-.daycol:hover{border-color:#D9DADE}
-.daycol.today{box-shadow:0 0 0 1.5px var(--teal)}
-.nowline{position:absolute;left:8px;right:8px;height:2px;background:var(--teal);border-radius:2px}
-.nowline:before{content:'';position:absolute;left:-3px;top:-3px;width:8px;height:8px;
-                border-radius:50%;background:var(--teal)}
-.evblock{background:var(--bg);border-radius:8px;padding:6px 8px;border-left:3px solid var(--blue);
-         font-size:10.5px;line-height:1.4}
-.evblock.type-followup{border-left-color:var(--teal)}
-.evblock.type-urgent{border-left-color:var(--red)}
-.evblock .evtime{font-weight:700;color:var(--text);font-variant-numeric:tabular-nums}
+        border-radius:6px;font-size:14px;font-weight:600;color:var(--text)}
+.daynum.today{background:var(--accent);color:#fff}
+.daycol{background:var(--surface);border-radius:10px;border:1px solid var(--line);
+        padding:8px;min-height:360px;cursor:pointer;display:flex;flex-direction:column;
+        gap:6px;position:relative}
+.daycol:hover{border-color:var(--line-strong)}
+.daycol.today{border-color:var(--accent-line);background:var(--accent-weak)}
+.nowline{position:absolute;left:8px;right:8px;height:2px;background:var(--accent);border-radius:2px}
+.evblock{background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:6px 8px;
+         border-left:3px solid var(--line-strong);font-size:11px;line-height:1.45}
+.evblock.type-new{border-left-color:var(--accent)}
+.evblock.type-followup{border-left-color:var(--line-strong)}
+.evblock.type-urgent{border-left-color:var(--t-emergent)}
+.evblock .evtime{font-weight:600;color:var(--text);font-variant-numeric:tabular-nums}
 .evblock .evname{color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.daycol-empty{font-size:10.5px;color:var(--faint);text-align:center;padding:14px 4px}
-.covtitle{font-size:14px;font-weight:700;margin-bottom:10px}
-.covrow{display:flex;justify-content:space-between;align-items:center;padding:8px 0;
-        border-bottom:1px solid var(--hair);font-size:12px}
+.daycol-empty{font-size:11px;color:var(--faint);text-align:center;padding:14px 4px}
+.covtitle{font-size:15px;font-weight:600;margin-bottom:12px}
+.covrow{display:flex;justify-content:space-between;align-items:center;padding:9px 0;
+        border-bottom:1px solid var(--line);font-size:12.5px}
 .covrow:last-child{border-bottom:0}
-.covrow .covday{color:var(--muted);font-weight:600}
-.covrow .covsite{color:var(--text);font-weight:650}
-.covrow .covsite.off{color:var(--faint);font-weight:500}
+.covrow .covday{color:var(--muted)}
+.covrow .covsite{color:var(--text);font-weight:600}
+.covrow .covsite.off{color:var(--faint);font-weight:400}
 
 /* ===== NOTES TAB ===== */
-.notesearch{display:flex;align-items:center;gap:9px;background:#fff;border:1.5px solid var(--border);
-           border-radius:999px;padding:10px 16px;margin-bottom:16px;max-width:420px}
+.notesearch{display:flex;align-items:center;gap:9px;background:var(--surface);border:1px solid var(--line);
+           border-radius:6px;padding:9px 14px;margin-bottom:16px;max-width:420px}
 .notesearch svg{width:15px;height:15px;color:var(--faint);flex-shrink:0}
 .notesearch input{border:none;outline:none;flex:1;font-size:13px;color:var(--text);background:none}
-.noterow{background:var(--card);border-radius:15px;border:1px solid rgba(16,17,20,.05);
-         box-shadow:0 1px 2px rgba(16,17,20,.04);padding:13px 15px;margin-bottom:9px;
-         display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+.noterow{background:var(--surface);border-radius:10px;border:1px solid var(--line);
+         padding:14px 16px;margin-bottom:10px;display:flex;align-items:center;gap:14px;flex-wrap:wrap}
 .noterow-main{flex:1;min-width:220px}
-.noterow-top{display:flex;align-items:center;gap:8px;margin-bottom:3px;flex-wrap:wrap}
-.nr-name{font-size:13.5px;font-weight:650}
-.nr-date{font-size:11.5px;color:var(--faint)}
-.nr-type{font-size:10.5px;font-weight:650;padding:2.5px 9px;border-radius:999px;
-         background:var(--gray-bg);color:var(--muted)}
-.nr-snippet{font-size:12px;color:var(--muted);line-height:1.5}
-.copybtn{font-size:12px;font-weight:650;color:var(--text);background:#fff;border:1.5px solid var(--border);
-         padding:8px 15px;border-radius:999px;white-space:nowrap;display:flex;align-items:center;gap:6px}
-.copybtn:hover{border-color:#C9CACF}
+.noterow-top{display:flex;align-items:center;gap:8px;margin-bottom:4px;flex-wrap:wrap}
+.nr-name{font-size:13.5px;font-weight:600}
+.nr-date{font-size:12px;color:var(--faint)}
+.nr-type{font-size:11.5px;font-weight:500;padding:3px 9px;border-radius:4px;
+         background:var(--surface-2);color:var(--muted)}
+.nr-snippet{font-size:12.5px;color:var(--muted);line-height:1.6}
+.copybtn{font-size:12.5px;font-weight:500;color:var(--muted);background:var(--surface);
+         border:1px solid var(--line);padding:8px 14px;border-radius:6px;white-space:nowrap;
+         display:flex;align-items:center;gap:6px}
+.copybtn:hover{border-color:var(--line-strong);color:var(--text)}
 .copybtn svg{width:13px;height:13px}
 
 /* ===== RESPONSIVE ===== */
-@media(max-width:1080px){
-  .leftcol{width:320px}
-  .triageList{width:260px}
+@media(max-width:1240px){
+  .leftcol{width:300px}
 }
-@media(max-width:920px){
-  .bodyrow{flex-direction:column;overflow-y:auto;overflow-x:hidden}
+@media(max-width:1000px){
+  .bodyrow{flex-direction:column;overflow-y:auto;overflow-x:hidden;gap:0}
   .leftcol{width:100%;overflow-y:visible}
-  .triageShell,.calShell{flex-direction:column}
-  .triageList,.calRail{width:100%}
+  .calShell{flex-direction:column}
+  .calRail{width:100%}
   .weekstrip{grid-template-columns:repeat(7,minmax(110px,1fr));overflow-x:auto}
+  .res-grid{grid-template-columns:1fr}
 }
 </style>
 </head>
@@ -615,7 +717,7 @@ textarea,input{font-family:inherit;font-size:inherit}
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.8A9 9 0 1 1 11.2 3 7 7 0 0 0 21 12.8Z"/></svg>
     </div>
     <div class="tb-avatar">
-      <div class="avcircle">🧑🏻‍⚕️<span class="avdot"></span></div>
+      <div class="avcircle">RN<span class="avdot"></span></div>
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
     </div>
   </div>
@@ -626,10 +728,12 @@ textarea,input{font-family:inherit;font-size:inherit}
       <div class="content" id="content"></div>
     </main>
   </div>
-  <div class="appfooter">Demo — fictional patients, illustrative pathway content. Skin matches Synapse AI
-    (Jan 2026 screen captures). Clinical pathways require RN+physician authorship + sentinel-gate eval
-    before live use. &nbsp;·&nbsp; <a href="./outpatient-triage-nurse.html">Concept overview ↗</a>
-    &nbsp;·&nbsp; <a href="./mvp-workflow.html">MVP workflow ↗</a></div>
+  <div class="appfooter">Demo — <b>synthetic data only</b>. Every patient, referral, site and MRN on
+    this page is fictional; no real patient data is present. Pathway, subspecialty-routing and workup
+    content is illustrative and requires RN + physician authorship plus a sentinel-gate eval before
+    live use. &nbsp;·&nbsp;
+    <a href="/concepts/triage-nurse/outpatient-triage-nurse.html">Concept overview ↗</a>
+    &nbsp;·&nbsp; <a href="/concepts/triage-nurse/mvp-workflow.html">MVP workflow ↗</a></div>
 </div>
 <div class="modal-backdrop" id="modalBackdrop" onclick="if(event.target===this)closeModal()">
   <div class="modal" id="modalBody"></div>
@@ -654,16 +758,288 @@ var SEGMENTS = [
 ];
 
 var LANES = [
-  {id:'emergency_now', label:'CONTACT NOW', code:'emergency_now', dot:'#F5333F'},
-  {id:'same_day_clinician_review', label:'SAME-DAY', code:'same_day_clinician_review', dot:'#F08000'},
-  {id:'routine_outpatient', label:'ROUTINE', code:'routine_outpatient', dot:'#12B5A5'},
-  {id:'undetermined', label:'HUMAN FIRST', code:'undetermined', dot:'#9A9CA4'}
+  {id:'emergency_now', label:'CONTACT NOW', code:'emergency_now', dot:'var(--t-emergent)'},
+  {id:'same_day_clinician_review', label:'SAME-DAY', code:'same_day_clinician_review', dot:'var(--t-semi)'},
+  {id:'routine_outpatient', label:'ROUTINE', code:'routine_outpatient', dot:'var(--t-routine)'},
+  {id:'undetermined', label:'HUMAN FIRST', code:'undetermined', dot:'var(--t-hold)'}
+];
+
+/* =========================================================================
+   REFERRAL INTAKE — paste a note, get tier + subspecialist + starting workup
+   -------------------------------------------------------------------------
+   SCOPE NOTE. The queue below, its four lanes, and its tier assignments are
+   UNCHANGED by this surface. Intake reuses the published red-flag library
+   (RED_FLAGS — the same four rows the "Red-flag library v3" modal renders)
+   and routes into the same four lanes. It introduces no new tier and moves
+   no threshold.
+
+   The matcher here is lexical with a simple negation guard — enough to drive
+   a demo, and nothing more. The live gateway is negation- AND temporality-
+   aware and independently cross-checked; disagreement escalates and never
+   silently downgrades. Subspecialty and workup mappings below are
+   ILLUSTRATIVE and are badged as such in the UI: they require RN + physician
+   authorship and a sentinel-gate eval before any live use.
+   ========================================================================= */
+var RED_FLAGS = [
+  {label:'"worst headache of my life", "thunderclap"',
+   syndrome:'Intracranial hemorrhage / SAH', behavior:'Gateway: contact now',
+   lane:'emergency_now',
+   match:['worst headache of my life','worst headache of her life',
+          'worst headache of his life','thunderclap']},
+  {label:'"face drooping", "slurred speech", "one side weak"',
+   syndrome:'Acute cerebrovascular', behavior:'Gateway: contact now',
+   lane:'emergency_now',
+   match:['face drooping','facial droop','face droop','slurred speech',
+          'speech is slurred','one side weak','one-sided weakness',
+          'weakness on one side']},
+  {label:'"curtain over my eye", "vision went black"',
+   syndrome:'Acute vision threat', behavior:'Gateway: contact now',
+   lane:'emergency_now',
+   match:['curtain over my eye','curtain over her eye','curtain over his eye',
+          'vision went black','sudden vision loss']},
+  {label:'"first ever seizure"',
+   syndrome:'Status / recurrent seizure', behavior:'Gateway: same-day floor',
+   lane:'same_day_clinician_review',
+   match:['first ever seizure','first-ever seizure','first seizure']}
+];
+
+/* Illustrative subspecialty routing — not a validated classifier. */
+var SUBSPECIALTY = [
+  {name:'Vascular neurology (stroke)',
+   match:['stroke','tia','transient ischemic','face drooping','facial droop','slurred speech',
+          'speech is slurred','one side weak','thunderclap','hemorrhage','carotid']},
+  {name:'Epilepsy',
+   match:['seizure','epilep','convuls','postictal','aed','levetiracetam','lamotrigine','eeg']},
+  {name:'Headache medicine',
+   match:['migraine','headache','photophobia','sumatriptan','topiramate','aura']},
+  {name:'Neuroimmunology (MS)',
+   match:['multiple sclerosis','ocrelizumab','relapse','optic neuritis','demyelinat',
+          'natalizumab','ms flare']},
+  {name:'Movement disorders',
+   match:["parkinson",'tremor','dystonia','carbidopa','levodopa','bradykines','rigidity']},
+  {name:'Neuromuscular',
+   match:['neuropathy','numbness','tingling','emg','nerve conduction','myopathy',
+          'myasthenia','foot drop']},
+  {name:'Cognitive / behavioral neurology',
+   match:['memory','dementia','cognitive','alzheimer','word-finding','forgetful']},
+  {name:'Sleep medicine',
+   match:['sleep study','sleep apnea','insomnia','narcolep','cpap','epworth']}
+];
+
+/* Illustrative starting workup — DRAFT. Requires RN + physician authorship. */
+var WORKUP = {
+  'Vascular neurology (stroke)':[
+    'Confirm and document last-known-well time',
+    'Non-contrast head CT on ED arrival',
+    'CBC, BMP, coagulation studies, point-of-care glucose',
+    'ECG and telemetry'],
+  'Epilepsy':[
+    'Routine EEG',
+    'MRI brain, seizure protocol',
+    'CBC, BMP, magnesium, calcium',
+    'Anti-seizure medication level if already on therapy'],
+  'Headache medicine':[
+    'Four-week headache diary before the visit',
+    'Structured red-flag re-screen at the intake call',
+    'Medication-overuse history — acute doses per month'],
+  'Neuroimmunology (MS)':[
+    'MRI brain and cervical cord, with and without contrast',
+    'Infection screen (UA + culture) before attributing to relapse',
+    'Vitamin D, CBC, CMP',
+    'Confirm date of last disease-modifying therapy dose'],
+  'Movement disorders':[
+    'Medication reconciliation — confirm dose and last fill date',
+    'Orthostatic vital signs',
+    'Fall-risk screen'],
+  'Neuromuscular':[
+    'B12, HbA1c, TSH, SPEP with immunofixation',
+    'EMG / nerve conduction study',
+    'Medication review for neurotoxic agents'],
+  'Cognitive / behavioral neurology':[
+    'MoCA at intake',
+    'B12, TSH, CMP',
+    'MRI brain without contrast',
+    'Medication review — anticholinergic burden'],
+  'Sleep medicine':[
+    'Retrieve prior sleep study report',
+    'Epworth Sleepiness Scale',
+    'CPAP adherence download if applicable'],
+  'General neurology':[
+    'Records request — referring note plus relevant prior imaging',
+    'Structured symptom intake call',
+    'Current medication list and vitals']
+};
+
+/* Symptom domains — used only to detect a too-thin or scattered referral. */
+var SYMPTOM_DOMAINS = [
+  {key:'motor',     match:['weak','falls','fell','tripping','gait','unsteady','drop']},
+  {key:'sensory',   match:['numb','tingling','pins and needles','burning']},
+  {key:'headache',  match:['headache','migraine']},
+  {key:'cognitive', match:['memory','confus','forgetful','word-finding']},
+  {key:'autonomic', match:['dizzy','lightheaded','fainting','syncope']},
+  {key:'vision',    match:['vision','blurry','double vision']},
+  {key:'seizure',   match:['seizure','convuls','staring spell']},
+  {key:'speech',    match:['slurred','aphas','speech']}
+];
+
+/* Signals that a routine-looking referral is actually borderline same-day. */
+var ESCALATION_SIGNALS = ['worsening','rapidly progressive','progressing','since yesterday',
+  'since this morning','acute onset','sudden onset','getting worse','new deficit','unable to walk'];
+
+var NEG = /\b(no|not|non|never|denies|denied|without|negative for|free of|absent)\b[^.;]{0,28}$/;
+function normalizeNote(t){ return (' '+String(t).toLowerCase().replace(/\s+/g,' ')+' '); }
+/* A match only counts if it is not sitting inside a negated clause. */
+function hasPhrase(text,phrase){
+  var i=text.indexOf(phrase);
+  while(i>-1){
+    if(!NEG.test(text.slice(Math.max(0,i-36),i))) return true;
+    i=text.indexOf(phrase,i+phrase.length);
+  }
+  return false;
+}
+function countMatches(text,list){
+  var n=0;
+  for(var i=0;i<list.length;i++){ if(hasPhrase(text,list[i])) n++; }
+  return n;
+}
+
+var TIER_OF_LANE = {emergency_now:{key:'emergent',label:'EMERGENT'},
+  same_day_clinician_review:{key:'semi',label:'SEMI-URGENT'},
+  routine_outpatient:{key:'routine',label:'ROUTINE'},
+  undetermined:{key:'idata',label:'INSUFFICIENT DATA'}};
+
+function triageNote(raw){
+  var text=normalizeNote(raw), evidence=[], i;
+
+  /* 1 — red-flag library (unchanged, v3) */
+  var flagHits=[];
+  for(i=0;i<RED_FLAGS.length;i++){
+    var rf=RED_FLAGS[i];
+    for(var j=0;j<rf.match.length;j++){
+      if(hasPhrase(text,rf.match[j])){
+        flagHits.push({rule:rf,phrase:rf.match[j]});
+        evidence.push({quote:rf.match[j],source:'Red-flag library v3 — '+rf.syndrome});
+        break;
+      }
+    }
+  }
+
+  /* 2 — best-fit subspecialty */
+  var sub='General neurology', bestScore=0, subTerms=[];
+  for(i=0;i<SUBSPECIALTY.length;i++){
+    var s=SUBSPECIALTY[i], score=countMatches(text,s.match);
+    if(score>bestScore){ bestScore=score; sub=s.name; }
+  }
+  if(bestScore){
+    for(i=0;i<SUBSPECIALTY.length;i++){
+      if(SUBSPECIALTY[i].name===sub){
+        subTerms=SUBSPECIALTY[i].match.filter(function(m){ return hasPhrase(text,m); });
+      }
+    }
+    evidence.push({quote:subTerms.slice(0,4).join(', '),source:'Subspecialty match (illustrative)'});
+  }
+
+  /* 3 — breadth / thinness of the referral */
+  var domains=[];
+  for(i=0;i<SYMPTOM_DOMAINS.length;i++){
+    if(countMatches(text,SYMPTOM_DOMAINS[i].match)) domains.push(SYMPTOM_DOMAINS[i].key);
+  }
+  var signals=flagHits.length+bestScore+domains.length;
+  var escalating=ESCALATION_SIGNALS.filter(function(e){ return hasPhrase(text,e); });
+
+  /* 4 — lane. Order is the existing gateway order: red flags first, then a
+         hold for thin/scattered input, then borderline, then routine. */
+  var lane, hold, holdReason, tierWhy, confidence;
+  var emergent=flagHits.filter(function(h){ return h.rule.lane==='emergency_now'; });
+  var sameDay=flagHits.filter(function(h){ return h.rule.lane==='same_day_clinician_review'; });
+
+  if(emergent.length){
+    lane='emergency_now'; confidence='high'; hold=true;
+    tierWhy='Red-flag anchor "'+emergent[0].phrase+'" matched — '+emergent[0].rule.syndrome+
+      '. Tiered by the gateway rule, not by model judgement.';
+    holdReason='Scheduling is locked and the engine cannot unlock it itself. A human '+
+      'acknowledges before anything else happens (existing gateway behavior).';
+  } else if(sameDay.length){
+    lane='same_day_clinician_review'; confidence='high'; hold=true;
+    tierWhy='Red-flag anchor "'+sameDay[0].phrase+'" sets a same-day floor — '+
+      sameDay[0].rule.syndrome+'.';
+    holdReason='A clinician confirms the tier before this is scheduled — the same-day floor '+
+      'is a minimum, not a final answer.';
+  } else if(signals<2){
+    lane='undetermined'; confidence='low'; hold=true;
+    tierWhy='Nothing tierable in the referral — no symptom, diagnosis, or clinical detail the '+
+      'engine can act on. It declined to tier rather than assign one.';
+    holdReason='A human reads this first. Nothing defaults to low-risk on thin input.';
+  } else if(domains.length>=4){
+    lane='undetermined'; confidence='low'; hold=true;
+    tierWhy=domains.length+' symptom domains ('+domains.join(', ')+') with no dominant '+
+      'presentation — the engine declined to tier rather than guess.';
+    holdReason='A human reads this first. Nothing defaults to low-risk on conflicting input.';
+  } else if(escalating.length){
+    lane='same_day_clinician_review'; confidence='low'; hold=true;
+    tierWhy='Otherwise routine presentation carrying escalation language ('+
+      escalating.join(', ')+') — borderline between routine and same-day.';
+    holdReason='Borderline tiers are surfaced rather than auto-routed. A physician decides '+
+      'which side of the line this falls on.';
+  } else {
+    lane='routine_outpatient'; confidence='high'; hold=false;
+    tierWhy='No red-flag anchor, one dominant presentation, and a clear subspecialty match — '+
+      'tiered routine at high confidence.';
+  }
+
+  if(escalating.length && lane!=='same_day_clinician_review'){
+    evidence.push({quote:escalating.join(', '),source:'Escalation language'});
+  }
+  if(domains.length) evidence.push({quote:domains.join(', '),source:'Symptom domains detected'});
+
+  var tier=TIER_OF_LANE[lane];
+  return {
+    lane:lane, laneObj:laneOf(lane), tierKey:tier.key, tierLabel:tier.label,
+    subspecialty:(lane==='undetermined'&&!bestScore)?'Not assignable yet':sub,
+    subspecialtyNote:bestScore?('Matched on: '+subTerms.slice(0,4).join(', ')):
+      'No subspecialty terms in the referral — defaults to general neurology intake.',
+    workup:WORKUP[(lane==='undetermined'&&!bestScore)?'General neurology':sub],
+    hold:hold, holdReason:holdReason, tierWhy:tierWhy,
+    confidence:confidence, evidence:evidence
+  };
+}
+
+/* Four synthetic referrals — fictional sites, fictional people, SYN- MRNs.
+   They exercise all four lanes and both sides of the human-in-the-loop rule. */
+var SAMPLE_NOTES = [
+  {id:'a', title:'Sample A', hint:'stroke red flag',
+   text:'*** SYNTHETIC DEMO REFERRAL — NOT A REAL PATIENT ***\n'+
+     'From: Dr. Placeholder, Example Family Medicine (fictional site)\n'+
+     'Re: DEMO-PATIENT-A, 68M, MRN SYN-0001\n\n'+
+     'Wife called our office 40 minutes ago. His face drooping on the right and his '+
+     'speech is slurred since he got up this morning. Left arm feels heavy. History of '+
+     'TIA two weeks ago, on aspirin. He is at home with his wife now. Please advise urgently.'},
+  {id:'b', title:'Sample B', hint:'first seizure',
+   text:'*** SYNTHETIC DEMO REFERRAL — NOT A REAL PATIENT ***\n'+
+     'From: Dr. Example, Sample Urgent Care (fictional site)\n'+
+     'Re: DEMO-PATIENT-B, 34F, MRN SYN-0002\n\n'+
+     'Witnessed first ever seizure yesterday evening at work — generalized shaking for '+
+     'roughly 90 seconds, confused for about 20 minutes afterward. No head injury, no '+
+     'fever, no alcohol. Back to baseline today, normal exam here. Referring for '+
+     'neurology evaluation.'},
+  {id:'c', title:'Sample C', hint:'clean routine',
+   text:'*** SYNTHETIC DEMO REFERRAL — NOT A REAL PATIENT ***\n'+
+     'From: Dr. Sample, Example Internal Medicine (fictional site)\n'+
+     'Re: DEMO-PATIENT-C, 29F, MRN SYN-0003\n\n'+
+     'Episodic migraine without aura, diagnosed 2021, stable pattern of 3 to 4 headache '+
+     'days per month for the past year. Responds to sumatriptan. No red-flag features. '+
+     'Neurological exam normal in clinic today. Requesting routine neurology follow-up '+
+     'to discuss prophylaxis options.'},
+  {id:'d', title:'Sample D', hint:'too thin to tier',
+   text:'*** SYNTHETIC DEMO REFERRAL — NOT A REAL PATIENT ***\n'+
+     'From: fax intake, Example Clinic (fictional site)\n'+
+     'Re: DEMO-PATIENT-D, MRN SYN-0004\n\n'+
+     'Please see for neuro. Thanks.'}
 ];
 
 var PATIENTS = [
-  { id:'okafor', name:'David Okafor', initials:'DO', avatarColor:'#F5333F',
-    age:67, sex:'M', condition:'post-TIA (2 wks)', mrn:'118820',
-    source:'call', sourceLabel:'📞 Call center 7:31 AM', receivedTime:'7:31 AM', waitTime:'11m',
+  { id:'okafor', name:'David Okafor', initials:'DO',    age:67, sex:'M', condition:'post-TIA (2 wks)', mrn:'118820',
+    source:'call', sourceLabel:'Call center 7:31 AM', receivedTime:'7:31 AM', waitTime:'11m',
     lane:'emergency_now', tier:'emergent', tierLabel:'EMERGENT',
     message:"Wife called: his face is drooping again since breakfast and his speech is slurred. She's with him now.",
     flags:['face drooping','speech slurred'],
@@ -673,9 +1049,9 @@ var PATIENTS = [
     noteSymptoms:"Symptoms: recurrent facial drooping since breakfast, slurred speech.",
     pathwayType:'emergent' },
 
-  { id:'ellison', name:'Margaret Ellison', initials:'ME', avatarColor:'#F08000',
+  { id:'ellison', name:'Margaret Ellison', initials:'ME',
     age:41, sex:'F', condition:'MS — ocrelizumab', mrn:'224417',
-    source:'portal', sourceLabel:'💬 Portal 6:58 AM', receivedTime:'6:58 AM', waitTime:'44m',
+    source:'portal', sourceLabel:'Portal 6:58 AM', receivedTime:'6:58 AM', waitTime:'44m',
     lane:'same_day_clinician_review', tier:'semi', tierLabel:'SEMI-URGENT (seen ≤2 wks)',
     message:"Since yesterday I've had numbness in both legs and I keep tripping when I walk. "+
       "No fever, no new medicines. It feels like before my last flare but not as strong. "+
@@ -696,9 +1072,9 @@ var PATIENTS = [
       "no fever, no med changes.",
     pathwayType:'stateMachine' },
 
-  { id:'chen', name:'Robert Chen', initials:'RC', avatarColor:'#C9A227',
+  { id:'chen', name:'Robert Chen', initials:'RC',
     age:72, sex:'M', condition:"Parkinson's", mrn:'336291',
-    source:'call', sourceLabel:'📞 Call center 6:15 AM', receivedTime:'6:15 AM', waitTime:'1h 27m',
+    source:'call', sourceLabel:'Call center 6:15 AM', receivedTime:'6:15 AM', waitTime:'1h 27m',
     lane:'same_day_clinician_review', tier:'semi', tierLabel:'SEMI-URGENT',
     message:'Fell twice this morning, no injury — his carbidopa-levodopa ran out Friday.',
     flags:['fell twice','ran out'],
@@ -709,9 +1085,9 @@ var PATIENTS = [
     noteSymptoms:"Symptoms: fell twice this morning (no injury); carbidopa-levodopa ran out Friday.",
     pathwayType:'honesty' },
 
-  { id:'reyes', name:'Ana Reyes', initials:'AR', avatarColor:'#12B5A5',
+  { id:'reyes', name:'Ana Reyes', initials:'AR',
     age:31, sex:'F', condition:'migraine', mrn:'441905',
-    source:'portal', sourceLabel:'💬 Portal yesterday 9:12 PM', receivedTime:'yesterday 9:12 PM', waitTime:'10h',
+    source:'portal', sourceLabel:'Portal yesterday 9:12 PM', receivedTime:'yesterday 9:12 PM', waitTime:'10h',
     lane:'routine_outpatient', tier:'routine', tierLabel:'ROUTINE',
     message:"I'm traveling next month and need my topiramate refilled before I go.",
     flags:[],
@@ -721,9 +1097,9 @@ var PATIENTS = [
     noteSymptoms:"Symptoms: none reported — routine topiramate refill request before travel.",
     pathwayType:'honesty' },
 
-  { id:'whitfield', name:'Tom Whitfield', initials:'TW', avatarColor:'#2F80ED',
+  { id:'whitfield', name:'Tom Whitfield', initials:'TW',
     age:58, sex:'M', condition:'neuropathy', mrn:'552733',
-    source:'portal', sourceLabel:'💬 Portal yesterday 6:40 PM', receivedTime:'yesterday 6:40 PM', waitTime:'13h',
+    source:'portal', sourceLabel:'Portal yesterday 6:40 PM', receivedTime:'yesterday 6:40 PM', waitTime:'13h',
     lane:'routine_outpatient', tier:'routine', tierLabel:'ROUTINE',
     message:"Wanted to follow up on my sleep study results from a few weeks ago — haven't heard back.",
     flags:[],
@@ -733,9 +1109,9 @@ var PATIENTS = [
     noteSymptoms:"Symptoms: none reported — question about outstanding sleep study results.",
     pathwayType:'honesty' },
 
-  { id:'nasser', name:'Priya Nasser', initials:'PN', avatarColor:'#6D5BF5',
+  { id:'nasser', name:'Priya Nasser', initials:'PN',
     age:45, sex:'F', condition:'epilepsy f/u', mrn:'663148',
-    source:'referral', sourceLabel:"📠 Referral (OCR'd packet)", receivedTime:'—', waitTime:'—',
+    source:'referral', sourceLabel:"Referral (OCR'd packet)", receivedTime:'—', waitTime:'—',
     lane:'routine_outpatient', tier:'routine', tierLabel:'ROUTINE',
     message:'Referral letter: routine neurology follow-up for medication-stable epilepsy. '+
       'Referring provider reports patient seizure-free; continuity-of-care visit requested.',
@@ -746,9 +1122,9 @@ var PATIENTS = [
     noteSymptoms:"Symptoms: none — routine continuity follow-up, seizure-free per referring provider.",
     pathwayType:'honesty' },
 
-  { id:'klein', name:'Dorothy Klein', initials:'DK', avatarColor:'#6E7079',
+  { id:'klein', name:'Dorothy Klein', initials:'DK',
     age:79, sex:'F', condition:'complex hx', mrn:'774062',
-    source:'portal', sourceLabel:'💬 Portal 7:05 AM', receivedTime:'7:05 AM', waitTime:'37m',
+    source:'portal', sourceLabel:'Portal 7:05 AM', receivedTime:'7:05 AM', waitTime:'37m',
     lane:'undetermined', tier:'idata', tierLabel:'INSUFFICIENT DATA',
     message:"I don't know where to start. My legs have been weak on and off for maybe three "+
       "weeks, and now my hands are tingling too. I also feel dizzy sometimes when I stand up, "+
@@ -868,7 +1244,8 @@ var NOTES = [
    snippet:'MS follow-up via video — stable exam, no new symptoms reported.'}
 ];
 var STATE = {
-  activeTab:'today',
+  activeTab:'triage',
+  intake:{ text:'', result:null },
   lastSelectedKind:'triage',
   selectedTriageId:'ellison',
   selectedScheduleDay:'tue21',
@@ -920,9 +1297,9 @@ function highlightFlags(p){
   return t;
 }
 function sourceChipLabel(s){
-  if(s==='portal') return '💬 Portal';
-  if(s==='call') return '📞 Call';
-  return '📠 Referral';
+  if(s==='portal') return 'Portal';
+  if(s==='call') return 'Call';
+  return 'Referral';
 }
 function dayRows(dayKey){ var d=TODAY_DAYS[dayKey]; return d?d.rows:[]; }
 function currentDayRows(){ return dayRows(STATE.todayDateKey); }
@@ -984,13 +1361,13 @@ function togglePHI(){
 }
 
 function tierColors(key){
-  if(key==='emergent') return {bg:'var(--red-bg)',fg:'var(--red-text)'};
-  if(key==='semi') return {bg:'var(--amber-bg)',fg:'var(--amber-text)'};
-  if(key==='routine') return {bg:'var(--teal-bg)',fg:'var(--teal)'};
-  if(key==='idata') return {bg:'var(--gray-bg)',fg:'var(--muted)'};
-  if(key==='New') return {bg:'var(--blue-bg)',fg:'var(--blue)'};
-  if(key==='Urgent') return {bg:'var(--red-bg)',fg:'var(--red-text)'};
-  return {bg:'var(--purple-bg)',fg:'var(--purple)'};
+  if(key==='emergent') return {bg:'var(--t-emergent-bg)',fg:'var(--t-emergent)'};
+  if(key==='semi') return {bg:'var(--t-semi-bg)',fg:'var(--t-semi)'};
+  if(key==='routine') return {bg:'var(--t-routine-bg)',fg:'var(--t-routine)'};
+  if(key==='idata') return {bg:'var(--t-hold-bg)',fg:'var(--t-hold)'};
+  if(key==='New') return {bg:'var(--accent-weak)',fg:'var(--accent)'};
+  if(key==='Urgent') return {bg:'var(--t-emergent-bg)',fg:'var(--t-emergent)'};
+  return {bg:'var(--surface-2)',fg:'var(--muted)'};
 }
 
 function siteCardHTML(){
@@ -1021,7 +1398,7 @@ function renderSelectedPatientCard(){
     if(row){
       var initials=row.name.replace('R. ','Robert ').split(' ').map(function(w){return w[0]||'';}).join('').slice(0,2).toUpperCase();
       var c=tierColors(row.type);
-      return '<div class="card2"><div class="pc-row"><div class="pc-avatar" style="background:#2F80ED">'+initials+'</div>'+
+      return '<div class="card2"><div class="pc-row"><div class="pc-avatar">'+initials+'</div>'+
         '<div class="pc-txt"><div class="pc-name">'+row.name+'</div>'+
         '<div class="pc-meta">'+row.age+' '+row.sex+' · '+row.time+'</div></div>'+
         '<div class="pc-edit" onclick="showToast(\'Edit — not wired in this demo\')">'+ICONS.pencil+'</div></div>'+
@@ -1034,7 +1411,7 @@ function renderSelectedPatientCard(){
   if(!p) return '<div class="card2"><div class="pc-empty">Select a patient from the queue or schedule to see details here.</div></div>';
   var tierShort=p.tierLabel.split(' (')[0];
   var c=tierColors(p.tier);
-  return '<div class="card2"><div class="pc-row"><div class="pc-avatar" style="background:'+p.avatarColor+'">'+p.initials+'</div>'+
+  return '<div class="card2"><div class="pc-row"><div class="pc-avatar">'+p.initials+'</div>'+
     '<div class="pc-txt"><div class="pc-name">'+p.name+'</div>'+
     '<div class="pc-meta">'+p.age+' '+p.sex+' · #'+p.mrn+'</div></div>'+
     '<div class="pc-edit" onclick="showToast(\'Edit — not wired in this demo\')">'+ICONS.pencil+'</div></div>'+
@@ -1243,6 +1620,96 @@ function wrStripInnerHTML(){
     '<span class="gchip2 new">Callback timers</span></div>';
 }
 
+/* ===== Referral intake console ===== */
+function fillSample(id){
+  for(var i=0;i<SAMPLE_NOTES.length;i++){
+    if(SAMPLE_NOTES[i].id===id){ STATE.intake.text=SAMPLE_NOTES[i].text; }
+  }
+  STATE.intake.result=null;
+  renderContent();
+}
+function clearIntake(){
+  STATE.intake.text=''; STATE.intake.result=null;
+  renderContent();
+}
+function runIntakeTriage(){
+  var t=STATE.intake.text||'';
+  if(!t.trim()){ showToast('Paste a referral note first, or load one of the synthetic samples.'); return; }
+  STATE.intake.result=triageNote(t);
+  renderContent();
+  var el=document.getElementById('intakeResult');
+  if(el && el.scrollIntoView) el.scrollIntoView({block:'nearest'});
+}
+function sampleBtnHTML(s){
+  return '<button class="samplebtn" onclick="fillSample(\''+s.id+'\')">'+
+    '<b>'+s.title+'</b>'+s.hint+'</button>';
+}
+function intakeResultHTML(r){
+  var tierCls='tier-'+(r.tierKey==='idata'?'hold':r.tierKey);
+  var routeCls=r.hold?'hold':'auto';
+  var routeTitle=r.hold?'Held for physician review':'Routed automatically — no physician review';
+  var routeBody=r.hold?r.holdReason:
+    'This one routes straight through to scheduling. Physicians are pulled in by exception '+
+    'only — red flags, low confidence, borderline tiers, and referrals too thin to tier.';
+  var evid=r.evidence.filter(function(e){ return e.quote; }).map(function(e){
+    return '<div class="evrow"><q>'+escHtml(e.quote)+'</q><span class="srctag">'+e.source+'</span></div>';
+  }).join('');
+  var workup=r.workup.map(function(w){ return '<li>'+w+'</li>'; }).join('');
+
+  return '<div class="res" id="intakeResult">'+
+    '<div class="res-banner '+tierCls+'">'+
+      '<div><div class="rb-tier">'+r.tierLabel+'</div>'+
+      '<div class="rb-lane">'+r.laneObj.label+' · '+r.laneObj.code+'</div></div>'+
+      '<div class="rb-div"></div>'+
+      '<div class="rb-why">'+r.tierWhy+'</div>'+
+    '</div>'+
+    '<div class="res-grid">'+
+      '<div class="res-cell"><div class="res-cell-label">Best-fit subspecialist</div>'+
+        '<div class="res-cell-value">'+r.subspecialty+'</div>'+
+        '<div class="res-cell-note">'+r.subspecialtyNote+'</div></div>'+
+      '<div class="res-cell"><div class="res-cell-label">Start while the patient waits</div>'+
+        '<ul class="worklist">'+workup+'</ul></div>'+
+    '</div>'+
+    '<div class="res-route '+routeCls+'">'+
+      '<span class="rr-mark">'+(r.hold?'!':'&#10003;')+'</span>'+
+      '<div><div class="rr-title">'+routeTitle+'</div>'+
+      '<div class="rr-body">'+routeBody+'</div></div>'+
+    '</div>'+
+    (evid?'<div class="res-evid"><div class="res-cell-label">Evidence the tier rests on</div>'+evid+'</div>':'')+
+    '<div class="res-foot">Tier and lane come from the existing engine and the red-flag library '+
+    'v3 — unchanged. Subspecialty routing and the starting workup are <b>illustrative drafts</b> '+
+    'and need RN + physician authorship plus a sentinel-gate eval before live use.</div>'+
+    '</div>';
+}
+function intakeConsoleHTML(){
+  var r=STATE.intake.result;
+  var chars=(STATE.intake.text||'').length;
+  return '<section class="intake">'+
+    '<div class="intake-hd"><div>'+
+      '<div class="intake-title">Referral intake</div>'+
+      '<div class="intake-sub">Paste a referral note. The engine tiers it against the red-flag '+
+      'library, names the best-fit subspecialist, and lists the workup to start while the '+
+      'patient waits for the appointment.</div></div>'+
+      '<span class="intake-badge">Synthetic data only</span>'+
+    '</div>'+
+    '<div class="samplewrap"><div class="microlabel">Load a synthetic sample</div>'+
+      '<div class="samplerow">'+SAMPLE_NOTES.map(sampleBtnHTML).join('')+'</div></div>'+
+    '<textarea class="intake-ta" id="intakeText" spellcheck="false" '+
+      'placeholder="Paste the referral note here — or load one of the synthetic samples above." '+
+      'oninput="STATE.intake.text=this.value;syncIntakeCount()">'+escHtml(STATE.intake.text)+'</textarea>'+
+    '<div class="intake-actions">'+
+      '<button class="btn-primary" onclick="runIntakeTriage()">Triage</button>'+
+      '<button class="btn-secondary" onclick="clearIntake()">Clear</button>'+
+      '<span class="intake-count" id="intakeCount">'+chars+' characters</span>'+
+    '</div>'+
+    (r?intakeResultHTML(r):'')+
+    '</section>';
+}
+function syncIntakeCount(){
+  var el=document.getElementById('intakeCount');
+  if(el) el.textContent=(STATE.intake.text||'').length+' characters';
+}
+
 function triageLaneGroupHTML(lane,count){
   return '<tr class="lanegrouprow"><td colspan="6"><div class="lanegrouprow-inner">'+
     '<span class="lane-dot" style="background:'+lane.dot+'"></span>'+lane.label+' — '+lane.code+' ('+count+')'+
@@ -1288,7 +1755,11 @@ function renderTriageTab(){
   if(!tableRows){
     tableRows='<tr><td colspan="6"><div class="empty-today">No patients match this filter (demo).</div></td></tr>';
   }
-  return '<div class="pagehd">Triage queue</div>'+
+  return '<div class="pagehd">Referral triage</div>'+
+    '<div class="pagesub">One nurse-facing surface: tier what arrives, route it, and only pull a '+
+    'physician in by exception.</div>'+
+    intakeConsoleHTML()+
+    '<div class="pagehd" style="font-size:20px;margin-bottom:14px">Live queue</div>'+
     '<div class="filterbar">'+
     '<div class="dropdownbtn" onclick="cycleTriageSource()">Source <b>'+
       (STATE.triageSourceFilter==='all'?'All':sourceLabelFull(STATE.triageSourceFilter))+'</b> '+ICONS.chevronDown+'</div>'+
@@ -1297,16 +1768,16 @@ function renderTriageTab(){
     '<div class="fb-spacer"></div>'+
     '<button class="blackbtn" onclick="showToast(\'New triage intake — not wired in this demo (portal + call-center intake already feed this queue)\')">Start triage</button>'+
     '</div>'+
-    '<div class="wr-toggle2" onclick="toggleWhatsReal()">ℹ What&#39;s real</div>'+
+    '<div class="wr-toggle2" onclick="toggleWhatsReal()">What&#39;s real</div>'+
     '<div class="wr-strip2'+(STATE.wrOpen?' open':'')+'">'+wrStripInnerHTML()+'</div>'+
-    '<div class="estrip"><b>⚠ Emergency gateway · 7:33 AM</b> — call-center contact matched acute-cerebrovascular '+
+    '<div class="estrip"><b>Emergency gateway · 7:33 AM</b> — call-center contact matched acute-cerebrovascular '+
     'red flags. Scheduling locked · 911/ED script shown to rep · covering neurologist paged.'+
     '<div class="estrip-chip">Exists today</div></div>'+
     '<div class="tablecard"><table class="datatable"><thead><tr>'+
     '<th>Received</th><th>Patient details</th><th>Source</th><th>Pathway</th><th>Flags</th><th>Status</th>'+
     '</tr></thead><tbody>'+tableRows+'</tbody></table></div>'+
     '<div class="loadmorewrap"><button class="loadmorebtn" onclick="triageLoadMore()">Load more</button></div>'+
-    '<div class="rflink" onclick="openRedFlagModal()">📋 Red-flag library · v3</div>'+
+    '<div class="rflink" onclick="openRedFlagModal()">Red-flag library · v3 ↗</div>'+
     '<div style="margin-top:18px">'+renderTriageDetail()+'</div>';
 }
 function patientHeaderHTML(p){
@@ -1343,7 +1814,7 @@ function assessmentCardHTML(p){
   var evid=(p.evidence||[]).map(function(e){return '<div class="ctxrow"><span>'+e.text+'</span><span class="srctag">'+e.source+'</span></div>';}).join('');
   return '<div class="card"><div class="card-hd"><span class="card-title">AI assessment</span>'+
     '<span class="badge ai">AI</span></div>'+
-    '<div class="pway-line">Pathway: '+laneObj.label+' <span style="font-weight:400;color:var(--faint)">'+laneObj.code+'</span></div>'+
+    '<div class="pway-line">Pathway: '+laneObj.label+' <span style="font-weight:400;color:var(--muted)">'+laneObj.code+'</span></div>'+
     '<span class="tchip '+p.tier+'" style="display:inline-flex;margin-bottom:8px">'+p.tierLabel+'</span>'+
     '<div class="rationale">'+p.rationale+'</div>'+evid+actions+overrideNote+
     '<div class="hint">The AI proposes; the nurse disposes. Overrides carry reason codes and land in the '+
@@ -1369,7 +1840,7 @@ function noteCardHTML(p){
 function actionStripHTML(){
   return '<div class="btnrow"><button class="btn blue" onclick="sendToProvider()">Send to provider — with note</button>'+
     '<button class="btn ghost" onclick="scheduleCallback()">Schedule callback · SMS confirm</button>'+
-    '<button class="btn ghost" onclick="openCallScript()">\u260E Call opening script</button></div>';
+    '<button class="btn ghost" onclick="openCallScript()">Call opening script</button></div>';
 }
 function collapsedLineHTML(q,ans){
   return '<div class="pway-q"><span class="ok">'+ICONS.check+'</span>'+q+'</div><div class="pway-a">→ '+ans+'</div>';
@@ -1404,7 +1875,7 @@ function pathwayStateMachineHTML(){
       }
     }
   }
-  var restart=(m.q1!==null)?'<div class="restart" onclick="restartPathway()">↺ restart pathway</div>':'';
+  var restart=(m.q1!==null)?'<div class="restart" onclick="restartPathway()">Restart pathway</div>':'';
   return '<div class="card"><div class="card-hd"><span class="card-title">Pathway — MS: new/worsening '+
     'sensory symptoms</span><span class="badge draft">DRAFT — ILLUSTRATIVE</span></div>'+
     lines+current+restart+'</div>';
@@ -1419,8 +1890,8 @@ function changePathwayFormHTML(){
   var opts=LANES.map(function(l){return '<option value="'+l.id+'">'+l.label+' — '+l.code+'</option>';}).join('');
   var reasons=['clinical judgment — sicker than text suggests','patient context known to me','other'];
   var rOpts=reasons.map(function(r){return '<option value="'+r+'">'+r+'</option>';}).join('');
-  var selStyle='background:#fff;color:var(--text);border:1.5px solid var(--border);'+
-    'border-radius:9px;padding:8px;font-size:12.5px;margin-bottom:8px;width:100%';
+  var selStyle='background:var(--surface);color:var(--text);border:1px solid var(--line-strong);'+
+    'border-radius:6px;padding:9px;font-size:13px;margin-bottom:8px;width:100%';
   return '<div style="margin-top:8px"><select id="changePathwaySel" style="'+selStyle+'">'+opts+'</select>'+
     '<select id="changeReasonSel" style="'+selStyle+'">'+rOpts+'</select>'+
     '<div class="btnrow" style="margin-top:0"><button class="btn blue" onclick="applyOverride()">Apply</button>'+
@@ -1440,7 +1911,7 @@ function renderDavid(p){
       '<button class="btn red" onclick="acknowledgeDavid()">Acknowledge — rep has caller on line</button>'+
       '</div></div>';
   } else {
-    body='<div class="ack-banner"><b>✓ Acknowledged — EMERGENT.</b> Scheduling locked · 911/ED script '+
+    body='<div class="ack-banner"><b>Acknowledged — EMERGENT.</b> Scheduling locked · 911/ED script '+
       'shown to rep · covering neurologist paged. <span style="text-decoration:underline;cursor:pointer" '+
       'onclick="openEdScript()">Open ED handoff script</span></div>';
   }
@@ -1660,15 +2131,11 @@ function openRedFlagModal(){
   var chips='<div class="modal-chips"><span class="modal-chip">v3</span>'+
     '<span class="modal-chip">Owner: triage RN + physician sign-off</span>'+
     '<span class="modal-chip">Applied identically to every message and call</span></div>';
-  var rows=[
-    ['"worst headache of my life", "thunderclap"','Intracranial hemorrhage / SAH','Gateway: contact now'],
-    ['"face drooping", "slurred speech", "one side weak"','Acute cerebrovascular','Gateway: contact now'],
-    ['"curtain over my eye", "vision went black"','Acute vision threat','Gateway: contact now'],
-    ['"first ever seizure"','Status / recurrent seizure','Gateway: same-day floor']
-  ];
+  /* Rendered from RED_FLAGS — the same rows referral intake matches against. */
   var table='<table class="rftable"><tr><th>Phrase anchors</th><th>Syndrome class</th><th>Behavior</th></tr>'+
-    rows.map(function(r){return '<tr><td>'+r[0]+'</td><td>'+r[1]+'</td><td>'+r[2]+'</td></tr>';}).join('')+
-    '</table>';
+    RED_FLAGS.map(function(r){
+      return '<tr><td>'+r.label+'</td><td>'+r.syndrome+'</td><td>'+r.behavior+'</td></tr>';
+    }).join('')+'</table>';
   var note='<div class="hint">Not naive string match — negation/temporality-aware, independently '+
     'cross-checked; disagreement escalates, never silently downgrades (existing gateway behavior).</div>';
   openModal('Red-flag library · v3',chips+table+note);

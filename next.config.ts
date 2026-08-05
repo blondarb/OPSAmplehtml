@@ -42,6 +42,29 @@ const nextConfig: NextConfig = {
   async headers() {
     return [{ source: '/:path*', headers: SECURITY_HEADERS }]
   },
+  // Standalone public URL for the outpatient referral-triage demo.
+  // The file itself stays at public/concepts/triage-nurse/... (git history,
+  // sibling concept pages); only the URL is promoted. Next evaluates
+  // redirects BEFORE rewrites, and a rewrite destination is not re-run
+  // through redirects, so these two rules do not loop.
+  async redirects() {
+    return [
+      {
+        source: '/concepts/triage-nurse/outpatient-triage-nurse-demo.html',
+        destination: '/triage-demo',
+        // statusCode, not `permanent: true` — the latter emits 308.
+        statusCode: 301,
+      },
+    ]
+  },
+  async rewrites() {
+    return [
+      {
+        source: '/triage-demo',
+        destination: '/concepts/triage-nurse/outpatient-triage-nurse-demo.html',
+      },
+    ]
+  },
   // Pass build-time env vars to the server runtime.
   // Amplify SSR compute does not inject app-level env vars at runtime,
   // so we inline them during the build via next.config.
