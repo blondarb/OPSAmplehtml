@@ -25,8 +25,27 @@ import {
 } from '@/lib/triage/sourceExtractionAuthority'
 
 // Lambda must stay alive for Bedrock + DB writes after the 202 is sent.
-// 120s gives plenty of headroom for the typical 25-40s total work.
-export const maxDuration = 120
+//
+// 120s was NOT plenty of headroom, despite the comment this replaces. Typical
+// work is 25-40s, but the WORST case exceeded the old ceiling:
+//
+//   safety + scoring branches run concurrently under Promise.all, each capped
+//   by MODEL_BRANCH_TIMEOUT_MS (45s) and each now retrying once  -> up to 90s
+//   the adjudicator then runs SEQUENTIALLY with the same 45s cap  -> up to 45s
+//                                                                   ------
+//                                                                    135s
+//
+// ensemblePolicy sets adjudicationRequired on ANY branch failure, so the slow
+// path is reached by exactly the failure the retry exists to survive. At 120s
+// the Lambda was killed mid-processing and the session stayed at
+// processing_status='pending' with NO error ever recorded — the page simply
+// hung forever, with nothing in the UI or the row to explain why.
+//
+// 300s, because that is what the client already waits: postTriage polls with
+// maxAttempts 300 at a 1s interval (pollClient.ts). Letting the server outlive
+// the client's patience buys nothing; letting it die first strands the row.
+// This is a ceiling, not a target — it only matters on the failure path.
+export const maxDuration = 300
 
 const MAX_HOLD_SAFETY_SIGNALS = 20
 const MAX_HOLD_EVIDENCE_PER_SIGNAL = 5
