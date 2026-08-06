@@ -2,6 +2,7 @@
 
 import type { TriageResult } from '@/lib/triage/types'
 import { buildSafetyReviewViewModel } from '@/lib/triage/safetyReviewView'
+import { triageOutputPolicy } from '@/lib/triage/triageOutputPolicy'
 
 function label(value: string | undefined): string {
   return value
@@ -12,14 +13,37 @@ function label(value: string | undefined): string {
 export default function SafetyReviewPanel({ result }: { result: TriageResult }) {
   const review = buildSafetyReviewViewModel(result.safety_review)
   const held = result.scheduling_locked !== false
+  // scheduling_locked is true on effectively every session today (no code
+  // path clears it — see the ground-truth audit), so "held" alone can't
+  // distinguish a genuine hold from a routine result awaiting sign-off.
+  // requiresHumanReviewHold (data conflict / insufficient data / safety
+  // conflict / emergency markers) is the flag that already draws that line
+  // elsewhere in the UI — reused here, not recomputed differently.
+  // Same-day clinician review is a GENUINE hold but is NOT part of
+  // requiresHumanReviewHold (triageOutputPolicy.ts:67-71 covers emergency
+  // markers, safety conflict, data conflict and insufficient data only).
+  // Without this, an urgent same-day case would render the same calm
+  // "clinician confirmation pending" badge as a routine one — under-alarming a
+  // real hold, which is worse than the over-alarming this change set out to
+  // fix. Caught in review 2026-08-06.
+  const policy = triageOutputPolicy(result)
+  const genuineHold =
+    held &&
+    (policy.requiresHumanReviewHold ||
+      result.care_pathway === 'same_day_clinician_review')
+  const badgeLabel = genuineHold
+    ? 'HUMAN REVIEW HOLD'
+    : held
+      ? 'CLINICIAN CONFIRMATION PENDING'
+      : 'CLINICIAN CONFIRMED'
 
   return (
     <section
       style={{
         padding: '16px',
-        background: held ? 'var(--nn-t1-bg)' : 'var(--nn-surface)',
+        background: genuineHold ? 'var(--nn-t1-bg)' : 'var(--nn-surface)',
         borderRadius: 'var(--nn-radius)',
-        border: `1px solid ${held ? 'var(--nn-t1)' : 'var(--nn-line)'}`,
+        border: `1px solid ${genuineHold ? 'var(--nn-t1)' : 'var(--nn-line)'}`,
         marginBottom: '16px',
       }}
       aria-label="Safety workflow review"
@@ -28,10 +52,14 @@ export default function SafetyReviewPanel({ result }: { result: TriageResult }) 
         <h3 style={{ color: 'var(--nn-ink)', fontSize: 'var(--nn-fs-base)', margin: 0 }}>
           Safety Workflow
         </h3>
-        <span style={{ color: held ? 'var(--nn-t1)' : 'var(--nn-ink-3)', fontSize: 'var(--nn-fs-xs)', fontWeight: 700 }}>
-          {held ? 'SCHEDULING LOCKED' : 'LOCK RELEASED'}
+        <span style={{ color: genuineHold ? 'var(--nn-t1)' : 'var(--nn-ink-2)', fontSize: 'var(--nn-fs-xs)', fontWeight: 700 }}>
+          {badgeLabel}
         </span>
       </div>
+      <p style={{ color: 'var(--nn-ink-3)', fontSize: 'var(--nn-fs-xs)', margin: '6px 0 0', lineHeight: 1.5 }}>
+        A clinician reviews and confirms every triage result in the chart before scheduling —
+        a standing control on all results, not a flag specific to this case.
+      </p>
 
       <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginTop: '12px' }}>
         {[

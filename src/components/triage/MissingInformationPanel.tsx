@@ -5,6 +5,15 @@ interface Props {
   timeframe: string
   schedulingLocked: boolean
   humanReviewHold?: boolean
+  /**
+   * True only for the common case: triaged with confidence (sufficient data
+   * quality, no data conflict, no emergency/same-day marker) and the model
+   * separately named items to confirm before the visit. None of them
+   * blocked the recommendation (missing_information gates nothing
+   * computationally — see triageOutputPolicy/outpatientFinalDisposition).
+   * Renders a calm "confirm these" list instead of the hold register.
+   */
+  advisoryOnly?: boolean
 }
 
 function activeActionCopy(timeframe: string): {
@@ -35,8 +44,33 @@ export default function MissingInformationPanel({
   timeframe,
   schedulingLocked,
   humanReviewHold = false,
+  advisoryOnly = false,
 }: Props) {
   if (!missingInformation?.length) return null
+
+  if (advisoryOnly) {
+    return (
+      <section
+        aria-label="Items to confirm before scheduling"
+        className="nn-card"
+        style={{ margin: 0 }}
+      >
+        <h3 className="nn-card-title">Confirm before scheduling</h3>
+        <p style={{ color: 'var(--nn-ink-2)', fontSize: 'var(--nn-fs-sm)', margin: '4px 0 10px', lineHeight: 1.5 }}>
+          {timeframe} is the recommended timeframe. The items below were not in the referral
+          and did not change this recommendation — a clinician confirms them before scheduling.
+        </p>
+        <ul style={{ margin: 0, paddingLeft: '20px' }}>
+          {missingInformation.map((item, index) => (
+            <li key={`${item}-${index}`} style={{ marginBottom: index < missingInformation.length - 1 ? '4px' : 0 }}>
+              {item}
+            </li>
+          ))}
+        </ul>
+      </section>
+    )
+  }
+
   const copy = activeActionCopy(timeframe)
 
   return (

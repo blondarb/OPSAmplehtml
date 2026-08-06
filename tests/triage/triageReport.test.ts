@@ -132,8 +132,14 @@ describe('buildTriageReport', () => {
       }),
     )
 
-    expect(report).toContain('Missing Information:')
+    // The item itself must still be VISIBLE — that is this test's intent and it
+    // is unchanged. Only the framing moved: an urgent case with sufficient data
+    // is triaged-with-gaps, not blocked, so the heading is advisory
+    // (2026-08-06). Asserting the advisory line too, so a silent regression
+    // back to failure framing fails here rather than surfacing on stage.
     expect(report).toContain('Synthetic anticoagulation status is missing.')
+    expect(report).toContain('Not documented in the referral:')
+    expect(report).toContain('None of the above blocked this recommendation')
   })
 
   it('copies a conflicting-data hold and suppresses outpatient content when no missing item was enumerated', () => {

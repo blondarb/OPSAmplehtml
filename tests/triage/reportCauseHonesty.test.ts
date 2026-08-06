@@ -82,3 +82,62 @@ describe('buildTriageReport — cause honesty on an insufficient-data hold', () 
     }
   })
 })
+
+/**
+ * The COMMON case must not read as a failure in the copied report either.
+ *
+ * Steve Arbogast, DO, 2026-08-06: "Oftentimes there's gonna be insufficient
+ * data... Most of the notes are not gonna have all the data they need, or else
+ * they would have been seen by a neurologist."
+ *
+ * His Gutierrez run scored semi_urgent with data_quality=sufficient and 4
+ * missing items — a successful triage. The report still headed those items
+ * "Missing Information" and said "Scheduling remains locked", which reads as a
+ * failure in the one document that leaves the app and reaches the referring
+ * provider. buildTriageReport was missed by the on-screen fix TWICE before this.
+ */
+describe('buildTriageReport — advisory gaps are not a failure', () => {
+  function advisoryResult(): TriageResult {
+    return {
+      triage_tier: 'semi_urgent',
+      triage_tier_display: 'Tier 3 of 7 — Semi-urgent',
+      care_pathway: 'expedited_outpatient',
+      data_quality: 'sufficient',
+      review_requirement: 'clinician_confirmation',
+      scheduling_locked: true,
+      insufficient_data: false,
+      missing_information: ['Fundoscopic exam not documented'],
+      clinical_reasons: [],
+      red_flags: [],
+      failed_therapies: [],
+      suggested_workup: [],
+    } as unknown as TriageResult
+  }
+
+  it('frames documented gaps as advisory, not as a blocked triage', () => {
+    const report = buildTriageReport(advisoryResult())
+    expect(report).toContain('Not documented in the referral:')
+    expect(report).toContain('None of the above blocked this recommendation')
+    expect(report).not.toContain('Missing Information:')
+  })
+
+  it('states the sign-off as a control, not a lock, in the common case', () => {
+    const report = buildTriageReport(advisoryResult())
+    expect(report).toContain('A clinician confirms this recommendation before scheduling.')
+    expect(report).not.toContain('Scheduling remains locked.')
+  })
+
+  it('a same-day clinician review is NOT advisory — it keeps the hold wording', () => {
+    // Under-alarming a genuine hold is worse than the over-alarming being fixed.
+    const sameDay = { ...advisoryResult(), care_pathway: 'same_day_clinician_review' } as TriageResult
+    const report = buildTriageReport(sameDay)
+    expect(report).toContain('Missing Information:')
+    expect(report).not.toContain('None of the above blocked this recommendation')
+  })
+
+  it('a genuine insufficient-data hold keeps the hold wording', () => {
+    const report = buildTriageReport(insufficientDataResult())
+    expect(report).toContain('INSUFFICIENT / UNDETERMINED DATA HOLD')
+    expect(report).toContain('Scheduling remains locked.')
+  })
+})

@@ -67,6 +67,16 @@ export default function TriageOutputPanel({ result, onTryAnother, onStartPatient
         )
   const isEmergent = outputPolicy.timeframe === EMERGENCY_TIMEFRAME
   const isSameDay = outputPolicy.timeframe === SAME_DAY_TIMEFRAME
+  // Common case (the Gutierrez pattern): triaged with confidence, some
+  // items just weren't in the referral, none of them blocked the
+  // recommendation. Built only from flags that already gate other
+  // presentation decisions on this page — no new triage logic.
+  const isAdvisoryOnly =
+    !outputPolicy.dataConflict &&
+    !outputPolicy.insufficientDataHold &&
+    !outputPolicy.safetyConflict &&
+    !isEmergent &&
+    !isSameDay
   // Cause-honest copy: distinguishes a genuinely thin referral from our own
   // independent safety-model check failing to complete, so InsufficientDataPanel
   // never blames the referral for an internal failure (production incident
@@ -168,6 +178,7 @@ export default function TriageOutputPanel({ result, onTryAnother, onStartPatient
                 timeframe={outputPolicy.timeframe}
                 schedulingLocked={outputPolicy.schedulingLocked}
                 humanReviewHold={outputPolicy.dataConflict}
+                advisoryOnly={isAdvisoryOnly}
               />
             )}
 

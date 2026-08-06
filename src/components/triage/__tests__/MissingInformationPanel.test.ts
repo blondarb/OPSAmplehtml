@@ -63,4 +63,21 @@ describe('MissingInformationPanel', () => {
 
     expect(html).toBe('')
   })
+
+  it('renders a calm confirm-before-scheduling list when advisoryOnly is true, not the hold register', () => {
+    const html = renderToStaticMarkup(
+      createElement(MissingInformationPanel, {
+        missingInformation: ['Symptom onset date', 'Prior imaging results'],
+        timeframe: 'Within 4-6 Weeks',
+        schedulingLocked: true,
+        advisoryOnly: true,
+      }),
+    )
+
+    expect(html).toContain('Confirm before scheduling')
+    expect(html).toContain('Symptom onset date')
+    expect(html).toContain('Within 4-6 Weeks is the recommended timeframe.')
+    expect(html).not.toContain('Missing information — active action remains')
+    expect(html).not.toContain('Scheduling remains locked.')
+  })
 })

@@ -76,10 +76,26 @@ export function buildTriageReport(result: TriageResult): string {
         ]),
       )
 
+  // The COMMON case: triaged with confidence, some details not documented,
+  // none of which blocked the recommendation. Most referrals look like this —
+  // if the note were complete the patient would already have seen a
+  // neurologist. Heading it "Missing Information" alongside "Scheduling
+  // remains locked" made a successful triage read as a failed one, in the
+  // document that gets pasted into charts and sent back to the referring
+  // provider. Mirrors MissingInformationPanel's advisory-only branch.
+  const advisoryOnly =
+    policy.showMissingInformation &&
+    !policy.requiresHumanReviewHold &&
+    result.care_pathway !== 'same_day_clinician_review'
+
   if (policy.showMissingInformation) {
-    lines.push('Missing Information:')
+    lines.push(advisoryOnly ? 'Not documented in the referral:' : 'Missing Information:')
     missingInformation.forEach((item) => lines.push(`  - ${item}`))
-    if (policy.timeframe === 'Emergency evaluation now') {
+    if (advisoryOnly) {
+      lines.push(
+        'None of the above blocked this recommendation. Confirm at scheduling.',
+      )
+    } else if (policy.timeframe === 'Emergency evaluation now') {
       lines.push(
         'The active emergency action remains in effect. Information gathering must not delay emergency evaluation.',
       )
@@ -93,9 +109,13 @@ export function buildTriageReport(result: TriageResult): string {
       )
     }
     lines.push(
-      policy.schedulingLocked
-        ? 'Scheduling remains locked.'
-        : 'Scheduling is not currently locked.',
+      !policy.schedulingLocked
+        ? 'Scheduling is not currently locked.'
+        : advisoryOnly
+          // Same state, honest framing: a clinician signs off before anything
+          // is scheduled. That is the human-in-the-loop control, not a fault.
+          ? 'A clinician confirms this recommendation before scheduling.'
+          : 'Scheduling remains locked.',
     )
     lines.push('')
   }
