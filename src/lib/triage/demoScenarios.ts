@@ -448,7 +448,7 @@ export const DEMO_SCENARIOS: DemoScenario[] = [
     "briefDescription": "Six weeks of progressive headache, episodic confusion, and transient aphasia with an MRI showing multiple enhancing brain lesions concerning for CNS vasculitis, CNS lymphoma, or neurosarcoidosis; urgent multidisciplinary workup already underway.",
     "clinicalHighlight": "Suspected CNS vasculitis/lymphoma",
     "expectedTier": "urgent",
-    "doNotDemo": { "reason": "Emergency gateway fires before scoring — shows EMERGENCY, not this tier" },
+    "doNotDemo": { "reason": "Emergency gateway fires before scoring — this one shows the emergency takeover, never the rubric" },
     "files": [
       {
         "filename": "10_Okafor_Emmanuel.pdf",
@@ -472,7 +472,7 @@ export const DEMO_SCENARIOS: DemoScenario[] = [
     "briefDescription": "Bilateral papilledema with absent venous pulsations, visual field defects, and transient visual obscurations found on a routine eye exam, referred urgently to evaluate for IIH versus a secondary intracranial process.",
     "clinicalHighlight": "Papilledema, suspected IIH",
     "expectedTier": "urgent",
-    "doNotDemo": { "reason": "Emergency gateway fires before scoring — shows EMERGENCY, not this tier" },
+    "doNotDemo": { "reason": "Emergency gateway fires before scoring — this one shows the emergency takeover, never the rubric" },
     "files": [
       {
         "filename": "11_Petrov_Nina.pdf",

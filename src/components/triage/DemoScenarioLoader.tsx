@@ -8,7 +8,7 @@ import {
   useRef,
   useState,
 } from 'react'
-import { DemoScenario, DemoCategory, TIER_DISPLAY } from '@/lib/triage/types'
+import { DemoScenario, DemoCategory } from '@/lib/triage/types'
 import { DEMO_CATEGORIES, getDemosByCategory } from '@/lib/triage/demoScenarios'
 import DemoPreviewModal from './DemoPreviewModal'
 
@@ -263,7 +263,6 @@ function DemoScenarioLoader({ onBeginLoad, onLoadFiles }, forwardedRef) {
           {/* Scenario list */}
           <div style={{ overflowY: 'auto', flex: 1 }}>
             {scenarios.map((scenario) => {
-              const tierConfig = TIER_DISPLAY[scenario.expectedTier]
               return (
                 <button
                   key={scenario.id}
@@ -285,24 +284,18 @@ function DemoScenarioLoader({ onBeginLoad, onLoadFiles }, forwardedRef) {
                   onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--nn-line-2)')}
                   onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
                 >
-                  {/* Tier badge. Suppressed on do-not-demo cards: the badge is
-                      the half of the contradiction we control, and showing a
-                      tier we know the run will not produce is the actual
-                      failure mode. */}
-                  <span style={{
-                    padding: '2px 6px',
-                    borderRadius: '4px',
-                    background: scenario.doNotDemo ? 'var(--nn-line-2)' : tierConfig.bgColor,
-                    color: scenario.doNotDemo ? 'var(--nn-ink-3)' : tierConfig.textColor,
-                    fontSize: '0.6rem',
-                    fontWeight: 700,
-                    flexShrink: 0,
-                    minWidth: '52px',
-                    textAlign: 'center',
-                    marginTop: '2px',
-                  }}>
-                    {scenario.doNotDemo ? 'SCREENS' : tierConfig.label}
-                  </span>
+                  {/* NO TIER BADGE — deliberately.
+                      These cards used to pre-announce the tier the run was
+                      expected to produce. When the engine landed elsewhere the
+                      screen contradicted itself in front of the room, which is
+                      exactly what happened with Gutierrez, then Okafor, Petrov
+                      and Nakamura. Suppressing the badge only on the known-bad
+                      cards was half a fix: the engine is nondeterministic on
+                      borderline notes, and Gutierrez (3.00), Williams (4.00)
+                      and Hargrove (4.00) all sit ON a tier boundary, so any of
+                      them can flip on any run.
+                      A pre-run tier is a promise the engine never made. The
+                      result panel is the only place a tier belongs. */}
 
                   {/* Content */}
                   <div style={{ flex: 1, minWidth: 0 }}>

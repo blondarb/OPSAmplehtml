@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useCallback } from 'react'
-import { DemoScenario, TIER_DISPLAY } from '@/lib/triage/types'
+import { DemoScenario } from '@/lib/triage/types'
 
 interface Props {
   scenario: DemoScenario
@@ -11,7 +11,6 @@ interface Props {
 }
 
 export default function DemoPreviewModal({ scenario, onClose, onLoad, loading }: Props) {
-  const tierConfig = TIER_DISPLAY[scenario.expectedTier]
 
   const handleKeyDown = useCallback((e: KeyboardEvent) => {
     if (e.key === 'Escape') onClose()
@@ -56,18 +55,10 @@ export default function DemoPreviewModal({ scenario, onClose, onLoad, loading }:
           borderBottom: '1px solid var(--nn-line)',
           flexShrink: 0,
         }}>
+          {/* No tier badge here either — see DemoScenarioLoader. This modal is
+              still pre-run, so a tier shown here is the same promise the engine
+              never made. */}
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '8px', flexWrap: 'wrap' }}>
-            <span style={{
-              padding: '3px 10px',
-              borderRadius: '4px',
-              background: tierConfig.bgColor,
-              color: tierConfig.textColor,
-              fontSize: '0.65rem',
-              fontWeight: 700,
-              textTransform: 'uppercase',
-            }}>
-              {tierConfig.label}
-            </span>
             <h2 id="nn-demo-preview-title" style={{ color: 'var(--nn-ink)', fontSize: 'var(--nn-fs-lg)', fontWeight: 600, margin: 0 }}>
               {scenario.patientName}
             </h2>
