@@ -1,0 +1,22 @@
+name: gitleaks
+
+# Secret scanning for every push and PR. Part of the Sevaro Labs engineering
+# standard — see sevaro-context/projects/engineering-standard/00-STANDARD.md.
+# Until this existed, secrets were only scanned by Steve's local /end pipeline,
+# which meant pushes from anyone else were unscanned.
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0   # gitleaks needs full history to scan commits
+      - name: Run gitleaks
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
