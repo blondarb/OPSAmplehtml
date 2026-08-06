@@ -131,6 +131,22 @@ export async function POST(request: Request) {
       referralFocus = referralContext.referralFocus
     }
 
+    // Fall back to the plain referral reason when no richer focus was derived.
+    //
+    // The REFERRAL-DIRECTED PRIORITY block in buildHistorianSystemPrompt is
+    // gated on `referralFocus` — it is what makes the interview OPEN with why
+    // the patient was referred. Only a triage handoff or a pasted referral
+    // produced one, so a canned demo scenario (which carries `referralReason`)
+    // got a generic opener: a patient who said "I don't know why I'm here" was
+    // never told. Observed 2026-08-06 on a live demo scenario.
+    //
+    // referralReason is already the scenario's own one-line reason, which is
+    // exactly what the directive block wants. Trimmed-empty is treated as
+    // absent so a blank string can't produce "referred for: ".
+    if (!referralFocus && referralReason?.trim()) {
+      referralFocus = referralReason.trim()
+    }
+
     // Provider selection: explicit client `provider` field wins, else the
     // server-side VOICE_PROVIDER env var, else default to 'openai' — today's
     // production path. Only 'nova' opts into the WS-relay/Bedrock path; any

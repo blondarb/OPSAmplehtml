@@ -129,7 +129,7 @@ export default function NeurologicHistorian({ initialMode, clinicianMirror = fal
   const tenant = getTenantClient()
   // Voice engine selection — defaults to 'openai' (today's production path);
   // Nova only engages via an explicit ?voice=nova link or a toggle click.
-  const [voiceProvider, setVoiceProvider] = useVoiceProviderPreference()
+  const [voiceProvider, setVoiceProvider, voiceProviderExplicit] = useVoiceProviderPreference()
 
   // Referred mode: a triage handoff was picked up on mount. `handoffDisplay`
   // is set in exactly one place (the handoff-pickup effect below) and
@@ -207,7 +207,10 @@ export default function NeurologicHistorian({ initialMode, clinicianMirror = fal
     patientName: activeConfig.patientName,
     patientContext: activeConfig.patientContext,
     consultId: consultIdRef.current,
-    provider: voiceProvider,
+    // Send the provider ONLY when the user actually chose one (?voice= link
+    // or the internal toggle). Otherwise omit it so the SERVER's
+    // VOICE_PROVIDER decides — see useVoiceProviderPreference.
+    provider: voiceProviderExplicit ? voiceProvider : undefined,
     referral: referralInput ?? undefined,
     // Patient-facing surface: the localizer drives a physician-only panel and
     // must not run here (redesign brief Part 4 — no diagnostic content on the

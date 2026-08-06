@@ -62,7 +62,7 @@ export default function EmbeddedHistorian({
   const tenant = getTenantClient()
   // Voice engine selection — defaults to 'openai' (today's production path);
   // Nova only engages via an explicit ?voice=nova link or a toggle click.
-  const [voiceProvider, setVoiceProvider] = useVoiceProviderPreference()
+  const [voiceProvider, setVoiceProvider, voiceProviderExplicit] = useVoiceProviderPreference()
 
   // Scales that have been injected into the live session (by us, not the AI's choice).
   // Used to deduplicate trigger evaluations so we never re-inject the same scale
@@ -227,7 +227,9 @@ export default function EmbeddedHistorian({
     referralReason,
     patientName,
     consultId,
-    provider: voiceProvider,
+    // Same rule as NeurologicHistorian: send the provider ONLY when the user
+    // explicitly chose one, so the server's VOICE_PROVIDER governs otherwise.
+    provider: voiceProviderExplicit ? voiceProvider : undefined,
     enableLocalizer: true,
     onComplete: handleSessionComplete,
     onSafetyEscalation: handleSafetyEscalation,
