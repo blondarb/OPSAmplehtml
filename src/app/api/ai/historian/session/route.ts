@@ -143,33 +143,25 @@ export async function POST(request: Request) {
     // referralReason is already the scenario's own one-line reason, which is
     // exactly what the directive block wants. Trimmed-empty is treated as
     // absent so a blank string can't produce "referred for: ".
-    // REVERTED 2026-08-06 — this fallback is disabled, deliberately.
+    // RE-ENABLED 2026-08-06 after the block that gated it was reworded.
     //
-    // It shipped in 8c1a209 so a canned demo scenario would open by naming why
-    // the patient was referred. It did that, and it also broke the voice
-    // interview outright: the REFERRAL-DIRECTED PRIORITY block it enables is
-    // BLOCKED BY BEDROCK'S CONTENT FILTER, so every Nova session it touched
-    // died with "This request has been blocked by our content filters" before
-    // the model ever spoke. Steve saw "Waiting for the first question..."
-    // forever.
+    // This fallback makes a canned demo scenario open by naming why the patient
+    // was referred — a patient who says "I don't know why I'm here" gets told.
+    // It was disabled for a few hours because the REFERRAL-DIRECTED PRIORITY
+    // block it switches on was BLOCKED BY BEDROCK'S CONTENT FILTER, which
+    // killed every Nova voice session it touched before the model spoke.
     //
-    // Measured against the live relay, so this is not a guess:
-    //   baseline (11,841 chars)                     -> accepted
-    //   baseline + 2,275 chars of neutral filler    -> accepted
-    //   baseline + the directive block (12,950)     -> BLOCKED
-    // A LARGER prompt passes. It is the block's text, not its size.
+    // The offending paragraph (the "if the patient asks why they were
+    // referred" one in historianPrompts.ts) has been reworded and re-verified
+    // against the live relay: 0/3 blocked, while the original still blocks.
+    // See the load-bearing-wording comment there before editing that text.
     //
-    // Re-enable only once the offending sentences are identified and reworded,
-    // verified against the relay the same way. Until then a canned scenario
-    // gets a generic opener — annoying, and far better than a mute interview.
-    //
-    // NOTE: this only affects the FALLBACK. A real triage handoff or pasted
-    // referral still sets referralFocus above and still hits the block, so
-    // those paths remain broken on Nova until the rewording lands.
-    //
-    // if (!referralFocus && referralReason?.trim()) {
-    //   referralFocus = referralReason.trim()
-    // }
+    // referralReason is the scenario's own one-line reason, which is exactly
+    // what the directive block wants. Trimmed-empty is treated as absent so a
+    // blank string cannot render "referred for: ".
+    if (!referralFocus && referralReason?.trim()) {
+      referralFocus = referralReason.trim()
+    }
 
     // Provider selection: explicit client `provider` field wins, else the
     // server-side VOICE_PROVIDER env var, else default to 'openai' — today's

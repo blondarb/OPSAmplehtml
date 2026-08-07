@@ -58,22 +58,15 @@ describe('the client must not shadow the server voice-provider default', () => {
 describe('a canned scenario leads with its referral reason', () => {
   it('the route falls back to referralReason when no richer focus exists', () => {
     const route = read('src/app/api/ai/historian/session/route.ts')
-    // REVERTED 2026-08-06. The fallback is disabled because the block it
-    // enables is rejected by Bedrock's content filter, which killed every Nova
-    // voice session it touched. Asserting the code string here would now pass
-    // against the COMMENTED-OUT line — a test that cannot fail. Assert the
-    // disable instead, and why, so re-enabling it is a deliberate act that has
-    // to update this test.
+    // Re-enabled 2026-08-06 once the paragraph that tripped Bedrock's content
+    // filter was reworded and re-verified against the live relay. Assert the
+    // ACTIVE code (comment lines stripped), so a commented-out fallback can
+    // never satisfy this the way it did during the revert.
     const active = route
       .split('\n')
       .filter((l) => !l.trim().startsWith('//'))
       .join('\n')
-    expect(
-      active.includes('referralFocus = referralReason.trim()'),
-      'the referralReason fallback must stay disabled until the ' +
-        'REFERRAL-DIRECTED block is reworded past the Bedrock content filter',
-    ).toBe(false)
-    expect(route).toContain('BLOCKED BY BEDROCK')
+    expect(active).toContain('referralFocus = referralReason.trim()')
   })
 
   it('a referralFocus actually produces the directive block', () => {
@@ -94,5 +87,55 @@ describe('a canned scenario leads with its referral reason', () => {
     const noFocus = buildHistorianSystemPrompt('new_patient', undefined, undefined, undefined, null)
     expect(noFocus).not.toContain('REFERRAL-DIRECTED PRIORITY')
     expect(noFocus.length).toBeGreaterThan(100)
+  })
+})
+
+/**
+ * The REFERRAL-DIRECTED block passes Bedrock's content filter. That is a
+ * property of its WORDING, and it is not obvious from reading it.
+ *
+ * 2026-08-06: the block's "if the patient asks why they were referred"
+ * paragraph read "Answer them — do not deflect this to the neurologist,
+ * because it is a question about their own record, not a request for medical
+ * advice." Bedrock rejected it, so every Nova voice session carrying the block
+ * died before the model spoke and the UI sat on "Waiting for the first
+ * question...". Bisected against the live relay: the other five paragraphs
+ * each pass alone; only this one blocked. It is NOT the phrase "medical
+ * advice" — deleting that clause still blocked, and swapping in "clinical
+ * guidance" still blocked. The trigger is the "do not deflect this to the
+ * neurologist" construction, which reads as an instruction to override
+ * clinical deferral.
+ *
+ * These assertions cannot call Bedrock, so they pin the known-bad shape
+ * instead. If you need to change this paragraph, re-verify against the relay.
+ */
+describe('the referral-directed block keeps its filter-safe wording', () => {
+  const prompt = buildHistorianSystemPrompt(
+    'new_patient',
+    'Persistent headaches',
+    undefined,
+    undefined,
+    'Persistent headaches',
+  )
+
+  it('does not reintroduce the construction Bedrock rejected', () => {
+    expect(
+      prompt.includes('do not deflect this to the'),
+      'this phrasing was BLOCKED by Bedrock and silenced every Nova session — ' +
+        're-verify against the relay before reinstating it',
+    ).toBe(false)
+  })
+
+  it('still tells the model to answer the question rather than defer it', () => {
+    // The clinical intent must survive the rewording — Steve asked for this
+    // behaviour explicitly ("the historian could even say 'you were sent to
+    // the neurologist to discuss...'").
+    expect(prompt).toContain('IF THE PATIENT ASKS WHY THEY WERE REFERRED')
+    expect(prompt).toContain('answer it directly')
+  })
+
+  it('keeps the safety carve-outs that must never be traded away', () => {
+    expect(prompt).toContain('Never trade a safety question for')
+    expect(prompt).toContain('not a confirmed diagnosis')
   })
 })
