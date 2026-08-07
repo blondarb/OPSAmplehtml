@@ -59,7 +59,15 @@ export default function HistorianInterviewStep({
           Question {turnNumber} of about {turnCap}
         </p>
         <p className="nn-q-text" aria-live="polite">
-          {displayedQuestion ?? 'Waiting for the first question…'}
+          {/* Before the first question, say what is ABOUT to happen rather than
+              that we are waiting. Steve called a healthy session dead at 0:08 on
+              2026-08-07 — the greeting legitimately takes ~10-15s, and "Waiting
+              for..." beside a running timer implies something already went
+              wrong. If the person who built it misreads that, a partner
+              watching a demo certainly will. A genuinely dead run now surfaces
+              a real error (see the poll stall detector), so this copy no longer
+              has to carry that job. */}
+          {displayedQuestion ?? 'Henry is getting ready — he will speak first.'}
         </p>
       </div>
 
@@ -84,7 +92,9 @@ export default function HistorianInterviewStep({
             ? 'The assistant is speaking'
             : isUserSpeaking
               ? 'Listening — we can hear you'
-              : 'Listening — speak when you’re ready'}
+              : displayedQuestion
+                ? 'Listening — speak when you’re ready'
+                : 'Connecting your microphone…'}
         <span className="nn-num" style={{ marginLeft: 'auto', fontWeight: 500 }}>
           {durationLabel}
         </span>
