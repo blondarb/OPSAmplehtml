@@ -111,6 +111,18 @@ export interface PollOptions {
   intervalMs?: number
   /** Maximum number of polls before giving up. Default 120 (~2min at 1s). */
   maxAttempts?: number
+  /**
+   * Fail if the run shows NO progress for this long. Distinct from
+   * maxAttempts, which is the absolute ceiling: extraction polls allow 900
+   * attempts (15 minutes) because a long-packet run can legitimately take
+   * ~13, but a DEAD single-pass run then span for 15 minutes with a spinner
+   * and no error. Observed 2026-08-07: an extraction stuck at `pending` with
+   * an empty error_message while normal runs complete in 22-24s.
+   *
+   * "Progress" = a change in status or in long-packet progress, so a genuine
+   * long run keeps resetting the timer and is never killed by this.
+   */
+  stallTimeoutMs?: number
   /** Called once with the accepted POST response, before the first poll. */
   onStart?: (start: Readonly<PollStartResponse>) => void
   /** Called on each pending poll; null clears absent or invalid progress. */
@@ -611,6 +623,51 @@ async function postStart(
   return accepted
 }
 
+
+/**
+ * Stall detector for the poll loop.
+ *
+ * A DEAD run reports an identical pending shape forever; a LIVE long-packet run
+ * advances its progress. So the guard keys off CHANGE, not elapsed time — which
+ * is what lets a legitimate ~13-minute long-packet run coexist with failing a
+ * dead single-pass run in ~2 minutes.
+ *
+ * Why this exists: 2026-08-07, an extraction sat at `pending` with an empty
+ * error_message while normal runs completed in 22-24s. The extraction poll
+ * allows maxAttempts 900 at 1s, so the UI would have spun for FIFTEEN MINUTES
+ * with no way to tell dead from slow.
+ *
+ * Pure and exported so the behaviour is testable without mocking the whole
+ * start/poll HTTP contract.
+ */
+export function createStallDetector(stallTimeoutMs: number, now: number) {
+  let lastKey = ''
+  let lastAt = now
+  return {
+    /** Returns true when nothing has changed for longer than the timeout. */
+    isStalled(key: string, at: number): boolean {
+      if (key !== lastKey) {
+        lastKey = key
+        lastAt = at
+        return false
+      }
+      return at - lastAt > stallTimeoutMs
+    },
+  }
+}
+
+export function pollProgressKey(
+  status: unknown,
+  progress: { run_status?: unknown; finalizer_status?: unknown; completed_chunks?: unknown } | null,
+): string {
+  return JSON.stringify([
+    status ?? null,
+    progress?.run_status ?? null,
+    progress?.finalizer_status ?? null,
+    progress?.completed_chunks ?? null,
+  ])
+}
+
 async function pollUntilDone<T>(
   pollUrl: string,
   identity: PollIdentityContract,
@@ -620,6 +677,11 @@ async function pollUntilDone<T>(
 ): Promise<T> {
   const intervalMs = options.intervalMs ?? 1000
   const maxAttempts = options.maxAttempts ?? 120
+  // 120s: five times the observed 22-24s normal extraction, and above the
+  // server's own 90s SINGLE_PASS_EXTRACTION_DEADLINE_MS, so a healthy
+  // single-pass run can never trip it.
+  const stallTimeoutMs = options.stallTimeoutMs ?? 120_000
+  const stall = createStallDetector(stallTimeoutMs, Date.now())
   let safetyState = initialSafetyState
 
   for (let attempt = 0; attempt < maxAttempts; attempt++) {
@@ -780,6 +842,24 @@ async function pollUntilDone<T>(
     // Pending responses may carry both advisory progress and safety state. The
     // reducer runs before either a terminal progress failure or the next wait.
     const progress = parseLongPacketProgress(data.long_packet_progress)
+
+    // Stall detection. A dead run reports the SAME pending shape forever; a
+    // live long-packet run advances its progress. Compare a fingerprint of
+    // both and only fail when nothing has moved for stallTimeoutMs.
+    const progressKey = pollProgressKey(
+      data.status,
+      progress as { run_status?: unknown; finalizer_status?: unknown; completed_chunks?: unknown } | null,
+    )
+    if (stall.isStalled(progressKey, Date.now())) {
+      throwIfAborted(signal)
+      throw triageStartErrorFromSafetyState(
+        'Processing stopped responding and produced no result. Nothing was scored. ' +
+          'Start the referral again — if it stalls a second time, route it for human review.',
+        'processing_stalled',
+        safetyState,
+      )
+    }
+
     const longPacketFailed = Boolean(
       progress?.run_status === 'failed' ||
         progress?.finalizer_status === 'failed',
