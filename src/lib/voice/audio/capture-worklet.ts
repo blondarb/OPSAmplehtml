@@ -54,6 +54,33 @@ export class MicCapture {
       const ctx = new AudioContext();
       this.ctx = ctx;
 
+      // RESUME BEFORE WIRING THE GRAPH — this line is the whole fix.
+      //
+      // Chrome's autoplay policy starts an AudioContext SUSPENDED unless it is
+      // constructed synchronously inside a user-gesture handler. This one is
+      // constructed after `await getUserMedia(...)`, which breaks the gesture
+      // chain, so it reliably begins suspended. A suspended context does not
+      // pull the graph: process() never fires, port.onmessage never runs, and
+      // NOT ONE audio chunk is ever sent. Silently.
+      //
+      // Observed 2026-08-07: "Henry can't hear me", and the interview taking
+      // ~40s to start. Nova does not speak unprompted — verified against the
+      // live relay, 45s of silence with both a 14,001-char prompt and a
+      // 111-char one — so the greeting only fires once audio arrives. With no
+      // audio ever arriving, the whole interview stalls waiting on it. It
+      // appeared intermittent because Chrome resumes a suspended context
+      // opportunistically on later user interaction: click something and it
+      // starts working, don't and it never does.
+      await ctx.resume();
+      if (ctx.state !== 'running') {
+        // Fail loudly rather than reporting a live mic that captures nothing.
+        // The silent no-op is what made this cost a day to find.
+        throw new Error(
+          `Microphone could not start: audio context is "${ctx.state}". ` +
+            `Tap or click the page once, then start the interview again.`,
+        );
+      }
+
       await ctx.audioWorklet.addModule('/voice/pcm-capture-worklet.js');
 
       const source = ctx.createMediaStreamSource(stream);
