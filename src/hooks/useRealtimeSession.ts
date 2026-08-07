@@ -686,9 +686,29 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
             timestamp: Math.floor((Date.now() - startTimeRef.current) / 1000),
             seq: ++seqCounterRef.current,
           }
+          const previousEntry =
+            transcriptRef.current[transcriptRef.current.length - 1]
           transcriptRef.current = [...transcriptRef.current, entry]
           setTranscript([...transcriptRef.current])
-          questionCountRef.current += 1
+
+          // Count EXCHANGES, not utterances. TURN_CAP's own comment says it:
+          // "A turn is one exchange, not one question." Henry's opening block
+          // arrives as several consecutive assistant turns — greeting, then an
+          // introduction, then the first question — and counting each one made
+          // the UI read "Question 4 of about 25" before he had asked anything
+          // (observed live 2026-08-07).
+          //
+          // This is not cosmetic: questionCountRef is the turn budget. Counting
+          // 3-4 phantom turns up front makes Henry hit the cap early and start
+          // wrapping up, silently trading away history questions he should be
+          // asking. Same failure mode as the Nova speculative/final double-emit
+          // handled just above, which "burned the turn budget at 2x".
+          //
+          // Only the FIRST assistant entry of a block counts; consecutive
+          // assistant entries collapse into the one exchange they really are.
+          if (!previousEntry || previousEntry.role !== 'assistant') {
+            questionCountRef.current += 1
+          }
 
           // Durable transcript flush (Task 1): buffer + flush every
           // FLUSH_THRESHOLD unflushed entries. Fire-and-forget — never
