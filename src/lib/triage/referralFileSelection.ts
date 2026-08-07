@@ -1,5 +1,13 @@
 import { FILE_CONSTRAINTS } from './types'
 
+/**
+ * Shown when more than one file is selected. Exported so tests pin the
+ * REJECTION BEHAVIOUR without hardcoding the sentence — three tests broke on a
+ * pure copy edit (2026-08-06), which is brittleness, not coverage.
+ */
+export const MULTIPLE_REFERRAL_FILES_MESSAGE =
+  'Triage scores one document at a time, so every finding stays traceable to its source. Upload the primary referral document on its own.'
+
 export type SingleReferralFileSelection =
   | { ok: true; file: File }
   | {
@@ -26,8 +34,12 @@ export function selectSingleReferralFile(
   return {
     ok: false,
     reason: 'multiple_referral_files',
-    message:
-      'Upload one referral packet at a time. Multiple same-patient documents require the reviewed packet workflow.',
+    // Says what the user can actually DO. The previous wording pointed at "the
+    // reviewed packet workflow", which has no UI entry point and no API that
+    // accepts multiple files — the long-packet modules handle one LONG
+    // document, not several. Pointing someone at an unreachable workflow is a
+    // dead end dressed as instructions (found on a live demo, 2026-08-06).
+    message: MULTIPLE_REFERRAL_FILES_MESSAGE,
   }
 }
 

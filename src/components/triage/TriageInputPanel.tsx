@@ -590,10 +590,16 @@ const TriageInputPanel = forwardRef<TriageInputPanelHandle, Props>(
       {tooManyFiles && (
         <div role="alert" className="nn-note" style={{ marginTop: 16, marginBottom: 0 }}>
           <h3>{uploadedFiles.length} documents selected — triage takes one</h3>
+          {/* Do NOT suggest combining them into one PDF. That advice was here
+              and it does not work: a merged 7-page Nakamura packet (12,989
+              chars) exceeded SINGLE_PASS_EXTRACTION_DEADLINE_MS (90s) and
+              failed with "Clinical model deadline exceeded" — verified on prod
+              2026-08-04. Multi-document ingestion is real engineering, not a
+              merge. */}
           <p style={{ margin: 0 }}>
             A referral is scored against a single source document so every finding stays
-            traceable to it. Combine these into one PDF and upload that, or triage the
-            primary document on its own.
+            traceable to it. Upload the primary document — usually the referral letter —
+            on its own.
           </p>
         </div>
       )}

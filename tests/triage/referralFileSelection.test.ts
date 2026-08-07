@@ -8,8 +8,11 @@ import {
 } from '@/lib/triage/referralAttempt'
 import { FILE_CONSTRAINTS } from '@/lib/triage/types'
 
-const { applyReferralFileSelection, selectSingleReferralFile } =
-  fileSelectionModule
+const {
+  applyReferralFileSelection,
+  selectSingleReferralFile,
+  MULTIPLE_REFERRAL_FILES_MESSAGE,
+} = fileSelectionModule
 const commitReferralIdentityChange = (
   fileSelectionModule as unknown as {
     commitReferralIdentityChange?: <T>(
@@ -69,7 +72,7 @@ describe('selectSingleReferralFile', () => {
       ok: false,
       reason: 'multiple_referral_files',
       message:
-        'Upload one referral packet at a time. Multiple same-patient documents require the reviewed packet workflow.',
+        MULTIPLE_REFERRAL_FILES_MESSAGE,
     })
   })
 })
@@ -129,7 +132,7 @@ describe('applyReferralFileSelection', () => {
     expect(transition).toStrictEqual({
       selectedFiles: [],
       error:
-        'Upload one referral packet at a time. Multiple same-patient documents require the reviewed packet workflow.',
+        MULTIPLE_REFERRAL_FILES_MESSAGE,
     })
     expect(selectedFiles).toStrictEqual([])
     expect(onFilesChange).toHaveBeenCalledOnce()
@@ -152,7 +155,7 @@ describe('applyReferralFileSelection', () => {
     expect(transition).toStrictEqual({
       selectedFiles: [],
       error:
-        'Upload one referral packet at a time. Multiple same-patient documents require the reviewed packet workflow.',
+        MULTIPLE_REFERRAL_FILES_MESSAGE,
     })
     expect(selectedFiles).toStrictEqual([])
     expect(onFilesChange).toHaveBeenCalledOnce()
