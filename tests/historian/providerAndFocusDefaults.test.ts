@@ -58,7 +58,22 @@ describe('the client must not shadow the server voice-provider default', () => {
 describe('a canned scenario leads with its referral reason', () => {
   it('the route falls back to referralReason when no richer focus exists', () => {
     const route = read('src/app/api/ai/historian/session/route.ts')
-    expect(route).toContain('if (!referralFocus && referralReason?.trim())')
+    // REVERTED 2026-08-06. The fallback is disabled because the block it
+    // enables is rejected by Bedrock's content filter, which killed every Nova
+    // voice session it touched. Asserting the code string here would now pass
+    // against the COMMENTED-OUT line — a test that cannot fail. Assert the
+    // disable instead, and why, so re-enabling it is a deliberate act that has
+    // to update this test.
+    const active = route
+      .split('\n')
+      .filter((l) => !l.trim().startsWith('//'))
+      .join('\n')
+    expect(
+      active.includes('referralFocus = referralReason.trim()'),
+      'the referralReason fallback must stay disabled until the ' +
+        'REFERRAL-DIRECTED block is reworded past the Bedrock content filter',
+    ).toBe(false)
+    expect(route).toContain('BLOCKED BY BEDROCK')
   })
 
   it('a referralFocus actually produces the directive block', () => {
