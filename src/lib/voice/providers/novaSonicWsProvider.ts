@@ -31,6 +31,10 @@ export class NovaSonicWsProvider implements VoiceProvider {
   private aiSpeaking = false
   /** Latched for a terminal text-only save; later PCM is discarded. */
   private outputSuppressed = false
+  /** False once the relay reports that the underlying Bedrock stream ended. */
+  private modelStreamOpen = false
+  /** Prevents a terminal relay frame plus the ensuing WS close from double-ending. */
+  private disconnectedEmitted = false
   /** Last diagnostics snapshot captured from `player` before it was closed in
    *  stop() — so getAudioDiagnostics() still has something to return after
    *  teardown (e.g. when the hook reads it right after stop() completes). */
@@ -53,7 +57,7 @@ export class NovaSonicWsProvider implements VoiceProvider {
 
   /** Transport-open signal for the hook's save-flush gate (see VoiceProvider). */
   isOpen(): boolean {
-    return this.ws?.readyState === WebSocket.OPEN
+    return this.ws?.readyState === WebSocket.OPEN && this.modelStreamOpen
   }
 
   async start(opts: VoiceStartOptions): Promise<void> {
@@ -68,6 +72,8 @@ export class NovaSonicWsProvider implements VoiceProvider {
     this.closing = false
     this.aiSpeaking = false
     this.outputSuppressed = false
+    this.modelStreamOpen = false
+    this.disconnectedEmitted = false
 
     // Wrap setup so a synchronous failure (e.g. `new WebSocket` throwing on a
     // malformed relayUrl) tears down anything already allocated — mirrors the
@@ -87,6 +93,7 @@ export class NovaSonicWsProvider implements VoiceProvider {
     this.ws = ws
 
     ws.onopen = () => {
+      this.modelStreamOpen = true
       // Kick off the session, then start streaming mic audio.
       this.send({
         t: 'start',
@@ -129,13 +136,18 @@ export class NovaSonicWsProvider implements VoiceProvider {
     }
 
     ws.onclose = (event: CloseEvent) => {
-      // Only an unexpected close (not our own stop(), not a clean 1000) is a
-      // drop. Emitted as `disconnected` (not `error`) so the hook runs the
+      // Every remote close that was not initiated by stop() is a drop, even
+      // when the peer used clean code 1000. Emitted as `disconnected` so the hook runs the
       // SAME graceful end-of-session flow as the OpenAI provider's transport-
       // drop handling and a manual "End Interview" click — flush
       // save_interview_output, fall back to a raw-transcript narrative, tear
       // down, fire onComplete.
-      if (!this.closing && !event.wasClean && event.code !== 1000) {
+      this.modelStreamOpen = false
+      this.outputSuppressed = true
+      this.aiSpeaking = false
+      this.player?.interrupt()
+      if (!this.closing && !this.disconnectedEmitted) {
+        this.disconnectedEmitted = true
         this.emit({ type: 'disconnected', reason: `ws:close(${event.code})` })
       }
     }
@@ -162,7 +174,7 @@ export class NovaSonicWsProvider implements VoiceProvider {
         break
       case 'audio':
         // Raw audio drives the player only — no VoiceEvent.
-        if (!this.outputSuppressed) this.player?.enqueue(msg.pcm)
+        if (this.modelStreamOpen && !this.outputSuppressed) this.player?.enqueue(msg.pcm)
         break
       case 'aiSpeechStart':
         this.aiSpeaking = true
@@ -211,7 +223,24 @@ export class NovaSonicWsProvider implements VoiceProvider {
         this.emitAiSpeechStopWhenDrained()
         break
       case 'error':
+        // Relay model errors are terminal. Mark the underlying model stream
+        // unavailable before the hook handles this event so its finalization
+        // path skips a save nudge that can no longer reach Nova.
+        this.modelStreamOpen = false
+        this.outputSuppressed = true
+        this.aiSpeaking = false
+        this.player?.interrupt()
         this.emit({ type: 'error', message: msg.message })
+        break
+      case 'sessionEnded':
+        this.modelStreamOpen = false
+        this.outputSuppressed = true
+        this.aiSpeaking = false
+        if (!this.disconnectedEmitted) {
+          this.disconnectedEmitted = true
+          this.player?.interrupt()
+          this.emit({ type: 'disconnected', reason: msg.reason })
+        }
         break
       case 'medicalTranscript':
         this.emit({ type: 'medicalTranscript', text: msg.text, isPartial: msg.isPartial })
@@ -282,6 +311,7 @@ export class NovaSonicWsProvider implements VoiceProvider {
     if (this.closing) return // idempotent
     this.closing = true
     this.aiSpeaking = false
+    this.modelStreamOpen = false
 
     // Tell the relay we're done before tearing local resources down.
     this.send({ t: 'stop' })

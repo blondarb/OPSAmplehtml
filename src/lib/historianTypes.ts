@@ -10,6 +10,17 @@ export type HistorianSessionType =
 export type HistorianInterviewMode = 'standard' | 'comprehensive'
 export type HistorianInterviewPromptVersion = 'standard-v1' | 'comprehensive-v1'
 
+/** Why an interview stopped; only coverage_complete represents a full intake. */
+export type HistorianTerminationReason =
+  | 'coverage_complete'
+  | 'patient_requested_stop'
+  | 'safety_escalated'
+  | 'hard_stop'
+  | 'manual_end'
+  | 'transport_lost'
+  | 'provider_error'
+  | 'unresponsive'
+
 /**
  * Fixed audit vocabulary for Comprehensive mode. These are coverage labels,
  * not findings: a domain counts as covered when it was asked and answered,
@@ -144,6 +155,7 @@ export interface HistorianSession {
   imported_to_note: boolean
   session_source?: string
   interview_completion_status?: 'complete' | 'ended_early' | null
+  interview_termination_reason?: HistorianTerminationReason | null
   /**
    * Historian Validation Suite Task 2: output of the post-session final
    * differential pass (src/lib/historian/eval/finalDifferential.ts) — a

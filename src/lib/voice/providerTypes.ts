@@ -45,8 +45,8 @@ export type VoiceEvent =
   | { type: 'medicalTranscript'; text: string; isPartial: boolean }
   // Transport dropped unexpectedly (WebRTC connection failed/closed, data
   // channel closed, WS closed non-cleanly) — distinct from `error`, which is
-  // an in-session protocol-level error the session can survive. `disconnected`
-  // means the transport is gone; the hook uses it to run the SAME graceful
+  // a terminal provider/model failure surfaced before or alongside transport
+  // closure. `disconnected` means the transport is gone; the hook uses it to run the SAME graceful
   // end-of-session flow as a manual "End Interview" click (flush
   // save_interview_output, fall back to a raw-transcript narrative, tear down,
   // fire onComplete). Never emitted as a result of the provider's own stop().

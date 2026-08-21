@@ -53,6 +53,7 @@ function body(overrides: Record<string, unknown> = {}) {
     duration_seconds: 120,
     question_count: 2,
     interview_completion_status: 'complete',
+    interview_termination_reason: 'coverage_complete',
     ...overrides,
   }
 }
@@ -111,8 +112,8 @@ describe('invited historian transactional save', () => {
     const sessionUpdate = queryMock.mock.calls.find(([sql]) =>
       String(sql).includes('UPDATE historian_sessions'),
     )
-    expect(sessionUpdate?.[0]).toContain('AND tenant_id = $11')
-    expect(sessionUpdate?.[0]).toContain('AND consult_id = $12')
+    expect(sessionUpdate?.[0]).toContain('AND tenant_id = $12')
+    expect(sessionUpdate?.[0]).toContain('AND consult_id = $13')
     expect(sessionUpdate?.[1]).toContain(binding.sessionId)
     expect(sessionUpdate?.[1]).toContain(binding.tenantId)
     expect(sessionUpdate?.[1]).toContain(binding.consultId)
@@ -206,7 +207,12 @@ describe('invited historian transactional save', () => {
 
     const result = await saveInvitedHistorianSession(
       binding,
-      body({ safety_escalated: true, red_flags: [] }),
+      body({
+        safety_escalated: true,
+        red_flags: [],
+        interview_completion_status: 'ended_early',
+        interview_termination_reason: 'safety_escalated',
+      }),
       new Date('2026-08-20T18:00:00.000Z'),
     )
     expect(result.ok).toBe(true)
@@ -216,5 +222,29 @@ describe('invited historian transactional save', () => {
     expect(queryMock.mock.calls.indexOf(alertInsert!)).toBeLessThan(
       queryMock.mock.calls.findIndex(([sql]) => sql === 'COMMIT'),
     )
+  })
+
+  it('rejects a terminal partial save mislabeled as complete', async () => {
+    const result = await saveInvitedHistorianSession(binding, body({
+      interview_completion_status: 'complete',
+      interview_termination_reason: 'hard_stop',
+      question_count: 60,
+    }))
+    expect(result).toMatchObject({ ok: false, status: 409 })
+    expect(getPoolMock).not.toHaveBeenCalled()
+  })
+
+  it('rejects a hard-stop reason before exchange 60', async () => {
+    const result = await saveInvitedHistorianSession(binding, body({
+      interview_completion_status: 'ended_early',
+      interview_termination_reason: 'hard_stop',
+      question_count: 59,
+    }))
+    expect(result).toEqual({
+      ok: false,
+      status: 409,
+      error: 'Hard-stop reason is invalid before exchange 60.',
+    })
+    expect(getPoolMock).not.toHaveBeenCalled()
   })
 })

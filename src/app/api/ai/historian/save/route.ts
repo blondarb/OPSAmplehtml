@@ -12,6 +12,11 @@ import { resolveHistorianPatientGrant } from '@/lib/historian/invitationStore'
 import { HISTORIAN_GRANT_COOKIE, readCookieValue } from '@/lib/historian/invitationTokens'
 import { saveInvitedHistorianSession } from '@/lib/historian/invitedSave'
 import {
+  completionStatusForTermination,
+  parseHistorianTerminationReason,
+  terminationMatchesCompletionStatus,
+} from '@/lib/historian/terminationPolicy'
+import {
   authorizeClinicalAccess,
   clinicalAccessDeniedMessage,
 } from '@/lib/auth/clinicalAccess'
@@ -67,11 +72,43 @@ export async function POST(request: Request) {
     const tenant = body.tenant_id || getTenantServer()
 
 
-    const completionStatus: 'complete' | 'ended_early' | null =
+    const requestedCompletionStatus: 'complete' | 'ended_early' | null =
       body.interview_completion_status === 'complete' ||
       body.interview_completion_status === 'ended_early'
         ? body.interview_completion_status
         : null
+    const terminationReason = parseHistorianTerminationReason(body.interview_termination_reason)
+    if (body.interview_termination_reason != null && !terminationReason) {
+      return NextResponse.json({ error: 'Invalid interview termination reason.' }, { status: 400 })
+    }
+    if (
+      terminationReason &&
+      requestedCompletionStatus &&
+      !terminationMatchesCompletionStatus(terminationReason, requestedCompletionStatus)
+    ) {
+      return NextResponse.json(
+        { error: 'Interview completion status conflicts with its termination reason.' },
+        { status: 400 },
+      )
+    }
+    if (
+      terminationReason &&
+      (body.safety_escalated === true) !== (terminationReason === 'safety_escalated')
+    ) {
+      return NextResponse.json(
+        { error: 'Safety escalation status conflicts with its termination reason.' },
+        { status: 400 },
+      )
+    }
+    if (
+      terminationReason === 'hard_stop' &&
+      !(typeof body.question_count === 'number' && body.question_count >= 60)
+    ) {
+      return NextResponse.json({ error: 'Hard-stop reason is invalid before exchange 60.' }, { status: 400 })
+    }
+    const completionStatus = terminationReason
+      ? completionStatusForTermination(terminationReason)
+      : requestedCompletionStatus
 
     // Pre-stringify jsonb array/object fields. The shared query builder
     // auto-stringifies plain objects but passes arrays through raw (for
@@ -103,6 +140,7 @@ export async function POST(request: Request) {
       question_count: body.question_count || 0,
       status: body.status || 'completed',
       interview_completion_status: completionStatus,
+      interview_termination_reason: terminationReason,
       reviewed: false,
       imported_to_note: false,
     }
@@ -208,6 +246,7 @@ export async function POST(request: Request) {
           body.red_flags || [],
           body.safety_escalated || false,
           completionStatus,
+          terminationReason,
         )
       } catch (pipelineErr) {
         // Non-fatal — historian session is saved regardless

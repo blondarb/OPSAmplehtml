@@ -9,6 +9,11 @@ import { validateTranscript } from './transcriptIntegrity'
 import type { HistorianInvitationBinding } from './invitationStore'
 import { ensureInvitedHistorianAlert } from './safetyNotification'
 import { validateComprehensiveCoverage } from './comprehensiveCoverage'
+import {
+  completionStatusForTermination,
+  parseHistorianTerminationReason,
+  terminationMatchesCompletionStatus,
+} from './terminationPolicy'
 
 const MAX_TRANSCRIPT_ENTRIES = 500
 const MAX_TRANSCRIPT_CHARS = 180_000
@@ -128,12 +133,43 @@ export async function saveInvitedHistorianSession(
       ? body.narrative_summary.trim().slice(0, MAX_SUMMARY_CHARS)
       : ''
   const redFlags = sanitizeRedFlags(body.red_flags)
-  const completionStatus =
+  const requestedCompletionStatus =
     body.interview_completion_status === 'ended_early' ? 'ended_early' : 'complete'
   const durationSeconds = integerInRange(body.duration_seconds, 0, 8 * 60 * 60)
   const questionCount = integerInRange(body.question_count, 0, 500)
   const safetyEscalated = body.safety_escalated === true
-  if (completionStatus === 'complete' && !safetyEscalated) {
+  const explicitTerminationReason = parseHistorianTerminationReason(
+    body.interview_termination_reason,
+  )
+  if (body.interview_termination_reason != null && !explicitTerminationReason) {
+    return { ok: false, status: 400, error: 'Invalid interview termination reason.' }
+  }
+  const terminationReason =
+    explicitTerminationReason ??
+    (requestedCompletionStatus === 'complete'
+      ? 'coverage_complete'
+      : safetyEscalated
+        ? 'safety_escalated'
+        : 'manual_end')
+  if (!terminationMatchesCompletionStatus(terminationReason, requestedCompletionStatus)) {
+    return {
+      ok: false,
+      status: 409,
+      error: 'Interview completion status conflicts with its termination reason.',
+    }
+  }
+  if (safetyEscalated !== (terminationReason === 'safety_escalated')) {
+    return {
+      ok: false,
+      status: 409,
+      error: 'Safety escalation status conflicts with its termination reason.',
+    }
+  }
+  if (terminationReason === 'hard_stop' && questionCount < 60) {
+    return { ok: false, status: 409, error: 'Hard-stop reason is invalid before exchange 60.' }
+  }
+  const completionStatus = completionStatusForTermination(terminationReason)
+  if (terminationReason === 'coverage_complete') {
     const coverage = validateComprehensiveCoverage(output)
     if (!coverage.complete) {
       return {
@@ -241,12 +277,13 @@ export async function saveInvitedHistorianSession(
               question_count = $7,
               status = 'completed',
               interview_completion_status = $8,
+              interview_termination_reason = $9,
               interview_mode = 'comprehensive',
               interview_prompt_version = 'comprehensive-v1',
-              updated_at = $9
-        WHERE id = $10
-          AND tenant_id = $11
-          AND consult_id = $12`,
+              updated_at = $10
+        WHERE id = $11
+          AND tenant_id = $12
+          AND consult_id = $13`,
       [
         JSON.stringify(output),
         narrativeSummary || null,
@@ -256,6 +293,7 @@ export async function saveInvitedHistorianSession(
         durationSeconds,
         questionCount,
         completionStatus,
+        terminationReason,
         now,
         binding.sessionId,
         binding.tenantId,
@@ -279,6 +317,7 @@ export async function saveInvitedHistorianSession(
               historian_safety_escalated = $7,
               historian_completed_at = $8,
               interview_completion_status = $9,
+              interview_termination_reason = $10,
               status = 'historian_complete',
               updated_at = $8
         WHERE id = $1
@@ -293,6 +332,7 @@ export async function saveInvitedHistorianSession(
         safetyEscalated,
         now,
         completionStatus,
+        terminationReason,
       ],
     )
 

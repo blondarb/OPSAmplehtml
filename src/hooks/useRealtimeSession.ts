@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useRef, useCallback, useEffect } from 'react'
-import type { HistorianTranscriptEntry, HistorianStructuredOutput, HistorianRedFlag, HistorianSessionType, HistorianInterviewMode, HistorianInterviewPromptVersion } from '@/lib/historianTypes'
+import type { HistorianTranscriptEntry, HistorianStructuredOutput, HistorianRedFlag, HistorianSessionType, HistorianInterviewMode, HistorianInterviewPromptVersion, HistorianTerminationReason } from '@/lib/historianTypes'
 import {
   COMPREHENSIVE_HARD_STOP_SAVE_NUDGE,
   evaluateComprehensiveSave,
@@ -72,6 +72,8 @@ interface UseRealtimeSessionOptions {
      * partial in downstream UIs and reports.
      */
     endedEarly: boolean
+    /** Explicit terminal cause; only coverage_complete is a full intake. */
+    terminationReason: HistorianTerminationReason
     /** Server-resolved interview contract actually applied to the session. */
     interviewMode: HistorianInterviewMode
     /** Server-owned version of the prompt contract actually applied. */
@@ -179,6 +181,25 @@ const FINAL_FLUSH_TIMEOUT_MS = 2000
  */
 const UNRESPONSIVE_SIGN_OFF_GRACE_MS = 8000
 
+const TERMINATION_PRIORITY: Record<HistorianTerminationReason, number> = {
+  coverage_complete: 0,
+  manual_end: 1,
+  unresponsive: 2,
+  transport_lost: 3,
+  provider_error: 3,
+  patient_requested_stop: 4,
+  hard_stop: 5,
+  safety_escalated: 6,
+}
+
+function strongerTerminationReason(
+  current: HistorianTerminationReason | null,
+  incoming: HistorianTerminationReason,
+): HistorianTerminationReason {
+  if (!current || TERMINATION_PRIORITY[incoming] > TERMINATION_PRIORITY[current]) return incoming
+  return current
+}
+
 export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealtimeSessionResult {
   const [status, setStatus] = useState<SessionStatus>('idle')
   const [transcript, setTranscript] = useState<HistorianTranscriptEntry[]>([])
@@ -241,7 +262,11 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
 
   // Stable ref to endSession so the provider's `disconnected` handler can call
   // the latest version without a circular useCallback dependency.
-  const endSessionRef = useRef<() => Promise<void>>(async () => {})
+  const endSessionRef = useRef<(reason?: HistorianTerminationReason) => Promise<void>>(async () => {})
+
+  // Kept independently from interviewCompleted: a terminal partial save still
+  // calls save_interview_output, but must never be mislabeled as complete.
+  const terminationReasonRef = useRef<HistorianTerminationReason | null>(null)
 
   // One-shot finalize guard — whichever path fires first (manual end or a
   // transport drop) wins; the other no-ops. Prevents double-save to
@@ -306,7 +331,7 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
         if (signOffTimerRef.current) clearTimeout(signOffTimerRef.current)
         signOffTimerRef.current = setTimeout(() => {
           signOffTimerRef.current = null
-          endSessionRef.current()
+          endSessionRef.current('unresponsive')
         }, UNRESPONSIVE_SIGN_OFF_GRACE_MS)
       },
     })
@@ -607,6 +632,29 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
           return
         }
 
+        // A tool call proves that output was captured, not that the history
+        // finished normally. Preserve the actual terminal cause separately so
+        // safety, patient stop, and the hard ceiling remain visibly partial.
+        const saveTerminationReason: HistorianTerminationReason | null =
+          safety_escalated === true
+            ? 'safety_escalated'
+            : patient_requested_stop === true
+              ? 'patient_requested_stop'
+              : saveDecision.reason === 'coverage_complete' ||
+                  saveDecision.reason === 'not_comprehensive'
+                ? 'coverage_complete'
+                : saveDecision.reason === 'patient_requested_stop' ||
+                    saveDecision.reason === 'safety_escalated' ||
+                    saveDecision.reason === 'hard_stop'
+                  ? saveDecision.reason
+                  : null
+        if (saveTerminationReason) {
+          terminationReasonRef.current = strongerTerminationReason(
+            terminationReasonRef.current,
+            saveTerminationReason,
+          )
+        }
+
         structuredOutputRef.current = structured
         narrativeSummaryRef.current = narrative_summary || null
         if (red_flags && Array.isArray(red_flags)) {
@@ -877,7 +925,7 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
             requestFinalization: (reason) => {
               if (reason === 'hard_stop') providerRef.current?.suppressOutput()
               unresponsiveRef.current?.suspend()
-              void endSessionRef.current()
+              void endSessionRef.current(reason)
             },
           })
 
@@ -994,7 +1042,7 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
         // does more work — nudging the AI, tearing down the provider —
         // and could itself stall or fail) ever completing.
         flushTranscript()
-        endSessionRef.current()
+        endSessionRef.current('transport_lost')
         break
       }
 
@@ -1005,6 +1053,10 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
         // the kind of event that might precede losing the session — flush
         // whatever hasn't been durably saved yet, best-effort.
         flushTranscript()
+        // Provider/model errors are terminal for a clinical interview. The
+        // relay also closes its transport, but this direct call covers other
+        // providers and the one-shot finalizing guard prevents a double save.
+        endSessionRef.current('provider_error')
         break
       }
     }
@@ -1020,6 +1072,7 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
     transcriptRef.current = []
     questionCountRef.current = 0
     runtimeGuardRef.current?.reset()
+    terminationReasonRef.current = null
     structuredOutputRef.current = null
     narrativeSummaryRef.current = null
     redFlagsRef.current = []
@@ -1252,8 +1305,24 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
     provider.requestResponse()
   }, [])
 
-  const endSession = useCallback(async () => {
+  const endSession = useCallback(async (requestedReason?: HistorianTerminationReason) => {
+    // A terminal event can arrive while a weaker end path is waiting on its
+    // bounded transcript flush. Preserve the strongest reason before the
+    // one-shot guard so a queued safety/hard-stop event cannot be discarded.
+    if (requestedReason) {
+      terminationReasonRef.current = strongerTerminationReason(
+        terminationReasonRef.current,
+        requestedReason,
+      )
+    }
     if (finalizingRef.current) return
+    const inferredReason =
+      terminationReasonRef.current ??
+      (interviewCompletedRef.current ? 'coverage_complete' : 'manual_end')
+    terminationReasonRef.current = strongerTerminationReason(
+      terminationReasonRef.current,
+      inferredReason,
+    )
     finalizingRef.current = true
     setStatus('ending')
 
@@ -1325,10 +1394,10 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
     try { await provider?.stop() } catch {}
     providerRef.current = null
 
-    // `interviewCompleted` flips to true only when the AI called
-    // save_interview_output. If it never fired, the patient ended before the
-    // AI judged the intake complete — flag it as partial.
-    const endedEarly = !interviewCompletedRef.current
+    const terminationReason = terminationReasonRef.current ?? 'manual_end'
+    // save_interview_output may be called for a terminal partial history.
+    // Only coverage_complete represents a naturally completed intake.
+    const endedEarly = terminationReason !== 'coverage_complete'
 
     // Durable transcript flush (Task 1 fix): flush whatever hasn't hit the
     // FLUSH_THRESHOLD-of-3 auto-trigger yet — trailing entries (the
@@ -1351,6 +1420,7 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
       duration: finalDuration,
       questionCount: questionCountRef.current,
       endedEarly,
+      terminationReason,
       interviewMode: resolvedInterviewModeRef.current,
       interviewPromptVersion: resolvedInterviewPromptVersionRef.current,
       sessionId: serverSessionIdRef.current,

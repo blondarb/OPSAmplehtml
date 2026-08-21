@@ -50,7 +50,7 @@ describe('comprehensive historian mode wiring', () => {
     expect(hookSource).toContain("fetch('/api/ai/historian/safety-escalation'")
     expect(hookSource).toContain("flag: 'Patient-stated active safety trigger'")
     expect(hookSource).toContain('applyHistorianTurnDecision(turnDecision')
-    expect(hookSource).toContain('void endSessionRef.current()')
+    expect(hookSource).toContain('void endSessionRef.current(reason)')
     expect(hookSource).not.toContain('setTimeout(() => { void endSessionRef.current() }, 0)')
   })
 

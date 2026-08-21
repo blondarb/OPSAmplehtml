@@ -185,6 +185,16 @@ wss.on('connection', (ws) => {
   let aiSpeaking = false
   let interviewMode: 'standard' | 'comprehensive' = 'standard'
   let comprehensiveOpeningSettled = false
+  let modelTerminalSent = false
+
+  function terminateModelSession(reason: 'nova_stream_error' | 'nova_stream_ended'): void {
+    if (modelTerminalSent) return
+    modelTerminalSent = true
+    send(ws, { t: 'sessionEnded', reason })
+    if (ws.readyState === WebSocket.OPEN) {
+      ws.close(1011, reason)
+    }
+  }
 
   function startAiSpeech(): void {
     if (!aiSpeaking) {
@@ -265,6 +275,12 @@ wss.on('connection', (ws) => {
       }
       console.error('[nova-session] stream error:', message, err)
       send(ws, { t: 'error', message })
+      terminateModelSession('nova_stream_error')
+    },
+
+    onUnexpectedStreamEnd() {
+      console.error('[nova-session] Bedrock stream ended before the client requested stop')
+      terminateModelSession('nova_stream_ended')
     },
   })
 

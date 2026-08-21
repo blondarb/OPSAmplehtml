@@ -22,4 +22,5 @@ export type ServerMsg =
   | { t: 'toolCall'; toolName: string; toolUseId: string; input: unknown }
   | { t: 'completion' }
   | { t: 'error'; message: string }
+  | { t: 'sessionEnded'; reason: 'nova_stream_error' | 'nova_stream_ended' }
   | { t: 'medicalTranscript'; text: string; isPartial: boolean }

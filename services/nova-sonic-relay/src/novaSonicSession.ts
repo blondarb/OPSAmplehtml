@@ -41,6 +41,13 @@ export interface NovaSonicCallbacks {
   onCompletionEnd?(): void
   onError?(err: unknown): void
   onBargeIn?(): void
+  /** Fires only when Bedrock ends the stream before the caller requested stop(). */
+  onUnexpectedStreamEnd?(): void
+}
+
+export interface NovaSonicStartOptions {
+  /** Production default is true; state-injected acceptance tests disable it. */
+  sendGreetingKickoff?: boolean
 }
 
 // A raw event is one of the `{ event: { ... } }` objects produced by the
@@ -213,7 +220,12 @@ export class NovaSonicSession {
    * system content → open the user audio channel), send the command, then kick
    * off the response loop without awaiting it.
    */
-  async start(instructions: string, tools: Tool[], voiceId?: string): Promise<void> {
+  async start(
+    instructions: string,
+    tools: Tool[],
+    voiceId?: string,
+    options: NovaSonicStartOptions = {},
+  ): Promise<void> {
     if (this.active || this.closed) {
       return
     }
@@ -250,7 +262,7 @@ export class NovaSonicSession {
     this.responseLoop = this.runResponseLoop(response)
     this.responseLoop.catch(() => {})
 
-    this.sendGreetingKickoff()
+    if (options.sendGreetingKickoff !== false) this.sendGreetingKickoff()
   }
 
   /**
@@ -376,7 +388,9 @@ export class NovaSonicSession {
     } catch (e) {
       this.callbacks.onError?.(e)
     } finally {
+      const endedUnexpectedly = !this.closed
       this.active = false
+      if (endedUnexpectedly) this.callbacks.onUnexpectedStreamEnd?.()
     }
   }
 

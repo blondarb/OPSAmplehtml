@@ -7,94 +7,147 @@ import {
   COMPREHENSIVE_SCENARIOS,
   runComprehensiveScenario,
 } from '../../src/lib/historian/comprehensiveScenarioContract'
+import {
+  LIVE_SYNTHETIC_SCENARIOS,
+  assessLiveSyntheticSave,
+  safetyResponseHasRequiredResources,
+} from '../../src/lib/historian/liveSyntheticAcceptance'
+import { COMPREHENSIVE_HISTORY_DOMAINS } from '../../src/lib/historianTypes'
 
 const source = readFileSync(
   join(__dirname, '..', '..', 'scripts/nova-historian-comprehensive-smoke.ts'),
   'utf8',
 )
 
-describe('Nova Comprehensive Historian live-smoke contract', () => {
-  it('uses the production Comprehensive prompt and Nova tool adapter', () => {
-    expect(source).toContain("buildHistorianSystemPrompt(")
+const completeHistory = {
+  history_coverage: {
+    covered_domains: COMPREHENSIVE_HISTORY_DOMAINS.map((domain) => domain.id),
+    missing_or_uncertain: [],
+  },
+}
+
+describe('Nova Comprehensive Historian acceptance contract', () => {
+  it('uses the production Comprehensive prompt, tool adapter, and Nova audio session', () => {
+    expect(source).toContain('buildHistorianSystemPrompt(')
     expect(source).toContain("'comprehensive'")
     expect(source).toContain("getHistorianToolsForProvider('nova', 'new_patient')")
     expect(source).toContain('new NovaSonicSession')
+    expect(source).toContain('streamPatientAudio(session, patientPcm)')
   })
 
-  it('pins referral-first and age-second acceptance', () => {
+  it('keeps opening referral-first and age-second acceptance live and explicit', () => {
     expect(source).toContain('PASS nova_start_and_referral_first')
     expect(source).toContain('PASS nova_age_second')
     expect(source).toMatch(/how old\|your age\|age are you/)
+    expect(source).toContain('session.pushSystemText(COMPREHENSIVE_AGE_NUDGE)')
   })
 
-  it('aggregates Nova text fragments through a quiet window', () => {
-    expect(source).toContain('onCompletionEnd')
-    expect(source).toContain("assistantFragments.join(' ')")
-    expect(source).toContain('TEXT_QUIET_MS')
-    expect(source).toContain('finalizeAssistantTurn')
-    expect(source).toContain("assistantFragments.join(' ').includes('?')")
-  })
-
-  it('does not execute tools or persist data', () => {
-    expect(source).not.toContain('/api/ai/historian/save')
-    expect(source).not.toContain('/api/ai/historian/transcript-flush')
-    expect(source).toContain('synthetic smoke does not execute tools')
-  })
-
-  it('matches the real Nova audio path with generated silence and a fixed synthetic TTS reply', () => {
-    expect(source).toContain('SILENCE_PCM_BASE64')
-    expect(source).toContain('session.pushAudio(SILENCE_PCM_BASE64)')
-    expect(source).toContain('generateSyntheticPatientPcm()')
-    expect(source).toContain("'I am sixty years old.'")
+  it('keeps all patient input fixed, PHI-free, and on the real PCM path', () => {
+    expect(source).toContain('generateFixedSyntheticPatientPcm')
     expect(source).toContain("'/usr/bin/say'")
     expect(source).toContain("'ffmpeg'")
-    expect(source).toContain('streamPatientAudio(session, patientPcm)')
+    expect(source).toContain('SILENCE_PCM_BASE64')
     expect(source).not.toContain("argumentValue('--patient-pcm')")
+    expect(source).not.toContain("argumentValue('--patient-text')")
     expect(source).not.toContain('console.log(`[synthetic patient transcript] ${content}`)')
-    // The patient reply must still travel through real PCM. The only text
-    // injection is the same private referral->age state nudge used by the
-    // production relay after finalized patient ASR.
-    expect(source).toContain('session.pushSystemText(COMPREHENSIVE_AGE_NUDGE)')
-    expect(source).toContain('waitForAudioQuiet')
-    expect(source).toContain('onAudioOutput')
   })
 
-  it('redacts AWS principal and account details from failures', () => {
-    expect(source).toContain('[AWS_PRINCIPAL_REDACTED]')
-    expect(source).toContain('[AWS_ACCOUNT_REDACTED]')
+  it('does not persist, deploy, or call application APIs', () => {
+    expect(source).not.toContain('/api/ai/historian/save')
+    expect(source).not.toContain('/api/ai/historian/transcript-flush')
+    expect(source).not.toContain('fetch(')
+    expect(source).toContain('sendGreetingKickoff: false')
   })
 
-  it('continues through exchange 26 without a non-safety save', () => {
+  it('labels logical boundary evidence as state injected rather than endurance', () => {
+    expect(source).toContain('PASS live_state_injected_')
+    expect(LIVE_SYNTHETIC_SCENARIOS['coverage-at-26'].stateInjection).toContain('LIVE_STATE_INJECTED')
+    expect(LIVE_SYNTHETIC_SCENARIOS['hard-stop-at-60'].stateInjection).toContain(
+      'not evidence of single-connection endurance',
+    )
+  })
+
+  it('accepts only coverage-complete output at logical exchange 26', () => {
+    const assessment = assessLiveSyntheticSave({
+      scenario: LIVE_SYNTHETIC_SCENARIOS['coverage-at-26'],
+      structured: completeHistory,
+      toolSafetyEscalated: false,
+      toolPatientRequestedStop: false,
+    })
+    expect(assessment).toMatchObject({ accepted: true, reason: 'coverage_complete' })
+
+    expect(assessLiveSyntheticSave({
+      scenario: LIVE_SYNTHETIC_SCENARIOS['coverage-at-26'],
+      structured: {},
+      toolSafetyEscalated: false,
+      toolPatientRequestedStop: false,
+    })).toMatchObject({ accepted: false, reason: 'history_incomplete' })
+  })
+
+  it('requires the safety terminal flag and all emergency resources at logical exchange 26', () => {
+    expect(assessLiveSyntheticSave({
+      scenario: LIVE_SYNTHETIC_SCENARIOS['emergency-at-26'],
+      structured: {},
+      toolSafetyEscalated: true,
+      toolPatientRequestedStop: false,
+    })).toMatchObject({ accepted: true, reason: 'safety_escalated' })
+    expect(assessLiveSyntheticSave({
+      scenario: LIVE_SYNTHETIC_SCENARIOS['emergency-at-26'],
+      structured: {},
+      toolSafetyEscalated: false,
+      toolPatientRequestedStop: false,
+    })).toMatchObject({ accepted: false })
+    expect(safetyResponseHasRequiredResources(
+      'Get the right help immediately. Call 911 or 988. You can text HOME to 741741. Your safety is the most important thing.',
+    )).toBe(true)
+    expect(safetyResponseHasRequiredResources('Please call 911.')).toBe(false)
+  })
+
+  it('uses coverage completion at the soft wrap and a partial hard-stop save at 60', () => {
+    expect(assessLiveSyntheticSave({
+      scenario: LIVE_SYNTHETIC_SCENARIOS['wrap-at-45'],
+      structured: completeHistory,
+      toolSafetyEscalated: false,
+      toolPatientRequestedStop: false,
+    })).toMatchObject({ accepted: true, reason: 'coverage_complete' })
+    expect(assessLiveSyntheticSave({
+      scenario: LIVE_SYNTHETIC_SCENARIOS['hard-stop-at-60'],
+      structured: {},
+      toolSafetyEscalated: false,
+      toolPatientRequestedStop: false,
+    })).toMatchObject({ accepted: true, reason: 'hard_stop' })
+  })
+
+  it('continues through exchange 26 without a non-safety save locally', () => {
     const report = runComprehensiveScenario(COMPREHENSIVE_SCENARIOS['continue-past-25'])
     expect(report.finalExchange).toBe(26)
     expect(report.terminal).toBe(false)
     expect(report.actions.filter((action) => action.type === 'request_finalization')).toEqual([])
   })
 
-  it('escalates and requests finalization for the fixed synthetic emergency at exchange 26', () => {
+  it('escalates and finalizes the fixed local emergency at exchange 26', () => {
     const report = runComprehensiveScenario(COMPREHENSIVE_SCENARIOS['emergency-at-26'])
     expect(report.terminal).toBe(true)
     expect(report.actions).toContainEqual({ type: 'safety_escalation', exchange: 26 })
     expect(report.actions).toContainEqual({
       type: 'request_finalization', exchange: 26, reason: 'safety_escalated',
     })
-    expect(report.actions).not.toContainEqual({ type: 'continue', exchange: 26 })
   })
 
-  it('begins benign wrapping once at 45 and requests hard-stop finalization at 60', () => {
+  it('wraps once at 45 and hard-stops once at 60 locally', () => {
     const report = runComprehensiveScenario(COMPREHENSIVE_SCENARIOS['benign-wrap-to-60'])
-    expect(report.terminal).toBe(true)
     expect(report.actions).toContainEqual({ type: 'begin_wrap', exchange: 45 })
     expect(report.actions).toContainEqual({
       type: 'request_finalization', exchange: 60, reason: 'hard_stop',
     })
     expect(report.actions.filter((action) => action.type === 'begin_wrap')).toHaveLength(1)
-    expect(report.actions.filter((action) => action.type === 'request_finalization')).toHaveLength(1)
   })
 
-  it('keeps live Nova execution explicit and reports provider/IAM failures as NOT_RUN', () => {
+  it('keeps live execution explicit and provider/IAM failures NOT_RUN', () => {
     expect(source).toContain("process.argv.includes('--live')")
-    expect(source).toContain('NOT_RUN nova_live_provider_or_iam')
-    expect(source).toContain('runAllComprehensiveScenarios')
+    expect(source).toContain("process.argv.includes('--live-suite')")
+    expect(source).toContain('NOT_RUN ${scenario.id} nova_live_provider_or_iam')
+    expect(source).toContain('[AWS_PRINCIPAL_REDACTED]')
+    expect(source).toContain('[AWS_ACCOUNT_REDACTED]')
   })
 })

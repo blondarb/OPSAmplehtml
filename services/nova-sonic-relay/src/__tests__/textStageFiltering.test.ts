@@ -154,4 +154,35 @@ describe('NovaSonicSession text-stage filtering (live-captured pattern)', () => 
     expect(map.size).toBe(0)
     void dispatch
   })
+
+  it('reports a response body that ends before caller stop as terminal', async () => {
+    let unexpectedEnds = 0
+    const session = new NovaSonicSession({
+      onUnexpectedStreamEnd: () => { unexpectedEnds += 1 },
+    })
+    const run = (session as unknown as {
+      runResponseLoop(response: { body: AsyncIterable<unknown> }): Promise<void>
+    }).runResponseLoop.bind(session)
+    const body = (async function* () {})()
+
+    await run({ body })
+
+    expect(unexpectedEnds).toBe(1)
+  })
+
+  it('does not report caller-requested shutdown as an unexpected stream end', async () => {
+    let unexpectedEnds = 0
+    const session = new NovaSonicSession({
+      onUnexpectedStreamEnd: () => { unexpectedEnds += 1 },
+    })
+    ;(session as unknown as { closed: boolean }).closed = true
+    const run = (session as unknown as {
+      runResponseLoop(response: { body: AsyncIterable<unknown> }): Promise<void>
+    }).runResponseLoop.bind(session)
+    const body = (async function* () {})()
+
+    await run({ body })
+
+    expect(unexpectedEnds).toBe(0)
+  })
 })

@@ -4,7 +4,7 @@ import '@/styles/neuro-navigator.css'
 import { useState, useCallback, useEffect, useRef } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
 import { useRealtimeSession } from '@/hooks/useRealtimeSession'
-import { DEMO_SCENARIOS, type DemoScenario, type HistorianStructuredOutput, type HistorianRedFlag, type HistorianTranscriptEntry, type HistorianSessionType, type HistorianInterviewMode, type PatientContext } from '@/lib/historianTypes'
+import { DEMO_SCENARIOS, type DemoScenario, type HistorianStructuredOutput, type HistorianRedFlag, type HistorianTranscriptEntry, type HistorianSessionType, type HistorianInterviewMode, type HistorianTerminationReason, type PatientContext } from '@/lib/historianTypes'
 import { getTenantClient } from '@/lib/tenant'
 import HistorianReportView from './HistorianReportView'
 import HistorianConsentDisclosure from './HistorianConsentDisclosure'
@@ -139,6 +139,7 @@ export default function NeurologicHistorian({
     duration: number
     questionCount: number
     endedEarly: boolean
+    terminationReason: HistorianTerminationReason
     interviewMode: HistorianInterviewMode
     interviewPromptVersion: HistorianStructuredOutput['interview_prompt_version']
     /** Server-minted historian_sessions id — see useRealtimeSession's onComplete. */
@@ -200,6 +201,7 @@ export default function NeurologicHistorian({
           question_count: data.questionCount,
           status: 'completed',
           interview_completion_status: data.endedEarly ? 'ended_early' : 'complete',
+          interview_termination_reason: data.terminationReason,
           consult_id: consultIdParam || null,
           sessionId: data.sessionId,
         }),

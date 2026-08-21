@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import type { HistorianStructuredOutput } from '@/lib/historianTypes'
+import type { HistorianStructuredOutput, HistorianTerminationReason } from '@/lib/historianTypes'
 
 /**
  * Minimal shape this component needs from a consult-like record. Loosened
@@ -15,6 +15,7 @@ export interface IntakeReviewData {
   historian_structured_output: Record<string, unknown> | null
   historian_summary: string | null
   interview_completion_status?: 'complete' | 'ended_early' | null
+  interview_termination_reason?: HistorianTerminationReason | null
 }
 
 interface IntakeReviewSectionProps {
@@ -68,6 +69,19 @@ export default function IntakeReviewSection({ consult, onCorrectionsChange }: In
   const structured = consult?.historian_structured_output as HistorianStructuredOutput | null | undefined
   const narrativeSummary = consult?.historian_summary
   const endedEarly = consult?.interview_completion_status === 'ended_early'
+  const terminationDetail: Partial<Record<HistorianTerminationReason, string>> = {
+    patient_requested_stop: 'The patient asked to stop before the full history was complete.',
+    safety_escalated: 'The interview stopped after an active safety trigger.',
+    hard_stop: 'The interview reached its configured safety ceiling.',
+    manual_end: 'The interview was ended manually before full coverage was complete.',
+    transport_lost: 'The voice connection ended unexpectedly.',
+    provider_error: 'The voice provider ended unexpectedly.',
+    unresponsive: 'The interview ended after the patient stopped responding.',
+  }
+  const earlyEndDetail =
+    (consult?.interview_termination_reason &&
+      terminationDetail[consult.interview_termination_reason]) ||
+    'The interview ended before the AI completed the full history.'
 
   const earlyEndBanner = endedEarly ? (
     <div
@@ -93,7 +107,7 @@ export default function IntakeReviewSection({ consult, onCorrectionsChange }: In
           Partial intake — interview ended early
         </div>
         <div style={{ color: '#FCD34D', fontSize: 12, marginTop: 2, lineHeight: 1.4 }}>
-          The patient ended before the AI completed the full history. Review what was captured and consider finishing any gaps during the visit.
+          {earlyEndDetail} Review what was captured and consider finishing any gaps during the visit.
         </div>
       </div>
     </div>

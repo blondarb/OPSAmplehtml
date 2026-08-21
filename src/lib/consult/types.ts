@@ -8,6 +8,8 @@
  * (localizer, scales, red flag escalation, report generator).
  */
 
+import type { HistorianTerminationReason } from '@/lib/historianTypes'
+
 /**
  * Pipeline status values, ordered by progression.
  * A consult moves forward through these states; it never moves backward.
@@ -69,6 +71,7 @@ export interface NeurologyConsult {
   // when the patient clicked End Interview before the AI finished. null for
   // legacy rows or consults that never reached the historian step.
   interview_completion_status: 'complete' | 'ended_early' | null
+  interview_termination_reason?: HistorianTerminationReason | null
 
   // ── SDNE (Standardized Digital Neurologic Exam) phase ─────────────
   sdne_session_id: string | null

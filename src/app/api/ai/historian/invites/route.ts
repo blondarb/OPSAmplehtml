@@ -104,6 +104,7 @@ export async function GET(request: Request) {
               invite.completed_at,
               invite.session_id,
               session.interview_completion_status,
+              session.interview_termination_reason,
               (session.final_differential IS NOT NULL) AS differential_ready,
               job.status AS evaluation_status
          FROM historian_invites invite
