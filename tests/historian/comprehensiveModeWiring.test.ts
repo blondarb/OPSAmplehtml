@@ -49,7 +49,9 @@ describe('comprehensive historian mode wiring', () => {
   it('durably alerts and finalizes when the deterministic safety screen fires', () => {
     expect(hookSource).toContain("fetch('/api/ai/historian/safety-escalation'")
     expect(hookSource).toContain("flag: 'Patient-stated active safety trigger'")
-    expect(hookSource).toContain('setTimeout(() => { void endSessionRef.current() }, 0)')
+    expect(hookSource).toContain('applyHistorianTurnDecision(turnDecision')
+    expect(hookSource).toContain('void endSessionRef.current()')
+    expect(hookSource).not.toContain('setTimeout(() => { void endSessionRef.current() }, 0)')
   })
 
   it('never previews a live one-time token and offers governed clinician reissue', () => {

@@ -132,6 +132,12 @@ export interface VoiceProvider {
    */
   requestResponse(opts?: { textOnly?: boolean }): void
   /**
+   * Immediately silence current and queued assistant audio while keeping the
+   * transport and tool-result channel open for a text-only terminal save.
+   * Idempotent for the current session; start() resets the suppression latch.
+   */
+  suppressOutput(): void
+  /**
    * Prompt the model to speak its single closing message after
    * save_interview_output has been acked. Providers differ on whether this is
    * needed at all:

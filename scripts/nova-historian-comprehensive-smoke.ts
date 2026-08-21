@@ -1,5 +1,5 @@
 /**
- * PHI-free live smoke for the Comprehensive Historian on Nova 2 Sonic.
+ * PHI-free comprehensive-historian contract runner plus opt-in Nova smoke.
  *
  * Exercises the real Bedrock bidirectional stream through the same
  * NovaSonicSession class used by the relay, with the production prompt/tool
@@ -9,15 +9,25 @@
  * persistence, or application deployment occurs.
  *
  * Usage:
- *   AWS_PROFILE=<authorized-profile> npm run historian:nova-smoke -- --patient-pcm /path/to/16khz-mono-s16le.pcm
- *   AWS_PROFILE=<authorized-profile> npm run historian:nova-smoke -- --patient-pcm /path/to/reply.pcm --verbose
+ *   npm run historian:nova-smoke
+ *   npm run historian:nova-smoke -- --scenario emergency-at-26
+ *   AWS_PROFILE=<authorized-profile> npm run historian:nova-smoke -- --live
  */
 
-import { readFileSync } from 'node:fs'
+import { spawnSync } from 'node:child_process'
+import { mkdtempSync, readFileSync, rmSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 
 import { buildHistorianSystemPrompt, getHistorianToolsForProvider } from '../src/lib/historianPrompts'
 import { NovaSonicSession } from '../services/nova-sonic-relay/src/novaSonicSession.js'
 import { COMPREHENSIVE_AGE_NUDGE } from '../services/nova-sonic-relay/src/comprehensiveOpening.js'
+import {
+  COMPREHENSIVE_SCENARIOS,
+  runAllComprehensiveScenarios,
+  runComprehensiveScenario,
+} from '../src/lib/historian/comprehensiveScenarioContract'
+import { isUnavailableLiveProviderFailure } from '../src/lib/historian/liveSmokeFailurePolicy'
 
 const VERBOSE = process.argv.includes('--verbose')
 const TURN_TIMEOUT_MS = 45_000
@@ -46,6 +56,38 @@ async function streamPatientAudio(session: NovaSonicSession, pcm: Buffer): Promi
   }
 }
 
+/**
+ * Generates the fixed patient reply with macOS's built-in synthetic voice,
+ * then converts it to Nova's 16 kHz mono signed-16-bit PCM input. No supplied
+ * recording, microphone, patient audio, or free text can enter this path.
+ */
+function generateSyntheticPatientPcm(): Buffer {
+  const directory = mkdtempSync(join(tmpdir(), 'historian-synthetic-pcm-'))
+  const aiffPath = join(directory, 'reply.aiff')
+  const pcmPath = join(directory, 'reply.pcm')
+  try {
+    const speech = spawnSync(
+      '/usr/bin/say',
+      ['-v', 'Samantha', '-r', '210', '-o', aiffPath, 'I am sixty years old.'],
+      { encoding: 'utf8' },
+    )
+    if (speech.error || speech.status !== 0) {
+      throw new Error('Unable to generate the fixed synthetic patient voice fixture')
+    }
+    const conversion = spawnSync(
+      'ffmpeg',
+      ['-loglevel', 'error', '-y', '-i', aiffPath, '-f', 's16le', '-acodec', 'pcm_s16le', '-ac', '1', '-ar', '16000', pcmPath],
+      { encoding: 'utf8' },
+    )
+    if (conversion.error || conversion.status !== 0) {
+      throw new Error('Unable to convert the fixed synthetic patient voice fixture to Nova PCM')
+    }
+    return readFileSync(pcmPath)
+  } finally {
+    rmSync(directory, { recursive: true, force: true })
+  }
+}
+
 function errorMessage(error: unknown): string {
   const raw = error instanceof Error ? error.message : String(error)
   if (/not authorized to perform: bedrock:(InvokeModel|InvokeModelWithBidirectionalStream)/i.test(raw)) {
@@ -61,6 +103,17 @@ function errorMessage(error: unknown): string {
     .replace(/arn:aws:[^\s]+/gi, '[AWS_PRINCIPAL_REDACTED]')
     .replace(/\b\d{12}\b/g, '[AWS_ACCOUNT_REDACTED]')
     .slice(0, 500)
+}
+
+function runLocalScenarioContract(): void {
+  const requested = argumentValue('--scenario')
+  if (requested && !COMPREHENSIVE_SCENARIOS[requested as keyof typeof COMPREHENSIVE_SCENARIOS]) {
+    throw new Error(`Unknown PHI-free scenario: ${requested}`)
+  }
+  const reports = requested
+    ? [runComprehensiveScenario(COMPREHENSIVE_SCENARIOS[requested as keyof typeof COMPREHENSIVE_SCENARIOS])]
+    : runAllComprehensiveScenarios()
+  for (const report of reports) console.log(`PASS historian_scenario_${report.id}_exchange_${report.finalExchange}`)
 }
 
 function waitForAssistantTurn(
@@ -112,12 +165,8 @@ function waitForAudioQuiet(lastAudioAt: () => number, errors: string[]): Promise
   })
 }
 
-async function main(): Promise<void> {
-  const patientPcmPath = argumentValue('--patient-pcm')
-  if (!patientPcmPath) {
-    throw new Error('Missing --patient-pcm path to PHI-free 16 kHz mono signed 16-bit little-endian audio')
-  }
-  const patientPcm = readFileSync(patientPcmPath)
+async function runLiveSmoke(): Promise<void> {
+  const patientPcm = generateSyntheticPatientPcm()
   const instructions = buildHistorianSystemPrompt(
     'new_patient',
     SYNTHETIC_REFERRAL,
@@ -135,7 +184,6 @@ async function main(): Promise<void> {
   const prematureTools: string[] = []
   let silenceTimer: ReturnType<typeof setInterval> | null = null
   let openingNudgeSent = false
-  let session: NovaSonicSession
 
   const finalizeAssistantTurn = () => {
     if (assistantFragments.length === 0) return
@@ -145,10 +193,10 @@ async function main(): Promise<void> {
     if (VERBOSE) console.log(`[assistant turn ${assistantTurns.length}] ${completedTurn}`)
   }
 
-  session = new NovaSonicSession({
+  const session = new NovaSonicSession({
     onTextOutput: (role, content) => {
       if (role.toUpperCase() === 'USER') {
-        if (VERBOSE) console.log(`[synthetic patient transcript] ${content}`)
+        if (VERBOSE) console.log(`[synthetic patient transcript received] chars=${content.length}`)
         if (!openingNudgeSent) {
           openingNudgeSent = true
           session.pushSystemText(COMPREHENSIVE_AGE_NUDGE)
@@ -227,6 +275,24 @@ async function main(): Promise<void> {
     if (silenceTimer) clearInterval(silenceTimer)
     if (fragmentTimer) clearTimeout(fragmentTimer)
     await session.stop()
+  }
+}
+
+async function main(): Promise<void> {
+  // This local state-machine suite has no provider, IAM, ASR, database,
+  // microphone, or network dependency. Real Nova evidence is opt-in.
+  if (!process.argv.includes('--live')) {
+    runLocalScenarioContract()
+    return
+  }
+  try {
+    await runLiveSmoke()
+  } catch (error) {
+    if (isUnavailableLiveProviderFailure(error)) {
+      console.log(`NOT_RUN nova_live_provider_or_iam ${errorMessage(error)}`)
+      return
+    }
+    throw error
   }
 }
 

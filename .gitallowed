@@ -74,3 +74,6 @@ gateway\+safety\+scorer\+fusion\+adjudicator
 # src/lib/historian/eval/ entry above.
 tests/historian/
 src/lib/historian/
+# Comprehensive historian relative import paths exceed the generic 40-character
+# entropy heuristic; these are source module names, not credentials.
+historian/comprehensive

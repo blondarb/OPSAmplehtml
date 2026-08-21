@@ -29,6 +29,8 @@ export class NovaSonicWsProvider implements VoiceProvider {
   private closing = false
   /** True while the AI is producing audio — lets `completion` end the turn cleanly. */
   private aiSpeaking = false
+  /** Latched for a terminal text-only save; later PCM is discarded. */
+  private outputSuppressed = false
   /** Last diagnostics snapshot captured from `player` before it was closed in
    *  stop() — so getAudioDiagnostics() still has something to return after
    *  teardown (e.g. when the hook reads it right after stop() completes). */
@@ -65,6 +67,7 @@ export class NovaSonicWsProvider implements VoiceProvider {
 
     this.closing = false
     this.aiSpeaking = false
+    this.outputSuppressed = false
 
     // Wrap setup so a synchronous failure (e.g. `new WebSocket` throwing on a
     // malformed relayUrl) tears down anything already allocated — mirrors the
@@ -159,7 +162,7 @@ export class NovaSonicWsProvider implements VoiceProvider {
         break
       case 'audio':
         // Raw audio drives the player only — no VoiceEvent.
-        this.player?.enqueue(msg.pcm)
+        if (!this.outputSuppressed) this.player?.enqueue(msg.pcm)
         break
       case 'aiSpeechStart':
         this.aiSpeaking = true
@@ -254,6 +257,13 @@ export class NovaSonicWsProvider implements VoiceProvider {
     // No-op: Nova drives its own turn-taking; the injected system text is acted
     // on as it continues. There is no relay frame to force a turn, and no
     // text-only response concept (opts ignored).
+  }
+
+  suppressOutput(): void {
+    if (this.outputSuppressed) return
+    this.outputSuppressed = true
+    this.aiSpeaking = false
+    this.player?.interrupt()
   }
 
   nudgeClosing(): void {

@@ -13,6 +13,10 @@ import type {
   ReferralClarificationQuestion,
 } from './historianTypes'
 import { COMPREHENSIVE_HISTORY_DOMAINS } from './historianTypes'
+import {
+  COMPREHENSIVE_HARD_STOP_EXCHANGE,
+  COMPREHENSIVE_SOFT_WRAP_EXCHANGE,
+} from './historian/comprehensiveCompletionPolicy'
 
 const COMPREHENSIVE_HISTORY_DOMAIN_IDS = COMPREHENSIVE_HISTORY_DOMAINS.map(({ id }) => id)
 const COMPREHENSIVE_HISTORY_DOMAIN_LIST = COMPREHENSIVE_HISTORY_DOMAINS
@@ -21,7 +25,7 @@ const COMPREHENSIVE_HISTORY_DOMAIN_LIST = COMPREHENSIVE_HISTORY_DOMAINS
 
 const STANDARD_TURN_POLICY = `13. TURN LIMIT: Never exceed 25 turns total. If you are approaching turn 20 and still have uncovered items, prioritize the most clinically important gaps and wrap up gracefully. Do not keep asking questions indefinitely.`
 
-const COMPREHENSIVE_TURN_POLICY = `13. COMPREHENSIVE INTERVIEW: The standard 25-turn ceiling does not apply in this mode. Continue until the clinically relevant history domains below are covered, the patient asks to stop, or the safety protocol ends the interview. Begin wrapping up by 45 patient exchanges and finish by 60; do not start a new history domain or scale after the soft limit. Do not pad the interview or repeat questions; depth must come from unresolved clinical gaps, not conversation length.`
+const COMPREHENSIVE_TURN_POLICY = `13. COMPREHENSIVE INTERVIEW: The standard 25-turn ceiling does not apply in this mode. Continue until the clinically relevant history domains below are covered, the patient asks to stop, or the safety protocol ends the interview. Begin wrapping up by ${COMPREHENSIVE_SOFT_WRAP_EXCHANGE} patient exchanges and finish by ${COMPREHENSIVE_HARD_STOP_EXCHANGE}; do not start a new history domain or scale after the soft limit. Do not pad the interview or repeat questions; depth must come from unresolved clinical gaps, not conversation length.`
 
 const STANDARD_INTERVIEW_BUDGET = `INTERVIEW BUDGET: Aim for 8-20 turns total. Quality over coverage. Call save_interview_output when you have clinical clarity — not when you have ticked every box. For straightforward presentations you may have enough after 8-10 turns; do not pad the conversation to hit a number.`
 
@@ -140,7 +144,8 @@ const SAVE_INTERVIEW_OUTPUT_TOOL = {
     '      and narrative_summary with substantive content (typically 8-20 turns),',
     '  OR',
     '  (b) The patient signals they are done (says "thank you", "that\'s all",',
-    '      "are we finished", or similar) — save immediately with what you have,',
+    '      "are we finished", or similar) — set patient_requested_stop:true',
+    '      and save immediately with what you have,',
     '  OR',
     '  (c) The patient is describing an ACTIVE emergency happening RIGHT NOW',
     '      ("worst headache of my life RIGHT NOW", "having a seizure",',
@@ -235,6 +240,10 @@ const SAVE_INTERVIEW_OUTPUT_TOOL = {
         },
       },
       safety_escalated: { type: 'boolean', description: 'Whether safety escalation was triggered' },
+      patient_requested_stop: {
+        type: 'boolean',
+        description: 'Set true only when the patient explicitly asks or clearly signals that the interview should end; never use this to bypass Comprehensive coverage',
+      },
     },
     required: ['chief_complaint', 'hpi', 'narrative_summary', 'safety_escalated'],
   },

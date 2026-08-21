@@ -2,7 +2,14 @@
 
 import { useState, useRef, useCallback, useEffect } from 'react'
 import type { HistorianTranscriptEntry, HistorianStructuredOutput, HistorianRedFlag, HistorianSessionType, HistorianInterviewMode, HistorianInterviewPromptVersion } from '@/lib/historianTypes'
-import { validateComprehensiveCoverage } from '@/lib/historian/comprehensiveCoverage'
+import {
+  COMPREHENSIVE_HARD_STOP_SAVE_NUDGE,
+  evaluateComprehensiveSave,
+} from '@/lib/historian/comprehensiveCompletionPolicy'
+import {
+  HistorianRuntimeGuard,
+  applyHistorianTurnDecision,
+} from '@/lib/historian/runtimeGuard'
 import type { HistorianReferralInput } from '@/lib/historian/referralContext'
 import type { LocalizerResponse } from '@/lib/consult/localizer-types'
 import type { SaveScaleResponsesArgs } from '@/lib/consult/scales'
@@ -143,12 +150,6 @@ interface UseRealtimeSessionResult {
   endedUnresponsive: boolean
 }
 
-const SAFETY_KEYWORDS = [
-  'kill myself', 'want to die', 'hurt myself', 'end my life',
-  'suicide', 'suicidal', 'self-harm', 'don\'t want to live',
-  'hurt someone', 'kill someone',
-]
-
 /** How many patient turns between localizer runs. */
 const LOCALIZER_INTERVAL = 3
 
@@ -200,10 +201,13 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const startTimeRef = useRef<number>(0)
   const questionCountRef = useRef<number>(0)
+  const runtimeGuardRef = useRef<HistorianRuntimeGuard | null>(null)
+  if (runtimeGuardRef.current === null) runtimeGuardRef.current = new HistorianRuntimeGuard()
   const structuredOutputRef = useRef<HistorianStructuredOutput | null>(null)
   const narrativeSummaryRef = useRef<string | null>(null)
   const redFlagsRef = useRef<HistorianRedFlag[]>([])
   const safetyEscalatedRef = useRef<boolean>(false)
+  const safetyEffectsActivatedRef = useRef<boolean>(false)
   const safetyAlertRequestedRef = useRef<boolean>(false)
   const transcriptRef = useRef<HistorianTranscriptEntry[]>([])
   const administeredScaleIdsRef = useRef<Set<string>>(new Set())
@@ -315,52 +319,44 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
   const lastLocalizerTurnRef = useRef<number>(0)
   const localizerInFlightRef = useRef<boolean>(false)
 
-  // Safety keyword check (secondary defense)
-  const checkSafety = useCallback((text: string) => {
-    const lower = text.toLowerCase()
-    for (const kw of SAFETY_KEYWORDS) {
-      if (lower.includes(kw)) {
-        safetyEscalatedRef.current = true
-        if (!redFlagsRef.current.some((flag) => flag.flag === 'Patient-stated active safety trigger')) {
-          redFlagsRef.current = [
-            ...redFlagsRef.current,
-            {
-              flag: 'Patient-stated active safety trigger',
-              severity: 'high',
-              context: 'Detected by the deterministic safety screen; review the final patient turn in the transcript.',
-            },
-          ]
-        }
-        // A safety escalation must never be interrupted by a check-in.
-        unresponsiveRef.current?.suspend()
-        setStatus('safety_escalation')
-        options.onSafetyEscalation?.()
-        const sessionId = serverSessionIdRef.current
-        if (
-          sessionId &&
-          resolvedInterviewModeRef.current === 'comprehensive' &&
-          !safetyAlertRequestedRef.current
-        ) {
-          safetyAlertRequestedRef.current = true
-          void fetch('/api/ai/historian/safety-escalation', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ sessionId }),
-            keepalive: true,
-          }).then((response) => {
-            if (!response.ok) console.error('[useRealtimeSession] clinic safety alert was not confirmed')
-          }).catch(() => {
-            console.error('[useRealtimeSession] clinic safety alert request failed')
-          })
-        }
-        // Preserve the triggering turn, stop further interviewing, and drive
-        // the normal final save without waiting for a model tool call.
-        setTimeout(() => { void endSessionRef.current() }, 0)
-        return true
-      }
+  // Idempotent safety effects shared by transcript and model-tool detection.
+  const activateSafety = useCallback(() => {
+    safetyEscalatedRef.current = true
+    if (safetyEffectsActivatedRef.current) return
+    safetyEffectsActivatedRef.current = true
+    if (!redFlagsRef.current.some((flag) => flag.flag === 'Patient-stated active safety trigger')) {
+      redFlagsRef.current = [
+        ...redFlagsRef.current,
+        {
+          flag: 'Patient-stated active safety trigger',
+          severity: 'high',
+          context: 'Activated by the transcript or model safety screen; review the final patient turn in the transcript.',
+        },
+      ]
     }
-    return false
-  }, [options])
+    // A safety escalation must never be interrupted by a check-in.
+    unresponsiveRef.current?.suspend()
+    setStatus('safety_escalation')
+    options.onSafetyEscalation?.()
+    const sessionId = serverSessionIdRef.current
+    if (
+      sessionId &&
+      resolvedInterviewModeRef.current === 'comprehensive' &&
+      !safetyAlertRequestedRef.current
+    ) {
+      safetyAlertRequestedRef.current = true
+      void fetch('/api/ai/historian/safety-escalation', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sessionId }),
+        keepalive: true,
+      }).then((response) => {
+        if (!response.ok) console.error('[useRealtimeSession] clinic safety alert was not confirmed')
+      }).catch(() => {
+        console.error('[useRealtimeSession] clinic safety alert request failed')
+      })
+    }
+  }, [options.onSafetyEscalation])
 
   const cleanup = useCallback(() => {
     // Stop the duration timer + auto-end timer. Transport teardown is owned
@@ -429,6 +425,7 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
 
   // ── Localizer: fire async, inject guidance back into session ─────────
   const runLocalizer = useCallback(async () => {
+    if (!runtimeGuardRef.current?.acceptsInterviewActivity()) return
     const localizerEnabled = options.enableLocalizer !== false // default true
     if (!localizerEnabled) return
     if (localizerInFlightRef.current) return
@@ -475,7 +472,12 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
       // advisory only, no forced response; the AI picks it up on its next
       // natural turn. Guard: skip injection if the AI is currently speaking
       // to avoid mid-sentence interruption and accidental vocalization.
-      if (data.contextHint && providerRef.current && !isAiSpeakingRef.current) {
+      if (
+        data.contextHint &&
+        providerRef.current &&
+        !isAiSpeakingRef.current &&
+        runtimeGuardRef.current?.acceptsInterviewActivity()
+      ) {
         const guidance = `[INTERNAL SYSTEM NOTE — do NOT speak this aloud, do NOT mention it to the patient, use ONLY to guide your next question silently]: ${data.contextHint}`
         providerRef.current.injectSystemText(guidance)
       }
@@ -556,39 +558,53 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
     const provider = providerRef.current
     const args: any = (input && typeof input === 'object') ? input : {}
 
+    if (toolName !== 'save_interview_output' && !runtimeGuardRef.current?.acceptsInterviewActivity()) {
+      provider?.sendToolResult(toolUseId, { success: false, status: 'interview_terminal' })
+      return
+    }
+
     // ── save_interview_output (existing) ──
     if (toolName === 'save_interview_output') {
       try {
-        const { narrative_summary, red_flags, safety_escalated, ...structured } = args
+        const {
+          narrative_summary,
+          red_flags,
+          safety_escalated,
+          patient_requested_stop,
+          ...structured
+        } = args
+
+        if (safety_escalated === true) {
+          runtimeGuardRef.current?.modelSafetyEscalation()
+          activateSafety()
+        } else if (patient_requested_stop === true) {
+          runtimeGuardRef.current?.modelPatientStop()
+        }
 
         // Comprehensive mode cannot finish merely because the HPI is clear.
         // Reject a premature natural save tool call until every fixed history
         // domain has been classified. Patient stop, emergency escalation, and
         // the 60-exchange safety ceiling still save a visibly partial history.
-        if (
-          resolvedInterviewModeRef.current === 'comprehensive' &&
-          !finalizingRef.current &&
-          !safetyEscalatedRef.current &&
-          safety_escalated !== true &&
-          questionCountRef.current < 60
-        ) {
-          const coverage = validateComprehensiveCoverage(structured)
-          if (!coverage.complete) {
-            const needsAttention = [
-              ...coverage.missingDomains,
-              ...coverage.notAskedDomains,
-              ...coverage.conflictingDomains,
-            ].filter((domain, index, all) => all.indexOf(domain) === index)
-            provider?.injectSystemText(
-              `[COMPREHENSIVE COMPLETION CHECK] The save was rejected because these required history domains are not yet cleanly classified: ${needsAttention.join(', ')}. Continue the patient interview. Ask only the remaining clinically appropriate questions, then call save_interview_output again. Do not mention this internal check to the patient.`,
-            )
-            provider?.sendToolResult(toolUseId, {
-              success: false,
-              status: 'history_incomplete',
-              remaining_domains: needsAttention,
-            })
-            return
-          }
+        const saveDecision = evaluateComprehensiveSave({
+          interviewMode: resolvedInterviewModeRef.current,
+          finalizing: finalizingRef.current,
+          safetyEscalated: safetyEscalatedRef.current,
+          toolSafetyEscalated: safety_escalated === true,
+          patientRequestedStop: runtimeGuardRef.current?.terminalReason() === 'patient_requested_stop',
+          toolPatientRequestedStop: patient_requested_stop === true,
+          exchange: questionCountRef.current,
+          structured,
+        })
+        if (!saveDecision.allowed) {
+          provider?.injectSystemText(
+            `[COMPREHENSIVE COMPLETION CHECK] The save was rejected because these required history domains are not yet cleanly classified: ${saveDecision.remainingDomains.join(', ')}. Continue the patient interview. Ask only the remaining clinically appropriate questions, then call save_interview_output again. Do not mention this internal check to the patient.`,
+          )
+          provider?.sendToolResult(toolUseId, {
+            success: false,
+            status: saveDecision.reason,
+            remaining_domains: saveDecision.remainingDomains,
+          })
+          return
         }
 
         structuredOutputRef.current = structured
@@ -600,9 +616,6 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
               candidate?.flag === flag?.flag && candidate?.context === flag?.context,
             ) === index,
           )
-        }
-        if (safety_escalated) {
-          safetyEscalatedRef.current = true
         }
         // Signal to consumers that the interview has concluded so they can
         // auto-end the session after the AI's closing line. Set the ref
@@ -620,7 +633,12 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
         // speak). The closing audio then drains before teardown via the
         // whenDrained/auto-end sequence below.
         provider?.sendToolResult(toolUseId, { success: true })
-        provider?.nudgeClosing()
+        // The 60-exchange ceiling is a text-only terminal save. Its runtime
+        // guard already silenced provider output, so never request a closing
+        // utterance that would contradict the hard-stop instruction.
+        if (runtimeGuardRef.current?.terminalReason() !== 'hard_stop') {
+          provider?.nudgeClosing()
+        }
         // Fix 4 (2026-07-09): this is only a FALLBACK schedule, not the
         // primary end trigger. The closing line may already be fully spoken
         // (same-turn ordering — the tool call landed after
@@ -729,7 +747,7 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
       })()
       return
     }
-  }, [options.consultId, maybeScheduleAutoEnd])
+  }, [options.consultId, maybeScheduleAutoEnd, activateSafety])
 
   // ── Normalized provider event handler — replaces handleServerEvent.
   // Routes provider-agnostic VoiceEvents to the SAME harness logic as before
@@ -737,6 +755,11 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
   const handleVoiceEvent = useCallback((e: VoiceEvent, sessionGen: number) => {
     switch (e.type) {
       case 'assistantTextDelta': {
+        if (!runtimeGuardRef.current?.acceptsInterviewActivity()) {
+          setCurrentAssistantText('')
+          setAiSpeaking(false)
+          break
+        }
         // Streaming AI text (was response.audio_transcript.delta)
         setCurrentAssistantText(prev => prev + (e.text || ''))
         setAiSpeaking(true)
@@ -744,6 +767,12 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
       }
 
       case 'assistantTranscript': {
+        if (!runtimeGuardRef.current?.acceptsInterviewActivity()) {
+          setCurrentAssistantText('')
+          setAiSpeaking(false)
+          maybeScheduleAutoEnd()
+          break
+        }
         // AI finished speaking this response (was response.audio_transcript.done)
         const fullText = e.text || ''
         // Nova Sonic emits every assistant turn's text twice — SPECULATIVE as
@@ -814,6 +843,11 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
         unresponsiveRef.current?.patientActivity()
         const userText = e.text || ''
         if (userText.trim()) {
+          if (!runtimeGuardRef.current?.acceptsInterviewActivity()) {
+            setCurrentUserText('')
+            setIsUserSpeaking(false)
+            break
+          }
           const entry: HistorianTranscriptEntry = {
             role: 'user',
             text: userText.trim(),
@@ -831,8 +865,21 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
             flushTranscript()
           }
 
-          // Safety check on user speech
-          checkSafety(userText)
+          // The guard latches safety/stop/hard-ceiling state synchronously.
+          const turnDecision = runtimeGuardRef.current.patientTurn({
+            interviewMode: resolvedInterviewModeRef.current,
+            exchange: questionCountRef.current,
+            text: userText,
+          })
+          applyHistorianTurnDecision(turnDecision, {
+            activateSafety,
+            injectSystemText: (text) => providerRef.current?.injectSystemText(text),
+            requestFinalization: (reason) => {
+              if (reason === 'hard_stop') providerRef.current?.suppressOutput()
+              unresponsiveRef.current?.suspend()
+              void endSessionRef.current()
+            },
+          })
 
           // Red flag detection: run keyword matching on cumulative transcript
           const fullText = transcriptRef.current
@@ -848,7 +895,7 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
           // Localizer: increment patient turn counter and trigger every 3 turns
           patientTurnCountRef.current += 1
           const turnsSinceLast = patientTurnCountRef.current - lastLocalizerTurnRef.current
-          if (turnsSinceLast >= LOCALIZER_INTERVAL) {
+          if (runtimeGuardRef.current.acceptsInterviewActivity() && turnsSinceLast >= LOCALIZER_INTERVAL) {
             lastLocalizerTurnRef.current = patientTurnCountRef.current
             // Fire async — must not block the event loop
             runLocalizer()
@@ -860,6 +907,7 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
       }
 
       case 'userSpeechStart': {
+        if (!runtimeGuardRef.current?.acceptsInterviewActivity()) break
         // Best-effort early reset. OpenAI-only, so the ladder must never
         // DEPEND on it — userTranscript above is the load-bearing signal.
         unresponsiveRef.current?.patientActivity()
@@ -877,6 +925,10 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
       }
 
       case 'aiSpeechStart': {
+        if (!runtimeGuardRef.current?.acceptsInterviewActivity()) {
+          setAiSpeaking(false)
+          break
+        }
         // Fix 4 (2026-07-09): a new utterance is starting — on OpenAI this is
         // very likely the closing line arriving via sendToolResult's
         // follow-up response.create (tool-first ordering). Cancel any
@@ -912,7 +964,11 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
         // The turn is now the patient's — start the unresponsiveness ladder.
         // Suppressed once the interview is complete or finalizing so a closing
         // message is never followed by "are you still there?".
-        if (!interviewCompletedRef.current && !finalizingRef.current) {
+        if (
+          !interviewCompletedRef.current &&
+          !finalizingRef.current &&
+          runtimeGuardRef.current?.acceptsInterviewActivity()
+        ) {
           unresponsiveRef.current?.agentTurnEnded()
         }
         break
@@ -952,7 +1008,7 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
         break
       }
     }
-  }, [checkSafety, runLocalizer, handleToolCall, options, setAiSpeaking, maybeScheduleAutoEnd, flushTranscript])
+  }, [activateSafety, runLocalizer, handleToolCall, options, setAiSpeaking, maybeScheduleAutoEnd, flushTranscript])
 
   const startSession = useCallback(async () => {
     setStatus('connecting')
@@ -963,10 +1019,12 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
     setLocalizerData(null)
     transcriptRef.current = []
     questionCountRef.current = 0
+    runtimeGuardRef.current?.reset()
     structuredOutputRef.current = null
     narrativeSummaryRef.current = null
     redFlagsRef.current = []
     safetyEscalatedRef.current = false
+    safetyEffectsActivatedRef.current = false
     safetyAlertRequestedRef.current = false
     patientTurnCountRef.current = 0
     lastLocalizerTurnRef.current = 0
@@ -1137,6 +1195,7 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
       suggested_scale_id?: string | null
       turn_count?: number
     }) => {
+      if (!runtimeGuardRef.current?.acceptsInterviewActivity()) return
       const provider = providerRef.current
       if (!provider) return
 
@@ -1180,6 +1239,7 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
    * express the old "inject + response.create" pattern across providers).
    */
   const injectScaleAdministration = useCallback((instructionBlock: string) => {
+    if (!runtimeGuardRef.current?.acceptsInterviewActivity()) return
     const provider = providerRef.current
     if (!provider) {
       console.warn('[useRealtimeSession] injectScaleAdministration: no active session')
@@ -1201,6 +1261,9 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
     setDuration(finalDuration)
 
     const provider = providerRef.current
+    if (runtimeGuardRef.current?.terminalReason() === 'hard_stop') {
+      provider?.suppressOutput()
+    }
 
     // If the AI never called save_interview_output but the patient has had a
     // real conversation, nudge it to save before we tear the transport down.
@@ -1223,7 +1286,9 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
     if (needsFlush && provider) {
       try {
         provider.injectSystemText(
-          'The patient has ended the interview early. Immediately call the save_interview_output tool with whatever information has been gathered so far. Populate narrative_summary with a concise summary of the conversation. Do not ask any more questions and do not speak — just call the tool.',
+          runtimeGuardRef.current?.terminalReason() === 'hard_stop'
+            ? COMPREHENSIVE_HARD_STOP_SAVE_NUDGE
+            : 'The patient has ended the interview early. Immediately call the save_interview_output tool with whatever information has been gathered so far. Populate narrative_summary with a concise summary of the conversation. Do not ask any more questions and do not speak — just call the tool.',
         )
         // Text-only forced response — the interview is ending, so we don't
         // want the AI to speak a full audio reply right before teardown.
@@ -1263,7 +1328,7 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
     // `interviewCompleted` flips to true only when the AI called
     // save_interview_output. If it never fired, the patient ended before the
     // AI judged the intake complete — flag it as partial.
-    const endedEarly = !interviewCompleted
+    const endedEarly = !interviewCompletedRef.current
 
     // Durable transcript flush (Task 1 fix): flush whatever hasn't hit the
     // FLUSH_THRESHOLD-of-3 auto-trigger yet — trailing entries (the
@@ -1292,7 +1357,7 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
     })
 
     setStatus('complete')
-  }, [cleanup, options, interviewCompleted, flushTranscript])
+  }, [cleanup, options, flushTranscript])
 
   // Keep the ref in sync so the provider's `disconnected` handler always
   // calls the latest endSession.
