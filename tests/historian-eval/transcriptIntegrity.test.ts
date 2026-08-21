@@ -47,6 +47,16 @@ describe('validateTranscript', () => {
     expect(result.issues.some((i) => /duplicate/i.test(i) && /seq/i.test(i))).toBe(true)
   })
 
+  it('flags a missing sequence number in an otherwise ordered transcript', () => {
+    const entries: HistorianTranscriptEntry[] = [
+      entry({ seq: 1, timestamp: 0 }),
+      entry({ seq: 3, timestamp: 1 }),
+    ]
+    const result = validateTranscript(entries)
+    expect(result.valid).toBe(false)
+    expect(result.issues.some((i) => /seq gap/i.test(i))).toBe(true)
+  })
+
   it('flags a negative timestamp', () => {
     const entries: HistorianTranscriptEntry[] = [entry({ seq: 1, timestamp: -1 })]
     const result = validateTranscript(entries)

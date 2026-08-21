@@ -1,7 +1,8 @@
 'use client'
 
 import { useState, useRef, useCallback, useEffect } from 'react'
-import type { HistorianTranscriptEntry, HistorianStructuredOutput, HistorianRedFlag, HistorianSessionType } from '@/lib/historianTypes'
+import type { HistorianTranscriptEntry, HistorianStructuredOutput, HistorianRedFlag, HistorianSessionType, HistorianInterviewMode, HistorianInterviewPromptVersion } from '@/lib/historianTypes'
+import { validateComprehensiveCoverage } from '@/lib/historian/comprehensiveCoverage'
 import type { HistorianReferralInput } from '@/lib/historian/referralContext'
 import type { LocalizerResponse } from '@/lib/consult/localizer-types'
 import type { SaveScaleResponsesArgs } from '@/lib/consult/scales'
@@ -22,6 +23,7 @@ type SessionStatus = 'idle' | 'connecting' | 'active' | 'ending' | 'complete' | 
 
 interface UseRealtimeSessionOptions {
   sessionType: HistorianSessionType
+  interviewMode?: HistorianInterviewMode
   referralReason?: string
   patientName?: string
   patientContext?: string
@@ -63,6 +65,10 @@ interface UseRealtimeSessionOptions {
      * partial in downstream UIs and reports.
      */
     endedEarly: boolean
+    /** Server-resolved interview contract actually applied to the session. */
+    interviewMode: HistorianInterviewMode
+    /** Server-owned version of the prompt contract actually applied. */
+    interviewPromptVersion: HistorianInterviewPromptVersion
     /**
      * Server-minted historian_sessions id (Task 1: durable transcript),
      * returned by /api/ai/historian/session as `sessionId`. Consumers must
@@ -198,6 +204,7 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
   const narrativeSummaryRef = useRef<string | null>(null)
   const redFlagsRef = useRef<HistorianRedFlag[]>([])
   const safetyEscalatedRef = useRef<boolean>(false)
+  const safetyAlertRequestedRef = useRef<boolean>(false)
   const transcriptRef = useRef<HistorianTranscriptEntry[]>([])
   const administeredScaleIdsRef = useRef<Set<string>>(new Set())
   // ── Durable transcript flush (Task 1 of the Historian Validation Suite) ──
@@ -207,6 +214,8 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
   // session still works exactly as before this feature if /session is an
   // older/mocked response without these fields).
   const serverSessionIdRef = useRef<string | null>(null)
+  const resolvedInterviewModeRef = useRef<HistorianInterviewMode>('standard')
+  const resolvedInterviewPromptVersionRef = useRef<HistorianInterviewPromptVersion>('standard-v1')
   const flushTokenRef = useRef<string | null>(null)
   // Monotonic per-entry sequence number, assigned at append time (both the
   // assistantTranscript and userTranscript branches below).
@@ -312,10 +321,41 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
     for (const kw of SAFETY_KEYWORDS) {
       if (lower.includes(kw)) {
         safetyEscalatedRef.current = true
+        if (!redFlagsRef.current.some((flag) => flag.flag === 'Patient-stated active safety trigger')) {
+          redFlagsRef.current = [
+            ...redFlagsRef.current,
+            {
+              flag: 'Patient-stated active safety trigger',
+              severity: 'high',
+              context: 'Detected by the deterministic safety screen; review the final patient turn in the transcript.',
+            },
+          ]
+        }
         // A safety escalation must never be interrupted by a check-in.
         unresponsiveRef.current?.suspend()
         setStatus('safety_escalation')
         options.onSafetyEscalation?.()
+        const sessionId = serverSessionIdRef.current
+        if (
+          sessionId &&
+          resolvedInterviewModeRef.current === 'comprehensive' &&
+          !safetyAlertRequestedRef.current
+        ) {
+          safetyAlertRequestedRef.current = true
+          void fetch('/api/ai/historian/safety-escalation', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ sessionId }),
+            keepalive: true,
+          }).then((response) => {
+            if (!response.ok) console.error('[useRealtimeSession] clinic safety alert was not confirmed')
+          }).catch(() => {
+            console.error('[useRealtimeSession] clinic safety alert request failed')
+          })
+        }
+        // Preserve the triggering turn, stop further interviewing, and drive
+        // the normal final save without waiting for a model tool call.
+        setTimeout(() => { void endSessionRef.current() }, 0)
         return true
       }
     }
@@ -520,10 +560,46 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
     if (toolName === 'save_interview_output') {
       try {
         const { narrative_summary, red_flags, safety_escalated, ...structured } = args
+
+        // Comprehensive mode cannot finish merely because the HPI is clear.
+        // Reject a premature natural save tool call until every fixed history
+        // domain has been classified. Patient stop, emergency escalation, and
+        // the 60-exchange safety ceiling still save a visibly partial history.
+        if (
+          resolvedInterviewModeRef.current === 'comprehensive' &&
+          !finalizingRef.current &&
+          !safetyEscalatedRef.current &&
+          safety_escalated !== true &&
+          questionCountRef.current < 60
+        ) {
+          const coverage = validateComprehensiveCoverage(structured)
+          if (!coverage.complete) {
+            const needsAttention = [
+              ...coverage.missingDomains,
+              ...coverage.notAskedDomains,
+              ...coverage.conflictingDomains,
+            ].filter((domain, index, all) => all.indexOf(domain) === index)
+            provider?.injectSystemText(
+              `[COMPREHENSIVE COMPLETION CHECK] The save was rejected because these required history domains are not yet cleanly classified: ${needsAttention.join(', ')}. Continue the patient interview. Ask only the remaining clinically appropriate questions, then call save_interview_output again. Do not mention this internal check to the patient.`,
+            )
+            provider?.sendToolResult(toolUseId, {
+              success: false,
+              status: 'history_incomplete',
+              remaining_domains: needsAttention,
+            })
+            return
+          }
+        }
+
         structuredOutputRef.current = structured
         narrativeSummaryRef.current = narrative_summary || null
         if (red_flags && Array.isArray(red_flags)) {
-          redFlagsRef.current = red_flags
+          const mergedFlags = [...redFlagsRef.current, ...red_flags]
+          redFlagsRef.current = mergedFlags.filter((flag, index, all) =>
+            all.findIndex((candidate) =>
+              candidate?.flag === flag?.flag && candidate?.context === flag?.context,
+            ) === index,
+          )
         }
         if (safety_escalated) {
           safetyEscalatedRef.current = true
@@ -891,6 +967,7 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
     narrativeSummaryRef.current = null
     redFlagsRef.current = []
     safetyEscalatedRef.current = false
+    safetyAlertRequestedRef.current = false
     patientTurnCountRef.current = 0
     lastLocalizerTurnRef.current = 0
     localizerInFlightRef.current = false
@@ -902,6 +979,8 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
     finalizingRef.current = false
     // Durable transcript flush (Task 1) — reset per session.
     serverSessionIdRef.current = null
+    resolvedInterviewModeRef.current = 'standard'
+    resolvedInterviewPromptVersionRef.current = 'standard-v1'
     flushTokenRef.current = null
     seqCounterRef.current = 0
     pendingFlushEntriesRef.current = []
@@ -920,10 +999,12 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           sessionType: options.sessionType,
+          interviewMode: options.interviewMode,
           referralReason: options.referralReason,
           patientContext: options.patientContext,
           provider: options.provider,
           referral: options.referral,
+          consult_id: options.consultId,
         }),
       })
 
@@ -950,10 +1031,19 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
         // session behaves exactly as it did before this feature.
         sessionId: mintedSessionId,
         flushToken: mintedFlushToken,
+        interviewMode: resolvedInterviewMode,
+        interviewPromptVersion: resolvedInterviewPromptVersion,
       } = sessionConfig
 
       serverSessionIdRef.current = typeof mintedSessionId === 'string' ? mintedSessionId : null
       flushTokenRef.current = typeof mintedFlushToken === 'string' ? mintedFlushToken : null
+      resolvedInterviewModeRef.current = resolvedInterviewMode === 'comprehensive'
+        ? 'comprehensive'
+        : 'standard'
+      resolvedInterviewPromptVersionRef.current =
+        resolvedInterviewPromptVersion === 'comprehensive-v1' && resolvedInterviewModeRef.current === 'comprehensive'
+          ? 'comprehensive-v1'
+          : 'standard-v1'
 
       // 2. Resolve the provider kind. The route's `provider` field wins (it
       //    minted the session for that kind); fall back to selectProvider
@@ -985,6 +1075,7 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
         instructions: baseInstructionsRef.current,
         tools: sessionTools ?? [],
         voiceId,
+        interviewMode: resolvedInterviewModeRef.current,
         ephemeralKey,
         model: sessionModel,
         relayUrl,
@@ -1011,6 +1102,7 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
     }
   }, [
     options.sessionType,
+    options.interviewMode,
     options.referralReason,
     options.patientContext,
     options.consultId,
@@ -1194,6 +1286,8 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
       duration: finalDuration,
       questionCount: questionCountRef.current,
       endedEarly,
+      interviewMode: resolvedInterviewModeRef.current,
+      interviewPromptVersion: resolvedInterviewPromptVersionRef.current,
       sessionId: serverSessionIdRef.current,
     })
 

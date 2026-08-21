@@ -7,6 +7,38 @@ export type HistorianSessionType =
   | 'follow_up'
   | 'referral_clarification'
 
+export type HistorianInterviewMode = 'standard' | 'comprehensive'
+export type HistorianInterviewPromptVersion = 'standard-v1' | 'comprehensive-v1'
+
+/**
+ * Fixed audit vocabulary for Comprehensive mode. These are coverage labels,
+ * not findings: a domain counts as covered when it was asked and answered,
+ * including a pertinent negative. Keeping the vocabulary closed prevents a
+ * model from making a history look more complete by inventing synonymous
+ * domain names that the physician UI cannot reconcile.
+ */
+export const COMPREHENSIVE_HISTORY_DOMAINS = [
+  { id: 'referral_reason', label: 'Referral reason / patient concern' },
+  { id: 'patient_reported_age', label: 'Patient-reported age' },
+  { id: 'presenting_symptom', label: 'Presenting symptom timeline and phenotype' },
+  { id: 'associated_symptoms', label: 'Associated symptoms and pertinent negatives' },
+  { id: 'red_flags', label: 'Complaint-specific red flags' },
+  { id: 'prior_episodes', label: 'Prior similar episodes' },
+  { id: 'functional_impact', label: 'Functional impact' },
+  { id: 'neurologic_review_of_systems', label: 'Neurologic review of systems' },
+  { id: 'past_medical_history', label: 'Past medical history' },
+  { id: 'past_surgical_history', label: 'Past surgical history' },
+  { id: 'medications', label: 'Medications and doses' },
+  { id: 'medication_adherence_side_effects', label: 'Medication adherence and side effects' },
+  { id: 'allergies', label: 'Allergies and reactions' },
+  { id: 'family_neurologic_history', label: 'Family neurologic history' },
+  { id: 'social_exposure_history', label: 'Social and exposure history' },
+  { id: 'prior_studies', label: 'Prior studies and patient-recalled results' },
+  { id: 'patient_goals_questions', label: 'Patient goals and questions' },
+] as const
+
+export type ComprehensiveHistoryDomain = (typeof COMPREHENSIVE_HISTORY_DOMAINS)[number]['id']
+
 export interface ReferralClarificationQuestion {
   id: string
   code: string
@@ -36,6 +68,20 @@ export interface HistorianRedFlag {
 }
 
 export interface HistorianStructuredOutput {
+  /** Interview-depth contract selected before the microphone starts. */
+  interview_mode?: HistorianInterviewMode
+  /** Versioned prompt contract, persisted inside structured_output JSONB. */
+  interview_prompt_version?: HistorianInterviewPromptVersion
+  /** Patient-reported age in completed years. Kept separate from identity-gate DOB. */
+  age_years_patient_reported?: number
+  /** Auditable coverage record for Comprehensive mode. */
+  history_coverage?: {
+    covered_domains: ComprehensiveHistoryDomain[]
+    missing_or_uncertain: Array<{
+      domain: ComprehensiveHistoryDomain
+      reason: 'not_asked' | 'unknown' | 'declined' | 'conflicting'
+    }>
+  }
   clarification_answers?: Array<{
     question_id: string
     answer: string
@@ -108,6 +154,11 @@ export interface HistorianSession {
    * 057 keep validating cleanly (same pattern as interview_completion_status).
    */
   final_differential?: import('./historian/eval/finalDifferential').FinalDifferential | null
+  /** Durable post-session DDx job state, returned only on authenticated clinician reads. */
+  evaluation_status?: 'pending' | 'leased' | 'retry_wait' | 'completed' | 'failed' | null
+  evaluation_attempt_count?: number | null
+  /** Sanitized error category only; never raw provider or transcript content. */
+  evaluation_error_code?: string | null
   /**
    * Historian Validation Suite Task 4: DeepSeek-R1's independent
    * differential (historian_evaluations, evaluator='independent_ddx') —

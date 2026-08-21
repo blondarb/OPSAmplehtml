@@ -10,6 +10,10 @@ export interface DifferentialCardProps {
    * for this session yet — rendered as a pending state, never an error.
    */
   finalDifferential: FinalDifferential | null | undefined
+  evaluationStatus?: 'pending' | 'leased' | 'retry_wait' | 'completed' | 'failed' | null
+  evaluationErrorCode?: string | null
+  onRetry?: () => void
+  retrying?: boolean
   /**
    * Called when a physician clicks a cited turn number, so the parent can
    * jump the Task-1 transcript viewer (HistorianTranscriptViewer) to that
@@ -123,7 +127,7 @@ function DifferentialItemRow({
             padding: '1px 6px',
           }}
         >
-          {item.likelihood} · {item.likelihood_pct}%
+          {item.likelihood} · {item.likelihood_pct}% model estimate
         </span>
       </div>
 
@@ -146,7 +150,14 @@ function DifferentialItemRow({
  * this is a separate, post-session evaluation pass for retrospective
  * review.
  */
-export default function DifferentialCard({ finalDifferential, onQuoteClick }: DifferentialCardProps) {
+export default function DifferentialCard({
+  finalDifferential,
+  evaluationStatus,
+  evaluationErrorCode,
+  onRetry,
+  retrying = false,
+  onQuoteClick,
+}: DifferentialCardProps) {
   return (
     <div
       style={{
@@ -172,7 +183,37 @@ export default function DifferentialCard({ finalDifferential, onQuoteClick }: Di
         {INVESTIGATIONAL_BANNER}
       </div>
 
-      {!finalDifferential ? (
+      {!finalDifferential && evaluationStatus === 'failed' ? (
+        <div>
+          <p style={{ fontSize: '0.8rem', color: '#b91c1c', margin: '0 0 8px', lineHeight: 1.5 }}>
+            Differential generation failed after the configured retries. The history and transcript remain available for physician review.
+            {evaluationErrorCode ? ` Error category: ${evaluationErrorCode}.` : ''}
+          </p>
+          {onRetry && (
+            <button
+              type="button"
+              onClick={onRetry}
+              disabled={retrying}
+              style={{
+                border: '1px solid #b91c1c',
+                borderRadius: 6,
+                background: 'transparent',
+                color: '#b91c1c',
+                padding: '6px 10px',
+                fontSize: '0.75rem',
+                fontWeight: 700,
+                cursor: retrying ? 'wait' : 'pointer',
+              }}
+            >
+              {retrying ? 'Scheduling retry…' : 'Retry Differential Review'}
+            </button>
+          )}
+        </div>
+      ) : !finalDifferential && evaluationStatus === 'retry_wait' ? (
+        <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary, #64748b)', fontStyle: 'italic', margin: 0 }}>
+          Differential generation is retrying automatically after a temporary failure.
+        </p>
+      ) : !finalDifferential ? (
         <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary, #64748b)', fontStyle: 'italic', margin: 0 }}>
           Final differential pending — the post-session review pass has not completed yet.
         </p>
@@ -204,6 +245,10 @@ export default function DifferentialCard({ finalDifferential, onQuoteClick }: Di
               <DifferentialItemRow key={i} item={item} rank={i + 1} onQuoteClick={onQuoteClick} />
             ))}
           </ol>
+
+          <p style={{ fontSize: '0.7rem', color: 'var(--text-secondary, #64748b)', margin: '8px 0 0', lineHeight: 1.4 }}>
+            Percentages are uncalibrated model estimates, not statistical confidence intervals or validated probabilities.
+          </p>
 
           <div
             style={{

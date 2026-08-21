@@ -100,7 +100,7 @@ function CompactDifferentialItem({
             padding: '0px 5px',
           }}
         >
-          {item.likelihood} · {item.likelihood_pct}%
+          {item.likelihood} · {item.likelihood_pct}% model estimate
         </span>
       </div>
       {item.rationale && (
@@ -324,6 +324,9 @@ export default function DdxComparisonCard({
           onQuoteClick={onQuoteClick}
         />
       </div>
+      <p style={{ fontSize: '0.65rem', color: 'var(--text-secondary, #64748b)', margin: '10px 0 0', lineHeight: 1.4 }}>
+        Percentages are uncalibrated model estimates, not statistical confidence intervals or validated probabilities.
+      </p>
     </div>
   )
 }

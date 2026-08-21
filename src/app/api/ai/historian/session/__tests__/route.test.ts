@@ -7,15 +7,32 @@ vi.mock('@/lib/consult/pipeline', () => ({
 vi.mock('@/lib/secrets', () => ({
   getOpenAIKey: vi.fn(),
 }))
+vi.mock('@/lib/auth/clinicalAccess', () => ({
+  authorizeClinicalAccess: vi.fn(),
+  clinicalAccessDeniedMessage: () => 'Access denied',
+}))
+vi.mock('@/lib/historian/invitationStore', () => ({
+  resolveHistorianPatientGrant: vi.fn(),
+  markHistorianInvitationStarted: vi.fn(),
+}))
 
 import { POST } from '@/app/api/ai/historian/session/route'
 import { getOpenAIKey } from '@/lib/secrets'
 import { getConsult } from '@/lib/consult/pipeline'
+import { authorizeClinicalAccess } from '@/lib/auth/clinicalAccess'
+import { __resetPublicRouteGuard } from '@/lib/api/publicRouteGuard'
+import {
+  markHistorianInvitationStarted,
+  resolveHistorianPatientGrant,
+} from '@/lib/historian/invitationStore'
 
-const buildReq = (body: Record<string, unknown>, queryString = ''): Request =>
+const buildReq = (body: Record<string, unknown>, queryString = '', cookie?: string): Request =>
   new Request(`http://localhost/api/ai/historian/session${queryString}`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: {
+      'Content-Type': 'application/json',
+      ...(cookie ? { Cookie: cookie } : {}),
+    },
     body: JSON.stringify(body),
   })
 
@@ -39,8 +56,15 @@ describe('POST /api/ai/historian/session — textMode (Historian Validation Suit
 
   beforeEach(() => {
     vi.clearAllMocks()
+    __resetPublicRouteGuard()
     vi.mocked(getOpenAIKey).mockResolvedValue('sk-test-key')
     vi.mocked(getConsult).mockResolvedValue(null)
+    vi.mocked(authorizeClinicalAccess).mockResolvedValue({
+      ok: true,
+      context: { userId: 'clinician-1', email: 'c@example.test', tenantId: 'default', role: 'clinician' },
+    })
+    vi.mocked(resolveHistorianPatientGrant).mockResolvedValue(null)
+    vi.mocked(markHistorianInvitationStarted).mockResolvedValue(true)
     // mockImplementation (not mockResolvedValue) so each call gets a FRESH
     // Response — a Response body can only be read once, and this test file
     // calls POST multiple times per test against the same mocked fetch.
@@ -102,9 +126,108 @@ describe('POST /api/ai/historian/session — textMode (Historian Validation Suit
     expect(typeof json.base_instructions).toBe('string')
     expect(typeof json.sessionId).toBe('string')
     expect(typeof json.flushToken).toBe('string')
+    expect(json.interviewMode).toBe('standard')
+    expect(json.interviewPromptVersion).toBe('standard-v1')
 
     expect(fetchSpy).toHaveBeenCalledTimes(1)
     expect(getOpenAIKey).toHaveBeenCalledTimes(1)
+  })
+
+  it('resolves comprehensive mode to Nova with the server-built instructions', async () => {
+    const res = await POST(buildReq({ sessionType: 'new_patient', interviewMode: 'comprehensive', provider: 'openai' }))
+    expect(res.status).toBe(200)
+    const json = await res.json()
+    expect(json.provider).toBe('nova')
+    expect(json.instructions).toContain('COMPREHENSIVE MODE — REQUIRED ORDER AND COVERAGE')
+    expect(json.instructions).not.toMatch(/Never exceed 25 turns total/)
+    expect(json.interviewMode).toBe('comprehensive')
+    expect(json.interviewPromptVersion).toBe('comprehensive-v1')
+    expect(getOpenAIKey).not.toHaveBeenCalled()
+  })
+
+  it('fails closed to standard mode for an unknown interviewMode', async () => {
+    const res = await POST(buildReq({ sessionType: 'new_patient', interviewMode: 'unlimited' }))
+    expect(res.status).toBe(200)
+    const json = await res.json()
+    expect(json.base_instructions).toMatch(/Never exceed 25 turns total/)
+    expect(json.base_instructions).not.toContain('COMPREHENSIVE MODE — REQUIRED ORDER AND COVERAGE')
+    expect(json.interviewMode).toBe('standard')
+    expect(json.interviewPromptVersion).toBe('standard-v1')
+  })
+
+  it('rejects anonymous comprehensive mode before minting voice credentials', async () => {
+    vi.mocked(authorizeClinicalAccess).mockResolvedValueOnce({
+      ok: false,
+      status: 401,
+      reason: 'unauthenticated',
+    })
+    const res = await POST(buildReq({ sessionType: 'new_patient', interviewMode: 'comprehensive' }))
+    expect(res.status).toBe(401)
+    expect(await res.json()).toEqual({ error: 'Access denied', reason: 'unauthenticated' })
+    expect(fetchSpy).not.toHaveBeenCalled()
+    expect(getOpenAIKey).not.toHaveBeenCalled()
+  })
+
+  it('uses the one-time patient grant as the sole authority for an invited Comprehensive Nova session', async () => {
+    vi.mocked(resolveHistorianPatientGrant).mockResolvedValueOnce({
+      inviteId: 'invite-1',
+      tenantId: 'tenant-a',
+      consultId: 'consult-1',
+      patientId: 'patient-1',
+      sessionId: '11111111-1111-4111-8111-111111111111',
+      patientName: 'Synthetic Patient',
+      referralReason: 'Progressive gait difficulty',
+      sessionType: 'new_patient',
+      provider: 'nova',
+      interviewMode: 'comprehensive',
+      interviewPromptVersion: 'comprehensive-v1',
+      status: 'redeemed',
+      grantExpiresAt: new Date(Date.now() + 60_000).toISOString(),
+    })
+
+    const res = await POST(buildReq({
+      sessionType: 'follow_up',
+      interviewMode: 'standard',
+      provider: 'openai',
+      referralReason: 'attacker supplied',
+      consult_id: 'attacker-consult',
+    }, '', 'historian_patient_grant=opaque-grant'))
+    expect(res.status).toBe(200)
+    const json = await res.json()
+    expect(json.provider).toBe('nova')
+    expect(json.sessionId).toBe('11111111-1111-4111-8111-111111111111')
+    expect(json.consult_id).toBe('consult-1')
+    expect(json.interviewMode).toBe('comprehensive')
+    expect(json.interviewPromptVersion).toBe('comprehensive-v1')
+    expect(json.instructions).toContain('Progressive gait difficulty')
+    expect(json.instructions).not.toContain('attacker supplied')
+    expect(authorizeClinicalAccess).not.toHaveBeenCalled()
+    expect(markHistorianInvitationStarted).toHaveBeenCalledTimes(1)
+  })
+
+  it('fails closed when a patient grant cookie is present but invalid', async () => {
+    vi.mocked(resolveHistorianPatientGrant).mockResolvedValueOnce(null)
+    const res = await POST(buildReq(
+      { interviewMode: 'standard' },
+      '',
+      'historian_patient_grant=expired-grant',
+    ))
+    expect(res.status).toBe(401)
+    expect(fetchSpy).not.toHaveBeenCalled()
+  })
+
+  it('does not restart an in-progress invited session after refresh', async () => {
+    vi.mocked(resolveHistorianPatientGrant).mockResolvedValueOnce({
+      inviteId: 'invite-1', tenantId: 'tenant-a', consultId: 'consult-1', patientId: 'patient-1',
+      sessionId: '11111111-1111-4111-8111-111111111111', patientName: 'Synthetic Patient',
+      referralReason: 'Gait concern', sessionType: 'new_patient', provider: 'nova',
+      interviewMode: 'comprehensive', interviewPromptVersion: 'comprehensive-v1',
+      status: 'in_progress', grantExpiresAt: new Date(Date.now() + 60_000).toISOString(),
+    })
+    const res = await POST(buildReq({}, '', 'historian_patient_grant=opaque-grant'))
+    expect(res.status).toBe(409)
+    expect((await res.json()).error).toMatch(/interrupted/i)
+    expect(markHistorianInvitationStarted).not.toHaveBeenCalled()
   })
 
   it('false-y textMode values (absent, false, "0") do not trigger the short-circuit', async () => {

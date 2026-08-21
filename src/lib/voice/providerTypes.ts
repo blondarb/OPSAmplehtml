@@ -63,6 +63,8 @@ export interface VoiceStartOptions {
   tools: unknown[]
   /** Optional voice selection (provider-specific voice id). */
   voiceId?: string
+  /** Server-resolved interview depth; Nova relay uses this for the deterministic opening transition. */
+  interviewMode?: 'standard' | 'comprehensive'
   // ── OpenAI-only (ignored by Nova) ──
   /** Ephemeral bearer key for the OpenAI Realtime SDP exchange. */
   ephemeralKey?: string

@@ -88,8 +88,13 @@ export class TranscriptTooLargeError extends Error {
 
 // ── Constants ────────────────────────────────────────────────────────────────
 
-/** Serialized-transcript size guard (JSON.stringify length, chars). Fail-closed. */
-export const MAX_TRANSCRIPT_CHARS = 60_000
+/**
+ * Serialized-transcript size guard (JSON.stringify length, chars). The
+ * Comprehensive interview may legitimately run well past 25 exchanges; this
+ * bound accommodates the 60-exchange safety ceiling with substantial headroom
+ * while still failing closed before an unbounded model request.
+ */
+export const MAX_TRANSCRIPT_CHARS = 180_000
 
 /**
  * Minimum number of non-empty patient (role: 'user') turns required before

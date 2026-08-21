@@ -23,18 +23,22 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
  * and @/lib/tenant, since importing the route module evaluates every
  * top-level import regardless of which handler is invoked.
  */
-const { queryMock, getPoolMock, getUserMock } = vi.hoisted(() => {
+const { queryMock, getPoolMock, authorizeClinicalAccessMock } = vi.hoisted(() => {
   const queryMock = vi.fn()
   const getPoolMock = vi.fn(async () => ({ query: queryMock }))
-  const getUserMock = vi.fn()
-  return { queryMock, getPoolMock, getUserMock }
+  const authorizeClinicalAccessMock = vi.fn()
+  return { queryMock, getPoolMock, authorizeClinicalAccessMock }
 })
 
 const AUTHED_USER = { id: 'physician-1', email: 'physician@test.com' }
 
 vi.mock('@/lib/db', () => ({ getPool: getPoolMock }))
 vi.mock('@/lib/db-query', () => ({ from: vi.fn() }))
-vi.mock('@/lib/cognito/server', () => ({ getUser: getUserMock }))
+vi.mock('@/lib/auth/clinicalAccess', () => ({
+  authorizeClinicalAccess: authorizeClinicalAccessMock,
+  clinicalAccessDeniedMessage: (reason: string) =>
+    reason === 'unauthenticated' ? 'Please sign in to continue.' : 'Access denied.',
+}))
 vi.mock('@/lib/tenant', () => ({ getTenantServer: () => 'test-tenant' }))
 vi.mock('@/lib/consult/pipeline', () => ({ linkHistorianToConsult: vi.fn() }))
 vi.mock('@/lib/notifications', () => ({ notifyHistorianRedFlag: vi.fn() }))
@@ -61,23 +65,30 @@ const SAMPLE_SESSION_ROW = {
 describe('GET /api/ai/historian/save — auth gate', () => {
   beforeEach(() => {
     queryMock.mockReset()
-    getUserMock.mockReset()
+    authorizeClinicalAccessMock.mockReset()
   })
 
   it('returns 401 and touches the database not at all when no user is authenticated', async () => {
-    getUserMock.mockResolvedValueOnce(null)
+    authorizeClinicalAccessMock.mockResolvedValueOnce({
+      ok: false,
+      status: 401,
+      reason: 'unauthenticated',
+    })
 
     const res = await getSessions()
     const body = await res.json()
 
     expect(res.status).toBe(401)
-    expect(body.error).toMatch(/unauthorized/i)
+    expect(body.error).toMatch(/sign in/i)
     expect(getPoolMock).not.toHaveBeenCalled()
     expect(queryMock).not.toHaveBeenCalled()
   })
 
   it('returns the enriched session list when a physician is authenticated', async () => {
-    getUserMock.mockResolvedValueOnce(AUTHED_USER)
+    authorizeClinicalAccessMock.mockResolvedValueOnce({
+      ok: true,
+      context: { userId: AUTHED_USER.id, email: AUTHED_USER.email, tenantId: 'test-tenant', role: 'clinician' },
+    })
     queryMock.mockResolvedValueOnce({ rows: [SAMPLE_SESSION_ROW] })
 
     const res = await getSessions()
@@ -94,8 +105,11 @@ describe('GET /api/ai/historian/save — independent_ddx/agreement enrichment', 
 
   beforeEach(() => {
     queryMock.mockReset()
-    getUserMock.mockReset()
-    getUserMock.mockResolvedValue(AUTHED_USER)
+    authorizeClinicalAccessMock.mockReset()
+    authorizeClinicalAccessMock.mockResolvedValue({
+      ok: true,
+      context: { userId: AUTHED_USER.id, email: AUTHED_USER.email, tenantId: 'test-tenant', role: 'clinician' },
+    })
     infoSpy = vi.spyOn(console, 'info').mockImplementation(() => {})
     errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
   })
@@ -118,11 +132,16 @@ describe('GET /api/ai/historian/save — independent_ddx/agreement enrichment', 
 
     const enrichedSql = queryMock.mock.calls[0][0] as string
     expect(enrichedSql).toContain('historian_evaluations')
+    expect(enrichedSql).toContain('historian_eval_jobs')
+    expect(enrichedSql).toContain('evaluation_status')
     expect(enrichedSql).toContain("evaluator = 'independent_ddx'")
     expect(enrichedSql).toContain("evaluator = 'agreement'")
   })
 
   it('falls back to the base query and still returns sessions when historian_evaluations does not exist yet (42P01)', async () => {
+    queryMock.mockRejectedValueOnce(
+      Object.assign(new Error('relation "historian_eval_jobs" does not exist'), { code: '42P01' }),
+    )
     queryMock.mockRejectedValueOnce(
       Object.assign(new Error('relation "historian_evaluations" does not exist'), { code: '42P01' }),
     )
@@ -133,16 +152,34 @@ describe('GET /api/ai/historian/save — independent_ddx/agreement enrichment', 
     const body = await res.json()
 
     expect(res.status).toBe(200)
-    expect(queryMock).toHaveBeenCalledTimes(2)
+    expect(queryMock).toHaveBeenCalledTimes(3)
     expect(body.sessions).toEqual([baseRow])
 
     // The fallback query must NOT reference historian_evaluations at all.
-    const fallbackSql = queryMock.mock.calls[1][0] as string
+    const fallbackSql = queryMock.mock.calls[2][0] as string
     expect(fallbackSql).not.toContain('historian_evaluations')
 
-    expect(infoSpy).toHaveBeenCalledTimes(1)
-    expect(infoSpy.mock.calls[0].join(' ')).toMatch(/migration 058 not applied/i)
+    expect(infoSpy).toHaveBeenCalledTimes(2)
+    expect(infoSpy.mock.calls[1].join(' ')).toMatch(/migration 058 not applied/i)
     expect(errorSpy).not.toHaveBeenCalled()
+  })
+
+  it('keeps evaluator results available when only the newer job table is missing', async () => {
+    queryMock.mockRejectedValueOnce(
+      Object.assign(new Error('relation "historian_eval_jobs" does not exist'), { code: '42P01' }),
+    )
+    queryMock.mockResolvedValueOnce({ rows: [SAMPLE_SESSION_ROW] })
+
+    const res = await getSessions()
+    const body = await res.json()
+
+    expect(res.status).toBe(200)
+    expect(queryMock).toHaveBeenCalledTimes(2)
+    const legacyEnrichedSql = queryMock.mock.calls[1][0] as string
+    expect(legacyEnrichedSql).toContain('historian_evaluations')
+    expect(legacyEnrichedSql).not.toContain('historian_eval_jobs')
+    expect(legacyEnrichedSql).not.toContain('job.status')
+    expect(body.sessions[0].independent_ddx).toEqual(SAMPLE_SESSION_ROW.independent_ddx)
   })
 
   it('surfaces a genuine (non-42P01) DB error as a 500, without attempting the fallback query', async () => {

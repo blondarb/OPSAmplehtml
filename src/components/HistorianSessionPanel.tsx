@@ -5,6 +5,7 @@ import type { HistorianSession } from '@/lib/historianTypes'
 import HistorianTranscriptViewer from './historian/HistorianTranscriptViewer'
 import DifferentialCard from './historian/DifferentialCard'
 import DdxComparisonCard from './historian/DdxComparisonCard'
+import HistoryCoverageCard from './historian/HistoryCoverageCard'
 
 interface HistorianSessionPanelProps {
   sessions: HistorianSession[]
@@ -30,6 +31,31 @@ export default function HistorianSessionPanel({ sessions, onImport }: HistorianS
   // HistorianTranscriptViewer's highlightIndex prop). Shared across cards
   // like expandedId/expandedSection — only one card is ever expanded.
   const [highlightIndex, setHighlightIndex] = useState<number | null>(null)
+  const [retryingEvaluationId, setRetryingEvaluationId] = useState<string | null>(null)
+  const [evaluationOverrides, setEvaluationOverrides] = useState<Record<string, 'pending'>>({})
+  const [evaluationRetryErrors, setEvaluationRetryErrors] = useState<Record<string, string>>({})
+
+  async function retryDifferential(sessionId: string) {
+    setRetryingEvaluationId(sessionId)
+    setEvaluationRetryErrors((current) => ({ ...current, [sessionId]: '' }))
+    try {
+      const response = await fetch('/api/ai/historian/evaluations/retry', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sessionId }),
+      })
+      const data = await response.json().catch(() => ({}))
+      if (!response.ok) throw new Error(data?.error || 'The differential retry could not be scheduled.')
+      setEvaluationOverrides((current) => ({ ...current, [sessionId]: 'pending' }))
+    } catch (error) {
+      setEvaluationRetryErrors((current) => ({
+        ...current,
+        [sessionId]: error instanceof Error ? error.message : 'The differential retry could not be scheduled.',
+      }))
+    } finally {
+      setRetryingEvaluationId(null)
+    }
+  }
 
   if (!sessions || sessions.length === 0) return null
 
@@ -261,8 +287,15 @@ export default function HistorianSessionPanel({ sessions, onImport }: HistorianS
                   {/* Structured data */}
                   {expandedSection === 'structured' && (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                      {session.structured_output?.interview_mode === 'comprehensive' && (
+                        <HistoryCoverageCard
+                          coverage={session.structured_output.history_coverage}
+                          ageYearsPatientReported={session.structured_output.age_years_patient_reported}
+                        />
+                      )}
                       {session.structured_output ? (
                         Object.entries(session.structured_output)
+                          .filter(([key]) => key !== 'history_coverage' && key !== 'prior_studies')
                           .filter(([, v]) => v && String(v).trim())
                           .map(([key, value]) => (
                             <div key={key}>
@@ -294,13 +327,26 @@ export default function HistorianSessionPanel({ sessions, onImport }: HistorianS
                       Pending state (DifferentialCard's own default) until
                       the async post-session evaluator completes. */}
                   {expandedSection === 'differential' && (
-                    <DifferentialCard
-                      finalDifferential={session.final_differential}
-                      onQuoteClick={(turn) => {
-                        setExpandedSection('transcript')
-                        setHighlightIndex(turn)
-                      }}
-                    />
+                    <div>
+                      <DifferentialCard
+                        finalDifferential={session.final_differential}
+                        evaluationStatus={evaluationOverrides[session.id] ?? session.evaluation_status}
+                        evaluationErrorCode={session.evaluation_error_code}
+                        retrying={retryingEvaluationId === session.id}
+                        onRetry={session.evaluation_status === 'failed'
+                          ? () => void retryDifferential(session.id)
+                          : undefined}
+                        onQuoteClick={(turn) => {
+                          setExpandedSection('transcript')
+                          setHighlightIndex(turn)
+                        }}
+                      />
+                      {evaluationRetryErrors[session.id] && (
+                        <p role="alert" style={{ color: '#b91c1c', fontSize: '0.75rem', margin: '8px 0 0' }}>
+                          {evaluationRetryErrors[session.id]}
+                        </p>
+                      )}
+                    </div>
                   )}
 
                   {/* Cross-family comparison (Historian Validation Suite Task

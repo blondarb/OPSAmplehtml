@@ -19,7 +19,7 @@ import type { HistorianTranscriptEntry } from '@/lib/historianTypes'
 export interface HistorianInterviewStepProps {
   phase: 'active' | 'ending'
   turnNumber: number
-  turnCap: number
+  turnCap?: number
   /** The current question as text; null before the first question arrives. */
   displayedQuestion: string | null
   /** The latest patient utterance the system heard; null before the first. */
@@ -56,7 +56,7 @@ export default function HistorianInterviewStep({
       {/* The current question, always visible as text — never voice-only */}
       <div className="nn-q">
         <p className="nn-eyebrow nn-num" style={{ marginBottom: 8 }}>
-          Question {turnNumber} of about {turnCap}
+          {turnCap ? `Question ${turnNumber} of about ${turnCap}` : `Question ${turnNumber} · Comprehensive interview`}
         </p>
         <p className="nn-q-text" aria-live="polite">
           {/* Before the first question, say what is ABOUT to happen rather than
@@ -172,7 +172,9 @@ export default function HistorianInterviewStep({
       )}
 
       <p className="nn-prog">
-        Question {turnNumber} of about {turnCap} · you can stop at any time
+        {turnCap
+          ? `Question ${turnNumber} of about ${turnCap} · you can stop at any time`
+          : `Question ${turnNumber} · comprehensive history · you can stop at any time`}
       </p>
     </>
   )

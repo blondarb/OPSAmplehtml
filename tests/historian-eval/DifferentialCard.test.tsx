@@ -54,12 +54,36 @@ describe('DifferentialCard', () => {
     expect(markup).toMatch(/pending/i)
   })
 
+  it('renders terminal failure distinctly from pending with an authorized retry action', () => {
+    const markup = renderToStaticMarkup(
+      <DifferentialCard
+        finalDifferential={null}
+        evaluationStatus="failed"
+        evaluationErrorCode="ProviderError"
+        onRetry={() => undefined}
+      />,
+    )
+    expect(markup).toMatch(/failed after the configured retries/i)
+    expect(markup).toContain('ProviderError')
+    expect(markup).toMatch(/Retry Differential Review/i)
+    expect(markup).not.toMatch(/has not completed yet/i)
+  })
+
+  it('renders automatic retry state distinctly from generic pending', () => {
+    const markup = renderToStaticMarkup(
+      <DifferentialCard finalDifferential={null} evaluationStatus="retry_wait" />,
+    )
+    expect(markup).toMatch(/retrying automatically/i)
+  })
+
   it('renders ranked diagnoses, likelihood, rationale, and quotes when populated', () => {
     const markup = renderToStaticMarkup(<DifferentialCard finalDifferential={SAMPLE} />)
     expect(markup).toContain('Migraine without aura')
     expect(markup).toContain('G43.009')
     expect(markup).toContain('High')
     expect(markup).toContain('70%')
+    expect(markup).toMatch(/uncalibrated model estimates/i)
+    expect(markup).toMatch(/not statistical confidence intervals/i)
     expect(markup).toContain('Throbbing headache with nausea, no red flags.')
     expect(markup).toContain('Turn 1')
     expect(markup).toContain('I have had a throbbing headache for three days.')

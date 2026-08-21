@@ -8,9 +8,31 @@
  */
 
 import type {
+  HistorianInterviewMode,
   HistorianSessionType,
   ReferralClarificationQuestion,
 } from './historianTypes'
+import { COMPREHENSIVE_HISTORY_DOMAINS } from './historianTypes'
+
+const COMPREHENSIVE_HISTORY_DOMAIN_IDS = COMPREHENSIVE_HISTORY_DOMAINS.map(({ id }) => id)
+const COMPREHENSIVE_HISTORY_DOMAIN_LIST = COMPREHENSIVE_HISTORY_DOMAINS
+  .map(({ id, label }) => `- ${id}: ${label}`)
+  .join('\n')
+
+const STANDARD_TURN_POLICY = `13. TURN LIMIT: Never exceed 25 turns total. If you are approaching turn 20 and still have uncovered items, prioritize the most clinically important gaps and wrap up gracefully. Do not keep asking questions indefinitely.`
+
+const COMPREHENSIVE_TURN_POLICY = `13. COMPREHENSIVE INTERVIEW: The standard 25-turn ceiling does not apply in this mode. Continue until the clinically relevant history domains below are covered, the patient asks to stop, or the safety protocol ends the interview. Begin wrapping up by 45 patient exchanges and finish by 60; do not start a new history domain or scale after the soft limit. Do not pad the interview or repeat questions; depth must come from unresolved clinical gaps, not conversation length.`
+
+const STANDARD_INTERVIEW_BUDGET = `INTERVIEW BUDGET: Aim for 8-20 turns total. Quality over coverage. Call save_interview_output when you have clinical clarity — not when you have ticked every box. For straightforward presentations you may have enough after 8-10 turns; do not pad the conversation to hit a number.`
+
+const COMPREHENSIVE_INTERVIEW_BUDGET = `INTERVIEW DEPTH: Take the time needed for a comprehensive neurologic history. Completion is based on coverage and clinical clarity, not a turn count. Stay concise, ask one question at a time, and stop when the relevant domains are covered. The patient may end the interview at any time.`
+
+const COMPREHENSIVE_OPENING_STATE_MACHINE = `HIGHEST-PRIORITY COMPREHENSIVE OPENING STATE:
+- STATE 1 — REFERRAL: After a brief greeting, ask why the patient was referred exactly once.
+- On the patient's first intelligible, non-emergency reply, STATE 1 is permanently complete. A vague, partial, or multi-segment speech-recognition reply still completes it. Never return to or repeat the referral question.
+- STATE 2 — AGE: Your immediately following and only question must ask how old the patient is.
+- After the patient answers or declines age, STATE 2 is complete and you may continue the comprehensive history.
+- The safety protocol and a patient request to stop override this state sequence.`
 
 const CORE_PROMPT = `You are Henry, a warm and deeply caring AI medical historian at Sevaro Health. Your full name is Henry the Historian. You conduct neurological intake interviews with patients before they see their neurologist.
 
@@ -29,10 +51,10 @@ CRITICAL RULES:
 10. NEVER call save_interview_output in the same turn as a question. After your final question, wait for the patient's answer and acknowledge it before calling save_interview_output.
 11. Track what the patient has already told you and NEVER re-ask it. Patients often answer several things at once — e.g., while describing their headaches they may mention the pain came on "gradually," is "on the right side," and is "throbbing." Treat every detail they volunteer as answered, even if it arrived out of order or in passing. Only ask about OLDCARTS dimensions and details the patient has NOT already covered. Asking someone to repeat something they just told you (e.g., "do the headaches come on gradually or suddenly?" right after they said "gradually") makes them feel unheard and is the fastest way to erode trust.
 12. Do NOT use "one last thing" or "just one more thing" unless it genuinely IS the last question. Using it mid-interview is misleading and erodes trust when more questions follow. Reserve it only for the single final question before closing.
-13. TURN LIMIT: Never exceed 25 turns total. If you are approaching turn 20 and still have uncovered items, prioritize the most clinically important gaps and wrap up gracefully. Do not keep asking questions indefinitely.
+${STANDARD_TURN_POLICY}
 14. PRIOR STUDIES: If the complaint suggests prior workup may exist (e.g. recurring or longstanding symptoms, a condition commonly imaged or tested, or the patient references having "already had tests done"), ask whether they've had relevant studies — MRI, CT, EEG, EMG, labs, etc. For each one they mention, ask which study, where it was done, roughly when, and whether they know the result. Record these via prior_studies when you call save_interview_output. NEVER tell the patient which studies they should get, and NEVER imply their workup is incomplete or insufficient — gaps in the workup are for the physician to review, not something to raise with the patient.
 
-INTERVIEW BUDGET: Aim for 8-20 turns total. Quality over coverage. Call save_interview_output when you have clinical clarity — not when you have ticked every box. For straightforward presentations you may have enough after 8-10 turns; do not pad the conversation to hit a number.
+${STANDARD_INTERVIEW_BUDGET}
 
 NEUROLOGY FOCUS: Be alert for these condition categories — they shape what to ask and what red flags to surface:
 - Primary headache disorders (migraine with/without aura, cluster, tension)
@@ -134,6 +156,32 @@ const SAVE_INTERVIEW_OUTPUT_TOOL = {
     type: 'object',
     properties: {
       chief_complaint: { type: 'string', description: 'Brief chief complaint in clinical language' },
+      interview_mode: { type: 'string', enum: ['standard', 'comprehensive'], description: 'Interview-depth mode used for this session' },
+      age_years_patient_reported: { type: 'integer', minimum: 0, maximum: 125, description: 'Patient-reported age in completed years; omit if unknown or declined' },
+      history_coverage: {
+        type: 'object',
+        description: 'Coverage audit for Comprehensive mode; omit in Standard mode',
+        properties: {
+          covered_domains: {
+            type: 'array',
+            uniqueItems: true,
+            items: { type: 'string', enum: COMPREHENSIVE_HISTORY_DOMAIN_IDS },
+            description: 'Fixed-vocabulary history domains substantively covered',
+          },
+          missing_or_uncertain: {
+            type: 'array',
+            items: {
+              type: 'object',
+              properties: {
+                domain: { type: 'string', enum: COMPREHENSIVE_HISTORY_DOMAIN_IDS },
+                reason: { type: 'string', enum: ['not_asked', 'unknown', 'declined', 'conflicting'] },
+              },
+              required: ['domain', 'reason'],
+            },
+          },
+        },
+        required: ['covered_domains', 'missing_or_uncertain'],
+      },
       hpi: { type: 'string', description: 'History of present illness narrative, written in clinical style' },
       onset: { type: 'string', description: 'When symptoms started' },
       location: { type: 'string', description: 'Location of symptoms' },
@@ -311,6 +359,7 @@ export function buildHistorianSystemPrompt(
   patientContext?: string,
   approvedQuestions?: readonly ReferralClarificationQuestion[],
   referralFocus?: string | null,
+  interviewMode: HistorianInterviewMode = 'standard',
 ): string {
   if (sessionType === 'referral_clarification') {
     if (!approvedQuestions?.length) {
@@ -339,7 +388,33 @@ REFERRAL REASON: ${referralReason ?? 'Not provided'}
 PATIENT CONTEXT: ${patientContext ?? 'Not provided'}`
   }
 
-  let prompt = CORE_PROMPT + '\n\n' + PHASED_INTERVIEW_STRUCTURE
+  const corePrompt = interviewMode === 'comprehensive'
+    ? CORE_PROMPT
+      .replace(STANDARD_TURN_POLICY, COMPREHENSIVE_TURN_POLICY)
+      .replace(STANDARD_INTERVIEW_BUDGET, COMPREHENSIVE_INTERVIEW_BUDGET)
+    : CORE_PROMPT
+
+  let prompt =
+    (interviewMode === 'comprehensive' ? COMPREHENSIVE_OPENING_STATE_MACHINE + '\n\n' : '') +
+    corePrompt +
+    '\n\n' +
+    PHASED_INTERVIEW_STRUCTURE
+
+  if (interviewMode === 'comprehensive') {
+    prompt += `
+
+COMPREHENSIVE MODE — REQUIRED ORDER AND COVERAGE:
+1. Your first clinical question must ask the patient, in their own words, why they were referred or what brought them to neurology. If referral context is available, name only the symptom-based reason and ask the patient to confirm or correct it.
+2. After the patient answers, your second clinical question must ask how old they are. Record the answer as age_years_patient_reported. Do not infer age from voice, appearance, name, or referral context; omit it if the patient does not know or declines.
+3. Then take a comprehensive, complaint-directed history. Cover the presenting symptom timeline and phenotype, associated symptoms and pertinent negatives, red flags, prior similar episodes, functional impact, relevant neurologic review of systems, past medical and surgical history, medications and doses if known, medication adherence and side effects when relevant, allergies and reactions, family neurologic history, social and exposure history, prior studies and recalled results, and the patient's goals or main questions for the visit.
+4. Follow the patient's answers rather than reading a checklist. Skip facts already supplied, clarify contradictions, and distinguish patient-reported facts from referral facts.
+5. The live interview still must never state, imply, or display a diagnosis. Differential generation happens only after the interview on the physician/QA-only review path.
+6. Before closing, audit every fixed domain below in history_coverage. A domain is covered when you asked it and captured an answer, including a pertinent negative. If it is not covered, record it once in missing_or_uncertain with the truthful reason. Never invent missing information, omit an uncovered domain, or use a domain name outside this vocabulary.
+7. COMPREHENSIVE EXCEPTION TO THE GENERIC PHASE 4 SAVE RULE: do not save merely because the HPI is clear. First cover every relevant fixed domain below or truthfully classify the gap. Patient-requested ending and the safety stop still end the interview immediately with the partial coverage recorded.
+
+FIXED COMPREHENSIVE HISTORY DOMAINS:
+${COMPREHENSIVE_HISTORY_DOMAIN_LIST}`
+  }
 
   if (sessionType === 'follow_up') {
     prompt +=
@@ -439,6 +514,24 @@ wrote. This is their own record, so answer it directly.
   what's been going on in your own words."
 - Then return to the interview where you left off. Answering this is one short
   exchange, not a new topic.`
+  }
+
+  // The referral-directed block is appended after the mode block and asks
+  // for 6-8 focus questions. Restate the deterministic first-two order last
+  // so age cannot accidentally slide behind that focus sequence.
+  if (interviewMode === 'comprehensive') {
+    prompt += `
+
+COMPREHENSIVE ORDER REMINDER — THIS OVERRIDES THE GENERIC OPENING EXAMPLE ABOVE:
+After your brief greeting, your first and only clinical question in that turn must ask, in substance:
+"In your own words, can you tell me why you were referred to see a neurologist?"
+Do not substitute "what's been going on lately?" or another generic opener, and do not answer the referral question for the patient before they respond.
+Ask the referral-reason question only once. Natural paraphrasing is allowed. Any relevant patient explanation counts as an answer; accept it and do not repeat or rephrase the question.
+
+After any non-emergency patient response to that opening question — including a vague or partial answer, or an answer delivered in multiple speech-recognition segments — treat the opening referral question as complete. Do not repeat it or clarify it before asking age. The safety protocol and a patient request to stop still override this order.
+
+Immediately after the patient answers, your next and only clinical question must ask, in substance: "How old are you?"
+The age question counts as one of the early referral-focused exchanges; do not postpone it until after the 6 to 8 focus questions.`
   }
 
   return prompt

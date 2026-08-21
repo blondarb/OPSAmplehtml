@@ -90,6 +90,7 @@ export class NovaSonicWsProvider implements VoiceProvider {
         instructions: opts.instructions,
         tools: opts.tools,
         voiceId: opts.voiceId,
+        interviewMode: opts.interviewMode,
       })
 
       // Start mic capture: each 16k PCM16 base64 chunk becomes an `audio` msg.

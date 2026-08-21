@@ -10,6 +10,7 @@ import IntakeReviewSection from './consult/IntakeReviewSection'
 import HistorianTranscriptViewer from './historian/HistorianTranscriptViewer'
 import DifferentialCard from './historian/DifferentialCard'
 import DdxComparisonCard from './historian/DdxComparisonCard'
+import HistoryCoverageCard from './historian/HistoryCoverageCard'
 
 interface HistorianReportViewProps {
   structuredOutput: HistorianStructuredOutput | null
@@ -67,7 +68,7 @@ interface HistorianReportViewProps {
    * scope). Content and structure are identical in both themes.
    */
   theme?: 'dark' | 'clinical'
-  onStartAnother: () => void
+  onStartAnother?: () => void
   onBackToPortal: () => void
 }
 
@@ -255,17 +256,19 @@ export default function HistorianReportView({
 
       {/* Actions */}
       <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', justifyContent: 'center' }}>
-        <button
-          onClick={onStartAnother}
-          className={clinical ? 'nn-btn nn-btn--sec' : undefined}
-          style={clinical ? undefined : {
-            padding: '12px 24px', borderRadius: '8px',
-            background: '#1e293b', border: '1px solid #334155',
-            color: '#e2e8f0', fontWeight: 600, fontSize: '0.875rem', cursor: 'pointer',
-          }}
-        >
-          Start Another Interview
-        </button>
+        {onStartAnother && (
+          <button
+            onClick={onStartAnother}
+            className={clinical ? 'nn-btn nn-btn--sec' : undefined}
+            style={clinical ? undefined : {
+              padding: '12px 24px', borderRadius: '8px',
+              background: '#1e293b', border: '1px solid #334155',
+              color: '#e2e8f0', fontWeight: 600, fontSize: '0.875rem', cursor: 'pointer',
+            }}
+          >
+            Start Another Interview
+          </button>
+        )}
         <button
           onClick={onBackToPortal}
           className={clinical ? 'nn-btn' : undefined}
@@ -341,6 +344,16 @@ function PhysicianReportTab({
           historian_summary: narrativeSummary,
         }}
       />
+
+      {surface === 'physician' && structuredOutput?.interview_mode === 'comprehensive' && (
+        <div style={{ marginTop: 16 }}>
+          <HistoryCoverageCard
+            coverage={structuredOutput.history_coverage}
+            ageYearsPatientReported={structuredOutput.age_years_patient_reported}
+            theme="dark"
+          />
+        </div>
+      )}
 
       {/* Design spec locked decision L1: DDx/thoroughness content is
           physician/QA-facing ONLY, never patient-facing. Gated directly on

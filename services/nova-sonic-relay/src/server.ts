@@ -2,6 +2,10 @@ import crypto from 'crypto'
 import http, { type IncomingMessage } from 'http'
 import { WebSocketServer, WebSocket } from 'ws'
 import { NovaSonicSession } from './novaSonicSession.js'
+import {
+  COMPREHENSIVE_AGE_NUDGE,
+  comprehensiveOpeningAction,
+} from './comprehensiveOpening.js'
 import { TranscribeMedicalSession } from './transcribeMedicalSession.js'
 import type { ClientMsg, ServerMsg } from './wsProtocol.js'
 
@@ -179,6 +183,8 @@ wss.on('connection', (ws) => {
   // completionEnd or bargeIn. A precise turn model would require richer signals
   // from the model, but this is sufficient for rendering and barge-in UX.
   let aiSpeaking = false
+  let interviewMode: 'standard' | 'comprehensive' = 'standard'
+  let comprehensiveOpeningSettled = false
 
   function startAiSpeech(): void {
     if (!aiSpeaking) {
@@ -201,6 +207,15 @@ wss.on('connection', (ws) => {
       TRACE(`-> text[${role}] ${JSON.stringify(content.slice(0, 60))}`)
       if (role.toUpperCase() === 'USER') {
         send(ws, { t: 'userTranscript', text: content })
+        const action = comprehensiveOpeningAction(
+          interviewMode,
+          comprehensiveOpeningSettled,
+          content,
+        )
+        if (action !== 'ignore') {
+          comprehensiveOpeningSettled = true
+          if (action === 'ask_age') session.pushSystemText(COMPREHENSIVE_AGE_NUDGE)
+        }
       } else {
         send(ws, { t: 'assistantTranscript', text: content })
       }
@@ -286,6 +301,8 @@ wss.on('connection', (ws) => {
     try {
       switch (msg.t) {
         case 'start':
+          interviewMode = msg.interviewMode === 'comprehensive' ? 'comprehensive' : 'standard'
+          comprehensiveOpeningSettled = false
           TRACE(`<- start (tools=${(msg.tools as unknown[] | undefined)?.length ?? 0})`)
           // start() surfaces any stream-open failure via the session's onError
           // callback (mapped to {t:'error'} above). This .catch only prevents an

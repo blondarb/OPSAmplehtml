@@ -107,6 +107,8 @@ describe('DdxComparisonCard', () => {
     expect(markup).toContain('G44.209')
     expect(markup).toContain('Sonnet')
     expect(markup).toContain('DeepSeek-R1')
+    expect(markup).toMatch(/uncalibrated model estimates/i)
+    expect(markup).toMatch(/not statistical confidence intervals/i)
   })
 
   it('shows a Top-1 Match badge and no disagreement flag when agreement.top1Match is true and there are no disagreements', () => {

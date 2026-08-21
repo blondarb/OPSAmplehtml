@@ -1,5 +1,4 @@
 import { NextResponse } from 'next/server'
-import { getUser } from '@/lib/cognito/server'
 import { getTenantServer } from '@/lib/tenant'
 import { from } from '@/lib/db-query'
 import { linkHistorianToConsult } from '@/lib/consult/pipeline'
@@ -9,6 +8,13 @@ import { runFinalDifferential } from '@/lib/historian/eval/finalDifferential'
 import { runThoroughnessJudge } from '@/lib/historian/eval/thoroughnessJudge'
 import { runIndependentDdxAndAgreement } from '@/lib/historian/eval/independentDdx'
 import type { HistorianTranscriptEntry } from '@/lib/historianTypes'
+import { resolveHistorianPatientGrant } from '@/lib/historian/invitationStore'
+import { HISTORIAN_GRANT_COOKIE, readCookieValue } from '@/lib/historian/invitationTokens'
+import { saveInvitedHistorianSession } from '@/lib/historian/invitedSave'
+import {
+  authorizeClinicalAccess,
+  clinicalAccessDeniedMessage,
+} from '@/lib/auth/clinicalAccess'
 
 // ── Auth boundary (binding — read before adding a new handler here) ─────────
 // POST = patient-portal pattern, intentionally UNAUTHENTICATED (same bar as
@@ -18,7 +24,7 @@ import type { HistorianTranscriptEntry } from '@/lib/historianTypes'
 // re-auditing every patient-facing caller (NeurologicHistorian.tsx,
 // EmbeddedHistorian.tsx) for a login requirement that doesn't exist today.
 //
-// GET = physician-only, Cognito-authenticated. It returns patient names,
+// GET = clinical-team only, Cognito + active tenant membership. It returns patient names,
 // MRNs, full interview transcripts, and (Historian Validation Suite Task 4)
 // both the pipeline and independent differentials — never acceptable
 // unauthenticated. Confirmed callers (2026-07-21 review fix): ClinicalNote.tsx
@@ -31,6 +37,33 @@ import type { HistorianTranscriptEntry } from '@/lib/historianTypes'
 export async function POST(request: Request) {
   try {
     const body = await request.json()
+
+    // Comprehensive remote-patient path. The HttpOnly browser grant binds the
+    // session to the clinician-created invitation; no tenant/patient/consult,
+    // provider, mode, prompt, referral, or session identity is accepted from
+    // the browser. A present-but-invalid grant fails closed and never falls
+    // through to the legacy public demo save path below.
+    const invitationBinding = await resolveHistorianPatientGrant(request)
+    if (readCookieValue(request, HISTORIAN_GRANT_COOKIE) && !invitationBinding) {
+      return NextResponse.json(
+        { error: 'This interview session is invalid or has expired.' },
+        { status: 401 },
+      )
+    }
+    if (invitationBinding) {
+      const result = await saveInvitedHistorianSession(invitationBinding, body)
+      if (!result.ok) {
+        return NextResponse.json({ error: result.error }, { status: result.status })
+      }
+
+      return NextResponse.json({
+        session: { id: result.sessionId, status: 'completed' },
+        consult_id: result.consultId,
+        evaluation_status: result.evaluationStatus,
+        replayed: result.replayed,
+      })
+    }
+
     const tenant = body.tenant_id || getTenantServer()
 
 
@@ -265,14 +298,21 @@ export async function POST(request: Request) {
 
 export async function GET(request: Request) {
   try {
-    // Physician-only — see the auth-boundary comment above the POST handler.
-    const user = await getUser()
-    if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    const access = await authorizeClinicalAccess({
+      action: 'historian.report_read',
+      allowedRoles: ['viewer', 'clinician', 'admin'],
+    })
+    if (!access.ok) {
+      return NextResponse.json(
+        { error: clinicalAccessDeniedMessage(access.reason), reason: access.reason },
+        { status: access.status },
+      )
     }
 
     const { searchParams } = new URL(request.url)
-    const tenant = searchParams.get('tenant_id') || getTenantServer()
+    // Never honor a caller-selected tenant for a PHI-bearing report. The
+    // active clinical membership is the tenant authority.
+    const tenant = access.context.tenantId
     const patientId = searchParams.get('patient_id')
 
     const { getPool } = await import('@/lib/db')
@@ -321,6 +361,40 @@ export async function GET(request: Request) {
           'id', p."id", 'first_name', p."first_name", 'last_name', p."last_name", 'mrn', p."mrn"
         ) ELSE NULL END AS patient,
         ddx.result AS independent_ddx,
+        agr.result AS agreement,
+        job.status AS evaluation_status,
+        job.attempt_count AS evaluation_attempt_count,
+        job.last_error_code AS evaluation_error_code
+      FROM "historian_sessions" hs
+      LEFT JOIN "patients" p ON p."id" = hs."patient_id"
+      LEFT JOIN historian_eval_jobs job
+        ON job.session_id = hs.id AND job.tenant_id = hs.tenant_id
+      LEFT JOIN LATERAL (
+        SELECT result FROM historian_evaluations
+        WHERE session_id = hs.id::text AND evaluator = 'independent_ddx'
+        ORDER BY created_at DESC LIMIT 1
+      ) ddx ON true
+      LEFT JOIN LATERAL (
+        SELECT result FROM historian_evaluations
+        WHERE session_id = hs.id::text AND evaluator = 'agreement'
+        ORDER BY created_at DESC LIMIT 1
+      ) agr ON true
+      WHERE ${conditions.join(' AND ')}
+      ORDER BY hs."created_at" DESC
+      LIMIT 10
+    `
+
+    // Explicit query for the migration-058-only state. Keep this as SQL rather
+    // than rewriting `enrichedSql` with string replacement: whitespace or a
+    // future SELECT change must not accidentally leave a dangling `job.*`
+    // reference in the clinician report path.
+    const legacyEnrichedSql = `
+      SELECT
+        hs.*,
+        CASE WHEN p."id" IS NOT NULL THEN json_build_object(
+          'id', p."id", 'first_name', p."first_name", 'last_name', p."last_name", 'mrn', p."mrn"
+        ) ELSE NULL END AS patient,
+        ddx.result AS independent_ddx,
         agr.result AS agreement
       FROM "historian_sessions" hs
       LEFT JOIN "patients" p ON p."id" = hs."patient_id"
@@ -346,9 +420,17 @@ export async function GET(request: Request) {
       const pgCode = (enrichErr as { code?: string } | undefined)?.code
       if (pgCode === '42P01') {
         console.info(
-          '[historian/list] historian_evaluations table not present yet (migration 058 not applied) — falling back to the base session query',
+          '[historian/list] evaluator/job table not present yet — retrying with the legacy clinician query',
         )
-        ;({ rows } = await pool.query(baseSql, values))
+        try {
+          ;({ rows } = await pool.query(legacyEnrichedSql, values))
+        } catch (legacyErr: unknown) {
+          if ((legacyErr as { code?: string } | undefined)?.code !== '42P01') throw legacyErr
+          console.info(
+            '[historian/list] historian_evaluations table not present yet (migration 058 not applied) — falling back to the base session query',
+          )
+          ;({ rows } = await pool.query(baseSql, values))
+        }
       } else {
         throw enrichErr
       }

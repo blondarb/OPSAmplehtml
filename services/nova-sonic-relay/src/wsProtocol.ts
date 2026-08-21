@@ -3,7 +3,7 @@
 
 // Browser → relay
 export type ClientMsg =
-  | { t: 'start'; instructions: string; tools: unknown[]; voiceId?: string }
+  | { t: 'start'; instructions: string; tools: unknown[]; voiceId?: string; interviewMode?: 'standard' | 'comprehensive' }
   | { t: 'audio'; pcm: string }            // base64 PCM16 @16k
   | { t: 'userTurnEnd' }
   | { t: 'toolResult'; toolUseId: string; output: string }

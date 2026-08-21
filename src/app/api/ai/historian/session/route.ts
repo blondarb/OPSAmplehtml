@@ -2,6 +2,7 @@ import crypto from 'crypto'
 import { NextResponse } from 'next/server'
 import { buildHistorianSystemPrompt, getHistorianToolDefinition, getHistorianToolsForProvider } from '@/lib/historianPrompts'
 import type { HistorianSessionType } from '@/lib/historianTypes'
+import type { HistorianInterviewMode, HistorianInterviewPromptVersion } from '@/lib/historianTypes'
 import { getTurnDetectionConfig, getNoiseReductionConfig } from '@/lib/historianTypes'
 import { getOpenAIKey } from '@/lib/secrets'
 import { getConsult, markHistorianStarted } from '@/lib/consult/pipeline'
@@ -12,7 +13,13 @@ import {
 import { buildWhisperBiasPrompt, isAsrBiasingEnabled } from '@/lib/asr/clinical-lexicon'
 import { mintFlushToken } from '@/lib/historian/flushToken'
 import { allowedAppOrigins, checkPublicRouteAbuse } from '@/lib/api/publicRouteGuard'
+import { authorizeClinicalAccess, clinicalAccessDeniedMessage } from '@/lib/auth/clinicalAccess'
 import { resolveReferralPayload } from './referralPayload'
+import {
+  markHistorianInvitationStarted,
+  resolveHistorianPatientGrant,
+} from '@/lib/historian/invitationStore'
+import { HISTORIAN_GRANT_COOKIE, readCookieValue } from '@/lib/historian/invitationTokens'
 
 /**
  * Mint a short-lived relay auth token for the Nova Sonic WS relay
@@ -85,7 +92,7 @@ export async function POST(request: Request) {
     // 100% behavior-preserving for every existing caller: nothing later in
     // this function reads sessionId/flushToken before they're used, and
     // nothing before this point used to run before they were minted either.
-    const sessionId = crypto.randomUUID()
+    let sessionId: string = crypto.randomUUID()
     let flushToken: string | undefined
     try {
       flushToken = mintFlushToken(sessionId)
@@ -115,15 +122,72 @@ export async function POST(request: Request) {
       return NextResponse.json({ sessionId, flushToken })
     }
 
-    const sessionType: HistorianSessionType = body.sessionType || 'new_patient'
-    let referralReason: string | undefined = body.referralReason
-    let patientContext: string | undefined = body.patientContext
+    // A remote patient is authorized by a one-time clinician invitation that
+    // has already been exchanged for an HttpOnly browser grant. Resolve that
+    // binding before trusting any client fields. If a grant cookie is present
+    // but invalid/expired, fail closed instead of silently falling back to the
+    // anonymous demo path.
+    const invitationBinding = await resolveHistorianPatientGrant(request)
+    if (readCookieValue(request, HISTORIAN_GRANT_COOKIE) && !invitationBinding) {
+      return NextResponse.json(
+        { error: 'This interview session is invalid or has expired.' },
+        { status: 401 },
+      )
+    }
+    if (invitationBinding?.status === 'completed') {
+      return NextResponse.json(
+        { error: 'This interview has already been completed.' },
+        { status: 409 },
+      )
+    }
+    if (invitationBinding?.status === 'in_progress') {
+      return NextResponse.json(
+        { error: 'This interview was interrupted and cannot be restarted safely. Please ask the clinic for a new link.' },
+        { status: 409 },
+      )
+    }
+    if (invitationBinding) {
+      sessionId = invitationBinding.sessionId
+      try {
+        flushToken = mintFlushToken(sessionId)
+      } catch (flushTokenErr) {
+        console.warn(
+          '[historian/session] mintFlushToken failed for invited session:',
+          flushTokenErr instanceof Error ? flushTokenErr.message : String(flushTokenErr),
+        )
+        flushToken = undefined
+      }
+    }
+
+    const sessionType: HistorianSessionType = invitationBinding?.sessionType || body.sessionType || 'new_patient'
+    const interviewMode: HistorianInterviewMode =
+      invitationBinding?.interviewMode ||
+      (body.interviewMode === 'comprehensive' ? 'comprehensive' : 'standard')
+    const interviewPromptVersion: HistorianInterviewPromptVersion =
+      invitationBinding?.interviewPromptVersion ||
+      (interviewMode === 'comprehensive' ? 'comprehensive-v1' : 'standard-v1')
+    let authorizedTenantId: string | null = invitationBinding?.tenantId ?? null
+    if (interviewMode === 'comprehensive' && !invitationBinding) {
+      const access = await authorizeClinicalAccess({
+        action: 'historian.start',
+        allowedRoles: ['clinician', 'admin'],
+      })
+      if (!access.ok) {
+        return NextResponse.json(
+          { error: clinicalAccessDeniedMessage(access.reason), reason: access.reason },
+          { status: access.status },
+        )
+      }
+      authorizedTenantId = access.context.tenantId
+    }
+    let referralReason: string | undefined = invitationBinding?.referralReason || body.referralReason
+    let patientContext: string | undefined = invitationBinding ? undefined : body.patientContext
 
     // A referral payload (from /consult or the note entry point on
     // /patient/historian) overrides caller-supplied context and supplies the
     // directive focus. Malformed payloads resolve to null and the interview
     // proceeds exactly as it does today.
-    const referralContext = resolveReferralPayload(body)
+    const referralContext = invitationBinding ? null : resolveReferralPayload(body)
     let referralFocus: string | null = null
     if (referralContext) {
       referralReason = referralContext.referralReason
@@ -167,13 +231,20 @@ export async function POST(request: Request) {
     // server-side VOICE_PROVIDER env var, else default to 'openai' — today's
     // production path. Only 'nova' opts into the WS-relay/Bedrock path; any
     // other/missing value falls back to openai (fail-safe default).
-    const requestedProvider = (body.provider ?? process.env.VOICE_PROVIDER ?? 'openai') as string
-    const provider: 'nova' | 'openai' = requestedProvider === 'nova' ? 'nova' : 'openai'
+    const requestedProvider = (
+      invitationBinding?.provider ?? body.provider ?? process.env.VOICE_PROVIDER ?? 'openai'
+    ) as string
+    // Comprehensive v1 is a Nova-only controlled pilot. Resolve this on the
+    // server so a stale client/default cannot silently run the wrong provider.
+    // Standard retains the existing explicit-client/env/default behavior.
+    const provider: 'nova' | 'openai' = interviewMode === 'comprehensive'
+      ? 'nova'
+      : requestedProvider === 'nova' ? 'nova' : 'openai'
 
     // Phase 1 pipeline: enrich the historian context with triage + intake from
     // the consult record. Caller-provided values are overridden when a consult
     // is found — the pipeline data is more authoritative.
-    const consultId: string | undefined = body.consult_id
+    const consultId: string | undefined = invitationBinding?.consultId || body.consult_id
     if (consultId) {
       try {
         const consult = await getConsult(consultId)
@@ -185,11 +256,20 @@ export async function POST(request: Request) {
           // without this, /consult sessions would get referral context but no
           // referral-directed priority.
           referralFocus = deriveConsultReferralFocus(consult)
-          // Pre-tenancy caller: migration 048 backfills tenant_id 'default'
-          await markHistorianStarted(consultId, 'default')
+          await markHistorianStarted(consultId, authorizedTenantId || 'default')
         }
       } catch (pipelineErr) {
         console.error('[historian/session] consult context build error (non-fatal):', pipelineErr)
+      }
+    }
+
+    if (invitationBinding) {
+      const markedStarted = await markHistorianInvitationStarted(invitationBinding)
+      if (!markedStarted) {
+        return NextResponse.json(
+          { error: 'This interview could not be started. Please ask the clinic for a new link.' },
+          { status: 409 },
+        )
       }
     }
 
@@ -200,11 +280,11 @@ export async function POST(request: Request) {
     // Nova-native tool specs (Bedrock Converse toolSpec shape). The hook
     // builds a NovaSonicWsProvider from this — no ephemeral key needed.
     if (provider === 'nova') {
-      const instructions = buildHistorianSystemPrompt(sessionType, referralReason, patientContext, undefined, referralFocus)
+      const instructions = buildHistorianSystemPrompt(sessionType, referralReason, patientContext, undefined, referralFocus, interviewMode)
       return NextResponse.json({
         provider: 'nova',
         instructions,
-        tools: getHistorianToolsForProvider('nova'),
+        tools: getHistorianToolsForProvider('nova', sessionType),
         relayUrl: process.env.NOVA_SONIC_RELAY_URL,
         voiceId: process.env.NOVA_SONIC_VOICE_ID,
         // Short-lived relay auth token (see mintNovaRelayToken above).
@@ -219,6 +299,8 @@ export async function POST(request: Request) {
         // matching transcript-flush bearer token.
         sessionId,
         flushToken,
+        interviewMode,
+        interviewPromptVersion,
       })
     }
 
@@ -231,8 +313,8 @@ export async function POST(request: Request) {
       )
     }
 
-    const instructions = buildHistorianSystemPrompt(sessionType, referralReason, patientContext, undefined, referralFocus)
-    const tools = getHistorianToolDefinition()
+    const instructions = buildHistorianSystemPrompt(sessionType, referralReason, patientContext, undefined, referralFocus, interviewMode)
+    const tools = getHistorianToolDefinition(sessionType)
     const model = process.env.OPENAI_HISTORIAN_REALTIME_MODEL || 'gpt-realtime-2'
     const turnDetection = getTurnDetectionConfig(process.env.HISTORIAN_TURN_DETECTION_MODE)
     // Filter background noise before it reaches the VAD + model so noisy rooms
@@ -332,6 +414,8 @@ export async function POST(request: Request) {
       // branch above — minted once per POST regardless of provider.
       sessionId,
       flushToken,
+      interviewMode,
+      interviewPromptVersion,
       // Pass the resolved model + turn detection mode back so the client knows
       // exactly which configuration is active (for debugging + analytics)
       model,
@@ -341,10 +425,10 @@ export async function POST(request: Request) {
       // Localizer context updates (BASE_PROMPT + delta).
       base_instructions: instructions,
     })
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('[historian/session] API error:', error)
     return NextResponse.json(
-      { error: error?.message || 'Failed to create historian session' },
+      { error: error instanceof Error ? error.message : 'Failed to create historian session' },
       { status: 500 },
     )
   }

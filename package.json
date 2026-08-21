@@ -15,7 +15,8 @@
     "seed:wearable": "npx tsx scripts/seed-wearable-demo.ts",
     "triage:sentinel": "npx tsx scripts/triage-sentinel.ts",
     "historian:eval": "npx tsx scripts/historian-eval.ts",
-    "historian:synthetic": "npx tsx scripts/historian-synthetic-run.ts"
+    "historian:synthetic": "npx tsx scripts/historian-synthetic-run.ts",
+    "historian:nova-smoke": "npx tsx scripts/nova-historian-comprehensive-smoke.ts"
   },
   "dependencies": {
     "@aws-sdk/client-bedrock-agent-runtime": "^3.1003.0",
