@@ -16,7 +16,8 @@
     "triage:sentinel": "npx tsx scripts/triage-sentinel.ts",
     "historian:eval": "npx tsx scripts/historian-eval.ts",
     "historian:synthetic": "npx tsx scripts/historian-synthetic-run.ts",
-    "historian:nova-smoke": "npx tsx scripts/nova-historian-comprehensive-smoke.ts"
+    "historian:nova-smoke": "npx tsx scripts/nova-historian-comprehensive-smoke.ts",
+    "historian:nova-mvp": "npx tsx scripts/nova-historian-mvp-acceptance.ts"
   },
   "dependencies": {
     "@aws-sdk/client-bedrock-agent-runtime": "^3.1003.0",

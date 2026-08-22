@@ -13,6 +13,11 @@ import {
   continuationHistory,
   validateContinuationCheckpoint,
 } from './continuationCheckpoint.js'
+import {
+  ContinuationTestBoundarySchedule,
+  continuationTestBoundaryAfterTool,
+  continuationTestBoundaryExchanges,
+} from './continuationTestSchedule.js'
 
 // ---------------------------------------------------------------------------
 // HTTP server — answers GET /healthz for App Runner health checks; 404 otherwise.
@@ -193,6 +198,8 @@ const CONTINUATION_DUE_MS = continuationTiming('NOVA_CONTINUATION_TEST_DUE_MS', 
 const CONTINUATION_BARRIER_MS = continuationTiming('NOVA_CONTINUATION_TEST_BARRIER_MS', 240_000)
 const CONTINUATION_DEADLINE_MS = continuationTiming('NOVA_CONTINUATION_TEST_DEADLINE_MS', 270_000)
 const CANDIDATE_STABILITY_MS = continuationTiming('NOVA_CONTINUATION_TEST_STABILITY_MS', 1_000)
+const CONTINUATION_TEST_BOUNDARY_EXCHANGES = continuationTestBoundaryExchanges()
+const CONTINUATION_TEST_BOUNDARY_AFTER_TOOL = continuationTestBoundaryAfterTool()
 const CONTINUATION_BUFFER_MAX_BASE64_CHARS = 1_280_000 // 30s PCM16@16k, base64 encoded
 const OLD_SEGMENT_STOP_TIMEOUT_MS = 5_000
 
@@ -215,6 +222,8 @@ wss.on('connection', (ws) => {
   let outputQuarantined = false
   let rotationInProgress = false
   let dueSent = false
+  let testBoundaryPending = false
+  let continuationDeadlineAtMs = 0
   let dueTimer: ReturnType<typeof setTimeout> | null = null
   let deadlineTimer: ReturnType<typeof setTimeout> | null = null
   const pendingTools = new Set<string>()
@@ -233,6 +242,10 @@ wss.on('connection', (ws) => {
     lastAudioSeq: number
     deadlineAtMs: number
   } | null = null
+  const testBoundarySchedule = new ContinuationTestBoundarySchedule(
+    CONTINUATION_TEST_BOUNDARY_EXCHANGES,
+    CONTINUATION_TEST_BOUNDARY_AFTER_TOOL,
+  )
 
   function terminateModelSession(reason: 'nova_stream_error' | 'nova_stream_ended'): void {
     if (modelTerminalSent) return
@@ -257,24 +270,54 @@ wss.on('connection', (ws) => {
   }
 
   function maybeSendContinuationDue(segmentId = activeSegmentId): void {
+    if (
+      testBoundarySchedule.enabled()
+    ) return
     if (clientStopping || modelTerminalSent || !continuationApplicable() || dueSent || segmentId !== activeSegmentId || !segmentStartedAt) return
     if (Date.now() - segmentStartedAt < CONTINUATION_DUE_MS) return
     dueSent = true
-    const deadlineAtMs = segmentStartedAt + CONTINUATION_DEADLINE_MS
-    send(ws, { t: 'continuationDue', segmentId, deadlineAtMs })
+    continuationDeadlineAtMs = segmentStartedAt + CONTINUATION_DEADLINE_MS
+    send(ws, { t: 'continuationDue', segmentId, deadlineAtMs: continuationDeadlineAtMs })
+  }
+
+  function maybeSendTestBoundaryDue(): void {
+    if (
+      clientStopping ||
+      modelTerminalSent ||
+      !continuationApplicable() ||
+      dueSent
+    ) return
+    dueSent = true
+    testBoundaryPending = true
+    continuationDeadlineAtMs = Date.now() + CONTINUATION_DEADLINE_MS
+    send(ws, {
+      t: 'continuationDue',
+      segmentId: activeSegmentId,
+      deadlineAtMs: continuationDeadlineAtMs,
+    })
+    deadlineTimer = setTimeout(() => {
+      if (modelTerminalSent || !testBoundaryPending) return
+      failContinuation('deadline', barrier?.id)
+    }, CONTINUATION_DEADLINE_MS)
   }
 
   function armContinuationClock(): void {
     clearContinuationTimers()
     dueSent = false
+    testBoundaryPending = false
+    continuationDeadlineAtMs = 0
     segmentStartedAt = Date.now()
     const segmentId = activeSegmentId
     if (clientStopping || modelTerminalSent || !CONTINUATION_ENABLED || interviewMode !== 'comprehensive') return
-    dueTimer = setTimeout(() => maybeSendContinuationDue(segmentId), CONTINUATION_DUE_MS)
-    deadlineTimer = setTimeout(() => {
-      if (segmentId !== activeSegmentId || modelTerminalSent) return
-      failContinuation('deadline', barrier?.id)
-    }, CONTINUATION_DEADLINE_MS)
+    if (
+      !testBoundarySchedule.enabled()
+    ) {
+      dueTimer = setTimeout(() => maybeSendContinuationDue(segmentId), CONTINUATION_DUE_MS)
+      deadlineTimer = setTimeout(() => {
+        if (segmentId !== activeSegmentId || modelTerminalSent) return
+        failContinuation('deadline', barrier?.id)
+      }, CONTINUATION_DEADLINE_MS)
+    }
   }
 
   function failContinuation(
@@ -316,10 +359,10 @@ wss.on('connection', (ws) => {
       pendingTools.size > 0 ||
       clientStopping ||
       modelTerminalSent ||
-      Date.now() - segmentStartedAt < CONTINUATION_BARRIER_MS
+      (!testBoundaryPending && Date.now() - segmentStartedAt < CONTINUATION_BARRIER_MS)
     ) return
     const id = crypto.randomUUID()
-    const deadlineAtMs = segmentStartedAt + CONTINUATION_DEADLINE_MS
+    const deadlineAtMs = continuationDeadlineAtMs || segmentStartedAt + CONTINUATION_DEADLINE_MS
     barrier = {
       id,
       segmentId: activeSegmentId,
@@ -385,6 +428,9 @@ wss.on('connection', (ws) => {
       if (segmentId !== activeSegmentId) return
       TRACE('-> assistantAudioEnd')
       stopAiSpeech()
+      if (testBoundarySchedule.observeAssistantBoundary()) {
+        maybeSendTestBoundaryDue()
+      }
       maybeOpenBarrier()
     },
 
@@ -399,6 +445,7 @@ wss.on('connection', (ws) => {
         // content is not JSON — pass through as a raw string
       }
       pendingTools.add(toolUseId)
+      testBoundarySchedule.observeTool(toolName)
       if (barrier) {
         // A late normal tool means the assistant boundary was not actually
         // quiescent. ToolUseIds are segment-scoped, so never migrate it.
@@ -638,6 +685,7 @@ wss.on('connection', (ws) => {
             const candidate: CandidateControl = { preparing: true, failed: false }
             const nextSession = createSession(nextSegmentId, candidate)
             openingSession = nextSession
+            TRACE(`continuation candidate segment ${nextSegmentId} opening`)
 
             const recoverOldSegment = async (): Promise<void> => {
               // Recovery is permitted only before the atomic promotion. First
@@ -692,12 +740,18 @@ wss.on('connection', (ws) => {
                 },
               )
             } catch {
+              TRACE(`continuation candidate segment ${nextSegmentId} start rejected`)
               await recoverOldSegment()
               return
             }
 
+            TRACE(`continuation candidate segment ${nextSegmentId} stream opened`)
+
             const transportReady = await nextSession.waitUntilTransportReady(
               CANDIDATE_STABILITY_MS,
+            )
+            TRACE(
+              `continuation candidate segment ${nextSegmentId} readiness=${transportReady && !candidate.failed}`,
             )
             if (!transportReady || candidate.failed) {
               await recoverOldSegment()

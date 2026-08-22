@@ -3,8 +3,8 @@ import type { VoiceContinuationCheckpoint } from './wsProtocol.js'
 
 const MAX_ENTRIES = 500
 const MAX_CHARS = 250_000
-const MAX_HISTORY_BYTES = 190_000
-const MAX_HISTORY_MESSAGE_BYTES = 45_000
+export const MAX_HISTORY_BYTES = 190_000
+export const MAX_HISTORY_MESSAGE_BYTES = 45_000
 const DOMAINS = new Set([
   'referral_reason', 'patient_reported_age', 'presenting_symptom', 'associated_symptoms',
   'red_flags', 'prior_episodes', 'functional_impact', 'neurologic_review_of_systems',

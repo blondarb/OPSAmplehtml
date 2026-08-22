@@ -3,6 +3,8 @@ import { createHash } from 'node:crypto'
 import { describe, expect, it } from 'vitest'
 
 import {
+  MAX_CONTINUATION_HISTORY_BYTES,
+  MAX_CONTINUATION_HISTORY_MESSAGE_BYTES,
   MAX_CONTINUATION_TRANSCRIPT_CHARS,
   MAX_CONTINUATION_TRANSCRIPT_ENTRIES,
   buildHistorianAnsweredQuestionPairs,
@@ -41,6 +43,45 @@ function checkpoint(): HistorianContinuationCheckpointV1 {
     activeScale: { scaleId: 'synthetic-scale-2', itemIndex: 0 },
     pendingTools: [],
   }
+}
+
+function exactAsciiText(label: string, bytes: number, suffix = ''): string {
+  const unit = `${label} synthetic neutral history. `
+  const bodyBytes = bytes - Buffer.byteLength(suffix)
+  if (bodyBytes < 1) throw new Error('Synthetic history target is too small')
+  return unit.repeat(Math.ceil(bodyBytes / unit.length)).slice(0, bodyBytes) + suffix
+}
+
+function checkpointWithTranscript(
+  transcript: HistorianContinuationCheckpointV1['transcript'],
+): HistorianContinuationCheckpointV1 {
+  const source = checkpoint()
+  const last = transcript.at(-1)!
+  source.transcript = transcript
+  source.transcriptThroughSeq = last.seq!
+  source.transcriptHash = hashHistorianContinuationTranscript(transcript)
+  source.exchangeCount = transcript.reduce((count, entry, index) => (
+    entry.role === 'assistant' && (index === 0 || transcript[index - 1].role === 'user')
+      ? count + 1
+      : count
+  ), 0)
+  source.patientTurnCount = transcript.filter((entry) => entry.role === 'user').length
+  source.elapsedSeconds = last.timestamp
+  source.awaitingAnswerTo = { seq: last.seq!, text: last.text }
+  source.answeredQuestionPairs = buildHistorianAnsweredQuestionPairs(transcript)
+  return source
+}
+
+function maximumHistoryTranscript(extraFinalByte = false): HistorianContinuationCheckpointV1['transcript'] {
+  return [
+    { role: 'assistant', text: 'Synthetic opening?', timestamp: 0, seq: 1 },
+    { role: 'user', text: exactAsciiText('U1', 45_000), timestamp: 1, seq: 2 },
+    { role: 'assistant', text: exactAsciiText('A1', 45_000), timestamp: 2, seq: 3 },
+    { role: 'user', text: exactAsciiText('U2', 45_000), timestamp: 3, seq: 4 },
+    { role: 'assistant', text: exactAsciiText('A2', 45_000), timestamp: 4, seq: 5 },
+    { role: 'user', text: exactAsciiText('U3', 5_000), timestamp: 5, seq: 6 },
+    { role: 'assistant', text: exactAsciiText('A3', 5_000 + Number(extraFinalByte), '?'), timestamp: 6, seq: 7 },
+  ]
 }
 
 describe('Historian continuation checkpoint', () => {
@@ -143,6 +184,28 @@ describe('Historian continuation checkpoint', () => {
     tooLong.awaitingAnswerTo = { seq: 1, text: tooLong.transcript[0].text }
     tooLong.transcriptHash = hashHistorianContinuationTranscript(tooLong.transcript)
     expect(validateHistorianContinuationCheckpoint(tooLong)).toMatchObject({ valid: false })
+  })
+
+  it('accepts the exact Nova replay budget and rejects one byte beyond either limit', () => {
+    const exact = checkpointWithTranscript(maximumHistoryTranscript())
+    const history = buildNovaHistorianContinuationHistory(exact.transcript)
+    expect(history.reduce((bytes, entry) => bytes + Buffer.byteLength(entry.text), 0))
+      .toBe(MAX_CONTINUATION_HISTORY_BYTES)
+    expect(Math.max(...history.map((entry) => Buffer.byteLength(entry.text))))
+      .toBe(MAX_CONTINUATION_HISTORY_MESSAGE_BYTES)
+    expect(validateHistorianContinuationCheckpoint(exact)).toMatchObject({ valid: true })
+
+    const totalOver = checkpointWithTranscript(maximumHistoryTranscript(true))
+    expect(validateHistorianContinuationCheckpoint(totalOver)).toMatchObject({ valid: false })
+
+    const messageOverTranscript = maximumHistoryTranscript()
+    messageOverTranscript[1].text = exactAsciiText(
+      'U1',
+      MAX_CONTINUATION_HISTORY_MESSAGE_BYTES + 1,
+    )
+    messageOverTranscript[3].text = exactAsciiText('U2', 44_000)
+    const messageOver = checkpointWithTranscript(messageOverTranscript)
+    expect(validateHistorianContinuationCheckpoint(messageOver)).toMatchObject({ valid: false })
   })
 
   it('rejects unknown schema fields and invalid closed-vocabulary coverage', () => {

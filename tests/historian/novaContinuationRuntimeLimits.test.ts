@@ -38,7 +38,7 @@ describe('Nova continuation preserves Comprehensive runtime limits', () => {
     vi.restoreAllMocks()
   })
 
-  it('wraps once at 45 and hard-stops once at 60 across three Nova segments', async () => {
+  it('wraps once at 45 and hard-stops once at 60 across seven Nova segments', async () => {
     let sink: ((event: VoiceEvent) => void) | null = null
     let streamOpen = true
     const commits: VoiceContinuationCheckpoint[] = []
@@ -114,40 +114,28 @@ describe('Nova continuation preserves Comprehensive runtime limits', () => {
       await vi.waitFor(() => expect(commits).toHaveLength(segmentId))
     }
 
-    for (let exchange = 1; exchange <= 43; exchange += 1) {
-      assistant(exchange, 1)
-      patient(exchange, 1)
+    const rolloverAfterQuestion = new Set([10, 20, 30, 40, 50, 59])
+    let segmentId = 1
+    for (let exchange = 1; exchange <= 60; exchange += 1) {
+      assistant(exchange, segmentId)
+      if (rolloverAfterQuestion.has(exchange)) {
+        await rotate(segmentId)
+        segmentId += 1
+      }
+      if (exchange === 60) streamOpen = false
+      patient(exchange, segmentId)
     }
-    assistant(44, 1)
-    await rotate(1)
-
-    patient(44, 2)
-    assistant(45, 2)
-    patient(45, 2)
-    for (let exchange = 46; exchange <= 50; exchange += 1) {
-      assistant(exchange, 2)
-      patient(exchange, 2)
-    }
-    assistant(51, 2)
-    await rotate(2)
-
-    patient(51, 3)
-    for (let exchange = 52; exchange <= 59; exchange += 1) {
-      assistant(exchange, 3)
-      patient(exchange, 3)
-    }
-    assistant(60, 3)
-    streamOpen = false
-    patient(60, 3)
 
     await vi.waitFor(() => expect(onComplete).toHaveBeenCalledOnce())
     const wrapCalls = (provider.injectSystemText as ReturnType<typeof vi.fn>).mock.calls
       .filter(([text]) => text === COMPREHENSIVE_SOFT_WRAP_NUDGE)
     expect(wrapCalls).toHaveLength(1)
     expect(provider.suppressOutput).toHaveBeenCalledOnce()
-    expect(commits).toHaveLength(2)
-    expect(commits[0]).toMatchObject({ exchangeCount: 44, runtimeGuard: { softWrapIssued: false } })
-    expect(commits[1]).toMatchObject({ exchangeCount: 51, runtimeGuard: { softWrapIssued: true } })
+    expect(commits).toHaveLength(6)
+    expect(commits.map((checkpoint) => checkpoint.exchangeCount)).toEqual([10, 20, 30, 40, 50, 59])
+    expect(commits.slice(0, 4).every((checkpoint) => !checkpoint.runtimeGuard.softWrapIssued)).toBe(true)
+    expect(commits.slice(4).every((checkpoint) => checkpoint.runtimeGuard.softWrapIssued)).toBe(true)
+    expect(commits.every((checkpoint, index) => checkpoint.fromSegmentId === index + 1)).toBe(true)
     expect(onComplete).toHaveBeenCalledWith(expect.objectContaining({
       sessionId: '00000000-0000-4000-8000-000000000060',
       questionCount: 60,

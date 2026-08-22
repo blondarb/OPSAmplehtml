@@ -2,7 +2,8 @@ import crypto from 'crypto'
 import { once } from 'events'
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import WebSocket from 'ws'
-import type { ServerMsg } from '../wsProtocol.js'
+import { MAX_HISTORY_BYTES } from '../continuationCheckpoint.js'
+import type { ServerMsg, VoiceContinuationCheckpoint } from '../wsProtocol.js'
 
 const DOMAINS = [
   'referral_reason', 'patient_reported_age', 'presenting_symptom', 'associated_symptoms',
@@ -132,7 +133,10 @@ function send(message: unknown): void {
   client.send(JSON.stringify(message))
 }
 
-function checkpoint(fromSegmentId: number, transcript: Array<{ seq: number; role: 'assistant' | 'user'; text: string; timestamp: number }>) {
+function checkpoint(
+  fromSegmentId: number,
+  transcript: Array<{ seq: number; role: 'assistant' | 'user'; text: string; timestamp: number }>,
+): VoiceContinuationCheckpoint {
   const canonical = JSON.stringify(transcript.map(({ role, text, timestamp, seq }) => ({ role, text, timestamp, seq })))
   const last = transcript.at(-1)!
   return {
@@ -167,6 +171,24 @@ function checkpoint(fromSegmentId: number, transcript: Array<{ seq: number; role
     activeScale: null,
     pendingTools: [],
   }
+}
+
+function exactAsciiText(label: string, bytes: number, suffix = ''): string {
+  const unit = `${label} synthetic neutral history. `
+  const bodyBytes = bytes - Buffer.byteLength(suffix)
+  return unit.repeat(Math.ceil(bodyBytes / unit.length)).slice(0, bodyBytes) + suffix
+}
+
+function maximumHistoryTranscript() {
+  return [
+    { seq: 1, role: 'assistant' as const, text: 'Synthetic opening?', timestamp: 0 },
+    { seq: 2, role: 'user' as const, text: exactAsciiText('U1', 45_000), timestamp: 1 },
+    { seq: 3, role: 'assistant' as const, text: exactAsciiText('A1', 45_000), timestamp: 2 },
+    { seq: 4, role: 'user' as const, text: exactAsciiText('U2', 45_000), timestamp: 3 },
+    { seq: 5, role: 'assistant' as const, text: exactAsciiText('A2', 45_000), timestamp: 4 },
+    { seq: 6, role: 'user' as const, text: exactAsciiText('U3', 5_000), timestamp: 5 },
+    { seq: 7, role: 'assistant' as const, text: exactAsciiText('A3', 5_000, '?'), timestamp: 6 },
+  ]
 }
 
 async function rotate(
@@ -296,6 +318,50 @@ describe('relay continuation protocol integration', () => {
       role: 'USER',
       text: 'Synthetic answer one.',
     })
+  })
+
+  it('opens a replacement with exact-limit replay and an active-scale checkpoint', async () => {
+    send({
+      t: 'start',
+      instructions: 'Synthetic maximum replay instructions.',
+      tools: [],
+      interviewMode: 'comprehensive',
+    })
+    send({ t: 'audio', audioSeq: 1, pcm: 'segment-1-live' })
+
+    const transcript = maximumHistoryTranscript()
+    const replayBytes = transcript.slice(1).reduce(
+      (bytes, entry) => bytes + Buffer.byteLength(entry.text),
+      0,
+    )
+    expect(replayBytes).toBe(MAX_HISTORY_BYTES)
+    await waitForMessage('continuationDue')
+    await new Promise((resolve) => setTimeout(resolve, 25))
+    relayHarness.instances[0].emitAssistant(transcript.at(-1)!.text)
+    const barrier = await waitForMessage('continuationBarrier')
+    const state = checkpoint(1, transcript)
+    state.activeScale = { scaleId: 'hit6', itemIndex: 0 }
+    send({ t: 'audio', audioSeq: 2, pcm: 'maximum-history-buffered' })
+    send({
+      t: 'continuationCommit',
+      barrierId: barrier.barrierId,
+      checkpoint: state,
+    })
+
+    await expect(waitForMessage('continuationReady')).resolves.toMatchObject({
+      fromSegmentId: 1,
+      segmentId: 2,
+      lastAudioSeq: 1,
+      transcriptThroughSeq: 7,
+    })
+    expect(relayHarness.instances[1].starts[0].options.conversationHistory)
+      .toHaveLength(6)
+    expect(relayHarness.instances[1].starts[0].options.conversationHistory!
+      .reduce((bytes, entry) => bytes + Buffer.byteLength(entry.text), 0))
+      .toBe(MAX_HISTORY_BYTES)
+    expect(relayHarness.instances[1].starts[0].instructions)
+      .toContain('"activeScale":{"scaleId":"hit6","itemIndex":0}')
+    expect(relayHarness.instances[1].audio).toEqual(['maximum-history-buffered'])
   })
 
   it('keeps the old stream and replays buffered PCM once when the candidate ends during readiness', async () => {
