@@ -1,0 +1,179 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: >
+  Ephemeral synthetic-only authenticated acceptance runner for the isolated
+  Historian MVP QA deployment. Delete immediately after one run.
+
+Parameters:
+  SourceCommit:
+    Type: String
+    AllowedPattern: '^[0-9a-f]{40}$'
+  MachinePasswordSecretArn:
+    Type: String
+    NoEcho: true
+    AllowedPattern: '^arn:aws:secretsmanager:us-east-2:[0-9]{12}:secret:sevaro/historian-qa/machine-user-[A-Za-z0-9]{6}$'
+  AppOrigin:
+    Type: String
+    Default: 'https://historian-mvp-qa.d3ietjwgco4g2t.amplifyapp.com'
+    AllowedValues:
+      - 'https://historian-mvp-qa.d3ietjwgco4g2t.amplifyapp.com'
+  CognitoClientId:
+    Type: String
+    Default: ecjsa2ifjoj85konf3ts42gf5
+    AllowedValues: [ecjsa2ifjoj85konf3ts42gf5]
+  DeleteAfter:
+    Type: String
+    Default: '2026-08-29'
+
+Resources:
+  AcceptanceSourceBucket:
+    Type: AWS::S3::Bucket
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Delete
+    Properties:
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+      LifecycleConfiguration:
+        Rules:
+          - Id: DeleteAcceptanceSource
+            Status: Enabled
+            ExpirationInDays: 1
+      OwnershipControls:
+        Rules:
+          - ObjectOwnership: BucketOwnerEnforced
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      Tags:
+        - { Key: DataClass, Value: synthetic-only }
+        - { Key: DeleteAfter, Value: !Ref DeleteAfter }
+
+  AcceptanceSourceBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref AcceptanceSourceBucket
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Sid: DenyInsecureTransport
+            Effect: Deny
+            Principal: '*'
+            Action: s3:*
+            Resource:
+              - !GetAtt AcceptanceSourceBucket.Arn
+              - !Sub '${AcceptanceSourceBucket.Arn}/*'
+            Condition:
+              Bool:
+                aws:SecureTransport: 'false'
+
+  AcceptanceLogGroup:
+    Type: AWS::Logs::LogGroup
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Delete
+    Properties:
+      LogGroupName: !Sub '/aws/codebuild/${AWS::StackName}'
+      RetentionInDays: 1
+      Tags:
+        - { Key: DataClass, Value: synthetic-only }
+        - { Key: DeleteAfter, Value: !Ref DeleteAfter }
+
+  AcceptanceRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: codebuild.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: RunHistorianQaAcceptanceOnly
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Sid: ReadQaMachineCredential
+                Effect: Allow
+                Action: secretsmanager:GetSecretValue
+                Resource: !Ref MachinePasswordSecretArn
+              - Sid: ReadAcceptanceSource
+                Effect: Allow
+                Action:
+                  - s3:GetBucketAcl
+                  - s3:GetBucketLocation
+                  - s3:GetObject
+                  - s3:GetObjectVersion
+                Resource:
+                  - !GetAtt AcceptanceSourceBucket.Arn
+                  - !Sub '${AcceptanceSourceBucket.Arn}/*'
+              - Sid: WriteBuildLogs
+                Effect: Allow
+                Action:
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                Resource: !Sub '${AcceptanceLogGroup.Arn}:*'
+      Tags:
+        - { Key: DataClass, Value: synthetic-only }
+        - { Key: DeleteAfter, Value: !Ref DeleteAfter }
+
+  AcceptanceProject:
+    Type: AWS::CodeBuild::Project
+    Properties:
+      ServiceRole: !GetAtt AcceptanceRole.Arn
+      Artifacts:
+        Type: NO_ARTIFACTS
+      Environment:
+        ComputeType: BUILD_GENERAL1_SMALL
+        Image: aws/codebuild/standard:7.0
+        ImagePullCredentialsType: CODEBUILD
+        PrivilegedMode: false
+        Type: LINUX_CONTAINER
+        EnvironmentVariables:
+          - { Name: SOURCE_COMMIT, Type: PLAINTEXT, Value: !Ref SourceCommit }
+          - { Name: HISTORIAN_QA_ACCEPTANCE_ENABLED, Type: PLAINTEXT, Value: 'true' }
+          - { Name: HISTORIAN_QA_DATA_CLASS, Type: PLAINTEXT, Value: synthetic-only }
+          - { Name: HISTORIAN_QA_APP_ORIGIN, Type: PLAINTEXT, Value: !Ref AppOrigin }
+          - { Name: HISTORIAN_QA_COGNITO_CLIENT_ID, Type: PLAINTEXT, Value: !Ref CognitoClientId }
+          - { Name: HISTORIAN_QA_COGNITO_REGION, Type: PLAINTEXT, Value: us-east-2 }
+          - { Name: QA_USERNAME, Type: SECRETS_MANAGER, Value: !Join [':', [!Ref MachinePasswordSecretArn, username]] }
+          - { Name: QA_PASSWORD, Type: SECRETS_MANAGER, Value: !Join [':', [!Ref MachinePasswordSecretArn, password]] }
+      Source:
+        Type: S3
+        Location: !Sub '${AcceptanceSourceBucket}/historian-qa-acceptance.zip'
+        BuildSpec: |
+          version: 0.2
+          phases:
+            install:
+              runtime-versions:
+                nodejs: 22
+              commands:
+                - set +x
+                - corepack enable
+                - pnpm install --frozen-lockfile --ignore-scripts
+            build:
+              commands:
+                - set +x
+                - test "$AWS_REGION" = us-east-2
+                - test -f source-commit.txt
+                - test "$(tr -d '\r\n' < source-commit.txt)" = "$SOURCE_COMMIT"
+                - test -f scripts/historian-qa-deployed-acceptance.ts
+                - pnpm exec tsx scripts/historian-qa-deployed-acceptance.ts
+      LogsConfig:
+        CloudWatchLogs:
+          Status: ENABLED
+          GroupName: !Ref AcceptanceLogGroup
+          StreamName: authenticated-acceptance
+      TimeoutInMinutes: 20
+      QueuedTimeoutInMinutes: 10
+      Tags:
+        - { Key: DataClass, Value: synthetic-only }
+        - { Key: DeleteAfter, Value: !Ref DeleteAfter }
+
+Outputs:
+  SourceBucket:
+    Value: !Ref AcceptanceSourceBucket
+  ProjectName:
+    Value: !Ref AcceptanceProject

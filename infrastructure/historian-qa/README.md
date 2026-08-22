@@ -39,9 +39,31 @@ Cognito, relay compute, or worker queues.
 7. Deploy the isolated worker and disabled/manual Amplify branch.
 8. Run negative authorization tests before any synthetic interview.
 
+## Automated authenticated acceptance
+
+`acceptance.yaml` is an ephemeral CodeBuild runner for the fixed synthetic QA
+fixture. It receives the existing machine username and password directly from
+Secrets Manager, authenticates to the dedicated QA Cognito client, and never
+prints credentials, Cognito tokens, invitation tokens, browser grants, patient
+context, transcript text, or differential content. Its logs contain only named
+PASS gates or a fixed failure code and HTTP status.
+
+The runner checks unauthenticated physician-report denial, clinician invitation
+creation, production-origin rejection, wrong-DOB rejection, correct-DOB grant
+cookie policy, non-diagnostic patient context, invited Nova session binding,
+transactional save and replay, durable worker completion, and authenticated
+physician-only report visibility. The final save uses a fixed state-injected
+coverage fixture: it proves deployed persistence and worker/report plumbing,
+not a natural 60-exchange interview or clinical validity.
+
+Create it from an exact commit archive containing `source-commit.txt`, run it
+once, then delete the exact source object and the stack after PASS or failure.
+Do not retain the project as a standing credentialed test surface.
+
 ## Teardown checkpoint
 
-No later than 2026-08-29: disable the Amplify branch, delete the exact ECS
+Immediately after acceptance: delete the exact acceptance source object and its
+ephemeral stack. No later than 2026-08-29: disable the Amplify branch, delete the exact ECS
 Express Gateway service and wait for its deletion, disable the worker schedule,
 delete the QA stacks/database/user pool and Secrets Manager secrets, explicitly
 delete retained worker queues, and verify that the QA URL and resource
