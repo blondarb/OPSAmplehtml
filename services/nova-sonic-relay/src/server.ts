@@ -180,8 +180,8 @@ wss.on('connection', (ws) => {
   // Track whether the AI is currently speaking so we can wrap turns with
   // aiSpeechStart / aiSpeechStop. This is an approximation: we emit
   // aiSpeechStart on the first audio chunk after silence, and aiSpeechStop on
-  // completionEnd or bargeIn. A precise turn model would require richer signals
-  // from the model, but this is sufficient for rendering and barge-in UX.
+  // the assistant AUDIO END_TURN marker (with completionEnd as a fallback) or
+  // bargeIn. Nova 2 can delay completionEnd well after audible output ends.
   let aiSpeaking = false
   let interviewMode: 'standard' | 'comprehensive' = 'standard'
   let comprehensiveOpeningSettled = false
@@ -234,6 +234,11 @@ wss.on('connection', (ws) => {
     onAudioOutput(base64) {
       startAiSpeech()
       send(ws, { t: 'audio', pcm: base64 })
+    },
+
+    onAssistantAudioEnd() {
+      TRACE('-> assistantAudioEnd')
+      stopAiSpeech()
     },
 
     onToolUse({ toolName, toolUseId, content }) {

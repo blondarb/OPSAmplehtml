@@ -33,8 +33,10 @@ import {
   runComprehensiveScenario,
 } from '../src/lib/historian/comprehensiveScenarioContract'
 import {
+  LIVE_SYNTHETIC_COVERAGE_SAVE_NUDGE,
   LIVE_SYNTHETIC_SCENARIO_IDS,
   LIVE_SYNTHETIC_SCENARIOS,
+  LIVE_SYNTHETIC_WRAP_SAVE_NUDGE,
   assessLiveSyntheticSave,
   safetyResponseHasRequiredResources,
   type LiveSyntheticScenario,
@@ -221,7 +223,7 @@ async function runLiveOpeningSmoke(): Promise<void> {
       }
       assistantFragments.push(content)
     },
-    onCompletionEnd: finalizeAssistantTurn,
+    onAssistantAudioEnd: finalizeAssistantTurn,
     onAudioOutput: () => { lastAudioAt = Date.now() },
     onToolUse: (tool) => {
       prematureTools.push(tool.toolName)
@@ -287,6 +289,7 @@ async function runLiveStateInjectedScenario(scenario: LiveSyntheticScenario): Pr
   let userTranscriptCount = 0
   let silenceTimer: ReturnType<typeof setInterval> | null = null
   let acceptedSave: ReturnType<typeof assessLiveSyntheticSave> | null = null
+  let coverageSaveNudgeSent = false
   let softWrapCount = 0
   let hardStopCount = 0
   let safetyLatchCount = 0
@@ -300,6 +303,10 @@ async function runLiveStateInjectedScenario(scenario: LiveSyntheticScenario): Pr
       }
       userTranscriptCount += 1
       if (VERBOSE) console.log(`[synthetic patient transcript received] chars=${content.length}`)
+      if (scenario.purpose === 'coverage' && !coverageSaveNudgeSent) {
+        coverageSaveNudgeSent = true
+        session.pushSystemText(LIVE_SYNTHETIC_COVERAGE_SAVE_NUDGE)
+      }
       const decision = guard.patientTurn({
         interviewMode: 'comprehensive',
         exchange: scenario.logicalExchange,
@@ -308,7 +315,11 @@ async function runLiveStateInjectedScenario(scenario: LiveSyntheticScenario): Pr
       if (decision.activateSafety) safetyLatchCount += 1
       if (decision.injectText) {
         softWrapCount += 1
-        session.pushSystemText(decision.injectText)
+        session.pushSystemText(
+          scenario.purpose === 'wrap'
+            ? `${decision.injectText}\n${LIVE_SYNTHETIC_WRAP_SAVE_NUDGE}`
+            : decision.injectText,
+        )
       }
       if (decision.requestFinalization === 'hard_stop') {
         hardStopCount += 1
@@ -317,6 +328,13 @@ async function runLiveStateInjectedScenario(scenario: LiveSyntheticScenario): Pr
     },
     onToolUse: (tool) => {
       if (tool.toolName !== 'save_interview_output') {
+        if (!guard.acceptsInterviewActivity()) {
+          session.pushToolResult(tool.toolUseId, JSON.stringify({
+            success: false,
+            status: 'interview_terminal',
+          }))
+          return
+        }
         errors.push(`Unexpected live tool call: ${tool.toolName}`)
         session.pushToolResult(tool.toolUseId, JSON.stringify({ status: 'error' }))
         return

@@ -37,6 +37,8 @@ export interface NovaSonicToolUse {
 export interface NovaSonicCallbacks {
   onTextOutput?(role: string, content: string): void
   onAudioOutput?(base64: string): void
+  /** Fires when Nova marks the assistant's audible response END_TURN. */
+  onAssistantAudioEnd?(): void
   onToolUse?(toolUse: NovaSonicToolUse): void
   onCompletionEnd?(): void
   onError?(err: unknown): void
@@ -418,9 +420,12 @@ export class NovaSonicSession {
     }
 
     if (event.contentEnd) {
+      const assistantAudioEnded =
+        event.contentEnd.type === 'AUDIO' && event.contentEnd.stopReason === 'END_TURN'
       if (event.contentEnd.contentId) {
         this.textStageByContentId.delete(event.contentEnd.contentId)
       }
+      if (assistantAudioEnded) this.callbacks.onAssistantAudioEnd?.()
       return
     }
 

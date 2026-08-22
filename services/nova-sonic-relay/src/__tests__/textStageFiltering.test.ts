@@ -31,6 +31,10 @@ function contentEnd(contentId: string, stopReason: string) {
   return { event: { contentEnd: { contentId, stopReason, type: 'TEXT' } } }
 }
 
+function audioContentEnd(contentId: string, stopReason: string) {
+  return { event: { contentEnd: { contentId, stopReason, type: 'AUDIO' } } }
+}
+
 /** Drive a session's private dispatcher directly with fabricated model events. */
 function makeHarness() {
   const forwarded: Array<{ role: string; content: string }> = []
@@ -73,6 +77,22 @@ describe('shouldForwardText', () => {
 })
 
 describe('NovaSonicSession text-stage filtering (live-captured pattern)', () => {
+  it('signals the audible turn boundary on AUDIO END_TURN without waiting for completionEnd', () => {
+    let audioEnds = 0
+    const session = new NovaSonicSession({
+      onAssistantAudioEnd: () => { audioEnds += 1 },
+    })
+    const dispatch = (e: unknown) =>
+      (session as unknown as { handleModelEvent(j: unknown): void }).handleModelEvent(e)
+
+    dispatch(audioContentEnd('a-partial', 'PARTIAL_TURN'))
+    dispatch(contentEnd('t-final', 'END_TURN'))
+    expect(audioEnds).toBe(0)
+
+    dispatch(audioContentEnd('a-final', 'END_TURN'))
+    expect(audioEnds).toBe(1)
+  })
+
   it('forwards an assistant turn exactly ONCE (SPECULATIVE kept, FINAL dropped)', () => {
     const { forwarded, dispatch } = makeHarness()
     const reply =

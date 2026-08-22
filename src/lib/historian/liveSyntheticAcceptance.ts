@@ -45,6 +45,22 @@ Fixed synthetic facts from the omitted earlier exchanges:
 - social_exposure_history: retired; no smoking or recreational drugs; occasional beer
 - prior_studies: brain MRI six months ago; patient recalls being told it did not identify a cause`
 
+export const LIVE_SYNTHETIC_COVERAGE_SAVE_NUDGE =
+  '[LIVE_STATE_INJECTED — PHI-FREE SYNTHETIC ACCEPTANCE ONLY] The immediately ' +
+  'preceding synthetic answer supplied patient_goals_questions, the only remaining ' +
+  'Comprehensive history domain. The fixed injected history is now complete. Do not ' +
+  'ask another question or restart the interview. Immediately call ' +
+  'save_interview_output with a truthful complete history_coverage audit. ' +
+  '[END LIVE_STATE_INJECTED]'
+
+export const LIVE_SYNTHETIC_WRAP_SAVE_NUDGE =
+  '[LIVE_STATE_INJECTED — PHI-FREE SYNTHETIC ACCEPTANCE ONLY] The immediately ' +
+  'preceding synthetic answer completed patient_goals_questions and answered the ' +
+  'final open-door question. Every fixed Comprehensive history domain is now ' +
+  'covered. Do not ask or repeat any question. Follow the production soft-wrap ' +
+  'control by immediately calling save_interview_output with a truthful complete ' +
+  'history_coverage audit. [END LIVE_STATE_INJECTED]'
+
 function injectedState(exchangeBeforeReply: number, extra: string): string {
   return `[LIVE_STATE_INJECTED — PHI-FREE SYNTHETIC ACCEPTANCE ONLY]
 The transport is intentionally starting at the boundary after logical patient exchange ${exchangeBeforeReply}.
@@ -87,17 +103,17 @@ export const LIVE_SYNTHETIC_SCENARIOS: Record<LiveSyntheticScenarioId, LiveSynth
     id: 'wrap-at-45',
     logicalExchange: 45,
     purpose: 'wrap',
-    fixedPatientReply: 'My goal is to understand the balance problem and reduce my risk of another fall.',
+    fixedPatientReply: 'No, nothing else. My goal is to understand my balance problem and prevent falls.',
     stateInjection: injectedState(
       44,
-      'Every fixed Comprehensive history domain except patient_goals_questions has been asked and captured. Treat the next spoken answer as exchange 45. The application will inject its production soft-wrap instruction after ASR.',
+      'Every fixed Comprehensive history domain except patient_goals_questions has been asked and captured. The final open-door question has already been asked; treat the next spoken answer as its answer and as exchange 45. The application will inject its production soft-wrap instruction after ASR.',
     ),
   },
   'hard-stop-at-60': {
     id: 'hard-stop-at-60',
     logicalExchange: 60,
     purpose: 'hard_stop',
-    fixedPatientReply: 'I am not certain, and I do not want to guess.',
+    fixedPatientReply: 'I do not remember that detail.',
     stateInjection: injectedState(
       59,
       'The history remains incomplete. Treat the next spoken answer as exchange 60. The application will inject its production hard-stop save instruction after ASR.',

@@ -8,7 +8,9 @@ import {
   runComprehensiveScenario,
 } from '../../src/lib/historian/comprehensiveScenarioContract'
 import {
+  LIVE_SYNTHETIC_COVERAGE_SAVE_NUDGE,
   LIVE_SYNTHETIC_SCENARIOS,
+  LIVE_SYNTHETIC_WRAP_SAVE_NUDGE,
   assessLiveSyntheticSave,
   safetyResponseHasRequiredResources,
 } from '../../src/lib/historian/liveSyntheticAcceptance'
@@ -40,6 +42,8 @@ describe('Nova Comprehensive Historian acceptance contract', () => {
     expect(source).toContain('PASS nova_age_second')
     expect(source).toMatch(/how old\|your age\|age are you/)
     expect(source).toContain('session.pushSystemText(COMPREHENSIVE_AGE_NUDGE)')
+    expect(source).toContain('onAssistantAudioEnd: finalizeAssistantTurn')
+    expect(source).not.toContain('onCompletionEnd: finalizeAssistantTurn')
   })
 
   it('keeps all patient input fixed, PHI-free, and on the real PCM path', () => {
@@ -68,6 +72,9 @@ describe('Nova Comprehensive Historian acceptance contract', () => {
   })
 
   it('accepts only coverage-complete output at logical exchange 26', () => {
+    expect(LIVE_SYNTHETIC_COVERAGE_SAVE_NUDGE).toContain('LIVE_STATE_INJECTED')
+    expect(LIVE_SYNTHETIC_COVERAGE_SAVE_NUDGE).toContain('Immediately call save_interview_output')
+    expect(source).toContain("scenario.purpose === 'coverage' && !coverageSaveNudgeSent")
     const assessment = assessLiveSyntheticSave({
       scenario: LIVE_SYNTHETIC_SCENARIOS['coverage-at-26'],
       structured: completeHistory,
@@ -104,6 +111,11 @@ describe('Nova Comprehensive Historian acceptance contract', () => {
   })
 
   it('uses coverage completion at the soft wrap and a partial hard-stop save at 60', () => {
+    expect(LIVE_SYNTHETIC_WRAP_SAVE_NUDGE).toContain('LIVE_STATE_INJECTED')
+    expect(LIVE_SYNTHETIC_WRAP_SAVE_NUDGE).toContain('Do not ask or repeat any question')
+    expect(source).toContain("scenario.purpose === 'wrap'")
+    expect(source).toContain("status: 'interview_terminal'")
+    expect(source).toContain('if (!guard.acceptsInterviewActivity())')
     expect(assessLiveSyntheticSave({
       scenario: LIVE_SYNTHETIC_SCENARIOS['wrap-at-45'],
       structured: completeHistory,
