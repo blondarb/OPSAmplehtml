@@ -87,6 +87,10 @@ const nextConfig: NextConfig = {
     RDS_PORT: process.env.RDS_PORT,
     RDS_USER: process.env.RDS_USER,
     RDS_DATABASE: process.env.RDS_DATABASE,
+    // Non-secret tenant routing must also be available to Amplify SSR route
+    // handlers; NEXT_PUBLIC_DEMO_TENANT covers the matching client bundle.
+    DEMO_TENANT: process.env.DEMO_TENANT,
+    NEXT_PUBLIC_DEMO_TENANT: process.env.NEXT_PUBLIC_DEMO_TENANT,
     COGNITO_USER_POOL_ID: process.env.COGNITO_USER_POOL_ID,
     COGNITO_CLIENT_ID: process.env.COGNITO_CLIENT_ID,
     COGNITO_REGION: process.env.COGNITO_REGION,
