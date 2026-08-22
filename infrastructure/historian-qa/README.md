@@ -60,12 +60,30 @@ Create it from an exact commit archive containing `source-commit.txt`, run it
 once, then delete the exact source object and the stack after PASS or failure.
 Do not retain the project as a standing credentialed test surface.
 
+## Passwordless synthetic patient link
+
+`temporary-link.yaml` issues one QA-only patient invitation without a person
+retrieving or resetting the machine password. Its CodeBuild project receives
+the existing QA Cognito and database credentials directly from the exact
+Secrets Manager ARNs, creates the invitation through the authenticated app,
+and transactionally extends only that pending synthetic invitation to exactly
+82 hours. The normal production invitation default remains 48 hours.
+
+The bearer link and fixed synthetic DOB are written once to the issuer stack's
+exact encrypted Secrets Manager output; neither appears in the build log,
+archive, source, or ordinary CloudFormation outputs. Retrieve the secret value
+once, delete the exact source object, then delete the issuer stack and verify
+that its output secret is gone. The invitation is one-time: after DOB
+verification it becomes an HttpOnly four-hour browser grant. It does not grant
+physician-dashboard access and must never be used with a real patient.
+
 ## Teardown checkpoint
 
-Immediately after acceptance: delete the exact acceptance source object and its
-ephemeral stack. No later than 2026-08-29: disable the Amplify branch, delete the exact ECS
-Express Gateway service and wait for its deletion, disable the worker schedule,
-delete the QA stacks/database/user pool and Secrets Manager secrets, explicitly
-delete retained worker queues, and verify that the QA URL and resource
-inventory are empty. Delete the relay support stack only after the Express
-service is gone. Production resources are not teardown targets.
+Immediately after acceptance or temporary-link issuance: delete the exact
+ephemeral source object and runner stack, including its encrypted output. No later
+than 2026-08-29: disable the Amplify branch, delete the exact ECS Express Gateway
+service and wait for its deletion, disable the worker schedule, delete the QA
+stacks/database/user pool and Secrets Manager secrets, explicitly delete
+retained worker queues, and verify that the QA URL and resource inventory are
+empty. Delete the relay support stack only after the Express service is gone.
+Production resources are not teardown targets.

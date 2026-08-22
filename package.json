@@ -18,7 +18,8 @@
     "historian:synthetic": "npx tsx scripts/historian-synthetic-run.ts",
     "historian:nova-smoke": "npx tsx scripts/nova-historian-comprehensive-smoke.ts",
     "historian:nova-mvp": "npx tsx scripts/nova-historian-mvp-acceptance.ts",
-    "historian:qa-acceptance": "npx tsx scripts/historian-qa-deployed-acceptance.ts"
+    "historian:qa-acceptance": "npx tsx scripts/historian-qa-deployed-acceptance.ts",
+    "historian:qa-temp-link": "npx tsx scripts/historian-qa-issue-temp-link.ts"
   },
   "dependencies": {
     "@aws-sdk/client-bedrock-agent-runtime": "^3.1003.0",
