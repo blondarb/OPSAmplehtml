@@ -2,7 +2,8 @@
 -- Source: reviewed pg_dump --schema-only from ops_amplehtml on 2026-08-22.
 -- Apply only to a new, isolated, synthetic-only QA database. QA normalization:
 -- guard the RDS-created public schema and restore the uuid-ossp dependency
--- omitted by the schema-filtered pg_dump.
+-- omitted by the schema-filtered pg_dump, then restore the public search path
+-- for the source migrations applied in the same psql transaction.
 
 --
 -- PostgreSQL database dump
@@ -5371,3 +5372,5 @@ ALTER TABLE ONLY public.wearable_spiral_assessments
 --
 
 \unrestrict IaJYE7KVgQK5fVuC4JyTz7zKVoQBLt9AsBEAFtAdl4717O9AeNLq2En3oLQOJLt
+
+SET search_path TO public;
