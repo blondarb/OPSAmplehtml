@@ -213,8 +213,8 @@ Resources:
                   image_digest="$(aws ecr describe-images --repository-name historian-qa-nova-relay --image-ids imageTag="$SOURCE_COMMIT" --query 'imageDetails[0].imageDigest' --output text)"
                   test "$(printf '%s' "$image_digest" | grep -Ec '^sha256:[0-9a-f]{64}$')" = 1
                   aws ecr wait image-scan-complete --repository-name historian-qa-nova-relay --image-id imageDigest="$image_digest"
-                  critical="$(aws ecr describe-image-scan-findings --repository-name historian-qa-nova-relay --image-id imageDigest="$image_digest" --query 'imageScanFindings.findingSeverityCounts.CRITICAL' --output text)"
-                  high="$(aws ecr describe-image-scan-findings --repository-name historian-qa-nova-relay --image-id imageDigest="$image_digest" --query 'imageScanFindings.findingSeverityCounts.HIGH' --output text)"
+                  critical="$(aws ecr describe-image-scan-findings --repository-name historian-qa-nova-relay --image-id imageDigest="$image_digest" --query 'imageScanFindings.findingSeverityCounts."CRITICAL"' --output text)"
+                  high="$(aws ecr describe-image-scan-findings --repository-name historian-qa-nova-relay --image-id imageDigest="$image_digest" --query 'imageScanFindings.findingSeverityCounts."HIGH"' --output text)"
                   test "$critical" != None || critical=0
                   test "$high" != None || high=0
                   if test "$critical" -ne 0 || test "$high" -ne 0; then
