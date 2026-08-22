@@ -1,7 +1,8 @@
 -- SYNTHETIC QA BOOTSTRAP - SCHEMA ONLY, NO PRODUCTION ROW DATA.
 -- Source: reviewed pg_dump --schema-only from ops_amplehtml on 2026-08-22.
--- Apply only to a new, isolated, synthetic-only QA database. The public
--- schema creation statement is guarded for an RDS-created empty database.
+-- Apply only to a new, isolated, synthetic-only QA database. QA normalization:
+-- guard the RDS-created public schema and restore the uuid-ossp dependency
+-- omitted by the schema-filtered pg_dump.
 
 --
 -- PostgreSQL database dump
@@ -36,6 +37,8 @@ CREATE SCHEMA IF NOT EXISTS public;
 --
 
 COMMENT ON SCHEMA public IS 'standard public schema';
+
+CREATE EXTENSION IF NOT EXISTS "uuid-ossp" WITH SCHEMA public;
 
 
 --
