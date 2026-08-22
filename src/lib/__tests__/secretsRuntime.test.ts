@@ -89,13 +89,13 @@ describe('runtime secret resolution', () => {
     expect(sendMock).not.toHaveBeenCalled()
   })
 
-  it('uses RDS_DATABASE when an RDS managed secret omits its database field', async () => {
+  it('uses deployment connection metadata when an RDS managed secret contains only credentials', async () => {
     vi.stubEnv('NODE_ENV', 'production')
+    vi.stubEnv('RDS_HOST', 'qa-rds.example.internal')
+    vi.stubEnv('RDS_PORT', '5432')
     vi.stubEnv('RDS_DATABASE', 'ops_amplehtml_qa')
     sendMock.mockResolvedValue({
       SecretString: JSON.stringify({
-        host: 'qa-rds.example.internal',
-        port: 5432,
         username: 'qa_app',
         password: 'synthetic-password',
       }),
@@ -108,6 +108,27 @@ describe('runtime secret resolution', () => {
       username: 'qa_app',
       password: 'synthetic-password',
       database: 'ops_amplehtml_qa',
+    })
+  })
+
+  it('keeps secret-bound RDS endpoint metadata authoritative over deployment fallbacks', async () => {
+    vi.stubEnv('NODE_ENV', 'production')
+    vi.stubEnv('RDS_HOST', 'misconfigured.example.invalid')
+    vi.stubEnv('RDS_PORT', '9999')
+    vi.stubEnv('RDS_DATABASE', 'ops_amplehtml_qa')
+    sendMock.mockResolvedValue({
+      SecretString: JSON.stringify({
+        host: 'secret-bound-rds.example.internal',
+        port: '5432',
+        username: 'qa_app',
+        password: 'synthetic-password',
+      }),
+    })
+    const secrets = await loadSecretsModule()
+
+    await expect(secrets.getRdsCredentials()).resolves.toMatchObject({
+      host: 'secret-bound-rds.example.internal',
+      port: '5432',
     })
   })
 

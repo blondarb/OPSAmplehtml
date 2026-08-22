@@ -128,8 +128,10 @@ export async function getRdsCredentials(): Promise<RdsCredentials> {
       process.env.RDS_SECRET_ID || 'sevaro/rds/credentials',
     )
     const creds: RdsCredentials = {
-      host: secretString(secret, 'host'),
-      port: secretString(secret, 'port') || '5432',
+      // RDS-managed master-user secrets can contain only username/password.
+      // Endpoint and port are non-secret deployment configuration.
+      host: secretString(secret, 'host') || process.env.RDS_HOST?.trim() || '',
+      port: secretString(secret, 'port') || process.env.RDS_PORT?.trim() || '5432',
       username:
         secretString(secret, 'username') || secretString(secret, 'user'),
       password: secretString(secret, 'password'),
