@@ -6,6 +6,7 @@ vi.mock('@/lib/consult/pipeline', () => ({
 }))
 vi.mock('@/lib/secrets', () => ({
   getOpenAIKey: vi.fn(),
+  getNovaRelaySharedSecret: vi.fn(),
 }))
 vi.mock('@/lib/auth/clinicalAccess', () => ({
   authorizeClinicalAccess: vi.fn(),
@@ -17,7 +18,7 @@ vi.mock('@/lib/historian/invitationStore', () => ({
 }))
 
 import { POST } from '@/app/api/ai/historian/session/route'
-import { getOpenAIKey } from '@/lib/secrets'
+import { getNovaRelaySharedSecret, getOpenAIKey } from '@/lib/secrets'
 import { getConsult } from '@/lib/consult/pipeline'
 import { authorizeClinicalAccess } from '@/lib/auth/clinicalAccess'
 import { __resetPublicRouteGuard } from '@/lib/api/publicRouteGuard'
@@ -58,6 +59,7 @@ describe('POST /api/ai/historian/session — textMode (Historian Validation Suit
     vi.clearAllMocks()
     __resetPublicRouteGuard()
     vi.mocked(getOpenAIKey).mockResolvedValue('sk-test-key')
+    vi.mocked(getNovaRelaySharedSecret).mockResolvedValue('synthetic-relay-secret')
     vi.mocked(getConsult).mockResolvedValue(null)
     vi.mocked(authorizeClinicalAccess).mockResolvedValue({
       ok: true,
