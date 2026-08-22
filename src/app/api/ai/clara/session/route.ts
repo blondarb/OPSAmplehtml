@@ -14,12 +14,13 @@ import crypto from 'crypto'
 import { NextResponse } from 'next/server'
 import { cookies } from 'next/headers'
 import { CLARA_GATE_COOKIE, verifyGateToken } from '@/lib/clara/testGate'
+import { getNovaRelaySharedSecret } from '@/lib/secrets'
 
 // Same token format/verification contract as
 // mintNovaRelayToken() in src/app/api/ai/historian/session/route.ts — MUST
 // match services/nova-sonic-relay/src/server.ts byte-for-byte.
-function mintNovaRelayToken(): string | null {
-  const secret = process.env.NOVA_RELAY_SHARED_SECRET
+async function mintNovaRelayToken(): Promise<string | null> {
+  const secret = await getNovaRelaySharedSecret()
   if (!secret) {
     console.warn('[clara/session] NOVA_RELAY_SHARED_SECRET is not set — issuing no relay token; the relay will reject the connection.')
     return null
@@ -142,7 +143,7 @@ export async function POST() {
       tools: [],
       relayUrl: process.env.NOVA_SONIC_RELAY_URL,
       voiceId: process.env.NOVA_SONIC_VOICE_ID,
-      relayToken: mintNovaRelayToken() ?? undefined,
+      relayToken: (await mintNovaRelayToken()) ?? undefined,
       base_instructions: CLARA_VOICE_INSTRUCTIONS,
     })
   } catch (error: unknown) {

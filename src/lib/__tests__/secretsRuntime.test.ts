@@ -29,6 +29,7 @@ describe('runtime secret resolution', () => {
 
   it('loads Cognito and Nova secrets through Secrets Manager in production', async () => {
     vi.stubEnv('NODE_ENV', 'production')
+    vi.stubEnv('COGNITO_CLIENT_SECRET_ID', 'sevaro/test/cognito')
     sendMock
       .mockResolvedValueOnce({
         SecretString: JSON.stringify({
@@ -68,6 +69,7 @@ describe('runtime secret resolution', () => {
 
   it('fails closed to an empty secret when production resolution is unavailable', async () => {
     vi.stubEnv('NODE_ENV', 'production')
+    vi.stubEnv('COGNITO_CLIENT_SECRET_ID', 'sevaro/test/cognito')
     vi.stubEnv('COGNITO_CLIENT_SECRET', '')
     vi.stubEnv('NOVA_RELAY_SHARED_SECRET', '')
     sendMock.mockRejectedValue(new Error('synthetic unavailable'))
@@ -75,6 +77,38 @@ describe('runtime secret resolution', () => {
 
     await expect(secrets.getCognitoClientSecret()).resolves.toBe('')
     await expect(secrets.getNovaRelaySharedSecret()).resolves.toBe('')
+  })
+
+  it('treats an unset production Cognito secret ID as a public client without an AWS lookup', async () => {
+    vi.stubEnv('NODE_ENV', 'production')
+    vi.stubEnv('COGNITO_CLIENT_SECRET_ID', '')
+    vi.stubEnv('COGNITO_CLIENT_SECRET', '')
+    const secrets = await loadSecretsModule()
+
+    await expect(secrets.getCognitoClientSecret()).resolves.toBe('')
+    expect(sendMock).not.toHaveBeenCalled()
+  })
+
+  it('uses RDS_DATABASE when an RDS managed secret omits its database field', async () => {
+    vi.stubEnv('NODE_ENV', 'production')
+    vi.stubEnv('RDS_DATABASE', 'ops_amplehtml_qa')
+    sendMock.mockResolvedValue({
+      SecretString: JSON.stringify({
+        host: 'qa-rds.example.internal',
+        port: 5432,
+        username: 'qa_app',
+        password: 'synthetic-password',
+      }),
+    })
+    const secrets = await loadSecretsModule()
+
+    await expect(secrets.getRdsCredentials()).resolves.toEqual({
+      host: 'qa-rds.example.internal',
+      port: '5432',
+      username: 'qa_app',
+      password: 'synthetic-password',
+      database: 'ops_amplehtml_qa',
+    })
   })
 
   it('caches the Nova secret before the default TTL and refreshes it at expiry', async () => {
@@ -141,6 +175,7 @@ describe('runtime secret resolution', () => {
     vi.useFakeTimers()
     vi.setSystemTime(new Date('2033-05-18T03:33:20.000Z'))
     vi.stubEnv('NODE_ENV', 'production')
+    vi.stubEnv('COGNITO_CLIENT_SECRET_ID', 'sevaro/test/cognito')
     sendMock.mockResolvedValue({
       SecretString: JSON.stringify({ client_secret: 'synthetic-cognito-secret' }),
     })

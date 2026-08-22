@@ -4,7 +4,7 @@ import { buildHistorianSystemPrompt, getHistorianToolDefinition, getHistorianToo
 import type { HistorianSessionType } from '@/lib/historianTypes'
 import type { HistorianInterviewMode, HistorianInterviewPromptVersion } from '@/lib/historianTypes'
 import { getTurnDetectionConfig, getNoiseReductionConfig } from '@/lib/historianTypes'
-import { getOpenAIKey } from '@/lib/secrets'
+import { getNovaRelaySharedSecret, getOpenAIKey } from '@/lib/secrets'
 import { getConsult, markHistorianStarted } from '@/lib/consult/pipeline'
 import {
   buildHistorianContextFromConsult,
@@ -38,8 +38,8 @@ import { HISTORIAN_GRANT_COOKIE, readCookieValue } from '@/lib/historian/invitat
  * resulting connection. That is the correct behavior, not a bug: an
  * unconfigured secret must never silently disable auth.
  */
-function mintNovaRelayToken(): string | null {
-  const secret = process.env.NOVA_RELAY_SHARED_SECRET
+async function mintNovaRelayToken(): Promise<string | null> {
+  const secret = await getNovaRelaySharedSecret()
   if (!secret) {
     console.warn('[historian/session] NOVA_RELAY_SHARED_SECRET is not set — issuing no relay token; the relay will reject the connection.')
     return null
@@ -95,7 +95,7 @@ export async function POST(request: Request) {
     let sessionId: string = crypto.randomUUID()
     let flushToken: string | undefined
     try {
-      flushToken = mintFlushToken(sessionId)
+      flushToken = await mintFlushToken(sessionId)
     } catch (flushTokenErr) {
       console.warn(
         '[historian/session] mintFlushToken failed (non-fatal — durable transcript flush unavailable this session):',
@@ -149,7 +149,7 @@ export async function POST(request: Request) {
     if (invitationBinding) {
       sessionId = invitationBinding.sessionId
       try {
-        flushToken = mintFlushToken(sessionId)
+        flushToken = await mintFlushToken(sessionId)
       } catch (flushTokenErr) {
         console.warn(
           '[historian/session] mintFlushToken failed for invited session:',
@@ -291,7 +291,7 @@ export async function POST(request: Request) {
         // Omitted (undefined -> dropped by JSON.stringify) when the shared
         // secret isn't configured — the relay fail-closed-rejects the
         // resulting connection.
-        relayToken: mintNovaRelayToken() ?? undefined,
+        relayToken: (await mintNovaRelayToken()) ?? undefined,
         // base_instructions kept for client parity (localizer push channel).
         base_instructions: instructions,
         consult_id: consultId || null,

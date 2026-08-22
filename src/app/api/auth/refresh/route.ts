@@ -1,10 +1,14 @@
 import { NextResponse } from 'next/server'
 import { cookies } from 'next/headers'
 import { jwtVerify, createRemoteJWKSet } from 'jose'
+import { getCognitoClientSecret } from '@/lib/secrets'
+import {
+  assertCognitoIdToken,
+  cognitoIdTokenVerificationOptions,
+} from '@/lib/cognito/idToken'
 
 const COGNITO_DOMAIN = process.env.NEXT_PUBLIC_COGNITO_DOMAIN || 'auth.neuroplans.app'
 const CLIENT_ID = process.env.NEXT_PUBLIC_COGNITO_CLIENT_ID || ''
-const CLIENT_SECRET = process.env.COGNITO_CLIENT_SECRET || ''
 const COGNITO_REGION = process.env.NEXT_PUBLIC_COGNITO_REGION || 'us-east-2'
 const COGNITO_POOL_ID = process.env.NEXT_PUBLIC_COGNITO_USER_POOL_ID || 'us-east-2_9y6XyJnXC'
 
@@ -25,8 +29,9 @@ export async function POST() {
     refresh_token: refreshToken,
   }
 
-  if (CLIENT_SECRET) {
-    body.client_secret = CLIENT_SECRET
+  const clientSecret = await getCognitoClientSecret()
+  if (clientSecret) {
+    body.client_secret = clientSecret
   }
 
   const tokenRes = await fetch(`https://${COGNITO_DOMAIN}/oauth2/token`, {
@@ -43,9 +48,12 @@ export async function POST() {
   const { id_token, access_token } = tokens
 
   // Parse user from the new ID token
-  const { payload } = await jwtVerify(id_token, jwks, {
-    issuer: `https://cognito-idp.${COGNITO_REGION}.amazonaws.com/${COGNITO_POOL_ID}`,
-  })
+  const { payload } = await jwtVerify(
+    id_token,
+    jwks,
+    cognitoIdTokenVerificationOptions(COGNITO_REGION, COGNITO_POOL_ID, CLIENT_ID),
+  )
+  assertCognitoIdToken(payload)
 
   const isSecure = process.env.NODE_ENV === 'production'
   const cookieOpts = {

@@ -79,7 +79,7 @@ describe('transcript-flush route', () => {
 
   describe('crash-sim durability gate', () => {
     it('retains events 1-9 and consolidates them in order when the client dies before flushing seq 10', async () => {
-      const token = mintFlushToken(SESSION_ID)
+      const token = await mintFlushToken(SESSION_ID)
       const all = buildEntries(10)
 
       // Flush in batches of 3 — mirrors the client's real "flush every 3
@@ -124,7 +124,7 @@ describe('transcript-flush route', () => {
 
   describe('auth + validation', () => {
     it('rejects a request whose bearer token sessionId does not match the body sessionId', async () => {
-      const token = mintFlushToken('some-other-session')
+      const token = await mintFlushToken('some-other-session')
       const res = await flushBatch(token, buildEntries(1))
       expect(res.status).toBe(403)
       expect(table.size).toBe(0)
@@ -141,27 +141,27 @@ describe('transcript-flush route', () => {
     })
 
     it('rejects a tampered token', async () => {
-      const token = mintFlushToken(SESSION_ID)
+      const token = await mintFlushToken(SESSION_ID)
       const tampered = token.slice(0, -1) + (token.at(-1) === 'A' ? 'B' : 'A')
       const res = await flushBatch(tampered, buildEntries(1))
       expect(res.status).toBe(403)
     })
 
     it('rejects more than 50 entries in one request', async () => {
-      const token = mintFlushToken(SESSION_ID)
+      const token = await mintFlushToken(SESSION_ID)
       const res = await flushBatch(token, buildEntries(51))
       expect(res.status).toBe(413)
       expect(table.size).toBe(0)
     })
 
     it('rejects a seq beyond the 500/session cap', async () => {
-      const token = mintFlushToken(SESSION_ID)
+      const token = await mintFlushToken(SESSION_ID)
       const res = await flushBatch(token, [{ seq: 501, role: 'user', text: 'x', tsOffsetS: 0 }])
       expect(res.status).toBe(413)
     })
 
     it('rejects a malformed entry (empty text) with a 400 that does not echo it', async () => {
-      const token = mintFlushToken(SESSION_ID)
+      const token = await mintFlushToken(SESSION_ID)
       const res = await flushBatch(token, [{ seq: 1, role: 'user', text: '   ', tsOffsetS: 0 }])
       expect(res.status).toBe(400)
       const body = await res.json()
@@ -169,7 +169,7 @@ describe('transcript-flush route', () => {
     })
 
     it('is a no-op 200 for an empty entries array', async () => {
-      const token = mintFlushToken(SESSION_ID)
+      const token = await mintFlushToken(SESSION_ID)
       const res = await flushBatch(token, [])
       expect(res.status).toBe(200)
       expect((await res.json()).accepted).toBe(0)

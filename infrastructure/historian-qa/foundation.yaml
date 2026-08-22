@@ -1,0 +1,288 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: >
+  Seven-day, synthetic-only foundation for the isolated Historian MVP QA slice.
+  This stack creates no patient data and does not reference production compute,
+  Cognito, relay, or database resources.
+
+Parameters:
+  VpcId:
+    Type: AWS::EC2::VPC::Id
+    Default: vpc-0b3b5434d73b68e82
+  DbSubnetGroupName:
+    Type: String
+    Default: sevaro-rds-subnets
+    Description: Existing network-only RDS subnet group; no database is reused.
+  QaAppOrigin:
+    Type: String
+    Default: https://historian-mvp-qa.d3ietjwgco4g2t.amplifyapp.com
+    AllowedPattern: '^https://[A-Za-z0-9.-]+$'
+  DeleteAfter:
+    Type: String
+    Default: '2026-08-29'
+
+Resources:
+  HistorianQaDatabaseSecurityGroupA:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Historian synthetic QA PostgreSQL access from current us-east-2 AWS ranges, part A
+      VpcId: !Ref VpcId
+      SecurityGroupIngress:
+        - { IpProtocol: tcp, FromPort: 5432, ToPort: 5432, CidrIp: 1.178.8.0/24 }
+        - { IpProtocol: tcp, FromPort: 5432, ToPort: 5432, CidrIp: 110.238.2.0/23 }
+        - { IpProtocol: tcp, FromPort: 5432, ToPort: 5432, CidrIp: 13.58.0.0/15 }
+        - { IpProtocol: tcp, FromPort: 5432, ToPort: 5432, CidrIp: 15.129.16.0/21 }
+        - { IpProtocol: tcp, FromPort: 5432, ToPort: 5432, CidrIp: 15.177.66.0/23 }
+        - { IpProtocol: tcp, FromPort: 5432, ToPort: 5432, CidrIp: 151.148.32.0/24 }
+        - { IpProtocol: tcp, FromPort: 5432, ToPort: 5432, CidrIp: 16.214.56.0/22 }
+        - { IpProtocol: tcp, FromPort: 5432, ToPort: 5432, CidrIp: 16.58.0.0/15 }
+        - { IpProtocol: tcp, FromPort: 5432, ToPort: 5432, CidrIp: 168.185.6.0/24 }
+        - { IpProtocol: tcp, FromPort: 5432, ToPort: 5432, CidrIp: 173.83.192.0/22 }
+        - { IpProtocol: tcp, FromPort: 5432, ToPort: 5432, CidrIp: 173.83.228.0/22 }
+        - { IpProtocol: tcp, FromPort: 5432, ToPort: 5432, CidrIp: 18.116.0.0/14 }
+        - { IpProtocol: tcp, FromPort: 5432, ToPort: 5432, CidrIp: 18.188.0.0/14 }
+        - { IpProtocol: tcp, FromPort: 5432, ToPort: 5432, CidrIp: 18.216.0.0/13 }
+        - { IpProtocol: tcp, FromPort: 5432, ToPort: 5432, CidrIp: 18.224.0.0/14 }
+        - { IpProtocol: tcp, FromPort: 5432, ToPort: 5432, CidrIp: 18.34.252.0/22 }
+        - { IpProtocol: tcp, FromPort: 5432, ToPort: 5432, CidrIp: 18.34.72.0/21 }
+        - { IpProtocol: tcp, FromPort: 5432, ToPort: 5432, CidrIp: 18.97.128.0/18 }
+        - { IpProtocol: tcp, FromPort: 5432, ToPort: 5432, CidrIp: 192.189.197.0/24 }
+        - { IpProtocol: tcp, FromPort: 5432, ToPort: 5432, CidrIp: 192.43.184.0/24 }
+        - { IpProtocol: tcp, FromPort: 5432, ToPort: 5432, CidrIp: 198.41.103.0/24 }
+        - { IpProtocol: tcp, FromPort: 5432, ToPort: 5432, CidrIp: 198.99.2.0/24 }
+        - { IpProtocol: tcp, FromPort: 5432, ToPort: 5432, CidrIp: 202.174.132.0/22 }
+        - { IpProtocol: tcp, FromPort: 5432, ToPort: 5432, CidrIp: 216.198.194.0/24 }
+        - { IpProtocol: tcp, FromPort: 5432, ToPort: 5432, CidrIp: 216.198.216.0/21 }
+        - { IpProtocol: tcp, FromPort: 5432, ToPort: 5432, CidrIp: 216.244.12.0/23 }
+        - { IpProtocol: tcp, FromPort: 5432, ToPort: 5432, CidrIp: 216.244.8.0/24 }
+        - { IpProtocol: tcp, FromPort: 5432, ToPort: 5432, CidrIp: 24.110.8.0/23 }
+        - { IpProtocol: tcp, FromPort: 5432, ToPort: 5432, CidrIp: 3.12.0.0/14 }
+        - { IpProtocol: tcp, FromPort: 5432, ToPort: 5432, CidrIp: 3.128.0.0/12 }
+        - { IpProtocol: tcp, FromPort: 5432, ToPort: 5432, CidrIp: 3.144.0.0/13 }
+        - { IpProtocol: tcp, FromPort: 5432, ToPort: 5432, CidrIp: 3.16.0.0/13 }
+      Tags:
+        - { Key: Name, Value: historian-mvp-qa-db-a }
+        - { Key: DataClass, Value: synthetic-only }
+        - { Key: DeleteAfter, Value: !Ref DeleteAfter }
+
+  HistorianQaDatabaseSecurityGroupB:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Historian synthetic QA PostgreSQL access from current us-east-2 AWS ranges, part B
+      VpcId: !Ref VpcId
+      SecurityGroupIngress:
+        - { IpProtocol: tcp, FromPort: 5432, ToPort: 5432, CidrIp: 3.2.67.0/24 }
+        - { IpProtocol: tcp, FromPort: 5432, ToPort: 5432, CidrIp: 3.43.64.0/18 }
+        - { IpProtocol: tcp, FromPort: 5432, ToPort: 5432, CidrIp: 3.5.100.0/22 }
+        - { IpProtocol: tcp, FromPort: 5432, ToPort: 5432, CidrIp: 3.5.104.0/21 }
+        - { IpProtocol: tcp, FromPort: 5432, ToPort: 5432, CidrIp: 3.5.128.0/22 }
+        - { IpProtocol: tcp, FromPort: 5432, ToPort: 5432, CidrIp: 3.5.132.0/23 }
+        - { IpProtocol: tcp, FromPort: 5432, ToPort: 5432, CidrIp: 3.5.88.0/22 }
+        - { IpProtocol: tcp, FromPort: 5432, ToPort: 5432, CidrIp: 3.5.92.0/23 }
+        - { IpProtocol: tcp, FromPort: 5432, ToPort: 5432, CidrIp: 35.50.142.0/23 }
+        - { IpProtocol: tcp, FromPort: 5432, ToPort: 5432, CidrIp: 35.50.144.0/24 }
+        - { IpProtocol: tcp, FromPort: 5432, ToPort: 5432, CidrIp: 35.50.160.0/23 }
+        - { IpProtocol: tcp, FromPort: 5432, ToPort: 5432, CidrIp: 35.55.33.0/24 }
+        - { IpProtocol: tcp, FromPort: 5432, ToPort: 5432, CidrIp: 35.55.34.0/23 }
+        - { IpProtocol: tcp, FromPort: 5432, ToPort: 5432, CidrIp: 35.71.102.0/24 }
+        - { IpProtocol: tcp, FromPort: 5432, ToPort: 5432, CidrIp: 40.235.192.0/18 }
+        - { IpProtocol: tcp, FromPort: 5432, ToPort: 5432, CidrIp: 52.14.0.0/15 }
+        - { IpProtocol: tcp, FromPort: 5432, ToPort: 5432, CidrIp: 52.94.248.160/28 }
+        - { IpProtocol: tcp, FromPort: 5432, ToPort: 5432, CidrIp: 52.95.251.0/24 }
+        - { IpProtocol: tcp, FromPort: 5432, ToPort: 5432, CidrIp: 63.249.144.0/23 }
+        - { IpProtocol: tcp, FromPort: 5432, ToPort: 5432, CidrIp: 63.249.146.0/24 }
+        - { IpProtocol: tcp, FromPort: 5432, ToPort: 5432, CidrIp: 64.252.74.0/23 }
+        - { IpProtocol: tcp, FromPort: 5432, ToPort: 5432, CidrIp: 64.252.76.0/23 }
+        - { IpProtocol: tcp, FromPort: 5432, ToPort: 5432, CidrIp: 64.66.136.0/24 }
+        - { IpProtocol: tcp, FromPort: 5432, ToPort: 5432, CidrIp: 75.3.0.0/18 }
+        - { IpProtocol: tcp, FromPort: 5432, ToPort: 5432, CidrIp: 75.3.128.0/18 }
+        - { IpProtocol: tcp, FromPort: 5432, ToPort: 5432, CidrIp: 77.112.0.0/14 }
+        - { IpProtocol: tcp, FromPort: 5432, ToPort: 5432, CidrIp: 99.150.0.0/21 }
+        - { IpProtocol: tcp, FromPort: 5432, ToPort: 5432, CidrIp: 99.77.131.0/24 }
+        - { IpProtocol: tcp, FromPort: 5432, ToPort: 5432, CidrIp: 99.77.153.0/24 }
+        - { IpProtocol: tcp, FromPort: 5432, ToPort: 5432, CidrIp: 99.77.162.0/24 }
+        - { IpProtocol: tcp, FromPort: 5432, ToPort: 5432, CidrIp: 99.77.252.0/24 }
+      Tags:
+        - { Key: Name, Value: historian-mvp-qa-db-b }
+        - { Key: DataClass, Value: synthetic-only }
+        - { Key: DeleteAfter, Value: !Ref DeleteAfter }
+
+  HistorianQaDatabase:
+    Type: AWS::RDS::DBInstance
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Delete
+    Properties:
+      DBInstanceIdentifier: historian-mvp-qa
+      DBName: ops_amplehtml_historian_qa
+      DBInstanceClass: db.t4g.micro
+      Engine: postgres
+      EngineVersion: '17.9'
+      MasterUsername: historian_qa_admin
+      ManageMasterUserPassword: true
+      AllocatedStorage: '20'
+      StorageType: gp3
+      StorageEncrypted: true
+      MultiAZ: false
+      PubliclyAccessible: true
+      DBSubnetGroupName: !Ref DbSubnetGroupName
+      VPCSecurityGroups:
+        - !GetAtt HistorianQaDatabaseSecurityGroupA.GroupId
+        - !GetAtt HistorianQaDatabaseSecurityGroupB.GroupId
+      BackupRetentionPeriod: 1
+      DeleteAutomatedBackups: true
+      CopyTagsToSnapshot: true
+      AutoMinorVersionUpgrade: true
+      EnableIAMDatabaseAuthentication: false
+      EnablePerformanceInsights: false
+      DeletionProtection: false
+      Tags:
+        - { Key: Name, Value: historian-mvp-qa }
+        - { Key: DataClass, Value: synthetic-only }
+        - { Key: DeleteAfter, Value: !Ref DeleteAfter }
+
+  HistorianQaNovaRelaySecret:
+    Type: AWS::SecretsManager::Secret
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Delete
+    Properties:
+      Name: sevaro/historian-qa/nova-relay
+      Description: Generated HMAC secret for the isolated synthetic Historian QA relay.
+      GenerateSecretString:
+        SecretStringTemplate: '{"purpose":"historian-qa-relay"}'
+        GenerateStringKey: shared_secret
+        PasswordLength: 64
+        ExcludePunctuation: true
+        RequireEachIncludedType: false
+      ReplicaRegions:
+        - Region: us-east-1
+      Tags:
+        - { Key: DataClass, Value: synthetic-only }
+        - { Key: DeleteAfter, Value: !Ref DeleteAfter }
+
+  HistorianQaMachinePassword:
+    Type: AWS::SecretsManager::Secret
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Delete
+    Properties:
+      Name: sevaro/historian-qa/machine-user
+      Description: Generated password for the synthetic QA clinician account; never emailed.
+      GenerateSecretString:
+        SecretStringTemplate: '{"username":"historian-qa-clinician"}'
+        GenerateStringKey: password
+        PasswordLength: 32
+        IncludeSpace: false
+        RequireEachIncludedType: true
+      Tags:
+        - { Key: DataClass, Value: synthetic-only }
+        - { Key: DeleteAfter, Value: !Ref DeleteAfter }
+
+  HistorianQaUserPool:
+    Type: AWS::Cognito::UserPool
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Delete
+    Properties:
+      UserPoolName: historian-mvp-qa
+      DeletionProtection: INACTIVE
+      MfaConfiguration: 'OFF'
+      UsernameConfiguration:
+        CaseSensitive: false
+      AliasAttributes: [email]
+      AutoVerifiedAttributes: [email]
+      AccountRecoverySetting:
+        RecoveryMechanisms:
+          - Name: verified_email
+            Priority: 1
+      AdminCreateUserConfig:
+        AllowAdminCreateUserOnly: true
+      Policies:
+        PasswordPolicy:
+          MinimumLength: 14
+          RequireLowercase: true
+          RequireNumbers: true
+          RequireSymbols: true
+          RequireUppercase: true
+          TemporaryPasswordValidityDays: 1
+      UserPoolTags:
+        DataClass: synthetic-only
+        DeleteAfter: !Ref DeleteAfter
+
+  HistorianQaUserPoolClient:
+    Type: AWS::Cognito::UserPoolClient
+    Properties:
+      ClientName: historian-mvp-qa-public-pkce
+      UserPoolId: !Ref HistorianQaUserPool
+      GenerateSecret: false
+      AllowedOAuthFlowsUserPoolClient: true
+      AllowedOAuthFlows: [code]
+      AllowedOAuthScopes: [openid, email, profile]
+      CallbackURLs:
+        - !Sub '${QaAppOrigin}/api/auth/callback'
+      LogoutURLs:
+        - !Sub '${QaAppOrigin}/'
+      SupportedIdentityProviders: [COGNITO]
+      ExplicitAuthFlows:
+        - ALLOW_USER_PASSWORD_AUTH
+        - ALLOW_REFRESH_TOKEN_AUTH
+      PreventUserExistenceErrors: ENABLED
+      EnableTokenRevocation: true
+      AuthSessionValidity: 3
+      AccessTokenValidity: 60
+      IdTokenValidity: 60
+      RefreshTokenValidity: 1
+      TokenValidityUnits:
+        AccessToken: minutes
+        IdToken: minutes
+        RefreshToken: days
+
+  HistorianQaUserPoolDomain:
+    Type: AWS::Cognito::UserPoolDomain
+    Properties:
+      Domain: !Sub 'historian-mvp-qa-${AWS::AccountId}'
+      UserPoolId: !Ref HistorianQaUserPool
+
+  HistorianQaAmplifyComputeRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: historian-mvp-qa-amplify-compute
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: amplify.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: ReadHistorianQaRuntimeSecretsOnly
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Sid: ReadQaRdsAndRelaySecrets
+                Effect: Allow
+                Action:
+                  - secretsmanager:DescribeSecret
+                  - secretsmanager:GetSecretValue
+                Resource:
+                  - !GetAtt HistorianQaDatabase.MasterUserSecret.SecretArn
+                  - !Ref HistorianQaNovaRelaySecret
+      Tags:
+        - { Key: DataClass, Value: synthetic-only }
+        - { Key: DeleteAfter, Value: !Ref DeleteAfter }
+
+Outputs:
+  DatabaseEndpoint:
+    Value: !GetAtt HistorianQaDatabase.Endpoint.Address
+  DatabasePort:
+    Value: !GetAtt HistorianQaDatabase.Endpoint.Port
+  DatabaseSecretArn:
+    Value: !GetAtt HistorianQaDatabase.MasterUserSecret.SecretArn
+  NovaRelaySecretArn:
+    Value: !Ref HistorianQaNovaRelaySecret
+  MachinePasswordSecretArn:
+    Value: !Ref HistorianQaMachinePassword
+  CognitoUserPoolId:
+    Value: !Ref HistorianQaUserPool
+  CognitoUserPoolClientId:
+    Value: !Ref HistorianQaUserPoolClient
+  CognitoDomain:
+    Value: !Sub 'historian-mvp-qa-${AWS::AccountId}.auth.${AWS::Region}.amazoncognito.com'
+  AmplifyComputeRoleArn:
+    Value: !GetAtt HistorianQaAmplifyComputeRole.Arn

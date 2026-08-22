@@ -36,7 +36,7 @@ export async function POST(request: Request) {
   try {
     const authHeader = request.headers.get('authorization') || ''
     const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7).trim() : ''
-    const verified = token ? verifyFlushToken(token) : null
+    const verified = token ? await verifyFlushToken(token) : null
     if (!verified) {
       return NextResponse.json({ error: 'Invalid or missing flush token' }, { status: 403 })
     }

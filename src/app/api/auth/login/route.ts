@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
+import { cognitoPkceCookie, createPkceLogin } from '@/lib/cognito/pkce'
 
 const COGNITO_DOMAIN = process.env.NEXT_PUBLIC_COGNITO_DOMAIN || 'auth.neuroplans.app'
 const CLIENT_ID = process.env.NEXT_PUBLIC_COGNITO_CLIENT_ID || ''
@@ -16,8 +17,7 @@ function getOrigin(request: NextRequest): string {
 }
 
 export async function GET(request: NextRequest) {
-  const returnTo = request.nextUrl.searchParams.get('returnTo') || '/'
-  const state = Buffer.from(JSON.stringify({ returnTo })).toString('base64url')
+  const pkce = createPkceLogin(request.nextUrl.searchParams.get('returnTo'))
   const origin = getOrigin(request)
   const redirectUri = `${origin}/api/auth/callback`
 
@@ -26,8 +26,18 @@ export async function GET(request: NextRequest) {
     client_id: CLIENT_ID,
     redirect_uri: redirectUri,
     scope: 'openid email profile',
-    state,
+    state: pkce.state,
+    code_challenge: pkce.challenge,
+    code_challenge_method: 'S256',
   })
 
-  return NextResponse.redirect(`https://${COGNITO_DOMAIN}/oauth2/authorize?${params}`)
+  const response = NextResponse.redirect(`https://${COGNITO_DOMAIN}/oauth2/authorize?${params}`)
+  response.cookies.set(cognitoPkceCookie.name, pkce.cookie, {
+    httpOnly: true,
+    secure: origin.startsWith('https'),
+    sameSite: 'lax',
+    path: '/api/auth/callback',
+    maxAge: cognitoPkceCookie.maxAge,
+  })
+  return response
 }

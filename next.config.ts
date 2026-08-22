@@ -86,7 +86,6 @@ const nextConfig: NextConfig = {
     RDS_HOST: process.env.RDS_HOST,
     RDS_PORT: process.env.RDS_PORT,
     RDS_USER: process.env.RDS_USER,
-    RDS_PASSWORD: process.env.RDS_PASSWORD,
     RDS_DATABASE: process.env.RDS_DATABASE,
     COGNITO_USER_POOL_ID: process.env.COGNITO_USER_POOL_ID,
     COGNITO_CLIENT_ID: process.env.COGNITO_CLIENT_ID,
@@ -96,7 +95,10 @@ const nextConfig: NextConfig = {
     BEDROCK_REGION: process.env.BEDROCK_REGION,
     BEDROCK_TRIAGE_MODEL: process.env.BEDROCK_TRIAGE_MODEL,
     BEDROCK_KB_ID: process.env.BEDROCK_KB_ID,
-    COGNITO_CLIENT_SECRET: process.env.COGNITO_CLIENT_SECRET,
+    // Identifiers/configuration only. Secret values are resolved at request
+    // time through src/lib/secrets.ts and must never be embedded in a build.
+    COGNITO_CLIENT_SECRET_ID: process.env.COGNITO_CLIENT_SECRET_ID,
+    RDS_SECRET_ID: process.env.RDS_SECRET_ID,
     // AI Historian turn-taking / noise handling (hot-revertable without a code change)
     HISTORIAN_TURN_DETECTION_MODE: process.env.HISTORIAN_TURN_DETECTION_MODE,
     HISTORIAN_NOISE_REDUCTION: process.env.HISTORIAN_NOISE_REDUCTION,
@@ -106,11 +108,10 @@ const nextConfig: NextConfig = {
     VOICE_PROVIDER: process.env.VOICE_PROVIDER,
     NOVA_SONIC_RELAY_URL: process.env.NOVA_SONIC_RELAY_URL,
     NOVA_SONIC_VOICE_ID: process.env.NOVA_SONIC_VOICE_ID,
-    // Shared secret used to mint the relay's WS-upgrade auth token
-    // (src/app/api/ai/historian/session/route.ts mintNovaRelayToken). Same
-    // known Amplify SSR gotcha as the vars above — must be inlined here or
-    // the session route can't read it at runtime.
-    NOVA_RELAY_SHARED_SECRET: process.env.NOVA_RELAY_SHARED_SECRET,
+    // Non-secret identifier for the shared relay secret. The actual HMAC key
+    // is resolved at request time and is never embedded in an app artifact.
+    NOVA_RELAY_SECRET_ID: process.env.NOVA_RELAY_SECRET_ID,
+    NOVA_RELAY_SECRET_CACHE_TTL_MS: process.env.NOVA_RELAY_SECRET_CACHE_TTL_MS,
     // Clara R&D voice test gate (src/lib/clara/testGate.ts). Doubles as the
     // HMAC secret for the gate cookie. Same Amplify SSR gotcha — must be
     // inlined here or /api/ai/clara/auth fail-closes with "unset" at runtime.

@@ -22,6 +22,7 @@
  *     configured secret to check against.
  */
 import crypto from 'crypto'
+import { getNovaRelaySharedSecret } from '@/lib/secrets'
 
 /**
  * Dev/test-only fallback secret. Reachable ONLY when NODE_ENV is not
@@ -50,9 +51,11 @@ interface FlushTokenPayload {
  * outside production, or null in production — the fail-closed signal both
  * mintFlushToken and verifyFlushToken key off of below.
  */
-function resolveSecret(): string | null {
-  const configured = process.env.HISTORIAN_FLUSH_SECRET || process.env.NOVA_RELAY_SHARED_SECRET
+async function resolveSecret(): Promise<string | null> {
+  const configured = process.env.HISTORIAN_FLUSH_SECRET?.trim()
   if (configured) return configured
+  const relaySecret = await getNovaRelaySharedSecret()
+  if (relaySecret) return relaySecret
   if (process.env.NODE_ENV === 'production') return null
   return DEV_FALLBACK_SECRET
 }
@@ -74,8 +77,8 @@ function sign(payloadB64: string, secret: string): string {
   return toBase64Url(crypto.createHmac('sha256', secret).update(payloadB64).digest())
 }
 
-export function mintFlushToken(sessionId: string): string {
-  const secret = resolveSecret()
+export async function mintFlushToken(sessionId: string): Promise<string> {
+  const secret = await resolveSecret()
   if (!secret) {
     // Fail closed: production with neither HISTORIAN_FLUSH_SECRET nor
     // NOVA_RELAY_SHARED_SECRET configured. Refuse to mint rather than
@@ -94,10 +97,10 @@ export function mintFlushToken(sessionId: string): string {
   return `${payloadB64}.${sig}`
 }
 
-export function verifyFlushToken(token: string): { sessionId: string } | null {
+export async function verifyFlushToken(token: string): Promise<{ sessionId: string } | null> {
   if (!token || typeof token !== 'string') return null
 
-  const secret = resolveSecret()
+  const secret = await resolveSecret()
   if (!secret) return null // fail closed — no configured secret to verify against
 
   const parts = token.split('.')
