@@ -27,7 +27,7 @@ Parameters:
   WorkerMaximumConcurrency:
     Type: Number
     Default: 3
-    MinValue: 1
+    MinValue: 2
     MaxValue: 10
   AlarmTopicArn:
     Type: String
@@ -72,7 +72,7 @@ Globals:
 Resources:
   HistorianEvalDeadLetterQueue:
     Type: AWS::SQS::Queue
-    DeletionPolicy: Retain
+    DeletionPolicy: RetainExceptOnCreate
     UpdateReplacePolicy: Retain
     Properties:
       MessageRetentionPeriod: 1209600
@@ -84,7 +84,7 @@ Resources:
 
   HistorianEvalQueue:
     Type: AWS::SQS::Queue
-    DeletionPolicy: Retain
+    DeletionPolicy: RetainExceptOnCreate
     UpdateReplacePolicy: Retain
     Properties:
       VisibilityTimeout: 900
