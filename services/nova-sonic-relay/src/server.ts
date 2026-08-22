@@ -8,6 +8,11 @@ import {
 } from './comprehensiveOpening.js'
 import { TranscribeMedicalSession } from './transcribeMedicalSession.js'
 import type { ClientMsg, ServerMsg } from './wsProtocol.js'
+import {
+  buildContinuationInstructions,
+  continuationHistory,
+  validateContinuationCheckpoint,
+} from './continuationCheckpoint.js'
 
 // ---------------------------------------------------------------------------
 // HTTP server — answers GET /healthz for App Runner health checks; 404 otherwise.
@@ -176,6 +181,21 @@ const TRACE: (m: string) => void = process.env.RELAY_TRACE
   ? (m: string) => console.log(`[trace ${new Date().toISOString().slice(11, 23)}] ${m}`)
   : () => {}
 
+// Application-owned Nova continuation is an explicit rollout flag. With the
+// flag off, the relay retains the current fail-closed single-segment behavior.
+const CONTINUATION_ENABLED = process.env.NOVA_APP_CONTINUATION_V1 === 'true'
+function continuationTiming(testEnvName: string, productionMs: number): number {
+  if (process.env.NODE_ENV !== 'test') return productionMs
+  const candidate = Number(process.env[testEnvName])
+  return Number.isFinite(candidate) && candidate >= 1 ? candidate : productionMs
+}
+const CONTINUATION_DUE_MS = continuationTiming('NOVA_CONTINUATION_TEST_DUE_MS', 210_000)
+const CONTINUATION_BARRIER_MS = continuationTiming('NOVA_CONTINUATION_TEST_BARRIER_MS', 240_000)
+const CONTINUATION_DEADLINE_MS = continuationTiming('NOVA_CONTINUATION_TEST_DEADLINE_MS', 270_000)
+const CANDIDATE_STABILITY_MS = continuationTiming('NOVA_CONTINUATION_TEST_STABILITY_MS', 1_000)
+const CONTINUATION_BUFFER_MAX_BASE64_CHARS = 1_280_000 // 30s PCM16@16k, base64 encoded
+const OLD_SEGMENT_STOP_TIMEOUT_MS = 5_000
+
 wss.on('connection', (ws) => {
   // Track whether the AI is currently speaking so we can wrap turns with
   // aiSpeechStart / aiSpeechStop. This is an approximation: we emit
@@ -186,21 +206,95 @@ wss.on('connection', (ws) => {
   let interviewMode: 'standard' | 'comprehensive' = 'standard'
   let comprehensiveOpeningSettled = false
   let modelTerminalSent = false
+  let clientStopping = false
+  let sessionStarted = false
+  let activeSegmentId = 1
+  let segmentStartedAt = 0
+  let lastAudioSeq = 0
+  let sequencedAudio = false
+  let outputQuarantined = false
+  let rotationInProgress = false
+  let dueSent = false
+  let dueTimer: ReturnType<typeof setTimeout> | null = null
+  let deadlineTimer: ReturnType<typeof setTimeout> | null = null
+  const pendingTools = new Set<string>()
+  let startConfig: {
+    instructions: string
+    tools: Parameters<NovaSonicSession['start']>[1]
+    voiceId?: string
+  } | null = null
+  let bufferedAudio: Array<{ audioSeq: number; pcm: string }> = []
+  let bufferedAudioChars = 0
+  let lastContinuationCheckpoint: import('./wsProtocol.js').VoiceContinuationCheckpoint | null = null
+  let openingSession: NovaSonicSession | null = null
+  let barrier: {
+    id: string
+    segmentId: number
+    lastAudioSeq: number
+    deadlineAtMs: number
+  } | null = null
 
   function terminateModelSession(reason: 'nova_stream_error' | 'nova_stream_ended'): void {
     if (modelTerminalSent) return
     modelTerminalSent = true
+    outputQuarantined = true
+    void openingSession?.stop().catch(() => {})
     send(ws, { t: 'sessionEnded', reason })
     if (ws.readyState === WebSocket.OPEN) {
       ws.close(1011, reason)
     }
   }
 
+  function clearContinuationTimers(): void {
+    if (dueTimer) clearTimeout(dueTimer)
+    if (deadlineTimer) clearTimeout(deadlineTimer)
+    dueTimer = null
+    deadlineTimer = null
+  }
+
+  function continuationApplicable(): boolean {
+    return CONTINUATION_ENABLED && interviewMode === 'comprehensive' && sequencedAudio
+  }
+
+  function maybeSendContinuationDue(segmentId = activeSegmentId): void {
+    if (clientStopping || modelTerminalSent || !continuationApplicable() || dueSent || segmentId !== activeSegmentId || !segmentStartedAt) return
+    if (Date.now() - segmentStartedAt < CONTINUATION_DUE_MS) return
+    dueSent = true
+    const deadlineAtMs = segmentStartedAt + CONTINUATION_DEADLINE_MS
+    send(ws, { t: 'continuationDue', segmentId, deadlineAtMs })
+  }
+
+  function armContinuationClock(): void {
+    clearContinuationTimers()
+    dueSent = false
+    segmentStartedAt = Date.now()
+    const segmentId = activeSegmentId
+    if (clientStopping || modelTerminalSent || !CONTINUATION_ENABLED || interviewMode !== 'comprehensive') return
+    dueTimer = setTimeout(() => maybeSendContinuationDue(segmentId), CONTINUATION_DUE_MS)
+    deadlineTimer = setTimeout(() => {
+      if (segmentId !== activeSegmentId || modelTerminalSent) return
+      failContinuation('deadline', barrier?.id)
+    }, CONTINUATION_DEADLINE_MS)
+  }
+
+  function failContinuation(
+    reason: Extract<ServerMsg, { t: 'continuationFailed' }>['reason'],
+    barrierId?: string,
+  ): void {
+    if (clientStopping || modelTerminalSent) return
+    clearContinuationTimers()
+    outputQuarantined = true
+    rotationInProgress = false
+    send(ws, { t: 'continuationFailed', barrierId, reason })
+    terminateModelSession('nova_stream_error')
+  }
+
   function startAiSpeech(): void {
+    if (outputQuarantined) return
     if (!aiSpeaking) {
       aiSpeaking = true
       TRACE('-> aiSpeechStart')
-      send(ws, { t: 'aiSpeechStart' })
+      send(ws, { t: 'aiSpeechStart', segmentId: activeSegmentId })
     }
   }
 
@@ -208,15 +302,63 @@ wss.on('connection', (ws) => {
     if (aiSpeaking) {
       aiSpeaking = false
       TRACE('-> aiSpeechStop')
-      send(ws, { t: 'aiSpeechStop' })
+      if (!outputQuarantined) send(ws, { t: 'aiSpeechStop', segmentId: activeSegmentId })
     }
   }
 
-  const session = new NovaSonicSession({
+  function maybeOpenBarrier(): void {
+    if (
+      !continuationApplicable() ||
+      !dueSent ||
+      barrier ||
+      rotationInProgress ||
+      aiSpeaking ||
+      pendingTools.size > 0 ||
+      clientStopping ||
+      modelTerminalSent ||
+      Date.now() - segmentStartedAt < CONTINUATION_BARRIER_MS
+    ) return
+    const id = crypto.randomUUID()
+    const deadlineAtMs = segmentStartedAt + CONTINUATION_DEADLINE_MS
+    barrier = {
+      id,
+      segmentId: activeSegmentId,
+      lastAudioSeq,
+      deadlineAtMs,
+    }
+    outputQuarantined = true
+    send(ws, {
+      t: 'continuationBarrier',
+      barrierId: id,
+      segmentId: activeSegmentId,
+      lastAudioSeq,
+      deadlineAtMs,
+    })
+  }
+
+  type CandidateControl = {
+    preparing: boolean
+    failed: boolean
+    failure?: string
+  }
+
+  function createSession(
+    segmentId: number,
+    candidate?: CandidateControl,
+  ): NovaSonicSession {
+    const rejectCandidateActivity = (activity: string): boolean => {
+      if (!candidate?.preparing) return false
+      candidate.failed = true
+      candidate.failure ??= activity
+      return true
+    }
+    return new NovaSonicSession({
     onTextOutput(role, content) {
+      if (rejectCandidateActivity(`unexpected_${role.toLowerCase()}_text`)) return
+      if (segmentId !== activeSegmentId || outputQuarantined) return
       TRACE(`-> text[${role}] ${JSON.stringify(content.slice(0, 60))}`)
       if (role.toUpperCase() === 'USER') {
-        send(ws, { t: 'userTranscript', text: content })
+        send(ws, { t: 'userTranscript', text: content, segmentId })
         const action = comprehensiveOpeningAction(
           interviewMode,
           comprehensiveOpeningSettled,
@@ -227,21 +369,28 @@ wss.on('connection', (ws) => {
           if (action === 'ask_age') session.pushSystemText(COMPREHENSIVE_AGE_NUDGE)
         }
       } else {
-        send(ws, { t: 'assistantTranscript', text: content })
+        send(ws, { t: 'assistantTranscript', text: content, segmentId })
       }
     },
 
     onAudioOutput(base64) {
+      if (rejectCandidateActivity('unexpected_audio')) return
+      if (segmentId !== activeSegmentId || outputQuarantined) return
       startAiSpeech()
-      send(ws, { t: 'audio', pcm: base64 })
+      send(ws, { t: 'audio', pcm: base64, segmentId })
     },
 
     onAssistantAudioEnd() {
+      if (rejectCandidateActivity('unexpected_assistant_end')) return
+      if (segmentId !== activeSegmentId) return
       TRACE('-> assistantAudioEnd')
       stopAiSpeech()
+      maybeOpenBarrier()
     },
 
     onToolUse({ toolName, toolUseId, content }) {
+      if (rejectCandidateActivity('unexpected_tool')) return
+      if (segmentId !== activeSegmentId) return
       TRACE(`-> toolUse ${toolName} id=${toolUseId} content=${JSON.stringify(String(content).slice(0, 80))}`)
       let input: unknown = content
       try {
@@ -249,22 +398,38 @@ wss.on('connection', (ws) => {
       } catch {
         // content is not JSON — pass through as a raw string
       }
-      send(ws, { t: 'toolCall', toolName, toolUseId, input })
+      pendingTools.add(toolUseId)
+      if (barrier) {
+        // A late normal tool means the assistant boundary was not actually
+        // quiescent. ToolUseIds are segment-scoped, so never migrate it.
+        failContinuation('pending_tool', barrier.id)
+        return
+      }
+      send(ws, { t: 'toolCall', toolName, toolUseId, input, segmentId })
     },
 
     onCompletionEnd() {
+      if (rejectCandidateActivity('unexpected_completion')) return
+      if (segmentId !== activeSegmentId || outputQuarantined) return
       TRACE('-> completionEnd')
       stopAiSpeech()
-      send(ws, { t: 'completion' })
+      send(ws, { t: 'completion', segmentId })
     },
 
     onBargeIn() {
+      if (rejectCandidateActivity('unexpected_barge_in')) return
+      if (segmentId !== activeSegmentId || outputQuarantined) return
       TRACE('-> bargeIn')
       stopAiSpeech()
-      send(ws, { t: 'bargeIn' })
+      send(ws, { t: 'bargeIn', segmentId })
     },
 
     onError(err) {
+      if (rejectCandidateActivity('stream_error')) {
+        console.error('[nova-session] candidate stream error before promotion:', err)
+        return
+      }
+      if (segmentId !== activeSegmentId) return
       // Nova's bidi exceptions (modelStreamErrorException / internalServerException)
       // arrive as PLAIN OBJECTS, so a bare String(err) collapses to "[object
       // Object]" and the real cause is lost. Extract a meaningful message and log
@@ -279,15 +444,31 @@ wss.on('connection', (ws) => {
         try { message = JSON.stringify(err) } catch { message = String(err) }
       }
       console.error('[nova-session] stream error:', message, err)
+      if (barrier || segmentId > 1) {
+        failContinuation('stream_start_failed', barrier?.id)
+        return
+      }
       send(ws, { t: 'error', message })
       terminateModelSession('nova_stream_error')
     },
 
     onUnexpectedStreamEnd() {
+      if (rejectCandidateActivity('stream_ended')) {
+        console.error('[nova-session] candidate stream ended before promotion')
+        return
+      }
+      if (segmentId !== activeSegmentId) return
       console.error('[nova-session] Bedrock stream ended before the client requested stop')
+      if (barrier || segmentId > 1) {
+        failContinuation('stream_start_failed', barrier?.id)
+        return
+      }
       terminateModelSession('nova_stream_ended')
     },
   })
+  }
+
+  let session = createSession(activeSegmentId)
 
   // Optional, flag-gated (default OFF) parallel AWS Transcribe Medical stream
   // on the same caller audio — see transcribeMedicalSession.ts. Wrapped in
@@ -318,24 +499,64 @@ wss.on('connection', (ws) => {
     }
 
     if (msg.t !== 'audio') TRACE(`<- ${msg.t}`)
+    if (clientStopping) return
 
     try {
       switch (msg.t) {
         case 'start':
+          if (sessionStarted) {
+            send(ws, { t: 'error', message: 'session already started' })
+            break
+          }
+          sessionStarted = true
           interviewMode = msg.interviewMode === 'comprehensive' ? 'comprehensive' : 'standard'
           comprehensiveOpeningSettled = false
+          startConfig = {
+            instructions: msg.instructions,
+            tools: msg.tools as Parameters<NovaSonicSession['start']>[1],
+            voiceId: msg.voiceId,
+          }
           TRACE(`<- start (tools=${(msg.tools as unknown[] | undefined)?.length ?? 0})`)
           // start() surfaces any stream-open failure via the session's onError
           // callback (mapped to {t:'error'} above). This .catch only prevents an
           // unhandled rejection from the un-awaited promise — it must NOT send a
           // second error, or the browser receives the same failure twice.
-          session
-            .start(msg.instructions, msg.tools as Parameters<typeof session.start>[1], msg.voiceId)
+          session.start(startConfig.instructions, startConfig.tools, startConfig.voiceId)
+            .then(() => {
+              if (!clientStopping && !modelTerminalSent && session.isActive()) {
+                armContinuationClock()
+              }
+            })
             .catch(() => {})
           break
 
         case 'audio':
-          session.pushAudio(msg.pcm)
+          if (typeof msg.audioSeq === 'number') {
+            if (!Number.isInteger(msg.audioSeq) || msg.audioSeq !== lastAudioSeq + 1) {
+              failContinuation('audio_sequence', barrier?.id)
+              break
+            }
+            sequencedAudio = true
+            lastAudioSeq = msg.audioSeq
+            maybeSendContinuationDue()
+          } else if (sequencedAudio || barrier) {
+            failContinuation('audio_sequence', barrier?.id)
+            break
+          }
+          if (barrier) {
+            if (typeof msg.audioSeq !== 'number') {
+              failContinuation('audio_sequence', barrier.id)
+              break
+            }
+            bufferedAudio.push({ audioSeq: msg.audioSeq, pcm: msg.pcm })
+            bufferedAudioChars += msg.pcm.length
+            if (bufferedAudioChars > CONTINUATION_BUFFER_MAX_BASE64_CHARS) {
+              failContinuation('buffer_overflow', barrier.id)
+              break
+            }
+          } else {
+            session.pushAudio(msg.pcm)
+          }
           transcribe?.pushAudio(msg.pcm)
           break
 
@@ -345,22 +566,216 @@ wss.on('connection', (ws) => {
           break
 
         case 'toolResult':
+          if (msg.segmentId != null && msg.segmentId !== activeSegmentId) {
+            failContinuation('checkpoint_mismatch', barrier?.id)
+            break
+          }
+          if (!pendingTools.has(msg.toolUseId)) {
+            failContinuation('checkpoint_mismatch', barrier?.id)
+            break
+          }
           TRACE(`<- toolResult id=${msg.toolUseId} output=${JSON.stringify(String(msg.output).slice(0, 80))}`)
           session.pushToolResult(msg.toolUseId, msg.output)
+          pendingTools.delete(msg.toolUseId)
+          if (!barrier) maybeOpenBarrier()
           break
 
         case 'systemText':
+          if (barrier) {
+            failContinuation('checkpoint_mismatch', barrier.id)
+            break
+          }
           TRACE(`<- systemText (injected as USER) ${JSON.stringify(msg.text.slice(0, 80))}`)
           session.pushSystemText(msg.text)
           break
 
-        case 'stop':
-          transcribe?.stop().catch(() => {})
-          session.stop().then(() => {
-            ws.close()
-          }).catch(() => {
-            ws.close()
+        case 'continuationDefer':
+          if (!barrier || barrier.id !== msg.barrierId || rotationInProgress) {
+            failContinuation('checkpoint_mismatch', msg.barrierId)
+            break
+          }
+          if (!session.isActive()) {
+            failContinuation('stream_start_failed', msg.barrierId)
+            break
+          }
+          {
+            const replay = bufferedAudio
+            bufferedAudio = []
+            bufferedAudioChars = 0
+            barrier = null
+            outputQuarantined = false
+            for (const chunk of replay) session.pushAudio(chunk.pcm)
+          }
+          break
+
+        case 'continuationCommit': {
+          if (
+            !barrier ||
+            barrier.id !== msg.barrierId ||
+            pendingTools.size !== 0 ||
+            rotationInProgress
+          ) {
+            failContinuation('checkpoint_mismatch', msg.barrierId)
+            break
+          }
+          const checked = validateContinuationCheckpoint(msg.checkpoint, {
+            segmentId: barrier.segmentId,
+            previous: lastContinuationCheckpoint,
           })
+          if (!checked.ok) {
+            failContinuation(checked.reason, barrier.id)
+            break
+          }
+          if (!startConfig) {
+            failContinuation('stream_start_failed', barrier.id)
+            break
+          }
+          rotationInProgress = true
+          const committedBarrier = barrier
+          const oldSession = session
+          void (async () => {
+            const nextSegmentId = committedBarrier.segmentId + 1
+            const candidate: CandidateControl = { preparing: true, failed: false }
+            const nextSession = createSession(nextSegmentId, candidate)
+            openingSession = nextSession
+
+            const recoverOldSegment = async (): Promise<void> => {
+              // Recovery is permitted only before the atomic promotion. First
+              // prove the failed candidate is retired; otherwise two possibly
+              // live streams would make replay ownership ambiguous.
+              candidate.preparing = false
+              const candidateStopped = await nextSession.stopWithin(OLD_SEGMENT_STOP_TIMEOUT_MS)
+              if (
+                !candidateStopped ||
+                clientStopping ||
+                modelTerminalSent ||
+                ws.readyState !== WebSocket.OPEN ||
+                Date.now() >= committedBarrier.deadlineAtMs ||
+                session !== oldSession ||
+                activeSegmentId !== committedBarrier.segmentId ||
+                barrier?.id !== committedBarrier.id ||
+                !oldSession.isActive()
+              ) {
+                failContinuation('stream_start_failed', committedBarrier.id)
+                return
+              }
+
+              // Clear ownership before replay. No await occurs between this
+              // state transition and the push loop, so each buffered audioSeq
+              // is returned to the old stream exactly once.
+              const replay = bufferedAudio
+              bufferedAudio = []
+              bufferedAudioChars = 0
+              openingSession = null
+              barrier = null
+              outputQuarantined = false
+              rotationInProgress = false
+              for (const chunk of replay) oldSession.pushAudio(chunk.pcm)
+              send(ws, {
+                t: 'continuationRecovered',
+                barrierId: committedBarrier.id,
+                segmentId: committedBarrier.segmentId,
+                lastAudioSeq: committedBarrier.lastAudioSeq,
+                transcriptThroughSeq: checked.checkpoint.transcriptThroughSeq,
+                reason: 'candidate_start_failed',
+              })
+            }
+
+            try {
+              await nextSession.start(
+                buildContinuationInstructions(startConfig!.instructions, checked.checkpoint),
+                startConfig!.tools,
+                startConfig!.voiceId,
+                {
+                  sendGreetingKickoff: false,
+                  conversationHistory: continuationHistory(checked.checkpoint),
+                },
+              )
+            } catch {
+              await recoverOldSegment()
+              return
+            }
+
+            const transportReady = await nextSession.waitUntilTransportReady(
+              CANDIDATE_STABILITY_MS,
+            )
+            if (!transportReady || candidate.failed) {
+              await recoverOldSegment()
+              return
+            }
+
+            // Stop/terminal/deadline can win while the candidate is opening or
+            // stabilizing. Never promote or drain after any such owner change.
+            if (
+              clientStopping ||
+              modelTerminalSent ||
+              ws.readyState !== WebSocket.OPEN ||
+              Date.now() >= committedBarrier.deadlineAtMs ||
+              barrier?.id !== committedBarrier.id ||
+              session !== oldSession ||
+              activeSegmentId !== committedBarrier.segmentId
+            ) {
+              await nextSession.stop().catch(() => {})
+              openingSession = null
+              if (!clientStopping && !modelTerminalSent && ws.readyState === WebSocket.OPEN) {
+                failContinuation('deadline', committedBarrier.id)
+              }
+              return
+            }
+
+            // Atomic no-return promotion: candidate becomes the sole owner,
+            // ready is queued before any candidate-origin activity, and the
+            // buffered PCM is drained once. The frozen old stream is retired
+            // afterward and cannot emit through the generation gate.
+            candidate.preparing = false
+            openingSession = null
+            session = nextSession
+            lastContinuationCheckpoint = checked.checkpoint
+            activeSegmentId = nextSegmentId
+            comprehensiveOpeningSettled = true
+            aiSpeaking = false
+            outputQuarantined = false
+            rotationInProgress = false
+            barrier = null
+            const replay = bufferedAudio
+            bufferedAudio = []
+            bufferedAudioChars = 0
+            send(ws, {
+              t: 'continuationReady',
+              barrierId: committedBarrier.id,
+              fromSegmentId: committedBarrier.segmentId,
+              segmentId: nextSegmentId,
+              lastAudioSeq: committedBarrier.lastAudioSeq,
+              transcriptThroughSeq: checked.checkpoint.transcriptThroughSeq,
+            })
+            for (const chunk of replay) nextSession.pushAudio(chunk.pcm)
+            armContinuationClock()
+
+            const oldStopped = await oldSession.stopWithin(OLD_SEGMENT_STOP_TIMEOUT_MS)
+            if (!oldStopped && !clientStopping && !modelTerminalSent) {
+              failContinuation('stream_start_failed', committedBarrier.id)
+            }
+          })()
+          break
+        }
+
+        case 'stop':
+          if (clientStopping) break
+          clientStopping = true
+          clearContinuationTimers()
+          outputQuarantined = true
+          transcribe?.stop().catch(() => {})
+          {
+            const activeAtStop = session
+            const openingAtStop = openingSession
+            openingSession = null
+            Promise.allSettled([
+              activeAtStop.stop(),
+              ...(openingAtStop && openingAtStop !== activeAtStop ? [openingAtStop.stop()] : []),
+            ]).then(() => {
+              ws.close()
+            })
+          }
           break
 
         default: {
@@ -377,8 +792,12 @@ wss.on('connection', (ws) => {
   })
 
   ws.on('close', () => {
+    clientStopping = true
+    clearContinuationTimers()
     // Best-effort teardown — ignore any errors from stop().
     session.stop().catch(() => {})
+    if (openingSession && openingSession !== session) openingSession.stop().catch(() => {})
+    openingSession = null
     transcribe?.stop().catch(() => {})
   })
 })
@@ -387,7 +806,10 @@ wss.on('connection', (ws) => {
 // Start listening
 // ---------------------------------------------------------------------------
 
-const PORT = Number(process.env.PORT) || 8081
+const configuredPort = Number(process.env.PORT)
+const PORT = Number.isInteger(configuredPort) && (
+  configuredPort > 0 || (configuredPort === 0 && process.env.NODE_ENV === 'test')
+) ? configuredPort : 8081
 // Bind explicitly to 0.0.0.0 (IPv4). Node's default `listen(PORT)` binds the
 // IPv6 unspecified address (::), which App Runner's IPv4 TCP health check
 // cannot reach in its container network — the app runs but the deploy fails
@@ -395,3 +817,6 @@ const PORT = Number(process.env.PORT) || 8081
 server.listen(PORT, '0.0.0.0', () => {
   console.log(`relay on port ${PORT}`)
 })
+
+// Exported for the relay's in-process protocol integration test only.
+export { server, wss }

@@ -21,6 +21,16 @@ export type HistorianRuntimeEffects = {
 }
 
 /**
+ * Minimal, non-transcript snapshot for an application-owned transport
+ * continuation. The guard itself remains the source of truth; this exposes
+ * only the latches a continuation checkpoint must bind and never logs text.
+ */
+export type HistorianRuntimeGuardSnapshot = {
+  softWrapIssued: boolean
+  terminalReason: HistorianTerminalReason | null
+}
+
+/**
  * Stateful one-session guard shared by the live hook and executable fake-
  * provider tests. Terminal state is latched synchronously before effects run.
  */
@@ -35,6 +45,13 @@ export class HistorianRuntimeGuard {
 
   terminalReason(): HistorianTerminalReason | null {
     return this.terminal
+  }
+
+  snapshot(): HistorianRuntimeGuardSnapshot {
+    return {
+      softWrapIssued: this.softWrapIssued,
+      terminalReason: this.terminal,
+    }
   }
 
   acceptsInterviewActivity(): boolean {

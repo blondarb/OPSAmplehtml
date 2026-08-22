@@ -25,9 +25,9 @@
  * never branch on which provider is active.
  */
 export type VoiceEvent =
-  | { type: 'userTranscript'; text: string }
-  | { type: 'assistantTranscript'; text: string }
-  | { type: 'assistantTextDelta'; text: string }
+  | { type: 'userTranscript'; text: string; segmentId?: number }
+  | { type: 'assistantTranscript'; text: string; segmentId?: number }
+  | { type: 'assistantTextDelta'; text: string; segmentId?: number }
   // NOTE: userSpeechStart/userSpeechStop are currently emitted ONLY by the
   // OpenAI provider (from input_audio_buffer.speech_started/stopped). The Nova
   // relay does not yet forward user-speech VAD boundaries, so under Nova these
@@ -35,9 +35,9 @@ export type VoiceEvent =
   // indicator), not as a required signal. Add relay frames later if needed.
   | { type: 'userSpeechStart' }
   | { type: 'userSpeechStop' }
-  | { type: 'aiSpeechStart' }
-  | { type: 'aiSpeechStop' }
-  | { type: 'toolCall'; toolName: string; toolUseId: string; input: unknown }
+  | { type: 'aiSpeechStart'; segmentId?: number }
+  | { type: 'aiSpeechStop'; segmentId?: number }
+  | { type: 'toolCall'; toolName: string; toolUseId: string; input: unknown; segmentId?: number }
   | { type: 'error'; message: string }
   // Parallel AWS Transcribe Medical accuracy check (flag-gated on the relay,
   // Nova-only — see services/nova-sonic-relay/src/transcribeMedicalSession.ts).
@@ -51,6 +51,26 @@ export type VoiceEvent =
   // save_interview_output, fall back to a raw-transcript narrative, tear down,
   // fire onComplete). Never emitted as a result of the provider's own stop().
   | { type: 'disconnected'; reason: string }
+  /** Relay transport clock says the current Nova segment is approaching its deadline. */
+  | { type: 'continuationDue'; segmentId: number; deadlineAtMs: number }
+  /**
+   * Relay froze input at an assistant END_TURN boundary. The provider emits
+   * this only after queued playback has drained, so the application can take
+   * an immutable clinical-state checkpoint without clipping audible output.
+   */
+  | {
+      type: 'continuationBarrier'
+      barrierId: string
+      segmentId: number
+      lastAudioSeq: number
+      deadlineAtMs: number
+    }
+
+export type VoiceContinuationCheckpoint =
+  import('@/lib/historian/continuationState').HistorianContinuationCheckpointV1
+
+/** Outcome of a continuation commit at the browser/relay boundary. */
+export type VoiceContinuationCommitResult = 'rotated' | 'recovered'
 
 /**
  * Options passed to `start`. Some fields are provider-specific; each provider
@@ -118,7 +138,7 @@ export interface VoiceProvider {
   /** Register the single event sink the provider emits VoiceEvents to. */
   on(cb: (e: VoiceEvent) => void): void
   /** Return a tool result for a prior `toolCall` (the hook executes the tool). */
-  sendToolResult(toolUseId: string, output: unknown): void
+  sendToolResult(toolUseId: string, output: unknown, segmentId?: number): void
   /** Inject advisory system text mid-session (localizer / scale guidance). */
   injectSystemText(text: string): void
   /**
@@ -151,6 +171,16 @@ export interface VoiceProvider {
    *            `sendGreetingKickoff` on the relay side.
    */
   nudgeClosing(): void
+  /**
+   * Nova-only continuation controls. The relay owns the transport clock and
+   * inner Bedrock rotation; the application owns checkpoint eligibility and
+   * clinical state. Other providers omit these methods.
+   */
+  commitContinuation?(params: {
+    barrierId: string
+    checkpoint: VoiceContinuationCheckpoint
+  }): Promise<VoiceContinuationCommitResult>
+  deferContinuation?(barrierId: string): void
   /**
    * OpenAI-only escape hatch: overwrite the live session's full instructions
    * (session.update) rather than append an advisory item to the timeline.

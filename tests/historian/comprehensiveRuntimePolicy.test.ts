@@ -143,7 +143,8 @@ describe('Comprehensive Historian production runtime policies', () => {
     expect(hookSource).toContain('runtimeGuardRef.current?.modelPatientStop()')
     expect(hookSource).toContain('runtimeGuardRef.current?.acceptsInterviewActivity()')
     expect(hookSource).toContain('COMPREHENSIVE_HARD_STOP_SAVE_NUDGE')
-    expect(hookSource).toContain("if (reason === 'hard_stop') providerRef.current?.suppressOutput()")
+    expect(hookSource).toContain("requestedReason === 'hard_stop'")
+    expect(hookSource).toContain('providerRef.current?.suppressOutput()')
     expect(hookSource).toContain("runtimeGuardRef.current?.terminalReason() !== 'hard_stop'")
   })
 

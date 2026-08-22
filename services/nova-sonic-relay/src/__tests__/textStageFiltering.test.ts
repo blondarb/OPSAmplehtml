@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, vi } from 'vitest'
 import {
   NovaSonicSession,
   parseGenerationStage,
@@ -204,5 +204,65 @@ describe('NovaSonicSession text-stage filtering (live-captured pattern)', () => 
     await run({ body })
 
     expect(unexpectedEnds).toBe(0)
+  })
+
+  it('rejects candidate readiness when the response loop ends immediately', async () => {
+    const session = new NovaSonicSession({})
+    const lifecycle = session as unknown as {
+      active: boolean
+      closed: boolean
+      responseBodyPresent: boolean
+      initPreambleYielded: boolean
+      responseLoop: Promise<void>
+    }
+    lifecycle.active = true
+    lifecycle.closed = false
+    lifecycle.responseBodyPresent = true
+    lifecycle.initPreambleYielded = true
+    lifecycle.responseLoop = Promise.resolve()
+
+    await expect(session.waitUntilTransportReady(5)).resolves.toBe(false)
+  })
+
+  it('requires a live body, yielded preamble, and stable response loop for readiness', async () => {
+    const session = new NovaSonicSession({})
+    const lifecycle = session as unknown as {
+      active: boolean
+      closed: boolean
+      responseBodyPresent: boolean
+      initPreambleYielded: boolean
+      responseLoop: Promise<void>
+    }
+    lifecycle.active = true
+    lifecycle.closed = false
+    lifecycle.responseBodyPresent = true
+    lifecycle.initPreambleYielded = true
+    lifecycle.responseLoop = new Promise<void>(() => {})
+
+    await expect(session.waitUntilTransportReady(5)).resolves.toBe(true)
+  })
+
+  it('aborts a pending stream open without surfacing an intentional-stop error', async () => {
+    const onError = vi.fn()
+    const session = new NovaSonicSession({ onError })
+    let abortObserved = false
+    const send = vi.fn((_command: unknown, options: { abortSignal: AbortSignal }) =>
+      new Promise<never>((_resolve, reject) => {
+        options.abortSignal.addEventListener('abort', () => {
+          abortObserved = true
+          reject(new Error('synthetic abort'))
+        }, { once: true })
+      }),
+    )
+    ;(session as unknown as { client: { send: typeof send } }).client = { send }
+
+    const opening = session.start('Synthetic instructions.', [])
+    await Promise.resolve()
+    await session.stop()
+
+    await expect(opening).rejects.toThrow('synthetic abort')
+    expect(abortObserved).toBe(true)
+    expect(onError).not.toHaveBeenCalled()
+    expect(session.isActive()).toBe(false)
   })
 })

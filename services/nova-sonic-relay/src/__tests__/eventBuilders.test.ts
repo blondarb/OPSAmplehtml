@@ -1,12 +1,20 @@
 import { describe, it, expect } from 'vitest'
-import { sessionStart, promptStart, systemContent, userText, audioContentStart, audioInput, toolResultEvents, promptEnd } from '../eventBuilders.js'
+import {
+  sessionStart,
+  promptStart,
+  systemContent,
+  conversationHistoryText,
+  userText,
+  audioContentStart,
+  toolResultEvents,
+} from '../eventBuilders.js'
 
 describe('eventBuilders', () => {
   it('sessionStart carries inferenceConfiguration', () => {
     expect(sessionStart().event.sessionStart.inferenceConfiguration.maxTokens).toBeGreaterThan(0)
   })
   it('promptStart includes 24k audio out + tool config', () => {
-    const e = promptStart('p1', [{ toolSpec: { name: 'save_interview_output' } } as any], 'matthew')
+    const e = promptStart('p1', [{ toolSpec: { name: 'save_interview_output' } }], 'matthew')
     expect(e.event.promptStart.audioOutputConfiguration.sampleRateHertz).toBe(24000)
     expect(e.event.promptStart.toolConfiguration.tools).toHaveLength(1)
     expect(e.event.promptStart.audioOutputConfiguration.voiceId).toBe('matthew')
@@ -19,7 +27,14 @@ describe('eventBuilders', () => {
   it('systemContent uses the SYSTEM role (init prompt only — once per prompt)', () => {
     const [start, input] = systemContent('p1', 'you are a historian')
     expect(start.event.contentStart.role).toBe('SYSTEM')
+    expect(start.event.contentStart.interactive).toBe(false)
     expect(input.event.textInput.content).toBe('you are a historian')
+  })
+  it('conversation history is non-interactive and preserves USER/ASSISTANT roles', () => {
+    const [userStart] = conversationHistoryText('p1', 'USER', 'prior answer')
+    const [assistantStart] = conversationHistoryText('p1', 'ASSISTANT', 'pending question')
+    expect(userStart.event.contentStart).toMatchObject({ role: 'USER', interactive: false })
+    expect(assistantStart.event.contentStart).toMatchObject({ role: 'ASSISTANT', interactive: false })
   })
   it('userText uses the USER role — mid-conversation injections must NOT be SYSTEM', () => {
     // Regression guard: a second SYSTEM content block fails the Nova stream with

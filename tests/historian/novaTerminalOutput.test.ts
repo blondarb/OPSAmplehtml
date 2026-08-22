@@ -14,6 +14,7 @@ type TestableNovaProvider = {
     | { t: 'audio'; pcm: string }
     | { t: 'error'; message: string }
     | { t: 'sessionEnded'; reason: 'nova_stream_error' | 'nova_stream_ended' }
+    | { t: 'continuationFailed'; reason: 'stream_start_failed' }
   ) => void
 }
 
@@ -72,5 +73,28 @@ describe('Nova terminal output suppression', () => {
     expect(testable.modelStreamOpen).toBe(false)
     expect(player.interrupt).toHaveBeenCalledOnce()
     expect(events).toEqual([{ type: 'error', message: 'model timeout' }])
+  })
+
+  it('surfaces a continuation failure once and suppresses the following terminal frame', () => {
+    const provider = new NovaSonicWsProvider()
+    const player = { enqueue: vi.fn(), interrupt: vi.fn() }
+    const events: unknown[] = []
+    provider.on((event) => events.push(event))
+    const testable = provider as unknown as TestableNovaProvider
+    testable.player = player
+    testable.modelStreamOpen = true
+
+    testable.handleServerMsg({ t: 'continuationFailed', reason: 'stream_start_failed' })
+    testable.handleServerMsg({ t: 'sessionEnded', reason: 'nova_stream_error' })
+
+    expect(testable.modelStreamOpen).toBe(false)
+    expect(player.interrupt).toHaveBeenCalledOnce()
+    expect(events).toEqual([{
+      type: 'error',
+      message:
+        'The voice connection ended during continuation (stream_start_failed). ' +
+        'Speech after the last confirmed turn may not have been transcribed. ' +
+        'If this may be a medical emergency, call 911; for crisis support, call or text 988.',
+    }])
   })
 })

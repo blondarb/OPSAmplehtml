@@ -7,6 +7,13 @@ import {
   evaluateComprehensiveSave,
 } from '@/lib/historian/comprehensiveCompletionPolicy'
 import {
+  assertHistorianContinuationCheckpoint,
+  buildHistorianAnsweredQuestionPairs,
+  conservativeHistorianContinuationCoverage,
+  hashHistorianContinuationTranscript,
+  type HistorianContinuationCheckpointV1,
+} from '@/lib/historian/continuationState'
+import {
   HistorianRuntimeGuard,
   applyHistorianTurnDecision,
 } from '@/lib/historian/runtimeGuard'
@@ -180,6 +187,7 @@ const FINAL_FLUSH_TIMEOUT_MS = 2000
  * drain and aiSpeechStop may never arrive, so this must not depend on either.
  */
 const UNRESPONSIVE_SIGN_OFF_GRACE_MS = 8000
+const CONTINUATION_RESERVE_MS = 5_000
 
 const TERMINATION_PRIORITY: Record<HistorianTerminationReason, number> = {
   coverage_complete: 0,
@@ -251,6 +259,13 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
   // flush endpoint is idempotent (ON CONFLICT (session_id, seq) DO
   // NOTHING) so resending an already-durable batch is always safe.
   const pendingFlushEntriesRef = useRef<HistorianTranscriptEntry[]>([])
+  // Segment-scoped pending tools are a hard continuation barrier. The segment
+  // binding also prevents a late async result from being routed to a new Nova
+  // stream where its toolUseId is meaningless.
+  const pendingToolsRef = useRef<Map<string, { toolName: string; segmentId?: number }>>(new Map())
+  const activeScaleRef = useRef<{ scaleId: string; itemIndex: number } | null>(null)
+  const continuationDueRef = useRef<{ segmentId: number; deadlineAtMs: number } | null>(null)
+  const continuationInFlightRef = useRef(false)
   // Phase 5: holds the base instructions returned by /api/ai/historian/session.
   // Used by pushLocalizerContext to re-serialize BASE_PROMPT + delta (OpenAI)
   // or as the closing-line-free source text (Nova has no overwrite primitive).
@@ -401,6 +416,9 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
       signOffTimerRef.current = null
     }
     unresponsiveRef.current?.suspend()
+    continuationDueRef.current = null
+    continuationInFlightRef.current = false
+    pendingToolsRef.current.clear()
   }, [])
 
   /**
@@ -524,11 +542,11 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
   // Failures simply leave the batch in pendingFlushEntriesRef so the next
   // trigger retries it; the endpoint is idempotent so resending an
   // already-durable batch is always safe.
-  const flushTranscript = useCallback((opts?: { keepalive?: boolean }): Promise<void> => {
+  const flushTranscript = useCallback((opts?: { keepalive?: boolean }): Promise<boolean> => {
     const sessionId = serverSessionIdRef.current
     const token = flushTokenRef.current
-    if (!sessionId || !token) return Promise.resolve() // /session didn't mint flush support — no-op
-    if (pendingFlushEntriesRef.current.length === 0) return Promise.resolve()
+    if (!sessionId || !token) return Promise.resolve(false) // no durable checkpoint authority
+    if (pendingFlushEntriesRef.current.length === 0) return Promise.resolve(true)
 
     // Cap at 50/request (server also enforces this — see transcript-flush
     // route.ts — this just avoids a guaranteed-413 round trip). Anything
@@ -549,7 +567,7 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
         keepalive: opts?.keepalive === true,
       })
         .then(res => {
-          if (!res.ok) return // fail-open: leave batch pending for the next trigger
+          if (!res.ok) return false // fail-open: leave batch pending for the next trigger
           // Cross-session prune race guard: if a NEW session has already
           // started by the time this (possibly slow/retried) response
           // lands, pendingFlushEntriesRef was already reset for that new
@@ -560,18 +578,20 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
           // on; this response already confirms the stale batch is durable
           // server-side, it just has nothing left to prune from a buffer
           // it's no longer part of.
-          if (serverSessionIdRef.current !== sessionId) return
+          if (serverSessionIdRef.current !== sessionId) return false
           const sentSeqs = new Set(batch.map(e => e.seq))
           pendingFlushEntriesRef.current = pendingFlushEntriesRef.current.filter(
             e => !sentSeqs.has(e.seq),
           )
+          return true
         })
         .catch(() => {
           // Network error — fail-open, retried on the next trigger.
+          return false
         })
     } catch {
       // Synchronous fetch-construction failure (shouldn't happen) — fail-open.
-      return Promise.resolve()
+      return Promise.resolve(false)
     }
   }, [])
 
@@ -579,12 +599,22 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
   // response.done branch pre-refactor, now keyed off the normalized `toolCall`
   // VoiceEvent and replying via provider.sendToolResult instead of writing
   // function_call_output to the data channel directly.
-  const handleToolCall = useCallback((toolName: string, toolUseId: string, input: unknown) => {
+  const handleToolCall = useCallback((
+    toolName: string,
+    toolUseId: string,
+    input: unknown,
+    segmentId?: number,
+  ) => {
     const provider = providerRef.current
     const args: any = (input && typeof input === 'object') ? input : {}
+    pendingToolsRef.current.set(toolUseId, { toolName, segmentId })
+    const settleTool = (output: unknown) => {
+      pendingToolsRef.current.delete(toolUseId)
+      provider?.sendToolResult(toolUseId, output, segmentId)
+    }
 
     if (toolName !== 'save_interview_output' && !runtimeGuardRef.current?.acceptsInterviewActivity()) {
-      provider?.sendToolResult(toolUseId, { success: false, status: 'interview_terminal' })
+      settleTool({ success: false, status: 'interview_terminal' })
       return
     }
 
@@ -624,7 +654,7 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
           provider?.injectSystemText(
             `[COMPREHENSIVE COMPLETION CHECK] The save was rejected because these required history domains are not yet cleanly classified: ${saveDecision.remainingDomains.join(', ')}. Continue the patient interview. Ask only the remaining clinically appropriate questions, then call save_interview_output again. Do not mention this internal check to the patient.`,
           )
-          provider?.sendToolResult(toolUseId, {
+          settleTool({
             success: false,
             status: saveDecision.reason,
             remaining_domains: saveDecision.remainingDomains,
@@ -680,7 +710,7 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
         // closing prompt on Nova and is a no-op on OpenAI (which would double-
         // speak). The closing audio then drains before teardown via the
         // whenDrained/auto-end sequence below.
-        provider?.sendToolResult(toolUseId, { success: true })
+        settleTool({ success: true })
         // The 60-exchange ceiling is a text-only terminal save. Its runtime
         // guard already silenced provider output, so never request a closing
         // utterance that would contradict the hard-stop instruction.
@@ -699,6 +729,7 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
         maybeScheduleAutoEnd(2500)
       } catch (e) {
         console.error('Error handling save_interview_output:', e)
+        settleTool({ success: false, status: 'client_error' })
       }
       return
     }
@@ -712,15 +743,17 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
         const updatedSet = new Set(administeredScaleIdsRef.current)
         updatedSet.add(scaleArgs.scale_id)
         administeredScaleIdsRef.current = updatedSet
+        activeScaleRef.current = null
         setAdministeredScaleIds(new Set(updatedSet))
 
         // Notify parent so it can POST to /api/ai/historian/scales?action=submit
         onScaleCompleteRef.current?.(scaleArgs)
 
         // Acknowledge so model can continue the intake interview
-        provider?.sendToolResult(toolUseId, { success: true, recorded: scaleArgs.scale_id })
+        settleTool({ success: true, recorded: scaleArgs.scale_id })
       } catch (e) {
         console.error('Error handling save_scale_responses:', e)
+        settleTool({ success: false, status: 'client_error' })
       }
       return
     }
@@ -755,6 +788,7 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
             const updatedSet = new Set(administeredScaleIdsRef.current)
             updatedSet.add(args.scale_id)
             administeredScaleIdsRef.current = updatedSet
+            activeScaleRef.current = null
             setAdministeredScaleIds(new Set(updatedSet))
             onScaleCompleteRef.current?.({
               scale_id: args.scale_id,
@@ -763,12 +797,18 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
               interpretation: result.interpretation,
               severity_level: result.severity_level,
             } as any)
+          } else if (
+            result?.done === false &&
+            typeof args.scale_id === 'string' &&
+            Number.isInteger(result.index)
+          ) {
+            activeScaleRef.current = { scaleId: args.scale_id, itemIndex: result.index }
           }
 
-          providerRef.current?.sendToolResult(toolUseId, result)
+          settleTool(result)
         } catch (err) {
           console.error('[useRealtimeSession] scale_step handler error:', err)
-          providerRef.current?.sendToolResult(toolUseId, { status: 'error', message: 'client error' })
+          settleTool({ status: 'error', message: 'client error' })
         }
       })()
       return
@@ -787,21 +827,215 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
             }),
           })
           const result = await res.json()
-          providerRef.current?.sendToolResult(toolUseId, result)
+          settleTool(result)
         } catch (err) {
           console.error('[useRealtimeSession] query_evidence handler error:', err)
-          providerRef.current?.sendToolResult(toolUseId, { status: 'error', chunks: [], message: 'client error' })
+          settleTool({ status: 'error', chunks: [], message: 'client error' })
         }
       })()
       return
     }
+    settleTool({ status: 'error', message: 'unknown tool' })
   }, [options.consultId, maybeScheduleAutoEnd, activateSafety])
+
+  const performNovaContinuation = useCallback(async (event: Extract<VoiceEvent, {
+    type: 'continuationBarrier'
+  }>) => {
+    const provider = providerRef.current
+    if (
+      !provider?.commitContinuation ||
+      !provider.deferContinuation
+    ) {
+      setError('The voice connection cannot continue safely with this provider.')
+      await endSessionRef.current('provider_error')
+      return
+    }
+    if (continuationInFlightRef.current) {
+      setError('The voice connection reported overlapping continuation barriers.')
+      await endSessionRef.current('provider_error')
+      return
+    }
+
+    const due = continuationDueRef.current
+    if (!due || due.segmentId !== event.segmentId || due.deadlineAtMs !== event.deadlineAtMs) {
+      setError('The voice connection continuation checkpoint did not match its transport clock.')
+      await endSessionRef.current('provider_error')
+      return
+    }
+
+    // These are transient pre-checkpoint conflicts. Because no checkpoint has
+    // been injected yet, the relay can replay its buffered PCM to the old
+    // segment exactly once and try again at a later assistant boundary.
+    if (pendingToolsRef.current.size > 0 || localizerInFlightRef.current) {
+      provider.deferContinuation(event.barrierId)
+      return
+    }
+    if (
+      finalizingRef.current ||
+      interviewCompletedRef.current ||
+      !runtimeGuardRef.current?.acceptsInterviewActivity() ||
+      safetyEscalatedRef.current ||
+      terminationReasonRef.current !== null
+    ) {
+      // A terminal path already owns teardown; never migrate it.
+      return
+    }
+
+    const appSessionId = serverSessionIdRef.current
+    const transcriptSnapshot = transcriptRef.current.map((entry) => ({ ...entry }))
+    const last = transcriptSnapshot[transcriptSnapshot.length - 1]
+    if (
+      !appSessionId ||
+      !last ||
+      last.role !== 'assistant' ||
+      !Number.isInteger(last.seq) ||
+      last.seq !== seqCounterRef.current ||
+      isAiSpeakingRef.current
+    ) {
+      setError('The interview state was not at a safe between-turn checkpoint.')
+      await endSessionRef.current('provider_error')
+      return
+    }
+
+    continuationInFlightRef.current = true
+    unresponsiveRef.current?.suspend()
+    const deferAfterCheckpointPreparation = () => {
+      provider.deferContinuation!(event.barrierId)
+      if (
+        !finalizingRef.current &&
+        !interviewCompletedRef.current &&
+        runtimeGuardRef.current?.acceptsInterviewActivity()
+      ) unresponsiveRef.current?.agentTurnEnded()
+    }
+    const captured = {
+      transcriptSeq: seqCounterRef.current,
+      exchangeCount: questionCountRef.current,
+      patientTurnCount: patientTurnCountRef.current,
+      guard: runtimeGuardRef.current.snapshot(),
+    }
+
+    try {
+      const flushDeadline = Math.min(
+        Date.now() + FINAL_FLUSH_TIMEOUT_MS,
+        event.deadlineAtMs - CONTINUATION_RESERVE_MS,
+      )
+      if (flushDeadline <= Date.now()) throw new Error('continuation deadline left no persistence window')
+      do {
+        const remainingFlushMs = flushDeadline - Date.now()
+        if (remainingFlushMs <= 0) {
+          deferAfterCheckpointPreparation()
+          return
+        }
+        const flushed = await Promise.race([
+          flushTranscript(),
+          new Promise<false>((resolve) => setTimeout(() => resolve(false), remainingFlushMs)),
+        ])
+        if (!flushed) {
+          deferAfterCheckpointPreparation()
+          return
+        }
+      } while (pendingFlushEntriesRef.current.length > 0)
+
+      if (
+        seqCounterRef.current !== captured.transcriptSeq ||
+        questionCountRef.current !== captured.exchangeCount ||
+        patientTurnCountRef.current !== captured.patientTurnCount ||
+        pendingToolsRef.current.size !== 0 ||
+        localizerInFlightRef.current ||
+        JSON.stringify(runtimeGuardRef.current.snapshot()) !== JSON.stringify(captured.guard)
+      ) {
+        deferAfterCheckpointPreparation()
+        return
+      }
+
+      if (
+        seqCounterRef.current !== captured.transcriptSeq ||
+        pendingToolsRef.current.size !== 0 ||
+        !runtimeGuardRef.current.acceptsInterviewActivity() ||
+        safetyEscalatedRef.current ||
+        terminationReasonRef.current !== null
+      ) throw new Error('application state changed after the continuation checkpoint')
+
+      const checkpoint: HistorianContinuationCheckpointV1 = {
+        version: 1,
+        appSessionId,
+        fromSegmentId: event.segmentId,
+        transcriptThroughSeq: captured.transcriptSeq,
+        transcriptHash: hashHistorianContinuationTranscript(transcriptSnapshot),
+        transcript: transcriptSnapshot,
+        exchangeCount: captured.exchangeCount,
+        patientTurnCount: captured.patientTurnCount,
+        elapsedSeconds: Math.floor((Date.now() - startTimeRef.current) / 1000),
+        awaitingAnswerTo: { seq: last.seq!, text: last.text },
+        answeredQuestionPairs: buildHistorianAnsweredQuestionPairs(transcriptSnapshot),
+        // This transport-only ledger deliberately under-claims every domain.
+        // Full replay is authoritative; final coverage still requires the
+        // ordinary save_interview_output audit and can never be inferred from
+        // this conservative rollover state.
+        coverage: conservativeHistorianContinuationCoverage(),
+        runtimeGuard: captured.guard,
+        safetyEscalated: false,
+        terminationReason: null,
+        administeredScaleIds: [...administeredScaleIdsRef.current].sort(),
+        activeScale: activeScaleRef.current,
+        pendingTools: [],
+      }
+      assertHistorianContinuationCheckpoint(checkpoint)
+      const continuationOutcome = await provider.commitContinuation({
+        barrierId: event.barrierId,
+        checkpoint,
+      })
+      // A pre-promotion candidate failure is recoverable: the relay has put
+      // every buffered PCM chunk back onto the still-live old stream exactly
+      // once. Keep the transport's original due latch so its next assistant
+      // boundary can retry. Only a committed replacement clears the due state.
+      if (continuationOutcome === 'rotated') continuationDueRef.current = null
+      if (
+        !finalizingRef.current &&
+        !interviewCompletedRef.current &&
+        runtimeGuardRef.current.acceptsInterviewActivity()
+      ) unresponsiveRef.current?.agentTurnEnded()
+    } catch (error) {
+      if (!finalizingRef.current) {
+        console.error(
+          '[useRealtimeSession] Nova continuation failed:',
+          error instanceof Error ? error.message : 'unknown continuation error',
+        )
+        setError(
+          'The voice connection could not continue safely. The interview ended with the transcript saved through the last confirmed turn. If this may be a medical emergency, call 911; for crisis support, call or text 988.',
+        )
+        await endSessionRef.current('provider_error')
+      }
+    } finally {
+      continuationInFlightRef.current = false
+    }
+  }, [flushTranscript])
 
   // ── Normalized provider event handler — replaces handleServerEvent.
   // Routes provider-agnostic VoiceEvents to the SAME harness logic as before
   // the provider-abstraction refactor.
   const handleVoiceEvent = useCallback((e: VoiceEvent, sessionGen: number) => {
     switch (e.type) {
+      case 'continuationDue': {
+        if (
+          resolvedInterviewModeRef.current === 'comprehensive' &&
+          runtimeGuardRef.current?.acceptsInterviewActivity() &&
+          !finalizingRef.current
+        ) {
+          continuationDueRef.current = {
+            segmentId: e.segmentId,
+            deadlineAtMs: e.deadlineAtMs,
+          }
+        }
+        break
+      }
+
+      case 'continuationBarrier': {
+        if (sessionGenRef.current !== sessionGen) break
+        void performNovaContinuation(e)
+        break
+      }
+
       case 'assistantTextDelta': {
         if (!runtimeGuardRef.current?.acceptsInterviewActivity()) {
           setCurrentAssistantText('')
@@ -923,7 +1157,6 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
             activateSafety,
             injectSystemText: (text) => providerRef.current?.injectSystemText(text),
             requestFinalization: (reason) => {
-              if (reason === 'hard_stop') providerRef.current?.suppressOutput()
               unresponsiveRef.current?.suspend()
               void endSessionRef.current(reason)
             },
@@ -1023,7 +1256,7 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
       }
 
       case 'toolCall': {
-        handleToolCall(e.toolName, e.toolUseId, e.input)
+        handleToolCall(e.toolName, e.toolUseId, e.input, e.segmentId)
         break
       }
 
@@ -1060,7 +1293,7 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
         break
       }
     }
-  }, [activateSafety, runLocalizer, handleToolCall, options, setAiSpeaking, maybeScheduleAutoEnd, flushTranscript])
+  }, [activateSafety, runLocalizer, handleToolCall, options, setAiSpeaking, maybeScheduleAutoEnd, flushTranscript, performNovaContinuation])
 
   const startSession = useCallback(async () => {
     setStatus('connecting')
@@ -1095,6 +1328,10 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
     flushTokenRef.current = null
     seqCounterRef.current = 0
     pendingFlushEntriesRef.current = []
+    pendingToolsRef.current = new Map()
+    activeScaleRef.current = null
+    continuationDueRef.current = null
+    continuationInFlightRef.current = false
     if (autoEndTimerRef.current) {
       clearTimeout(autoEndTimerRef.current)
       autoEndTimerRef.current = null
@@ -1315,6 +1552,15 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
         requestedReason,
       )
     }
+    // Hard-stop suppression must happen even if a weaker finalization path is
+    // already in progress. Keep it before the one-shot guard, but perform it
+    // in this single location so the normal hard-stop path is not duplicated.
+    if (
+      requestedReason === 'hard_stop' ||
+      runtimeGuardRef.current?.terminalReason() === 'hard_stop'
+    ) {
+      providerRef.current?.suppressOutput()
+    }
     if (finalizingRef.current) return
     const inferredReason =
       terminationReasonRef.current ??
@@ -1330,9 +1576,6 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
     setDuration(finalDuration)
 
     const provider = providerRef.current
-    if (runtimeGuardRef.current?.terminalReason() === 'hard_stop') {
-      provider?.suppressOutput()
-    }
 
     // If the AI never called save_interview_output but the patient has had a
     // real conversation, nudge it to save before we tear the transport down.

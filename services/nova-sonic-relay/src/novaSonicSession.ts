@@ -14,6 +14,7 @@ import {
   sessionStart,
   promptStart,
   systemContent,
+  conversationHistoryText,
   userText,
   audioContentStart,
   audioInput,
@@ -50,6 +51,8 @@ export interface NovaSonicCallbacks {
 export interface NovaSonicStartOptions {
   /** Production default is true; state-injected acceptance tests disable it. */
   sendGreetingKickoff?: boolean
+  /** Non-interactive prior turns, emitted after SYSTEM and before live audio. */
+  conversationHistory?: Array<{ role: 'USER' | 'ASSISTANT'; text: string }>
 }
 
 // A raw event is one of the `{ event: { ... } }` objects produced by the
@@ -144,9 +147,12 @@ export class NovaSonicSession {
 
   // Init events, captured at start() and replayed by the generator's preamble.
   private initEvents: RawEvent[] = []
+  private initPreambleYielded = false
+  private responseBodyPresent = false
 
   // The fire-and-forget response loop, stored so stop() can best-effort await it.
   private responseLoop: Promise<void> | null = null
+  private abortController: AbortController | null = null
 
   constructor(callbacks: NovaSonicCallbacks = {}) {
     this.callbacks = callbacks
@@ -183,6 +189,7 @@ export class NovaSonicSession {
     for (const event of this.initEvents) {
       yield this.wrap(event)
     }
+    this.initPreambleYielded = true
 
     // 2. Live event loop.
     while (this.active || this.events.length > 0) {
@@ -232,12 +239,21 @@ export class NovaSonicSession {
       return
     }
 
+    if (!validConversationHistory(options.conversationHistory ?? [])) {
+      throw new Error('Nova continuation history must be USER-first and alternate through ASSISTANT')
+    }
+
     this.initEvents = [
       sessionStart(),
       promptStart(this.promptName, tools, voiceId),
       ...systemContent(this.promptName, instructions),
+      ...(options.conversationHistory ?? []).flatMap((entry) =>
+        conversationHistoryText(this.promptName, entry.role, entry.text),
+      ),
       audioContentStart(this.promptName, this.audioContentName),
     ]
+    this.initPreambleYielded = false
+    this.responseBodyPresent = false
 
     this.active = true
 
@@ -248,15 +264,27 @@ export class NovaSonicSession {
 
     let response: InvokeModelWithBidirectionalStreamCommandOutput
     try {
-      response = await this.client.send(command)
+      this.abortController = new AbortController()
+      response = await this.client.send(command, { abortSignal: this.abortController.signal })
     } catch (e) {
       // send() failed to open the stream — reset state so subsequent
       // pushAudio/stop calls don't enqueue against a stream that never opened.
+      const intentionallyClosed = this.closed
       this.active = false
       this.closed = true
-      this.callbacks.onError?.(e)
+      if (!intentionallyClosed) this.callbacks.onError?.(e)
       throw e
     }
+
+    // stop() may have aborted a still-opening client.send(). A transport mock
+    // or SDK edge can nevertheless resolve after the abort; never install an
+    // orphan response loop in that case.
+    if (this.closed || !this.active) {
+      this.abortController?.abort()
+      throw new Error('Nova session stopped while the stream was opening')
+    }
+
+    this.responseBodyPresent = response.body != null
 
     // Fire-and-forget; stop() best-effort awaits the stored promise. The
     // trailing .catch prevents a never-stopped loop from surfacing as an
@@ -265,6 +293,48 @@ export class NovaSonicSession {
     this.responseLoop.catch(() => {})
 
     if (options.sendGreetingKickoff !== false) this.sendGreetingKickoff()
+  }
+
+  /** True only while this one Bedrock stream can accept live input. */
+  isActive(): boolean {
+    return this.active && !this.closed && this.responseLoop !== null
+  }
+
+  /**
+   * Candidate-rollover readiness is stronger than client.send() resolving.
+   * It requires a response body, the complete validated init/history/audio
+   * preamble to have been consumed, a live response loop, and no stream end or
+   * callback-visible failure during a bounded stabilization interval.
+   */
+  async waitUntilTransportReady(stabilizationMs: number): Promise<boolean> {
+    if (!Number.isFinite(stabilizationMs) || stabilizationMs < 1) return false
+    const responseLoop = this.responseLoop
+    if (!responseLoop || !this.responseBodyPresent || !this.isActive()) return false
+
+    const preambleDeadline = Date.now() + stabilizationMs
+    while (
+      !this.initPreambleYielded &&
+      this.isActive() &&
+      this.responseLoop === responseLoop &&
+      Date.now() < preambleDeadline
+    ) {
+      await new Promise<void>((resolve) => setTimeout(resolve, 5))
+    }
+    if (!this.initPreambleYielded || !this.isActive() || this.responseLoop !== responseLoop) {
+      return false
+    }
+
+    const endedDuringStabilization = await Promise.race([
+      responseLoop.then(() => true, () => true),
+      new Promise<false>((resolve) => setTimeout(() => resolve(false), stabilizationMs)),
+    ])
+    return (
+      !endedDuringStabilization &&
+      this.initPreambleYielded &&
+      this.responseBodyPresent &&
+      this.isActive() &&
+      this.responseLoop === responseLoop
+    )
   }
 
   /**
@@ -278,7 +348,7 @@ export class NovaSonicSession {
    * once per session; the historian system prompt owns the actual greeting
    * content/persona, this just signals "start now."
    */
-  private sendGreetingKickoff(): void {
+  sendGreetingKickoff(): void {
     if (this.kickoffSent || !this.active) {
       return
     }
@@ -339,6 +409,22 @@ export class NovaSonicSession {
       return
     }
 
+    // start() is awaiting client.send() and no response loop exists yet.
+    // Closing protocol events cannot reach a stream that has not opened, so
+    // abort the request directly. start() suppresses the resulting error
+    // callback because this is an intentional caller-owned shutdown.
+    if (this.active && !this.responseLoop) {
+      this.closed = true
+      this.active = false
+      this.abortController?.abort()
+      if (this.pendingResolve) {
+        const resolve = this.pendingResolve
+        this.pendingResolve = null
+        resolve()
+      }
+      return
+    }
+
     if (this.active) {
       this.enqueue(audioContentEnd(this.promptName, this.audioContentName))
       this.enqueue(promptEnd(this.promptName))
@@ -362,6 +448,31 @@ export class NovaSonicSession {
         // The response loop reports its own errors via onError; swallow here.
       }
     }
+  }
+
+  /**
+   * Rotation-specific bounded close. After atomic promotion the old stream is
+   * generation-gated and receives no new PCM, but its retirement still must be
+   * confirmed or aborted within this bound. Returning false means the relay
+   * must fail the interview closed rather than tolerate an ambiguous stream.
+   */
+  async stopWithin(timeoutMs: number): Promise<boolean> {
+    if (!Number.isFinite(timeoutMs) || timeoutMs <= 0) return false
+    const stopPromise = this.stop().then(() => true).catch(() => false)
+    const completed = await Promise.race([
+      stopPromise,
+      new Promise<false>((resolve) => setTimeout(() => resolve(false), timeoutMs)),
+    ])
+    if (completed) return true
+    this.closed = true
+    this.active = false
+    this.abortController?.abort()
+    if (this.pendingResolve) {
+      const resolve = this.pendingResolve
+      this.pendingResolve = null
+      resolve()
+    }
+    return false
   }
 
   // -------------------------------------------------------------------------
@@ -388,7 +499,7 @@ export class NovaSonicSession {
         }
       }
     } catch (e) {
-      this.callbacks.onError?.(e)
+      if (!this.closed) this.callbacks.onError?.(e)
     } finally {
       const endedUnexpectedly = !this.closed
       this.active = false
@@ -461,4 +572,16 @@ export class NovaSonicSession {
       return
     }
   }
+}
+
+function validConversationHistory(
+  history: Array<{ role: 'USER' | 'ASSISTANT'; text: string }>,
+): boolean {
+  if (history.length === 0) return true
+  return history[0].role === 'USER' &&
+    history.at(-1)?.role === 'ASSISTANT' &&
+    history.every((entry, index) => (
+      entry.text.trim().length > 0 &&
+      (index === 0 || entry.role !== history[index - 1].role)
+    ))
 }

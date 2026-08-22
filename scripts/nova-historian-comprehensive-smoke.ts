@@ -14,16 +14,21 @@
  *   AWS_PROFILE=<authorized-profile> npm run historian:nova-smoke -- --live
  *   AWS_PROFILE=<authorized-profile> npm run historian:nova-smoke -- --live --live-scenario emergency-at-26
  *   AWS_PROFILE=<authorized-profile> npm run historian:nova-smoke -- --live --live-suite
+ *   AWS_PROFILE=<authorized-profile> npm run historian:nova-smoke -- --live --live-continuation
  */
 
 import { spawnSync } from 'node:child_process'
+import { createHmac, randomBytes } from 'node:crypto'
+import { once } from 'node:events'
 import { mkdtempSync, readFileSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import WebSocket from 'ws'
 
 import { buildHistorianSystemPrompt, getHistorianToolsForProvider } from '../src/lib/historianPrompts'
 import { NovaSonicSession } from '../services/nova-sonic-relay/src/novaSonicSession.js'
 import { COMPREHENSIVE_AGE_NUDGE } from '../services/nova-sonic-relay/src/comprehensiveOpening.js'
+import type { ServerMsg } from '../services/nova-sonic-relay/src/wsProtocol.js'
 import {
   COMPREHENSIVE_HARD_STOP_SAVE_NUDGE,
 } from '../src/lib/historian/comprehensiveCompletionPolicy'
@@ -43,7 +48,15 @@ import {
   type LiveSyntheticScenarioId,
 } from '../src/lib/historian/liveSyntheticAcceptance'
 import { isUnavailableLiveProviderFailure } from '../src/lib/historian/liveSmokeFailurePolicy'
+import {
+  assertHistorianContinuationCheckpoint,
+  buildHistorianAnsweredQuestionPairs,
+  conservativeHistorianContinuationCoverage,
+  hashHistorianContinuationTranscript,
+  type HistorianContinuationCheckpointV1,
+} from '../src/lib/historian/continuationState'
 import { HistorianRuntimeGuard } from '../src/lib/historian/runtimeGuard'
+import type { HistorianTranscriptEntry } from '../src/lib/historianTypes'
 
 const VERBOSE = process.argv.includes('--verbose')
 const TURN_TIMEOUT_MS = 60_000
@@ -427,6 +440,405 @@ async function runLiveStateInjectedScenario(scenario: LiveSyntheticScenario): Pr
   }
 }
 
+type LiveRelayModule = typeof import('../services/nova-sonic-relay/src/server.js')
+
+/**
+ * Forced-short, PHI-free live continuation acceptance.
+ *
+ * This runs the real local relay and three real Bedrock Nova streams while
+ * keeping one WebSocket, one synthetic application session id, one monotonic
+ * transcript, and one audio sequence. Test-only relay timing forces two
+ * between-turn rotations. It does not exercise the browser microphone/player,
+ * application persistence, deployed infrastructure, or 45/60-turn endurance.
+ */
+async function runLiveRelayContinuationAcceptance(): Promise<void> {
+  const fixedPcm = {
+    referral: generateFixedSyntheticPatientPcm(
+      'I was referred for progressive balance difficulty and several recent falls.',
+    ),
+    age: generateFixedSyntheticPatientPcm('I am fifty one years old.'),
+    onset: generateFixedSyntheticPatientPcm(
+      'The balance difficulty began gradually about six months ago.',
+    ),
+    frequency: generateFixedSyntheticPatientPcm(
+      'It is present most days and is worse when I turn quickly.',
+    ),
+  }
+  const instructions = buildHistorianSystemPrompt(
+    'new_patient',
+    SYNTHETIC_REFERRAL,
+    undefined,
+    undefined,
+    SYNTHETIC_REFERRAL,
+    'comprehensive',
+  )
+  const tools = getHistorianToolsForProvider('nova', 'new_patient')
+  const appSessionId = '00000000-0000-4000-8000-00000000c003'
+  const startedAt = Date.now()
+  const transcript: HistorianTranscriptEntry[] = []
+  const observedText: Array<{
+    role: 'assistant' | 'user'
+    text: string
+    segmentId: number
+  }> = []
+  const audioFramesBySegment = new Map<number, number>()
+  const checkpoints: HistorianContinuationCheckpointV1[] = []
+  const inbox: ServerMsg[] = []
+  const errors: string[] = []
+  let nextAudioSeq = 0
+  let relay: LiveRelayModule | null = null
+  let client: WebSocket | null = null
+  let clientClosing = false
+
+  const envNames = [
+    'NODE_ENV',
+    'PORT',
+    'NOVA_RELAY_SHARED_SECRET',
+    'NOVA_RELAY_ALLOWED_ORIGINS',
+    'NOVA_APP_CONTINUATION_V1',
+    'NOVA_CONTINUATION_TEST_DUE_MS',
+    'NOVA_CONTINUATION_TEST_BARRIER_MS',
+    'NOVA_CONTINUATION_TEST_DEADLINE_MS',
+    'TRANSCRIBE_MEDICAL_ENABLED',
+  ] as const
+  const priorEnv = new Map(envNames.map((name) => [name, process.env[name]]))
+  const sharedSecret = randomBytes(32).toString('hex')
+  const origin = 'http://synthetic-continuation.test'
+
+  const sendRelay = (message: unknown) => {
+    if (!client || client.readyState !== WebSocket.OPEN) {
+      throw new Error('Live continuation relay WebSocket is not open')
+    }
+    client.send(JSON.stringify(message))
+  }
+
+  const appendTranscript = (
+    role: 'assistant' | 'user',
+    text: string,
+    segmentId: number,
+  ) => {
+    const normalized = text.replace(/\s+/g, ' ').trim()
+    if (!normalized) return
+    observedText.push({ role, text: normalized, segmentId })
+    const last = transcript.at(-1)
+    if (role === 'assistant' && last?.role === 'assistant' && last.text === normalized) return
+    transcript.push({
+      role,
+      text: normalized,
+      timestamp: Math.floor((Date.now() - startedAt) / 1000),
+      seq: transcript.length + 1,
+    })
+    if (VERBOSE) console.log(`[live relay segment ${segmentId} ${role}] ${normalized}`)
+  }
+
+  const waitForRelay = async <T extends ServerMsg['t']>(
+    type: T,
+    description: string,
+    predicate?: (message: Extract<ServerMsg, { t: T }>) => boolean,
+  ): Promise<Extract<ServerMsg, { t: T }>> => {
+    const waitStarted = Date.now()
+    while (Date.now() - waitStarted < TURN_TIMEOUT_MS) {
+      if (errors.length > 0) throw new Error(errors[0])
+      const index = inbox.findIndex((message) => {
+        if (message.t !== type) return false
+        return !predicate || predicate(message as Extract<ServerMsg, { t: T }>)
+      })
+      if (index >= 0) {
+        return inbox.splice(index, 1)[0] as Extract<ServerMsg, { t: T }>
+      }
+      await sleep(50)
+    }
+    throw new Error(`Timed out waiting for ${description}`)
+  }
+
+  const waitForCondition = async (condition: () => boolean, description: string) => {
+    const waitStarted = Date.now()
+    while (Date.now() - waitStarted < TURN_TIMEOUT_MS) {
+      if (errors.length > 0) throw new Error(errors[0])
+      if (condition()) return
+      await sleep(50)
+    }
+    throw new Error(`Timed out waiting for ${description}`)
+  }
+
+  const streamRelayAudio = async (
+    pcm: Buffer,
+    options: { sequenced: boolean; tailSilenceChunks?: number },
+  ) => {
+    for (let offset = 0; offset < pcm.length; offset += AUDIO_CHUNK_BYTES) {
+      const chunk = pcm.subarray(offset, Math.min(offset + AUDIO_CHUNK_BYTES, pcm.length))
+      sendRelay({
+        t: 'audio',
+        pcm: chunk.toString('base64'),
+        ...(options.sequenced ? { audioSeq: ++nextAudioSeq } : {}),
+      })
+      await sleep(AUDIO_CHUNK_MS)
+    }
+    for (let index = 0; index < (options.tailSilenceChunks ?? 8); index += 1) {
+      sendRelay({
+        t: 'audio',
+        pcm: SILENCE_PCM_BASE64,
+        ...(options.sequenced ? { audioSeq: ++nextAudioSeq } : {}),
+      })
+      await sleep(AUDIO_CHUNK_MS)
+    }
+  }
+
+  const exchangeCount = () => transcript.reduce((count, entry, index) => (
+    entry.role === 'assistant' && (index === 0 || transcript[index - 1].role === 'user')
+      ? count + 1
+      : count
+  ), 0)
+
+  const rotate = async (
+    barrier: Extract<ServerMsg, { t: 'continuationBarrier' }>,
+  ): Promise<Extract<ServerMsg, { t: 'continuationReady' }>> => {
+    const rotationStartedAt = Date.now()
+    const snapshot = transcript.map((entry) => ({ ...entry }))
+    const last = snapshot.at(-1)
+    if (!last || last.role !== 'assistant' || last.seq !== snapshot.length) {
+      throw new Error('Live relay checkpoint was not at a final assistant question')
+    }
+    const checkpoint = assertHistorianContinuationCheckpoint({
+      version: 1,
+      appSessionId,
+      fromSegmentId: barrier.segmentId,
+      transcriptThroughSeq: last.seq,
+      transcriptHash: hashHistorianContinuationTranscript(snapshot),
+      transcript: snapshot,
+      exchangeCount: exchangeCount(),
+      patientTurnCount: snapshot.filter((entry) => entry.role === 'user').length,
+      elapsedSeconds: Math.floor((Date.now() - startedAt) / 1000),
+      awaitingAnswerTo: { seq: last.seq, text: last.text },
+      answeredQuestionPairs: buildHistorianAnsweredQuestionPairs(snapshot),
+      coverage: conservativeHistorianContinuationCoverage(),
+      runtimeGuard: { softWrapIssued: false, terminalReason: null },
+      safetyEscalated: false,
+      terminationReason: null,
+      administeredScaleIds: [],
+      activeScale: null,
+      pendingTools: [],
+    })
+    checkpoints.push(checkpoint)
+    sendRelay({ t: 'continuationCommit', barrierId: barrier.barrierId, checkpoint })
+    const ready = await waitForRelay(
+      'continuationReady',
+      `segment ${barrier.segmentId + 1} ready acknowledgement`,
+      (message) => message.barrierId === barrier.barrierId,
+    )
+    if (
+      ready.fromSegmentId !== barrier.segmentId ||
+      ready.segmentId !== barrier.segmentId + 1 ||
+      ready.lastAudioSeq !== barrier.lastAudioSeq ||
+      ready.transcriptThroughSeq !== last.seq
+    ) {
+      throw new Error('Live relay continuation ready acknowledgement did not match its checkpoint')
+    }
+    if (Date.now() - rotationStartedAt > 30_000) {
+      throw new Error('Live Nova continuation exceeded the production 30-second handoff window')
+    }
+    return ready
+  }
+
+  try {
+    process.env.NODE_ENV = 'test'
+    process.env.PORT = '0'
+    process.env.NOVA_RELAY_SHARED_SECRET = sharedSecret
+    process.env.NOVA_RELAY_ALLOWED_ORIGINS = origin
+    process.env.NOVA_APP_CONTINUATION_V1 = 'true'
+    process.env.NOVA_CONTINUATION_TEST_DUE_MS = '10'
+    process.env.NOVA_CONTINUATION_TEST_BARRIER_MS = '20'
+    // The forced first barrier occurs after the opening sequence, well after
+    // segment start. Give the test relay a wider absolute clock, then enforce
+    // the real production 30-second barrier-to-ready budget in rotate().
+    process.env.NOVA_CONTINUATION_TEST_DEADLINE_MS = '60000'
+    process.env.TRANSCRIBE_MEDICAL_ENABLED = 'false'
+
+    relay = await import('../services/nova-sonic-relay/src/server.js')
+    if (!relay.server.listening) await once(relay.server, 'listening')
+    const address = relay.server.address()
+    if (!address || typeof address === 'string') {
+      throw new Error('Live continuation relay did not bind a local TCP port')
+    }
+    const payload = Buffer.from(JSON.stringify({ exp: Math.floor(Date.now() / 1000) + 300 }))
+      .toString('base64url')
+    const signature = createHmac('sha256', sharedSecret).update(payload).digest('base64url')
+    client = new WebSocket(
+      `ws://127.0.0.1:${address.port}`,
+      ['nova.v1', `${payload}.${signature}`],
+      { origin },
+    )
+    client.on('message', (raw) => {
+      let message: ServerMsg
+      try {
+        message = JSON.parse(raw.toString()) as ServerMsg
+      } catch {
+        errors.push('Live continuation relay returned malformed JSON')
+        return
+      }
+      if (message.t === 'assistantTranscript') {
+        appendTranscript('assistant', message.text, message.segmentId ?? 1)
+      } else if (message.t === 'userTranscript') {
+        appendTranscript('user', message.text, message.segmentId ?? 1)
+      } else if (message.t === 'audio') {
+        const segmentId = message.segmentId ?? 1
+        audioFramesBySegment.set(segmentId, (audioFramesBySegment.get(segmentId) ?? 0) + 1)
+      } else if (message.t === 'error') {
+        errors.push(`Nova relay error: ${message.message}`)
+      } else if (message.t === 'continuationFailed') {
+        errors.push(`Nova continuation failed: ${message.reason}`)
+      } else if (message.t === 'continuationRecovered') {
+        errors.push(
+          `Nova continuation candidate rolled back before promotion: ${message.reason}`,
+        )
+      } else if (message.t === 'sessionEnded' && !clientClosing) {
+        errors.push(`Nova relay ended unexpectedly: ${message.reason}`)
+      } else if (message.t === 'toolCall') {
+        sendRelay({
+          t: 'toolResult',
+          toolUseId: message.toolUseId,
+          output: JSON.stringify({ status: 'error', message: 'unexpected live acceptance tool' }),
+          segmentId: message.segmentId,
+        })
+        errors.push(`Unexpected live continuation tool call: ${message.toolName}`)
+      }
+      inbox.push(message)
+    })
+    client.on('close', (code) => {
+      if (!clientClosing) errors.push(`Live continuation relay WebSocket closed (${code})`)
+    })
+    await once(client, 'open')
+    sendRelay({
+      t: 'start',
+      instructions,
+      tools,
+      interviewMode: 'comprehensive',
+    })
+
+    const initialSilence = setInterval(() => {
+      try { sendRelay({ t: 'audio', pcm: SILENCE_PCM_BASE64 }) } catch {}
+    }, AUDIO_CHUNK_MS)
+    try {
+      await waitForCondition(
+        () => observedText.some((entry) => entry.segmentId === 1 && entry.role === 'assistant'),
+        'initial live Nova referral question',
+      )
+      await waitForRelay('aiSpeechStop', 'initial assistant audio end', (message) => message.segmentId === 1)
+    } finally {
+      clearInterval(initialSilence)
+    }
+
+    await streamRelayAudio(fixedPcm.referral, { sequenced: false })
+    await waitForCondition(
+      () => observedText.some((entry) => entry.segmentId === 1 && entry.role === 'user'),
+      'segment one synthetic referral ASR',
+    )
+    await waitForCondition(
+      () => observedText.some((entry) =>
+        entry.segmentId === 1 && entry.role === 'assistant' &&
+        /how old|your age|age are you/i.test(entry.text),
+      ),
+      'segment one patient-reported age question',
+    )
+    await waitForRelay('aiSpeechStop', 'age question audio end', (message) => message.segmentId === 1)
+
+    sendRelay({ t: 'audio', pcm: SILENCE_PCM_BASE64, audioSeq: ++nextAudioSeq })
+    await waitForRelay('continuationDue', 'segment one continuation due', (message) => message.segmentId === 1)
+    await streamRelayAudio(fixedPcm.age, { sequenced: true })
+    const barrier1 = await waitForRelay(
+      'continuationBarrier',
+      'segment one between-turn barrier',
+      (message) => message.segmentId === 1,
+    )
+    const pendingQuestion1 = transcript.at(-1)?.text
+    const bufferedOnset = streamRelayAudio(fixedPcm.onset, { sequenced: true })
+    const [rotationResult, bufferedOnsetResult] = await Promise.allSettled([
+      rotate(barrier1),
+      bufferedOnset,
+    ])
+    if (rotationResult.status === 'rejected') throw rotationResult.reason
+    if (bufferedOnsetResult.status === 'rejected') throw bufferedOnsetResult.reason
+    const ready2 = rotationResult.value
+
+    const barrier2 = await waitForRelay(
+      'continuationBarrier',
+      'segment two between-turn barrier after buffered PCM',
+      (message) => message.segmentId === 2,
+    )
+    await waitForCondition(
+      () => observedText.some((entry) => entry.segmentId === 2 && entry.role === 'user') &&
+        observedText.some((entry) => entry.segmentId === 2 && entry.role === 'assistant'),
+      'segment two ASR and assistant response',
+    )
+    const pendingQuestion2 = transcript.at(-1)?.text
+    const ready3 = await rotate(barrier2)
+
+    const segment3TextBeforeInput = observedText.filter((entry) => entry.segmentId === 3).length
+    const segment3AudioBeforeInput = audioFramesBySegment.get(3) ?? 0
+    await sleep(1000)
+    if (
+      observedText.filter((entry) => entry.segmentId === 3).length !== segment3TextBeforeInput ||
+      (audioFramesBySegment.get(3) ?? 0) !== segment3AudioBeforeInput
+    ) {
+      throw new Error('Replacement Nova segment spoke before receiving the pending answer')
+    }
+
+    await streamRelayAudio(fixedPcm.frequency, { sequenced: true })
+    await waitForCondition(
+      () => observedText.some((entry) => entry.segmentId === 3 && entry.role === 'user') &&
+        observedText.some((entry) => entry.segmentId === 3 && entry.role === 'assistant'),
+      'segment three ASR and assistant response',
+    )
+    await waitForRelay('aiSpeechStop', 'segment three assistant audio end', (message) => message.segmentId === 3)
+
+    const segment2Text = observedText.filter((entry) => entry.segmentId === 2)
+    const segment3Text = observedText.filter((entry) => entry.segmentId === 3)
+    if (segment2Text[0]?.role !== 'user' || segment3Text[0]?.role !== 'user') {
+      throw new Error('A replacement Nova segment emitted a duplicate greeting before patient ASR')
+    }
+    if (
+      !pendingQuestion1 ||
+      !pendingQuestion2 ||
+      segment2Text.some((entry) => entry.role === 'assistant' && entry.text === pendingQuestion1) ||
+      segment3Text.some((entry) => entry.role === 'assistant' && entry.text === pendingQuestion2)
+    ) {
+      throw new Error('A replacement Nova segment repeated the already-heard pending question')
+    }
+    if (
+      ready2.segmentId !== 2 ||
+      ready3.segmentId !== 3 ||
+      checkpoints.length !== 2 ||
+      checkpoints.some((checkpoint) => checkpoint.appSessionId !== appSessionId) ||
+      transcript.some((entry, index) => entry.seq !== index + 1)
+    ) {
+      throw new Error('Live continuation did not preserve one monotonic application session')
+    }
+
+    console.log('PASS live_forced_short_relay_continuation_three_segments')
+    console.log('PASS live_forced_short_relay_continuation_each_handoff_within_30s')
+    console.log('PASS live_forced_short_relay_continuation_one_greeting_monotonic_transcript')
+    console.log('PASS live_forced_short_relay_continuation_buffered_pcm_after_ready')
+    console.log('PASS LIVE_CONTINUATION_CONSERVATIVE_REPLAY')
+    console.log('LIMIT live_forced_short_not_endurance_not_persistence_not_deployed')
+  } finally {
+    clientClosing = true
+    if (client?.readyState === WebSocket.OPEN) {
+      try { client.send(JSON.stringify({ t: 'stop' })) } catch {}
+      await Promise.race([once(client, 'close').catch(() => undefined), sleep(1500)])
+    }
+    if (client && client.readyState !== WebSocket.CLOSED) client.terminate()
+    if (relay) {
+      await new Promise<void>((resolve) => relay!.wss.close(() => resolve()))
+      await new Promise<void>((resolve) => relay!.server.close(() => resolve()))
+    }
+    for (const name of envNames) {
+      const previous = priorEnv.get(name)
+      if (previous === undefined) delete process.env[name]
+      else process.env[name] = previous
+    }
+  }
+}
+
 function requestedLiveScenarios(): LiveSyntheticScenario[] {
   if (process.argv.includes('--live-suite')) {
     return LIVE_SYNTHETIC_SCENARIO_IDS.map((id) => LIVE_SYNTHETIC_SCENARIOS[id])
@@ -441,6 +853,19 @@ function requestedLiveScenarios(): LiveSyntheticScenario[] {
 async function main(): Promise<void> {
   if (!process.argv.includes('--live')) {
     runLocalScenarioContract()
+    return
+  }
+
+  if (process.argv.includes('--live-continuation')) {
+    try {
+      await runLiveRelayContinuationAcceptance()
+    } catch (error) {
+      if (isUnavailableLiveProviderFailure(error)) {
+        console.log(`NOT_RUN continuation nova_live_provider_or_iam ${errorMessage(error)}`)
+        return
+      }
+      throw error
+    }
     return
   }
 

@@ -71,6 +71,15 @@ describe('Nova Comprehensive Historian acceptance contract', () => {
     )
   })
 
+  it('keeps forced live continuation PHI-free and explicitly bounded', () => {
+    expect(source).toContain("process.argv.includes('--live-continuation')")
+    expect(source).toContain('PASS live_forced_short_relay_continuation_three_segments')
+    expect(source).toContain('PASS LIVE_CONTINUATION_CONSERVATIVE_REPLAY')
+    expect(source).toContain('LIMIT live_forced_short_not_endurance_not_persistence_not_deployed')
+    expect(source).toContain('NOVA_APP_CONTINUATION_V1')
+    expect(source).toContain('conservativeHistorianContinuationCoverage')
+  })
+
   it('accepts only coverage-complete output at logical exchange 26', () => {
     expect(LIVE_SYNTHETIC_COVERAGE_SAVE_NUDGE).toContain('LIVE_STATE_INJECTED')
     expect(LIVE_SYNTHETIC_COVERAGE_SAVE_NUDGE).toContain('Immediately call save_interview_output')
@@ -158,6 +167,7 @@ describe('Nova Comprehensive Historian acceptance contract', () => {
   it('keeps live execution explicit and provider/IAM failures NOT_RUN', () => {
     expect(source).toContain("process.argv.includes('--live')")
     expect(source).toContain("process.argv.includes('--live-suite')")
+    expect(source).toContain('NOT_RUN continuation nova_live_provider_or_iam')
     expect(source).toContain('NOT_RUN ${scenario.id} nova_live_provider_or_iam')
     expect(source).toContain('[AWS_PRINCIPAL_REDACTED]')
     expect(source).toContain('[AWS_ACCOUNT_REDACTED]')

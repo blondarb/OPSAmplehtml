@@ -18,7 +18,13 @@
 import type { ClientMsg, ServerMsg } from '@/lib/voice/relayProtocol'
 import { MicCapture } from '@/lib/voice/audio/capture-worklet'
 import { PcmPlayer } from '@/lib/voice/audio/player'
-import type { VoiceEvent, VoiceProvider, VoiceStartOptions } from '@/lib/voice/providerTypes'
+import type {
+  VoiceContinuationCheckpoint,
+  VoiceContinuationCommitResult,
+  VoiceEvent,
+  VoiceProvider,
+  VoiceStartOptions,
+} from '@/lib/voice/providerTypes'
 
 export class NovaSonicWsProvider implements VoiceProvider {
   private ws: WebSocket | null = null
@@ -35,6 +41,25 @@ export class NovaSonicWsProvider implements VoiceProvider {
   private modelStreamOpen = false
   /** Prevents a terminal relay frame plus the ensuing WS close from double-ending. */
   private disconnectedEmitted = false
+  /** Monotonic browser input sequence; never resets across inner Nova segments. */
+  private audioSeq = 0
+  /** Relay-owned Bedrock segment currently allowed to reach the hook/player. */
+  private segmentId = 1
+  /** Segment-scoped tool ownership prevents a late async result reaching a replacement stream. */
+  private readonly toolSegments = new Map<string, number>()
+  private continuationBarrier: {
+    barrierId: string
+    segmentId: number
+    lastAudioSeq: number
+    deadlineAtMs: number
+  } | null = null
+  private continuationCommit: {
+    barrierId: string
+    transcriptThroughSeq: number
+    resolve: (result: VoiceContinuationCommitResult) => void
+    reject: (error: Error) => void
+    timeout: ReturnType<typeof setTimeout>
+  } | null = null
   /** Last diagnostics snapshot captured from `player` before it was closed in
    *  stop() — so getAudioDiagnostics() still has something to return after
    *  teardown (e.g. when the hook reads it right after stop() completes). */
@@ -74,6 +99,10 @@ export class NovaSonicWsProvider implements VoiceProvider {
     this.outputSuppressed = false
     this.modelStreamOpen = false
     this.disconnectedEmitted = false
+    this.audioSeq = 0
+    this.segmentId = 1
+    this.toolSegments.clear()
+    this.clearContinuation(new Error('Nova session restarted'))
 
     // Wrap setup so a synchronous failure (e.g. `new WebSocket` throwing on a
     // malformed relayUrl) tears down anything already allocated — mirrors the
@@ -108,7 +137,7 @@ export class NovaSonicWsProvider implements VoiceProvider {
       this.mic = mic
       mic
         .start((pcm) => {
-          this.send({ t: 'audio', pcm })
+          this.send({ t: 'audio', pcm, audioSeq: ++this.audioSeq })
         })
         .catch((err: unknown) => {
           this.emit({
@@ -162,15 +191,26 @@ export class NovaSonicWsProvider implements VoiceProvider {
 
   /** Map a relay ServerMsg onto a VoiceEvent and/or drive the player. */
   private handleServerMsg(msg: ServerMsg): void {
+    const taggedSegment = 'segmentId' in msg ? msg.segmentId : undefined
+    if (
+      typeof taggedSegment === 'number' &&
+      taggedSegment !== this.segmentId &&
+      msg.t !== 'continuationDue' &&
+      msg.t !== 'continuationBarrier' &&
+      msg.t !== 'continuationReady' &&
+      msg.t !== 'continuationRecovered'
+    ) {
+      return
+    }
     switch (msg.t) {
       case 'userTranscript':
-        this.emit({ type: 'userTranscript', text: msg.text })
+        this.emit({ type: 'userTranscript', text: msg.text, segmentId: msg.segmentId })
         break
       case 'assistantTranscript':
-        this.emit({ type: 'assistantTranscript', text: msg.text })
+        this.emit({ type: 'assistantTranscript', text: msg.text, segmentId: msg.segmentId })
         break
       case 'assistantTextDelta':
-        this.emit({ type: 'assistantTextDelta', text: msg.text })
+        this.emit({ type: 'assistantTextDelta', text: msg.text, segmentId: msg.segmentId })
         break
       case 'audio':
         // Raw audio drives the player only — no VoiceEvent.
@@ -178,7 +218,7 @@ export class NovaSonicWsProvider implements VoiceProvider {
         break
       case 'aiSpeechStart':
         this.aiSpeaking = true
-        this.emit({ type: 'aiSpeechStart' })
+        this.emit({ type: 'aiSpeechStart', segmentId: msg.segmentId })
         break
       case 'aiSpeechStop':
         // The relay sends this the moment Nova's turn (completionEnd) ends,
@@ -190,7 +230,7 @@ export class NovaSonicWsProvider implements VoiceProvider {
         // session down mid-audio. No-op delay for ordinary turns — resolves
         // immediately once nothing is left scheduled.
         this.aiSpeaking = false
-        this.emitAiSpeechStopWhenDrained()
+        this.emitAiSpeechStopWhenDrained(msg.segmentId ?? this.segmentId)
         break
       case 'bargeIn':
         // User interrupted: flush queued AI audio, then signal speech stopped
@@ -198,14 +238,16 @@ export class NovaSonicWsProvider implements VoiceProvider {
         // nothing left to drain.
         this.player?.interrupt()
         this.aiSpeaking = false
-        this.emit({ type: 'aiSpeechStop' })
+        this.emit({ type: 'aiSpeechStop', segmentId: msg.segmentId })
         break
       case 'toolCall':
+        this.toolSegments.set(msg.toolUseId, msg.segmentId ?? this.segmentId)
         this.emit({
           type: 'toolCall',
           toolName: msg.toolName,
           toolUseId: msg.toolUseId,
           input: msg.input,
+          segmentId: msg.segmentId,
         })
         break
       case 'completion':
@@ -220,17 +262,13 @@ export class NovaSonicWsProvider implements VoiceProvider {
         // interview aiSpeechStop only clears the speaking flag (the hook's
         // auto-end gates on interviewCompleted, so it can't end early).
         this.aiSpeaking = false
-        this.emitAiSpeechStopWhenDrained()
+        this.emitAiSpeechStopWhenDrained(msg.segmentId ?? this.segmentId)
         break
       case 'error':
         // Relay model errors are terminal. Mark the underlying model stream
         // unavailable before the hook handles this event so its finalization
         // path skips a save nudge that can no longer reach Nova.
-        this.modelStreamOpen = false
-        this.outputSuppressed = true
-        this.aiSpeaking = false
-        this.player?.interrupt()
-        this.emit({ type: 'error', message: msg.message })
+        this.emitTerminalError(msg.message)
         break
       case 'sessionEnded':
         this.modelStreamOpen = false
@@ -245,6 +283,95 @@ export class NovaSonicWsProvider implements VoiceProvider {
       case 'medicalTranscript':
         this.emit({ type: 'medicalTranscript', text: msg.text, isPartial: msg.isPartial })
         break
+      case 'continuationDue':
+        if (msg.segmentId !== this.segmentId) break
+        this.emit({
+          type: 'continuationDue',
+          segmentId: msg.segmentId,
+          deadlineAtMs: msg.deadlineAtMs,
+        })
+        break
+      case 'continuationBarrier': {
+        if (msg.segmentId !== this.segmentId || this.continuationBarrier) {
+          this.emitTerminalError('Nova continuation barrier mismatch')
+          break
+        }
+        this.continuationBarrier = {
+          barrierId: msg.barrierId,
+          segmentId: msg.segmentId,
+          lastAudioSeq: msg.lastAudioSeq,
+          deadlineAtMs: msg.deadlineAtMs,
+        }
+        const player = this.player
+        const drained = player ? player.whenDrained() : Promise.resolve()
+        drained.then(() => {
+          const barrier = this.continuationBarrier
+          if (!barrier || barrier.barrierId !== msg.barrierId || this.segmentId !== msg.segmentId) return
+          if (Date.now() >= barrier.deadlineAtMs) {
+            this.emitTerminalError('Nova continuation missed its transport deadline')
+            return
+          }
+          this.emit({
+            type: 'continuationBarrier',
+            barrierId: barrier.barrierId,
+            segmentId: barrier.segmentId,
+            lastAudioSeq: barrier.lastAudioSeq,
+            deadlineAtMs: barrier.deadlineAtMs,
+          })
+        })
+        break
+      }
+      case 'continuationReady': {
+        const pending = this.continuationCommit
+        const barrier = this.continuationBarrier
+        if (
+          !pending ||
+          !barrier ||
+          msg.barrierId !== pending.barrierId ||
+          msg.fromSegmentId !== this.segmentId ||
+          msg.lastAudioSeq !== barrier.lastAudioSeq ||
+          msg.transcriptThroughSeq !== pending.transcriptThroughSeq ||
+          msg.segmentId !== this.segmentId + 1
+        ) {
+          this.emitTerminalError('Nova continuation acknowledgement mismatch')
+          break
+        }
+        clearTimeout(pending.timeout)
+        this.segmentId = msg.segmentId
+        this.continuationBarrier = null
+        this.continuationCommit = null
+        pending.resolve('rotated')
+        break
+      }
+      case 'continuationRecovered': {
+        const pending = this.continuationCommit
+        const barrier = this.continuationBarrier
+        if (
+          !pending ||
+          !barrier ||
+          msg.barrierId !== pending.barrierId ||
+          msg.segmentId !== this.segmentId ||
+          msg.lastAudioSeq !== barrier.lastAudioSeq ||
+          msg.transcriptThroughSeq !== pending.transcriptThroughSeq
+        ) {
+          this.emitTerminalError('Nova continuation recovery acknowledgement mismatch')
+          break
+        }
+        clearTimeout(pending.timeout)
+        this.continuationBarrier = null
+        this.continuationCommit = null
+        pending.resolve('recovered')
+        break
+      }
+      case 'continuationFailed': {
+        const reason =
+          `The voice connection ended during continuation (${msg.reason}). ` +
+          'Speech after the last confirmed turn may not have been transcribed. ' +
+          'If this may be a medical emergency, call 911; for crisis support, call or text 988.'
+        this.clearContinuation(new Error(reason))
+        this.emitTerminalError(reason)
+        break
+      }
     }
   }
 
@@ -253,14 +380,14 @@ export class NovaSonicWsProvider implements VoiceProvider {
    * finished playing (see PcmPlayer.whenDrained). Falls back to an immediate
    * emit if there's no player (e.g. already torn down).
    */
-  private emitAiSpeechStopWhenDrained(): void {
+  private emitAiSpeechStopWhenDrained(segmentId: number): void {
     const player = this.player
     if (!player) {
-      this.emit({ type: 'aiSpeechStop' })
+      if (segmentId === this.segmentId) this.emit({ type: 'aiSpeechStop', segmentId })
       return
     }
     player.whenDrained().then(() => {
-      this.emit({ type: 'aiSpeechStop' })
+      if (segmentId === this.segmentId) this.emit({ type: 'aiSpeechStop', segmentId })
     })
   }
 
@@ -270,12 +397,92 @@ export class NovaSonicWsProvider implements VoiceProvider {
     return this.stashedDiagnostics
   }
 
-  sendToolResult(toolUseId: string, output: unknown): void {
+  sendToolResult(toolUseId: string, output: unknown, segmentId?: number): void {
+    const owner = this.toolSegments.get(toolUseId)
+    const target = segmentId ?? owner ?? this.segmentId
+    if (target !== this.segmentId || (owner != null && owner !== target)) {
+      // A Nova toolUseId belongs to one Bedrock segment. Silently discard a
+      // stale async result; routing it to the replacement segment is unsafe.
+      this.toolSegments.delete(toolUseId)
+      return
+    }
     this.send({
       t: 'toolResult',
       toolUseId,
       output: typeof output === 'string' ? output : JSON.stringify(output),
+      segmentId: target,
     })
+    this.toolSegments.delete(toolUseId)
+  }
+
+  commitContinuation(params: {
+    barrierId: string
+    checkpoint: VoiceContinuationCheckpoint
+  }): Promise<VoiceContinuationCommitResult> {
+    const barrier = this.continuationBarrier
+    if (
+      !barrier ||
+      barrier.barrierId !== params.barrierId ||
+      params.checkpoint.fromSegmentId !== this.segmentId ||
+      this.continuationCommit
+    ) {
+      this.markModelUnavailable()
+      return Promise.reject(new Error('Nova continuation commit does not match the active barrier'))
+    }
+    const remainingMs = barrier.deadlineAtMs - Date.now()
+    if (remainingMs <= 0) {
+      this.markModelUnavailable()
+      return Promise.reject(new Error('Nova continuation deadline elapsed'))
+    }
+    return new Promise<VoiceContinuationCommitResult>((resolve, reject) => {
+      const timeout = setTimeout(() => {
+        if (this.continuationCommit?.barrierId !== params.barrierId) return
+        this.continuationCommit = null
+        this.markModelUnavailable()
+        reject(new Error('Nova continuation acknowledgement timed out'))
+      }, remainingMs)
+      this.continuationCommit = {
+        barrierId: params.barrierId,
+        transcriptThroughSeq: params.checkpoint.transcriptThroughSeq,
+        resolve,
+        reject,
+        timeout,
+      }
+      this.send({ t: 'continuationCommit', ...params })
+    })
+  }
+
+  deferContinuation(barrierId: string): void {
+    if (this.continuationBarrier?.barrierId !== barrierId) {
+      this.emitTerminalError('Nova continuation deferral mismatch')
+      return
+    }
+    this.send({ t: 'continuationDefer', barrierId })
+    this.continuationBarrier = null
+  }
+
+  private clearContinuation(error: Error): void {
+    if (this.continuationCommit) {
+      clearTimeout(this.continuationCommit.timeout)
+      this.continuationCommit.reject(error)
+    }
+    this.continuationCommit = null
+    this.continuationBarrier = null
+  }
+
+  private markModelUnavailable(): void {
+    this.modelStreamOpen = false
+    this.outputSuppressed = true
+    this.aiSpeaking = false
+    this.player?.interrupt()
+  }
+
+  private emitTerminalError(message: string): void {
+    this.markModelUnavailable()
+    // This error already owns the terminal notification. Suppress the relay's
+    // following sessionEnded/WS-close frames so the hook sees one cause.
+    this.disconnectedEmitted = true
+    this.emit({ type: 'error', message })
   }
 
   injectSystemText(text: string): void {
@@ -312,6 +519,8 @@ export class NovaSonicWsProvider implements VoiceProvider {
     this.closing = true
     this.aiSpeaking = false
     this.modelStreamOpen = false
+    this.clearContinuation(new Error('Nova session stopped'))
+    this.toolSegments.clear()
 
     // Tell the relay we're done before tearing local resources down.
     this.send({ t: 'stop' })
