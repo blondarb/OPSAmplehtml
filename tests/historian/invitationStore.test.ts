@@ -224,6 +224,13 @@ describe('historian invitation store', () => {
         }], rowCount: 1 }
       }
       if (sql.includes('verification_attempts')) {
+        // Bind parameters reused across SET and CASE arms need explicit
+        // casts. PostgreSQL otherwise rejects this statement at parse time
+        // with 42P08 (text versus integer) before a wrong-DOB attempt can be
+        // recorded and returned as the intended generic denial.
+        expect(sql).toContain('verification_attempts = $2::integer')
+        expect(sql).toContain('$2::integer >= $3::integer')
+        expect(sql).toContain('$4::timestamptz')
         expect(values).toEqual(['invite-1', 5, 5, new Date('2026-08-20T18:00:00.000Z')])
         return { rows: [], rowCount: 1 }
       }

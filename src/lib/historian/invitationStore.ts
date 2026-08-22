@@ -328,10 +328,16 @@ export async function redeemHistorianInvitation(
       const attempts = Math.min(MAX_IDENTITY_ATTEMPTS, (invite.verification_attempts || 0) + 1)
       await client.query(
         `UPDATE historian_invites
-            SET verification_attempts = $2,
-                status = CASE WHEN $2 >= $3 THEN 'revoked' ELSE status END,
-                revoked_at = CASE WHEN $2 >= $3 THEN $4 ELSE revoked_at END,
-                updated_at = $4
+            SET verification_attempts = $2::integer,
+                status = CASE
+                  WHEN $2::integer >= $3::integer THEN 'revoked'
+                  ELSE status
+                END,
+                revoked_at = CASE
+                  WHEN $2::integer >= $3::integer THEN $4::timestamptz
+                  ELSE revoked_at
+                END,
+                updated_at = $4::timestamptz
           WHERE id = $1`,
         [invite.id, attempts, MAX_IDENTITY_ATTEMPTS, now],
       )
