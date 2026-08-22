@@ -18,6 +18,7 @@ import {
   continuationTestBoundaryAfterTool,
   continuationTestBoundaryExchanges,
 } from './continuationTestSchedule.js'
+import { sweepHeartbeatSockets, trackHeartbeat } from './websocketHeartbeat.js'
 
 // ---------------------------------------------------------------------------
 // HTTP server — answers GET /healthz for App Runner health checks; 404 otherwise.
@@ -175,6 +176,14 @@ const wss = new WebSocketServer({
   handleProtocols: (protocols) => (protocols.has(NOVA_PROTOCOL) ? NOVA_PROTOCOL : false),
 })
 
+// Protocol-level ping/pong keeps the outer browser-to-relay WebSocket active
+// through managed load balancers and fails closed when the browser disappears.
+// Browsers answer WebSocket ping frames automatically; no app message or
+// transcript content is involved.
+const heartbeatTimer = setInterval(() => sweepHeartbeatSockets(wss.clients), 25_000)
+heartbeatTimer.unref()
+wss.on('close', () => clearInterval(heartbeatTimer))
+
 function send(ws: WebSocket, msg: ServerMsg): void {
   if (ws.readyState === WebSocket.OPEN) {
     ws.send(JSON.stringify(msg))
@@ -204,6 +213,7 @@ const CONTINUATION_BUFFER_MAX_BASE64_CHARS = 1_280_000 // 30s PCM16@16k, base64 
 const OLD_SEGMENT_STOP_TIMEOUT_MS = 5_000
 
 wss.on('connection', (ws) => {
+  trackHeartbeat(ws)
   // Track whether the AI is currently speaking so we can wrap turns with
   // aiSpeechStart / aiSpeechStop. This is an approximation: we emit
   // aiSpeechStart on the first audio chunk after silence, and aiSpeechStop on
