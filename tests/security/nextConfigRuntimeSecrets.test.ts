@@ -13,4 +13,15 @@ describe('Next build-time runtime-secret boundary', () => {
     expect(source).toMatch(/^\s*COGNITO_CLIENT_SECRET_ID:\s*process\.env\.COGNITO_CLIENT_SECRET_ID/m)
     expect(source).toMatch(/^\s*NOVA_RELAY_SECRET_ID:\s*process\.env\.NOVA_RELAY_SECRET_ID/m)
   })
+
+  it('propagates non-secret QA origin and durable-worker policy controls', () => {
+    const source = fs.readFileSync(path.join(process.cwd(), 'next.config.ts'), 'utf8')
+
+    expect(source).toMatch(
+      /^\s*PUBLIC_ROUTE_ALLOWED_ORIGINS:\s*process\.env\.PUBLIC_ROUTE_ALLOWED_ORIGINS/m,
+    )
+    expect(source).toMatch(
+      /^\s*HISTORIAN_EVAL_AUTORUN:\s*process\.env\.HISTORIAN_EVAL_AUTORUN/m,
+    )
+  })
 })

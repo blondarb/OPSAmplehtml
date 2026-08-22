@@ -91,6 +91,11 @@ const nextConfig: NextConfig = {
     // handlers; NEXT_PUBLIC_DEMO_TENANT covers the matching client bundle.
     DEMO_TENANT: process.env.DEMO_TENANT,
     NEXT_PUBLIC_DEMO_TENANT: process.env.NEXT_PUBLIC_DEMO_TENANT,
+    // QA/runtime policy flags are non-secret but still need explicit Amplify
+    // SSR propagation. An unset value preserves the existing production
+    // fallback behavior.
+    PUBLIC_ROUTE_ALLOWED_ORIGINS: process.env.PUBLIC_ROUTE_ALLOWED_ORIGINS,
+    HISTORIAN_EVAL_AUTORUN: process.env.HISTORIAN_EVAL_AUTORUN,
     COGNITO_USER_POOL_ID: process.env.COGNITO_USER_POOL_ID,
     COGNITO_CLIENT_ID: process.env.COGNITO_CLIENT_ID,
     COGNITO_REGION: process.env.COGNITO_REGION,
