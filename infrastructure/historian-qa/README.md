@@ -27,13 +27,23 @@ Cognito, relay compute, or worker queues.
    patient, consult, and clinician membership.
 4. After either PASS or failure, delete the exact initializer source object,
    then delete the initializer stack.
-5. Deploy the isolated relay, worker, and disabled/manual Amplify branch.
-6. Run negative authorization tests before any synthetic interview.
+5. Create the Add-only `relay.yaml` support stack in us-east-1, upload an
+   encrypted archive from the exact Git commit, and build its immutable relay
+   image. The archive must include `source-commit.txt`; its content and the
+   uploaded hash must match the stack's exact 40-character `SourceCommit`
+   parameter. Delete the exact source object after PASS or failure. Wait for
+   ECR scanning and require zero HIGH or CRITICAL findings.
+6. Create the ECS Express Gateway service from that image digest with the QA
+   relay secret, exact QA origin, continuation enabled, Transcribe disabled,
+   one task minimum/maximum, and `/healthz` health checks.
+7. Deploy the isolated worker and disabled/manual Amplify branch.
+8. Run negative authorization tests before any synthetic interview.
 
 ## Teardown checkpoint
 
-No later than 2026-08-29: disable the Amplify branch, set relay capacity to
-zero, disable the worker schedule, delete the QA stacks/database/user pool and
-Secrets Manager secrets, explicitly delete retained worker queues, and verify
-that the QA URL and resource inventory are empty. Production resources are not
-teardown targets.
+No later than 2026-08-29: disable the Amplify branch, delete the exact ECS
+Express Gateway service and wait for its deletion, disable the worker schedule,
+delete the QA stacks/database/user pool and Secrets Manager secrets, explicitly
+delete retained worker queues, and verify that the QA URL and resource
+inventory are empty. Delete the relay support stack only after the Express
+service is gone. Production resources are not teardown targets.

@@ -1,0 +1,319 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: >
+  Build and runtime roles for the seven-day, synthetic-only Historian MVP QA
+  Nova relay. The ECS Express Gateway service is created separately from the
+  immutable image digest because CloudFormation does not yet expose that API.
+
+Parameters:
+  NovaRelaySecretArn:
+    Type: String
+    Description: ARN of the us-east-1 replica of the isolated QA relay secret.
+  SourceCommit:
+    Type: String
+    AllowedPattern: '^[0-9a-f]{40}$'
+    Description: Exact Git commit represented by the encrypted source archive.
+  DeleteAfter:
+    Type: String
+    Default: '2026-08-29'
+
+Resources:
+  RelayRepository:
+    Type: AWS::ECR::Repository
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Delete
+    Properties:
+      RepositoryName: historian-qa-nova-relay
+      EmptyOnDelete: true
+      ImageTagMutability: IMMUTABLE
+      ImageScanningConfiguration:
+        ScanOnPush: true
+      EncryptionConfiguration:
+        EncryptionType: AES256
+      Tags:
+        - { Key: DataClass, Value: synthetic-only }
+        - { Key: DeleteAfter, Value: !Ref DeleteAfter }
+
+  RelaySourceBucket:
+    Type: AWS::S3::Bucket
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Delete
+    Properties:
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      OwnershipControls:
+        Rules:
+          - ObjectOwnership: BucketOwnerEnforced
+      LifecycleConfiguration:
+        Rules:
+          - Id: ExpireTemporaryRelaySource
+            Status: Enabled
+            ExpirationInDays: 1
+            AbortIncompleteMultipartUpload:
+              DaysAfterInitiation: 1
+      Tags:
+        - { Key: DataClass, Value: synthetic-only }
+        - { Key: DeleteAfter, Value: !Ref DeleteAfter }
+
+  RelaySourceBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref RelaySourceBucket
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Sid: DenyInsecureTransport
+            Effect: Deny
+            Principal: '*'
+            Action: s3:*
+            Resource:
+              - !GetAtt RelaySourceBucket.Arn
+              - !Sub '${RelaySourceBucket.Arn}/*'
+            Condition:
+              Bool:
+                aws:SecureTransport: 'false'
+          - Sid: DenyUnencryptedUploads
+            Effect: Deny
+            Principal: '*'
+            Action: s3:PutObject
+            Resource: !Sub '${RelaySourceBucket.Arn}/*'
+            Condition:
+              StringNotEquals:
+                s3:x-amz-server-side-encryption: AES256
+
+  RelayBuildLogGroup:
+    Type: AWS::Logs::LogGroup
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Delete
+    Properties:
+      LogGroupName: !Sub '/aws/codebuild/${AWS::StackName}'
+      RetentionInDays: 7
+      Tags:
+        - { Key: DataClass, Value: synthetic-only }
+        - { Key: DeleteAfter, Value: !Ref DeleteAfter }
+
+  RelayRuntimeLogGroup:
+    Type: AWS::Logs::LogGroup
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Delete
+    Properties:
+      LogGroupName: /aws/ecs/historian-mvp-qa-nova-relay
+      RetentionInDays: 7
+      Tags:
+        - { Key: DataClass, Value: synthetic-only }
+        - { Key: DeleteAfter, Value: !Ref DeleteAfter }
+
+  RelayBuildRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: codebuild.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: BuildOnlyHistorianQaRelay
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Sid: ReadExactQaSourceBucket
+                Effect: Allow
+                Action:
+                  - s3:GetBucketLocation
+                  - s3:ListBucket
+                Resource: !GetAtt RelaySourceBucket.Arn
+              - Sid: ReadQaSourceObject
+                Effect: Allow
+                Action:
+                  - s3:GetObject
+                  - s3:GetObjectVersion
+                Resource: !Sub '${RelaySourceBucket.Arn}/*'
+              - Sid: WriteQaRelayBuildLogs
+                Effect: Allow
+                Action:
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                Resource: !GetAtt RelayBuildLogGroup.Arn
+              - Sid: ObtainEcrAuthorization
+                Effect: Allow
+                Action: ecr:GetAuthorizationToken
+                Resource: '*'
+              - Sid: PushOnlyQaRelayRepository
+                Effect: Allow
+                Action:
+                  - ecr:BatchCheckLayerAvailability
+                  - ecr:CompleteLayerUpload
+                  - ecr:DescribeImageScanFindings
+                  - ecr:DescribeImages
+                  - ecr:GetDownloadUrlForLayer
+                  - ecr:InitiateLayerUpload
+                  - ecr:PutImage
+                  - ecr:UploadLayerPart
+                Resource: !GetAtt RelayRepository.Arn
+      Tags:
+        - { Key: DataClass, Value: synthetic-only }
+        - { Key: DeleteAfter, Value: !Ref DeleteAfter }
+
+  RelayBuildProject:
+    Type: AWS::CodeBuild::Project
+    Properties:
+      ServiceRole: !GetAtt RelayBuildRole.Arn
+      Artifacts:
+        Type: NO_ARTIFACTS
+      Environment:
+        ComputeType: BUILD_GENERAL1_SMALL
+        Image: aws/codebuild/standard:7.0
+        Type: LINUX_CONTAINER
+        PrivilegedMode: true
+        EnvironmentVariables:
+          - Name: REPOSITORY_URI
+            Type: PLAINTEXT
+            Value: !GetAtt RelayRepository.RepositoryUri
+          - Name: SOURCE_COMMIT
+            Type: PLAINTEXT
+            Value: !Ref SourceCommit
+      Source:
+        Type: S3
+        Location: !Sub '${RelaySourceBucket}/historian-qa-relay.zip'
+        BuildSpec: |
+          version: 0.2
+          phases:
+            pre_build:
+              commands:
+                - set +x
+                - test "$(printf '%s' "$SOURCE_COMMIT" | grep -Ec '^[0-9a-f]{40}$')" = 1
+                - test -f source-commit.txt
+                - test "$(tr -d '\r\n' < source-commit.txt)" = "$SOURCE_COMMIT"
+                - test -f services/nova-sonic-relay/Dockerfile
+                - test -f services/nova-sonic-relay/package-lock.json
+            build:
+              commands:
+                - |
+                  set +x
+                  existing_digest="$(aws ecr describe-images --repository-name historian-qa-nova-relay --image-ids imageTag="$SOURCE_COMMIT" --query 'imageDetails[0].imageDigest' --output text 2>/dev/null || true)"
+                  if printf '%s' "$existing_digest" | grep -Eq '^sha256:[0-9a-f]{64}$'; then
+                    printf 'Reusing existing immutable relay image for %s\n' "$SOURCE_COMMIT"
+                  else
+                    aws ecr get-login-password | docker login --username AWS --password-stdin "${REPOSITORY_URI%%/*}" >/dev/null
+                    docker build --platform linux/amd64 --label "org.opencontainers.image.revision=$SOURCE_COMMIT" --tag "$REPOSITORY_URI:$SOURCE_COMMIT" services/nova-sonic-relay
+                    docker push "$REPOSITORY_URI:$SOURCE_COMMIT" >/dev/null
+                  fi
+            post_build:
+              commands:
+                - |
+                  set +x
+                  image_digest="$(aws ecr describe-images --repository-name historian-qa-nova-relay --image-ids imageTag="$SOURCE_COMMIT" --query 'imageDetails[0].imageDigest' --output text)"
+                  test "$(printf '%s' "$image_digest" | grep -Ec '^sha256:[0-9a-f]{64}$')" = 1
+                  aws ecr wait image-scan-complete --repository-name historian-qa-nova-relay --image-id imageDigest="$image_digest"
+                  critical="$(aws ecr describe-image-scan-findings --repository-name historian-qa-nova-relay --image-id imageDigest="$image_digest" --query 'imageScanFindings.findingSeverityCounts.CRITICAL' --output text)"
+                  high="$(aws ecr describe-image-scan-findings --repository-name historian-qa-nova-relay --image-id imageDigest="$image_digest" --query 'imageScanFindings.findingSeverityCounts.HIGH' --output text)"
+                  test "$critical" != None || critical=0
+                  test "$high" != None || high=0
+                  if test "$critical" -ne 0 || test "$high" -ne 0; then
+                    printf 'FAIL relay image scan: CRITICAL=%s HIGH=%s\n' "$critical" "$high"
+                    exit 1
+                  fi
+                  printf 'PASS immutable relay image %s@%s; CRITICAL=0 HIGH=0\n' "$SOURCE_COMMIT" "$image_digest"
+      LogsConfig:
+        CloudWatchLogs:
+          Status: ENABLED
+          GroupName: !Ref RelayBuildLogGroup
+          StreamName: relay-image
+      TimeoutInMinutes: 20
+      QueuedTimeoutInMinutes: 10
+      Tags:
+        - { Key: DataClass, Value: synthetic-only }
+        - { Key: DeleteAfter, Value: !Ref DeleteAfter }
+
+  RelayExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ecs-tasks.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy
+      Policies:
+        - PolicyName: ReadOnlyHistorianQaRelaySecret
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - secretsmanager:DescribeSecret
+                  - secretsmanager:GetSecretValue
+                Resource: !Ref NovaRelaySecretArn
+      Tags:
+        - { Key: DataClass, Value: synthetic-only }
+        - { Key: DeleteAfter, Value: !Ref DeleteAfter }
+
+  RelayTaskRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ecs-tasks.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: InvokeOnlyNovaSonic
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - bedrock:InvokeModel
+                  - bedrock:InvokeModelWithBidirectionalStream
+                Resource: arn:aws:bedrock:us-east-1::foundation-model/amazon.nova-2-sonic-v1:0
+      Tags:
+        - { Key: DataClass, Value: synthetic-only }
+        - { Key: DeleteAfter, Value: !Ref DeleteAfter }
+
+  RelayInfrastructureRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Sid: AllowAccessInfrastructureForECSExpressServices
+            Effect: Allow
+            Principal:
+              Service: ecs.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AmazonECSInfrastructureRoleforExpressGatewayServices
+      Tags:
+        - { Key: DataClass, Value: synthetic-only }
+        - { Key: DeleteAfter, Value: !Ref DeleteAfter }
+
+Outputs:
+  RepositoryUri:
+    Value: !GetAtt RelayRepository.RepositoryUri
+  RepositoryArn:
+    Value: !GetAtt RelayRepository.Arn
+  SourceBucket:
+    Value: !Ref RelaySourceBucket
+  BuildProjectName:
+    Value: !Ref RelayBuildProject
+  ExecutionRoleArn:
+    Value: !GetAtt RelayExecutionRole.Arn
+  TaskRoleArn:
+    Value: !GetAtt RelayTaskRole.Arn
+  InfrastructureRoleArn:
+    Value: !GetAtt RelayInfrastructureRole.Arn
+  RuntimeLogGroup:
+    Value: !Ref RelayRuntimeLogGroup
