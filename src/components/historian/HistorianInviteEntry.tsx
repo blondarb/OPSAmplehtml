@@ -3,6 +3,10 @@
 import { useEffect, useState, type FormEvent } from 'react'
 import NeurologicHistorian from '@/components/NeurologicHistorian'
 import type { HistorianInvitationPublicContext } from '@/lib/historian/invitationStore'
+import {
+  formatDateOfBirthInput,
+  parseDateOfBirthInput,
+} from '@/lib/historian/dateOfBirthInput'
 
 type InviteState =
   | { status: 'loading' }
@@ -77,7 +81,8 @@ export default function HistorianInviteEntry() {
 
   async function verifyIdentity(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
-    if (state.status !== 'verify' || !/^\d{4}-\d{2}-\d{2}$/.test(dateOfBirth)) return
+    const normalizedDateOfBirth = parseDateOfBirthInput(dateOfBirth)
+    if (state.status !== 'verify' || !normalizedDateOfBirth) return
     const token = state.token
     setVerificationError('')
     setState({ status: 'verifying', token })
@@ -85,7 +90,7 @@ export default function HistorianInviteEntry() {
       const response = await fetch('/api/ai/historian/invites/redeem', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ token, dateOfBirth }),
+        body: JSON.stringify({ token, dateOfBirth: normalizedDateOfBirth }),
       })
       if (!response.ok) {
         throw new Error(
@@ -174,13 +179,18 @@ export default function HistorianInviteEntry() {
               Enter your date of birth before any visit details are displayed.
             </p>
             <label style={{ color: '#334155', fontSize: 14, fontWeight: 700 }}>
-              Date of birth
+              Date of birth (MM/DD/YYYY)
               <input
-                type="date"
+                type="text"
+                inputMode="numeric"
                 autoComplete="bday"
+                placeholder="MM/DD/YYYY"
                 value={dateOfBirth}
-                onChange={(event) => setDateOfBirth(event.target.value)}
+                onChange={(event) => setDateOfBirth(formatDateOfBirthInput(event.target.value))}
                 disabled={state.status === 'verifying'}
+                maxLength={10}
+                pattern="[0-9]{2}/[0-9]{2}/[0-9]{4}"
+                aria-describedby="historian-dob-format"
                 required
                 style={{
                   width: '100%',
@@ -195,6 +205,12 @@ export default function HistorianInviteEntry() {
                 }}
               />
             </label>
+            <p
+              id="historian-dob-format"
+              style={{ margin: '-6px 0 0', color: '#64748b', fontSize: 13 }}
+            >
+              Type the date with numbers, for example 01/15/1985.
+            </p>
             {verificationError && (
               <p role="alert" style={{ margin: 0, color: '#b91c1c', fontSize: 13, lineHeight: 1.5 }}>
                 {verificationError}
@@ -202,7 +218,7 @@ export default function HistorianInviteEntry() {
             )}
             <button
               type="submit"
-              disabled={state.status === 'verifying' || !dateOfBirth}
+              disabled={state.status === 'verifying' || !parseDateOfBirthInput(dateOfBirth)}
               style={{
                 padding: '13px 18px',
                 border: 0,
@@ -212,7 +228,7 @@ export default function HistorianInviteEntry() {
                 fontSize: 16,
                 fontWeight: 800,
                 cursor: state.status === 'verifying' ? 'wait' : 'pointer',
-                opacity: !dateOfBirth ? 0.55 : 1,
+                opacity: !parseDateOfBirthInput(dateOfBirth) ? 0.55 : 1,
               }}
             >
               {state.status === 'verifying' ? 'Verifying…' : 'Continue securely'}
