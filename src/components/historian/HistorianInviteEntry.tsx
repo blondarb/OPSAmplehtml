@@ -209,7 +209,7 @@ export default function HistorianInviteEntry() {
               id="historian-dob-format"
               style={{ margin: '-6px 0 0', color: '#64748b', fontSize: 13 }}
             >
-              Type the date with numbers, for example 01/15/1985.
+              Type eight numbers; the slashes are added automatically.
             </p>
             {verificationError && (
               <p role="alert" style={{ margin: 0, color: '#b91c1c', fontSize: 13, lineHeight: 1.5 }}>
