@@ -8,11 +8,12 @@ export type HistorianSessionType =
   | 'referral_clarification'
 
 export type HistorianInterviewMode = 'standard' | 'comprehensive'
-export type HistorianInterviewPromptVersion = 'standard-v1' | 'comprehensive-v1'
+export type HistorianInterviewPromptVersion = 'standard-v1' | 'comprehensive-v1' | 'comprehensive-v2'
 
-/** Why an interview stopped; only coverage_complete represents a full intake. */
+/** Why an interview stopped; the two coverage outcomes represent completed intakes. */
 export type HistorianTerminationReason =
   | 'coverage_complete'
+  | 'complete_with_uncertainty'
   | 'patient_requested_stop'
   | 'safety_escalated'
   | 'hard_stop'
@@ -33,7 +34,7 @@ export const COMPREHENSIVE_HISTORY_DOMAINS = [
   { id: 'patient_reported_age', label: 'Patient-reported age' },
   { id: 'presenting_symptom', label: 'Presenting symptom timeline and phenotype' },
   { id: 'associated_symptoms', label: 'Associated symptoms and pertinent negatives' },
-  { id: 'red_flags', label: 'Complaint-specific red flags' },
+  { id: 'red_flags', label: 'Fixed neurologic safety screen' },
   { id: 'prior_episodes', label: 'Prior similar episodes' },
   { id: 'functional_impact', label: 'Functional impact' },
   { id: 'neurologic_review_of_systems', label: 'Neurologic review of systems' },
@@ -93,6 +94,12 @@ export interface HistorianStructuredOutput {
       reason: 'not_asked' | 'unknown' | 'declined' | 'conflicting'
     }>
   }
+  /**
+   * Application-owned, transcript-bound Comprehensive v2 evidence ledger.
+   * Kept unknown at this shared boundary: save handlers must validate it with
+   * validatePatientEvidenceState before reading or persisting its claims.
+   */
+  history_evidence_v1?: unknown
   clarification_answers?: Array<{
     question_id: string
     answer: string

@@ -10,6 +10,7 @@ type TestPlayer = {
 type TestableNovaProvider = {
   player: TestPlayer
   modelStreamOpen: boolean
+  send: (message: unknown) => void
   handleServerMsg: (message:
     | { t: 'audio'; pcm: string }
     | { t: 'error'; message: string }
@@ -28,6 +29,7 @@ describe('Nova terminal output suppression', () => {
     const testable = provider as unknown as TestableNovaProvider
     testable.player = player
     testable.modelStreamOpen = true
+    testable.send = vi.fn()
 
     testable.handleServerMsg({ t: 'audio', pcm: 'before-terminal' })
     expect(player.enqueue).toHaveBeenCalledOnce()
@@ -38,6 +40,8 @@ describe('Nova terminal output suppression', () => {
 
     expect(player.interrupt).toHaveBeenCalledOnce()
     expect(player.enqueue).toHaveBeenCalledTimes(1)
+    expect(testable.send).toHaveBeenCalledOnce()
+    expect(testable.send).toHaveBeenCalledWith({ t: 'suppressOutput' })
   })
 
   it('turns a relay stream-end frame into one fail-closed disconnect', () => {

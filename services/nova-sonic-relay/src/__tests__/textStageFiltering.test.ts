@@ -3,6 +3,7 @@ import {
   NovaSonicSession,
   parseGenerationStage,
   shouldForwardText,
+  summarizeRawModelEvent,
 } from '../novaSonicSession.js'
 
 // Event shapes below are verbatim (minus ids) from a live Nova Sonic stream
@@ -38,14 +39,18 @@ function audioContentEnd(contentId: string, stopReason: string) {
 /** Drive a session's private dispatcher directly with fabricated model events. */
 function makeHarness() {
   const forwarded: Array<{ role: string; content: string }> = []
+  const assistantFinal: string[] = []
   const session = new NovaSonicSession({
     onTextOutput(role, content) {
       forwarded.push({ role, content })
     },
+    onAssistantFinalText(content) {
+      assistantFinal.push(content)
+    },
   })
   const dispatch = (e: unknown) =>
     (session as unknown as { handleModelEvent(j: unknown): void }).handleModelEvent(e)
-  return { forwarded, dispatch }
+  return { forwarded, assistantFinal, dispatch }
 }
 
 describe('parseGenerationStage', () => {
@@ -76,6 +81,30 @@ describe('shouldForwardText', () => {
   })
 })
 
+describe('raw relay trace redaction', () => {
+  it('reports event metadata without interview text or tool arguments', () => {
+    const patientText = 'synthetic private patient statement'
+    const toolArguments = '{"narrative_summary":"synthetic private summary"}'
+
+    const textSummary = summarizeRawModelEvent({
+      event: { textOutput: { role: 'USER', content: patientText } },
+    })
+    const toolSummary = summarizeRawModelEvent({
+      event: { toolUse: { toolName: 'save_interview_output', content: toolArguments } },
+    })
+    const undecodedSummary = summarizeRawModelEvent({
+      syntheticPrivatePayload: patientText,
+    } as unknown as { event?: Record<string, unknown> })
+
+    expect(textSummary).toBe(`textOutput role=USER chars=${patientText.length}`)
+    expect(toolSummary).toBe(
+      `toolUse name=save_interview_output contentChars=${toolArguments.length}`,
+    )
+    expect(undecodedSummary).toBe('(no event)')
+    expect(`${textSummary} ${toolSummary} ${undecodedSummary}`).not.toContain('synthetic private')
+  })
+})
+
 describe('NovaSonicSession text-stage filtering (live-captured pattern)', () => {
   it('signals the audible turn boundary on AUDIO END_TURN without waiting for completionEnd', () => {
     let audioEnds = 0
@@ -94,7 +123,7 @@ describe('NovaSonicSession text-stage filtering (live-captured pattern)', () => 
   })
 
   it('forwards an assistant turn exactly ONCE (SPECULATIVE kept, FINAL dropped)', () => {
-    const { forwarded, dispatch } = makeHarness()
+    const { forwarded, assistantFinal, dispatch } = makeHarness()
     const reply =
       'Hello, Doctor Chen. Thank you for calling in. To get started, is the patient currently able to speak clearly?'
 
@@ -108,6 +137,7 @@ describe('NovaSonicSession text-stage filtering (live-captured pattern)', () => 
     dispatch(contentEnd('c-final', 'END_TURN'))
 
     expect(forwarded).toEqual([{ role: 'ASSISTANT', content: reply }])
+    expect(assistantFinal).toEqual([reply])
   })
 
   it('forwards each USER ASR segment once (all FINAL)', () => {

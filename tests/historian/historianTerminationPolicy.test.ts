@@ -18,13 +18,20 @@ const migrationSource = readFileSync(
   join(__dirname, '..', '..', 'migrations/060_historian_termination_reason.sql'),
   'utf8',
 )
+const v2MigrationSource = readFileSync(
+  join(__dirname, '..', '..', 'migrations/061_historian_comprehensive_v2.sql'),
+  'utf8',
+)
 
 describe('Historian termination reason policy', () => {
-  it('reserves complete for coverage-complete natural termination', () => {
+  it('reserves complete for the two deterministic coverage outcomes', () => {
     expect(completionStatusForTermination('coverage_complete')).toBe('complete')
+    expect(completionStatusForTermination('complete_with_uncertainty')).toBe('complete')
     for (const reason of HISTORIAN_TERMINATION_REASONS) {
       expect(completionStatusForTermination(reason)).toBe(
-        reason === 'coverage_complete' ? 'complete' : 'ended_early',
+        reason === 'coverage_complete' || reason === 'complete_with_uncertainty'
+          ? 'complete'
+          : 'ended_early',
       )
     }
   })
@@ -41,6 +48,7 @@ describe('Historian termination reason policy', () => {
     expect(terminationMatchesCompletionStatus('hard_stop', 'complete')).toBe(false)
     expect(terminationMatchesCompletionStatus('safety_escalated', 'ended_early')).toBe(true)
     expect(terminationMatchesCompletionStatus('coverage_complete', 'ended_early')).toBe(false)
+    expect(terminationMatchesCompletionStatus('complete_with_uncertainty', 'complete')).toBe(true)
   })
 
   it('wires terminal causes before deriving endedEarly in the live hook', () => {
@@ -48,7 +56,8 @@ describe('Historian termination reason policy', () => {
     expect(hookSource).toContain("endSessionRef.current('provider_error')")
     expect(hookSource).toContain("endSessionRef.current('unresponsive')")
     expect(hookSource).toContain('void endSessionRef.current(reason)')
-    expect(hookSource).toContain("const endedEarly = terminationReason !== 'coverage_complete'")
+    expect(hookSource).toContain("terminationReason !== 'coverage_complete' &&")
+    expect(hookSource).toContain("terminationReason !== 'complete_with_uncertainty'")
     expect(hookSource).toContain('terminationReason,')
   })
 
@@ -58,5 +67,6 @@ describe('Historian termination reason policy', () => {
     expect(migrationSource).toContain('interview_termination_reason')
     expect(migrationSource).toContain("interview_completion_status = 'complete'")
     expect(migrationSource).toContain("interview_termination_reason = 'coverage_complete'")
+    expect(v2MigrationSource).toContain("'complete_with_uncertainty'")
   })
 })

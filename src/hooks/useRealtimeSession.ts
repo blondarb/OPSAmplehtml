@@ -3,9 +3,21 @@
 import { useState, useRef, useCallback, useEffect } from 'react'
 import type { HistorianTranscriptEntry, HistorianStructuredOutput, HistorianRedFlag, HistorianSessionType, HistorianInterviewMode, HistorianInterviewPromptVersion, HistorianTerminationReason } from '@/lib/historianTypes'
 import {
+  COMPREHENSIVE_HARD_STOP_EXCHANGE,
   COMPREHENSIVE_HARD_STOP_SAVE_NUDGE,
   evaluateComprehensiveSave,
 } from '@/lib/historian/comprehensiveCompletionPolicy'
+import {
+  approveNextPatientEvidenceQuestion,
+  collectPatientEvidenceEntry,
+  commitApprovedPatientEvidenceQuestion,
+  createPatientEvidenceState,
+  derivePatientEvidenceStructuredCoverage,
+  patientEvidenceAnswerRequiresSafetyEscalation,
+  patientEvidenceCompletion,
+  settlePatientEvidenceAnswer,
+  type PatientEvidenceState,
+} from '@/lib/historian/patientEvidenceController'
 import {
   assertHistorianContinuationCheckpoint,
   buildHistorianAnsweredQuestionPairs,
@@ -79,7 +91,7 @@ interface UseRealtimeSessionOptions {
      * partial in downstream UIs and reports.
      */
     endedEarly: boolean
-    /** Explicit terminal cause; only coverage_complete is a full intake. */
+    /** Explicit terminal cause; both deterministic coverage outcomes are completed intakes. */
     terminationReason: HistorianTerminationReason
     /** Server-resolved interview contract actually applied to the session. */
     interviewMode: HistorianInterviewMode
@@ -191,6 +203,7 @@ const CONTINUATION_RESERVE_MS = 5_000
 
 const TERMINATION_PRIORITY: Record<HistorianTerminationReason, number> = {
   coverage_complete: 0,
+  complete_with_uncertainty: 0,
   manual_end: 1,
   unresponsive: 2,
   transport_lost: 3,
@@ -249,6 +262,8 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
   const serverSessionIdRef = useRef<string | null>(null)
   const resolvedInterviewModeRef = useRef<HistorianInterviewMode>('standard')
   const resolvedInterviewPromptVersionRef = useRef<HistorianInterviewPromptVersion>('standard-v1')
+  const turnEvidenceControllerEnabledRef = useRef(false)
+  const patientEvidenceStateRef = useRef<PatientEvidenceState>(createPatientEvidenceState())
   const flushTokenRef = useRef<string | null>(null)
   // Monotonic per-entry sequence number, assigned at append time (both the
   // assistantTranscript and userTranscript branches below).
@@ -323,6 +338,10 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
     unresponsiveRef.current = createUnresponsivenessMonitor({
       config: options.unresponsiveness ?? DEFAULT_UNRESPONSIVENESS_CONFIG,
       onCheckIn: () => {
+        // V2 reserves every audible question for an evidence obligation. Do
+        // not insert an unbound check-in between the approved question and
+        // its eventual patient transcript.
+        if (turnEvidenceControllerEnabledRef.current) return
         const provider = providerRef.current
         if (!provider?.isOpen()) return
         provider.injectSystemText(UNRESPONSIVE_CHECK_IN_NUDGE)
@@ -338,6 +357,11 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
         setEndedUnresponsive(true)
         console.warn('[useRealtimeSession] patient unresponsive — ending session gracefully')
         const provider = providerRef.current
+        if (turnEvidenceControllerEnabledRef.current) {
+          provider?.suppressOutput()
+          void endSessionRef.current('unresponsive')
+          return
+        }
         if (provider?.isOpen()) {
           provider.injectSystemText(UNRESPONSIVE_SIGN_OFF_NUDGE)
           provider.requestResponse()
@@ -362,6 +386,10 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
   // Idempotent safety effects shared by transcript and model-tool detection.
   const activateSafety = useCallback(() => {
     safetyEscalatedRef.current = true
+    // Cancel both locally queued PCM and the relay's quarantined normal turn
+    // before any other safety effect. A late ordinary answer must never play
+    // over the patient-facing emergency screen.
+    providerRef.current?.suppressOutput()
     if (safetyEffectsActivatedRef.current) return
     safetyEffectsActivatedRef.current = true
     if (!redFlagsRef.current.some((flag) => flag.flag === 'Patient-stated active safety trigger')) {
@@ -618,6 +646,77 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
       return
     }
 
+    if (toolName === 'request_history_question') {
+      if (!turnEvidenceControllerEnabledRef.current) {
+        settleTool({ success: false, status: 'controller_unavailable' })
+        return
+      }
+      const failClosed = (status: string) => {
+        provider?.suppressOutput()
+        setError('The interview question sequence could not be verified, so the session ended safely.')
+        settleTool({ success: false, status })
+        void endSessionRef.current('provider_error')
+      }
+      let evidenceState = patientEvidenceStateRef.current
+      if (evidenceState.awaitingQuestion) {
+        if (
+          evidenceState.awaitingQuestion.assistantSeq === null ||
+          evidenceState.pendingPatientSeqs.length === 0
+        ) {
+          failClosed('answer_not_confirmed')
+          return
+        }
+        const settled = settlePatientEvidenceAnswer(evidenceState, transcriptRef.current)
+        if (!settled.ok || !settled.value) {
+          failClosed('answer_binding_failed')
+          return
+        }
+        evidenceState = settled.value
+        patientEvidenceStateRef.current = evidenceState
+      }
+
+      const completion = patientEvidenceCompletion(evidenceState)
+      if (completion !== 'incomplete') {
+        settleTool({ success: true, status: 'coverage_ready', completion })
+        return
+      }
+
+      // The 60th patient answer is always collected and settled before the
+      // ceiling is evaluated. If it still leaves a gap, never approve a 61st
+      // question: latch the hard stop and enter the existing silent partial-
+      // save path. If it completed the ledger, the branch above wins.
+      if (questionCountRef.current >= COMPREHENSIVE_HARD_STOP_EXCHANGE) {
+        const decision = runtimeGuardRef.current?.applicationHardStop()
+        settleTool({ success: false, status: 'interview_terminal' })
+        if (decision) {
+          applyHistorianTurnDecision(decision, {
+            activateSafety,
+            injectSystemText: () => undefined,
+            requestFinalization: (reason) => {
+              unresponsiveRef.current?.suspend()
+              void endSessionRef.current(reason)
+            },
+          })
+        }
+        return
+      }
+
+      const approved = approveNextPatientEvidenceQuestion(evidenceState)
+      if (!approved.ok || !approved.value) {
+        failClosed('question_approval_failed')
+        return
+      }
+      patientEvidenceStateRef.current = approved.value.state
+      settleTool({
+        success: true,
+        status: 'approved',
+        obligation_id: approved.value.obligation.id,
+        approved_text: approved.value.questionText,
+        allow_example: false,
+      })
+      return
+    }
+
     // ── save_interview_output (existing) ──
     if (toolName === 'save_interview_output') {
       try {
@@ -636,48 +735,96 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
           runtimeGuardRef.current?.modelPatientStop()
         }
 
-        // Comprehensive mode cannot finish merely because the HPI is clear.
-        // Reject a premature natural save tool call until every fixed history
-        // domain has been classified. Patient stop, emergency escalation, and
-        // the 60-exchange safety ceiling still save a visibly partial history.
-        const saveDecision = evaluateComprehensiveSave({
-          interviewMode: resolvedInterviewModeRef.current,
-          finalizing: finalizingRef.current,
-          safetyEscalated: safetyEscalatedRef.current,
-          toolSafetyEscalated: safety_escalated === true,
-          patientRequestedStop: runtimeGuardRef.current?.terminalReason() === 'patient_requested_stop',
-          toolPatientRequestedStop: patient_requested_stop === true,
-          exchange: questionCountRef.current,
-          structured,
-        })
-        if (!saveDecision.allowed) {
-          provider?.injectSystemText(
-            `[COMPREHENSIVE COMPLETION CHECK] The save was rejected because these required history domains are not yet cleanly classified: ${saveDecision.remainingDomains.join(', ')}. Continue the patient interview. Ask only the remaining clinically appropriate questions, then call save_interview_output again. Do not mention this internal check to the patient.`,
-          )
-          settleTool({
-            success: false,
-            status: saveDecision.reason,
-            remaining_domains: saveDecision.remainingDomains,
+        let structuredForSave: HistorianStructuredOutput = structured
+        let saveTerminationReason: HistorianTerminationReason | null = null
+
+        if (turnEvidenceControllerEnabledRef.current) {
+          let evidenceState = patientEvidenceStateRef.current
+          const runtimeTerminal = runtimeGuardRef.current?.terminalReason() ?? null
+          const terminalPartial =
+            finalizingRef.current ||
+            safety_escalated === true ||
+            patient_requested_stop === true ||
+            runtimeTerminal !== null
+
+          // A normal completion must settle the final transcript-bound answer.
+          // Terminal partial saves intentionally retain any interrupted
+          // awaiting/pending state instead of misclassifying stop/safety words
+          // as the answer to a clinical question.
+          if (!terminalPartial && evidenceState.awaitingQuestion) {
+            const settled = settlePatientEvidenceAnswer(evidenceState, transcriptRef.current)
+            if (!settled.ok || !settled.value) {
+              settleTool({ success: false, status: 'evidence_incomplete' })
+              return
+            }
+            evidenceState = settled.value
+            patientEvidenceStateRef.current = evidenceState
+          }
+
+          const completion = patientEvidenceCompletion(evidenceState)
+          if (!terminalPartial && completion === 'incomplete') {
+            settleTool({ success: false, status: 'evidence_incomplete' })
+            return
+          }
+
+          structuredForSave = {
+            ...structured,
+            interview_mode: 'comprehensive',
+            interview_prompt_version: 'comprehensive-v2',
+            history_evidence_v1: evidenceState,
+            history_coverage: derivePatientEvidenceStructuredCoverage(evidenceState),
+          }
+          saveTerminationReason =
+            safety_escalated === true
+              ? 'safety_escalated'
+              : patient_requested_stop === true
+                ? 'patient_requested_stop'
+                : runtimeTerminal ?? (
+                    completion === 'coverage_complete' || completion === 'complete_with_uncertainty'
+                      ? completion
+                      : terminationReasonRef.current
+                  )
+        } else {
+          // Legacy Comprehensive v1 keeps its model-authored fixed-domain
+          // audit. Patient stop, safety, and the hard ceiling remain partial.
+          const saveDecision = evaluateComprehensiveSave({
+            interviewMode: resolvedInterviewModeRef.current,
+            finalizing: finalizingRef.current,
+            safetyEscalated: safetyEscalatedRef.current,
+            toolSafetyEscalated: safety_escalated === true,
+            patientRequestedStop: runtimeGuardRef.current?.terminalReason() === 'patient_requested_stop',
+            toolPatientRequestedStop: patient_requested_stop === true,
+            exchange: questionCountRef.current,
+            structured,
           })
-          return
+          if (!saveDecision.allowed) {
+            provider?.injectSystemText(
+              `[COMPREHENSIVE COMPLETION CHECK] The save was rejected because these required history domains are not yet cleanly classified: ${saveDecision.remainingDomains.join(', ')}. Continue the patient interview. Ask only the remaining clinically appropriate questions, then call save_interview_output again. Do not mention this internal check to the patient.`,
+            )
+            settleTool({
+              success: false,
+              status: saveDecision.reason,
+              remaining_domains: saveDecision.remainingDomains,
+            })
+            return
+          }
+          saveTerminationReason =
+            safety_escalated === true
+              ? 'safety_escalated'
+              : patient_requested_stop === true
+                ? 'patient_requested_stop'
+                : saveDecision.reason === 'coverage_complete' ||
+                    saveDecision.reason === 'not_comprehensive'
+                  ? 'coverage_complete'
+                  : saveDecision.reason === 'patient_requested_stop' ||
+                      saveDecision.reason === 'safety_escalated' ||
+                      saveDecision.reason === 'hard_stop'
+                    ? saveDecision.reason
+                    : null
         }
 
-        // A tool call proves that output was captured, not that the history
-        // finished normally. Preserve the actual terminal cause separately so
-        // safety, patient stop, and the hard ceiling remain visibly partial.
-        const saveTerminationReason: HistorianTerminationReason | null =
-          safety_escalated === true
-            ? 'safety_escalated'
-            : patient_requested_stop === true
-              ? 'patient_requested_stop'
-              : saveDecision.reason === 'coverage_complete' ||
-                  saveDecision.reason === 'not_comprehensive'
-                ? 'coverage_complete'
-                : saveDecision.reason === 'patient_requested_stop' ||
-                    saveDecision.reason === 'safety_escalated' ||
-                    saveDecision.reason === 'hard_stop'
-                  ? saveDecision.reason
-                  : null
+        // A tool call proves output capture, not normal completion. Preserve
+        // the independently established terminal cause.
         if (saveTerminationReason) {
           terminationReasonRef.current = strongerTerminationReason(
             terminationReasonRef.current,
@@ -685,7 +832,7 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
           )
         }
 
-        structuredOutputRef.current = structured
+        structuredOutputRef.current = structuredForSave
         narrativeSummaryRef.current = narrative_summary || null
         if (red_flags && Array.isArray(red_flags)) {
           const mergedFlags = [...redFlagsRef.current, ...red_flags]
@@ -714,7 +861,14 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
         // The 60-exchange ceiling is a text-only terminal save. Its runtime
         // guard already silenced provider output, so never request a closing
         // utterance that would contradict the hard-stop instruction.
-        if (runtimeGuardRef.current?.terminalReason() !== 'hard_stop') {
+        const controlledTerminalPartial =
+          turnEvidenceControllerEnabledRef.current &&
+          terminationReasonRef.current !== 'coverage_complete' &&
+          terminationReasonRef.current !== 'complete_with_uncertainty'
+        if (
+          runtimeGuardRef.current?.terminalReason() !== 'hard_stop' &&
+          !controlledTerminalPartial
+        ) {
           provider?.nudgeClosing()
         }
         // Fix 4 (2026-07-09): this is only a FALLBACK schedule, not the
@@ -1067,11 +1221,37 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
         const lastAssistant = [...transcriptRef.current].reverse().find(t => t.role === 'assistant')
         const isRelayDuplicate = !!fullText.trim() && lastAssistant?.text === fullText.trim()
         if (fullText.trim() && !isRelayDuplicate) {
+          const nextSeq = seqCounterRef.current + 1
+          if (
+            turnEvidenceControllerEnabledRef.current &&
+            !interviewCompletedRef.current
+          ) {
+            const awaiting = patientEvidenceStateRef.current.awaitingQuestion
+            const committed =
+              awaiting &&
+              e.obligationId === awaiting.obligationId
+                ? commitApprovedPatientEvidenceQuestion(
+                    patientEvidenceStateRef.current,
+                    nextSeq,
+                    fullText.trim(),
+                  )
+                : { ok: false as const, error: 'Assistant obligation does not match the application approval.' }
+            if (!committed.ok || !committed.value) {
+              providerRef.current?.suppressOutput()
+              setError('The spoken question could not be verified, so the session ended safely.')
+              setCurrentAssistantText('')
+              setAiSpeaking(false)
+              void endSessionRef.current('provider_error')
+              break
+            }
+            patientEvidenceStateRef.current = committed.value
+          }
+          seqCounterRef.current = nextSeq
           const entry: HistorianTranscriptEntry = {
             role: 'assistant',
             text: fullText.trim(),
             timestamp: Math.floor((Date.now() - startTimeRef.current) / 1000),
-            seq: ++seqCounterRef.current,
+            seq: nextSeq,
           }
           const previousEntry =
             transcriptRef.current[transcriptRef.current.length - 1]
@@ -1093,7 +1273,9 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
           //
           // Only the FIRST assistant entry of a block counts; consecutive
           // assistant entries collapse into the one exchange they really are.
-          if (!previousEntry || previousEntry.role !== 'assistant') {
+          const isControlledClosing =
+            turnEvidenceControllerEnabledRef.current && interviewCompletedRef.current
+          if (!isControlledClosing && (!previousEntry || previousEntry.role !== 'assistant')) {
             questionCountRef.current += 1
           }
 
@@ -1147,15 +1329,85 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
             flushTranscript()
           }
 
+          // The direct answer to the app-owned active-emergency question is
+          // evaluated before generic stop/hard-stop parsing so safety remains
+          // the strongest terminal cause even when the same utterance also
+          // asks to end the interview.
+          if (
+            turnEvidenceControllerEnabledRef.current &&
+            patientEvidenceAnswerRequiresSafetyEscalation(
+              patientEvidenceStateRef.current,
+              userText,
+            )
+          ) {
+            runtimeGuardRef.current.modelSafetyEscalation()
+            activateSafety()
+            unresponsiveRef.current?.suspend()
+            setCurrentUserText('')
+            setIsUserSpeaking(false)
+            void endSessionRef.current('safety_escalated')
+            break
+          }
           // The guard latches safety/stop/hard-ceiling state synchronously.
-          const turnDecision = runtimeGuardRef.current.patientTurn({
+          let turnDecision = runtimeGuardRef.current.patientTurn({
             interviewMode: resolvedInterviewModeRef.current,
-            exchange: questionCountRef.current,
+            // Comprehensive v2 evaluates its ceiling only after the answer is
+            // transcript-bound below. Capping this generic guard input keeps
+            // the 60th answer from being discarded before settlement.
+            exchange: turnEvidenceControllerEnabledRef.current
+              ? Math.min(
+                  questionCountRef.current,
+                  COMPREHENSIVE_HARD_STOP_EXCHANGE - 1,
+                )
+              : questionCountRef.current,
             text: userText,
           })
+          if (
+            turnEvidenceControllerEnabledRef.current &&
+            turnDecision.terminalReason === null
+          ) {
+            const collected = collectPatientEvidenceEntry(
+              patientEvidenceStateRef.current,
+              entry,
+            )
+            if (!collected.ok || !collected.value) {
+              providerRef.current?.suppressOutput()
+              setError('The patient answer could not be bound to its question, so the session ended safely.')
+              setCurrentUserText('')
+              setIsUserSpeaking(false)
+              void endSessionRef.current('provider_error')
+              break
+            }
+            patientEvidenceStateRef.current = collected.value
+
+            if (
+              questionCountRef.current >= COMPREHENSIVE_HARD_STOP_EXCHANGE
+            ) {
+              const settled = settlePatientEvidenceAnswer(
+                patientEvidenceStateRef.current,
+                transcriptRef.current,
+              )
+              if (!settled.ok || !settled.value) {
+                providerRef.current?.suppressOutput()
+                setError('The final patient answer could not be verified, so the session ended safely.')
+                setCurrentUserText('')
+                setIsUserSpeaking(false)
+                void endSessionRef.current('provider_error')
+                break
+              }
+              patientEvidenceStateRef.current = settled.value
+              if (patientEvidenceCompletion(settled.value) === 'incomplete') {
+                turnDecision = runtimeGuardRef.current.applicationHardStop()
+              }
+            }
+          }
           applyHistorianTurnDecision(turnDecision, {
             activateSafety,
-            injectSystemText: (text) => providerRef.current?.injectSystemText(text),
+            injectSystemText: (text) => {
+              if (!turnEvidenceControllerEnabledRef.current) {
+                providerRef.current?.injectSystemText(text)
+              }
+            },
             requestFinalization: (reason) => {
               unresponsiveRef.current?.suspend()
               void endSessionRef.current(reason)
@@ -1176,7 +1428,11 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
           // Localizer: increment patient turn counter and trigger every 3 turns
           patientTurnCountRef.current += 1
           const turnsSinceLast = patientTurnCountRef.current - lastLocalizerTurnRef.current
-          if (runtimeGuardRef.current.acceptsInterviewActivity() && turnsSinceLast >= LOCALIZER_INTERVAL) {
+          if (
+            !turnEvidenceControllerEnabledRef.current &&
+            runtimeGuardRef.current.acceptsInterviewActivity() &&
+            turnsSinceLast >= LOCALIZER_INTERVAL
+          ) {
             lastLocalizerTurnRef.current = patientTurnCountRef.current
             // Fire async — must not block the event loop
             runLocalizer()
@@ -1325,6 +1581,8 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
     serverSessionIdRef.current = null
     resolvedInterviewModeRef.current = 'standard'
     resolvedInterviewPromptVersionRef.current = 'standard-v1'
+    turnEvidenceControllerEnabledRef.current = false
+    patientEvidenceStateRef.current = createPatientEvidenceState()
     flushTokenRef.current = null
     seqCounterRef.current = 0
     pendingFlushEntriesRef.current = []
@@ -1381,6 +1639,7 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
         flushToken: mintedFlushToken,
         interviewMode: resolvedInterviewMode,
         interviewPromptVersion: resolvedInterviewPromptVersion,
+        turnEvidenceController: resolvedTurnEvidenceController,
       } = sessionConfig
 
       serverSessionIdRef.current = typeof mintedSessionId === 'string' ? mintedSessionId : null
@@ -1389,9 +1648,17 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
         ? 'comprehensive'
         : 'standard'
       resolvedInterviewPromptVersionRef.current =
-        resolvedInterviewPromptVersion === 'comprehensive-v1' && resolvedInterviewModeRef.current === 'comprehensive'
-          ? 'comprehensive-v1'
+        resolvedInterviewModeRef.current === 'comprehensive' &&
+        (resolvedInterviewPromptVersion === 'comprehensive-v1' ||
+          resolvedInterviewPromptVersion === 'comprehensive-v2')
+          ? resolvedInterviewPromptVersion
           : 'standard-v1'
+      const expectsTurnEvidenceController =
+        resolvedInterviewPromptVersionRef.current === 'comprehensive-v2'
+      if (expectsTurnEvidenceController !== (resolvedTurnEvidenceController === true)) {
+        throw new Error('The server returned an inconsistent interview safety contract.')
+      }
+      turnEvidenceControllerEnabledRef.current = expectsTurnEvidenceController
 
       // 2. Resolve the provider kind. The route's `provider` field wins (it
       //    minted the session for that kind); fall back to selectProvider
@@ -1400,6 +1667,10 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
         sessionConfig.provider === 'openai' || sessionConfig.provider === 'nova'
           ? sessionConfig.provider
           : selectProvider(options.provider)
+
+      if (turnEvidenceControllerEnabledRef.current && kind !== 'nova') {
+        throw new Error('The controlled Comprehensive interview requires the Nova relay.')
+      }
 
       // OpenAI requires the ephemeral key; Nova does not.
       if (kind === 'openai' && !ephemeralKey) throw new Error('No ephemeral key returned')
@@ -1424,6 +1695,7 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
         tools: sessionTools ?? [],
         voiceId,
         interviewMode: resolvedInterviewModeRef.current,
+        turnEvidenceController: turnEvidenceControllerEnabledRef.current,
         ephemeralKey,
         model: sessionModel,
         relayUrl,
@@ -1485,6 +1757,9 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
       suggested_scale_id?: string | null
       turn_count?: number
     }) => {
+      // Comprehensive v2 owns the next audible obligation. A caller-triggered
+      // localizer push must not create a second, unapproved speech path.
+      if (turnEvidenceControllerEnabledRef.current) return
       if (!runtimeGuardRef.current?.acceptsInterviewActivity()) return
       const provider = providerRef.current
       if (!provider) return
@@ -1529,6 +1804,9 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
    * express the old "inject + response.create" pattern across providers).
    */
   const injectScaleAdministration = useCallback((instructionBlock: string) => {
+    // Scales are outside the v2 atomic evidence plan. Fail closed until a
+    // scale can participate in the same approve-then-speak contract.
+    if (turnEvidenceControllerEnabledRef.current) return
     if (!runtimeGuardRef.current?.acceptsInterviewActivity()) return
     const provider = providerRef.current
     if (!provider) {
@@ -1552,11 +1830,14 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
         requestedReason,
       )
     }
-    // Hard-stop suppression must happen even if a weaker finalization path is
-    // already in progress. Keep it before the one-shot guard, but perform it
-    // in this single location so the normal hard-stop path is not duplicated.
+    // Terminal suppression must happen even if a weaker finalization path is
+    // already in progress. Keep it before the one-shot guard so no queued
+    // ordinary question can play after stop, safety, silence, or hard-stop.
     if (
+      requestedReason === 'patient_requested_stop' ||
+      requestedReason === 'safety_escalated' ||
       requestedReason === 'hard_stop' ||
+      requestedReason === 'unresponsive' ||
       runtimeGuardRef.current?.terminalReason() === 'hard_stop'
     ) {
       providerRef.current?.suppressOutput()
@@ -1564,7 +1845,13 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
     if (finalizingRef.current) return
     const inferredReason =
       terminationReasonRef.current ??
-      (interviewCompletedRef.current ? 'coverage_complete' : 'manual_end')
+      (interviewCompletedRef.current
+        ? turnEvidenceControllerEnabledRef.current
+          ? patientEvidenceCompletion(patientEvidenceStateRef.current) === 'complete_with_uncertainty'
+            ? 'complete_with_uncertainty'
+            : 'coverage_complete'
+          : 'coverage_complete'
+        : 'manual_end')
     terminationReasonRef.current = strongerTerminationReason(
       terminationReasonRef.current,
       inferredReason,
@@ -1639,8 +1926,11 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
 
     const terminationReason = terminationReasonRef.current ?? 'manual_end'
     // save_interview_output may be called for a terminal partial history.
-    // Only coverage_complete represents a naturally completed intake.
-    const endedEarly = terminationReason !== 'coverage_complete'
+    // Both deterministic coverage outcomes represent completed intakes;
+    // uncertainty remains explicit rather than being mislabeled as early end.
+    const endedEarly =
+      terminationReason !== 'coverage_complete' &&
+      terminationReason !== 'complete_with_uncertainty'
 
     // Durable transcript flush (Task 1 fix): flush whatever hasn't hit the
     // FLUSH_THRESHOLD-of-3 auto-trigger yet — trailing entries (the

@@ -29,10 +29,16 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'consultId is required.' }, { status: 400 })
   }
 
+  // This is intentionally an exact opt-in. Absent/other values preserve the
+  // existing v1 patient flow while the v2 evidence controller is rolled out.
+  const promptVersion = process.env.HISTORIAN_TURN_EVIDENCE_CONTROLLER_V1 === 'true'
+    ? 'comprehensive-v2'
+    : 'comprehensive-v1'
   const result = await createHistorianInvitation({
     tenantId: access.context.tenantId,
     consultId,
     invitedByUserId: access.context.userId,
+    promptVersion,
     ...(body?.replaceActive === true ? { replaceActive: true } : {}),
   })
   if (!result.ok) {
@@ -71,7 +77,7 @@ export async function POST(request: Request) {
       referralReason: result.referralReason,
       provider: 'nova',
       interviewMode: 'comprehensive',
-      interviewPromptVersion: 'comprehensive-v1',
+      interviewPromptVersion: result.interviewPromptVersion,
     },
   })
 }

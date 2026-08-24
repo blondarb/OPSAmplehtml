@@ -2,7 +2,6 @@ import type { PoolClient } from 'pg'
 import { getPool } from '@/lib/db'
 import type {
   HistorianInterviewMode,
-  HistorianInterviewPromptVersion,
   HistorianSessionType,
 } from '@/lib/historianTypes'
 import {
@@ -25,7 +24,7 @@ export interface HistorianInvitationBinding {
   sessionType: HistorianSessionType
   provider: 'nova'
   interviewMode: 'comprehensive'
-  interviewPromptVersion: 'comprehensive-v1'
+  interviewPromptVersion: 'comprehensive-v1' | 'comprehensive-v2'
   status: 'redeemed' | 'in_progress' | 'completed'
   grantExpiresAt: string
 }
@@ -35,7 +34,7 @@ export interface HistorianInvitationPublicContext {
   referralReason: string | null
   sessionType: HistorianSessionType
   interviewMode: HistorianInterviewMode
-  interviewPromptVersion: HistorianInterviewPromptVersion
+  interviewPromptVersion: 'standard-v1' | 'comprehensive-v1' | 'comprehensive-v2'
   interviewStatus: 'redeemed' | 'in_progress' | 'completed'
 }
 
@@ -48,6 +47,7 @@ export type CreateHistorianInvitationResult =
       expiresAt: string
       patientName: string
       referralReason: string | null
+      interviewPromptVersion: 'comprehensive-v1' | 'comprehensive-v2'
     }
   | { ok: false; reason: 'consult_not_found' | 'patient_identity_unavailable' | 'interview_in_progress' | 'database_error' }
 
@@ -86,10 +86,13 @@ export async function createHistorianInvitation(input: {
   consultId: string
   invitedByUserId: string
   replaceActive?: boolean
+  /** Default remains v1 until the application-owned controller is explicitly enabled. */
+  promptVersion?: 'comprehensive-v1' | 'comprehensive-v2'
   now?: Date
 }): Promise<CreateHistorianInvitationResult> {
   const now = input.now ?? new Date()
   const expiresAt = new Date(now.getTime() + HISTORIAN_INVITE_TTL_SECONDS * 1000)
+  const promptVersion = input.promptVersion ?? 'comprehensive-v1'
   const inviteToken = mintHistorianToken()
   const pool = await getPool()
   const client = await pool.connect()
@@ -182,7 +185,7 @@ export async function createHistorianInvitation(input: {
          interview_prompt_version, authorized_by_user_id, created_at, updated_at)
        VALUES ($1, $2, 'new_patient', $3, $4,
                'in_progress', false, false, $5, 'comprehensive',
-               'comprehensive-v1', $6, $7, $7)
+               $6, $7, $8, $8)
        RETURNING id`,
       [
         input.tenantId,
@@ -190,6 +193,7 @@ export async function createHistorianInvitation(input: {
         patientName,
         referralReason,
         consult.id,
+        promptVersion,
         input.invitedByUserId,
         now,
       ],
@@ -203,8 +207,8 @@ export async function createHistorianInvitation(input: {
          provider, interview_mode, interview_prompt_version, token_hash,
          status, expires_at, created_at, updated_at)
        VALUES ($1, $2, $3, $4, $5,
-               'nova', 'comprehensive', 'comprehensive-v1', $6,
-               'pending', $7, $8, $8)
+               'nova', 'comprehensive', $6, $7,
+               'pending', $8, $9, $9)
        RETURNING id`,
       [
         input.tenantId,
@@ -212,6 +216,7 @@ export async function createHistorianInvitation(input: {
         consult.patient_id,
         sessionId,
         input.invitedByUserId,
+        promptVersion,
         inviteToken.hash,
         expiresAt,
         now,
@@ -241,6 +246,7 @@ export async function createHistorianInvitation(input: {
       expiresAt: expiresAt.toISOString(),
       patientName,
       referralReason,
+      interviewPromptVersion: promptVersion,
     }
   } catch (error) {
     await rollbackQuietly(client)
@@ -287,6 +293,7 @@ export async function redeemHistorianInvitation(
       patient_name: string
       referral_reason: string | null
       session_type: HistorianSessionType
+      interview_prompt_version: 'comprehensive-v1' | 'comprehensive-v2'
       patient_date_of_birth: Date | string | null
       verification_attempts: number
     }>(
@@ -296,6 +303,7 @@ export async function redeemHistorianInvitation(
               session.patient_name,
               session.referral_reason,
               session.session_type,
+              invite.interview_prompt_version,
               patient.date_of_birth AS patient_date_of_birth,
               invite.verification_attempts
          FROM historian_invites invite
@@ -367,7 +375,7 @@ export async function redeemHistorianInvitation(
         referralReason: invite.referral_reason,
         sessionType: invite.session_type,
         interviewMode: 'comprehensive',
-        interviewPromptVersion: 'comprehensive-v1',
+        interviewPromptVersion: invite.interview_prompt_version,
         interviewStatus: 'redeemed',
       },
     }
@@ -399,7 +407,7 @@ export async function resolveHistorianPatientGrant(
       session_type: HistorianSessionType
       provider: 'nova'
       interview_mode: 'comprehensive'
-      interview_prompt_version: 'comprehensive-v1'
+      interview_prompt_version: 'comprehensive-v1' | 'comprehensive-v2'
       status: 'redeemed' | 'in_progress' | 'completed'
       grant_expires_at: Date | string
     }>(

@@ -74,6 +74,24 @@ describe('buildHistorianSystemPrompt', () => {
     expect(prompt).toMatch(/live interview still must never state, imply, or display a diagnosis/i)
   })
 
+  it('uses the application-owned exact-question contract only for Comprehensive v2', () => {
+    const prompt = buildHistorianSystemPrompt(
+      'new_patient',
+      'synthetic gait concern',
+      'synthetic context',
+      undefined,
+      'gait concern',
+      'comprehensive',
+      'comprehensive-v2',
+    )
+    expect(prompt).toContain('Your first action must be to call request_history_question')
+    expect(prompt).toContain('speak approved_text EXACTLY')
+    expect(prompt).toContain('Do not add an example')
+    expect(prompt).toContain('application independently derives coverage')
+    expect(prompt).not.toContain('COMPREHENSIVE MODE — REQUIRED ORDER AND COVERAGE')
+    expect(prompt).not.toContain('OPENING: As soon as the session starts')
+  })
+
   it('instructs the historian not to re-ask already-answered details', () => {
     const prompt = buildHistorianSystemPrompt('new_patient')
     expect(prompt).toMatch(/already told you|already volunteered|already covered/i)
@@ -266,6 +284,27 @@ describe('getHistorianToolDefinition', () => {
     ) as Array<{ toolSpec: { name: string } }>
 
     expect(tools.map((tool) => tool.toolSpec.name)).toEqual([
+      'save_interview_output',
+    ])
+  })
+
+  it('exposes only the app-owned question and save tools in Comprehensive v2', () => {
+    const openAi = getHistorianToolDefinition(
+      'new_patient',
+      'comprehensive-v2',
+    ) as unknown as TestToolDefinition[]
+    expect(openAi.map((tool) => tool.name)).toEqual([
+      'request_history_question',
+      'save_interview_output',
+    ])
+
+    const nova = getHistorianToolsForProvider(
+      'nova',
+      'new_patient',
+      'comprehensive-v2',
+    ) as Array<{ toolSpec: { name: string } }>
+    expect(nova.map((tool) => tool.toolSpec.name)).toEqual([
+      'request_history_question',
       'save_interview_output',
     ])
   })

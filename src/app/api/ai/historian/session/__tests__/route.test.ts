@@ -67,6 +67,7 @@ describe('POST /api/ai/historian/session — textMode (Historian Validation Suit
     })
     vi.mocked(resolveHistorianPatientGrant).mockResolvedValue(null)
     vi.mocked(markHistorianInvitationStarted).mockResolvedValue(true)
+    delete process.env.HISTORIAN_TURN_EVIDENCE_CONTROLLER_V1
     // mockImplementation (not mockResolvedValue) so each call gets a FRESH
     // Response — a Response body can only be read once, and this test file
     // calls POST multiple times per test against the same mocked fetch.
@@ -144,7 +145,23 @@ describe('POST /api/ai/historian/session — textMode (Historian Validation Suit
     expect(json.instructions).not.toMatch(/Never exceed 25 turns total/)
     expect(json.interviewMode).toBe('comprehensive')
     expect(json.interviewPromptVersion).toBe('comprehensive-v1')
+    expect(json.turnEvidenceController).toBe(false)
     expect(getOpenAIKey).not.toHaveBeenCalled()
+  })
+
+  it('enables the app-owned question/evidence contract only with the exact server flag', async () => {
+    process.env.HISTORIAN_TURN_EVIDENCE_CONTROLLER_V1 = 'true'
+    const res = await POST(buildReq({ sessionType: 'new_patient', interviewMode: 'comprehensive' }))
+    expect(res.status).toBe(200)
+    const json = await res.json()
+    expect(json.provider).toBe('nova')
+    expect(json.interviewPromptVersion).toBe('comprehensive-v2')
+    expect(json.turnEvidenceController).toBe(true)
+    expect(json.instructions).toContain('request_history_question')
+    expect(json.tools.map((tool: { toolSpec: { name: string } }) => tool.toolSpec.name)).toEqual([
+      'request_history_question',
+      'save_interview_output',
+    ])
   })
 
   it('fails closed to standard mode for an unknown interviewMode', async () => {

@@ -20,7 +20,7 @@ Cognito, relay compute, or worker queues.
 ## Provisioning order
 
 1. Review and execute the Add-only `foundation.yaml` change set.
-2. Package only `bootstrap-schema.sql`, `seed.sql`, `verify.sql`, and migrations 059-060 for
+2. Package only `bootstrap-schema.sql`, `seed.sql`, `verify.sql`, and migrations 059-061 for
    the temporary `database-init.yaml` project.
 3. Run the initializer once. It restores with `ON_ERROR_STOP=1`, creates a
    message-suppressed synthetic Cognito user, and verifies one synthetic tenant,
@@ -34,9 +34,13 @@ Cognito, relay compute, or worker queues.
    parameter. Delete the exact source object after PASS or failure. Wait for
    ECR scanning and require zero HIGH or CRITICAL findings.
 6. Create the ECS Express Gateway service from that image digest with the QA
-   relay secret, exact QA origin, continuation enabled, Transcribe disabled,
-   one task minimum/maximum, and `/healthz` health checks.
+   relay secret, exact QA origin, continuation enabled, the turn/evidence gate
+   enabled (`NOVA_HISTORIAN_TURN_GATE_V1=true`), Transcribe disabled, one task
+   minimum/maximum, and `/healthz` health checks.
 7. Deploy the isolated worker and disabled/manual Amplify branch.
+   Enable `HISTORIAN_TURN_EVIDENCE_CONTROLLER_V1=true` on that QA branch only
+   after migration 061 and the gated relay image are both live. Never enable
+   the application flag against a relay that lacks the matching gate.
 8. Run negative authorization tests before any synthetic interview.
 
 ## Automated authenticated acceptance

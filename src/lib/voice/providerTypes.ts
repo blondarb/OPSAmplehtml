@@ -26,7 +26,7 @@
  */
 export type VoiceEvent =
   | { type: 'userTranscript'; text: string; segmentId?: number }
-  | { type: 'assistantTranscript'; text: string; segmentId?: number }
+  | { type: 'assistantTranscript'; text: string; segmentId?: number; obligationId?: string }
   | { type: 'assistantTextDelta'; text: string; segmentId?: number }
   // NOTE: userSpeechStart/userSpeechStop are currently emitted ONLY by the
   // OpenAI provider (from input_audio_buffer.speech_started/stopped). The Nova
@@ -85,6 +85,8 @@ export interface VoiceStartOptions {
   voiceId?: string
   /** Server-resolved interview depth; Nova relay uses this for the deterministic opening transition. */
   interviewMode?: 'standard' | 'comprehensive'
+  /** Require the Comprehensive v2 application-owned question/evidence gate. */
+  turnEvidenceController?: boolean
   // ── OpenAI-only (ignored by Nova) ──
   /** Ephemeral bearer key for the OpenAI Realtime SDP exchange. */
   ephemeralKey?: string

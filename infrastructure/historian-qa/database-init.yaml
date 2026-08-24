@@ -171,6 +171,7 @@ Resources:
                 - test -f infrastructure/historian-qa/bootstrap-schema.sql
                 - test -f migrations/059_historian_invites_and_eval_jobs.sql
                 - test -f migrations/060_historian_termination_reason.sql
+                - test -f migrations/061_historian_comprehensive_v2.sql
                 - test -f infrastructure/historian-qa/seed.sql
                 - test -f infrastructure/historian-qa/verify.sql
                 - curl --fail --silent --show-error --location --output rds-global-bundle.pem https://truststore.pki.rds.amazonaws.com/global/global-bundle.pem
@@ -179,7 +180,7 @@ Resources:
                 - aws cognito-idp admin-set-user-password --user-pool-id "$QA_USER_POOL_ID" --username "$QA_USERNAME" --password "$QA_PASSWORD" --permanent >/dev/null
                 - export QA_COGNITO_SUB="$(aws cognito-idp admin-get-user --user-pool-id "$QA_USER_POOL_ID" --username "$QA_USERNAME" --query 'UserAttributes[?Name==`sub`].Value | [0]' --output text)"
                 - test -n "$QA_COGNITO_SUB" && test "$QA_COGNITO_SUB" != None
-                - docker run --rm --user "$(id -u):$(id -g)" -e PGHOST -e PGPORT -e PGUSER -e PGPASSWORD -e PGDATABASE -e PGSSLMODE -e PGSSLROOTCERT=/certs/rds-global-bundle.pem -v "$CODEBUILD_SRC_DIR:/work" -v "$CODEBUILD_SRC_DIR/rds-global-bundle.pem:/certs/rds-global-bundle.pem:ro" -w /work public.ecr.aws/docker/library/postgres:17 psql --single-transaction --set=ON_ERROR_STOP=1 --set=cognito_sub="$QA_COGNITO_SUB" --file=infrastructure/historian-qa/bootstrap-schema.sql --file=migrations/059_historian_invites_and_eval_jobs.sql --file=migrations/060_historian_termination_reason.sql --file=infrastructure/historian-qa/seed.sql --file=infrastructure/historian-qa/verify.sql
+                - docker run --rm --user "$(id -u):$(id -g)" -e PGHOST -e PGPORT -e PGUSER -e PGPASSWORD -e PGDATABASE -e PGSSLMODE -e PGSSLROOTCERT=/certs/rds-global-bundle.pem -v "$CODEBUILD_SRC_DIR:/work" -v "$CODEBUILD_SRC_DIR/rds-global-bundle.pem:/certs/rds-global-bundle.pem:ro" -w /work public.ecr.aws/docker/library/postgres:17 psql --single-transaction --set=ON_ERROR_STOP=1 --set=cognito_sub="$QA_COGNITO_SUB" --file=infrastructure/historian-qa/bootstrap-schema.sql --file=migrations/059_historian_invites_and_eval_jobs.sql --file=migrations/060_historian_termination_reason.sql --file=migrations/061_historian_comprehensive_v2.sql --file=infrastructure/historian-qa/seed.sql --file=infrastructure/historian-qa/verify.sql
       LogsConfig:
         CloudWatchLogs:
           Status: ENABLED

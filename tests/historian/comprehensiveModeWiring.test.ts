@@ -42,7 +42,10 @@ describe('comprehensive historian mode wiring', () => {
   })
 
   it('assigns the production transcript a contiguous one-based sequence', () => {
-    expect(hookSource.match(/seq: \+\+seqCounterRef\.current/g)).toHaveLength(2)
+    expect(hookSource.match(/seq: \+\+seqCounterRef\.current/g)).toHaveLength(1)
+    expect(hookSource).toContain('const nextSeq = seqCounterRef.current + 1')
+    expect(hookSource).toContain('seqCounterRef.current = nextSeq')
+    expect(hookSource).toContain('seq: nextSeq')
     expect(hookSource).toContain('seqCounterRef.current = 0')
   })
 

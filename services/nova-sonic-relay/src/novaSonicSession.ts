@@ -37,6 +37,8 @@ export interface NovaSonicToolUse {
 
 export interface NovaSonicCallbacks {
   onTextOutput?(role: string, content: string): void
+  /** Final assistant text copy at END_TURN; used by strict relay admission. */
+  onAssistantFinalText?(content: string): void
   onAudioOutput?(base64: string): void
   /** Fires when Nova marks the assistant's audible response END_TURN. */
   onAssistantAudioEnd?(): void
@@ -104,26 +106,53 @@ export function shouldForwardText(role: string, stage: GenerationStage): boolean
   return stage === 'SPECULATIVE'
 }
 
-// Opt-in raw model-event trace (RELAY_TRACE_RAW=1): logs EVERY decoded Bedrock
-// event — including contentStart/contentEnd, which the dispatcher otherwise
-// drops silently — so emission-pattern bugs (e.g. duplicate SPECULATIVE+FINAL
-// text) can be diagnosed from the relay log. audioOutput is logged as a byte
-// count only.
+// Opt-in raw model-event trace (RELAY_TRACE_RAW=1): logs event metadata only.
+// Interview text, tool arguments, system instructions, audio, and undecoded
+// payloads are never written to relay logs, including rejected turns.
 const TRACE_RAW = !!process.env.RELAY_TRACE_RAW
-function traceRaw(json: { event?: Record<string, unknown> }): void {
+
+export function summarizeRawModelEvent(
+  json: { event?: Record<string, unknown> },
+): string {
   const event = json?.event
-  const ts = new Date().toISOString().slice(11, 23)
-  if (!event) {
-    console.log(`[raw ${ts}] (no event) ${JSON.stringify(json).slice(0, 300)}`)
-    return
-  }
-  const kind = Object.keys(event)[0] ?? '?'
+  if (!event) return '(no event)'
+  const kind = Object.keys(event)[0] ?? 'unknown'
+
   if (kind === 'audioOutput') {
     const content = (event.audioOutput as { content?: string } | undefined)?.content ?? ''
-    console.log(`[raw ${ts}] audioOutput b64len=${content.length}`)
-  } else {
-    console.log(`[raw ${ts}] ${JSON.stringify(event).slice(0, 500)}`)
+    return `audioOutput b64len=${content.length}`
   }
+  if (kind === 'textOutput') {
+    const output = event.textOutput as { role?: string; content?: string } | undefined
+    return `textOutput role=${output?.role ?? 'unknown'} chars=${output?.content?.length ?? 0}`
+  }
+  if (kind === 'toolUse') {
+    const tool = event.toolUse as { toolName?: string; content?: string } | undefined
+    return `toolUse name=${tool?.toolName ?? 'unknown'} contentChars=${tool?.content?.length ?? 0}`
+  }
+  if (kind === 'contentStart') {
+    const start = event.contentStart as {
+      type?: string
+      role?: string
+      additionalModelFields?: unknown
+    } | undefined
+    return [
+      'contentStart',
+      `type=${start?.type ?? 'unknown'}`,
+      `role=${start?.role ?? 'unknown'}`,
+      `stage=${parseGenerationStage(start?.additionalModelFields) || 'unknown'}`,
+    ].join(' ')
+  }
+  if (kind === 'contentEnd') {
+    const end = event.contentEnd as { type?: string; stopReason?: string } | undefined
+    return `contentEnd type=${end?.type ?? 'unknown'} stop=${end?.stopReason ?? 'unknown'}`
+  }
+  return kind
+}
+
+function traceRaw(json: { event?: Record<string, unknown> }): void {
+  const ts = new Date().toISOString().slice(11, 23)
+  console.log(`[raw ${ts}] ${summarizeRawModelEvent(json)}`)
 }
 
 // ---------------------------------------------------------------------------
@@ -546,6 +575,12 @@ export class NovaSonicSession {
         this.callbacks.onBargeIn?.()
       } else {
         const stage = this.textStageByContentId.get(event.textOutput.contentId) ?? ''
+        if (
+          (event.textOutput.role ?? '').toUpperCase() === 'ASSISTANT' &&
+          stage === 'FINAL'
+        ) {
+          this.callbacks.onAssistantFinalText?.(content)
+        }
         if (shouldForwardText(event.textOutput.role, stage)) {
           this.callbacks.onTextOutput?.(event.textOutput.role, content)
         }

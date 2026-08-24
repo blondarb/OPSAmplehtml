@@ -16,6 +16,7 @@ const DOMAINS = [
 type MockCallbacks = {
   onToolUse?: (tool: { toolName: string; toolUseId: string; content: string }) => void
   onTextOutput?: (role: string, content: string) => void
+  onAssistantFinalText?: (content: string) => void
   onAudioOutput?: (pcm: string) => void
   onAssistantAudioEnd?: () => void
   onError?: (error: unknown) => void
@@ -76,6 +77,7 @@ vi.mock('../novaSonicSession.js', () => ({
     emitAssistant(text: string) {
       this.callbacks.onTextOutput?.('ASSISTANT', text)
       this.callbacks.onAudioOutput?.('synthetic-audio')
+      this.callbacks.onAssistantFinalText?.(text)
       this.callbacks.onAssistantAudioEnd?.()
     }
     isActive() { return this.active }
@@ -231,6 +233,7 @@ describe('relay continuation protocol integration', () => {
   beforeAll(async () => {
     process.env.NOVA_RELAY_SHARED_SECRET = 'synthetic-relay-secret'
     process.env.NOVA_APP_CONTINUATION_V1 = 'true'
+    process.env.NOVA_HISTORIAN_TURN_GATE_V1 = 'true'
     process.env.NOVA_CONTINUATION_TEST_DUE_MS = '10'
     process.env.NOVA_CONTINUATION_TEST_BARRIER_MS = '20'
     process.env.NOVA_CONTINUATION_TEST_DEADLINE_MS = '1000'
@@ -269,10 +272,188 @@ describe('relay continuation protocol integration', () => {
     await new Promise<void>((resolve) => serverModule?.server.close(() => resolve()))
     delete process.env.NOVA_RELAY_SHARED_SECRET
     delete process.env.NOVA_APP_CONTINUATION_V1
+    delete process.env.NOVA_HISTORIAN_TURN_GATE_V1
     delete process.env.NOVA_CONTINUATION_TEST_DUE_MS
     delete process.env.NOVA_CONTINUATION_TEST_BARRIER_MS
     delete process.env.NOVA_CONTINUATION_TEST_DEADLINE_MS
     delete process.env.PORT
+  })
+
+  it('releases exact approved question text and PCM together with its obligation id', async () => {
+    send({
+      t: 'start',
+      instructions: 'Synthetic controlled instructions.',
+      tools: [],
+      interviewMode: 'comprehensive',
+      turnEvidenceController: true,
+    })
+    await new Promise((resolve) => setTimeout(resolve, 10))
+    relayHarness.instances[0].callbacks.onToolUse?.({
+      toolName: 'request_history_question',
+      toolUseId: 'approved-tool',
+      content: '{}',
+    })
+    const tool = await waitForMessage('toolCall')
+    send({
+      t: 'toolResult',
+      toolUseId: tool.toolUseId,
+      segmentId: 1,
+      output: JSON.stringify({
+        success: true,
+        status: 'approved',
+        obligation_id: 'synthetic-onset',
+        approved_text: 'When did the symptom begin?',
+        allow_example: false,
+      }),
+    })
+    await new Promise((resolve) => setTimeout(resolve, 10))
+    relayHarness.instances[0].emitAssistant('When did the symptom begin?')
+    const transcript = await waitForMessage('assistantTranscript')
+    const audio = await waitForMessage('audio')
+    expect(transcript).toMatchObject({
+      text: 'When did the symptom begin?',
+      obligationId: 'synthetic-onset',
+      segmentId: 1,
+    })
+    expect(audio).toMatchObject({ pcm: 'synthetic-audio', segmentId: 1 })
+  })
+
+  it('releases neither text nor PCM for a question-example-question turn', async () => {
+    send({
+      t: 'start',
+      instructions: 'Synthetic controlled instructions.',
+      tools: [],
+      interviewMode: 'comprehensive',
+      turnEvidenceController: true,
+    })
+    await new Promise((resolve) => setTimeout(resolve, 10))
+    relayHarness.instances[0].callbacks.onToolUse?.({
+      toolName: 'request_history_question',
+      toolUseId: 'rejected-tool',
+      content: '{}',
+    })
+    const tool = await waitForMessage('toolCall')
+    send({
+      t: 'toolResult',
+      toolUseId: tool.toolUseId,
+      segmentId: 1,
+      output: JSON.stringify({
+        success: true,
+        status: 'approved',
+        obligation_id: 'synthetic-onset',
+        approved_text: 'When did the symptom begin?',
+        allow_example: false,
+      }),
+    })
+    await new Promise((resolve) => setTimeout(resolve, 10))
+    relayHarness.instances[0].emitAssistant(
+      'When did it begin? For example, was it last week? How has it changed?',
+    )
+    await waitForMessage('error')
+    expect(inbox.some((message) => message.t === 'assistantTranscript')).toBe(false)
+    expect(inbox.some((message) => message.t === 'audio')).toBe(false)
+  })
+
+  it('discards an approved normal turn when terminal suppression arrives before release', async () => {
+    send({
+      t: 'start',
+      instructions: 'Synthetic controlled instructions.',
+      tools: [],
+      interviewMode: 'comprehensive',
+      turnEvidenceController: true,
+    })
+    await new Promise((resolve) => setTimeout(resolve, 10))
+    relayHarness.instances[0].callbacks.onToolUse?.({
+      toolName: 'request_history_question',
+      toolUseId: 'suppressed-tool',
+      content: '{}',
+    })
+    const tool = await waitForMessage('toolCall')
+    send({
+      t: 'toolResult',
+      toolUseId: tool.toolUseId,
+      segmentId: 1,
+      output: JSON.stringify({
+        success: true,
+        status: 'approved',
+        obligation_id: 'synthetic-onset',
+        approved_text: 'When did the symptom begin?',
+        allow_example: false,
+      }),
+    })
+    await new Promise((resolve) => setTimeout(resolve, 10))
+    relayHarness.instances[0].callbacks.onTextOutput?.('ASSISTANT', 'When did the symptom begin?')
+    relayHarness.instances[0].callbacks.onAudioOutput?.('must-not-play')
+    relayHarness.instances[0].callbacks.onAssistantFinalText?.('When did the symptom begin?')
+    send({ t: 'suppressOutput' })
+    await new Promise((resolve) => setTimeout(resolve, 10))
+    relayHarness.instances[0].callbacks.onAssistantAudioEnd?.()
+    await new Promise((resolve) => setTimeout(resolve, 10))
+
+    expect(inbox.some((message) => message.t === 'assistantTranscript')).toBe(false)
+    expect(inbox.some((message) => message.t === 'audio')).toBe(false)
+    expect(inbox.some((message) => message.t === 'error')).toBe(false)
+  })
+
+  it('accepts an exact suppressed terminal question result and keeps the silent save path open', async () => {
+    send({
+      t: 'start',
+      instructions: 'Synthetic controlled instructions.',
+      tools: [],
+      interviewMode: 'comprehensive',
+      turnEvidenceController: true,
+    })
+    send({ t: 'audio', audioSeq: 1, pcm: 'terminal-sequenced-audio' })
+    await waitForMessage('continuationDue')
+    relayHarness.instances[0].callbacks.onToolUse?.({
+      toolName: 'request_history_question',
+      toolUseId: 'terminal-question-tool',
+      content: '{}',
+    })
+    const questionTool = await waitForMessage('toolCall')
+    // Let the normal barrier-age gate elapse while the pending tool keeps the
+    // due continuation from opening a barrier.
+    await new Promise((resolve) => setTimeout(resolve, 25))
+
+    send({ t: 'suppressOutput' })
+    send({
+      t: 'toolResult',
+      toolUseId: questionTool.toolUseId,
+      segmentId: 1,
+      output: JSON.stringify({ success: false, status: 'interview_terminal' }),
+    })
+    send({
+      t: 'systemText',
+      text: '[COMPREHENSIVE HARD STOP] Save silently now.',
+    })
+    await new Promise((resolve) => setTimeout(resolve, 10))
+    expect(inbox.some((message) => message.t === 'error')).toBe(false)
+    expect(inbox.some((message) => message.t === 'continuationBarrier')).toBe(false)
+    expect(inbox.some((message) => message.t === 'continuationFailed')).toBe(false)
+    expect(inbox.some((message) => message.t === 'assistantTranscript')).toBe(false)
+    expect(inbox.some((message) => message.t === 'audio')).toBe(false)
+
+    relayHarness.instances[0].callbacks.onToolUse?.({
+      toolName: 'save_interview_output',
+      toolUseId: 'terminal-save-tool',
+      content: '{}',
+    })
+    const saveTool = await waitForMessage('toolCall')
+    send({
+      t: 'toolResult',
+      toolUseId: saveTool.toolUseId,
+      segmentId: 1,
+      output: JSON.stringify({ success: true }),
+    })
+    // The test continuation deadline is one second. Remaining connected past
+    // it proves terminal suppression cleared the deadline timer permanently.
+    await new Promise((resolve) => setTimeout(resolve, 1_100))
+
+    expect(inbox.some((message) => message.t === 'error')).toBe(false)
+    expect(inbox.some((message) => message.t === 'continuationFailed')).toBe(false)
+    expect(inbox.some((message) => message.t === 'sessionEnded')).toBe(false)
+    expect(inbox.some((message) => message.t === 'assistantTranscript')).toBe(false)
+    expect(inbox.some((message) => message.t === 'audio')).toBe(false)
   })
 
   it('rotates twice with one greeting and exactly-once sequenced PCM', async () => {

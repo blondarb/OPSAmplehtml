@@ -10,6 +10,11 @@ import type { HistorianInvitationBinding } from './invitationStore'
 import { ensureInvitedHistorianAlert } from './safetyNotification'
 import { validateComprehensiveCoverage } from './comprehensiveCoverage'
 import {
+  derivePatientEvidenceStructuredCoverage,
+  patientEvidenceCompletion,
+  validatePatientEvidenceState,
+} from './patientEvidenceController'
+import {
   completionStatusForTermination,
   parseHistorianTerminationReason,
   terminationMatchesCompletionStatus,
@@ -87,14 +92,17 @@ function parseTranscript(value: unknown): HistorianTranscriptEntry[] | null {
   return transcript
 }
 
-function structuredOutput(value: unknown): HistorianStructuredOutput {
+function structuredOutput(
+  value: unknown,
+  promptVersion: HistorianInvitationBinding['interviewPromptVersion'],
+): HistorianStructuredOutput {
   const base = value && typeof value === 'object' && !Array.isArray(value)
     ? (value as HistorianStructuredOutput)
     : {}
   return {
     ...base,
     interview_mode: 'comprehensive',
-    interview_prompt_version: 'comprehensive-v1',
+    interview_prompt_version: promptVersion,
   }
 }
 
@@ -127,7 +135,7 @@ export async function saveInvitedHistorianSession(
     return { ok: false, status: 409, error: 'Transcript sequence is incomplete or inconsistent.' }
   }
 
-  const output = structuredOutput(body.structured_output)
+  let output = structuredOutput(body.structured_output, binding.interviewPromptVersion)
   const narrativeSummary =
     typeof body.narrative_summary === 'string'
       ? body.narrative_summary.trim().slice(0, MAX_SUMMARY_CHARS)
@@ -169,7 +177,40 @@ export async function saveInvitedHistorianSession(
     return { ok: false, status: 409, error: 'Hard-stop reason is invalid before exchange 60.' }
   }
   const completionStatus = completionStatusForTermination(terminationReason)
-  if (terminationReason === 'coverage_complete') {
+  if (binding.interviewPromptVersion === 'comprehensive-v2') {
+    const evidence = output.history_evidence_v1
+    const evidenceValidation = validatePatientEvidenceState(evidence, transcript)
+    if (!evidenceValidation.valid) {
+      return {
+        ok: false,
+        status: 409,
+        error: 'The application-owned history evidence is incomplete or inconsistent.',
+      }
+    }
+    const completion = patientEvidenceCompletion(evidence as import('./patientEvidenceController').PatientEvidenceState)
+    if (
+      (terminationReason === 'coverage_complete' || terminationReason === 'complete_with_uncertainty') &&
+      terminationReason !== completion
+    ) {
+      return {
+        ok: false,
+        status: 409,
+        error: 'The completion reason does not match the transcript-bound history evidence.',
+      }
+    }
+    output = {
+      ...output,
+      history_coverage: derivePatientEvidenceStructuredCoverage(
+        evidence as import('./patientEvidenceController').PatientEvidenceState,
+      ),
+    }
+  } else if (terminationReason === 'complete_with_uncertainty') {
+    return {
+      ok: false,
+      status: 409,
+      error: 'Uncertain completion requires the application-owned history evidence contract.',
+    }
+  } else if (terminationReason === 'coverage_complete') {
     const coverage = validateComprehensiveCoverage(output)
     if (!coverage.complete) {
       return {
@@ -279,11 +320,11 @@ export async function saveInvitedHistorianSession(
               interview_completion_status = $8,
               interview_termination_reason = $9,
               interview_mode = 'comprehensive',
-              interview_prompt_version = 'comprehensive-v1',
-              updated_at = $10
-        WHERE id = $11
-          AND tenant_id = $12
-          AND consult_id = $13`,
+              interview_prompt_version = $10,
+              updated_at = $11
+        WHERE id = $12
+          AND tenant_id = $13
+          AND consult_id = $14`,
       [
         JSON.stringify(output),
         narrativeSummary || null,
@@ -294,6 +335,7 @@ export async function saveInvitedHistorianSession(
         questionCount,
         completionStatus,
         terminationReason,
+        binding.interviewPromptVersion,
         now,
         binding.sessionId,
         binding.tenantId,

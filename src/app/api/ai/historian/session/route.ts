@@ -163,9 +163,14 @@ export async function POST(request: Request) {
     const interviewMode: HistorianInterviewMode =
       invitationBinding?.interviewMode ||
       (body.interviewMode === 'comprehensive' ? 'comprehensive' : 'standard')
+    const turnEvidenceControllerEnabled =
+      process.env.HISTORIAN_TURN_EVIDENCE_CONTROLLER_V1 === 'true'
     const interviewPromptVersion: HistorianInterviewPromptVersion =
       invitationBinding?.interviewPromptVersion ||
-      (interviewMode === 'comprehensive' ? 'comprehensive-v1' : 'standard-v1')
+      (interviewMode === 'comprehensive'
+        ? turnEvidenceControllerEnabled ? 'comprehensive-v2' : 'comprehensive-v1'
+        : 'standard-v1')
+    const turnEvidenceController = interviewPromptVersion === 'comprehensive-v2'
     let authorizedTenantId: string | null = invitationBinding?.tenantId ?? null
     if (interviewMode === 'comprehensive' && !invitationBinding) {
       const access = await authorizeClinicalAccess({
@@ -280,11 +285,19 @@ export async function POST(request: Request) {
     // Nova-native tool specs (Bedrock Converse toolSpec shape). The hook
     // builds a NovaSonicWsProvider from this — no ephemeral key needed.
     if (provider === 'nova') {
-      const instructions = buildHistorianSystemPrompt(sessionType, referralReason, patientContext, undefined, referralFocus, interviewMode)
+      const instructions = buildHistorianSystemPrompt(
+        sessionType,
+        referralReason,
+        patientContext,
+        undefined,
+        referralFocus,
+        interviewMode,
+        interviewPromptVersion,
+      )
       return NextResponse.json({
         provider: 'nova',
         instructions,
-        tools: getHistorianToolsForProvider('nova', sessionType),
+        tools: getHistorianToolsForProvider('nova', sessionType, interviewPromptVersion),
         relayUrl: process.env.NOVA_SONIC_RELAY_URL,
         voiceId: process.env.NOVA_SONIC_VOICE_ID,
         // Short-lived relay auth token (see mintNovaRelayToken above).
@@ -301,6 +314,7 @@ export async function POST(request: Request) {
         flushToken,
         interviewMode,
         interviewPromptVersion,
+        turnEvidenceController,
       })
     }
 
@@ -313,8 +327,16 @@ export async function POST(request: Request) {
       )
     }
 
-    const instructions = buildHistorianSystemPrompt(sessionType, referralReason, patientContext, undefined, referralFocus, interviewMode)
-    const tools = getHistorianToolDefinition(sessionType)
+    const instructions = buildHistorianSystemPrompt(
+      sessionType,
+      referralReason,
+      patientContext,
+      undefined,
+      referralFocus,
+      interviewMode,
+      interviewPromptVersion,
+    )
+    const tools = getHistorianToolDefinition(sessionType, interviewPromptVersion)
     const model = process.env.OPENAI_HISTORIAN_REALTIME_MODEL || 'gpt-realtime-2'
     const turnDetection = getTurnDetectionConfig(process.env.HISTORIAN_TURN_DETECTION_MODE)
     // Filter background noise before it reaches the VAD + model so noisy rooms

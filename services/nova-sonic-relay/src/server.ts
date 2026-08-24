@@ -19,6 +19,10 @@ import {
   continuationTestBoundaryExchanges,
 } from './continuationTestSchedule.js'
 import { sweepHeartbeatSockets, trackHeartbeat } from './websocketHeartbeat.js'
+import {
+  HistorianTurnQuarantine,
+  parseApprovedHistorianTurn,
+} from './turnAdmission.js'
 
 // ---------------------------------------------------------------------------
 // HTTP server — answers GET /healthz for App Runner health checks; 404 otherwise.
@@ -198,6 +202,9 @@ const TRACE: (m: string) => void = process.env.RELAY_TRACE
 // Application-owned Nova continuation is an explicit rollout flag. With the
 // flag off, the relay retains the current fail-closed single-segment behavior.
 const CONTINUATION_ENABLED = process.env.NOVA_APP_CONTINUATION_V1 === 'true'
+// Default-off rollout gate for Comprehensive v2. The browser must also request
+// it; a requested gate against an unconfigured relay fails closed at start.
+const TURN_EVIDENCE_GATE_ENABLED = process.env.NOVA_HISTORIAN_TURN_GATE_V1 === 'true'
 function continuationTiming(testEnvName: string, productionMs: number): number {
   if (process.env.NODE_ENV !== 'test') return productionMs
   const candidate = Number(process.env[testEnvName])
@@ -236,7 +243,10 @@ wss.on('connection', (ws) => {
   let continuationDeadlineAtMs = 0
   let dueTimer: ReturnType<typeof setTimeout> | null = null
   let deadlineTimer: ReturnType<typeof setTimeout> | null = null
-  const pendingTools = new Set<string>()
+  const pendingTools = new Map<string, string>()
+  let turnEvidenceControllerActive = false
+  let speechSuppressed = false
+  const turnQuarantine = new HistorianTurnQuarantine(2_560_000)
   let startConfig: {
     instructions: string
     tools: Parameters<NovaSonicSession['start']>[1]
@@ -268,6 +278,19 @@ wss.on('connection', (ws) => {
     }
   }
 
+  function rejectHistorianTurn(reason: string): void {
+    if (clientStopping || modelTerminalSent) return
+    // Metadata only: never log or return the rejected response text/audio.
+    console.error(`[nova-session] historian turn rejected: ${reason}`)
+    speechSuppressed = true
+    turnQuarantine.discard()
+    send(ws, {
+      t: 'error',
+      message: 'The voice response did not satisfy the patient interview safety contract.',
+    })
+    terminateModelSession('nova_stream_error')
+  }
+
   function clearContinuationTimers(): void {
     if (dueTimer) clearTimeout(dueTimer)
     if (deadlineTimer) clearTimeout(deadlineTimer)
@@ -276,7 +299,12 @@ wss.on('connection', (ws) => {
   }
 
   function continuationApplicable(): boolean {
-    return CONTINUATION_ENABLED && interviewMode === 'comprehensive' && sequencedAudio
+    return (
+      CONTINUATION_ENABLED &&
+      interviewMode === 'comprehensive' &&
+      sequencedAudio &&
+      !speechSuppressed
+    )
   }
 
   function maybeSendContinuationDue(segmentId = activeSegmentId): void {
@@ -306,7 +334,7 @@ wss.on('connection', (ws) => {
       deadlineAtMs: continuationDeadlineAtMs,
     })
     deadlineTimer = setTimeout(() => {
-      if (modelTerminalSent || !testBoundaryPending) return
+      if (modelTerminalSent || speechSuppressed || !testBoundaryPending) return
       failContinuation('deadline', barrier?.id)
     }, CONTINUATION_DEADLINE_MS)
   }
@@ -318,13 +346,19 @@ wss.on('connection', (ws) => {
     continuationDeadlineAtMs = 0
     segmentStartedAt = Date.now()
     const segmentId = activeSegmentId
-    if (clientStopping || modelTerminalSent || !CONTINUATION_ENABLED || interviewMode !== 'comprehensive') return
+    if (
+      clientStopping ||
+      modelTerminalSent ||
+      speechSuppressed ||
+      !CONTINUATION_ENABLED ||
+      interviewMode !== 'comprehensive'
+    ) return
     if (
       !testBoundarySchedule.enabled()
     ) {
       dueTimer = setTimeout(() => maybeSendContinuationDue(segmentId), CONTINUATION_DUE_MS)
       deadlineTimer = setTimeout(() => {
-        if (segmentId !== activeSegmentId || modelTerminalSent) return
+        if (segmentId !== activeSegmentId || modelTerminalSent || speechSuppressed) return
         failContinuation('deadline', barrier?.id)
       }, CONTINUATION_DEADLINE_MS)
     }
@@ -367,6 +401,8 @@ wss.on('connection', (ws) => {
       rotationInProgress ||
       aiSpeaking ||
       pendingTools.size > 0 ||
+      (turnEvidenceControllerActive && (turnQuarantine.hasAuthorization() || turnQuarantine.hasContent())) ||
+      speechSuppressed ||
       clientStopping ||
       modelTerminalSent ||
       (!testBoundaryPending && Date.now() - segmentStartedAt < CONTINUATION_BARRIER_MS)
@@ -409,26 +445,50 @@ wss.on('connection', (ws) => {
     onTextOutput(role, content) {
       if (rejectCandidateActivity(`unexpected_${role.toLowerCase()}_text`)) return
       if (segmentId !== activeSegmentId || outputQuarantined) return
-      TRACE(`-> text[${role}] ${JSON.stringify(content.slice(0, 60))}`)
+      TRACE(`-> text[${role}] chars=${content.length}`)
       if (role.toUpperCase() === 'USER') {
         send(ws, { t: 'userTranscript', text: content, segmentId })
-        const action = comprehensiveOpeningAction(
-          interviewMode,
-          comprehensiveOpeningSettled,
-          content,
-        )
-        if (action !== 'ignore') {
-          comprehensiveOpeningSettled = true
-          if (action === 'ask_age') session.pushSystemText(COMPREHENSIVE_AGE_NUDGE)
+        // Comprehensive v2's application ledger owns every next question,
+        // including age. The legacy relay nudge would race that approval and
+        // could create an unauthorised second response.
+        if (!turnEvidenceControllerActive) {
+          const action = comprehensiveOpeningAction(
+            interviewMode,
+            comprehensiveOpeningSettled,
+            content,
+          )
+          if (action !== 'ignore') {
+            comprehensiveOpeningSettled = true
+            if (action === 'ask_age') session.pushSystemText(COMPREHENSIVE_AGE_NUDGE)
+          }
         }
       } else {
+        if (turnEvidenceControllerActive) {
+          if (!speechSuppressed) turnQuarantine.bufferText(content)
+          return
+        }
         send(ws, { t: 'assistantTranscript', text: content, segmentId })
+      }
+    },
+
+    onAssistantFinalText(content) {
+      if (rejectCandidateActivity('unexpected_assistant_final_text')) return
+      if (segmentId !== activeSegmentId || outputQuarantined) return
+      if (turnEvidenceControllerActive && !speechSuppressed) {
+        turnQuarantine.bufferFinalText(content)
       }
     },
 
     onAudioOutput(base64) {
       if (rejectCandidateActivity('unexpected_audio')) return
       if (segmentId !== activeSegmentId || outputQuarantined) return
+      if (turnEvidenceControllerActive) {
+        if (speechSuppressed) return
+        if (!turnQuarantine.bufferAudio(base64)) {
+          rejectHistorianTurn('audio_buffer_overflow')
+        }
+        return
+      }
       startAiSpeech()
       send(ws, { t: 'audio', pcm: base64, segmentId })
     },
@@ -437,6 +497,25 @@ wss.on('connection', (ws) => {
       if (rejectCandidateActivity('unexpected_assistant_end')) return
       if (segmentId !== activeSegmentId) return
       TRACE('-> assistantAudioEnd')
+      if (turnEvidenceControllerActive) {
+        if (speechSuppressed) {
+          turnQuarantine.discard()
+          return
+        }
+        const admitted = turnQuarantine.finalize()
+        if (!admitted.allowed) {
+          rejectHistorianTurn(admitted.reason)
+          return
+        }
+        startAiSpeech()
+        send(ws, {
+          t: 'assistantTranscript',
+          text: admitted.text,
+          segmentId,
+          ...(admitted.obligationId ? { obligationId: admitted.obligationId } : {}),
+        })
+        for (const pcm of admitted.audio) send(ws, { t: 'audio', pcm, segmentId })
+      }
       stopAiSpeech()
       if (testBoundarySchedule.observeAssistantBoundary()) {
         maybeSendTestBoundaryDue()
@@ -447,14 +526,18 @@ wss.on('connection', (ws) => {
     onToolUse({ toolName, toolUseId, content }) {
       if (rejectCandidateActivity('unexpected_tool')) return
       if (segmentId !== activeSegmentId) return
-      TRACE(`-> toolUse ${toolName} id=${toolUseId} content=${JSON.stringify(String(content).slice(0, 80))}`)
+      if (turnEvidenceControllerActive && turnQuarantine.hasContent()) {
+        rejectHistorianTurn('speech_before_tool')
+        return
+      }
+      TRACE(`-> toolUse ${toolName} id=${toolUseId} contentChars=${String(content).length}`)
       let input: unknown = content
       try {
         input = JSON.parse(content)
       } catch {
         // content is not JSON — pass through as a raw string
       }
-      pendingTools.add(toolUseId)
+      pendingTools.set(toolUseId, toolName)
       testBoundarySchedule.observeTool(toolName)
       if (barrier) {
         // A late normal tool means the assistant boundary was not actually
@@ -468,6 +551,10 @@ wss.on('connection', (ws) => {
     onCompletionEnd() {
       if (rejectCandidateActivity('unexpected_completion')) return
       if (segmentId !== activeSegmentId || outputQuarantined) return
+      if (turnEvidenceControllerActive && turnQuarantine.hasContent()) {
+        rejectHistorianTurn('completion_before_audio_end')
+        return
+      }
       TRACE('-> completionEnd')
       stopAiSpeech()
       send(ws, { t: 'completion', segmentId })
@@ -476,6 +563,10 @@ wss.on('connection', (ws) => {
     onBargeIn() {
       if (rejectCandidateActivity('unexpected_barge_in')) return
       if (segmentId !== activeSegmentId || outputQuarantined) return
+      if (turnEvidenceControllerActive && (turnQuarantine.hasContent() || turnQuarantine.hasAuthorization())) {
+        rejectHistorianTurn('ambiguous_barge_in')
+        return
+      }
       TRACE('-> bargeIn')
       stopAiSpeech()
       send(ws, { t: 'bargeIn', segmentId })
@@ -567,6 +658,16 @@ wss.on('connection', (ws) => {
           }
           sessionStarted = true
           interviewMode = msg.interviewMode === 'comprehensive' ? 'comprehensive' : 'standard'
+          if (msg.turnEvidenceController === true && !TURN_EVIDENCE_GATE_ENABLED) {
+            rejectHistorianTurn('requested_gate_unavailable')
+            break
+          }
+          turnEvidenceControllerActive =
+            msg.turnEvidenceController === true &&
+            TURN_EVIDENCE_GATE_ENABLED &&
+            interviewMode === 'comprehensive'
+          speechSuppressed = false
+          turnQuarantine.discard()
           comprehensiveOpeningSettled = false
           startConfig = {
             instructions: msg.instructions,
@@ -631,9 +732,55 @@ wss.on('connection', (ws) => {
             failContinuation('checkpoint_mismatch', barrier?.id)
             break
           }
-          TRACE(`<- toolResult id=${msg.toolUseId} output=${JSON.stringify(String(msg.output).slice(0, 80))}`)
-          session.pushToolResult(msg.toolUseId, msg.output)
-          pendingTools.delete(msg.toolUseId)
+          {
+            const toolName = pendingTools.get(msg.toolUseId)!
+            let parsedOutput: unknown = msg.output
+            try { parsedOutput = JSON.parse(msg.output) } catch {}
+            let approvedQuestion: ReturnType<typeof parseApprovedHistorianTurn> = null
+            if (turnEvidenceControllerActive && toolName === 'request_history_question') {
+              approvedQuestion = parseApprovedHistorianTurn(parsedOutput)
+              const outputRecord = parsedOutput && typeof parsedOutput === 'object'
+                ? parsedOutput as Record<string, unknown>
+                : null
+              const suppressedTerminalResult =
+                speechSuppressed &&
+                outputRecord?.success === false &&
+                outputRecord.status === 'interview_terminal' &&
+                Object.keys(outputRecord).length === 2
+              if (approvedQuestion) {
+                if (!turnQuarantine.approveQuestion(approvedQuestion)) {
+                  rejectHistorianTurn('overlapping_question_approval')
+                  break
+                }
+              } else if (
+                outputRecord?.status !== 'coverage_ready' &&
+                !suppressedTerminalResult
+              ) {
+                rejectHistorianTurn('invalid_question_approval')
+                break
+              }
+            }
+            if (
+              turnEvidenceControllerActive &&
+              toolName === 'save_interview_output' &&
+              !speechSuppressed &&
+              parsedOutput &&
+              typeof parsedOutput === 'object' &&
+              (parsedOutput as Record<string, unknown>).success === true &&
+              !turnQuarantine.allowControl('terminal_statement')
+            ) {
+              rejectHistorianTurn('closing_authorization_conflict')
+              break
+            }
+            session.pushToolResult(msg.toolUseId, msg.output)
+            pendingTools.delete(msg.toolUseId)
+            if (approvedQuestion) {
+              session.pushSystemText(
+                `[APPLICATION-OWNED APPROVED QUESTION] Speak exactly the approved_text from the tool result now. Do not add, remove, explain, acknowledge, or ask anything else. approved_text=${JSON.stringify(approvedQuestion.approvedText)}`,
+              )
+            }
+          }
+          TRACE(`<- toolResult id=${msg.toolUseId} (content redacted)`)
           if (!barrier) maybeOpenBarrier()
           break
 
@@ -642,11 +789,43 @@ wss.on('connection', (ws) => {
             failContinuation('checkpoint_mismatch', barrier.id)
             break
           }
-          TRACE(`<- systemText (injected as USER) ${JSON.stringify(msg.text.slice(0, 80))}`)
+          if (turnEvidenceControllerActive && !speechSuppressed) {
+            const controlMode = msg.text.startsWith('[The patient has not said anything')
+              ? 'unresponsive_check_in'
+              : msg.text.startsWith('[The patient still has not responded')
+                ? 'unresponsive_sign_off'
+                : null
+            if (controlMode && !turnQuarantine.allowControl(controlMode)) {
+              rejectHistorianTurn('control_turn_authorization_conflict')
+              break
+            }
+          }
+          TRACE(`<- systemText (injected as USER) chars=${msg.text.length}`)
           session.pushSystemText(msg.text)
           break
 
+        case 'suppressOutput':
+          speechSuppressed = true
+          turnQuarantine.discard()
+          // Terminal suppression permanently retires continuation for this
+          // session. In particular, a due/deadline timer must not race the
+          // silent save, and removing a pre-commit barrier restores the old
+          // active stream as the sole tool owner without replaying patient PCM.
+          clearContinuationTimers()
+          dueSent = false
+          testBoundaryPending = false
+          continuationDeadlineAtMs = 0
+          if (barrier && !rotationInProgress) {
+            barrier = null
+            outputQuarantined = false
+            bufferedAudio = []
+            bufferedAudioChars = 0
+          }
+          stopAiSpeech()
+          break
+
         case 'continuationDefer':
+          if (speechSuppressed) break
           if (!barrier || barrier.id !== msg.barrierId || rotationInProgress) {
             failContinuation('checkpoint_mismatch', msg.barrierId)
             break
@@ -666,6 +845,7 @@ wss.on('connection', (ws) => {
           break
 
         case 'continuationCommit': {
+          if (speechSuppressed) break
           if (
             !barrier ||
             barrier.id !== msg.barrierId ||

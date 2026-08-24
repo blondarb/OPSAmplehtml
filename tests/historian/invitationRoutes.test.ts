@@ -58,6 +58,7 @@ describe('historian invitation routes', () => {
       expiresAt: '2026-08-22T18:00:00.000Z',
       patientName: 'Synthetic Patient',
       referralReason: 'Gait concern',
+      interviewPromptVersion: 'comprehensive-v1',
     })
     const response = await createInvitation(new Request('https://neuroplans.example/api/ai/historian/invites', {
       method: 'POST',
@@ -74,7 +75,33 @@ describe('historian invitation routes', () => {
       tenantId: 'tenant-a',
       consultId: 'consult-1',
       invitedByUserId: 'clinician-1',
+      promptVersion: 'comprehensive-v1',
     })
+  })
+
+  it('selects v2 only when the exact controller feature flag is enabled', async () => {
+    const prior = process.env.HISTORIAN_TURN_EVIDENCE_CONTROLLER_V1
+    process.env.HISTORIAN_TURN_EVIDENCE_CONTROLLER_V1 = 'true'
+    try {
+      authorizeClinicalAccessMock.mockResolvedValueOnce({
+        ok: true,
+        context: { userId: 'clinician-1', email: 'c@example.test', tenantId: 'tenant-a', role: 'clinician' },
+      })
+      createHistorianInvitationMock.mockResolvedValueOnce({
+        ok: true, inviteId: 'invite-1', sessionId: 'session-1', rawToken: 'secret',
+        expiresAt: '2026-08-22T18:00:00.000Z', patientName: 'Synthetic Patient', referralReason: 'Gait concern',
+        interviewPromptVersion: 'comprehensive-v2',
+      })
+      const response = await createInvitation(new Request('https://neuroplans.example/api/ai/historian/invites', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ consultId: 'consult-1' }),
+      }))
+      expect(response.status).toBe(200)
+      expect(createHistorianInvitationMock).toHaveBeenCalledWith(expect.objectContaining({ promptVersion: 'comprehensive-v2' }))
+      expect((await response.json()).invitation.interviewPromptVersion).toBe('comprehensive-v2')
+    } finally {
+      if (prior === undefined) delete process.env.HISTORIAN_TURN_EVIDENCE_CONTROLLER_V1
+      else process.env.HISTORIAN_TURN_EVIDENCE_CONTROLLER_V1 = prior
+    }
   })
 
   it('redeems once into an HttpOnly Secure SameSite=Strict four-hour grant', async () => {
@@ -124,6 +151,7 @@ describe('historian invitation routes', () => {
       tenantId: 'tenant-a',
       consultId: 'consult-1',
       invitedByUserId: 'clinician-1',
+      promptVersion: 'comprehensive-v1',
       replaceActive: true,
     })
   })

@@ -2,6 +2,7 @@ import type { HistorianTerminationReason } from '@/lib/historianTypes'
 
 export const HISTORIAN_TERMINATION_REASONS = [
   'coverage_complete',
+  'complete_with_uncertainty',
   'patient_requested_stop',
   'safety_escalated',
   'hard_stop',
@@ -22,7 +23,9 @@ export function parseHistorianTerminationReason(value: unknown): HistorianTermin
 export function completionStatusForTermination(
   reason: HistorianTerminationReason,
 ): 'complete' | 'ended_early' {
-  return reason === 'coverage_complete' ? 'complete' : 'ended_early'
+  return reason === 'coverage_complete' || reason === 'complete_with_uncertainty'
+    ? 'complete'
+    : 'ended_early'
 }
 
 export function terminationMatchesCompletionStatus(

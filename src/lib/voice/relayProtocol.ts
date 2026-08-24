@@ -3,11 +3,12 @@
 
 // Browser → relay
 export type ClientMsg =
-  | { t: 'start'; instructions: string; tools: unknown[]; voiceId?: string; interviewMode?: 'standard' | 'comprehensive' }
+  | { t: 'start'; instructions: string; tools: unknown[]; voiceId?: string; interviewMode?: 'standard' | 'comprehensive'; turnEvidenceController?: boolean }
   | { t: 'audio'; pcm: string; audioSeq?: number } // base64 PCM16 @16k; seq is required by continuation-capable clients
   | { t: 'userTurnEnd' }
   | { t: 'toolResult'; toolUseId: string; output: string; segmentId?: number }
   | { t: 'systemText'; text: string }
+  | { t: 'suppressOutput' }
   | { t: 'continuationCommit'; barrierId: string; checkpoint: import('./providerTypes').VoiceContinuationCheckpoint }
   | { t: 'continuationDefer'; barrierId: string }
   | { t: 'stop' }
@@ -15,7 +16,7 @@ export type ClientMsg =
 // Relay → browser
 export type ServerMsg =
   | { t: 'userTranscript'; text: string; segmentId?: number }
-  | { t: 'assistantTranscript'; text: string; segmentId?: number }
+  | { t: 'assistantTranscript'; text: string; segmentId?: number; obligationId?: string }
   | { t: 'assistantTextDelta'; text: string; segmentId?: number }
   | { t: 'audio'; pcm: string; segmentId?: number } // base64 PCM16 @24k
   | { t: 'aiSpeechStart'; segmentId?: number }

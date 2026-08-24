@@ -30,7 +30,7 @@ export const MAX_CONTINUATION_HISTORY_BYTES = 190_000
 export const MAX_CONTINUATION_HISTORY_MESSAGE_BYTES = 45_000
 
 const TERMINATION_REASONS = new Set<HistorianTerminationReason>([
-  'coverage_complete', 'patient_requested_stop', 'safety_escalated', 'hard_stop',
+  'coverage_complete', 'complete_with_uncertainty', 'patient_requested_stop', 'safety_escalated', 'hard_stop',
   'manual_end', 'transport_lost', 'provider_error', 'unresponsive',
 ])
 const GUARD_TERMINAL_REASONS = new Set<HistorianRuntimeGuardSnapshot['terminalReason']>([

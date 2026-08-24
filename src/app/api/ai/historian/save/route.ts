@@ -7,7 +7,7 @@ import { validateTranscript } from '@/lib/historian/transcriptIntegrity'
 import { runFinalDifferential } from '@/lib/historian/eval/finalDifferential'
 import { runThoroughnessJudge } from '@/lib/historian/eval/thoroughnessJudge'
 import { runIndependentDdxAndAgreement } from '@/lib/historian/eval/independentDdx'
-import type { HistorianTranscriptEntry } from '@/lib/historianTypes'
+import type { HistorianStructuredOutput, HistorianTranscriptEntry } from '@/lib/historianTypes'
 import { resolveHistorianPatientGrant } from '@/lib/historian/invitationStore'
 import { HISTORIAN_GRANT_COOKIE, readCookieValue } from '@/lib/historian/invitationTokens'
 import { saveInvitedHistorianSession } from '@/lib/historian/invitedSave'
@@ -16,6 +16,12 @@ import {
   parseHistorianTerminationReason,
   terminationMatchesCompletionStatus,
 } from '@/lib/historian/terminationPolicy'
+import {
+  derivePatientEvidenceStructuredCoverage,
+  patientEvidenceCompletion,
+  validatePatientEvidenceState,
+  type PatientEvidenceState,
+} from '@/lib/historian/patientEvidenceController'
 import {
   authorizeClinicalAccess,
   clinicalAccessDeniedMessage,
@@ -110,6 +116,52 @@ export async function POST(request: Request) {
       ? completionStatusForTermination(terminationReason)
       : requestedCompletionStatus
 
+    let structuredOutput: HistorianStructuredOutput =
+      body.structured_output && typeof body.structured_output === 'object' && !Array.isArray(body.structured_output)
+        ? body.structured_output
+        : {}
+    const promptVersion = structuredOutput.interview_prompt_version
+    if (promptVersion === 'comprehensive-v2') {
+      if (!terminationReason) {
+        return NextResponse.json(
+          { error: 'Comprehensive v2 requires an explicit termination reason.' },
+          { status: 400 },
+        )
+      }
+      const transcript: HistorianTranscriptEntry[] = Array.isArray(body.transcript)
+        ? body.transcript
+        : []
+      const evidence = structuredOutput.history_evidence_v1
+      const evidenceValidation = validatePatientEvidenceState(evidence, transcript)
+      if (!evidenceValidation.valid) {
+        return NextResponse.json(
+          { error: 'The application-owned history evidence is incomplete or inconsistent.' },
+          { status: 409 },
+        )
+      }
+      const completion = patientEvidenceCompletion(evidence as PatientEvidenceState)
+      if (
+        (terminationReason === 'coverage_complete' || terminationReason === 'complete_with_uncertainty') &&
+        terminationReason !== completion
+      ) {
+        return NextResponse.json(
+          { error: 'The completion reason does not match the transcript-bound history evidence.' },
+          { status: 409 },
+        )
+      }
+      structuredOutput = {
+        ...structuredOutput,
+        interview_mode: 'comprehensive',
+        interview_prompt_version: 'comprehensive-v2',
+        history_coverage: derivePatientEvidenceStructuredCoverage(evidence as PatientEvidenceState),
+      }
+    } else if (terminationReason === 'complete_with_uncertainty') {
+      return NextResponse.json(
+        { error: 'Uncertain completion requires the application-owned history evidence contract.' },
+        { status: 409 },
+      )
+    }
+
     // Pre-stringify jsonb array/object fields. The shared query builder
     // auto-stringifies plain objects but passes arrays through raw (for
     // text[] compat), which breaks jsonb inserts of transcript/red_flags
@@ -131,7 +183,7 @@ export async function POST(request: Request) {
       session_type: body.session_type || 'new_patient',
       patient_name: body.patient_name || '',
       referral_reason: body.referral_reason || null,
-      structured_output: toJSON(body.structured_output),
+      structured_output: toJSON(structuredOutput),
       narrative_summary: body.narrative_summary || null,
       transcript: toJSON(body.transcript),
       red_flags: toJSON(body.red_flags),
@@ -143,6 +195,10 @@ export async function POST(request: Request) {
       interview_termination_reason: terminationReason,
       reviewed: false,
       imported_to_note: false,
+    }
+    if (promptVersion === 'comprehensive-v2') {
+      insertPayload.interview_mode = 'comprehensive'
+      insertPayload.interview_prompt_version = 'comprehensive-v2'
     }
     const sessionId: string | undefined =
       typeof body.sessionId === 'string' && body.sessionId ? body.sessionId : undefined
@@ -190,8 +246,8 @@ export async function POST(request: Request) {
         ? body.transcript
         : []
       const chiefComplaintForEval: string | undefined =
-        body.structured_output?.chief_complaint || body.referral_reason || undefined
-      const structuredOutputForEval = body.structured_output || null
+        structuredOutput.chief_complaint || body.referral_reason || undefined
+      const structuredOutputForEval = structuredOutput
       const narrativeSummaryForEval: string | undefined =
         typeof body.narrative_summary === 'string' && body.narrative_summary.trim()
           ? body.narrative_summary
@@ -242,7 +298,7 @@ export async function POST(request: Request) {
           consultId,
           data.id,
           body.narrative_summary || '',
-          body.structured_output || {},
+          { ...structuredOutput },
           body.red_flags || [],
           body.safety_escalated || false,
           completionStatus,

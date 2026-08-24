@@ -39,6 +39,7 @@ describe('historian invitation store', () => {
             patient_name: 'Synthetic Patient',
             referral_reason: 'Gait concern',
             session_type: 'new_patient',
+            interview_prompt_version: 'comprehensive-v2',
             patient_date_of_birth: '1960-04-12',
             verification_attempts: 0,
           }],
@@ -58,7 +59,7 @@ describe('historian invitation store', () => {
     if (!result.ok) return
     expect(result.grantToken).not.toBe('one-time-invite')
     expect(result.context.interviewMode).toBe('comprehensive')
-    expect(result.context.interviewPromptVersion).toBe('comprehensive-v1')
+    expect(result.context.interviewPromptVersion).toBe('comprehensive-v2')
     expect(releaseMock).toHaveBeenCalledTimes(1)
   })
 
@@ -101,6 +102,31 @@ describe('historian invitation store', () => {
     expect(result?.tenantId).toBe('tenant-a')
     expect(result?.provider).toBe('nova')
     expect(queryMock.mock.calls[0][1]).toEqual([hashHistorianToken('browser-grant')])
+  })
+
+  it('persists the explicitly selected prompt version on both session and invitation rows', async () => {
+    queryMock.mockImplementation(async (sql: string, values?: unknown[]) => {
+      if (sql === 'BEGIN' || sql === 'COMMIT') return { rows: [], rowCount: 0 }
+      if (sql.includes('FROM neurology_consults consult')) return { rows: [{
+        id: 'consult-1', tenant_id: 'tenant-a', patient_id: 'patient-1', status: 'historian_pending',
+        triage_chief_complaint: 'Gait concern', patient_name: 'Synthetic Patient', patient_date_of_birth: '1960-04-12',
+      }], rowCount: 1 }
+      if (sql.includes('FROM historian_invites') && sql.includes('FOR UPDATE')) return { rows: [], rowCount: 0 }
+      if (sql.includes('INSERT INTO historian_sessions')) {
+        expect(values).toContain('comprehensive-v2')
+        return { rows: [{ id: 'session-new' }], rowCount: 1 }
+      }
+      if (sql.includes('INSERT INTO historian_invites')) {
+        expect(values).toContain('comprehensive-v2')
+        return { rows: [{ id: 'invite-new' }], rowCount: 1 }
+      }
+      if (sql.includes('UPDATE neurology_consults')) return { rows: [], rowCount: 1 }
+      throw new Error(`Unexpected SQL: ${sql}`)
+    })
+    const result = await createHistorianInvitation({
+      tenantId: 'tenant-a', consultId: 'consult-1', invitedByUserId: 'clinician-1', promptVersion: 'comprehensive-v2',
+    })
+    expect(result).toMatchObject({ ok: true, interviewPromptVersion: 'comprehensive-v2' })
   })
 
   it('does not replace an unexpired redeemed invitation without an explicit clinician action', async () => {

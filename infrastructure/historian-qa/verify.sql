@@ -5,6 +5,16 @@ DO $verify$
 BEGIN
   IF to_regclass('public.historian_invites') IS NULL
      OR to_regclass('public.historian_eval_jobs') IS NULL
+     OR NOT EXISTS (
+       SELECT 1 FROM pg_constraint
+        WHERE conname = 'historian_sessions_prompt_version_check'
+          AND pg_get_constraintdef(oid) LIKE '%comprehensive-v2%'
+     )
+     OR NOT EXISTS (
+       SELECT 1 FROM pg_constraint
+        WHERE conname = 'chk_historian_sessions_termination_reason'
+          AND pg_get_constraintdef(oid) LIKE '%complete_with_uncertainty%'
+     )
      OR (SELECT count(*) FROM public.patients WHERE tenant_id = 'historian-mvp-qa') <> 1
      OR (SELECT count(*) FROM public.neurology_consults WHERE tenant_id = 'historian-mvp-qa') <> 1
      OR (

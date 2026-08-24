@@ -100,6 +100,17 @@ export class HistorianRuntimeGuard {
     return changed
   }
 
+  /**
+   * Latches the application-owned exchange ceiling after the final patient
+   * answer has been bound and settled. Safety and an explicit patient stop
+   * remain stronger terminal causes and are never overwritten.
+   */
+  applicationHardStop(): HistorianTurnDecision {
+    if (this.terminal) return this.decision(false, null, null)
+    this.terminal = 'hard_stop'
+    return this.decision(false, null, 'hard_stop')
+  }
+
   private decision(
     activateSafety: boolean,
     injectText: string | null,
