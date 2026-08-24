@@ -1,0 +1,192 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: >
+  Ephemeral fail-closed migration runner for upgrading the existing isolated,
+  synthetic-only Historian QA database to Comprehensive v2. Delete after one run.
+
+Parameters:
+  SourceCommit:
+    Type: String
+    AllowedPattern: '^[0-9a-f]{40}$'
+  MigrationSha256:
+    Type: String
+    AllowedPattern: '^[0-9a-f]{64}$'
+  VerifySha256:
+    Type: String
+    AllowedPattern: '^[0-9a-f]{64}$'
+  RdsSecretArn:
+    Type: String
+    NoEcho: true
+    AllowedPattern: '^arn:aws:secretsmanager:us-east-2:[0-9]{12}:secret:rds!db-[A-Za-z0-9-]+$'
+  DatabaseName:
+    Type: String
+    Default: ops_amplehtml_historian_qa
+    AllowedValues: [ops_amplehtml_historian_qa]
+  DatabaseHost:
+    Type: String
+    Default: historian-mvp-qa.cxe2y0soqa7a.us-east-2.rds.amazonaws.com
+    AllowedValues:
+      - historian-mvp-qa.cxe2y0soqa7a.us-east-2.rds.amazonaws.com
+  DatabasePort:
+    Type: Number
+    Default: 5432
+    AllowedValues: [5432]
+  DeleteAfter:
+    Type: String
+    Default: '2026-08-29'
+
+Resources:
+  MigrationSourceBucket:
+    Type: AWS::S3::Bucket
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Delete
+    Properties:
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+      LifecycleConfiguration:
+        Rules:
+          - Id: DeleteMigrationSource
+            Status: Enabled
+            ExpirationInDays: 1
+      OwnershipControls:
+        Rules:
+          - ObjectOwnership: BucketOwnerEnforced
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      Tags:
+        - { Key: DataClass, Value: synthetic-only }
+        - { Key: DeleteAfter, Value: !Ref DeleteAfter }
+
+  MigrationSourceBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref MigrationSourceBucket
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Sid: DenyInsecureTransport
+            Effect: Deny
+            Principal: '*'
+            Action: s3:*
+            Resource:
+              - !GetAtt MigrationSourceBucket.Arn
+              - !Sub '${MigrationSourceBucket.Arn}/*'
+            Condition:
+              Bool:
+                aws:SecureTransport: 'false'
+
+  MigrationLogGroup:
+    Type: AWS::Logs::LogGroup
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Delete
+    Properties:
+      LogGroupName: !Sub '/aws/codebuild/${AWS::StackName}'
+      RetentionInDays: 1
+      Tags:
+        - { Key: DataClass, Value: synthetic-only }
+        - { Key: DeleteAfter, Value: !Ref DeleteAfter }
+
+  MigrationRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: codebuild.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: MigrateOnlyHistorianQaDatabase
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Sid: ReadExactQaCredential
+                Effect: Allow
+                Action: secretsmanager:GetSecretValue
+                Resource: !Ref RdsSecretArn
+              - Sid: ReadMigrationSource
+                Effect: Allow
+                Action:
+                  - s3:GetBucketAcl
+                  - s3:GetBucketLocation
+                  - s3:GetObject
+                  - s3:GetObjectVersion
+                Resource:
+                  - !GetAtt MigrationSourceBucket.Arn
+                  - !Sub '${MigrationSourceBucket.Arn}/*'
+              - Sid: WriteMigrationLogs
+                Effect: Allow
+                Action:
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                Resource: !Sub '${MigrationLogGroup.Arn}:*'
+      Tags:
+        - { Key: DataClass, Value: synthetic-only }
+        - { Key: DeleteAfter, Value: !Ref DeleteAfter }
+
+  MigrationProject:
+    Type: AWS::CodeBuild::Project
+    Properties:
+      ServiceRole: !GetAtt MigrationRole.Arn
+      Artifacts:
+        Type: NO_ARTIFACTS
+      Environment:
+        ComputeType: BUILD_GENERAL1_SMALL
+        Image: aws/codebuild/standard:7.0
+        ImagePullCredentialsType: CODEBUILD
+        PrivilegedMode: true
+        Type: LINUX_CONTAINER
+        EnvironmentVariables:
+          - { Name: SOURCE_COMMIT, Type: PLAINTEXT, Value: !Ref SourceCommit }
+          - { Name: MIGRATION_SHA256, Type: PLAINTEXT, Value: !Ref MigrationSha256 }
+          - { Name: VERIFY_SHA256, Type: PLAINTEXT, Value: !Ref VerifySha256 }
+          - { Name: PGHOST, Type: PLAINTEXT, Value: !Ref DatabaseHost }
+          - { Name: PGPORT, Type: PLAINTEXT, Value: !Ref DatabasePort }
+          - { Name: PGUSER, Type: SECRETS_MANAGER, Value: !Join [':', [!Ref RdsSecretArn, username]] }
+          - { Name: PGPASSWORD, Type: SECRETS_MANAGER, Value: !Join [':', [!Ref RdsSecretArn, password]] }
+          - { Name: PGDATABASE, Type: PLAINTEXT, Value: !Ref DatabaseName }
+          - { Name: PGSSLMODE, Type: PLAINTEXT, Value: verify-full }
+      Source:
+        Type: S3
+        Location: !Sub '${MigrationSourceBucket}/historian-qa-v2-migrate.zip'
+        BuildSpec: |
+          version: 0.2
+          phases:
+            install:
+              commands:
+                - set +x
+                - docker pull public.ecr.aws/docker/library/postgres:17 >/dev/null
+            build:
+              commands:
+                - set +x
+                - umask 077
+                - test -f source-commit.txt
+                - test "$(tr -d '\r\n' < source-commit.txt)" = "$SOURCE_COMMIT"
+                - test -f migrations/061_historian_comprehensive_v2.sql
+                - test -f infrastructure/historian-qa/verify.sql
+                - test "$(sha256sum migrations/061_historian_comprehensive_v2.sql | cut -d' ' -f1)" = "$MIGRATION_SHA256"
+                - test "$(sha256sum infrastructure/historian-qa/verify.sql | cut -d' ' -f1)" = "$VERIFY_SHA256"
+                - curl --fail --silent --show-error --location --output rds-global-bundle.pem https://truststore.pki.rds.amazonaws.com/global/global-bundle.pem
+                - test "$(wc -c < rds-global-bundle.pem)" -gt 1000
+                - docker run --rm --user "$(id -u):$(id -g)" -e PGHOST -e PGPORT -e PGUSER -e PGPASSWORD -e PGDATABASE -e PGSSLMODE -e PGSSLROOTCERT=/certs/rds-global-bundle.pem -v "$CODEBUILD_SRC_DIR:/work" -v "$CODEBUILD_SRC_DIR/rds-global-bundle.pem:/certs/rds-global-bundle.pem:ro" -w /work public.ecr.aws/docker/library/postgres:17 psql --single-transaction --set=ON_ERROR_STOP=1 --file=migrations/061_historian_comprehensive_v2.sql --file=infrastructure/historian-qa/verify.sql
+      LogsConfig:
+        CloudWatchLogs:
+          Status: ENABLED
+          GroupName: !Ref MigrationLogGroup
+          StreamName: v2-migration
+      TimeoutInMinutes: 15
+      QueuedTimeoutInMinutes: 10
+      Tags:
+        - { Key: DataClass, Value: synthetic-only }
+        - { Key: DeleteAfter, Value: !Ref DeleteAfter }
+
+Outputs:
+  SourceBucket:
+    Value: !Ref MigrationSourceBucket
+  ProjectName:
+    Value: !Ref MigrationProject

@@ -43,6 +43,19 @@ Cognito, relay compute, or worker queues.
    the application flag against a relay that lacks the matching gate.
 8. Run negative authorization tests before any synthetic interview.
 
+### Upgrading the existing QA database
+
+Do not rerun `database-init.yaml` against an already initialized QA database;
+its schema bootstrap is intentionally a one-time restore. Use the ephemeral
+`database-migrate.yaml` project for migration 061. Bind its host, port, database,
+and secret ARN directly to the current foundation outputs; bind `SourceCommit`
+to the exact archive commit and independently calculate both required SQL
+SHA-256 values before creating the stack. Upload only `source-commit.txt`,
+`migrations/061_historian_comprehensive_v2.sql`, and
+`infrastructure/historian-qa/verify.sql`. The build applies and verifies both
+files in one transaction with `ON_ERROR_STOP=1`. After PASS or failure, delete
+the exact source object before deleting the ephemeral stack.
+
 ## Automated authenticated acceptance
 
 `acceptance.yaml` is an ephemeral CodeBuild runner for the fixed synthetic QA
