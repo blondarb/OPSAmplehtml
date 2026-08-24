@@ -7,6 +7,7 @@ import {
   formatDateOfBirthInput,
   parseDateOfBirthInput,
 } from '@/lib/historian/dateOfBirthInput'
+import { observeHistorianInvitationTokens } from '@/lib/historian/invitationLink'
 
 type InviteState =
   | { status: 'loading' }
@@ -27,23 +28,18 @@ export default function HistorianInviteEntry() {
 
   useEffect(() => {
     let cancelled = false
+    let invitationAttempt = 0
 
-    async function openInvitation() {
+    function acceptInvitationToken(token: string) {
+      invitationAttempt += 1
+      setDateOfBirth('')
+      setVerificationError('')
+      setState({ status: 'verify', token })
+    }
+
+    async function openInvitationContext() {
+      const attempt = ++invitationAttempt
       try {
-        const params = new URLSearchParams(window.location.hash.replace(/^#/, ''))
-        const token = params.get('token')
-
-        // Remove the bearer token from the visible URL before any subsequent
-        // navigation, analytics, or support screenshot can capture it.
-        if (window.location.hash) {
-          window.history.replaceState(null, '', window.location.pathname + window.location.search)
-        }
-
-        if (token) {
-          if (!cancelled) setState({ status: 'verify', token })
-          return
-        }
-
         const response = await fetch('/api/ai/historian/invites/context', {
           method: 'GET',
           cache: 'no-store',
@@ -59,9 +55,11 @@ export default function HistorianInviteEntry() {
         }
         const data = await response.json()
         if (!data?.context) throw new Error('The interview link returned no session context.')
-        if (!cancelled) setState({ status: 'ready', context: data.context })
+        if (!cancelled && invitationAttempt === attempt) {
+          setState({ status: 'ready', context: data.context })
+        }
       } catch (error) {
-        if (!cancelled) {
+        if (!cancelled && invitationAttempt === attempt) {
           setState({
             status: 'error',
             message:
@@ -73,9 +71,16 @@ export default function HistorianInviteEntry() {
       }
     }
 
-    void openInvitation()
+    const observer = observeHistorianInvitationTokens(window, acceptInvitationToken)
+    if (observer.initialToken) {
+      acceptInvitationToken(observer.initialToken)
+    } else {
+      void openInvitationContext()
+    }
     return () => {
       cancelled = true
+      invitationAttempt += 1
+      observer.dispose()
     }
   }, [])
 
