@@ -72,11 +72,27 @@ describe('deployed Historian QA acceptance runner', () => {
           sessionId: 'session-1',
           provider: 'nova',
           interviewMode: 'comprehensive',
-          interviewPromptVersion: 'comprehensive-v1',
+          interviewPromptVersion: 'comprehensive-v2',
+          turnEvidenceController: true,
           relayToken: 'fake-relay-token',
         })
       }
       if (url.endsWith('/api/ai/historian/save') && method === 'POST') {
+        expect(body.structured_output).toMatchObject({
+          interview_mode: 'comprehensive',
+          interview_prompt_version: 'comprehensive-v2',
+          history_evidence_v1: {
+            version: 1,
+            awaitingQuestion: null,
+            pendingPatientSeqs: [],
+            repeatObligationId: null,
+          },
+          history_coverage: { covered_domains: [], missing_or_uncertain: [] },
+        })
+        expect(body.question_count).toBe(51)
+        expect(body.transcript).toHaveLength(body.question_count * 2)
+        expect(body.interview_completion_status).toBe('complete')
+        expect(body.interview_termination_reason).toBe('coverage_complete')
         const previousSaveCount = fetchMock.mock.calls.filter(([priorInput, priorInit]) =>
           String(priorInput).endsWith('/api/ai/historian/save') && priorInit?.method === 'POST',
         ).length
@@ -98,6 +114,8 @@ describe('deployed Historian QA acceptance runner', () => {
             id: 'session-1',
             patient_id: '10000000-0000-4000-8000-000000000001',
             tenant_id: 'historian-mvp-qa',
+            consult_id: '20000000-0000-4000-8000-000000000001',
+            interview_prompt_version: 'comprehensive-v2',
             interview_completion_status: 'complete',
             interview_termination_reason: 'coverage_complete',
             evaluation_status: 'completed',

@@ -1,4 +1,14 @@
-import { COMPREHENSIVE_HISTORY_DOMAINS } from '../src/lib/historianTypes'
+import type { HistorianTranscriptEntry } from '../src/lib/historianTypes'
+import {
+  approveNextPatientEvidenceQuestion,
+  collectPatientEvidenceEntry,
+  commitApprovedPatientEvidenceQuestion,
+  createPatientEvidenceState,
+  patientEvidenceCompletion,
+  settlePatientEvidenceAnswer,
+  type PatientEvidenceState,
+} from '../src/lib/historian/patientEvidenceController'
+import { syntheticPatientAnswer } from '../tests/historian/patientEvidenceFixtures'
 
 const QA_APP_ORIGIN = 'https://historian-mvp-qa.d3ietjwgco4g2t.amplifyapp.com'
 const QA_COGNITO_CLIENT_ID = 'ecjsa2ifjoj85konf3ts42gf5'
@@ -189,30 +199,90 @@ function appHeaders(cookie?: string): Record<string, string> {
   }
 }
 
+function completeSyntheticV2Evidence(): {
+  state: PatientEvidenceState
+  transcript: HistorianTranscriptEntry[]
+} {
+  let state = createPatientEvidenceState()
+  const transcript: HistorianTranscriptEntry[] = []
+  let seq = 1
+
+  while (patientEvidenceCompletion(state) === 'incomplete') {
+    const approved = approveNextPatientEvidenceQuestion(state)
+    if (!approved.ok || !approved.value) {
+      throw new HistorianQaAcceptanceError('V2_FIXTURE_APPROVAL_FAILED')
+    }
+    state = approved.value.state
+
+    const committed = commitApprovedPatientEvidenceQuestion(
+      state,
+      seq,
+      approved.value.questionText,
+    )
+    if (!committed.ok || !committed.value) {
+      throw new HistorianQaAcceptanceError('V2_FIXTURE_COMMIT_FAILED')
+    }
+    state = committed.value
+    transcript.push({
+      role: 'assistant',
+      text: approved.value.questionText,
+      timestamp: seq,
+      seq,
+    })
+    seq += 1
+
+    const patientEntry: HistorianTranscriptEntry = {
+      role: 'user',
+      text: syntheticPatientAnswer(approved.value.obligation.id),
+      timestamp: seq,
+      seq,
+    }
+    transcript.push(patientEntry)
+    const collected = collectPatientEvidenceEntry(state, patientEntry)
+    if (!collected.ok || !collected.value) {
+      throw new HistorianQaAcceptanceError('V2_FIXTURE_COLLECTION_FAILED')
+    }
+    state = collected.value
+
+    const settled = settlePatientEvidenceAnswer(state, transcript)
+    if (!settled.ok || !settled.value) {
+      throw new HistorianQaAcceptanceError('V2_FIXTURE_SETTLEMENT_FAILED')
+    }
+    state = settled.value
+    seq += 1
+  }
+
+  if (patientEvidenceCompletion(state) !== 'coverage_complete') {
+    throw new HistorianQaAcceptanceError('V2_FIXTURE_COMPLETION_FAILED')
+  }
+  return { state, transcript }
+}
+
 function fixedSaveBody(sessionId: string): Record<string, unknown> {
+  const fixture = completeSyntheticV2Evidence()
   return {
     sessionId,
     structured_output: {
       chief_complaint: 'Synthetic recurrent headache history',
       hpi: 'Synthetic fixed-fixture history for persistence acceptance only.',
-      age_years_patient_reported: 41,
+      age_years_patient_reported: 45,
+      interview_mode: 'comprehensive',
+      interview_prompt_version: 'comprehensive-v2',
+      history_evidence_v1: fixture.state,
+      // Deliberately forged empty model coverage. The deployed save boundary
+      // must replace this with coverage derived from the transcript ledger.
       history_coverage: {
-        covered_domains: COMPREHENSIVE_HISTORY_DOMAINS.map((domain) => domain.id),
+        covered_domains: [],
         missing_or_uncertain: [],
       },
     },
     narrative_summary:
-      'SYNTHETIC TEST DATA - NOT FOR CLINICAL CARE. Fixed state-injected persistence acceptance.',
-    transcript: [
-      { role: 'assistant', text: 'Why were you referred?', timestamp: 0, seq: 1 },
-      { role: 'user', text: 'For the fixed synthetic headache scenario.', timestamp: 2, seq: 2 },
-      { role: 'assistant', text: 'How old are you?', timestamp: 3, seq: 3 },
-      { role: 'user', text: 'I am forty-one in this synthetic scenario.', timestamp: 5, seq: 4 },
-    ],
+      'SYNTHETIC TEST DATA - NOT FOR CLINICAL CARE. Transcript-grounded v2 persistence acceptance.',
+    transcript: fixture.transcript,
     red_flags: [],
     safety_escalated: false,
-    duration_seconds: 120,
-    question_count: 2,
+    duration_seconds: fixture.state.records.length * 5,
+    question_count: fixture.state.records.length,
     interview_completion_status: 'complete',
     interview_termination_reason: 'coverage_complete',
   }
@@ -390,7 +460,8 @@ export async function runHistorianQaAcceptance(
     session.body.sessionId !== expectedSessionId ||
     session.body.provider !== 'nova' ||
     session.body.interviewMode !== 'comprehensive' ||
-    session.body.interviewPromptVersion !== 'comprehensive-v1'
+    session.body.interviewPromptVersion !== 'comprehensive-v2' ||
+    session.body.turnEvidenceController !== true
   ) {
     throw new HistorianQaAcceptanceError('PATIENT_SESSION_BINDING_FAILED')
   }
@@ -485,6 +556,8 @@ export async function runHistorianQaAcceptance(
     !matchingSession ||
     matchingSession.patient_id !== FIXTURE.patientId ||
     matchingSession.tenant_id !== FIXTURE.tenantId ||
+    matchingSession.consult_id !== FIXTURE.consultId ||
+    matchingSession.interview_prompt_version !== 'comprehensive-v2' ||
     matchingSession.interview_completion_status !== 'complete' ||
     matchingSession.interview_termination_reason !== 'coverage_complete' ||
     matchingSession.evaluation_status !== 'completed' ||
@@ -496,7 +569,7 @@ export async function runHistorianQaAcceptance(
   gate('authenticated_physician_report_with_differential')
 
   emit(
-    'HISTORIAN_QA_ACCEPTANCE_PASS mode=state_injected_persistence worker=completed physician_report=visible',
+    'HISTORIAN_QA_ACCEPTANCE_PASS mode=v2_transcript_grounded_state_injected_persistence worker=completed physician_report=visible',
   )
   return { gates: gateCount, evaluationStatus: 'completed' }
 }
