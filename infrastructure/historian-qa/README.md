@@ -67,11 +67,13 @@ PASS gates or a fixed failure code and HTTP status.
 
 The runner checks unauthenticated physician-report denial, clinician invitation
 creation, production-origin rejection, wrong-DOB rejection, correct-DOB grant
-cookie policy, non-diagnostic patient context, invited Nova session binding,
+cookie policy, non-diagnostic patient context, exact v2 Nova session binding,
 transactional save and replay, durable worker completion, and authenticated
-physician-only report visibility. The final save uses a fixed state-injected
-coverage fixture: it proves deployed persistence and worker/report plumbing,
-not a natural 60-exchange interview or clinical validity.
+physician-only report visibility. The final save uses a fixed 51-question,
+transcript-grounded v2 evidence ledger and deliberately supplies empty model
+coverage so the deployed save boundary must derive it authoritatively. This
+proves deployed persistence and worker/report plumbing, not a natural audible
+interview, Nova rollover, or clinical validity.
 
 Create it from an exact commit archive containing `source-commit.txt`, run it
 once, then delete the exact source object and the stack after PASS or failure.
