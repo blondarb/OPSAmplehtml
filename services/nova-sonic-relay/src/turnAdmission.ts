@@ -195,6 +195,10 @@ export class HistorianTurnQuarantine {
     return !!this.approval && !this.controlMode
   }
 
+  currentApprovedQuestion(): ApprovedHistorianTurn | null {
+    return this.approval ? { ...this.approval } : null
+  }
+
   hasApprovedQuestionStreaming(): boolean {
     return this.approvedQuestionStreaming
   }

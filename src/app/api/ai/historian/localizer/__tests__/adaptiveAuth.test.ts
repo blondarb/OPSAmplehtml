@@ -45,6 +45,7 @@ function request(token = 'conductor-token') {
         { role: 'user', text: 'Synthetic recurrent headaches.', timestamp: 1 },
       ],
       reviewGaps: ['functional_impact'],
+      reviewIntents: ['Clarify how the headaches affect daily function.'],
     }),
   })
 }
@@ -110,5 +111,8 @@ describe('adaptive Claude conductor authority', () => {
     expect(invokeBedrockJSONMock).toHaveBeenCalledTimes(2)
     const generatorInput = JSON.parse(invokeBedrockJSONMock.mock.calls[1][0].messages[0].content)
     expect(generatorInput.silentReviewerMissingDomains).toEqual(['functional_impact'])
+    expect(generatorInput.silentReviewerNextQuestionIntents).toEqual([
+      'Clarify how the headaches affect daily function.',
+    ])
   })
 })

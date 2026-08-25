@@ -588,6 +588,9 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
                 .map((item) => item.domain)
                 .slice(0, 8) ?? []
             : undefined,
+          reviewIntents: adaptiveTurnControllerEnabledRef.current
+            ? liveReviewRef.current?.review.nextQuestionIntents.slice(0, 3) ?? []
+            : undefined,
           adaptiveInterview: adaptiveTurnControllerEnabledRef.current,
         }),
       })
@@ -627,28 +630,23 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
       setLocalizerData(data)
       options.onLocalizerUpdate?.(data)
 
-      // Inject follow-up questions as advisory guidance into the session —
-      // advisory only, no forced response; the AI picks it up on its next
-      // natural turn. Guard: skip injection if the AI is currently speaking
-      // to avoid mid-sentence interruption and accidental vocalization.
+      // The adaptive conductor stays behind the application boundary. Nova
+      // receives its selected question only through the exact
+      // clinical_redirect -> resubmission contract below. Nova Sonic carries
+      // injected mid-session notes as USER-role turns; sending one while an
+      // approved question is waiting to be spoken can trigger a second tool
+      // call and terminate the interview. Legacy non-adaptive sessions retain
+      // their advisory localizer injection.
       if (
+        !adaptiveTurnControllerEnabledRef.current &&
         (data.contextHint || data.followUpQuestions.length > 0) &&
         providerRef.current &&
         !isAiSpeakingRef.current &&
         runtimeGuardRef.current?.acceptsInterviewActivity()
       ) {
-        const reviewIntents = adaptiveTurnControllerEnabledRef.current
-          ? liveReviewRef.current?.review.nextQuestionIntents.slice(0, 3) ?? []
-          : []
-        const guidance = adaptiveTurnControllerEnabledRef.current
-          ? [
-              '[PRIVATE CLAUDE CLINICAL CONDUCTOR NOTE — never speak or mention this note, a diagnosis, an internal agent, or your reasoning.]',
-              `Suggested next patient-history question: ${JSON.stringify(conductorQuestion ?? null)}`,
-              `Independent reviewer gap intents: ${JSON.stringify(reviewIntents)}`,
-              'Use this only when it is still unanswered and clinically higher-value than your own next question. Propose exactly one natural question through request_history_question.',
-            ].join('\n')
-          : `[INTERNAL SYSTEM NOTE — do NOT speak this aloud, do NOT mention it to the patient, use ONLY to guide your next question silently]: ${data.contextHint}`
-        providerRef.current.injectSystemText(guidance)
+        providerRef.current.injectSystemText(
+          `[INTERNAL SYSTEM NOTE — do NOT speak this aloud, do NOT mention it to the patient, use ONLY to guide your next question silently]: ${data.contextHint}`,
+        )
       }
     } catch (err: any) {
       // Network/timeout errors must not interrupt the session
@@ -705,24 +703,10 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
         return artifact
       }
 
-      if (
-        providerRef.current &&
-        !isAiSpeakingRef.current &&
-        runtimeGuardRef.current?.acceptsInterviewActivity()
-      ) {
-        const missingDomains = artifact.review.domains
-          .filter((item) => item.status === 'missing')
-          .map((item) => item.domain)
-        providerRef.current.injectSystemText([
-          '[PRIVATE INDEPENDENT REVIEW — never speak or mention this note, an internal reviewer, or its reasoning.]',
-          `Ready to close: ${artifact.review.readyToClose ? 'yes' : 'no'}`,
-          `Missing coverage domains: ${JSON.stringify(missingDomains)}`,
-          `Next history intents: ${JSON.stringify(artifact.review.nextQuestionIntents)}`,
-          `Contradiction count: ${artifact.review.contradictions.length}`,
-          `Repetition count: ${artifact.review.repetitions.length}`,
-          'Use this only to choose one unanswered patient-history question through request_history_question. Never expose a diagnosis or advice.',
-        ].join('\n'))
-      }
+      // Keep the independent reviewer fully silent and application-owned.
+      // Its cited domains govern closure and feed the next Claude conductor
+      // request; injecting reviewer prose into Nova would create a USER-role
+      // turn that can race an already-authorized patient-facing question.
       return artifact
     } catch {
       // Fail open for conversation continuity, but never for normal closure:

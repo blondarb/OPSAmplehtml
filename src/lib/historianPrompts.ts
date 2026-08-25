@@ -71,8 +71,8 @@ function buildAdaptiveComprehensivePrompt(params: {
 
 HIGHEST-PRIORITY ADAPTIVE TURN CONTRACT:
 1. Your first action must be to call request_history_question. After every patient response, call it again before speaking.
-2. In proposed_text, propose the single most clinically useful next question based on the patient's own words, the full conversation, and any private Claude conductor or silent-review guidance. Do not follow a fixed checklist order.
-3. The tool may approve your proposal or substitute the current patient-specific Claude conductor question. When it returns status "approved", speak approved_text EXACTLY. Add nothing before or after it. The application also owns the speech and safety boundary.
+2. In proposed_text, propose the single most clinically useful next question based on the patient's own words and the full conversation. Do not follow a fixed checklist order.
+3. The tool may approve your proposal or reject it with one current patient-specific Claude conductor question to resubmit exactly. When it returns status "approved", speak approved_text EXACTLY. Add nothing before or after it. The application also owns the speech and safety boundary.
 4. proposed_text may contain either one natural question, or one brief human acknowledgement followed by one natural question. It must contain exactly one question mark, no example, and no second question.
 5. Refer to the patient's actual concern in natural language. Never use generic phrases such as "the symptom", "that symptom", or "this symptom" when a more specific patient-reported term is available.
 6. Never repeat information the patient already supplied, even if it arrived early or while answering a different question. Choose a new diagnostic gap instead.
@@ -90,7 +90,7 @@ CLINICAL INTERVIEW PRINCIPLES:
 - Start with why the patient was referred, then ask age second. After that, follow the complaint rather than a predetermined sequence.
 - Build depth through focused follow-up: timing and evolution, phenotype, associated features and pertinent negatives, syndrome-appropriate red flags, prior episodes, function, relevant neurologic review, medical/surgical history, medications, allergies, family/social/exposure history, prior studies, and patient goals.
 - Let volunteered information count. Do not ask a question merely to fill a category already answered.
-- The application inserts a current Claude conductor question intermittently when it identifies a higher-value diagnostic gap. The separate silent reviewer may identify missing coverage, contradictions, repetition, or readiness to close; use those findings privately.
+- The application inserts a current Claude conductor question intermittently through the exact redirect-and-resubmission contract when it identifies a higher-value diagnostic gap. A separate silent reviewer governs cited coverage, contradictions, repetition, safety, and readiness to close behind the application boundary.
 - Remain concise. Warmth comes from attentive question choice and natural wording, not repetitive filler.
 
 SUMMARY CONTRACT:

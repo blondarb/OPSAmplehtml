@@ -33,6 +33,8 @@ type MockStartOptions = {
 type MockSession = {
   callbacks: MockCallbacks
   audio: string[]
+  toolResults: Array<{ toolUseId: string; output: string }>
+  systemTexts: string[]
   starts: Array<{ instructions: string; options: MockStartOptions }>
   emitAssistant: (text: string) => void
   active: boolean
@@ -48,6 +50,8 @@ const relayHarness = vi.hoisted(() => ({
 vi.mock('../novaSonicSession.js', () => ({
   NovaSonicSession: class {
     audio: string[] = []
+    toolResults: Array<{ toolUseId: string; output: string }> = []
+    systemTexts: string[] = []
     starts: Array<{ instructions: string; options: MockStartOptions }> = []
     active = false
     stopWithinResult = true
@@ -74,8 +78,8 @@ vi.mock('../novaSonicSession.js', () => ({
       }
     }
     pushAudio(pcm: string) { if (this.active) this.audio.push(pcm) }
-    pushToolResult() {}
-    pushSystemText() {}
+    pushToolResult(toolUseId: string, output: string) { this.toolResults.push({ toolUseId, output }) }
+    pushSystemText(text: string) { this.systemTexts.push(text) }
     emitAssistant(text: string) {
       this.callbacks.onTextOutput?.('ASSISTANT', text)
       this.callbacks.onAudioOutput?.('synthetic-audio')
@@ -351,6 +355,7 @@ describe('relay continuation protocol integration', () => {
       }),
     })
     await new Promise((resolve) => setTimeout(resolve, 10))
+    expect(relayHarness.instances[0].systemTexts).toEqual([])
 
     relayHarness.instances[0].callbacks.onTextOutput?.('ASSISTANT', 'When did the headaches begin?')
     relayHarness.instances[0].callbacks.onAudioOutput?.('adaptive-live-audio')
@@ -373,6 +378,107 @@ describe('relay continuation protocol integration', () => {
     expect(inbox.some((message) => message.t === 'error')).toBe(false)
     expect(inbox.filter((message) => message.t === 'assistantTranscript')).toHaveLength(0)
     expect(inbox.filter((message) => message.t === 'audio')).toHaveLength(0)
+  })
+
+  it('rebinds one duplicate adaptive tool call to the existing exact approval', async () => {
+    send({
+      t: 'start',
+      instructions: 'Synthetic adaptive instructions.',
+      tools: [],
+      interviewMode: 'comprehensive',
+      adaptiveTurnController: true,
+    })
+    await new Promise((resolve) => setTimeout(resolve, 10))
+    relayHarness.instances[0].callbacks.onToolUse?.({
+      toolName: 'request_history_question',
+      toolUseId: 'original-adaptive-tool',
+      content: JSON.stringify({ proposed_text: 'How often do the headaches occur?' }),
+    })
+    const original = await waitForMessage('toolCall')
+    send({
+      t: 'toolResult',
+      toolUseId: original.toolUseId,
+      segmentId: 1,
+      output: JSON.stringify({
+        success: true,
+        status: 'approved',
+        obligation_id: 'adaptive-question-5',
+        approved_text: 'How often do the headaches occur?',
+        allow_example: false,
+      }),
+    })
+    await new Promise((resolve) => setTimeout(resolve, 10))
+
+    relayHarness.instances[0].callbacks.onToolUse?.({
+      toolName: 'request_history_question',
+      toolUseId: 'duplicate-adaptive-tool',
+      content: JSON.stringify({ proposed_text: 'What makes the headaches worse?' }),
+    })
+    await new Promise((resolve) => setTimeout(resolve, 15))
+
+    expect(inbox.some((message) => message.t === 'toolCall')).toBe(false)
+    expect(relayHarness.instances[0].toolResults.at(-1)).toEqual({
+      toolUseId: 'duplicate-adaptive-tool',
+      output: JSON.stringify({
+        success: true,
+        status: 'approved',
+        obligation_id: 'adaptive-question-5',
+        approved_text: 'How often do the headaches occur?',
+        allow_example: false,
+      }),
+    })
+
+    relayHarness.instances[0].emitAssistant('How often do the headaches occur?')
+    await expect(waitForMessage('assistantTranscript')).resolves.toMatchObject({
+      text: 'How often do the headaches occur?',
+      obligationId: 'adaptive-question-5',
+    })
+    await expect(waitForMessage('audio')).resolves.toMatchObject({ pcm: 'synthetic-audio' })
+    expect(inbox.some((message) => message.t === 'error')).toBe(false)
+  })
+
+  it('fails closed when an adaptive approval enters a duplicate-tool loop', async () => {
+    send({
+      t: 'start',
+      instructions: 'Synthetic adaptive instructions.',
+      tools: [],
+      interviewMode: 'comprehensive',
+      adaptiveTurnController: true,
+    })
+    await new Promise((resolve) => setTimeout(resolve, 10))
+    relayHarness.instances[0].callbacks.onToolUse?.({
+      toolName: 'request_history_question',
+      toolUseId: 'loop-original-tool',
+      content: JSON.stringify({ proposed_text: 'How often do the headaches occur?' }),
+    })
+    const original = await waitForMessage('toolCall')
+    send({
+      t: 'toolResult',
+      toolUseId: original.toolUseId,
+      segmentId: 1,
+      output: JSON.stringify({
+        success: true,
+        status: 'approved',
+        obligation_id: 'adaptive-question-5',
+        approved_text: 'How often do the headaches occur?',
+        allow_example: false,
+      }),
+    })
+    await new Promise((resolve) => setTimeout(resolve, 10))
+
+    for (const toolUseId of ['loop-duplicate-one', 'loop-duplicate-two']) {
+      relayHarness.instances[0].callbacks.onToolUse?.({
+        toolName: 'request_history_question',
+        toolUseId,
+        content: JSON.stringify({ proposed_text: 'What makes the headaches worse?' }),
+      })
+    }
+
+    await expect(waitForMessage('error')).resolves.toMatchObject({
+      message: 'The voice response did not satisfy the patient interview safety contract.',
+    })
+    expect(inbox.some((message) => message.t === 'assistantTranscript')).toBe(false)
+    expect(inbox.some((message) => message.t === 'audio')).toBe(false)
   })
 
   it('lets the adaptive model retry a rejected proposal without terminating the stream', async () => {
@@ -560,6 +666,11 @@ describe('relay continuation protocol integration', () => {
       expect(logged).toContain('first_microphone_audio')
       expect(logged).toContain('tool_requested')
       expect(logged).not.toContain('SYNTHETIC_PRIVATE')
+
+      relayHarness.instances[0].callbacks.onTextOutput?.('USER', 'SYNTHETIC_PRIVATE_TRANSCRIPT')
+      const afterUserTranscript = JSON.stringify(logSpy.mock.calls)
+      expect(afterUserTranscript).toContain('user_transcript_block')
+      expect(afterUserTranscript).not.toContain('SYNTHETIC_PRIVATE_TRANSCRIPT')
 
       relayHarness.instances[0].callbacks.onToolUse?.({
         toolName: 'SYNTHETIC_PRIVATE_MODEL_CONTROLLED_NAME',

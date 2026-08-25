@@ -39,6 +39,7 @@ const MAX_SUGGESTED_ACTIONS = 4
 const SUGGESTED_ACTION_FIELD_MAX_LEN = 200
 const MAX_TRANSCRIPT_ENTRIES = 120
 const MAX_TRANSCRIPT_CHARS = 100_000
+const MAX_REVIEW_INTENT_CHARS = 240
 const REVIEW_DOMAIN_IDS = new Set<string>(
   COMPREHENSIVE_HISTORY_DOMAINS.map((domain) => domain.id),
 )
@@ -108,6 +109,7 @@ Rules for followUpQuestions:
 - Generate exactly 2–3 questions.
 - Each question should target a specific diagnostic gap not yet covered in the transcript.
 - When silentReviewerMissingDomains is non-empty, use it as an independent coverage signal, but still choose the most clinically coherent next gap rather than reciting a checklist order.
+- When silentReviewerNextQuestionIntents is non-empty, use it as independent clinical-review guidance only when the cited transcript still supports that intent and it remains unanswered.
 - Questions should be phrased as if spoken naturally to a patient (plain language).
 - Prioritize questions that would distinguish between the top 2 differential diagnoses.
 - For follow-up sessions: focus on treatment response, interval change, functional impact.
@@ -123,7 +125,7 @@ Rules for localizationHypothesis:
 
 Rules for contextHint:
 - Complete this sentence: "Based on what the patient has shared so far, clinical guidelines suggest..."
-- One sentence maximum. This will be injected into the AI historian's system prompt.
+- One sentence maximum. It is advisory metadata and is never patient-facing.
 
 Rules for confidence:
 - high: ≥3 turns of detailed patient history, clear symptom pattern
@@ -262,6 +264,12 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
         .filter((value) => typeof value === 'string' && REVIEW_DOMAIN_IDS.has(value))
         .slice(0, 8)
     : []
+  const reviewIntents = Array.isArray(body.reviewIntents)
+    ? body.reviewIntents
+        .filter((value): value is string => typeof value === 'string' && !!value.trim())
+        .map((value) => value.trim().slice(0, MAX_REVIEW_INTENT_CHARS))
+        .slice(0, 3)
+    : []
 
   if (!sessionId || !transcript || !Array.isArray(transcript)) {
     return NextResponse.json(
@@ -390,6 +398,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
           guidelineContext: kbGeneratedText || '(No guideline context available — use clinical judgment)',
           transcriptSummary: symptoms.clinicalSummary,
           silentReviewerMissingDomains: reviewGaps,
+          silentReviewerNextQuestionIntents: reviewIntents,
         })
 
         const { parsed } = await invokeBedrockJSON<GeneratedQuestions>({

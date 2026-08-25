@@ -297,6 +297,7 @@ describe('Comprehensive v3 adaptive synthetic runtime acceptance', () => {
       }),
     }))
     expect(provider.nudgeClosing).toHaveBeenCalledOnce()
+    expect(provider.injectSystemText).not.toHaveBeenCalled()
   })
 
   it('restores Claude as a private rolling clinical conductor every three patient turns', async () => {
@@ -337,6 +338,7 @@ describe('Comprehensive v3 adaptive synthetic runtime acceptance', () => {
     expect(conductorRequests[0].body).toMatchObject({
       sessionId: '00000000-0000-4000-8000-000000000063',
       adaptiveInterview: true,
+      reviewIntents: [],
     })
     expect(conductorRequests[0].body.transcript).toHaveLength(6)
 
@@ -353,15 +355,6 @@ describe('Comprehensive v3 adaptive synthetic runtime acceptance', () => {
     releaseConductor?.()
 
     await vi.waitFor(() => {
-      expect(provider.injectSystemText).toHaveBeenCalledWith(
-        expect.stringContaining('PRIVATE CLAUDE CLINICAL CONDUCTOR NOTE'),
-      )
-    })
-    const injected = String(vi.mocked(provider.injectSystemText).mock.calls[0][0])
-    expect(injected).toContain('How long does each headache usually last?')
-    expect(injected).not.toContain('synthetic-private-differential')
-    expect(provider.injectSystemText).toHaveBeenCalledTimes(1)
-    await vi.waitFor(() => {
       expect(lastToolOutput(provider)).toEqual({
         success: false,
         status: 'proposal_rejected',
@@ -369,6 +362,7 @@ describe('Comprehensive v3 adaptive synthetic runtime acceptance', () => {
         required_text: 'How long does each headache usually last?',
       })
     })
+    expect(provider.injectSystemText).not.toHaveBeenCalled()
     voiceSink?.({
       type: 'toolCall',
       toolName: 'request_history_question',
@@ -424,5 +418,6 @@ describe('Comprehensive v3 adaptive synthetic runtime acceptance', () => {
     await vi.waitFor(() => expect(reviewCalls).toBe(1))
     await vi.waitFor(() => expect(onSafetyEscalation).toHaveBeenCalledOnce())
     expect(provider.suppressOutput).toHaveBeenCalled()
+    expect(provider.injectSystemText).not.toHaveBeenCalled()
   })
 })

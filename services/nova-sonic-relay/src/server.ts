@@ -308,7 +308,9 @@ wss.on('connection', (ws) => {
   let pendingTurnAudioEndAtMs = 0
   let turnConfirmationTimer: ReturnType<typeof setTimeout> | null = null
   let adaptiveInterruptedTurn = false
+  let duplicateQuestionReauthorizationCount = 0
   let firstAudioObserved = false
+  let userTranscriptBlockCount = 0
   let admittedTurnCount = 0
   let startConfig: {
     instructions: string
@@ -540,6 +542,7 @@ wss.on('connection', (ws) => {
     }
 
     admittedTurnCount += 1
+    duplicateQuestionReauthorizationCount = 0
     logSessionEvent('turn_admitted', {
       segmentId,
       turn: admittedTurnCount,
@@ -617,6 +620,12 @@ wss.on('connection', (ws) => {
       if (segmentId !== activeSegmentId || outputQuarantined) return
       TRACE(`-> text[${role}] chars=${content.length}`)
       if (role.toUpperCase() === 'USER') {
+        userTranscriptBlockCount += 1
+        // Structural timing only. Never log transcript text or identifiers.
+        logSessionEvent('user_transcript_block', {
+          segmentId,
+          block: userTranscriptBlockCount,
+        })
         send(ws, { t: 'userTranscript', text: content, segmentId })
         // Comprehensive v2's application ledger owns every next question,
         // including age. The legacy relay nudge would race that approval and
@@ -716,6 +725,7 @@ wss.on('connection', (ws) => {
       if (controlledTurnActive()) {
         if (adaptiveInterruptedTurn) {
           adaptiveInterruptedTurn = false
+          duplicateQuestionReauthorizationCount = 0
           clearTurnConfirmationTimer()
           turnQuarantine.discard()
           maybeOpenBarrier()
@@ -750,6 +760,35 @@ wss.on('connection', (ws) => {
         segmentId,
         toolCategory: historianToolCategory(toolName),
       })
+      if (
+        adaptiveTurnControllerActive &&
+        toolName === 'request_history_question' &&
+        !turnQuarantine.hasContent()
+      ) {
+        const currentApproval = turnQuarantine.currentApprovedQuestion()
+        if (currentApproval) {
+          // A mid-stream USER-role note (or a provider duplicate) can make
+          // Nova request another question after one exact question is already
+          // authorized but before its first text/audio arrives. Never ask the
+          // browser to authorize a second obligation. Rebind one duplicate
+          // tool call to the existing exact approval; a second duplicate is a
+          // protocol loop and still fails closed.
+          if (duplicateQuestionReauthorizationCount >= 1) {
+            rejectHistorianTurn('duplicate_question_retry_limit')
+            return
+          }
+          duplicateQuestionReauthorizationCount += 1
+          logSessionEvent('duplicate_question_reauthorized', { segmentId })
+          session.pushToolResult(toolUseId, JSON.stringify({
+            success: true,
+            status: 'approved',
+            obligation_id: currentApproval.obligationId,
+            approved_text: currentApproval.approvedText,
+            allow_example: currentApproval.allowExample,
+          }))
+          return
+        }
+      }
       let input: unknown = content
       try {
         input = JSON.parse(content)
@@ -915,6 +954,7 @@ wss.on('connection', (ws) => {
             interviewMode === 'comprehensive'
           speechSuppressed = false
           adaptiveInterruptedTurn = false
+          duplicateQuestionReauthorizationCount = 0
           clearTurnConfirmationTimer()
           turnQuarantine.discard()
           comprehensiveOpeningSettled = false
@@ -1034,6 +1074,7 @@ wss.on('connection', (ws) => {
                   rejectHistorianTurn('overlapping_question_approval')
                   break
                 }
+                duplicateQuestionReauthorizationCount = 0
                 logSessionEvent('question_authorized', { segmentId: activeSegmentId })
               } else if (
                 outputRecord?.status !== 'coverage_ready' &&
@@ -1058,7 +1099,13 @@ wss.on('connection', (ws) => {
             }
             session.pushToolResult(msg.toolUseId, msg.output)
             pendingTools.delete(msg.toolUseId)
-            if (approvedQuestion) {
+            if (approvedQuestion && !adaptiveTurnControllerActive) {
+              // Comprehensive v2 receives an application-authored question,
+              // so retain its explicit reinforcement. In adaptive v3 the
+              // approved text is already Nova's exact proposal (including an
+              // exact Claude redirect resubmission). Sending another USER-role
+              // message here can be mistaken for a new patient turn and cause
+              // a duplicate tool call before speech.
               session.pushSystemText(
                 `[APPLICATION-OWNED APPROVED QUESTION] Speak exactly the approved_text from the tool result now. Do not add, remove, explain, acknowledge, or ask anything else. approved_text=${JSON.stringify(approvedQuestion.approvedText)}`,
               )

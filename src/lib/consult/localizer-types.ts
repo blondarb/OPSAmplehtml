@@ -43,6 +43,8 @@ export interface LocalizerRequest {
   referralReason?: string
   /** Fixed-vocabulary gaps from the separate silent reviewer. Never diagnoses. */
   reviewGaps?: ComprehensiveHistoryDomain[]
+  /** Bounded history-question intents from the separate silent reviewer. */
+  reviewIntents?: string[]
   /** Requires session-bound bearer authority and enables the adaptive conductor path. */
   adaptiveInterview?: boolean
 }
