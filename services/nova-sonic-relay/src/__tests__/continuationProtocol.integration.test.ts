@@ -19,6 +19,7 @@ type MockCallbacks = {
   onAssistantFinalText?: (content: string) => void
   onAudioOutput?: (pcm: string) => void
   onAssistantAudioEnd?: () => void
+  onCompletionEnd?: () => void
   onError?: (error: unknown) => void
   onUnexpectedStreamEnd?: () => void
 }
@@ -77,8 +78,9 @@ vi.mock('../novaSonicSession.js', () => ({
     emitAssistant(text: string) {
       this.callbacks.onTextOutput?.('ASSISTANT', text)
       this.callbacks.onAudioOutput?.('synthetic-audio')
-      this.callbacks.onAssistantFinalText?.(text)
       this.callbacks.onAssistantAudioEnd?.()
+      this.callbacks.onAssistantFinalText?.(text)
+      this.callbacks.onCompletionEnd?.()
     }
     isActive() { return this.active }
     async waitUntilTransportReady() {
@@ -362,7 +364,7 @@ describe('relay continuation protocol integration', () => {
     }
   })
 
-  it('waits for a FINAL text copy that arrives after AUDIO END_TURN, then releases once', async () => {
+  it('waits for every paired sentence-level FINAL block, then releases once', async () => {
     send({
       t: 'start',
       instructions: 'Synthetic controlled instructions.',
@@ -385,12 +387,13 @@ describe('relay continuation protocol integration', () => {
         success: true,
         status: 'approved',
         obligation_id: 'synthetic-onset',
-        approved_text: 'When did the symptom begin?',
+        approved_text: 'I will ask one question. When did the symptom begin?',
         allow_example: false,
       }),
     })
     await new Promise((resolve) => setTimeout(resolve, 10))
 
+    relayHarness.instances[0].callbacks.onTextOutput?.('ASSISTANT', 'I will ask one question.')
     relayHarness.instances[0].callbacks.onTextOutput?.('ASSISTANT', 'When did the symptom begin?')
     relayHarness.instances[0].callbacks.onAudioOutput?.('delayed-final-audio')
     relayHarness.instances[0].callbacks.onAssistantAudioEnd?.()
@@ -399,9 +402,13 @@ describe('relay continuation protocol integration', () => {
     expect(inbox.some((message) => message.t === 'audio')).toBe(false)
     expect(inbox.some((message) => message.t === 'error')).toBe(false)
 
+    relayHarness.instances[0].callbacks.onAssistantFinalText?.('I will ask one question.')
+    await new Promise((resolve) => setTimeout(resolve, 5))
+    expect(inbox.some((message) => message.t === 'assistantTranscript')).toBe(false)
+    expect(inbox.some((message) => message.t === 'audio')).toBe(false)
     relayHarness.instances[0].callbacks.onAssistantFinalText?.('When did the symptom begin?')
     await expect(waitForMessage('assistantTranscript')).resolves.toMatchObject({
-      text: 'When did the symptom begin?',
+      text: 'I will ask one question. When did the symptom begin?',
       obligationId: 'synthetic-onset',
       segmentId: 1,
     })
@@ -409,6 +416,10 @@ describe('relay continuation protocol integration', () => {
       pcm: 'delayed-final-audio',
       segmentId: 1,
     })
+    expect(inbox.filter((message) => message.t === 'assistantTranscript')).toHaveLength(0)
+    expect(inbox.filter((message) => message.t === 'audio')).toHaveLength(0)
+    relayHarness.instances[0].callbacks.onCompletionEnd?.()
+    await new Promise((resolve) => setTimeout(resolve, 5))
     expect(inbox.filter((message) => message.t === 'assistantTranscript')).toHaveLength(0)
     expect(inbox.filter((message) => message.t === 'audio')).toHaveLength(0)
   })
@@ -484,6 +495,7 @@ describe('relay continuation protocol integration', () => {
     relayHarness.instances[0].callbacks.onAssistantAudioEnd?.()
     relayHarness.instances[0].callbacks.onAudioOutput?.('post-boundary-audio')
     relayHarness.instances[0].callbacks.onAssistantFinalText?.('When did the symptom begin?')
+    relayHarness.instances[0].callbacks.onCompletionEnd?.()
 
     await waitForMessage('error')
     expect(inbox.some((message) => message.t === 'assistantTranscript')).toBe(false)

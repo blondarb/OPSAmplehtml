@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest'
 import {
   APPROVED_HISTORIAN_CLOSING_TEXT,
   HistorianTurnQuarantine,
+  PRODUCTION_TURN_CONFIRMATION_TIMEOUT_MS,
   canonicalSpokenText,
   countResponseRequests,
   parseApprovedHistorianTurn,
@@ -16,6 +17,10 @@ const APPROVAL = {
 }
 
 describe('Historian assistant turn admission', () => {
+  it('allows a bounded provider-finalization window longer than normal mobile startup latency', () => {
+    expect(PRODUCTION_TURN_CONFIRMATION_TIMEOUT_MS).toBe(30_000)
+  })
+
   it('releases exact approved text and its quarantined audio together', () => {
     const gate = new HistorianTurnQuarantine(1_000)
     expect(gate.approveQuestion(APPROVAL)).toBe(true)
@@ -29,6 +34,28 @@ describe('Historian assistant turn admission', () => {
       audio: ['AAAA', 'BBBB'],
       obligationId: APPROVAL.obligationId,
       mode: 'approved_question',
+    })
+  })
+
+  it('requires every speculative sentence block to receive its matching FINAL block', () => {
+    const gate = new HistorianTurnQuarantine(1_000)
+    const approval = {
+      obligationId: 'onset',
+      approvedText: 'I will ask one question. When did the symptom begin?',
+      allowExample: false,
+    }
+    gate.approveQuestion(approval)
+    gate.bufferText('I will ask one question.')
+    gate.bufferText('When did the symptom begin?')
+    gate.bufferAudio('AAAA')
+    gate.bufferFinalText('I will ask one question.')
+    expect(gate.hasConfirmedTextMatch()).toBe(false)
+    gate.bufferFinalText('When did the symptom begin?')
+    expect(gate.hasConfirmedTextMatch()).toBe(true)
+    expect(gate.finalize()).toMatchObject({
+      allowed: true,
+      text: approval.approvedText,
+      obligationId: approval.obligationId,
     })
   })
 
@@ -136,11 +163,19 @@ describe('Historian assistant turn admission', () => {
       authorization: 'approved_question',
       speculativeTextSeen: true,
       finalTextSeen: false,
+      speculativeTextPartCount: 1,
+      finalTextPartCount: 0,
+      speculativeMatchesApproval: false,
+      finalMatchesApproval: null,
+      stageTextMatches: null,
+      speculativeWordCount: 8,
+      finalWordCount: 0,
+      approvedWordCount: 7,
       audioChunkCount: 1,
       overflowed: false,
     })
     expect(JSON.stringify(diagnostics)).not.toContain('private')
-    expect(gate.hasConfirmedTextPair()).toBe(false)
+    expect(gate.hasConfirmedTextMatch()).toBe(false)
   })
 
   it('parses only the exact application approval shape', () => {

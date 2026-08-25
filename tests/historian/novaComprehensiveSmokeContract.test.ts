@@ -80,6 +80,19 @@ describe('Nova Comprehensive Historian acceptance contract', () => {
     expect(source).toContain('conservativeHistorianContinuationCoverage')
   })
 
+  it('has an explicit live opening-turn admission acceptance with no patient data path', () => {
+    expect(source).toContain("process.argv.includes('--live-turn-admission')")
+    expect(source).toContain('turnEvidenceController: true')
+    expect(source).toContain("getHistorianToolsForProvider('nova', 'new_patient', 'comprehensive-v2')")
+    expect(source).toContain('PRODUCTION_TURN_CONFIRMATION_TIMEOUT_MS')
+    expect(source).toContain('PASS live_turn_admission_delayed_final_confirmed')
+    expect(source).toContain(
+      'PASS live_turn_admission_exact_question_and_audio_released_after_final_confirmation',
+    )
+    expect(source).not.toContain('live_turn_admission_exact_question_and_audio_released_once')
+    expect(source).toContain('LIMIT live_turn_admission_not_browser_not_persistence_not_clinical')
+  })
+
   it('accepts only coverage-complete output at logical exchange 26', () => {
     expect(LIVE_SYNTHETIC_COVERAGE_SAVE_NUDGE).toContain('LIVE_STATE_INJECTED')
     expect(LIVE_SYNTHETIC_COVERAGE_SAVE_NUDGE).toContain('Immediately call save_interview_output')

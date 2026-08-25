@@ -1,5 +1,6 @@
 import { describe, it, expect, vi } from 'vitest'
 import {
+  NOVA_SESSION_START_KICKOFF,
   NovaSonicSession,
   parseGenerationStage,
   shouldForwardText,
@@ -106,6 +107,11 @@ describe('raw relay trace redaction', () => {
 })
 
 describe('NovaSonicSession text-stage filtering (live-captured pattern)', () => {
+  it('uses a neutral kickoff that cannot override a system-required first tool call', () => {
+    expect(NOVA_SESSION_START_KICKOFF).toContain('Follow your system instructions')
+    expect(NOVA_SESSION_START_KICKOFF).not.toMatch(/greet|ask.*question/i)
+  })
+
   it('signals the audible turn boundary on AUDIO END_TURN without waiting for completionEnd', () => {
     let audioEnds = 0
     const session = new NovaSonicSession({

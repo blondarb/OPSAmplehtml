@@ -12,6 +12,15 @@ export type TurnAdmissionMode =
   | 'unresponsive_check_in'
   | 'unresponsive_sign_off'
 
+/**
+ * Nova emits the FINAL sentence-level transcription after audio generation.
+ * That post-audio step is not bounded to two seconds by the provider contract;
+ * the application keeps the entire turn quarantined while it waits. Thirty
+ * seconds stays below the existing 60-second live-response ceiling while
+ * allowing the documented finalization phase to complete on mobile sessions.
+ */
+export const PRODUCTION_TURN_CONFIRMATION_TIMEOUT_MS = 30_000
+
 export interface ApprovedHistorianTurn {
   obligationId: string
   approvedText: string
@@ -26,6 +35,14 @@ export interface HistorianTurnQuarantineDiagnostics {
     | 'none'
   speculativeTextSeen: boolean
   finalTextSeen: boolean
+  speculativeTextPartCount: number
+  finalTextPartCount: number
+  speculativeMatchesApproval: boolean | null
+  finalMatchesApproval: boolean | null
+  stageTextMatches: boolean | null
+  speculativeWordCount: number
+  finalWordCount: number
+  approvedWordCount: number
   audioChunkCount: number
   overflowed: boolean
 }
@@ -163,17 +180,46 @@ export class HistorianTurnQuarantine {
     return !!this.approval || !!this.controlMode
   }
 
-  hasConfirmedTextPair(): boolean {
-    return this.textParts.length > 0 && this.finalTextParts.length > 0
+  hasConfirmedTextMatch(): boolean {
+    const speculativeText = canonicalSpokenText(this.textParts.join(' '))
+    const finalText = canonicalSpokenText(this.finalTextParts.join(' '))
+    return (
+      this.textParts.length > 0 &&
+      this.textParts.length === this.finalTextParts.length &&
+      !!speculativeText &&
+      !!finalText &&
+      speculativeText === finalText
+    )
   }
 
   diagnostics(): HistorianTurnQuarantineDiagnostics {
+    const speculativeText = this.textParts.join(' ').trim()
+    const finalText = this.finalTextParts.join(' ').trim()
+    const approvedText = this.approval?.approvedText.trim() ?? ''
+    const canonicalSpeculative = canonicalSpokenText(speculativeText)
+    const canonicalFinal = canonicalSpokenText(finalText)
+    const canonicalApproved = canonicalSpokenText(approvedText)
+    const wordCount = (value: string) => value ? value.split(' ').length : 0
     return {
       authorization: this.approval
         ? 'approved_question'
         : this.controlMode ?? 'none',
       speculativeTextSeen: this.textParts.length > 0,
       finalTextSeen: this.finalTextParts.length > 0,
+      speculativeTextPartCount: this.textParts.length,
+      finalTextPartCount: this.finalTextParts.length,
+      speculativeMatchesApproval: this.approval && canonicalSpeculative
+        ? canonicalSpeculative === canonicalApproved
+        : null,
+      finalMatchesApproval: this.approval && canonicalFinal
+        ? canonicalFinal === canonicalApproved
+        : null,
+      stageTextMatches: canonicalSpeculative && canonicalFinal
+        ? canonicalSpeculative === canonicalFinal
+        : null,
+      speculativeWordCount: wordCount(canonicalSpeculative),
+      finalWordCount: wordCount(canonicalFinal),
+      approvedWordCount: wordCount(canonicalApproved),
       audioChunkCount: this.audioParts.length,
       overflowed: this.overflowed,
     }

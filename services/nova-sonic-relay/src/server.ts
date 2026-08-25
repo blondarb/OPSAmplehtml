@@ -21,6 +21,7 @@ import {
 import { sweepHeartbeatSockets, trackHeartbeat } from './websocketHeartbeat.js'
 import {
   HistorianTurnQuarantine,
+  PRODUCTION_TURN_CONFIRMATION_TIMEOUT_MS,
   parseApprovedHistorianTurn,
 } from './turnAdmission.js'
 
@@ -231,7 +232,7 @@ const CONTINUATION_BUFFER_MAX_BASE64_CHARS = 1_280_000 // 30s PCM16@16k, base64 
 const OLD_SEGMENT_STOP_TIMEOUT_MS = 5_000
 const TURN_CONFIRMATION_TIMEOUT_MS = continuationTiming(
   'NOVA_TURN_CONFIRMATION_TEST_TIMEOUT_MS',
-  2_000,
+  PRODUCTION_TURN_CONFIRMATION_TIMEOUT_MS,
 )
 
 wss.on('connection', (ws) => {
@@ -274,6 +275,7 @@ wss.on('connection', (ws) => {
   let speechSuppressed = false
   const turnQuarantine = new HistorianTurnQuarantine(2_560_000)
   let pendingTurnAudioEndSegment: number | null = null
+  let pendingTurnAudioEndAtMs = 0
   let turnConfirmationTimer: ReturnType<typeof setTimeout> | null = null
   let firstAudioObserved = false
   let admittedTurnCount = 0
@@ -470,6 +472,7 @@ wss.on('connection', (ws) => {
     if (turnConfirmationTimer) clearTimeout(turnConfirmationTimer)
     turnConfirmationTimer = null
     pendingTurnAudioEndSegment = null
+    pendingTurnAudioEndAtMs = 0
   }
 
   function finishAssistantBoundary(): void {
@@ -481,18 +484,23 @@ wss.on('connection', (ws) => {
   }
 
   /**
-   * Nova may deliver the AUDIO END_TURN marker immediately before the
-   * byte-identical FINAL text copy. The strict gate must wait for both pieces,
-   * not reject at the first marker and not release any audio early.
+   * Nova emits FINAL transcription sentence by sentence after AUDIO END_TURN
+   * and may delay completionEnd indefinitely on a continuous stream. Nova's
+   * paired speculative/final block counts plus full-text equality prove every
+   * planned sentence was confirmed. A partial first FINAL sentence cannot
+   * trigger this boundary.
    */
   function tryFinalizeControlledTurn(segmentId: number): boolean {
     if (
       pendingTurnAudioEndSegment !== segmentId ||
       segmentId !== activeSegmentId ||
-      !turnQuarantine.hasConfirmedTextPair()
+      !turnQuarantine.hasConfirmedTextMatch()
     ) return false
 
     const diagnostics = turnQuarantine.diagnostics()
+    const confirmationWaitMs = pendingTurnAudioEndAtMs > 0
+      ? Math.max(0, Date.now() - pendingTurnAudioEndAtMs)
+      : 0
     clearTurnConfirmationTimer()
     const admitted = turnQuarantine.finalize()
     if (!admitted.allowed) {
@@ -505,6 +513,7 @@ wss.on('connection', (ws) => {
       segmentId,
       turn: admittedTurnCount,
       mode: admitted.mode,
+      confirmationWaitMs,
       ...diagnostics,
     })
     startAiSpeech()
@@ -525,12 +534,12 @@ wss.on('connection', (ws) => {
       return
     }
     pendingTurnAudioEndSegment = segmentId
+    pendingTurnAudioEndAtMs = Date.now()
     logSessionEvent('turn_audio_end', {
       segmentId,
       ...turnQuarantine.diagnostics(),
     })
     if (tryFinalizeControlledTurn(segmentId)) return
-
     turnConfirmationTimer = setTimeout(() => {
       if (pendingTurnAudioEndSegment !== segmentId || modelTerminalSent || clientStopping) return
       const diagnostics = turnQuarantine.diagnostics()
@@ -673,10 +682,11 @@ wss.on('connection', (ws) => {
       if (rejectCandidateActivity('unexpected_completion')) return
       if (segmentId !== activeSegmentId || outputQuarantined) return
       if (turnEvidenceControllerActive && pendingTurnAudioEndSegment === segmentId) {
-        logSessionEvent('completion_deferred_for_final_text', {
+        logSessionEvent('turn_completion_end', {
           segmentId,
           ...turnQuarantine.diagnostics(),
         })
+        tryFinalizeControlledTurn(segmentId)
         return
       }
       if (turnEvidenceControllerActive && turnQuarantine.hasContent()) {

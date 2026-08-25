@@ -15,6 +15,7 @@
  *   AWS_PROFILE=<authorized-profile> npm run historian:nova-smoke -- --live --live-scenario emergency-at-26
  *   AWS_PROFILE=<authorized-profile> npm run historian:nova-smoke -- --live --live-suite
  *   AWS_PROFILE=<authorized-profile> npm run historian:nova-smoke -- --live --live-continuation
+ *   AWS_PROFILE=<authorized-profile> npm run historian:nova-smoke -- --live --live-turn-admission
  */
 
 import { spawnSync } from 'node:child_process'
@@ -28,6 +29,7 @@ import WebSocket from 'ws'
 import { buildHistorianSystemPrompt, getHistorianToolsForProvider } from '../src/lib/historianPrompts'
 import { NovaSonicSession } from '../services/nova-sonic-relay/src/novaSonicSession.js'
 import { COMPREHENSIVE_AGE_NUDGE } from '../services/nova-sonic-relay/src/comprehensiveOpening.js'
+import { PRODUCTION_TURN_CONFIRMATION_TIMEOUT_MS } from '../services/nova-sonic-relay/src/turnAdmission.js'
 import type { ServerMsg } from '../services/nova-sonic-relay/src/wsProtocol.js'
 import {
   COMPREHENSIVE_HARD_STOP_SAVE_NUDGE,
@@ -278,6 +280,167 @@ async function runLiveOpeningSmoke(): Promise<void> {
   } finally {
     if (silenceTimer) clearInterval(silenceTimer)
     await session.stop()
+  }
+}
+
+/**
+ * PHI-free live acceptance for the exact app-owned opening-turn admission
+ * boundary. A local relay and real Nova stream receive only silence plus one
+ * fixed application-approved question. The test passes only when FINAL text
+ * confirmation arrives, the exact approved transcript is emitted, and at
+ * least one quarantined audio frame is released. It does not use a browser,
+ * microphone, invitation, application API, database, or persistence.
+ */
+async function runLiveTurnAdmissionOpening(): Promise<void> {
+  const approvedQuestion = {
+    success: true,
+    status: 'approved',
+    obligation_id: 'referral_reason',
+    approved_text: "Hi, I'm Henry, and I'll help gather your history before your neurology visit. What brought you to be referred for this visit?",
+    allow_example: false,
+  }
+  const instructions = buildHistorianSystemPrompt(
+    'new_patient',
+    SYNTHETIC_REFERRAL,
+    undefined,
+    undefined,
+    SYNTHETIC_REFERRAL,
+    'comprehensive',
+    'comprehensive-v2',
+  )
+  const tools = getHistorianToolsForProvider('nova', 'new_patient', 'comprehensive-v2')
+  const errors: string[] = []
+  const sharedSecret = randomBytes(32).toString('hex')
+  const origin = 'http://synthetic-turn-admission.test'
+  const envNames = [
+    'NODE_ENV',
+    'PORT',
+    'NOVA_RELAY_SHARED_SECRET',
+    'NOVA_RELAY_ALLOWED_ORIGINS',
+    'NOVA_HISTORIAN_TURN_GATE_V1',
+    'NOVA_TURN_CONFIRMATION_TEST_TIMEOUT_MS',
+    'TRANSCRIBE_MEDICAL_ENABLED',
+  ] as const
+  const priorEnv = new Map(envNames.map((name) => [name, process.env[name]]))
+  let relay: LiveRelayModule | null = null
+  let client: WebSocket | null = null
+  let clientClosing = false
+  let silenceTimer: ReturnType<typeof setInterval> | null = null
+  let approvedToolCalls = 0
+  let admittedTranscript: Extract<ServerMsg, { t: 'assistantTranscript' }> | null = null
+  let admittedAudioFrames = 0
+  let speechStopped = false
+
+  const sendRelay = (message: unknown) => {
+    if (!client || client.readyState !== WebSocket.OPEN) {
+      throw new Error('Live turn-admission relay WebSocket is not open')
+    }
+    client.send(JSON.stringify(message))
+  }
+
+  try {
+    process.env.NODE_ENV = 'test'
+    process.env.PORT = '0'
+    process.env.NOVA_RELAY_SHARED_SECRET = sharedSecret
+    process.env.NOVA_RELAY_ALLOWED_ORIGINS = origin
+    process.env.NOVA_HISTORIAN_TURN_GATE_V1 = 'true'
+    process.env.NOVA_TURN_CONFIRMATION_TEST_TIMEOUT_MS = String(
+      PRODUCTION_TURN_CONFIRMATION_TIMEOUT_MS,
+    )
+    process.env.TRANSCRIBE_MEDICAL_ENABLED = 'false'
+
+    relay = await import('../services/nova-sonic-relay/src/server.js')
+    if (!relay.server.listening) await once(relay.server, 'listening')
+    const address = relay.server.address()
+    if (!address || typeof address === 'string') {
+      throw new Error('Live turn-admission relay did not bind a local TCP port')
+    }
+    const payload = Buffer.from(JSON.stringify({ exp: Math.floor(Date.now() / 1000) + 180 }))
+      .toString('base64url')
+    const signature = createHmac('sha256', sharedSecret).update(payload).digest('base64url')
+    client = new WebSocket(
+      `ws://127.0.0.1:${address.port}`,
+      ['nova.v1', `${payload}.${signature}`],
+      { origin },
+    )
+    client.on('message', (raw) => {
+      let message: ServerMsg
+      try {
+        message = JSON.parse(raw.toString()) as ServerMsg
+      } catch {
+        errors.push('Live turn-admission relay returned malformed JSON')
+        return
+      }
+      if (message.t === 'toolCall') {
+        if (message.toolName !== 'request_history_question' || approvedToolCalls > 0) {
+          errors.push(`Unexpected live turn-admission tool call: ${message.toolName}`)
+          return
+        }
+        approvedToolCalls += 1
+        sendRelay({
+          t: 'toolResult',
+          toolUseId: message.toolUseId,
+          output: JSON.stringify(approvedQuestion),
+          segmentId: message.segmentId,
+        })
+      } else if (message.t === 'assistantTranscript') {
+        admittedTranscript = message
+      } else if (message.t === 'audio') {
+        admittedAudioFrames += 1
+      } else if (message.t === 'aiSpeechStop') {
+        speechStopped = true
+      } else if (message.t === 'error') {
+        errors.push(`Nova relay error: ${message.message}`)
+      } else if (message.t === 'sessionEnded' && !clientClosing) {
+        errors.push(`Nova relay ended unexpectedly: ${message.reason}`)
+      }
+    })
+    client.on('close', (code) => {
+      if (!clientClosing) errors.push(`Live turn-admission relay WebSocket closed (${code})`)
+    })
+    await once(client, 'open')
+    sendRelay({
+      t: 'start',
+      instructions,
+      tools,
+      interviewMode: 'comprehensive',
+      turnEvidenceController: true,
+    })
+    silenceTimer = setInterval(() => {
+      try { sendRelay({ t: 'audio', pcm: SILENCE_PCM_BASE64 }) } catch {}
+    }, AUDIO_CHUNK_MS)
+
+    await waitFor(
+      () => approvedToolCalls === 1 && !!admittedTranscript && admittedAudioFrames > 0 && speechStopped,
+      'one admitted live Nova opening turn',
+      errors,
+    )
+    if (
+      admittedTranscript?.text !== approvedQuestion.approved_text ||
+      admittedTranscript?.obligationId !== approvedQuestion.obligation_id
+    ) {
+      throw new Error('Live turn admission did not preserve the exact application-approved question')
+    }
+    console.log('PASS live_turn_admission_delayed_final_confirmed')
+    console.log('PASS live_turn_admission_exact_question_and_audio_released_after_final_confirmation')
+    console.log('LIMIT live_turn_admission_not_browser_not_persistence_not_clinical')
+  } finally {
+    if (silenceTimer) clearInterval(silenceTimer)
+    clientClosing = true
+    if (client?.readyState === WebSocket.OPEN) {
+      try { client.send(JSON.stringify({ t: 'stop' })) } catch {}
+      await Promise.race([once(client, 'close').catch(() => undefined), sleep(1500)])
+    }
+    if (client && client.readyState !== WebSocket.CLOSED) client.terminate()
+    if (relay) {
+      await new Promise<void>((resolve) => relay!.wss.close(() => resolve()))
+      await new Promise<void>((resolve) => relay!.server.close(() => resolve()))
+    }
+    for (const name of envNames) {
+      const previous = priorEnv.get(name)
+      if (previous === undefined) delete process.env[name]
+      else process.env[name] = previous
+    }
   }
 }
 
@@ -862,6 +1025,19 @@ async function main(): Promise<void> {
     } catch (error) {
       if (isUnavailableLiveProviderFailure(error)) {
         console.log(`NOT_RUN continuation nova_live_provider_or_iam ${errorMessage(error)}`)
+        return
+      }
+      throw error
+    }
+    return
+  }
+
+  if (process.argv.includes('--live-turn-admission')) {
+    try {
+      await runLiveTurnAdmissionOpening()
+    } catch (error) {
+      if (isUnavailableLiveProviderFailure(error)) {
+        console.log(`NOT_RUN turn_admission nova_live_provider_or_iam ${errorMessage(error)}`)
         return
       }
       throw error

@@ -67,6 +67,14 @@ type RawEvent = { event: Record<string, unknown> }
 // match loosely to be resilient to whitespace changes.
 const INTERRUPTED_RE = /"interrupted"\s*:\s*true/
 
+/**
+ * Neutral session-start signal. The system prompt owns whether the first
+ * action is speech or a tool call; the transport must not contradict it by
+ * independently instructing Nova to greet or ask a question.
+ */
+export const NOVA_SESSION_START_KICKOFF =
+  '[The conversation has now started. Follow your system instructions for the first action exactly.]'
+
 // ---------------------------------------------------------------------------
 // Text-output stage filtering
 //
@@ -368,23 +376,21 @@ export class NovaSonicSession {
 
   /**
    * Enqueue one initial USER-role text turn that prompts Nova to open the
-   * conversation with its greeting, immediately after the stream opens.
+   * conversation, immediately after the stream opens.
    * Nova is speech-to-speech and otherwise waits silently for the patient to
    * speak first — unlike the OpenAI/Henry path, which sends `response.create`
    * on session-open. This reuses the exact same enqueue path as
    * pushSystemText()/userText() (role USER, not SYSTEM — a second SYSTEM
    * block fails the whole stream with "Duplicate SYSTEM content"). Fires
-   * once per session; the historian system prompt owns the actual greeting
-   * content/persona, this just signals "start now."
+   * once per session; the system prompt owns the actual first action and
+   * content/persona, while this message only signals "start now."
    */
   sendGreetingKickoff(): void {
     if (this.kickoffSent || !this.active) {
       return
     }
     this.kickoffSent = true
-    this.pushSystemText(
-      '[The interview has now started. Please greet the patient warmly by beginning the conversation and asking your first question.]',
-    )
+    this.pushSystemText(NOVA_SESSION_START_KICKOFF)
   }
 
   /** Enqueue one chunk of user audio (base64 LPCM). No-op if not active. */
