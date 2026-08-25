@@ -197,6 +197,7 @@ Resources:
             build:
               commands:
                 - |
+                  set -eu
                   set +x
                   existing_digest="$(aws ecr describe-images --repository-name historian-qa-nova-relay --image-ids imageTag="$SOURCE_COMMIT" --query 'imageDetails[0].imageDigest' --output text 2>/dev/null || true)"
                   if printf '%s' "$existing_digest" | grep -Eq '^sha256:[0-9a-f]{64}$'; then
@@ -209,6 +210,7 @@ Resources:
             post_build:
               commands:
                 - |
+                  set -eu
                   set +x
                   image_digest="$(aws ecr describe-images --repository-name historian-qa-nova-relay --image-ids imageTag="$SOURCE_COMMIT" --query 'imageDetails[0].imageDigest' --output text)"
                   test "$(printf '%s' "$image_digest" | grep -Ec '^sha256:[0-9a-f]{64}$')" = 1

@@ -1,7 +1,7 @@
 # ---------------------------------------------------------------------------
 # Stage 1: build — compile TypeScript to dist/
 # ---------------------------------------------------------------------------
-FROM node:22-alpine@sha256:c610fcdfb1d5b4740dd70c284ed3cb16bb857e0f7166196e36a5501df7a3aa32 AS build
+FROM public.ecr.aws/docker/library/node:22-alpine@sha256:c610fcdfb1d5b4740dd70c284ed3cb16bb857e0f7166196e36a5501df7a3aa32 AS build
 
 WORKDIR /app
 
@@ -16,7 +16,7 @@ RUN npm run build
 # ---------------------------------------------------------------------------
 # Stage 2: runtime — production deps only + compiled output
 # ---------------------------------------------------------------------------
-FROM node:22-alpine@sha256:c610fcdfb1d5b4740dd70c284ed3cb16bb857e0f7166196e36a5501df7a3aa32
+FROM public.ecr.aws/docker/library/node:22-alpine@sha256:c610fcdfb1d5b4740dd70c284ed3cb16bb857e0f7166196e36a5501df7a3aa32
 
 WORKDIR /app
 
