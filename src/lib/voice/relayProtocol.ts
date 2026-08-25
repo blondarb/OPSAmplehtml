@@ -5,6 +5,7 @@
 export type ClientMsg =
   | { t: 'start'; instructions: string; tools: unknown[]; voiceId?: string; interviewMode?: 'standard' | 'comprehensive'; turnEvidenceController?: boolean; adaptiveTurnController?: boolean }
   | { t: 'audio'; pcm: string; audioSeq?: number } // base64 PCM16 @16k; seq is required by continuation-capable clients
+  | { t: 'clientDiagnostic'; category: 'microphone_runtime_failure'; reason: 'track_ended' | 'track_muted' | 'context_not_running' | 'audio_chunks_stalled' }
   | { t: 'userTurnEnd' }
   | { t: 'toolResult'; toolUseId: string; output: string; segmentId?: number }
   | { t: 'systemText'; text: string }

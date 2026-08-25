@@ -1,7 +1,13 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import type { HistorianRedFlag, HistorianStructuredOutput, HistorianTranscriptEntry } from '@/lib/historianTypes'
+import type {
+  HistorianRedFlag,
+  HistorianStructuredOutput,
+  HistorianTerminationReason,
+  HistorianTranscriptEntry,
+} from '@/lib/historianTypes'
+import { historianPatientCompletionPresentation } from '@/lib/historian/completionPresentation'
 import type { FinalDifferential } from '@/lib/historian/eval/finalDifferential'
 import type { IndependentDifferential } from '@/lib/historian/eval/independentDdx'
 import type { AgreementResult } from '@/lib/historian/eval/agreement'
@@ -18,6 +24,8 @@ interface HistorianReportViewProps {
   redFlags: HistorianRedFlag[]
   duration: number
   questionCount: number
+  endedEarly: boolean
+  terminationReason: HistorianTerminationReason
   /** Optional — included when available so the Patient Report fallback has more to work with. */
   transcript?: HistorianTranscriptEntry[]
   /**
@@ -86,6 +94,8 @@ export default function HistorianReportView({
   redFlags,
   duration,
   questionCount,
+  endedEarly,
+  terminationReason,
   transcript,
   surface,
   finalDifferential,
@@ -102,6 +112,10 @@ export default function HistorianReportView({
     surface === 'patient' ? 'patient' : 'physician',
   )
   const clinical = theme === 'clinical'
+  const completionPresentation = historianPatientCompletionPresentation(
+    endedEarly,
+    terminationReason,
+  )
   const [patientReport, setPatientReport] = useState<string | null>(null)
   const [patientReportLoading, setPatientReportLoading] = useState(true)
   const [patientReportError, setPatientReportError] = useState(false)
@@ -173,19 +187,25 @@ export default function HistorianReportView({
       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center', marginBottom: '24px' }}>
         <div style={{
           width: 64, height: 64, borderRadius: '50%',
-          background: clinical ? 'var(--nn-accent-wash)' : 'rgba(34, 197, 94, 0.15)',
+          background: completionPresentation.tone === 'warning'
+            ? (clinical ? '#fffbeb' : 'rgba(245, 158, 11, 0.15)')
+            : (clinical ? 'var(--nn-accent-wash)' : 'rgba(34, 197, 94, 0.15)'),
           display: 'flex', alignItems: 'center', justifyContent: 'center',
           marginBottom: '16px',
         }}>
-          <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke={clinical ? 'var(--nn-accent-ink)' : '#22c55e'} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-            <polyline points="20 6 9 17 4 12" />
-          </svg>
+          {completionPresentation.tone === 'warning' ? (
+            <span aria-hidden="true" style={{ color: '#b45309', fontSize: 28, fontWeight: 800 }}>!</span>
+          ) : (
+            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke={clinical ? 'var(--nn-accent-ink)' : '#22c55e'} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <polyline points="20 6 9 17 4 12" />
+            </svg>
+          )}
         </div>
         <h2 style={{ color: clinical ? 'var(--nn-ink)' : '#fff', fontSize: '1.375rem', fontWeight: 700, margin: '0 0 8px' }}>
-          Interview Complete
+          {completionPresentation.title}
         </h2>
         <p style={{ color: clinical ? 'var(--nn-ink-2)' : '#94a3b8', fontSize: '0.9rem', margin: '0 0 16px', maxWidth: '440px' }}>
-          Thank you for completing the intake interview. Your physician will review this information before your appointment.
+          {completionPresentation.body}
         </p>
 
         <div style={{ display: 'flex', gap: '32px' }}>

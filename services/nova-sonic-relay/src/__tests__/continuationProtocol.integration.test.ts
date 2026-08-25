@@ -683,6 +683,42 @@ describe('relay continuation protocol integration', () => {
         String(line).includes('"toolCategory":"unknown"')
       ))).toBe(true)
       expect(afterUnknownTool).not.toContain('SYNTHETIC_PRIVATE_MODEL_CONTROLLED_NAME')
+
+      send({
+        t: 'clientDiagnostic',
+        category: 'microphone_runtime_failure',
+        reason: 'track_muted',
+      })
+      send({ t: 'stop' })
+      await new Promise((resolve) => setTimeout(resolve, 10))
+      const afterMicFailure = JSON.stringify(logSpy.mock.calls)
+      expect(afterMicFailure).toContain('client_diagnostic')
+      expect(afterMicFailure).toContain('microphone_runtime_failure')
+      expect(afterMicFailure).toContain('track_muted')
+      expect(afterMicFailure).toContain('audioFrameCount')
+      expect(afterMicFailure).toContain('lastAudioSeq')
+      expect(afterMicFailure).not.toContain('SYNTHETIC_PRIVATE_PCM')
+    } finally {
+      logSpy.mockRestore()
+    }
+  })
+
+  it('sanitizes untrusted microphone diagnostic labels before logging', async () => {
+    const logSpy = vi.spyOn(console, 'log').mockImplementation(() => undefined)
+    try {
+      send({
+        t: 'clientDiagnostic',
+        category: 'SYNTHETIC_PRIVATE_CATEGORY',
+        reason: 'SYNTHETIC_PRIVATE_REASON',
+      } as never)
+      await new Promise((resolve) => setTimeout(resolve, 10))
+      const logged = JSON.stringify(logSpy.mock.calls)
+      expect(logged).toContain('client_diagnostic')
+      expect(logSpy.mock.calls.some(([line]) => (
+        String(line).includes('"category":"unknown"') &&
+        String(line).includes('"reason":"unknown"')
+      ))).toBe(true)
+      expect(logged).not.toContain('SYNTHETIC_PRIVATE')
     } finally {
       logSpy.mockRestore()
     }

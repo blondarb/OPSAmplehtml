@@ -16,7 +16,11 @@
  */
 
 import type { ClientMsg, ServerMsg } from '@/lib/voice/relayProtocol'
-import { MicCapture } from '@/lib/voice/audio/capture-worklet'
+import {
+  MicCapture,
+  MicCaptureStartCancelledError,
+  type MicRuntimeFailureReason,
+} from '@/lib/voice/audio/capture-worklet'
 import { PcmPlayer } from '@/lib/voice/audio/player'
 import type {
   VoiceContinuationCheckpoint,
@@ -45,6 +49,8 @@ export class NovaSonicWsProvider implements VoiceProvider {
   private disconnectedEmitted = false
   /** Monotonic browser input sequence; never resets across inner Nova segments. */
   private audioSeq = 0
+  /** Prevents one capture failure from emitting duplicate diagnostics/errors. */
+  private micRuntimeFailureEmitted = false
   /** Relay-owned Bedrock segment currently allowed to reach the hook/player. */
   private segmentId = 1
   /** Segment-scoped tool ownership prevents a late async result reaching a replacement stream. */
@@ -104,6 +110,7 @@ export class NovaSonicWsProvider implements VoiceProvider {
     this.modelStreamOpen = false
     this.disconnectedEmitted = false
     this.audioSeq = 0
+    this.micRuntimeFailureEmitted = false
     this.segmentId = 1
     this.toolSegments.clear()
     this.clearContinuation(new Error('Nova session restarted'))
@@ -144,8 +151,18 @@ export class NovaSonicWsProvider implements VoiceProvider {
       mic
         .start((pcm) => {
           this.send({ t: 'audio', pcm, audioSeq: ++this.audioSeq })
+        }, (reason) => {
+          this.handleMicRuntimeFailure(reason)
         })
         .catch((err: unknown) => {
+          // stop() may win while Android's permission prompt or worklet setup
+          // is still pending. That intentional stale start is already cleaned
+          // up by MicCapture and must not terminate a later/retried session.
+          if (
+            this.closing ||
+            this.mic !== mic ||
+            err instanceof MicCaptureStartCancelledError
+          ) return
           this.emit({
             type: 'error',
             message: `mic capture failed: ${err instanceof Error ? err.message : String(err)}`,
@@ -193,6 +210,24 @@ export class NovaSonicWsProvider implements VoiceProvider {
       await this.stop()
       throw err instanceof Error ? err : new Error(`nova start failed: ${String(err)}`)
     }
+  }
+
+  private handleMicRuntimeFailure(reason: MicRuntimeFailureReason): void {
+    if (this.closing || this.micRuntimeFailureEmitted) return
+    this.micRuntimeFailureEmitted = true
+    this.send({
+      t: 'clientDiagnostic',
+      category: 'microphone_runtime_failure',
+      reason,
+    })
+    // Once the patient can no longer answer, no queued/current ordinary Nova
+    // turn may remain audible during the bounded partial-save window.
+    this.suppressOutput()
+    this.emit({
+      type: 'error',
+      message:
+        'Your microphone stopped sending audio. The interview will be saved through your last confirmed answer.',
+    })
   }
 
   /** Map a relay ServerMsg onto a VoiceEvent and/or drive the player. */

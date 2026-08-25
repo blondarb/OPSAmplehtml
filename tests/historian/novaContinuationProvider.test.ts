@@ -5,14 +5,35 @@ import { hashHistorianContinuationTranscript } from '../../src/lib/historian/con
 
 const audioHarness = vi.hoisted(() => ({
   onMicChunk: null as ((pcm: string) => void) | null,
+  onMicFailure: null as ((reason: 'track_ended' | 'track_muted' | 'context_not_running' | 'audio_chunks_stalled') => void) | null,
+  startGate: null as Promise<void> | null,
+  stopCalls: 0,
 }))
 
-vi.mock('@/lib/voice/audio/capture-worklet', () => ({
-  MicCapture: class {
-    async start(callback: (pcm: string) => void) { audioHarness.onMicChunk = callback }
-    async stop() { audioHarness.onMicChunk = null }
-  },
-}))
+vi.mock('@/lib/voice/audio/capture-worklet', () => {
+  class MicCaptureStartCancelledError extends Error {}
+  return {
+    MicCaptureStartCancelledError,
+    MicCapture: class {
+      private stopped = false
+      async start(
+        callback: (pcm: string) => void,
+        onRuntimeFailure?: (reason: 'track_ended' | 'track_muted' | 'context_not_running' | 'audio_chunks_stalled') => void,
+      ) {
+        audioHarness.onMicChunk = callback
+        audioHarness.onMicFailure = onRuntimeFailure ?? null
+        if (audioHarness.startGate) await audioHarness.startGate
+        if (this.stopped) throw new MicCaptureStartCancelledError()
+      }
+      async stop() {
+        this.stopped = true
+        audioHarness.stopCalls += 1
+        audioHarness.onMicChunk = null
+        audioHarness.onMicFailure = null
+      }
+    },
+  }
+})
 
 vi.mock('@/lib/voice/audio/player', () => ({
   PcmPlayer: class {
@@ -93,6 +114,9 @@ describe('Nova browser provider continuation', () => {
   beforeEach(() => {
     FakeWebSocket.instances = []
     audioHarness.onMicChunk = null
+    audioHarness.onMicFailure = null
+    audioHarness.startGate = null
+    audioHarness.stopCalls = 0
     Object.defineProperty(globalThis, 'WebSocket', {
       configurable: true,
       value: FakeWebSocket,
@@ -170,6 +194,74 @@ describe('Nova browser provider continuation', () => {
       text: 'new segment output',
       segmentId: 2,
     })
+  })
+
+  it('reports one allowlisted runtime microphone failure and suppresses output before the hook error', async () => {
+    const provider = new NovaSonicWsProvider()
+    const events: unknown[] = []
+    provider.on((event) => events.push(event))
+    await provider.start({
+      instructions: 'synthetic instructions',
+      tools: [],
+      relayUrl: 'wss://synthetic.invalid',
+      interviewMode: 'comprehensive',
+    })
+    const ws = FakeWebSocket.instances[0]
+    ws.open()
+    await Promise.resolve()
+
+    audioHarness.onMicFailure?.('track_muted')
+    audioHarness.onMicFailure?.('track_muted')
+
+    const sent = ws.sent.map((frame) => JSON.parse(frame))
+    const diagnostics = sent
+      .filter((frame) => frame.t === 'clientDiagnostic')
+    expect(diagnostics).toEqual([{
+      t: 'clientDiagnostic',
+      category: 'microphone_runtime_failure',
+      reason: 'track_muted',
+    }])
+    expect(sent.filter((frame) => frame.t === 'suppressOutput')).toHaveLength(1)
+    expect(sent.findIndex((frame) => frame.t === 'clientDiagnostic')).toBeLessThan(
+      sent.findIndex((frame) => frame.t === 'suppressOutput'),
+    )
+    expect((provider as unknown as {
+      player: { interrupt: ReturnType<typeof vi.fn> }
+    }).player.interrupt).toHaveBeenCalledOnce()
+    expect(events.filter((event) => (
+      (event as { type?: string }).type === 'error'
+    ))).toEqual([{
+      type: 'error',
+      message: 'Your microphone stopped sending audio. The interview will be saved through your last confirmed answer.',
+    }])
+  })
+
+  it('does not emit an error or audio when stop wins a pending microphone start', async () => {
+    let releaseStart!: () => void
+    audioHarness.startGate = new Promise<void>((resolve) => {
+      releaseStart = resolve
+    })
+    const provider = new NovaSonicWsProvider()
+    const events: unknown[] = []
+    provider.on((event) => events.push(event))
+    await provider.start({
+      instructions: 'synthetic instructions',
+      tools: [],
+      relayUrl: 'wss://synthetic.invalid',
+      interviewMode: 'comprehensive',
+    })
+    const ws = FakeWebSocket.instances[0]
+    ws.open()
+    await Promise.resolve()
+
+    await provider.stop()
+    releaseStart()
+    await Promise.resolve()
+    await Promise.resolve()
+
+    expect(audioHarness.stopCalls).toBe(1)
+    expect(events).toEqual([])
+    expect(ws.sent.map((frame) => JSON.parse(frame)).filter((frame) => frame.t === 'audio')).toEqual([])
   })
 
   it('never routes a late segment-one tool result into segment two', async () => {

@@ -1023,6 +1023,8 @@ export default function NeurologicHistorian({
             redFlags={completionData.redFlags}
             duration={completionData.duration}
             questionCount={completionData.questionCount}
+            endedEarly={completionData.endedEarly}
+            terminationReason={completionData.terminationReason}
             transcript={completionData.transcript}
             // This is the unauthenticated patient surface (/patient/historian)
             // — see design spec locked decision L1. DDx/thoroughness props

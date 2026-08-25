@@ -310,6 +310,9 @@ wss.on('connection', (ws) => {
   let adaptiveInterruptedTurn = false
   let duplicateQuestionReauthorizationCount = 0
   let firstAudioObserved = false
+  let audioFrameCount = 0
+  let lastAudioFrameAtMs = 0
+  let microphoneFailureLogged = false
   let userTranscriptBlockCount = 0
   let admittedTurnCount = 0
   let startConfig: {
@@ -1002,6 +1005,8 @@ wss.on('connection', (ws) => {
             failContinuation('audio_sequence', barrier?.id)
             break
           }
+          audioFrameCount += 1
+          lastAudioFrameAtMs = Date.now()
           if (barrier) {
             if (typeof msg.audioSeq !== 'number') {
               failContinuation('audio_sequence', barrier.id)
@@ -1018,6 +1023,31 @@ wss.on('connection', (ws) => {
           }
           transcribe?.pushAudio(msg.pcm)
           break
+
+        case 'clientDiagnostic': {
+          if (microphoneFailureLogged) break
+          microphoneFailureLogged = true
+          const category = msg.category === 'microphone_runtime_failure'
+            ? 'microphone_runtime_failure'
+            : 'unknown'
+          const reason = (
+            msg.reason === 'track_ended' ||
+            msg.reason === 'track_muted' ||
+            msg.reason === 'context_not_running' ||
+            msg.reason === 'audio_chunks_stalled'
+          ) ? msg.reason : 'unknown'
+          logSessionEvent('client_diagnostic', {
+            category,
+            reason,
+            segmentId: activeSegmentId,
+            audioFrameCount,
+            lastAudioSeq,
+            lastAudioAgeMs: lastAudioFrameAtMs
+              ? Math.max(0, Date.now() - lastAudioFrameAtMs)
+              : null,
+          })
+          break
+        }
 
         case 'userTurnEnd':
           // Nova Sonic performs its own turn detection; userTurnEnd is reserved
@@ -1342,6 +1372,11 @@ wss.on('connection', (ws) => {
             segmentId: activeSegmentId,
             firstAudioObserved,
             admittedTurnCount,
+            audioFrameCount,
+            lastAudioSeq,
+            lastAudioAgeMs: lastAudioFrameAtMs
+              ? Math.max(0, Date.now() - lastAudioFrameAtMs)
+              : null,
           })
           clearContinuationTimers()
           clearTurnConfirmationTimer()
@@ -1380,6 +1415,11 @@ wss.on('connection', (ws) => {
       sessionStarted,
       firstAudioObserved,
       admittedTurnCount,
+      audioFrameCount,
+      lastAudioSeq,
+      lastAudioAgeMs: lastAudioFrameAtMs
+        ? Math.max(0, Date.now() - lastAudioFrameAtMs)
+        : null,
       modelTerminalSent,
     })
     clearContinuationTimers()

@@ -36,9 +36,12 @@ describe('MicCapture audio context state', () => {
   })
 
   it('refuses to continue if the context is not running', () => {
-    expect(source).toContain("ctx.state !== 'running'")
+    const startupResumeAt = source.indexOf('// RESUME BEFORE WIRING THE GRAPH')
+    const startupGuardAt = source.indexOf("ctx.state !== 'running'", startupResumeAt)
+    expect(startupResumeAt).toBeGreaterThan(-1)
+    expect(startupGuardAt).toBeGreaterThan(startupResumeAt)
     // Must throw, not warn — a warning keeps the silent-capture failure.
-    const guard = source.slice(source.indexOf("ctx.state !== 'running'"))
+    const guard = source.slice(startupGuardAt)
     expect(guard.slice(0, 400)).toContain('throw new Error')
   })
 
