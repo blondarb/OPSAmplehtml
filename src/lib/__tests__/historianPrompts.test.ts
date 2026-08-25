@@ -288,13 +288,14 @@ describe('getHistorianToolDefinition', () => {
     ])
   })
 
-  it('exposes only the app-owned question and save tools in Comprehensive v2', () => {
+  it('exposes only app-owned question, control, and save tools in Comprehensive v2', () => {
     const openAi = getHistorianToolDefinition(
       'new_patient',
       'comprehensive-v2',
     ) as unknown as TestToolDefinition[]
     expect(openAi.map((tool) => tool.name)).toEqual([
       'request_history_question',
+      'request_interview_control',
       'save_interview_output',
     ])
 
@@ -305,7 +306,25 @@ describe('getHistorianToolDefinition', () => {
     ) as Array<{ toolSpec: { name: string } }>
     expect(nova.map((tool) => tool.toolSpec.name)).toEqual([
       'request_history_question',
+      'request_interview_control',
       'save_interview_output',
+    ])
+  })
+
+  it('gives Comprehensive v3 the same relay-local control tool', () => {
+    const tools = getHistorianToolDefinition(
+      'new_patient',
+      'comprehensive-v3',
+    ) as unknown as TestToolDefinition[]
+    expect(tools.map((tool) => tool.name)).toEqual([
+      'request_history_question',
+      'request_interview_control',
+      'save_interview_output',
+    ])
+    expect((tools[1].parameters.properties.kind as { enum: string[] }).enum).toEqual([
+      'closing',
+      'check_in',
+      'sign_off',
     ])
   })
 

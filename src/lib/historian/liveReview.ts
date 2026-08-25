@@ -37,6 +37,8 @@ Grounding requirements:
 - Never count referral context, historian wording, a suggested question, silence, or your own inference as patient evidence.
 - Do not mark a domain covered merely because a broad generic question was asked; the patient response must actually address it.
 - Flag clinically important gaps, contradictions in patient statements, and materially repetitive historian questions.
+- Extract every prescription medicine, over-the-counter medicine, vitamin, or supplement the patient names. Copy name_span EXACTLY from one cited patient turn; do not expand abbreviations, select a likely drug, fix spelling, map brands/generics, or silently substitute one name for another.
+- For each medication mention, classify dose and frequency separately as known, unknown, declined, or missing. A known value_span must be copied EXACTLY from a cited patient turn. Use null and no citations for missing. Never infer a dose or schedule.
 - active_safety_concern may be true only when the patient's words state a current emergency or self-harm/harm-to-others concern. This reviewer can raise concern but can never clear or downgrade the application's deterministic safety handling.
 - ready_to_close may be true only when every domain is covered or explicitly uncertain, no critical gap remains, and no active safety concern is present.
 - next_question_intents are short private clinical targets, not scripts and not diagnoses. Never include a diagnosis name, treatment, test recommendation, or advice.
@@ -118,6 +120,47 @@ const INPUT_SCHEMA = {
         required: ['assistant_seqs', 'description'],
       },
     },
+    medications: {
+      type: 'array',
+      maxItems: 12,
+      items: {
+        type: 'object',
+        additionalProperties: false,
+        properties: {
+          name_span: { type: 'string', maxLength: 80 },
+          patient_seq: { type: 'integer', minimum: 1 },
+          dose: {
+            type: 'object',
+            additionalProperties: false,
+            properties: {
+              status: { type: 'string', enum: ['known', 'unknown', 'declined', 'missing'] },
+              value_span: { type: ['string', 'null'], maxLength: 80 },
+              patient_seqs: {
+                type: 'array',
+                maxItems: 6,
+                items: { type: 'integer', minimum: 1 },
+              },
+            },
+            required: ['status', 'value_span', 'patient_seqs'],
+          },
+          frequency: {
+            type: 'object',
+            additionalProperties: false,
+            properties: {
+              status: { type: 'string', enum: ['known', 'unknown', 'declined', 'missing'] },
+              value_span: { type: ['string', 'null'], maxLength: 80 },
+              patient_seqs: {
+                type: 'array',
+                maxItems: 6,
+                items: { type: 'integer', minimum: 1 },
+              },
+            },
+            required: ['status', 'value_span', 'patient_seqs'],
+          },
+        },
+        required: ['name_span', 'patient_seq', 'dose', 'frequency'],
+      },
+    },
     active_safety_concern: {
       type: 'object',
       additionalProperties: false,
@@ -146,6 +189,7 @@ const INPUT_SCHEMA = {
     'critical_gaps',
     'contradictions',
     'repetitions',
+    'medications',
     'active_safety_concern',
     'ready_to_close',
     'next_question_intents',

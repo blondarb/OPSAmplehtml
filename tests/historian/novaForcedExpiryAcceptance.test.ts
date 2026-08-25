@@ -167,7 +167,8 @@ describe('Nova forced-expiry acceptance contract', () => {
         expect.objectContaining({ seq: 2, role: 'user', text: 'This is a fixed synthetic headache fixture.' }),
         expect.objectContaining({ seq: 3, role: 'user', text: "I can't move my arm right now." }),
       ],
-      narrativeSummary: expect.stringContaining('Raw transcript'),
+      // A preserved transcript is not relabeled as a generated report.
+      narrativeSummary: null,
     }))
   })
 })

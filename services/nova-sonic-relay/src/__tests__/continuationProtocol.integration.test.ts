@@ -3,6 +3,7 @@ import { once } from 'events'
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import WebSocket from 'ws'
 import { MAX_HISTORY_BYTES } from '../continuationCheckpoint.js'
+import { APPROVED_HISTORIAN_CLOSING_TEXT } from '../turnAdmission.js'
 import type { ServerMsg, VoiceContinuationCheckpoint } from '../wsProtocol.js'
 
 const DOMAINS = [
@@ -28,6 +29,7 @@ type MockCallbacks = {
 type MockStartOptions = {
   sendGreetingKickoff?: boolean
   conversationHistory?: Array<{ role: 'USER' | 'ASSISTANT'; text: string }>
+  requireToolAtResponseStart?: boolean
 }
 
 type MockSession = {
@@ -336,6 +338,7 @@ describe('relay continuation protocol integration', () => {
       adaptiveTurnController: true,
     })
     await new Promise((resolve) => setTimeout(resolve, 10))
+    expect(relayHarness.instances[0].starts[0].options.requireToolAtResponseStart).toBe(true)
     relayHarness.instances[0].callbacks.onToolUse?.({
       toolName: 'request_history_question',
       toolUseId: 'adaptive-tool',
@@ -939,6 +942,124 @@ describe('relay continuation protocol integration', () => {
     expect(inbox.some((message) => message.t === 'error')).toBe(false)
   })
 
+  it('handles a tool-first adaptive closing locally and releases the exact saved statement', async () => {
+    send({
+      t: 'start',
+      instructions: 'Synthetic adaptive instructions.',
+      tools: [],
+      interviewMode: 'comprehensive',
+      adaptiveTurnController: true,
+    })
+    await new Promise((resolve) => setTimeout(resolve, 10))
+
+    relayHarness.instances[0].callbacks.onToolUse?.({
+      toolName: 'save_interview_output',
+      toolUseId: 'adaptive-save',
+      content: '{}',
+    })
+    const saveTool = await waitForMessage('toolCall')
+    send({
+      t: 'toolResult',
+      toolUseId: saveTool.toolUseId,
+      segmentId: 1,
+      output: JSON.stringify({ success: true }),
+    })
+    send({
+      t: 'systemText',
+      text: `[The interview is complete. Speak exactly this statement and nothing else: ${JSON.stringify(APPROVED_HISTORIAN_CLOSING_TEXT)}]`,
+    })
+    await new Promise((resolve) => setTimeout(resolve, 10))
+    expect(relayHarness.instances[0].systemTexts.at(-1)).toContain(
+      'request_interview_control with exactly {"kind":"closing"}',
+    )
+
+    relayHarness.instances[0].callbacks.onToolUse?.({
+      toolName: 'request_interview_control',
+      toolUseId: 'adaptive-closing-control',
+      content: JSON.stringify({ kind: 'closing' }),
+    })
+    await new Promise((resolve) => setTimeout(resolve, 10))
+    expect(relayHarness.instances[0].toolResults.at(-1)).toEqual({
+      toolUseId: 'adaptive-closing-control',
+      output: JSON.stringify({ success: true, status: 'approved', kind: 'closing' }),
+    })
+    expect(inbox.some((message) => (
+      message.t === 'toolCall' && message.toolUseId === 'adaptive-closing-control'
+    ))).toBe(false)
+
+    relayHarness.instances[0].emitAssistant(APPROVED_HISTORIAN_CLOSING_TEXT)
+    await expect(waitForMessage('assistantTranscript')).resolves.toMatchObject({
+      text: APPROVED_HISTORIAN_CLOSING_TEXT,
+      segmentId: 1,
+    })
+    await expect(waitForMessage('audio')).resolves.toMatchObject({
+      pcm: 'synthetic-audio',
+      segmentId: 1,
+    })
+  })
+
+  it('requires a matching local control kind and never forwards a mismatched request', async () => {
+    send({
+      t: 'start',
+      instructions: 'Synthetic adaptive instructions.',
+      tools: [],
+      interviewMode: 'comprehensive',
+      adaptiveTurnController: true,
+    })
+    await new Promise((resolve) => setTimeout(resolve, 10))
+    send({
+      t: 'systemText',
+      text: '[The patient has not said anything for a while. Briefly check whether they are still there.]',
+    })
+    await new Promise((resolve) => setTimeout(resolve, 10))
+
+    relayHarness.instances[0].callbacks.onToolUse?.({
+      toolName: 'request_interview_control',
+      toolUseId: 'wrong-control-kind',
+      content: JSON.stringify({ kind: 'sign_off' }),
+    })
+    await waitForMessage('error')
+    expect(inbox.some((message) => (
+      message.t === 'toolCall' && message.toolUseId === 'wrong-control-kind'
+    ))).toBe(false)
+    expect(relayHarness.instances[0].toolResults).toEqual([])
+  })
+
+  it('handles a tool-first silence check-in locally before admitting its one question', async () => {
+    send({
+      t: 'start',
+      instructions: 'Synthetic adaptive instructions.',
+      tools: [],
+      interviewMode: 'comprehensive',
+      adaptiveTurnController: true,
+    })
+    await new Promise((resolve) => setTimeout(resolve, 10))
+    send({
+      t: 'systemText',
+      text: '[The patient has not said anything for a while. Briefly check whether they are still there.]',
+    })
+    await new Promise((resolve) => setTimeout(resolve, 10))
+    expect(relayHarness.instances[0].systemTexts.at(-1)).toContain(
+      'request_interview_control with exactly {"kind":"check_in"}',
+    )
+
+    relayHarness.instances[0].callbacks.onToolUse?.({
+      toolName: 'request_interview_control',
+      toolUseId: 'check-in-control',
+      content: JSON.stringify({ kind: 'check_in' }),
+    })
+    await new Promise((resolve) => setTimeout(resolve, 10))
+    relayHarness.instances[0].emitAssistant('Are you still with me?')
+    await expect(waitForMessage('assistantTranscript')).resolves.toMatchObject({
+      text: 'Are you still with me?',
+      segmentId: 1,
+    })
+    await expect(waitForMessage('audio')).resolves.toMatchObject({
+      pcm: 'synthetic-audio',
+      segmentId: 1,
+    })
+  })
+
   it('accepts an exact suppressed terminal question result and keeps the silent save path open', async () => {
     send({
       t: 'start',
@@ -1042,6 +1163,60 @@ describe('relay continuation protocol integration', () => {
     expect(relayHarness.instances[2].starts[0].options.conversationHistory![0]).toEqual({
       role: 'USER',
       text: 'Synthetic answer one.',
+    })
+  })
+
+  it('requires tool-first responses on an adaptive continuation candidate', async () => {
+    send({
+      t: 'start',
+      instructions: 'Synthetic adaptive continuation instructions.',
+      tools: [],
+      interviewMode: 'comprehensive',
+      adaptiveTurnController: true,
+    })
+    send({ t: 'audio', audioSeq: 1, pcm: 'adaptive-segment-1-live' })
+    await waitForMessage('continuationDue')
+    await new Promise((resolve) => setTimeout(resolve, 25))
+
+    const transcript = [
+      { seq: 1, role: 'assistant' as const, text: 'Synthetic question one?', timestamp: 0 },
+      { seq: 2, role: 'user' as const, text: 'Synthetic answer one.', timestamp: 1 },
+      { seq: 3, role: 'assistant' as const, text: 'Synthetic question two?', timestamp: 2 },
+    ]
+
+    relayHarness.instances[0].callbacks.onToolUse?.({
+      toolName: 'request_history_question',
+      toolUseId: 'adaptive-rollover-question',
+      content: JSON.stringify({ proposed_text: transcript.at(-1)!.text }),
+    })
+    const tool = await waitForMessage('toolCall')
+    send({
+      t: 'toolResult',
+      toolUseId: tool.toolUseId,
+      segmentId: 1,
+      output: JSON.stringify({
+        success: true,
+        status: 'approved',
+        obligation_id: 'adaptive-question-2',
+        approved_text: transcript.at(-1)!.text,
+        allow_example: false,
+      }),
+    })
+    await new Promise((resolve) => setTimeout(resolve, 10))
+    relayHarness.instances[0].emitAssistant(transcript.at(-1)!.text)
+    const barrier = await waitForMessage('continuationBarrier')
+    send({ t: 'audio', audioSeq: 2, pcm: 'adaptive-buffered' })
+    send({
+      t: 'continuationCommit',
+      barrierId: barrier.barrierId,
+      checkpoint: checkpoint(1, transcript),
+    })
+    await waitForMessage('continuationReady')
+
+    expect(relayHarness.instances[0].starts[0].options.requireToolAtResponseStart).toBe(true)
+    expect(relayHarness.instances[1].starts[0].options).toMatchObject({
+      sendGreetingKickoff: false,
+      requireToolAtResponseStart: true,
     })
   })
 

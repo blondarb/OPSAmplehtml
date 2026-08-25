@@ -166,4 +166,47 @@ describe('HistorianReportView — surface guard (design spec L1)', () => {
     )
     expect(consoleErrorSpy).not.toHaveBeenCalled()
   })
+
+  it('keeps the patient summary and transcript separate from clinician-only report labeling', () => {
+    const patientMarkup = renderToStaticMarkup(
+      <HistorianReportView {...BASE_PROPS} surface="patient" />,
+    )
+    expect(patientMarkup).toContain('Your Summary')
+    expect(patientMarkup).toContain('Interview Transcript')
+    expect(patientMarkup).not.toContain('Physician Report')
+    expect(patientMarkup).not.toContain('Clinician History Report')
+
+    const clinicianMarkup = renderToStaticMarkup(
+      <HistorianReportView {...BASE_PROPS} surface="physician" />,
+    )
+    expect(clinicianMarkup).toContain('Clinician History Report')
+    expect(clinicianMarkup).toContain('Interview Transcript')
+    expect(clinicianMarkup).not.toContain('Patient Report')
+  })
+
+  it('does not present v3 model draft fields as a clinician report', () => {
+    const markup = renderToStaticMarkup(
+      <HistorianReportView
+        {...BASE_PROPS}
+        surface="physician"
+        narrativeSummary={null}
+        structuredOutput={{
+          interview_mode: 'comprehensive',
+          interview_prompt_version: 'comprehensive-v3',
+          current_medications: 'tirzepatide — amount: 5 mg; schedule: weekly',
+          medication_reconciliation_has_uncertainty: true,
+          medication_reconciliation_unresolved_count: 1,
+          hpi: 'Untrusted model draft mentioning trazodone.',
+        }}
+      />,
+    )
+
+    expect(markup).toContain('Clinician history report generation is pending')
+    expect(markup).toContain('Verified medication reconciliation')
+    expect(markup).toContain('Medication reconciliation needs review')
+    expect(markup).toContain('Medication reconciliation has unresolved information')
+    expect(markup).toContain('tirzepatide')
+    expect(markup).not.toContain('Untrusted model draft')
+    expect(markup).not.toContain('trazodone')
+  })
 })

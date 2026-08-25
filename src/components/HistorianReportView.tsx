@@ -80,7 +80,7 @@ interface HistorianReportViewProps {
   onBackToPortal: () => void
 }
 
-type ReportTab = 'physician' | 'patient'
+type ReportTab = 'physician' | 'patient' | 'transcript'
 
 function formatDuration(seconds: number): string {
   const m = Math.floor(seconds / 60)
@@ -142,9 +142,9 @@ export default function HistorianReportView({
     )
   }
 
-  // Generate the patient-facing recap once, on mount, so it's ready by the
-  // time the patient switches to that tab. Fail-open: any error falls back
-  // to the raw narrative summary — never a blank or crashed tab.
+  // Generate the patient-facing recap once, on mount. A generator failure is
+  // displayed as unavailable; transcript/notes are never relabeled as a
+  // generated report.
   useEffect(() => {
     let cancelled = false
 
@@ -158,12 +158,17 @@ export default function HistorianReportView({
         if (!res.ok) throw new Error(`patient-report request failed: ${res.status}`)
         const data = await res.json()
         if (cancelled) return
-        setPatientReport(data.patientReport || narrativeSummary || '')
+        if (data.unavailable === true) {
+          setPatientReportError(true)
+          setPatientReport('')
+        } else {
+          setPatientReport(data.patientReport || '')
+        }
       } catch (err) {
         console.error('Failed to generate patient report:', err)
         if (cancelled) return
         setPatientReportError(true)
-        setPatientReport(narrativeSummary || '')
+        setPatientReport('')
       } finally {
         if (!cancelled) setPatientReportLoading(false)
       }
@@ -174,10 +179,15 @@ export default function HistorianReportView({
     // eslint-disable-next-line react-hooks/exhaustive-deps -- generate once per completed interview
   }, [])
 
-  const TABS: Array<{ key: ReportTab; label: string }> = [
-    { key: 'physician', label: 'Physician Report' },
-    { key: 'patient', label: 'Patient Report' },
-  ]
+  const tabs: Array<{ key: ReportTab; label: string }> = surface === 'patient'
+    ? [
+        { key: 'patient', label: 'Your Summary' },
+        { key: 'transcript', label: 'Interview Transcript' },
+      ]
+    : [
+        { key: 'physician', label: 'Clinician History Report' },
+        { key: 'transcript', label: 'Interview Transcript' },
+      ]
 
   return (
     <div style={clinical
@@ -222,7 +232,7 @@ export default function HistorianReportView({
 
       {/* Tabs */}
       <div style={{ display: 'flex', gap: '4px', marginBottom: '16px', borderBottom: clinical ? '1px solid var(--nn-line)' : '1px solid #334155' }}>
-        {TABS.map(tab => (
+        {tabs.map(tab => (
           <button
             key={tab.key}
             onClick={() => setActiveTab(tab.key)}
@@ -262,7 +272,17 @@ export default function HistorianReportView({
             finalDifferential={finalDifferential}
             independentDdx={independentDdx}
             agreement={agreement}
+            endedEarly={endedEarly}
+            terminationReason={terminationReason}
           />
+        ) : activeTab === 'transcript' ? (
+          transcript && transcript.length > 0 ? (
+            <HistorianTranscriptViewer entries={transcript} />
+          ) : (
+            <p style={{ color: clinical ? 'var(--nn-ink-3)' : '#64748B', fontSize: 13, margin: 0 }}>
+              No interview transcript is available.
+            </p>
+          )
         ) : (
           <PatientReportTab
             loading={patientReportLoading}
@@ -316,6 +336,8 @@ interface PhysicianReportTabProps {
   finalDifferential?: FinalDifferential | null
   independentDdx?: IndependentDifferential | null
   agreement?: AgreementResult | null
+  endedEarly: boolean
+  terminationReason: HistorianTerminationReason
 }
 
 function PhysicianReportTab({
@@ -327,11 +349,16 @@ function PhysicianReportTab({
   finalDifferential,
   independentDdx,
   agreement,
+  endedEarly,
+  terminationReason,
 }: PhysicianReportTabProps) {
   // Turn-link state: clicking a cited quote in DifferentialCard jumps the
   // transcript viewer below to that turn (see HistorianTranscriptViewer's
   // highlightIndex prop).
   const [highlightIndex, setHighlightIndex] = useState<number | null>(null)
+  const adaptiveReportPending =
+    structuredOutput?.interview_prompt_version === 'comprehensive-v3' &&
+    !narrativeSummary
 
   return (
     <div>
@@ -358,12 +385,65 @@ function PhysicianReportTab({
         </div>
       )}
 
-      <IntakeReviewSection
-        consult={{
-          historian_structured_output: structuredOutput as Record<string, unknown> | null,
-          historian_summary: narrativeSummary,
-        }}
-      />
+      {(!structuredOutput && !narrativeSummary) || adaptiveReportPending ? (
+        <div role="status" style={{
+          background: '#0F172A',
+          border: '1px solid #334155',
+          borderRadius: 8,
+          padding: 16,
+          color: '#CBD5E1',
+          fontSize: 13,
+          lineHeight: 1.5,
+        }}>
+          {surface === 'patient'
+            ? 'Your interview summary is not available yet. Your answers were preserved for your neurologist to review.'
+            : 'Clinician history report generation is pending. Verified interview evidence and the separate transcript were preserved for review.'}
+        </div>
+      ) : (
+        <IntakeReviewSection
+          consult={{
+            historian_structured_output: structuredOutput as Record<string, unknown> | null,
+            historian_summary: narrativeSummary,
+            interview_completion_status: endedEarly ? 'ended_early' : 'complete',
+            interview_termination_reason: terminationReason,
+          }}
+        />
+      )}
+
+      {surface === 'physician' && adaptiveReportPending && structuredOutput?.current_medications && (
+        <div style={{
+          marginTop: 16,
+          background: '#0F172A',
+          border: '1px solid #334155',
+          borderRadius: 8,
+          padding: 16,
+          color: '#E2E8F0',
+          fontSize: 13,
+          lineHeight: 1.6,
+          whiteSpace: 'pre-wrap',
+        }}>
+          <div style={{ fontWeight: 700, marginBottom: 8 }}>Verified medication reconciliation</div>
+          {structuredOutput.current_medications}
+        </div>
+      )}
+
+      {surface === 'physician' &&
+        structuredOutput?.interview_prompt_version === 'comprehensive-v3' &&
+        structuredOutput.medication_reconciliation_has_uncertainty === true && (
+          <div role="alert" style={{
+            marginTop: 16,
+            background: 'rgba(245, 158, 11, 0.12)',
+            border: '1px solid rgba(245, 158, 11, 0.55)',
+            borderRadius: 8,
+            padding: 16,
+            color: '#FDE68A',
+            fontSize: 13,
+            lineHeight: 1.5,
+          }}>
+            <div style={{ fontWeight: 700, marginBottom: 4 }}>Medication reconciliation needs review</div>
+            Medication reconciliation has unresolved information; review the interview transcript.
+          </div>
+        )}
 
       {surface === 'physician' && structuredOutput?.interview_mode === 'comprehensive' && (
         <div style={{ marginTop: 16 }}>
@@ -403,7 +483,7 @@ function PhysicianReportTab({
         </>
       )}
 
-      {transcript && transcript.length > 0 && (
+      {highlightIndex != null && transcript && transcript.length > 0 && (
         <div style={{ marginTop: 16 }}>
           <HistorianTranscriptViewer entries={transcript} highlightIndex={highlightIndex} />
         </div>
@@ -472,7 +552,7 @@ function PatientReportTab({ loading, error, report, narrativeSummary, clinical =
 
       {error && (
         <p style={{ color: clinical ? 'var(--nn-ink-3)' : '#64748b', fontSize: '0.7rem', marginTop: 10 }}>
-          We couldn&apos;t generate a personalized summary right now, so we&apos;re showing your interview notes instead.
+          We couldn&apos;t generate a personalized summary right now. Your interview transcript was still preserved for the clinic.
         </p>
       )}
 

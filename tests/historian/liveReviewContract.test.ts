@@ -50,6 +50,7 @@ function rawReview() {
     critical_gaps: [],
     contradictions: [],
     repetitions: [],
+    medications: [],
     active_safety_concern: { present: false, patient_seqs: [] },
     ready_to_close: true,
     next_question_intents: [],
@@ -128,6 +129,31 @@ describe('silent live Historian review contract', () => {
     const stale = rawReview()
     stale.reviewed_through_seq = 22
     expect(() => parseLiveInterviewReview(stale, transcript())).toThrow(/latest patient/i)
+  })
+
+  it('accepts only exact transcript-cited medication names, doses, and schedules', () => {
+    const withMedication = transcript()
+    withMedication[1] = {
+      ...withMedication[1],
+      text: 'I take tirzepatide 5 mg weekly.',
+    }
+    const raw: any = rawReview()
+    raw.medications = [{
+      name_span: 'tirzepatide',
+      patient_seq: 2,
+      dose: { status: 'known', value_span: '5 mg', patient_seqs: [2] },
+      frequency: { status: 'known', value_span: 'weekly', patient_seqs: [2] },
+    }]
+    const review = parseLiveInterviewReview(raw, withMedication)
+    expect(review.medications).toEqual([{
+      nameSpan: 'tirzepatide',
+      patientSeq: 2,
+      dose: { status: 'known', valueSpan: '5 mg', patientSeqs: [2] },
+      frequency: { status: 'known', valueSpan: 'weekly', patientSeqs: [2] },
+    }])
+
+    raw.medications[0].name_span = 'trazodone'
+    expect(() => parseLiveInterviewReview(raw, withMedication)).toThrow(/exact patient substring/i)
   })
 
   it('requires the exact artifact schema and normalizes it at the browser boundary', () => {

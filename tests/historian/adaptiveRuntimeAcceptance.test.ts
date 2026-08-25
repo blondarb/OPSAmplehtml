@@ -3,6 +3,12 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { VoiceEvent, VoiceProvider } from '@/lib/voice/providerTypes'
 import { COMPREHENSIVE_HISTORY_DOMAINS } from '@/lib/historianTypes'
 import { LIVE_INTERVIEW_REVIEW_PROMPT_VERSION } from '@/lib/historian/liveReviewContract'
+import {
+  ADAPTIVE_OPENING_QUESTION,
+  ADAPTIVE_PRE_CLOSE_QUESTION,
+} from '@/lib/historian/adaptiveQuestionContract'
+import { MEDICATION_INVENTORY_QUESTION } from '@/lib/historian/medicationReconciliation'
+import { COMPREHENSIVE_V3_CLOSING_TEXT } from '@/lib/historianPrompts'
 
 const voiceFactory = vi.hoisted(() => ({ provider: null as VoiceProvider | null }))
 const reactHarness = vi.hoisted(() => ({ effects: [] as Array<() => void | (() => void)> }))
@@ -25,7 +31,7 @@ function lastToolOutput(provider: VoiceProvider): Record<string, unknown> {
 }
 
 function syntheticAdaptiveProposal(turn: number): string {
-  if (turn === 1) return "Hi, I'm Henry. What brings you in for your neurology visit today?"
+  if (turn === 1) return ADAPTIVE_OPENING_QUESTION
   if (turn === 2) return 'What is your age?'
   return `What patient-specific headache detail should we clarify at turn ${turn}?`
 }
@@ -117,6 +123,7 @@ describe('Comprehensive v3 adaptive synthetic runtime acceptance', () => {
               criticalGaps: [],
               contradictions: [],
               repetitions: [],
+              medications: [],
               activeSafetyConcern: {
                 present: reviewSafetyConcern,
                 patientSeqs: reviewSafetyConcern ? [patientSeqs.at(-1)] : [],
@@ -255,15 +262,87 @@ describe('Comprehensive v3 adaptive synthetic runtime acceptance', () => {
     voiceSink?.({
       type: 'toolCall',
       toolName: 'request_history_question',
-      toolUseId: 'coverage-check',
+      toolUseId: 'inventory-redirect',
       segmentId: 1,
       input: { proposed_text: 'What else would you like your neurologist to know?' },
     })
     expect(lastToolOutput(provider)).toEqual({
+      success: false,
+      status: 'proposal_rejected',
+      issue_codes: ['clinical_redirect'],
+      required_text: MEDICATION_INVENTORY_QUESTION,
+    })
+    voiceSink?.({
+      type: 'toolCall',
+      toolName: 'request_history_question',
+      toolUseId: 'inventory-question',
+      segmentId: 1,
+      input: { proposed_text: MEDICATION_INVENTORY_QUESTION },
+    })
+    let completionOutput = lastToolOutput(provider)
+    expect(completionOutput).toMatchObject({
+      success: true,
+      status: 'approved',
+      obligation_id: 'medication-inventory',
+      approved_text: MEDICATION_INVENTORY_QUESTION,
+    })
+    voiceSink?.({
+      type: 'assistantTranscript',
+      text: MEDICATION_INVENTORY_QUESTION,
+      obligationId: 'medication-inventory',
+      segmentId: 1,
+    })
+    voiceSink?.({ type: 'userTranscript', text: 'No other medicines.', segmentId: 1 })
+    await vi.waitFor(() => expect(reviewCalls).toBe(4))
+
+    voiceSink?.({
+      type: 'toolCall',
+      toolName: 'request_history_question',
+      toolUseId: 'preclose-redirect',
+      segmentId: 1,
+      input: { proposed_text: 'May I ask one more question?' },
+    })
+    await vi.waitFor(() => expect(lastToolOutput(provider)).toEqual({
+      success: false,
+      status: 'proposal_rejected',
+      issue_codes: ['clinical_redirect'],
+      required_text: ADAPTIVE_PRE_CLOSE_QUESTION,
+    }))
+    voiceSink?.({
+      type: 'toolCall',
+      toolName: 'request_history_question',
+      toolUseId: 'preclose-question',
+      segmentId: 1,
+      input: { proposed_text: ADAPTIVE_PRE_CLOSE_QUESTION },
+    })
+    completionOutput = lastToolOutput(provider)
+    expect(completionOutput).toMatchObject({
+      success: true,
+      status: 'approved',
+      obligation_id: 'adaptive-preclose',
+      approved_text: ADAPTIVE_PRE_CLOSE_QUESTION,
+    })
+    voiceSink?.({
+      type: 'assistantTranscript',
+      text: ADAPTIVE_PRE_CLOSE_QUESTION,
+      obligationId: 'adaptive-preclose',
+      segmentId: 1,
+    })
+    voiceSink?.({ type: 'userTranscript', text: 'No, that covers it.', segmentId: 1 })
+    await vi.waitFor(() => expect(reviewCalls).toBe(5))
+
+    voiceSink?.({
+      type: 'toolCall',
+      toolName: 'request_history_question',
+      toolUseId: 'coverage-check',
+      segmentId: 1,
+      input: { proposed_text: 'What else would you like your neurologist to know?' },
+    })
+    await vi.waitFor(() => expect(lastToolOutput(provider)).toEqual({
       success: true,
       status: 'coverage_ready',
       completion: 'coverage_complete',
-    })
+    }))
 
     voiceSink?.({
       type: 'toolCall',
@@ -280,7 +359,7 @@ describe('Comprehensive v3 adaptive synthetic runtime acceptance', () => {
     expect(lastToolOutput(provider)).toEqual({ success: true })
     voiceSink?.({
       type: 'assistantTranscript',
-      text: 'Thank you. Your history has been recorded for your neurologist to review.',
+      text: COMPREHENSIVE_V3_CLOSING_TEXT,
       segmentId: 1,
     })
     await session.endSession()
@@ -288,11 +367,16 @@ describe('Comprehensive v3 adaptive synthetic runtime acceptance', () => {
     expect(onComplete).toHaveBeenCalledWith(expect.objectContaining({
       endedEarly: false,
       terminationReason: 'coverage_complete',
-      questionCount: 12,
+      questionCount: 14,
+      narrativeSummary: null,
       interviewPromptVersion: 'comprehensive-v3',
       structuredOutput: expect.objectContaining({
         interview_prompt_version: 'comprehensive-v3',
         live_review_v1: expect.objectContaining({ attestation: 'a'.repeat(43) }),
+        medication_reconciliation_v1: expect.objectContaining({
+          inventoryStatus: 'answered',
+          medicationNameClarificationCount: 0,
+        }),
         history_coverage: expect.objectContaining({ missing_or_uncertain: [] }),
       }),
     }))

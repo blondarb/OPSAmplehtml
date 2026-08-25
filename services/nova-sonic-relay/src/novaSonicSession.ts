@@ -55,6 +55,12 @@ export interface NovaSonicStartOptions {
   sendGreetingKickoff?: boolean
   /** Non-interactive prior turns, emitted after SYSTEM and before live audio. */
   conversationHistory?: Array<{ role: 'USER' | 'ASSISTANT'; text: string }>
+  /**
+   * Require Nova to begin every response with one of the configured tools.
+   * Comprehensive v3 uses this on both the opening and rollover streams so a
+   * replacement model can never speak an unauthorised question first.
+   */
+  requireToolAtResponseStart?: boolean
 }
 
 // A raw event is one of the `{ event: { ... } }` objects produced by the
@@ -282,7 +288,7 @@ export class NovaSonicSession {
 
     this.initEvents = [
       sessionStart(),
-      promptStart(this.promptName, tools, voiceId),
+      promptStart(this.promptName, tools, voiceId, options.requireToolAtResponseStart === true),
       ...systemContent(this.promptName, instructions),
       ...(options.conversationHistory ?? []).flatMap((entry) =>
         conversationHistoryText(this.promptName, entry.role, entry.text),

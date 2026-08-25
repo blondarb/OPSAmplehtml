@@ -48,7 +48,7 @@ export interface HistorianTurnQuarantineDiagnostics {
 }
 
 export const APPROVED_HISTORIAN_CLOSING_TEXT =
-  'Thank you. Your history has been recorded for your neurologist to review.'
+  "Thank you. We're finished with the interview. Please keep this page open while your history is securely saved for your neurologist."
 
 export type TurnAdmissionResult =
   | {
@@ -197,6 +197,10 @@ export class HistorianTurnQuarantine {
 
   currentApprovedQuestion(): ApprovedHistorianTurn | null {
     return this.approval ? { ...this.approval } : null
+  }
+
+  currentControlMode(): Exclude<TurnAdmissionMode, 'approved_question'> | null {
+    return this.controlMode
   }
 
   hasApprovedQuestionStreaming(): boolean {
@@ -365,7 +369,7 @@ export function parseApprovedHistorianTurn(value: unknown): ApprovedHistorianTur
     candidate.status !== 'approved' ||
     typeof candidate.obligation_id !== 'string' ||
     typeof candidate.approved_text !== 'string' ||
-    candidate.allow_example !== false
+    typeof candidate.allow_example !== 'boolean'
   ) return null
   const approval = {
     obligationId: candidate.obligation_id.trim(),

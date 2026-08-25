@@ -18,6 +18,16 @@ describe('eventBuilders', () => {
     expect(e.event.promptStart.audioOutputConfiguration.sampleRateHertz).toBe(24000)
     expect(e.event.promptStart.toolConfiguration.tools).toHaveLength(1)
     expect(e.event.promptStart.audioOutputConfiguration.voiceId).toBe('matthew')
+    expect(e.event.promptStart.toolConfiguration).not.toHaveProperty('toolChoice')
+  })
+  it('promptStart can require one configured tool at the beginning of every response', () => {
+    const e = promptStart(
+      'p1',
+      [{ toolSpec: { name: 'request_history_question' } }],
+      'matthew',
+      true,
+    )
+    expect(e.event.promptStart.toolConfiguration.toolChoice).toEqual({ any: {} })
   })
   it('audioContentStart declares 16k USER audio', () => {
     const e = audioContentStart('p1', 'c1')

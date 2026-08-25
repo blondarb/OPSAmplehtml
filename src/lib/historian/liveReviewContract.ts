@@ -40,6 +40,27 @@ export interface LiveReviewRepetition {
   description: string
 }
 
+export type LiveReviewMedicationValueStatus =
+  | 'known'
+  | 'unknown'
+  | 'declined'
+  | 'missing'
+
+export interface LiveReviewMedicationValue {
+  status: LiveReviewMedicationValueStatus
+  /** Exact patient-transcript substring when status is known; otherwise null. */
+  valueSpan: string | null
+  patientSeqs: number[]
+}
+
+export interface LiveReviewMedicationMention {
+  /** Exact, unnormalized substring copied from one patient transcript turn. */
+  nameSpan: string
+  patientSeq: number
+  dose: LiveReviewMedicationValue
+  frequency: LiveReviewMedicationValue
+}
+
 export interface LiveInterviewReviewV1 {
   version: typeof LIVE_INTERVIEW_REVIEW_VERSION
   reviewedThroughSeq: number
@@ -47,6 +68,7 @@ export interface LiveInterviewReviewV1 {
   criticalGaps: LiveReviewCriticalGap[]
   contradictions: LiveReviewContradiction[]
   repetitions: LiveReviewRepetition[]
+  medications: LiveReviewMedicationMention[]
   activeSafetyConcern: {
     present: boolean
     patientSeqs: number[]
@@ -80,8 +102,15 @@ export type LiveInterviewReviewCompletion =
 const DOMAIN_IDS = new Set<string>(COMPREHENSIVE_HISTORY_DOMAINS.map(({ id }) => id))
 const STATUS_VALUES = new Set<LiveReviewCoverageStatus>(['covered', 'uncertain', 'missing'])
 const CONFIDENCE_VALUES = new Set(['high', 'medium', 'low'])
+const MEDICATION_VALUE_STATUSES = new Set<LiveReviewMedicationValueStatus>([
+  'known',
+  'unknown',
+  'declined',
+  'missing',
+])
 const MAX_TEXT_LENGTH = 240
 const MAX_FINDINGS = 10
+const MAX_MEDICATIONS = 12
 
 function isPlainObject(value: unknown): value is Record<string, unknown> {
   return !!value && typeof value === 'object' && !Array.isArray(value)
@@ -149,6 +178,45 @@ function transcriptIndex(transcript: HistorianTranscriptEntry[]): {
   return { patientSeqs, assistantSeqs, latestPatientSeq, patientTurnCount: patientSeqs.size }
 }
 
+function parseMedicationValue(
+  raw: unknown,
+  index: ReturnType<typeof transcriptIndex>,
+  patientTextBySeq: Map<number, string>,
+  label: string,
+): LiveReviewMedicationValue {
+  if (!isPlainObject(raw) || !hasExactKeys(raw, ['status', 'value_span', 'patient_seqs'])) {
+    throw new Error(`${label} has an invalid schema.`)
+  }
+  if (
+    typeof raw.status !== 'string' ||
+    !MEDICATION_VALUE_STATUSES.has(raw.status as LiveReviewMedicationValueStatus)
+  ) throw new Error(`${label} has an invalid status.`)
+  const status = raw.status as LiveReviewMedicationValueStatus
+  const patientSeqs = exactIntegerArray(
+    raw.patient_seqs,
+    index.patientSeqs,
+    label,
+    status === 'missing' ? 0 : 1,
+    6,
+  )
+  if (status === 'known') {
+    if (typeof raw.value_span !== 'string') {
+      throw new Error(`${label} must include an exact value span.`)
+    }
+    const valueSpan = raw.value_span.trim()
+    if (
+      !valueSpan ||
+      valueSpan.length > 80 ||
+      !patientSeqs.some((seq) => patientTextBySeq.get(seq)?.includes(valueSpan))
+    ) throw new Error(`${label} value is not an exact cited patient substring.`)
+    return { status, valueSpan, patientSeqs }
+  }
+  if (raw.value_span !== null) {
+    throw new Error(`${label} cannot include a value span for ${status}.`)
+  }
+  return { status, valueSpan: null, patientSeqs }
+}
+
 /**
  * Parse and independently validate an untrusted reviewer result.  The return
  * value contains only known fields, fixed domain identifiers, bounded text,
@@ -166,6 +234,7 @@ export function parseLiveInterviewReview(
     'critical_gaps',
     'contradictions',
     'repetitions',
+    'medications',
     'active_safety_concern',
     'ready_to_close',
     'next_question_intents',
@@ -251,6 +320,52 @@ export function parseLiveInterviewReview(
     }
   })
 
+  if (!Array.isArray(raw.medications) || raw.medications.length > MAX_MEDICATIONS) {
+    throw new Error('Live review medications have an invalid item count.')
+  }
+  const patientTextBySeq = new Map(
+    transcript
+      .filter((entry) => entry.role === 'user')
+      .map((entry) => [entry.seq!, entry.text] as const),
+  )
+  const seenMedicationMentions = new Set<string>()
+  const medications: LiveReviewMedicationMention[] = raw.medications.map((item, itemIndex) => {
+    if (!isPlainObject(item) || !hasExactKeys(item, [
+      'name_span',
+      'patient_seq',
+      'dose',
+      'frequency',
+    ])) throw new Error(`Live review medication ${itemIndex} has an invalid schema.`)
+    if (
+      typeof item.name_span !== 'string' ||
+      !Number.isInteger(item.patient_seq) ||
+      !index.patientSeqs.has(item.patient_seq as number)
+    ) throw new Error(`Live review medication ${itemIndex} has invalid source evidence.`)
+    const nameSpan = item.name_span.trim()
+    const patientSeq = item.patient_seq as number
+    if (
+      !nameSpan ||
+      nameSpan.length > 80 ||
+      !patientTextBySeq.get(patientSeq)?.includes(nameSpan)
+    ) throw new Error(`Live review medication ${itemIndex} name is not an exact patient substring.`)
+    const mentionKey = `${patientSeq}:\u0000${nameSpan}`
+    if (seenMedicationMentions.has(mentionKey)) {
+      throw new Error('Live review contains a duplicate medication mention.')
+    }
+    seenMedicationMentions.add(mentionKey)
+    return {
+      nameSpan,
+      patientSeq,
+      dose: parseMedicationValue(item.dose, index, patientTextBySeq, `Medication ${itemIndex} dose`),
+      frequency: parseMedicationValue(
+        item.frequency,
+        index,
+        patientTextBySeq,
+        `Medication ${itemIndex} frequency`,
+      ),
+    }
+  })
+
   if (!isPlainObject(raw.active_safety_concern) || !hasExactKeys(raw.active_safety_concern, ['present', 'patient_seqs'])) {
     throw new Error('Live review safety finding has an invalid schema.')
   }
@@ -291,6 +406,7 @@ export function parseLiveInterviewReview(
     criticalGaps,
     contradictions,
     repetitions,
+    medications,
     activeSafetyConcern: { present: raw.active_safety_concern.present, patientSeqs: safetySeqs },
     // A model may under-protect closure, but it may never bypass the
     // application prerequisites above.
@@ -363,6 +479,7 @@ export function parseLiveInterviewReviewArtifact(
     'criticalGaps',
     'contradictions',
     'repetitions',
+    'medications',
     'activeSafetyConcern',
     'readyToClose',
     'nextQuestionIntents',
@@ -392,6 +509,28 @@ export function parseLiveInterviewReviewArtifact(
         ? { assistant_seqs: item.assistantSeqs, description: item.description }
         : item)
       : review.repetitions,
+    medications: Array.isArray(review.medications)
+      ? review.medications.map((item) => isPlainObject(item)
+        ? {
+            name_span: item.nameSpan,
+            patient_seq: item.patientSeq,
+            dose: isPlainObject(item.dose)
+              ? {
+                  status: item.dose.status,
+                  value_span: item.dose.valueSpan,
+                  patient_seqs: item.dose.patientSeqs,
+                }
+              : item.dose,
+            frequency: isPlainObject(item.frequency)
+              ? {
+                  status: item.frequency.status,
+                  value_span: item.frequency.valueSpan,
+                  patient_seqs: item.frequency.patientSeqs,
+                }
+              : item.frequency,
+          }
+        : item)
+      : review.medications,
     active_safety_concern: isPlainObject(review.activeSafetyConcern)
       ? { present: review.activeSafetyConcern.present, patient_seqs: review.activeSafetyConcern.patientSeqs }
       : review.activeSafetyConcern,

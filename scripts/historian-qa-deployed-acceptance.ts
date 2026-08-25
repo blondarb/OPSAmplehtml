@@ -4,6 +4,14 @@ import {
   parseLiveInterviewReviewArtifact,
   type LiveInterviewReviewArtifactV1,
 } from '../src/lib/historian/liveReviewContract'
+import {
+  ADAPTIVE_OPENING_QUESTION,
+  ADAPTIVE_PRE_CLOSE_QUESTION,
+} from '../src/lib/historian/adaptiveQuestionContract'
+import {
+  MEDICATION_INVENTORY_QUESTION,
+  MEDICATION_RECONCILIATION_VERSION,
+} from '../src/lib/historian/medicationReconciliation'
 
 const QA_APP_ORIGIN = 'https://historian-mvp-qa.d3ietjwgco4g2t.amplifyapp.com'
 const QA_COGNITO_CLIENT_ID = 'ecjsa2ifjoj85konf3ts42gf5'
@@ -197,7 +205,7 @@ function appHeaders(cookie?: string): Record<string, string> {
 function completeSyntheticAdaptiveTranscript(): HistorianTranscriptEntry[] {
   const turns: Array<[question: string, answer: string]> = [
     [
-      'What brought you to be referred for this visit?',
+      ADAPTIVE_OPENING_QUESTION,
       'This is synthetic test data only. I was referred for recurrent headaches with light sensitivity that began six months ago and now occur twice a week.',
     ],
     ['How old are you?', 'I am 45 years old.'],
@@ -226,7 +234,7 @@ function completeSyntheticAdaptiveTranscript(): HistorianTranscriptEntry[] {
       'I report no chronic medical conditions, hospitalizations, or prior surgeries.',
     ],
     [
-      'What medications or supplements do you take?',
+      MEDICATION_INVENTORY_QUESTION,
       'I take no prescription, over-the-counter, or supplement medications, so there are no adherence problems or medication side effects to report.',
     ],
     [
@@ -238,7 +246,7 @@ function completeSyntheticAdaptiveTranscript(): HistorianTranscriptEntry[] {
       'I live with my spouse, work in an office, and am independent. I report no tobacco, alcohol, recreational drugs, recent travel, tick exposure, toxic exposure, or major sleep deprivation.',
     ],
     [
-      'What prior studies do you recall?',
+      ADAPTIVE_PRE_CLOSE_QUESTION,
       'I recall a normal eye examination but no brain imaging, EEG, or spinal tap. I want the neurologist to clarify why the headaches changed and discuss safe next steps; I have no other questions today.',
     ],
   ]
@@ -270,6 +278,15 @@ function fixedSaveBody(
       interview_mode: 'comprehensive',
       interview_prompt_version: 'comprehensive-v3',
       live_review_v1: liveReview,
+      medication_reconciliation_v1: {
+        version: MEDICATION_RECONCILIATION_VERSION,
+        items: [],
+        inventoryStatus: 'answered',
+        inventoryPatientSeq: 18,
+        pendingQuestion: null,
+        medicationNameClarificationCount: 0,
+        clinicalMedicationQuestionCount: 1,
+      },
       // Deliberately forged empty client coverage. The deployed save boundary
       // must replace this with coverage derived from the attested review.
       history_coverage: {

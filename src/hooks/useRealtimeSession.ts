@@ -22,6 +22,8 @@ import {
 import {
   ADAPTIVE_AGE_QUESTION,
   ADAPTIVE_OPENING_QUESTION,
+  ADAPTIVE_PRE_CLOSE_QUESTION,
+  adaptiveQuestionAllowsExample,
   adaptiveQuestionIssues,
   approvedAdaptiveAgeQuestion,
   approvedAdaptiveOpeningQuestion,
@@ -34,6 +36,20 @@ import {
   parseLiveInterviewReviewArtifact,
   type LiveInterviewReviewArtifactV1,
 } from '@/lib/historian/liveReviewContract'
+import {
+  approveMedicationQuestion,
+  commitMedicationQuestion,
+  completionWithMedicationUncertainty,
+  confirmedMedicationSummary,
+  createMedicationReconciliationState,
+  medicationReconciliationClosed,
+  medicationReconciliationHasUncertainty,
+  medicationReconciliationUnresolvedCount,
+  nextMedicationQuestion,
+  recordMedicationAnswer,
+  syncMedicationReview,
+  type MedicationReconciliationState,
+} from '@/lib/historian/medicationReconciliation'
 import {
   assertHistorianContinuationCheckpoint,
   buildHistorianAnsweredQuestionPairs,
@@ -198,8 +214,9 @@ const MAX_ADAPTIVE_PROPOSAL_REJECTIONS = 2
  * than this bound, Nova's already-validated proposal wins and the interview
  * continues without an unbounded pause.
  */
-const ADAPTIVE_CONDUCTOR_WAIT_MS = 6_000
+const ADAPTIVE_CONDUCTOR_WAIT_MS = 4_500
 const ADAPTIVE_CONDUCTOR_POLL_MS = 50
+const ADAPTIVE_REVIEW_WAIT_MS = 6_000
 
 /**
  * How many unflushed transcript entries accumulate before triggering an
@@ -301,6 +318,11 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
   const liveReviewRef = useRef<LiveInterviewReviewArtifactV1 | null>(null)
   const liveReviewInFlightRef = useRef(false)
   const lastLiveReviewTurnRef = useRef(0)
+  const medicationReconciliationRef = useRef<MedicationReconciliationState>(
+    createMedicationReconciliationState(),
+  )
+  const preCloseStateRef = useRef<'not_asked' | 'approved' | 'answered'>('not_asked')
+  const reviewRequiredPatientSeqRef = useRef<number | null>(null)
   const flushTokenRef = useRef<string | null>(null)
   // Monotonic per-entry sequence number, assigned at append time (both the
   // assistantTranscript and userTranscript branches below).
@@ -691,6 +713,13 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
       // Never let a slower review overwrite a newer transcript boundary.
       if (currentLatestPatientSeq !== latestPatientSeq) return null
       liveReviewRef.current = artifact
+      medicationReconciliationRef.current = syncMedicationReview(
+        medicationReconciliationRef.current,
+        artifact.review.medications,
+      )
+      if (reviewRequiredPatientSeqRef.current === latestPatientSeq) {
+        reviewRequiredPatientSeqRef.current = null
+      }
       lastLiveReviewTurnRef.current = capturedPatientTurns
 
       if (artifact.review.activeSafetyConcern.present) {
@@ -843,30 +872,6 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
           .reverse()
           .find((entry) => entry.role === 'user')?.seq
         const currentReview = liveReviewRef.current
-        const completion =
-          currentReview && currentReview.review.reviewedThroughSeq === latestPatientSeq
-            ? liveInterviewReviewCompletion(currentReview.review)
-            : 'incomplete'
-        if (completion !== 'incomplete') {
-          settleTool({ success: true, status: 'coverage_ready', completion })
-          return
-        }
-
-        if (questionCountRef.current >= COMPREHENSIVE_HARD_STOP_EXCHANGE) {
-          const decision = runtimeGuardRef.current?.applicationHardStop()
-          settleTool({ success: false, status: 'interview_terminal' })
-          if (decision) {
-            applyHistorianTurnDecision(decision, {
-              activateSafety,
-              injectSystemText: () => undefined,
-              requestFinalization: (reason) => {
-                unresponsiveRef.current?.suspend()
-                void endSessionRef.current(reason)
-              },
-            })
-          }
-          return
-        }
 
         if (
           questionCountRef.current >= COMPREHENSIVE_SOFT_WRAP_EXCHANGE &&
@@ -892,14 +897,78 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
             return
           }
 
+          const latestReview = liveReviewRef.current
+          const reviewCompletion =
+            latestReview && latestReview.review.reviewedThroughSeq === currentLatestPatientSeq
+              ? liveInterviewReviewCompletion(latestReview.review)
+              : 'incomplete'
+          const latestCompletion = completionWithMedicationUncertainty(
+            reviewCompletion,
+            medicationReconciliationRef.current,
+          )
+          const medicationQuestion = nextMedicationQuestion(
+            medicationReconciliationRef.current,
+            { includeInventory: latestCompletion !== 'incomplete' },
+          )
+          const medicationClosed = medicationReconciliationClosed(
+            medicationReconciliationRef.current,
+          )
+          if (
+            latestCompletion !== 'incomplete' &&
+            medicationClosed &&
+            preCloseStateRef.current === 'answered'
+          ) {
+            settleTool({ success: true, status: 'coverage_ready', completion: latestCompletion })
+            return
+          }
+
+          // A fresh review after the 60th answer may still certify completion,
+          // so the ceiling is checked here rather than before the bounded
+          // review wait. If any required medication/pre-close work remains,
+          // never approve question 61.
+          if (questionCountRef.current >= COMPREHENSIVE_HARD_STOP_EXCHANGE) {
+            const decision = runtimeGuardRef.current?.applicationHardStop()
+            settleTool({ success: false, status: 'interview_terminal' })
+            if (decision) {
+              applyHistorianTurnDecision(decision, {
+                activateSafety,
+                injectSystemText: () => undefined,
+                requestFinalization: (reason) => {
+                  unresponsiveRef.current?.suspend()
+                  void endSessionRef.current(reason)
+                },
+              })
+            }
+            return
+          }
+
           const fixedOpening = questionCountRef.current === 0
             ? { id: 'adaptive-opening', requiredText: ADAPTIVE_OPENING_QUESTION }
             : questionCountRef.current === 1
               ? { id: 'adaptive-age', requiredText: ADAPTIVE_AGE_QUESTION }
               : null
+          const preCloseQuestion =
+            !fixedOpening &&
+            !medicationQuestion &&
+            latestCompletion !== 'incomplete' &&
+            medicationClosed &&
+            preCloseStateRef.current === 'not_asked'
+              ? {
+                  id: 'adaptive-preclose',
+                  requiredText: ADAPTIVE_PRE_CLOSE_QUESTION,
+                }
+              : null
+          const applicationQuestion = fixedOpening ?? (
+            medicationQuestion
+              ? {
+                  id: medicationQuestion.obligationId,
+                  requiredText: medicationQuestion.questionText,
+                }
+              : preCloseQuestion
+          )
           const pendingConductor = pendingConductorQuestionRef.current
           const conductorQuestion =
-            !fixedOpening &&
+            !applicationQuestion &&
             pendingConductor &&
             pendingConductor.reviewedThroughPatientSeq === latestPatientSeq
               ? pendingConductor.text
@@ -914,6 +983,13 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
             proposedText = approvedAdaptiveOpeningQuestion(args.proposed_text)
           } else if (questionCountRef.current === 1) {
             proposedText = approvedAdaptiveAgeQuestion(args.proposed_text)
+          } else if (applicationQuestion) {
+            proposedText =
+              modelProposal &&
+              canonicalAdaptiveQuestion(modelProposal) ===
+                canonicalAdaptiveQuestion(applicationQuestion.requiredText)
+                ? applicationQuestion.requiredText
+                : null
           } else if (conductorQuestion) {
             proposedText =
               modelProposal &&
@@ -929,7 +1005,7 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
               failClosed('proposal_retry_limit')
               return
             }
-            const requiredText = fixedOpening?.requiredText ?? conductorQuestion
+            const requiredText = applicationQuestion?.requiredText ?? conductorQuestion
             const issueCodes = requiredText
               ? ['clinical_redirect']
               : adaptiveQuestionIssues(args.proposed_text)
@@ -942,6 +1018,15 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
             return
           }
           adaptiveProposalRejectionsRef.current = 0
+          if (medicationQuestion && applicationQuestion?.id === medicationQuestion.obligationId) {
+            medicationReconciliationRef.current = approveMedicationQuestion(
+              medicationReconciliationRef.current,
+              medicationQuestion,
+            )
+          }
+          if (preCloseQuestion && applicationQuestion?.id === 'adaptive-preclose') {
+            preCloseStateRef.current = 'approved'
+          }
           if (conductorQuestion) pendingConductorQuestionRef.current = null
           if (conductorDuePatientSeqRef.current === latestPatientSeq) {
             // Consume the intermittent conductor slot only after its exact
@@ -952,13 +1037,13 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
           settleTool({
             success: true,
             status: 'approved',
-            obligation_id: fixedOpening?.id ?? (
+            obligation_id: applicationQuestion?.id ?? (
               conductorQuestion
                 ? `claude-conductor-${questionCountRef.current + 1}`
                 : `adaptive-question-${questionCountRef.current + 1}`
             ),
             approved_text: proposedText,
-            allow_example: false,
+            allow_example: adaptiveQuestionAllowsExample(proposedText),
           })
         }
 
@@ -966,14 +1051,31 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
           conductorDuePatientSeqRef.current === latestPatientSeq &&
           localizerInFlightRef.current &&
           pendingConductorQuestionRef.current?.reviewedThroughPatientSeq !== latestPatientSeq
-        if (waitingForThisConductorTurn) {
+        const waitingForRequiredReview =
+          reviewRequiredPatientSeqRef.current === latestPatientSeq &&
+          currentReview?.review.reviewedThroughSeq !== latestPatientSeq
+        if (waitingForRequiredReview && !liveReviewInFlightRef.current) void runLiveReview()
+        if (waitingForThisConductorTurn || waitingForRequiredReview) {
           void (async () => {
-            const deadline = Date.now() + ADAPTIVE_CONDUCTOR_WAIT_MS
+            const deadline = Date.now() + Math.max(
+              waitingForThisConductorTurn ? ADAPTIVE_CONDUCTOR_WAIT_MS : 0,
+              waitingForRequiredReview ? ADAPTIVE_REVIEW_WAIT_MS : 0,
+            )
             while (
-              localizerInFlightRef.current &&
               pendingToolsRef.current.has(toolUseId) &&
               sessionGenRef.current === requestSessionGen &&
-              Date.now() < deadline
+              Date.now() < deadline &&
+              (
+                (
+                  waitingForThisConductorTurn &&
+                  localizerInFlightRef.current &&
+                  pendingConductorQuestionRef.current?.reviewedThroughPatientSeq !== latestPatientSeq
+                ) ||
+                (
+                  waitingForRequiredReview &&
+                  liveReviewRef.current?.review.reviewedThroughSeq !== latestPatientSeq
+                )
+              )
             ) {
               await new Promise((resolve) => setTimeout(resolve, ADAPTIVE_CONDUCTOR_POLL_MS))
             }
@@ -1079,20 +1181,49 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
           const currentReview = liveReviewRef.current
           const reviewIsCurrent =
             !!currentReview && currentReview.review.reviewedThroughSeq === latestPatientSeq
-          const completion = reviewIsCurrent
+          const reviewCompletion = reviewIsCurrent
             ? liveInterviewReviewCompletion(currentReview.review)
             : 'incomplete'
+          const completion = completionWithMedicationUncertainty(
+            reviewCompletion,
+            medicationReconciliationRef.current,
+          )
 
           if (!terminalPartial && completion === 'incomplete') {
             settleTool({ success: false, status: 'review_required' })
             void runLiveReview()
             return
           }
+          if (
+            !terminalPartial &&
+            (
+              !medicationReconciliationClosed(medicationReconciliationRef.current) ||
+              preCloseStateRef.current !== 'answered'
+            )
+          ) {
+            settleTool({ success: false, status: 'completion_obligations_required' })
+            return
+          }
+
+          const confirmedMedications = confirmedMedicationSummary(
+            medicationReconciliationRef.current,
+          )
 
           structuredForSave = {
-            ...structured,
+            // Comprehensive v3 never persists Nova-authored clinical prose.
+            // Until a separate transcript-citing clinician-report generator
+            // exists, only application-owned/attested structures cross the
+            // save boundary. This prevents a misheard drug name from surviving
+            // in HPI, side effects, medication changes, or another free-text
+            // field after current_medications has been corrected.
+            current_medications: confirmedMedications || undefined,
             interview_mode: 'comprehensive',
             interview_prompt_version: 'comprehensive-v3',
+            medication_reconciliation_v1: medicationReconciliationRef.current,
+            medication_reconciliation_has_uncertainty:
+              medicationReconciliationHasUncertainty(medicationReconciliationRef.current),
+            medication_reconciliation_unresolved_count:
+              medicationReconciliationUnresolvedCount(medicationReconciliationRef.current),
             ...(reviewIsCurrent
               ? {
                   live_review_v1: currentReview,
@@ -1205,8 +1336,18 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
         }
 
         structuredOutputRef.current = structuredForSave
-        narrativeSummaryRef.current = narrative_summary || null
-        if (red_flags && Array.isArray(red_flags)) {
+        // Comprehensive v3's in-stream narrative is a model draft, not a
+        // validated clinician report. In particular, it may silently normalize
+        // a medication name. Persist the structured transcript-bound evidence
+        // and medication ledger; report generation remains a separate surface.
+        narrativeSummaryRef.current = adaptiveTurnControllerEnabledRef.current
+          ? null
+          : narrative_summary || null
+        if (
+          !adaptiveTurnControllerEnabledRef.current &&
+          red_flags &&
+          Array.isArray(red_flags)
+        ) {
           const mergedFlags = [...redFlagsRef.current, ...red_flags]
           redFlagsRef.current = mergedFlags.filter((flag, index, all) =>
             all.findIndex((candidate) =>
@@ -1625,6 +1766,12 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
             timestamp: Math.floor((Date.now() - startTimeRef.current) / 1000),
             seq: nextSeq,
           }
+          medicationReconciliationRef.current = commitMedicationQuestion(
+            medicationReconciliationRef.current,
+            e.obligationId,
+            nextSeq,
+            entry.text,
+          )
           const previousEntry =
             transcriptRef.current[transcriptRef.current.length - 1]
           transcriptRef.current = [...transcriptRef.current, entry]
@@ -1693,6 +1840,28 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
           }
           transcriptRef.current = [...transcriptRef.current, entry]
           setTranscript([...transcriptRef.current])
+          let requiresFreshAdaptiveReview = false
+          if (
+            adaptiveTurnControllerEnabledRef.current &&
+            medicationReconciliationRef.current.pendingQuestion?.assistantSeq != null
+          ) {
+            medicationReconciliationRef.current = recordMedicationAnswer(
+              medicationReconciliationRef.current,
+              entry.seq!,
+              entry.text,
+            )
+            requiresFreshAdaptiveReview = true
+          }
+          if (
+            adaptiveTurnControllerEnabledRef.current &&
+            preCloseStateRef.current === 'approved'
+          ) {
+            preCloseStateRef.current = 'answered'
+            requiresFreshAdaptiveReview = true
+          }
+          if (requiresFreshAdaptiveReview) {
+            reviewRequiredPatientSeqRef.current = entry.seq!
+          }
 
           // Durable transcript flush (Task 1): buffer + flush every
           // FLUSH_THRESHOLD unflushed entries. Fire-and-forget — never
@@ -1820,7 +1989,8 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
             runtimeGuardRef.current.acceptsInterviewActivity() &&
             (
               turnsSinceReview >= LIVE_REVIEW_INTERVAL ||
-              questionCountRef.current >= COMPREHENSIVE_SOFT_WRAP_EXCHANGE
+              questionCountRef.current >= COMPREHENSIVE_SOFT_WRAP_EXCHANGE ||
+              requiresFreshAdaptiveReview
             )
           ) void runLiveReview()
         }
@@ -1980,6 +2150,9 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
     liveReviewRef.current = null
     liveReviewInFlightRef.current = false
     lastLiveReviewTurnRef.current = 0
+    medicationReconciliationRef.current = createMedicationReconciliationState()
+    preCloseStateRef.current = 'not_asked'
+    reviewRequiredPatientSeqRef.current = null
     flushTokenRef.current = null
     seqCounterRef.current = 0
     pendingFlushEntriesRef.current = []
@@ -2287,11 +2460,15 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
       providerRef.current?.suppressOutput()
     }
     if (finalizingRef.current) return
+    const adaptiveCompletion = completionWithMedicationUncertainty(
+      liveInterviewReviewCompletion(liveReviewRef.current?.review),
+      medicationReconciliationRef.current,
+    )
     const inferredReason =
       terminationReasonRef.current ??
       (interviewCompletedRef.current
         ? adaptiveTurnControllerEnabledRef.current
-          ? liveInterviewReviewCompletion(liveReviewRef.current?.review) === 'complete_with_uncertainty'
+          ? adaptiveCompletion === 'complete_with_uncertainty'
             ? 'complete_with_uncertainty'
             : 'coverage_complete'
           : turnEvidenceControllerEnabledRef.current
@@ -2350,22 +2527,9 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
       }
     }
 
-    // Last-resort fallback: if the AI still hasn't produced a narrative (tool
-    // didn't fire, channel dropped, model refused, etc.), preserve the raw
-    // transcript as the narrative summary so the physician can still see what
-    // the patient said.
-    if (!narrativeSummaryRef.current && transcriptRef.current.length > 0) {
-      const hasPatientSpeech = transcriptRef.current.some(
-        t => t.role === 'user' && t.text.trim().length > 0,
-      )
-      if (hasPatientSpeech) {
-        narrativeSummaryRef.current =
-          'Interview ended before AI generated a structured summary. Raw transcript:\n\n' +
-          transcriptRef.current
-            .map(t => `${t.role === 'assistant' ? 'AI' : 'Patient'}: ${t.text}`)
-            .join('\n\n')
-      }
-    }
+    // The transcript is already durably persisted as its own artifact. Never
+    // copy it into narrative_summary: doing so made a raw transcript appear to
+    // be a generated physician report after a provider failure.
 
     // Stop the timer, then tear the transport down via the provider.
     cleanup()

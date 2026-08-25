@@ -27,6 +27,7 @@ import {
 
 const KNOWN_HISTORIAN_TOOL_NAMES = new Set([
   'request_history_question',
+  'request_interview_control',
   'save_interview_output',
   'query_evidence',
   'scale_step',
@@ -61,6 +62,32 @@ function isBoundedClinicalRedirect(value: unknown): value is string {
 
 function historianToolCategory(toolName: string): string {
   return KNOWN_HISTORIAN_TOOL_NAMES.has(toolName) ? toolName : 'unknown'
+}
+
+const CONTROL_KIND_TO_MODE = {
+  closing: 'terminal_statement',
+  check_in: 'unresponsive_check_in',
+  sign_off: 'unresponsive_sign_off',
+} as const
+
+type InterviewControlKind = keyof typeof CONTROL_KIND_TO_MODE
+
+function parseInterviewControlKind(value: unknown): InterviewControlKind | null {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return null
+  const record = value as Record<string, unknown>
+  if (Object.keys(record).length !== 1 || typeof record.kind !== 'string') return null
+  return record.kind in CONTROL_KIND_TO_MODE
+    ? record.kind as InterviewControlKind
+    : null
+}
+
+function controlledSystemInstruction(kind: InterviewControlKind, text: string): string {
+  return [
+    '[APPLICATION-OWNED CONTROL TURN]',
+    `First call request_interview_control with exactly {"kind":${JSON.stringify(kind)}}.`,
+    'Wait for its success result. Then follow the application statement exactly; do not add another question or any other words.',
+    text,
+  ].join(' ')
 }
 
 // ---------------------------------------------------------------------------
@@ -798,6 +825,24 @@ wss.on('connection', (ws) => {
       } catch {
         // content is not JSON — pass through as a raw string
       }
+      if (controlledTurnActive() && toolName === 'request_interview_control') {
+        const kind = parseInterviewControlKind(input)
+        const currentMode = turnQuarantine.currentControlMode()
+        if (!kind || !currentMode || CONTROL_KIND_TO_MODE[kind] !== currentMode) {
+          rejectHistorianTurn('invalid_interview_control')
+          return
+        }
+        session.pushToolResult(toolUseId, JSON.stringify({
+          success: true,
+          status: 'approved',
+          kind,
+        }))
+        logSessionEvent('control_authorized', {
+          segmentId: activeSegmentId,
+          controlKind: kind,
+        })
+        return
+      }
       pendingTools.set(toolUseId, toolName)
       testBoundarySchedule.observeTool(toolName)
       if (barrier) {
@@ -978,7 +1023,9 @@ wss.on('connection', (ws) => {
           // callback (mapped to {t:'error'} above). This .catch only prevents an
           // unhandled rejection from the un-awaited promise — it must NOT send a
           // second error, or the browser receives the same failure twice.
-          session.start(startConfig.instructions, startConfig.tools, startConfig.voiceId)
+          session.start(startConfig.instructions, startConfig.tools, startConfig.voiceId, {
+            requireToolAtResponseStart: adaptiveTurnControllerActive,
+          })
             .then(() => {
               if (!clientStopping && !modelTerminalSent && session.isActive()) {
                 logSessionEvent('model_stream_active', { segmentId: activeSegmentId })
@@ -1127,6 +1174,20 @@ wss.on('connection', (ws) => {
               rejectHistorianTurn('closing_authorization_conflict')
               break
             }
+            if (
+              controlledTurnActive() &&
+              toolName === 'save_interview_output' &&
+              parsedOutput &&
+              typeof parsedOutput === 'object' &&
+              (parsedOutput as Record<string, unknown>).success === true
+            ) {
+              // A completed interview must never enter another provider
+              // rollover while its exact closing statement is pending.
+              clearContinuationTimers()
+              dueSent = false
+              testBoundaryPending = false
+              continuationDeadlineAtMs = 0
+            }
             session.pushToolResult(msg.toolUseId, msg.output)
             pendingTools.delete(msg.toolUseId)
             if (approvedQuestion && !adaptiveTurnControllerActive) {
@@ -1151,13 +1212,27 @@ wss.on('connection', (ws) => {
             break
           }
           if (controlledTurnActive() && !speechSuppressed) {
-            const controlMode = msg.text.startsWith('[The patient has not said anything')
-              ? 'unresponsive_check_in'
-              : msg.text.startsWith('[The patient still has not responded')
-                ? 'unresponsive_sign_off'
-                : null
-            if (controlMode && !turnQuarantine.allowControl(controlMode)) {
-              rejectHistorianTurn('control_turn_authorization_conflict')
+            const controlKind: InterviewControlKind | null =
+              msg.text.startsWith('[The interview is complete.')
+                ? 'closing'
+                : msg.text.startsWith('[The patient has not said anything')
+                  ? 'check_in'
+                  : msg.text.startsWith('[The patient still has not responded')
+                    ? 'sign_off'
+                    : null
+            if (controlKind) {
+              const controlMode = CONTROL_KIND_TO_MODE[controlKind]
+              if (controlKind === 'closing') {
+                if (turnQuarantine.currentControlMode() !== controlMode) {
+                  rejectHistorianTurn('closing_not_saved')
+                  break
+                }
+              } else if (!turnQuarantine.allowControl(controlMode)) {
+                rejectHistorianTurn('control_turn_authorization_conflict')
+                break
+              }
+              TRACE(`<- systemText control=${controlKind} (injected as USER) chars=${msg.text.length}`)
+              session.pushSystemText(controlledSystemInstruction(controlKind, msg.text))
               break
             }
           }
@@ -1289,6 +1364,7 @@ wss.on('connection', (ws) => {
                 {
                   sendGreetingKickoff: false,
                   conversationHistory: continuationHistory(checked.checkpoint),
+                  requireToolAtResponseStart: adaptiveTurnControllerActive,
                 },
               )
             } catch {

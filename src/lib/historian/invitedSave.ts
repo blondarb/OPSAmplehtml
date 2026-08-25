@@ -21,6 +21,17 @@ import {
 } from './liveReviewContract'
 import { verifyLiveInterviewReviewArtifact } from './liveReviewAttestation'
 import {
+  completionWithMedicationUncertainty,
+  confirmedMedicationSummary,
+  medicationReconciliationClosed,
+  medicationReconciliationHasUncertainty,
+  medicationReconciliationMatchesReview,
+  medicationReconciliationTranscriptIsValid,
+  medicationReconciliationUnresolvedCount,
+  parseMedicationReconciliationState,
+} from './medicationReconciliation'
+import { adaptiveCompletionTranscriptIsValid } from './adaptiveQuestionContract'
+import {
   completionStatusForTermination,
   parseHistorianTerminationReason,
   terminationMatchesCompletionStatus,
@@ -143,10 +154,11 @@ export async function saveInvitedHistorianSession(
 
   let output = structuredOutput(body.structured_output, binding.interviewPromptVersion)
   const narrativeSummary =
+    binding.interviewPromptVersion !== 'comprehensive-v3' &&
     typeof body.narrative_summary === 'string'
       ? body.narrative_summary.trim().slice(0, MAX_SUMMARY_CHARS)
       : ''
-  const redFlags = sanitizeRedFlags(body.red_flags)
+  let redFlags = sanitizeRedFlags(body.red_flags)
   const requestedCompletionStatus =
     body.interview_completion_status === 'ended_early' ? 'ended_early' : 'complete'
   const durationSeconds = integerInRange(body.duration_seconds, 0, 8 * 60 * 60)
@@ -178,6 +190,15 @@ export async function saveInvitedHistorianSession(
       status: 409,
       error: 'Safety escalation status conflicts with its termination reason.',
     }
+  }
+  if (binding.interviewPromptVersion === 'comprehensive-v3') {
+    redFlags = safetyEscalated
+      ? [{
+          flag: 'Patient-stated active safety trigger',
+          severity: 'high',
+          context: 'Application safety protocol activated during the interview.',
+        }]
+      : []
   }
   if (terminationReason === 'hard_stop' && questionCount < 60) {
     return { ok: false, status: 409, error: 'Hard-stop reason is invalid before exchange 60.' }
@@ -211,16 +232,64 @@ export async function saveInvitedHistorianSession(
         error: 'Normal completion requires a current independent live history review.',
       }
     }
-    const completion = liveInterviewReviewCompletion(reviewArtifact?.review)
+    let medicationState = null
+    if (output.medication_reconciliation_v1 != null) {
+      try {
+        medicationState = parseMedicationReconciliationState(
+          output.medication_reconciliation_v1,
+          transcript,
+        )
+      } catch {
+        return {
+          ok: false,
+          status: 409,
+          error: 'Medication reconciliation is incomplete or inconsistent.',
+        }
+      }
+    }
+    const reviewCompletion = liveInterviewReviewCompletion(reviewArtifact?.review)
+    const completion = medicationState
+      ? completionWithMedicationUncertainty(reviewCompletion, medicationState)
+      : reviewCompletion
     if (!terminalPartial && terminationReason !== completion) {
       return {
         ok: false,
         status: 409,
-        error: 'The completion reason does not match the independent live history review.',
+        error: 'The completion reason does not match the independent live history review and medication reconciliation.',
+      }
+    }
+    if (
+      !terminalPartial &&
+      (
+        !medicationState ||
+        !medicationReconciliationClosed(medicationState) ||
+        !medicationReconciliationTranscriptIsValid(medicationState, transcript) ||
+        !medicationReconciliationMatchesReview(
+          medicationState,
+          reviewArtifact?.review.medications ?? [],
+        ) ||
+        !adaptiveCompletionTranscriptIsValid(transcript)
+      )
+    ) {
+      return {
+        ok: false,
+        status: 409,
+        error: 'Normal completion requires the introduction, medication reconciliation, and final patient check.',
       }
     }
     output = {
-      ...output,
+      interview_mode: 'comprehensive',
+      interview_prompt_version: 'comprehensive-v3',
+      current_medications: medicationState
+        ? confirmedMedicationSummary(medicationState) || undefined
+        : undefined,
+      medication_reconciliation_v1: medicationState ?? undefined,
+      medication_reconciliation_has_uncertainty: medicationState
+        ? medicationReconciliationHasUncertainty(medicationState)
+        : false,
+      medication_reconciliation_unresolved_count: medicationState
+        ? medicationReconciliationUnresolvedCount(medicationState)
+        : 0,
       ...(reviewArtifact
         ? {
             live_review_v1: reviewArtifact,

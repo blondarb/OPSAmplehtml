@@ -99,6 +99,7 @@ describe('deployed Historian QA acceptance runner', () => {
             criticalGaps: [],
             contradictions: [],
             repetitions: [],
+            medications: [],
             activeSafetyConcern: { present: false, patientSeqs: [] },
             readyToClose: true,
             nextQuestionIntents: [],
@@ -117,6 +118,10 @@ describe('deployed Historian QA acceptance runner', () => {
           interview_mode: 'comprehensive',
           interview_prompt_version: 'comprehensive-v3',
           live_review_v1: { attestation: 'a'.repeat(43) },
+          medication_reconciliation_v1: {
+            inventoryStatus: 'answered',
+            inventoryPatientSeq: 18,
+          },
           history_coverage: { covered_domains: [], missing_or_uncertain: [] },
         })
         expect(body.question_count).toBe(12)

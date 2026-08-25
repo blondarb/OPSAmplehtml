@@ -29,6 +29,17 @@ import {
 } from '@/lib/historian/liveReviewContract'
 import { verifyLiveInterviewReviewArtifact } from '@/lib/historian/liveReviewAttestation'
 import {
+  completionWithMedicationUncertainty,
+  confirmedMedicationSummary,
+  medicationReconciliationClosed,
+  medicationReconciliationHasUncertainty,
+  medicationReconciliationMatchesReview,
+  medicationReconciliationTranscriptIsValid,
+  medicationReconciliationUnresolvedCount,
+  parseMedicationReconciliationState,
+} from '@/lib/historian/medicationReconciliation'
+import { adaptiveCompletionTranscriptIsValid } from '@/lib/historian/adaptiveQuestionContract'
+import {
   authorizeClinicalAccess,
   clinicalAccessDeniedMessage,
 } from '@/lib/auth/clinicalAccess'
@@ -169,17 +180,64 @@ export async function POST(request: Request) {
           { status: 409 },
         )
       }
-      const completion = liveInterviewReviewCompletion(reviewArtifact?.review)
+      let medicationState = null
+      if (structuredOutput.medication_reconciliation_v1 != null) {
+        try {
+          medicationState = parseMedicationReconciliationState(
+            structuredOutput.medication_reconciliation_v1,
+            transcript,
+          )
+        } catch {
+          return NextResponse.json(
+            { error: 'Medication reconciliation is incomplete or inconsistent.' },
+            { status: 409 },
+          )
+        }
+      }
+      const reviewCompletion = liveInterviewReviewCompletion(reviewArtifact?.review)
+      const completion = medicationState
+        ? completionWithMedicationUncertainty(reviewCompletion, medicationState)
+        : reviewCompletion
       if (!terminalPartial && completion !== terminationReason) {
         return NextResponse.json(
-          { error: 'The completion reason does not match the independent live history review.' },
+          { error: 'The completion reason does not match the independent live history review and medication reconciliation.' },
+          { status: 409 },
+        )
+      }
+      if (
+        !terminalPartial &&
+        (
+          !medicationState ||
+          !medicationReconciliationClosed(medicationState) ||
+          !medicationReconciliationTranscriptIsValid(medicationState, transcript) ||
+          !medicationReconciliationMatchesReview(
+            medicationState,
+            reviewArtifact?.review.medications ?? [],
+          ) ||
+          !adaptiveCompletionTranscriptIsValid(transcript)
+        )
+      ) {
+        return NextResponse.json(
+          {
+            error:
+              'Normal completion requires the introduction, medication reconciliation, and final patient check.',
+          },
           { status: 409 },
         )
       }
       structuredOutput = {
-        ...structuredOutput,
         interview_mode: 'comprehensive',
         interview_prompt_version: 'comprehensive-v3',
+        current_medications: medicationState
+          ? confirmedMedicationSummary(medicationState) || undefined
+          : undefined,
+        medication_reconciliation_v1: medicationState ?? undefined,
+        medication_reconciliation_has_uncertainty: medicationState
+          ? medicationReconciliationHasUncertainty(medicationState)
+          : false,
+        medication_reconciliation_unresolved_count: medicationState
+          ? medicationReconciliationUnresolvedCount(medicationState)
+          : 0,
         ...(reviewArtifact
           ? {
               live_review_v1: reviewArtifact,
@@ -228,6 +286,29 @@ export async function POST(request: Request) {
       )
     }
 
+    // Comprehensive v3 does not trust Nova's free-form narrative as a
+    // clinician report. Its structured fields and transcript-bound ledgers
+    // are persisted; a separate post-session clinician report owns synthesis.
+    const narrativeSummary =
+      promptVersion === 'comprehensive-v3'
+        ? null
+        : typeof body.narrative_summary === 'string' && body.narrative_summary.trim()
+          ? body.narrative_summary.trim()
+          : null
+
+    // The v3 voice model's clinical prose is not a report trust boundary.
+    // Red flags persist only from the application-owned safety path; ordinary
+    // model-authored flags are suppressed along with the other free text.
+    const redFlagsForSave = promptVersion === 'comprehensive-v3'
+      ? (body.safety_escalated === true
+          ? [{
+              flag: 'Patient-stated active safety trigger',
+              severity: 'high',
+              context: 'Application safety protocol activated during the interview.',
+            }]
+          : [])
+      : body.red_flags
+
     // Pre-stringify jsonb array/object fields. The shared query builder
     // auto-stringifies plain objects but passes arrays through raw (for
     // text[] compat), which breaks jsonb inserts of transcript/red_flags
@@ -250,9 +331,9 @@ export async function POST(request: Request) {
       patient_name: body.patient_name || '',
       referral_reason: body.referral_reason || null,
       structured_output: toJSON(structuredOutput),
-      narrative_summary: body.narrative_summary || null,
+      narrative_summary: narrativeSummary,
       transcript: toJSON(body.transcript),
-      red_flags: toJSON(body.red_flags),
+      red_flags: toJSON(redFlagsForSave),
       safety_escalated: body.safety_escalated || false,
       duration_seconds: body.duration_seconds || 0,
       question_count: body.question_count || 0,
@@ -313,10 +394,7 @@ export async function POST(request: Request) {
       const chiefComplaintForEval: string | undefined =
         structuredOutput.chief_complaint || body.referral_reason || undefined
       const structuredOutputForEval = structuredOutput
-      const narrativeSummaryForEval: string | undefined =
-        typeof body.narrative_summary === 'string' && body.narrative_summary.trim()
-          ? body.narrative_summary
-          : undefined
+      const narrativeSummaryForEval: string | undefined = narrativeSummary ?? undefined
 
       const finalDifferentialSettled = runFinalDifferential(
         data.id,
@@ -362,9 +440,9 @@ export async function POST(request: Request) {
         await linkHistorianToConsult(
           consultId,
           data.id,
-          body.narrative_summary || '',
+          narrativeSummary || '',
           { ...structuredOutput },
-          body.red_flags || [],
+          redFlagsForSave || [],
           body.safety_escalated || false,
           completionStatus,
           terminationReason,
@@ -377,7 +455,7 @@ export async function POST(request: Request) {
 
     // ── Notification: alert staff if red flags were detected ──────────
     try {
-      const redFlags = body.red_flags || []
+      const redFlags = redFlagsForSave || []
       if (redFlags.length > 0 && data) {
         await notifyHistorianRedFlag(
           data.id,

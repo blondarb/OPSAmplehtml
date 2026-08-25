@@ -236,6 +236,6 @@ describe('Historian assistant turn admission', () => {
       obligation_id: 'age',
       approved_text: 'How old are you?',
       allow_example: true,
-    })).toBeNull()
+    })).toEqual({ obligationId: 'age', approvedText: 'How old are you?', allowExample: true })
   })
 })

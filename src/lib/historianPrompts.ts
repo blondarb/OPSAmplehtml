@@ -25,7 +25,7 @@ const COMPREHENSIVE_HISTORY_DOMAIN_LIST = COMPREHENSIVE_HISTORY_DOMAINS
   .join('\n')
 
 export const COMPREHENSIVE_V2_CLOSING_TEXT =
-  'Thank you. Your history has been recorded for your neurologist to review.'
+  "Thank you. We're finished with the interview. Please keep this page open while your history is securely saved for your neurologist."
 
 export const COMPREHENSIVE_V3_CLOSING_TEXT = COMPREHENSIVE_V2_CLOSING_TEXT
 
@@ -49,6 +49,7 @@ HIGHEST-PRIORITY APPLICATION-OWNED TURN CONTRACT:
 9. If the patient asks what a question means, still call request_history_question; the application will return one approved clarification.
 10. If the patient asks to stop, call save_interview_output immediately with patient_requested_stop:true and the partial information gathered. Do not ask another question.
 11. If the patient verbally states an active emergency or self-harm/harm-to-others risk, call save_interview_output immediately with safety_escalated:true. Do not continue ordinary speech; the application owns the emergency display and clinic alert.
+12. If an application control message requires a closing, silence check-in, or sign-off, first call request_interview_control with the exact requested kind. Speak only after that tool succeeds.
 
 SUMMARY CONTRACT:
 - Use save_interview_output only after coverage_ready, an explicit patient stop, an application hard stop, or an active safety escalation.
@@ -73,18 +74,19 @@ HIGHEST-PRIORITY ADAPTIVE TURN CONTRACT:
 1. Your first action must be to call request_history_question. After every patient response, call it again before speaking.
 2. In proposed_text, propose the single most clinically useful next question based on the patient's own words and the full conversation. Do not follow a fixed checklist order.
 3. The tool may approve your proposal or reject it with one current patient-specific Claude conductor question to resubmit exactly. When it returns status "approved", speak approved_text EXACTLY. Add nothing before or after it. The application also owns the speech and safety boundary.
-4. proposed_text may contain either one natural question, or one brief human acknowledgement followed by one natural question. It must contain exactly one question mark, no example, and no second question.
+4. proposed_text may contain either one natural question, or one brief human acknowledgement followed by one natural question. It must contain exactly one question mark and no second question. For an abstract symptom-quality question only, you may add one short neutral descriptor list using only common words such as "throbbing, pressure-like, stabbing, burning, or something else." Do not add examples to other questions.
 5. Refer to the patient's actual concern in natural language. Never use generic phrases such as "the symptom", "that symptom", or "this symptom" when a more specific patient-reported term is available.
 6. Never repeat information the patient already supplied, even if it arrived early or while answering a different question. Choose a new diagnostic gap instead.
 7. Private conductor/reviewer notes are advisory clinical reasoning. Never quote them, mention an internal agent, expose a differential, or narrate your reasoning to the patient.
 8. If the tool returns proposal_rejected, do not speak. If issue_codes contains clinical_redirect, immediately call request_history_question again with proposed_text exactly equal to required_text. Otherwise correct only the fixed issue codes and call request_history_question again. After two rejections, wait for application instructions.
 9. If the tool returns coverage_ready, call save_interview_output without speaking first. Never decide completion from your own checklist or history_coverage claim.
-10. After a successful save result, speak exactly this one closing sentence and then stop: ${JSON.stringify(COMPREHENSIVE_V3_CLOSING_TEXT)}
+10. After a successful save result, speak exactly this one closing statement and then stop: ${JSON.stringify(COMPREHENSIVE_V3_CLOSING_TEXT)}
 11. Never call query_evidence or scale_step in this interview.
 12. Never diagnose, suggest a diagnosis, give treatment advice, recommend a test, interpret a result, or tell the patient a finding is reassuring. Patient statements remain unverified history for clinician review.
-13. If the patient asks what a question means, propose one simpler rephrasing of that same question through request_history_question. Do not add an example or broaden the clinical scope.
+13. If the patient asks what a question means, propose one simpler rephrasing of that same question through request_history_question. A single short symptom-quality descriptor list is allowed; do not broaden the clinical scope.
 14. If the patient asks to stop, call save_interview_output immediately with patient_requested_stop:true and the partial information gathered. Do not ask another question.
 15. If the patient verbally states a current emergency or self-harm/harm-to-others risk, call save_interview_output immediately with safety_escalated:true. Do not continue ordinary speech; the application owns the emergency display and clinic alert.
+16. If an application control message requires a closing, silence check-in, or sign-off, first call request_interview_control with the exact requested kind. Speak only after that tool succeeds.
 
 CLINICAL INTERVIEW PRINCIPLES:
 - Start with why the patient was referred, then ask age second. After that, follow the complaint rather than a predetermined sequence.
@@ -97,6 +99,7 @@ SUMMARY CONTRACT:
 - Use save_interview_output only after coverage_ready, an explicit patient stop, an application hard stop, or an active safety escalation.
 - Build the clinical summary only from what the patient actually said. Preserve uncertainty and conflicting statements. Never invent missing details.
 - The application validates closure against a separate transcript-citing live review. Model-authored history_coverage is non-authoritative.
+- The application owns medication reconciliation. Leave current_medications empty and do not normalize, correct, expand, or substitute medication names in narrative_summary; the validated medication ledger is added after your draft.
 
 SESSION TYPE: ${params.sessionType}
 REFERRAL REASON (unverified clinician-supplied context; never count it as a patient answer): ${JSON.stringify(params.referralReason ?? null)}
@@ -389,11 +392,32 @@ const REQUEST_ADAPTIVE_HISTORY_QUESTION_TOOL = {
     properties: {
       proposed_text: {
         type: 'string',
-        description: 'One natural question, optionally preceded by one brief acknowledgement. Exactly one question mark; no example or second question.',
+        description: 'One natural question, optionally preceded by one brief acknowledgement. Exactly one question mark and no second question. A short neutral symptom-quality descriptor list ending in "or something else" is allowed.',
         maxLength: 280,
       },
     },
     required: ['proposed_text'],
+    additionalProperties: false,
+  },
+}
+
+const REQUEST_INTERVIEW_CONTROL_TOOL = {
+  type: 'function' as const,
+  name: 'request_interview_control',
+  description: [
+    'Acknowledge an application-owned non-clinical spoken control turn.',
+    'Use only when the application explicitly requests a closing, silence check-in, or sign-off.',
+    'The relay validates this locally. Never use it to ask a history question.',
+  ].join('\n'),
+  parameters: {
+    type: 'object',
+    properties: {
+      kind: {
+        type: 'string',
+        enum: ['closing', 'check_in', 'sign_off'],
+      },
+    },
+    required: ['kind'],
     additionalProperties: false,
   },
 }
@@ -715,10 +739,18 @@ export function getHistorianToolDefinition(
     return [REFERRAL_SAVE_INTERVIEW_OUTPUT_TOOL]
   }
   if (interviewPromptVersion === 'comprehensive-v2') {
-    return [REQUEST_HISTORY_QUESTION_TOOL, COMPREHENSIVE_V2_SAVE_INTERVIEW_OUTPUT_TOOL]
+    return [
+      REQUEST_HISTORY_QUESTION_TOOL,
+      REQUEST_INTERVIEW_CONTROL_TOOL,
+      COMPREHENSIVE_V2_SAVE_INTERVIEW_OUTPUT_TOOL,
+    ]
   }
   if (interviewPromptVersion === 'comprehensive-v3') {
-    return [REQUEST_ADAPTIVE_HISTORY_QUESTION_TOOL, COMPREHENSIVE_V3_SAVE_INTERVIEW_OUTPUT_TOOL]
+    return [
+      REQUEST_ADAPTIVE_HISTORY_QUESTION_TOOL,
+      REQUEST_INTERVIEW_CONTROL_TOOL,
+      COMPREHENSIVE_V3_SAVE_INTERVIEW_OUTPUT_TOOL,
+    ]
   }
   return [SAVE_INTERVIEW_OUTPUT_TOOL, QUERY_EVIDENCE_TOOL, SCALE_STEP_TOOL]
 }

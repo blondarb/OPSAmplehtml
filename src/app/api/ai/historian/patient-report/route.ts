@@ -10,9 +10,9 @@
  * mirror the patient-safety rules the AI Historian itself follows
  * (src/lib/historianPrompts.ts).
  *
- * Fail-open: any error here falls back to returning the raw
- * `narrativeSummary` with a 200, so the report page can never show a blank
- * or crashed Patient Report tab.
+ * Fail closed for presentation: any generation error returns an unavailable
+ * state. The separately persisted transcript remains accessible, but is never
+ * relabeled as a generated patient or clinician report.
  */
 
 import { NextResponse } from 'next/server'
@@ -30,6 +30,7 @@ CRITICAL RULES:
 6. End with a brief, gentle reminder to reach out to their doctor's office with any questions, and to call 911 for a medical emergency.
 7. Write in second person ("you told us...", "you mentioned...").
 8. Keep it to 2-4 short paragraphs. No headers, no bullet lists, no medical jargon — write it like a warm note, not a chart.
+9. Medication names, amounts, and schedules may come ONLY from the structured field labeled "current medications". If that field is absent or blank, omit medication details even if another field appears to mention them.
 
 Output ONLY the recap text. No preamble, no markdown formatting, no "Here is your summary:" — just the recap itself.`
 
@@ -62,9 +63,15 @@ function buildUserContent(
     }
   }
 
-  // Only fall back to the raw transcript if we have nothing else to work
-  // from — keeps the prompt small in the common case.
-  if (parts.length === 0 && transcript && transcript.length > 0) {
+  // v3 deliberately does not turn a raw transcript into a report. Its
+  // transcript remains separately visible while the validated structured
+  // history owns generated summaries.
+  if (
+    parts.length === 0 &&
+    structuredOutput?.interview_prompt_version !== 'comprehensive-v3' &&
+    transcript &&
+    transcript.length > 0
+  ) {
     const patientLines = transcript
       .filter((t) => t.role === 'user')
       .map((t) => `- ${t.text}`)
@@ -91,10 +98,18 @@ export async function POST(request: Request) {
   const structuredOutput = body.structuredOutput ?? null
   const transcript = body.transcript ?? null
 
-  // Fail-open fallback — used for both "nothing to generate from" and any
-  // Bedrock error below. The UI must never show a blank or crashed tab.
+  // A failed generator must never cause raw notes/transcript to masquerade as
+  // a report. The UI renders an explicit unavailable state instead.
   const fallback = () =>
-    NextResponse.json({ patientReport: narrativeSummary ?? '' }, { status: 200 })
+    NextResponse.json({ patientReport: '', unavailable: true }, { status: 200 })
+
+  // Comprehensive v3 intentionally persists only application-owned ledgers,
+  // not a model-authored narrative. Until a separate transcript-citing report
+  // artifact exists, do not ask another model to turn those sparse controls
+  // into prose or accidentally reintroduce a misheard medication name.
+  if (structuredOutput?.interview_prompt_version === 'comprehensive-v3') {
+    return fallback()
+  }
 
   if (!structuredOutput && !narrativeSummary && !transcript) {
     return fallback()
@@ -115,7 +130,7 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ patientReport })
   } catch (err) {
-    console.error('[historian/patient-report] Bedrock error (fail-open to narrative):', err)
+    console.error('[historian/patient-report] Bedrock error (report unavailable):', err)
     return fallback()
   }
 }

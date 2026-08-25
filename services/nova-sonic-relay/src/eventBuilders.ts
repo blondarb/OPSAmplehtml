@@ -88,7 +88,12 @@ export function sessionStart(cfg?: Partial<InferenceConfiguration>) {
 // 2. promptStart
 // ---------------------------------------------------------------------------
 
-export function promptStart(promptName: string, tools: Tool[], voiceId?: string) {
+export function promptStart(
+  promptName: string,
+  tools: Tool[],
+  voiceId?: string,
+  requireToolAtResponseStart = false,
+) {
   return {
     event: {
       promptStart: {
@@ -110,6 +115,7 @@ export function promptStart(promptName: string, tools: Tool[], voiceId?: string)
         },
         toolConfiguration: {
           tools,
+          ...(requireToolAtResponseStart ? { toolChoice: { any: {} } } : {}),
         },
       },
     },

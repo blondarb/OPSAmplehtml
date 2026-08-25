@@ -61,28 +61,12 @@ describe('adaptive Claude conductor authority', () => {
       rows: [{ status: 'in_progress', startup_attempt_id: ATTEMPT_ID }],
     })
     retrievePlanEvidenceMock.mockResolvedValue({ guidelineText: '', citations: [] })
-    invokeBedrockJSONMock
-      .mockResolvedValueOnce({
-        parsed: {
-          primarySymptoms: ['headache'],
-          location: [],
-          temporalPattern: ['recurrent'],
-          severity: [],
-          associatedFeatures: [],
-          redFlags: [],
-          clinicalSummary: 'Synthetic recurrent headaches.',
-        },
-      })
-      .mockResolvedValueOnce({
-        parsed: {
-          followUpQuestions: ['How do the headaches affect your usual activities?'],
-          differential: [],
-          localizationHypothesis: '',
-          contextHint: 'Based on what the patient has shared so far, more functional history is needed.',
-          confidence: 'medium',
-          suggested_actions: [],
-        },
-      })
+    invokeBedrockJSONMock.mockResolvedValue({
+      parsed: {
+        followUpQuestions: ['How do the headaches affect your usual activities?'],
+        confidence: 'medium',
+      },
+    })
   })
 
   it('rejects an invalid bearer before sending transcript content to Claude', async () => {
@@ -108,11 +92,16 @@ describe('adaptive Claude conductor authority', () => {
     expect(body.followUpQuestions).toEqual([
       'How do the headaches affect your usual activities?',
     ])
-    expect(invokeBedrockJSONMock).toHaveBeenCalledTimes(2)
-    const generatorInput = JSON.parse(invokeBedrockJSONMock.mock.calls[1][0].messages[0].content)
+    expect(invokeBedrockJSONMock).toHaveBeenCalledTimes(1)
+    expect(retrievePlanEvidenceMock).not.toHaveBeenCalled()
+    const generatorInput = JSON.parse(invokeBedrockJSONMock.mock.calls[0][0].messages[0].content)
     expect(generatorInput.silentReviewerMissingDomains).toEqual(['functional_impact'])
     expect(generatorInput.silentReviewerNextQuestionIntents).toEqual([
       'Clarify how the headaches affect daily function.',
+    ])
+    expect(generatorInput.orderedTranscript).toEqual([
+      { role: 'assistant', text: 'Why were you referred?' },
+      { role: 'user', text: 'Synthetic recurrent headaches.' },
     ])
   })
 })

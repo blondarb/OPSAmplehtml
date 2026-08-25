@@ -557,7 +557,7 @@ export class NovaSonicWsProvider implements VoiceProvider {
     // audio then streams as PCM and is drained by whenDrained() before
     // aiSpeechStop fires (#150), so it plays in full before teardown.
     this.injectSystemText(this.turnEvidenceController || this.adaptiveTurnController
-      ? '[The interview is complete. Speak exactly this sentence and nothing else: "Thank you. Your history has been recorded for your neurologist to review."]'
+      ? '[The interview is complete. Speak exactly this statement and nothing else: "Thank you. We\'re finished with the interview. Please keep this page open while your history is securely saved for your neurologist."]'
       : '[The interview is now complete and your notes have been saved. Please now speak your single warm closing message to the patient, then stop. Do not ask any further questions and do not wait for the patient to reply.]')
   }
 

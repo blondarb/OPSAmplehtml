@@ -1,11 +1,14 @@
 import { patientEvidenceQuestionContractIssues } from './patientEvidenceController'
+import type { HistorianTranscriptEntry } from '@/lib/historianTypes'
 
 export const ADAPTIVE_QUESTION_MAX_CHARS = 280
 export const ADAPTIVE_QUESTION_MAX_ACK_CHARS = 90
 
 export const ADAPTIVE_OPENING_QUESTION =
-  "Hi, I'm Henry, and I'll help gather your history before your neurology visit. What brought you to be referred for this visit?"
+  "Hi, I'm Henry, an AI assistant helping collect your history for your neurologist. What would you most like your neurologist to understand about why you were referred?"
 export const ADAPTIVE_AGE_QUESTION = 'How old are you?'
+export const ADAPTIVE_PRE_CLOSE_QUESTION =
+  "I'm nearly finished. Is there anything important we haven't discussed?"
 
 export type AdaptiveQuestionIssue =
   | 'invalid_type'
@@ -28,6 +31,52 @@ const GENERIC_SYMPTOM_RE = /\b(?:that|the|this) symptom\b/i
 const DIAGNOSTIC_ASSERTION_RE = /\b(?:it sounds like|this sounds like|you (?:may|might|probably) have|this (?:may|might|could) be|your diagnosis is|i think (?:this|you) (?:is|have))\b/i
 const MEDICAL_ADVICE_RE = /\b(?:you should|you need to|i recommend|my recommendation|start taking|stop taking|increase (?:the|your)|decrease (?:the|your))\b/i
 const RESPONSE_REQUEST_SENTENCE_RE = /^\s*(?:(?:please\s+)?(?:tell|describe|explain|share|list|rate)\b|(?:can|could|would|will)\s+you\b|(?:what|when|where|who|why|how|which|do|does|did|is|are|was|were|have|has)\b)/i
+const EXAMPLE_MARKER_RE = /\b(?:for example|for instance|such as|e\.g\.)\b/i
+const EXAMPLE_MARKER_GLOBAL_RE = /\b(?:for example|for instance|such as|e\.g\.)\b/gi
+const ALLOWED_EXAMPLE_TERMS = new Set([
+  'throbbing',
+  'pressure like',
+  'squeezing',
+  'stabbing',
+  'burning',
+  'aching',
+  'sharp',
+  'dull',
+  'tingling',
+  'numb',
+  'pins and needles',
+  'spinning',
+  'lightheaded',
+  'off balance',
+  'faint',
+])
+
+/**
+ * A short, curated descriptor list can explain an abstract symptom-quality
+ * question without creating another response obligation. The open-ended
+ * "or something else" ending avoids treating the examples as a diagnosis or
+ * a closed list.
+ */
+export function adaptiveQuestionAllowsExample(value: unknown): boolean {
+  if (typeof value !== 'string') return false
+  const text = value.trim()
+  const match = text.match(EXAMPLE_MARKER_RE)
+  if (!match || match.index == null || !/\bor something else\?$/i.test(text)) return false
+  if ((text.match(EXAMPLE_MARKER_GLOBAL_RE) ?? []).length > 1) return false
+  const exampleText = text
+    .slice(match.index + match[0].length)
+    .replace(/\bor something else\?$/i, '')
+    .replace(/^[\s,:—–-]+|[\s,:—–-]+$/g, '')
+  const terms = exampleText
+    .split(/\s*,\s*|\s+or\s+/i)
+    .map((term) => term.toLowerCase().replace(/[^a-z]+/g, ' ').trim())
+    .filter(Boolean)
+  return (
+    terms.length >= 2 &&
+    terms.length <= 6 &&
+    terms.every((term) => ALLOWED_EXAMPLE_TERMS.has(term))
+  )
+}
 
 /**
  * Deterministic speech-shape gate for a model-proposed adaptive question.
@@ -44,7 +93,10 @@ export function adaptiveQuestionIssues(value: unknown): AdaptiveQuestionIssue[] 
 
   const sharedIssues = patientEvidenceQuestionContractIssues(text)
   if (sharedIssues.some((issue) => issue.includes('exactly one terminal'))) issues.push('question_shape')
-  if (sharedIssues.some((issue) => issue.includes('unsolicited example'))) issues.push('unsolicited_example')
+  if (
+    sharedIssues.some((issue) => issue.includes('unsolicited example')) &&
+    !adaptiveQuestionAllowsExample(text)
+  ) issues.push('unsolicited_example')
   if (sharedIssues.some((issue) => issue.includes('second response obligation'))) issues.push('multiple_questions')
 
   const sentences = text.split(SENTENCE_SPLIT_RE).filter(Boolean)
@@ -77,14 +129,9 @@ export function approvedAdaptiveQuestion(value: unknown): string | null {
 export function approvedAdaptiveOpeningQuestion(value: unknown): string | null {
   const text = approvedAdaptiveQuestion(value)
   if (!text) return null
-  const asksWhyHere =
-    /\bwhy\b/i.test(text) ||
-    /\bwhat\s+(?:brought|brings|bring|led)\b/i.test(text) ||
-    /\b(?:reason|purpose)\b/i.test(text)
-  const identifiesVisit = /\b(?:refer(?:red|ral)?|neurolog(?:y|ist)|appointment|visit)\b/i.test(text)
-  const asksWhatBroughtPatientHere =
-    /\bwhat\s+(?:brought|brings|bring|led)\s+you\b.*\b(?:in|here)\b/i.test(text)
-  return asksWhyHere && (identifiesVisit || asksWhatBroughtPatientHere) ? text : null
+  return canonicalAdaptiveQuestion(text) === canonicalAdaptiveQuestion(ADAPTIVE_OPENING_QUESTION)
+    ? ADAPTIVE_OPENING_QUESTION
+    : null
 }
 
 export function approvedAdaptiveAgeQuestion(value: unknown): string | null {
@@ -103,4 +150,20 @@ export function canonicalAdaptiveQuestion(value: string): string {
     .replace(/[^a-z0-9']+/g, ' ')
     .trim()
     .replace(/\s+/g, ' ')
+}
+
+export function adaptiveCompletionTranscriptIsValid(
+  transcript: HistorianTranscriptEntry[],
+): boolean {
+  const firstAssistant = transcript.find((entry) => entry.role === 'assistant')
+  if (firstAssistant?.text !== ADAPTIVE_OPENING_QUESTION) return false
+  const preCloseIndexes = transcript
+    .map((entry, index) => (
+      entry.role === 'assistant' && entry.text === ADAPTIVE_PRE_CLOSE_QUESTION
+        ? index
+        : -1
+    ))
+    .filter((index) => index >= 0)
+  if (preCloseIndexes.length !== 1) return false
+  return transcript[preCloseIndexes[0] + 1]?.role === 'user'
 }

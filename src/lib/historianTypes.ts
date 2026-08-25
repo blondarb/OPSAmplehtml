@@ -110,6 +110,15 @@ export interface HistorianStructuredOutput {
    * coverage or closure readiness.
    */
   live_review_v1?: unknown
+  /**
+   * Application-owned medication ledger. Names and values are copied only
+   * from transcript-cited reviewer spans and are never silently normalized.
+   */
+  medication_reconciliation_v1?: unknown
+  /** Trusted server-recomputed warning; never supplied by the model. */
+  medication_reconciliation_has_uncertainty?: boolean
+  /** Number of medication entries with an unresolved name, amount, or schedule. */
+  medication_reconciliation_unresolved_count?: number
   clarification_answers?: Array<{
     question_id: string
     answer: string

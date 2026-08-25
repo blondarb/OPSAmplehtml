@@ -198,7 +198,7 @@ describe('Comprehensive v2 synthetic runtime acceptance', () => {
     expect(lastToolOutput(provider)).toEqual({ success: true })
     voiceSink?.({
       type: 'assistantTranscript',
-      text: 'Thank you. Your history has been recorded for your neurologist to review.',
+      text: "Thank you. We're finished with the interview. Please keep this page open while your history is securely saved for your neurologist.",
       segmentId,
     })
     await session.endSession()
