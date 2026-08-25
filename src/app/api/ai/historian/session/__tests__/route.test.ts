@@ -161,6 +161,7 @@ describe('POST /api/ai/historian/session — textMode (Historian Validation Suit
     expect(json.instructions).toContain('request_history_question')
     expect(json.tools.map((tool: { toolSpec: { name: string } }) => tool.toolSpec.name)).toEqual([
       'request_history_question',
+      'request_interview_control',
       'save_interview_output',
     ])
   })
@@ -180,6 +181,7 @@ describe('POST /api/ai/historian/session — textMode (Historian Validation Suit
     expect(json.instructions).not.toContain('fixed question plan')
     expect(json.tools.map((tool: { toolSpec: { name: string } }) => tool.toolSpec.name)).toEqual([
       'request_history_question',
+      'request_interview_control',
       'save_interview_output',
     ])
   })
