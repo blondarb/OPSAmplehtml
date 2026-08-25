@@ -41,6 +41,7 @@ export const FLUSH_TOKEN_TTL_SECONDS = 4 * 60 * 60
 
 interface FlushTokenPayload {
   sessionId: string
+  startupAttemptId?: string
   exp: number // unix seconds
 }
 
@@ -77,7 +78,10 @@ function sign(payloadB64: string, secret: string): string {
   return toBase64Url(crypto.createHmac('sha256', secret).update(payloadB64).digest())
 }
 
-export async function mintFlushToken(sessionId: string): Promise<string> {
+export async function mintFlushToken(
+  sessionId: string,
+  startupAttemptId?: string,
+): Promise<string> {
   const secret = await resolveSecret()
   if (!secret) {
     // Fail closed: production with neither HISTORIAN_FLUSH_SECRET nor
@@ -90,6 +94,7 @@ export async function mintFlushToken(sessionId: string): Promise<string> {
   }
   const payload: FlushTokenPayload = {
     sessionId,
+    ...(startupAttemptId ? { startupAttemptId } : {}),
     exp: Math.floor(Date.now() / 1000) + FLUSH_TOKEN_TTL_SECONDS,
   }
   const payloadB64 = toBase64Url(JSON.stringify(payload))
@@ -97,7 +102,10 @@ export async function mintFlushToken(sessionId: string): Promise<string> {
   return `${payloadB64}.${sig}`
 }
 
-export async function verifyFlushToken(token: string): Promise<{ sessionId: string } | null> {
+export async function verifyFlushToken(token: string): Promise<{
+  sessionId: string
+  startupAttemptId?: string
+} | null> {
   if (!token || typeof token !== 'string') return null
 
   const secret = await resolveSecret()
@@ -124,7 +132,15 @@ export async function verifyFlushToken(token: string): Promise<{ sessionId: stri
   }
 
   if (!payload || typeof payload.sessionId !== 'string' || !payload.sessionId) return null
-  if (typeof payload.exp === 'number' && Math.floor(Date.now() / 1000) > payload.exp) return null
+  if (
+    payload.startupAttemptId !== undefined &&
+    (typeof payload.startupAttemptId !== 'string' ||
+      !/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(payload.startupAttemptId))
+  ) return null
+  if (typeof payload.exp !== 'number' || Math.floor(Date.now() / 1000) > payload.exp) return null
 
-  return { sessionId: payload.sessionId }
+  return {
+    sessionId: payload.sessionId,
+    ...(payload.startupAttemptId ? { startupAttemptId: payload.startupAttemptId } : {}),
+  }
 }

@@ -25,6 +25,15 @@ describe('flushToken', () => {
     await expect(verifyFlushToken(token)).resolves.toEqual({ sessionId: 'abc' })
   })
 
+  it('round-trips an invited startup attempt with the session authority', async () => {
+    const startupAttemptId = '11111111-1111-4111-8111-111111111111'
+    const token = await mintFlushToken('abc', startupAttemptId)
+    await expect(verifyFlushToken(token)).resolves.toEqual({
+      sessionId: 'abc',
+      startupAttemptId,
+    })
+  })
+
   it('produces different, independently-verifiable tokens for different sessionIds', async () => {
     const t1 = await mintFlushToken('session-1')
     const t2 = await mintFlushToken('session-2')

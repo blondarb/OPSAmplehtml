@@ -20,7 +20,7 @@ Cognito, relay compute, or worker queues.
 ## Provisioning order
 
 1. Review and execute the Add-only `foundation.yaml` change set.
-2. Package only `bootstrap-schema.sql`, `seed.sql`, `verify.sql`, and migrations 059-061 for
+2. Package only `bootstrap-schema.sql`, `seed.sql`, `verify.sql`, and migrations 059-062 for
    the temporary `database-init.yaml` project.
 3. Run the initializer once. It restores with `ON_ERROR_STOP=1`, creates a
    message-suppressed synthetic Cognito user, and verifies one synthetic tenant,
@@ -47,11 +47,11 @@ Cognito, relay compute, or worker queues.
 
 Do not rerun `database-init.yaml` against an already initialized QA database;
 its schema bootstrap is intentionally a one-time restore. Use the ephemeral
-`database-migrate.yaml` project for migration 061. Bind its host, port, database,
+`database-migrate.yaml` project for the latest numbered migration. Bind its host, port, database,
 and secret ARN directly to the current foundation outputs; bind `SourceCommit`
 to the exact archive commit and independently calculate both required SQL
 SHA-256 values before creating the stack. Upload only `source-commit.txt`,
-`migrations/061_historian_comprehensive_v2.sql`, and
+the exact migration SQL named in that template, and
 `infrastructure/historian-qa/verify.sql`. The build applies and verifies both
 files in one transaction with `ON_ERROR_STOP=1`. After PASS or failure, delete
 the exact source object before deleting the ephemeral stack.

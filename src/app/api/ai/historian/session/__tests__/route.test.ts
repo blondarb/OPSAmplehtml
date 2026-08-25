@@ -222,6 +222,15 @@ describe('POST /api/ai/historian/session — textMode (Historian Validation Suit
     expect(json.instructions).not.toContain('attacker supplied')
     expect(authorizeClinicalAccess).not.toHaveBeenCalled()
     expect(markHistorianInvitationStarted).toHaveBeenCalledTimes(1)
+    const startupAttemptId = vi.mocked(markHistorianInvitationStarted).mock.calls[0][1]
+    expect(startupAttemptId).toMatch(/^[0-9a-f-]{36}$/i)
+    const verifiedPayload = JSON.parse(
+      Buffer.from(json.flushToken.split('.')[0], 'base64url').toString('utf8'),
+    )
+    expect(verifiedPayload).toMatchObject({
+      sessionId: '11111111-1111-4111-8111-111111111111',
+      startupAttemptId,
+    })
   })
 
   it('fails closed when a patient grant cookie is present but invalid', async () => {

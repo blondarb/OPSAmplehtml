@@ -12,6 +12,8 @@ vi.mock('@/lib/db', () => ({ getPool: getPoolMock }))
 
 import {
   createHistorianInvitation,
+  markHistorianInvitationStarted,
+  recoverHistorianInvitationStartup,
   redeemHistorianInvitation,
   resolveHistorianPatientGrant,
 } from '@/lib/historian/invitationStore'
@@ -237,6 +239,125 @@ describe('historian invitation store', () => {
       now: new Date('2026-08-20T18:00:00.000Z'),
     })
     expect(result).toMatchObject({ ok: true, inviteId: 'invite-new', sessionId: 'session-new' })
+  })
+
+  it('reopens only a recent zero-turn v2 startup failure under the existing grant', async () => {
+    const now = new Date('2026-08-20T18:00:00.000Z')
+    const startupAttemptId = '11111111-1111-4111-8111-111111111111'
+    queryMock.mockImplementation(async (sql: string, values?: unknown[]) => {
+      if (sql === 'BEGIN' || sql === 'COMMIT') return { rows: [], rowCount: 0 }
+      if (sql.includes('FROM historian_invites invite') && sql.includes('FOR UPDATE OF invite, session')) {
+        expect(values).toEqual(['session-1'])
+        return { rows: [{
+          invite_id: 'invite-1',
+          invite_status: 'in_progress',
+          grant_expires_at: '2026-08-20T21:00:00.000Z',
+          invite_updated_at: '2026-08-20T17:59:30.000Z',
+          session_status: 'in_progress',
+          interview_prompt_version: 'comprehensive-v2',
+          transcript_count: 0,
+          question_count: 0,
+          interview_completion_status: null,
+          interview_termination_reason: null,
+          startup_attempt_id: startupAttemptId,
+        }], rowCount: 1 }
+      }
+      if (sql.includes('FROM historian_transcript_events')) {
+        return { rows: [{ has_events: false }], rowCount: 1 }
+      }
+      if (sql.includes("SET status = 'redeemed'")) {
+        expect(values).toEqual(['invite-1', now, startupAttemptId])
+        return { rows: [], rowCount: 1 }
+      }
+      throw new Error(`Unexpected SQL: ${sql}`)
+    })
+
+    await expect(recoverHistorianInvitationStartup(
+      'session-1',
+      startupAttemptId,
+      'provider_error',
+      now,
+    )).resolves.toEqual({ ok: true, recovered: true, replayed: false })
+    expect(releaseMock).toHaveBeenCalledOnce()
+  })
+
+  it('refuses startup recovery when even one transcript event is durable', async () => {
+    const now = new Date('2026-08-20T18:00:00.000Z')
+    const startupAttemptId = '11111111-1111-4111-8111-111111111111'
+    queryMock.mockImplementation(async (sql: string) => {
+      if (sql === 'BEGIN' || sql === 'ROLLBACK') return { rows: [], rowCount: 0 }
+      if (sql.includes('FROM historian_invites invite') && sql.includes('FOR UPDATE OF invite, session')) {
+        return { rows: [{
+          invite_id: 'invite-1',
+          invite_status: 'in_progress',
+          grant_expires_at: '2026-08-20T21:00:00.000Z',
+          invite_updated_at: '2026-08-20T17:59:30.000Z',
+          session_status: 'in_progress',
+          interview_prompt_version: 'comprehensive-v2',
+          transcript_count: 0,
+          question_count: 0,
+          interview_completion_status: null,
+          interview_termination_reason: null,
+          startup_attempt_id: startupAttemptId,
+        }], rowCount: 1 }
+      }
+      if (sql.includes('FROM historian_transcript_events')) {
+        return { rows: [{ has_events: true }], rowCount: 1 }
+      }
+      throw new Error(`Unexpected SQL: ${sql}`)
+    })
+
+    await expect(recoverHistorianInvitationStartup(
+      'session-1',
+      startupAttemptId,
+      'transport_lost',
+      now,
+    )).resolves.toEqual({ ok: false, reason: 'not_retryable' })
+    expect(queryMock.mock.calls.some(([sql]) => String(sql).includes("SET status = 'redeemed'"))).toBe(false)
+  })
+
+  it('refuses a delayed recovery from an older startup attempt', async () => {
+    queryMock.mockImplementation(async (sql: string) => {
+      if (sql === 'BEGIN' || sql === 'ROLLBACK') return { rows: [], rowCount: 0 }
+      if (sql.includes('FROM historian_invites invite') && sql.includes('FOR UPDATE OF invite, session')) {
+        return { rows: [{
+          invite_id: 'invite-1', invite_status: 'in_progress',
+          grant_expires_at: '2026-08-20T21:00:00.000Z',
+          invite_updated_at: '2026-08-20T17:59:30.000Z', session_status: 'in_progress',
+          interview_prompt_version: 'comprehensive-v2', transcript_count: 0, question_count: 0,
+          interview_completion_status: null, interview_termination_reason: null,
+          startup_attempt_id: '22222222-2222-4222-8222-222222222222',
+        }], rowCount: 1 }
+      }
+      throw new Error(`Unexpected SQL: ${sql}`)
+    })
+
+    await expect(recoverHistorianInvitationStartup(
+      'session-1',
+      '11111111-1111-4111-8111-111111111111',
+      'provider_error',
+      new Date('2026-08-20T18:00:00.000Z'),
+    )).resolves.toEqual({ ok: false, reason: 'not_retryable' })
+    expect(queryMock.mock.calls.some(([sql]) => String(sql).includes('historian_transcript_events'))).toBe(false)
+  })
+
+  it('starts an invitation only from redeemed and binds one exact attempt id', async () => {
+    const binding = {
+      inviteId: 'invite-1', tenantId: 'tenant-a', consultId: 'consult-1', patientId: null,
+      sessionId: 'session-1', patientName: 'Synthetic Patient', referralReason: 'Gait concern',
+      sessionType: 'new_patient' as const, provider: 'nova' as const,
+      interviewMode: 'comprehensive' as const, interviewPromptVersion: 'comprehensive-v2' as const,
+      status: 'redeemed' as const, grantExpiresAt: '2026-08-20T21:00:00.000Z',
+    }
+    const attemptId = '11111111-1111-4111-8111-111111111111'
+    const now = new Date('2026-08-20T18:00:00.000Z')
+    queryMock.mockResolvedValueOnce({ rows: [], rowCount: 1 })
+
+    await expect(markHistorianInvitationStarted(binding, attemptId, now)).resolves.toBe(true)
+    const [sql, values] = queryMock.mock.calls[0]
+    expect(String(sql)).toContain("AND status = 'redeemed'")
+    expect(String(sql)).not.toContain("status IN ('redeemed', 'in_progress')")
+    expect(values).toEqual(['invite-1', 'session-1', attemptId, now])
   })
 
   it('does not issue a grant when date of birth does not match and revokes after bounded attempts', async () => {

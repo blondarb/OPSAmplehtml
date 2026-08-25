@@ -80,6 +80,9 @@ describe('Comprehensive v2 synthetic runtime acceptance', () => {
       if (url === '/api/ai/historian/safety-escalation') {
         return Promise.resolve({ ok: true, status: 200, json: async () => ({ ok: true }) } as Response)
       }
+      if (url === '/api/ai/historian/startup-recovery') {
+        return Promise.resolve({ ok: true, status: 200, json: async () => ({ recovered: true }) } as Response)
+      }
       throw new Error(`Unexpected synthetic fetch: ${url}`)
     }) as typeof fetch
   })
@@ -316,7 +319,7 @@ describe('Comprehensive v2 synthetic runtime acceptance', () => {
     expect(provider.nudgeClosing).not.toHaveBeenCalled()
   })
 
-  it('fails closed before retaining an assistant turn that differs from its approval', async () => {
+  it('fails closed and reopens the zero-turn invitation when an assistant turn differs from its approval', async () => {
     const onComplete = vi.fn()
     const session = useRealtimeSession({
       sessionType: 'new_patient',
@@ -347,12 +350,12 @@ describe('Comprehensive v2 synthetic runtime acceptance', () => {
 
     expect(provider.suppressOutput).toHaveBeenCalled()
     await vi.waitFor(() => {
-      expect(onComplete).toHaveBeenCalledWith(expect.objectContaining({
-        endedEarly: true,
-        terminationReason: 'provider_error',
-        transcript: [],
-      }))
+      expect(globalThis.fetch).toHaveBeenCalledWith(
+        '/api/ai/historian/startup-recovery',
+        expect.objectContaining({ method: 'POST' }),
+      )
     })
+    expect(onComplete).not.toHaveBeenCalled()
   })
 
   it('escalates a direct yes to the app-owned active-emergency question', async () => {

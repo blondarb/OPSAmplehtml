@@ -623,6 +623,27 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
     }
   }, [])
 
+  const recoverRetryableStartupFailure = useCallback(async (
+    reason: 'provider_error' | 'transport_lost',
+  ): Promise<boolean> => {
+    const sessionId = serverSessionIdRef.current
+    const token = flushTokenRef.current
+    if (!sessionId || !token) return false
+    try {
+      const response = await fetch('/api/ai/historian/startup-recovery', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ sessionId, reason }),
+      })
+      return response.ok
+    } catch {
+      return false
+    }
+  }, [])
+
   // ── Tool execution: same per-tool logic that lived in handleServerEvent's
   // response.done branch pre-refactor, now keyed off the normalized `toolCall`
   // VoiceEvent and replying via provider.sendToolResult instead of writing
@@ -1536,6 +1557,10 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
       }
 
       case 'error': {
+        // A stopped provider can reject its still-pending microphone/start
+        // promise after the patient has already begun a newer retry. Never let
+        // that stale callback terminate the current attempt.
+        if (sessionGenRef.current !== sessionGen) break
         console.error('Voice provider error:', e.message)
         setError(e.message || 'Voice provider error')
         // Durable transcript flush (Task 1): a transport error is exactly
@@ -1713,12 +1738,36 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
       setStatus('active')
     } catch (err: any) {
       console.error('Failed to start realtime session:', err)
-      setError(err.message || 'Failed to start session')
-      setStatus('error')
+      const retryableInvitedStartup =
+        !!serverSessionIdRef.current &&
+        !!flushTokenRef.current &&
+        resolvedInterviewPromptVersionRef.current === 'comprehensive-v2' &&
+        transcriptRef.current.length === 0 &&
+        questionCountRef.current === 0 &&
+        !safetyEscalatedRef.current
       cleanup()
       // Tear down any half-open transport the provider may have allocated.
       try { await providerRef.current?.stop() } catch {}
       providerRef.current = null
+
+      if (retryableInvitedStartup) {
+        const recovered = await recoverRetryableStartupFailure('provider_error')
+        // A newer attempt may already own the hook while the recovery request
+        // was in flight. The server-side attempt nonce protects its DB state;
+        // this generation check protects its UI state.
+        if (sessionGenRef.current !== sessionGen) return
+        setError(
+          recovered
+            ? 'The voice connection could not start. Your interview was not submitted. Tap Start Interview to try again.'
+            : 'The voice connection could not start. Your interview was not submitted, but this link could not be reopened safely. Please ask the clinic for a new link.',
+        )
+        setStatus('error')
+        return
+      }
+
+      if (sessionGenRef.current !== sessionGen) return
+      setError(err.message || 'Failed to start session')
+      setStatus('error')
     }
   }, [
     options.sessionType,
@@ -1729,6 +1778,7 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
     options.provider,
     cleanup,
     handleVoiceEvent,
+    recoverRetryableStartupFailure,
   ])
 
   /**
@@ -1925,6 +1975,29 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
     providerRef.current = null
 
     const terminationReason = terminationReasonRef.current ?? 'manual_end'
+
+    // A provider/transport failure before the first admitted assistant turn is
+    // a startup failure, not a submitted interview. For a bound v2 invitation,
+    // the server atomically reopens only when there is also no durable event or
+    // finalized content. Keep the patient on the start screen with explicit
+    // retry guidance and never call onComplete/save for an empty history.
+    const retryableStartupFailure =
+      (terminationReason === 'provider_error' || terminationReason === 'transport_lost') &&
+      resolvedInterviewPromptVersionRef.current === 'comprehensive-v2' &&
+      transcriptRef.current.length === 0 &&
+      questionCountRef.current === 0 &&
+      !safetyEscalatedRef.current
+    if (retryableStartupFailure) {
+      const recovered = await recoverRetryableStartupFailure(terminationReason)
+      setError(
+        recovered
+          ? 'The voice connection ended before the first question. Your interview was not submitted. Tap Start Interview to try again.'
+          : 'The voice connection ended before the first question. Your interview was not submitted, but this link could not be reopened safely. Please ask the clinic for a new link.',
+      )
+      setStatus('error')
+      return
+    }
+
     // save_interview_output may be called for a terminal partial history.
     // Both deterministic coverage outcomes represent completed intakes;
     // uncertainty remains explicit rather than being mislabeled as early end.
@@ -1960,7 +2033,7 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
     })
 
     setStatus('complete')
-  }, [cleanup, options, flushTranscript])
+  }, [cleanup, options, flushTranscript, recoverRetryableStartupFailure])
 
   // Keep the ref in sync so the provider's `disconnected` handler always
   // calls the latest endSession.

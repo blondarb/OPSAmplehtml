@@ -24,6 +24,17 @@ import {
   parseApprovedHistorianTurn,
 } from './turnAdmission.js'
 
+const KNOWN_HISTORIAN_TOOL_NAMES = new Set([
+  'request_history_question',
+  'save_interview_output',
+  'query_evidence',
+  'scale_step',
+])
+
+function historianToolCategory(toolName: string): string {
+  return KNOWN_HISTORIAN_TOOL_NAMES.has(toolName) ? toolName : 'unknown'
+}
+
 // ---------------------------------------------------------------------------
 // HTTP server — answers GET /healthz for App Runner health checks; 404 otherwise.
 // This handler only ever sees plain HTTP requests (GET /healthz or a 404) —
@@ -218,9 +229,24 @@ const CONTINUATION_TEST_BOUNDARY_EXCHANGES = continuationTestBoundaryExchanges()
 const CONTINUATION_TEST_BOUNDARY_AFTER_TOOL = continuationTestBoundaryAfterTool()
 const CONTINUATION_BUFFER_MAX_BASE64_CHARS = 1_280_000 // 30s PCM16@16k, base64 encoded
 const OLD_SEGMENT_STOP_TIMEOUT_MS = 5_000
+const TURN_CONFIRMATION_TIMEOUT_MS = continuationTiming(
+  'NOVA_TURN_CONFIRMATION_TEST_TIMEOUT_MS',
+  2_000,
+)
 
 wss.on('connection', (ws) => {
   trackHeartbeat(ws)
+  // Random, non-patient trace id for correlating one relay connection's
+  // metadata-only lifecycle. Never accept an id from the browser and never
+  // log transcript, audio, tool arguments, invitation/session ids, or tokens.
+  const traceId = crypto.randomUUID().slice(0, 12)
+  const logSessionEvent = (
+    event: string,
+    details: Record<string, string | number | boolean | null> = {},
+  ): void => {
+    console.log(`[nova-session] ${JSON.stringify({ traceId, event, ...details })}`)
+  }
+  logSessionEvent('connection_open')
   // Track whether the AI is currently speaking so we can wrap turns with
   // aiSpeechStart / aiSpeechStop. This is an approximation: we emit
   // aiSpeechStart on the first audio chunk after silence, and aiSpeechStop on
@@ -247,6 +273,10 @@ wss.on('connection', (ws) => {
   let turnEvidenceControllerActive = false
   let speechSuppressed = false
   const turnQuarantine = new HistorianTurnQuarantine(2_560_000)
+  let pendingTurnAudioEndSegment: number | null = null
+  let turnConfirmationTimer: ReturnType<typeof setTimeout> | null = null
+  let firstAudioObserved = false
+  let admittedTurnCount = 0
   let startConfig: {
     instructions: string
     tools: Parameters<NovaSonicSession['start']>[1]
@@ -271,6 +301,7 @@ wss.on('connection', (ws) => {
     if (modelTerminalSent) return
     modelTerminalSent = true
     outputQuarantined = true
+    clearTurnConfirmationTimer()
     void openingSession?.stop().catch(() => {})
     send(ws, { t: 'sessionEnded', reason })
     if (ws.readyState === WebSocket.OPEN) {
@@ -278,11 +309,21 @@ wss.on('connection', (ws) => {
     }
   }
 
-  function rejectHistorianTurn(reason: string): void {
+  function rejectHistorianTurn(
+    reason: string,
+    diagnostics = turnQuarantine.diagnostics(),
+  ): void {
     if (clientStopping || modelTerminalSent) return
     // Metadata only: never log or return the rejected response text/audio.
-    console.error(`[nova-session] historian turn rejected: ${reason}`)
+    console.error(`[nova-session] ${JSON.stringify({
+      traceId,
+      event: 'turn_rejected',
+      reason,
+      segmentId: activeSegmentId,
+      ...diagnostics,
+    })}`)
     speechSuppressed = true
+    clearTurnConfirmationTimer()
     turnQuarantine.discard()
     send(ws, {
       t: 'error',
@@ -425,6 +466,82 @@ wss.on('connection', (ws) => {
     })
   }
 
+  function clearTurnConfirmationTimer(): void {
+    if (turnConfirmationTimer) clearTimeout(turnConfirmationTimer)
+    turnConfirmationTimer = null
+    pendingTurnAudioEndSegment = null
+  }
+
+  function finishAssistantBoundary(): void {
+    stopAiSpeech()
+    if (testBoundarySchedule.observeAssistantBoundary()) {
+      maybeSendTestBoundaryDue()
+    }
+    maybeOpenBarrier()
+  }
+
+  /**
+   * Nova may deliver the AUDIO END_TURN marker immediately before the
+   * byte-identical FINAL text copy. The strict gate must wait for both pieces,
+   * not reject at the first marker and not release any audio early.
+   */
+  function tryFinalizeControlledTurn(segmentId: number): boolean {
+    if (
+      pendingTurnAudioEndSegment !== segmentId ||
+      segmentId !== activeSegmentId ||
+      !turnQuarantine.hasConfirmedTextPair()
+    ) return false
+
+    const diagnostics = turnQuarantine.diagnostics()
+    clearTurnConfirmationTimer()
+    const admitted = turnQuarantine.finalize()
+    if (!admitted.allowed) {
+      rejectHistorianTurn(admitted.reason, diagnostics)
+      return true
+    }
+
+    admittedTurnCount += 1
+    logSessionEvent('turn_admitted', {
+      segmentId,
+      turn: admittedTurnCount,
+      mode: admitted.mode,
+      ...diagnostics,
+    })
+    startAiSpeech()
+    send(ws, {
+      t: 'assistantTranscript',
+      text: admitted.text,
+      segmentId,
+      ...(admitted.obligationId ? { obligationId: admitted.obligationId } : {}),
+    })
+    for (const pcm of admitted.audio) send(ws, { t: 'audio', pcm, segmentId })
+    finishAssistantBoundary()
+    return true
+  }
+
+  function observeControlledAudioEnd(segmentId: number): void {
+    if (pendingTurnAudioEndSegment !== null) {
+      rejectHistorianTurn('overlapping_audio_end')
+      return
+    }
+    pendingTurnAudioEndSegment = segmentId
+    logSessionEvent('turn_audio_end', {
+      segmentId,
+      ...turnQuarantine.diagnostics(),
+    })
+    if (tryFinalizeControlledTurn(segmentId)) return
+
+    turnConfirmationTimer = setTimeout(() => {
+      if (pendingTurnAudioEndSegment !== segmentId || modelTerminalSent || clientStopping) return
+      const diagnostics = turnQuarantine.diagnostics()
+      const result = turnQuarantine.finalize()
+      rejectHistorianTurn(
+        result.allowed ? 'turn_confirmation_timeout' : result.reason,
+        diagnostics,
+      )
+    }, TURN_CONFIRMATION_TIMEOUT_MS)
+  }
+
   type CandidateControl = {
     preparing: boolean
     failed: boolean
@@ -464,7 +581,10 @@ wss.on('connection', (ws) => {
         }
       } else {
         if (turnEvidenceControllerActive) {
-          if (!speechSuppressed) turnQuarantine.bufferText(content)
+          if (!speechSuppressed) {
+            turnQuarantine.bufferText(content)
+            tryFinalizeControlledTurn(segmentId)
+          }
           return
         }
         send(ws, { t: 'assistantTranscript', text: content, segmentId })
@@ -476,6 +596,7 @@ wss.on('connection', (ws) => {
       if (segmentId !== activeSegmentId || outputQuarantined) return
       if (turnEvidenceControllerActive && !speechSuppressed) {
         turnQuarantine.bufferFinalText(content)
+        tryFinalizeControlledTurn(segmentId)
       }
     },
 
@@ -484,6 +605,14 @@ wss.on('connection', (ws) => {
       if (segmentId !== activeSegmentId || outputQuarantined) return
       if (turnEvidenceControllerActive) {
         if (speechSuppressed) return
+        // AUDIO END_TURN is the authorization boundary for the quarantined
+        // response. Any later PCM is ambiguous protocol output and must never
+        // be released under the preceding question approval while we wait for
+        // Nova's delayed FINAL text copy.
+        if (pendingTurnAudioEndSegment === segmentId) {
+          rejectHistorianTurn('audio_after_turn_boundary')
+          return
+        }
         if (!turnQuarantine.bufferAudio(base64)) {
           rejectHistorianTurn('audio_buffer_overflow')
         }
@@ -499,28 +628,14 @@ wss.on('connection', (ws) => {
       TRACE('-> assistantAudioEnd')
       if (turnEvidenceControllerActive) {
         if (speechSuppressed) {
+          clearTurnConfirmationTimer()
           turnQuarantine.discard()
           return
         }
-        const admitted = turnQuarantine.finalize()
-        if (!admitted.allowed) {
-          rejectHistorianTurn(admitted.reason)
-          return
-        }
-        startAiSpeech()
-        send(ws, {
-          t: 'assistantTranscript',
-          text: admitted.text,
-          segmentId,
-          ...(admitted.obligationId ? { obligationId: admitted.obligationId } : {}),
-        })
-        for (const pcm of admitted.audio) send(ws, { t: 'audio', pcm, segmentId })
+        observeControlledAudioEnd(segmentId)
+        return
       }
-      stopAiSpeech()
-      if (testBoundarySchedule.observeAssistantBoundary()) {
-        maybeSendTestBoundaryDue()
-      }
-      maybeOpenBarrier()
+      finishAssistantBoundary()
     },
 
     onToolUse({ toolName, toolUseId, content }) {
@@ -530,7 +645,13 @@ wss.on('connection', (ws) => {
         rejectHistorianTurn('speech_before_tool')
         return
       }
-      TRACE(`-> toolUse ${toolName} id=${toolUseId} contentChars=${String(content).length}`)
+      TRACE(`-> toolUse ${historianToolCategory(toolName)} id=${toolUseId} contentChars=${String(content).length}`)
+      // Never log raw model-controlled tool names. A malformed name could
+      // contain patient-derived text. This fixed category is structural only.
+      logSessionEvent('tool_requested', {
+        segmentId,
+        toolCategory: historianToolCategory(toolName),
+      })
       let input: unknown = content
       try {
         input = JSON.parse(content)
@@ -551,6 +672,13 @@ wss.on('connection', (ws) => {
     onCompletionEnd() {
       if (rejectCandidateActivity('unexpected_completion')) return
       if (segmentId !== activeSegmentId || outputQuarantined) return
+      if (turnEvidenceControllerActive && pendingTurnAudioEndSegment === segmentId) {
+        logSessionEvent('completion_deferred_for_final_text', {
+          segmentId,
+          ...turnQuarantine.diagnostics(),
+        })
+        return
+      }
       if (turnEvidenceControllerActive && turnQuarantine.hasContent()) {
         rejectHistorianTurn('completion_before_audio_end')
         return
@@ -667,6 +795,7 @@ wss.on('connection', (ws) => {
             TURN_EVIDENCE_GATE_ENABLED &&
             interviewMode === 'comprehensive'
           speechSuppressed = false
+          clearTurnConfirmationTimer()
           turnQuarantine.discard()
           comprehensiveOpeningSettled = false
           startConfig = {
@@ -675,6 +804,11 @@ wss.on('connection', (ws) => {
             voiceId: msg.voiceId,
           }
           TRACE(`<- start (tools=${(msg.tools as unknown[] | undefined)?.length ?? 0})`)
+          logSessionEvent('start_received', {
+            interviewMode,
+            turnEvidenceControllerRequested: msg.turnEvidenceController === true,
+            turnEvidenceControllerActive,
+          })
           // start() surfaces any stream-open failure via the session's onError
           // callback (mapped to {t:'error'} above). This .catch only prevents an
           // unhandled rejection from the un-awaited promise — it must NOT send a
@@ -682,6 +816,7 @@ wss.on('connection', (ws) => {
           session.start(startConfig.instructions, startConfig.tools, startConfig.voiceId)
             .then(() => {
               if (!clientStopping && !modelTerminalSent && session.isActive()) {
+                logSessionEvent('model_stream_active', { segmentId: activeSegmentId })
                 armContinuationClock()
               }
             })
@@ -689,6 +824,10 @@ wss.on('connection', (ws) => {
           break
 
         case 'audio':
+          if (!firstAudioObserved) {
+            firstAudioObserved = true
+            logSessionEvent('first_microphone_audio', { segmentId: activeSegmentId })
+          }
           if (typeof msg.audioSeq === 'number') {
             if (!Number.isInteger(msg.audioSeq) || msg.audioSeq !== lastAudioSeq + 1) {
               failContinuation('audio_sequence', barrier?.id)
@@ -752,6 +891,7 @@ wss.on('connection', (ws) => {
                   rejectHistorianTurn('overlapping_question_approval')
                   break
                 }
+                logSessionEvent('question_authorized', { segmentId: activeSegmentId })
               } else if (
                 outputRecord?.status !== 'coverage_ready' &&
                 !suppressedTerminalResult
@@ -806,6 +946,7 @@ wss.on('connection', (ws) => {
 
         case 'suppressOutput':
           speechSuppressed = true
+          clearTurnConfirmationTimer()
           turnQuarantine.discard()
           // Terminal suppression permanently retires continuation for this
           // session. In particular, a due/deadline timer must not race the
@@ -1006,7 +1147,13 @@ wss.on('connection', (ws) => {
         case 'stop':
           if (clientStopping) break
           clientStopping = true
+          logSessionEvent('client_stop', {
+            segmentId: activeSegmentId,
+            firstAudioObserved,
+            admittedTurnCount,
+          })
           clearContinuationTimers()
+          clearTurnConfirmationTimer()
           outputQuarantined = true
           transcribe?.stop().catch(() => {})
           {
@@ -1035,9 +1182,17 @@ wss.on('connection', (ws) => {
     }
   })
 
-  ws.on('close', () => {
+  ws.on('close', (code) => {
     clientStopping = true
+    logSessionEvent('connection_closed', {
+      code,
+      sessionStarted,
+      firstAudioObserved,
+      admittedTurnCount,
+      modelTerminalSent,
+    })
     clearContinuationTimers()
+    clearTurnConfirmationTimer()
     // Best-effort teardown — ignore any errors from stop().
     session.stop().catch(() => {})
     if (openingSession && openingSession !== session) openingSession.stop().catch(() => {})

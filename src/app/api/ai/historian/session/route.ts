@@ -94,6 +94,7 @@ export async function POST(request: Request) {
     // nothing before this point used to run before they were minted either.
     let sessionId: string = crypto.randomUUID()
     let flushToken: string | undefined
+    let startupAttemptId: string | undefined
     try {
       flushToken = await mintFlushToken(sessionId)
     } catch (flushTokenErr) {
@@ -148,14 +149,22 @@ export async function POST(request: Request) {
     }
     if (invitationBinding) {
       sessionId = invitationBinding.sessionId
+      startupAttemptId = crypto.randomUUID()
       try {
-        flushToken = await mintFlushToken(sessionId)
+        // This signed, server-minted attempt id binds transcript writes and a
+        // possible zero-turn recovery to this exact start. Mint before the DB
+        // transition so a secret-resolution failure cannot strand the invite
+        // in progress without recovery authority.
+        flushToken = await mintFlushToken(sessionId, startupAttemptId)
       } catch (flushTokenErr) {
-        console.warn(
-          '[historian/session] mintFlushToken failed for invited session:',
+        console.error(
+          '[historian/session] startup authority unavailable for invited session:',
           flushTokenErr instanceof Error ? flushTokenErr.message : String(flushTokenErr),
         )
-        flushToken = undefined
+        return NextResponse.json(
+          { error: 'The interview could not be started safely. Please try again.' },
+          { status: 503 },
+        )
       }
     }
 
@@ -269,7 +278,10 @@ export async function POST(request: Request) {
     }
 
     if (invitationBinding) {
-      const markedStarted = await markHistorianInvitationStarted(invitationBinding)
+      const markedStarted = await markHistorianInvitationStarted(
+        invitationBinding,
+        startupAttemptId!,
+      )
       if (!markedStarted) {
         return NextResponse.json(
           { error: 'This interview could not be started. Please ask the clinic for a new link.' },

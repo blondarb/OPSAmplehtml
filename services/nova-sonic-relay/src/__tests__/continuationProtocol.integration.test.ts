@@ -237,6 +237,7 @@ describe('relay continuation protocol integration', () => {
     process.env.NOVA_CONTINUATION_TEST_DUE_MS = '10'
     process.env.NOVA_CONTINUATION_TEST_BARRIER_MS = '20'
     process.env.NOVA_CONTINUATION_TEST_DEADLINE_MS = '1000'
+    process.env.NOVA_TURN_CONFIRMATION_TEST_TIMEOUT_MS = '40'
     process.env.PORT = '0'
     serverModule = await import('../server.js')
     if (!serverModule.server.listening) await once(serverModule.server, 'listening')
@@ -276,6 +277,7 @@ describe('relay continuation protocol integration', () => {
     delete process.env.NOVA_CONTINUATION_TEST_DUE_MS
     delete process.env.NOVA_CONTINUATION_TEST_BARRIER_MS
     delete process.env.NOVA_CONTINUATION_TEST_DEADLINE_MS
+    delete process.env.NOVA_TURN_CONFIRMATION_TEST_TIMEOUT_MS
     delete process.env.PORT
   })
 
@@ -316,6 +318,176 @@ describe('relay continuation protocol integration', () => {
       segmentId: 1,
     })
     expect(audio).toMatchObject({ pcm: 'synthetic-audio', segmentId: 1 })
+  })
+
+  it('logs startup lifecycle metadata without instructions, audio, or tool arguments', async () => {
+    const logSpy = vi.spyOn(console, 'log').mockImplementation(() => undefined)
+    try {
+      send({
+        t: 'start',
+        instructions: 'SYNTHETIC_PRIVATE_INSTRUCTIONS',
+        tools: [],
+        interviewMode: 'comprehensive',
+        turnEvidenceController: true,
+      })
+      send({ t: 'audio', audioSeq: 1, pcm: 'SYNTHETIC_PRIVATE_PCM' })
+      await new Promise((resolve) => setTimeout(resolve, 10))
+      relayHarness.instances[0].callbacks.onToolUse?.({
+        toolName: 'request_history_question',
+        toolUseId: 'metadata-only-tool',
+        content: 'SYNTHETIC_PRIVATE_TOOL_ARGUMENTS',
+      })
+      await waitForMessage('toolCall')
+
+      const logged = JSON.stringify(logSpy.mock.calls)
+      expect(logged).toContain('start_received')
+      expect(logged).toContain('model_stream_active')
+      expect(logged).toContain('first_microphone_audio')
+      expect(logged).toContain('tool_requested')
+      expect(logged).not.toContain('SYNTHETIC_PRIVATE')
+
+      relayHarness.instances[0].callbacks.onToolUse?.({
+        toolName: 'SYNTHETIC_PRIVATE_MODEL_CONTROLLED_NAME',
+        toolUseId: 'unknown-tool',
+        content: '{}',
+      })
+      await waitForMessage('toolCall')
+      const afterUnknownTool = JSON.stringify(logSpy.mock.calls)
+      expect(logSpy.mock.calls.some(([line]) => (
+        String(line).includes('"toolCategory":"unknown"')
+      ))).toBe(true)
+      expect(afterUnknownTool).not.toContain('SYNTHETIC_PRIVATE_MODEL_CONTROLLED_NAME')
+    } finally {
+      logSpy.mockRestore()
+    }
+  })
+
+  it('waits for a FINAL text copy that arrives after AUDIO END_TURN, then releases once', async () => {
+    send({
+      t: 'start',
+      instructions: 'Synthetic controlled instructions.',
+      tools: [],
+      interviewMode: 'comprehensive',
+      turnEvidenceController: true,
+    })
+    await new Promise((resolve) => setTimeout(resolve, 10))
+    relayHarness.instances[0].callbacks.onToolUse?.({
+      toolName: 'request_history_question',
+      toolUseId: 'delayed-final-tool',
+      content: '{}',
+    })
+    const tool = await waitForMessage('toolCall')
+    send({
+      t: 'toolResult',
+      toolUseId: tool.toolUseId,
+      segmentId: 1,
+      output: JSON.stringify({
+        success: true,
+        status: 'approved',
+        obligation_id: 'synthetic-onset',
+        approved_text: 'When did the symptom begin?',
+        allow_example: false,
+      }),
+    })
+    await new Promise((resolve) => setTimeout(resolve, 10))
+
+    relayHarness.instances[0].callbacks.onTextOutput?.('ASSISTANT', 'When did the symptom begin?')
+    relayHarness.instances[0].callbacks.onAudioOutput?.('delayed-final-audio')
+    relayHarness.instances[0].callbacks.onAssistantAudioEnd?.()
+    await new Promise((resolve) => setTimeout(resolve, 15))
+    expect(inbox.some((message) => message.t === 'assistantTranscript')).toBe(false)
+    expect(inbox.some((message) => message.t === 'audio')).toBe(false)
+    expect(inbox.some((message) => message.t === 'error')).toBe(false)
+
+    relayHarness.instances[0].callbacks.onAssistantFinalText?.('When did the symptom begin?')
+    await expect(waitForMessage('assistantTranscript')).resolves.toMatchObject({
+      text: 'When did the symptom begin?',
+      obligationId: 'synthetic-onset',
+      segmentId: 1,
+    })
+    await expect(waitForMessage('audio')).resolves.toMatchObject({
+      pcm: 'delayed-final-audio',
+      segmentId: 1,
+    })
+    expect(inbox.filter((message) => message.t === 'assistantTranscript')).toHaveLength(0)
+    expect(inbox.filter((message) => message.t === 'audio')).toHaveLength(0)
+  })
+
+  it('fails closed after a bounded wait when the FINAL text copy never arrives', async () => {
+    send({
+      t: 'start',
+      instructions: 'Synthetic controlled instructions.',
+      tools: [],
+      interviewMode: 'comprehensive',
+      turnEvidenceController: true,
+    })
+    await new Promise((resolve) => setTimeout(resolve, 10))
+    relayHarness.instances[0].callbacks.onToolUse?.({
+      toolName: 'request_history_question',
+      toolUseId: 'missing-final-tool',
+      content: '{}',
+    })
+    const tool = await waitForMessage('toolCall')
+    send({
+      t: 'toolResult',
+      toolUseId: tool.toolUseId,
+      segmentId: 1,
+      output: JSON.stringify({
+        success: true,
+        status: 'approved',
+        obligation_id: 'synthetic-onset',
+        approved_text: 'When did the symptom begin?',
+        allow_example: false,
+      }),
+    })
+    await new Promise((resolve) => setTimeout(resolve, 10))
+    relayHarness.instances[0].callbacks.onTextOutput?.('ASSISTANT', 'When did the symptom begin?')
+    relayHarness.instances[0].callbacks.onAudioOutput?.('must-never-release')
+    relayHarness.instances[0].callbacks.onAssistantAudioEnd?.()
+
+    await waitForMessage('error')
+    expect(inbox.some((message) => message.t === 'assistantTranscript')).toBe(false)
+    expect(inbox.some((message) => message.t === 'audio')).toBe(false)
+  })
+
+  it('fails closed without releasing any PCM received after AUDIO END_TURN', async () => {
+    send({
+      t: 'start',
+      instructions: 'Synthetic controlled instructions.',
+      tools: [],
+      interviewMode: 'comprehensive',
+      turnEvidenceController: true,
+    })
+    await new Promise((resolve) => setTimeout(resolve, 10))
+    relayHarness.instances[0].callbacks.onToolUse?.({
+      toolName: 'request_history_question',
+      toolUseId: 'post-end-audio-tool',
+      content: '{}',
+    })
+    const tool = await waitForMessage('toolCall')
+    send({
+      t: 'toolResult',
+      toolUseId: tool.toolUseId,
+      segmentId: 1,
+      output: JSON.stringify({
+        success: true,
+        status: 'approved',
+        obligation_id: 'synthetic-onset',
+        approved_text: 'When did the symptom begin?',
+        allow_example: false,
+      }),
+    })
+    await new Promise((resolve) => setTimeout(resolve, 10))
+
+    relayHarness.instances[0].callbacks.onTextOutput?.('ASSISTANT', 'When did the symptom begin?')
+    relayHarness.instances[0].callbacks.onAudioOutput?.('pre-boundary-audio')
+    relayHarness.instances[0].callbacks.onAssistantAudioEnd?.()
+    relayHarness.instances[0].callbacks.onAudioOutput?.('post-boundary-audio')
+    relayHarness.instances[0].callbacks.onAssistantFinalText?.('When did the symptom begin?')
+
+    await waitForMessage('error')
+    expect(inbox.some((message) => message.t === 'assistantTranscript')).toBe(false)
+    expect(inbox.some((message) => message.t === 'audio')).toBe(false)
   })
 
   it('releases neither text nor PCM for a question-example-question turn', async () => {

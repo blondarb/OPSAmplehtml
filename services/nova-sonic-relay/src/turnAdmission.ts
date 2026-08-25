@@ -18,6 +18,18 @@ export interface ApprovedHistorianTurn {
   allowExample: boolean
 }
 
+/** Metadata-only snapshot used for relay diagnostics. It deliberately exposes
+ * no text, audio, obligation id, tool arguments, or patient/session identity. */
+export interface HistorianTurnQuarantineDiagnostics {
+  authorization:
+    | TurnAdmissionMode
+    | 'none'
+  speculativeTextSeen: boolean
+  finalTextSeen: boolean
+  audioChunkCount: number
+  overflowed: boolean
+}
+
 export const APPROVED_HISTORIAN_CLOSING_TEXT =
   'Thank you. Your history has been recorded for your neurologist to review.'
 
@@ -149,6 +161,22 @@ export class HistorianTurnQuarantine {
 
   hasAuthorization(): boolean {
     return !!this.approval || !!this.controlMode
+  }
+
+  hasConfirmedTextPair(): boolean {
+    return this.textParts.length > 0 && this.finalTextParts.length > 0
+  }
+
+  diagnostics(): HistorianTurnQuarantineDiagnostics {
+    return {
+      authorization: this.approval
+        ? 'approved_question'
+        : this.controlMode ?? 'none',
+      speculativeTextSeen: this.textParts.length > 0,
+      finalTextSeen: this.finalTextParts.length > 0,
+      audioChunkCount: this.audioParts.length,
+      overflowed: this.overflowed,
+    }
   }
 
   discard(): void {

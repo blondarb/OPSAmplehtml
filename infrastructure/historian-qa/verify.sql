@@ -6,6 +6,13 @@ BEGIN
   IF to_regclass('public.historian_invites') IS NULL
      OR to_regclass('public.historian_eval_jobs') IS NULL
      OR NOT EXISTS (
+       SELECT 1 FROM information_schema.columns
+        WHERE table_schema = 'public'
+          AND table_name = 'historian_invites'
+          AND column_name = 'startup_attempt_id'
+          AND data_type = 'uuid'
+     )
+     OR NOT EXISTS (
        SELECT 1 FROM pg_constraint
         WHERE conname = 'historian_sessions_prompt_version_check'
           AND pg_get_constraintdef(oid) LIKE '%comprehensive-v2%'

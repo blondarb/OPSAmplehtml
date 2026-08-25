@@ -1,7 +1,7 @@
 AWSTemplateFormatVersion: '2010-09-09'
 Description: >
   Ephemeral fail-closed migration runner for upgrading the existing isolated,
-  synthetic-only Historian QA database to Comprehensive v2. Delete after one run.
+  synthetic-only Historian QA database with the latest bounded migration. Delete after one run.
 
 Parameters:
   SourceCommit:
@@ -167,13 +167,13 @@ Resources:
                 - umask 077
                 - test -f source-commit.txt
                 - test "$(tr -d '\r\n' < source-commit.txt)" = "$SOURCE_COMMIT"
-                - test -f migrations/061_historian_comprehensive_v2.sql
+                - test -f migrations/062_historian_startup_attempt_authority.sql
                 - test -f infrastructure/historian-qa/verify.sql
-                - test "$(sha256sum migrations/061_historian_comprehensive_v2.sql | cut -d' ' -f1)" = "$MIGRATION_SHA256"
+                - test "$(sha256sum migrations/062_historian_startup_attempt_authority.sql | cut -d' ' -f1)" = "$MIGRATION_SHA256"
                 - test "$(sha256sum infrastructure/historian-qa/verify.sql | cut -d' ' -f1)" = "$VERIFY_SHA256"
                 - curl --fail --silent --show-error --location --output rds-global-bundle.pem https://truststore.pki.rds.amazonaws.com/global/global-bundle.pem
                 - test "$(wc -c < rds-global-bundle.pem)" -gt 1000
-                - docker run --rm --user "$(id -u):$(id -g)" -e PGHOST -e PGPORT -e PGUSER -e PGPASSWORD -e PGDATABASE -e PGSSLMODE -e PGSSLROOTCERT=/certs/rds-global-bundle.pem -v "$CODEBUILD_SRC_DIR:/work" -v "$CODEBUILD_SRC_DIR/rds-global-bundle.pem:/certs/rds-global-bundle.pem:ro" -w /work public.ecr.aws/docker/library/postgres:17 psql --single-transaction --set=ON_ERROR_STOP=1 --file=migrations/061_historian_comprehensive_v2.sql --file=infrastructure/historian-qa/verify.sql
+                - docker run --rm --user "$(id -u):$(id -g)" -e PGHOST -e PGPORT -e PGUSER -e PGPASSWORD -e PGDATABASE -e PGSSLMODE -e PGSSLROOTCERT=/certs/rds-global-bundle.pem -v "$CODEBUILD_SRC_DIR:/work" -v "$CODEBUILD_SRC_DIR/rds-global-bundle.pem:/certs/rds-global-bundle.pem:ro" -w /work public.ecr.aws/docker/library/postgres:17 psql --single-transaction --set=ON_ERROR_STOP=1 --file=migrations/062_historian_startup_attempt_authority.sql --file=infrastructure/historian-qa/verify.sql
       LogsConfig:
         CloudWatchLogs:
           Status: ENABLED

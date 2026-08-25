@@ -138,6 +138,186 @@ describe('Nova continuation failure acceptance', () => {
     expect(provider.stop).toHaveBeenCalledOnce()
   })
 
+  it('reopens a zero-turn v2 invitation instead of reporting an empty interview as submitted', async () => {
+    let sink: ((event: VoiceEvent) => void) | null = null
+    const provider: VoiceProvider = {
+      start: vi.fn(async () => undefined),
+      stop: vi.fn(async () => undefined),
+      isOpen: vi.fn(() => false),
+      on: vi.fn((callback) => { sink = callback }),
+      sendToolResult: vi.fn(),
+      injectSystemText: vi.fn(),
+      requestResponse: vi.fn(),
+      suppressOutput: vi.fn(),
+      nudgeClosing: vi.fn(),
+    }
+    voiceFactory.provider = provider
+    const fetchCalls: string[] = []
+    globalThis.fetch = vi.fn((input: string | URL | Request) => {
+      const url = String(input)
+      fetchCalls.push(url)
+      if (url === '/api/ai/historian/session') {
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          json: async () => ({
+            provider: 'nova',
+            base_instructions: 'Fixed synthetic controlled instructions.',
+            tools: [],
+            relayUrl: 'wss://synthetic.invalid',
+            sessionId: '00000000-0000-4000-8000-0000000000f2',
+            flushToken: 'synthetic-flush-token',
+            interviewMode: 'comprehensive',
+            interviewPromptVersion: 'comprehensive-v2',
+            turnEvidenceController: true,
+          }),
+        } as Response)
+      }
+      if (url === '/api/ai/historian/startup-recovery') {
+        return Promise.resolve({ ok: true, status: 200 } as Response)
+      }
+      throw new Error(`Unexpected zero-turn recovery fetch: ${url}`)
+    }) as typeof fetch
+
+    const onComplete = vi.fn()
+    const hook = useRealtimeSession({
+      sessionType: 'new_patient',
+      interviewMode: 'comprehensive',
+      provider: 'nova',
+      referralReason: 'Synthetic fixture.',
+      enableLocalizer: false,
+      unresponsiveness: { enabled: false, checkInAfterMs: 60_000, giveUpAfterMs: 60_000 },
+      onComplete,
+    })
+    reactHarness.effects.forEach((effect) => effect())
+    await hook.startSession()
+
+    sink!({
+      type: 'error',
+      message: 'The voice response did not satisfy the patient interview safety contract.',
+    })
+
+    await vi.waitFor(() => {
+      expect(fetchCalls).toContain('/api/ai/historian/startup-recovery')
+      expect(provider.stop).toHaveBeenCalledOnce()
+    })
+    expect(onComplete).not.toHaveBeenCalled()
+    expect(fetchCalls).not.toContain('/api/ai/historian/save')
+    expect(fetchCalls).not.toContain('/api/ai/historian/transcript-flush')
+  })
+
+  it('reopens a zero-turn v2 invitation when provider setup itself fails', async () => {
+    const provider: VoiceProvider = {
+      start: vi.fn(async () => { throw new Error('synthetic microphone setup failure') }),
+      stop: vi.fn(async () => undefined),
+      isOpen: vi.fn(() => false),
+      on: vi.fn(),
+      sendToolResult: vi.fn(),
+      injectSystemText: vi.fn(),
+      requestResponse: vi.fn(),
+      suppressOutput: vi.fn(),
+      nudgeClosing: vi.fn(),
+    }
+    voiceFactory.provider = provider
+    const fetchCalls: string[] = []
+    globalThis.fetch = vi.fn((input: string | URL | Request) => {
+      const url = String(input)
+      fetchCalls.push(url)
+      if (url === '/api/ai/historian/session') {
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          json: async () => ({
+            provider: 'nova',
+            base_instructions: 'Fixed synthetic controlled instructions.',
+            tools: [],
+            relayUrl: 'wss://synthetic.invalid',
+            sessionId: '00000000-0000-4000-8000-0000000000f3',
+            flushToken: 'synthetic-flush-token',
+            interviewMode: 'comprehensive',
+            interviewPromptVersion: 'comprehensive-v2',
+            turnEvidenceController: true,
+          }),
+        } as Response)
+      }
+      if (url === '/api/ai/historian/startup-recovery') {
+        return Promise.resolve({ ok: true, status: 200 } as Response)
+      }
+      throw new Error(`Unexpected setup recovery fetch: ${url}`)
+    }) as typeof fetch
+
+    const onComplete = vi.fn()
+    const hook = useRealtimeSession({
+      sessionType: 'new_patient', interviewMode: 'comprehensive', provider: 'nova',
+      enableLocalizer: false,
+      unresponsiveness: { enabled: false, checkInAfterMs: 60_000, giveUpAfterMs: 60_000 },
+      onComplete,
+    })
+    reactHarness.effects.forEach((effect) => effect())
+    await hook.startSession()
+
+    expect(fetchCalls).toContain('/api/ai/historian/startup-recovery')
+    expect(provider.stop).toHaveBeenCalledOnce()
+    expect(onComplete).not.toHaveBeenCalled()
+  })
+
+  it('ignores a delayed error callback from the provider used by an older retry', async () => {
+    let oldSink: ((event: VoiceEvent) => void) | null = null
+    let newSink: ((event: VoiceEvent) => void) | null = null
+    const oldProvider: VoiceProvider = {
+      start: vi.fn(async () => undefined), stop: vi.fn(async () => undefined),
+      isOpen: vi.fn(() => false), on: vi.fn((callback) => { oldSink = callback }),
+      sendToolResult: vi.fn(), injectSystemText: vi.fn(), requestResponse: vi.fn(),
+      suppressOutput: vi.fn(), nudgeClosing: vi.fn(),
+    }
+    const newProvider: VoiceProvider = {
+      start: vi.fn(async () => undefined), stop: vi.fn(async () => undefined),
+      isOpen: vi.fn(() => true), on: vi.fn((callback) => { newSink = callback }),
+      sendToolResult: vi.fn(), injectSystemText: vi.fn(), requestResponse: vi.fn(),
+      suppressOutput: vi.fn(), nudgeClosing: vi.fn(),
+    }
+    let recoveryCalls = 0
+    globalThis.fetch = vi.fn((input: string | URL | Request) => {
+      const url = String(input)
+      if (url === '/api/ai/historian/session') {
+        return Promise.resolve({ ok: true, status: 200, json: async () => ({
+          provider: 'nova', base_instructions: 'Synthetic.', tools: [],
+          relayUrl: 'wss://synthetic.invalid', sessionId: '00000000-0000-4000-8000-0000000000f4',
+          flushToken: 'synthetic-flush-token', interviewMode: 'comprehensive',
+          interviewPromptVersion: 'comprehensive-v2', turnEvidenceController: true,
+        }) } as Response)
+      }
+      if (url === '/api/ai/historian/startup-recovery') {
+        recoveryCalls += 1
+        return Promise.resolve({ ok: true, status: 200 } as Response)
+      }
+      throw new Error(`Unexpected stale-provider fetch: ${url}`)
+    }) as typeof fetch
+
+    voiceFactory.provider = oldProvider
+    const onComplete = vi.fn()
+    const hook = useRealtimeSession({
+      sessionType: 'new_patient', interviewMode: 'comprehensive', provider: 'nova',
+      enableLocalizer: false,
+      unresponsiveness: { enabled: false, checkInAfterMs: 60_000, giveUpAfterMs: 60_000 },
+      onComplete,
+    })
+    reactHarness.effects.forEach((effect) => effect())
+    await hook.startSession()
+    oldSink!({ type: 'error', message: 'synthetic first attempt failure' })
+    await vi.waitFor(() => expect(recoveryCalls).toBe(1))
+
+    voiceFactory.provider = newProvider
+    await hook.startSession()
+    expect(newSink).not.toBeNull()
+    oldSink!({ type: 'error', message: 'delayed stale provider failure' })
+    await new Promise((resolve) => setTimeout(resolve, 25))
+
+    expect(newProvider.stop).not.toHaveBeenCalled()
+    expect(recoveryCalls).toBe(1)
+    expect(onComplete).not.toHaveBeenCalled()
+  })
+
   it('lets replayed emergency ASR win after a pre-promotion candidate rollback', async () => {
     let sink: ((event: VoiceEvent) => void) | null = null
     let streamOpen = true

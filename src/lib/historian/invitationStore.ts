@@ -459,6 +459,7 @@ export async function resolveHistorianPatientGrant(
 
 export async function markHistorianInvitationStarted(
   binding: HistorianInvitationBinding,
+  startupAttemptId: string,
   now: Date = new Date(),
 ): Promise<boolean> {
   try {
@@ -466,13 +467,14 @@ export async function markHistorianInvitationStarted(
     const result = await pool.query(
       `UPDATE historian_invites
           SET status = 'in_progress',
-              started_at = COALESCE(started_at, $3),
-              updated_at = $3
+              startup_attempt_id = $3::uuid,
+              started_at = COALESCE(started_at, $4),
+              updated_at = $4
         WHERE id = $1
           AND session_id = $2
-          AND status IN ('redeemed', 'in_progress')
-          AND grant_expires_at > $3`,
-      [binding.inviteId, binding.sessionId, now],
+          AND status = 'redeemed'
+          AND grant_expires_at > $4`,
+      [binding.inviteId, binding.sessionId, startupAttemptId, now],
     )
     return result.rowCount === 1
   } catch (error) {
@@ -481,6 +483,128 @@ export async function markHistorianInvitationStarted(
       error,
     })
     return false
+  }
+}
+
+export type HistorianStartupRecoveryReason = 'provider_error' | 'transport_lost'
+
+export type RecoverHistorianStartupResult =
+  | { ok: true; recovered: true; replayed: boolean }
+  | { ok: false; reason: 'not_retryable' | 'database_error' }
+
+// Recovery is deliberately narrow: only a newly-started Comprehensive v2
+// invitation with no durable or finalized interview content can return to the
+// already identity-verified `redeemed` state. This lets the same browser grant
+// retry a microphone/relay startup failure without making an interrupted real
+// conversation restartable.
+const STARTUP_RECOVERY_WINDOW_MS = 2 * 60 * 1000
+
+export async function recoverHistorianInvitationStartup(
+  sessionId: string,
+  startupAttemptId: string,
+  _reason: HistorianStartupRecoveryReason,
+  now: Date = new Date(),
+): Promise<RecoverHistorianStartupResult> {
+  const pool = await getPool()
+  const client = await pool.connect()
+  try {
+    await client.query('BEGIN')
+    const locked = await client.query<{
+      invite_id: string
+      invite_status: string
+      grant_expires_at: Date | string
+      invite_updated_at: Date | string
+      session_status: string
+      interview_prompt_version: string | null
+      transcript_count: number | string
+      question_count: number | string
+      interview_completion_status: string | null
+      interview_termination_reason: string | null
+      startup_attempt_id: string | null
+    }>(
+      `SELECT invite.id AS invite_id,
+              invite.status AS invite_status,
+              invite.grant_expires_at,
+              invite.updated_at AS invite_updated_at,
+              session.status AS session_status,
+              session.interview_prompt_version,
+              jsonb_array_length(COALESCE(session.transcript, '[]'::jsonb)) AS transcript_count,
+              COALESCE(session.question_count, 0) AS question_count,
+              session.interview_completion_status,
+              session.interview_termination_reason
+              , invite.startup_attempt_id
+         FROM historian_invites invite
+         JOIN historian_sessions session
+           ON session.id = invite.session_id
+          AND session.tenant_id = invite.tenant_id
+        WHERE invite.session_id = $1
+          AND invite.status = 'in_progress'
+        FOR UPDATE OF invite, session`,
+      [sessionId],
+    )
+    const row = locked.rows[0]
+    const grantExpiryMs = row ? new Date(row.grant_expires_at).getTime() : Number.NaN
+    const lastTransitionMs = row ? new Date(row.invite_updated_at).getTime() : Number.NaN
+    const structurallyRetryable =
+      !!row &&
+      Number.isFinite(grantExpiryMs) &&
+      grantExpiryMs > now.getTime() &&
+      Number.isFinite(lastTransitionMs) &&
+      now.getTime() - lastTransitionMs >= 0 &&
+      now.getTime() - lastTransitionMs <= STARTUP_RECOVERY_WINDOW_MS &&
+      row.session_status === 'in_progress' &&
+      row.startup_attempt_id === startupAttemptId &&
+      row.interview_prompt_version === 'comprehensive-v2' &&
+      Number(row.transcript_count) === 0 &&
+      Number(row.question_count) === 0 &&
+      row.interview_completion_status == null &&
+      row.interview_termination_reason == null
+
+    if (!structurallyRetryable) {
+      await rollbackQuietly(client)
+      return { ok: false, reason: 'not_retryable' }
+    }
+
+    const eventResult = await client.query<{ has_events: boolean }>(
+      `SELECT EXISTS (
+         SELECT 1
+           FROM historian_transcript_events
+          WHERE session_id = $1
+       ) AS has_events`,
+      [sessionId],
+    )
+    if (eventResult.rows[0]?.has_events !== false) {
+      await rollbackQuietly(client)
+      return { ok: false, reason: 'not_retryable' }
+    }
+
+    const updated = await client.query(
+      `UPDATE historian_invites
+          SET status = 'redeemed',
+              startup_attempt_id = NULL,
+              updated_at = $2
+        WHERE id = $1
+          AND status = 'in_progress'
+          AND startup_attempt_id = $3::uuid`,
+      [row.invite_id, now, startupAttemptId],
+    )
+    if (updated.rowCount !== 1) {
+      await rollbackQuietly(client)
+      return { ok: false, reason: 'not_retryable' }
+    }
+
+    await client.query('COMMIT')
+    return { ok: true, recovered: true, replayed: false }
+  } catch (error) {
+    await rollbackQuietly(client)
+    // Metadata-only. Session/invitation/patient identifiers are intentionally
+    // omitted from logs.
+    console.error('[historian/startup-recovery] database error', {
+      error: error instanceof Error ? error.message : String(error),
+    })
+    return { ok: false, reason: 'database_error' }
+  } finally {
+    client.release()
   }
 }
 

@@ -125,6 +125,24 @@ describe('Historian assistant turn admission', () => {
     expect(changed.finalize()).toEqual({ allowed: false, reason: 'turn_text_stage_mismatch' })
   })
 
+  it('exposes only structural diagnostics while a turn is quarantined', () => {
+    const gate = new HistorianTurnQuarantine(1_000)
+    gate.approveQuestion(APPROVAL)
+    gate.bufferText('Synthetic private wording must not appear in diagnostics.')
+    gate.bufferAudio('SYNTHETIC_PRIVATE_PCM')
+
+    const diagnostics = gate.diagnostics()
+    expect(diagnostics).toEqual({
+      authorization: 'approved_question',
+      speculativeTextSeen: true,
+      finalTextSeen: false,
+      audioChunkCount: 1,
+      overflowed: false,
+    })
+    expect(JSON.stringify(diagnostics)).not.toContain('private')
+    expect(gate.hasConfirmedTextPair()).toBe(false)
+  })
+
   it('parses only the exact application approval shape', () => {
     expect(parseApprovedHistorianTurn({
       success: true,
