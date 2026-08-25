@@ -96,6 +96,30 @@ describe('silent live Historian review contract', () => {
     expect(liveInterviewReviewCompletion(review)).toBe('complete_with_uncertainty')
   })
 
+  it('bounds verbose private reviewer prose without discarding cited findings', () => {
+    const raw: any = rawReview()
+    const verbose = `Synthetic cited finding ${'detail '.repeat(80)}`
+    raw.critical_gaps = [{
+      domain: 'red_flags',
+      reason: verbose,
+      question_intent: verbose,
+    }]
+    raw.contradictions = [{ patient_seqs: [2, 4], description: verbose }]
+    raw.repetitions = [{ assistant_seqs: [1, 3], description: verbose }]
+    raw.next_question_intents = [verbose]
+
+    const review = parseLiveInterviewReview(raw, transcript())
+
+    expect(review.criticalGaps[0].reason).toHaveLength(240)
+    expect(review.criticalGaps[0].questionIntent).toHaveLength(240)
+    expect(review.contradictions[0]).toMatchObject({ patientSeqs: [2, 4] })
+    expect(review.contradictions[0].description).toHaveLength(240)
+    expect(review.repetitions[0]).toMatchObject({ assistantSeqs: [1, 3] })
+    expect(review.repetitions[0].description).toHaveLength(240)
+    expect(review.nextQuestionIntents[0]).toHaveLength(240)
+    expect(review.readyToClose).toBe(false)
+  })
+
   it('rejects assistant or nonexistent sequences as patient evidence', () => {
     const assistantCitation = rawReview()
     assistantCitation.domains[0] = { ...assistantCitation.domains[0], patient_seqs: [1] }

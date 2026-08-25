@@ -95,8 +95,12 @@ function hasExactKeys(value: Record<string, unknown>, keys: readonly string[]): 
 function boundedText(value: unknown, label: string): string {
   if (typeof value !== 'string') throw new Error(`${label} must be text.`)
   const text = value.trim()
-  if (!text || text.length > MAX_TEXT_LENGTH) throw new Error(`${label} is empty or too long.`)
-  return text
+  if (!text) throw new Error(`${label} is empty.`)
+  // Bedrock tool schemas are advisory: a clinically useful, fully cited
+  // finding may occasionally exceed maxLength even with temperature zero.
+  // Normalize only the private explanatory prose. Fixed domains, transcript
+  // citations, finding counts, safety state, and closure gates remain strict.
+  return text.slice(0, MAX_TEXT_LENGTH).trimEnd()
 }
 
 function exactIntegerArray(
