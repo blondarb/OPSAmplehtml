@@ -153,7 +153,7 @@ Resources:
           - { Name: PGSSLMODE, Type: PLAINTEXT, Value: verify-full }
       Source:
         Type: S3
-        Location: !Sub '${MigrationSourceBucket}/historian-qa-v2-migrate.zip'
+        Location: !Sub '${MigrationSourceBucket}/historian-qa-v3-migrate.zip'
         BuildSpec: |
           version: 0.2
           phases:
@@ -167,18 +167,18 @@ Resources:
                 - umask 077
                 - test -f source-commit.txt
                 - test "$(tr -d '\r\n' < source-commit.txt)" = "$SOURCE_COMMIT"
-                - test -f migrations/062_historian_startup_attempt_authority.sql
+                - test -f migrations/063_historian_adaptive_v3.sql
                 - test -f infrastructure/historian-qa/verify.sql
-                - test "$(sha256sum migrations/062_historian_startup_attempt_authority.sql | cut -d' ' -f1)" = "$MIGRATION_SHA256"
+                - test "$(sha256sum migrations/063_historian_adaptive_v3.sql | cut -d' ' -f1)" = "$MIGRATION_SHA256"
                 - test "$(sha256sum infrastructure/historian-qa/verify.sql | cut -d' ' -f1)" = "$VERIFY_SHA256"
                 - curl --fail --silent --show-error --location --output rds-global-bundle.pem https://truststore.pki.rds.amazonaws.com/global/global-bundle.pem
                 - test "$(wc -c < rds-global-bundle.pem)" -gt 1000
-                - docker run --rm --user "$(id -u):$(id -g)" -e PGHOST -e PGPORT -e PGUSER -e PGPASSWORD -e PGDATABASE -e PGSSLMODE -e PGSSLROOTCERT=/certs/rds-global-bundle.pem -v "$CODEBUILD_SRC_DIR:/work" -v "$CODEBUILD_SRC_DIR/rds-global-bundle.pem:/certs/rds-global-bundle.pem:ro" -w /work public.ecr.aws/docker/library/postgres:17 psql --single-transaction --set=ON_ERROR_STOP=1 --file=migrations/062_historian_startup_attempt_authority.sql --file=infrastructure/historian-qa/verify.sql
+                - docker run --rm --user "$(id -u):$(id -g)" -e PGHOST -e PGPORT -e PGUSER -e PGPASSWORD -e PGDATABASE -e PGSSLMODE -e PGSSLROOTCERT=/certs/rds-global-bundle.pem -v "$CODEBUILD_SRC_DIR:/work" -v "$CODEBUILD_SRC_DIR/rds-global-bundle.pem:/certs/rds-global-bundle.pem:ro" -w /work public.ecr.aws/docker/library/postgres:17 psql --single-transaction --set=ON_ERROR_STOP=1 --file=migrations/063_historian_adaptive_v3.sql --file=infrastructure/historian-qa/verify.sql
       LogsConfig:
         CloudWatchLogs:
           Status: ENABLED
           GroupName: !Ref MigrationLogGroup
-          StreamName: v2-migration
+          StreamName: v3-migration
       TimeoutInMinutes: 15
       QueuedTimeoutInMinutes: 10
       Tags:

@@ -18,9 +18,11 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { invokeBedrockJSON } from '@/lib/bedrock'
 import { from } from '@/lib/db-query'
-import { getNeuroPlansPool } from '@/lib/db'
+import { getNeuroPlansPool, getPool } from '@/lib/db'
+import { verifyFlushToken } from '@/lib/historian/flushToken'
 import { retrievePlanEvidence } from '@/lib/consult/planEvidence'
 import { SYMPTOM_EXTRACTOR_PROMPT } from '@/lib/consult/symptomExtractorPrompt'
+import { COMPREHENSIVE_HISTORY_DOMAINS } from '@/lib/historianTypes'
 import type {
   LocalizerRequest,
   LocalizerResponse,
@@ -35,6 +37,34 @@ import type {
 const LOCALIZER_TIMEOUT_MS = 15000
 const MAX_SUGGESTED_ACTIONS = 4
 const SUGGESTED_ACTION_FIELD_MAX_LEN = 200
+const MAX_TRANSCRIPT_ENTRIES = 120
+const MAX_TRANSCRIPT_CHARS = 100_000
+const REVIEW_DOMAIN_IDS = new Set<string>(
+  COMPREHENSIVE_HISTORY_DOMAINS.map((domain) => domain.id),
+)
+
+function bearerToken(request: Request): string {
+  const value = request.headers.get('authorization') ?? ''
+  return value.startsWith('Bearer ') ? value.slice(7).trim() : ''
+}
+
+async function adaptiveAttemptAuthorityIsCurrent(
+  sessionId: string,
+  startupAttemptId?: string,
+): Promise<boolean> {
+  const pool = await getPool()
+  const result = await pool.query<{ status: string; startup_attempt_id: string | null }>(
+    `SELECT status, startup_attempt_id
+       FROM historian_invites
+      WHERE session_id = $1`,
+    [sessionId],
+  )
+  const invitation = result.rows[0]
+  if (!invitation) return true
+  return invitation.status === 'in_progress' &&
+    !!startupAttemptId &&
+    invitation.startup_attempt_id === startupAttemptId
+}
 
 // ── Prompts ───────────────────────────────────────────────────────────────────
 //
@@ -77,6 +107,7 @@ Return JSON matching this exact shape:
 Rules for followUpQuestions:
 - Generate exactly 2–3 questions.
 - Each question should target a specific diagnostic gap not yet covered in the transcript.
+- When silentReviewerMissingDomains is non-empty, use it as an independent coverage signal, but still choose the most clinically coherent next gap rather than reciting a checklist order.
 - Questions should be phrased as if spoken naturally to a patient (plain language).
 - Prioritize questions that would distinguish between the top 2 differential diagnoses.
 - For follow-up sessions: focus on treatment response, interval change, functional impact.
@@ -226,12 +257,40 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   }
 
   const { sessionId, sessionType, transcript, chiefComplaint, referralReason } = body
+  const reviewGaps = Array.isArray(body.reviewGaps)
+    ? body.reviewGaps
+        .filter((value) => typeof value === 'string' && REVIEW_DOMAIN_IDS.has(value))
+        .slice(0, 8)
+    : []
 
   if (!sessionId || !transcript || !Array.isArray(transcript)) {
     return NextResponse.json(
       { error: 'sessionId and transcript array are required' },
       { status: 400 }
     )
+  }
+  if (
+    transcript.length > MAX_TRANSCRIPT_ENTRIES ||
+    transcript.some((turn) => (
+      !turn ||
+      (turn.role !== 'assistant' && turn.role !== 'user') ||
+      typeof turn.text !== 'string' ||
+      !turn.text.trim()
+    )) ||
+    transcript.reduce((chars, turn) => chars + turn.text.length, 0) > MAX_TRANSCRIPT_CHARS
+  ) {
+    return NextResponse.json({ error: 'Transcript is malformed or outside the conductor bounds.' }, { status: 400 })
+  }
+
+  if (body.adaptiveInterview === true) {
+    const verified = await verifyFlushToken(bearerToken(req))
+    if (
+      !verified ||
+      verified.sessionId !== sessionId ||
+      !await adaptiveAttemptAuthorityIsCurrent(sessionId, verified.startupAttemptId)
+    ) {
+      return NextResponse.json({ error: 'Invalid or stale conductor authority.' }, { status: 403 })
+    }
   }
 
   // Minimum data check — don't waste Bedrock calls on empty sessions
@@ -290,7 +349,9 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       symptoms = parsed
     } catch (err) {
       if (signal.aborted) throw err // Let the outer catch handle timeout
-      console.error('[localizer] Step 1 (symptom extraction) failed:', err)
+      // Model/parse errors can contain patient-derived output. Log only the
+      // fixed pipeline stage, never the raw exception text.
+      console.error('[localizer] Step 1 (symptom extraction) failed')
       degradedReason = 'Symptom extraction failed'
     }
 
@@ -314,7 +375,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
         }
       } catch (err) {
         if (signal.aborted) throw err
-        console.error('[localizer] Step 2 (plan evidence retrieval) failed:', err)
+        console.error('[localizer] Step 2 (plan evidence retrieval) failed')
         degradedReason = degradedReason ?? 'Plan evidence retrieval unavailable'
       }
     }
@@ -328,6 +389,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
           extractedSymptoms: symptoms,
           guidelineContext: kbGeneratedText || '(No guideline context available — use clinical judgment)',
           transcriptSummary: symptoms.clinicalSummary,
+          silentReviewerMissingDomains: reviewGaps,
         })
 
         const { parsed } = await invokeBedrockJSON<GeneratedQuestions>({
@@ -340,18 +402,17 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
         questions = parsed
       } catch (err) {
         if (signal.aborted) throw err
-        console.error('[localizer] Step 3 (question generation) failed:', err)
+        console.error('[localizer] Step 3 (question generation) failed')
         degradedReason = degradedReason ?? 'Question generation failed'
       }
     }
-  } catch (err) {
+  } catch {
     // Timeout or unrecoverable error — return whatever we have
     const isTimeout = signal.aborted
     console.warn(
       isTimeout
-        ? `[localizer] Timeout after ${LOCALIZER_TIMEOUT_MS}ms for session ${sessionId}`
-        : `[localizer] Unrecoverable error for session ${sessionId}:`,
-      isTimeout ? '' : err
+        ? `[localizer] Timeout after ${LOCALIZER_TIMEOUT_MS}ms`
+        : '[localizer] Unrecoverable pipeline error'
     )
     degradedReason = isTimeout ? `Timeout after ${LOCALIZER_TIMEOUT_MS}ms` : 'Localizer pipeline error'
   } finally {

@@ -28,7 +28,11 @@ import { POST as createInvitation } from '@/app/api/ai/historian/invites/route'
 import { POST as redeemInvitation } from '@/app/api/ai/historian/invites/redeem/route'
 
 describe('historian invitation routes', () => {
-  beforeEach(() => vi.clearAllMocks())
+  beforeEach(() => {
+    vi.clearAllMocks()
+    delete process.env.HISTORIAN_ADAPTIVE_INTERVIEW_V1
+    delete process.env.HISTORIAN_TURN_EVIDENCE_CONTROLLER_V1
+  })
 
   it('requires an active clinician/admin membership to create a patient link', async () => {
     authorizeClinicalAccessMock.mockResolvedValueOnce({
@@ -102,6 +106,28 @@ describe('historian invitation routes', () => {
       if (prior === undefined) delete process.env.HISTORIAN_TURN_EVIDENCE_CONTROLLER_V1
       else process.env.HISTORIAN_TURN_EVIDENCE_CONTROLLER_V1 = prior
     }
+  })
+
+  it('selects v3 ahead of v2 only when the adaptive interview flag is enabled', async () => {
+    process.env.HISTORIAN_TURN_EVIDENCE_CONTROLLER_V1 = 'true'
+    process.env.HISTORIAN_ADAPTIVE_INTERVIEW_V1 = 'true'
+    authorizeClinicalAccessMock.mockResolvedValueOnce({
+      ok: true,
+      context: { userId: 'clinician-1', email: 'c@example.test', tenantId: 'tenant-a', role: 'clinician' },
+    })
+    createHistorianInvitationMock.mockResolvedValueOnce({
+      ok: true, inviteId: 'invite-1', sessionId: 'session-1', rawToken: 'secret',
+      expiresAt: '2026-08-26T18:00:00.000Z', patientName: 'Synthetic Patient', referralReason: 'Gait concern',
+      interviewPromptVersion: 'comprehensive-v3',
+    })
+    const response = await createInvitation(new Request('https://neuroplans.example/api/ai/historian/invites', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ consultId: 'consult-1' }),
+    }))
+    expect(response.status).toBe(200)
+    expect(createHistorianInvitationMock).toHaveBeenCalledWith(expect.objectContaining({
+      promptVersion: 'comprehensive-v3',
+    }))
+    expect((await response.json()).invitation.interviewPromptVersion).toBe('comprehensive-v3')
   })
 
   it('redeems once into an HttpOnly Secure SameSite=Strict four-hour grant', async () => {

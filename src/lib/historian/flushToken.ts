@@ -78,6 +78,39 @@ function sign(payloadB64: string, secret: string): string {
   return toBase64Url(crypto.createHmac('sha256', secret).update(payloadB64).digest())
 }
 
+/** Domain-separated server attestation for bounded Historian artifacts. */
+export async function signHistorianServerPayload(
+  purpose: string,
+  payload: string,
+): Promise<string> {
+  const secret = await resolveSecret()
+  if (!secret) throw new Error('Historian server attestation secret is unavailable.')
+  return toBase64Url(
+    crypto.createHmac('sha256', secret)
+      .update(`historian:${purpose}:v1\n${payload}`)
+      .digest(),
+  )
+}
+
+export async function verifyHistorianServerPayload(
+  purpose: string,
+  payload: string,
+  signature: string,
+): Promise<boolean> {
+  if (typeof signature !== 'string' || !/^[A-Za-z0-9_-]{43}$/.test(signature)) return false
+  const secret = await resolveSecret()
+  if (!secret) return false
+  const expected = toBase64Url(
+    crypto.createHmac('sha256', secret)
+      .update(`historian:${purpose}:v1\n${payload}`)
+      .digest(),
+  )
+  const receivedBuffer = Buffer.from(signature)
+  const expectedBuffer = Buffer.from(expected)
+  return receivedBuffer.length === expectedBuffer.length &&
+    crypto.timingSafeEqual(receivedBuffer, expectedBuffer)
+}
+
 export async function mintFlushToken(
   sessionId: string,
   startupAttemptId?: string,

@@ -32,6 +32,21 @@ const KNOWN_HISTORIAN_TOOL_NAMES = new Set([
   'scale_step',
 ])
 
+const ADAPTIVE_QUESTION_ISSUE_CODES = new Set([
+  'invalid_type',
+  'too_long',
+  'multiline',
+  'question_shape',
+  'unsolicited_example',
+  'multiple_questions',
+  'too_many_sentences',
+  'acknowledgement_too_long',
+  'formulaic_filler',
+  'generic_symptom_reference',
+  'diagnostic_assertion',
+  'medical_advice',
+])
+
 function historianToolCategory(toolName: string): string {
   return KNOWN_HISTORIAN_TOOL_NAMES.has(toolName) ? toolName : 'unknown'
 }
@@ -272,11 +287,15 @@ wss.on('connection', (ws) => {
   let deadlineTimer: ReturnType<typeof setTimeout> | null = null
   const pendingTools = new Map<string, string>()
   let turnEvidenceControllerActive = false
+  let adaptiveTurnControllerActive = false
+  const controlledTurnActive = () =>
+    turnEvidenceControllerActive || adaptiveTurnControllerActive
   let speechSuppressed = false
   const turnQuarantine = new HistorianTurnQuarantine(2_560_000)
   let pendingTurnAudioEndSegment: number | null = null
   let pendingTurnAudioEndAtMs = 0
   let turnConfirmationTimer: ReturnType<typeof setTimeout> | null = null
+  let adaptiveInterruptedTurn = false
   let firstAudioObserved = false
   let admittedTurnCount = 0
   let startConfig: {
@@ -444,7 +463,7 @@ wss.on('connection', (ws) => {
       rotationInProgress ||
       aiSpeaking ||
       pendingTools.size > 0 ||
-      (turnEvidenceControllerActive && (turnQuarantine.hasAuthorization() || turnQuarantine.hasContent())) ||
+      (controlledTurnActive() && (turnQuarantine.hasAuthorization() || turnQuarantine.hasContent())) ||
       speechSuppressed ||
       clientStopping ||
       modelTerminalSent ||
@@ -513,18 +532,26 @@ wss.on('connection', (ws) => {
       segmentId,
       turn: admittedTurnCount,
       mode: admitted.mode,
+      streamedBeforeFinal: admitted.alreadyReleased === true,
       confirmationWaitMs,
       ...diagnostics,
     })
-    startAiSpeech()
-    send(ws, {
-      t: 'assistantTranscript',
-      text: admitted.text,
-      segmentId,
-      ...(admitted.obligationId ? { obligationId: admitted.obligationId } : {}),
-    })
-    for (const pcm of admitted.audio) send(ws, { t: 'audio', pcm, segmentId })
-    finishAssistantBoundary()
+    if (admitted.alreadyReleased) {
+      // Audio ended before Nova emitted its delayed FINAL transcript. The
+      // browser boundary was already closed at AUDIO END_TURN; FINAL merely
+      // confirms the exact application-approved question after the fact.
+      maybeOpenBarrier()
+    } else {
+      startAiSpeech()
+      send(ws, {
+        t: 'assistantTranscript',
+        text: admitted.text,
+        segmentId,
+        ...(admitted.obligationId ? { obligationId: admitted.obligationId } : {}),
+      })
+      for (const pcm of admitted.audio) send(ws, { t: 'audio', pcm, segmentId })
+      finishAssistantBoundary()
+    }
     return true
   }
 
@@ -539,6 +566,11 @@ wss.on('connection', (ws) => {
       segmentId,
       ...turnQuarantine.diagnostics(),
     })
+    if (turnQuarantine.hasApprovedQuestionStreaming()) {
+      // Do not make the patient wait for Nova's delayed FINAL transcription
+      // before the browser learns that audible speech has ended.
+      finishAssistantBoundary()
+    }
     if (tryFinalizeControlledTurn(segmentId)) return
     turnConfirmationTimer = setTimeout(() => {
       if (pendingTurnAudioEndSegment !== segmentId || modelTerminalSent || clientStopping) return
@@ -577,7 +609,7 @@ wss.on('connection', (ws) => {
         // Comprehensive v2's application ledger owns every next question,
         // including age. The legacy relay nudge would race that approval and
         // could create an unauthorised second response.
-        if (!turnEvidenceControllerActive) {
+        if (!controlledTurnActive()) {
           const action = comprehensiveOpeningAction(
             interviewMode,
             comprehensiveOpeningSettled,
@@ -589,9 +621,13 @@ wss.on('connection', (ws) => {
           }
         }
       } else {
-        if (turnEvidenceControllerActive) {
+        if (controlledTurnActive()) {
+          if (adaptiveInterruptedTurn) return
           if (!speechSuppressed) {
-            turnQuarantine.bufferText(content)
+            if (!turnQuarantine.bufferText(content)) {
+              rejectHistorianTurn('speculative_text_after_release')
+              return
+            }
             tryFinalizeControlledTurn(segmentId)
           }
           return
@@ -603,7 +639,8 @@ wss.on('connection', (ws) => {
     onAssistantFinalText(content) {
       if (rejectCandidateActivity('unexpected_assistant_final_text')) return
       if (segmentId !== activeSegmentId || outputQuarantined) return
-      if (turnEvidenceControllerActive && !speechSuppressed) {
+      if (controlledTurnActive() && !speechSuppressed) {
+        if (adaptiveInterruptedTurn) return
         turnQuarantine.bufferFinalText(content)
         tryFinalizeControlledTurn(segmentId)
       }
@@ -612,14 +649,43 @@ wss.on('connection', (ws) => {
     onAudioOutput(base64) {
       if (rejectCandidateActivity('unexpected_audio')) return
       if (segmentId !== activeSegmentId || outputQuarantined) return
-      if (turnEvidenceControllerActive) {
-        if (speechSuppressed) return
+      if (controlledTurnActive()) {
+        if (speechSuppressed || adaptiveInterruptedTurn) return
         // AUDIO END_TURN is the authorization boundary for the quarantined
         // response. Any later PCM is ambiguous protocol output and must never
         // be released under the preceding question approval while we wait for
         // Nova's delayed FINAL text copy.
         if (pendingTurnAudioEndSegment === segmentId) {
           rejectHistorianTurn('audio_after_turn_boundary')
+          return
+        }
+        if (
+          adaptiveTurnControllerActive &&
+          turnQuarantine.hasApprovedQuestionAuthorization()
+        ) {
+          if (!turnQuarantine.hasApprovedQuestionStreaming()) {
+            const release = turnQuarantine.beginApprovedQuestionStreaming()
+            if (!release.allowed) {
+              rejectHistorianTurn(release.reason)
+              return
+            }
+            logSessionEvent('adaptive_question_stream_started', {
+              segmentId,
+              ...turnQuarantine.diagnostics(),
+            })
+            startAiSpeech()
+            send(ws, {
+              t: 'assistantTranscript',
+              text: release.text,
+              segmentId,
+              obligationId: release.obligationId,
+            })
+          }
+          if (!turnQuarantine.observeStreamedAudio(base64)) {
+            rejectHistorianTurn('audio_stream_overflow')
+            return
+          }
+          send(ws, { t: 'audio', pcm: base64, segmentId })
           return
         }
         if (!turnQuarantine.bufferAudio(base64)) {
@@ -635,7 +701,14 @@ wss.on('connection', (ws) => {
       if (rejectCandidateActivity('unexpected_assistant_end')) return
       if (segmentId !== activeSegmentId) return
       TRACE('-> assistantAudioEnd')
-      if (turnEvidenceControllerActive) {
+      if (controlledTurnActive()) {
+        if (adaptiveInterruptedTurn) {
+          adaptiveInterruptedTurn = false
+          clearTurnConfirmationTimer()
+          turnQuarantine.discard()
+          maybeOpenBarrier()
+          return
+        }
         if (speechSuppressed) {
           clearTurnConfirmationTimer()
           turnQuarantine.discard()
@@ -650,7 +723,11 @@ wss.on('connection', (ws) => {
     onToolUse({ toolName, toolUseId, content }) {
       if (rejectCandidateActivity('unexpected_tool')) return
       if (segmentId !== activeSegmentId) return
-      if (turnEvidenceControllerActive && turnQuarantine.hasContent()) {
+      if (adaptiveInterruptedTurn) {
+        rejectHistorianTurn('tool_during_interrupted_turn')
+        return
+      }
+      if (controlledTurnActive() && turnQuarantine.hasContent()) {
         rejectHistorianTurn('speech_before_tool')
         return
       }
@@ -681,7 +758,14 @@ wss.on('connection', (ws) => {
     onCompletionEnd() {
       if (rejectCandidateActivity('unexpected_completion')) return
       if (segmentId !== activeSegmentId || outputQuarantined) return
-      if (turnEvidenceControllerActive && pendingTurnAudioEndSegment === segmentId) {
+      if (adaptiveInterruptedTurn) {
+        adaptiveInterruptedTurn = false
+        clearTurnConfirmationTimer()
+        turnQuarantine.discard()
+        maybeOpenBarrier()
+        return
+      }
+      if (controlledTurnActive() && pendingTurnAudioEndSegment === segmentId) {
         logSessionEvent('turn_completion_end', {
           segmentId,
           ...turnQuarantine.diagnostics(),
@@ -689,7 +773,7 @@ wss.on('connection', (ws) => {
         tryFinalizeControlledTurn(segmentId)
         return
       }
-      if (turnEvidenceControllerActive && turnQuarantine.hasContent()) {
+      if (controlledTurnActive() && turnQuarantine.hasContent()) {
         rejectHistorianTurn('completion_before_audio_end')
         return
       }
@@ -704,6 +788,12 @@ wss.on('connection', (ws) => {
       if (turnEvidenceControllerActive && (turnQuarantine.hasContent() || turnQuarantine.hasAuthorization())) {
         rejectHistorianTurn('ambiguous_barge_in')
         return
+      }
+      if (adaptiveTurnControllerActive && (turnQuarantine.hasContent() || turnQuarantine.hasAuthorization())) {
+        adaptiveInterruptedTurn = true
+        clearTurnConfirmationTimer()
+        turnQuarantine.discard()
+        logSessionEvent('adaptive_turn_interrupted', { segmentId })
       }
       TRACE('-> bargeIn')
       stopAiSpeech()
@@ -796,7 +886,10 @@ wss.on('connection', (ws) => {
           }
           sessionStarted = true
           interviewMode = msg.interviewMode === 'comprehensive' ? 'comprehensive' : 'standard'
-          if (msg.turnEvidenceController === true && !TURN_EVIDENCE_GATE_ENABLED) {
+          if (
+            (msg.turnEvidenceController === true || msg.adaptiveTurnController === true) &&
+            !TURN_EVIDENCE_GATE_ENABLED
+          ) {
             rejectHistorianTurn('requested_gate_unavailable')
             break
           }
@@ -804,7 +897,12 @@ wss.on('connection', (ws) => {
             msg.turnEvidenceController === true &&
             TURN_EVIDENCE_GATE_ENABLED &&
             interviewMode === 'comprehensive'
+          adaptiveTurnControllerActive =
+            msg.adaptiveTurnController === true &&
+            TURN_EVIDENCE_GATE_ENABLED &&
+            interviewMode === 'comprehensive'
           speechSuppressed = false
+          adaptiveInterruptedTurn = false
           clearTurnConfirmationTimer()
           turnQuarantine.discard()
           comprehensiveOpeningSettled = false
@@ -818,6 +916,8 @@ wss.on('connection', (ws) => {
             interviewMode,
             turnEvidenceControllerRequested: msg.turnEvidenceController === true,
             turnEvidenceControllerActive,
+            adaptiveTurnControllerRequested: msg.adaptiveTurnController === true,
+            adaptiveTurnControllerActive,
           })
           // start() surfaces any stream-open failure via the session's onError
           // callback (mapped to {t:'error'} above). This .catch only prevents an
@@ -886,7 +986,7 @@ wss.on('connection', (ws) => {
             let parsedOutput: unknown = msg.output
             try { parsedOutput = JSON.parse(msg.output) } catch {}
             let approvedQuestion: ReturnType<typeof parseApprovedHistorianTurn> = null
-            if (turnEvidenceControllerActive && toolName === 'request_history_question') {
+            if (controlledTurnActive() && toolName === 'request_history_question') {
               approvedQuestion = parseApprovedHistorianTurn(parsedOutput)
               const outputRecord = parsedOutput && typeof parsedOutput === 'object'
                 ? parsedOutput as Record<string, unknown>
@@ -896,6 +996,20 @@ wss.on('connection', (ws) => {
                 outputRecord?.success === false &&
                 outputRecord.status === 'interview_terminal' &&
                 Object.keys(outputRecord).length === 2
+              const adaptiveProposalRejected =
+                adaptiveTurnControllerActive &&
+                outputRecord?.success === false &&
+                outputRecord.status === 'proposal_rejected' &&
+                Array.isArray(outputRecord.issue_codes) &&
+                outputRecord.issue_codes.length > 0 &&
+                outputRecord.issue_codes.length <= ADAPTIVE_QUESTION_ISSUE_CODES.size &&
+                new Set(outputRecord.issue_codes).size === outputRecord.issue_codes.length &&
+                outputRecord.issue_codes.every((code) => (
+                  typeof code === 'string' && ADAPTIVE_QUESTION_ISSUE_CODES.has(code)
+                )) &&
+                Object.keys(outputRecord).every((key) => (
+                  key === 'success' || key === 'status' || key === 'issue_codes'
+                ))
               if (approvedQuestion) {
                 if (!turnQuarantine.approveQuestion(approvedQuestion)) {
                   rejectHistorianTurn('overlapping_question_approval')
@@ -904,6 +1018,7 @@ wss.on('connection', (ws) => {
                 logSessionEvent('question_authorized', { segmentId: activeSegmentId })
               } else if (
                 outputRecord?.status !== 'coverage_ready' &&
+                !adaptiveProposalRejected &&
                 !suppressedTerminalResult
               ) {
                 rejectHistorianTurn('invalid_question_approval')
@@ -911,7 +1026,7 @@ wss.on('connection', (ws) => {
               }
             }
             if (
-              turnEvidenceControllerActive &&
+              controlledTurnActive() &&
               toolName === 'save_interview_output' &&
               !speechSuppressed &&
               parsedOutput &&
@@ -939,7 +1054,7 @@ wss.on('connection', (ws) => {
             failContinuation('checkpoint_mismatch', barrier.id)
             break
           }
-          if (turnEvidenceControllerActive && !speechSuppressed) {
+          if (controlledTurnActive() && !speechSuppressed) {
             const controlMode = msg.text.startsWith('[The patient has not said anything')
               ? 'unresponsive_check_in'
               : msg.text.startsWith('[The patient still has not responded')

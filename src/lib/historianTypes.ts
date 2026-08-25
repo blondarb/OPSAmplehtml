@@ -8,7 +8,11 @@ export type HistorianSessionType =
   | 'referral_clarification'
 
 export type HistorianInterviewMode = 'standard' | 'comprehensive'
-export type HistorianInterviewPromptVersion = 'standard-v1' | 'comprehensive-v1' | 'comprehensive-v2'
+export type HistorianInterviewPromptVersion =
+  | 'standard-v1'
+  | 'comprehensive-v1'
+  | 'comprehensive-v2'
+  | 'comprehensive-v3'
 
 /** Why an interview stopped; the two coverage outcomes represent completed intakes. */
 export type HistorianTerminationReason =
@@ -100,6 +104,12 @@ export interface HistorianStructuredOutput {
    * validatePatientEvidenceState before reading or persisting its claims.
    */
   history_evidence_v1?: unknown
+  /**
+   * Silent, transcript-citing Comprehensive v3 coverage/quality review.
+   * Save handlers must parse it against the exact transcript before trusting
+   * coverage or closure readiness.
+   */
+  live_review_v1?: unknown
   clarification_answers?: Array<{
     question_id: string
     answer: string

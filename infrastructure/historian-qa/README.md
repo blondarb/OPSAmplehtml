@@ -20,7 +20,7 @@ Cognito, relay compute, or worker queues.
 ## Provisioning order
 
 1. Review and execute the Add-only `foundation.yaml` change set.
-2. Package only `bootstrap-schema.sql`, `seed.sql`, `verify.sql`, and migrations 059-062 for
+2. Package only `bootstrap-schema.sql`, `seed.sql`, `verify.sql`, and migrations 059-063 for
    the temporary `database-init.yaml` project.
 3. Run the initializer once. It restores with `ON_ERROR_STOP=1`, creates a
    message-suppressed synthetic Cognito user, and verifies one synthetic tenant,
@@ -38,9 +38,11 @@ Cognito, relay compute, or worker queues.
    enabled (`NOVA_HISTORIAN_TURN_GATE_V1=true`), Transcribe disabled, one task
    minimum/maximum, and `/healthz` health checks.
 7. Deploy the isolated worker and disabled/manual Amplify branch.
-   Enable `HISTORIAN_TURN_EVIDENCE_CONTROLLER_V1=true` on that QA branch only
-   after migration 061 and the gated relay image are both live. Never enable
-   the application flag against a relay that lacks the matching gate.
+   For the adaptive interview, enable `HISTORIAN_ADAPTIVE_INTERVIEW_V1=true`
+   on that QA branch only after migration 063 and an exact-source relay image
+   with `NOVA_HISTORIAN_TURN_GATE_V1=true` are both live. Keep the older
+   `HISTORIAN_TURN_EVIDENCE_CONTROLLER_V1` available only as the v2 fallback.
+   Never enable either application flag against a relay that lacks the gate.
 8. Run negative authorization tests before any synthetic interview.
 
 ### Upgrading the existing QA database
@@ -67,13 +69,14 @@ PASS gates or a fixed failure code and HTTP status.
 
 The runner checks unauthenticated physician-report denial, clinician invitation
 creation, production-origin rejection, wrong-DOB rejection, correct-DOB grant
-cookie policy, non-diagnostic patient context, exact v2 Nova session binding,
-transactional save and replay, durable worker completion, and authenticated
-physician-only report visibility. The final save uses a fixed 51-question,
-transcript-grounded v2 evidence ledger and deliberately supplies empty model
-coverage so the deployed save boundary must derive it authoritatively. This
-proves deployed persistence and worker/report plumbing, not a natural audible
-interview, Nova rollover, or clinical validity.
+cookie policy, non-diagnostic patient context, exact v3 Nova session binding,
+server-attested independent live review, transactional save and replay, durable
+worker completion, and authenticated physician-only report visibility. The
+final save uses a fixed 12-turn comprehensive synthetic transcript and
+deliberately supplies empty client coverage so the deployed save boundary must
+derive it from the attested review. This proves deployed reviewer, attestation,
+persistence, and worker/report plumbing—not a natural audible interview, Claude
+conductor timing, Nova rollover, or clinical validity.
 
 Create it from an exact commit archive containing `source-commit.txt`, run it
 once, then delete the exact source object and the stack after PASS or failure.

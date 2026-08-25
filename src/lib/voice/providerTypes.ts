@@ -87,6 +87,8 @@ export interface VoiceStartOptions {
   interviewMode?: 'standard' | 'comprehensive'
   /** Require the Comprehensive v2 application-owned question/evidence gate. */
   turnEvidenceController?: boolean
+  /** Require the Comprehensive v3 model-proposal/application-admission gate. */
+  adaptiveTurnController?: boolean
   // ── OpenAI-only (ignored by Nova) ──
   /** Ephemeral bearer key for the OpenAI Realtime SDP exchange. */
   ephemeralKey?: string

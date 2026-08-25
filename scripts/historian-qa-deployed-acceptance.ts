@@ -1,14 +1,9 @@
 import type { HistorianTranscriptEntry } from '../src/lib/historianTypes'
 import {
-  approveNextPatientEvidenceQuestion,
-  collectPatientEvidenceEntry,
-  commitApprovedPatientEvidenceQuestion,
-  createPatientEvidenceState,
-  patientEvidenceCompletion,
-  settlePatientEvidenceAnswer,
-  type PatientEvidenceState,
-} from '../src/lib/historian/patientEvidenceController'
-import { syntheticPatientAnswer } from '../tests/historian/patientEvidenceFixtures'
+  liveInterviewReviewCompletion,
+  parseLiveInterviewReviewArtifact,
+  type LiveInterviewReviewArtifactV1,
+} from '../src/lib/historian/liveReviewContract'
 
 const QA_APP_ORIGIN = 'https://historian-mvp-qa.d3ietjwgco4g2t.amplifyapp.com'
 const QA_COGNITO_CLIENT_ID = 'ecjsa2ifjoj85konf3ts42gf5'
@@ -199,92 +194,98 @@ function appHeaders(cookie?: string): Record<string, string> {
   }
 }
 
-function completeSyntheticV2Evidence(): {
-  state: PatientEvidenceState
-  transcript: HistorianTranscriptEntry[]
-} {
-  let state = createPatientEvidenceState()
-  const transcript: HistorianTranscriptEntry[] = []
-  let seq = 1
-
-  while (patientEvidenceCompletion(state) === 'incomplete') {
-    const approved = approveNextPatientEvidenceQuestion(state)
-    if (!approved.ok || !approved.value) {
-      throw new HistorianQaAcceptanceError('V2_FIXTURE_APPROVAL_FAILED')
-    }
-    state = approved.value.state
-
-    const committed = commitApprovedPatientEvidenceQuestion(
-      state,
-      seq,
-      approved.value.questionText,
-    )
-    if (!committed.ok || !committed.value) {
-      throw new HistorianQaAcceptanceError('V2_FIXTURE_COMMIT_FAILED')
-    }
-    state = committed.value
-    transcript.push({
-      role: 'assistant',
-      text: approved.value.questionText,
-      timestamp: seq,
-      seq,
-    })
-    seq += 1
-
-    const patientEntry: HistorianTranscriptEntry = {
-      role: 'user',
-      text: syntheticPatientAnswer(approved.value.obligation.id),
-      timestamp: seq,
-      seq,
-    }
-    transcript.push(patientEntry)
-    const collected = collectPatientEvidenceEntry(state, patientEntry)
-    if (!collected.ok || !collected.value) {
-      throw new HistorianQaAcceptanceError('V2_FIXTURE_COLLECTION_FAILED')
-    }
-    state = collected.value
-
-    const settled = settlePatientEvidenceAnswer(state, transcript)
-    if (!settled.ok || !settled.value) {
-      throw new HistorianQaAcceptanceError('V2_FIXTURE_SETTLEMENT_FAILED')
-    }
-    state = settled.value
-    seq += 1
-  }
-
-  if (patientEvidenceCompletion(state) !== 'coverage_complete') {
-    throw new HistorianQaAcceptanceError('V2_FIXTURE_COMPLETION_FAILED')
-  }
-  return { state, transcript }
+function completeSyntheticAdaptiveTranscript(): HistorianTranscriptEntry[] {
+  const turns: Array<[question: string, answer: string]> = [
+    [
+      'What brought you to be referred for this visit?',
+      'This is synthetic test data only. I was referred for recurrent headaches with light sensitivity that began six months ago and now occur twice a week.',
+    ],
+    ['How old are you?', 'I am 45 years old.'],
+    [
+      'Please describe a typical headache from beginning to end?',
+      'The pain builds gradually over about 30 minutes, feels throbbing over the right temple, reaches seven out of ten, lasts four to six hours, and improves in a dark quiet room.',
+    ],
+    [
+      'What other symptoms come with the headaches?',
+      'I have nausea and sensitivity to light and sound, but no vomiting, eye redness, tearing, nasal symptoms, fever, or neck stiffness.',
+    ],
+    [
+      'Have you noticed any warning signs or urgent neurologic symptoms?',
+      'No sudden thunderclap onset, head injury, positional or exertional trigger, pregnancy, cancer, immune suppression, fainting, seizure, weakness, numbness, speech change, vision loss, or trouble walking.',
+    ],
+    [
+      'Have you had similar episodes before?',
+      'I had occasional milder headaches in college, but nothing like this until six months ago. I miss about one work afternoon each week and sometimes cancel family activities.',
+    ],
+    [
+      'Do you have any other neurologic symptoms between headaches?',
+      'Between headaches I have no persistent weakness, numbness, tremor, memory change, double vision, speech or swallowing trouble, dizziness, balance difficulty, or loss of consciousness.',
+    ],
+    [
+      'What is your medical and surgical history?',
+      'I report no chronic medical conditions, hospitalizations, or prior surgeries.',
+    ],
+    [
+      'What medications or supplements do you take?',
+      'I take no prescription, over-the-counter, or supplement medications, so there are no adherence problems or medication side effects to report.',
+    ],
+    [
+      'Do you have any allergies or prior allergic reactions?',
+      'I report no drug, food, or environmental allergies and no prior allergic reactions. My mother had recurrent headaches, and there is no known family seizure, stroke at a young age, or inherited neurologic disease.',
+    ],
+    [
+      'Tell me about your living situation and daily habits?',
+      'I live with my spouse, work in an office, and am independent. I report no tobacco, alcohol, recreational drugs, recent travel, tick exposure, toxic exposure, or major sleep deprivation.',
+    ],
+    [
+      'What prior studies do you recall?',
+      'I recall a normal eye examination but no brain imaging, EEG, or spinal tap. I want the neurologist to clarify why the headaches changed and discuss safe next steps; I have no other questions today.',
+    ],
+  ]
+  return turns.flatMap(([question, answer], index) => {
+    const assistantSeq = index * 2 + 1
+    const patientSeq = assistantSeq + 1
+    return [
+      { role: 'assistant' as const, text: question, timestamp: assistantSeq, seq: assistantSeq },
+      { role: 'user' as const, text: answer, timestamp: patientSeq, seq: patientSeq },
+    ]
+  })
 }
 
-function fixedSaveBody(sessionId: string): Record<string, unknown> {
-  const fixture = completeSyntheticV2Evidence()
+function fixedSaveBody(
+  sessionId: string,
+  transcript: HistorianTranscriptEntry[],
+  liveReview: LiveInterviewReviewArtifactV1,
+): Record<string, unknown> {
+  const terminationReason = liveInterviewReviewCompletion(liveReview.review)
+  if (terminationReason === 'incomplete') {
+    throw new HistorianQaAcceptanceError('LIVE_REVIEW_NOT_READY')
+  }
   return {
     sessionId,
     structured_output: {
       chief_complaint: 'Synthetic recurrent headache history',
-      hpi: 'Synthetic fixed-fixture history for persistence acceptance only.',
+      hpi: 'Synthetic adaptive-v3 fixture history for persistence acceptance only.',
       age_years_patient_reported: 45,
       interview_mode: 'comprehensive',
-      interview_prompt_version: 'comprehensive-v2',
-      history_evidence_v1: fixture.state,
-      // Deliberately forged empty model coverage. The deployed save boundary
-      // must replace this with coverage derived from the transcript ledger.
+      interview_prompt_version: 'comprehensive-v3',
+      live_review_v1: liveReview,
+      // Deliberately forged empty client coverage. The deployed save boundary
+      // must replace this with coverage derived from the attested review.
       history_coverage: {
         covered_domains: [],
         missing_or_uncertain: [],
       },
     },
     narrative_summary:
-      'SYNTHETIC TEST DATA - NOT FOR CLINICAL CARE. Transcript-grounded v2 persistence acceptance.',
-    transcript: fixture.transcript,
+      'SYNTHETIC TEST DATA - NOT FOR CLINICAL CARE. Transcript-reviewed v3 persistence acceptance.',
+    transcript,
     red_flags: [],
     safety_escalated: false,
-    duration_seconds: fixture.state.records.length * 5,
-    question_count: fixture.state.records.length,
+    duration_seconds: transcript.length * 3,
+    question_count: transcript.filter((entry) => entry.role === 'assistant').length,
     interview_completion_status: 'complete',
-    interview_termination_reason: 'coverage_complete',
+    interview_termination_reason: terminationReason,
   }
 }
 
@@ -460,14 +461,46 @@ export async function runHistorianQaAcceptance(
     session.body.sessionId !== expectedSessionId ||
     session.body.provider !== 'nova' ||
     session.body.interviewMode !== 'comprehensive' ||
-    session.body.interviewPromptVersion !== 'comprehensive-v2' ||
-    session.body.turnEvidenceController !== true
+    session.body.interviewPromptVersion !== 'comprehensive-v3' ||
+    session.body.turnEvidenceController !== false ||
+    session.body.adaptiveTurnController !== true
   ) {
     throw new HistorianQaAcceptanceError('PATIENT_SESSION_BINDING_FAILED')
   }
   gate('invited_nova_session_bound')
 
-  const saveBody = fixedSaveBody(expectedSessionId)
+  const flushToken = session.body.flushToken
+  if (typeof flushToken !== 'string' || !flushToken) {
+    throw new HistorianQaAcceptanceError('LIVE_REVIEW_AUTHORITY_MISSING')
+  }
+  const transcript = completeSyntheticAdaptiveTranscript()
+  const reviewed = await jsonRequest(
+    fetchImpl,
+    `${QA_APP_ORIGIN}/api/ai/historian/live-review`,
+    {
+      method: 'POST',
+      headers: {
+        ...appHeaders(grantedCookie),
+        Authorization: `Bearer ${flushToken}`,
+      },
+      body: JSON.stringify({ sessionId: expectedSessionId, transcript }),
+    },
+    'LIVE_REVIEW_FAILED',
+  )
+  expectStatus(reviewed, 200, 'LIVE_REVIEW_REJECTED')
+  let liveReview: LiveInterviewReviewArtifactV1
+  try {
+    liveReview = parseLiveInterviewReviewArtifact(reviewed.body, transcript)
+  } catch {
+    throw new HistorianQaAcceptanceError('LIVE_REVIEW_ARTIFACT_INVALID')
+  }
+  const expectedTerminationReason = liveInterviewReviewCompletion(liveReview.review)
+  if (expectedTerminationReason === 'incomplete') {
+    throw new HistorianQaAcceptanceError('LIVE_REVIEW_NOT_READY')
+  }
+  gate('independent_live_review_attested')
+
+  const saveBody = fixedSaveBody(expectedSessionId, transcript, liveReview)
   const saved = await jsonRequest(
     fetchImpl,
     `${QA_APP_ORIGIN}/api/ai/historian/save`,
@@ -557,9 +590,9 @@ export async function runHistorianQaAcceptance(
     matchingSession.patient_id !== FIXTURE.patientId ||
     matchingSession.tenant_id !== FIXTURE.tenantId ||
     matchingSession.consult_id !== FIXTURE.consultId ||
-    matchingSession.interview_prompt_version !== 'comprehensive-v2' ||
+    matchingSession.interview_prompt_version !== 'comprehensive-v3' ||
     matchingSession.interview_completion_status !== 'complete' ||
-    matchingSession.interview_termination_reason !== 'coverage_complete' ||
+    matchingSession.interview_termination_reason !== expectedTerminationReason ||
     matchingSession.evaluation_status !== 'completed' ||
     !matchingSession.final_differential ||
     !report.response.headers.get('cache-control')?.includes('no-store')
@@ -569,7 +602,7 @@ export async function runHistorianQaAcceptance(
   gate('authenticated_physician_report_with_differential')
 
   emit(
-    'HISTORIAN_QA_ACCEPTANCE_PASS mode=v2_transcript_grounded_state_injected_persistence worker=completed physician_report=visible',
+    'HISTORIAN_QA_ACCEPTANCE_PASS mode=v3_transcript_reviewed_state_injected_persistence worker=completed physician_report=visible',
   )
   return { gates: gateCount, evaluationStatus: 'completed' }
 }

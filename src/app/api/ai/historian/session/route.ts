@@ -174,12 +174,19 @@ export async function POST(request: Request) {
       (body.interviewMode === 'comprehensive' ? 'comprehensive' : 'standard')
     const turnEvidenceControllerEnabled =
       process.env.HISTORIAN_TURN_EVIDENCE_CONTROLLER_V1 === 'true'
+    const adaptiveInterviewEnabled =
+      process.env.HISTORIAN_ADAPTIVE_INTERVIEW_V1 === 'true'
     const interviewPromptVersion: HistorianInterviewPromptVersion =
       invitationBinding?.interviewPromptVersion ||
       (interviewMode === 'comprehensive'
-        ? turnEvidenceControllerEnabled ? 'comprehensive-v2' : 'comprehensive-v1'
+        ? adaptiveInterviewEnabled
+          ? 'comprehensive-v3'
+          : turnEvidenceControllerEnabled
+            ? 'comprehensive-v2'
+            : 'comprehensive-v1'
         : 'standard-v1')
     const turnEvidenceController = interviewPromptVersion === 'comprehensive-v2'
+    const adaptiveTurnController = interviewPromptVersion === 'comprehensive-v3'
     let authorizedTenantId: string | null = invitationBinding?.tenantId ?? null
     if (interviewMode === 'comprehensive' && !invitationBinding) {
       const access = await authorizeClinicalAccess({
@@ -327,6 +334,7 @@ export async function POST(request: Request) {
         interviewMode,
         interviewPromptVersion,
         turnEvidenceController,
+        adaptiveTurnController,
       })
     }
 
@@ -450,6 +458,8 @@ export async function POST(request: Request) {
       flushToken,
       interviewMode,
       interviewPromptVersion,
+      turnEvidenceController,
+      adaptiveTurnController,
       // Pass the resolved model + turn detection mode back so the client knows
       // exactly which configuration is active (for debugging + analytics)
       model,

@@ -57,6 +57,16 @@ export type TurnAdmissionResult =
       audio: string[]
       obligationId?: string
       mode: TurnAdmissionMode
+      alreadyReleased?: true
+    }
+  | { allowed: false; reason: string }
+
+export type ApprovedQuestionStreamingStart =
+  | {
+      allowed: true
+      text: string
+      obligationId: string
+      mode: 'approved_question'
     }
   | { allowed: false; reason: string }
 
@@ -138,6 +148,8 @@ export class HistorianTurnQuarantine {
   private finalTextParts: string[] = []
   private audioParts: string[] = []
   private audioChars = 0
+  private streamedAudioChunkCount = 0
+  private approvedQuestionStreaming = false
   private overflowed = false
 
   constructor(private readonly maxAudioBase64Chars: number) {}
@@ -154,8 +166,14 @@ export class HistorianTurnQuarantine {
     return true
   }
 
-  bufferText(text: string): void {
-    if (text.trim()) this.textParts.push(text.trim())
+  bufferText(text: string): boolean {
+    if (!text.trim()) return true
+    // Once an adaptive question starts streaming, any additional speculative
+    // block would describe words that were never application-approved. The
+    // relay must stop before accepting PCM for that extra block.
+    if (this.approvedQuestionStreaming) return false
+    this.textParts.push(text.trim())
+    return true
   }
 
   bufferFinalText(text: string): void {
@@ -163,12 +181,64 @@ export class HistorianTurnQuarantine {
   }
 
   bufferAudio(base64: string): boolean {
+    if (this.approvedQuestionStreaming) return false
     this.audioChars += base64.length
     if (this.audioChars > this.maxAudioBase64Chars) {
       this.overflowed = true
       return false
     }
     this.audioParts.push(base64)
+    return true
+  }
+
+  hasApprovedQuestionAuthorization(): boolean {
+    return !!this.approval && !this.controlMode
+  }
+
+  hasApprovedQuestionStreaming(): boolean {
+    return this.approvedQuestionStreaming
+  }
+
+  /**
+   * Low-latency adaptive path. Nova's complete SPECULATIVE question is
+   * application-checked before the first PCM frame is released. FINAL text is
+   * still required later as a provider-integrity confirmation. Control turns
+   * and Comprehensive v2 never use this method.
+   */
+  beginApprovedQuestionStreaming(): ApprovedQuestionStreamingStart {
+    if (this.approvedQuestionStreaming) {
+      return { allowed: false, reason: 'approved_stream_already_started' }
+    }
+    if (!this.approval || this.controlMode) {
+      return { allowed: false, reason: 'turn_not_approved_question' }
+    }
+    if (this.audioParts.length > 0 || this.streamedAudioChunkCount > 0) {
+      return { allowed: false, reason: 'audio_preceded_approved_stream' }
+    }
+    const speculativeText = this.textParts.join(' ').trim()
+    const checked = validateTurnText({
+      text: speculativeText,
+      mode: 'approved_question',
+      approval: this.approval,
+    })
+    if (!checked.valid) return { allowed: false, reason: checked.reason }
+    this.approvedQuestionStreaming = true
+    return {
+      allowed: true,
+      text: this.approval.approvedText,
+      obligationId: this.approval.obligationId,
+      mode: 'approved_question',
+    }
+  }
+
+  observeStreamedAudio(base64: string): boolean {
+    if (!this.approvedQuestionStreaming) return false
+    this.audioChars += base64.length
+    if (this.audioChars > this.maxAudioBase64Chars) {
+      this.overflowed = true
+      return false
+    }
+    this.streamedAudioChunkCount += 1
     return true
   }
 
@@ -220,7 +290,7 @@ export class HistorianTurnQuarantine {
       speculativeWordCount: wordCount(canonicalSpeculative),
       finalWordCount: wordCount(canonicalFinal),
       approvedWordCount: wordCount(canonicalApproved),
-      audioChunkCount: this.audioParts.length,
+      audioChunkCount: this.audioParts.length + this.streamedAudioChunkCount,
       overflowed: this.overflowed,
     }
   }
@@ -232,6 +302,8 @@ export class HistorianTurnQuarantine {
     this.finalTextParts = []
     this.audioParts = []
     this.audioChars = 0
+    this.streamedAudioChunkCount = 0
+    this.approvedQuestionStreaming = false
     this.overflowed = false
   }
 
@@ -250,7 +322,7 @@ export class HistorianTurnQuarantine {
       this.discard()
       return { allowed: false, reason: 'turn_text_stage_mismatch' }
     }
-    if (this.audioParts.length === 0) {
+    if (this.audioParts.length === 0 && this.streamedAudioChunkCount === 0) {
       this.discard()
       return { allowed: false, reason: 'turn_has_no_audio' }
     }
@@ -263,6 +335,7 @@ export class HistorianTurnQuarantine {
     }
     const approval = this.approval ? { ...this.approval } : undefined
     const audio = [...this.audioParts]
+    const alreadyReleased = this.approvedQuestionStreaming
     const checked = validateTurnText({ text: finalText, mode, approval })
     this.discard()
     if (!checked.valid) return { allowed: false, reason: checked.reason }
@@ -275,6 +348,7 @@ export class HistorianTurnQuarantine {
       audio,
       mode,
       ...(checked.obligationId ? { obligationId: checked.obligationId } : {}),
+      ...(alreadyReleased ? { alreadyReleased: true as const } : {}),
     }
   }
 }

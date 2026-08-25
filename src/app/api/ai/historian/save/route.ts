@@ -23,6 +23,12 @@ import {
   type PatientEvidenceState,
 } from '@/lib/historian/patientEvidenceController'
 import {
+  deriveLiveReviewStructuredCoverage,
+  liveInterviewReviewCompletion,
+  type LiveInterviewReviewArtifactV1,
+} from '@/lib/historian/liveReviewContract'
+import { verifyLiveInterviewReviewArtifact } from '@/lib/historian/liveReviewAttestation'
+import {
   authorizeClinicalAccess,
   clinicalAccessDeniedMessage,
 } from '@/lib/auth/clinicalAccess'
@@ -121,7 +127,67 @@ export async function POST(request: Request) {
         ? body.structured_output
         : {}
     const promptVersion = structuredOutput.interview_prompt_version
-    if (promptVersion === 'comprehensive-v2') {
+    const requestedSessionId: string | undefined =
+      typeof body.sessionId === 'string' && body.sessionId ? body.sessionId : undefined
+    if (promptVersion === 'comprehensive-v3') {
+      if (!terminationReason) {
+        return NextResponse.json(
+          { error: 'Comprehensive v3 requires an explicit termination reason.' },
+          { status: 400 },
+        )
+      }
+      const transcript: HistorianTranscriptEntry[] = Array.isArray(body.transcript)
+        ? body.transcript
+        : []
+      const terminalPartial =
+        terminationReason !== 'coverage_complete' &&
+        terminationReason !== 'complete_with_uncertainty'
+      if (!requestedSessionId) {
+        return NextResponse.json(
+          { error: 'Comprehensive v3 requires a server-minted session identity.' },
+          { status: 409 },
+        )
+      }
+      let reviewArtifact: LiveInterviewReviewArtifactV1 | null = null
+      if (structuredOutput.live_review_v1 != null) {
+        try {
+          reviewArtifact = await verifyLiveInterviewReviewArtifact(
+            requestedSessionId,
+            transcript,
+            structuredOutput.live_review_v1,
+          )
+        } catch {
+          return NextResponse.json(
+            { error: 'The independent live history review is incomplete or inconsistent.' },
+            { status: 409 },
+          )
+        }
+      }
+      if (!terminalPartial && !reviewArtifact) {
+        return NextResponse.json(
+          { error: 'Normal completion requires a current independent live history review.' },
+          { status: 409 },
+        )
+      }
+      const completion = liveInterviewReviewCompletion(reviewArtifact?.review)
+      if (!terminalPartial && completion !== terminationReason) {
+        return NextResponse.json(
+          { error: 'The completion reason does not match the independent live history review.' },
+          { status: 409 },
+        )
+      }
+      structuredOutput = {
+        ...structuredOutput,
+        interview_mode: 'comprehensive',
+        interview_prompt_version: 'comprehensive-v3',
+        ...(reviewArtifact
+          ? {
+              live_review_v1: reviewArtifact,
+              history_coverage: deriveLiveReviewStructuredCoverage(reviewArtifact.review),
+            }
+          : {}),
+      }
+    } else if (promptVersion === 'comprehensive-v2') {
       if (!terminationReason) {
         return NextResponse.json(
           { error: 'Comprehensive v2 requires an explicit termination reason.' },
@@ -157,7 +223,7 @@ export async function POST(request: Request) {
       }
     } else if (terminationReason === 'complete_with_uncertainty') {
       return NextResponse.json(
-        { error: 'Uncertain completion requires the application-owned history evidence contract.' },
+        { error: 'Uncertain completion requires a validated application-owned review contract.' },
         { status: 409 },
       )
     }
@@ -196,12 +262,11 @@ export async function POST(request: Request) {
       reviewed: false,
       imported_to_note: false,
     }
-    if (promptVersion === 'comprehensive-v2') {
+    if (promptVersion === 'comprehensive-v2' || promptVersion === 'comprehensive-v3') {
       insertPayload.interview_mode = 'comprehensive'
-      insertPayload.interview_prompt_version = 'comprehensive-v2'
+      insertPayload.interview_prompt_version = promptVersion
     }
-    const sessionId: string | undefined =
-      typeof body.sessionId === 'string' && body.sessionId ? body.sessionId : undefined
+    const sessionId = requestedSessionId
     if (sessionId) {
       insertPayload.id = sessionId
     }

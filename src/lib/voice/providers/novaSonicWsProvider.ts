@@ -34,6 +34,7 @@ export class NovaSonicWsProvider implements VoiceProvider {
   /** Set true once stop() runs so a subsequent onclose isn't reported as an error. */
   private closing = false
   private turnEvidenceController = false
+  private adaptiveTurnController = false
   /** True while the AI is producing audio — lets `completion` end the turn cleanly. */
   private aiSpeaking = false
   /** Latched for a terminal text-only save; later PCM is discarded. */
@@ -97,6 +98,7 @@ export class NovaSonicWsProvider implements VoiceProvider {
 
     this.closing = false
     this.turnEvidenceController = opts.turnEvidenceController === true
+    this.adaptiveTurnController = opts.adaptiveTurnController === true
     this.aiSpeaking = false
     this.outputSuppressed = false
     this.modelStreamOpen = false
@@ -133,6 +135,7 @@ export class NovaSonicWsProvider implements VoiceProvider {
         voiceId: opts.voiceId,
         interviewMode: opts.interviewMode,
         turnEvidenceController: opts.turnEvidenceController,
+        adaptiveTurnController: opts.adaptiveTurnController,
       })
 
       // Start mic capture: each 16k PCM16 base64 chunk becomes an `audio` msg.
@@ -518,7 +521,7 @@ export class NovaSonicWsProvider implements VoiceProvider {
     // frame) telling it to deliver its one closing message now. The closing
     // audio then streams as PCM and is drained by whenDrained() before
     // aiSpeechStop fires (#150), so it plays in full before teardown.
-    this.injectSystemText(this.turnEvidenceController
+    this.injectSystemText(this.turnEvidenceController || this.adaptiveTurnController
       ? '[The interview is complete. Speak exactly this sentence and nothing else: "Thank you. Your history has been recorded for your neurologist to review."]'
       : '[The interview is now complete and your notes have been saved. Please now speak your single warm closing message to the patient, then stop. Do not ask any further questions and do not wait for the patient to reply.]')
   }

@@ -3,7 +3,7 @@
 
 // Browser → relay
 export type ClientMsg =
-  | { t: 'start'; instructions: string; tools: unknown[]; voiceId?: string; interviewMode?: 'standard' | 'comprehensive'; turnEvidenceController?: boolean }
+  | { t: 'start'; instructions: string; tools: unknown[]; voiceId?: string; interviewMode?: 'standard' | 'comprehensive'; turnEvidenceController?: boolean; adaptiveTurnController?: boolean }
   | { t: 'audio'; pcm: string; audioSeq?: number }
   | { t: 'userTurnEnd' }
   | { t: 'toolResult'; toolUseId: string; output: string; segmentId?: number }

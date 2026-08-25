@@ -16,6 +16,13 @@ BEGIN
        SELECT 1 FROM pg_constraint
         WHERE conname = 'historian_sessions_prompt_version_check'
           AND pg_get_constraintdef(oid) LIKE '%comprehensive-v2%'
+          AND pg_get_constraintdef(oid) LIKE '%comprehensive-v3%'
+     )
+     OR NOT EXISTS (
+       SELECT 1 FROM pg_constraint
+        WHERE conname = 'historian_invites_interview_prompt_version_check'
+          AND pg_get_constraintdef(oid) LIKE '%comprehensive-v2%'
+          AND pg_get_constraintdef(oid) LIKE '%comprehensive-v3%'
      )
      OR NOT EXISTS (
        SELECT 1 FROM pg_constraint

@@ -5,6 +5,8 @@ import {
   runHistorianQaAcceptance,
   type HistorianQaAcceptanceConfig,
 } from '../../scripts/historian-qa-deployed-acceptance'
+import { COMPREHENSIVE_HISTORY_DOMAINS } from '@/lib/historianTypes'
+import { LIVE_INTERVIEW_REVIEW_PROMPT_VERSION } from '@/lib/historian/liveReviewContract'
 
 const config: HistorianQaAcceptanceConfig = {
   enabled: true,
@@ -72,25 +74,53 @@ describe('deployed Historian QA acceptance runner', () => {
           sessionId: 'session-1',
           provider: 'nova',
           interviewMode: 'comprehensive',
-          interviewPromptVersion: 'comprehensive-v2',
-          turnEvidenceController: true,
+          interviewPromptVersion: 'comprehensive-v3',
+          turnEvidenceController: false,
+          adaptiveTurnController: true,
+          flushToken: 'fake-flush-token',
           relayToken: 'fake-relay-token',
+        })
+      }
+      if (url.endsWith('/api/ai/historian/live-review') && method === 'POST') {
+        expect(new Headers(init?.headers).get('authorization')).toBe('Bearer fake-flush-token')
+        expect(body.transcript).toHaveLength(24)
+        const patientSeqs = body.transcript
+          .filter((entry: { role: string }) => entry.role === 'user')
+          .map((entry: { seq: number }) => entry.seq)
+        return response(200, {
+          review: {
+            version: 1,
+            reviewedThroughSeq: patientSeqs.at(-1),
+            domains: COMPREHENSIVE_HISTORY_DOMAINS.map((domain, index) => ({
+              domain: domain.id,
+              status: 'covered',
+              patientSeqs: [patientSeqs[index % patientSeqs.length]],
+            })),
+            criticalGaps: [],
+            contradictions: [],
+            repetitions: [],
+            activeSafetyConcern: { present: false, patientSeqs: [] },
+            readyToClose: true,
+            nextQuestionIntents: [],
+            confidence: 'high',
+          },
+          provenance: {
+            modelId: 'synthetic-independent-reviewer',
+            promptVersion: LIVE_INTERVIEW_REVIEW_PROMPT_VERSION,
+            generatedAt: '2026-08-25T12:00:00.000Z',
+          },
+          attestation: 'a'.repeat(43),
         })
       }
       if (url.endsWith('/api/ai/historian/save') && method === 'POST') {
         expect(body.structured_output).toMatchObject({
           interview_mode: 'comprehensive',
-          interview_prompt_version: 'comprehensive-v2',
-          history_evidence_v1: {
-            version: 1,
-            awaitingQuestion: null,
-            pendingPatientSeqs: [],
-            repeatObligationId: null,
-          },
+          interview_prompt_version: 'comprehensive-v3',
+          live_review_v1: { attestation: 'a'.repeat(43) },
           history_coverage: { covered_domains: [], missing_or_uncertain: [] },
         })
-        expect(body.question_count).toBe(51)
-        expect(body.transcript).toHaveLength(body.question_count * 2)
+        expect(body.question_count).toBe(12)
+        expect(body.transcript).toHaveLength(24)
         expect(body.interview_completion_status).toBe('complete')
         expect(body.interview_termination_reason).toBe('coverage_complete')
         const previousSaveCount = fetchMock.mock.calls.filter(([priorInput, priorInit]) =>
@@ -115,7 +145,7 @@ describe('deployed Historian QA acceptance runner', () => {
             patient_id: '10000000-0000-4000-8000-000000000001',
             tenant_id: 'historian-mvp-qa',
             consult_id: '20000000-0000-4000-8000-000000000001',
-            interview_prompt_version: 'comprehensive-v2',
+            interview_prompt_version: 'comprehensive-v3',
             interview_completion_status: 'complete',
             interview_termination_reason: 'coverage_complete',
             evaluation_status: 'completed',
@@ -133,7 +163,7 @@ describe('deployed Historian QA acceptance runner', () => {
       emit: (line) => emitted.push(line),
     })
 
-    expect(result).toEqual({ gates: 12, evaluationStatus: 'completed' })
+    expect(result).toEqual({ gates: 13, evaluationStatus: 'completed' })
     expect(emitted.at(-1)).toContain('HISTORIAN_QA_ACCEPTANCE_PASS')
     const output = emitted.join('\n')
     for (const forbidden of [
@@ -142,6 +172,7 @@ describe('deployed Historian QA acceptance runner', () => {
       'fake-invite-token',
       'fake-grant',
       'fake-relay-token',
+      'fake-flush-token',
       'Synthetic Casey',
     ]) {
       expect(output).not.toContain(forbidden)

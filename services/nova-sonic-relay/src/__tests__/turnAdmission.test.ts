@@ -37,6 +37,44 @@ describe('Historian assistant turn admission', () => {
     })
   })
 
+  it('starts adaptive streaming only after the full speculative question exactly matches approval', () => {
+    const gate = new HistorianTurnQuarantine(1_000)
+    expect(gate.approveQuestion(APPROVAL)).toBe(true)
+    gate.bufferText('When did the main problem')
+    expect(gate.beginApprovedQuestionStreaming()).toEqual({
+      allowed: false,
+      reason: 'approved_text_mismatch',
+    })
+
+    const ready = new HistorianTurnQuarantine(1_000)
+    ready.approveQuestion(APPROVAL)
+    ready.bufferText(APPROVAL.approvedText)
+    expect(ready.beginApprovedQuestionStreaming()).toEqual({
+      allowed: true,
+      text: APPROVAL.approvedText,
+      obligationId: APPROVAL.obligationId,
+      mode: 'approved_question',
+    })
+    expect(ready.observeStreamedAudio('AAAA')).toBe(true)
+    ready.bufferFinalText(APPROVAL.approvedText)
+    expect(ready.finalize()).toEqual({
+      allowed: true,
+      text: APPROVAL.approvedText,
+      audio: [],
+      obligationId: APPROVAL.obligationId,
+      mode: 'approved_question',
+      alreadyReleased: true,
+    })
+  })
+
+  it('rejects any extra speculative block after adaptive streaming begins', () => {
+    const gate = new HistorianTurnQuarantine(1_000)
+    gate.approveQuestion(APPROVAL)
+    expect(gate.bufferText(APPROVAL.approvedText)).toBe(true)
+    expect(gate.beginApprovedQuestionStreaming()).toMatchObject({ allowed: true })
+    expect(gate.bufferText('What else happened?')).toBe(false)
+  })
+
   it('requires every speculative sentence block to receive its matching FINAL block', () => {
     const gate = new HistorianTurnQuarantine(1_000)
     const approval = {

@@ -20,6 +20,7 @@ type MockCallbacks = {
   onAudioOutput?: (pcm: string) => void
   onAssistantAudioEnd?: () => void
   onCompletionEnd?: () => void
+  onBargeIn?: () => void
   onError?: (error: unknown) => void
   onUnexpectedStreamEnd?: () => void
 }
@@ -320,6 +321,144 @@ describe('relay continuation protocol integration', () => {
       segmentId: 1,
     })
     expect(audio).toMatchObject({ pcm: 'synthetic-audio', segmentId: 1 })
+  })
+
+  it('streams an adaptive approved question before delayed FINAL confirmation', async () => {
+    send({
+      t: 'start',
+      instructions: 'Synthetic adaptive instructions.',
+      tools: [],
+      interviewMode: 'comprehensive',
+      adaptiveTurnController: true,
+    })
+    await new Promise((resolve) => setTimeout(resolve, 10))
+    relayHarness.instances[0].callbacks.onToolUse?.({
+      toolName: 'request_history_question',
+      toolUseId: 'adaptive-tool',
+      content: JSON.stringify({ proposed_text: 'When did the headaches begin?' }),
+    })
+    const tool = await waitForMessage('toolCall')
+    send({
+      t: 'toolResult',
+      toolUseId: tool.toolUseId,
+      segmentId: 1,
+      output: JSON.stringify({
+        success: true,
+        status: 'approved',
+        obligation_id: 'adaptive-question-3',
+        approved_text: 'When did the headaches begin?',
+        allow_example: false,
+      }),
+    })
+    await new Promise((resolve) => setTimeout(resolve, 10))
+
+    relayHarness.instances[0].callbacks.onTextOutput?.('ASSISTANT', 'When did the headaches begin?')
+    relayHarness.instances[0].callbacks.onAudioOutput?.('adaptive-live-audio')
+
+    await expect(waitForMessage('assistantTranscript')).resolves.toMatchObject({
+      text: 'When did the headaches begin?',
+      obligationId: 'adaptive-question-3',
+      segmentId: 1,
+    })
+    await expect(waitForMessage('audio')).resolves.toMatchObject({
+      pcm: 'adaptive-live-audio',
+      segmentId: 1,
+    })
+
+    relayHarness.instances[0].callbacks.onAssistantAudioEnd?.()
+    await expect(waitForMessage('aiSpeechStop')).resolves.toMatchObject({ segmentId: 1 })
+    relayHarness.instances[0].callbacks.onAssistantFinalText?.('When did the headaches begin?')
+    relayHarness.instances[0].callbacks.onCompletionEnd?.()
+    await new Promise((resolve) => setTimeout(resolve, 10))
+    expect(inbox.some((message) => message.t === 'error')).toBe(false)
+    expect(inbox.filter((message) => message.t === 'assistantTranscript')).toHaveLength(0)
+    expect(inbox.filter((message) => message.t === 'audio')).toHaveLength(0)
+  })
+
+  it('lets the adaptive model retry a rejected proposal without terminating the stream', async () => {
+    send({
+      t: 'start',
+      instructions: 'Synthetic adaptive instructions.',
+      tools: [],
+      interviewMode: 'comprehensive',
+      adaptiveTurnController: true,
+    })
+    await new Promise((resolve) => setTimeout(resolve, 10))
+    relayHarness.instances[0].callbacks.onToolUse?.({
+      toolName: 'request_history_question',
+      toolUseId: 'rejected-adaptive-tool',
+      content: '{}',
+    })
+    const rejected = await waitForMessage('toolCall')
+    send({
+      t: 'toolResult',
+      toolUseId: rejected.toolUseId,
+      segmentId: 1,
+      output: JSON.stringify({
+        success: false,
+        status: 'proposal_rejected',
+        issue_codes: ['generic_symptom_reference'],
+      }),
+    })
+    await new Promise((resolve) => setTimeout(resolve, 10))
+    expect(inbox.some((message) => message.t === 'error')).toBe(false)
+
+    relayHarness.instances[0].callbacks.onToolUse?.({
+      toolName: 'request_history_question',
+      toolUseId: 'retry-adaptive-tool',
+      content: JSON.stringify({ proposed_text: 'How often do the headaches occur?' }),
+    })
+    await expect(waitForMessage('toolCall')).resolves.toMatchObject({
+      toolUseId: 'retry-adaptive-tool',
+    })
+  })
+
+  it('treats a patient interruption as recoverable for adaptive questions', async () => {
+    send({
+      t: 'start',
+      instructions: 'Synthetic adaptive instructions.',
+      tools: [],
+      interviewMode: 'comprehensive',
+      adaptiveTurnController: true,
+    })
+    await new Promise((resolve) => setTimeout(resolve, 10))
+    relayHarness.instances[0].callbacks.onToolUse?.({
+      toolName: 'request_history_question',
+      toolUseId: 'interruptible-tool',
+      content: '{}',
+    })
+    const tool = await waitForMessage('toolCall')
+    send({
+      t: 'toolResult',
+      toolUseId: tool.toolUseId,
+      segmentId: 1,
+      output: JSON.stringify({
+        success: true,
+        status: 'approved',
+        obligation_id: 'adaptive-question-4',
+        approved_text: 'How often do the headaches occur?',
+        allow_example: false,
+      }),
+    })
+    await new Promise((resolve) => setTimeout(resolve, 10))
+    relayHarness.instances[0].callbacks.onTextOutput?.('ASSISTANT', 'How often do the headaches occur?')
+    relayHarness.instances[0].callbacks.onAudioOutput?.('interruptible-audio')
+    await waitForMessage('audio')
+
+    relayHarness.instances[0].callbacks.onBargeIn?.()
+    await expect(waitForMessage('bargeIn')).resolves.toMatchObject({ segmentId: 1 })
+    relayHarness.instances[0].callbacks.onAssistantAudioEnd?.()
+    await new Promise((resolve) => setTimeout(resolve, 10))
+    expect(inbox.some((message) => message.t === 'error')).toBe(false)
+
+    relayHarness.instances[0].callbacks.onToolUse?.({
+      toolName: 'request_history_question',
+      toolUseId: 'after-interruption-tool',
+      content: '{}',
+    })
+    await expect(waitForMessage('toolCall')).resolves.toMatchObject({
+      toolUseId: 'after-interruption-tool',
+    })
   })
 
   it('logs startup lifecycle metadata without instructions, audio, or tool arguments', async () => {

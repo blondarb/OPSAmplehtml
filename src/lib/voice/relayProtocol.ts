@@ -3,7 +3,7 @@
 
 // Browser → relay
 export type ClientMsg =
-  | { t: 'start'; instructions: string; tools: unknown[]; voiceId?: string; interviewMode?: 'standard' | 'comprehensive'; turnEvidenceController?: boolean }
+  | { t: 'start'; instructions: string; tools: unknown[]; voiceId?: string; interviewMode?: 'standard' | 'comprehensive'; turnEvidenceController?: boolean; adaptiveTurnController?: boolean }
   | { t: 'audio'; pcm: string; audioSeq?: number } // base64 PCM16 @16k; seq is required by continuation-capable clients
   | { t: 'userTurnEnd' }
   | { t: 'toolResult'; toolUseId: string; output: string; segmentId?: number }

@@ -68,6 +68,7 @@ describe('POST /api/ai/historian/session — textMode (Historian Validation Suit
     vi.mocked(resolveHistorianPatientGrant).mockResolvedValue(null)
     vi.mocked(markHistorianInvitationStarted).mockResolvedValue(true)
     delete process.env.HISTORIAN_TURN_EVIDENCE_CONTROLLER_V1
+    delete process.env.HISTORIAN_ADAPTIVE_INTERVIEW_V1
     // mockImplementation (not mockResolvedValue) so each call gets a FRESH
     // Response — a Response body can only be read once, and this test file
     // calls POST multiple times per test against the same mocked fetch.
@@ -158,6 +159,25 @@ describe('POST /api/ai/historian/session — textMode (Historian Validation Suit
     expect(json.interviewPromptVersion).toBe('comprehensive-v2')
     expect(json.turnEvidenceController).toBe(true)
     expect(json.instructions).toContain('request_history_question')
+    expect(json.tools.map((tool: { toolSpec: { name: string } }) => tool.toolSpec.name)).toEqual([
+      'request_history_question',
+      'save_interview_output',
+    ])
+  })
+
+  it('selects the adaptive conductor and silent-review contract ahead of v2 only with its exact flag', async () => {
+    process.env.HISTORIAN_TURN_EVIDENCE_CONTROLLER_V1 = 'true'
+    process.env.HISTORIAN_ADAPTIVE_INTERVIEW_V1 = 'true'
+    const res = await POST(buildReq({ sessionType: 'new_patient', interviewMode: 'comprehensive' }))
+    expect(res.status).toBe(200)
+    const json = await res.json()
+    expect(json.provider).toBe('nova')
+    expect(json.interviewPromptVersion).toBe('comprehensive-v3')
+    expect(json.turnEvidenceController).toBe(false)
+    expect(json.adaptiveTurnController).toBe(true)
+    expect(json.instructions).toContain('Claude conductor')
+    expect(json.instructions).toContain('request_history_question')
+    expect(json.instructions).not.toContain('fixed question plan')
     expect(json.tools.map((tool: { toolSpec: { name: string } }) => tool.toolSpec.name)).toEqual([
       'request_history_question',
       'save_interview_output',

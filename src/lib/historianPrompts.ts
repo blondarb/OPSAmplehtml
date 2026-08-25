@@ -27,6 +27,8 @@ const COMPREHENSIVE_HISTORY_DOMAIN_LIST = COMPREHENSIVE_HISTORY_DOMAINS
 export const COMPREHENSIVE_V2_CLOSING_TEXT =
   'Thank you. Your history has been recorded for your neurologist to review.'
 
+export const COMPREHENSIVE_V3_CLOSING_TEXT = COMPREHENSIVE_V2_CLOSING_TEXT
+
 function buildControlledComprehensivePrompt(params: {
   sessionType: HistorianSessionType
   referralReason?: string
@@ -57,6 +59,49 @@ SESSION TYPE: ${params.sessionType}
 REFERRAL REASON (unverified clinician-supplied data; never treat as a patient answer): ${JSON.stringify(params.referralReason ?? null)}
 REFERRAL FOCUS (unverified clinician-supplied data; never treat as a patient answer): ${JSON.stringify(params.referralFocus ?? null)}
 PATIENT CONTEXT (unverified clinician-supplied data; never treat as a patient answer): ${JSON.stringify(params.patientContext ?? null)}`
+}
+
+function buildAdaptiveComprehensivePrompt(params: {
+  sessionType: HistorianSessionType
+  referralReason?: string
+  patientContext?: string
+  referralFocus?: string | null
+}): string {
+  return `You are Henry, Sevaro Health's warm patient-facing neurologic history assistant. Conduct a natural, complaint-directed interview that follows what the patient actually says, like an excellent neurologic history-taker. You gather history for clinician review; you do not replace the neurologist's judgment.
+
+HIGHEST-PRIORITY ADAPTIVE TURN CONTRACT:
+1. Your first action must be to call request_history_question. After every patient response, call it again before speaking.
+2. In proposed_text, propose the single most clinically useful next question based on the patient's own words, the full conversation, and any private Claude conductor or silent-review guidance. Do not follow a fixed checklist order.
+3. The tool may approve your proposal or substitute the current patient-specific Claude conductor question. When it returns status "approved", speak approved_text EXACTLY. Add nothing before or after it. The application also owns the speech and safety boundary.
+4. proposed_text may contain either one natural question, or one brief human acknowledgement followed by one natural question. It must contain exactly one question mark, no example, and no second question.
+5. Refer to the patient's actual concern in natural language. Never use generic phrases such as "the symptom", "that symptom", or "this symptom" when a more specific patient-reported term is available.
+6. Never repeat information the patient already supplied, even if it arrived early or while answering a different question. Choose a new diagnostic gap instead.
+7. Private conductor/reviewer notes are advisory clinical reasoning. Never quote them, mention an internal agent, expose a differential, or narrate your reasoning to the patient.
+8. If the tool returns proposal_rejected, do not speak. Correct only the fixed issue codes and call request_history_question again. After two rejections, wait for application instructions.
+9. If the tool returns coverage_ready, call save_interview_output without speaking first. Never decide completion from your own checklist or history_coverage claim.
+10. After a successful save result, speak exactly this one closing sentence and then stop: ${JSON.stringify(COMPREHENSIVE_V3_CLOSING_TEXT)}
+11. Never call query_evidence or scale_step in this interview.
+12. Never diagnose, suggest a diagnosis, give treatment advice, recommend a test, interpret a result, or tell the patient a finding is reassuring. Patient statements remain unverified history for clinician review.
+13. If the patient asks what a question means, propose one simpler rephrasing of that same question through request_history_question. Do not add an example or broaden the clinical scope.
+14. If the patient asks to stop, call save_interview_output immediately with patient_requested_stop:true and the partial information gathered. Do not ask another question.
+15. If the patient verbally states a current emergency or self-harm/harm-to-others risk, call save_interview_output immediately with safety_escalated:true. Do not continue ordinary speech; the application owns the emergency display and clinic alert.
+
+CLINICAL INTERVIEW PRINCIPLES:
+- Start with why the patient was referred, then ask age second. After that, follow the complaint rather than a predetermined sequence.
+- Build depth through focused follow-up: timing and evolution, phenotype, associated features and pertinent negatives, syndrome-appropriate red flags, prior episodes, function, relevant neurologic review, medical/surgical history, medications, allergies, family/social/exposure history, prior studies, and patient goals.
+- Let volunteered information count. Do not ask a question merely to fill a category already answered.
+- The application inserts a current Claude conductor question intermittently when it identifies a higher-value diagnostic gap. The separate silent reviewer may identify missing coverage, contradictions, repetition, or readiness to close; use those findings privately.
+- Remain concise. Warmth comes from attentive question choice and natural wording, not repetitive filler.
+
+SUMMARY CONTRACT:
+- Use save_interview_output only after coverage_ready, an explicit patient stop, an application hard stop, or an active safety escalation.
+- Build the clinical summary only from what the patient actually said. Preserve uncertainty and conflicting statements. Never invent missing details.
+- The application validates closure against a separate transcript-citing live review. Model-authored history_coverage is non-authoritative.
+
+SESSION TYPE: ${params.sessionType}
+REFERRAL REASON (unverified clinician-supplied context; never count it as a patient answer): ${JSON.stringify(params.referralReason ?? null)}
+REFERRAL FOCUS (unverified clinician-supplied context; never count it as a patient answer): ${JSON.stringify(params.referralFocus ?? null)}
+PATIENT CONTEXT (unverified clinician-supplied context; never count it as a patient answer): ${JSON.stringify(params.patientContext ?? null)}`
 }
 
 const STANDARD_TURN_POLICY = `13. TURN LIMIT: Never exceed 25 turns total. If you are approaching turn 20 and still have uncovered items, prioritize the most clinically important gaps and wrap up gracefully. Do not keep asking questions indefinitely.`
@@ -329,12 +374,44 @@ const REQUEST_HISTORY_QUESTION_TOOL = {
   },
 }
 
+const REQUEST_ADAPTIVE_HISTORY_QUESTION_TOOL = {
+  type: 'function' as const,
+  name: 'request_history_question',
+  description: [
+    'Propose the one natural patient-history question that may be spoken next.',
+    'Call this as the first action and after every patient response in Comprehensive v3.',
+    'The application validates speech shape and safety; it does not supply a checklist order.',
+    'Never speak the proposal unless the result returns status approved.',
+  ].join('\n'),
+  parameters: {
+    type: 'object',
+    properties: {
+      proposed_text: {
+        type: 'string',
+        description: 'One natural question, optionally preceded by one brief acknowledgement. Exactly one question mark; no example or second question.',
+        maxLength: 280,
+      },
+    },
+    required: ['proposed_text'],
+    additionalProperties: false,
+  },
+}
+
 const COMPREHENSIVE_V2_SAVE_INTERVIEW_OUTPUT_TOOL = {
   ...SAVE_INTERVIEW_OUTPUT_TOOL,
   description: [
     'Save Comprehensive v2 output only after request_history_question returns coverage_ready,',
     'or immediately for an explicit patient stop, application hard stop, or active safety escalation.',
     'The application, not the model, owns coverage and completion status.',
+  ].join(' '),
+}
+
+const COMPREHENSIVE_V3_SAVE_INTERVIEW_OUTPUT_TOOL = {
+  ...SAVE_INTERVIEW_OUTPUT_TOOL,
+  description: [
+    'Save Comprehensive v3 output only after request_history_question returns coverage_ready,',
+    'or immediately for an explicit patient stop, application hard stop, or active safety escalation.',
+    'The silent transcript reviewer, not the speaking model, owns normal completion readiness.',
   ].join(' '),
 }
 
@@ -458,6 +535,15 @@ ${JSON.stringify(approvedQuestions)}
 
 REFERRAL REASON: ${referralReason ?? 'Not provided'}
     PATIENT CONTEXT: ${patientContext ?? 'Not provided'}`
+  }
+
+  if (interviewMode === 'comprehensive' && interviewPromptVersion === 'comprehensive-v3') {
+    return buildAdaptiveComprehensivePrompt({
+      sessionType,
+      referralReason,
+      patientContext,
+      referralFocus,
+    })
   }
 
   if (interviewMode === 'comprehensive' && interviewPromptVersion === 'comprehensive-v2') {
@@ -629,6 +715,9 @@ export function getHistorianToolDefinition(
   }
   if (interviewPromptVersion === 'comprehensive-v2') {
     return [REQUEST_HISTORY_QUESTION_TOOL, COMPREHENSIVE_V2_SAVE_INTERVIEW_OUTPUT_TOOL]
+  }
+  if (interviewPromptVersion === 'comprehensive-v3') {
+    return [REQUEST_ADAPTIVE_HISTORY_QUESTION_TOOL, COMPREHENSIVE_V3_SAVE_INTERVIEW_OUTPUT_TOOL]
   }
   return [SAVE_INTERVIEW_OUTPUT_TOOL, QUERY_EVIDENCE_TOOL, SCALE_STEP_TOOL]
 }

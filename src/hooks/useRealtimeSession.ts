@@ -5,6 +5,7 @@ import type { HistorianTranscriptEntry, HistorianStructuredOutput, HistorianRedF
 import {
   COMPREHENSIVE_HARD_STOP_EXCHANGE,
   COMPREHENSIVE_HARD_STOP_SAVE_NUDGE,
+  COMPREHENSIVE_SOFT_WRAP_EXCHANGE,
   evaluateComprehensiveSave,
 } from '@/lib/historian/comprehensiveCompletionPolicy'
 import {
@@ -18,6 +19,18 @@ import {
   settlePatientEvidenceAnswer,
   type PatientEvidenceState,
 } from '@/lib/historian/patientEvidenceController'
+import {
+  ADAPTIVE_AGE_QUESTION,
+  ADAPTIVE_OPENING_QUESTION,
+  adaptiveQuestionIssues,
+  approvedAdaptiveQuestion,
+} from '@/lib/historian/adaptiveQuestionContract'
+import {
+  deriveLiveReviewStructuredCoverage,
+  liveInterviewReviewCompletion,
+  parseLiveInterviewReviewArtifact,
+  type LiveInterviewReviewArtifactV1,
+} from '@/lib/historian/liveReviewContract'
 import {
   assertHistorianContinuationCheckpoint,
   buildHistorianAnsweredQuestionPairs,
@@ -173,6 +186,17 @@ interface UseRealtimeSessionResult {
 
 /** How many patient turns between localizer runs. */
 const LOCALIZER_INTERVAL = 3
+const LIVE_REVIEW_INTERVAL = 4
+const MAX_ADAPTIVE_PROPOSAL_REJECTIONS = 2
+/**
+ * On each intermittent Claude-conductor turn, hold Nova's proposed question
+ * briefly so the patient-specific conductor question can actually own that
+ * turn. Other turns remain immediate. If Claude is unavailable or slower
+ * than this bound, Nova's already-validated proposal wins and the interview
+ * continues without an unbounded pause.
+ */
+const ADAPTIVE_CONDUCTOR_WAIT_MS = 6_000
+const ADAPTIVE_CONDUCTOR_POLL_MS = 50
 
 /**
  * How many unflushed transcript entries accumulate before triggering an
@@ -263,7 +287,17 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
   const resolvedInterviewModeRef = useRef<HistorianInterviewMode>('standard')
   const resolvedInterviewPromptVersionRef = useRef<HistorianInterviewPromptVersion>('standard-v1')
   const turnEvidenceControllerEnabledRef = useRef(false)
+  const adaptiveTurnControllerEnabledRef = useRef(false)
+  const adaptiveProposalRejectionsRef = useRef(0)
+  const pendingConductorQuestionRef = useRef<{
+    text: string
+    reviewedThroughPatientSeq: number
+  } | null>(null)
+  const conductorDuePatientSeqRef = useRef<number | null>(null)
   const patientEvidenceStateRef = useRef<PatientEvidenceState>(createPatientEvidenceState())
+  const liveReviewRef = useRef<LiveInterviewReviewArtifactV1 | null>(null)
+  const liveReviewInFlightRef = useRef(false)
+  const lastLiveReviewTurnRef = useRef(0)
   const flushTokenRef = useRef<string | null>(null)
   // Monotonic per-entry sequence number, assigned at append time (both the
   // assistantTranscript and userTranscript branches below).
@@ -357,7 +391,10 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
         setEndedUnresponsive(true)
         console.warn('[useRealtimeSession] patient unresponsive — ending session gracefully')
         const provider = providerRef.current
-        if (turnEvidenceControllerEnabledRef.current) {
+        if (
+          turnEvidenceControllerEnabledRef.current ||
+          adaptiveTurnControllerEnabledRef.current
+        ) {
           provider?.suppressOutput()
           void endSessionRef.current('unresponsive')
           return
@@ -501,29 +538,54 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
     if (!localizerEnabled) return
     if (localizerInFlightRef.current) return
     if (transcriptRef.current.length < 2) return
+    const adaptiveSessionId = serverSessionIdRef.current
+    const adaptiveToken = flushTokenRef.current
+    if (adaptiveTurnControllerEnabledRef.current && (!adaptiveSessionId || !adaptiveToken)) return
+    const requestSessionGen = sessionGenRef.current
+    const reviewedThroughPatientSeq = [...transcriptRef.current]
+      .reverse()
+      .find((entry) => entry.role === 'user')?.seq
 
     localizerInFlightRef.current = true
     setLocalizerLoading(true)
 
-    // Grab last 8 turns for context
-    const recentTurns = transcriptRef.current.slice(-8).map(t => ({
-      role: t.role,
-      text: t.text,
-    }))
-
+    // The adaptive conductor needs enough rolling history to follow the
+    // patient's actual story and avoid re-asking earlier facts. Keep the
+    // payload bounded even when individual ASR turns are unusually long.
+    const boundedTurns: Array<{ role: 'assistant' | 'user'; text: string }> = []
+    let boundedChars = 0
+    for (const turn of transcriptRef.current.slice(-120).reverse()) {
+      if (boundedChars + turn.text.length > 80_000) break
+      boundedTurns.unshift({ role: turn.role, text: turn.text })
+      boundedChars += turn.text.length
+    }
     try {
       const res = await fetch('/api/ai/historian/localizer', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          ...(adaptiveTurnControllerEnabledRef.current
+            ? { Authorization: `Bearer ${adaptiveToken}` }
+            : {}),
+        },
         body: JSON.stringify({
-          sessionId: options.consultId ?? 'ephemeral',
+          sessionId: adaptiveTurnControllerEnabledRef.current
+            ? adaptiveSessionId
+            : options.consultId ?? 'ephemeral',
           sessionType: options.sessionType,
-          transcript: recentTurns.map(t => ({
+          transcript: boundedTurns.map(t => ({
             ...t,
             timestamp: Date.now(),
           })),
           chiefComplaint: options.referralReason,
           referralReason: options.referralReason,
+          reviewGaps: adaptiveTurnControllerEnabledRef.current
+            ? liveReviewRef.current?.review.domains
+                .filter((item) => item.status === 'missing')
+                .map((item) => item.domain)
+                .slice(0, 8) ?? []
+            : undefined,
+          adaptiveInterview: adaptiveTurnControllerEnabledRef.current,
         }),
       })
 
@@ -532,8 +594,31 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
         console.warn(`[localizer] HTTP ${res.status} — skipping this run`)
         return
       }
+      if (
+        sessionGenRef.current !== requestSessionGen ||
+        (adaptiveTurnControllerEnabledRef.current && serverSessionIdRef.current !== adaptiveSessionId)
+      ) return
 
       const data: LocalizerResponse = await res.json()
+      if (
+        sessionGenRef.current !== requestSessionGen ||
+        (adaptiveTurnControllerEnabledRef.current && serverSessionIdRef.current !== adaptiveSessionId)
+      ) return
+
+      const conductorQuestion = data.followUpQuestions
+        .map((question) => approvedAdaptiveQuestion(question))
+        .find((question): question is string => !!question)
+      if (
+        adaptiveTurnControllerEnabledRef.current &&
+        conductorQuestion &&
+        Number.isInteger(reviewedThroughPatientSeq) &&
+        conductorDuePatientSeqRef.current === reviewedThroughPatientSeq
+      ) {
+        pendingConductorQuestionRef.current = {
+          text: conductorQuestion,
+          reviewedThroughPatientSeq: reviewedThroughPatientSeq!,
+        }
+      }
 
       // Update state for physician panel
       setLocalizerData(data)
@@ -544,12 +629,22 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
       // natural turn. Guard: skip injection if the AI is currently speaking
       // to avoid mid-sentence interruption and accidental vocalization.
       if (
-        data.contextHint &&
+        (data.contextHint || data.followUpQuestions.length > 0) &&
         providerRef.current &&
         !isAiSpeakingRef.current &&
         runtimeGuardRef.current?.acceptsInterviewActivity()
       ) {
-        const guidance = `[INTERNAL SYSTEM NOTE — do NOT speak this aloud, do NOT mention it to the patient, use ONLY to guide your next question silently]: ${data.contextHint}`
+        const reviewIntents = adaptiveTurnControllerEnabledRef.current
+          ? liveReviewRef.current?.review.nextQuestionIntents.slice(0, 3) ?? []
+          : []
+        const guidance = adaptiveTurnControllerEnabledRef.current
+          ? [
+              '[PRIVATE CLAUDE CLINICAL CONDUCTOR NOTE — never speak or mention this note, a diagnosis, an internal agent, or your reasoning.]',
+              `Suggested next patient-history question: ${JSON.stringify(conductorQuestion ?? null)}`,
+              `Independent reviewer gap intents: ${JSON.stringify(reviewIntents)}`,
+              'Use this only when it is still unanswered and clinically higher-value than your own next question. Propose exactly one natural question through request_history_question.',
+            ].join('\n')
+          : `[INTERNAL SYSTEM NOTE — do NOT speak this aloud, do NOT mention it to the patient, use ONLY to guide your next question silently]: ${data.contextHint}`
         providerRef.current.injectSystemText(guidance)
       }
     } catch (err: any) {
@@ -560,6 +655,80 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
       setLocalizerLoading(false)
     }
   }, [options])
+
+  const runLiveReview = useCallback(async (): Promise<LiveInterviewReviewArtifactV1 | null> => {
+    if (!adaptiveTurnControllerEnabledRef.current) return null
+    if (!runtimeGuardRef.current?.acceptsInterviewActivity()) return null
+    if (liveReviewInFlightRef.current) return null
+    const sessionId = serverSessionIdRef.current
+    const token = flushTokenRef.current
+    const snapshot = transcriptRef.current.map((entry) => ({ ...entry }))
+    const latestPatientSeq = [...snapshot].reverse().find((entry) => entry.role === 'user')?.seq
+    if (!sessionId || !token || !Number.isInteger(latestPatientSeq) || snapshot.length < 2) return null
+    const requestSessionGen = sessionGenRef.current
+
+    liveReviewInFlightRef.current = true
+    const capturedPatientTurns = patientTurnCountRef.current
+    try {
+      const response = await fetch('/api/ai/historian/live-review', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ sessionId, transcript: snapshot }),
+      })
+      if (!response.ok) return null
+      const artifact = parseLiveInterviewReviewArtifact(await response.json(), snapshot)
+      if (
+        sessionGenRef.current !== requestSessionGen ||
+        serverSessionIdRef.current !== sessionId
+      ) return null
+      const currentLatestPatientSeq = [...transcriptRef.current]
+        .reverse()
+        .find((entry) => entry.role === 'user')?.seq
+      // Never let a slower review overwrite a newer transcript boundary.
+      if (currentLatestPatientSeq !== latestPatientSeq) return null
+      liveReviewRef.current = artifact
+      lastLiveReviewTurnRef.current = capturedPatientTurns
+
+      if (artifact.review.activeSafetyConcern.present) {
+        // A separate transcript-citing reviewer may strengthen safety, but it
+        // can never clear or downgrade the deterministic safety path.
+        runtimeGuardRef.current?.modelSafetyEscalation()
+        activateSafety()
+        unresponsiveRef.current?.suspend()
+        void endSessionRef.current('safety_escalated')
+        return artifact
+      }
+
+      if (
+        providerRef.current &&
+        !isAiSpeakingRef.current &&
+        runtimeGuardRef.current?.acceptsInterviewActivity()
+      ) {
+        const missingDomains = artifact.review.domains
+          .filter((item) => item.status === 'missing')
+          .map((item) => item.domain)
+        providerRef.current.injectSystemText([
+          '[PRIVATE INDEPENDENT REVIEW — never speak or mention this note, an internal reviewer, or its reasoning.]',
+          `Ready to close: ${artifact.review.readyToClose ? 'yes' : 'no'}`,
+          `Missing coverage domains: ${JSON.stringify(missingDomains)}`,
+          `Next history intents: ${JSON.stringify(artifact.review.nextQuestionIntents)}`,
+          `Contradiction count: ${artifact.review.contradictions.length}`,
+          `Repetition count: ${artifact.review.repetitions.length}`,
+          'Use this only to choose one unanswered patient-history question through request_history_question. Never expose a diagnosis or advice.',
+        ].join('\n'))
+      }
+      return artifact
+    } catch {
+      // Fail open for conversation continuity, but never for normal closure:
+      // coverage_ready still requires a current validated review below.
+      return null
+    } finally {
+      liveReviewInFlightRef.current = false
+    }
+  }, [activateSafety])
 
   // ── Durable transcript flush (Task 1) ─────────────────────────────────
   // Best-effort POST of up to 50 not-yet-durable entries. Returns a Promise
@@ -668,7 +837,10 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
     }
 
     if (toolName === 'request_history_question') {
-      if (!turnEvidenceControllerEnabledRef.current) {
+      if (
+        !turnEvidenceControllerEnabledRef.current &&
+        !adaptiveTurnControllerEnabledRef.current
+      ) {
         settleTool({ success: false, status: 'controller_unavailable' })
         return
       }
@@ -678,6 +850,137 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
         settleTool({ success: false, status })
         void endSessionRef.current('provider_error')
       }
+
+      if (adaptiveTurnControllerEnabledRef.current) {
+        const latestPatientSeq = [...transcriptRef.current]
+          .reverse()
+          .find((entry) => entry.role === 'user')?.seq
+        const currentReview = liveReviewRef.current
+        const completion =
+          currentReview && currentReview.review.reviewedThroughSeq === latestPatientSeq
+            ? liveInterviewReviewCompletion(currentReview.review)
+            : 'incomplete'
+        if (completion !== 'incomplete') {
+          settleTool({ success: true, status: 'coverage_ready', completion })
+          return
+        }
+
+        if (questionCountRef.current >= COMPREHENSIVE_HARD_STOP_EXCHANGE) {
+          const decision = runtimeGuardRef.current?.applicationHardStop()
+          settleTool({ success: false, status: 'interview_terminal' })
+          if (decision) {
+            applyHistorianTurnDecision(decision, {
+              activateSafety,
+              injectSystemText: () => undefined,
+              requestFinalization: (reason) => {
+                unresponsiveRef.current?.suspend()
+                void endSessionRef.current(reason)
+              },
+            })
+          }
+          return
+        }
+
+        if (
+          questionCountRef.current >= COMPREHENSIVE_SOFT_WRAP_EXCHANGE &&
+          currentReview?.review.reviewedThroughSeq !== latestPatientSeq
+        ) void runLiveReview()
+
+        const requestSessionGen = sessionGenRef.current
+        const approveCurrentAdaptiveProposal = () => {
+          if (!pendingToolsRef.current.has(toolUseId)) return
+          if (
+            sessionGenRef.current !== requestSessionGen ||
+            providerRef.current !== provider ||
+            !runtimeGuardRef.current?.acceptsInterviewActivity()
+          ) {
+            pendingToolsRef.current.delete(toolUseId)
+            return
+          }
+          const currentLatestPatientSeq = [...transcriptRef.current]
+            .reverse()
+            .find((entry) => entry.role === 'user')?.seq
+          if (currentLatestPatientSeq !== latestPatientSeq) {
+            failClosed('question_context_changed')
+            return
+          }
+
+          const fixedOpening = questionCountRef.current === 0
+            ? { id: 'adaptive-opening', text: ADAPTIVE_OPENING_QUESTION }
+            : questionCountRef.current === 1
+              ? { id: 'adaptive-age', text: ADAPTIVE_AGE_QUESTION }
+              : null
+          const pendingConductor = pendingConductorQuestionRef.current
+          const conductorQuestion =
+            !fixedOpening &&
+            pendingConductor &&
+            pendingConductor.reviewedThroughPatientSeq === latestPatientSeq
+              ? pendingConductor.text
+              : null
+          if (
+            pendingConductor &&
+            pendingConductor.reviewedThroughPatientSeq !== latestPatientSeq
+          ) pendingConductorQuestionRef.current = null
+          if (conductorDuePatientSeqRef.current === latestPatientSeq) {
+            // Consume the intermittent conductor slot whether Claude answered
+            // in time or Nova supplied the bounded fallback question.
+            conductorDuePatientSeqRef.current = null
+          }
+          const proposedText = fixedOpening?.text ??
+            conductorQuestion ??
+            approvedAdaptiveQuestion(args.proposed_text)
+          if (!proposedText) {
+            adaptiveProposalRejectionsRef.current += 1
+            const issueCodes = adaptiveQuestionIssues(args.proposed_text)
+            if (adaptiveProposalRejectionsRef.current > MAX_ADAPTIVE_PROPOSAL_REJECTIONS) {
+              failClosed('proposal_retry_limit')
+              return
+            }
+            settleTool({
+              success: false,
+              status: 'proposal_rejected',
+              issue_codes: issueCodes,
+            })
+            return
+          }
+          adaptiveProposalRejectionsRef.current = 0
+          if (conductorQuestion) pendingConductorQuestionRef.current = null
+          settleTool({
+            success: true,
+            status: 'approved',
+            obligation_id: fixedOpening?.id ?? (
+              conductorQuestion
+                ? `claude-conductor-${questionCountRef.current + 1}`
+                : `adaptive-question-${questionCountRef.current + 1}`
+            ),
+            approved_text: proposedText,
+            allow_example: false,
+          })
+        }
+
+        const waitingForThisConductorTurn =
+          conductorDuePatientSeqRef.current === latestPatientSeq &&
+          localizerInFlightRef.current &&
+          pendingConductorQuestionRef.current?.reviewedThroughPatientSeq !== latestPatientSeq
+        if (waitingForThisConductorTurn) {
+          void (async () => {
+            const deadline = Date.now() + ADAPTIVE_CONDUCTOR_WAIT_MS
+            while (
+              localizerInFlightRef.current &&
+              pendingToolsRef.current.has(toolUseId) &&
+              sessionGenRef.current === requestSessionGen &&
+              Date.now() < deadline
+            ) {
+              await new Promise((resolve) => setTimeout(resolve, ADAPTIVE_CONDUCTOR_POLL_MS))
+            }
+            approveCurrentAdaptiveProposal()
+          })()
+          return
+        }
+        approveCurrentAdaptiveProposal()
+        return
+      }
+
       let evidenceState = patientEvidenceStateRef.current
       if (evidenceState.awaitingQuestion) {
         if (
@@ -759,7 +1062,51 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
         let structuredForSave: HistorianStructuredOutput = structured
         let saveTerminationReason: HistorianTerminationReason | null = null
 
-        if (turnEvidenceControllerEnabledRef.current) {
+        if (adaptiveTurnControllerEnabledRef.current) {
+          const runtimeTerminal = runtimeGuardRef.current?.terminalReason() ?? null
+          const terminalPartial =
+            finalizingRef.current ||
+            safety_escalated === true ||
+            patient_requested_stop === true ||
+            runtimeTerminal !== null
+          const latestPatientSeq = [...transcriptRef.current]
+            .reverse()
+            .find((entry) => entry.role === 'user')?.seq
+          const currentReview = liveReviewRef.current
+          const reviewIsCurrent =
+            !!currentReview && currentReview.review.reviewedThroughSeq === latestPatientSeq
+          const completion = reviewIsCurrent
+            ? liveInterviewReviewCompletion(currentReview.review)
+            : 'incomplete'
+
+          if (!terminalPartial && completion === 'incomplete') {
+            settleTool({ success: false, status: 'review_required' })
+            void runLiveReview()
+            return
+          }
+
+          structuredForSave = {
+            ...structured,
+            interview_mode: 'comprehensive',
+            interview_prompt_version: 'comprehensive-v3',
+            ...(reviewIsCurrent
+              ? {
+                  live_review_v1: currentReview,
+                  history_coverage: deriveLiveReviewStructuredCoverage(currentReview.review),
+                }
+              : {}),
+          }
+          saveTerminationReason =
+            safety_escalated === true
+              ? 'safety_escalated'
+              : patient_requested_stop === true
+                ? 'patient_requested_stop'
+                : runtimeTerminal ?? (
+                    completion === 'coverage_complete' || completion === 'complete_with_uncertainty'
+                      ? completion
+                      : terminationReasonRef.current
+                  )
+        } else if (turnEvidenceControllerEnabledRef.current) {
           let evidenceState = patientEvidenceStateRef.current
           const runtimeTerminal = runtimeGuardRef.current?.terminalReason() ?? null
           const terminalPartial =
@@ -883,7 +1230,7 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
         // guard already silenced provider output, so never request a closing
         // utterance that would contradict the hard-stop instruction.
         const controlledTerminalPartial =
-          turnEvidenceControllerEnabledRef.current &&
+          (turnEvidenceControllerEnabledRef.current || adaptiveTurnControllerEnabledRef.current) &&
           terminationReasonRef.current !== 'coverage_complete' &&
           terminationReasonRef.current !== 'complete_with_uncertainty'
         if (
@@ -1011,7 +1358,7 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
       return
     }
     settleTool({ status: 'error', message: 'unknown tool' })
-  }, [options.consultId, maybeScheduleAutoEnd, activateSafety])
+  }, [options.consultId, maybeScheduleAutoEnd, activateSafety, runLiveReview])
 
   const performNovaContinuation = useCallback(async (event: Extract<VoiceEvent, {
     type: 'continuationBarrier'
@@ -1295,7 +1642,8 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
           // Only the FIRST assistant entry of a block counts; consecutive
           // assistant entries collapse into the one exchange they really are.
           const isControlledClosing =
-            turnEvidenceControllerEnabledRef.current && interviewCompletedRef.current
+            (turnEvidenceControllerEnabledRef.current || adaptiveTurnControllerEnabledRef.current) &&
+            interviewCompletedRef.current
           if (!isControlledClosing && (!previousEntry || previousEntry.role !== 'assistant')) {
             questionCountRef.current += 1
           }
@@ -1375,7 +1723,7 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
             // Comprehensive v2 evaluates its ceiling only after the answer is
             // transcript-bound below. Capping this generic guard input keeps
             // the 60th answer from being discarded before settlement.
-            exchange: turnEvidenceControllerEnabledRef.current
+            exchange: turnEvidenceControllerEnabledRef.current || adaptiveTurnControllerEnabledRef.current
               ? Math.min(
                   questionCountRef.current,
                   COMPREHENSIVE_HARD_STOP_EXCHANGE - 1,
@@ -1452,12 +1800,25 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
           if (
             !turnEvidenceControllerEnabledRef.current &&
             runtimeGuardRef.current.acceptsInterviewActivity() &&
-            turnsSinceLast >= LOCALIZER_INTERVAL
+            turnsSinceLast >= LOCALIZER_INTERVAL &&
+            !localizerInFlightRef.current
           ) {
             lastLocalizerTurnRef.current = patientTurnCountRef.current
+            if (adaptiveTurnControllerEnabledRef.current) {
+              conductorDuePatientSeqRef.current = entry.seq ?? null
+            }
             // Fire async — must not block the event loop
-            runLocalizer()
+            void runLocalizer()
           }
+          const turnsSinceReview = patientTurnCountRef.current - lastLiveReviewTurnRef.current
+          if (
+            adaptiveTurnControllerEnabledRef.current &&
+            runtimeGuardRef.current.acceptsInterviewActivity() &&
+            (
+              turnsSinceReview >= LIVE_REVIEW_INTERVAL ||
+              questionCountRef.current >= COMPREHENSIVE_SOFT_WRAP_EXCHANGE
+            )
+          ) void runLiveReview()
         }
         setCurrentUserText('')
         setIsUserSpeaking(false)
@@ -1574,7 +1935,7 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
         break
       }
     }
-  }, [activateSafety, runLocalizer, handleToolCall, options, setAiSpeaking, maybeScheduleAutoEnd, flushTranscript, performNovaContinuation])
+  }, [activateSafety, runLocalizer, runLiveReview, handleToolCall, options, setAiSpeaking, maybeScheduleAutoEnd, flushTranscript, performNovaContinuation])
 
   const startSession = useCallback(async () => {
     setStatus('connecting')
@@ -1607,7 +1968,14 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
     resolvedInterviewModeRef.current = 'standard'
     resolvedInterviewPromptVersionRef.current = 'standard-v1'
     turnEvidenceControllerEnabledRef.current = false
+    adaptiveTurnControllerEnabledRef.current = false
+    adaptiveProposalRejectionsRef.current = 0
+    pendingConductorQuestionRef.current = null
+    conductorDuePatientSeqRef.current = null
     patientEvidenceStateRef.current = createPatientEvidenceState()
+    liveReviewRef.current = null
+    liveReviewInFlightRef.current = false
+    lastLiveReviewTurnRef.current = 0
     flushTokenRef.current = null
     seqCounterRef.current = 0
     pendingFlushEntriesRef.current = []
@@ -1665,6 +2033,7 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
         interviewMode: resolvedInterviewMode,
         interviewPromptVersion: resolvedInterviewPromptVersion,
         turnEvidenceController: resolvedTurnEvidenceController,
+        adaptiveTurnController: resolvedAdaptiveTurnController,
       } = sessionConfig
 
       serverSessionIdRef.current = typeof mintedSessionId === 'string' ? mintedSessionId : null
@@ -1675,15 +2044,22 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
       resolvedInterviewPromptVersionRef.current =
         resolvedInterviewModeRef.current === 'comprehensive' &&
         (resolvedInterviewPromptVersion === 'comprehensive-v1' ||
-          resolvedInterviewPromptVersion === 'comprehensive-v2')
+          resolvedInterviewPromptVersion === 'comprehensive-v2' ||
+          resolvedInterviewPromptVersion === 'comprehensive-v3')
           ? resolvedInterviewPromptVersion
           : 'standard-v1'
       const expectsTurnEvidenceController =
         resolvedInterviewPromptVersionRef.current === 'comprehensive-v2'
+      const expectsAdaptiveTurnController =
+        resolvedInterviewPromptVersionRef.current === 'comprehensive-v3'
       if (expectsTurnEvidenceController !== (resolvedTurnEvidenceController === true)) {
         throw new Error('The server returned an inconsistent interview safety contract.')
       }
+      if (expectsAdaptiveTurnController !== (resolvedAdaptiveTurnController === true)) {
+        throw new Error('The server returned an inconsistent adaptive interview contract.')
+      }
       turnEvidenceControllerEnabledRef.current = expectsTurnEvidenceController
+      adaptiveTurnControllerEnabledRef.current = expectsAdaptiveTurnController
 
       // 2. Resolve the provider kind. The route's `provider` field wins (it
       //    minted the session for that kind); fall back to selectProvider
@@ -1693,7 +2069,10 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
           ? sessionConfig.provider
           : selectProvider(options.provider)
 
-      if (turnEvidenceControllerEnabledRef.current && kind !== 'nova') {
+      if (
+        (turnEvidenceControllerEnabledRef.current || adaptiveTurnControllerEnabledRef.current) &&
+        kind !== 'nova'
+      ) {
         throw new Error('The controlled Comprehensive interview requires the Nova relay.')
       }
 
@@ -1721,6 +2100,7 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
         voiceId,
         interviewMode: resolvedInterviewModeRef.current,
         turnEvidenceController: turnEvidenceControllerEnabledRef.current,
+        adaptiveTurnController: adaptiveTurnControllerEnabledRef.current,
         ephemeralKey,
         model: sessionModel,
         relayUrl,
@@ -1741,7 +2121,8 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
       const retryableInvitedStartup =
         !!serverSessionIdRef.current &&
         !!flushTokenRef.current &&
-        resolvedInterviewPromptVersionRef.current === 'comprehensive-v2' &&
+        (resolvedInterviewPromptVersionRef.current === 'comprehensive-v2' ||
+          resolvedInterviewPromptVersionRef.current === 'comprehensive-v3') &&
         transcriptRef.current.length === 0 &&
         questionCountRef.current === 0 &&
         !safetyEscalatedRef.current
@@ -1815,6 +2196,12 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
       if (!provider) return
 
       try {
+        if (adaptiveTurnControllerEnabledRef.current) {
+          // runLocalizer already injected the richer conductor note, including
+          // silent-review gaps. EmbeddedHistorian echoes this callback for
+          // legacy OpenAI sessions; suppress that duplicate in v3.
+          return
+        }
         if (provider.updateInstructions) {
           // OpenAI path — unchanged from before the provider-abstraction refactor.
           if (!baseInstructionsRef.current) return
@@ -1856,7 +2243,10 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
   const injectScaleAdministration = useCallback((instructionBlock: string) => {
     // Scales are outside the v2 atomic evidence plan. Fail closed until a
     // scale can participate in the same approve-then-speak contract.
-    if (turnEvidenceControllerEnabledRef.current) return
+    if (
+      turnEvidenceControllerEnabledRef.current ||
+      adaptiveTurnControllerEnabledRef.current
+    ) return
     if (!runtimeGuardRef.current?.acceptsInterviewActivity()) return
     const provider = providerRef.current
     if (!provider) {
@@ -1896,11 +2286,15 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
     const inferredReason =
       terminationReasonRef.current ??
       (interviewCompletedRef.current
-        ? turnEvidenceControllerEnabledRef.current
-          ? patientEvidenceCompletion(patientEvidenceStateRef.current) === 'complete_with_uncertainty'
+        ? adaptiveTurnControllerEnabledRef.current
+          ? liveInterviewReviewCompletion(liveReviewRef.current?.review) === 'complete_with_uncertainty'
             ? 'complete_with_uncertainty'
             : 'coverage_complete'
-          : 'coverage_complete'
+          : turnEvidenceControllerEnabledRef.current
+            ? patientEvidenceCompletion(patientEvidenceStateRef.current) === 'complete_with_uncertainty'
+              ? 'complete_with_uncertainty'
+              : 'coverage_complete'
+            : 'coverage_complete'
         : 'manual_end')
     terminationReasonRef.current = strongerTerminationReason(
       terminationReasonRef.current,
@@ -1983,7 +2377,8 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
     // retry guidance and never call onComplete/save for an empty history.
     const retryableStartupFailure =
       (terminationReason === 'provider_error' || terminationReason === 'transport_lost') &&
-      resolvedInterviewPromptVersionRef.current === 'comprehensive-v2' &&
+      (resolvedInterviewPromptVersionRef.current === 'comprehensive-v2' ||
+        resolvedInterviewPromptVersionRef.current === 'comprehensive-v3') &&
       transcriptRef.current.length === 0 &&
       questionCountRef.current === 0 &&
       !safetyEscalatedRef.current

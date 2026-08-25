@@ -15,6 +15,12 @@ import {
   validatePatientEvidenceState,
 } from './patientEvidenceController'
 import {
+  deriveLiveReviewStructuredCoverage,
+  liveInterviewReviewCompletion,
+  type LiveInterviewReviewArtifactV1,
+} from './liveReviewContract'
+import { verifyLiveInterviewReviewArtifact } from './liveReviewAttestation'
+import {
   completionStatusForTermination,
   parseHistorianTerminationReason,
   terminationMatchesCompletionStatus,
@@ -177,7 +183,52 @@ export async function saveInvitedHistorianSession(
     return { ok: false, status: 409, error: 'Hard-stop reason is invalid before exchange 60.' }
   }
   const completionStatus = completionStatusForTermination(terminationReason)
-  if (binding.interviewPromptVersion === 'comprehensive-v2') {
+  if (binding.interviewPromptVersion === 'comprehensive-v3') {
+    const terminalPartial =
+      terminationReason !== 'coverage_complete' &&
+      terminationReason !== 'complete_with_uncertainty'
+    let reviewArtifact: LiveInterviewReviewArtifactV1 | null = null
+    if (output.live_review_v1 != null) {
+      try {
+        reviewArtifact = await verifyLiveInterviewReviewArtifact(
+          binding.sessionId,
+          transcript,
+          output.live_review_v1,
+          binding.startupAttemptId ?? undefined,
+        )
+      } catch {
+        return {
+          ok: false,
+          status: 409,
+          error: 'The independent live history review is incomplete or inconsistent.',
+        }
+      }
+    }
+    if (!terminalPartial && !reviewArtifact) {
+      return {
+        ok: false,
+        status: 409,
+        error: 'Normal completion requires a current independent live history review.',
+      }
+    }
+    const completion = liveInterviewReviewCompletion(reviewArtifact?.review)
+    if (!terminalPartial && terminationReason !== completion) {
+      return {
+        ok: false,
+        status: 409,
+        error: 'The completion reason does not match the independent live history review.',
+      }
+    }
+    output = {
+      ...output,
+      ...(reviewArtifact
+        ? {
+            live_review_v1: reviewArtifact,
+            history_coverage: deriveLiveReviewStructuredCoverage(reviewArtifact.review),
+          }
+        : {}),
+    }
+  } else if (binding.interviewPromptVersion === 'comprehensive-v2') {
     const evidence = output.history_evidence_v1
     const evidenceValidation = validatePatientEvidenceState(evidence, transcript)
     if (!evidenceValidation.valid) {
@@ -228,10 +279,12 @@ export async function saveInvitedHistorianSession(
     const locked = await client.query<{
       invite_status: string
       session_status: string
+      startup_attempt_id: string | null
       grant_expires_at: Date | string
     }>(
       `SELECT invite.status AS invite_status,
               session.status AS session_status,
+              invite.startup_attempt_id,
               invite.grant_expires_at
          FROM historian_invites invite
          JOIN historian_sessions session ON session.id = invite.session_id
@@ -260,6 +313,16 @@ export async function saveInvitedHistorianSession(
         patientId: binding.patientId,
         tenantId: binding.tenantId,
       }
+    }
+    if (
+      binding.interviewPromptVersion === 'comprehensive-v3' &&
+      (
+        !binding.startupAttemptId ||
+        row.startup_attempt_id !== binding.startupAttemptId
+      )
+    ) {
+      await rollbackQuietly(client)
+      return { ok: false, status: 409, error: 'This interview attempt is no longer current.' }
     }
     if (!['redeemed', 'in_progress'].includes(row.invite_status) || row.session_status !== 'in_progress') {
       await rollbackQuietly(client)
