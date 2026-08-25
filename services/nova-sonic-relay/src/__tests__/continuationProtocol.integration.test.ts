@@ -413,6 +413,80 @@ describe('relay continuation protocol integration', () => {
     })
   })
 
+  it('passes one bounded clinical redirect back for exact resubmission without releasing speech', async () => {
+    send({
+      t: 'start',
+      instructions: 'Synthetic adaptive instructions.',
+      tools: [],
+      interviewMode: 'comprehensive',
+      adaptiveTurnController: true,
+    })
+    await new Promise((resolve) => setTimeout(resolve, 10))
+    relayHarness.instances[0].callbacks.onToolUse?.({
+      toolName: 'request_history_question',
+      toolUseId: 'redirected-adaptive-tool',
+      content: JSON.stringify({ proposed_text: 'What does the headache feel like?' }),
+    })
+    const redirected = await waitForMessage('toolCall')
+    send({
+      t: 'toolResult',
+      toolUseId: redirected.toolUseId,
+      segmentId: 1,
+      output: JSON.stringify({
+        success: false,
+        status: 'proposal_rejected',
+        issue_codes: ['clinical_redirect'],
+        required_text: 'How long does each headache usually last?',
+      }),
+    })
+    await new Promise((resolve) => setTimeout(resolve, 10))
+    expect(inbox.some((message) => message.t === 'error')).toBe(false)
+    expect(inbox.some((message) => message.t === 'assistantTranscript')).toBe(false)
+    expect(inbox.some((message) => message.t === 'audio')).toBe(false)
+
+    relayHarness.instances[0].callbacks.onToolUse?.({
+      toolName: 'request_history_question',
+      toolUseId: 'redirect-resubmission-tool',
+      content: JSON.stringify({ proposed_text: 'How long does each headache usually last?' }),
+    })
+    await expect(waitForMessage('toolCall')).resolves.toMatchObject({
+      toolUseId: 'redirect-resubmission-tool',
+    })
+  })
+
+  it('fails closed on a clinical redirect without one bounded required question', async () => {
+    send({
+      t: 'start',
+      instructions: 'Synthetic adaptive instructions.',
+      tools: [],
+      interviewMode: 'comprehensive',
+      adaptiveTurnController: true,
+    })
+    await new Promise((resolve) => setTimeout(resolve, 10))
+    relayHarness.instances[0].callbacks.onToolUse?.({
+      toolName: 'request_history_question',
+      toolUseId: 'malformed-redirect-tool',
+      content: JSON.stringify({ proposed_text: 'What does the headache feel like?' }),
+    })
+    const tool = await waitForMessage('toolCall')
+    send({
+      t: 'toolResult',
+      toolUseId: tool.toolUseId,
+      segmentId: 1,
+      output: JSON.stringify({
+        success: false,
+        status: 'proposal_rejected',
+        issue_codes: ['clinical_redirect'],
+      }),
+    })
+    await expect(waitForMessage('error')).resolves.toMatchObject({
+      message: 'The voice response did not satisfy the patient interview safety contract.',
+    })
+    await expect(waitForMessage('sessionEnded')).resolves.toMatchObject({
+      reason: 'nova_stream_error',
+    })
+  })
+
   it('treats a patient interruption as recoverable for adaptive questions', async () => {
     send({
       t: 'start',

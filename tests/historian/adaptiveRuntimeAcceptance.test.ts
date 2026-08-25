@@ -24,6 +24,12 @@ function lastToolOutput(provider: VoiceProvider): Record<string, unknown> {
   return vi.mocked(provider.sendToolResult).mock.calls.at(-1)?.[1] as Record<string, unknown>
 }
 
+function syntheticAdaptiveProposal(turn: number): string {
+  if (turn === 1) return "Hi, I'm Henry. What brings you in for your neurology visit today?"
+  if (turn === 2) return 'What is your age?'
+  return `What patient-specific headache detail should we clarify at turn ${turn}?`
+}
+
 describe('Comprehensive v3 adaptive synthetic runtime acceptance', () => {
   const originalFetch = globalThis.fetch
   const originalWindow = globalThis.window
@@ -205,7 +211,7 @@ describe('Comprehensive v3 adaptive synthetic runtime acceptance', () => {
         input: {
           proposed_text: turn === 3
             ? 'How has the symptom changed?'
-            : `What patient-specific headache detail should we clarify at turn ${turn}?`,
+            : syntheticAdaptiveProposal(turn),
         },
       })
       let output = lastToolOutput(provider)
@@ -225,8 +231,8 @@ describe('Comprehensive v3 adaptive synthetic runtime acceptance', () => {
         output = lastToolOutput(provider)
       }
       expect(output).toMatchObject({ success: true, status: 'approved', allow_example: false })
-      if (turn === 1) expect(output.approved_text).toMatch(/What brought you/i)
-      if (turn === 2) expect(output.approved_text).toBe('How old are you?')
+      if (turn === 1) expect(output.approved_text).toBe(syntheticAdaptiveProposal(1))
+      if (turn === 2) expect(output.approved_text).toBe(syntheticAdaptiveProposal(2))
       voiceSink?.({
         type: 'assistantTranscript',
         text: String(output.approved_text),
@@ -310,7 +316,7 @@ describe('Comprehensive v3 adaptive synthetic runtime acceptance', () => {
         toolName: 'request_history_question',
         toolUseId: `conductor-question-${turn}`,
         segmentId: 1,
-        input: { proposed_text: `What headache detail should we clarify at turn ${turn}?` },
+        input: { proposed_text: syntheticAdaptiveProposal(turn) },
       })
       const output = lastToolOutput(provider)
       voiceSink?.({
@@ -356,12 +362,25 @@ describe('Comprehensive v3 adaptive synthetic runtime acceptance', () => {
     expect(injected).not.toContain('synthetic-private-differential')
     expect(provider.injectSystemText).toHaveBeenCalledTimes(1)
     await vi.waitFor(() => {
-      expect(lastToolOutput(provider)).toMatchObject({
-        success: true,
-        status: 'approved',
-        obligation_id: 'claude-conductor-4',
-        approved_text: 'How long does each headache usually last?',
+      expect(lastToolOutput(provider)).toEqual({
+        success: false,
+        status: 'proposal_rejected',
+        issue_codes: ['clinical_redirect'],
+        required_text: 'How long does each headache usually last?',
       })
+    })
+    voiceSink?.({
+      type: 'toolCall',
+      toolName: 'request_history_question',
+      toolUseId: 'conductor-resubmitted-question',
+      segmentId: 1,
+      input: { proposed_text: 'How long does each headache usually last?' },
+    })
+    expect(lastToolOutput(provider)).toMatchObject({
+      success: true,
+      status: 'approved',
+      obligation_id: 'claude-conductor-4',
+      approved_text: 'How long does each headache usually last?',
     })
   })
 
@@ -385,7 +404,7 @@ describe('Comprehensive v3 adaptive synthetic runtime acceptance', () => {
         toolName: 'request_history_question',
         toolUseId: `reviewer-safety-question-${turn}`,
         segmentId: 1,
-        input: { proposed_text: `What synthetic headache detail should we clarify at turn ${turn}?` },
+        input: { proposed_text: syntheticAdaptiveProposal(turn) },
       })
       const output = lastToolOutput(provider)
       voiceSink?.({

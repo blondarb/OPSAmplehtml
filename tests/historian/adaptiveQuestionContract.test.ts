@@ -4,7 +4,10 @@ import {
   ADAPTIVE_AGE_QUESTION,
   ADAPTIVE_OPENING_QUESTION,
   adaptiveQuestionIssues,
+  approvedAdaptiveAgeQuestion,
+  approvedAdaptiveOpeningQuestion,
   approvedAdaptiveQuestion,
+  canonicalAdaptiveQuestion,
 } from '@/lib/historian/adaptiveQuestionContract'
 
 describe('adaptive Historian question contract', () => {
@@ -17,6 +20,21 @@ describe('adaptive Historian question contract', () => {
   it('keeps the two application-owned opening questions stable', () => {
     expect(ADAPTIVE_OPENING_QUESTION).toContain('What brought you')
     expect(ADAPTIVE_AGE_QUESTION).toBe('How old are you?')
+  })
+
+  it('accepts natural Nova wording while preserving the first-two clinical intents', () => {
+    expect(approvedAdaptiveOpeningQuestion(
+      "Hi, I'm Henry. What brings you in for your neurology visit today?",
+    )).toBe("Hi, I'm Henry. What brings you in for your neurology visit today?")
+    expect(approvedAdaptiveOpeningQuestion('How old are you?')).toBeNull()
+    expect(approvedAdaptiveOpeningQuestion('What brought on the headache in the morning?')).toBeNull()
+    expect(approvedAdaptiveAgeQuestion('Got it. What is your age?')).toBe(
+      'Got it. What is your age?',
+    )
+    expect(approvedAdaptiveAgeQuestion('What brings you in today?')).toBeNull()
+    expect(canonicalAdaptiveQuestion('HOW long do they last?')).toBe(
+      canonicalAdaptiveQuestion('How long do they last.'),
+    )
   })
 
   it.each([

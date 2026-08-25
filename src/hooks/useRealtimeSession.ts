@@ -23,7 +23,10 @@ import {
   ADAPTIVE_AGE_QUESTION,
   ADAPTIVE_OPENING_QUESTION,
   adaptiveQuestionIssues,
+  approvedAdaptiveAgeQuestion,
+  approvedAdaptiveOpeningQuestion,
   approvedAdaptiveQuestion,
+  canonicalAdaptiveQuestion,
 } from '@/lib/historian/adaptiveQuestionContract'
 import {
   deriveLiveReviewStructuredCoverage,
@@ -906,9 +909,9 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
           }
 
           const fixedOpening = questionCountRef.current === 0
-            ? { id: 'adaptive-opening', text: ADAPTIVE_OPENING_QUESTION }
+            ? { id: 'adaptive-opening', requiredText: ADAPTIVE_OPENING_QUESTION }
             : questionCountRef.current === 1
-              ? { id: 'adaptive-age', text: ADAPTIVE_AGE_QUESTION }
+              ? { id: 'adaptive-age', requiredText: ADAPTIVE_AGE_QUESTION }
               : null
           const pendingConductor = pendingConductorQuestionRef.current
           const conductorQuestion =
@@ -921,30 +924,47 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
             pendingConductor &&
             pendingConductor.reviewedThroughPatientSeq !== latestPatientSeq
           ) pendingConductorQuestionRef.current = null
-          if (conductorDuePatientSeqRef.current === latestPatientSeq) {
-            // Consume the intermittent conductor slot whether Claude answered
-            // in time or Nova supplied the bounded fallback question.
-            conductorDuePatientSeqRef.current = null
+          const modelProposal = approvedAdaptiveQuestion(args.proposed_text)
+          let proposedText: string | null
+          if (questionCountRef.current === 0) {
+            proposedText = approvedAdaptiveOpeningQuestion(args.proposed_text)
+          } else if (questionCountRef.current === 1) {
+            proposedText = approvedAdaptiveAgeQuestion(args.proposed_text)
+          } else if (conductorQuestion) {
+            proposedText =
+              modelProposal &&
+              canonicalAdaptiveQuestion(modelProposal) === canonicalAdaptiveQuestion(conductorQuestion)
+                ? modelProposal
+                : null
+          } else {
+            proposedText = modelProposal
           }
-          const proposedText = fixedOpening?.text ??
-            conductorQuestion ??
-            approvedAdaptiveQuestion(args.proposed_text)
           if (!proposedText) {
             adaptiveProposalRejectionsRef.current += 1
-            const issueCodes = adaptiveQuestionIssues(args.proposed_text)
             if (adaptiveProposalRejectionsRef.current > MAX_ADAPTIVE_PROPOSAL_REJECTIONS) {
               failClosed('proposal_retry_limit')
               return
             }
+            const requiredText = fixedOpening?.requiredText ?? conductorQuestion
+            const issueCodes = requiredText
+              ? ['clinical_redirect']
+              : adaptiveQuestionIssues(args.proposed_text)
             settleTool({
               success: false,
               status: 'proposal_rejected',
               issue_codes: issueCodes,
+              ...(requiredText ? { required_text: requiredText } : {}),
             })
             return
           }
           adaptiveProposalRejectionsRef.current = 0
           if (conductorQuestion) pendingConductorQuestionRef.current = null
+          if (conductorDuePatientSeqRef.current === latestPatientSeq) {
+            // Consume the intermittent conductor slot only after its exact
+            // resubmission is approved, or after the bounded Claude wait
+            // elapsed without a usable conductor question.
+            conductorDuePatientSeqRef.current = null
+          }
           settleTool({
             success: true,
             status: 'approved',

@@ -20,6 +20,7 @@ export type AdaptiveQuestionIssue =
   | 'generic_symptom_reference'
   | 'diagnostic_assertion'
   | 'medical_advice'
+  | 'clinical_redirect'
 
 const SENTENCE_SPLIT_RE = /(?<=[.!?])\s+/
 const FORMULAIC_FILLER_RE = /\b(?:thanks? for (?:sharing|that)|thank you for (?:sharing|that)|i appreciate (?:you )?sharing|that(?:'s| is) helpful)\b/i
@@ -65,4 +66,41 @@ export function approvedAdaptiveQuestion(value: unknown): string | null {
   if (typeof value !== 'string') return null
   const text = value.trim()
   return adaptiveQuestionIssues(text).length === 0 ? text : null
+}
+
+/**
+ * The first two adaptive turns have application-owned clinical intents, but
+ * Nova may phrase them naturally.  Keep those intents deterministic without
+ * replacing a valid proposal after tool use (Nova Sonic may continue with its
+ * original proposal even when a tool result contains different wording).
+ */
+export function approvedAdaptiveOpeningQuestion(value: unknown): string | null {
+  const text = approvedAdaptiveQuestion(value)
+  if (!text) return null
+  const asksWhyHere =
+    /\bwhy\b/i.test(text) ||
+    /\bwhat\s+(?:brought|brings|bring|led)\b/i.test(text) ||
+    /\b(?:reason|purpose)\b/i.test(text)
+  const identifiesVisit = /\b(?:refer(?:red|ral)?|neurolog(?:y|ist)|appointment|visit)\b/i.test(text)
+  const asksWhatBroughtPatientHere =
+    /\bwhat\s+(?:brought|brings|bring|led)\s+you\b.*\b(?:in|here)\b/i.test(text)
+  return asksWhyHere && (identifiesVisit || asksWhatBroughtPatientHere) ? text : null
+}
+
+export function approvedAdaptiveAgeQuestion(value: unknown): string | null {
+  const text = approvedAdaptiveQuestion(value)
+  if (!text) return null
+  return /\bhow old are you\b/i.test(text) || /\bwhat(?:'s| is) your age\b/i.test(text)
+    ? text
+    : null
+}
+
+export function canonicalAdaptiveQuestion(value: string): string {
+  return value
+    .normalize('NFKC')
+    .replace(/[\u2018\u2019]/g, "'")
+    .toLowerCase()
+    .replace(/[^a-z0-9']+/g, ' ')
+    .trim()
+    .replace(/\s+/g, ' ')
 }

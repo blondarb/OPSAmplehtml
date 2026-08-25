@@ -45,7 +45,19 @@ const ADAPTIVE_QUESTION_ISSUE_CODES = new Set([
   'generic_symptom_reference',
   'diagnostic_assertion',
   'medical_advice',
+  'clinical_redirect',
 ])
+
+function isBoundedClinicalRedirect(value: unknown): value is string {
+  if (typeof value !== 'string') return false
+  const text = value.trim()
+  return (
+    text.length > 0 &&
+    text.length <= 280 &&
+    !/[\r\n]/.test(text) &&
+    (text.match(/\?/g) ?? []).length === 1
+  )
+}
 
 function historianToolCategory(toolName: string): string {
   return KNOWN_HISTORIAN_TOOL_NAMES.has(toolName) ? toolName : 'unknown'
@@ -1007,8 +1019,15 @@ wss.on('connection', (ws) => {
                 outputRecord.issue_codes.every((code) => (
                   typeof code === 'string' && ADAPTIVE_QUESTION_ISSUE_CODES.has(code)
                 )) &&
+                (outputRecord.issue_codes.includes('clinical_redirect')
+                  ? outputRecord.issue_codes.length === 1 &&
+                    isBoundedClinicalRedirect(outputRecord.required_text)
+                  : outputRecord.required_text === undefined) &&
                 Object.keys(outputRecord).every((key) => (
-                  key === 'success' || key === 'status' || key === 'issue_codes'
+                  key === 'success' ||
+                  key === 'status' ||
+                  key === 'issue_codes' ||
+                  key === 'required_text'
                 ))
               if (approvedQuestion) {
                 if (!turnQuarantine.approveQuestion(approvedQuestion)) {

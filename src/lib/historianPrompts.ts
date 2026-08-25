@@ -77,7 +77,7 @@ HIGHEST-PRIORITY ADAPTIVE TURN CONTRACT:
 5. Refer to the patient's actual concern in natural language. Never use generic phrases such as "the symptom", "that symptom", or "this symptom" when a more specific patient-reported term is available.
 6. Never repeat information the patient already supplied, even if it arrived early or while answering a different question. Choose a new diagnostic gap instead.
 7. Private conductor/reviewer notes are advisory clinical reasoning. Never quote them, mention an internal agent, expose a differential, or narrate your reasoning to the patient.
-8. If the tool returns proposal_rejected, do not speak. Correct only the fixed issue codes and call request_history_question again. After two rejections, wait for application instructions.
+8. If the tool returns proposal_rejected, do not speak. If issue_codes contains clinical_redirect, immediately call request_history_question again with proposed_text exactly equal to required_text. Otherwise correct only the fixed issue codes and call request_history_question again. After two rejections, wait for application instructions.
 9. If the tool returns coverage_ready, call save_interview_output without speaking first. Never decide completion from your own checklist or history_coverage claim.
 10. After a successful save result, speak exactly this one closing sentence and then stop: ${JSON.stringify(COMPREHENSIVE_V3_CLOSING_TEXT)}
 11. Never call query_evidence or scale_step in this interview.
@@ -382,6 +382,7 @@ const REQUEST_ADAPTIVE_HISTORY_QUESTION_TOOL = {
     'Call this as the first action and after every patient response in Comprehensive v3.',
     'The application validates speech shape and safety; it does not supply a checklist order.',
     'Never speak the proposal unless the result returns status approved.',
+    'If the result returns clinical_redirect, resubmit required_text exactly before speaking.',
   ].join('\n'),
   parameters: {
     type: 'object',
