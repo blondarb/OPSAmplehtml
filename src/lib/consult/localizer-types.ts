@@ -7,6 +7,9 @@
  * suggest clinically-grounded follow-up questions.
  */
 
+import type { ComprehensiveHistoryDomain } from '@/lib/historianTypes'
+import type { LiveReviewClarificationReceiptV1 } from '@/lib/historian/liveReviewClarificationContract'
+
 // ── Request ───────────────────────────────────────────────────────────────────
 
 /** A single turn in the historian transcript. */
@@ -31,14 +34,26 @@ export interface LocalizerRequest {
   /** Session type influences the localizer prompt — new patients need diagnosis; follow-ups need treatment response. */
   sessionType: 'new_patient' | 'follow_up' | 'referral_clarification'
   /**
-   * Recent transcript turns to analyze. Send the last 6–10 turns for
-   * efficiency; the localizer does not need the full session history.
+   * Ordered transcript turns to analyze. Adaptive interviews send the
+   * bounded rolling history so the conductor can avoid repetition.
    */
   transcript: LocalizerTranscriptTurn[]
   /** Chief complaint from the session init context (e.g. "new-onset headache"). */
   chiefComplaint?: string
   /** Original referral reason from the neurology_consults record, if available. */
   referralReason?: string
+  /** Fixed-vocabulary gaps from the separate silent reviewer. Never diagnoses. */
+  reviewGaps?: ComprehensiveHistoryDomain[]
+  /** Bounded history-question intents from the separate silent reviewer. */
+  reviewIntents?: string[]
+  /** Exact single reviewer intent that must own this conductor turn. */
+  requiredReviewIntent?: string
+  /** Fixed-vocabulary domain+depth key paired with requiredReviewIntent. */
+  requiredReviewGapKey?: string
+  /** Latest patient sequence covered by the signed review that produced the gap. */
+  reviewedThroughPatientSeq?: number
+  /** Requires session-bound bearer authority and enables the adaptive conductor path. */
+  adaptiveInterview?: boolean
 }
 
 // ── Step 1 Output: Symptom Extraction ────────────────────────────────────────
@@ -157,6 +172,10 @@ export interface LocalizerResponse {
   partial?: boolean
   /** Error message if the route degraded (session continues regardless). */
   degradedReason?: string
+  /** Echoed only when the conductor explicitly addressed the required intent. */
+  addressedReviewGapKey?: string
+  /** Server-signed receipt for the exact required gap and generated question. */
+  reviewClarificationReceipt?: LiveReviewClarificationReceiptV1
 }
 
 // ── DB columns added to neurology_consults ───────────────────────────────────

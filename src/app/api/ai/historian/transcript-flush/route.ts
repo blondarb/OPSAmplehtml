@@ -36,7 +36,7 @@ export async function POST(request: Request) {
   try {
     const authHeader = request.headers.get('authorization') || ''
     const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7).trim() : ''
-    const verified = token ? verifyFlushToken(token) : null
+    const verified = token ? await verifyFlushToken(token) : null
     if (!verified) {
       return NextResponse.json({ error: 'Invalid or missing flush token' }, { status: 403 })
     }
@@ -98,6 +98,7 @@ export async function POST(request: Request) {
     }
 
     const pool = await getPool()
+    const client = await pool.connect()
     const values: unknown[] = []
     const valueRows = entries.map((entry) => {
       values.push(sessionId, entry.seq, entry.role, entry.text, entry.tsOffsetS)
@@ -110,9 +111,41 @@ export async function POST(request: Request) {
       ON CONFLICT (session_id, seq) DO NOTHING
       RETURNING id
     `
-    const { rowCount } = await pool.query(sql, values)
+    try {
+      await client.query('BEGIN')
+      // Serialize transcript persistence with zero-turn startup recovery. If
+      // recovery wins, this sees redeemed and writes nothing. If this wins,
+      // recovery waits, then sees the durable event and refuses to reopen.
+      const invite = await client.query<{
+        status: string
+        startup_attempt_id: string | null
+      }>(
+        `SELECT status, startup_attempt_id
+           FROM historian_invites
+          WHERE session_id = $1
+          FOR UPDATE`,
+        [sessionId],
+      )
+      const invitation = invite.rows[0]
+      if (
+        invitation &&
+        (invitation.status !== 'in_progress' ||
+          !verified.startupAttemptId ||
+          invitation.startup_attempt_id !== verified.startupAttemptId)
+      ) {
+        await client.query('ROLLBACK')
+        return NextResponse.json({ error: 'Stale transcript authority' }, { status: 403 })
+      }
 
-    return NextResponse.json({ accepted: rowCount ?? 0 })
+      const { rowCount } = await client.query(sql, values)
+      await client.query('COMMIT')
+      return NextResponse.json({ accepted: rowCount ?? 0 })
+    } catch (error) {
+      try { await client.query('ROLLBACK') } catch {}
+      throw error
+    } finally {
+      client.release()
+    }
   } catch (error: unknown) {
     const pgCode = (error as { code?: string } | undefined)?.code
     if (pgCode === '42P01') {

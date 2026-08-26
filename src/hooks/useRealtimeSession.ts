@@ -1,13 +1,83 @@
 'use client'
 
 import { useState, useRef, useCallback, useEffect } from 'react'
-import type { HistorianTranscriptEntry, HistorianStructuredOutput, HistorianRedFlag, HistorianSessionType } from '@/lib/historianTypes'
+import type { HistorianTranscriptEntry, HistorianStructuredOutput, HistorianRedFlag, HistorianSessionType, HistorianInterviewMode, HistorianInterviewPromptVersion, HistorianTerminationReason } from '@/lib/historianTypes'
+import {
+  COMPREHENSIVE_HARD_STOP_EXCHANGE,
+  COMPREHENSIVE_HARD_STOP_SAVE_NUDGE,
+  COMPREHENSIVE_SOFT_WRAP_EXCHANGE,
+  evaluateComprehensiveSave,
+} from '@/lib/historian/comprehensiveCompletionPolicy'
+import {
+  approveNextPatientEvidenceQuestion,
+  collectPatientEvidenceEntry,
+  commitApprovedPatientEvidenceQuestion,
+  createPatientEvidenceState,
+  derivePatientEvidenceStructuredCoverage,
+  patientEvidenceAnswerRequiresSafetyEscalation,
+  patientEvidenceCompletion,
+  settlePatientEvidenceAnswer,
+  type PatientEvidenceState,
+} from '@/lib/historian/patientEvidenceController'
+import {
+  ADAPTIVE_AGE_QUESTION,
+  ADAPTIVE_OPENING_QUESTION,
+  ADAPTIVE_PRE_CLOSE_QUESTION,
+  adaptiveQuestionAllowsExample,
+  adaptiveQuestionIssues,
+  approvedAdaptiveAgeQuestion,
+  approvedAdaptiveOpeningQuestion,
+  approvedAdaptiveQuestion,
+  canonicalAdaptiveQuestion,
+} from '@/lib/historian/adaptiveQuestionContract'
+import {
+  deriveLiveReviewStructuredCoverage,
+  liveReviewGapKey,
+  liveInterviewReviewCompletion,
+  parseLiveInterviewReviewArtifact,
+  type LiveInterviewReviewArtifact,
+} from '@/lib/historian/liveReviewContract'
+import {
+  parseLiveReviewClarificationReceipt,
+  type LiveReviewClarificationEvidenceV1,
+  type LiveReviewClarificationReceiptV1,
+} from '@/lib/historian/liveReviewClarificationContract'
+import {
+  approveMedicationQuestion,
+  commitMedicationQuestion,
+  completionWithMedicationUncertainty,
+  confirmedMedicationSummary,
+  createMedicationReconciliationState,
+  medicationReconciliationClosed,
+  medicationReconciliationHasUncertainty,
+  medicationReconciliationUnresolvedCount,
+  nextMedicationQuestion,
+  recordMedicationAnswer,
+  syncMedicationReview,
+  type MedicationReconciliationState,
+} from '@/lib/historian/medicationReconciliation'
+import {
+  assertHistorianContinuationCheckpoint,
+  buildHistorianAnsweredQuestionPairs,
+  conservativeHistorianContinuationCoverage,
+  hashHistorianContinuationTranscript,
+  type HistorianContinuationCheckpointV1,
+} from '@/lib/historian/continuationState'
+import {
+  HistorianRuntimeGuard,
+  applyHistorianTurnDecision,
+} from '@/lib/historian/runtimeGuard'
 import type { HistorianReferralInput } from '@/lib/historian/referralContext'
 import type { LocalizerResponse } from '@/lib/consult/localizer-types'
 import type { SaveScaleResponsesArgs } from '@/lib/consult/scales'
 import { detectRedFlags } from '@/lib/consult/red-flags/red-flag-detector'
 import type { DetectedFlag } from '@/lib/consult/red-flags/red-flag-types'
-import type { VoiceEvent, VoiceProvider } from '@/lib/voice/providerTypes'
+import {
+  voiceStartupFailureStage,
+  type VoiceEvent,
+  type VoiceProvider,
+  type VoiceStartupFailureStage,
+} from '@/lib/voice/providerTypes'
 import { selectProvider, makeProvider } from '@/lib/voice/selectProvider'
 import {
   createUnresponsivenessMonitor,
@@ -22,6 +92,7 @@ type SessionStatus = 'idle' | 'connecting' | 'active' | 'ending' | 'complete' | 
 
 interface UseRealtimeSessionOptions {
   sessionType: HistorianSessionType
+  interviewMode?: HistorianInterviewMode
   referralReason?: string
   patientName?: string
   patientContext?: string
@@ -63,6 +134,12 @@ interface UseRealtimeSessionOptions {
      * partial in downstream UIs and reports.
      */
     endedEarly: boolean
+    /** Explicit terminal cause; both deterministic coverage outcomes are completed intakes. */
+    terminationReason: HistorianTerminationReason
+    /** Server-resolved interview contract actually applied to the session. */
+    interviewMode: HistorianInterviewMode
+    /** Server-owned version of the prompt contract actually applied. */
+    interviewPromptVersion: HistorianInterviewPromptVersion
     /**
      * Server-minted historian_sessions id (Task 1: durable transcript),
      * returned by /api/ai/historian/session as `sessionId`. Consumers must
@@ -137,14 +214,23 @@ interface UseRealtimeSessionResult {
   endedUnresponsive: boolean
 }
 
-const SAFETY_KEYWORDS = [
-  'kill myself', 'want to die', 'hurt myself', 'end my life',
-  'suicide', 'suicidal', 'self-harm', 'don\'t want to live',
-  'hurt someone', 'kill someone',
-]
-
 /** How many patient turns between localizer runs. */
 const LOCALIZER_INTERVAL = 3
+const LIVE_REVIEW_INTERVAL = 4
+const MAX_REVIEW_GAP_CLARIFICATIONS = 3
+const MAX_ADAPTIVE_PROPOSAL_REJECTIONS = 2
+/**
+ * On each intermittent Claude-conductor turn, hold Nova's proposed question
+ * briefly so the patient-specific conductor question can actually own that
+ * turn. Other turns remain immediate. If Claude is unavailable or slower
+ * than this bound, Nova's already-validated proposal wins and the interview
+ * continues without an unbounded pause.
+ */
+const ADAPTIVE_CONDUCTOR_WAIT_MS = 4_500
+const ADAPTIVE_CONDUCTOR_POLL_MS = 50
+const ADAPTIVE_REVIEW_WAIT_MS = 6_000
+const ADAPTIVE_REVIEW_THEN_CONDUCTOR_WAIT_MS =
+  ADAPTIVE_REVIEW_WAIT_MS + ADAPTIVE_CONDUCTOR_WAIT_MS
 
 /**
  * How many unflushed transcript entries accumulate before triggering an
@@ -171,6 +257,27 @@ const FINAL_FLUSH_TIMEOUT_MS = 2000
  * drain and aiSpeechStop may never arrive, so this must not depend on either.
  */
 const UNRESPONSIVE_SIGN_OFF_GRACE_MS = 8000
+const CONTINUATION_RESERVE_MS = 5_000
+
+const TERMINATION_PRIORITY: Record<HistorianTerminationReason, number> = {
+  coverage_complete: 0,
+  complete_with_uncertainty: 0,
+  manual_end: 1,
+  unresponsive: 2,
+  transport_lost: 3,
+  provider_error: 3,
+  patient_requested_stop: 4,
+  hard_stop: 5,
+  safety_escalated: 6,
+}
+
+function strongerTerminationReason(
+  current: HistorianTerminationReason | null,
+  incoming: HistorianTerminationReason,
+): HistorianTerminationReason {
+  if (!current || TERMINATION_PRIORITY[incoming] > TERMINATION_PRIORITY[current]) return incoming
+  return current
+}
 
 export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealtimeSessionResult {
   const [status, setStatus] = useState<SessionStatus>('idle')
@@ -194,10 +301,14 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const startTimeRef = useRef<number>(0)
   const questionCountRef = useRef<number>(0)
+  const runtimeGuardRef = useRef<HistorianRuntimeGuard | null>(null)
+  if (runtimeGuardRef.current === null) runtimeGuardRef.current = new HistorianRuntimeGuard()
   const structuredOutputRef = useRef<HistorianStructuredOutput | null>(null)
   const narrativeSummaryRef = useRef<string | null>(null)
   const redFlagsRef = useRef<HistorianRedFlag[]>([])
   const safetyEscalatedRef = useRef<boolean>(false)
+  const safetyEffectsActivatedRef = useRef<boolean>(false)
+  const safetyAlertRequestedRef = useRef<boolean>(false)
   const transcriptRef = useRef<HistorianTranscriptEntry[]>([])
   const administeredScaleIdsRef = useRef<Set<string>>(new Set())
   // ── Durable transcript flush (Task 1 of the Historian Validation Suite) ──
@@ -207,6 +318,32 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
   // session still works exactly as before this feature if /session is an
   // older/mocked response without these fields).
   const serverSessionIdRef = useRef<string | null>(null)
+  const startupFailureStageRef = useRef<VoiceStartupFailureStage>('provider_setup')
+  const resolvedInterviewModeRef = useRef<HistorianInterviewMode>('standard')
+  const resolvedInterviewPromptVersionRef = useRef<HistorianInterviewPromptVersion>('standard-v1')
+  const turnEvidenceControllerEnabledRef = useRef(false)
+  const adaptiveTurnControllerEnabledRef = useRef(false)
+  const adaptiveProposalRejectionsRef = useRef(0)
+  const pendingConductorQuestionRef = useRef<{
+    text: string
+    reviewedThroughPatientSeq: number
+    clarificationReceipt: LiveReviewClarificationReceiptV1 | null
+  } | null>(null)
+  const conductorDuePatientSeqRef = useRef<number | null>(null)
+  const patientEvidenceStateRef = useRef<PatientEvidenceState>(createPatientEvidenceState())
+  const liveReviewRef = useRef<LiveInterviewReviewArtifact | null>(null)
+  const liveReviewInFlightRef = useRef(false)
+  const lastLiveReviewTurnRef = useRef(0)
+  const pendingReviewClarificationRef = useRef<{
+    receipt: LiveReviewClarificationReceiptV1
+    assistantSeq: number | null
+  } | null>(null)
+  const reviewClarificationEvidenceRef = useRef<LiveReviewClarificationEvidenceV1[]>([])
+  const medicationReconciliationRef = useRef<MedicationReconciliationState>(
+    createMedicationReconciliationState(),
+  )
+  const preCloseStateRef = useRef<'not_asked' | 'approved' | 'answered'>('not_asked')
+  const reviewRequiredPatientSeqRef = useRef<number | null>(null)
   const flushTokenRef = useRef<string | null>(null)
   // Monotonic per-entry sequence number, assigned at append time (both the
   // assistantTranscript and userTranscript branches below).
@@ -217,6 +354,13 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
   // flush endpoint is idempotent (ON CONFLICT (session_id, seq) DO
   // NOTHING) so resending an already-durable batch is always safe.
   const pendingFlushEntriesRef = useRef<HistorianTranscriptEntry[]>([])
+  // Segment-scoped pending tools are a hard continuation barrier. The segment
+  // binding also prevents a late async result from being routed to a new Nova
+  // stream where its toolUseId is meaningless.
+  const pendingToolsRef = useRef<Map<string, { toolName: string; segmentId?: number }>>(new Map())
+  const activeScaleRef = useRef<{ scaleId: string; itemIndex: number } | null>(null)
+  const continuationDueRef = useRef<{ segmentId: number; deadlineAtMs: number } | null>(null)
+  const continuationInFlightRef = useRef(false)
   // Phase 5: holds the base instructions returned by /api/ai/historian/session.
   // Used by pushLocalizerContext to re-serialize BASE_PROMPT + delta (OpenAI)
   // or as the closing-line-free source text (Nova has no overwrite primitive).
@@ -228,7 +372,11 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
 
   // Stable ref to endSession so the provider's `disconnected` handler can call
   // the latest version without a circular useCallback dependency.
-  const endSessionRef = useRef<() => Promise<void>>(async () => {})
+  const endSessionRef = useRef<(reason?: HistorianTerminationReason) => Promise<void>>(async () => {})
+
+  // Kept independently from interviewCompleted: a terminal partial save still
+  // calls save_interview_output, but must never be mislabeled as complete.
+  const terminationReasonRef = useRef<HistorianTerminationReason | null>(null)
 
   // One-shot finalize guard — whichever path fires first (manual end or a
   // transport drop) wins; the other no-ops. Prevents double-save to
@@ -270,6 +418,10 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
     unresponsiveRef.current = createUnresponsivenessMonitor({
       config: options.unresponsiveness ?? DEFAULT_UNRESPONSIVENESS_CONFIG,
       onCheckIn: () => {
+        // V2 reserves every audible question for an evidence obligation. Do
+        // not insert an unbound check-in between the approved question and
+        // its eventual patient transcript.
+        if (turnEvidenceControllerEnabledRef.current) return
         const provider = providerRef.current
         if (!provider?.isOpen()) return
         provider.injectSystemText(UNRESPONSIVE_CHECK_IN_NUDGE)
@@ -285,6 +437,14 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
         setEndedUnresponsive(true)
         console.warn('[useRealtimeSession] patient unresponsive — ending session gracefully')
         const provider = providerRef.current
+        if (
+          turnEvidenceControllerEnabledRef.current ||
+          adaptiveTurnControllerEnabledRef.current
+        ) {
+          provider?.suppressOutput()
+          void endSessionRef.current('unresponsive')
+          return
+        }
         if (provider?.isOpen()) {
           provider.injectSystemText(UNRESPONSIVE_SIGN_OFF_NUDGE)
           provider.requestResponse()
@@ -293,7 +453,7 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
         if (signOffTimerRef.current) clearTimeout(signOffTimerRef.current)
         signOffTimerRef.current = setTimeout(() => {
           signOffTimerRef.current = null
-          endSessionRef.current()
+          endSessionRef.current('unresponsive')
         }, UNRESPONSIVE_SIGN_OFF_GRACE_MS)
       },
     })
@@ -306,21 +466,48 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
   const lastLocalizerTurnRef = useRef<number>(0)
   const localizerInFlightRef = useRef<boolean>(false)
 
-  // Safety keyword check (secondary defense)
-  const checkSafety = useCallback((text: string) => {
-    const lower = text.toLowerCase()
-    for (const kw of SAFETY_KEYWORDS) {
-      if (lower.includes(kw)) {
-        safetyEscalatedRef.current = true
-        // A safety escalation must never be interrupted by a check-in.
-        unresponsiveRef.current?.suspend()
-        setStatus('safety_escalation')
-        options.onSafetyEscalation?.()
-        return true
-      }
+  // Idempotent safety effects shared by transcript and model-tool detection.
+  const activateSafety = useCallback(() => {
+    safetyEscalatedRef.current = true
+    // Cancel both locally queued PCM and the relay's quarantined normal turn
+    // before any other safety effect. A late ordinary answer must never play
+    // over the patient-facing emergency screen.
+    providerRef.current?.suppressOutput()
+    if (safetyEffectsActivatedRef.current) return
+    safetyEffectsActivatedRef.current = true
+    if (!redFlagsRef.current.some((flag) => flag.flag === 'Patient-stated active safety trigger')) {
+      redFlagsRef.current = [
+        ...redFlagsRef.current,
+        {
+          flag: 'Patient-stated active safety trigger',
+          severity: 'high',
+          context: 'Activated by the transcript or model safety screen; review the final patient turn in the transcript.',
+        },
+      ]
     }
-    return false
-  }, [options])
+    // A safety escalation must never be interrupted by a check-in.
+    unresponsiveRef.current?.suspend()
+    setStatus('safety_escalation')
+    options.onSafetyEscalation?.()
+    const sessionId = serverSessionIdRef.current
+    if (
+      sessionId &&
+      resolvedInterviewModeRef.current === 'comprehensive' &&
+      !safetyAlertRequestedRef.current
+    ) {
+      safetyAlertRequestedRef.current = true
+      void fetch('/api/ai/historian/safety-escalation', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sessionId }),
+        keepalive: true,
+      }).then((response) => {
+        if (!response.ok) console.error('[useRealtimeSession] clinic safety alert was not confirmed')
+      }).catch(() => {
+        console.error('[useRealtimeSession] clinic safety alert request failed')
+      })
+    }
+  }, [options.onSafetyEscalation])
 
   const cleanup = useCallback(() => {
     // Stop the duration timer + auto-end timer. Transport teardown is owned
@@ -340,6 +527,9 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
       signOffTimerRef.current = null
     }
     unresponsiveRef.current?.suspend()
+    continuationDueRef.current = null
+    continuationInFlightRef.current = false
+    pendingToolsRef.current.clear()
   }, [])
 
   /**
@@ -389,33 +579,80 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
 
   // ── Localizer: fire async, inject guidance back into session ─────────
   const runLocalizer = useCallback(async () => {
+    if (!runtimeGuardRef.current?.acceptsInterviewActivity()) return
     const localizerEnabled = options.enableLocalizer !== false // default true
     if (!localizerEnabled) return
     if (localizerInFlightRef.current) return
     if (transcriptRef.current.length < 2) return
+    const adaptiveSessionId = serverSessionIdRef.current
+    const adaptiveToken = flushTokenRef.current
+    if (adaptiveTurnControllerEnabledRef.current && (!adaptiveSessionId || !adaptiveToken)) return
+    const requestSessionGen = sessionGenRef.current
+    const reviewedThroughPatientSeq = [...transcriptRef.current]
+      .reverse()
+      .find((entry) => entry.role === 'user')?.seq
+    const reviewSnapshot = liveReviewRef.current?.review
+    const requiredReviewGap =
+      reviewSnapshot?.version === 2 &&
+      reviewSnapshot.integrity === 'valid' &&
+      reviewSnapshot.reviewedThroughSeq === reviewedThroughPatientSeq
+        ? reviewSnapshot.criticalGaps[0] ?? null
+        : null
+    const requiredReviewIntent = requiredReviewGap?.questionIntent ?? null
+    const requiredReviewGapKey = requiredReviewGap ? liveReviewGapKey(requiredReviewGap) : null
 
     localizerInFlightRef.current = true
     setLocalizerLoading(true)
 
-    // Grab last 8 turns for context
-    const recentTurns = transcriptRef.current.slice(-8).map(t => ({
-      role: t.role,
-      text: t.text,
-    }))
-
+    // The adaptive conductor needs enough rolling history to follow the
+    // patient's actual story and avoid re-asking earlier facts. Keep the
+    // payload bounded even when individual ASR turns are unusually long.
+    const boundedTurns: Array<{ role: 'assistant' | 'user'; text: string }> = []
+    let boundedChars = 0
+    for (const turn of transcriptRef.current.slice(-120).reverse()) {
+      if (boundedChars + turn.text.length > 80_000) break
+      boundedTurns.unshift({ role: turn.role, text: turn.text })
+      boundedChars += turn.text.length
+    }
     try {
       const res = await fetch('/api/ai/historian/localizer', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          ...(adaptiveTurnControllerEnabledRef.current
+            ? { Authorization: `Bearer ${adaptiveToken}` }
+            : {}),
+        },
         body: JSON.stringify({
-          sessionId: options.consultId ?? 'ephemeral',
+          sessionId: adaptiveTurnControllerEnabledRef.current
+            ? adaptiveSessionId
+            : options.consultId ?? 'ephemeral',
           sessionType: options.sessionType,
-          transcript: recentTurns.map(t => ({
+          transcript: boundedTurns.map(t => ({
             ...t,
             timestamp: Date.now(),
           })),
           chiefComplaint: options.referralReason,
           referralReason: options.referralReason,
+          reviewGaps: adaptiveTurnControllerEnabledRef.current
+            ? reviewSnapshot?.domains
+                .filter((item) => item.status === 'missing')
+                .map((item) => item.domain)
+                .slice(0, 8) ?? []
+            : undefined,
+          reviewIntents: adaptiveTurnControllerEnabledRef.current
+            ? reviewSnapshot?.version === 2
+              ? reviewSnapshot.nextQuestionIntents.slice(0, 1)
+              : reviewSnapshot?.nextQuestionIntents.slice(0, 3) ?? []
+            : undefined,
+          ...(adaptiveTurnControllerEnabledRef.current && requiredReviewIntent && requiredReviewGapKey
+            ? {
+                requiredReviewIntent,
+                requiredReviewGapKey,
+                reviewedThroughPatientSeq,
+              }
+            : {}),
+          adaptiveInterview: adaptiveTurnControllerEnabledRef.current,
         }),
       })
 
@@ -424,20 +661,74 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
         console.warn(`[localizer] HTTP ${res.status} — skipping this run`)
         return
       }
+      if (
+        sessionGenRef.current !== requestSessionGen ||
+        (adaptiveTurnControllerEnabledRef.current && serverSessionIdRef.current !== adaptiveSessionId)
+      ) return
 
       const data: LocalizerResponse = await res.json()
+      if (
+        sessionGenRef.current !== requestSessionGen ||
+        (adaptiveTurnControllerEnabledRef.current && serverSessionIdRef.current !== adaptiveSessionId)
+      ) return
+
+      const conductorQuestion = data.followUpQuestions
+        .map((question) => approvedAdaptiveQuestion(question))
+        .find((question): question is string => !!question)
+      let clarificationReceipt: LiveReviewClarificationReceiptV1 | null = null
+      if (
+        conductorQuestion &&
+        requiredReviewGapKey &&
+        data.addressedReviewGapKey === requiredReviewGapKey &&
+        data.reviewClarificationReceipt != null
+      ) {
+        try {
+          const parsedReceipt = parseLiveReviewClarificationReceipt(
+            data.reviewClarificationReceipt,
+          )
+          if (
+            parsedReceipt.gapKey === requiredReviewGapKey &&
+            parsedReceipt.reviewedThroughPatientSeq === reviewedThroughPatientSeq &&
+            parsedReceipt.question === conductorQuestion
+          ) clarificationReceipt = parsedReceipt
+        } catch {
+          clarificationReceipt = null
+        }
+      }
+      if (
+        adaptiveTurnControllerEnabledRef.current &&
+        conductorQuestion &&
+        Number.isInteger(reviewedThroughPatientSeq) &&
+        conductorDuePatientSeqRef.current === reviewedThroughPatientSeq
+      ) {
+        pendingConductorQuestionRef.current = {
+          text: conductorQuestion,
+          reviewedThroughPatientSeq: reviewedThroughPatientSeq!,
+          clarificationReceipt,
+        }
+      }
 
       // Update state for physician panel
       setLocalizerData(data)
       options.onLocalizerUpdate?.(data)
 
-      // Inject follow-up questions as advisory guidance into the session —
-      // advisory only, no forced response; the AI picks it up on its next
-      // natural turn. Guard: skip injection if the AI is currently speaking
-      // to avoid mid-sentence interruption and accidental vocalization.
-      if (data.contextHint && providerRef.current && !isAiSpeakingRef.current) {
-        const guidance = `[INTERNAL SYSTEM NOTE — do NOT speak this aloud, do NOT mention it to the patient, use ONLY to guide your next question silently]: ${data.contextHint}`
-        providerRef.current.injectSystemText(guidance)
+      // The adaptive conductor stays behind the application boundary. Nova
+      // receives its selected question only through the exact
+      // clinical_redirect -> resubmission contract below. Nova Sonic carries
+      // injected mid-session notes as USER-role turns; sending one while an
+      // approved question is waiting to be spoken can trigger a second tool
+      // call and terminate the interview. Legacy non-adaptive sessions retain
+      // their advisory localizer injection.
+      if (
+        !adaptiveTurnControllerEnabledRef.current &&
+        (data.contextHint || data.followUpQuestions.length > 0) &&
+        providerRef.current &&
+        !isAiSpeakingRef.current &&
+        runtimeGuardRef.current?.acceptsInterviewActivity()
+      ) {
+        providerRef.current.injectSystemText(
+          `[INTERNAL SYSTEM NOTE — do NOT speak this aloud, do NOT mention it to the patient, use ONLY to guide your next question silently]: ${data.contextHint}`,
+        )
       }
     } catch (err: any) {
       // Network/timeout errors must not interrupt the session
@@ -448,6 +739,93 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
     }
   }, [options])
 
+  const runLiveReview = useCallback(async (): Promise<LiveInterviewReviewArtifact | null> => {
+    if (!adaptiveTurnControllerEnabledRef.current) return null
+    if (!runtimeGuardRef.current?.acceptsInterviewActivity()) return null
+    if (liveReviewInFlightRef.current) return null
+    const sessionId = serverSessionIdRef.current
+    const token = flushTokenRef.current
+    const snapshot = transcriptRef.current.map((entry) => ({ ...entry }))
+    const latestPatientSeq = [...snapshot].reverse().find((entry) => entry.role === 'user')?.seq
+    if (!sessionId || !token || !Number.isInteger(latestPatientSeq) || snapshot.length < 2) return null
+    const requestSessionGen = sessionGenRef.current
+
+    liveReviewInFlightRef.current = true
+    const capturedPatientTurns = patientTurnCountRef.current
+    try {
+      const response = await fetch('/api/ai/historian/live-review', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          sessionId,
+          transcript: snapshot,
+          interviewPromptVersion: resolvedInterviewPromptVersionRef.current,
+          ...(resolvedInterviewPromptVersionRef.current === 'comprehensive-v4'
+            ? {
+                reviewClarificationEvidence: reviewClarificationEvidenceRef.current.slice(
+                  0,
+                  MAX_REVIEW_GAP_CLARIFICATIONS,
+                ),
+              }
+            : {}),
+        }),
+      })
+      if (!response.ok) return null
+      const artifact = parseLiveInterviewReviewArtifact(await response.json(), snapshot)
+      if (
+        sessionGenRef.current !== requestSessionGen ||
+        serverSessionIdRef.current !== sessionId
+      ) return null
+      const currentLatestPatientSeq = [...transcriptRef.current]
+        .reverse()
+        .find((entry) => entry.role === 'user')?.seq
+      // Never let a slower review overwrite a newer transcript boundary.
+      if (currentLatestPatientSeq !== latestPatientSeq) return null
+      liveReviewRef.current = artifact
+      medicationReconciliationRef.current = syncMedicationReview(
+        medicationReconciliationRef.current,
+        artifact.review.medications,
+      )
+      if (reviewRequiredPatientSeqRef.current === latestPatientSeq) {
+        reviewRequiredPatientSeqRef.current = null
+      }
+      lastLiveReviewTurnRef.current = capturedPatientTurns
+
+      if (artifact.review.activeSafetyConcern.present) {
+        // A separate transcript-citing reviewer may strengthen safety, but it
+        // can never clear or downgrade the deterministic safety path.
+        runtimeGuardRef.current?.modelSafetyEscalation()
+        activateSafety()
+        unresponsiveRef.current?.suspend()
+        void endSessionRef.current('safety_escalated')
+        return artifact
+      }
+
+      // When a periodic conductor turn and review are due together, the
+      // caller defers Claude until this exact patient boundary has a fresh
+      // signed review. This prevents an older gap from owning a newer turn.
+      if (
+        conductorDuePatientSeqRef.current === latestPatientSeq &&
+        !localizerInFlightRef.current
+      ) void runLocalizer()
+
+      // Keep the independent reviewer fully silent and application-owned.
+      // Its cited domains govern closure and feed the next Claude conductor
+      // request; injecting reviewer prose into Nova would create a USER-role
+      // turn that can race an already-authorized patient-facing question.
+      return artifact
+    } catch {
+      // Fail open for conversation continuity, but never for normal closure:
+      // coverage_ready still requires a current validated review below.
+      return null
+    } finally {
+      liveReviewInFlightRef.current = false
+    }
+  }, [activateSafety, runLocalizer])
+
   // ── Durable transcript flush (Task 1) ─────────────────────────────────
   // Best-effort POST of up to 50 not-yet-durable entries. Returns a Promise
   // so a caller that needs to (endSession's final flush, below) CAN await
@@ -457,11 +835,11 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
   // Failures simply leave the batch in pendingFlushEntriesRef so the next
   // trigger retries it; the endpoint is idempotent so resending an
   // already-durable batch is always safe.
-  const flushTranscript = useCallback((opts?: { keepalive?: boolean }): Promise<void> => {
+  const flushTranscript = useCallback((opts?: { keepalive?: boolean }): Promise<boolean> => {
     const sessionId = serverSessionIdRef.current
     const token = flushTokenRef.current
-    if (!sessionId || !token) return Promise.resolve() // /session didn't mint flush support — no-op
-    if (pendingFlushEntriesRef.current.length === 0) return Promise.resolve()
+    if (!sessionId || !token) return Promise.resolve(false) // no durable checkpoint authority
+    if (pendingFlushEntriesRef.current.length === 0) return Promise.resolve(true)
 
     // Cap at 50/request (server also enforces this — see transcript-flush
     // route.ts — this just avoids a guaranteed-413 round trip). Anything
@@ -482,7 +860,7 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
         keepalive: opts?.keepalive === true,
       })
         .then(res => {
-          if (!res.ok) return // fail-open: leave batch pending for the next trigger
+          if (!res.ok) return false // fail-open: leave batch pending for the next trigger
           // Cross-session prune race guard: if a NEW session has already
           // started by the time this (possibly slow/retried) response
           // lands, pendingFlushEntriesRef was already reset for that new
@@ -493,18 +871,42 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
           // on; this response already confirms the stale batch is durable
           // server-side, it just has nothing left to prune from a buffer
           // it's no longer part of.
-          if (serverSessionIdRef.current !== sessionId) return
+          if (serverSessionIdRef.current !== sessionId) return false
           const sentSeqs = new Set(batch.map(e => e.seq))
           pendingFlushEntriesRef.current = pendingFlushEntriesRef.current.filter(
             e => !sentSeqs.has(e.seq),
           )
+          return true
         })
         .catch(() => {
           // Network error — fail-open, retried on the next trigger.
+          return false
         })
     } catch {
       // Synchronous fetch-construction failure (shouldn't happen) — fail-open.
-      return Promise.resolve()
+      return Promise.resolve(false)
+    }
+  }, [])
+
+  const recoverRetryableStartupFailure = useCallback(async (
+    reason: 'provider_error' | 'transport_lost',
+    stage: VoiceStartupFailureStage,
+  ): Promise<boolean> => {
+    const sessionId = serverSessionIdRef.current
+    const token = flushTokenRef.current
+    if (!sessionId || !token) return false
+    try {
+      const response = await fetch('/api/ai/historian/startup-recovery', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ sessionId, reason, stage }),
+      })
+      return response.ok
+    } catch {
+      return false
     }
   }, [])
 
@@ -512,21 +914,548 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
   // response.done branch pre-refactor, now keyed off the normalized `toolCall`
   // VoiceEvent and replying via provider.sendToolResult instead of writing
   // function_call_output to the data channel directly.
-  const handleToolCall = useCallback((toolName: string, toolUseId: string, input: unknown) => {
+  const handleToolCall = useCallback((
+    toolName: string,
+    toolUseId: string,
+    input: unknown,
+    segmentId?: number,
+  ) => {
     const provider = providerRef.current
     const args: any = (input && typeof input === 'object') ? input : {}
+    pendingToolsRef.current.set(toolUseId, { toolName, segmentId })
+    const settleTool = (output: unknown) => {
+      pendingToolsRef.current.delete(toolUseId)
+      provider?.sendToolResult(toolUseId, output, segmentId)
+    }
+
+    if (toolName !== 'save_interview_output' && !runtimeGuardRef.current?.acceptsInterviewActivity()) {
+      settleTool({ success: false, status: 'interview_terminal' })
+      return
+    }
+
+    if (toolName === 'request_history_question') {
+      if (
+        !turnEvidenceControllerEnabledRef.current &&
+        !adaptiveTurnControllerEnabledRef.current
+      ) {
+        settleTool({ success: false, status: 'controller_unavailable' })
+        return
+      }
+      const failClosed = (status: string) => {
+        provider?.suppressOutput()
+        setError('The interview question sequence could not be verified, so the session ended safely.')
+        settleTool({ success: false, status })
+        void endSessionRef.current('provider_error')
+      }
+
+      if (adaptiveTurnControllerEnabledRef.current) {
+        const latestPatientSeq = [...transcriptRef.current]
+          .reverse()
+          .find((entry) => entry.role === 'user')?.seq
+        const currentReview = liveReviewRef.current
+
+        if (
+          questionCountRef.current >= COMPREHENSIVE_SOFT_WRAP_EXCHANGE &&
+          currentReview?.review.reviewedThroughSeq !== latestPatientSeq
+        ) void runLiveReview()
+
+        const requestSessionGen = sessionGenRef.current
+        const approveCurrentAdaptiveProposal = () => {
+          if (!pendingToolsRef.current.has(toolUseId)) return
+          if (
+            sessionGenRef.current !== requestSessionGen ||
+            providerRef.current !== provider ||
+            !runtimeGuardRef.current?.acceptsInterviewActivity()
+          ) {
+            pendingToolsRef.current.delete(toolUseId)
+            return
+          }
+          const currentLatestPatientSeq = [...transcriptRef.current]
+            .reverse()
+            .find((entry) => entry.role === 'user')?.seq
+          if (currentLatestPatientSeq !== latestPatientSeq) {
+            failClosed('question_context_changed')
+            return
+          }
+
+          const latestReview = liveReviewRef.current
+          const reviewCompletion =
+            latestReview && latestReview.review.reviewedThroughSeq === currentLatestPatientSeq
+              ? liveInterviewReviewCompletion(latestReview.review)
+              : 'incomplete'
+          const latestCompletion = completionWithMedicationUncertainty(
+            reviewCompletion,
+            medicationReconciliationRef.current,
+          )
+          const medicationQuestion = nextMedicationQuestion(
+            medicationReconciliationRef.current,
+            { includeInventory: latestCompletion !== 'incomplete' },
+          )
+          const medicationClosed = medicationReconciliationClosed(
+            medicationReconciliationRef.current,
+          )
+          if (
+            latestCompletion !== 'incomplete' &&
+            medicationClosed &&
+            preCloseStateRef.current === 'answered'
+          ) {
+            settleTool({ success: true, status: 'coverage_ready', completion: latestCompletion })
+            return
+          }
+
+          // A fresh review after the 60th answer may still certify completion,
+          // so the ceiling is checked here rather than before the bounded
+          // review wait. If any required medication/pre-close work remains,
+          // never approve question 61.
+          if (questionCountRef.current >= COMPREHENSIVE_HARD_STOP_EXCHANGE) {
+            const decision = runtimeGuardRef.current?.applicationHardStop()
+            settleTool({ success: false, status: 'interview_terminal' })
+            if (decision) {
+              applyHistorianTurnDecision(decision, {
+                activateSafety,
+                injectSystemText: () => undefined,
+                requestFinalization: (reason) => {
+                  unresponsiveRef.current?.suspend()
+                  void endSessionRef.current(reason)
+                },
+              })
+            }
+            return
+          }
+
+          const fixedOpening = questionCountRef.current === 0
+            ? { id: 'adaptive-opening', requiredText: ADAPTIVE_OPENING_QUESTION }
+            : questionCountRef.current === 1
+              ? { id: 'adaptive-age', requiredText: ADAPTIVE_AGE_QUESTION }
+              : null
+          const preCloseQuestion =
+            !fixedOpening &&
+            !medicationQuestion &&
+            latestCompletion !== 'incomplete' &&
+            medicationClosed &&
+            preCloseStateRef.current === 'not_asked'
+              ? {
+                  id: 'adaptive-preclose',
+                  requiredText: ADAPTIVE_PRE_CLOSE_QUESTION,
+                }
+              : null
+          const applicationQuestion = fixedOpening ?? (
+            medicationQuestion
+              ? {
+                  id: medicationQuestion.obligationId,
+                  requiredText: medicationQuestion.questionText,
+                }
+              : preCloseQuestion
+          )
+          const pendingConductor = pendingConductorQuestionRef.current
+          const conductorQuestion =
+            !applicationQuestion &&
+            pendingConductor &&
+            pendingConductor.reviewedThroughPatientSeq === latestPatientSeq
+              ? pendingConductor.text
+              : null
+          if (
+            pendingConductor &&
+            pendingConductor.reviewedThroughPatientSeq !== latestPatientSeq
+          ) pendingConductorQuestionRef.current = null
+          const modelProposal = approvedAdaptiveQuestion(args.proposed_text)
+          let proposedText: string | null
+          if (questionCountRef.current === 0) {
+            proposedText = approvedAdaptiveOpeningQuestion(args.proposed_text)
+          } else if (questionCountRef.current === 1) {
+            proposedText = approvedAdaptiveAgeQuestion(args.proposed_text)
+          } else if (applicationQuestion) {
+            proposedText =
+              modelProposal &&
+              canonicalAdaptiveQuestion(modelProposal) ===
+                canonicalAdaptiveQuestion(applicationQuestion.requiredText)
+                ? applicationQuestion.requiredText
+                : null
+          } else if (conductorQuestion) {
+            proposedText =
+              modelProposal &&
+              canonicalAdaptiveQuestion(modelProposal) === canonicalAdaptiveQuestion(conductorQuestion)
+                ? modelProposal
+                : null
+          } else {
+            proposedText = modelProposal
+          }
+          if (!proposedText) {
+            adaptiveProposalRejectionsRef.current += 1
+            if (adaptiveProposalRejectionsRef.current > MAX_ADAPTIVE_PROPOSAL_REJECTIONS) {
+              failClosed('proposal_retry_limit')
+              return
+            }
+            const requiredText = applicationQuestion?.requiredText ?? conductorQuestion
+            const issueCodes = requiredText
+              ? ['clinical_redirect']
+              : adaptiveQuestionIssues(args.proposed_text)
+            settleTool({
+              success: false,
+              status: 'proposal_rejected',
+              issue_codes: issueCodes,
+              ...(requiredText ? { required_text: requiredText } : {}),
+            })
+            return
+          }
+          adaptiveProposalRejectionsRef.current = 0
+          if (medicationQuestion && applicationQuestion?.id === medicationQuestion.obligationId) {
+            medicationReconciliationRef.current = approveMedicationQuestion(
+              medicationReconciliationRef.current,
+              medicationQuestion,
+            )
+          }
+          if (preCloseQuestion && applicationQuestion?.id === 'adaptive-preclose') {
+            preCloseStateRef.current = 'approved'
+          }
+          if (conductorQuestion) {
+            if (pendingConductor?.clarificationReceipt) {
+              pendingReviewClarificationRef.current = {
+                receipt: pendingConductor.clarificationReceipt,
+                assistantSeq: null,
+              }
+            }
+            pendingConductorQuestionRef.current = null
+          }
+          if (conductorDuePatientSeqRef.current === latestPatientSeq) {
+            // Consume the intermittent conductor slot only after its exact
+            // resubmission is approved, or after the bounded Claude wait
+            // elapsed without a usable conductor question.
+            conductorDuePatientSeqRef.current = null
+          }
+          settleTool({
+            success: true,
+            status: 'approved',
+            obligation_id: applicationQuestion?.id ?? (
+              conductorQuestion
+                ? `claude-conductor-${questionCountRef.current + 1}`
+                : `adaptive-question-${questionCountRef.current + 1}`
+            ),
+            approved_text: proposedText,
+            allow_example: adaptiveQuestionAllowsExample(proposedText),
+          })
+        }
+
+        const conductorBoundaryPending =
+          conductorDuePatientSeqRef.current === latestPatientSeq &&
+          pendingConductorQuestionRef.current?.reviewedThroughPatientSeq !== latestPatientSeq
+        const waitingForThisConductorTurn =
+          conductorBoundaryPending &&
+          (liveReviewInFlightRef.current || localizerInFlightRef.current)
+        const waitingForRequiredReview =
+          reviewRequiredPatientSeqRef.current === latestPatientSeq &&
+          currentReview?.review.reviewedThroughSeq !== latestPatientSeq
+        if (waitingForRequiredReview && !liveReviewInFlightRef.current) void runLiveReview()
+        if (waitingForThisConductorTurn || waitingForRequiredReview) {
+          void (async () => {
+            const deadline = Date.now() + Math.max(
+              waitingForThisConductorTurn
+                ? (liveReviewInFlightRef.current
+                    ? ADAPTIVE_REVIEW_THEN_CONDUCTOR_WAIT_MS
+                    : ADAPTIVE_CONDUCTOR_WAIT_MS)
+                : 0,
+              waitingForRequiredReview ? ADAPTIVE_REVIEW_WAIT_MS : 0,
+            )
+            while (
+              pendingToolsRef.current.has(toolUseId) &&
+              sessionGenRef.current === requestSessionGen &&
+              Date.now() < deadline &&
+              (
+                (
+                  waitingForThisConductorTurn &&
+                  conductorDuePatientSeqRef.current === latestPatientSeq &&
+                  (liveReviewInFlightRef.current || localizerInFlightRef.current) &&
+                  pendingConductorQuestionRef.current?.reviewedThroughPatientSeq !== latestPatientSeq
+                ) ||
+                (
+                  waitingForRequiredReview &&
+                  liveReviewRef.current?.review.reviewedThroughSeq !== latestPatientSeq
+                )
+              )
+            ) {
+              await new Promise((resolve) => setTimeout(resolve, ADAPTIVE_CONDUCTOR_POLL_MS))
+            }
+            approveCurrentAdaptiveProposal()
+          })()
+          return
+        }
+        approveCurrentAdaptiveProposal()
+        return
+      }
+
+      let evidenceState = patientEvidenceStateRef.current
+      if (evidenceState.awaitingQuestion) {
+        if (
+          evidenceState.awaitingQuestion.assistantSeq === null ||
+          evidenceState.pendingPatientSeqs.length === 0
+        ) {
+          failClosed('answer_not_confirmed')
+          return
+        }
+        const settled = settlePatientEvidenceAnswer(evidenceState, transcriptRef.current)
+        if (!settled.ok || !settled.value) {
+          failClosed('answer_binding_failed')
+          return
+        }
+        evidenceState = settled.value
+        patientEvidenceStateRef.current = evidenceState
+      }
+
+      const completion = patientEvidenceCompletion(evidenceState)
+      if (completion !== 'incomplete') {
+        settleTool({ success: true, status: 'coverage_ready', completion })
+        return
+      }
+
+      // The 60th patient answer is always collected and settled before the
+      // ceiling is evaluated. If it still leaves a gap, never approve a 61st
+      // question: latch the hard stop and enter the existing silent partial-
+      // save path. If it completed the ledger, the branch above wins.
+      if (questionCountRef.current >= COMPREHENSIVE_HARD_STOP_EXCHANGE) {
+        const decision = runtimeGuardRef.current?.applicationHardStop()
+        settleTool({ success: false, status: 'interview_terminal' })
+        if (decision) {
+          applyHistorianTurnDecision(decision, {
+            activateSafety,
+            injectSystemText: () => undefined,
+            requestFinalization: (reason) => {
+              unresponsiveRef.current?.suspend()
+              void endSessionRef.current(reason)
+            },
+          })
+        }
+        return
+      }
+
+      const approved = approveNextPatientEvidenceQuestion(evidenceState)
+      if (!approved.ok || !approved.value) {
+        failClosed('question_approval_failed')
+        return
+      }
+      patientEvidenceStateRef.current = approved.value.state
+      settleTool({
+        success: true,
+        status: 'approved',
+        obligation_id: approved.value.obligation.id,
+        approved_text: approved.value.questionText,
+        allow_example: false,
+      })
+      return
+    }
 
     // ── save_interview_output (existing) ──
     if (toolName === 'save_interview_output') {
       try {
-        const { narrative_summary, red_flags, safety_escalated, ...structured } = args
-        structuredOutputRef.current = structured
-        narrativeSummaryRef.current = narrative_summary || null
-        if (red_flags && Array.isArray(red_flags)) {
-          redFlagsRef.current = red_flags
+        const {
+          narrative_summary,
+          red_flags,
+          safety_escalated,
+          patient_requested_stop,
+          ...structured
+        } = args
+
+        if (safety_escalated === true) {
+          runtimeGuardRef.current?.modelSafetyEscalation()
+          activateSafety()
+        } else if (patient_requested_stop === true) {
+          runtimeGuardRef.current?.modelPatientStop()
         }
-        if (safety_escalated) {
-          safetyEscalatedRef.current = true
+
+        let structuredForSave: HistorianStructuredOutput = structured
+        let saveTerminationReason: HistorianTerminationReason | null = null
+
+        if (adaptiveTurnControllerEnabledRef.current) {
+          const runtimeTerminal = runtimeGuardRef.current?.terminalReason() ?? null
+          const terminalPartial =
+            finalizingRef.current ||
+            safety_escalated === true ||
+            patient_requested_stop === true ||
+            runtimeTerminal !== null
+          const latestPatientSeq = [...transcriptRef.current]
+            .reverse()
+            .find((entry) => entry.role === 'user')?.seq
+          const currentReview = liveReviewRef.current
+          const reviewIsCurrent =
+            !!currentReview && currentReview.review.reviewedThroughSeq === latestPatientSeq
+          const reviewCompletion = reviewIsCurrent
+            ? liveInterviewReviewCompletion(currentReview.review)
+            : 'incomplete'
+          const completion = completionWithMedicationUncertainty(
+            reviewCompletion,
+            medicationReconciliationRef.current,
+          )
+
+          if (!terminalPartial && completion === 'incomplete') {
+            settleTool({ success: false, status: 'review_required' })
+            void runLiveReview()
+            return
+          }
+          if (
+            !terminalPartial &&
+            (
+              !medicationReconciliationClosed(medicationReconciliationRef.current) ||
+              preCloseStateRef.current !== 'answered'
+            )
+          ) {
+            settleTool({ success: false, status: 'completion_obligations_required' })
+            return
+          }
+
+          const confirmedMedications = confirmedMedicationSummary(
+            medicationReconciliationRef.current,
+          )
+
+          const adaptivePromptVersion =
+            resolvedInterviewPromptVersionRef.current === 'comprehensive-v4'
+              ? 'comprehensive-v4'
+              : 'comprehensive-v3'
+          structuredForSave = {
+            // Controlled adaptive interviews never persist Nova-authored clinical prose.
+            // Until a separate transcript-citing clinician-report generator
+            // exists, only application-owned/attested structures cross the
+            // save boundary. This prevents a misheard drug name from surviving
+            // in HPI, side effects, medication changes, or another free-text
+            // field after current_medications has been corrected.
+            current_medications: confirmedMedications || undefined,
+            interview_mode: 'comprehensive',
+            interview_prompt_version: adaptivePromptVersion,
+            medication_reconciliation_v1: medicationReconciliationRef.current,
+            medication_reconciliation_has_uncertainty:
+              medicationReconciliationHasUncertainty(medicationReconciliationRef.current),
+            medication_reconciliation_unresolved_count:
+              medicationReconciliationUnresolvedCount(medicationReconciliationRef.current),
+            ...(reviewIsCurrent
+              ? {
+                  ...(adaptivePromptVersion === 'comprehensive-v4'
+                    ? { live_review_v2: currentReview }
+                    : { live_review_v1: currentReview }),
+                  history_coverage: deriveLiveReviewStructuredCoverage(currentReview.review),
+                }
+              : {}),
+          }
+          saveTerminationReason =
+            safety_escalated === true
+              ? 'safety_escalated'
+              : patient_requested_stop === true
+                ? 'patient_requested_stop'
+                : runtimeTerminal ?? (
+                    completion === 'coverage_complete' || completion === 'complete_with_uncertainty'
+                      ? completion
+                      : terminationReasonRef.current
+                  )
+        } else if (turnEvidenceControllerEnabledRef.current) {
+          let evidenceState = patientEvidenceStateRef.current
+          const runtimeTerminal = runtimeGuardRef.current?.terminalReason() ?? null
+          const terminalPartial =
+            finalizingRef.current ||
+            safety_escalated === true ||
+            patient_requested_stop === true ||
+            runtimeTerminal !== null
+
+          // A normal completion must settle the final transcript-bound answer.
+          // Terminal partial saves intentionally retain any interrupted
+          // awaiting/pending state instead of misclassifying stop/safety words
+          // as the answer to a clinical question.
+          if (!terminalPartial && evidenceState.awaitingQuestion) {
+            const settled = settlePatientEvidenceAnswer(evidenceState, transcriptRef.current)
+            if (!settled.ok || !settled.value) {
+              settleTool({ success: false, status: 'evidence_incomplete' })
+              return
+            }
+            evidenceState = settled.value
+            patientEvidenceStateRef.current = evidenceState
+          }
+
+          const completion = patientEvidenceCompletion(evidenceState)
+          if (!terminalPartial && completion === 'incomplete') {
+            settleTool({ success: false, status: 'evidence_incomplete' })
+            return
+          }
+
+          structuredForSave = {
+            ...structured,
+            interview_mode: 'comprehensive',
+            interview_prompt_version: 'comprehensive-v2',
+            history_evidence_v1: evidenceState,
+            history_coverage: derivePatientEvidenceStructuredCoverage(evidenceState),
+          }
+          saveTerminationReason =
+            safety_escalated === true
+              ? 'safety_escalated'
+              : patient_requested_stop === true
+                ? 'patient_requested_stop'
+                : runtimeTerminal ?? (
+                    completion === 'coverage_complete' || completion === 'complete_with_uncertainty'
+                      ? completion
+                      : terminationReasonRef.current
+                  )
+        } else {
+          // Legacy Comprehensive v1 keeps its model-authored fixed-domain
+          // audit. Patient stop, safety, and the hard ceiling remain partial.
+          const saveDecision = evaluateComprehensiveSave({
+            interviewMode: resolvedInterviewModeRef.current,
+            finalizing: finalizingRef.current,
+            safetyEscalated: safetyEscalatedRef.current,
+            toolSafetyEscalated: safety_escalated === true,
+            patientRequestedStop: runtimeGuardRef.current?.terminalReason() === 'patient_requested_stop',
+            toolPatientRequestedStop: patient_requested_stop === true,
+            exchange: questionCountRef.current,
+            structured,
+          })
+          if (!saveDecision.allowed) {
+            provider?.injectSystemText(
+              `[COMPREHENSIVE COMPLETION CHECK] The save was rejected because these required history domains are not yet cleanly classified: ${saveDecision.remainingDomains.join(', ')}. Continue the patient interview. Ask only the remaining clinically appropriate questions, then call save_interview_output again. Do not mention this internal check to the patient.`,
+            )
+            settleTool({
+              success: false,
+              status: saveDecision.reason,
+              remaining_domains: saveDecision.remainingDomains,
+            })
+            return
+          }
+          saveTerminationReason =
+            safety_escalated === true
+              ? 'safety_escalated'
+              : patient_requested_stop === true
+                ? 'patient_requested_stop'
+                : saveDecision.reason === 'coverage_complete' ||
+                    saveDecision.reason === 'not_comprehensive'
+                  ? 'coverage_complete'
+                  : saveDecision.reason === 'patient_requested_stop' ||
+                      saveDecision.reason === 'safety_escalated' ||
+                      saveDecision.reason === 'hard_stop'
+                    ? saveDecision.reason
+                    : null
+        }
+
+        // A tool call proves output capture, not normal completion. Preserve
+        // the independently established terminal cause.
+        if (saveTerminationReason) {
+          terminationReasonRef.current = strongerTerminationReason(
+            terminationReasonRef.current,
+            saveTerminationReason,
+          )
+        }
+
+        structuredOutputRef.current = structuredForSave
+        // Comprehensive v3's in-stream narrative is a model draft, not a
+        // validated clinician report. In particular, it may silently normalize
+        // a medication name. Persist the structured transcript-bound evidence
+        // and medication ledger; report generation remains a separate surface.
+        narrativeSummaryRef.current = adaptiveTurnControllerEnabledRef.current
+          ? null
+          : narrative_summary || null
+        if (
+          !adaptiveTurnControllerEnabledRef.current &&
+          red_flags &&
+          Array.isArray(red_flags)
+        ) {
+          const mergedFlags = [...redFlagsRef.current, ...red_flags]
+          redFlagsRef.current = mergedFlags.filter((flag, index, all) =>
+            all.findIndex((candidate) =>
+              candidate?.flag === flag?.flag && candidate?.context === flag?.context,
+            ) === index,
+          )
         }
         // Signal to consumers that the interview has concluded so they can
         // auto-end the session after the AI's closing line. Set the ref
@@ -543,8 +1472,20 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
         // closing prompt on Nova and is a no-op on OpenAI (which would double-
         // speak). The closing audio then drains before teardown via the
         // whenDrained/auto-end sequence below.
-        provider?.sendToolResult(toolUseId, { success: true })
-        provider?.nudgeClosing()
+        settleTool({ success: true })
+        // The 60-exchange ceiling is a text-only terminal save. Its runtime
+        // guard already silenced provider output, so never request a closing
+        // utterance that would contradict the hard-stop instruction.
+        const controlledTerminalPartial =
+          (turnEvidenceControllerEnabledRef.current || adaptiveTurnControllerEnabledRef.current) &&
+          terminationReasonRef.current !== 'coverage_complete' &&
+          terminationReasonRef.current !== 'complete_with_uncertainty'
+        if (
+          runtimeGuardRef.current?.terminalReason() !== 'hard_stop' &&
+          !controlledTerminalPartial
+        ) {
+          provider?.nudgeClosing()
+        }
         // Fix 4 (2026-07-09): this is only a FALLBACK schedule, not the
         // primary end trigger. The closing line may already be fully spoken
         // (same-turn ordering — the tool call landed after
@@ -557,6 +1498,7 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
         maybeScheduleAutoEnd(2500)
       } catch (e) {
         console.error('Error handling save_interview_output:', e)
+        settleTool({ success: false, status: 'client_error' })
       }
       return
     }
@@ -570,15 +1512,17 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
         const updatedSet = new Set(administeredScaleIdsRef.current)
         updatedSet.add(scaleArgs.scale_id)
         administeredScaleIdsRef.current = updatedSet
+        activeScaleRef.current = null
         setAdministeredScaleIds(new Set(updatedSet))
 
         // Notify parent so it can POST to /api/ai/historian/scales?action=submit
         onScaleCompleteRef.current?.(scaleArgs)
 
         // Acknowledge so model can continue the intake interview
-        provider?.sendToolResult(toolUseId, { success: true, recorded: scaleArgs.scale_id })
+        settleTool({ success: true, recorded: scaleArgs.scale_id })
       } catch (e) {
         console.error('Error handling save_scale_responses:', e)
+        settleTool({ success: false, status: 'client_error' })
       }
       return
     }
@@ -613,6 +1557,7 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
             const updatedSet = new Set(administeredScaleIdsRef.current)
             updatedSet.add(args.scale_id)
             administeredScaleIdsRef.current = updatedSet
+            activeScaleRef.current = null
             setAdministeredScaleIds(new Set(updatedSet))
             onScaleCompleteRef.current?.({
               scale_id: args.scale_id,
@@ -621,12 +1566,18 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
               interpretation: result.interpretation,
               severity_level: result.severity_level,
             } as any)
+          } else if (
+            result?.done === false &&
+            typeof args.scale_id === 'string' &&
+            Number.isInteger(result.index)
+          ) {
+            activeScaleRef.current = { scaleId: args.scale_id, itemIndex: result.index }
           }
 
-          providerRef.current?.sendToolResult(toolUseId, result)
+          settleTool(result)
         } catch (err) {
           console.error('[useRealtimeSession] scale_step handler error:', err)
-          providerRef.current?.sendToolResult(toolUseId, { status: 'error', message: 'client error' })
+          settleTool({ status: 'error', message: 'client error' })
         }
       })()
       return
@@ -645,22 +1596,221 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
             }),
           })
           const result = await res.json()
-          providerRef.current?.sendToolResult(toolUseId, result)
+          settleTool(result)
         } catch (err) {
           console.error('[useRealtimeSession] query_evidence handler error:', err)
-          providerRef.current?.sendToolResult(toolUseId, { status: 'error', chunks: [], message: 'client error' })
+          settleTool({ status: 'error', chunks: [], message: 'client error' })
         }
       })()
       return
     }
-  }, [options.consultId, maybeScheduleAutoEnd])
+    settleTool({ status: 'error', message: 'unknown tool' })
+  }, [options.consultId, maybeScheduleAutoEnd, activateSafety, runLiveReview])
+
+  const performNovaContinuation = useCallback(async (event: Extract<VoiceEvent, {
+    type: 'continuationBarrier'
+  }>) => {
+    const provider = providerRef.current
+    if (
+      !provider?.commitContinuation ||
+      !provider.deferContinuation
+    ) {
+      setError('The voice connection cannot continue safely with this provider.')
+      await endSessionRef.current('provider_error')
+      return
+    }
+    if (continuationInFlightRef.current) {
+      setError('The voice connection reported overlapping continuation barriers.')
+      await endSessionRef.current('provider_error')
+      return
+    }
+
+    const due = continuationDueRef.current
+    if (!due || due.segmentId !== event.segmentId || due.deadlineAtMs !== event.deadlineAtMs) {
+      setError('The voice connection continuation checkpoint did not match its transport clock.')
+      await endSessionRef.current('provider_error')
+      return
+    }
+
+    // These are transient pre-checkpoint conflicts. Because no checkpoint has
+    // been injected yet, the relay can replay its buffered PCM to the old
+    // segment exactly once and try again at a later assistant boundary.
+    if (pendingToolsRef.current.size > 0 || localizerInFlightRef.current) {
+      provider.deferContinuation(event.barrierId)
+      return
+    }
+    if (
+      finalizingRef.current ||
+      interviewCompletedRef.current ||
+      !runtimeGuardRef.current?.acceptsInterviewActivity() ||
+      safetyEscalatedRef.current ||
+      terminationReasonRef.current !== null
+    ) {
+      // A terminal path already owns teardown; never migrate it.
+      return
+    }
+
+    const appSessionId = serverSessionIdRef.current
+    const transcriptSnapshot = transcriptRef.current.map((entry) => ({ ...entry }))
+    const last = transcriptSnapshot[transcriptSnapshot.length - 1]
+    if (
+      !appSessionId ||
+      !last ||
+      last.role !== 'assistant' ||
+      !Number.isInteger(last.seq) ||
+      last.seq !== seqCounterRef.current ||
+      isAiSpeakingRef.current
+    ) {
+      setError('The interview state was not at a safe between-turn checkpoint.')
+      await endSessionRef.current('provider_error')
+      return
+    }
+
+    continuationInFlightRef.current = true
+    unresponsiveRef.current?.suspend()
+    const deferAfterCheckpointPreparation = () => {
+      provider.deferContinuation!(event.barrierId)
+      if (
+        !finalizingRef.current &&
+        !interviewCompletedRef.current &&
+        runtimeGuardRef.current?.acceptsInterviewActivity()
+      ) unresponsiveRef.current?.agentTurnEnded()
+    }
+    const captured = {
+      transcriptSeq: seqCounterRef.current,
+      exchangeCount: questionCountRef.current,
+      patientTurnCount: patientTurnCountRef.current,
+      guard: runtimeGuardRef.current.snapshot(),
+    }
+
+    try {
+      const flushDeadline = Math.min(
+        Date.now() + FINAL_FLUSH_TIMEOUT_MS,
+        event.deadlineAtMs - CONTINUATION_RESERVE_MS,
+      )
+      if (flushDeadline <= Date.now()) throw new Error('continuation deadline left no persistence window')
+      do {
+        const remainingFlushMs = flushDeadline - Date.now()
+        if (remainingFlushMs <= 0) {
+          deferAfterCheckpointPreparation()
+          return
+        }
+        const flushed = await Promise.race([
+          flushTranscript(),
+          new Promise<false>((resolve) => setTimeout(() => resolve(false), remainingFlushMs)),
+        ])
+        if (!flushed) {
+          deferAfterCheckpointPreparation()
+          return
+        }
+      } while (pendingFlushEntriesRef.current.length > 0)
+
+      if (
+        seqCounterRef.current !== captured.transcriptSeq ||
+        questionCountRef.current !== captured.exchangeCount ||
+        patientTurnCountRef.current !== captured.patientTurnCount ||
+        pendingToolsRef.current.size !== 0 ||
+        localizerInFlightRef.current ||
+        JSON.stringify(runtimeGuardRef.current.snapshot()) !== JSON.stringify(captured.guard)
+      ) {
+        deferAfterCheckpointPreparation()
+        return
+      }
+
+      if (
+        seqCounterRef.current !== captured.transcriptSeq ||
+        pendingToolsRef.current.size !== 0 ||
+        !runtimeGuardRef.current.acceptsInterviewActivity() ||
+        safetyEscalatedRef.current ||
+        terminationReasonRef.current !== null
+      ) throw new Error('application state changed after the continuation checkpoint')
+
+      const checkpoint: HistorianContinuationCheckpointV1 = {
+        version: 1,
+        appSessionId,
+        fromSegmentId: event.segmentId,
+        transcriptThroughSeq: captured.transcriptSeq,
+        transcriptHash: hashHistorianContinuationTranscript(transcriptSnapshot),
+        transcript: transcriptSnapshot,
+        exchangeCount: captured.exchangeCount,
+        patientTurnCount: captured.patientTurnCount,
+        elapsedSeconds: Math.floor((Date.now() - startTimeRef.current) / 1000),
+        awaitingAnswerTo: { seq: last.seq!, text: last.text },
+        answeredQuestionPairs: buildHistorianAnsweredQuestionPairs(transcriptSnapshot),
+        // This transport-only ledger deliberately under-claims every domain.
+        // Full replay is authoritative; final coverage still requires the
+        // ordinary save_interview_output audit and can never be inferred from
+        // this conservative rollover state.
+        coverage: conservativeHistorianContinuationCoverage(),
+        runtimeGuard: captured.guard,
+        safetyEscalated: false,
+        terminationReason: null,
+        administeredScaleIds: [...administeredScaleIdsRef.current].sort(),
+        activeScale: activeScaleRef.current,
+        pendingTools: [],
+      }
+      assertHistorianContinuationCheckpoint(checkpoint)
+      const continuationOutcome = await provider.commitContinuation({
+        barrierId: event.barrierId,
+        checkpoint,
+      })
+      // A pre-promotion candidate failure is recoverable: the relay has put
+      // every buffered PCM chunk back onto the still-live old stream exactly
+      // once. Keep the transport's original due latch so its next assistant
+      // boundary can retry. Only a committed replacement clears the due state.
+      if (continuationOutcome === 'rotated') continuationDueRef.current = null
+      if (
+        !finalizingRef.current &&
+        !interviewCompletedRef.current &&
+        runtimeGuardRef.current.acceptsInterviewActivity()
+      ) unresponsiveRef.current?.agentTurnEnded()
+    } catch (error) {
+      if (!finalizingRef.current) {
+        console.error(
+          '[useRealtimeSession] Nova continuation failed:',
+          error instanceof Error ? error.message : 'unknown continuation error',
+        )
+        setError(
+          'The voice connection could not continue safely. The interview ended with the transcript saved through the last confirmed turn. If this may be a medical emergency, call 911; for crisis support, call or text 988.',
+        )
+        await endSessionRef.current('provider_error')
+      }
+    } finally {
+      continuationInFlightRef.current = false
+    }
+  }, [flushTranscript])
 
   // ── Normalized provider event handler — replaces handleServerEvent.
   // Routes provider-agnostic VoiceEvents to the SAME harness logic as before
   // the provider-abstraction refactor.
   const handleVoiceEvent = useCallback((e: VoiceEvent, sessionGen: number) => {
     switch (e.type) {
+      case 'continuationDue': {
+        if (
+          resolvedInterviewModeRef.current === 'comprehensive' &&
+          runtimeGuardRef.current?.acceptsInterviewActivity() &&
+          !finalizingRef.current
+        ) {
+          continuationDueRef.current = {
+            segmentId: e.segmentId,
+            deadlineAtMs: e.deadlineAtMs,
+          }
+        }
+        break
+      }
+
+      case 'continuationBarrier': {
+        if (sessionGenRef.current !== sessionGen) break
+        void performNovaContinuation(e)
+        break
+      }
+
       case 'assistantTextDelta': {
+        if (!runtimeGuardRef.current?.acceptsInterviewActivity()) {
+          setCurrentAssistantText('')
+          setAiSpeaking(false)
+          break
+        }
         // Streaming AI text (was response.audio_transcript.delta)
         setCurrentAssistantText(prev => prev + (e.text || ''))
         setAiSpeaking(true)
@@ -668,6 +1818,12 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
       }
 
       case 'assistantTranscript': {
+        if (!runtimeGuardRef.current?.acceptsInterviewActivity()) {
+          setCurrentAssistantText('')
+          setAiSpeaking(false)
+          maybeScheduleAutoEnd()
+          break
+        }
         // AI finished speaking this response (was response.audio_transcript.done)
         const fullText = e.text || ''
         // Nova Sonic emits every assistant turn's text twice — SPECULATIVE as
@@ -680,16 +1836,58 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
         const lastAssistant = [...transcriptRef.current].reverse().find(t => t.role === 'assistant')
         const isRelayDuplicate = !!fullText.trim() && lastAssistant?.text === fullText.trim()
         if (fullText.trim() && !isRelayDuplicate) {
+          const nextSeq = seqCounterRef.current + 1
+          if (
+            turnEvidenceControllerEnabledRef.current &&
+            !interviewCompletedRef.current
+          ) {
+            const awaiting = patientEvidenceStateRef.current.awaitingQuestion
+            const committed =
+              awaiting &&
+              e.obligationId === awaiting.obligationId
+                ? commitApprovedPatientEvidenceQuestion(
+                    patientEvidenceStateRef.current,
+                    nextSeq,
+                    fullText.trim(),
+                  )
+                : { ok: false as const, error: 'Assistant obligation does not match the application approval.' }
+            if (!committed.ok || !committed.value) {
+              providerRef.current?.suppressOutput()
+              setError('The spoken question could not be verified, so the session ended safely.')
+              setCurrentAssistantText('')
+              setAiSpeaking(false)
+              void endSessionRef.current('provider_error')
+              break
+            }
+            patientEvidenceStateRef.current = committed.value
+          }
+          seqCounterRef.current = nextSeq
           const entry: HistorianTranscriptEntry = {
             role: 'assistant',
             text: fullText.trim(),
             timestamp: Math.floor((Date.now() - startTimeRef.current) / 1000),
-            seq: ++seqCounterRef.current,
+            seq: nextSeq,
           }
+          medicationReconciliationRef.current = commitMedicationQuestion(
+            medicationReconciliationRef.current,
+            e.obligationId,
+            nextSeq,
+            entry.text,
+          )
           const previousEntry =
             transcriptRef.current[transcriptRef.current.length - 1]
           transcriptRef.current = [...transcriptRef.current, entry]
           setTranscript([...transcriptRef.current])
+          if (
+            pendingReviewClarificationRef.current &&
+            pendingReviewClarificationRef.current.assistantSeq === null &&
+            pendingReviewClarificationRef.current.receipt.question === entry.text
+          ) {
+            pendingReviewClarificationRef.current = {
+              ...pendingReviewClarificationRef.current,
+              assistantSeq: entry.seq!,
+            }
+          }
 
           // Count EXCHANGES, not utterances. TURN_CAP's own comment says it:
           // "A turn is one exchange, not one question." Henry's opening block
@@ -706,7 +1904,10 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
           //
           // Only the FIRST assistant entry of a block counts; consecutive
           // assistant entries collapse into the one exchange they really are.
-          if (!previousEntry || previousEntry.role !== 'assistant') {
+          const isControlledClosing =
+            (turnEvidenceControllerEnabledRef.current || adaptiveTurnControllerEnabledRef.current) &&
+            interviewCompletedRef.current
+          if (!isControlledClosing && (!previousEntry || previousEntry.role !== 'assistant')) {
             questionCountRef.current += 1
           }
 
@@ -738,6 +1939,11 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
         unresponsiveRef.current?.patientActivity()
         const userText = e.text || ''
         if (userText.trim()) {
+          if (!runtimeGuardRef.current?.acceptsInterviewActivity()) {
+            setCurrentUserText('')
+            setIsUserSpeaking(false)
+            break
+          }
           const entry: HistorianTranscriptEntry = {
             role: 'user',
             text: userText.trim(),
@@ -746,6 +1952,49 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
           }
           transcriptRef.current = [...transcriptRef.current, entry]
           setTranscript([...transcriptRef.current])
+          let requiresFreshAdaptiveReview = false
+          const pendingClarification = pendingReviewClarificationRef.current
+          if (
+            adaptiveTurnControllerEnabledRef.current &&
+            pendingClarification?.assistantSeq != null
+          ) {
+            if (entry.seq === pendingClarification.assistantSeq + 1) {
+              const evidence: LiveReviewClarificationEvidenceV1 = {
+                receipt: pendingClarification.receipt,
+                assistantSeq: pendingClarification.assistantSeq,
+                userSeq: entry.seq!,
+              }
+              reviewClarificationEvidenceRef.current = [
+                ...reviewClarificationEvidenceRef.current.filter((item) => (
+                  item.receipt.gapKey !== evidence.receipt.gapKey
+                )),
+                evidence,
+              ].slice(0, MAX_REVIEW_GAP_CLARIFICATIONS)
+              requiresFreshAdaptiveReview = true
+            }
+            pendingReviewClarificationRef.current = null
+          }
+          if (
+            adaptiveTurnControllerEnabledRef.current &&
+            medicationReconciliationRef.current.pendingQuestion?.assistantSeq != null
+          ) {
+            medicationReconciliationRef.current = recordMedicationAnswer(
+              medicationReconciliationRef.current,
+              entry.seq!,
+              entry.text,
+            )
+            requiresFreshAdaptiveReview = true
+          }
+          if (
+            adaptiveTurnControllerEnabledRef.current &&
+            preCloseStateRef.current === 'approved'
+          ) {
+            preCloseStateRef.current = 'answered'
+            requiresFreshAdaptiveReview = true
+          }
+          if (requiresFreshAdaptiveReview) {
+            reviewRequiredPatientSeqRef.current = entry.seq!
+          }
 
           // Durable transcript flush (Task 1): buffer + flush every
           // FLUSH_THRESHOLD unflushed entries. Fire-and-forget — never
@@ -755,8 +2004,90 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
             flushTranscript()
           }
 
-          // Safety check on user speech
-          checkSafety(userText)
+          // The direct answer to the app-owned active-emergency question is
+          // evaluated before generic stop/hard-stop parsing so safety remains
+          // the strongest terminal cause even when the same utterance also
+          // asks to end the interview.
+          if (
+            turnEvidenceControllerEnabledRef.current &&
+            patientEvidenceAnswerRequiresSafetyEscalation(
+              patientEvidenceStateRef.current,
+              userText,
+            )
+          ) {
+            runtimeGuardRef.current.modelSafetyEscalation()
+            activateSafety()
+            unresponsiveRef.current?.suspend()
+            setCurrentUserText('')
+            setIsUserSpeaking(false)
+            void endSessionRef.current('safety_escalated')
+            break
+          }
+          // The guard latches safety/stop/hard-ceiling state synchronously.
+          let turnDecision = runtimeGuardRef.current.patientTurn({
+            interviewMode: resolvedInterviewModeRef.current,
+            // Comprehensive v2 evaluates its ceiling only after the answer is
+            // transcript-bound below. Capping this generic guard input keeps
+            // the 60th answer from being discarded before settlement.
+            exchange: turnEvidenceControllerEnabledRef.current || adaptiveTurnControllerEnabledRef.current
+              ? Math.min(
+                  questionCountRef.current,
+                  COMPREHENSIVE_HARD_STOP_EXCHANGE - 1,
+                )
+              : questionCountRef.current,
+            text: userText,
+          })
+          if (
+            turnEvidenceControllerEnabledRef.current &&
+            turnDecision.terminalReason === null
+          ) {
+            const collected = collectPatientEvidenceEntry(
+              patientEvidenceStateRef.current,
+              entry,
+            )
+            if (!collected.ok || !collected.value) {
+              providerRef.current?.suppressOutput()
+              setError('The patient answer could not be bound to its question, so the session ended safely.')
+              setCurrentUserText('')
+              setIsUserSpeaking(false)
+              void endSessionRef.current('provider_error')
+              break
+            }
+            patientEvidenceStateRef.current = collected.value
+
+            if (
+              questionCountRef.current >= COMPREHENSIVE_HARD_STOP_EXCHANGE
+            ) {
+              const settled = settlePatientEvidenceAnswer(
+                patientEvidenceStateRef.current,
+                transcriptRef.current,
+              )
+              if (!settled.ok || !settled.value) {
+                providerRef.current?.suppressOutput()
+                setError('The final patient answer could not be verified, so the session ended safely.')
+                setCurrentUserText('')
+                setIsUserSpeaking(false)
+                void endSessionRef.current('provider_error')
+                break
+              }
+              patientEvidenceStateRef.current = settled.value
+              if (patientEvidenceCompletion(settled.value) === 'incomplete') {
+                turnDecision = runtimeGuardRef.current.applicationHardStop()
+              }
+            }
+          }
+          applyHistorianTurnDecision(turnDecision, {
+            activateSafety,
+            injectSystemText: (text) => {
+              if (!turnEvidenceControllerEnabledRef.current) {
+                providerRef.current?.injectSystemText(text)
+              }
+            },
+            requestFinalization: (reason) => {
+              unresponsiveRef.current?.suspend()
+              void endSessionRef.current(reason)
+            },
+          })
 
           // Red flag detection: run keyword matching on cumulative transcript
           const fullText = transcriptRef.current
@@ -772,11 +2103,30 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
           // Localizer: increment patient turn counter and trigger every 3 turns
           patientTurnCountRef.current += 1
           const turnsSinceLast = patientTurnCountRef.current - lastLocalizerTurnRef.current
-          if (turnsSinceLast >= LOCALIZER_INTERVAL) {
+          const turnsSinceReview = patientTurnCountRef.current - lastLiveReviewTurnRef.current
+          const shouldRunLiveReview =
+            adaptiveTurnControllerEnabledRef.current &&
+            runtimeGuardRef.current.acceptsInterviewActivity() &&
+            (
+              turnsSinceReview >= LIVE_REVIEW_INTERVAL ||
+              questionCountRef.current >= COMPREHENSIVE_SOFT_WRAP_EXCHANGE ||
+              requiresFreshAdaptiveReview
+            )
+          if (
+            !turnEvidenceControllerEnabledRef.current &&
+            runtimeGuardRef.current.acceptsInterviewActivity() &&
+            turnsSinceLast >= LOCALIZER_INTERVAL &&
+            !localizerInFlightRef.current
+          ) {
             lastLocalizerTurnRef.current = patientTurnCountRef.current
-            // Fire async — must not block the event loop
-            runLocalizer()
+            if (adaptiveTurnControllerEnabledRef.current) {
+              conductorDuePatientSeqRef.current = entry.seq ?? null
+            }
+            // If a review is also due, run it first; runLiveReview starts the
+            // conductor only after installing the fresh signed artifact.
+            if (!shouldRunLiveReview) void runLocalizer()
           }
+          if (shouldRunLiveReview) void runLiveReview()
         }
         setCurrentUserText('')
         setIsUserSpeaking(false)
@@ -784,6 +2134,7 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
       }
 
       case 'userSpeechStart': {
+        if (!runtimeGuardRef.current?.acceptsInterviewActivity()) break
         // Best-effort early reset. OpenAI-only, so the ladder must never
         // DEPEND on it — userTranscript above is the load-bearing signal.
         unresponsiveRef.current?.patientActivity()
@@ -801,6 +2152,10 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
       }
 
       case 'aiSpeechStart': {
+        if (!runtimeGuardRef.current?.acceptsInterviewActivity()) {
+          setAiSpeaking(false)
+          break
+        }
         // Fix 4 (2026-07-09): a new utterance is starting — on OpenAI this is
         // very likely the closing line arriving via sendToolResult's
         // follow-up response.create (tool-first ordering). Cancel any
@@ -836,14 +2191,18 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
         // The turn is now the patient's — start the unresponsiveness ladder.
         // Suppressed once the interview is complete or finalizing so a closing
         // message is never followed by "are you still there?".
-        if (!interviewCompletedRef.current && !finalizingRef.current) {
+        if (
+          !interviewCompletedRef.current &&
+          !finalizingRef.current &&
+          runtimeGuardRef.current?.acceptsInterviewActivity()
+        ) {
           unresponsiveRef.current?.agentTurnEnded()
         }
         break
       }
 
       case 'toolCall': {
-        handleToolCall(e.toolName, e.toolUseId, e.input)
+        handleToolCall(e.toolName, e.toolUseId, e.input, e.segmentId)
         break
       }
 
@@ -853,6 +2212,11 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
         // close event racing async after cleanup() already ran for a NEWER
         // session) — mirrors the pre-refactor handleDrop's sessionGen check.
         if (sessionGenRef.current !== sessionGen) break
+        if (transcriptRef.current.length === 0 && questionCountRef.current === 0) {
+          startupFailureStageRef.current = e.reason.startsWith('ws:')
+            ? 'websocket_after_open'
+            : 'transport_after_open'
+        }
         console.warn('[useRealtimeSession] transport disconnected —', e.reason, '— running graceful end')
         // Durable transcript flush (Task 1 fix): a dropped transport is the
         // headline scenario this feature protects against — flush whatever
@@ -862,21 +2226,36 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
         // does more work — nudging the AI, tearing down the provider —
         // and could itself stall or fail) ever completing.
         flushTranscript()
-        endSessionRef.current()
+        endSessionRef.current('transport_lost')
         break
       }
 
       case 'error': {
+        // A stopped provider can reject its still-pending microphone/start
+        // promise after the patient has already begun a newer retry. Never let
+        // that stale callback terminate the current attempt.
+        if (sessionGenRef.current !== sessionGen) break
+        if (transcriptRef.current.length === 0 && questionCountRef.current === 0) {
+          startupFailureStageRef.current = e.message.startsWith('mic capture failed:')
+            ? 'microphone_setup'
+            : e.message.startsWith('Your microphone stopped sending audio.')
+              ? 'microphone_runtime'
+              : 'provider_runtime'
+        }
         console.error('Voice provider error:', e.message)
         setError(e.message || 'Voice provider error')
         // Durable transcript flush (Task 1): a transport error is exactly
         // the kind of event that might precede losing the session — flush
         // whatever hasn't been durably saved yet, best-effort.
         flushTranscript()
+        // Provider/model errors are terminal for a clinical interview. The
+        // relay also closes its transport, but this direct call covers other
+        // providers and the one-shot finalizing guard prevents a double save.
+        endSessionRef.current('provider_error')
         break
       }
     }
-  }, [checkSafety, runLocalizer, handleToolCall, options, setAiSpeaking, maybeScheduleAutoEnd, flushTranscript])
+  }, [activateSafety, runLocalizer, runLiveReview, handleToolCall, options, setAiSpeaking, maybeScheduleAutoEnd, flushTranscript, performNovaContinuation])
 
   const startSession = useCallback(async () => {
     setStatus('connecting')
@@ -887,10 +2266,14 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
     setLocalizerData(null)
     transcriptRef.current = []
     questionCountRef.current = 0
+    runtimeGuardRef.current?.reset()
+    terminationReasonRef.current = null
     structuredOutputRef.current = null
     narrativeSummaryRef.current = null
     redFlagsRef.current = []
     safetyEscalatedRef.current = false
+    safetyEffectsActivatedRef.current = false
+    safetyAlertRequestedRef.current = false
     patientTurnCountRef.current = 0
     lastLocalizerTurnRef.current = 0
     localizerInFlightRef.current = false
@@ -902,9 +2285,30 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
     finalizingRef.current = false
     // Durable transcript flush (Task 1) — reset per session.
     serverSessionIdRef.current = null
+    startupFailureStageRef.current = 'provider_setup'
+    resolvedInterviewModeRef.current = 'standard'
+    resolvedInterviewPromptVersionRef.current = 'standard-v1'
+    turnEvidenceControllerEnabledRef.current = false
+    adaptiveTurnControllerEnabledRef.current = false
+    adaptiveProposalRejectionsRef.current = 0
+    pendingConductorQuestionRef.current = null
+    conductorDuePatientSeqRef.current = null
+    patientEvidenceStateRef.current = createPatientEvidenceState()
+    liveReviewRef.current = null
+    liveReviewInFlightRef.current = false
+    lastLiveReviewTurnRef.current = 0
+    pendingReviewClarificationRef.current = null
+    reviewClarificationEvidenceRef.current = []
+    medicationReconciliationRef.current = createMedicationReconciliationState()
+    preCloseStateRef.current = 'not_asked'
+    reviewRequiredPatientSeqRef.current = null
     flushTokenRef.current = null
     seqCounterRef.current = 0
     pendingFlushEntriesRef.current = []
+    pendingToolsRef.current = new Map()
+    activeScaleRef.current = null
+    continuationDueRef.current = null
+    continuationInFlightRef.current = false
     if (autoEndTimerRef.current) {
       clearTimeout(autoEndTimerRef.current)
       autoEndTimerRef.current = null
@@ -920,10 +2324,12 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           sessionType: options.sessionType,
+          interviewMode: options.interviewMode,
           referralReason: options.referralReason,
           patientContext: options.patientContext,
           provider: options.provider,
           referral: options.referral,
+          consult_id: options.consultId,
         }),
       })
 
@@ -950,10 +2356,38 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
         // session behaves exactly as it did before this feature.
         sessionId: mintedSessionId,
         flushToken: mintedFlushToken,
+        interviewMode: resolvedInterviewMode,
+        interviewPromptVersion: resolvedInterviewPromptVersion,
+        turnEvidenceController: resolvedTurnEvidenceController,
+        adaptiveTurnController: resolvedAdaptiveTurnController,
       } = sessionConfig
 
       serverSessionIdRef.current = typeof mintedSessionId === 'string' ? mintedSessionId : null
       flushTokenRef.current = typeof mintedFlushToken === 'string' ? mintedFlushToken : null
+      resolvedInterviewModeRef.current = resolvedInterviewMode === 'comprehensive'
+        ? 'comprehensive'
+        : 'standard'
+      resolvedInterviewPromptVersionRef.current =
+        resolvedInterviewModeRef.current === 'comprehensive' &&
+        (resolvedInterviewPromptVersion === 'comprehensive-v1' ||
+          resolvedInterviewPromptVersion === 'comprehensive-v2' ||
+          resolvedInterviewPromptVersion === 'comprehensive-v3' ||
+          resolvedInterviewPromptVersion === 'comprehensive-v4')
+          ? resolvedInterviewPromptVersion
+          : 'standard-v1'
+      const expectsTurnEvidenceController =
+        resolvedInterviewPromptVersionRef.current === 'comprehensive-v2'
+      const expectsAdaptiveTurnController =
+        resolvedInterviewPromptVersionRef.current === 'comprehensive-v3' ||
+        resolvedInterviewPromptVersionRef.current === 'comprehensive-v4'
+      if (expectsTurnEvidenceController !== (resolvedTurnEvidenceController === true)) {
+        throw new Error('The server returned an inconsistent interview safety contract.')
+      }
+      if (expectsAdaptiveTurnController !== (resolvedAdaptiveTurnController === true)) {
+        throw new Error('The server returned an inconsistent adaptive interview contract.')
+      }
+      turnEvidenceControllerEnabledRef.current = expectsTurnEvidenceController
+      adaptiveTurnControllerEnabledRef.current = expectsAdaptiveTurnController
 
       // 2. Resolve the provider kind. The route's `provider` field wins (it
       //    minted the session for that kind); fall back to selectProvider
@@ -962,6 +2396,13 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
         sessionConfig.provider === 'openai' || sessionConfig.provider === 'nova'
           ? sessionConfig.provider
           : selectProvider(options.provider)
+
+      if (
+        (turnEvidenceControllerEnabledRef.current || adaptiveTurnControllerEnabledRef.current) &&
+        kind !== 'nova'
+      ) {
+        throw new Error('The controlled Comprehensive interview requires the Nova relay.')
+      }
 
       // OpenAI requires the ephemeral key; Nova does not.
       if (kind === 'openai' && !ephemeralKey) throw new Error('No ephemeral key returned')
@@ -985,6 +2426,9 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
         instructions: baseInstructionsRef.current,
         tools: sessionTools ?? [],
         voiceId,
+        interviewMode: resolvedInterviewModeRef.current,
+        turnEvidenceController: turnEvidenceControllerEnabledRef.current,
+        adaptiveTurnController: adaptiveTurnControllerEnabledRef.current,
         ephemeralKey,
         model: sessionModel,
         relayUrl,
@@ -1002,21 +2446,53 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
       setStatus('active')
     } catch (err: any) {
       console.error('Failed to start realtime session:', err)
-      setError(err.message || 'Failed to start session')
-      setStatus('error')
+      startupFailureStageRef.current = voiceStartupFailureStage(err) ?? 'provider_setup'
+      const retryableInvitedStartup =
+        !!serverSessionIdRef.current &&
+        !!flushTokenRef.current &&
+        (resolvedInterviewPromptVersionRef.current === 'comprehensive-v2' ||
+          resolvedInterviewPromptVersionRef.current === 'comprehensive-v3' ||
+          resolvedInterviewPromptVersionRef.current === 'comprehensive-v4') &&
+        transcriptRef.current.length === 0 &&
+        questionCountRef.current === 0 &&
+        !safetyEscalatedRef.current
       cleanup()
       // Tear down any half-open transport the provider may have allocated.
       try { await providerRef.current?.stop() } catch {}
       providerRef.current = null
+
+      if (retryableInvitedStartup) {
+        const recovered = await recoverRetryableStartupFailure(
+          'provider_error',
+          startupFailureStageRef.current,
+        )
+        // A newer attempt may already own the hook while the recovery request
+        // was in flight. The server-side attempt nonce protects its DB state;
+        // this generation check protects its UI state.
+        if (sessionGenRef.current !== sessionGen) return
+        setError(
+          recovered
+            ? 'The voice connection could not start. Your interview was not submitted. Tap Start Interview to try again.'
+            : 'The voice connection could not start. Your interview was not submitted, but this link could not be reopened safely. Please ask the clinic for a new link.',
+        )
+        setStatus('error')
+        return
+      }
+
+      if (sessionGenRef.current !== sessionGen) return
+      setError(err.message || 'Failed to start session')
+      setStatus('error')
     }
   }, [
     options.sessionType,
+    options.interviewMode,
     options.referralReason,
     options.patientContext,
     options.consultId,
     options.provider,
     cleanup,
     handleVoiceEvent,
+    recoverRetryableStartupFailure,
   ])
 
   /**
@@ -1045,10 +2521,20 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
       suggested_scale_id?: string | null
       turn_count?: number
     }) => {
+      // Comprehensive v2 owns the next audible obligation. A caller-triggered
+      // localizer push must not create a second, unapproved speech path.
+      if (turnEvidenceControllerEnabledRef.current) return
+      if (!runtimeGuardRef.current?.acceptsInterviewActivity()) return
       const provider = providerRef.current
       if (!provider) return
 
       try {
+        if (adaptiveTurnControllerEnabledRef.current) {
+          // runLocalizer already injected the richer conductor note, including
+          // silent-review gaps. EmbeddedHistorian echoes this callback for
+          // legacy OpenAI sessions; suppress that duplicate in v3.
+          return
+        }
         if (provider.updateInstructions) {
           // OpenAI path — unchanged from before the provider-abstraction refactor.
           if (!baseInstructionsRef.current) return
@@ -1088,6 +2574,13 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
    * express the old "inject + response.create" pattern across providers).
    */
   const injectScaleAdministration = useCallback((instructionBlock: string) => {
+    // Scales are outside the v2 atomic evidence plan. Fail closed until a
+    // scale can participate in the same approve-then-speak contract.
+    if (
+      turnEvidenceControllerEnabledRef.current ||
+      adaptiveTurnControllerEnabledRef.current
+    ) return
+    if (!runtimeGuardRef.current?.acceptsInterviewActivity()) return
     const provider = providerRef.current
     if (!provider) {
       console.warn('[useRealtimeSession] injectScaleAdministration: no active session')
@@ -1100,8 +2593,50 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
     provider.requestResponse()
   }, [])
 
-  const endSession = useCallback(async () => {
+  const endSession = useCallback(async (requestedReason?: HistorianTerminationReason) => {
+    // A terminal event can arrive while a weaker end path is waiting on its
+    // bounded transcript flush. Preserve the strongest reason before the
+    // one-shot guard so a queued safety/hard-stop event cannot be discarded.
+    if (requestedReason) {
+      terminationReasonRef.current = strongerTerminationReason(
+        terminationReasonRef.current,
+        requestedReason,
+      )
+    }
+    // Terminal suppression must happen even if a weaker finalization path is
+    // already in progress. Keep it before the one-shot guard so no queued
+    // ordinary question can play after stop, safety, silence, or hard-stop.
+    if (
+      requestedReason === 'patient_requested_stop' ||
+      requestedReason === 'safety_escalated' ||
+      requestedReason === 'hard_stop' ||
+      requestedReason === 'unresponsive' ||
+      runtimeGuardRef.current?.terminalReason() === 'hard_stop'
+    ) {
+      providerRef.current?.suppressOutput()
+    }
     if (finalizingRef.current) return
+    const adaptiveCompletion = completionWithMedicationUncertainty(
+      liveInterviewReviewCompletion(liveReviewRef.current?.review),
+      medicationReconciliationRef.current,
+    )
+    const inferredReason =
+      terminationReasonRef.current ??
+      (interviewCompletedRef.current
+        ? adaptiveTurnControllerEnabledRef.current
+          ? adaptiveCompletion === 'complete_with_uncertainty'
+            ? 'complete_with_uncertainty'
+            : 'coverage_complete'
+          : turnEvidenceControllerEnabledRef.current
+            ? patientEvidenceCompletion(patientEvidenceStateRef.current) === 'complete_with_uncertainty'
+              ? 'complete_with_uncertainty'
+              : 'coverage_complete'
+            : 'coverage_complete'
+        : 'manual_end')
+    terminationReasonRef.current = strongerTerminationReason(
+      terminationReasonRef.current,
+      inferredReason,
+    )
     finalizingRef.current = true
     setStatus('ending')
 
@@ -1131,7 +2666,9 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
     if (needsFlush && provider) {
       try {
         provider.injectSystemText(
-          'The patient has ended the interview early. Immediately call the save_interview_output tool with whatever information has been gathered so far. Populate narrative_summary with a concise summary of the conversation. Do not ask any more questions and do not speak — just call the tool.',
+          runtimeGuardRef.current?.terminalReason() === 'hard_stop'
+            ? COMPREHENSIVE_HARD_STOP_SAVE_NUDGE
+            : 'The patient has ended the interview early. Immediately call the save_interview_output tool with whatever information has been gathered so far. Populate narrative_summary with a concise summary of the conversation. Do not ask any more questions and do not speak — just call the tool.',
         )
         // Text-only forced response — the interview is ending, so we don't
         // want the AI to speak a full audio reply right before teardown.
@@ -1146,32 +2683,50 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
       }
     }
 
-    // Last-resort fallback: if the AI still hasn't produced a narrative (tool
-    // didn't fire, channel dropped, model refused, etc.), preserve the raw
-    // transcript as the narrative summary so the physician can still see what
-    // the patient said.
-    if (!narrativeSummaryRef.current && transcriptRef.current.length > 0) {
-      const hasPatientSpeech = transcriptRef.current.some(
-        t => t.role === 'user' && t.text.trim().length > 0,
-      )
-      if (hasPatientSpeech) {
-        narrativeSummaryRef.current =
-          'Interview ended before AI generated a structured summary. Raw transcript:\n\n' +
-          transcriptRef.current
-            .map(t => `${t.role === 'assistant' ? 'AI' : 'Patient'}: ${t.text}`)
-            .join('\n\n')
-      }
-    }
+    // The transcript is already durably persisted as its own artifact. Never
+    // copy it into narrative_summary: doing so made a raw transcript appear to
+    // be a generated physician report after a provider failure.
 
     // Stop the timer, then tear the transport down via the provider.
     cleanup()
     try { await provider?.stop() } catch {}
     providerRef.current = null
 
-    // `interviewCompleted` flips to true only when the AI called
-    // save_interview_output. If it never fired, the patient ended before the
-    // AI judged the intake complete — flag it as partial.
-    const endedEarly = !interviewCompleted
+    const terminationReason = terminationReasonRef.current ?? 'manual_end'
+
+    // A provider/transport failure before the first admitted assistant turn is
+    // a startup failure, not a submitted interview. For a bound v2 invitation,
+    // the server atomically reopens only when there is also no durable event or
+    // finalized content. Keep the patient on the start screen with explicit
+    // retry guidance and never call onComplete/save for an empty history.
+    const retryableStartupFailure =
+      (terminationReason === 'provider_error' || terminationReason === 'transport_lost') &&
+      (resolvedInterviewPromptVersionRef.current === 'comprehensive-v2' ||
+        resolvedInterviewPromptVersionRef.current === 'comprehensive-v3' ||
+        resolvedInterviewPromptVersionRef.current === 'comprehensive-v4') &&
+      transcriptRef.current.length === 0 &&
+      questionCountRef.current === 0 &&
+      !safetyEscalatedRef.current
+    if (retryableStartupFailure) {
+      const recovered = await recoverRetryableStartupFailure(
+        terminationReason,
+        startupFailureStageRef.current,
+      )
+      setError(
+        recovered
+          ? 'The voice connection ended before the first question. Your interview was not submitted. Tap Start Interview to try again.'
+          : 'The voice connection ended before the first question. Your interview was not submitted, but this link could not be reopened safely. Please ask the clinic for a new link.',
+      )
+      setStatus('error')
+      return
+    }
+
+    // save_interview_output may be called for a terminal partial history.
+    // Both deterministic coverage outcomes represent completed intakes;
+    // uncertainty remains explicit rather than being mislabeled as early end.
+    const endedEarly =
+      terminationReason !== 'coverage_complete' &&
+      terminationReason !== 'complete_with_uncertainty'
 
     // Durable transcript flush (Task 1 fix): flush whatever hasn't hit the
     // FLUSH_THRESHOLD-of-3 auto-trigger yet — trailing entries (the
@@ -1194,11 +2749,14 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
       duration: finalDuration,
       questionCount: questionCountRef.current,
       endedEarly,
+      terminationReason,
+      interviewMode: resolvedInterviewModeRef.current,
+      interviewPromptVersion: resolvedInterviewPromptVersionRef.current,
       sessionId: serverSessionIdRef.current,
     })
 
     setStatus('complete')
-  }, [cleanup, options, interviewCompleted, flushTranscript])
+  }, [cleanup, options, flushTranscript, recoverRetryableStartupFailure])
 
   // Keep the ref in sync so the provider's `disconnected` handler always
   // calls the latest endSession.

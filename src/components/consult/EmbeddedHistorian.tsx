@@ -2,7 +2,7 @@
 
 import { useState, useCallback, useRef, useEffect } from 'react'
 import { useRealtimeSession } from '@/hooks/useRealtimeSession'
-import type { HistorianStructuredOutput, HistorianRedFlag, HistorianTranscriptEntry, HistorianSessionType } from '@/lib/historianTypes'
+import type { HistorianStructuredOutput, HistorianRedFlag, HistorianTranscriptEntry, HistorianSessionType, HistorianTerminationReason } from '@/lib/historianTypes'
 import type { LocalizerResponse } from '@/lib/consult/localizer-types'
 import type { SaveScaleResponsesArgs, LocalizerSnapshot, TriggeredScale } from '@/lib/consult/scales'
 import { getTenantClient } from '@/lib/tenant'
@@ -54,6 +54,7 @@ export default function EmbeddedHistorian({
     duration: number
     questionCount: number
     endedEarly: boolean
+    terminationReason: HistorianTerminationReason
     /** Server-minted historian_sessions id — see useRealtimeSession's onComplete. */
     sessionId: string | null
   } | null>(null)
@@ -95,6 +96,7 @@ export default function EmbeddedHistorian({
           question_count: data.questionCount,
           status: 'completed',
           interview_completion_status: data.endedEarly ? 'ended_early' : 'complete',
+          interview_termination_reason: data.terminationReason,
           consult_id: consultId,
           sessionId: data.sessionId,
         }),

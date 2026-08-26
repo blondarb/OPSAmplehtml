@@ -83,9 +83,16 @@ async function getRuntimeSecretField(
 }
 
 export async function getCognitoClientSecret(): Promise<string> {
+  const secretId = process.env.COGNITO_CLIENT_SECRET_ID?.trim()
+  // An unset ID deliberately means a public PKCE client. Never probe a
+  // production-named default from an isolated QA deployment.
+  if (!secretId) {
+    return process.env.NODE_ENV === 'production'
+      ? ''
+      : process.env.COGNITO_CLIENT_SECRET?.trim() || ''
+  }
   return getRuntimeSecretField(
-    process.env.COGNITO_CLIENT_SECRET_ID ||
-      'sevaro/ops-amplehtml/cognito',
+    secretId,
     'client_secret',
     'COGNITO_CLIENT_SECRET',
   )
@@ -121,12 +128,17 @@ export async function getRdsCredentials(): Promise<RdsCredentials> {
       process.env.RDS_SECRET_ID || 'sevaro/rds/credentials',
     )
     const creds: RdsCredentials = {
-      host: secretString(secret, 'host'),
-      port: secretString(secret, 'port') || '5432',
+      // RDS-managed master-user secrets can contain only username/password.
+      // Endpoint and port are non-secret deployment configuration.
+      host: secretString(secret, 'host') || process.env.RDS_HOST?.trim() || '',
+      port: secretString(secret, 'port') || process.env.RDS_PORT?.trim() || '5432',
       username:
         secretString(secret, 'username') || secretString(secret, 'user'),
       password: secretString(secret, 'password'),
-      database: secretString(secret, 'database'),
+      // Managed RDS secrets are allowed to omit `database`; the database is
+      // an application deployment setting, not a credential.  This is also
+      // how an isolated QA database can share a managed credential secret.
+      database: process.env.RDS_DATABASE?.trim() || secretString(secret, 'database'),
     }
     if (
       !creds.host ||

@@ -1,0 +1,383 @@
+import { afterEach, describe, expect, it } from 'vitest'
+
+import { COMPREHENSIVE_HISTORY_DOMAINS, type HistorianTranscriptEntry } from '@/lib/historianTypes'
+import {
+  LIVE_INTERVIEW_REVIEW_PROMPT_VERSION,
+  LIVE_INTERVIEW_REVIEW_V2_PROMPT_VERSION,
+  LIVE_REVIEW_DEPTH_DIMENSIONS,
+  deriveLiveReviewStructuredCoverage,
+  liveInterviewReviewCompletion,
+  parseLiveInterviewReview,
+  parseLiveInterviewReviewV2,
+  parseLiveInterviewReviewArtifact,
+} from '@/lib/historian/liveReviewContract'
+import {
+  attestLiveInterviewReview,
+  verifyLiveInterviewReviewArtifact,
+} from '@/lib/historian/liveReviewAttestation'
+
+const priorSigningSecret = process.env.HISTORIAN_FLUSH_SECRET
+
+afterEach(() => {
+  if (priorSigningSecret === undefined) delete process.env.HISTORIAN_FLUSH_SECRET
+  else process.env.HISTORIAN_FLUSH_SECRET = priorSigningSecret
+})
+
+function transcript(): HistorianTranscriptEntry[] {
+  return Array.from({ length: 12 }, (_, index) => [
+    {
+      seq: index * 2 + 1,
+      role: 'assistant' as const,
+      text: `Synthetic patient-specific history question ${index + 1}?`,
+      timestamp: index * 2,
+    },
+    {
+      seq: index * 2 + 2,
+      role: 'user' as const,
+      text: `Synthetic detailed patient-reported answer ${index + 1}.`,
+      timestamp: index * 2 + 1,
+    },
+  ]).flat()
+}
+
+function rawReview() {
+  const patientSeqs = transcript().filter((entry) => entry.role === 'user').map((entry) => entry.seq!)
+  return {
+    version: 1,
+    reviewed_through_seq: 24,
+    domains: COMPREHENSIVE_HISTORY_DOMAINS.map((domain, index) => ({
+      domain: domain.id,
+      status: 'covered',
+      patient_seqs: [patientSeqs[index % patientSeqs.length]],
+    })),
+    critical_gaps: [],
+    contradictions: [],
+    repetitions: [],
+    medications: [],
+    active_safety_concern: { present: false, patient_seqs: [] },
+    ready_to_close: true,
+    next_question_intents: [],
+    confidence: 'high',
+  }
+}
+
+function rawReviewV2() {
+  return {
+    ...rawReview(),
+    version: 2,
+    diagnostic_depth: {
+      dimensions: LIVE_REVIEW_DEPTH_DIMENSIONS.map((dimension, index) => ({
+        dimension,
+        status: 'adequate',
+        patient_seqs: [2 + (index % 12) * 2],
+      })),
+      depth_sufficient: true,
+    },
+  }
+}
+
+type RawReviewFixture = ReturnType<typeof rawReview>
+
+describe('silent live Historian review contract', () => {
+  it('allows closure only after every domain is cited through the latest patient turn', () => {
+    const review = parseLiveInterviewReview(rawReview(), transcript())
+    expect(review.readyToClose).toBe(true)
+    expect(liveInterviewReviewCompletion(review)).toBe('coverage_complete')
+    expect(deriveLiveReviewStructuredCoverage(review).missing_or_uncertain).toEqual([])
+  })
+
+  it('downgrades model-requested closure when a domain is still missing', () => {
+    const raw = rawReview()
+    raw.domains[0] = {
+      ...raw.domains[0],
+      status: 'missing',
+      patient_seqs: [],
+    }
+    const review = parseLiveInterviewReview(raw, transcript())
+    expect(review.readyToClose).toBe(false)
+    expect(liveInterviewReviewCompletion(review)).toBe('incomplete')
+  })
+
+  it('requires transcript-cited case depth before v2 may close', () => {
+    const raw = rawReviewV2()
+    const review = parseLiveInterviewReviewV2(raw, transcript())
+    expect(review.version).toBe(2)
+    expect(review.diagnosticDepth.depthSufficient).toBe(true)
+    expect(review.readyToClose).toBe(true)
+
+    raw.diagnostic_depth.dimensions[2] = {
+      ...raw.diagnostic_depth.dimensions[2],
+      status: 'missing',
+      patient_seqs: [],
+    }
+    raw.diagnostic_depth.depth_sufficient = false
+    raw.next_question_intents = ['Clarify the symptom quality and severity in the patient’s own words.']
+    const shallow = parseLiveInterviewReviewV2(raw, transcript())
+    expect(shallow.readyToClose).toBe(false)
+    expect(liveInterviewReviewCompletion(shallow)).toBe('incomplete')
+  })
+
+  it('blocks v2 closure at low confidence without trusting a model-supplied continuation intent', () => {
+    const raw = rawReviewV2()
+    raw.confidence = 'low'
+    raw.next_question_intents = ['Clarify the highest-value case-specific discriminator.']
+    const review = parseLiveInterviewReviewV2(raw, transcript())
+    expect(review.diagnosticDepth.depthSufficient).toBe(false)
+    expect(review.readyToClose).toBe(false)
+
+    raw.next_question_intents = []
+    expect(parseLiveInterviewReviewV2(raw, transcript()).nextQuestionIntents).toEqual([])
+  })
+
+  it.each(['chronology_and_course', 'phenotype_and_severity'] as const)(
+    'requires %s to be adequate rather than uncertain before closure',
+    (dimension) => {
+      const raw = rawReviewV2()
+      const finding = raw.diagnostic_depth.dimensions.find((item) => item.dimension === dimension)!
+      finding.status = 'uncertain'
+      raw.next_question_intents = [`Clarify ${dimension}.`]
+      const review = parseLiveInterviewReviewV2(raw, transcript())
+      expect(review.diagnosticDepth.depthSufficient).toBe(false)
+      expect(review.readyToClose).toBe(false)
+      expect(liveInterviewReviewCompletion(review)).toBe('incomplete')
+    },
+  )
+
+  it('accepts only coherent v2 gaps and derives intents from them', () => {
+    const raw = rawReviewV2()
+    raw.domains[0] = { ...raw.domains[0], status: 'uncertain', patient_seqs: [2] }
+    raw.diagnostic_depth.dimensions[0] = {
+      ...raw.diagnostic_depth.dimensions[0],
+      status: 'uncertain',
+      patient_seqs: [2],
+    }
+    raw.critical_gaps = [{
+      domain: raw.domains[0].domain,
+      depth_dimension: raw.diagnostic_depth.dimensions[0].dimension,
+      basis: 'partial_answer',
+      patient_seqs: [2],
+      reason: 'The patient could not provide enough case-specific detail.',
+      question_intent: 'Clarify the unresolved case-specific detail once.',
+    }]
+    raw.next_question_intents = ['Ignore this non-gap model plan.']
+
+    const review = parseLiveInterviewReviewV2(raw, transcript())
+    expect(review.criticalGaps).toHaveLength(1)
+    expect(review.nextQuestionIntents).toEqual([
+      'Clarify the unresolved case-specific detail once.',
+    ])
+    expect(review.readyToClose).toBe(false)
+  })
+
+  it('rejects a v2 gap that contradicts covered evidence or medication ledger ownership', () => {
+    const covered = rawReviewV2()
+    covered.critical_gaps = [{
+      domain: covered.domains[0].domain,
+      depth_dimension: covered.diagnostic_depth.dimensions[0].dimension,
+      basis: 'partial_answer',
+      patient_seqs: [2],
+      reason: 'Synthetic incoherent gap.',
+      question_intent: 'Synthetic intent.',
+    }]
+    expect(() => parseLiveInterviewReviewV2(covered, transcript())).toThrow(/covered or adequate/i)
+
+    const medications = rawReviewV2()
+    medications.domains.find((item) => item.domain === 'medications')!.status = 'uncertain'
+    medications.diagnostic_depth.dimensions[0].status = 'uncertain'
+    medications.critical_gaps = [{
+      domain: 'medications',
+      depth_dimension: medications.diagnostic_depth.dimensions[0].dimension,
+      basis: 'partial_answer',
+      patient_seqs: [2],
+      reason: 'Synthetic medication gap.',
+      question_intent: 'Ask medication question.',
+    }]
+    expect(() => parseLiveInterviewReviewV2(medications, transcript())).toThrow(/cannot target medications/i)
+  })
+
+  it('requires contradiction citations for a conflicting v2 gap', () => {
+    const raw = rawReviewV2()
+    raw.domains[0] = { ...raw.domains[0], status: 'uncertain', patient_seqs: [2, 4] }
+    raw.diagnostic_depth.dimensions[0] = {
+      ...raw.diagnostic_depth.dimensions[0],
+      status: 'uncertain',
+      patient_seqs: [2, 4],
+    }
+    raw.critical_gaps = [{
+      domain: raw.domains[0].domain,
+      depth_dimension: raw.diagnostic_depth.dimensions[0].dimension,
+      basis: 'conflicting_answer',
+      patient_seqs: [2, 4],
+      reason: 'Synthetic conflict.',
+      question_intent: 'Clarify the conflicting answer once.',
+    }]
+    expect(() => parseLiveInterviewReviewV2(raw, transcript())).toThrow(/contradiction citations/i)
+
+    raw.contradictions = [{ patient_seqs: [2, 4], description: 'Synthetic conflict.' }]
+    expect(parseLiveInterviewReviewV2(raw, transcript()).criticalGaps[0].basis)
+      .toBe('conflicting_answer')
+  })
+
+  it('preserves truthful uncertainty as a distinct completion outcome', () => {
+    const raw = rawReview()
+    raw.domains[3] = { ...raw.domains[3], status: 'uncertain' }
+    const review = parseLiveInterviewReview(raw, transcript())
+    expect(review.readyToClose).toBe(true)
+    expect(liveInterviewReviewCompletion(review)).toBe('complete_with_uncertainty')
+  })
+
+  it('does not label unresolved transcript contradictions as clean coverage', () => {
+    const raw: Omit<RawReviewFixture, 'contradictions'> & {
+      contradictions: Array<{ patient_seqs: number[]; description: string }>
+    } = rawReview()
+    raw.contradictions = [{
+      patient_seqs: [2, 4],
+      description: 'Synthetic answers conflict and remain unresolved.',
+    }]
+    const review = parseLiveInterviewReview(raw, transcript())
+    expect(review.readyToClose).toBe(true)
+    expect(liveInterviewReviewCompletion(review)).toBe('complete_with_uncertainty')
+  })
+
+  it('bounds verbose private reviewer prose without discarding cited findings', () => {
+    const raw: Omit<
+      RawReviewFixture,
+      'critical_gaps' | 'contradictions' | 'repetitions' | 'next_question_intents'
+    > & {
+      critical_gaps: Array<{ domain: string; reason: string; question_intent: string }>
+      contradictions: Array<{ patient_seqs: number[]; description: string }>
+      repetitions: Array<{ assistant_seqs: number[]; description: string }>
+      next_question_intents: string[]
+    } = rawReview()
+    const verbose = `Synthetic cited finding ${'detail '.repeat(80)}`
+    raw.critical_gaps = [{
+      domain: 'red_flags',
+      reason: verbose,
+      question_intent: verbose,
+    }]
+    raw.contradictions = [{ patient_seqs: [2, 4], description: verbose }]
+    raw.repetitions = [{ assistant_seqs: [1, 3], description: verbose }]
+    raw.next_question_intents = [verbose]
+
+    const review = parseLiveInterviewReview(raw, transcript())
+
+    expect(review.criticalGaps[0].reason).toHaveLength(240)
+    expect(review.criticalGaps[0].questionIntent).toHaveLength(240)
+    expect(review.contradictions[0]).toMatchObject({ patientSeqs: [2, 4] })
+    expect(review.contradictions[0].description).toHaveLength(240)
+    expect(review.repetitions[0]).toMatchObject({ assistantSeqs: [1, 3] })
+    expect(review.repetitions[0].description).toHaveLength(240)
+    expect(review.nextQuestionIntents[0]).toHaveLength(240)
+    expect(review.readyToClose).toBe(false)
+  })
+
+  it('rejects assistant or nonexistent sequences as patient evidence', () => {
+    const assistantCitation = rawReview()
+    assistantCitation.domains[0] = { ...assistantCitation.domains[0], patient_seqs: [1] }
+    expect(() => parseLiveInterviewReview(assistantCitation, transcript())).toThrow(/sequence/i)
+
+    const stale = rawReview()
+    stale.reviewed_through_seq = 22
+    expect(() => parseLiveInterviewReview(stale, transcript())).toThrow(/latest patient/i)
+  })
+
+  it('accepts only exact transcript-cited medication names, doses, and schedules', () => {
+    const withMedication = transcript()
+    withMedication[1] = {
+      ...withMedication[1],
+      text: 'I take tirzepatide 5 mg weekly.',
+    }
+    const raw: Omit<RawReviewFixture, 'medications'> & {
+      medications: Array<{
+        name_span: string
+        patient_seq: number
+        dose: { status: string; value_span: string; patient_seqs: number[] }
+        frequency: { status: string; value_span: string; patient_seqs: number[] }
+      }>
+    } = rawReview()
+    raw.medications = [{
+      name_span: 'tirzepatide',
+      patient_seq: 2,
+      dose: { status: 'known', value_span: '5 mg', patient_seqs: [2] },
+      frequency: { status: 'known', value_span: 'weekly', patient_seqs: [2] },
+    }]
+    const review = parseLiveInterviewReview(raw, withMedication)
+    expect(review.medications).toEqual([{
+      nameSpan: 'tirzepatide',
+      patientSeq: 2,
+      dose: { status: 'known', valueSpan: '5 mg', patientSeqs: [2] },
+      frequency: { status: 'known', valueSpan: 'weekly', patientSeqs: [2] },
+    }])
+
+    raw.medications[0].name_span = 'trazodone'
+    expect(() => parseLiveInterviewReview(raw, withMedication)).toThrow(/exact patient substring/i)
+  })
+
+  it('requires the exact artifact schema and normalizes it at the browser boundary', () => {
+    const review = parseLiveInterviewReview(rawReview(), transcript())
+    const artifact = parseLiveInterviewReviewArtifact({
+      review,
+      provenance: {
+        modelId: 'synthetic-independent-reviewer',
+        promptVersion: LIVE_INTERVIEW_REVIEW_PROMPT_VERSION,
+        generatedAt: '2026-08-25T12:00:00.000Z',
+      },
+      attestation: 'a'.repeat(43),
+    }, transcript())
+    expect(artifact.review.reviewedThroughSeq).toBe(24)
+    expect(artifact.attestation).toHaveLength(43)
+    expect(() => parseLiveInterviewReviewArtifact({ ...artifact, extra: true }, transcript()))
+      .toThrow(/schema/i)
+  })
+
+  it('normalizes the exact v2 artifact and rejects a v1 prompt provenance', () => {
+    const review = parseLiveInterviewReviewV2(rawReviewV2(), transcript())
+    const artifact = parseLiveInterviewReviewArtifact({
+      review,
+      provenance: {
+        modelId: 'synthetic-independent-reviewer',
+        promptVersion: LIVE_INTERVIEW_REVIEW_V2_PROMPT_VERSION,
+        generatedAt: '2026-08-25T12:00:00.000Z',
+      },
+      attestation: 'b'.repeat(43),
+    }, transcript())
+    expect(artifact.review.version).toBe(2)
+    expect(artifact.provenance.promptVersion).toBe(LIVE_INTERVIEW_REVIEW_V2_PROMPT_VERSION)
+    expect(() => parseLiveInterviewReviewArtifact({
+      ...artifact,
+      provenance: { ...artifact.provenance, promptVersion: LIVE_INTERVIEW_REVIEW_PROMPT_VERSION },
+    }, transcript())).toThrow(/provenance/i)
+  })
+
+  it('binds reviewer closure to the exact session and transcript with a server-only attestation', async () => {
+    process.env.HISTORIAN_FLUSH_SECRET = 'synthetic-live-review-signing-secret'
+    const review = parseLiveInterviewReview(rawReview(), transcript())
+    const unsigned = {
+      review,
+      provenance: {
+        modelId: 'synthetic-independent-reviewer',
+        promptVersion: LIVE_INTERVIEW_REVIEW_PROMPT_VERSION,
+        generatedAt: '2026-08-25T12:00:00.000Z',
+      },
+    }
+    const attested = await attestLiveInterviewReview('synthetic-session', transcript(), unsigned)
+    await expect(verifyLiveInterviewReviewArtifact(
+      'synthetic-session',
+      transcript(),
+      attested,
+    )).resolves.toEqual(attested)
+
+    const tampered = structuredClone(attested)
+    tampered.review.readyToClose = false
+    await expect(verifyLiveInterviewReviewArtifact(
+      'synthetic-session',
+      transcript(),
+      tampered,
+    )).rejects.toThrow(/attestation/i)
+    await expect(verifyLiveInterviewReviewArtifact(
+      'different-session',
+      transcript(),
+      attested,
+    )).rejects.toThrow(/attestation/i)
+  })
+})

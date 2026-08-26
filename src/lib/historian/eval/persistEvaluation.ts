@@ -38,6 +38,8 @@ export interface PersistEvaluationInput {
   result: unknown
   usage: { inputTokens?: number; outputTokens?: number }
   latencyMs: number
+  /** Stable transcript-bound pipeline digest for idempotent SQS retries. */
+  inputDigest?: string
 }
 
 export async function persistEvaluation(input: PersistEvaluationInput): Promise<void> {
@@ -48,8 +50,11 @@ export async function persistEvaluation(input: PersistEvaluationInput): Promise<
     const pool = await getPool()
     await pool.query(
       `INSERT INTO historian_evaluations
-        (session_id, evaluator, model_id, prompt_version, rubric_version, inference_params, result, cost_usd, latency_ms)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+        (session_id, evaluator, model_id, prompt_version, rubric_version, inference_params, result, cost_usd, latency_ms, input_digest)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+       ON CONFLICT (session_id, evaluator, prompt_version, input_digest)
+         WHERE input_digest IS NOT NULL
+       DO NOTHING`,
       [
         input.sessionId,
         input.evaluator,
@@ -60,6 +65,7 @@ export async function persistEvaluation(input: PersistEvaluationInput): Promise<
         JSON.stringify(input.result),
         costUsd,
         input.latencyMs,
+        input.inputDigest ?? null,
       ],
     )
   } catch (err: unknown) {

@@ -54,7 +54,7 @@ interface TextContentStartEvent {
       contentName: string
       type: 'TEXT'
       interactive: boolean
-      role: 'SYSTEM' | 'USER'
+      role: 'SYSTEM' | 'USER' | 'ASSISTANT'
       textInputConfiguration: { mediaType: string }
     }
   }
@@ -88,7 +88,12 @@ export function sessionStart(cfg?: Partial<InferenceConfiguration>) {
 // 2. promptStart
 // ---------------------------------------------------------------------------
 
-export function promptStart(promptName: string, tools: Tool[], voiceId?: string) {
+export function promptStart(
+  promptName: string,
+  tools: Tool[],
+  voiceId?: string,
+  requireToolAtResponseStart = false,
+) {
   return {
     event: {
       promptStart: {
@@ -110,6 +115,7 @@ export function promptStart(promptName: string, tools: Tool[], voiceId?: string)
         },
         toolConfiguration: {
           tools,
+          ...(requireToolAtResponseStart ? { toolChoice: { any: {} } } : {}),
         },
       },
     },
@@ -133,7 +139,7 @@ export function systemContent(
           promptName,
           contentName: name,
           type: 'TEXT',
-          interactive: true,
+          interactive: false,
           role: 'SYSTEM',
           textInputConfiguration: { mediaType: 'text/plain' },
         },
@@ -145,6 +151,55 @@ export function systemContent(
           promptName,
           contentName: name,
           content: instructions,
+        },
+      },
+    },
+    {
+      event: {
+        contentEnd: {
+          promptName,
+          contentName: name,
+        },
+      },
+    },
+  ]
+}
+
+// ---------------------------------------------------------------------------
+// 3a. conversationHistoryText — non-interactive pre-audio context
+// ---------------------------------------------------------------------------
+
+/**
+ * Nova permits conversation history exactly once after SYSTEM and before the
+ * live audio container. Historical turns are deliberately non-interactive so
+ * replaying the final assistant question cannot trigger a duplicate response.
+ */
+export function conversationHistoryText(
+  promptName: string,
+  role: 'USER' | 'ASSISTANT',
+  text: string,
+  contentName?: string,
+): TextContentEvents {
+  const name = contentName ?? uuidv4()
+  return [
+    {
+      event: {
+        contentStart: {
+          promptName,
+          contentName: name,
+          type: 'TEXT',
+          interactive: false,
+          role,
+          textInputConfiguration: { mediaType: 'text/plain' },
+        },
+      },
+    },
+    {
+      event: {
+        textInput: {
+          promptName,
+          contentName: name,
+          content: text,
         },
       },
     },

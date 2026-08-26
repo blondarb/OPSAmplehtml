@@ -14,12 +14,13 @@
  * so this module's independence is enforced BY CONSTRUCTION, not by
  * convention:
  *
- *   BLINDNESS (binding): generateIndependentDdx's signature takes ONLY a
- *   transcript and an optional chief complaint — nothing else. It must
- *   NEVER receive or read structured HPI output, localizer output,
- *   final_differential, rubrics, or persona expectedDDx. agreement.ts is
- *   the ONLY place the two differentials are allowed to meet (as plain
- *   DifferentialItem[] arrays, after both have already been generated).
+ *   BLINDNESS (binding): generateIndependentDdx receives the transcript,
+ *   optional chief complaint, and an optional application-owned medication
+ *   summary derived from the verified reconciliation ledger — nothing from
+ *   another model. It must NEVER receive or read structured HPI output,
+ *   localizer output, final_differential, rubrics, or persona expectedDDx.
+ *   agreement.ts is the ONLY place the two differentials are allowed to meet
+ *   (as plain DifferentialItem[] arrays, after both have been generated).
  *
  * ── WIRE-FORMAT NOTE (read before touching the R1 request-building code) ──
  * DeepSeek-R1 on Bedrock is invoked via the InvokeModel API, which (unlike
@@ -110,6 +111,8 @@ import { buildBedrockClientConfig } from '@/lib/bedrock'
 import { invokeBedrockClinicalToolWithMeta } from './bedrockMeta'
 import {
   TranscriptTooLargeError,
+  DifferentialGroundingError,
+  GROUNDED_DIFFERENTIAL_SUMMARY,
   MAX_TRANSCRIPT_CHARS,
   sanitizeDifferential,
   type DifferentialItem,
@@ -188,6 +191,7 @@ const MAX_QUOTES_PER_ITEM = 6
 const INDEPENDENT_DDX_INSTRUCTIONS = `You are a neurologist producing an INDEPENDENT differential diagnosis from a patient intake transcript, for retrospective quality-review purposes. You have not seen any other clinician's or AI system's analysis of this case — form your own opinion from the transcript alone.
 
 You will receive the full numbered transcript (each line prefixed "Turn N (Patient|Historian): ...") and, if available, the stated chief complaint.
+Medication names in the transcript may be replaced by [medication redacted]. When an application-verified medication context is supplied, it is the ONLY authority for medication names, amounts, schedules, adherence, or effects. Never reconstruct or guess a redacted name.
 
 Produce up to ${MAX_DIFFERENTIAL_ITEMS} candidate diagnoses, ranked most likely first, and a one-paragraph summary.
 
@@ -195,7 +199,7 @@ CRITICAL — quote grounding:
 - Every supporting_quotes and contradicting_quotes entry MUST be a VERBATIM, character-for-character substring copied from the numbered transcript's turn text — do not paraphrase, truncate mid-word, or combine text from two turns.
 - "turn" is the integer N from that quote's "Turn N" line.
 - contradicting_quotes cites evidence that argues AGAINST that diagnosis (may be an empty array — do not invent contradicting evidence that is not in the transcript).
-- If you cannot find a verbatim supporting quote for a diagnosis, you may still list it but leave supporting_quotes empty rather than fabricate one.
+- Every listed diagnosis MUST contain at least one valid supporting quote. Omit a diagnosis when the transcript contains no verbatim supporting evidence; never fabricate a quote.
 - Up to ${MAX_QUOTES_PER_ITEM} quotes per list per item.
 
 Other rules:
@@ -382,15 +386,14 @@ function serializedTranscriptLength(transcript: HistorianTranscriptEntry[]): num
   return JSON.stringify(transcript).length
 }
 
-// ── Public entry point (BLIND — transcript + chief complaint ONLY) ────────────
+// ── Public entry point (BLIND to model-derived intermediate context) ──────────
 
 /**
  * Generate an independent differential diagnosis from DeepSeek-R1, blind to
- * everything except the transcript and chief complaint (see module doc's
- * BLINDNESS section — this is enforced by this function's signature: it is
- * structurally impossible to pass in structured HPI output, localizer
- * output, final_differential, rubrics, or persona ground truth, because
- * there is no parameter for any of them).
+ * everything except the transcript, chief complaint, and the application-
+ * verified medication summary (see the module doc's BLINDNESS section). It
+ * remains structurally impossible to pass in structured HPI output,
+ * localizer output, final_differential, rubrics, or persona ground truth.
  *
  * Fail-closed: throws TranscriptTooLargeError before invoking Bedrock at
  * all if the serialized transcript exceeds MAX_TRANSCRIPT_CHARS (same
@@ -401,6 +404,7 @@ function serializedTranscriptLength(transcript: HistorianTranscriptEntry[]): num
 export async function generateIndependentDdx(
   transcript: HistorianTranscriptEntry[],
   chiefComplaint?: string,
+  trustedMedicationContext = '',
 ): Promise<IndependentDifferential> {
   const serializedLength = serializedTranscriptLength(transcript)
   if (serializedLength > MAX_TRANSCRIPT_CHARS) {
@@ -410,6 +414,9 @@ export async function generateIndependentDdx(
   const numberedTranscript = buildNumberedTranscriptText(transcript)
   const userText = [
     chiefComplaint ? `Chief complaint: ${chiefComplaint}` : '',
+    trustedMedicationContext
+      ? `Medication authority: ${trustedMedicationContext}`
+      : 'Medication authority: unavailable; do not infer medication facts.',
     '',
     'Transcript:',
     numberedTranscript,
@@ -431,9 +438,13 @@ export async function generateIndependentDdx(
       }
 
       const { items, droppedQuotes } = sanitizeDifferential(transcript, raw.differential)
+      if (items.length === 0) {
+        lastError = new DifferentialGroundingError()
+        continue
+      }
       return {
         differential: items,
-        summary: typeof raw.summary === 'string' ? raw.summary.trim() : '',
+        summary: GROUNDED_DIFFERENTIAL_SUMMARY,
         provenance: {
           model_id: DEEPSEEK_R1_MODEL_ID,
           prompt_version: INDEPENDENT_DDX_PROMPT_VERSION,
@@ -534,11 +545,17 @@ export async function runIndependentDdxAndAgreement(
   sessionId: string,
   transcript: HistorianTranscriptEntry[],
   chiefComplaint?: string,
+  inputDigest?: string,
+  trustedMedicationContext?: string,
 ): Promise<void> {
   const ddxStart = Date.now()
   let independent: IndependentDifferential
   try {
-    independent = await generateIndependentDdx(transcript, chiefComplaint)
+    independent = await generateIndependentDdx(
+      transcript,
+      chiefComplaint,
+      trustedMedicationContext,
+    )
   } catch (err) {
     if (err instanceof TranscriptTooLargeError) {
       console.warn('[historian/eval] skipping independent ddx — transcript too large for session', sessionId)
@@ -560,6 +577,7 @@ export async function runIndependentDdxAndAgreement(
     // than a fabricated figure.
     usage: {},
     latencyMs: Date.now() - ddxStart,
+    inputDigest,
   })
 
   // Agreement runs ONLY when both differentials exist — fetch Task 2's
@@ -616,5 +634,6 @@ export async function runIndependentDdxAndAgreement(
     result: agreement,
     usage: {},
     latencyMs: Date.now() - agreementStart,
+    inputDigest,
   })
 }

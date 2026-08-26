@@ -641,6 +641,7 @@ export async function runThoroughnessJudge(
   sessionId: string,
   transcript: HistorianTranscriptEntry[],
   options: ThoroughnessJudgeOptions = {},
+  inputDigest?: string,
 ): Promise<void> {
   const start = Date.now()
   let evaluation: ThoroughnessEvaluation
@@ -668,5 +669,6 @@ export async function runThoroughnessJudge(
     result: evaluation,
     usage,
     latencyMs: Date.now() - start,
+    inputDigest,
   })
 }

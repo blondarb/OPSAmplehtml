@@ -7,13 +7,22 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
  * (session_id, seq) pair is silently skipped (not counted in rowCount),
  * exactly like the real UNIQUE constraint from migration 056.
  */
-const { queryMock, table, getPoolMock } = vi.hoisted(() => {
+const { queryMock, table, invitationState, getPoolMock, releaseMock } = vi.hoisted(() => {
   const table = new Map<
     string,
     { id: number; session_id: string; seq: number; role: string; text: string; ts_offset_s: number | null }
   >()
   let nextId = 1
+  const invitationState: {
+    row: { status: string; startup_attempt_id: string | null } | null
+  } = { row: null }
   const queryMock = vi.fn(async (sql: string, values: unknown[] = []) => {
+    if (sql === 'BEGIN' || sql === 'COMMIT' || sql === 'ROLLBACK') {
+      return { rows: [], rowCount: 0 }
+    }
+    if (sql.includes('FROM historian_invites')) {
+      return { rows: invitationState.row ? [invitationState.row] : [], rowCount: invitationState.row ? 1 : 0 }
+    }
     if (!sql.includes('INSERT INTO historian_transcript_events')) {
       return { rows: [], rowCount: 0 }
     }
@@ -34,8 +43,12 @@ const { queryMock, table, getPoolMock } = vi.hoisted(() => {
     }
     return { rows: inserted, rowCount: inserted.length }
   })
-  const getPoolMock = vi.fn(async () => ({ query: queryMock }))
-  return { queryMock, table, getPoolMock }
+  const releaseMock = vi.fn()
+  const getPoolMock = vi.fn(async () => ({
+    query: queryMock,
+    connect: async () => ({ query: queryMock, release: releaseMock }),
+  }))
+  return { queryMock, table, invitationState, getPoolMock, releaseMock }
 })
 
 vi.mock('@/lib/db', () => ({ getPool: getPoolMock }))
@@ -73,13 +86,15 @@ async function flushBatch(token: string, entries: SyntheticEntry[], sessionId = 
 describe('transcript-flush route', () => {
   beforeEach(() => {
     table.clear()
+    invitationState.row = null
     queryMock.mockClear()
+    releaseMock.mockClear()
     process.env.HISTORIAN_FLUSH_SECRET = 'crash-sim-secret'
   })
 
   describe('crash-sim durability gate', () => {
     it('retains events 1-9 and consolidates them in order when the client dies before flushing seq 10', async () => {
-      const token = mintFlushToken(SESSION_ID)
+      const token = await mintFlushToken(SESSION_ID)
       const all = buildEntries(10)
 
       // Flush in batches of 3 — mirrors the client's real "flush every 3
@@ -124,10 +139,39 @@ describe('transcript-flush route', () => {
 
   describe('auth + validation', () => {
     it('rejects a request whose bearer token sessionId does not match the body sessionId', async () => {
-      const token = mintFlushToken('some-other-session')
+      const token = await mintFlushToken('some-other-session')
       const res = await flushBatch(token, buildEntries(1))
       expect(res.status).toBe(403)
       expect(table.size).toBe(0)
+    })
+
+    it('rejects a stale invited-attempt token before any transcript write', async () => {
+      invitationState.row = {
+        status: 'in_progress',
+        startup_attempt_id: '22222222-2222-4222-8222-222222222222',
+      }
+      const token = await mintFlushToken(
+        SESSION_ID,
+        '11111111-1111-4111-8111-111111111111',
+      )
+      const res = await flushBatch(token, buildEntries(1))
+      expect(res.status).toBe(403)
+      expect(table.size).toBe(0)
+      expect(releaseMock).toHaveBeenCalledOnce()
+    })
+
+    it('accepts transcript writes only for the current invited attempt', async () => {
+      invitationState.row = {
+        status: 'in_progress',
+        startup_attempt_id: '11111111-1111-4111-8111-111111111111',
+      }
+      const token = await mintFlushToken(
+        SESSION_ID,
+        '11111111-1111-4111-8111-111111111111',
+      )
+      const res = await flushBatch(token, buildEntries(1))
+      expect(res.status).toBe(200)
+      expect(table.size).toBe(1)
     })
 
     it('rejects a missing token', async () => {
@@ -141,27 +185,27 @@ describe('transcript-flush route', () => {
     })
 
     it('rejects a tampered token', async () => {
-      const token = mintFlushToken(SESSION_ID)
+      const token = await mintFlushToken(SESSION_ID)
       const tampered = token.slice(0, -1) + (token.at(-1) === 'A' ? 'B' : 'A')
       const res = await flushBatch(tampered, buildEntries(1))
       expect(res.status).toBe(403)
     })
 
     it('rejects more than 50 entries in one request', async () => {
-      const token = mintFlushToken(SESSION_ID)
+      const token = await mintFlushToken(SESSION_ID)
       const res = await flushBatch(token, buildEntries(51))
       expect(res.status).toBe(413)
       expect(table.size).toBe(0)
     })
 
     it('rejects a seq beyond the 500/session cap', async () => {
-      const token = mintFlushToken(SESSION_ID)
+      const token = await mintFlushToken(SESSION_ID)
       const res = await flushBatch(token, [{ seq: 501, role: 'user', text: 'x', tsOffsetS: 0 }])
       expect(res.status).toBe(413)
     })
 
     it('rejects a malformed entry (empty text) with a 400 that does not echo it', async () => {
-      const token = mintFlushToken(SESSION_ID)
+      const token = await mintFlushToken(SESSION_ID)
       const res = await flushBatch(token, [{ seq: 1, role: 'user', text: '   ', tsOffsetS: 0 }])
       expect(res.status).toBe(400)
       const body = await res.json()
@@ -169,7 +213,7 @@ describe('transcript-flush route', () => {
     })
 
     it('is a no-op 200 for an empty entries array', async () => {
-      const token = mintFlushToken(SESSION_ID)
+      const token = await mintFlushToken(SESSION_ID)
       const res = await flushBatch(token, [])
       expect(res.status).toBe(200)
       expect((await res.json()).accepted).toBe(0)

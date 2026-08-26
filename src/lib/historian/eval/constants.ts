@@ -47,6 +47,12 @@ export interface PromptVersionInfo {
  * report) key off these stable ids to compare runs across prompt versions.
  */
 export const PROMPT_VERSIONS: Record<string, PromptVersionInfo> = {
+  'clinician-history-report-v1': {
+    id: 'clinician-history-report-v1',
+    description:
+      'Citation-grounded clinician history report: ten fixed non-medication sections from exact patient-turn quotes, with the application-owned medication ledger and limitations appended after model validation.',
+    introducedAt: '2026-08-25',
+  },
   'final-ddx-v1': {
     id: 'final-ddx-v1',
     description:

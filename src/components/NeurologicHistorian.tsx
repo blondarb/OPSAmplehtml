@@ -4,7 +4,7 @@ import '@/styles/neuro-navigator.css'
 import { useState, useCallback, useEffect, useRef } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
 import { useRealtimeSession } from '@/hooks/useRealtimeSession'
-import { DEMO_SCENARIOS, type DemoScenario, type HistorianStructuredOutput, type HistorianRedFlag, type HistorianTranscriptEntry, type HistorianSessionType, type PatientContext } from '@/lib/historianTypes'
+import { DEMO_SCENARIOS, type DemoScenario, type HistorianStructuredOutput, type HistorianRedFlag, type HistorianTranscriptEntry, type HistorianSessionType, type HistorianInterviewMode, type HistorianTerminationReason, type PatientContext } from '@/lib/historianTypes'
 import { getTenantClient } from '@/lib/tenant'
 import HistorianReportView from './HistorianReportView'
 import HistorianConsentDisclosure from './HistorianConsentDisclosure'
@@ -25,8 +25,9 @@ import { deriveReferredCardContent } from '@/lib/historian/referredCardContent'
 import { postExtractJSON } from '@/lib/triage/pollClient'
 import type { ClinicalExtraction } from '@/lib/triage/types'
 import LocalizerPanel from '@/components/LocalizerPanel'
+import type { HistorianInvitationPublicContext } from '@/lib/historian/invitationStore'
 
-type Phase = 'loading_context' | 'scenario_select' | 'connecting' | 'active' | 'ending' | 'complete' | 'safety_escalation'
+type Phase = 'loading_context' | 'scenario_select' | 'connecting' | 'active' | 'ending' | 'saving' | 'complete' | 'safety_escalation'
 
 /** Unified config for both real-patient and demo-scenario flows */
 interface SessionConfig {
@@ -77,9 +78,19 @@ interface NeurologicHistorianProps {
    * by editing the URL.
    */
   clinicianMirror?: boolean
+  /**
+   * Server-resolved patient invitation context. The actual authority remains
+   * the HttpOnly grant cookie; these fields are display-only and every API
+   * request re-resolves the server binding.
+   */
+  invitation?: HistorianInvitationPublicContext
 }
 
-export default function NeurologicHistorian({ initialMode, clinicianMirror = false }: NeurologicHistorianProps = {}) {
+export default function NeurologicHistorian({
+  initialMode,
+  clinicianMirror = false,
+  invitation,
+}: NeurologicHistorianProps = {}) {
   const searchParams = useSearchParams()
   const router = useRouter()
   const scenarioParam = searchParams.get('scenario')
@@ -91,9 +102,20 @@ export default function NeurologicHistorian({ initialMode, clinicianMirror = fal
   // useVoiceProviderPreference).
   const showEngineToggle = searchParams.get('internal') === '1'
 
-  const [phase, setPhase] = useState<Phase>(patientIdParam ? 'loading_context' : 'scenario_select')
+  const [phase, setPhase] = useState<Phase>(
+    patientIdParam && !invitation ? 'loading_context' : 'scenario_select',
+  )
   const [selectedScenario, setSelectedScenario] = useState<DemoScenario | null>(null)
-  const [sessionConfig, setSessionConfig] = useState<SessionConfig | null>(null)
+  const [sessionConfig, setSessionConfig] = useState<SessionConfig | null>(
+    invitation
+      ? {
+          sessionType: invitation.sessionType,
+          referralReason: invitation.referralReason || undefined,
+          patientName: invitation.patientName,
+          patientId: null,
+        }
+      : null,
+  )
   const [showTranscript, setShowTranscript] = useState(false)
   const [referralNote, setReferralNote] = useState('')
   const [referralInput, setReferralInput] = useState<HistorianReferralInput | null>(null)
@@ -107,6 +129,7 @@ export default function NeurologicHistorian({ initialMode, clinicianMirror = fal
   // ever called from handleConsentConfirm, never directly from the button handler.
   const [showConsentDisclosure, setShowConsentDisclosure] = useState(false)
   const [consentAcknowledged, setConsentAcknowledged] = useState(false)
+  const [saveError, setSaveError] = useState<string | null>(null)
   const [completionData, setCompletionData] = useState<{
     structuredOutput: HistorianStructuredOutput | null
     narrativeSummary: string | null
@@ -115,6 +138,10 @@ export default function NeurologicHistorian({ initialMode, clinicianMirror = fal
     transcript: HistorianTranscriptEntry[]
     duration: number
     questionCount: number
+    endedEarly: boolean
+    terminationReason: HistorianTerminationReason
+    interviewMode: HistorianInterviewMode
+    interviewPromptVersion: HistorianStructuredOutput['interview_prompt_version']
     /** Server-minted historian_sessions id — see useRealtimeSession's onComplete. */
     sessionId: string | null
   } | null>(null)
@@ -130,6 +157,9 @@ export default function NeurologicHistorian({ initialMode, clinicianMirror = fal
   // Voice engine selection — defaults to 'openai' (today's production path);
   // Nova only engages via an explicit ?voice=nova link or a toggle click.
   const [voiceProvider, setVoiceProvider, voiceProviderExplicit] = useVoiceProviderPreference()
+  const [interviewMode, setInterviewMode] = useState<HistorianInterviewMode>(
+    invitation?.interviewMode ?? 'standard',
+  )
 
   // Referred mode: a triage handoff was picked up on mount. `handoffDisplay`
   // is set in exactly one place (the handoff-pickup effect below) and
@@ -150,14 +180,10 @@ export default function NeurologicHistorian({ initialMode, clinicianMirror = fal
     patientId: null,
   }
 
-  const handleComplete = useCallback(async (data: typeof completionData) => {
-    if (!data) return
-    setCompletionData(data)
-    setPhase('complete')
-
-    // Save session to database
-    try {
-      await fetch('/api/ai/historian/save', {
+  const saveCompletedSession = useCallback(async (
+    data: NonNullable<typeof completionData>,
+  ) => {
+    const response = await fetch('/api/ai/historian/save', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -174,14 +200,58 @@ export default function NeurologicHistorian({ initialMode, clinicianMirror = fal
           duration_seconds: data.duration,
           question_count: data.questionCount,
           status: 'completed',
+          interview_completion_status: data.endedEarly ? 'ended_early' : 'complete',
+          interview_termination_reason: data.terminationReason,
           consult_id: consultIdParam || null,
           sessionId: data.sessionId,
         }),
       })
+    if (!response.ok) {
+      const responseBody = await response.json().catch(() => ({}))
+      throw new Error(
+        typeof responseBody?.error === 'string'
+          ? responseBody.error
+          : `Save failed (${response.status})`,
+      )
+    }
+  }, [tenant, activeConfig, consultIdParam])
+
+  const handleComplete = useCallback(async (data: typeof completionData) => {
+    if (!data) return
+    const completedData: NonNullable<typeof completionData> = {
+      ...data,
+      structuredOutput: {
+        ...(data.structuredOutput ?? {}),
+        interview_mode: data.interviewMode,
+        interview_prompt_version: data.interviewPromptVersion,
+      },
+    }
+    setCompletionData(completedData)
+    setSaveError(null)
+    if (!completedData.safetyEscalated) setPhase('saving')
+
+    try {
+      await saveCompletedSession(completedData)
+      if (!completedData.safetyEscalated) setPhase('complete')
     } catch (err) {
       console.error('Failed to save historian session:', err)
+      setSaveError(
+        'The clinic has not received this interview yet. Keep this page open and retry. If you close or reload it, ask the clinic to revoke this interrupted session and send a new link.',
+      )
     }
-  }, [tenant, activeConfig])
+  }, [saveCompletedSession])
+
+  const handleRetrySave = useCallback(async () => {
+    if (!completionData) return
+    setSaveError(null)
+    try {
+      await saveCompletedSession(completionData)
+      if (!completionData.safetyEscalated) setPhase('complete')
+    } catch (err) {
+      console.error('Historian save retry failed:', err)
+      setSaveError('The clinic still has not received the interview. Check your connection and try again.')
+    }
+  }, [completionData, saveCompletedSession])
 
   const handleSafetyEscalation = useCallback(() => {
     setPhase('safety_escalation')
@@ -203,6 +273,7 @@ export default function NeurologicHistorian({ initialMode, clinicianMirror = fal
     endSession,
   } = useRealtimeSession({
     sessionType: activeConfig.sessionType,
+    interviewMode,
     referralReason: activeConfig.referralReason,
     patientName: activeConfig.patientName,
     patientContext: activeConfig.patientContext,
@@ -210,21 +281,27 @@ export default function NeurologicHistorian({ initialMode, clinicianMirror = fal
     // Send the provider ONLY when the user actually chose one (?voice= link
     // or the internal toggle). Otherwise omit it so the SERVER's
     // VOICE_PROVIDER decides — see useVoiceProviderPreference.
-    provider: voiceProviderExplicit ? voiceProvider : undefined,
+    provider: interviewMode === 'comprehensive'
+      ? 'nova'
+      : voiceProviderExplicit ? voiceProvider : undefined,
     referral: referralInput ?? undefined,
     // Patient-facing surface: the localizer drives a physician-only panel and
     // must not run here (redesign brief Part 4 — no diagnostic content on the
     // patient page). The /consult clinician surface keeps its own localizer.
     // `clinicianMirror` is the single, explicit opt-in for a clinician-facing
     // route that wants the differential mirrored — never set on /patient/*.
-    enableLocalizer: clinicianMirror,
+    // Comprehensive mode is designed for a patient-facing interview run from
+    // a clinician-authorized launch. Do not place live diagnostic suggestions
+    // on that shared interview screen; the full-transcript differential runs
+    // after save and remains available on physician review surfaces.
+    enableLocalizer: clinicianMirror && interviewMode === 'standard',
     onComplete: handleComplete,
     onSafetyEscalation: handleSafetyEscalation,
   })
 
   // Fetch patient context when patient_id is provided
   useEffect(() => {
-    if (!patientIdParam) return
+    if (!patientIdParam || invitation) return
 
     let cancelled = false
     async function fetchContext() {
@@ -271,7 +348,7 @@ export default function NeurologicHistorian({ initialMode, clinicianMirror = fal
     }
     fetchContext()
     return () => { cancelled = true }
-  }, [patientIdParam])
+  }, [patientIdParam, invitation])
 
   // Auto-select scenario from query param
   useEffect(() => {
@@ -502,7 +579,7 @@ export default function NeurologicHistorian({ initialMode, clinicianMirror = fal
 
   // ── Presentation-only derivations for the stepped patient flow ──
   const currentStep: 1 | 2 | 3 | 4 =
-    phase === 'complete'
+    phase === 'complete' || phase === 'saving'
       ? 4
       : phase === 'connecting' || phase === 'active' || phase === 'ending'
         ? 3
@@ -514,10 +591,10 @@ export default function NeurologicHistorian({ initialMode, clinicianMirror = fal
   const lastUserText = [...transcript].reverse().find(e => e.role === 'user')?.text
   const displayedHeard = currentUserText || lastUserText || null
   const assistantTurns = transcript.filter(e => e.role === 'assistant').length
-  const currentQuestionNumber = Math.min(
-    TURN_CAP,
-    Math.max(1, assistantTurns + (currentAssistantText ? 1 : 0)),
-  )
+  const rawQuestionNumber = Math.max(1, assistantTurns + (currentAssistantText ? 1 : 0))
+  const currentQuestionNumber = interviewMode === 'standard'
+    ? Math.min(TURN_CAP, rawQuestionNumber)
+    : rawQuestionNumber
 
   // ============= RENDER =============
 
@@ -589,19 +666,59 @@ export default function NeurologicHistorian({ initialMode, clinicianMirror = fal
         >
           Back to Patient Portal
         </button>
+        {saveError && (
+          <div style={{ marginTop: 18, maxWidth: 500 }}>
+            <p role="alert" style={{ color: '#fff', lineHeight: 1.5 }}>
+              We could not confirm final delivery of the interview. Keep following the emergency instructions above and retry sending the history.
+            </p>
+            <button
+              onClick={() => void handleRetrySave()}
+              style={{
+                padding: '12px 20px',
+                borderRadius: 8,
+                background: '#fff',
+                border: 0,
+                color: '#991b1b',
+                fontWeight: 700,
+                cursor: 'pointer',
+              }}
+            >
+              Retry Sending Interview
+            </button>
+          </div>
+        )}
       </div>
     )
   }
 
-  return (
-    <PlatformShell>
-    <FeatureSubHeader
-      title="AI Health Interview"
-      icon={Mic}
-      accentColor="#12706e"
-      showDemo={false}
-      nextStep={{ label: 'Patient Messaging', route: '/patient/messages' }}
-    />
+  const historianPage = (
+    <>
+    {invitation ? (
+      <header
+        style={{
+          minHeight: 64,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          gap: 16,
+          padding: '14px 24px',
+          background: '#0f172a',
+          color: '#fff',
+          fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
+        }}
+      >
+        <span style={{ fontSize: 18, fontWeight: 800 }}>Sevaro Neurology</span>
+        <span style={{ color: '#99f6e4', fontSize: 13, fontWeight: 700 }}>Secure history intake</span>
+      </header>
+    ) : (
+      <FeatureSubHeader
+        title="AI Health Interview"
+        icon={Mic}
+        accentColor="#12706e"
+        showDemo={false}
+        nextStep={{ label: 'Patient Messaging', route: '/patient/messages' }}
+      />
+    )}
     <div className="nn">
       <div className="nn-hist">
 
@@ -633,7 +750,7 @@ export default function NeurologicHistorian({ initialMode, clinicianMirror = fal
         {phase === 'scenario_select' && showConsentDisclosure && (
           <HistorianConsentDisclosure
             presentation="page"
-            requireIdentity
+            requireIdentity={!invitation}
             onConfirm={handleConsentConfirm}
             onCancel={handleConsentCancel}
           />
@@ -745,8 +862,42 @@ export default function NeurologicHistorian({ initialMode, clinicianMirror = fal
               </details>
             )}
 
+            {/* Comprehensive mode is initially limited to the authenticated
+                clinician mirror. The anonymous patient/demo route keeps the
+                established standard interview until privacy, duration, and
+                clinical-pilot gates are explicitly approved. */}
+            {clinicianMirror && !invitation && (
+              <fieldset className="nn-card" style={{ marginBottom: 20 }}>
+                <legend className="nn-card-title">Interview depth</legend>
+                <div style={{ display: 'grid', gap: 10 }}>
+                  <button
+                    type="button"
+                    className={`nn-choice${interviewMode === 'standard' ? ' on' : ''}`}
+                    aria-pressed={interviewMode === 'standard'}
+                    onClick={() => setInterviewMode('standard')}
+                  >
+                    <span style={{ display: 'block', fontWeight: 650, marginBottom: 4 }}>Standard</span>
+                    <span style={{ display: 'block', fontSize: 'var(--nn-fs-sm)', color: 'var(--nn-ink-2)' }}>
+                      Focused intake, usually about 8 minutes and up to 25 exchanges.
+                    </span>
+                  </button>
+                  <button
+                    type="button"
+                    className={`nn-choice${interviewMode === 'comprehensive' ? ' on' : ''}`}
+                    aria-pressed={interviewMode === 'comprehensive'}
+                    onClick={() => setInterviewMode('comprehensive')}
+                  >
+                    <span style={{ display: 'block', fontWeight: 650, marginBottom: 4 }}>Comprehensive</span>
+                    <span style={{ display: 'block', fontSize: 'var(--nn-fs-sm)', color: 'var(--nn-ink-2)' }}>
+                      Referral reason first, age second, then a complete complaint-directed neurologic history. Not limited to 25 exchanges.
+                    </span>
+                  </button>
+                </div>
+              </fieldset>
+            )}
+
             {/* Internal-only engine selector (?internal=1) — never a patient control */}
-            {showEngineToggle && (
+            {showEngineToggle && !invitation && interviewMode === 'standard' && (
               <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 10 }}>
                 <VoiceProviderToggle value={voiceProvider} onChange={setVoiceProvider} />
               </div>
@@ -767,7 +918,9 @@ export default function NeurologicHistorian({ initialMode, clinicianMirror = fal
             </button>
 
             <p className="nn-prog">
-              Takes about 8 minutes · Requires microphone access · You can pause or stop at any time
+              {interviewMode === 'comprehensive'
+                ? 'Length adapts to the history · Requires microphone access · You can stop at any time'
+                : 'Takes about 8 minutes · Requires microphone access · You can stop at any time'}
             </p>
           </>
         )}
@@ -797,7 +950,7 @@ export default function NeurologicHistorian({ initialMode, clinicianMirror = fal
           <HistorianInterviewStep
             phase={phase}
             turnNumber={currentQuestionNumber}
-            turnCap={TURN_CAP}
+            turnCap={interviewMode === 'standard' ? TURN_CAP : undefined}
             displayedQuestion={displayedQuestion}
             displayedHeard={displayedHeard}
             isAiSpeaking={isAiSpeaking}
@@ -816,7 +969,7 @@ export default function NeurologicHistorian({ initialMode, clinicianMirror = fal
             Rendered only for an auth-gated clinician route. Updates on the
             Localizer's own cadence (every LOCALIZER_INTERVAL patient turns),
             which is the "watch it think" behaviour the /consult surface has. */}
-        {clinicianMirror && (phase === 'active' || phase === 'ending') && (
+        {clinicianMirror && interviewMode === 'standard' && (phase === 'active' || phase === 'ending') && (
           <div style={{ marginTop: 16 }}>
             <div style={{
               fontSize: '0.7rem',
@@ -833,6 +986,36 @@ export default function NeurologicHistorian({ initialMode, clinicianMirror = fal
         )}
 
         {/* ====== STEP 4 — SUMMARY ====== */}
+        {phase === 'saving' && (
+          <div className="nn-card" style={{ textAlign: 'center', padding: '34px 22px' }} aria-live="polite">
+            <div style={{
+              width: 52,
+              height: 52,
+              borderRadius: '50%',
+              display: 'grid',
+              placeItems: 'center',
+              margin: '0 auto 14px',
+              background: saveError ? '#fef2f2' : 'var(--nn-accent-wash)',
+              color: saveError ? '#b91c1c' : 'var(--nn-accent-ink)',
+              fontSize: 22,
+              fontWeight: 800,
+            }}>
+              {saveError ? '!' : '✓'}
+            </div>
+            <h2 className="nn-hist-title" style={{ marginBottom: 8 }}>
+              {saveError ? 'Interview not delivered yet' : 'Securely saving your interview'}
+            </h2>
+            <p className="nn-lede" style={{ marginBottom: saveError ? 18 : 0 }}>
+              {saveError || 'Please keep this page open while the clinic receives your history.'}
+            </p>
+            {saveError && (
+              <button className="nn-btn" onClick={() => void handleRetrySave()}>
+                Retry Save
+              </button>
+            )}
+          </div>
+        )}
+
         {phase === 'complete' && completionData && (
           <HistorianReportView
             structuredOutput={completionData.structuredOutput}
@@ -840,6 +1023,8 @@ export default function NeurologicHistorian({ initialMode, clinicianMirror = fal
             redFlags={completionData.redFlags}
             duration={completionData.duration}
             questionCount={completionData.questionCount}
+            endedEarly={completionData.endedEarly}
+            terminationReason={completionData.terminationReason}
             transcript={completionData.transcript}
             // This is the unauthenticated patient surface (/patient/historian)
             // — see design spec locked decision L1. DDx/thoroughness props
@@ -848,12 +1033,19 @@ export default function NeurologicHistorian({ initialMode, clinicianMirror = fal
             // them even if that ever changes.
             surface="patient"
             theme="clinical"
-            onStartAnother={handleStartAnother}
+            onStartAnother={invitation ? undefined : handleStartAnother}
             onBackToPortal={handleBackToPortal}
           />
         )}
       </div>
     </div>
-    </PlatformShell>
+    </>
   )
+
+  // A patient invitation is a dedicated bearer-grant surface. Keep it out of
+  // the signed-in platform shell so it neither polls clinician notifications
+  // nor advertises portal navigation to an unauthenticated patient.
+  return invitation
+    ? <div className="min-h-screen">{historianPage}</div>
+    : <PlatformShell>{historianPage}</PlatformShell>
 }

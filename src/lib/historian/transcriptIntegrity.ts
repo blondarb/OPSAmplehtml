@@ -70,6 +70,8 @@ export function validateTranscript(
       // be reported as out-of-order; only a strictly-decreasing seq is.
       if (prevSeq !== null && seq < prevSeq) {
         issues.push(`seq out of order at index ${index}: ${prevSeq} -> ${seq}`)
+      } else if (prevSeq !== null && seq > prevSeq + 1) {
+        issues.push(`seq gap before index ${index}: ${prevSeq} -> ${seq}`)
       }
       prevSeq = seq
     }

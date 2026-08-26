@@ -1,0 +1,202 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: >
+  Temporary fail-fast initializer for the isolated synthetic Historian QA
+  database and machine Cognito user. Delete after one successful run.
+
+Parameters:
+  RdsSecretArn:
+    Type: String
+    NoEcho: true
+  DatabaseName:
+    Type: String
+    Default: ops_amplehtml_historian_qa
+    AllowedPattern: '^[A-Za-z_][A-Za-z0-9_]*$'
+  DatabaseHost:
+    Type: String
+    AllowedPattern: '^[A-Za-z0-9.-]+$'
+  DatabasePort:
+    Type: String
+    Default: '5432'
+    AllowedPattern: '^[0-9]{2,5}$'
+  MachinePasswordSecretArn:
+    Type: String
+    NoEcho: true
+  CognitoUserPoolId:
+    Type: String
+  DeleteAfter:
+    Type: String
+    Default: '2026-08-29'
+
+Resources:
+  InitSourceBucket:
+    Type: AWS::S3::Bucket
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Delete
+    Properties:
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+      LifecycleConfiguration:
+        Rules:
+          - Id: DeleteInitializerSource
+            Status: Enabled
+            ExpirationInDays: 1
+      OwnershipControls:
+        Rules:
+          - ObjectOwnership: BucketOwnerEnforced
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      Tags:
+        - { Key: DataClass, Value: synthetic-only }
+        - { Key: DeleteAfter, Value: !Ref DeleteAfter }
+
+  InitSourceBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref InitSourceBucket
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Sid: DenyInsecureTransport
+            Effect: Deny
+            Principal: '*'
+            Action: s3:*
+            Resource:
+              - !GetAtt InitSourceBucket.Arn
+              - !Sub '${InitSourceBucket.Arn}/*'
+            Condition:
+              Bool:
+                aws:SecureTransport: 'false'
+
+  InitLogGroup:
+    Type: AWS::Logs::LogGroup
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Delete
+    Properties:
+      LogGroupName: !Sub '/aws/codebuild/${AWS::StackName}'
+      RetentionInDays: 1
+      Tags:
+        - { Key: DataClass, Value: synthetic-only }
+        - { Key: DeleteAfter, Value: !Ref DeleteAfter }
+
+  InitRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: codebuild.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: InitializeHistorianQaOnly
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Sid: ReadQaCredentials
+                Effect: Allow
+                Action: secretsmanager:GetSecretValue
+                Resource:
+                  - !Ref RdsSecretArn
+                  - !Ref MachinePasswordSecretArn
+              - Sid: ManageSyntheticQaUser
+                Effect: Allow
+                Action:
+                  - cognito-idp:AdminCreateUser
+                  - cognito-idp:AdminGetUser
+                  - cognito-idp:AdminSetUserPassword
+                Resource: !Sub arn:${AWS::Partition}:cognito-idp:${AWS::Region}:${AWS::AccountId}:userpool/${CognitoUserPoolId}
+              - Sid: ReadInitializerSource
+                Effect: Allow
+                Action:
+                  - s3:GetBucketAcl
+                  - s3:GetBucketLocation
+                  - s3:GetObject
+                  - s3:GetObjectVersion
+                Resource:
+                  - !GetAtt InitSourceBucket.Arn
+                  - !Sub '${InitSourceBucket.Arn}/*'
+              - Sid: WriteBuildLogs
+                Effect: Allow
+                Action:
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                Resource: !Sub '${InitLogGroup.Arn}:*'
+      Tags:
+        - { Key: DataClass, Value: synthetic-only }
+        - { Key: DeleteAfter, Value: !Ref DeleteAfter }
+
+  InitProject:
+    Type: AWS::CodeBuild::Project
+    DependsOn: InitLogGroup
+    Properties:
+      ServiceRole: !GetAtt InitRole.Arn
+      Artifacts:
+        Type: NO_ARTIFACTS
+      Environment:
+        ComputeType: BUILD_GENERAL1_SMALL
+        Image: aws/codebuild/standard:7.0
+        ImagePullCredentialsType: CODEBUILD
+        PrivilegedMode: true
+        Type: LINUX_CONTAINER
+        EnvironmentVariables:
+          - { Name: PGHOST, Type: PLAINTEXT, Value: !Ref DatabaseHost }
+          - { Name: PGPORT, Type: PLAINTEXT, Value: !Ref DatabasePort }
+          - { Name: PGUSER, Type: SECRETS_MANAGER, Value: !Join [':', [!Ref RdsSecretArn, username]] }
+          - { Name: PGPASSWORD, Type: SECRETS_MANAGER, Value: !Join [':', [!Ref RdsSecretArn, password]] }
+          - { Name: PGDATABASE, Type: PLAINTEXT, Value: !Ref DatabaseName }
+          - { Name: PGSSLMODE, Type: PLAINTEXT, Value: verify-full }
+          - { Name: QA_USERNAME, Type: SECRETS_MANAGER, Value: !Join [':', [!Ref MachinePasswordSecretArn, username]] }
+          - { Name: QA_PASSWORD, Type: SECRETS_MANAGER, Value: !Join [':', [!Ref MachinePasswordSecretArn, password]] }
+          - { Name: QA_USER_POOL_ID, Type: PLAINTEXT, Value: !Ref CognitoUserPoolId }
+      Source:
+        Type: S3
+        Location: !Sub '${InitSourceBucket}/historian-qa-init.zip'
+        BuildSpec: |
+          version: 0.2
+          phases:
+            install:
+              commands:
+                - set +x
+                - docker pull public.ecr.aws/docker/library/postgres:17 >/dev/null
+            build:
+              commands:
+                - set +x
+                - umask 077
+                - test -f infrastructure/historian-qa/bootstrap-schema.sql
+                - test -f migrations/059_historian_invites_and_eval_jobs.sql
+                - test -f migrations/060_historian_termination_reason.sql
+                - test -f migrations/061_historian_comprehensive_v2.sql
+                - test -f migrations/062_historian_startup_attempt_authority.sql
+                - test -f migrations/063_historian_adaptive_v3.sql
+                - test -f migrations/064_historian_comprehensive_v4.sql
+                - test -f infrastructure/historian-qa/seed.sql
+                - test -f infrastructure/historian-qa/verify.sql
+                - curl --fail --silent --show-error --location --output rds-global-bundle.pem https://truststore.pki.rds.amazonaws.com/global/global-bundle.pem
+                - test "$(wc -c < rds-global-bundle.pem)" -gt 1000
+                - if ! aws cognito-idp admin-get-user --user-pool-id "$QA_USER_POOL_ID" --username "$QA_USERNAME" >/dev/null 2>&1; then aws cognito-idp admin-create-user --user-pool-id "$QA_USER_POOL_ID" --username "$QA_USERNAME" --user-attributes Name=email,Value=historian.qa@example.invalid Name=email_verified,Value=true --message-action SUPPRESS >/dev/null; fi
+                - aws cognito-idp admin-set-user-password --user-pool-id "$QA_USER_POOL_ID" --username "$QA_USERNAME" --password "$QA_PASSWORD" --permanent >/dev/null
+                - export QA_COGNITO_SUB="$(aws cognito-idp admin-get-user --user-pool-id "$QA_USER_POOL_ID" --username "$QA_USERNAME" --query 'UserAttributes[?Name==`sub`].Value | [0]' --output text)"
+                - test -n "$QA_COGNITO_SUB" && test "$QA_COGNITO_SUB" != None
+                - docker run --rm --user "$(id -u):$(id -g)" -e PGHOST -e PGPORT -e PGUSER -e PGPASSWORD -e PGDATABASE -e PGSSLMODE -e PGSSLROOTCERT=/certs/rds-global-bundle.pem -v "$CODEBUILD_SRC_DIR:/work" -v "$CODEBUILD_SRC_DIR/rds-global-bundle.pem:/certs/rds-global-bundle.pem:ro" -w /work public.ecr.aws/docker/library/postgres:17 psql --single-transaction --set=ON_ERROR_STOP=1 --set=cognito_sub="$QA_COGNITO_SUB" --file=infrastructure/historian-qa/bootstrap-schema.sql --file=migrations/059_historian_invites_and_eval_jobs.sql --file=migrations/060_historian_termination_reason.sql --file=migrations/061_historian_comprehensive_v2.sql --file=migrations/062_historian_startup_attempt_authority.sql --file=migrations/063_historian_adaptive_v3.sql --file=migrations/064_historian_comprehensive_v4.sql --file=infrastructure/historian-qa/seed.sql --file=infrastructure/historian-qa/verify.sql
+      LogsConfig:
+        CloudWatchLogs:
+          Status: ENABLED
+          GroupName: !Ref InitLogGroup
+          StreamName: database-init
+      TimeoutInMinutes: 20
+      QueuedTimeoutInMinutes: 10
+      Tags:
+        - { Key: DataClass, Value: synthetic-only }
+        - { Key: DeleteAfter, Value: !Ref DeleteAfter }
+
+Outputs:
+  SourceBucket:
+    Value: !Ref InitSourceBucket
+  ProjectName:
+    Value: !Ref InitProject

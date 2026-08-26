@@ -4,7 +4,8 @@
  * Background Localizer — Phase 2 of the Integrated Neuro Intake Engine.
  *
  * Fires every 3 completed user turns during an active historian session.
- * Runs a 3-step pipeline:
+ * Adaptive v3 uses one focused Claude conductor call; standard interviews
+ * retain the 3-step clinical-observer pipeline:
  *   1. Symptom extraction  — Bedrock Claude extracts structured symptoms from transcript
  *   2. Plan evidence       — neuro_plans DB match returns relevant guideline context
  *   3. Question generation — Bedrock Claude generates 2-3 follow-up questions + differential
@@ -18,9 +19,13 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { invokeBedrockJSON } from '@/lib/bedrock'
 import { from } from '@/lib/db-query'
-import { getNeuroPlansPool } from '@/lib/db'
+import { getNeuroPlansPool, getPool } from '@/lib/db'
+import { verifyFlushToken } from '@/lib/historian/flushToken'
+import { isLiveReviewGapKey } from '@/lib/historian/liveReviewContract'
+import { issueLiveReviewClarificationReceipt } from '@/lib/historian/liveReviewClarificationReceipt'
 import { retrievePlanEvidence } from '@/lib/consult/planEvidence'
 import { SYMPTOM_EXTRACTOR_PROMPT } from '@/lib/consult/symptomExtractorPrompt'
+import { COMPREHENSIVE_HISTORY_DOMAINS } from '@/lib/historianTypes'
 import type {
   LocalizerRequest,
   LocalizerResponse,
@@ -35,6 +40,35 @@ import type {
 const LOCALIZER_TIMEOUT_MS = 15000
 const MAX_SUGGESTED_ACTIONS = 4
 const SUGGESTED_ACTION_FIELD_MAX_LEN = 200
+const MAX_TRANSCRIPT_ENTRIES = 120
+const MAX_TRANSCRIPT_CHARS = 100_000
+const MAX_REVIEW_INTENT_CHARS = 240
+const REVIEW_DOMAIN_IDS = new Set<string>(
+  COMPREHENSIVE_HISTORY_DOMAINS.map((domain) => domain.id),
+)
+
+function bearerToken(request: Request): string {
+  const value = request.headers.get('authorization') ?? ''
+  return value.startsWith('Bearer ') ? value.slice(7).trim() : ''
+}
+
+async function adaptiveAttemptAuthorityIsCurrent(
+  sessionId: string,
+  startupAttemptId?: string,
+): Promise<boolean> {
+  const pool = await getPool()
+  const result = await pool.query<{ status: string; startup_attempt_id: string | null }>(
+    `SELECT status, startup_attempt_id
+       FROM historian_invites
+      WHERE session_id = $1`,
+    [sessionId],
+  )
+  const invitation = result.rows[0]
+  if (!invitation) return true
+  return invitation.status === 'in_progress' &&
+    !!startupAttemptId &&
+    invitation.startup_attempt_id === startupAttemptId
+}
 
 // ── Prompts ───────────────────────────────────────────────────────────────────
 //
@@ -77,6 +111,8 @@ Return JSON matching this exact shape:
 Rules for followUpQuestions:
 - Generate exactly 2–3 questions.
 - Each question should target a specific diagnostic gap not yet covered in the transcript.
+- When silentReviewerMissingDomains is non-empty, use it as an independent coverage signal, but still choose the most clinically coherent next gap rather than reciting a checklist order.
+- When silentReviewerNextQuestionIntents is non-empty, use it as independent clinical-review guidance only when the cited transcript still supports that intent and it remains unanswered.
 - Questions should be phrased as if spoken naturally to a patient (plain language).
 - Prioritize questions that would distinguish between the top 2 differential diagnoses.
 - For follow-up sessions: focus on treatment response, interval change, functional impact.
@@ -92,7 +128,7 @@ Rules for localizationHypothesis:
 
 Rules for contextHint:
 - Complete this sentence: "Based on what the patient has shared so far, clinical guidelines suggest..."
-- One sentence maximum. This will be injected into the AI historian's system prompt.
+- One sentence maximum. It is advisory metadata and is never patient-facing.
 
 Rules for confidence:
 - high: ≥3 turns of detailed patient history, clear symptom pattern
@@ -105,6 +141,58 @@ Rules for suggested_actions:
 - Each action needs a one-sentence rationale specific to this patient.
 - Never include drug dosages.
 - These are suggestions for clinician review, not orders. Empty array if nothing warrants a suggestion.`
+
+const ADAPTIVE_CONDUCTOR_PROMPT = `You are the silent clinical conductor for an in-progress neurologic history interview. You never speak to the patient. A separate Nova voice agent will propose questions, and the application may use your output to redirect one intermittent turn.
+
+Choose exactly one clinically useful next history question from the patient's evolving story and the full ordered transcript. Work like an excellent neurologic history-taker, not a checklist.
+
+Rules:
+- Ask only for history. Never diagnose, disclose a differential, recommend treatment/testing, or provide reassurance.
+- Do not repeat information the patient already supplied, even if it appeared while answering another question.
+- Follow the patient's actual words and use their specific concern. Never say "the symptom", "that symptom", or "this symptom" when a specific term is available.
+- Ask exactly one response obligation and use exactly one question mark.
+- Do not combine two questions. Do not prepend filler such as "thanks for sharing."
+- A short neutral descriptor list is allowed only when explaining abstract symptom quality, and must end with "or something else?"
+- Medication-name confirmation, dose/frequency reconciliation, the final medication inventory, and interview closure are application-owned; do not propose those turns.
+- When requiredSilentReviewerIntent is non-null, that intent owns this turn. Translate exactly that intent into one natural patient-facing question; do not choose another gap. Echo the exact required string in addressedReviewIntent.
+- When requiredSilentReviewerIntent is null, treat silent-review missing domains and next-question intents as private advisory signals, then choose the most coherent patient-specific gap. Return addressedReviewIntent as null.
+
+Return only JSON with this exact shape:
+{"followUpQuestions":["one patient-facing question"],"confidence":"high | medium | low","addressedReviewIntent":"exact required string or null"}`
+
+type AdaptiveConductorResult = {
+  followUpQuestions?: unknown
+  confidence?: unknown
+  addressedReviewIntent?: unknown
+}
+
+function adaptiveConductorQuestions(value: unknown, requiredReviewIntent: string | null): {
+  questions: string[]
+  confidence: 'high' | 'medium' | 'low'
+  addressedRequiredIntent: boolean
+} {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    return { questions: [], confidence: 'low', addressedRequiredIntent: false }
+  }
+  const parsed = value as AdaptiveConductorResult
+  const questions = Array.isArray(parsed.followUpQuestions)
+    ? parsed.followUpQuestions
+        .filter((question): question is string => typeof question === 'string' && !!question.trim())
+        .map((question) => question.trim().slice(0, 280))
+        .slice(0, 1)
+    : []
+  const confidence =
+    parsed.confidence === 'high' || parsed.confidence === 'medium' || parsed.confidence === 'low'
+      ? parsed.confidence
+      : 'low'
+  const addressedRequiredIntent = requiredReviewIntent === null ||
+    parsed.addressedReviewIntent === requiredReviewIntent
+  return {
+    questions: addressedRequiredIntent ? questions : [],
+    confidence,
+    addressedRequiredIntent,
+  }
+}
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -226,12 +314,69 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   }
 
   const { sessionId, sessionType, transcript, chiefComplaint, referralReason } = body
+  const reviewGaps = Array.isArray(body.reviewGaps)
+    ? body.reviewGaps
+        .filter((value) => typeof value === 'string' && REVIEW_DOMAIN_IDS.has(value))
+        .slice(0, 8)
+    : []
+  const reviewIntents = Array.isArray(body.reviewIntents)
+    ? body.reviewIntents
+        .filter((value): value is string => typeof value === 'string' && !!value.trim())
+        .map((value) => value.trim().slice(0, MAX_REVIEW_INTENT_CHARS))
+        .slice(0, 3)
+    : []
+  const requiredReviewIntent = typeof body.requiredReviewIntent === 'string'
+    ? body.requiredReviewIntent.trim()
+    : ''
+  const requiredReviewGapKey = typeof body.requiredReviewGapKey === 'string'
+    ? body.requiredReviewGapKey
+    : ''
+  const reviewedThroughPatientSeq = body.reviewedThroughPatientSeq
+  if (
+    body.adaptiveInterview === true &&
+    (
+      (!!requiredReviewIntent !== !!requiredReviewGapKey) ||
+      requiredReviewIntent.length > MAX_REVIEW_INTENT_CHARS ||
+      (!!requiredReviewGapKey && !isLiveReviewGapKey(requiredReviewGapKey)) ||
+      (!!requiredReviewGapKey && (
+        !Number.isInteger(reviewedThroughPatientSeq) ||
+        (reviewedThroughPatientSeq as number) < 1
+      ))
+    )
+  ) {
+    return NextResponse.json({ error: 'Required reviewer guidance is malformed.' }, { status: 400 })
+  }
 
   if (!sessionId || !transcript || !Array.isArray(transcript)) {
     return NextResponse.json(
       { error: 'sessionId and transcript array are required' },
       { status: 400 }
     )
+  }
+  if (
+    transcript.length > MAX_TRANSCRIPT_ENTRIES ||
+    transcript.some((turn) => (
+      !turn ||
+      (turn.role !== 'assistant' && turn.role !== 'user') ||
+      typeof turn.text !== 'string' ||
+      !turn.text.trim()
+    )) ||
+    transcript.reduce((chars, turn) => chars + turn.text.length, 0) > MAX_TRANSCRIPT_CHARS
+  ) {
+    return NextResponse.json({ error: 'Transcript is malformed or outside the conductor bounds.' }, { status: 400 })
+  }
+
+  let adaptiveStartupAttemptId: string | undefined
+  if (body.adaptiveInterview === true) {
+    const verified = await verifyFlushToken(bearerToken(req))
+    if (
+      !verified ||
+      verified.sessionId !== sessionId ||
+      !await adaptiveAttemptAuthorityIsCurrent(sessionId, verified.startupAttemptId)
+    ) {
+      return NextResponse.json({ error: 'Invalid or stale conductor authority.' }, { status: 403 })
+    }
+    adaptiveStartupAttemptId = verified.startupAttemptId
   }
 
   // Minimum data check — don't waste Bedrock calls on empty sessions
@@ -256,6 +401,86 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   const timeoutId = setTimeout(() => controller.abort(), LOCALIZER_TIMEOUT_MS)
 
   const signal = controller.signal
+
+  // Adaptive v3 is on the patient's turn-latency path. Use one direct Claude
+  // conductor call over the complete bounded transcript instead of the
+  // standard observer's two serial model calls plus plan retrieval. The app
+  // still validates the returned question before Nova may speak it.
+  if (body.adaptiveInterview === true) {
+    try {
+      const { parsed } = await invokeBedrockJSON<AdaptiveConductorResult>({
+        system: ADAPTIVE_CONDUCTOR_PROMPT,
+        messages: [{
+          role: 'user',
+          content: JSON.stringify({
+            sessionType,
+            chiefComplaint: chiefComplaint ?? null,
+            referralReason: referralReason ?? null,
+            silentReviewerMissingDomains: reviewGaps,
+            silentReviewerNextQuestionIntents: reviewIntents,
+            requiredSilentReviewerIntent: requiredReviewIntent || null,
+            orderedTranscript: transcript.map(({ role, text }) => ({ role, text })),
+          }),
+        }],
+        maxTokens: 320,
+        temperature: 0.2,
+        signal,
+      })
+      const conductor = adaptiveConductorQuestions(parsed, requiredReviewIntent || null)
+      const clarificationReceipt =
+        requiredReviewGapKey &&
+        conductor.addressedRequiredIntent &&
+        conductor.questions[0]
+          ? await issueLiveReviewClarificationReceipt(
+              sessionId,
+              adaptiveStartupAttemptId,
+              reviewedThroughPatientSeq as number,
+              requiredReviewGapKey,
+              conductor.questions[0],
+            )
+          : null
+      clearTimeout(timeoutId)
+      return NextResponse.json<LocalizerResponse>({
+        differential: [],
+        evidenceSnippets: [],
+        followUpQuestions: conductor.questions,
+        contextHint: '',
+        confidence: conductor.confidence,
+        localizationHypothesis: '',
+        kbSources: [],
+        suggestedActions: [],
+        processingMs: Date.now() - startMs,
+        partial: conductor.questions.length === 0,
+        ...(requiredReviewGapKey && conductor.addressedRequiredIntent
+          ? { addressedReviewGapKey: requiredReviewGapKey }
+          : {}),
+        ...(clarificationReceipt
+          ? { reviewClarificationReceipt: clarificationReceipt }
+          : {}),
+        ...(conductor.questions.length === 0
+          ? { degradedReason: 'Adaptive conductor returned no usable question' }
+          : {}),
+      })
+    } catch {
+      clearTimeout(timeoutId)
+      console.warn('[localizer] Adaptive conductor unavailable')
+      return NextResponse.json<LocalizerResponse>({
+        differential: [],
+        evidenceSnippets: [],
+        followUpQuestions: [],
+        contextHint: '',
+        confidence: 'low',
+        localizationHypothesis: '',
+        kbSources: [],
+        suggestedActions: [],
+        processingMs: Date.now() - startMs,
+        partial: true,
+        degradedReason: signal.aborted
+          ? `Timeout after ${LOCALIZER_TIMEOUT_MS}ms`
+          : 'Adaptive conductor unavailable',
+      })
+    }
+  }
 
   // Accumulated results — populated progressively so partial responses are possible
   let symptoms: ExtractedSymptoms | null = null
@@ -290,7 +515,9 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       symptoms = parsed
     } catch (err) {
       if (signal.aborted) throw err // Let the outer catch handle timeout
-      console.error('[localizer] Step 1 (symptom extraction) failed:', err)
+      // Model/parse errors can contain patient-derived output. Log only the
+      // fixed pipeline stage, never the raw exception text.
+      console.error('[localizer] Step 1 (symptom extraction) failed')
       degradedReason = 'Symptom extraction failed'
     }
 
@@ -314,7 +541,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
         }
       } catch (err) {
         if (signal.aborted) throw err
-        console.error('[localizer] Step 2 (plan evidence retrieval) failed:', err)
+        console.error('[localizer] Step 2 (plan evidence retrieval) failed')
         degradedReason = degradedReason ?? 'Plan evidence retrieval unavailable'
       }
     }
@@ -328,6 +555,8 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
           extractedSymptoms: symptoms,
           guidelineContext: kbGeneratedText || '(No guideline context available — use clinical judgment)',
           transcriptSummary: symptoms.clinicalSummary,
+          silentReviewerMissingDomains: reviewGaps,
+          silentReviewerNextQuestionIntents: reviewIntents,
         })
 
         const { parsed } = await invokeBedrockJSON<GeneratedQuestions>({
@@ -340,18 +569,17 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
         questions = parsed
       } catch (err) {
         if (signal.aborted) throw err
-        console.error('[localizer] Step 3 (question generation) failed:', err)
+        console.error('[localizer] Step 3 (question generation) failed')
         degradedReason = degradedReason ?? 'Question generation failed'
       }
     }
-  } catch (err) {
+  } catch {
     // Timeout or unrecoverable error — return whatever we have
     const isTimeout = signal.aborted
     console.warn(
       isTimeout
-        ? `[localizer] Timeout after ${LOCALIZER_TIMEOUT_MS}ms for session ${sessionId}`
-        : `[localizer] Unrecoverable error for session ${sessionId}:`,
-      isTimeout ? '' : err
+        ? `[localizer] Timeout after ${LOCALIZER_TIMEOUT_MS}ms`
+        : '[localizer] Unrecoverable pipeline error'
     )
     degradedReason = isTimeout ? `Timeout after ${LOCALIZER_TIMEOUT_MS}ms` : 'Localizer pipeline error'
   } finally {

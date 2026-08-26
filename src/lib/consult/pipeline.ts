@@ -12,6 +12,7 @@ import { from } from '@/lib/db-query'
 import { getPool } from '@/lib/db'
 import type { NeurologyConsult, TriageConsultUpdate } from './types'
 import { getTenantServer } from '@/lib/tenant'
+import type { HistorianTerminationReason } from '@/lib/historianTypes'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Create
@@ -238,6 +239,7 @@ export async function linkHistorianToConsult(
   redFlags: Array<{ flag: string; severity: string; context: string }>,
   safetyEscalated: boolean,
   interviewCompletionStatus: 'complete' | 'ended_early' | null = null,
+  interviewTerminationReason: HistorianTerminationReason | null = null,
 ): Promise<boolean> {
   // Pre-stringify jsonb fields. The shared query builder auto-stringifies
   // plain objects but passes arrays through raw; historian_red_flags is a
@@ -254,6 +256,7 @@ export async function linkHistorianToConsult(
       historian_safety_escalated: safetyEscalated,
       historian_completed_at: new Date().toISOString(),
       interview_completion_status: interviewCompletionStatus,
+      interview_termination_reason: interviewTerminationReason,
       status: 'historian_complete',
       updated_at: new Date().toISOString(),
     })

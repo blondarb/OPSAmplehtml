@@ -25,9 +25,9 @@
  * never branch on which provider is active.
  */
 export type VoiceEvent =
-  | { type: 'userTranscript'; text: string }
-  | { type: 'assistantTranscript'; text: string }
-  | { type: 'assistantTextDelta'; text: string }
+  | { type: 'userTranscript'; text: string; segmentId?: number }
+  | { type: 'assistantTranscript'; text: string; segmentId?: number; obligationId?: string }
+  | { type: 'assistantTextDelta'; text: string; segmentId?: number }
   // NOTE: userSpeechStart/userSpeechStop are currently emitted ONLY by the
   // OpenAI provider (from input_audio_buffer.speech_started/stopped). The Nova
   // relay does not yet forward user-speech VAD boundaries, so under Nova these
@@ -35,9 +35,9 @@ export type VoiceEvent =
   // indicator), not as a required signal. Add relay frames later if needed.
   | { type: 'userSpeechStart' }
   | { type: 'userSpeechStop' }
-  | { type: 'aiSpeechStart' }
-  | { type: 'aiSpeechStop' }
-  | { type: 'toolCall'; toolName: string; toolUseId: string; input: unknown }
+  | { type: 'aiSpeechStart'; segmentId?: number }
+  | { type: 'aiSpeechStop'; segmentId?: number }
+  | { type: 'toolCall'; toolName: string; toolUseId: string; input: unknown; segmentId?: number }
   | { type: 'error'; message: string }
   // Parallel AWS Transcribe Medical accuracy check (flag-gated on the relay,
   // Nova-only — see services/nova-sonic-relay/src/transcribeMedicalSession.ts).
@@ -45,12 +45,32 @@ export type VoiceEvent =
   | { type: 'medicalTranscript'; text: string; isPartial: boolean }
   // Transport dropped unexpectedly (WebRTC connection failed/closed, data
   // channel closed, WS closed non-cleanly) — distinct from `error`, which is
-  // an in-session protocol-level error the session can survive. `disconnected`
-  // means the transport is gone; the hook uses it to run the SAME graceful
+  // a terminal provider/model failure surfaced before or alongside transport
+  // closure. `disconnected` means the transport is gone; the hook uses it to run the SAME graceful
   // end-of-session flow as a manual "End Interview" click (flush
   // save_interview_output, fall back to a raw-transcript narrative, tear down,
   // fire onComplete). Never emitted as a result of the provider's own stop().
   | { type: 'disconnected'; reason: string }
+  /** Relay transport clock says the current Nova segment is approaching its deadline. */
+  | { type: 'continuationDue'; segmentId: number; deadlineAtMs: number }
+  /**
+   * Relay froze input at an assistant END_TURN boundary. The provider emits
+   * this only after queued playback has drained, so the application can take
+   * an immutable clinical-state checkpoint without clipping audible output.
+   */
+  | {
+      type: 'continuationBarrier'
+      barrierId: string
+      segmentId: number
+      lastAudioSeq: number
+      deadlineAtMs: number
+    }
+
+export type VoiceContinuationCheckpoint =
+  import('@/lib/historian/continuationState').HistorianContinuationCheckpointV1
+
+/** Outcome of a continuation commit at the browser/relay boundary. */
+export type VoiceContinuationCommitResult = 'rotated' | 'recovered'
 
 /**
  * Options passed to `start`. Some fields are provider-specific; each provider
@@ -63,6 +83,12 @@ export interface VoiceStartOptions {
   tools: unknown[]
   /** Optional voice selection (provider-specific voice id). */
   voiceId?: string
+  /** Server-resolved interview depth; Nova relay uses this for the deterministic opening transition. */
+  interviewMode?: 'standard' | 'comprehensive'
+  /** Require the Comprehensive v2 application-owned question/evidence gate. */
+  turnEvidenceController?: boolean
+  /** Require the Comprehensive v3 model-proposal/application-admission gate. */
+  adaptiveTurnController?: boolean
   // ── OpenAI-only (ignored by Nova) ──
   /** Ephemeral bearer key for the OpenAI Realtime SDP exchange. */
   ephemeralKey?: string
@@ -97,6 +123,34 @@ export interface VoiceStartOptions {
 }
 
 /**
+ * PHI-free, allowlisted startup stages that may be attached to a zero-turn
+ * invitation recovery. These values describe only the transport boundary;
+ * they never contain URLs, browser error text, tokens, or patient content.
+ */
+export type VoiceStartupFailureStage =
+  | 'websocket_unavailable'
+  | 'websocket_after_open'
+  | 'microphone_setup'
+  | 'microphone_runtime'
+  | 'provider_setup'
+  | 'provider_runtime'
+  | 'transport_after_open'
+
+export class VoiceStartupError extends Error {
+  constructor(
+    public readonly stage: VoiceStartupFailureStage,
+    message: string,
+  ) {
+    super(message)
+    this.name = 'VoiceStartupError'
+  }
+}
+
+export function voiceStartupFailureStage(error: unknown): VoiceStartupFailureStage | null {
+  return error instanceof VoiceStartupError ? error.stage : null
+}
+
+/**
  * The uniform transport contract both providers implement.
  */
 export interface VoiceProvider {
@@ -116,7 +170,7 @@ export interface VoiceProvider {
   /** Register the single event sink the provider emits VoiceEvents to. */
   on(cb: (e: VoiceEvent) => void): void
   /** Return a tool result for a prior `toolCall` (the hook executes the tool). */
-  sendToolResult(toolUseId: string, output: unknown): void
+  sendToolResult(toolUseId: string, output: unknown, segmentId?: number): void
   /** Inject advisory system text mid-session (localizer / scale guidance). */
   injectSystemText(text: string): void
   /**
@@ -129,6 +183,12 @@ export interface VoiceProvider {
    * full reply right before the transport tears down. Ignored by Nova.
    */
   requestResponse(opts?: { textOnly?: boolean }): void
+  /**
+   * Immediately silence current and queued assistant audio while keeping the
+   * transport and tool-result channel open for a text-only terminal save.
+   * Idempotent for the current session; start() resets the suppression latch.
+   */
+  suppressOutput(): void
   /**
    * Prompt the model to speak its single closing message after
    * save_interview_output has been acked. Providers differ on whether this is
@@ -143,6 +203,16 @@ export interface VoiceProvider {
    *            `sendGreetingKickoff` on the relay side.
    */
   nudgeClosing(): void
+  /**
+   * Nova-only continuation controls. The relay owns the transport clock and
+   * inner Bedrock rotation; the application owns checkpoint eligibility and
+   * clinical state. Other providers omit these methods.
+   */
+  commitContinuation?(params: {
+    barrierId: string
+    checkpoint: VoiceContinuationCheckpoint
+  }): Promise<VoiceContinuationCommitResult>
+  deferContinuation?(barrierId: string): void
   /**
    * OpenAI-only escape hatch: overwrite the live session's full instructions
    * (session.update) rather than append an advisory item to the timeline.

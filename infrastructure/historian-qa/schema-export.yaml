@@ -1,0 +1,199 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: >
+  Temporary, read-only schema exporter used to create a reviewed no-data
+  bootstrap for the isolated synthetic Historian QA database.
+
+Parameters:
+  SourceRdsSecretId:
+    Type: String
+    Default: sevaro/rds/app/ops_amplehtml
+    Description: Name of the existing app-specific RDS secret.
+  SourceDatabase:
+    Type: String
+    Default: ops_amplehtml
+    AllowedPattern: '^[A-Za-z_][A-Za-z0-9_]*$'
+  DeleteAfter:
+    Type: String
+    Default: '2026-08-29'
+
+Resources:
+  SchemaArtifactBucket:
+    Type: AWS::S3::Bucket
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Delete
+    Properties:
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+      LifecycleConfiguration:
+        Rules:
+          - Id: DeleteTemporarySchemaArtifacts
+            Status: Enabled
+            ExpirationInDays: 1
+            NoncurrentVersionExpiration:
+              NoncurrentDays: 1
+      OwnershipControls:
+        Rules:
+          - ObjectOwnership: BucketOwnerEnforced
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      Tags:
+        - Key: DataClass
+          Value: schema-only-no-data
+        - Key: DeleteAfter
+          Value: !Ref DeleteAfter
+
+  SchemaArtifactBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref SchemaArtifactBucket
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Sid: DenyInsecureTransport
+            Effect: Deny
+            Principal: '*'
+            Action: s3:*
+            Resource:
+              - !GetAtt SchemaArtifactBucket.Arn
+              - !Sub '${SchemaArtifactBucket.Arn}/*'
+            Condition:
+              Bool:
+                aws:SecureTransport: 'false'
+
+  SchemaExportLogGroup:
+    Type: AWS::Logs::LogGroup
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Delete
+    Properties:
+      LogGroupName: !Sub '/aws/codebuild/${AWS::StackName}'
+      RetentionInDays: 1
+      Tags:
+        - Key: DataClass
+          Value: schema-only-no-data
+        - Key: DeleteAfter
+          Value: !Ref DeleteAfter
+
+  SchemaExportRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: codebuild.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: ExportSchemaOnly
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Sid: ReadOnlySourceCredentials
+                Effect: Allow
+                Action: secretsmanager:GetSecretValue
+                Resource: !Sub arn:${AWS::Partition}:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:${SourceRdsSecretId}-*
+              - Sid: WriteTemporaryArtifact
+                Effect: Allow
+                Action:
+                  - s3:GetBucketAcl
+                  - s3:GetBucketLocation
+                  - s3:PutObject
+                  - s3:GetObject
+                  - s3:GetObjectVersion
+                Resource:
+                  - !GetAtt SchemaArtifactBucket.Arn
+                  - !Sub '${SchemaArtifactBucket.Arn}/*'
+              - Sid: WriteBuildLogs
+                Effect: Allow
+                Action:
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                Resource: !Sub '${SchemaExportLogGroup.Arn}:*'
+      Tags:
+        - Key: DataClass
+          Value: schema-only-no-data
+        - Key: DeleteAfter
+          Value: !Ref DeleteAfter
+
+  SchemaExportProject:
+    Type: AWS::CodeBuild::Project
+    DependsOn: SchemaExportLogGroup
+    Properties:
+      ServiceRole: !GetAtt SchemaExportRole.Arn
+      Artifacts:
+        Type: S3
+        Location: !Ref SchemaArtifactBucket
+        Name: historian-qa-schema.zip
+        NamespaceType: NONE
+        Packaging: ZIP
+        Path: exports
+      Environment:
+        ComputeType: BUILD_GENERAL1_SMALL
+        Image: aws/codebuild/standard:7.0
+        ImagePullCredentialsType: CODEBUILD
+        PrivilegedMode: true
+        Type: LINUX_CONTAINER
+        EnvironmentVariables:
+          - Name: PGHOST
+            Type: SECRETS_MANAGER
+            Value: !Join [':', [!Ref SourceRdsSecretId, host]]
+          - Name: PGPORT
+            Type: SECRETS_MANAGER
+            Value: !Join [':', [!Ref SourceRdsSecretId, port]]
+          - Name: PGUSER
+            Type: SECRETS_MANAGER
+            Value: !Join [':', [!Ref SourceRdsSecretId, username]]
+          - Name: PGPASSWORD
+            Type: SECRETS_MANAGER
+            Value: !Join [':', [!Ref SourceRdsSecretId, password]]
+          - Name: PGDATABASE
+            Type: PLAINTEXT
+            Value: !Ref SourceDatabase
+          - Name: PGSSLMODE
+            Type: PLAINTEXT
+            Value: verify-full
+      Source:
+        Type: NO_SOURCE
+        BuildSpec: |
+          version: 0.2
+          phases:
+            install:
+              commands:
+                - set +x
+                - docker pull public.ecr.aws/docker/library/postgres:17 >/dev/null
+            build:
+              commands:
+                - set +x
+                - umask 077
+                - curl --fail --silent --show-error --location --output rds-global-bundle.pem https://truststore.pki.rds.amazonaws.com/global/global-bundle.pem
+                - test "$(wc -c < rds-global-bundle.pem)" -gt 1000
+                - docker run --rm --user "$(id -u):$(id -g)" -e PGHOST -e PGPORT -e PGUSER -e PGPASSWORD -e PGDATABASE -e PGSSLMODE -e PGSSLROOTCERT=/certs/rds-global-bundle.pem -v "$CODEBUILD_SRC_DIR:/work" -v "$CODEBUILD_SRC_DIR/rds-global-bundle.pem:/certs/rds-global-bundle.pem:ro" -w /work public.ecr.aws/docker/library/postgres:17 pg_dump --schema-only --no-owner --no-privileges --schema=public --file=historian-qa-schema.sql
+                - test -s historian-qa-schema.sql
+                - if grep -Eiq '^-- (Data|Statistics Data) for Name:|^(COPY|INSERT[[:space:]]+INTO)[[:space:]]' historian-qa-schema.sql; then echo 'FAIL top-level row data detected'; exit 1; fi
+                - echo 'PASS schema-only export completed without row-data sections or top-level data statements'
+          artifacts:
+            files:
+              - historian-qa-schema.sql
+      LogsConfig:
+        CloudWatchLogs:
+          Status: ENABLED
+          GroupName: !Ref SchemaExportLogGroup
+          StreamName: schema-export
+      TimeoutInMinutes: 10
+      QueuedTimeoutInMinutes: 10
+      Tags:
+        - Key: DataClass
+          Value: schema-only-no-data
+        - Key: DeleteAfter
+          Value: !Ref DeleteAfter
+
+Outputs:
+  ProjectName:
+    Value: !Ref SchemaExportProject
+  ArtifactBucket:
+    Value: !Ref SchemaArtifactBucket

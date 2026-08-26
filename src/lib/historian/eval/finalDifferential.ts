@@ -86,10 +86,27 @@ export class TranscriptTooLargeError extends Error {
   }
 }
 
+/**
+ * A model response that cannot retain even one transcript-grounded diagnosis
+ * is not a usable clinician artifact. The durable job runner may retry this
+ * error, but callers must never persist or display the ungrounded response.
+ */
+export class DifferentialGroundingError extends Error {
+  readonly name = 'DifferentialGroundingError'
+  constructor() {
+    super('Differential generation produced no diagnosis with a verified supporting patient quote.')
+  }
+}
+
 // ── Constants ────────────────────────────────────────────────────────────────
 
-/** Serialized-transcript size guard (JSON.stringify length, chars). Fail-closed. */
-export const MAX_TRANSCRIPT_CHARS = 60_000
+/**
+ * Serialized-transcript size guard (JSON.stringify length, chars). The
+ * Comprehensive interview may legitimately run well past 25 exchanges; this
+ * bound accommodates the 60-exchange safety ceiling with substantial headroom
+ * while still failing closed before an unbounded model request.
+ */
+export const MAX_TRANSCRIPT_CHARS = 180_000
 
 /**
  * Minimum number of non-empty patient (role: 'user') turns required before
@@ -110,6 +127,8 @@ const MAX_QUOTES_PER_ITEM = 6
 const FINAL_DDX_PROMPT_VERSION = PROMPT_VERSIONS['final-ddx-v1'].id
 const FINAL_DDX_TOOL_NAME = 'record_final_differential'
 const FINAL_DDX_TEMPERATURE = 0
+export const GROUNDED_DIFFERENTIAL_SUMMARY =
+  'Candidate diagnoses are grounded to the cited patient statements and require physician verification.'
 // Up to 6 diagnoses × (diagnosis/icd10/likelihood/rationale + up to 6
 // supporting + 6 contradicting verbatim quotes each) + a summary paragraph
 // is a genuinely large tool-call payload. invokeBedrockClinicalTool fails
@@ -135,6 +154,7 @@ You will receive:
   1. The full numbered transcript (each line prefixed "Turn N (Patient|Historian): ...").
   2. Structured symptoms already extracted from that transcript.
   3. Relevant excerpts from vetted clinical guidelines/plans, when available.
+  4. An application-verified medication context. Medication names in the transcript may be replaced by [medication redacted]. Use ONLY the verified medication context for medication names, amounts, schedules, adherence, or effects; never reconstruct or guess a redacted name.
 
 Produce up to ${MAX_DIFFERENTIAL_ITEMS} candidate diagnoses, ranked most likely first, and a one-paragraph summary.
 
@@ -142,7 +162,7 @@ CRITICAL — quote grounding:
 - Every supporting_quotes and contradicting_quotes entry MUST be a VERBATIM, character-for-character substring copied from the numbered transcript's turn text — do not paraphrase, truncate mid-word, or combine text from two turns.
 - "turn" is the integer N from that quote's "Turn N" line.
 - contradicting_quotes cites evidence that argues AGAINST that diagnosis (may be an empty array — do not invent contradicting evidence that is not in the transcript).
-- If you cannot find a verbatim supporting quote for a diagnosis, you may still list it (grounded in the extracted symptoms/guideline context) but leave supporting_quotes empty rather than fabricate one.
+- Every listed diagnosis MUST contain at least one valid supporting quote. Omit a diagnosis when the transcript contains no verbatim supporting evidence; never fabricate a quote.
 - Up to ${MAX_QUOTES_PER_ITEM} quotes per list per item.
 
 Other rules:
@@ -183,6 +203,7 @@ const DIFFERENTIAL_ITEM_SCHEMA = {
     supporting_quotes: {
       type: 'array',
       items: QUOTE_SCHEMA,
+      minItems: 1,
       maxItems: MAX_QUOTES_PER_ITEM,
     },
     contradicting_quotes: {
@@ -250,8 +271,10 @@ function isVerbatimQuote(
   quote: unknown,
 ): turn is number {
   if (!Number.isInteger(turn) || typeof quote !== 'string' || quote.length === 0) return false
+  if (quote.includes('[medication redacted]')) return false
   const t = turn as number
   if (t < 0 || t >= transcript.length) return false
+  if (transcript[t].role !== 'user') return false
   return transcript[t].text.includes(quote)
 }
 
@@ -286,15 +309,13 @@ function sanitizeLikelihoodPct(value: unknown): number {
   return Math.min(100, Math.max(0, Math.round(value)))
 }
 
-function sanitizeIcd10(value: unknown): string | null {
-  return typeof value === 'string' && value.trim() ? value.trim() : null
-}
-
 /**
  * Defensively normalize + validate a model's raw differential-array output
  * into safe DifferentialItem[] — verbatim-quote-checks every citation
  * against the transcript, caps at MAX_DIFFERENTIAL_ITEMS, drops blank-
- * diagnosis entries, normalizes likelihood/likelihood_pct/icd10. Exported
+ * diagnosis entries, requires at least one verified supporting patient quote,
+ * suppresses unbound model rationale, and normalizes likelihood/
+ * likelihood_pct/icd10. Exported
  * (Task 4) so independentDdx.ts's DeepSeek-R1 pass — which produces the
  * SAME DifferentialItem[] shape from the SAME transcript, just via a
  * different model — reuses this exact, already-tested sanitization instead
@@ -318,12 +339,21 @@ export function sanitizeDifferential(
     const contradicting = sanitizeQuotes(transcript, e.contradicting_quotes)
     droppedQuotes += supporting.dropped + contradicting.dropped
 
+    // A diagnosis without transcript-verified supporting evidence must never
+    // be persisted or displayed on the clinician surface.
+    if (supporting.kept.length === 0) continue
+
     items.push({
       diagnosis: e.diagnosis.trim(),
-      icd10: sanitizeIcd10(e.icd10),
+      // A transcript quote may ground a candidate diagnosis, but it cannot
+      // validate a billing code. Suppress model-authored codes until a
+      // separately validated terminology mapping is available.
+      icd10: null,
       likelihood: sanitizeLikelihood(e.likelihood),
       likelihood_pct: sanitizeLikelihoodPct(e.likelihood_pct),
-      rationale: typeof e.rationale === 'string' ? e.rationale.trim() : '',
+      // Model-authored free-form rationale is not citation-bound. The UI uses
+      // the verified quote list as its only explanatory evidence.
+      rationale: '',
       supporting_quotes: supporting.kept,
       contradicting_quotes: contradicting.kept,
     })
@@ -359,6 +389,7 @@ export function sanitizeDifferential(
 export async function generateFinalDifferential(
   transcript: HistorianTranscriptEntry[],
   chiefComplaint?: string,
+  trustedMedicationContext = '',
 ): Promise<FinalDifferential> {
   const serializedLength = serializedTranscriptLength(transcript)
   if (serializedLength > MAX_TRANSCRIPT_CHARS) {
@@ -395,6 +426,9 @@ export async function generateFinalDifferential(
         role: 'user',
         content: [
           chiefComplaint ? `Chief complaint: ${chiefComplaint}` : '',
+          trustedMedicationContext
+            ? `Medication authority: ${trustedMedicationContext}`
+            : '',
           '',
           'Transcript:',
           numberedTranscript,
@@ -433,6 +467,8 @@ export async function generateFinalDifferential(
           chiefComplaint: chiefComplaint ?? null,
           extractedSymptoms: symptoms,
           guidelineContext: guidelineText || '(No guideline context available — use clinical judgment)',
+          trustedMedicationContext: trustedMedicationContext ??
+            'No application-verified medication context was supplied; do not infer medication facts.',
           numberedTranscript,
         }),
       },
@@ -445,10 +481,13 @@ export async function generateFinalDifferential(
   })
 
   const { items, droppedQuotes } = sanitizeDifferential(transcript, result.differential)
+  if (items.length === 0) throw new DifferentialGroundingError()
 
   return {
     differential: items,
-    summary: typeof result.summary === 'string' ? result.summary.trim() : '',
+    // Do not persist unverified model synthesis prose. This deterministic
+    // statement accurately describes the evidence boundary enforced above.
+    summary: GROUNDED_DIFFERENTIAL_SUMMARY,
     provenance: {
       model_id: modelId,
       prompt_version: FINAL_DDX_PROMPT_VERSION,

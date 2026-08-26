@@ -15,7 +15,11 @@
     "seed:wearable": "npx tsx scripts/seed-wearable-demo.ts",
     "triage:sentinel": "npx tsx scripts/triage-sentinel.ts",
     "historian:eval": "npx tsx scripts/historian-eval.ts",
-    "historian:synthetic": "npx tsx scripts/historian-synthetic-run.ts"
+    "historian:synthetic": "npx tsx scripts/historian-synthetic-run.ts",
+    "historian:nova-smoke": "npx tsx scripts/nova-historian-comprehensive-smoke.ts",
+    "historian:nova-mvp": "npx tsx scripts/nova-historian-mvp-acceptance.ts",
+    "historian:qa-acceptance": "npx tsx scripts/historian-qa-deployed-acceptance.ts",
+    "historian:qa-temp-link": "npx tsx scripts/historian-qa-issue-temp-link.ts"
   },
   "dependencies": {
     "@aws-sdk/client-bedrock-agent-runtime": "^3.1003.0",
@@ -64,6 +68,7 @@
     "postcss": "^8.4.49",
     "tailwindcss": "^3.4.17",
     "ts-node": "^10.9.2",
+    "tsx": "4.23.12",
     "typescript": "5.9.3",
     "vitest": "^4.0.18",
     "ws": "^8.21.1"

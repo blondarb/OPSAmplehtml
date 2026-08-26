@@ -1,9 +1,10 @@
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
+import { getCognitoClientSecret } from '@/lib/secrets'
+import { cognitoPkceCookie, readPkceCallback } from '@/lib/cognito/pkce'
 
 const COGNITO_DOMAIN = process.env.NEXT_PUBLIC_COGNITO_DOMAIN || 'auth.neuroplans.app'
 const CLIENT_ID = process.env.NEXT_PUBLIC_COGNITO_CLIENT_ID || ''
-const CLIENT_SECRET = process.env.COGNITO_CLIENT_SECRET || ''
 
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL || ''
 
@@ -33,6 +34,10 @@ export async function GET(request: NextRequest) {
   const cognitoErrorDescription = request.nextUrl.searchParams.get('error_description')
 
   const origin = getOrigin(request)
+  const pkce = readPkceCallback(request.cookies.get(cognitoPkceCookie.name)?.value, state)
+  if (!pkce) {
+    return redirectWithError(origin, 'invalid_state')
+  }
 
   if (cognitoError) {
     console.error('Cognito returned error on callback:', cognitoError, cognitoErrorDescription)
@@ -43,29 +48,25 @@ export async function GET(request: NextRequest) {
     return redirectWithError(origin, 'no_code')
   }
 
-  let returnTo = '/'
-  if (state) {
-    try {
-      const decoded = JSON.parse(Buffer.from(state, 'base64url').toString())
-      returnTo = decoded.returnTo || '/'
-    } catch {
-      // Invalid state — use default
-    }
-  }
+  const returnTo = pkce.returnTo
 
   const redirectUri = `${origin}/api/auth/callback`
 
-  // Exchange authorization code for tokens (confidential client — includes client_secret)
+  // Exchange authorization code. Dedicated QA clients can be public (PKCE
+  // only), while existing confidential clients retain client-secret auth.
+  const clientSecret = await getCognitoClientSecret()
+  const tokenBody: Record<string, string> = {
+    grant_type: 'authorization_code',
+    client_id: CLIENT_ID,
+    code,
+    redirect_uri: redirectUri,
+    code_verifier: pkce.verifier,
+  }
+  if (clientSecret) tokenBody.client_secret = clientSecret
   const tokenRes = await fetch(`https://${COGNITO_DOMAIN}/oauth2/token`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: new URLSearchParams({
-      grant_type: 'authorization_code',
-      client_id: CLIENT_ID,
-      client_secret: CLIENT_SECRET,
-      code,
-      redirect_uri: redirectUri,
-    }),
+    body: new URLSearchParams(tokenBody),
   })
 
   if (!tokenRes.ok) {
@@ -104,6 +105,13 @@ export async function GET(request: NextRequest) {
   response.cookies.set('cognito-id-token', '', { ...cookieOpts, maxAge: 0 })
   response.cookies.set('cognito-access-token', '', { ...cookieOpts, maxAge: 0 })
   response.cookies.set('cognito-refresh-token', '', { ...cookieOpts, maxAge: 0 })
+  response.cookies.set(cognitoPkceCookie.name, '', {
+    httpOnly: true,
+    secure: isSecure,
+    sameSite: 'lax',
+    path: '/api/auth/callback',
+    maxAge: 0,
+  })
 
   return response
 }

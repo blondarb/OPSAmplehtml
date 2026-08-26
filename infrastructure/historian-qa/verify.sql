@@ -1,0 +1,88 @@
+-- Synthetic-only post-initialization assertions. ON_ERROR_STOP makes any
+-- raised exception fail the temporary initializer build.
+
+DO $verify$
+BEGIN
+  IF to_regclass('public.historian_invites') IS NULL
+     OR to_regclass('public.historian_eval_jobs') IS NULL
+     OR NOT EXISTS (
+       SELECT 1 FROM information_schema.columns
+        WHERE table_schema = 'public'
+          AND table_name = 'historian_invites'
+          AND column_name = 'startup_attempt_id'
+          AND data_type = 'uuid'
+     )
+     OR NOT EXISTS (
+       SELECT 1 FROM information_schema.columns
+        WHERE table_schema = 'public'
+          AND table_name = 'historian_sessions'
+          AND column_name = 'diagnostic_sufficiency'
+          AND data_type = 'jsonb'
+     )
+     OR NOT EXISTS (
+       SELECT 1 FROM information_schema.columns
+        WHERE table_schema = 'public'
+          AND table_name = 'historian_sessions'
+          AND column_name = 'clinician_history_report'
+          AND data_type = 'jsonb'
+     )
+     OR NOT EXISTS (
+       SELECT 1 FROM information_schema.columns
+        WHERE table_schema = 'public'
+          AND table_name = 'historian_eval_jobs'
+          AND column_name = 'pipeline_version'
+          AND data_type = 'integer'
+     )
+     OR NOT EXISTS (
+       SELECT 1 FROM information_schema.columns
+        WHERE table_schema = 'public'
+          AND table_name = 'historian_eval_jobs'
+          AND column_name = 'current_stage'
+          AND data_type = 'text'
+     )
+     OR NOT EXISTS (
+       SELECT 1 FROM information_schema.columns
+        WHERE table_schema = 'public'
+          AND table_name = 'historian_evaluations'
+          AND column_name = 'input_digest'
+          AND data_type = 'text'
+     )
+     OR NOT EXISTS (
+       SELECT 1 FROM pg_indexes
+        WHERE schemaname = 'public'
+          AND indexname = 'uq_historian_evaluations_digest'
+          AND indexdef LIKE '%input_digest%'
+     )
+     OR NOT EXISTS (
+       SELECT 1 FROM pg_constraint
+        WHERE conname = 'historian_sessions_prompt_version_check'
+          AND pg_get_constraintdef(oid) LIKE '%comprehensive-v2%'
+          AND pg_get_constraintdef(oid) LIKE '%comprehensive-v3%'
+          AND pg_get_constraintdef(oid) LIKE '%comprehensive-v4%'
+     )
+     OR NOT EXISTS (
+       SELECT 1 FROM pg_constraint
+        WHERE conname = 'historian_invites_interview_prompt_version_check'
+          AND pg_get_constraintdef(oid) LIKE '%comprehensive-v2%'
+          AND pg_get_constraintdef(oid) LIKE '%comprehensive-v3%'
+          AND pg_get_constraintdef(oid) LIKE '%comprehensive-v4%'
+     )
+     OR NOT EXISTS (
+       SELECT 1 FROM pg_constraint
+        WHERE conname = 'chk_historian_sessions_termination_reason'
+          AND pg_get_constraintdef(oid) LIKE '%complete_with_uncertainty%'
+     )
+     OR (SELECT count(*) FROM public.patients WHERE tenant_id = 'historian-mvp-qa') <> 1
+     OR (SELECT count(*) FROM public.neurology_consults WHERE tenant_id = 'historian-mvp-qa') <> 1
+     OR (
+       SELECT count(*)
+         FROM public.clinical_access_memberships
+        WHERE tenant_id = 'historian-mvp-qa' AND active
+     ) <> 1
+  THEN
+    RAISE EXCEPTION 'Synthetic QA schema or seed verification failed.';
+  END IF;
+END
+$verify$;
+
+SELECT 'PASS synthetic QA schema and seed verified';

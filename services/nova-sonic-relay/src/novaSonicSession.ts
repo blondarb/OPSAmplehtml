@@ -14,6 +14,7 @@ import {
   sessionStart,
   promptStart,
   systemContent,
+  conversationHistoryText,
   userText,
   audioContentStart,
   audioInput,
@@ -36,11 +37,30 @@ export interface NovaSonicToolUse {
 
 export interface NovaSonicCallbacks {
   onTextOutput?(role: string, content: string): void
+  /** Final assistant text copy at END_TURN; used by strict relay admission. */
+  onAssistantFinalText?(content: string): void
   onAudioOutput?(base64: string): void
+  /** Fires when Nova marks the assistant's audible response END_TURN. */
+  onAssistantAudioEnd?(): void
   onToolUse?(toolUse: NovaSonicToolUse): void
   onCompletionEnd?(): void
   onError?(err: unknown): void
   onBargeIn?(): void
+  /** Fires only when Bedrock ends the stream before the caller requested stop(). */
+  onUnexpectedStreamEnd?(): void
+}
+
+export interface NovaSonicStartOptions {
+  /** Production default is true; state-injected acceptance tests disable it. */
+  sendGreetingKickoff?: boolean
+  /** Non-interactive prior turns, emitted after SYSTEM and before live audio. */
+  conversationHistory?: Array<{ role: 'USER' | 'ASSISTANT'; text: string }>
+  /**
+   * Require Nova to begin every response with one of the configured tools.
+   * Comprehensive v3 uses this on both the opening and rollover streams so a
+   * replacement model can never speak an unauthorised question first.
+   */
+  requireToolAtResponseStart?: boolean
 }
 
 // A raw event is one of the `{ event: { ... } }` objects produced by the
@@ -52,6 +72,14 @@ type RawEvent = { event: Record<string, unknown> }
 // string. Spaces are intentional and match the model's serialization, but we
 // match loosely to be resilient to whitespace changes.
 const INTERRUPTED_RE = /"interrupted"\s*:\s*true/
+
+/**
+ * Neutral session-start signal. The system prompt owns whether the first
+ * action is speech or a tool call; the transport must not contradict it by
+ * independently instructing Nova to greet or ask a question.
+ */
+export const NOVA_SESSION_START_KICKOFF =
+  '[The conversation has now started. Follow your system instructions for the first action exactly.]'
 
 // ---------------------------------------------------------------------------
 // Text-output stage filtering
@@ -92,26 +120,53 @@ export function shouldForwardText(role: string, stage: GenerationStage): boolean
   return stage === 'SPECULATIVE'
 }
 
-// Opt-in raw model-event trace (RELAY_TRACE_RAW=1): logs EVERY decoded Bedrock
-// event — including contentStart/contentEnd, which the dispatcher otherwise
-// drops silently — so emission-pattern bugs (e.g. duplicate SPECULATIVE+FINAL
-// text) can be diagnosed from the relay log. audioOutput is logged as a byte
-// count only.
+// Opt-in raw model-event trace (RELAY_TRACE_RAW=1): logs event metadata only.
+// Interview text, tool arguments, system instructions, audio, and undecoded
+// payloads are never written to relay logs, including rejected turns.
 const TRACE_RAW = !!process.env.RELAY_TRACE_RAW
-function traceRaw(json: { event?: Record<string, unknown> }): void {
+
+export function summarizeRawModelEvent(
+  json: { event?: Record<string, unknown> },
+): string {
   const event = json?.event
-  const ts = new Date().toISOString().slice(11, 23)
-  if (!event) {
-    console.log(`[raw ${ts}] (no event) ${JSON.stringify(json).slice(0, 300)}`)
-    return
-  }
-  const kind = Object.keys(event)[0] ?? '?'
+  if (!event) return '(no event)'
+  const kind = Object.keys(event)[0] ?? 'unknown'
+
   if (kind === 'audioOutput') {
     const content = (event.audioOutput as { content?: string } | undefined)?.content ?? ''
-    console.log(`[raw ${ts}] audioOutput b64len=${content.length}`)
-  } else {
-    console.log(`[raw ${ts}] ${JSON.stringify(event).slice(0, 500)}`)
+    return `audioOutput b64len=${content.length}`
   }
+  if (kind === 'textOutput') {
+    const output = event.textOutput as { role?: string; content?: string } | undefined
+    return `textOutput role=${output?.role ?? 'unknown'} chars=${output?.content?.length ?? 0}`
+  }
+  if (kind === 'toolUse') {
+    const tool = event.toolUse as { toolName?: string; content?: string } | undefined
+    return `toolUse name=${tool?.toolName ?? 'unknown'} contentChars=${tool?.content?.length ?? 0}`
+  }
+  if (kind === 'contentStart') {
+    const start = event.contentStart as {
+      type?: string
+      role?: string
+      additionalModelFields?: unknown
+    } | undefined
+    return [
+      'contentStart',
+      `type=${start?.type ?? 'unknown'}`,
+      `role=${start?.role ?? 'unknown'}`,
+      `stage=${parseGenerationStage(start?.additionalModelFields) || 'unknown'}`,
+    ].join(' ')
+  }
+  if (kind === 'contentEnd') {
+    const end = event.contentEnd as { type?: string; stopReason?: string } | undefined
+    return `contentEnd type=${end?.type ?? 'unknown'} stop=${end?.stopReason ?? 'unknown'}`
+  }
+  return kind
+}
+
+function traceRaw(json: { event?: Record<string, unknown> }): void {
+  const ts = new Date().toISOString().slice(11, 23)
+  console.log(`[raw ${ts}] ${summarizeRawModelEvent(json)}`)
 }
 
 // ---------------------------------------------------------------------------
@@ -135,9 +190,12 @@ export class NovaSonicSession {
 
   // Init events, captured at start() and replayed by the generator's preamble.
   private initEvents: RawEvent[] = []
+  private initPreambleYielded = false
+  private responseBodyPresent = false
 
   // The fire-and-forget response loop, stored so stop() can best-effort await it.
   private responseLoop: Promise<void> | null = null
+  private abortController: AbortController | null = null
 
   constructor(callbacks: NovaSonicCallbacks = {}) {
     this.callbacks = callbacks
@@ -174,6 +232,7 @@ export class NovaSonicSession {
     for (const event of this.initEvents) {
       yield this.wrap(event)
     }
+    this.initPreambleYielded = true
 
     // 2. Live event loop.
     while (this.active || this.events.length > 0) {
@@ -213,17 +272,31 @@ export class NovaSonicSession {
    * system content → open the user audio channel), send the command, then kick
    * off the response loop without awaiting it.
    */
-  async start(instructions: string, tools: Tool[], voiceId?: string): Promise<void> {
+  async start(
+    instructions: string,
+    tools: Tool[],
+    voiceId?: string,
+    options: NovaSonicStartOptions = {},
+  ): Promise<void> {
     if (this.active || this.closed) {
       return
     }
 
+    if (!validConversationHistory(options.conversationHistory ?? [])) {
+      throw new Error('Nova continuation history must be USER-first and alternate through ASSISTANT')
+    }
+
     this.initEvents = [
       sessionStart(),
-      promptStart(this.promptName, tools, voiceId),
+      promptStart(this.promptName, tools, voiceId, options.requireToolAtResponseStart === true),
       ...systemContent(this.promptName, instructions),
+      ...(options.conversationHistory ?? []).flatMap((entry) =>
+        conversationHistoryText(this.promptName, entry.role, entry.text),
+      ),
       audioContentStart(this.promptName, this.audioContentName),
     ]
+    this.initPreambleYielded = false
+    this.responseBodyPresent = false
 
     this.active = true
 
@@ -234,15 +307,27 @@ export class NovaSonicSession {
 
     let response: InvokeModelWithBidirectionalStreamCommandOutput
     try {
-      response = await this.client.send(command)
+      this.abortController = new AbortController()
+      response = await this.client.send(command, { abortSignal: this.abortController.signal })
     } catch (e) {
       // send() failed to open the stream — reset state so subsequent
       // pushAudio/stop calls don't enqueue against a stream that never opened.
+      const intentionallyClosed = this.closed
       this.active = false
       this.closed = true
-      this.callbacks.onError?.(e)
+      if (!intentionallyClosed) this.callbacks.onError?.(e)
       throw e
     }
+
+    // stop() may have aborted a still-opening client.send(). A transport mock
+    // or SDK edge can nevertheless resolve after the abort; never install an
+    // orphan response loop in that case.
+    if (this.closed || !this.active) {
+      this.abortController?.abort()
+      throw new Error('Nova session stopped while the stream was opening')
+    }
+
+    this.responseBodyPresent = response.body != null
 
     // Fire-and-forget; stop() best-effort awaits the stored promise. The
     // trailing .catch prevents a never-stopped loop from surfacing as an
@@ -250,28 +335,68 @@ export class NovaSonicSession {
     this.responseLoop = this.runResponseLoop(response)
     this.responseLoop.catch(() => {})
 
-    this.sendGreetingKickoff()
+    if (options.sendGreetingKickoff !== false) this.sendGreetingKickoff()
+  }
+
+  /** True only while this one Bedrock stream can accept live input. */
+  isActive(): boolean {
+    return this.active && !this.closed && this.responseLoop !== null
+  }
+
+  /**
+   * Candidate-rollover readiness is stronger than client.send() resolving.
+   * It requires a response body, the complete validated init/history/audio
+   * preamble to have been consumed, a live response loop, and no stream end or
+   * callback-visible failure during a bounded stabilization interval.
+   */
+  async waitUntilTransportReady(stabilizationMs: number): Promise<boolean> {
+    if (!Number.isFinite(stabilizationMs) || stabilizationMs < 1) return false
+    const responseLoop = this.responseLoop
+    if (!responseLoop || !this.responseBodyPresent || !this.isActive()) return false
+
+    const preambleDeadline = Date.now() + stabilizationMs
+    while (
+      !this.initPreambleYielded &&
+      this.isActive() &&
+      this.responseLoop === responseLoop &&
+      Date.now() < preambleDeadline
+    ) {
+      await new Promise<void>((resolve) => setTimeout(resolve, 5))
+    }
+    if (!this.initPreambleYielded || !this.isActive() || this.responseLoop !== responseLoop) {
+      return false
+    }
+
+    const endedDuringStabilization = await Promise.race([
+      responseLoop.then(() => true, () => true),
+      new Promise<false>((resolve) => setTimeout(() => resolve(false), stabilizationMs)),
+    ])
+    return (
+      !endedDuringStabilization &&
+      this.initPreambleYielded &&
+      this.responseBodyPresent &&
+      this.isActive() &&
+      this.responseLoop === responseLoop
+    )
   }
 
   /**
    * Enqueue one initial USER-role text turn that prompts Nova to open the
-   * conversation with its greeting, immediately after the stream opens.
+   * conversation, immediately after the stream opens.
    * Nova is speech-to-speech and otherwise waits silently for the patient to
    * speak first — unlike the OpenAI/Henry path, which sends `response.create`
    * on session-open. This reuses the exact same enqueue path as
    * pushSystemText()/userText() (role USER, not SYSTEM — a second SYSTEM
    * block fails the whole stream with "Duplicate SYSTEM content"). Fires
-   * once per session; the historian system prompt owns the actual greeting
-   * content/persona, this just signals "start now."
+   * once per session; the system prompt owns the actual first action and
+   * content/persona, while this message only signals "start now."
    */
-  private sendGreetingKickoff(): void {
+  sendGreetingKickoff(): void {
     if (this.kickoffSent || !this.active) {
       return
     }
     this.kickoffSent = true
-    this.pushSystemText(
-      '[The interview has now started. Please greet the patient warmly by beginning the conversation and asking your first question.]',
-    )
+    this.pushSystemText(NOVA_SESSION_START_KICKOFF)
   }
 
   /** Enqueue one chunk of user audio (base64 LPCM). No-op if not active. */
@@ -325,6 +450,22 @@ export class NovaSonicSession {
       return
     }
 
+    // start() is awaiting client.send() and no response loop exists yet.
+    // Closing protocol events cannot reach a stream that has not opened, so
+    // abort the request directly. start() suppresses the resulting error
+    // callback because this is an intentional caller-owned shutdown.
+    if (this.active && !this.responseLoop) {
+      this.closed = true
+      this.active = false
+      this.abortController?.abort()
+      if (this.pendingResolve) {
+        const resolve = this.pendingResolve
+        this.pendingResolve = null
+        resolve()
+      }
+      return
+    }
+
     if (this.active) {
       this.enqueue(audioContentEnd(this.promptName, this.audioContentName))
       this.enqueue(promptEnd(this.promptName))
@@ -348,6 +489,31 @@ export class NovaSonicSession {
         // The response loop reports its own errors via onError; swallow here.
       }
     }
+  }
+
+  /**
+   * Rotation-specific bounded close. After atomic promotion the old stream is
+   * generation-gated and receives no new PCM, but its retirement still must be
+   * confirmed or aborted within this bound. Returning false means the relay
+   * must fail the interview closed rather than tolerate an ambiguous stream.
+   */
+  async stopWithin(timeoutMs: number): Promise<boolean> {
+    if (!Number.isFinite(timeoutMs) || timeoutMs <= 0) return false
+    const stopPromise = this.stop().then(() => true).catch(() => false)
+    const completed = await Promise.race([
+      stopPromise,
+      new Promise<false>((resolve) => setTimeout(() => resolve(false), timeoutMs)),
+    ])
+    if (completed) return true
+    this.closed = true
+    this.active = false
+    this.abortController?.abort()
+    if (this.pendingResolve) {
+      const resolve = this.pendingResolve
+      this.pendingResolve = null
+      resolve()
+    }
+    return false
   }
 
   // -------------------------------------------------------------------------
@@ -374,9 +540,11 @@ export class NovaSonicSession {
         }
       }
     } catch (e) {
-      this.callbacks.onError?.(e)
+      if (!this.closed) this.callbacks.onError?.(e)
     } finally {
+      const endedUnexpectedly = !this.closed
       this.active = false
+      if (endedUnexpectedly) this.callbacks.onUnexpectedStreamEnd?.()
     }
   }
 
@@ -404,9 +572,12 @@ export class NovaSonicSession {
     }
 
     if (event.contentEnd) {
+      const assistantAudioEnded =
+        event.contentEnd.type === 'AUDIO' && event.contentEnd.stopReason === 'END_TURN'
       if (event.contentEnd.contentId) {
         this.textStageByContentId.delete(event.contentEnd.contentId)
       }
+      if (assistantAudioEnded) this.callbacks.onAssistantAudioEnd?.()
       return
     }
 
@@ -416,6 +587,12 @@ export class NovaSonicSession {
         this.callbacks.onBargeIn?.()
       } else {
         const stage = this.textStageByContentId.get(event.textOutput.contentId) ?? ''
+        if (
+          (event.textOutput.role ?? '').toUpperCase() === 'ASSISTANT' &&
+          stage === 'FINAL'
+        ) {
+          this.callbacks.onAssistantFinalText?.(content)
+        }
         if (shouldForwardText(event.textOutput.role, stage)) {
           this.callbacks.onTextOutput?.(event.textOutput.role, content)
         }
@@ -442,4 +619,16 @@ export class NovaSonicSession {
       return
     }
   }
+}
+
+function validConversationHistory(
+  history: Array<{ role: 'USER' | 'ASSISTANT'; text: string }>,
+): boolean {
+  if (history.length === 0) return true
+  return history[0].role === 'USER' &&
+    history.at(-1)?.role === 'ASSISTANT' &&
+    history.every((entry, index) => (
+      entry.text.trim().length > 0 &&
+      (index === 0 || entry.role !== history[index - 1].role)
+    ))
 }

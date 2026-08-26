@@ -35,6 +35,63 @@ describe('buildHistorianSystemPrompt', () => {
     expect(prompt).toMatch(/8.*20/)
   })
 
+  it('keeps the standard 25-turn ceiling by default', () => {
+    const prompt = buildHistorianSystemPrompt('new_patient')
+    expect(prompt).toMatch(/Never exceed 25 turns total/)
+    expect(prompt).not.toContain('COMPREHENSIVE MODE — REQUIRED ORDER AND COVERAGE')
+  })
+
+  it('gives comprehensive mode referral-first and age-second ordering beyond 25 turns', () => {
+    const prompt = buildHistorianSystemPrompt(
+      'new_patient',
+      'progressive gait difficulty',
+      undefined,
+      undefined,
+      'gait difficulty',
+      'comprehensive',
+    )
+    expect(prompt).toMatch(/^HIGHEST-PRIORITY COMPREHENSIVE OPENING STATE:/)
+    expect(prompt).toContain('STATE 1 is permanently complete')
+    expect(prompt).toContain('STATE 2 — AGE')
+    expect(prompt).toContain('COMPREHENSIVE MODE — REQUIRED ORDER AND COVERAGE')
+    expect(prompt).toMatch(/first clinical question[\s\S]*why they were referred/i)
+    expect(prompt).toMatch(/second clinical question[\s\S]*how old they are/i)
+    expect(prompt).toContain('In your own words, can you tell me why you were referred to see a neurologist?')
+    expect(prompt).toContain('Do not substitute "what\'s been going on lately?"')
+    expect(prompt).toContain('Ask the referral-reason question only once')
+    expect(prompt).toContain('Natural paraphrasing is allowed')
+    expect(prompt).toContain('accept it and do not repeat or rephrase the question')
+    expect(prompt).toContain('including a vague or partial answer')
+    expect(prompt).toContain('answer delivered in multiple speech-recognition segments')
+    expect(prompt).toContain('Do not repeat it or clarify it before asking age')
+    expect(prompt).toContain('How old are you?')
+    expect(prompt).toContain('age_years_patient_reported')
+    expect(prompt).toContain('history_coverage')
+    expect(prompt).toContain('standard 25-turn ceiling does not apply')
+    expect(prompt).toMatch(/45 patient exchanges/)
+    expect(prompt).toMatch(/finish by 60/)
+    expect(prompt).not.toMatch(/Never exceed 25 turns total/)
+    expect(prompt).toMatch(/live interview still must never state, imply, or display a diagnosis/i)
+  })
+
+  it('uses the application-owned exact-question contract only for Comprehensive v2', () => {
+    const prompt = buildHistorianSystemPrompt(
+      'new_patient',
+      'synthetic gait concern',
+      'synthetic context',
+      undefined,
+      'gait concern',
+      'comprehensive',
+      'comprehensive-v2',
+    )
+    expect(prompt).toContain('Your first action must be to call request_history_question')
+    expect(prompt).toContain('speak approved_text EXACTLY')
+    expect(prompt).toContain('Do not add an example')
+    expect(prompt).toContain('application independently derives coverage')
+    expect(prompt).not.toContain('COMPREHENSIVE MODE — REQUIRED ORDER AND COVERAGE')
+    expect(prompt).not.toContain('OPENING: As soon as the session starts')
+  })
+
   it('instructs the historian not to re-ask already-answered details', () => {
     const prompt = buildHistorianSystemPrompt('new_patient')
     expect(prompt).toMatch(/already told you|already volunteered|already covered/i)
@@ -118,12 +175,14 @@ describe('buildHistorianSystemPrompt', () => {
 
   // ── "Why was I referred?" ───────────────────────────────────────────────
 
-  it('answers why-was-I-referred instead of deflecting to the neurologist', () => {
+  it('answers why-was-I-referred directly using the Nova-safe wording', () => {
     const prompt = buildHistorianSystemPrompt(
       'new_patient', 'dizziness', 'ctx', undefined, 'dizziness and balance trouble',
     )
     expect(prompt).toMatch(/IF THE PATIENT ASKS WHY THEY WERE REFERRED/)
-    expect(prompt).toMatch(/do not deflect this to the\s+neurologist/i)
+    // The older "do not deflect" construction was removed after it tripped
+    // Nova's content filter. Pin the verified equivalent instead.
+    expect(prompt).toMatch(/This is their own record, so answer it directly/i)
   })
 
   it('requires the reason be given as symptoms, never as a suspected diagnosis', () => {
@@ -179,6 +238,20 @@ describe('buildHistorianSystemPrompt', () => {
       buildHistorianSystemPrompt('referral_clarification'),
     ).toThrow('Referral clarification requires approved questions')
   })
+
+  it('does not let comprehensive mode expand referral clarification scope', () => {
+    const prompt = buildHistorianSystemPrompt(
+      'referral_clarification',
+      'episodic numbness',
+      'stable outpatient referral',
+      [{ id: 'q1', code: 'onset', text: 'When did it begin?' }],
+      null,
+      'comprehensive',
+    )
+    expect(prompt).toContain('Ask ONLY the clinician-approved questions')
+    expect(prompt).not.toContain('COMPREHENSIVE MODE')
+    expect(prompt).not.toMatch(/how old/i)
+  })
 })
 
 describe('getHistorianToolDefinition', () => {
@@ -215,6 +288,46 @@ describe('getHistorianToolDefinition', () => {
     ])
   })
 
+  it('exposes only app-owned question, control, and save tools in Comprehensive v2', () => {
+    const openAi = getHistorianToolDefinition(
+      'new_patient',
+      'comprehensive-v2',
+    ) as unknown as TestToolDefinition[]
+    expect(openAi.map((tool) => tool.name)).toEqual([
+      'request_history_question',
+      'request_interview_control',
+      'save_interview_output',
+    ])
+
+    const nova = getHistorianToolsForProvider(
+      'nova',
+      'new_patient',
+      'comprehensive-v2',
+    ) as Array<{ toolSpec: { name: string } }>
+    expect(nova.map((tool) => tool.toolSpec.name)).toEqual([
+      'request_history_question',
+      'request_interview_control',
+      'save_interview_output',
+    ])
+  })
+
+  it('gives Comprehensive v3 the same relay-local control tool', () => {
+    const tools = getHistorianToolDefinition(
+      'new_patient',
+      'comprehensive-v3',
+    ) as unknown as TestToolDefinition[]
+    expect(tools.map((tool) => tool.name)).toEqual([
+      'request_history_question',
+      'request_interview_control',
+      'save_interview_output',
+    ])
+    expect((tools[1].parameters.properties.kind as { enum: string[] }).enum).toEqual([
+      'closing',
+      'check_in',
+      'sign_off',
+    ])
+  })
+
   it('save_interview_output requires chief_complaint, hpi, narrative_summary, safety_escalated', () => {
     const tools = getTestTools()
     const tool = tools.find((candidate) => candidate.name === 'save_interview_output')
@@ -222,6 +335,14 @@ describe('getHistorianToolDefinition', () => {
     expect(tool!.parameters.required).toEqual(
       expect.arrayContaining(['chief_complaint', 'hpi', 'narrative_summary', 'safety_escalated']),
     )
+  })
+
+  it('allows patient-reported age and interview mode in the structured output', () => {
+    const tools = getTestTools()
+    const tool = tools.find((candidate) => candidate.name === 'save_interview_output')
+    expect(tool?.parameters.properties.age_years_patient_reported).toBeDefined()
+    expect(tool?.parameters.properties.interview_mode).toBeDefined()
+    expect(tool?.parameters.properties.history_coverage).toBeDefined()
   })
 
   it('query_evidence requires question, allows focus_diagnoses optional', () => {

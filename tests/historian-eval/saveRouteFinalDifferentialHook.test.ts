@@ -122,6 +122,26 @@ describe('save/route.ts final-differential hook', () => {
     expect(runFinalDifferentialMock).not.toHaveBeenCalled()
   })
 
+  it('never generates a differential for an explicitly partial interview', async () => {
+    const res = await postSave({
+      interview_completion_status: 'ended_early',
+      interview_termination_reason: 'provider_error',
+    })
+    expect(res.status).toBe(200)
+    await new Promise((r) => setTimeout(r, 0))
+    expect(runFinalDifferentialMock).not.toHaveBeenCalled()
+  })
+
+  it('rejects Comprehensive v4 outside a clinician-created invitation', async () => {
+    const res = await postSave({
+      structured_output: { interview_prompt_version: 'comprehensive-v4' },
+      interview_completion_status: 'ended_early',
+      interview_termination_reason: 'provider_error',
+    })
+    expect(res.status).toBe(409)
+    expect(runFinalDifferentialMock).not.toHaveBeenCalled()
+  })
+
   it('fires when HISTORIAN_EVAL_AUTORUN is set to any value other than "false"', async () => {
     process.env.HISTORIAN_EVAL_AUTORUN = 'true'
     await postSave()

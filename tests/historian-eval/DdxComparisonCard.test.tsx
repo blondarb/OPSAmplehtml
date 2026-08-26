@@ -103,10 +103,14 @@ describe('DdxComparisonCard', () => {
     )
     expect(markup).toContain('Migraine without aura')
     expect(markup).toContain('Tension-type headache')
-    expect(markup).toContain('G43.009')
-    expect(markup).toContain('G44.209')
+    expect(markup).not.toContain('G43.009')
+    expect(markup).not.toContain('G44.209')
+    expect(markup).not.toContain('Throbbing headache with nausea, no red flags.')
+    expect(markup).not.toContain('Most consistent with migraine.')
     expect(markup).toContain('Sonnet')
     expect(markup).toContain('DeepSeek-R1')
+    expect(markup).toMatch(/uncalibrated model estimates/i)
+    expect(markup).toMatch(/not statistical confidence intervals/i)
   })
 
   it('shows a Top-1 Match badge and no disagreement flag when agreement.top1Match is true and there are no disagreements', () => {

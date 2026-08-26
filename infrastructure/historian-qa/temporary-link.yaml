@@ -1,0 +1,227 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: >
+  Ephemeral synthetic-only issuer for one 82-hour Historian QA patient link.
+  Retrieve the encrypted output once, then delete this stack and its secret.
+
+Parameters:
+  SourceCommit:
+    Type: String
+    AllowedPattern: '^[0-9a-f]{40}$'
+  MachinePasswordSecretArn:
+    Type: String
+    NoEcho: true
+    AllowedPattern: '^arn:aws:secretsmanager:us-east-2:[0-9]{12}:secret:sevaro/historian-qa/machine-user-[A-Za-z0-9]{6}$'
+  RdsSecretArn:
+    Type: String
+    NoEcho: true
+    AllowedPattern: '^arn:aws:secretsmanager:us-east-2:[0-9]{12}:secret:rds!db-[A-Za-z0-9-]+$'
+  DatabaseHost:
+    Type: String
+    Default: historian-mvp-qa.cxe2y0soqa7a.us-east-2.rds.amazonaws.com
+    AllowedValues:
+      - historian-mvp-qa.cxe2y0soqa7a.us-east-2.rds.amazonaws.com
+  DatabasePort:
+    Type: Number
+    Default: 5432
+    AllowedValues: [5432]
+  DatabaseName:
+    Type: String
+    Default: ops_amplehtml_historian_qa
+    AllowedValues: [ops_amplehtml_historian_qa]
+  AppOrigin:
+    Type: String
+    Default: 'https://historian-mvp-qa.d3ietjwgco4g2t.amplifyapp.com'
+    AllowedValues:
+      - 'https://historian-mvp-qa.d3ietjwgco4g2t.amplifyapp.com'
+  CognitoClientId:
+    Type: String
+    Default: ecjsa2ifjoj85konf3ts42gf5
+    AllowedValues: [ecjsa2ifjoj85konf3ts42gf5]
+  LinkHours:
+    Type: Number
+    Default: 82
+    AllowedValues: [82]
+  DeleteAfter:
+    Type: String
+    Default: '2026-08-29'
+
+Resources:
+  TempLinkSourceBucket:
+    Type: AWS::S3::Bucket
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Delete
+    Properties:
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+      LifecycleConfiguration:
+        Rules:
+          - Id: DeleteTempLinkSource
+            Status: Enabled
+            ExpirationInDays: 1
+      OwnershipControls:
+        Rules:
+          - ObjectOwnership: BucketOwnerEnforced
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      Tags:
+        - { Key: DataClass, Value: synthetic-only }
+        - { Key: DeleteAfter, Value: !Ref DeleteAfter }
+
+  TempLinkSourceBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref TempLinkSourceBucket
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Sid: DenyInsecureTransport
+            Effect: Deny
+            Principal: '*'
+            Action: s3:*
+            Resource:
+              - !GetAtt TempLinkSourceBucket.Arn
+              - !Sub '${TempLinkSourceBucket.Arn}/*'
+            Condition:
+              Bool:
+                aws:SecureTransport: 'false'
+
+  TempLinkLogGroup:
+    Type: AWS::Logs::LogGroup
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Delete
+    Properties:
+      LogGroupName: !Sub '/aws/codebuild/${AWS::StackName}'
+      RetentionInDays: 1
+      Tags:
+        - { Key: DataClass, Value: synthetic-only }
+        - { Key: DeleteAfter, Value: !Ref DeleteAfter }
+
+  TempLinkOutputSecret:
+    Type: AWS::SecretsManager::Secret
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Delete
+    Properties:
+      Name: !Sub '${AWS::StackName}-output'
+      Description: One-time synthetic Historian QA link; delete with the issuer stack.
+      SecretString: '{"status":"pending"}'
+      Tags:
+        - { Key: DataClass, Value: synthetic-only }
+        - { Key: DeleteAfter, Value: !Ref DeleteAfter }
+
+  TempLinkRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: codebuild.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: IssueOneHistorianQaTempLink
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Sid: ReadExactQaCredentials
+                Effect: Allow
+                Action: secretsmanager:GetSecretValue
+                Resource:
+                  - !Ref MachinePasswordSecretArn
+                  - !Ref RdsSecretArn
+              - Sid: ReadTempLinkSource
+                Effect: Allow
+                Action:
+                  - s3:GetBucketAcl
+                  - s3:GetBucketLocation
+                  - s3:GetObject
+                  - s3:GetObjectVersion
+                Resource:
+                  - !GetAtt TempLinkSourceBucket.Arn
+                  - !Sub '${TempLinkSourceBucket.Arn}/*'
+              - Sid: WriteExactEncryptedOutput
+                Effect: Allow
+                Action: secretsmanager:PutSecretValue
+                Resource: !Ref TempLinkOutputSecret
+              - Sid: WriteTempLinkLogs
+                Effect: Allow
+                Action:
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                Resource: !Sub '${TempLinkLogGroup.Arn}:*'
+      Tags:
+        - { Key: DataClass, Value: synthetic-only }
+        - { Key: DeleteAfter, Value: !Ref DeleteAfter }
+
+  TempLinkProject:
+    Type: AWS::CodeBuild::Project
+    Properties:
+      ServiceRole: !GetAtt TempLinkRole.Arn
+      Artifacts:
+        Type: NO_ARTIFACTS
+      Environment:
+        ComputeType: BUILD_GENERAL1_SMALL
+        Image: aws/codebuild/standard:7.0
+        ImagePullCredentialsType: CODEBUILD
+        PrivilegedMode: false
+        Type: LINUX_CONTAINER
+        EnvironmentVariables:
+          - { Name: SOURCE_COMMIT, Type: PLAINTEXT, Value: !Ref SourceCommit }
+          - { Name: HISTORIAN_QA_TEMP_LINK_ENABLED, Type: PLAINTEXT, Value: 'true' }
+          - { Name: HISTORIAN_QA_DATA_CLASS, Type: PLAINTEXT, Value: synthetic-only }
+          - { Name: HISTORIAN_QA_APP_ORIGIN, Type: PLAINTEXT, Value: !Ref AppOrigin }
+          - { Name: HISTORIAN_QA_COGNITO_CLIENT_ID, Type: PLAINTEXT, Value: !Ref CognitoClientId }
+          - { Name: HISTORIAN_QA_COGNITO_REGION, Type: PLAINTEXT, Value: us-east-2 }
+          - { Name: QA_USERNAME, Type: SECRETS_MANAGER, Value: !Join [':', [!Ref MachinePasswordSecretArn, username]] }
+          - { Name: QA_PASSWORD, Type: SECRETS_MANAGER, Value: !Join [':', [!Ref MachinePasswordSecretArn, password]] }
+          - { Name: QA_DATABASE_HOST, Type: PLAINTEXT, Value: !Ref DatabaseHost }
+          - { Name: QA_DATABASE_PORT, Type: PLAINTEXT, Value: !Ref DatabasePort }
+          - { Name: QA_DATABASE_USER, Type: SECRETS_MANAGER, Value: !Join [':', [!Ref RdsSecretArn, username]] }
+          - { Name: QA_DATABASE_PASSWORD, Type: SECRETS_MANAGER, Value: !Join [':', [!Ref RdsSecretArn, password]] }
+          - { Name: QA_DATABASE_NAME, Type: PLAINTEXT, Value: !Ref DatabaseName }
+          - { Name: HISTORIAN_QA_TEMP_LINK_OUTPUT_SECRET_ARN, Type: PLAINTEXT, Value: !Ref TempLinkOutputSecret }
+          - { Name: HISTORIAN_QA_TEMP_LINK_HOURS, Type: PLAINTEXT, Value: !Ref LinkHours }
+      Source:
+        Type: S3
+        Location: !Sub '${TempLinkSourceBucket}/historian-qa-temp-link.zip'
+        BuildSpec: |
+          version: 0.2
+          phases:
+            install:
+              runtime-versions:
+                nodejs: 22
+              commands:
+                - set +x
+                - corepack enable
+                - pnpm install --frozen-lockfile --ignore-scripts
+            build:
+              commands:
+                - set +x
+                - test "$AWS_REGION" = us-east-2
+                - test -f source-commit.txt
+                - test "$(tr -d '\r\n' < source-commit.txt)" = "$SOURCE_COMMIT"
+                - test -f scripts/historian-qa-issue-temp-link.ts
+                - pnpm exec tsx scripts/historian-qa-issue-temp-link.ts
+      LogsConfig:
+        CloudWatchLogs:
+          Status: ENABLED
+          GroupName: !Ref TempLinkLogGroup
+          StreamName: temp-link-issuer
+      TimeoutInMinutes: 10
+      QueuedTimeoutInMinutes: 10
+      Tags:
+        - { Key: DataClass, Value: synthetic-only }
+        - { Key: DeleteAfter, Value: !Ref DeleteAfter }
+
+Outputs:
+  SourceBucket:
+    Value: !Ref TempLinkSourceBucket
+  ProjectName:
+    Value: !Ref TempLinkProject
+  SecureOutputSecretArn:
+    Value: !Ref TempLinkOutputSecret

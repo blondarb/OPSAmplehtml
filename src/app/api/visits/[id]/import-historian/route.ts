@@ -41,7 +41,8 @@ export async function POST(
 
     // 1. Fetch the historian session
     const { rows: sessionRows } = await pool.query(
-      `SELECT id, structured_output, narrative_summary, red_flags, imported_to_note, patient_name
+      `SELECT id, structured_output, narrative_summary, red_flags, imported_to_note,
+              patient_name, interview_prompt_version
        FROM historian_sessions
        WHERE id = $1
        LIMIT 1`,
@@ -53,6 +54,22 @@ export async function POST(
       return NextResponse.json(
         { error: 'Historian session not found' },
         { status: 404 }
+      )
+    }
+
+    // Comprehensive v3/v4 artifacts intentionally remain a physician-review
+    // surface for the MVP. They must not enter a clinical note until this
+    // route has full tenant/role/visit/patient/session binding and imports the
+    // new cited report contract instead of browser/model-authored prose.
+    const structuredPromptVersion =
+      session.structured_output && typeof session.structured_output === 'object'
+        ? session.structured_output.interview_prompt_version
+        : undefined
+    const promptVersion = session.interview_prompt_version ?? structuredPromptVersion
+    if (promptVersion === 'comprehensive-v3' || promptVersion === 'comprehensive-v4') {
+      return NextResponse.json(
+        { error: 'Import is not available for this historian report version.' },
+        { status: 409 },
       )
     }
 

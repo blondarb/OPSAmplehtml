@@ -1,7 +1,13 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import type { HistorianRedFlag, HistorianStructuredOutput, HistorianTranscriptEntry } from '@/lib/historianTypes'
+import type {
+  HistorianRedFlag,
+  HistorianStructuredOutput,
+  HistorianTerminationReason,
+  HistorianTranscriptEntry,
+} from '@/lib/historianTypes'
+import { historianPatientCompletionPresentation } from '@/lib/historian/completionPresentation'
 import type { FinalDifferential } from '@/lib/historian/eval/finalDifferential'
 import type { IndependentDifferential } from '@/lib/historian/eval/independentDdx'
 import type { AgreementResult } from '@/lib/historian/eval/agreement'
@@ -10,6 +16,7 @@ import IntakeReviewSection from './consult/IntakeReviewSection'
 import HistorianTranscriptViewer from './historian/HistorianTranscriptViewer'
 import DifferentialCard from './historian/DifferentialCard'
 import DdxComparisonCard from './historian/DdxComparisonCard'
+import HistoryCoverageCard from './historian/HistoryCoverageCard'
 
 interface HistorianReportViewProps {
   structuredOutput: HistorianStructuredOutput | null
@@ -17,6 +24,8 @@ interface HistorianReportViewProps {
   redFlags: HistorianRedFlag[]
   duration: number
   questionCount: number
+  endedEarly: boolean
+  terminationReason: HistorianTerminationReason
   /** Optional — included when available so the Patient Report fallback has more to work with. */
   transcript?: HistorianTranscriptEntry[]
   /**
@@ -67,11 +76,11 @@ interface HistorianReportViewProps {
    * scope). Content and structure are identical in both themes.
    */
   theme?: 'dark' | 'clinical'
-  onStartAnother: () => void
+  onStartAnother?: () => void
   onBackToPortal: () => void
 }
 
-type ReportTab = 'physician' | 'patient'
+type ReportTab = 'physician' | 'patient' | 'transcript'
 
 function formatDuration(seconds: number): string {
   const m = Math.floor(seconds / 60)
@@ -85,6 +94,8 @@ export default function HistorianReportView({
   redFlags,
   duration,
   questionCount,
+  endedEarly,
+  terminationReason,
   transcript,
   surface,
   finalDifferential,
@@ -101,6 +112,10 @@ export default function HistorianReportView({
     surface === 'patient' ? 'patient' : 'physician',
   )
   const clinical = theme === 'clinical'
+  const completionPresentation = historianPatientCompletionPresentation(
+    endedEarly,
+    terminationReason,
+  )
   const [patientReport, setPatientReport] = useState<string | null>(null)
   const [patientReportLoading, setPatientReportLoading] = useState(true)
   const [patientReportError, setPatientReportError] = useState(false)
@@ -127,9 +142,9 @@ export default function HistorianReportView({
     )
   }
 
-  // Generate the patient-facing recap once, on mount, so it's ready by the
-  // time the patient switches to that tab. Fail-open: any error falls back
-  // to the raw narrative summary — never a blank or crashed tab.
+  // Generate the patient-facing recap once, on mount. A generator failure is
+  // displayed as unavailable; transcript/notes are never relabeled as a
+  // generated report.
   useEffect(() => {
     let cancelled = false
 
@@ -143,12 +158,17 @@ export default function HistorianReportView({
         if (!res.ok) throw new Error(`patient-report request failed: ${res.status}`)
         const data = await res.json()
         if (cancelled) return
-        setPatientReport(data.patientReport || narrativeSummary || '')
+        if (data.unavailable === true) {
+          setPatientReportError(true)
+          setPatientReport('')
+        } else {
+          setPatientReport(data.patientReport || '')
+        }
       } catch (err) {
         console.error('Failed to generate patient report:', err)
         if (cancelled) return
         setPatientReportError(true)
-        setPatientReport(narrativeSummary || '')
+        setPatientReport('')
       } finally {
         if (!cancelled) setPatientReportLoading(false)
       }
@@ -159,10 +179,15 @@ export default function HistorianReportView({
     // eslint-disable-next-line react-hooks/exhaustive-deps -- generate once per completed interview
   }, [])
 
-  const TABS: Array<{ key: ReportTab; label: string }> = [
-    { key: 'physician', label: 'Physician Report' },
-    { key: 'patient', label: 'Patient Report' },
-  ]
+  const tabs: Array<{ key: ReportTab; label: string }> = surface === 'patient'
+    ? [
+        { key: 'patient', label: 'Your Summary' },
+        { key: 'transcript', label: 'Interview Transcript' },
+      ]
+    : [
+        { key: 'physician', label: 'Clinician History Report' },
+        { key: 'transcript', label: 'Interview Transcript' },
+      ]
 
   return (
     <div style={clinical
@@ -172,19 +197,25 @@ export default function HistorianReportView({
       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center', marginBottom: '24px' }}>
         <div style={{
           width: 64, height: 64, borderRadius: '50%',
-          background: clinical ? 'var(--nn-accent-wash)' : 'rgba(34, 197, 94, 0.15)',
+          background: completionPresentation.tone === 'warning'
+            ? (clinical ? '#fffbeb' : 'rgba(245, 158, 11, 0.15)')
+            : (clinical ? 'var(--nn-accent-wash)' : 'rgba(34, 197, 94, 0.15)'),
           display: 'flex', alignItems: 'center', justifyContent: 'center',
           marginBottom: '16px',
         }}>
-          <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke={clinical ? 'var(--nn-accent-ink)' : '#22c55e'} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-            <polyline points="20 6 9 17 4 12" />
-          </svg>
+          {completionPresentation.tone === 'warning' ? (
+            <span aria-hidden="true" style={{ color: '#b45309', fontSize: 28, fontWeight: 800 }}>!</span>
+          ) : (
+            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke={clinical ? 'var(--nn-accent-ink)' : '#22c55e'} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <polyline points="20 6 9 17 4 12" />
+            </svg>
+          )}
         </div>
         <h2 style={{ color: clinical ? 'var(--nn-ink)' : '#fff', fontSize: '1.375rem', fontWeight: 700, margin: '0 0 8px' }}>
-          Interview Complete
+          {completionPresentation.title}
         </h2>
         <p style={{ color: clinical ? 'var(--nn-ink-2)' : '#94a3b8', fontSize: '0.9rem', margin: '0 0 16px', maxWidth: '440px' }}>
-          Thank you for completing the intake interview. Your physician will review this information before your appointment.
+          {completionPresentation.body}
         </p>
 
         <div style={{ display: 'flex', gap: '32px' }}>
@@ -201,7 +232,7 @@ export default function HistorianReportView({
 
       {/* Tabs */}
       <div style={{ display: 'flex', gap: '4px', marginBottom: '16px', borderBottom: clinical ? '1px solid var(--nn-line)' : '1px solid #334155' }}>
-        {TABS.map(tab => (
+        {tabs.map(tab => (
           <button
             key={tab.key}
             onClick={() => setActiveTab(tab.key)}
@@ -241,7 +272,17 @@ export default function HistorianReportView({
             finalDifferential={finalDifferential}
             independentDdx={independentDdx}
             agreement={agreement}
+            endedEarly={endedEarly}
+            terminationReason={terminationReason}
           />
+        ) : activeTab === 'transcript' ? (
+          transcript && transcript.length > 0 ? (
+            <HistorianTranscriptViewer entries={transcript} />
+          ) : (
+            <p style={{ color: clinical ? 'var(--nn-ink-3)' : '#64748B', fontSize: 13, margin: 0 }}>
+              No interview transcript is available.
+            </p>
+          )
         ) : (
           <PatientReportTab
             loading={patientReportLoading}
@@ -255,17 +296,19 @@ export default function HistorianReportView({
 
       {/* Actions */}
       <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', justifyContent: 'center' }}>
-        <button
-          onClick={onStartAnother}
-          className={clinical ? 'nn-btn nn-btn--sec' : undefined}
-          style={clinical ? undefined : {
-            padding: '12px 24px', borderRadius: '8px',
-            background: '#1e293b', border: '1px solid #334155',
-            color: '#e2e8f0', fontWeight: 600, fontSize: '0.875rem', cursor: 'pointer',
-          }}
-        >
-          Start Another Interview
-        </button>
+        {onStartAnother && (
+          <button
+            onClick={onStartAnother}
+            className={clinical ? 'nn-btn nn-btn--sec' : undefined}
+            style={clinical ? undefined : {
+              padding: '12px 24px', borderRadius: '8px',
+              background: '#1e293b', border: '1px solid #334155',
+              color: '#e2e8f0', fontWeight: 600, fontSize: '0.875rem', cursor: 'pointer',
+            }}
+          >
+            Start Another Interview
+          </button>
+        )}
         <button
           onClick={onBackToPortal}
           className={clinical ? 'nn-btn' : undefined}
@@ -293,6 +336,8 @@ interface PhysicianReportTabProps {
   finalDifferential?: FinalDifferential | null
   independentDdx?: IndependentDifferential | null
   agreement?: AgreementResult | null
+  endedEarly: boolean
+  terminationReason: HistorianTerminationReason
 }
 
 function PhysicianReportTab({
@@ -304,11 +349,17 @@ function PhysicianReportTab({
   finalDifferential,
   independentDdx,
   agreement,
+  endedEarly,
+  terminationReason,
 }: PhysicianReportTabProps) {
   // Turn-link state: clicking a cited quote in DifferentialCard jumps the
   // transcript viewer below to that turn (see HistorianTranscriptViewer's
   // highlightIndex prop).
   const [highlightIndex, setHighlightIndex] = useState<number | null>(null)
+  const adaptiveReportPending =
+    (structuredOutput?.interview_prompt_version === 'comprehensive-v3' ||
+      structuredOutput?.interview_prompt_version === 'comprehensive-v4') &&
+    !narrativeSummary
 
   return (
     <div>
@@ -335,12 +386,76 @@ function PhysicianReportTab({
         </div>
       )}
 
-      <IntakeReviewSection
-        consult={{
-          historian_structured_output: structuredOutput as Record<string, unknown> | null,
-          historian_summary: narrativeSummary,
-        }}
-      />
+      {(!structuredOutput && !narrativeSummary) || adaptiveReportPending ? (
+        <div role="status" style={{
+          background: '#0F172A',
+          border: '1px solid #334155',
+          borderRadius: 8,
+          padding: 16,
+          color: '#CBD5E1',
+          fontSize: 13,
+          lineHeight: 1.5,
+        }}>
+          {surface === 'patient'
+            ? 'Your interview summary is not available yet. Your answers were preserved for your neurologist to review.'
+            : 'Clinician history report generation is pending. Verified interview evidence and the separate transcript were preserved for review.'}
+        </div>
+      ) : (
+        <IntakeReviewSection
+          consult={{
+            historian_structured_output: structuredOutput as Record<string, unknown> | null,
+            historian_summary: narrativeSummary,
+            interview_completion_status: endedEarly ? 'ended_early' : 'complete',
+            interview_termination_reason: terminationReason,
+          }}
+        />
+      )}
+
+      {surface === 'physician' && adaptiveReportPending && structuredOutput?.current_medications && (
+        <div style={{
+          marginTop: 16,
+          background: '#0F172A',
+          border: '1px solid #334155',
+          borderRadius: 8,
+          padding: 16,
+          color: '#E2E8F0',
+          fontSize: 13,
+          lineHeight: 1.6,
+          whiteSpace: 'pre-wrap',
+        }}>
+          <div style={{ fontWeight: 700, marginBottom: 8 }}>Verified medication reconciliation</div>
+          {structuredOutput.current_medications}
+        </div>
+      )}
+
+      {surface === 'physician' &&
+        (structuredOutput?.interview_prompt_version === 'comprehensive-v3' ||
+          structuredOutput?.interview_prompt_version === 'comprehensive-v4') &&
+        structuredOutput.medication_reconciliation_has_uncertainty === true && (
+          <div role="alert" style={{
+            marginTop: 16,
+            background: 'rgba(245, 158, 11, 0.12)',
+            border: '1px solid rgba(245, 158, 11, 0.55)',
+            borderRadius: 8,
+            padding: 16,
+            color: '#FDE68A',
+            fontSize: 13,
+            lineHeight: 1.5,
+          }}>
+            <div style={{ fontWeight: 700, marginBottom: 4 }}>Medication reconciliation needs review</div>
+            Medication reconciliation has unresolved information; review the interview transcript.
+          </div>
+        )}
+
+      {surface === 'physician' && structuredOutput?.interview_mode === 'comprehensive' && (
+        <div style={{ marginTop: 16 }}>
+          <HistoryCoverageCard
+            coverage={structuredOutput.history_coverage}
+            ageYearsPatientReported={structuredOutput.age_years_patient_reported}
+            theme="dark"
+          />
+        </div>
+      )}
 
       {/* Design spec locked decision L1: DDx/thoroughness content is
           physician/QA-facing ONLY, never patient-facing. Gated directly on
@@ -370,7 +485,7 @@ function PhysicianReportTab({
         </>
       )}
 
-      {transcript && transcript.length > 0 && (
+      {highlightIndex != null && transcript && transcript.length > 0 && (
         <div style={{ marginTop: 16 }}>
           <HistorianTranscriptViewer entries={transcript} highlightIndex={highlightIndex} />
         </div>
@@ -439,7 +554,7 @@ function PatientReportTab({ loading, error, report, narrativeSummary, clinical =
 
       {error && (
         <p style={{ color: clinical ? 'var(--nn-ink-3)' : '#64748b', fontSize: '0.7rem', marginTop: 10 }}>
-          We couldn&apos;t generate a personalized summary right now, so we&apos;re showing your interview notes instead.
+          We couldn&apos;t generate a personalized summary right now. Your interview transcript was still preserved for the clinic.
         </p>
       )}
 

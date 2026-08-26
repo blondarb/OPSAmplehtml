@@ -16,9 +16,24 @@
  */
 
 import type { ClientMsg, ServerMsg } from '@/lib/voice/relayProtocol'
-import { MicCapture } from '@/lib/voice/audio/capture-worklet'
+import {
+  MicCapture,
+  MicCaptureStartCancelledError,
+  type MicRuntimeFailureReason,
+} from '@/lib/voice/audio/capture-worklet'
 import { PcmPlayer } from '@/lib/voice/audio/player'
-import type { VoiceEvent, VoiceProvider, VoiceStartOptions } from '@/lib/voice/providerTypes'
+import {
+  VoiceStartupError,
+  type VoiceContinuationCheckpoint,
+  type VoiceContinuationCommitResult,
+  type VoiceEvent,
+  type VoiceProvider,
+  type VoiceStartOptions,
+} from '@/lib/voice/providerTypes'
+
+const WS_STARTUP_ATTEMPTS = 2
+const WS_STARTUP_TIMEOUT_MS = 8_000
+const WS_STARTUP_RETRY_DELAY_MS = 250
 
 export class NovaSonicWsProvider implements VoiceProvider {
   private ws: WebSocket | null = null
@@ -27,8 +42,37 @@ export class NovaSonicWsProvider implements VoiceProvider {
   private cb: ((e: VoiceEvent) => void) | null = null
   /** Set true once stop() runs so a subsequent onclose isn't reported as an error. */
   private closing = false
+  private turnEvidenceController = false
+  private adaptiveTurnController = false
   /** True while the AI is producing audio — lets `completion` end the turn cleanly. */
   private aiSpeaking = false
+  /** Latched for a terminal text-only save; later PCM is discarded. */
+  private outputSuppressed = false
+  /** False once the relay reports that the underlying Bedrock stream ended. */
+  private modelStreamOpen = false
+  /** Prevents a terminal relay frame plus the ensuing WS close from double-ending. */
+  private disconnectedEmitted = false
+  /** Monotonic browser input sequence; never resets across inner Nova segments. */
+  private audioSeq = 0
+  /** Prevents one capture failure from emitting duplicate diagnostics/errors. */
+  private micRuntimeFailureEmitted = false
+  /** Relay-owned Bedrock segment currently allowed to reach the hook/player. */
+  private segmentId = 1
+  /** Segment-scoped tool ownership prevents a late async result reaching a replacement stream. */
+  private readonly toolSegments = new Map<string, number>()
+  private continuationBarrier: {
+    barrierId: string
+    segmentId: number
+    lastAudioSeq: number
+    deadlineAtMs: number
+  } | null = null
+  private continuationCommit: {
+    barrierId: string
+    transcriptThroughSeq: number
+    resolve: (result: VoiceContinuationCommitResult) => void
+    reject: (error: Error) => void
+    timeout: ReturnType<typeof setTimeout>
+  } | null = null
   /** Last diagnostics snapshot captured from `player` before it was closed in
    *  stop() — so getAudioDiagnostics() still has something to return after
    *  teardown (e.g. when the hook reads it right after stop() completes). */
@@ -51,7 +95,95 @@ export class NovaSonicWsProvider implements VoiceProvider {
 
   /** Transport-open signal for the hook's save-flush gate (see VoiceProvider). */
   isOpen(): boolean {
-    return this.ws?.readyState === WebSocket.OPEN
+    return this.ws?.readyState === WebSocket.OPEN && this.modelStreamOpen
+  }
+
+  /**
+   * Complete one browser-to-relay handshake. `VoiceProvider.start()` must not
+   * report success until this resolves: the hook otherwise marks a dead
+   * transport active and can only discover the failure through a later,
+   * generic close event.
+   */
+  private openWebSocket(opts: VoiceStartOptions): Promise<WebSocket> {
+    return new Promise((resolve, reject) => {
+      let ws: WebSocket | null = null
+      let opened = false
+      let settled = false
+      let timeout: ReturnType<typeof setTimeout> | null = null
+
+      const rejectStartup = () => {
+        if (settled) return
+        settled = true
+        if (timeout) clearTimeout(timeout)
+        if (ws && this.ws === ws) this.ws = null
+        try { ws?.close() } catch {}
+        reject(new VoiceStartupError(
+          'websocket_unavailable',
+          'The secure voice connection could not be established.',
+        ))
+      }
+
+      try {
+        ws = new WebSocket(
+          opts.relayUrl!,
+          ['nova.v1', opts.relayToken].filter(Boolean) as string[],
+        )
+      } catch {
+        rejectStartup()
+        return
+      }
+      this.ws = ws
+
+      ws.onopen = () => {
+        if (this.closing || this.ws !== ws) {
+          rejectStartup()
+          return
+        }
+        opened = true
+        settled = true
+        if (timeout) clearTimeout(timeout)
+        resolve(ws!)
+      }
+
+      ws.onmessage = (event: MessageEvent) => {
+        let msg: ServerMsg
+        try {
+          msg = JSON.parse(event.data as string) as ServerMsg
+        } catch {
+          return // ignore unparseable frames
+        }
+        this.handleServerMsg(msg)
+      }
+
+      ws.onerror = () => {
+        // Browser WebSocket error events carry no safe/detail-bearing reason.
+        // Before OPEN this is a failed startup attempt; after OPEN the close
+        // event below remains the single terminal transport notification.
+        if (!opened) rejectStartup()
+      }
+
+      ws.onclose = (event: CloseEvent) => {
+        if (!opened) {
+          rejectStartup()
+          return
+        }
+        if (this.ws !== ws) return
+
+        // Every remote close that was not initiated by stop() is a drop, even
+        // when the peer used clean code 1000. Emitted as `disconnected` so the
+        // hook runs the same graceful persistence path as other transports.
+        this.modelStreamOpen = false
+        this.outputSuppressed = true
+        this.aiSpeaking = false
+        this.player?.interrupt()
+        if (!this.closing && !this.disconnectedEmitted) {
+          this.disconnectedEmitted = true
+          this.emit({ type: 'disconnected', reason: `ws:close(${event.code})` })
+        }
+      }
+
+      timeout = setTimeout(rejectStartup, WS_STARTUP_TIMEOUT_MS)
+    })
   }
 
   async start(opts: VoiceStartOptions): Promise<void> {
@@ -64,7 +196,17 @@ export class NovaSonicWsProvider implements VoiceProvider {
     }
 
     this.closing = false
+    this.turnEvidenceController = opts.turnEvidenceController === true
+    this.adaptiveTurnController = opts.adaptiveTurnController === true
     this.aiSpeaking = false
+    this.outputSuppressed = false
+    this.modelStreamOpen = false
+    this.disconnectedEmitted = false
+    this.audioSeq = 0
+    this.micRuntimeFailureEmitted = false
+    this.segmentId = 1
+    this.toolSegments.clear()
+    this.clearContinuation(new Error('Nova session restarted'))
 
     // Wrap setup so a synchronous failure (e.g. `new WebSocket` throwing on a
     // malformed relayUrl) tears down anything already allocated — mirrors the
@@ -75,66 +217,60 @@ export class NovaSonicWsProvider implements VoiceProvider {
     // The relay's WS upgrade requires a short-lived auth token (see
     // services/nova-sonic-relay/src/server.ts verifyClient). Browsers cannot
     // set custom headers on a WS handshake, so the token rides along as a
-    // second subprotocol next to the fixed 'nova.v1' tag. If the session
-    // route didn't return a token (NOVA_RELAY_SHARED_SECRET unset
-    // server-side), we still attempt the connection with just 'nova.v1' —
-    // the relay's fail-closed verifyClient rejects it and the existing
-    // onclose/onerror -> `disconnected`/`error` path surfaces the failure.
-    const ws = new WebSocket(opts.relayUrl, ['nova.v1', opts.relayToken].filter(Boolean) as string[])
-    this.ws = ws
-
-    ws.onopen = () => {
-      // Kick off the session, then start streaming mic audio.
-      this.send({
-        t: 'start',
-        instructions: opts.instructions,
-        tools: opts.tools,
-        voiceId: opts.voiceId,
-      })
-
-      // Start mic capture: each 16k PCM16 base64 chunk becomes an `audio` msg.
-      const mic = new MicCapture()
-      this.mic = mic
-      mic
-        .start((pcm) => {
-          this.send({ t: 'audio', pcm })
-        })
-        .catch((err: unknown) => {
-          this.emit({
-            type: 'error',
-            message: `mic capture failed: ${err instanceof Error ? err.message : String(err)}`,
-          })
-        })
-    }
-
-    ws.onmessage = (event: MessageEvent) => {
-      let msg: ServerMsg
+    // second subprotocol next to the fixed 'nova.v1' tag. A failed first
+    // browser handshake gets one bounded retry before startup fails closed;
+    // no microphone or model session exists during that retry.
+    let startupError: unknown = null
+    for (let attempt = 0; attempt < WS_STARTUP_ATTEMPTS; attempt += 1) {
       try {
-        msg = JSON.parse(event.data as string) as ServerMsg
-      } catch {
-        return // ignore unparseable frames
-      }
-      this.handleServerMsg(msg)
-    }
-
-    ws.onerror = () => {
-      // The browser WebSocket error event carries no detail. onclose follows
-      // and is the one that decides disconnected-vs-clean, so no emit here —
-      // avoids double-reporting the same drop as both `error` and
-      // `disconnected`.
-    }
-
-    ws.onclose = (event: CloseEvent) => {
-      // Only an unexpected close (not our own stop(), not a clean 1000) is a
-      // drop. Emitted as `disconnected` (not `error`) so the hook runs the
-      // SAME graceful end-of-session flow as the OpenAI provider's transport-
-      // drop handling and a manual "End Interview" click — flush
-      // save_interview_output, fall back to a raw-transcript narrative, tear
-      // down, fire onComplete.
-      if (!this.closing && !event.wasClean && event.code !== 1000) {
-        this.emit({ type: 'disconnected', reason: `ws:close(${event.code})` })
+        await this.openWebSocket(opts)
+        startupError = null
+        break
+      } catch (err) {
+        startupError = err
+        if (this.closing || attempt === WS_STARTUP_ATTEMPTS - 1) break
+        await new Promise((resolve) => setTimeout(resolve, WS_STARTUP_RETRY_DELAY_MS))
+        if (this.closing) break
       }
     }
+    if (startupError) throw startupError
+
+    this.modelStreamOpen = true
+    // Kick off the session only after the browser has an accepted relay
+    // handshake, then start streaming mic audio.
+    this.send({
+      t: 'start',
+      instructions: opts.instructions,
+      tools: opts.tools,
+      voiceId: opts.voiceId,
+      interviewMode: opts.interviewMode,
+      turnEvidenceController: opts.turnEvidenceController,
+      adaptiveTurnController: opts.adaptiveTurnController,
+    })
+
+    // Start mic capture: each 16k PCM16 base64 chunk becomes an `audio` msg.
+    const mic = new MicCapture()
+    this.mic = mic
+    mic
+      .start((pcm) => {
+        this.send({ t: 'audio', pcm, audioSeq: ++this.audioSeq })
+      }, (reason) => {
+        this.handleMicRuntimeFailure(reason)
+      })
+      .catch((err: unknown) => {
+        // stop() may win while Android's permission prompt or worklet setup
+        // is still pending. That intentional stale start is already cleaned
+        // up by MicCapture and must not terminate a later/retried session.
+        if (
+          this.closing ||
+          this.mic !== mic ||
+          err instanceof MicCaptureStartCancelledError
+        ) return
+        this.emit({
+          type: 'error',
+          message: `mic capture failed: ${err instanceof Error ? err.message : String(err)}`,
+        })
+      })
     } catch (err) {
       // Tear down, then RE-THROW so start() rejects and the hook's catch sets
       // status:'error' (same contract as the OpenAI provider). Resolving after
@@ -144,25 +280,59 @@ export class NovaSonicWsProvider implements VoiceProvider {
     }
   }
 
+  private handleMicRuntimeFailure(reason: MicRuntimeFailureReason): void {
+    if (this.closing || this.micRuntimeFailureEmitted) return
+    this.micRuntimeFailureEmitted = true
+    this.send({
+      t: 'clientDiagnostic',
+      category: 'microphone_runtime_failure',
+      reason,
+    })
+    // Once the patient can no longer answer, no queued/current ordinary Nova
+    // turn may remain audible during the bounded partial-save window.
+    this.suppressOutput()
+    this.emit({
+      type: 'error',
+      message:
+        'Your microphone stopped sending audio. The interview will be saved through your last confirmed answer.',
+    })
+  }
+
   /** Map a relay ServerMsg onto a VoiceEvent and/or drive the player. */
   private handleServerMsg(msg: ServerMsg): void {
+    const taggedSegment = 'segmentId' in msg ? msg.segmentId : undefined
+    if (
+      typeof taggedSegment === 'number' &&
+      taggedSegment !== this.segmentId &&
+      msg.t !== 'continuationDue' &&
+      msg.t !== 'continuationBarrier' &&
+      msg.t !== 'continuationReady' &&
+      msg.t !== 'continuationRecovered'
+    ) {
+      return
+    }
     switch (msg.t) {
       case 'userTranscript':
-        this.emit({ type: 'userTranscript', text: msg.text })
+        this.emit({ type: 'userTranscript', text: msg.text, segmentId: msg.segmentId })
         break
       case 'assistantTranscript':
-        this.emit({ type: 'assistantTranscript', text: msg.text })
+        this.emit({
+          type: 'assistantTranscript',
+          text: msg.text,
+          segmentId: msg.segmentId,
+          obligationId: msg.obligationId,
+        })
         break
       case 'assistantTextDelta':
-        this.emit({ type: 'assistantTextDelta', text: msg.text })
+        this.emit({ type: 'assistantTextDelta', text: msg.text, segmentId: msg.segmentId })
         break
       case 'audio':
         // Raw audio drives the player only — no VoiceEvent.
-        this.player?.enqueue(msg.pcm)
+        if (this.modelStreamOpen && !this.outputSuppressed) this.player?.enqueue(msg.pcm)
         break
       case 'aiSpeechStart':
         this.aiSpeaking = true
-        this.emit({ type: 'aiSpeechStart' })
+        this.emit({ type: 'aiSpeechStart', segmentId: msg.segmentId })
         break
       case 'aiSpeechStop':
         // The relay sends this the moment Nova's turn (completionEnd) ends,
@@ -174,7 +344,7 @@ export class NovaSonicWsProvider implements VoiceProvider {
         // session down mid-audio. No-op delay for ordinary turns — resolves
         // immediately once nothing is left scheduled.
         this.aiSpeaking = false
-        this.emitAiSpeechStopWhenDrained()
+        this.emitAiSpeechStopWhenDrained(msg.segmentId ?? this.segmentId)
         break
       case 'bargeIn':
         // User interrupted: flush queued AI audio, then signal speech stopped
@@ -182,14 +352,16 @@ export class NovaSonicWsProvider implements VoiceProvider {
         // nothing left to drain.
         this.player?.interrupt()
         this.aiSpeaking = false
-        this.emit({ type: 'aiSpeechStop' })
+        this.emit({ type: 'aiSpeechStop', segmentId: msg.segmentId })
         break
       case 'toolCall':
+        this.toolSegments.set(msg.toolUseId, msg.segmentId ?? this.segmentId)
         this.emit({
           type: 'toolCall',
           toolName: msg.toolName,
           toolUseId: msg.toolUseId,
           input: msg.input,
+          segmentId: msg.segmentId,
         })
         break
       case 'completion':
@@ -204,14 +376,116 @@ export class NovaSonicWsProvider implements VoiceProvider {
         // interview aiSpeechStop only clears the speaking flag (the hook's
         // auto-end gates on interviewCompleted, so it can't end early).
         this.aiSpeaking = false
-        this.emitAiSpeechStopWhenDrained()
+        this.emitAiSpeechStopWhenDrained(msg.segmentId ?? this.segmentId)
         break
       case 'error':
-        this.emit({ type: 'error', message: msg.message })
+        // Relay model errors are terminal. Mark the underlying model stream
+        // unavailable before the hook handles this event so its finalization
+        // path skips a save nudge that can no longer reach Nova.
+        this.emitTerminalError(msg.message)
+        break
+      case 'sessionEnded':
+        this.modelStreamOpen = false
+        this.outputSuppressed = true
+        this.aiSpeaking = false
+        if (!this.disconnectedEmitted) {
+          this.disconnectedEmitted = true
+          this.player?.interrupt()
+          this.emit({ type: 'disconnected', reason: msg.reason })
+        }
         break
       case 'medicalTranscript':
         this.emit({ type: 'medicalTranscript', text: msg.text, isPartial: msg.isPartial })
         break
+      case 'continuationDue':
+        if (msg.segmentId !== this.segmentId) break
+        this.emit({
+          type: 'continuationDue',
+          segmentId: msg.segmentId,
+          deadlineAtMs: msg.deadlineAtMs,
+        })
+        break
+      case 'continuationBarrier': {
+        if (msg.segmentId !== this.segmentId || this.continuationBarrier) {
+          this.emitTerminalError('Nova continuation barrier mismatch')
+          break
+        }
+        this.continuationBarrier = {
+          barrierId: msg.barrierId,
+          segmentId: msg.segmentId,
+          lastAudioSeq: msg.lastAudioSeq,
+          deadlineAtMs: msg.deadlineAtMs,
+        }
+        const player = this.player
+        const drained = player ? player.whenDrained() : Promise.resolve()
+        drained.then(() => {
+          const barrier = this.continuationBarrier
+          if (!barrier || barrier.barrierId !== msg.barrierId || this.segmentId !== msg.segmentId) return
+          if (Date.now() >= barrier.deadlineAtMs) {
+            this.emitTerminalError('Nova continuation missed its transport deadline')
+            return
+          }
+          this.emit({
+            type: 'continuationBarrier',
+            barrierId: barrier.barrierId,
+            segmentId: barrier.segmentId,
+            lastAudioSeq: barrier.lastAudioSeq,
+            deadlineAtMs: barrier.deadlineAtMs,
+          })
+        })
+        break
+      }
+      case 'continuationReady': {
+        const pending = this.continuationCommit
+        const barrier = this.continuationBarrier
+        if (
+          !pending ||
+          !barrier ||
+          msg.barrierId !== pending.barrierId ||
+          msg.fromSegmentId !== this.segmentId ||
+          msg.lastAudioSeq !== barrier.lastAudioSeq ||
+          msg.transcriptThroughSeq !== pending.transcriptThroughSeq ||
+          msg.segmentId !== this.segmentId + 1
+        ) {
+          this.emitTerminalError('Nova continuation acknowledgement mismatch')
+          break
+        }
+        clearTimeout(pending.timeout)
+        this.segmentId = msg.segmentId
+        this.continuationBarrier = null
+        this.continuationCommit = null
+        pending.resolve('rotated')
+        break
+      }
+      case 'continuationRecovered': {
+        const pending = this.continuationCommit
+        const barrier = this.continuationBarrier
+        if (
+          !pending ||
+          !barrier ||
+          msg.barrierId !== pending.barrierId ||
+          msg.segmentId !== this.segmentId ||
+          msg.lastAudioSeq !== barrier.lastAudioSeq ||
+          msg.transcriptThroughSeq !== pending.transcriptThroughSeq
+        ) {
+          this.emitTerminalError('Nova continuation recovery acknowledgement mismatch')
+          break
+        }
+        clearTimeout(pending.timeout)
+        this.continuationBarrier = null
+        this.continuationCommit = null
+        pending.resolve('recovered')
+        break
+      }
+      case 'continuationFailed': {
+        const reason =
+          `The voice connection ended during continuation (${msg.reason}). ` +
+          'Speech after the last confirmed turn may not have been transcribed. ' +
+          'If this may be a medical emergency, call 911; for crisis support, call or text 988.'
+        this.clearContinuation(new Error(reason))
+        this.emitTerminalError(reason)
+        break
+      }
     }
   }
 
@@ -220,14 +494,14 @@ export class NovaSonicWsProvider implements VoiceProvider {
    * finished playing (see PcmPlayer.whenDrained). Falls back to an immediate
    * emit if there's no player (e.g. already torn down).
    */
-  private emitAiSpeechStopWhenDrained(): void {
+  private emitAiSpeechStopWhenDrained(segmentId: number): void {
     const player = this.player
     if (!player) {
-      this.emit({ type: 'aiSpeechStop' })
+      if (segmentId === this.segmentId) this.emit({ type: 'aiSpeechStop', segmentId })
       return
     }
     player.whenDrained().then(() => {
-      this.emit({ type: 'aiSpeechStop' })
+      if (segmentId === this.segmentId) this.emit({ type: 'aiSpeechStop', segmentId })
     })
   }
 
@@ -237,12 +511,92 @@ export class NovaSonicWsProvider implements VoiceProvider {
     return this.stashedDiagnostics
   }
 
-  sendToolResult(toolUseId: string, output: unknown): void {
+  sendToolResult(toolUseId: string, output: unknown, segmentId?: number): void {
+    const owner = this.toolSegments.get(toolUseId)
+    const target = segmentId ?? owner ?? this.segmentId
+    if (target !== this.segmentId || (owner != null && owner !== target)) {
+      // A Nova toolUseId belongs to one Bedrock segment. Silently discard a
+      // stale async result; routing it to the replacement segment is unsafe.
+      this.toolSegments.delete(toolUseId)
+      return
+    }
     this.send({
       t: 'toolResult',
       toolUseId,
       output: typeof output === 'string' ? output : JSON.stringify(output),
+      segmentId: target,
     })
+    this.toolSegments.delete(toolUseId)
+  }
+
+  commitContinuation(params: {
+    barrierId: string
+    checkpoint: VoiceContinuationCheckpoint
+  }): Promise<VoiceContinuationCommitResult> {
+    const barrier = this.continuationBarrier
+    if (
+      !barrier ||
+      barrier.barrierId !== params.barrierId ||
+      params.checkpoint.fromSegmentId !== this.segmentId ||
+      this.continuationCommit
+    ) {
+      this.markModelUnavailable()
+      return Promise.reject(new Error('Nova continuation commit does not match the active barrier'))
+    }
+    const remainingMs = barrier.deadlineAtMs - Date.now()
+    if (remainingMs <= 0) {
+      this.markModelUnavailable()
+      return Promise.reject(new Error('Nova continuation deadline elapsed'))
+    }
+    return new Promise<VoiceContinuationCommitResult>((resolve, reject) => {
+      const timeout = setTimeout(() => {
+        if (this.continuationCommit?.barrierId !== params.barrierId) return
+        this.continuationCommit = null
+        this.markModelUnavailable()
+        reject(new Error('Nova continuation acknowledgement timed out'))
+      }, remainingMs)
+      this.continuationCommit = {
+        barrierId: params.barrierId,
+        transcriptThroughSeq: params.checkpoint.transcriptThroughSeq,
+        resolve,
+        reject,
+        timeout,
+      }
+      this.send({ t: 'continuationCommit', ...params })
+    })
+  }
+
+  deferContinuation(barrierId: string): void {
+    if (this.continuationBarrier?.barrierId !== barrierId) {
+      this.emitTerminalError('Nova continuation deferral mismatch')
+      return
+    }
+    this.send({ t: 'continuationDefer', barrierId })
+    this.continuationBarrier = null
+  }
+
+  private clearContinuation(error: Error): void {
+    if (this.continuationCommit) {
+      clearTimeout(this.continuationCommit.timeout)
+      this.continuationCommit.reject(error)
+    }
+    this.continuationCommit = null
+    this.continuationBarrier = null
+  }
+
+  private markModelUnavailable(): void {
+    this.modelStreamOpen = false
+    this.outputSuppressed = true
+    this.aiSpeaking = false
+    this.player?.interrupt()
+  }
+
+  private emitTerminalError(message: string): void {
+    this.markModelUnavailable()
+    // This error already owns the terminal notification. Suppress the relay's
+    // following sessionEnded/WS-close frames so the hook sees one cause.
+    this.disconnectedEmitted = true
+    this.emit({ type: 'error', message })
   }
 
   injectSystemText(text: string): void {
@@ -255,6 +609,14 @@ export class NovaSonicWsProvider implements VoiceProvider {
     // text-only response concept (opts ignored).
   }
 
+  suppressOutput(): void {
+    if (this.outputSuppressed) return
+    this.outputSuppressed = true
+    this.aiSpeaking = false
+    this.player?.interrupt()
+    this.send({ t: 'suppressOutput' })
+  }
+
   nudgeClosing(): void {
     // Nova is speech-to-speech and stays SILENT after the save_interview_output
     // tool result unless prompted — the same reason it needed sendGreetingKickoff
@@ -262,15 +624,18 @@ export class NovaSonicWsProvider implements VoiceProvider {
     // frame) telling it to deliver its one closing message now. The closing
     // audio then streams as PCM and is drained by whenDrained() before
     // aiSpeechStop fires (#150), so it plays in full before teardown.
-    this.injectSystemText(
-      '[The interview is now complete and your notes have been saved. Please now speak your single warm closing message to the patient, then stop. Do not ask any further questions and do not wait for the patient to reply.]',
-    )
+    this.injectSystemText(this.turnEvidenceController || this.adaptiveTurnController
+      ? '[The interview is complete. Speak exactly this statement and nothing else: "Thank you. We\'re finished with the interview. Please keep this page open while your history is securely saved for your neurologist."]'
+      : '[The interview is now complete and your notes have been saved. Please now speak your single warm closing message to the patient, then stop. Do not ask any further questions and do not wait for the patient to reply.]')
   }
 
   async stop(): Promise<void> {
     if (this.closing) return // idempotent
     this.closing = true
     this.aiSpeaking = false
+    this.modelStreamOpen = false
+    this.clearContinuation(new Error('Nova session stopped'))
+    this.toolSegments.clear()
 
     // Tell the relay we're done before tearing local resources down.
     this.send({ t: 'stop' })

@@ -22,6 +22,7 @@
  *     configured secret to check against.
  */
 import crypto from 'crypto'
+import { getNovaRelaySharedSecret } from '@/lib/secrets'
 
 /**
  * Dev/test-only fallback secret. Reachable ONLY when NODE_ENV is not
@@ -40,6 +41,7 @@ export const FLUSH_TOKEN_TTL_SECONDS = 4 * 60 * 60
 
 interface FlushTokenPayload {
   sessionId: string
+  startupAttemptId?: string
   exp: number // unix seconds
 }
 
@@ -50,9 +52,11 @@ interface FlushTokenPayload {
  * outside production, or null in production — the fail-closed signal both
  * mintFlushToken and verifyFlushToken key off of below.
  */
-function resolveSecret(): string | null {
-  const configured = process.env.HISTORIAN_FLUSH_SECRET || process.env.NOVA_RELAY_SHARED_SECRET
+async function resolveSecret(): Promise<string | null> {
+  const configured = process.env.HISTORIAN_FLUSH_SECRET?.trim()
   if (configured) return configured
+  const relaySecret = await getNovaRelaySharedSecret()
+  if (relaySecret) return relaySecret
   if (process.env.NODE_ENV === 'production') return null
   return DEV_FALLBACK_SECRET
 }
@@ -74,8 +78,44 @@ function sign(payloadB64: string, secret: string): string {
   return toBase64Url(crypto.createHmac('sha256', secret).update(payloadB64).digest())
 }
 
-export function mintFlushToken(sessionId: string): string {
-  const secret = resolveSecret()
+/** Domain-separated server attestation for bounded Historian artifacts. */
+export async function signHistorianServerPayload(
+  purpose: string,
+  payload: string,
+): Promise<string> {
+  const secret = await resolveSecret()
+  if (!secret) throw new Error('Historian server attestation secret is unavailable.')
+  return toBase64Url(
+    crypto.createHmac('sha256', secret)
+      .update(`historian:${purpose}:v1\n${payload}`)
+      .digest(),
+  )
+}
+
+export async function verifyHistorianServerPayload(
+  purpose: string,
+  payload: string,
+  signature: string,
+): Promise<boolean> {
+  if (typeof signature !== 'string' || !/^[A-Za-z0-9_-]{43}$/.test(signature)) return false
+  const secret = await resolveSecret()
+  if (!secret) return false
+  const expected = toBase64Url(
+    crypto.createHmac('sha256', secret)
+      .update(`historian:${purpose}:v1\n${payload}`)
+      .digest(),
+  )
+  const receivedBuffer = Buffer.from(signature)
+  const expectedBuffer = Buffer.from(expected)
+  return receivedBuffer.length === expectedBuffer.length &&
+    crypto.timingSafeEqual(receivedBuffer, expectedBuffer)
+}
+
+export async function mintFlushToken(
+  sessionId: string,
+  startupAttemptId?: string,
+): Promise<string> {
+  const secret = await resolveSecret()
   if (!secret) {
     // Fail closed: production with neither HISTORIAN_FLUSH_SECRET nor
     // NOVA_RELAY_SHARED_SECRET configured. Refuse to mint rather than
@@ -87,6 +127,7 @@ export function mintFlushToken(sessionId: string): string {
   }
   const payload: FlushTokenPayload = {
     sessionId,
+    ...(startupAttemptId ? { startupAttemptId } : {}),
     exp: Math.floor(Date.now() / 1000) + FLUSH_TOKEN_TTL_SECONDS,
   }
   const payloadB64 = toBase64Url(JSON.stringify(payload))
@@ -94,10 +135,13 @@ export function mintFlushToken(sessionId: string): string {
   return `${payloadB64}.${sig}`
 }
 
-export function verifyFlushToken(token: string): { sessionId: string } | null {
+export async function verifyFlushToken(token: string): Promise<{
+  sessionId: string
+  startupAttemptId?: string
+} | null> {
   if (!token || typeof token !== 'string') return null
 
-  const secret = resolveSecret()
+  const secret = await resolveSecret()
   if (!secret) return null // fail closed — no configured secret to verify against
 
   const parts = token.split('.')
@@ -121,7 +165,15 @@ export function verifyFlushToken(token: string): { sessionId: string } | null {
   }
 
   if (!payload || typeof payload.sessionId !== 'string' || !payload.sessionId) return null
-  if (typeof payload.exp === 'number' && Math.floor(Date.now() / 1000) > payload.exp) return null
+  if (
+    payload.startupAttemptId !== undefined &&
+    (typeof payload.startupAttemptId !== 'string' ||
+      !/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(payload.startupAttemptId))
+  ) return null
+  if (typeof payload.exp !== 'number' || Math.floor(Date.now() / 1000) > payload.exp) return null
 
-  return { sessionId: payload.sessionId }
+  return {
+    sessionId: payload.sessionId,
+    ...(payload.startupAttemptId ? { startupAttemptId: payload.startupAttemptId } : {}),
+  }
 }

@@ -34,6 +34,21 @@ import type { VoiceEvent, VoiceProvider, VoiceStartOptions } from '@/lib/voice/p
 
 const DEFAULT_MODEL = 'gpt-realtime-2'
 
+type OpenAiRealtimeServerEvent = {
+  type?: string
+  delta?: string
+  transcript?: string
+  response?: {
+    output?: Array<{
+      type?: string
+      arguments?: string
+      name?: string
+      call_id?: string
+    }>
+  }
+  error?: { message?: string }
+}
+
 export class OpenAiWebrtcProvider implements VoiceProvider {
   private pc: RTCPeerConnection | null = null
   private dc: RTCDataChannel | null = null
@@ -43,6 +58,8 @@ export class OpenAiWebrtcProvider implements VoiceProvider {
   private stopped = false
   /** Tracks whether we've emitted aiSpeechStart for the in-flight response. */
   private aiSpeaking = false
+  /** Latched for a terminal text-only save; remote audio remains muted. */
+  private outputSuppressed = false
   /** Set true once session.created arrives (#134 greeting-timing fix). */
   private sessionCreated = false
   /** Token renewal (~90s before expiry). */
@@ -85,6 +102,7 @@ export class OpenAiWebrtcProvider implements VoiceProvider {
 
     this.stopped = false
     this.aiSpeaking = false
+    this.outputSuppressed = false
     this.sessionCreated = false
     if (opts.sessionType) this.sessionType = opts.sessionType
 
@@ -108,6 +126,10 @@ export class OpenAiWebrtcProvider implements VoiceProvider {
 
       pc.ontrack = (event) => {
         audioEl.srcObject = event.streams[0]
+        if (this.outputSuppressed) {
+          audioEl.muted = true
+          return
+        }
         // Resume playback if the browser paused after srcObject change.
         audioEl.play().catch(() => {})
       }
@@ -256,7 +278,7 @@ export class OpenAiWebrtcProvider implements VoiceProvider {
    * Mirrors the switch in useRealtimeSession.handleServerEvent, minus the
    * harness-specific bookkeeping that now lives in the hook.
    */
-  private handleServerEvent(msg: any): void {
+  private handleServerEvent(msg: OpenAiRealtimeServerEvent): void {
     switch (msg.type) {
       case 'session.created': {
         // #134: session is fully configured — instructions are applied. Fire
@@ -309,7 +331,11 @@ export class OpenAiWebrtcProvider implements VoiceProvider {
         const output = msg.response?.output
         if (output && Array.isArray(output)) {
           for (const item of output) {
-            if (item.type !== 'function_call') continue
+            if (
+              item.type !== 'function_call' ||
+              typeof item.name !== 'string' ||
+              typeof item.call_id !== 'string'
+            ) continue
             let input: unknown
             try {
               input = JSON.parse(item.arguments || '{}')
@@ -376,6 +402,16 @@ export class OpenAiWebrtcProvider implements VoiceProvider {
       return
     }
     this.sendResponseCreate()
+  }
+
+  suppressOutput(): void {
+    if (this.outputSuppressed) return
+    this.outputSuppressed = true
+    this.aiSpeaking = false
+    if (this.audioEl) {
+      this.audioEl.muted = true
+      this.audioEl.pause()
+    }
   }
 
   nudgeClosing(): void {
