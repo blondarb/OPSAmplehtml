@@ -37,6 +37,7 @@ import { createMedicationReconciliationState } from '@/lib/historian/medicationR
 import { MEDICATION_INVENTORY_QUESTION } from '@/lib/historian/medicationReconciliation'
 import { ADAPTIVE_PRE_CLOSE_QUESTION } from '@/lib/historian/adaptiveQuestionContract'
 import { buildDiagnosticInputProjection } from '@/lib/historian/eval/diagnosticInput'
+import { deriveDiagnosticSufficiency } from '@/lib/historian/diagnosticSufficiency'
 
 const jobId = '11111111-1111-4111-8111-111111111111'
 const event = (body: string): SQSEvent => ({
@@ -148,6 +149,16 @@ function mockReport() {
   }
 }
 
+function reverseObjectKeyOrder(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map(reverseObjectKeyOrder)
+  if (!value || typeof value !== 'object') return value
+  return Object.fromEntries(
+    Object.entries(value as Record<string, unknown>)
+      .reverse()
+      .map(([key, nested]) => [key, reverseObjectKeyOrder(nested)]),
+  )
+}
+
 describe('durable historian evaluation worker', () => {
   beforeEach(() => {
     vi.clearAllMocks()
@@ -195,6 +206,83 @@ describe('durable historian evaluation worker', () => {
       diagnosticProjection.trustedMedicationContext,
     )
     expect(service.fail).not.toHaveBeenCalled()
+  })
+
+  it('accepts equivalent persisted sufficiency after a JSONB key-order round trip', async () => {
+    process.env.HISTORIAN_EVAL_QA_AUTORUN = 'false'
+    const claim = completeClaim()
+    const persisted = deriveDiagnosticSufficiency({
+      transcript: claim.transcript,
+      promptVersion: claim.promptVersion,
+      completionStatus: claim.completionStatus,
+      terminationReason: claim.terminationReason,
+      reviewArtifact: claim.structuredOutput.live_review_v2,
+      medicationState: claim.structuredOutput.medication_reconciliation_v1,
+      generatedAt: new Date('2026-08-25T12:30:00.000Z'),
+    })
+    claim.diagnosticSufficiency = reverseObjectKeyOrder(persisted) as typeof persisted
+
+    const service = {
+      claim: vi.fn(async () => claim),
+      persistDiagnosticSufficiency: vi.fn(),
+      persistClinicianHistoryReport: vi.fn(),
+      persistFinalDifferential: vi.fn(),
+      complete: vi.fn(),
+      fail: vi.fn(),
+    }
+    generateFinalDifferentialMock.mockResolvedValueOnce({
+      status: 'ok', differential: [], summary: 'Synthetic', provenance: {}, dropped_quotes: 0,
+    })
+
+    const result = await processHistorianEvalEvent(
+      event(JSON.stringify({ v: 1, kind: 'historian_eval', job_id: jobId })),
+      service as never,
+    )
+
+    expect(result.batchItemFailures).toEqual([])
+    expect(service.persistDiagnosticSufficiency).not.toHaveBeenCalled()
+    expect(service.persistClinicianHistoryReport).toHaveBeenCalledTimes(1)
+    expect(service.persistFinalDifferential).toHaveBeenCalledTimes(1)
+    expect(service.complete).toHaveBeenCalledWith(claim)
+    expect(service.fail).not.toHaveBeenCalled()
+  })
+
+  it('still rejects a persisted sufficiency value that differs from the session evidence', async () => {
+    process.env.HISTORIAN_EVAL_QA_AUTORUN = 'false'
+    const claim = completeClaim()
+    const persisted = deriveDiagnosticSufficiency({
+      transcript: claim.transcript,
+      promptVersion: claim.promptVersion,
+      completionStatus: claim.completionStatus,
+      terminationReason: claim.terminationReason,
+      reviewArtifact: claim.structuredOutput.live_review_v2,
+      medicationState: claim.structuredOutput.medication_reconciliation_v1,
+      generatedAt: new Date('2026-08-25T12:30:00.000Z'),
+    })
+    claim.diagnosticSufficiency = {
+      ...persisted,
+      patient_turn_count: persisted.patient_turn_count + 1,
+    }
+
+    const service = {
+      claim: vi.fn(async () => claim),
+      persistDiagnosticSufficiency: vi.fn(),
+      persistClinicianHistoryReport: vi.fn(),
+      persistFinalDifferential: vi.fn(),
+      complete: vi.fn(),
+      fail: vi.fn(async () => undefined),
+    }
+
+    const result = await processHistorianEvalEvent(
+      event(JSON.stringify({ v: 1, kind: 'historian_eval', job_id: jobId })),
+      service as never,
+    )
+
+    expect(result.batchItemFailures).toEqual([])
+    expect(service.fail).toHaveBeenCalledWith(claim, 'HistorianEvaluationIntegrityError')
+    expect(service.persistClinicianHistoryReport).not.toHaveBeenCalled()
+    expect(service.persistFinalDifferential).not.toHaveBeenCalled()
+    expect(service.complete).not.toHaveBeenCalled()
   })
 
   it('preserves the legacy pipeline for a migration-era version-1 job', async () => {

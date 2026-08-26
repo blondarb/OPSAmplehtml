@@ -1,4 +1,5 @@
 import type { SQSBatchResponse, SQSEvent } from 'aws-lambda'
+import { isDeepStrictEqual } from 'node:util'
 import { getPool } from '@/lib/db'
 import {
   HistorianEvalJobService,
@@ -83,7 +84,10 @@ function deriveClaimSufficiency(claim: ClaimedHistorianEvalJob): {
   })
   if (claim.diagnosticSufficiency) {
     const persisted = claim.diagnosticSufficiency
-    if (JSON.stringify(sufficiencyIntegrityView(persisted)) !== JSON.stringify(sufficiencyIntegrityView(sufficiency))) {
+    // PostgreSQL JSONB does not preserve object-key insertion order. Compare
+    // the immutable clinical values semantically so an equivalent JSONB
+    // round trip cannot be mistaken for an integrity violation.
+    if (!isDeepStrictEqual(sufficiencyIntegrityView(persisted), sufficiencyIntegrityView(sufficiency))) {
       throw new HistorianEvaluationIntegrityError('Diagnostic sufficiency does not match immutable session inputs.')
     }
     return { sufficiency: persisted, medication }
