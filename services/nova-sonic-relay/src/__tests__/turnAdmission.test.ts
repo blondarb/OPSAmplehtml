@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest'
 
 import {
+  APPROVED_HISTORIAN_CHECK_IN_TEXT,
   APPROVED_HISTORIAN_CLOSING_TEXT,
+  APPROVED_HISTORIAN_SIGN_OFF_TEXT,
   HistorianTurnQuarantine,
   PRODUCTION_TURN_CONFIRMATION_TIMEOUT_MS,
   canonicalSpokenText,
@@ -58,8 +60,23 @@ describe('Historian assistant turn admission', () => {
       bufferedAudio: [],
     })
     expect(ready.observeStreamedAudio('AAAA')).toBe(true)
-    ready.bufferFinalText(APPROVAL.approvedText)
-    expect(ready.finalize()).toEqual({
+    expect(ready.finalizeAdaptiveAtAudioEnd()).toEqual({
+      allowed: true,
+      text: APPROVAL.approvedText,
+      audio: [],
+      obligationId: APPROVAL.obligationId,
+      mode: 'approved_question',
+      alreadyReleased: true,
+    })
+  })
+
+  it('admits exact adaptive speculative text and bounded PCM without a FINAL copy', () => {
+    const gate = new HistorianTurnQuarantine(1_000)
+    gate.approveQuestion(APPROVAL)
+    gate.bufferText(APPROVAL.approvedText)
+    expect(gate.beginApprovedQuestionStreaming()).toMatchObject({ allowed: true })
+    expect(gate.observeStreamedAudio('AAAA')).toBe(true)
+    expect(gate.finalizeAdaptiveAtAudioEnd()).toEqual({
       allowed: true,
       text: APPROVAL.approvedText,
       audio: [],
@@ -94,9 +111,7 @@ describe('Historian assistant turn admission', () => {
       bufferedAudio: ['INTRO_PCM'],
     })
     expect(gate.observeStreamedAudio('QUESTION_PCM')).toBe(true)
-    gate.bufferFinalText("Hi, I'm Henry, an AI assistant helping collect your history for your neurologist.")
-    gate.bufferFinalText('What would you most like your neurologist to understand about why you were referred?')
-    expect(gate.finalize()).toEqual({
+    expect(gate.finalizeAdaptiveAtAudioEnd()).toEqual({
       allowed: true,
       text: approval.approvedText,
       audio: [],
@@ -121,9 +136,7 @@ describe('Historian assistant turn admission', () => {
     })
     expect(gate.bufferApprovedQuestionPrefixAudio('INTRO_ONLY_PCM')).toBe(true)
     gate.bufferText('What brought you to neurology?')
-    gate.bufferFinalText('I am Henry.')
-    gate.bufferFinalText('What brought you to neurology?')
-    expect(gate.finalize()).toEqual({
+    expect(gate.finalizeAdaptiveAtAudioEnd()).toEqual({
       allowed: false,
       reason: 'approved_question_audio_incomplete',
     })
@@ -245,6 +258,22 @@ describe('Historian assistant turn admission', () => {
       text: 'Your history proves that everything is fine.',
       mode: 'terminal_statement',
     })).toEqual({ valid: false, reason: 'terminal_text_mismatch' })
+    expect(validateTurnText({
+      text: APPROVED_HISTORIAN_CHECK_IN_TEXT,
+      mode: 'unresponsive_check_in',
+    })).toEqual({ valid: true })
+    expect(validateTurnText({
+      text: 'Can you hear me?',
+      mode: 'unresponsive_check_in',
+    })).toEqual({ valid: false, reason: 'check_in_text_mismatch' })
+    expect(validateTurnText({
+      text: APPROVED_HISTORIAN_SIGN_OFF_TEXT,
+      mode: 'unresponsive_sign_off',
+    })).toEqual({ valid: true })
+    expect(validateTurnText({
+      text: 'I will stop now.',
+      mode: 'unresponsive_sign_off',
+    })).toEqual({ valid: false, reason: 'sign_off_text_mismatch' })
   })
 
   it('requires a matching final assistant text copy before releasing audio', () => {

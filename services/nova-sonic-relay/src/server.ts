@@ -20,6 +20,9 @@ import {
 } from './continuationTestSchedule.js'
 import { sweepHeartbeatSockets, trackHeartbeat } from './websocketHeartbeat.js'
 import {
+  APPROVED_HISTORIAN_CHECK_IN_TEXT,
+  APPROVED_HISTORIAN_CLOSING_TEXT,
+  APPROVED_HISTORIAN_SIGN_OFF_TEXT,
   HistorianTurnQuarantine,
   PRODUCTION_TURN_CONFIRMATION_TIMEOUT_MS,
   parseApprovedHistorianTurn,
@@ -81,12 +84,17 @@ function parseInterviewControlKind(value: unknown): InterviewControlKind | null 
     : null
 }
 
-function controlledSystemInstruction(kind: InterviewControlKind, text: string): string {
+function controlledSystemInstruction(kind: InterviewControlKind, _text: string): string {
+  const exactText = kind === 'closing'
+    ? APPROVED_HISTORIAN_CLOSING_TEXT
+    : kind === 'check_in'
+      ? APPROVED_HISTORIAN_CHECK_IN_TEXT
+      : APPROVED_HISTORIAN_SIGN_OFF_TEXT
   return [
     '[APPLICATION-OWNED CONTROL TURN]',
     `First call request_interview_control with exactly {"kind":${JSON.stringify(kind)}}.`,
-    'Wait for its success result. Then follow the application statement exactly; do not add another question or any other words.',
-    text,
+    'Wait for its success result. Then speak the exact application statement below; do not add, remove, explain, or ask anything else.',
+    JSON.stringify(exactText),
   ].join(' ')
 }
 
@@ -336,6 +344,23 @@ wss.on('connection', (ws) => {
   let turnConfirmationTimer: ReturnType<typeof setTimeout> | null = null
   let adaptiveInterruptedTurn = false
   let duplicateQuestionReauthorizationCount = 0
+  let controlledTurnEpoch = 0
+  let adaptiveAudioEndTombstone: { segmentId: number; turnEpoch: number } | null = null
+  // Nova 2 occasionally violates its tool-first contract immediately after a
+  // promoted adaptive continuation. The fully quarantined first response can
+  // still be submitted to the existing application authorization controller,
+  // but only once per promoted segment and only while the complete
+  // post-promotion patient transcript remains current. Nothing is released
+  // first.
+  let lateBindingRecoveryUsed = false
+  let lateBindingRecovery: {
+    segmentId: number
+    userTranscriptBlockCountAtPromotion: number
+    boundUserTranscriptBlockCount: number | null
+    toolUseId: string | null
+    turnEpoch: number
+  } | null = null
+  let lateBindingRecoveryTimer: ReturnType<typeof setTimeout> | null = null
   let firstAudioObserved = false
   let audioFrameCount = 0
   let lastAudioFrameAtMs = 0
@@ -366,7 +391,9 @@ wss.on('connection', (ws) => {
     if (modelTerminalSent) return
     modelTerminalSent = true
     outputQuarantined = true
+    adaptiveAudioEndTombstone = null
     clearTurnConfirmationTimer()
+    clearLateBindingRecovery()
     void openingSession?.stop().catch(() => {})
     send(ws, { t: 'sessionEnded', reason })
     if (ws.readyState === WebSocket.OPEN) {
@@ -388,7 +415,9 @@ wss.on('connection', (ws) => {
       ...diagnostics,
     })}`)
     speechSuppressed = true
+    adaptiveAudioEndTombstone = null
     clearTurnConfirmationTimer()
+    clearLateBindingRecovery()
     turnQuarantine.discard()
     send(ws, {
       t: 'error',
@@ -538,12 +567,128 @@ wss.on('connection', (ws) => {
     pendingTurnAudioEndAtMs = 0
   }
 
+  function clearLateBindingRecoveryTimer(): void {
+    if (lateBindingRecoveryTimer) clearTimeout(lateBindingRecoveryTimer)
+    lateBindingRecoveryTimer = null
+  }
+
+  /** Retire a relay-minted browser tool use before any terminal, interruption,
+   * or ownership transition. It must never later be mistaken for a provider
+   * tool and forwarded into Nova. */
+  function clearLateBindingRecovery(): void {
+    const invalidatedEpoch = lateBindingRecovery?.turnEpoch
+    if (lateBindingRecovery?.toolUseId) pendingTools.delete(lateBindingRecovery.toolUseId)
+    clearLateBindingRecoveryTimer()
+    lateBindingRecovery = null
+    if (invalidatedEpoch === controlledTurnEpoch) controlledTurnEpoch += 1
+  }
+
+  /**
+   * Start the sole permitted late binding after a continuation candidate has
+   * produced an audio-ended, still-silent response without its required tool.
+   * The browser receives the same request_history_question toolCall it already
+   * validates. Its answer is deliberately not sent to Nova: Nova has already
+   * produced the quarantined turn, and the relay will release only if the
+   * browser grants an exact approval for the immutable speculative wording.
+   */
+  function requestLateBindingRecovery(segmentId: number): boolean {
+    const recovery = lateBindingRecovery
+    if (
+      !adaptiveTurnControllerActive ||
+      lateBindingRecoveryUsed ||
+      !recovery ||
+      recovery.segmentId !== segmentId ||
+      recovery.turnEpoch !== controlledTurnEpoch ||
+      userTranscriptBlockCount <= recovery.userTranscriptBlockCountAtPromotion ||
+      recovery.toolUseId !== null ||
+      pendingTurnAudioEndSegment !== segmentId ||
+      turnQuarantine.hasAuthorization() ||
+      !turnQuarantine.hasAdaptiveAudioEndCandidate() ||
+      turnQuarantine.hasApprovedQuestionStreaming()
+    ) return false
+
+    const proposedText = turnQuarantine.proposedText()
+    if (!proposedText) return false
+    const toolUseId = `relay-late-binding-${crypto.randomUUID()}`
+    lateBindingRecoveryUsed = true
+    recovery.boundUserTranscriptBlockCount = userTranscriptBlockCount
+    recovery.toolUseId = toolUseId
+    pendingTools.set(toolUseId, 'request_history_question')
+    logSessionEvent('late_binding_requested', {
+      segmentId,
+      userTranscriptBlockCount,
+    })
+    send(ws, {
+      t: 'toolCall',
+      toolName: 'request_history_question',
+      toolUseId,
+      input: { proposed_text: proposedText },
+      segmentId,
+    })
+    lateBindingRecoveryTimer = setTimeout(() => {
+      if (
+        lateBindingRecovery?.segmentId !== segmentId ||
+        lateBindingRecovery.toolUseId !== toolUseId ||
+        modelTerminalSent ||
+        clientStopping
+      ) return
+      rejectHistorianTurn('late_binding_authorization_timeout')
+    }, TURN_CONFIRMATION_TIMEOUT_MS)
+    // Preserve the immutable audio-end boundary while the controller response
+    // is pending; the late-binding timer above is the sole deadline.
+    if (turnConfirmationTimer) clearTimeout(turnConfirmationTimer)
+    turnConfirmationTimer = null
+    return true
+  }
+
   function finishAssistantBoundary(): void {
     stopAiSpeech()
     if (testBoundarySchedule.observeAssistantBoundary()) {
       maybeSendTestBoundaryDue()
     }
     maybeOpenBarrier()
+  }
+
+  function releaseAdmittedTurn(
+    segmentId: number,
+    admitted: Extract<ReturnType<HistorianTurnQuarantine['finalize']>, { allowed: true }>,
+    diagnostics: ReturnType<HistorianTurnQuarantine['diagnostics']>,
+    admissionEvidence: 'paired_final' | 'adaptive_speculative_audio_end',
+  ): void {
+    const confirmationWaitMs = pendingTurnAudioEndAtMs > 0
+      ? Math.max(0, Date.now() - pendingTurnAudioEndAtMs)
+      : 0
+    clearTurnConfirmationTimer()
+    if (admissionEvidence === 'adaptive_speculative_audio_end') {
+      adaptiveAudioEndTombstone = { segmentId, turnEpoch: controlledTurnEpoch }
+    }
+    admittedTurnCount += 1
+    duplicateQuestionReauthorizationCount = 0
+    logSessionEvent('turn_admitted', {
+      segmentId,
+      turn: admittedTurnCount,
+      mode: admitted.mode,
+      admissionEvidence,
+      streamedBeforeAdmission: admitted.alreadyReleased === true,
+      confirmationWaitMs,
+      ...diagnostics,
+    })
+
+    if (!admitted.alreadyReleased) startAiSpeech()
+    // Adaptive audio may begin only after the full speculative wording is an
+    // exact application-approved question, but the transcript remains
+    // provisional until AUDIO END_TURN. Emit it exactly once at admission so
+    // an interrupted partial question cannot become durable evidence.
+    send(ws, {
+      t: 'assistantTranscript',
+      text: admitted.text,
+      segmentId,
+      ...(admitted.obligationId ? { obligationId: admitted.obligationId } : {}),
+    })
+    if (!admitted.alreadyReleased) {
+      for (const pcm of admitted.audio) send(ws, { t: 'audio', pcm, segmentId })
+    }
+    finishAssistantBoundary()
   }
 
   /**
@@ -560,43 +705,25 @@ wss.on('connection', (ws) => {
       !turnQuarantine.hasConfirmedTextMatch()
     ) return false
 
+    if (!turnQuarantine.hasAuthorization()) {
+      // The assistant response is complete and its two text stages match, but
+      // it arrived without Nova's required tool immediately after rollover.
+      // Hold it and route its candidate wording through the normal browser
+      // authorization path. Any other tool-less turn remains a hard failure.
+      if (requestLateBindingRecovery(segmentId)) return true
+      // completionEnd may follow the two text stages while the browser is
+      // still evaluating the relay-minted toolCall. Keep the same complete
+      // turn quarantined; the late-binding timer owns this wait.
+      if (lateBindingRecovery?.toolUseId != null) return true
+    }
+
     const diagnostics = turnQuarantine.diagnostics()
-    const confirmationWaitMs = pendingTurnAudioEndAtMs > 0
-      ? Math.max(0, Date.now() - pendingTurnAudioEndAtMs)
-      : 0
-    clearTurnConfirmationTimer()
     const admitted = turnQuarantine.finalize()
     if (!admitted.allowed) {
       rejectHistorianTurn(admitted.reason, diagnostics)
       return true
     }
-
-    admittedTurnCount += 1
-    duplicateQuestionReauthorizationCount = 0
-    logSessionEvent('turn_admitted', {
-      segmentId,
-      turn: admittedTurnCount,
-      mode: admitted.mode,
-      streamedBeforeFinal: admitted.alreadyReleased === true,
-      confirmationWaitMs,
-      ...diagnostics,
-    })
-    if (admitted.alreadyReleased) {
-      // Audio ended before Nova emitted its delayed FINAL transcript. The
-      // browser boundary was already closed at AUDIO END_TURN; FINAL merely
-      // confirms the exact application-approved question after the fact.
-      maybeOpenBarrier()
-    } else {
-      startAiSpeech()
-      send(ws, {
-        t: 'assistantTranscript',
-        text: admitted.text,
-        segmentId,
-        ...(admitted.obligationId ? { obligationId: admitted.obligationId } : {}),
-      })
-      for (const pcm of admitted.audio) send(ws, { t: 'audio', pcm, segmentId })
-      finishAssistantBoundary()
-    }
+    releaseAdmittedTurn(segmentId, admitted, diagnostics, 'paired_final')
     return true
   }
 
@@ -611,10 +738,25 @@ wss.on('connection', (ws) => {
       segmentId,
       ...turnQuarantine.diagnostics(),
     })
-    if (turnQuarantine.hasApprovedQuestionStreaming()) {
-      // Do not make the patient wait for Nova's delayed FINAL transcription
-      // before the browser learns that audible speech has ended.
-      finishAssistantBoundary()
+    if (adaptiveTurnControllerActive) {
+      if (!turnQuarantine.hasAuthorization()) {
+        if (requestLateBindingRecovery(segmentId)) return
+        rejectHistorianTurn('turn_not_authorized')
+        return
+      }
+      const diagnostics = turnQuarantine.diagnostics()
+      const admitted = turnQuarantine.finalizeAdaptiveAtAudioEnd()
+      if (!admitted.allowed) {
+        rejectHistorianTurn(admitted.reason, diagnostics)
+        return
+      }
+      releaseAdmittedTurn(
+        segmentId,
+        admitted,
+        diagnostics,
+        'adaptive_speculative_audio_end',
+      )
+      return
     }
     if (tryFinalizeControlledTurn(segmentId)) return
     turnConfirmationTimer = setTimeout(() => {
@@ -656,6 +798,12 @@ wss.on('connection', (ws) => {
           segmentId,
           block: userTranscriptBlockCount,
         })
+        if (lateBindingRecovery?.segmentId === segmentId) {
+          if (lateBindingRecovery.toolUseId !== null) {
+            rejectHistorianTurn('late_binding_stale_user_transcript')
+            return
+          }
+        }
         send(ws, { t: 'userTranscript', text: content, segmentId })
         // Comprehensive v2's application ledger owns every next question,
         // including age. The legacy relay nudge would race that approval and
@@ -674,6 +822,19 @@ wss.on('connection', (ws) => {
       } else {
         if (controlledTurnActive()) {
           if (adaptiveInterruptedTurn) return
+          if (
+            adaptiveTurnControllerActive &&
+            adaptiveAudioEndTombstone?.segmentId === segmentId &&
+            !turnQuarantine.hasAuthorization() &&
+            !turnQuarantine.hasContent()
+          ) {
+            rejectHistorianTurn('speculative_text_after_turn_boundary')
+            return
+          }
+          if (lateBindingRecovery?.toolUseId != null) {
+            rejectHistorianTurn('late_binding_output_after_request')
+            return
+          }
           if (!speechSuppressed) {
             if (!turnQuarantine.bufferText(content)) {
               rejectHistorianTurn('speculative_text_after_release')
@@ -690,8 +851,16 @@ wss.on('connection', (ws) => {
     onAssistantFinalText(content) {
       if (rejectCandidateActivity('unexpected_assistant_final_text')) return
       if (segmentId !== activeSegmentId || outputQuarantined) return
+      // Adaptive v4 commits the exact application-approved speculative text at
+      // AUDIO END_TURN. Nova may omit, delay, duplicate, or reorder the FINAL
+      // copy, so it must never mutate or reject the current/next adaptive turn.
+      if (adaptiveTurnControllerActive) return
       if (controlledTurnActive() && !speechSuppressed) {
         if (adaptiveInterruptedTurn) return
+        if (lateBindingRecovery?.toolUseId != null) {
+          rejectHistorianTurn('late_binding_output_after_request')
+          return
+        }
         turnQuarantine.bufferFinalText(content)
         tryFinalizeControlledTurn(segmentId)
       }
@@ -702,10 +871,22 @@ wss.on('connection', (ws) => {
       if (segmentId !== activeSegmentId || outputQuarantined) return
       if (controlledTurnActive()) {
         if (speechSuppressed || adaptiveInterruptedTurn) return
-        // AUDIO END_TURN is the authorization boundary for the quarantined
-        // response. Any later PCM is ambiguous protocol output and must never
-        // be released under the preceding question approval while we wait for
-        // Nova's delayed FINAL text copy.
+        if (
+          adaptiveTurnControllerActive &&
+          adaptiveAudioEndTombstone?.segmentId === segmentId &&
+          !turnQuarantine.hasAuthorization() &&
+          !turnQuarantine.hasContent()
+        ) {
+          rejectHistorianTurn('audio_after_turn_boundary')
+          return
+        }
+        if (lateBindingRecovery?.toolUseId != null) {
+          rejectHistorianTurn('late_binding_output_after_request')
+          return
+        }
+        // AUDIO END_TURN is the immutable boundary for the response. Any later
+        // PCM is ambiguous protocol output and must never be released under
+        // the preceding question approval.
         if (pendingTurnAudioEndSegment === segmentId) {
           rejectHistorianTurn('audio_after_turn_boundary')
           return
@@ -738,12 +919,6 @@ wss.on('connection', (ws) => {
               ...turnQuarantine.diagnostics(),
             })
             startAiSpeech()
-            send(ws, {
-              t: 'assistantTranscript',
-              text: release.text,
-              segmentId,
-              obligationId: release.obligationId,
-            })
             for (const bufferedPcm of release.bufferedAudio) {
               send(ws, { t: 'audio', pcm: bufferedPcm, segmentId })
             }
@@ -771,6 +946,12 @@ wss.on('connection', (ws) => {
       if (segmentId !== activeSegmentId) return
       TRACE('-> assistantAudioEnd')
       if (controlledTurnActive()) {
+        if (
+          adaptiveTurnControllerActive &&
+          adaptiveAudioEndTombstone?.segmentId === segmentId &&
+          !turnQuarantine.hasAuthorization() &&
+          !turnQuarantine.hasContent()
+        ) return
         if (adaptiveInterruptedTurn) {
           adaptiveInterruptedTurn = false
           duplicateQuestionReauthorizationCount = 0
@@ -796,6 +977,22 @@ wss.on('connection', (ws) => {
       if (adaptiveInterruptedTurn) {
         rejectHistorianTurn('tool_during_interrupted_turn')
         return
+      }
+      if (
+        adaptiveTurnControllerActive &&
+        !turnQuarantine.hasAuthorization() &&
+        !turnQuarantine.hasContent()
+      ) {
+        controlledTurnEpoch += 1
+        adaptiveAudioEndTombstone = null
+      }
+      // The late-binding exception is exclusively for the first response of a
+      // promoted segment. A normal provider tool proves that the first turn
+      // followed the ordinary path, so no later tool-less turn may claim the
+      // exception.
+      if (lateBindingRecovery?.segmentId === segmentId && lateBindingRecovery.toolUseId === null) {
+        lateBindingRecoveryUsed = true
+        lateBindingRecovery = null
       }
       if (controlledTurnActive() && turnQuarantine.hasContent()) {
         rejectHistorianTurn('speech_before_tool')
@@ -875,6 +1072,12 @@ wss.on('connection', (ws) => {
     onCompletionEnd() {
       if (rejectCandidateActivity('unexpected_completion')) return
       if (segmentId !== activeSegmentId || outputQuarantined) return
+      if (
+        adaptiveTurnControllerActive &&
+        adaptiveAudioEndTombstone?.segmentId === segmentId &&
+        !turnQuarantine.hasAuthorization() &&
+        !turnQuarantine.hasContent()
+      ) return
       if (adaptiveInterruptedTurn) {
         adaptiveInterruptedTurn = false
         clearTurnConfirmationTimer()
@@ -909,6 +1112,7 @@ wss.on('connection', (ws) => {
       if (adaptiveTurnControllerActive && (turnQuarantine.hasContent() || turnQuarantine.hasAuthorization())) {
         adaptiveInterruptedTurn = true
         clearTurnConfirmationTimer()
+        clearLateBindingRecovery()
         turnQuarantine.discard()
         logSessionEvent('adaptive_turn_interrupted', { segmentId })
       }
@@ -1021,6 +1225,10 @@ wss.on('connection', (ws) => {
           speechSuppressed = false
           adaptiveInterruptedTurn = false
           duplicateQuestionReauthorizationCount = 0
+          lateBindingRecoveryUsed = false
+          clearLateBindingRecovery()
+          controlledTurnEpoch = 0
+          adaptiveAudioEndTombstone = null
           clearTurnConfirmationTimer()
           turnQuarantine.discard()
           comprehensiveOpeningSettled = false
@@ -1132,6 +1340,49 @@ wss.on('connection', (ws) => {
             const toolName = pendingTools.get(msg.toolUseId)!
             let parsedOutput: unknown = msg.output
             try { parsedOutput = JSON.parse(msg.output) } catch {}
+            const lateBinding = lateBindingRecovery
+            const isLateBindingResult =
+              lateBinding?.segmentId === activeSegmentId &&
+              lateBinding.toolUseId === msg.toolUseId &&
+              toolName === 'request_history_question'
+            if (isLateBindingResult) {
+              const approvedQuestion = parseApprovedHistorianTurn(parsedOutput)
+              pendingTools.delete(msg.toolUseId)
+              clearLateBindingRecoveryTimer()
+              if (
+                !approvedQuestion ||
+                lateBinding?.turnEpoch !== controlledTurnEpoch ||
+                lateBinding?.boundUserTranscriptBlockCount !== userTranscriptBlockCount ||
+                pendingTurnAudioEndSegment !== activeSegmentId ||
+                !turnQuarantine.hasAdaptiveAudioEndCandidate() ||
+                turnQuarantine.hasAuthorization() ||
+                !turnQuarantine.lateBindQuestion(approvedQuestion)
+              ) {
+                rejectHistorianTurn('late_binding_not_authorized')
+                break
+              }
+              logSessionEvent('late_binding_authorized', {
+                segmentId: activeSegmentId,
+                userTranscriptBlockCount,
+              })
+              // Deliberately no session.pushToolResult(): this toolUseId was
+              // minted by the relay, not by Nova. The audio/text already in
+              // quarantine is now revalidated and released exactly once.
+              const diagnostics = turnQuarantine.diagnostics()
+              lateBindingRecovery = null
+              const admitted = turnQuarantine.finalizeAdaptiveAtAudioEnd()
+              if (!admitted.allowed) {
+                rejectHistorianTurn(admitted.reason, diagnostics)
+                break
+              }
+              releaseAdmittedTurn(
+                activeSegmentId,
+                admitted,
+                diagnostics,
+                'adaptive_speculative_audio_end',
+              )
+              break
+            }
             let approvedQuestion: ReturnType<typeof parseApprovedHistorianTurn> = null
             if (controlledTurnActive() && toolName === 'request_history_question') {
               approvedQuestion = parseApprovedHistorianTurn(parsedOutput)
@@ -1245,9 +1496,15 @@ wss.on('connection', (ws) => {
                   rejectHistorianTurn('closing_not_saved')
                   break
                 }
-              } else if (!turnQuarantine.allowControl(controlMode)) {
-                rejectHistorianTurn('control_turn_authorization_conflict')
-                break
+              } else {
+                if (adaptiveTurnControllerActive) {
+                  controlledTurnEpoch += 1
+                  adaptiveAudioEndTombstone = null
+                }
+                if (!turnQuarantine.allowControl(controlMode)) {
+                  rejectHistorianTurn('control_turn_authorization_conflict')
+                  break
+                }
               }
               TRACE(`<- systemText control=${controlKind} (injected as USER) chars=${msg.text.length}`)
               session.pushSystemText(controlledSystemInstruction(controlKind, msg.text))
@@ -1260,7 +1517,9 @@ wss.on('connection', (ws) => {
 
         case 'suppressOutput':
           speechSuppressed = true
+          adaptiveAudioEndTombstone = null
           clearTurnConfirmationTimer()
+          clearLateBindingRecovery()
           turnQuarantine.discard()
           // Terminal suppression permanently retires continuation for this
           // session. In particular, a due/deadline timer must not race the
@@ -1432,6 +1691,18 @@ wss.on('connection', (ws) => {
             session = nextSession
             lastContinuationCheckpoint = checked.checkpoint
             activeSegmentId = nextSegmentId
+            if (adaptiveTurnControllerActive) {
+              lateBindingRecoveryUsed = false
+              clearLateBindingRecovery()
+              adaptiveAudioEndTombstone = null
+              lateBindingRecovery = {
+                segmentId: nextSegmentId,
+                userTranscriptBlockCountAtPromotion: userTranscriptBlockCount,
+                boundUserTranscriptBlockCount: null,
+                toolUseId: null,
+                turnEpoch: ++controlledTurnEpoch,
+              }
+            }
             comprehensiveOpeningSettled = true
             aiSpeaking = false
             outputQuarantined = false
@@ -1473,7 +1744,9 @@ wss.on('connection', (ws) => {
               : null,
           })
           clearContinuationTimers()
+          adaptiveAudioEndTombstone = null
           clearTurnConfirmationTimer()
+          clearLateBindingRecovery()
           outputQuarantined = true
           transcribe?.stop().catch(() => {})
           {
@@ -1517,6 +1790,7 @@ wss.on('connection', (ws) => {
       modelTerminalSent,
     })
     clearContinuationTimers()
+    adaptiveAudioEndTombstone = null
     clearTurnConfirmationTimer()
     // Best-effort teardown — ignore any errors from stop().
     session.stop().catch(() => {})

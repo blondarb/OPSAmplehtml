@@ -1,9 +1,10 @@
 /**
  * Fail-closed admission for one complete Nova assistant turn.
  *
- * Nova audio is quarantined in the relay until END_TURN. Nothing in this
- * module logs or persists text/audio. A normal Comprehensive v2 turn is
- * releasable only when the application first approved one exact question.
+ * Nothing in this module logs or persists text/audio. Comprehensive v2 keeps
+ * the paired SPECULATIVE/FINAL contract. Adaptive v4 instead commits an
+ * application-approved exact SPECULATIVE turn at AUDIO END_TURN because Nova
+ * can omit the delayed FINAL copy on an otherwise complete live turn.
  */
 
 export type TurnAdmissionMode =
@@ -13,11 +14,10 @@ export type TurnAdmissionMode =
   | 'unresponsive_sign_off'
 
 /**
- * Nova emits the FINAL sentence-level transcription after audio generation.
+ * Comprehensive v2 still requires Nova's FINAL sentence-level transcription.
  * That post-audio step is not bounded to two seconds by the provider contract;
- * the application keeps the entire turn quarantined while it waits. Thirty
- * seconds stays below the existing 60-second live-response ceiling while
- * allowing the documented finalization phase to complete on mobile sessions.
+ * thirty seconds stays below the existing 60-second live-response ceiling.
+ * Adaptive v4 uses finalizeAdaptiveAtAudioEnd() and never starts this timer.
  */
 export const PRODUCTION_TURN_CONFIRMATION_TIMEOUT_MS = 30_000
 
@@ -49,6 +49,9 @@ export interface HistorianTurnQuarantineDiagnostics {
 
 export const APPROVED_HISTORIAN_CLOSING_TEXT =
   "Thank you. We're finished with the interview. Please keep this page open while your history is securely saved for your neurologist."
+export const APPROVED_HISTORIAN_CHECK_IN_TEXT = 'Are you still with me?'
+export const APPROVED_HISTORIAN_SIGN_OFF_TEXT =
+  "I'll stop here for now. Everything you've shared so far has been saved, and your care team will follow up."
 
 export type TurnAdmissionResult =
   | {
@@ -136,14 +139,16 @@ export function validateTurnText(params: {
   }
 
   if (params.mode === 'unresponsive_sign_off') {
-    return requests === 0
+    if (requests !== 0) return { valid: false, reason: 'terminal_turn_must_not_ask' }
+    return canonicalSpokenText(text) === canonicalSpokenText(APPROVED_HISTORIAN_SIGN_OFF_TEXT)
       ? { valid: true }
-      : { valid: false, reason: 'terminal_turn_must_not_ask' }
+      : { valid: false, reason: 'sign_off_text_mismatch' }
   }
 
-  if (requests > 1) return { valid: false, reason: 'check_in_has_multiple_requests' }
-  if (EXAMPLE_RE.test(text)) return { valid: false, reason: 'check_in_contains_example' }
-  return { valid: true }
+  if (requests !== 1) return { valid: false, reason: 'check_in_must_have_one_request' }
+  return canonicalSpokenText(text) === canonicalSpokenText(APPROVED_HISTORIAN_CHECK_IN_TEXT)
+    ? { valid: true }
+    : { valid: false, reason: 'check_in_text_mismatch' }
 }
 
 export class HistorianTurnQuarantine {
@@ -162,6 +167,15 @@ export class HistorianTurnQuarantine {
 
   approveQuestion(approval: ApprovedHistorianTurn): boolean {
     if (this.approval || this.controlMode || this.hasContent()) return false
+    this.approval = { ...approval }
+    return true
+  }
+
+  /** Bind a browser approval to an audio-ended, still-quarantined turn. This
+   * is narrower than approveQuestion: it is only safe before any output has
+   * streamed, and adaptive admission still performs exact-text validation. */
+  lateBindQuestion(approval: ApprovedHistorianTurn): boolean {
+    if (this.approval || this.controlMode || this.approvedQuestionStreaming) return false
     this.approval = { ...approval }
     return true
   }
@@ -222,9 +236,9 @@ export class HistorianTurnQuarantine {
 
   /**
    * Low-latency adaptive path. Nova's complete SPECULATIVE question is
-   * application-checked before the first PCM frame is released. FINAL text is
-   * still required later as a provider-integrity confirmation. Control turns
-   * and Comprehensive v2 never use this method.
+   * application-checked before the first PCM frame is released. AUDIO END_TURN
+   * commits it later; Nova's unreliable FINAL duplicate is not evidence for
+   * adaptive v4. Control turns and Comprehensive v2 never use this method.
    */
   beginApprovedQuestionStreaming(): ApprovedQuestionStreamingStart {
     if (this.approvedQuestionStreaming) {
@@ -305,6 +319,27 @@ export class HistorianTurnQuarantine {
       !!finalText &&
       speculativeText === finalText
     )
+  }
+
+  /** True only when an adaptive, still-quarantined response has enough
+   * immutable evidence to ask the browser to authorize its exact wording.
+   * AUDIO END_TURN is checked by the relay; this method checks the local
+   * speculative-text/audio payload and overflow state. */
+  hasAdaptiveAudioEndCandidate(): boolean {
+    return (
+      this.textParts.length > 0 &&
+      this.audioParts.length > 0 &&
+      !this.approvedQuestionStreaming &&
+      !this.overflowed
+    )
+  }
+
+  /** The candidate wording remains quarantined until the application grants
+   * an exact approval. This accessor is intentionally used only to construct
+   * the normal browser-side question-authorization request; it never logs or
+   * persists the text in the relay. */
+  proposedText(): string {
+    return this.textParts.join(' ').trim()
   }
 
   diagnostics(): HistorianTurnQuarantineDiagnostics {
@@ -399,6 +434,55 @@ export class HistorianTurnQuarantine {
       // text stage may vary only punctuation/case while the admitted audio is
       // semantically identical; downstream evidence binding remains exact.
       text: mode === 'approved_question' ? approval!.approvedText : finalText,
+      audio,
+      mode,
+      ...(checked.obligationId ? { obligationId: checked.obligationId } : {}),
+      ...(alreadyReleased ? { alreadyReleased: true as const } : {}),
+    }
+  }
+
+  /**
+   * Adaptive-v4 admission boundary. Nova may never emit the delayed FINAL
+   * duplicate, so the exact application-approved cumulative SPECULATIVE text,
+   * bounded PCM, and AUDIO END_TURN form the complete turn. Callers must invoke
+   * this only after observing AUDIO END_TURN.
+   *
+   * The legacy finalize() contract remains unchanged for v2.
+   */
+  finalizeAdaptiveAtAudioEnd(): TurnAdmissionResult {
+    if (this.overflowed) {
+      this.discard()
+      return { allowed: false, reason: 'turn_audio_buffer_overflow' }
+    }
+    const speculativeText = this.textParts.join(' ').trim()
+    if (!speculativeText) {
+      this.discard()
+      return { allowed: false, reason: 'turn_missing_speculative_text' }
+    }
+    if (this.approvedPrefixAudioBuffered && !this.approvedQuestionStreaming) {
+      this.discard()
+      return { allowed: false, reason: 'approved_question_audio_incomplete' }
+    }
+    if (this.audioParts.length === 0 && this.streamedAudioChunkCount === 0) {
+      this.discard()
+      return { allowed: false, reason: 'turn_has_no_audio' }
+    }
+    const mode: TurnAdmissionMode | null = this.approval
+      ? 'approved_question'
+      : this.controlMode
+    if (!mode) {
+      this.discard()
+      return { allowed: false, reason: 'turn_not_authorized' }
+    }
+    const approval = this.approval ? { ...this.approval } : undefined
+    const audio = [...this.audioParts]
+    const alreadyReleased = this.approvedQuestionStreaming
+    const checked = validateTurnText({ text: speculativeText, mode, approval })
+    this.discard()
+    if (!checked.valid) return { allowed: false, reason: checked.reason }
+    return {
+      allowed: true,
+      text: mode === 'approved_question' ? approval!.approvedText : speculativeText,
       audio,
       mode,
       ...(checked.obligationId ? { obligationId: checked.obligationId } : {}),

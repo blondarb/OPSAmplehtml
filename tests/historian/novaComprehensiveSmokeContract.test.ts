@@ -74,6 +74,10 @@ describe('Nova Comprehensive Historian acceptance contract', () => {
   it('keeps forced live continuation PHI-free and explicitly bounded', () => {
     expect(source).toContain("process.argv.includes('--live-continuation')")
     expect(source).toContain('PASS live_forced_short_relay_continuation_three_segments')
+    expect(source).toContain('adaptiveTurnController: true')
+    expect(source).toContain('PASS live_forced_short_adaptive_rollover_question_authorization')
+    expect(source).toContain("NOVA_CONTINUATION_TEST_BOUNDARY_EXCHANGES = '2,3,4'")
+    expect(source).toContain('if (patientAudioStreaming) return')
     expect(source).toContain('PASS LIVE_CONTINUATION_CONSERVATIVE_REPLAY')
     expect(source).toContain('LIMIT live_forced_short_not_endurance_not_persistence_not_deployed')
     expect(source).toContain('NOVA_APP_CONTINUATION_V1')

@@ -238,6 +238,42 @@ async function rotate(
   return waitForMessage('continuationReady')
 }
 
+async function promoteFirstAdaptiveSegment() {
+  send({
+    t: 'start',
+    instructions: 'Synthetic adaptive continuation instructions.',
+    tools: [],
+    interviewMode: 'comprehensive',
+    adaptiveTurnController: true,
+  })
+  send({ t: 'audio', audioSeq: 1, pcm: 'adaptive-segment-1-live' })
+  await waitForMessage('continuationDue')
+  await new Promise((resolve) => setTimeout(resolve, 25))
+  const transcript = [
+    { seq: 1, role: 'assistant' as const, text: 'Synthetic question one?', timestamp: 0 },
+    { seq: 2, role: 'user' as const, text: 'Synthetic answer one.', timestamp: 1 },
+    { seq: 3, role: 'assistant' as const, text: 'Synthetic question two?', timestamp: 2 },
+  ]
+  relayHarness.instances[0].callbacks.onToolUse?.({
+    toolName: 'request_history_question',
+    toolUseId: 'shared-initial-adaptive-tool',
+    content: JSON.stringify({ proposed_text: transcript.at(-1)!.text }),
+  })
+  const tool = await waitForMessage('toolCall')
+  send({
+    t: 'toolResult', toolUseId: tool.toolUseId, segmentId: 1,
+    output: JSON.stringify({ success: true, status: 'approved', obligation_id: 'shared-initial-question', approved_text: transcript.at(-1)!.text, allow_example: false }),
+  })
+  await new Promise((resolve) => setTimeout(resolve, 10))
+  relayHarness.instances[0].emitAssistant(transcript.at(-1)!.text)
+  const barrier = await waitForMessage('continuationBarrier')
+  send({ t: 'audio', audioSeq: 2, pcm: 'adaptive-segment-2-buffered' })
+  send({ t: 'continuationCommit', barrierId: barrier.barrierId, checkpoint: checkpoint(1, transcript) })
+  await waitForMessage('continuationReady')
+  inbox.length = 0
+  return { transcript, candidate: relayHarness.instances[1] }
+}
+
 describe('relay continuation protocol integration', () => {
   beforeAll(async () => {
     process.env.NOVA_RELAY_SHARED_SECRET = 'synthetic-relay-secret'
@@ -329,7 +365,7 @@ describe('relay continuation protocol integration', () => {
     expect(audio).toMatchObject({ pcm: 'synthetic-audio', segmentId: 1 })
   })
 
-  it('streams an adaptive approved question before delayed FINAL confirmation', async () => {
+  it('admits an adaptive approved question at audio end when FINAL never arrives', async () => {
     send({
       t: 'start',
       instructions: 'Synthetic adaptive instructions.',
@@ -363,19 +399,26 @@ describe('relay continuation protocol integration', () => {
     relayHarness.instances[0].callbacks.onTextOutput?.('ASSISTANT', 'When did the headaches begin?')
     relayHarness.instances[0].callbacks.onAudioOutput?.('adaptive-live-audio')
 
+    await expect(waitForMessage('audio')).resolves.toMatchObject({
+      pcm: 'adaptive-live-audio',
+      segmentId: 1,
+    })
+    expect(inbox.some((message) => message.t === 'assistantTranscript')).toBe(false)
+
+    relayHarness.instances[0].callbacks.onAssistantAudioEnd?.()
     await expect(waitForMessage('assistantTranscript')).resolves.toMatchObject({
       text: 'When did the headaches begin?',
       obligationId: 'adaptive-question-3',
       segmentId: 1,
     })
-    await expect(waitForMessage('audio')).resolves.toMatchObject({
-      pcm: 'adaptive-live-audio',
-      segmentId: 1,
-    })
-
-    relayHarness.instances[0].callbacks.onAssistantAudioEnd?.()
     await expect(waitForMessage('aiSpeechStop')).resolves.toMatchObject({ segmentId: 1 })
+    // The v2 confirmation timeout is 40 ms in this suite. Adaptive v4 must
+    // remain admitted even when FINAL never arrives, and delayed/conflicting
+    // copies must not mutate the completed or next logical turn.
+    await new Promise((resolve) => setTimeout(resolve, 60))
+    relayHarness.instances[0].callbacks.onAssistantFinalText?.('Conflicting delayed final text.')
     relayHarness.instances[0].callbacks.onAssistantFinalText?.('When did the headaches begin?')
+    relayHarness.instances[0].callbacks.onCompletionEnd?.()
     relayHarness.instances[0].callbacks.onCompletionEnd?.()
     await new Promise((resolve) => setTimeout(resolve, 10))
     expect(inbox.some((message) => message.t === 'error')).toBe(false)
@@ -383,10 +426,54 @@ describe('relay continuation protocol integration', () => {
     expect(inbox.filter((message) => message.t === 'audio')).toHaveLength(0)
   })
 
+  it('rejects post-END adaptive PCM without duplicating the committed transcript or audio', async () => {
+    send({
+      t: 'start',
+      instructions: 'Synthetic adaptive instructions.',
+      tools: [],
+      interviewMode: 'comprehensive',
+      adaptiveTurnController: true,
+    })
+    await new Promise((resolve) => setTimeout(resolve, 10))
+    relayHarness.instances[0].callbacks.onToolUse?.({
+      toolName: 'request_history_question',
+      toolUseId: 'adaptive-post-end-tool',
+      content: JSON.stringify({ proposed_text: 'When did the headaches begin?' }),
+    })
+    const tool = await waitForMessage('toolCall')
+    send({
+      t: 'toolResult',
+      toolUseId: tool.toolUseId,
+      segmentId: 1,
+      output: JSON.stringify({
+        success: true,
+        status: 'approved',
+        obligation_id: 'adaptive-post-end',
+        approved_text: 'When did the headaches begin?',
+        allow_example: false,
+      }),
+    })
+    await new Promise((resolve) => setTimeout(resolve, 10))
+    relayHarness.instances[0].callbacks.onTextOutput?.('ASSISTANT', 'When did the headaches begin?')
+    relayHarness.instances[0].callbacks.onAudioOutput?.('admitted-audio')
+    await waitForMessage('audio')
+    relayHarness.instances[0].callbacks.onAssistantAudioEnd?.()
+    await waitForMessage('assistantTranscript')
+    await waitForMessage('aiSpeechStop')
+
+    relayHarness.instances[0].callbacks.onAudioOutput?.('must-not-release-after-end')
+    await expect(waitForMessage('error')).resolves.toMatchObject({
+      message: 'The voice response did not satisfy the patient interview safety contract.',
+    })
+    expect(inbox.some((message) => message.t === 'assistantTranscript')).toBe(false)
+    expect(inbox.some((message) => message.t === 'audio')).toBe(false)
+  })
+
   it('buffers first-sentence PCM until a multi-block approved opening is complete', async () => {
     const opening = "Hi, I'm Henry, an AI assistant helping collect your history for your neurologist. What would you most like your neurologist to understand about why you were referred?"
     const introduction = "Hi, I'm Henry, an AI assistant helping collect your history for your neurologist."
     const question = 'What would you most like your neurologist to understand about why you were referred?'
+    expect(opening.split(/\s+/)).toHaveLength(27)
     send({
       t: 'start',
       instructions: 'Synthetic adaptive instructions.',
@@ -425,22 +512,27 @@ describe('relay continuation protocol integration', () => {
     expect(inbox.some((message) => message.t === 'error')).toBe(false)
 
     relayHarness.instances[0].callbacks.onTextOutput?.('ASSISTANT', question)
-    relayHarness.instances[0].callbacks.onAudioOutput?.('question-audio')
+    for (let index = 1; index <= 101; index += 1) {
+      relayHarness.instances[0].callbacks.onAudioOutput?.(`question-audio-${index}`)
+    }
+    const releasedPcm: string[] = []
+    for (let index = 0; index < 102; index += 1) {
+      const audio = await waitForMessage('audio')
+      releasedPcm.push(audio.pcm)
+      expect(audio).toMatchObject({ segmentId: 1 })
+    }
+    expect(releasedPcm).toHaveLength(102)
+    expect(releasedPcm[0]).toBe('introduction-audio')
+    expect(releasedPcm.at(-1)).toBe('question-audio-101')
+    expect(inbox.some((message) => message.t === 'assistantTranscript')).toBe(false)
+
+    relayHarness.instances[0].callbacks.onAssistantAudioEnd?.()
     await expect(waitForMessage('assistantTranscript')).resolves.toMatchObject({
       text: opening,
       obligationId: 'adaptive-opening',
       segmentId: 1,
     })
-    await expect(waitForMessage('audio')).resolves.toMatchObject({
-      pcm: 'introduction-audio',
-      segmentId: 1,
-    })
-    await expect(waitForMessage('audio')).resolves.toMatchObject({
-      pcm: 'question-audio',
-      segmentId: 1,
-    })
-
-    relayHarness.instances[0].callbacks.onAssistantAudioEnd?.()
+    await expect(waitForMessage('aiSpeechStop')).resolves.toMatchObject({ segmentId: 1 })
     relayHarness.instances[0].callbacks.onAssistantFinalText?.(introduction)
     relayHarness.instances[0].callbacks.onAssistantFinalText?.(question)
     relayHarness.instances[0].callbacks.onCompletionEnd?.()
@@ -736,12 +828,14 @@ describe('relay continuation protocol integration', () => {
     relayHarness.instances[0].callbacks.onTextOutput?.('ASSISTANT', 'How often do the headaches occur?')
     relayHarness.instances[0].callbacks.onAudioOutput?.('interruptible-audio')
     await waitForMessage('audio')
+    expect(inbox.some((message) => message.t === 'assistantTranscript')).toBe(false)
 
     relayHarness.instances[0].callbacks.onBargeIn?.()
     await expect(waitForMessage('bargeIn')).resolves.toMatchObject({ segmentId: 1 })
     relayHarness.instances[0].callbacks.onAssistantAudioEnd?.()
     await new Promise((resolve) => setTimeout(resolve, 10))
     expect(inbox.some((message) => message.t === 'error')).toBe(false)
+    expect(inbox.some((message) => message.t === 'assistantTranscript')).toBe(false)
 
     relayHarness.instances[0].callbacks.onToolUse?.({
       toolName: 'request_history_question',
@@ -1326,6 +1420,217 @@ describe('relay continuation protocol integration', () => {
     expect(relayHarness.instances[1].starts[0].options).toMatchObject({
       sendGreetingKickoff: false,
       requireToolAtResponseStart: true,
+    })
+  })
+
+  it('late-binds one fully quarantined tool-less first adaptive continuation turn', async () => {
+    send({
+      t: 'start',
+      instructions: 'Synthetic adaptive continuation instructions.',
+      tools: [],
+      interviewMode: 'comprehensive',
+      adaptiveTurnController: true,
+    })
+    send({ t: 'audio', audioSeq: 1, pcm: 'adaptive-segment-1-live' })
+    await waitForMessage('continuationDue')
+    await new Promise((resolve) => setTimeout(resolve, 25))
+    const transcript = [
+      { seq: 1, role: 'assistant' as const, text: 'Synthetic question one?', timestamp: 0 },
+      { seq: 2, role: 'user' as const, text: 'Synthetic answer one.', timestamp: 1 },
+      { seq: 3, role: 'assistant' as const, text: 'Synthetic question two?', timestamp: 2 },
+    ]
+    relayHarness.instances[0].callbacks.onToolUse?.({
+      toolName: 'request_history_question',
+      toolUseId: 'initial-adaptive-rollover-tool',
+      content: JSON.stringify({ proposed_text: transcript.at(-1)!.text }),
+    })
+    const initialTool = await waitForMessage('toolCall')
+    send({
+      t: 'toolResult', toolUseId: initialTool.toolUseId, segmentId: 1,
+      output: JSON.stringify({ success: true, status: 'approved', obligation_id: 'initial-rollover-question', approved_text: transcript.at(-1)!.text, allow_example: false }),
+    })
+    await new Promise((resolve) => setTimeout(resolve, 10))
+    relayHarness.instances[0].emitAssistant(transcript.at(-1)!.text)
+    const barrier = await waitForMessage('continuationBarrier')
+    send({ t: 'audio', audioSeq: 2, pcm: 'adaptive-buffered' })
+    send({ t: 'continuationCommit', barrierId: barrier.barrierId, checkpoint: checkpoint(1, transcript) })
+    await waitForMessage('continuationReady')
+    inbox.length = 0
+
+    const candidate = relayHarness.instances[1]
+    candidate.callbacks.onTextOutput?.('USER', 'The symptom is still present.')
+    candidate.callbacks.onTextOutput?.('USER', 'It happens every day.')
+    await waitForMessage('userTranscript')
+    await waitForMessage('userTranscript')
+    const lateText = 'How often does the symptom occur?'
+    candidate.callbacks.onTextOutput?.('ASSISTANT', lateText)
+    candidate.callbacks.onAudioOutput?.('late-quarantined-audio')
+    candidate.callbacks.onAssistantAudioEnd?.()
+
+    const lateTool = await waitForMessage('toolCall')
+    expect(lateTool).toMatchObject({
+      toolName: 'request_history_question',
+      segmentId: 2,
+      input: { proposed_text: lateText },
+    })
+    expect(inbox.some((message) => message.t === 'assistantTranscript')).toBe(false)
+    expect(inbox.some((message) => message.t === 'audio')).toBe(false)
+    expect(candidate.toolResults).toEqual([])
+
+    send({
+      t: 'toolResult', toolUseId: lateTool.toolUseId, segmentId: 2,
+      output: JSON.stringify({ success: true, status: 'approved', obligation_id: 'late-bound-question', approved_text: lateText, allow_example: false }),
+    })
+    await expect(waitForMessage('assistantTranscript')).resolves.toMatchObject({
+      text: lateText, obligationId: 'late-bound-question', segmentId: 2,
+    })
+    await expect(waitForMessage('audio')).resolves.toMatchObject({
+      pcm: 'late-quarantined-audio', segmentId: 2,
+    })
+    expect(candidate.toolResults).toEqual([])
+    expect(inbox.some((message) => message.t === 'error')).toBe(false)
+  })
+
+  it('fails closed without browser-visible assistant output when late binding is rejected', async () => {
+    send({
+      t: 'start',
+      instructions: 'Synthetic adaptive continuation instructions.',
+      tools: [],
+      interviewMode: 'comprehensive',
+      adaptiveTurnController: true,
+    })
+    send({ t: 'audio', audioSeq: 1, pcm: 'adaptive-segment-1-live' })
+    await waitForMessage('continuationDue')
+    await new Promise((resolve) => setTimeout(resolve, 25))
+    const transcript = [
+      { seq: 1, role: 'assistant' as const, text: 'Synthetic question one?', timestamp: 0 },
+      { seq: 2, role: 'user' as const, text: 'Synthetic answer one.', timestamp: 1 },
+      { seq: 3, role: 'assistant' as const, text: 'Synthetic question two?', timestamp: 2 },
+    ]
+    relayHarness.instances[0].callbacks.onToolUse?.({
+      toolName: 'request_history_question', toolUseId: 'initial-rejected-rollover-tool',
+      content: JSON.stringify({ proposed_text: transcript.at(-1)!.text }),
+    })
+    const initialTool = await waitForMessage('toolCall')
+    send({
+      t: 'toolResult', toolUseId: initialTool.toolUseId, segmentId: 1,
+      output: JSON.stringify({ success: true, status: 'approved', obligation_id: 'initial-rejected-rollover-question', approved_text: transcript.at(-1)!.text, allow_example: false }),
+    })
+    await new Promise((resolve) => setTimeout(resolve, 10))
+    relayHarness.instances[0].emitAssistant(transcript.at(-1)!.text)
+    const barrier = await waitForMessage('continuationBarrier')
+    send({ t: 'audio', audioSeq: 2, pcm: 'adaptive-buffered' })
+    send({ t: 'continuationCommit', barrierId: barrier.barrierId, checkpoint: checkpoint(1, transcript) })
+    await waitForMessage('continuationReady')
+    inbox.length = 0
+
+    const candidate = relayHarness.instances[1]
+    candidate.callbacks.onTextOutput?.('USER', 'The symptom is still present.')
+    await waitForMessage('userTranscript')
+    const lateText = 'How often does the symptom occur?'
+    candidate.callbacks.onTextOutput?.('ASSISTANT', lateText)
+    candidate.callbacks.onAudioOutput?.('late-quarantined-audio')
+    candidate.callbacks.onAssistantAudioEnd?.()
+    const lateTool = await waitForMessage('toolCall')
+
+    send({
+      t: 'toolResult', toolUseId: lateTool.toolUseId, segmentId: 2,
+      output: JSON.stringify({ success: false, status: 'proposal_rejected', issue_codes: ['generic_symptom_reference'] }),
+    })
+    await expect(waitForMessage('error')).resolves.toMatchObject({
+      message: 'The voice response did not satisfy the patient interview safety contract.',
+    })
+    expect(inbox.some((message) => message.t === 'assistantTranscript')).toBe(false)
+    expect(inbox.some((message) => message.t === 'audio')).toBe(false)
+    expect(candidate.toolResults).toEqual([])
+  })
+
+  it('disarms late binding after a normal first provider tool and rejects a later tool-less turn', async () => {
+    const { candidate } = await promoteFirstAdaptiveSegment()
+    candidate.callbacks.onTextOutput?.('USER', 'The symptom continues.')
+    await waitForMessage('userTranscript')
+    const normalText = 'How often does the symptom occur?'
+    candidate.callbacks.onToolUse?.({
+      toolName: 'request_history_question', toolUseId: 'candidate-normal-tool',
+      content: JSON.stringify({ proposed_text: normalText }),
+    })
+    const normalTool = await waitForMessage('toolCall')
+    send({
+      t: 'toolResult', toolUseId: normalTool.toolUseId, segmentId: 2,
+      output: JSON.stringify({ success: true, status: 'approved', obligation_id: 'candidate-normal-question', approved_text: normalText, allow_example: false }),
+    })
+    await new Promise((resolve) => setTimeout(resolve, 10))
+    candidate.emitAssistant(normalText)
+    await waitForMessage('assistantTranscript')
+    await waitForMessage('audio')
+    await waitForMessage('continuationDue')
+    const deferredBarrier = await waitForMessage('continuationBarrier')
+    send({ t: 'continuationDefer', barrierId: deferredBarrier.barrierId })
+    await new Promise((resolve) => setTimeout(resolve, 10))
+    inbox.length = 0
+
+    candidate.callbacks.onTextOutput?.('USER', 'It happens every day.')
+    await waitForMessage('userTranscript')
+    const lateText = 'Does anything make it worse?'
+    candidate.callbacks.onTextOutput?.('ASSISTANT', lateText)
+    candidate.callbacks.onAudioOutput?.('later-tool-less-audio')
+    candidate.callbacks.onAssistantAudioEnd?.()
+    await expect(waitForMessage('error')).resolves.toMatchObject({
+      message: 'The voice response did not satisfy the patient interview safety contract.',
+    })
+    expect(inbox.some((message) => message.t === 'toolCall')).toBe(false)
+    expect(inbox.some((message) => message.t === 'assistantTranscript')).toBe(false)
+    expect(inbox.some((message) => message.t === 'audio')).toBe(false)
+  })
+
+  it('allows one independent late binding after each successful promotion', async () => {
+    const { transcript, candidate } = await promoteFirstAdaptiveSegment()
+    const firstLateText = 'How often does the symptom occur?'
+    candidate.callbacks.onTextOutput?.('USER', 'The symptom continues.')
+    await waitForMessage('userTranscript')
+    candidate.callbacks.onTextOutput?.('ASSISTANT', firstLateText)
+    candidate.callbacks.onAudioOutput?.('segment-2-late-audio')
+    candidate.callbacks.onAssistantAudioEnd?.()
+    const firstLateTool = await waitForMessage('toolCall')
+    // The relay's production barrier opens only at a subsequent quiet
+    // boundary after its minimum age. Keep the authorization inside the
+    // bounded late-binding window, then finalize after that age.
+    await new Promise((resolve) => setTimeout(resolve, 25))
+    send({
+      t: 'toolResult', toolUseId: firstLateTool.toolUseId, segmentId: 2,
+      output: JSON.stringify({ success: true, status: 'approved', obligation_id: 'segment-2-late-question', approved_text: firstLateText, allow_example: false }),
+    })
+    await waitForMessage('assistantTranscript')
+    await waitForMessage('audio')
+    await waitForMessage('continuationDue')
+    const transcript2 = [
+      ...transcript,
+      { seq: 4, role: 'user' as const, text: 'The symptom continues.', timestamp: 3 },
+      { seq: 5, role: 'assistant' as const, text: firstLateText, timestamp: 4 },
+    ]
+    const barrier = await waitForMessage('continuationBarrier')
+    send({ t: 'audio', audioSeq: 3, pcm: 'adaptive-segment-3-buffered' })
+    send({ t: 'continuationCommit', barrierId: barrier.barrierId, checkpoint: checkpoint(2, transcript2) })
+    await waitForMessage('continuationReady')
+    inbox.length = 0
+
+    const candidate3 = relayHarness.instances[2]
+    const secondLateText = 'What does the symptom feel like?'
+    candidate3.callbacks.onTextOutput?.('USER', 'It feels like pressure.')
+    await waitForMessage('userTranscript')
+    candidate3.callbacks.onTextOutput?.('ASSISTANT', secondLateText)
+    candidate3.callbacks.onAudioOutput?.('segment-3-late-audio')
+    candidate3.callbacks.onAssistantAudioEnd?.()
+    const secondLateTool = await waitForMessage('toolCall')
+    send({
+      t: 'toolResult', toolUseId: secondLateTool.toolUseId, segmentId: 3,
+      output: JSON.stringify({ success: true, status: 'approved', obligation_id: 'segment-3-late-question', approved_text: secondLateText, allow_example: false }),
+    })
+    await expect(waitForMessage('assistantTranscript')).resolves.toMatchObject({
+      text: secondLateText, obligationId: 'segment-3-late-question', segmentId: 3,
+    })
+    await expect(waitForMessage('audio')).resolves.toMatchObject({
+      pcm: 'segment-3-late-audio', segmentId: 3,
     })
   })
 
