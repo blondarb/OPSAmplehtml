@@ -168,6 +168,22 @@ function expectStatus(
   }
 }
 
+export function assertInvitedV4SessionBinding(
+  body: Record<string, unknown>,
+  expectedSessionId: string,
+): void {
+  const checks: Array<[boolean, string]> = [
+    [body.sessionId === expectedSessionId, 'PATIENT_SESSION_ID_MISMATCH'],
+    [body.provider === 'nova', 'PATIENT_SESSION_PROVIDER_MISMATCH'],
+    [body.interviewMode === 'comprehensive', 'PATIENT_SESSION_MODE_MISMATCH'],
+    [body.interviewPromptVersion === 'comprehensive-v4', 'PATIENT_SESSION_PROMPT_MISMATCH'],
+    [body.turnEvidenceController === false, 'PATIENT_SESSION_EVIDENCE_CONTROLLER_MISMATCH'],
+    [body.adaptiveTurnController === true, 'PATIENT_SESSION_ADAPTIVE_CONTROLLER_MISMATCH'],
+  ]
+  const failed = checks.find(([matches]) => !matches)
+  if (failed) throw new HistorianQaAcceptanceError(failed[1])
+}
+
 function cookieFromSetCookie(setCookie: string | null, name: string): string | null {
   if (!setCookie) return null
   const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
@@ -431,6 +447,9 @@ export async function runHistorianQaAcceptance(
   if (typeof expectedSessionId !== 'string' || !expectedSessionId) {
     throw new HistorianQaAcceptanceError('INVITATION_SESSION_ID_MISSING')
   }
+  if (invitationPayload?.interviewPromptVersion !== 'comprehensive-v4') {
+    throw new HistorianQaAcceptanceError('INVITATION_PROMPT_MISMATCH')
+  }
   gate('clinician_invitation_created')
 
   const wrongOrigin = await jsonRequest(
@@ -524,16 +543,7 @@ export async function runHistorianQaAcceptance(
     'PATIENT_SESSION_START_FAILED',
   )
   expectStatus(session, 200, 'PATIENT_SESSION_START_REJECTED')
-  if (
-    session.body.sessionId !== expectedSessionId ||
-    session.body.provider !== 'nova' ||
-    session.body.interviewMode !== 'comprehensive' ||
-    session.body.interviewPromptVersion !== 'comprehensive-v4' ||
-    session.body.turnEvidenceController !== false ||
-    session.body.adaptiveTurnController !== true
-  ) {
-    throw new HistorianQaAcceptanceError('PATIENT_SESSION_BINDING_FAILED')
-  }
+  assertInvitedV4SessionBinding(session.body, expectedSessionId)
   gate('invited_nova_session_bound')
 
   const flushToken = session.body.flushToken

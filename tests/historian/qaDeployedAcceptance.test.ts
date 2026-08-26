@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 import {
+  assertInvitedV4SessionBinding,
   assertHistorianQaAcceptanceConfig,
   HistorianQaAcceptanceError,
   runHistorianQaAcceptance,
@@ -54,6 +55,7 @@ describe('deployed Historian QA acceptance runner', () => {
           invitation: {
             sessionId: 'session-1',
             url: `${config.appOrigin}/patient/historian/invite#token=fake-invite-token`,
+            interviewPromptVersion: 'comprehensive-v4',
           },
         })
       }
@@ -234,6 +236,22 @@ describe('deployed Historian QA acceptance runner', () => {
       ...config,
       cognitoClientId: 'production-client',
     })).toThrowError(new HistorianQaAcceptanceError('QA_COGNITO_CLIENT_MISMATCH'))
+  })
+
+  it('reports only a fixed structural code for each invited session binding mismatch', () => {
+    const valid = {
+      sessionId: 'session-1',
+      provider: 'nova',
+      interviewMode: 'comprehensive',
+      interviewPromptVersion: 'comprehensive-v4',
+      turnEvidenceController: false,
+      adaptiveTurnController: true,
+    }
+    expect(() => assertInvitedV4SessionBinding(valid, 'session-1')).not.toThrow()
+    expect(() => assertInvitedV4SessionBinding(
+      { ...valid, interviewPromptVersion: 'comprehensive-v3' },
+      'session-1',
+    )).toThrowError(new HistorianQaAcceptanceError('PATIENT_SESSION_PROMPT_MISMATCH'))
   })
 
   it('never incorporates a rejected Cognito response body into the surfaced error', async () => {
