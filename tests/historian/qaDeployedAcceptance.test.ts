@@ -13,6 +13,10 @@ import {
 } from '@/lib/historian/liveReviewContract'
 import { CLINICIAN_HISTORY_SECTION_IDS } from '@/lib/historian/eval/clinicianHistoryReport'
 import { CLINICIAN_HISTORY_REQUIRED_COMPLETE_SECTION_IDS } from '@/lib/historian/eval/clinicianHistoryReport'
+import {
+  medicationReconciliationTranscriptIsValid,
+  parseMedicationReconciliationState,
+} from '@/lib/historian/medicationReconciliation'
 
 const config: HistorianQaAcceptanceConfig = {
   enabled: true,
@@ -137,12 +141,20 @@ describe('deployed Historian QA acceptance runner', () => {
           live_review_v2: { attestation: 'a'.repeat(43) },
           medication_reconciliation_v1: {
             inventoryStatus: 'answered',
-            inventoryPatientSeq: 18,
+            inventoryPatientSeq: 20,
           },
           history_coverage: { covered_domains: [], missing_or_uncertain: [] },
         })
         expect(body.question_count).toBe(14)
         expect(body.transcript).toHaveLength(28)
+        const medicationState = parseMedicationReconciliationState(
+          body.structured_output.medication_reconciliation_v1,
+          body.transcript,
+        )
+        expect(medicationReconciliationTranscriptIsValid(
+          medicationState,
+          body.transcript,
+        )).toBe(true)
         expect(body.interview_completion_status).toBe('complete')
         expect(body.interview_termination_reason).toBe('coverage_complete')
         const previousSaveCount = fetchMock.mock.calls.filter(([priorInput, priorInit]) =>

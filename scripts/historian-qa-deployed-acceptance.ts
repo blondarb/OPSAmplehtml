@@ -313,7 +313,7 @@ function fixedSaveBody(
         version: MEDICATION_RECONCILIATION_VERSION,
         items: [],
         inventoryStatus: 'answered',
-        inventoryPatientSeq: 18,
+        inventoryPatientSeq: 20,
         pendingQuestion: null,
         medicationNameClarificationCount: 0,
         clinicalMedicationQuestionCount: 1,
