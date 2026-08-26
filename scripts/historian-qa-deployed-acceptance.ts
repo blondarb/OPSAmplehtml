@@ -590,8 +590,11 @@ export async function runHistorianQaAcceptance(
       `missing_domains=${liveReview.review.domains.filter((item) => item.status === 'missing').length}`,
       `uncertain_domains=${liveReview.review.domains.filter((item) => item.status === 'uncertain').length}`,
       `critical_gaps=${liveReview.review.criticalGaps.length}`,
+      `critical_gap_domains=${[...new Set(liveReview.review.criticalGaps.map((item) => item.domain))].sort().join(',') || 'none'}`,
       `missing_depth=${liveReview.review.diagnosticDepth.dimensions.filter((item) => item.status === 'missing').length}`,
+      `missing_depth_dimensions=${liveReview.review.diagnosticDepth.dimensions.filter((item) => item.status === 'missing').map((item) => item.dimension).sort().join(',') || 'none'}`,
       `uncertain_depth=${liveReview.review.diagnosticDepth.dimensions.filter((item) => item.status === 'uncertain').length}`,
+      `uncertain_depth_dimensions=${liveReview.review.diagnosticDepth.dimensions.filter((item) => item.status === 'uncertain').map((item) => item.dimension).sort().join(',') || 'none'}`,
       `confidence=${liveReview.review.confidence}`,
       `next_intents=${liveReview.review.nextQuestionIntents.length}`,
     ].join(' '))
