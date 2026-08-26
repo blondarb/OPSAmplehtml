@@ -682,18 +682,22 @@ describe('invited historian transactional save', () => {
         throw new Error(`Unexpected SQL: ${sql}`)
       })
 
-      const accepted = await saveInvitedHistorianSession(v3Binding, body({
-        structured_output: {
-          interview_prompt_version: 'comprehensive-v3',
-          live_review_v1: fixture.review,
-          medication_reconciliation_v1: fixture.medicationState,
-          medication_reconciliation_has_uncertainty: false,
-          medication_reconciliation_unresolved_count: 0,
-        },
-        transcript: fixture.transcript,
-        question_count: 13,
-        interview_termination_reason: 'complete_with_uncertainty',
-      }))
+      const accepted = await saveInvitedHistorianSession(
+        v3Binding,
+        body({
+          structured_output: {
+            interview_prompt_version: 'comprehensive-v3',
+            live_review_v1: fixture.review,
+            medication_reconciliation_v1: fixture.medicationState,
+            medication_reconciliation_has_uncertainty: false,
+            medication_reconciliation_unresolved_count: 0,
+          },
+          transcript: fixture.transcript,
+          question_count: 13,
+          interview_termination_reason: 'complete_with_uncertainty',
+        }),
+        new Date('2026-08-25T18:00:00.000Z'),
+      )
       expect(accepted.ok).toBe(true)
       const sessionUpdate = queryMock.mock.calls.find(([sql]) =>
         String(sql).includes('UPDATE historian_sessions'),
@@ -767,15 +771,19 @@ describe('invited historian transactional save', () => {
         throw new Error(`Unexpected SQL: ${sql}`)
       })
 
-      const result = await saveInvitedHistorianSession(v4Binding, body({
-        structured_output: {
-          interview_prompt_version: 'comprehensive-v4',
-          live_review_v2: review,
-          medication_reconciliation_v1: completeEmptyMedicationReconciliation(),
-        },
-        transcript,
-        question_count: 12,
-      }))
+      const result = await saveInvitedHistorianSession(
+        v4Binding,
+        body({
+          structured_output: {
+            interview_prompt_version: 'comprehensive-v4',
+            live_review_v2: review,
+            medication_reconciliation_v1: completeEmptyMedicationReconciliation(),
+          },
+          transcript,
+          question_count: 12,
+        }),
+        new Date('2026-08-25T18:00:00.000Z'),
+      )
       expect(result.ok).toBe(true)
       const sessionUpdate = queryMock.mock.calls.find(([sql]) =>
         String(sql).includes('UPDATE historian_sessions'))
