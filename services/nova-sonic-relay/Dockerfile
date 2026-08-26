@@ -1,7 +1,15 @@
 # ---------------------------------------------------------------------------
 # Stage 1: build — compile TypeScript to dist/
 # ---------------------------------------------------------------------------
-FROM public.ecr.aws/docker/library/node:22-alpine@sha256:c610fcdfb1d5b4740dd70c284ed3cb16bb857e0f7166196e36a5501df7a3aa32 AS build
+FROM public.ecr.aws/docker/library/node:22-alpine3.23@sha256:46825fbbd4e996a78b7a2cdc08d75e38a5a505bdab95dcda55605359bf124bc6 AS build
+
+# The immutable upstream image predates Alpine's OpenSSL 3.5.8 security
+# packages. Pin the patched v3.23 packages so builds do not inherit the
+# vulnerable 3.5.7-r0 layer or float across unrelated package updates.
+RUN apk add --no-cache --upgrade \
+      openssl=3.5.8-r0 \
+      libssl3=3.5.8-r0 \
+      libcrypto3=3.5.8-r0
 
 WORKDIR /app
 
@@ -16,7 +24,12 @@ RUN npm run build
 # ---------------------------------------------------------------------------
 # Stage 2: runtime — production deps only + compiled output
 # ---------------------------------------------------------------------------
-FROM public.ecr.aws/docker/library/node:22-alpine@sha256:c610fcdfb1d5b4740dd70c284ed3cb16bb857e0f7166196e36a5501df7a3aa32
+FROM public.ecr.aws/docker/library/node:22-alpine3.23@sha256:46825fbbd4e996a78b7a2cdc08d75e38a5a505bdab95dcda55605359bf124bc6
+
+RUN apk add --no-cache --upgrade \
+      openssl=3.5.8-r0 \
+      libssl3=3.5.8-r0 \
+      libcrypto3=3.5.8-r0
 
 WORKDIR /app
 

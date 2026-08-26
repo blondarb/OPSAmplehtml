@@ -214,15 +214,37 @@ Resources:
                   set +x
                   image_digest="$(aws ecr describe-images --repository-name historian-qa-nova-relay --image-ids imageTag="$SOURCE_COMMIT" --query 'imageDetails[0].imageDigest' --output text)"
                   test "$(printf '%s' "$image_digest" | grep -Ec '^sha256:[0-9a-f]{64}$')" = 1
-                  aws ecr wait image-scan-complete --repository-name historian-qa-nova-relay --image-id imageDigest="$image_digest"
+                  scan_wait_attempt=0
+                  until aws ecr wait image-scan-complete --repository-name historian-qa-nova-relay --image-id imageDigest="$image_digest" 2>/dev/null; do
+                    scan_wait_attempt=$((scan_wait_attempt + 1))
+                    if test "$scan_wait_attempt" -ge 24; then
+                      printf 'FAIL relay image scan did not become available\n'
+                      exit 1
+                    fi
+                    sleep 5
+                  done
                   critical="$(aws ecr describe-image-scan-findings --repository-name historian-qa-nova-relay --image-id imageDigest="$image_digest" --query 'imageScanFindings.findingSeverityCounts."CRITICAL"' --output text)"
                   high="$(aws ecr describe-image-scan-findings --repository-name historian-qa-nova-relay --image-id imageDigest="$image_digest" --query 'imageScanFindings.findingSeverityCounts."HIGH"' --output text)"
-                  test "$critical" != None || critical=0
-                  test "$high" != None || high=0
-                  if test "$critical" -ne 0 || test "$high" -ne 0; then
+                  # SCAN_COUNT_GATE_START — stack-controlled; the source archive cannot replace this gate.
+                  case "$critical" in
+                    None) critical=0 ;;
+                    ''|*[!0-9]*)
+                      printf '%s\n' 'FAIL relay image scan returned an invalid CRITICAL count'
+                      exit 1
+                      ;;
+                  esac
+                  case "$high" in
+                    None) high=0 ;;
+                    ''|*[!0-9]*)
+                      printf '%s\n' 'FAIL relay image scan returned an invalid HIGH count'
+                      exit 1
+                      ;;
+                  esac
+                  if test "$critical" != 0 || test "$high" != 0; then
                     printf 'FAIL relay image scan: CRITICAL=%s HIGH=%s\n' "$critical" "$high"
                     exit 1
                   fi
+                  # SCAN_COUNT_GATE_END
                   printf 'PASS immutable relay image %s@%s; CRITICAL=0 HIGH=0\n' "$SOURCE_COMMIT" "$image_digest"
       LogsConfig:
         CloudWatchLogs:
