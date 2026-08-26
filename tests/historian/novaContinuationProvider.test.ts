@@ -66,12 +66,30 @@ class FakeWebSocket {
     this.onopen?.()
   }
 
+  failBeforeOpen() {
+    this.readyState = 3
+    this.onerror?.()
+    this.onclose?.({ code: 1006 } as CloseEvent)
+  }
+
   server(message: unknown) {
     this.onmessage?.({ data: JSON.stringify(message) } as MessageEvent)
   }
 
   send(message: string) { this.sent.push(message) }
   close() { this.readyState = 3 }
+}
+
+async function startAndOpen(
+  provider: NovaSonicWsProvider,
+  opts: Parameters<NovaSonicWsProvider['start']>[0],
+): Promise<FakeWebSocket> {
+  const startPromise = provider.start(opts)
+  const ws = FakeWebSocket.instances.at(-1)!
+  ws.open()
+  await startPromise
+  await Promise.resolve()
+  return ws
 }
 
 function checkpoint() {
@@ -135,16 +153,13 @@ describe('Nova browser provider continuation', () => {
     const provider = new NovaSonicWsProvider()
     const events: unknown[] = []
     provider.on((event) => events.push(event))
-    await provider.start({
+    const ws = await startAndOpen(provider, {
       instructions: 'synthetic instructions',
       tools: [],
       relayUrl: 'wss://synthetic.invalid',
       relayToken: 'token',
       interviewMode: 'comprehensive',
     })
-    const ws = FakeWebSocket.instances[0]
-    ws.open()
-    await Promise.resolve()
 
     audioHarness.onMicChunk?.('pcm-1')
     audioHarness.onMicChunk?.('pcm-2')
@@ -200,15 +215,12 @@ describe('Nova browser provider continuation', () => {
     const provider = new NovaSonicWsProvider()
     const events: unknown[] = []
     provider.on((event) => events.push(event))
-    await provider.start({
+    const ws = await startAndOpen(provider, {
       instructions: 'synthetic instructions',
       tools: [],
       relayUrl: 'wss://synthetic.invalid',
       interviewMode: 'comprehensive',
     })
-    const ws = FakeWebSocket.instances[0]
-    ws.open()
-    await Promise.resolve()
 
     audioHarness.onMicFailure?.('track_muted')
     audioHarness.onMicFailure?.('track_muted')
@@ -244,15 +256,12 @@ describe('Nova browser provider continuation', () => {
     const provider = new NovaSonicWsProvider()
     const events: unknown[] = []
     provider.on((event) => events.push(event))
-    await provider.start({
+    const ws = await startAndOpen(provider, {
       instructions: 'synthetic instructions',
       tools: [],
       relayUrl: 'wss://synthetic.invalid',
       interviewMode: 'comprehensive',
     })
-    const ws = FakeWebSocket.instances[0]
-    ws.open()
-    await Promise.resolve()
 
     await provider.stop()
     releaseStart()
@@ -267,10 +276,11 @@ describe('Nova browser provider continuation', () => {
   it('never routes a late segment-one tool result into segment two', async () => {
     const provider = new NovaSonicWsProvider()
     provider.on(() => undefined)
-    await provider.start({ instructions: 'x', tools: [], relayUrl: 'wss://synthetic.invalid' })
-    const ws = FakeWebSocket.instances[0]
-    ws.open()
-    await Promise.resolve()
+    const ws = await startAndOpen(provider, {
+      instructions: 'x',
+      tools: [],
+      relayUrl: 'wss://synthetic.invalid',
+    })
     ws.server({
       t: 'toolCall',
       toolName: 'scale_step',
@@ -288,15 +298,12 @@ describe('Nova browser provider continuation', () => {
     const provider = new NovaSonicWsProvider()
     const events: unknown[] = []
     provider.on((event) => events.push(event))
-    await provider.start({
+    const ws = await startAndOpen(provider, {
       instructions: 'synthetic instructions',
       tools: [],
       relayUrl: 'wss://synthetic.invalid',
       interviewMode: 'comprehensive',
     })
-    const ws = FakeWebSocket.instances[0]
-    ws.open()
-    await Promise.resolve()
 
     audioHarness.onMicChunk?.('pcm-1')
     const deadlineAtMs = Date.now() + 20_000
@@ -333,5 +340,56 @@ describe('Nova browser provider continuation', () => {
       text: 'old segment recovered',
       segmentId: 1,
     })
+  })
+
+  it('retries one pre-open browser failure and starts the model only on the accepted socket', async () => {
+    const provider = new NovaSonicWsProvider()
+    const events: unknown[] = []
+    provider.on((event) => events.push(event))
+
+    const startPromise = provider.start({
+      instructions: 'synthetic instructions',
+      tools: [],
+      relayUrl: 'wss://synthetic.invalid',
+      relayToken: 'token',
+      interviewMode: 'comprehensive',
+    })
+    const first = FakeWebSocket.instances[0]
+    first.failBeforeOpen()
+
+    await vi.waitFor(() => expect(FakeWebSocket.instances).toHaveLength(2))
+    const second = FakeWebSocket.instances[1]
+    second.open()
+    await startPromise
+    await Promise.resolve()
+
+    expect(first.sent).toEqual([])
+    expect(second.sent.map((frame) => JSON.parse(frame)).filter((frame) => frame.t === 'start'))
+      .toHaveLength(1)
+    expect(events).toEqual([])
+    expect(provider.isOpen()).toBe(true)
+  })
+
+  it('fails closed with an allowlisted stage after both pre-open attempts fail', async () => {
+    const provider = new NovaSonicWsProvider()
+    provider.on(() => undefined)
+
+    const startPromise = provider.start({
+      instructions: 'synthetic instructions',
+      tools: [],
+      relayUrl: 'wss://synthetic.invalid',
+      relayToken: 'token',
+      interviewMode: 'comprehensive',
+    })
+    FakeWebSocket.instances[0].failBeforeOpen()
+    await vi.waitFor(() => expect(FakeWebSocket.instances).toHaveLength(2))
+    FakeWebSocket.instances[1].failBeforeOpen()
+
+    await expect(startPromise).rejects.toMatchObject({
+      name: 'VoiceStartupError',
+      stage: 'websocket_unavailable',
+    })
+    expect(audioHarness.onMicChunk).toBeNull()
+    expect(provider.isOpen()).toBe(false)
   })
 })

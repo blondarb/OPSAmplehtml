@@ -123,6 +123,34 @@ export interface VoiceStartOptions {
 }
 
 /**
+ * PHI-free, allowlisted startup stages that may be attached to a zero-turn
+ * invitation recovery. These values describe only the transport boundary;
+ * they never contain URLs, browser error text, tokens, or patient content.
+ */
+export type VoiceStartupFailureStage =
+  | 'websocket_unavailable'
+  | 'websocket_after_open'
+  | 'microphone_setup'
+  | 'microphone_runtime'
+  | 'provider_setup'
+  | 'provider_runtime'
+  | 'transport_after_open'
+
+export class VoiceStartupError extends Error {
+  constructor(
+    public readonly stage: VoiceStartupFailureStage,
+    message: string,
+  ) {
+    super(message)
+    this.name = 'VoiceStartupError'
+  }
+}
+
+export function voiceStartupFailureStage(error: unknown): VoiceStartupFailureStage | null {
+  return error instanceof VoiceStartupError ? error.stage : null
+}
+
+/**
  * The uniform transport contract both providers implement.
  */
 export interface VoiceProvider {

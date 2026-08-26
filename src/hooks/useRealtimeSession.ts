@@ -72,7 +72,12 @@ import type { LocalizerResponse } from '@/lib/consult/localizer-types'
 import type { SaveScaleResponsesArgs } from '@/lib/consult/scales'
 import { detectRedFlags } from '@/lib/consult/red-flags/red-flag-detector'
 import type { DetectedFlag } from '@/lib/consult/red-flags/red-flag-types'
-import type { VoiceEvent, VoiceProvider } from '@/lib/voice/providerTypes'
+import {
+  voiceStartupFailureStage,
+  type VoiceEvent,
+  type VoiceProvider,
+  type VoiceStartupFailureStage,
+} from '@/lib/voice/providerTypes'
 import { selectProvider, makeProvider } from '@/lib/voice/selectProvider'
 import {
   createUnresponsivenessMonitor,
@@ -313,6 +318,7 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
   // session still works exactly as before this feature if /session is an
   // older/mocked response without these fields).
   const serverSessionIdRef = useRef<string | null>(null)
+  const startupFailureStageRef = useRef<VoiceStartupFailureStage>('provider_setup')
   const resolvedInterviewModeRef = useRef<HistorianInterviewMode>('standard')
   const resolvedInterviewPromptVersionRef = useRef<HistorianInterviewPromptVersion>('standard-v1')
   const turnEvidenceControllerEnabledRef = useRef(false)
@@ -884,6 +890,7 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
 
   const recoverRetryableStartupFailure = useCallback(async (
     reason: 'provider_error' | 'transport_lost',
+    stage: VoiceStartupFailureStage,
   ): Promise<boolean> => {
     const sessionId = serverSessionIdRef.current
     const token = flushTokenRef.current
@@ -895,7 +902,7 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
           'Content-Type': 'application/json',
           Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify({ sessionId, reason }),
+        body: JSON.stringify({ sessionId, reason, stage }),
       })
       return response.ok
     } catch {
@@ -2205,6 +2212,11 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
         // close event racing async after cleanup() already ran for a NEWER
         // session) — mirrors the pre-refactor handleDrop's sessionGen check.
         if (sessionGenRef.current !== sessionGen) break
+        if (transcriptRef.current.length === 0 && questionCountRef.current === 0) {
+          startupFailureStageRef.current = e.reason.startsWith('ws:')
+            ? 'websocket_after_open'
+            : 'transport_after_open'
+        }
         console.warn('[useRealtimeSession] transport disconnected —', e.reason, '— running graceful end')
         // Durable transcript flush (Task 1 fix): a dropped transport is the
         // headline scenario this feature protects against — flush whatever
@@ -2223,6 +2235,13 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
         // promise after the patient has already begun a newer retry. Never let
         // that stale callback terminate the current attempt.
         if (sessionGenRef.current !== sessionGen) break
+        if (transcriptRef.current.length === 0 && questionCountRef.current === 0) {
+          startupFailureStageRef.current = e.message.startsWith('mic capture failed:')
+            ? 'microphone_setup'
+            : e.message.startsWith('Your microphone stopped sending audio.')
+              ? 'microphone_runtime'
+              : 'provider_runtime'
+        }
         console.error('Voice provider error:', e.message)
         setError(e.message || 'Voice provider error')
         // Durable transcript flush (Task 1): a transport error is exactly
@@ -2266,6 +2285,7 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
     finalizingRef.current = false
     // Durable transcript flush (Task 1) — reset per session.
     serverSessionIdRef.current = null
+    startupFailureStageRef.current = 'provider_setup'
     resolvedInterviewModeRef.current = 'standard'
     resolvedInterviewPromptVersionRef.current = 'standard-v1'
     turnEvidenceControllerEnabledRef.current = false
@@ -2426,6 +2446,7 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
       setStatus('active')
     } catch (err: any) {
       console.error('Failed to start realtime session:', err)
+      startupFailureStageRef.current = voiceStartupFailureStage(err) ?? 'provider_setup'
       const retryableInvitedStartup =
         !!serverSessionIdRef.current &&
         !!flushTokenRef.current &&
@@ -2441,7 +2462,10 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
       providerRef.current = null
 
       if (retryableInvitedStartup) {
-        const recovered = await recoverRetryableStartupFailure('provider_error')
+        const recovered = await recoverRetryableStartupFailure(
+          'provider_error',
+          startupFailureStageRef.current,
+        )
         // A newer attempt may already own the hook while the recovery request
         // was in flight. The server-side attempt nonce protects its DB state;
         // this generation check protects its UI state.
@@ -2684,7 +2708,10 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
       questionCountRef.current === 0 &&
       !safetyEscalatedRef.current
     if (retryableStartupFailure) {
-      const recovered = await recoverRetryableStartupFailure(terminationReason)
+      const recovered = await recoverRetryableStartupFailure(
+        terminationReason,
+        startupFailureStageRef.current,
+      )
       setError(
         recovered
           ? 'The voice connection ended before the first question. Your interview was not submitted. Tap Start Interview to try again.'

@@ -153,7 +153,8 @@ describe('Nova continuation failure acceptance', () => {
     }
     voiceFactory.provider = provider
     const fetchCalls: string[] = []
-    globalThis.fetch = vi.fn((input: string | URL | Request) => {
+    const recoveryBodies: unknown[] = []
+    globalThis.fetch = vi.fn((input: string | URL | Request, init?: RequestInit) => {
       const url = String(input)
       fetchCalls.push(url)
       if (url === '/api/ai/historian/session') {
@@ -174,6 +175,7 @@ describe('Nova continuation failure acceptance', () => {
         } as Response)
       }
       if (url === '/api/ai/historian/startup-recovery') {
+        recoveryBodies.push(JSON.parse(String(init?.body)))
         return Promise.resolve({ ok: true, status: 200 } as Response)
       }
       throw new Error(`Unexpected zero-turn recovery fetch: ${url}`)
@@ -202,6 +204,11 @@ describe('Nova continuation failure acceptance', () => {
       expect(provider.stop).toHaveBeenCalledOnce()
     })
     expect(onComplete).not.toHaveBeenCalled()
+    expect(recoveryBodies).toEqual([{
+      sessionId: '00000000-0000-4000-8000-0000000000f2',
+      reason: 'provider_error',
+      stage: 'provider_runtime',
+    }])
     expect(fetchCalls).not.toContain('/api/ai/historian/save')
     expect(fetchCalls).not.toContain('/api/ai/historian/transcript-flush')
   })
@@ -220,7 +227,8 @@ describe('Nova continuation failure acceptance', () => {
     }
     voiceFactory.provider = provider
     const fetchCalls: string[] = []
-    globalThis.fetch = vi.fn((input: string | URL | Request) => {
+    const recoveryBodies: unknown[] = []
+    globalThis.fetch = vi.fn((input: string | URL | Request, init?: RequestInit) => {
       const url = String(input)
       fetchCalls.push(url)
       if (url === '/api/ai/historian/session') {
@@ -241,6 +249,7 @@ describe('Nova continuation failure acceptance', () => {
         } as Response)
       }
       if (url === '/api/ai/historian/startup-recovery') {
+        recoveryBodies.push(JSON.parse(String(init?.body)))
         return Promise.resolve({ ok: true, status: 200 } as Response)
       }
       throw new Error(`Unexpected setup recovery fetch: ${url}`)
@@ -257,6 +266,11 @@ describe('Nova continuation failure acceptance', () => {
     await hook.startSession()
 
     expect(fetchCalls).toContain('/api/ai/historian/startup-recovery')
+    expect(recoveryBodies).toEqual([{
+      sessionId: '00000000-0000-4000-8000-0000000000f3',
+      reason: 'provider_error',
+      stage: 'provider_setup',
+    }])
     expect(provider.stop).toHaveBeenCalledOnce()
     expect(onComplete).not.toHaveBeenCalled()
   })

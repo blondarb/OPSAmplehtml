@@ -20,6 +20,7 @@ function request(body: unknown, token = 'synthetic-recovery-token') {
     headers: {
       'Content-Type': 'application/json',
       Authorization: `Bearer ${token}`,
+      'User-Agent': 'SyntheticBrowser/1.0 Safari/605.1.15 Macintosh private-detail',
     },
     body: JSON.stringify(body),
   })
@@ -65,6 +66,23 @@ describe('Historian startup recovery route', () => {
     expect(mocks.recoverHistorianInvitationStartup).not.toHaveBeenCalled()
   })
 
+  it('rejects arbitrary browser error text instead of logging it as a startup stage', async () => {
+    mocks.verifyFlushToken.mockResolvedValue({
+      sessionId: 'session-1',
+      startupAttemptId: '11111111-1111-4111-8111-111111111111',
+    })
+
+    const response = await POST(request({
+      sessionId: 'session-1',
+      reason: 'provider_error',
+      stage: 'private browser error text',
+    }))
+
+    expect(response.status).toBe(400)
+    expect(mocks.recoverHistorianInvitationStartup).not.toHaveBeenCalled()
+    expect(JSON.stringify(vi.mocked(console.info).mock.calls)).not.toContain('private browser error text')
+  })
+
   it('reopens an eligible zero-turn invitation without logging identifiers or credentials', async () => {
     mocks.verifyFlushToken.mockResolvedValue({
       sessionId: 'session-1',
@@ -79,6 +97,7 @@ describe('Historian startup recovery route', () => {
     const response = await POST(request({
       sessionId: 'session-1',
       reason: 'provider_error',
+      stage: 'websocket_unavailable',
     }))
 
     expect(response.status).toBe(200)
@@ -90,8 +109,12 @@ describe('Historian startup recovery route', () => {
     )
     const logged = JSON.stringify(vi.mocked(console.info).mock.calls)
     expect(logged).toContain('zero_turn_invitation_reopened')
+    expect(logged).toContain('websocket_unavailable')
+    expect(logged).toContain('safari')
+    expect(logged).toContain('mac')
     expect(logged).not.toContain('session-1')
     expect(logged).not.toContain('synthetic-recovery-token')
+    expect(logged).not.toContain('private-detail')
   })
 
   it('rejects a legacy token without an attempt binding', async () => {
