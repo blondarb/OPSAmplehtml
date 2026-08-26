@@ -383,6 +383,115 @@ describe('relay continuation protocol integration', () => {
     expect(inbox.filter((message) => message.t === 'audio')).toHaveLength(0)
   })
 
+  it('buffers first-sentence PCM until a multi-block approved opening is complete', async () => {
+    const opening = "Hi, I'm Henry, an AI assistant helping collect your history for your neurologist. What would you most like your neurologist to understand about why you were referred?"
+    const introduction = "Hi, I'm Henry, an AI assistant helping collect your history for your neurologist."
+    const question = 'What would you most like your neurologist to understand about why you were referred?'
+    send({
+      t: 'start',
+      instructions: 'Synthetic adaptive instructions.',
+      tools: [],
+      interviewMode: 'comprehensive',
+      adaptiveTurnController: true,
+    })
+    await new Promise((resolve) => setTimeout(resolve, 10))
+    relayHarness.instances[0].callbacks.onToolUse?.({
+      toolName: 'request_history_question',
+      toolUseId: 'adaptive-opening-tool',
+      content: JSON.stringify({ proposed_text: opening }),
+    })
+    const tool = await waitForMessage('toolCall')
+    send({
+      t: 'toolResult',
+      toolUseId: tool.toolUseId,
+      segmentId: 1,
+      output: JSON.stringify({
+        success: true,
+        status: 'approved',
+        obligation_id: 'adaptive-opening',
+        approved_text: opening,
+        allow_example: false,
+      }),
+    })
+    await new Promise((resolve) => setTimeout(resolve, 10))
+
+    // This is the exact ordering observed from Nova in the physical Mac run:
+    // sentence-one text, then its PCM, before sentence-two text arrives.
+    relayHarness.instances[0].callbacks.onTextOutput?.('ASSISTANT', introduction)
+    relayHarness.instances[0].callbacks.onAudioOutput?.('introduction-audio')
+    await new Promise((resolve) => setTimeout(resolve, 10))
+    expect(inbox.some((message) => message.t === 'assistantTranscript')).toBe(false)
+    expect(inbox.some((message) => message.t === 'audio')).toBe(false)
+    expect(inbox.some((message) => message.t === 'error')).toBe(false)
+
+    relayHarness.instances[0].callbacks.onTextOutput?.('ASSISTANT', question)
+    relayHarness.instances[0].callbacks.onAudioOutput?.('question-audio')
+    await expect(waitForMessage('assistantTranscript')).resolves.toMatchObject({
+      text: opening,
+      obligationId: 'adaptive-opening',
+      segmentId: 1,
+    })
+    await expect(waitForMessage('audio')).resolves.toMatchObject({
+      pcm: 'introduction-audio',
+      segmentId: 1,
+    })
+    await expect(waitForMessage('audio')).resolves.toMatchObject({
+      pcm: 'question-audio',
+      segmentId: 1,
+    })
+
+    relayHarness.instances[0].callbacks.onAssistantAudioEnd?.()
+    relayHarness.instances[0].callbacks.onAssistantFinalText?.(introduction)
+    relayHarness.instances[0].callbacks.onAssistantFinalText?.(question)
+    relayHarness.instances[0].callbacks.onCompletionEnd?.()
+    await new Promise((resolve) => setTimeout(resolve, 10))
+    expect(inbox.some((message) => message.t === 'error')).toBe(false)
+    expect(inbox.filter((message) => message.t === 'assistantTranscript')).toHaveLength(0)
+    expect(inbox.filter((message) => message.t === 'audio')).toHaveLength(0)
+  })
+
+  it('rejects a multi-block opening when only the introduction has PCM', async () => {
+    const opening = 'I am Henry. What brought you to neurology?'
+    send({
+      t: 'start',
+      instructions: 'Synthetic adaptive instructions.',
+      tools: [],
+      interviewMode: 'comprehensive',
+      adaptiveTurnController: true,
+    })
+    await new Promise((resolve) => setTimeout(resolve, 10))
+    relayHarness.instances[0].callbacks.onToolUse?.({
+      toolName: 'request_history_question',
+      toolUseId: 'incomplete-opening-tool',
+      content: JSON.stringify({ proposed_text: opening }),
+    })
+    const tool = await waitForMessage('toolCall')
+    send({
+      t: 'toolResult',
+      toolUseId: tool.toolUseId,
+      segmentId: 1,
+      output: JSON.stringify({
+        success: true,
+        status: 'approved',
+        obligation_id: 'incomplete-opening',
+        approved_text: opening,
+        allow_example: false,
+      }),
+    })
+    await new Promise((resolve) => setTimeout(resolve, 10))
+
+    relayHarness.instances[0].callbacks.onTextOutput?.('ASSISTANT', 'I am Henry.')
+    relayHarness.instances[0].callbacks.onAudioOutput?.('introduction-only-audio')
+    relayHarness.instances[0].callbacks.onTextOutput?.('ASSISTANT', 'What brought you to neurology?')
+    relayHarness.instances[0].callbacks.onAssistantAudioEnd?.()
+    relayHarness.instances[0].callbacks.onAssistantFinalText?.('I am Henry.')
+    relayHarness.instances[0].callbacks.onAssistantFinalText?.('What brought you to neurology?')
+
+    await waitForMessage('error')
+    expect(inbox.some((message) => message.t === 'assistantTranscript')).toBe(false)
+    expect(inbox.some((message) => message.t === 'audio')).toBe(false)
+  })
+
   it('rebinds one duplicate adaptive tool call to the existing exact approval', async () => {
     send({
       t: 'start',

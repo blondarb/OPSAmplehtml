@@ -67,8 +67,13 @@ export type ApprovedQuestionStreamingStart =
       text: string
       obligationId: string
       mode: 'approved_question'
+      bufferedAudio: string[]
     }
-  | { allowed: false; reason: string }
+  | {
+      allowed: false
+      reason: string
+      waitForMoreText?: true
+    }
 
 const EXAMPLE_RE = /\b(?:for example|for instance|such as|e\.g\.)\b/i
 const INTERROGATIVE_RE = /^\s*(?:what|when|where|who|why|how|which|do|does|did|is|are|was|were|have|has|can|could|would|will)\b/i
@@ -150,6 +155,7 @@ export class HistorianTurnQuarantine {
   private audioChars = 0
   private streamedAudioChunkCount = 0
   private approvedQuestionStreaming = false
+  private approvedPrefixAudioBuffered = false
   private overflowed = false
 
   constructor(private readonly maxAudioBase64Chars: number) {}
@@ -191,6 +197,13 @@ export class HistorianTurnQuarantine {
     return true
   }
 
+  bufferApprovedQuestionPrefixAudio(base64: string): boolean {
+    if (!this.approval || this.controlMode || this.approvedQuestionStreaming) return false
+    if (!this.bufferAudio(base64)) return false
+    this.approvedPrefixAudioBuffered = true
+    return true
+  }
+
   hasApprovedQuestionAuthorization(): boolean {
     return !!this.approval && !this.controlMode
   }
@@ -220,7 +233,7 @@ export class HistorianTurnQuarantine {
     if (!this.approval || this.controlMode) {
       return { allowed: false, reason: 'turn_not_approved_question' }
     }
-    if (this.audioParts.length > 0 || this.streamedAudioChunkCount > 0) {
+    if (this.streamedAudioChunkCount > 0) {
       return { allowed: false, reason: 'audio_preceded_approved_stream' }
     }
     const speculativeText = this.textParts.join(' ').trim()
@@ -229,13 +242,37 @@ export class HistorianTurnQuarantine {
       mode: 'approved_question',
       approval: this.approval,
     })
-    if (!checked.valid) return { allowed: false, reason: checked.reason }
+    if (!checked.valid) {
+      const canonicalSpeculative = canonicalSpokenText(speculativeText)
+      const canonicalApproved = canonicalSpokenText(this.approval.approvedText)
+      // Nova emits sentence-level SPECULATIVE text and may begin the first
+      // sentence's PCM before it emits the next text block. If every word seen
+      // so far is an exact, word-boundary prefix of the application-approved
+      // question, hold that PCM locally until the remaining approved text
+      // arrives. Nothing reaches the browser while the turn is incomplete.
+      if (
+        canonicalSpeculative &&
+        canonicalApproved.startsWith(`${canonicalSpeculative} `)
+      ) {
+        return {
+          allowed: false,
+          reason: 'approved_stream_waiting_for_more_text',
+          waitForMoreText: true,
+        }
+      }
+      return { allowed: false, reason: checked.reason }
+    }
+    const bufferedAudio = [...this.audioParts]
+    this.audioParts = []
+    this.streamedAudioChunkCount += bufferedAudio.length
+    this.approvedPrefixAudioBuffered = false
     this.approvedQuestionStreaming = true
     return {
       allowed: true,
       text: this.approval.approvedText,
       obligationId: this.approval.obligationId,
       mode: 'approved_question',
+      bufferedAudio,
     }
   }
 
@@ -312,6 +349,7 @@ export class HistorianTurnQuarantine {
     this.audioChars = 0
     this.streamedAudioChunkCount = 0
     this.approvedQuestionStreaming = false
+    this.approvedPrefixAudioBuffered = false
     this.overflowed = false
   }
 
@@ -329,6 +367,14 @@ export class HistorianTurnQuarantine {
     if (canonicalSpokenText(speculativeText) !== canonicalSpokenText(finalText)) {
       this.discard()
       return { allowed: false, reason: 'turn_text_stage_mismatch' }
+    }
+    // Prefix PCM alone proves only that the already-approved prefix was
+    // audible. It cannot be used to admit the later question text unless a
+    // subsequent PCM frame arrived after the full approved text and started
+    // the adaptive stream.
+    if (this.approvedPrefixAudioBuffered && !this.approvedQuestionStreaming) {
+      this.discard()
+      return { allowed: false, reason: 'approved_question_audio_incomplete' }
     }
     if (this.audioParts.length === 0 && this.streamedAudioChunkCount === 0) {
       this.discard()

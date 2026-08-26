@@ -43,7 +43,8 @@ describe('Historian assistant turn admission', () => {
     gate.bufferText('When did the main problem')
     expect(gate.beginApprovedQuestionStreaming()).toEqual({
       allowed: false,
-      reason: 'approved_text_mismatch',
+      reason: 'approved_stream_waiting_for_more_text',
+      waitForMoreText: true,
     })
 
     const ready = new HistorianTurnQuarantine(1_000)
@@ -54,6 +55,7 @@ describe('Historian assistant turn admission', () => {
       text: APPROVAL.approvedText,
       obligationId: APPROVAL.obligationId,
       mode: 'approved_question',
+      bufferedAudio: [],
     })
     expect(ready.observeStreamedAudio('AAAA')).toBe(true)
     ready.bufferFinalText(APPROVAL.approvedText)
@@ -64,6 +66,76 @@ describe('Historian assistant turn admission', () => {
       obligationId: APPROVAL.obligationId,
       mode: 'approved_question',
       alreadyReleased: true,
+    })
+  })
+
+  it('holds audio for an exact approved sentence prefix until the full question arrives', () => {
+    const gate = new HistorianTurnQuarantine(1_000)
+    const approval = {
+      obligationId: 'opening',
+      approvedText: "Hi, I'm Henry, an AI assistant helping collect your history for your neurologist. What would you most like your neurologist to understand about why you were referred?",
+      allowExample: false,
+    }
+    gate.approveQuestion(approval)
+    gate.bufferText("Hi, I'm Henry, an AI assistant helping collect your history for your neurologist.")
+    expect(gate.beginApprovedQuestionStreaming()).toEqual({
+      allowed: false,
+      reason: 'approved_stream_waiting_for_more_text',
+      waitForMoreText: true,
+    })
+    expect(gate.bufferApprovedQuestionPrefixAudio('INTRO_PCM')).toBe(true)
+
+    gate.bufferText('What would you most like your neurologist to understand about why you were referred?')
+    expect(gate.beginApprovedQuestionStreaming()).toEqual({
+      allowed: true,
+      text: approval.approvedText,
+      obligationId: approval.obligationId,
+      mode: 'approved_question',
+      bufferedAudio: ['INTRO_PCM'],
+    })
+    expect(gate.observeStreamedAudio('QUESTION_PCM')).toBe(true)
+    gate.bufferFinalText("Hi, I'm Henry, an AI assistant helping collect your history for your neurologist.")
+    gate.bufferFinalText('What would you most like your neurologist to understand about why you were referred?')
+    expect(gate.finalize()).toEqual({
+      allowed: true,
+      text: approval.approvedText,
+      audio: [],
+      obligationId: approval.obligationId,
+      mode: 'approved_question',
+      alreadyReleased: true,
+    })
+  })
+
+  it('never admits a full approved question using only prefix audio', () => {
+    const gate = new HistorianTurnQuarantine(1_000)
+    const approval = {
+      obligationId: 'opening',
+      approvedText: 'I am Henry. What brought you to neurology?',
+      allowExample: false,
+    }
+    gate.approveQuestion(approval)
+    gate.bufferText('I am Henry.')
+    expect(gate.beginApprovedQuestionStreaming()).toMatchObject({
+      allowed: false,
+      waitForMoreText: true,
+    })
+    expect(gate.bufferApprovedQuestionPrefixAudio('INTRO_ONLY_PCM')).toBe(true)
+    gate.bufferText('What brought you to neurology?')
+    gate.bufferFinalText('I am Henry.')
+    gate.bufferFinalText('What brought you to neurology?')
+    expect(gate.finalize()).toEqual({
+      allowed: false,
+      reason: 'approved_question_audio_incomplete',
+    })
+  })
+
+  it('rejects a spoken prefix that is not an exact word-boundary prefix of approval', () => {
+    const gate = new HistorianTurnQuarantine(1_000)
+    gate.approveQuestion(APPROVAL)
+    gate.bufferText('When did a different problem')
+    expect(gate.beginApprovedQuestionStreaming()).toEqual({
+      allowed: false,
+      reason: 'approved_text_mismatch',
     })
   })
 

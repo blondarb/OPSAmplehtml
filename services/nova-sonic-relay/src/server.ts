@@ -717,7 +717,20 @@ wss.on('connection', (ws) => {
           if (!turnQuarantine.hasApprovedQuestionStreaming()) {
             const release = turnQuarantine.beginApprovedQuestionStreaming()
             if (!release.allowed) {
+              if (release.waitForMoreText) {
+                if (!turnQuarantine.bufferApprovedQuestionPrefixAudio(base64)) {
+                  rejectHistorianTurn('audio_buffer_overflow')
+                }
+                return
+              }
               rejectHistorianTurn(release.reason)
+              return
+            }
+            // Account for the triggering PCM before releasing the transcript
+            // or any earlier buffered prefix. An overflow must remain a
+            // zero-output failure.
+            if (!turnQuarantine.observeStreamedAudio(base64)) {
+              rejectHistorianTurn('audio_stream_overflow')
               return
             }
             logSessionEvent('adaptive_question_stream_started', {
@@ -731,6 +744,11 @@ wss.on('connection', (ws) => {
               segmentId,
               obligationId: release.obligationId,
             })
+            for (const bufferedPcm of release.bufferedAudio) {
+              send(ws, { t: 'audio', pcm: bufferedPcm, segmentId })
+            }
+            send(ws, { t: 'audio', pcm: base64, segmentId })
+            return
           }
           if (!turnQuarantine.observeStreamedAudio(base64)) {
             rejectHistorianTurn('audio_stream_overflow')
