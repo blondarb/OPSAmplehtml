@@ -234,11 +234,15 @@ function completeSyntheticAdaptiveTranscript(): HistorianTranscriptEntry[] {
     ['How old are you?', 'I am 45 years old.'],
     [
       'Please describe a typical headache from beginning to end?',
-      'The pain builds gradually over about 30 minutes, feels throbbing over the right temple, reaches seven out of ten, lasts four to six hours, and improves in a dark quiet room.',
+      'Each headache begins gradually over about 30 minutes, stays over the right temple without switching sides, feels throbbing, reaches seven out of ten, and lasts four to six hours. They increased from about once a month to twice a week over six months, and I feel completely normal between attacks.',
     ],
     [
       'What other symptoms come with the headaches?',
-      'I have nausea and sensitivity to light and sound, but no vomiting, eye redness, tearing, nasal symptoms, fever, or neck stiffness.',
+      'I have nausea, sensitivity to light and sound, and worse pain with routine movement. I have no vomiting, visual zigzags or blind spots, spreading tingling, speech change, eye redness, tearing, eyelid droop, nasal symptoms, restlessness, scalp tenderness, jaw pain, fever, or neck stiffness.',
+    ],
+    [
+      'Is there a pattern, warning, trigger, or activity relationship?',
+      'There is no warning aura. Missed meals and poor sleep sometimes precede an attack, but standing, lying down, coughing, straining, exercise, and sexual activity do not trigger it. It does not wake me from sleep and is not limited to a particular time of day.',
     ],
     [
       'Have you noticed any warning signs or urgent neurologic symptoms?',
@@ -246,7 +250,7 @@ function completeSyntheticAdaptiveTranscript(): HistorianTranscriptEntry[] {
     ],
     [
       'Have you had similar episodes before?',
-      'I had occasional milder headaches in college, but nothing like this until six months ago. I miss about one work afternoon each week and sometimes cancel family activities.',
+      'In college I had a mild bilateral pressure headache once or twice a year after late nights. It resolved after sleep, had no nausea or light sensitivity, and was never evaluated. I had no recurring headaches after college until this distinct pattern began six months ago. I now miss about one work afternoon each week and sometimes cancel family activities.',
     ],
     [
       'Do you have any other neurologic symptoms between headaches?',

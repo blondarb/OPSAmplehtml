@@ -90,7 +90,7 @@ describe('deployed Historian QA acceptance runner', () => {
       }
       if (url.endsWith('/api/ai/historian/live-review') && method === 'POST') {
         expect(new Headers(init?.headers).get('authorization')).toBe('Bearer fake-flush-token')
-        expect(body.transcript).toHaveLength(26)
+        expect(body.transcript).toHaveLength(28)
         const patientSeqs = body.transcript
           .filter((entry: { role: string }) => entry.role === 'user')
           .map((entry: { seq: number }) => entry.seq)
@@ -139,8 +139,8 @@ describe('deployed Historian QA acceptance runner', () => {
           },
           history_coverage: { covered_domains: [], missing_or_uncertain: [] },
         })
-        expect(body.question_count).toBe(13)
-        expect(body.transcript).toHaveLength(26)
+        expect(body.question_count).toBe(14)
+        expect(body.transcript).toHaveLength(28)
         expect(body.interview_completion_status).toBe('complete')
         expect(body.interview_termination_reason).toBe('coverage_complete')
         const previousSaveCount = fetchMock.mock.calls.filter(([priorInput, priorInit]) =>
@@ -173,7 +173,7 @@ describe('deployed Historian QA acceptance runner', () => {
             interview_termination_reason: 'coverage_complete',
             evaluation_status: 'completed',
             diagnostic_sufficiency: {
-              version: 1, outcome: 'sufficient', ddx_allowed: true, patient_turn_count: 13,
+              version: 1, outcome: 'sufficient', ddx_allowed: true, patient_turn_count: 14,
             },
             clinician_history_report: {
               version: 1,
@@ -190,7 +190,7 @@ describe('deployed Historian QA acceptance runner', () => {
               })),
               medication_reconciliation: { items: [] },
               limitations: [],
-              completion: { patient_turn_count: 13 },
+              completion: { patient_turn_count: 14 },
               provenance: { prompt_version: 'clinician-history-report-v1' },
             },
             final_differential: { differential: [{ diagnosis: 'Synthetic physician-only output' }] },
