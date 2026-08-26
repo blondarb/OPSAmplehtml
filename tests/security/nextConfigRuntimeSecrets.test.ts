@@ -26,5 +26,8 @@ describe('Next build-time runtime-secret boundary', () => {
     expect(source).toMatch(
       /^\s*HISTORIAN_TURN_EVIDENCE_CONTROLLER_V1:\s*\n\s*process\.env\.HISTORIAN_TURN_EVIDENCE_CONTROLLER_V1/m,
     )
+    expect(source).toMatch(
+      /^\s*HISTORIAN_DIAGNOSTIC_DEPTH_V1:\s*\n\s*process\.env\.HISTORIAN_DIAGNOSTIC_DEPTH_V1/m,
+    )
   })
 })
