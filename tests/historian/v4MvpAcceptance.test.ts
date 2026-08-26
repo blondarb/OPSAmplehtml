@@ -5,6 +5,7 @@ import {
   type HistorianTranscriptEntry,
 } from '@/lib/historianTypes'
 import {
+  LIVE_INTERVIEW_REVIEW_V2_PROMPT_VERSION,
   LIVE_REVIEW_DEPTH_DIMENSIONS,
   parseLiveInterviewReviewV2,
   type LiveInterviewReviewArtifactV2,
@@ -121,16 +122,24 @@ function artifactFor(
 ): LiveInterviewReviewArtifactV2 {
   const patientSeqs = transcript.filter((entry) => entry.role === 'user').map((entry) => entry.seq!)
   const shallowDimension = options.shallowDimension
+  const shallowDomainIndex = shallowDimension ?? 0
   const review = parseLiveInterviewReviewV2({
     version: 2,
     reviewed_through_seq: patientSeqs.at(-1),
     domains: COMPREHENSIVE_HISTORY_DOMAINS.map((domain, index) => ({
       domain: domain.id,
-      status: options.uncertain && index === 0 ? 'uncertain' : 'covered',
-      patient_seqs: [patientSeqs[index % patientSeqs.length]],
+      status: shallowDimension != null && index === shallowDomainIndex
+        ? 'missing'
+        : options.uncertain && index === 0 ? 'uncertain' : 'covered',
+      patient_seqs: shallowDimension != null && index === shallowDomainIndex
+        ? []
+        : [patientSeqs[index % patientSeqs.length]],
     })),
     critical_gaps: shallowDimension == null ? [] : [{
-      domain: COMPREHENSIVE_HISTORY_DOMAINS[0].id,
+      domain: COMPREHENSIVE_HISTORY_DOMAINS[shallowDomainIndex].id,
+      depth_dimension: LIVE_REVIEW_DEPTH_DIMENSIONS[shallowDimension],
+      basis: 'not_asked',
+      patient_seqs: [],
       reason: 'The synthetic history lacks a discriminating chronology detail.',
       question_intent: 'Clarify the highest-value missing chronology discriminator.',
     }],
@@ -156,7 +165,7 @@ function artifactFor(
     review,
     provenance: {
       modelId: 'synthetic-depth-reviewer',
-      promptVersion: 'historian-live-review-v2',
+      promptVersion: LIVE_INTERVIEW_REVIEW_V2_PROMPT_VERSION,
       generatedAt: '2026-08-25T12:00:00.000Z',
     },
     attestation: 'a'.repeat(43),

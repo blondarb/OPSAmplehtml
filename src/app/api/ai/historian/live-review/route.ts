@@ -3,6 +3,7 @@ import { getPool } from '@/lib/db'
 import { verifyFlushToken } from '@/lib/historian/flushToken'
 import { generateLiveInterviewReview } from '@/lib/historian/liveReview'
 import { attestLiveInterviewReview } from '@/lib/historian/liveReviewAttestation'
+import { verifyLiveReviewClarificationEvidence } from '@/lib/historian/liveReviewClarificationReceipt'
 import type { HistorianTranscriptEntry } from '@/lib/historianTypes'
 
 const MAX_TRANSCRIPT_ENTRIES = 120
@@ -101,7 +102,40 @@ export async function POST(request: Request) {
       ? body.interviewPromptVersion
       : null
     const diagnosticDepth = (authority.promptVersion ?? requestedPromptVersion) === 'comprehensive-v4'
-    const unsignedArtifact = await generateLiveInterviewReview(transcript, { diagnosticDepth })
+    let exhaustedGapKeys: string[] = []
+    if (diagnosticDepth && body.reviewClarificationEvidence != null) {
+      if (
+        !Array.isArray(body.reviewClarificationEvidence) ||
+        body.reviewClarificationEvidence.length > 3
+      ) {
+        return NextResponse.json({ error: 'Review clarification state is malformed.' }, { status: 400 })
+      }
+      try {
+        const verifiedEvidence = await Promise.all(
+          body.reviewClarificationEvidence.map((evidence) => (
+            verifyLiveReviewClarificationEvidence(
+              verified.sessionId,
+              verified.startupAttemptId,
+              transcript,
+              evidence,
+            )
+          )),
+        )
+        exhaustedGapKeys = [...new Set(verifiedEvidence.map((item) => item.receipt.gapKey))]
+      } catch {
+        return NextResponse.json({ error: 'Review clarification evidence is invalid.' }, { status: 400 })
+      }
+    }
+    const unsignedArtifact = await generateLiveInterviewReview(
+      transcript,
+      diagnosticDepth
+        ? {
+            diagnosticDepth: true,
+            exhaustedGapKeys,
+            clarificationBudgetExhausted: exhaustedGapKeys.length >= 3,
+          }
+        : { diagnosticDepth: false },
+    )
     const artifact = await attestLiveInterviewReview(
       verified.sessionId,
       transcript,

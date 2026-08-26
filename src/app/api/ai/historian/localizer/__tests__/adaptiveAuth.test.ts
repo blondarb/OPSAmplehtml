@@ -6,15 +6,20 @@ const {
   verifyFlushTokenMock,
   queryMock,
   retrievePlanEvidenceMock,
+  issueClarificationReceiptMock,
 } = vi.hoisted(() => ({
   invokeBedrockJSONMock: vi.fn(),
   verifyFlushTokenMock: vi.fn(),
   queryMock: vi.fn(),
   retrievePlanEvidenceMock: vi.fn(),
+  issueClarificationReceiptMock: vi.fn(),
 }))
 
 vi.mock('@/lib/bedrock', () => ({ invokeBedrockJSON: invokeBedrockJSONMock }))
 vi.mock('@/lib/historian/flushToken', () => ({ verifyFlushToken: verifyFlushTokenMock }))
+vi.mock('@/lib/historian/liveReviewClarificationReceipt', () => ({
+  issueLiveReviewClarificationReceipt: issueClarificationReceiptMock,
+}))
 vi.mock('@/lib/db', () => ({
   getPool: async () => ({ query: queryMock }),
   getNeuroPlansPool: async () => ({}),
@@ -29,7 +34,10 @@ import { POST } from '@/app/api/ai/historian/localizer/route'
 const SESSION_ID = '11111111-1111-4111-8111-111111111111'
 const ATTEMPT_ID = '22222222-2222-4222-8222-222222222222'
 
-function request(token = 'conductor-token') {
+function request(
+  token = 'conductor-token',
+  overrides: Record<string, unknown> = {},
+) {
   return new NextRequest('https://example.test/api/ai/historian/localizer', {
     method: 'POST',
     headers: {
@@ -46,6 +54,7 @@ function request(token = 'conductor-token') {
       ],
       reviewGaps: ['functional_impact'],
       reviewIntents: ['Clarify how the headaches affect daily function.'],
+      ...overrides,
     }),
   })
 }
@@ -65,8 +74,22 @@ describe('adaptive Claude conductor authority', () => {
       parsed: {
         followUpQuestions: ['How do the headaches affect your usual activities?'],
         confidence: 'medium',
+        addressedReviewIntent: null,
       },
     })
+    issueClarificationReceiptMock.mockImplementation(async (
+      _sessionId: string,
+      _attemptId: string,
+      reviewedThroughPatientSeq: number,
+      gapKey: string,
+      question: string,
+    ) => ({
+      version: 1,
+      reviewedThroughPatientSeq,
+      gapKey,
+      question,
+      attestation: 'c'.repeat(43),
+    }))
   })
 
   it('rejects an invalid bearer before sending transcript content to Claude', async () => {
@@ -103,5 +126,50 @@ describe('adaptive Claude conductor authority', () => {
       { role: 'assistant', text: 'Why were you referred?' },
       { role: 'user', text: 'Synthetic recurrent headaches.' },
     ])
+  })
+
+  it('credits a reviewer clarification only when Claude echoes the exact required intent', async () => {
+    const requiredReviewIntent = 'Clarify how the headaches affect daily function.'
+    const requiredReviewGapKey = 'functional_impact:functional_impact'
+    invokeBedrockJSONMock.mockResolvedValueOnce({
+      parsed: {
+        followUpQuestions: ['How do the headaches affect your usual activities?'],
+        confidence: 'medium',
+        addressedReviewIntent: requiredReviewIntent,
+      },
+    })
+
+    const response = await POST(request('conductor-token', {
+      requiredReviewIntent,
+      requiredReviewGapKey,
+      reviewedThroughPatientSeq: 2,
+    }))
+    expect(response.status).toBe(200)
+    await expect(response.json()).resolves.toMatchObject({
+      followUpQuestions: ['How do the headaches affect your usual activities?'],
+      addressedReviewGapKey: requiredReviewGapKey,
+    })
+    const generatorInput = JSON.parse(invokeBedrockJSONMock.mock.calls[0][0].messages[0].content)
+    expect(generatorInput.requiredSilentReviewerIntent).toBe(requiredReviewIntent)
+  })
+
+  it('does not credit or release a different conductor target as the required reviewer gap', async () => {
+    invokeBedrockJSONMock.mockResolvedValueOnce({
+      parsed: {
+        followUpQuestions: ['When did the headaches begin?'],
+        confidence: 'medium',
+        addressedReviewIntent: 'Clarify headache onset.',
+      },
+    })
+    const response = await POST(request('conductor-token', {
+      requiredReviewIntent: 'Clarify functional impact.',
+      requiredReviewGapKey: 'functional_impact:functional_impact',
+      reviewedThroughPatientSeq: 2,
+    }))
+    expect(response.status).toBe(200)
+    await expect(response.json()).resolves.toMatchObject({
+      followUpQuestions: [],
+      partial: true,
+    })
   })
 })

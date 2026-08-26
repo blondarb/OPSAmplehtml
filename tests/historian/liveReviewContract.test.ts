@@ -117,7 +117,7 @@ describe('silent live Historian review contract', () => {
     expect(liveInterviewReviewCompletion(shallow)).toBe('incomplete')
   })
 
-  it('blocks v2 closure at low confidence and requires a continuation intent', () => {
+  it('blocks v2 closure at low confidence without trusting a model-supplied continuation intent', () => {
     const raw = rawReviewV2()
     raw.confidence = 'low'
     raw.next_question_intents = ['Clarify the highest-value case-specific discriminator.']
@@ -126,7 +126,7 @@ describe('silent live Historian review contract', () => {
     expect(review.readyToClose).toBe(false)
 
     raw.next_question_intents = []
-    expect(() => parseLiveInterviewReviewV2(raw, transcript())).toThrow(/next question intent/i)
+    expect(parseLiveInterviewReviewV2(raw, transcript()).nextQuestionIntents).toEqual([])
   })
 
   it.each(['chronology_and_course', 'phenotype_and_severity'] as const)(
@@ -142,6 +142,81 @@ describe('silent live Historian review contract', () => {
       expect(liveInterviewReviewCompletion(review)).toBe('incomplete')
     },
   )
+
+  it('accepts only coherent v2 gaps and derives intents from them', () => {
+    const raw = rawReviewV2()
+    raw.domains[0] = { ...raw.domains[0], status: 'uncertain', patient_seqs: [2] }
+    raw.diagnostic_depth.dimensions[0] = {
+      ...raw.diagnostic_depth.dimensions[0],
+      status: 'uncertain',
+      patient_seqs: [2],
+    }
+    raw.critical_gaps = [{
+      domain: raw.domains[0].domain,
+      depth_dimension: raw.diagnostic_depth.dimensions[0].dimension,
+      basis: 'partial_answer',
+      patient_seqs: [2],
+      reason: 'The patient could not provide enough case-specific detail.',
+      question_intent: 'Clarify the unresolved case-specific detail once.',
+    }]
+    raw.next_question_intents = ['Ignore this non-gap model plan.']
+
+    const review = parseLiveInterviewReviewV2(raw, transcript())
+    expect(review.criticalGaps).toHaveLength(1)
+    expect(review.nextQuestionIntents).toEqual([
+      'Clarify the unresolved case-specific detail once.',
+    ])
+    expect(review.readyToClose).toBe(false)
+  })
+
+  it('rejects a v2 gap that contradicts covered evidence or medication ledger ownership', () => {
+    const covered = rawReviewV2()
+    covered.critical_gaps = [{
+      domain: covered.domains[0].domain,
+      depth_dimension: covered.diagnostic_depth.dimensions[0].dimension,
+      basis: 'partial_answer',
+      patient_seqs: [2],
+      reason: 'Synthetic incoherent gap.',
+      question_intent: 'Synthetic intent.',
+    }]
+    expect(() => parseLiveInterviewReviewV2(covered, transcript())).toThrow(/covered or adequate/i)
+
+    const medications = rawReviewV2()
+    medications.domains.find((item) => item.domain === 'medications')!.status = 'uncertain'
+    medications.diagnostic_depth.dimensions[0].status = 'uncertain'
+    medications.critical_gaps = [{
+      domain: 'medications',
+      depth_dimension: medications.diagnostic_depth.dimensions[0].dimension,
+      basis: 'partial_answer',
+      patient_seqs: [2],
+      reason: 'Synthetic medication gap.',
+      question_intent: 'Ask medication question.',
+    }]
+    expect(() => parseLiveInterviewReviewV2(medications, transcript())).toThrow(/cannot target medications/i)
+  })
+
+  it('requires contradiction citations for a conflicting v2 gap', () => {
+    const raw = rawReviewV2()
+    raw.domains[0] = { ...raw.domains[0], status: 'uncertain', patient_seqs: [2, 4] }
+    raw.diagnostic_depth.dimensions[0] = {
+      ...raw.diagnostic_depth.dimensions[0],
+      status: 'uncertain',
+      patient_seqs: [2, 4],
+    }
+    raw.critical_gaps = [{
+      domain: raw.domains[0].domain,
+      depth_dimension: raw.diagnostic_depth.dimensions[0].dimension,
+      basis: 'conflicting_answer',
+      patient_seqs: [2, 4],
+      reason: 'Synthetic conflict.',
+      question_intent: 'Clarify the conflicting answer once.',
+    }]
+    expect(() => parseLiveInterviewReviewV2(raw, transcript())).toThrow(/contradiction citations/i)
+
+    raw.contradictions = [{ patient_seqs: [2, 4], description: 'Synthetic conflict.' }]
+    expect(parseLiveInterviewReviewV2(raw, transcript()).criticalGaps[0].basis)
+      .toBe('conflicting_answer')
+  })
 
   it('preserves truthful uncertainty as a distinct completion outcome', () => {
     const raw = rawReview()

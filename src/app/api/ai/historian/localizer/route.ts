@@ -21,6 +21,8 @@ import { invokeBedrockJSON } from '@/lib/bedrock'
 import { from } from '@/lib/db-query'
 import { getNeuroPlansPool, getPool } from '@/lib/db'
 import { verifyFlushToken } from '@/lib/historian/flushToken'
+import { isLiveReviewGapKey } from '@/lib/historian/liveReviewContract'
+import { issueLiveReviewClarificationReceipt } from '@/lib/historian/liveReviewClarificationReceipt'
 import { retrievePlanEvidence } from '@/lib/consult/planEvidence'
 import { SYMPTOM_EXTRACTOR_PROMPT } from '@/lib/consult/symptomExtractorPrompt'
 import { COMPREHENSIVE_HISTORY_DOMAINS } from '@/lib/historianTypes'
@@ -152,22 +154,25 @@ Rules:
 - Do not combine two questions. Do not prepend filler such as "thanks for sharing."
 - A short neutral descriptor list is allowed only when explaining abstract symptom quality, and must end with "or something else?"
 - Medication-name confirmation, dose/frequency reconciliation, the final medication inventory, and interview closure are application-owned; do not propose those turns.
-- Treat silent-review missing domains and next-question intents as private advisory signals, then choose the most coherent patient-specific gap.
+- When requiredSilentReviewerIntent is non-null, that intent owns this turn. Translate exactly that intent into one natural patient-facing question; do not choose another gap. Echo the exact required string in addressedReviewIntent.
+- When requiredSilentReviewerIntent is null, treat silent-review missing domains and next-question intents as private advisory signals, then choose the most coherent patient-specific gap. Return addressedReviewIntent as null.
 
 Return only JSON with this exact shape:
-{"followUpQuestions":["one patient-facing question"],"confidence":"high | medium | low"}`
+{"followUpQuestions":["one patient-facing question"],"confidence":"high | medium | low","addressedReviewIntent":"exact required string or null"}`
 
 type AdaptiveConductorResult = {
   followUpQuestions?: unknown
   confidence?: unknown
+  addressedReviewIntent?: unknown
 }
 
-function adaptiveConductorQuestions(value: unknown): {
+function adaptiveConductorQuestions(value: unknown, requiredReviewIntent: string | null): {
   questions: string[]
   confidence: 'high' | 'medium' | 'low'
+  addressedRequiredIntent: boolean
 } {
   if (!value || typeof value !== 'object' || Array.isArray(value)) {
-    return { questions: [], confidence: 'low' }
+    return { questions: [], confidence: 'low', addressedRequiredIntent: false }
   }
   const parsed = value as AdaptiveConductorResult
   const questions = Array.isArray(parsed.followUpQuestions)
@@ -180,7 +185,13 @@ function adaptiveConductorQuestions(value: unknown): {
     parsed.confidence === 'high' || parsed.confidence === 'medium' || parsed.confidence === 'low'
       ? parsed.confidence
       : 'low'
-  return { questions, confidence }
+  const addressedRequiredIntent = requiredReviewIntent === null ||
+    parsed.addressedReviewIntent === requiredReviewIntent
+  return {
+    questions: addressedRequiredIntent ? questions : [],
+    confidence,
+    addressedRequiredIntent,
+  }
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -314,6 +325,27 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
         .map((value) => value.trim().slice(0, MAX_REVIEW_INTENT_CHARS))
         .slice(0, 3)
     : []
+  const requiredReviewIntent = typeof body.requiredReviewIntent === 'string'
+    ? body.requiredReviewIntent.trim()
+    : ''
+  const requiredReviewGapKey = typeof body.requiredReviewGapKey === 'string'
+    ? body.requiredReviewGapKey
+    : ''
+  const reviewedThroughPatientSeq = body.reviewedThroughPatientSeq
+  if (
+    body.adaptiveInterview === true &&
+    (
+      (!!requiredReviewIntent !== !!requiredReviewGapKey) ||
+      requiredReviewIntent.length > MAX_REVIEW_INTENT_CHARS ||
+      (!!requiredReviewGapKey && !isLiveReviewGapKey(requiredReviewGapKey)) ||
+      (!!requiredReviewGapKey && (
+        !Number.isInteger(reviewedThroughPatientSeq) ||
+        (reviewedThroughPatientSeq as number) < 1
+      ))
+    )
+  ) {
+    return NextResponse.json({ error: 'Required reviewer guidance is malformed.' }, { status: 400 })
+  }
 
   if (!sessionId || !transcript || !Array.isArray(transcript)) {
     return NextResponse.json(
@@ -334,6 +366,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     return NextResponse.json({ error: 'Transcript is malformed or outside the conductor bounds.' }, { status: 400 })
   }
 
+  let adaptiveStartupAttemptId: string | undefined
   if (body.adaptiveInterview === true) {
     const verified = await verifyFlushToken(bearerToken(req))
     if (
@@ -343,6 +376,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     ) {
       return NextResponse.json({ error: 'Invalid or stale conductor authority.' }, { status: 403 })
     }
+    adaptiveStartupAttemptId = verified.startupAttemptId
   }
 
   // Minimum data check — don't waste Bedrock calls on empty sessions
@@ -384,6 +418,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
             referralReason: referralReason ?? null,
             silentReviewerMissingDomains: reviewGaps,
             silentReviewerNextQuestionIntents: reviewIntents,
+            requiredSilentReviewerIntent: requiredReviewIntent || null,
             orderedTranscript: transcript.map(({ role, text }) => ({ role, text })),
           }),
         }],
@@ -391,7 +426,19 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
         temperature: 0.2,
         signal,
       })
-      const conductor = adaptiveConductorQuestions(parsed)
+      const conductor = adaptiveConductorQuestions(parsed, requiredReviewIntent || null)
+      const clarificationReceipt =
+        requiredReviewGapKey &&
+        conductor.addressedRequiredIntent &&
+        conductor.questions[0]
+          ? await issueLiveReviewClarificationReceipt(
+              sessionId,
+              adaptiveStartupAttemptId,
+              reviewedThroughPatientSeq as number,
+              requiredReviewGapKey,
+              conductor.questions[0],
+            )
+          : null
       clearTimeout(timeoutId)
       return NextResponse.json<LocalizerResponse>({
         differential: [],
@@ -404,6 +451,12 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
         suggestedActions: [],
         processingMs: Date.now() - startMs,
         partial: conductor.questions.length === 0,
+        ...(requiredReviewGapKey && conductor.addressedRequiredIntent
+          ? { addressedReviewGapKey: requiredReviewGapKey }
+          : {}),
+        ...(clarificationReceipt
+          ? { reviewClarificationReceipt: clarificationReceipt }
+          : {}),
         ...(conductor.questions.length === 0
           ? { degradedReason: 'Adaptive conductor returned no usable question' }
           : {}),

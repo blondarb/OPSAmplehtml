@@ -16,7 +16,7 @@ export const LIVE_INTERVIEW_REVIEW_VERSION = 1 as const
 export const LIVE_INTERVIEW_REVIEW_MIN_PATIENT_TURNS = 12
 export const LIVE_INTERVIEW_REVIEW_PROMPT_VERSION = 'historian-live-review-v1' as const
 export const LIVE_INTERVIEW_REVIEW_V2_VERSION = 2 as const
-export const LIVE_INTERVIEW_REVIEW_V2_PROMPT_VERSION = 'historian-live-review-v2' as const
+export const LIVE_INTERVIEW_REVIEW_V2_PROMPT_VERSION = 'historian-live-review-v2-coherent-contract' as const
 
 /**
  * Case-depth audit dimensions. These are silent evidence checks, never a
@@ -53,6 +53,22 @@ export interface LiveReviewDomainFinding {
 
 export interface LiveReviewCriticalGap {
   domain: ComprehensiveHistoryDomain
+  reason: string
+  questionIntent: string
+}
+
+/**
+ * V2 gaps are evidence-bound. They deliberately cannot be used as a second,
+ * competing medication checklist: medication completeness belongs to the
+ * deterministic application ledger.
+ */
+export type LiveReviewCriticalGapBasis = 'not_asked' | 'partial_answer' | 'conflicting_answer'
+
+export interface LiveReviewCriticalGapV2 {
+  domain: Exclude<ComprehensiveHistoryDomain, 'medications'>
+  depthDimension: LiveReviewDepthDimension
+  basis: LiveReviewCriticalGapBasis
+  patientSeqs: number[]
   reason: string
   questionIntent: string
 }
@@ -111,8 +127,19 @@ export interface LiveReviewDepthFinding {
   patientSeqs: number[]
 }
 
-export interface LiveInterviewReviewV2 extends Omit<LiveInterviewReviewV1, 'version'> {
+export interface LiveInterviewReviewV2 extends Omit<
+  LiveInterviewReviewV1,
+  'version' | 'criticalGaps' | 'readyToClose' | 'nextQuestionIntents'
+> {
   version: typeof LIVE_INTERVIEW_REVIEW_V2_VERSION
+  /** Recomputed from the cited transcript at every trust boundary. */
+  patientTurnCount: number
+  /** A model-contract failure is attested and can never authorize DDx. */
+  integrity: 'valid' | 'inconsistent' | 'clarification_exhausted'
+  criticalGaps: LiveReviewCriticalGapV2[]
+  /** Derived only from independently valid critical gaps. */
+  nextQuestionIntents: string[]
+  readyToClose: boolean
   diagnosticDepth: {
     dimensions: LiveReviewDepthFinding[]
     depthSufficient: boolean
@@ -183,6 +210,21 @@ const MEDICATION_VALUE_STATUSES = new Set<LiveReviewMedicationValueStatus>([
 const MAX_TEXT_LENGTH = 240
 const MAX_FINDINGS = 10
 const MAX_MEDICATIONS = 12
+
+export function liveReviewGapKey(
+  gap: Pick<LiveReviewCriticalGapV2, 'domain' | 'depthDimension'>,
+): string {
+  return `${gap.domain}:${gap.depthDimension}`
+}
+
+export function isLiveReviewGapKey(value: unknown): value is string {
+  if (typeof value !== 'string') return false
+  const [domain, depthDimension, extra] = value.split(':')
+  return extra === undefined &&
+    domain !== 'medications' &&
+    DOMAIN_IDS.has(domain) &&
+    DEPTH_DIMENSION_IDS.has(depthDimension)
+}
 
 function isPlainObject(value: unknown): value is Record<string, unknown> {
   return !!value && typeof value === 'object' && !Array.isArray(value)
@@ -519,13 +561,16 @@ export function parseLiveInterviewReviewV2(
     ['dimensions', 'depth_sufficient'],
   )) throw new Error('Live review diagnostic depth has an invalid schema.')
 
-  // Reuse the established v1 parser for every shared transcript-bound field.
-  // Its closure value is treated only as a prerequisite below.
+  // Reuse the established v1 parser for shared transcript-bound fields, but
+  // never let the v1 gap or intent semantics leak into the coherent V2
+  // closure calculation.
   const sharedRaw: Record<string, unknown> = { ...raw }
   delete sharedRaw.diagnostic_depth
   const base = parseLiveInterviewReview({
     ...sharedRaw,
     version: LIVE_INTERVIEW_REVIEW_VERSION,
+    critical_gaps: [],
+    next_question_intents: [],
   }, transcript)
 
   const index = transcriptIndex(transcript)
@@ -568,32 +613,132 @@ export function parseLiveInterviewReviewV2(
     throw new Error('Live review depth sufficiency must be boolean.')
   }
 
+  if (!Array.isArray(raw.critical_gaps) || raw.critical_gaps.length > MAX_FINDINGS) {
+    throw new Error('Live review v2 critical gaps have an invalid item count.')
+  }
+  const domainById = new Map(base.domains.map((item) => [item.domain, item]))
+  const depthById = new Map(dimensions.map((item) => [item.dimension, item]))
+  const contradictionSeqSets = base.contradictions.map((item) => new Set(item.patientSeqs))
+  const criticalGaps: LiveReviewCriticalGapV2[] = raw.critical_gaps.map((item, itemIndex) => {
+    if (!isPlainObject(item) || !hasExactKeys(item, [
+      'domain',
+      'depth_dimension',
+      'basis',
+      'patient_seqs',
+      'reason',
+      'question_intent',
+    ])) throw new Error(`Live review v2 critical gap ${itemIndex} has an invalid schema.`)
+    if (
+      typeof item.domain !== 'string' ||
+      !DOMAIN_IDS.has(item.domain) ||
+      item.domain === 'medications'
+    ) throw new Error('Live review v2 critical gaps cannot target medications or an unknown domain.')
+    if (typeof item.depth_dimension !== 'string' || !DEPTH_DIMENSION_IDS.has(item.depth_dimension)) {
+      throw new Error('Live review v2 critical gap has an invalid depth dimension.')
+    }
+    if (
+      typeof item.basis !== 'string' ||
+      !['not_asked', 'partial_answer', 'conflicting_answer'].includes(item.basis)
+    ) throw new Error('Live review v2 critical gap has an invalid basis.')
+
+    const domain = domainById.get(item.domain as ComprehensiveHistoryDomain)!
+    const depthDimension = depthById.get(item.depth_dimension as LiveReviewDepthDimension)!
+    if (domain.status === 'covered' || depthDimension.status === 'adequate') {
+      throw new Error('Live review v2 critical gap conflicts with covered or adequate evidence.')
+    }
+    const basis = item.basis as LiveReviewCriticalGapBasis
+    const patientSeqs = exactIntegerArray(
+      item.patient_seqs,
+      index.patientSeqs,
+      'Live review v2 critical gap',
+      basis === 'not_asked' ? 0 : basis === 'partial_answer' ? 1 : 2,
+      6,
+    )
+    if (basis === 'not_asked') {
+      if (
+        domain.status !== 'missing' ||
+        depthDimension.status !== 'missing' ||
+        domain.patientSeqs.length !== 0 ||
+        depthDimension.patientSeqs.length !== 0 ||
+        patientSeqs.length !== 0
+      ) throw new Error('A not_asked v2 critical gap requires missing, uncited domain and depth evidence.')
+    } else {
+      if (domain.status !== 'uncertain' || depthDimension.status !== 'uncertain') {
+        throw new Error('A cited v2 critical gap requires uncertain domain and depth evidence.')
+      }
+      if (!patientSeqs.every((seq) => domain.patientSeqs.includes(seq) && depthDimension.patientSeqs.includes(seq))) {
+        throw new Error('Live review v2 critical gap citations must be shared by its domain and depth finding.')
+      }
+      if (basis === 'conflicting_answer' && !contradictionSeqSets.some((contradictionSeqs) => (
+        patientSeqs.every((seq) => contradictionSeqs.has(seq))
+      ))) throw new Error('A conflicting_answer v2 critical gap requires matching contradiction citations.')
+    }
+    return {
+      domain: item.domain as Exclude<ComprehensiveHistoryDomain, 'medications'>,
+      depthDimension: item.depth_dimension as LiveReviewDepthDimension,
+      basis,
+      patientSeqs,
+      reason: boundedText(item.reason, 'Live review v2 gap reason'),
+      questionIntent: boundedText(item.question_intent, 'Live review v2 question intent'),
+    }
+  })
+
+  if (!Array.isArray(raw.next_question_intents) || raw.next_question_intents.length > 3) {
+    throw new Error('Live review v2 question intents have an invalid item count.')
+  }
+  // The model must not smuggle a competing interview plan through this field.
+  // Only exact intents from independently valid gaps can guide the conductor.
+  const nextQuestionIntents = [...new Set(criticalGaps.map((gap) => gap.questionIntent))].slice(0, 3)
+
   const applicationDepthSufficient =
-    raw.diagnostic_depth.depth_sufficient &&
     dimensions.every((item) => item.status !== 'missing') &&
     dimensions.every((item) => (
       !REQUIRED_ADEQUATE_DEPTH_DIMENSION_IDS.has(item.dimension) || item.status === 'adequate'
     )) &&
-    base.criticalGaps.length === 0 &&
+    criticalGaps.length === 0 &&
     base.confidence !== 'low'
-  if (!applicationDepthSufficient && base.nextQuestionIntents.length === 0) {
-    throw new Error('An insufficient depth review must provide a next question intent.')
-  }
+  const readyToClose =
+    index.patientTurnCount >= LIVE_INTERVIEW_REVIEW_MIN_PATIENT_TURNS &&
+    base.domains.every((item) => item.status !== 'missing') &&
+    applicationDepthSufficient &&
+    !base.activeSafetyConcern.present
 
   return {
     ...base,
     version: LIVE_INTERVIEW_REVIEW_V2_VERSION,
+    patientTurnCount: index.patientTurnCount,
+    integrity: 'valid',
+    criticalGaps,
+    nextQuestionIntents,
     diagnosticDepth: {
       dimensions,
       depthSufficient: applicationDepthSufficient,
     },
-    readyToClose: base.readyToClose && applicationDepthSufficient,
+    // Raw reviewer booleans are advisory only; closure is application-derived.
+    readyToClose,
   }
 }
 
 export function liveInterviewReviewCompletion(
   review: LiveInterviewReview | null | undefined,
 ): LiveInterviewReviewCompletion {
+  // Safety always outranks closure integrity and clarification exhaustion.
+  // The hook will strengthen this to the existing safety_escalated terminal
+  // path; a review carrying active safety can never authorize normal close.
+  if (review?.activeSafetyConcern.present) return 'incomplete'
+  // A twice-incoherent silent reviewer must not trap the patient in an
+  // indefinite interview. Once the fixed 12-turn baseline exists, this
+  // permits only a graceful, uncertainty-labeled close. Diagnostic
+  // sufficiency independently treats this integrity state as unavailable,
+  // so it can never authorize a differential.
+  if (
+    review?.version === LIVE_INTERVIEW_REVIEW_V2_VERSION &&
+    review.integrity !== 'valid'
+  ) {
+    return review.patientTurnCount >= LIVE_INTERVIEW_REVIEW_MIN_PATIENT_TURNS
+      ? 'complete_with_uncertainty'
+      : 'incomplete'
+  }
   if (!review?.readyToClose) return 'incomplete'
   return review.domains.some((item) => item.status === 'uncertain') ||
     review.contradictions.length > 0
@@ -751,6 +896,8 @@ function parseLiveInterviewReviewArtifactV2(
   if (!hasExactKeys(raw.review, [
     'version',
     'reviewedThroughSeq',
+    'patientTurnCount',
+    'integrity',
     'domains',
     'criticalGaps',
     'contradictions',
@@ -767,16 +914,34 @@ function parseLiveInterviewReviewArtifactV2(
   // artifact boundary, then add the independently validated v2 depth block.
   const {
     diagnosticDepth,
+    patientTurnCount,
+    integrity,
     ...sharedReview
   } = raw.review
   const shared = parseLiveInterviewReviewArtifactV1({
-    review: { ...sharedReview, version: LIVE_INTERVIEW_REVIEW_VERSION },
+    review: {
+      ...sharedReview,
+      version: LIVE_INTERVIEW_REVIEW_VERSION,
+      criticalGaps: [],
+      nextQuestionIntents: [],
+    },
     provenance: {
       ...raw.provenance,
       promptVersion: LIVE_INTERVIEW_REVIEW_PROMPT_VERSION,
     },
     attestation: raw.attestation,
   }, transcript)
+  const actualPatientTurnCount = transcript.filter((entry) => entry.role === 'user').length
+  if (patientTurnCount !== actualPatientTurnCount) {
+    throw new Error('Live review v2 artifact patient turn count does not match its transcript.')
+  }
+  if (
+    integrity !== 'valid' &&
+    integrity !== 'inconsistent' &&
+    integrity !== 'clarification_exhausted'
+  ) {
+    throw new Error('Live review v2 artifact integrity is invalid.')
+  }
   const parsed = parseLiveInterviewReviewV2({
     version: LIVE_INTERVIEW_REVIEW_V2_VERSION,
     reviewed_through_seq: shared.review.reviewedThroughSeq,
@@ -785,11 +950,18 @@ function parseLiveInterviewReviewArtifactV2(
       status: item.status,
       patient_seqs: item.patientSeqs,
     })),
-    critical_gaps: shared.review.criticalGaps.map((item) => ({
-      domain: item.domain,
-      reason: item.reason,
-      question_intent: item.questionIntent,
-    })),
+    critical_gaps: Array.isArray(raw.review.criticalGaps)
+      ? raw.review.criticalGaps.map((item) => isPlainObject(item)
+        ? {
+            domain: item.domain,
+            depth_dimension: item.depthDimension,
+            basis: item.basis,
+            patient_seqs: item.patientSeqs,
+            reason: item.reason,
+            question_intent: item.questionIntent,
+          }
+        : item)
+      : raw.review.criticalGaps,
     contradictions: shared.review.contradictions.map((item) => ({
       patient_seqs: item.patientSeqs,
       description: item.description,
@@ -835,8 +1007,37 @@ function parseLiveInterviewReviewArtifactV2(
     confidence: shared.review.confidence,
   }, transcript)
 
+  // A fallback is signed and structurally valid so it can be audited, but it
+  // is never a source of closure authority or patient-facing intents.
+  if (integrity === 'inconsistent') {
+    if (
+      parsed.readyToClose ||
+      parsed.diagnosticDepth.depthSufficient ||
+      parsed.criticalGaps.length !== 0 ||
+      parsed.nextQuestionIntents.length !== 0 ||
+      parsed.domains.some((item) => item.status !== 'missing' || item.patientSeqs.length !== 0) ||
+      parsed.diagnosticDepth.dimensions.some((item) => (
+        item.status !== 'missing' || item.patientSeqs.length !== 0
+      )) ||
+      parsed.contradictions.length !== 0 ||
+      parsed.repetitions.length !== 0 ||
+      parsed.medications.length !== 0 ||
+      parsed.activeSafetyConcern.present ||
+      parsed.activeSafetyConcern.patientSeqs.length !== 0 ||
+      parsed.confidence !== 'low'
+    ) throw new Error('An inconsistent live review v2 artifact must fail closed.')
+  }
+  if (integrity === 'clarification_exhausted') {
+    if (
+      parsed.readyToClose ||
+      parsed.diagnosticDepth.depthSufficient ||
+      parsed.criticalGaps.length === 0 ||
+      parsed.nextQuestionIntents.length === 0
+    ) throw new Error('An exhausted live review v2 artifact must retain an unresolved cited gap.')
+  }
+
   return {
-    review: parsed,
+    review: { ...parsed, integrity },
     provenance: {
       modelId: raw.provenance.modelId.trim(),
       promptVersion: LIVE_INTERVIEW_REVIEW_V2_PROMPT_VERSION,

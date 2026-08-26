@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 
 import { COMPREHENSIVE_HISTORY_DOMAINS, type HistorianTranscriptEntry } from '@/lib/historianTypes'
 import {
+  LIVE_INTERVIEW_REVIEW_V2_PROMPT_VERSION,
   LIVE_REVIEW_DEPTH_DIMENSIONS,
   parseLiveInterviewReviewV2,
   type LiveInterviewReviewArtifactV2,
@@ -50,7 +51,7 @@ function artifact(): LiveInterviewReviewArtifactV2 {
     review,
     provenance: {
       modelId: 'synthetic-reviewer',
-      promptVersion: 'historian-live-review-v2',
+      promptVersion: LIVE_INTERVIEW_REVIEW_V2_PROMPT_VERSION,
       generatedAt: '2026-08-25T12:00:00.000Z',
     },
     attestation: 'a'.repeat(43),
@@ -109,6 +110,49 @@ describe('server-derived diagnostic sufficiency', () => {
       medicationState: closedMedication(),
     })
     expect(result).toMatchObject({ outcome: 'gate_unavailable', ddx_allowed: false })
+    expect(buildWithheldFinalDifferential(result).status).toBe('withheld_gate_error')
+  })
+
+  it('withholds DDx when the twice-repaired reviewer remains inconsistent', () => {
+    const reviewArtifact = artifact()
+    reviewArtifact.review = {
+      ...reviewArtifact.review,
+      integrity: 'inconsistent',
+      domains: reviewArtifact.review.domains.map((item) => ({
+        ...item,
+        status: 'missing',
+        patientSeqs: [],
+      })),
+      criticalGaps: [],
+      contradictions: [],
+      repetitions: [],
+      medications: [],
+      activeSafetyConcern: { present: false, patientSeqs: [] },
+      diagnosticDepth: {
+        dimensions: reviewArtifact.review.diagnosticDepth.dimensions.map((item) => ({
+          ...item,
+          status: 'missing',
+          patientSeqs: [],
+        })),
+        depthSufficient: false,
+      },
+      readyToClose: false,
+      nextQuestionIntents: [],
+      confidence: 'low',
+    }
+    const result = deriveDiagnosticSufficiency({
+      transcript: transcript(),
+      promptVersion: 'comprehensive-v4',
+      completionStatus: 'complete',
+      terminationReason: 'complete_with_uncertainty',
+      reviewArtifact,
+      medicationState: closedMedication(),
+    })
+    expect(result).toMatchObject({
+      outcome: 'gate_unavailable',
+      ddx_allowed: false,
+      medication: { status: 'incomplete', unresolved_count: 1 },
+    })
     expect(buildWithheldFinalDifferential(result).status).toBe('withheld_gate_error')
   })
 })

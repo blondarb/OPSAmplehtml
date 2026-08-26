@@ -29,7 +29,10 @@ vi.mock('@/lib/historian/eval/independentDdx', () => ({
 
 import { processHistorianEvalEvent } from '@/workers/historianEvalWorker'
 import { COMPREHENSIVE_HISTORY_DOMAINS } from '@/lib/historianTypes'
-import { LIVE_REVIEW_DEPTH_DIMENSIONS } from '@/lib/historian/liveReviewContract'
+import {
+  LIVE_INTERVIEW_REVIEW_V2_PROMPT_VERSION,
+  LIVE_REVIEW_DEPTH_DIMENSIONS,
+} from '@/lib/historian/liveReviewContract'
 import { createMedicationReconciliationState } from '@/lib/historian/medicationReconciliation'
 import { MEDICATION_INVENTORY_QUESTION } from '@/lib/historian/medicationReconciliation'
 import { ADAPTIVE_PRE_CLOSE_QUESTION } from '@/lib/historian/adaptiveQuestionContract'
@@ -70,6 +73,8 @@ function v2ReviewArtifact() {
     review: {
       version: 2,
       reviewedThroughSeq: 24,
+      patientTurnCount: 12,
+      integrity: 'valid',
       domains: COMPREHENSIVE_HISTORY_DOMAINS.map((domain, index) => ({
         domain: domain.id,
         status: 'covered',
@@ -94,7 +99,7 @@ function v2ReviewArtifact() {
     },
     provenance: {
       modelId: 'synthetic-reviewer',
-      promptVersion: 'historian-live-review-v2',
+      promptVersion: LIVE_INTERVIEW_REVIEW_V2_PROMPT_VERSION,
       generatedAt: '2026-08-25T12:00:00.000Z',
     },
     attestation: 'a'.repeat(43),

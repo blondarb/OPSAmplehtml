@@ -148,21 +148,30 @@ async function attestedCompleteV3Review(
 
 async function attestedCompleteV4Review(
   transcript = completeV3Transcript(),
-  options: { shallow?: boolean } = {},
+  options: { shallow?: boolean; exhausted?: boolean; activeSafety?: boolean } = {},
 ) {
   const patientSeqs = transcript.filter((entry) => entry.role === 'user').map((entry) => entry.seq!)
   return attestLiveInterviewReview(v4Binding.sessionId, transcript, {
     review: {
       version: 2,
       reviewedThroughSeq: patientSeqs.at(-1)!,
+      patientTurnCount: patientSeqs.length,
+      integrity: options.exhausted ? 'clarification_exhausted' as const : 'valid' as const,
       domains: COMPREHENSIVE_HISTORY_DOMAINS.map((domain, index) => ({
         domain: domain.id,
-        status: 'covered' as const,
-        patientSeqs: [patientSeqs[index % patientSeqs.length]],
+        status: options.shallow && domain.id === 'presenting_symptom'
+          ? 'missing' as const
+          : 'covered' as const,
+        patientSeqs: options.shallow && domain.id === 'presenting_symptom'
+          ? []
+          : [patientSeqs[index % patientSeqs.length]],
       })),
       criticalGaps: options.shallow
         ? [{
             domain: 'presenting_symptom' as const,
+            depthDimension: 'phenotype_and_severity' as const,
+            basis: 'not_asked' as const,
+            patientSeqs: [],
             reason: 'The symptom phenotype remains too shallow.',
             questionIntent: 'Clarify the symptom quality and severity.',
           }]
@@ -170,7 +179,10 @@ async function attestedCompleteV4Review(
       contradictions: [],
       repetitions: [],
       medications: [],
-      activeSafetyConcern: { present: false, patientSeqs: [] },
+      activeSafetyConcern: {
+        present: options.activeSafety === true,
+        patientSeqs: options.activeSafety ? [patientSeqs.at(-1)!] : [],
+      },
       diagnosticDepth: {
         dimensions: LIVE_REVIEW_DEPTH_DIMENSIONS.map((dimension, index) => ({
           dimension,
@@ -183,7 +195,7 @@ async function attestedCompleteV4Review(
         })),
         depthSufficient: !options.shallow,
       },
-      readyToClose: !options.shallow,
+      readyToClose: !options.shallow && !options.activeSafety,
       nextQuestionIntents: options.shallow
         ? ['Clarify the symptom quality and severity.']
         : [],
@@ -806,6 +818,37 @@ describe('invited historian transactional save', () => {
         question_count: 12,
       }))
       expect(result).toMatchObject({ ok: false, status: 409 })
+      expect(getPoolMock).not.toHaveBeenCalled()
+    } finally {
+      if (priorSecret === undefined) delete process.env.HISTORIAN_FLUSH_SECRET
+      else process.env.HISTORIAN_FLUSH_SECRET = priorSecret
+    }
+  })
+
+  it('rejects normal completion when an exhausted review carries an active safety finding', async () => {
+    const priorSecret = process.env.HISTORIAN_FLUSH_SECRET
+    process.env.HISTORIAN_FLUSH_SECRET = 'synthetic-v4-save-attestation-secret'
+    try {
+      const transcript = completeV3Transcript()
+      const review = await attestedCompleteV4Review(transcript, {
+        shallow: true,
+        exhausted: true,
+        activeSafety: true,
+      })
+      const result = await saveInvitedHistorianSession(v4Binding, body({
+        structured_output: {
+          interview_prompt_version: 'comprehensive-v4',
+          live_review_v2: review,
+          medication_reconciliation_v1: completeEmptyMedicationReconciliation(),
+        },
+        transcript,
+        question_count: 12,
+      }))
+      expect(result).toMatchObject({
+        ok: false,
+        status: 409,
+        error: 'An active independent safety finding requires safety escalation.',
+      })
       expect(getPoolMock).not.toHaveBeenCalled()
     } finally {
       if (priorSecret === undefined) delete process.env.HISTORIAN_FLUSH_SECRET

@@ -98,6 +98,8 @@ describe('deployed Historian QA acceptance runner', () => {
           review: {
             version: 2,
             reviewedThroughSeq: patientSeqs.at(-1),
+            patientTurnCount: patientSeqs.length,
+            integrity: 'valid',
             domains: COMPREHENSIVE_HISTORY_DOMAINS.map((domain, index) => ({
               domain: domain.id,
               status: 'covered',

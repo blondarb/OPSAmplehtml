@@ -268,6 +268,16 @@ export async function saveInvitedHistorianSession(
         error: 'The independent live history review version does not match this interview.',
       }
     }
+    if (
+      verifiedReviewArtifact?.review.activeSafetyConcern.present &&
+      terminationReason !== 'safety_escalated'
+    ) {
+      return {
+        ok: false,
+        status: 409,
+        error: 'An active independent safety finding requires safety escalation.',
+      }
+    }
     const reviewCompletion = liveInterviewReviewCompletion(verifiedReviewArtifact?.review)
     const completion = verifiedMedicationState
       ? completionWithMedicationUncertainty(reviewCompletion, verifiedMedicationState)
@@ -285,7 +295,10 @@ export async function saveInvitedHistorianSession(
         !verifiedMedicationState ||
         !medicationReconciliationClosed(verifiedMedicationState) ||
         !medicationReconciliationTranscriptIsValid(verifiedMedicationState, transcript) ||
-        !medicationReconciliationMatchesReview(
+        !(
+          verifiedReviewArtifact?.review.version === 2 &&
+          verifiedReviewArtifact.review.integrity === 'inconsistent'
+        ) && !medicationReconciliationMatchesReview(
           verifiedMedicationState,
           verifiedReviewArtifact?.review.medications ?? [],
         ) ||

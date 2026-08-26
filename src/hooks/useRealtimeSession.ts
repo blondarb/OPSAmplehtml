@@ -32,10 +32,16 @@ import {
 } from '@/lib/historian/adaptiveQuestionContract'
 import {
   deriveLiveReviewStructuredCoverage,
+  liveReviewGapKey,
   liveInterviewReviewCompletion,
   parseLiveInterviewReviewArtifact,
   type LiveInterviewReviewArtifact,
 } from '@/lib/historian/liveReviewContract'
+import {
+  parseLiveReviewClarificationReceipt,
+  type LiveReviewClarificationEvidenceV1,
+  type LiveReviewClarificationReceiptV1,
+} from '@/lib/historian/liveReviewClarificationContract'
 import {
   approveMedicationQuestion,
   commitMedicationQuestion,
@@ -206,6 +212,7 @@ interface UseRealtimeSessionResult {
 /** How many patient turns between localizer runs. */
 const LOCALIZER_INTERVAL = 3
 const LIVE_REVIEW_INTERVAL = 4
+const MAX_REVIEW_GAP_CLARIFICATIONS = 3
 const MAX_ADAPTIVE_PROPOSAL_REJECTIONS = 2
 /**
  * On each intermittent Claude-conductor turn, hold Nova's proposed question
@@ -217,6 +224,8 @@ const MAX_ADAPTIVE_PROPOSAL_REJECTIONS = 2
 const ADAPTIVE_CONDUCTOR_WAIT_MS = 4_500
 const ADAPTIVE_CONDUCTOR_POLL_MS = 50
 const ADAPTIVE_REVIEW_WAIT_MS = 6_000
+const ADAPTIVE_REVIEW_THEN_CONDUCTOR_WAIT_MS =
+  ADAPTIVE_REVIEW_WAIT_MS + ADAPTIVE_CONDUCTOR_WAIT_MS
 
 /**
  * How many unflushed transcript entries accumulate before triggering an
@@ -312,12 +321,18 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
   const pendingConductorQuestionRef = useRef<{
     text: string
     reviewedThroughPatientSeq: number
+    clarificationReceipt: LiveReviewClarificationReceiptV1 | null
   } | null>(null)
   const conductorDuePatientSeqRef = useRef<number | null>(null)
   const patientEvidenceStateRef = useRef<PatientEvidenceState>(createPatientEvidenceState())
   const liveReviewRef = useRef<LiveInterviewReviewArtifact | null>(null)
   const liveReviewInFlightRef = useRef(false)
   const lastLiveReviewTurnRef = useRef(0)
+  const pendingReviewClarificationRef = useRef<{
+    receipt: LiveReviewClarificationReceiptV1
+    assistantSeq: number | null
+  } | null>(null)
+  const reviewClarificationEvidenceRef = useRef<LiveReviewClarificationEvidenceV1[]>([])
   const medicationReconciliationRef = useRef<MedicationReconciliationState>(
     createMedicationReconciliationState(),
   )
@@ -570,6 +585,15 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
     const reviewedThroughPatientSeq = [...transcriptRef.current]
       .reverse()
       .find((entry) => entry.role === 'user')?.seq
+    const reviewSnapshot = liveReviewRef.current?.review
+    const requiredReviewGap =
+      reviewSnapshot?.version === 2 &&
+      reviewSnapshot.integrity === 'valid' &&
+      reviewSnapshot.reviewedThroughSeq === reviewedThroughPatientSeq
+        ? reviewSnapshot.criticalGaps[0] ?? null
+        : null
+    const requiredReviewIntent = requiredReviewGap?.questionIntent ?? null
+    const requiredReviewGapKey = requiredReviewGap ? liveReviewGapKey(requiredReviewGap) : null
 
     localizerInFlightRef.current = true
     setLocalizerLoading(true)
@@ -605,14 +629,23 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
           chiefComplaint: options.referralReason,
           referralReason: options.referralReason,
           reviewGaps: adaptiveTurnControllerEnabledRef.current
-            ? liveReviewRef.current?.review.domains
+            ? reviewSnapshot?.domains
                 .filter((item) => item.status === 'missing')
                 .map((item) => item.domain)
                 .slice(0, 8) ?? []
             : undefined,
           reviewIntents: adaptiveTurnControllerEnabledRef.current
-            ? liveReviewRef.current?.review.nextQuestionIntents.slice(0, 3) ?? []
+            ? reviewSnapshot?.version === 2
+              ? reviewSnapshot.nextQuestionIntents.slice(0, 1)
+              : reviewSnapshot?.nextQuestionIntents.slice(0, 3) ?? []
             : undefined,
+          ...(adaptiveTurnControllerEnabledRef.current && requiredReviewIntent && requiredReviewGapKey
+            ? {
+                requiredReviewIntent,
+                requiredReviewGapKey,
+                reviewedThroughPatientSeq,
+              }
+            : {}),
           adaptiveInterview: adaptiveTurnControllerEnabledRef.current,
         }),
       })
@@ -636,6 +669,26 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
       const conductorQuestion = data.followUpQuestions
         .map((question) => approvedAdaptiveQuestion(question))
         .find((question): question is string => !!question)
+      let clarificationReceipt: LiveReviewClarificationReceiptV1 | null = null
+      if (
+        conductorQuestion &&
+        requiredReviewGapKey &&
+        data.addressedReviewGapKey === requiredReviewGapKey &&
+        data.reviewClarificationReceipt != null
+      ) {
+        try {
+          const parsedReceipt = parseLiveReviewClarificationReceipt(
+            data.reviewClarificationReceipt,
+          )
+          if (
+            parsedReceipt.gapKey === requiredReviewGapKey &&
+            parsedReceipt.reviewedThroughPatientSeq === reviewedThroughPatientSeq &&
+            parsedReceipt.question === conductorQuestion
+          ) clarificationReceipt = parsedReceipt
+        } catch {
+          clarificationReceipt = null
+        }
+      }
       if (
         adaptiveTurnControllerEnabledRef.current &&
         conductorQuestion &&
@@ -645,6 +698,7 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
         pendingConductorQuestionRef.current = {
           text: conductorQuestion,
           reviewedThroughPatientSeq: reviewedThroughPatientSeq!,
+          clarificationReceipt,
         }
       }
 
@@ -703,6 +757,14 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
           sessionId,
           transcript: snapshot,
           interviewPromptVersion: resolvedInterviewPromptVersionRef.current,
+          ...(resolvedInterviewPromptVersionRef.current === 'comprehensive-v4'
+            ? {
+                reviewClarificationEvidence: reviewClarificationEvidenceRef.current.slice(
+                  0,
+                  MAX_REVIEW_GAP_CLARIFICATIONS,
+                ),
+              }
+            : {}),
         }),
       })
       if (!response.ok) return null
@@ -736,6 +798,14 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
         return artifact
       }
 
+      // When a periodic conductor turn and review are due together, the
+      // caller defers Claude until this exact patient boundary has a fresh
+      // signed review. This prevents an older gap from owning a newer turn.
+      if (
+        conductorDuePatientSeqRef.current === latestPatientSeq &&
+        !localizerInFlightRef.current
+      ) void runLocalizer()
+
       // Keep the independent reviewer fully silent and application-owned.
       // Its cited domains govern closure and feed the next Claude conductor
       // request; injecting reviewer prose into Nova would create a USER-role
@@ -748,7 +818,7 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
     } finally {
       liveReviewInFlightRef.current = false
     }
-  }, [activateSafety])
+  }, [activateSafety, runLocalizer])
 
   // ── Durable transcript flush (Task 1) ─────────────────────────────────
   // Best-effort POST of up to 50 not-yet-durable entries. Returns a Promise
@@ -1031,7 +1101,15 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
           if (preCloseQuestion && applicationQuestion?.id === 'adaptive-preclose') {
             preCloseStateRef.current = 'approved'
           }
-          if (conductorQuestion) pendingConductorQuestionRef.current = null
+          if (conductorQuestion) {
+            if (pendingConductor?.clarificationReceipt) {
+              pendingReviewClarificationRef.current = {
+                receipt: pendingConductor.clarificationReceipt,
+                assistantSeq: null,
+              }
+            }
+            pendingConductorQuestionRef.current = null
+          }
           if (conductorDuePatientSeqRef.current === latestPatientSeq) {
             // Consume the intermittent conductor slot only after its exact
             // resubmission is approved, or after the bounded Claude wait
@@ -1051,10 +1129,12 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
           })
         }
 
-        const waitingForThisConductorTurn =
+        const conductorBoundaryPending =
           conductorDuePatientSeqRef.current === latestPatientSeq &&
-          localizerInFlightRef.current &&
           pendingConductorQuestionRef.current?.reviewedThroughPatientSeq !== latestPatientSeq
+        const waitingForThisConductorTurn =
+          conductorBoundaryPending &&
+          (liveReviewInFlightRef.current || localizerInFlightRef.current)
         const waitingForRequiredReview =
           reviewRequiredPatientSeqRef.current === latestPatientSeq &&
           currentReview?.review.reviewedThroughSeq !== latestPatientSeq
@@ -1062,7 +1142,11 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
         if (waitingForThisConductorTurn || waitingForRequiredReview) {
           void (async () => {
             const deadline = Date.now() + Math.max(
-              waitingForThisConductorTurn ? ADAPTIVE_CONDUCTOR_WAIT_MS : 0,
+              waitingForThisConductorTurn
+                ? (liveReviewInFlightRef.current
+                    ? ADAPTIVE_REVIEW_THEN_CONDUCTOR_WAIT_MS
+                    : ADAPTIVE_CONDUCTOR_WAIT_MS)
+                : 0,
               waitingForRequiredReview ? ADAPTIVE_REVIEW_WAIT_MS : 0,
             )
             while (
@@ -1072,7 +1156,8 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
               (
                 (
                   waitingForThisConductorTurn &&
-                  localizerInFlightRef.current &&
+                  conductorDuePatientSeqRef.current === latestPatientSeq &&
+                  (liveReviewInFlightRef.current || localizerInFlightRef.current) &&
                   pendingConductorQuestionRef.current?.reviewedThroughPatientSeq !== latestPatientSeq
                 ) ||
                 (
@@ -1786,6 +1871,16 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
             transcriptRef.current[transcriptRef.current.length - 1]
           transcriptRef.current = [...transcriptRef.current, entry]
           setTranscript([...transcriptRef.current])
+          if (
+            pendingReviewClarificationRef.current &&
+            pendingReviewClarificationRef.current.assistantSeq === null &&
+            pendingReviewClarificationRef.current.receipt.question === entry.text
+          ) {
+            pendingReviewClarificationRef.current = {
+              ...pendingReviewClarificationRef.current,
+              assistantSeq: entry.seq!,
+            }
+          }
 
           // Count EXCHANGES, not utterances. TURN_CAP's own comment says it:
           // "A turn is one exchange, not one question." Henry's opening block
@@ -1851,6 +1946,27 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
           transcriptRef.current = [...transcriptRef.current, entry]
           setTranscript([...transcriptRef.current])
           let requiresFreshAdaptiveReview = false
+          const pendingClarification = pendingReviewClarificationRef.current
+          if (
+            adaptiveTurnControllerEnabledRef.current &&
+            pendingClarification?.assistantSeq != null
+          ) {
+            if (entry.seq === pendingClarification.assistantSeq + 1) {
+              const evidence: LiveReviewClarificationEvidenceV1 = {
+                receipt: pendingClarification.receipt,
+                assistantSeq: pendingClarification.assistantSeq,
+                userSeq: entry.seq!,
+              }
+              reviewClarificationEvidenceRef.current = [
+                ...reviewClarificationEvidenceRef.current.filter((item) => (
+                  item.receipt.gapKey !== evidence.receipt.gapKey
+                )),
+                evidence,
+              ].slice(0, MAX_REVIEW_GAP_CLARIFICATIONS)
+              requiresFreshAdaptiveReview = true
+            }
+            pendingReviewClarificationRef.current = null
+          }
           if (
             adaptiveTurnControllerEnabledRef.current &&
             medicationReconciliationRef.current.pendingQuestion?.assistantSeq != null
@@ -1980,6 +2096,15 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
           // Localizer: increment patient turn counter and trigger every 3 turns
           patientTurnCountRef.current += 1
           const turnsSinceLast = patientTurnCountRef.current - lastLocalizerTurnRef.current
+          const turnsSinceReview = patientTurnCountRef.current - lastLiveReviewTurnRef.current
+          const shouldRunLiveReview =
+            adaptiveTurnControllerEnabledRef.current &&
+            runtimeGuardRef.current.acceptsInterviewActivity() &&
+            (
+              turnsSinceReview >= LIVE_REVIEW_INTERVAL ||
+              questionCountRef.current >= COMPREHENSIVE_SOFT_WRAP_EXCHANGE ||
+              requiresFreshAdaptiveReview
+            )
           if (
             !turnEvidenceControllerEnabledRef.current &&
             runtimeGuardRef.current.acceptsInterviewActivity() &&
@@ -1990,19 +2115,11 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
             if (adaptiveTurnControllerEnabledRef.current) {
               conductorDuePatientSeqRef.current = entry.seq ?? null
             }
-            // Fire async — must not block the event loop
-            void runLocalizer()
+            // If a review is also due, run it first; runLiveReview starts the
+            // conductor only after installing the fresh signed artifact.
+            if (!shouldRunLiveReview) void runLocalizer()
           }
-          const turnsSinceReview = patientTurnCountRef.current - lastLiveReviewTurnRef.current
-          if (
-            adaptiveTurnControllerEnabledRef.current &&
-            runtimeGuardRef.current.acceptsInterviewActivity() &&
-            (
-              turnsSinceReview >= LIVE_REVIEW_INTERVAL ||
-              questionCountRef.current >= COMPREHENSIVE_SOFT_WRAP_EXCHANGE ||
-              requiresFreshAdaptiveReview
-            )
-          ) void runLiveReview()
+          if (shouldRunLiveReview) void runLiveReview()
         }
         setCurrentUserText('')
         setIsUserSpeaking(false)
@@ -2160,6 +2277,8 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
     liveReviewRef.current = null
     liveReviewInFlightRef.current = false
     lastLiveReviewTurnRef.current = 0
+    pendingReviewClarificationRef.current = null
+    reviewClarificationEvidenceRef.current = []
     medicationReconciliationRef.current = createMedicationReconciliationState()
     preCloseStateRef.current = 'not_asked'
     reviewRequiredPatientSeqRef.current = null

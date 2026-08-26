@@ -51,8 +51,11 @@ describe('Comprehensive v3 adaptive synthetic runtime acceptance', () => {
   let conductorRequests: Array<{ headers: Record<string, string>; body: Record<string, unknown> }>
   let conductorGate: Promise<void> | null
   let releaseConductor: (() => void) | null
+  let reviewGate: Promise<void> | null
+  let releaseReview: (() => void) | null
   let sessionPromptVersion: 'comprehensive-v3' | 'comprehensive-v4'
   let v4DepthSufficient: boolean
+  let reviewerOnlyConductor: boolean
   let liveReviewRequestBodies: Array<Record<string, unknown>>
 
   beforeEach(() => {
@@ -64,8 +67,11 @@ describe('Comprehensive v3 adaptive synthetic runtime acceptance', () => {
     conductorRequests = []
     conductorGate = null
     releaseConductor = null
+    reviewGate = null
+    releaseReview = null
     sessionPromptVersion = 'comprehensive-v3'
     v4DepthSufficient = true
+    reviewerOnlyConductor = false
     liveReviewRequestBodies = []
     Object.defineProperty(globalThis, 'window', {
       configurable: true,
@@ -119,6 +125,7 @@ describe('Comprehensive v3 adaptive synthetic runtime acceptance', () => {
         const patientSeqs = transcript
           .filter((entry) => entry.role === 'user')
           .map((entry) => entry.seq)
+        if (reviewGate) await reviewGate
         return {
           ok: true,
           status: 200,
@@ -126,12 +133,35 @@ describe('Comprehensive v3 adaptive synthetic runtime acceptance', () => {
             review: {
               version: sessionPromptVersion === 'comprehensive-v4' ? 2 : 1,
               reviewedThroughSeq: patientSeqs.at(-1),
+              ...(sessionPromptVersion === 'comprehensive-v4'
+                ? { patientTurnCount: patientSeqs.length, integrity: 'valid' }
+                : {}),
               domains: COMPREHENSIVE_HISTORY_DOMAINS.map((domain, index) => ({
                 domain: domain.id,
-                status: 'covered',
-                patientSeqs: [patientSeqs[index % patientSeqs.length]],
+                status:
+                  sessionPromptVersion === 'comprehensive-v4' &&
+                  !v4DepthSufficient &&
+                  domain.id === 'presenting_symptom'
+                    ? 'missing'
+                    : 'covered',
+                patientSeqs:
+                  sessionPromptVersion === 'comprehensive-v4' &&
+                  !v4DepthSufficient &&
+                  domain.id === 'presenting_symptom'
+                    ? []
+                    : [patientSeqs[index % patientSeqs.length]],
               })),
-              criticalGaps: [],
+              criticalGaps:
+                sessionPromptVersion === 'comprehensive-v4' && !v4DepthSufficient
+                  ? [{
+                      domain: 'presenting_symptom',
+                      depthDimension: 'chronology_and_course',
+                      basis: 'not_asked',
+                      patientSeqs: [],
+                      reason: 'Synthetic chronology remains missing.',
+                      questionIntent: 'Clarify the symptom chronology once.',
+                    }]
+                  : [],
               contradictions: [],
               repetitions: [],
               medications: [],
@@ -178,6 +208,14 @@ describe('Comprehensive v3 adaptive synthetic runtime acceptance', () => {
           body: JSON.parse(String(init?.body)),
         })
         if (conductorGate) await conductorGate
+        const requestBody = conductorRequests.at(-1)!.body
+        const reviewerQuestion = 'How did the synthetic headaches change over time?'
+        const hasRequiredReviewerGap = typeof requestBody.requiredReviewGapKey === 'string'
+        const questions = reviewerOnlyConductor && !hasRequiredReviewerGap
+          ? []
+          : [hasRequiredReviewerGap
+              ? reviewerQuestion
+              : 'How long does each headache usually last?']
         return {
           ok: true,
           status: 200,
@@ -188,7 +226,19 @@ describe('Comprehensive v3 adaptive synthetic runtime acceptance', () => {
               likelihood: 'medium',
             }],
             evidenceSnippets: [],
-            followUpQuestions: ['How long does each headache usually last?'],
+            followUpQuestions: questions,
+            ...(hasRequiredReviewerGap
+              ? {
+                  addressedReviewGapKey: requestBody.requiredReviewGapKey,
+                  reviewClarificationReceipt: {
+                    version: 1,
+                    reviewedThroughPatientSeq: requestBody.reviewedThroughPatientSeq,
+                    gapKey: requestBody.requiredReviewGapKey,
+                    question: reviewerQuestion,
+                    attestation: 'c'.repeat(43),
+                  },
+                }
+              : {}),
             contextHint: 'Private synthetic context.',
             confidence: 'medium',
             localizationHypothesis: 'Private synthetic localization.',
@@ -627,6 +677,119 @@ describe('Comprehensive v3 adaptive synthetic runtime acceptance', () => {
       obligation_id: 'claude-conductor-4',
       approved_text: 'How long does each headache usually last?',
     })
+  })
+
+  it('holds a joint review turn until the fresh reviewer question is ready and receipts its answer', async () => {
+    sessionPromptVersion = 'comprehensive-v4'
+    v4DepthSufficient = false
+    reviewerOnlyConductor = true
+    const session = useRealtimeSession({
+      sessionType: 'new_patient',
+      interviewMode: 'comprehensive',
+      provider: 'nova',
+      unresponsiveness: { enabled: false, checkInAfterMs: 60_000, giveUpAfterMs: 60_000 },
+    })
+    reactHarness.effects.forEach((effect) => effect())
+    await session.startSession()
+
+    const askAndAnswer = async (turn: number) => {
+      voiceSink?.({
+        type: 'toolCall',
+        toolName: 'request_history_question',
+        toolUseId: `joint-review-question-${turn}`,
+        segmentId: 1,
+        input: { proposed_text: syntheticAdaptiveProposal(turn) },
+      })
+      const output = lastToolOutput(provider)
+      expect(output).toMatchObject({ success: true, status: 'approved' })
+      voiceSink?.({
+        type: 'assistantTranscript',
+        text: String(output.approved_text),
+        obligationId: String(output.obligation_id),
+        segmentId: 1,
+      })
+      voiceSink?.({
+        type: 'userTranscript',
+        text: `Synthetic joint-review answer ${turn}.`,
+        segmentId: 1,
+      })
+      if (turn % 4 === 0) {
+        await vi.waitFor(() => expect(reviewCalls).toBe(turn / 4))
+      }
+      if (turn % 3 === 0 && !reviewGate) {
+        await vi.waitFor(() => expect(conductorRequests).toHaveLength(turn / 3))
+      }
+      await Promise.resolve()
+      await Promise.resolve()
+    }
+
+    for (let turn = 1; turn <= 11; turn += 1) await askAndAnswer(turn)
+
+    reviewGate = new Promise<void>((resolve) => { releaseReview = resolve })
+    await askAndAnswer(12)
+    const toolResultsBeforeProposal = vi.mocked(provider.sendToolResult).mock.calls.length
+
+    // The turn-12 review and conductor are one bounded admission boundary.
+    // Nova's immediate proposal must not consume the slot while the fresh
+    // reviewer is still deciding which cited gap Claude should translate.
+    voiceSink?.({
+      type: 'toolCall',
+      toolName: 'request_history_question',
+      toolUseId: 'joint-review-immediate-proposal',
+      segmentId: 1,
+      input: { proposed_text: 'What does the headache feel like now?' },
+    })
+    expect(vi.mocked(provider.sendToolResult)).toHaveBeenCalledTimes(toolResultsBeforeProposal)
+
+    releaseReview?.()
+    reviewGate = null
+    await vi.waitFor(() => expect(conductorRequests).toHaveLength(4))
+    expect(conductorRequests.at(-1)?.body).toMatchObject({
+      requiredReviewIntent: 'Clarify the symptom chronology once.',
+      reviewedThroughPatientSeq: 24,
+    })
+    await vi.waitFor(() => expect(lastToolOutput(provider)).toEqual({
+      success: false,
+      status: 'proposal_rejected',
+      issue_codes: ['clinical_redirect'],
+      required_text: 'How did the synthetic headaches change over time?',
+    }))
+
+    voiceSink?.({
+      type: 'toolCall',
+      toolName: 'request_history_question',
+      toolUseId: 'joint-review-exact-resubmission',
+      segmentId: 1,
+      input: { proposed_text: 'How did the synthetic headaches change over time?' },
+    })
+    const reviewerOutput = lastToolOutput(provider)
+    expect(reviewerOutput).toMatchObject({
+      success: true,
+      status: 'approved',
+      approved_text: 'How did the synthetic headaches change over time?',
+    })
+    voiceSink?.({
+      type: 'assistantTranscript',
+      text: String(reviewerOutput.approved_text),
+      obligationId: String(reviewerOutput.obligation_id),
+      segmentId: 1,
+    })
+    voiceSink?.({
+      type: 'userTranscript',
+      text: 'They became more frequent over the last synthetic month.',
+      segmentId: 1,
+    })
+
+    await vi.waitFor(() => expect(reviewCalls).toBe(4))
+    expect(liveReviewRequestBodies.at(-1)?.reviewClarificationEvidence).toEqual([
+      expect.objectContaining({
+        assistantSeq: 25,
+        userSeq: 26,
+        receipt: expect.objectContaining({
+          question: 'How did the synthetic headaches change over time?',
+        }),
+      }),
+    ])
   })
 
   it('lets the transcript-citing silent reviewer strengthen the existing safety pathway', async () => {

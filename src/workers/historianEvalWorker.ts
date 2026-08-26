@@ -106,7 +106,11 @@ function reportInputForClaim(
     limitations.push(`Uncertain history domains: ${sufficiency.uncertainty_domains.join(', ')}.`)
   }
   if (sufficiency.medication.status !== 'closed') {
-    limitations.push('Medication reconciliation contains unresolved or unobtained information.')
+    limitations.push(
+      sufficiency.outcome === 'gate_unavailable'
+        ? 'Medication reconciliation was not independently verified; review the transcript and application medication ledger.'
+        : 'Medication reconciliation contains unresolved or unobtained information.',
+    )
   }
   return {
     transcript: claim.transcript,

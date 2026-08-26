@@ -9,9 +9,11 @@ import {
   LIVE_INTERVIEW_REVIEW_V2_PROMPT_VERSION,
   LIVE_INTERVIEW_REVIEW_V2_VERSION,
   LIVE_REVIEW_DEPTH_DIMENSIONS,
+  liveReviewGapKey,
   parseLiveInterviewReview,
   parseLiveInterviewReviewV2,
   type UnsignedLiveInterviewReviewArtifact,
+  type LiveInterviewReviewV2,
 } from './liveReviewContract'
 
 /**
@@ -59,6 +61,21 @@ ADDITIONAL CASE-DEPTH AUDIT:
 - If depth is not sufficient, provide at least one next_question_intent targeting the highest-value missing discriminator. Keep it non-diagnostic, one-question-at-a-time, and do not prescribe a test or treatment.
 - Low confidence can never support closure.
 - ready_to_close may be true only when the original coverage rules AND this depth audit permit it.`
+
+const COHERENT_GAP_RULES = `
+
+COHERENT V2 GAP CONTRACT:
+- Explicit patient negatives are evidence and may satisfy a domain or depth dimension.
+- Medication completeness is owned exclusively by the application's deterministic medication ledger. Never emit a critical gap for medications.
+- Each critical_gap must contain domain, depth_dimension, basis, patient_seqs, reason, and question_intent.
+- A critical gap may never target a covered domain or an adequate depth dimension.
+- basis not_asked requires both the domain and depth dimension to be missing, with no patient citations anywhere in that gap.
+- basis partial_answer requires both findings to be uncertain and at least one cited patient sequence shared by the domain, depth dimension, and gap.
+- basis conflicting_answer requires both findings to be uncertain, at least two shared patient citations, and those same citations in a contradiction.
+- next_question_intents must be exactly the de-duplicated question_intent values from valid critical_gaps; do not add any other intents.
+- The application recomputes ready_to_close and depth_sufficient. Return your honest classifications, but do not rely on those booleans to override this contract.`
+
+const SYSTEM_PROMPT_V2_COHERENT = `${SYSTEM_PROMPT_V2}${COHERENT_GAP_RULES}`
 
 const INPUT_SCHEMA = {
   type: 'object',
@@ -244,6 +261,27 @@ const INPUT_SCHEMA_V2 = {
       },
       required: ['dimensions', 'depth_sufficient'],
     },
+    critical_gaps: {
+      type: 'array',
+      maxItems: 10,
+      items: {
+        type: 'object',
+        additionalProperties: false,
+        properties: {
+          domain: { type: 'string', enum: DOMAIN_ENUM.filter((domain) => domain !== 'medications') },
+          depth_dimension: { type: 'string', enum: LIVE_REVIEW_DEPTH_DIMENSIONS },
+          basis: { type: 'string', enum: ['not_asked', 'partial_answer', 'conflicting_answer'] },
+          patient_seqs: {
+            type: 'array',
+            maxItems: 6,
+            items: { type: 'integer', minimum: 1 },
+          },
+          reason: { type: 'string', maxLength: 240 },
+          question_intent: { type: 'string', maxLength: 240 },
+        },
+        required: ['domain', 'depth_dimension', 'basis', 'patient_seqs', 'reason', 'question_intent'],
+      },
+    },
   },
   required: [
     ...INPUT_SCHEMA.required,
@@ -257,26 +295,61 @@ function numberedTranscript(transcript: HistorianTranscriptEntry[]): string {
     .join('\n')
 }
 
-export async function generateLiveInterviewReview(
-  transcript: HistorianTranscriptEntry[],
-  options: { diagnosticDepth?: boolean } = {},
-): Promise<UnsignedLiveInterviewReviewArtifact> {
+function inconsistentV2Review(transcript: HistorianTranscriptEntry[]) {
   const latestPatientSeq = [...transcript]
     .reverse()
-    .find((entry) => entry.role === 'user')?.seq
-  if (!Number.isInteger(latestPatientSeq)) {
-    throw new Error('A patient transcript turn is required for live review.')
+    .find((entry) => entry.role === 'user')!.seq!
+  const patientTurnCount = transcript.filter((entry) => entry.role === 'user').length
+  return {
+    version: LIVE_INTERVIEW_REVIEW_V2_VERSION,
+    reviewedThroughSeq: latestPatientSeq,
+    patientTurnCount,
+    integrity: 'inconsistent' as const,
+    domains: COMPREHENSIVE_HISTORY_DOMAINS.map(({ id }) => ({
+      domain: id,
+      status: 'missing' as const,
+      patientSeqs: [],
+    })),
+    criticalGaps: [],
+    contradictions: [],
+    repetitions: [],
+    medications: [],
+    activeSafetyConcern: { present: false, patientSeqs: [] },
+    diagnosticDepth: {
+      dimensions: LIVE_REVIEW_DEPTH_DIMENSIONS.map((dimension) => ({
+        dimension,
+        status: 'missing' as const,
+        patientSeqs: [],
+      })),
+      depthSufficient: false,
+    },
+    readyToClose: false,
+    nextQuestionIntents: [],
+    confidence: 'low' as const,
   }
+}
 
-  const { result, modelId } = await invokeBedrockClinicalToolWithMeta<unknown>({
+async function invokeReviewTool(
+  transcript: HistorianTranscriptEntry[],
+  diagnosticDepth: boolean,
+  repairCodes: string[] = [],
+) {
+  const latestPatientSeq = [...transcript]
+    .reverse()
+    .find((entry) => entry.role === 'user')!.seq!
+  return invokeBedrockClinicalToolWithMeta<unknown>({
     model: LIVE_INTERVIEW_REVIEW_MODEL,
-    system: options.diagnosticDepth ? SYSTEM_PROMPT_V2 : SYSTEM_PROMPT,
+    system: diagnosticDepth
+      ? `${SYSTEM_PROMPT_V2_COHERENT}${repairCodes.length
+        ? `\nREPAIR: Your prior tool result violated fixed contract code(s): ${repairCodes.join(', ')}. Return a newly validated tool payload only.`
+        : ''}`
+      : SYSTEM_PROMPT,
     messages: [{
       role: 'user',
       content: JSON.stringify({
         reviewed_through_seq: latestPatientSeq,
         fixed_domains: COMPREHENSIVE_HISTORY_DOMAINS,
-        ...(options.diagnosticDepth
+        ...(diagnosticDepth
           ? { diagnostic_depth_dimensions: LIVE_REVIEW_DEPTH_DIMENSIONS }
           : {}),
         numbered_transcript: numberedTranscript(transcript),
@@ -286,25 +359,83 @@ export async function generateLiveInterviewReview(
     temperature: 0,
     toolName: TOOL_NAME,
     toolDescription: 'Record the silent in-session coverage and quality review. This result is never shown or spoken to the patient.',
-    inputSchema: options.diagnosticDepth ? INPUT_SCHEMA_V2 : INPUT_SCHEMA,
+    inputSchema: diagnosticDepth ? INPUT_SCHEMA_V2 : INPUT_SCHEMA,
   })
+}
 
-  const generatedAt = new Date().toISOString()
-  return options.diagnosticDepth
-    ? {
-        review: parseLiveInterviewReviewV2(result, transcript),
+export async function generateLiveInterviewReview(
+  transcript: HistorianTranscriptEntry[],
+  options: {
+    diagnosticDepth?: boolean
+    exhaustedGapKeys?: readonly string[]
+    clarificationBudgetExhausted?: boolean
+  } = {},
+): Promise<UnsignedLiveInterviewReviewArtifact> {
+  const latestPatientSeq = [...transcript]
+    .reverse()
+    .find((entry) => entry.role === 'user')?.seq
+  if (!Number.isInteger(latestPatientSeq)) {
+    throw new Error('A patient transcript turn is required for live review.')
+  }
+
+  if (!options.diagnosticDepth) {
+    const { result, modelId } = await invokeReviewTool(transcript, false)
+    return {
+      review: parseLiveInterviewReview(result, transcript),
+      provenance: {
+        modelId,
+        promptVersion: LIVE_INTERVIEW_REVIEW_PROMPT_VERSION,
+        generatedAt: new Date().toISOString(),
+      },
+    }
+  }
+
+  const applyClarificationBudget = (review: LiveInterviewReviewV2): LiveInterviewReviewV2 => {
+    const exhausted = new Set(options.exhaustedGapKeys ?? [])
+    if (
+      review.criticalGaps.length > 0 &&
+      (
+        options.clarificationBudgetExhausted === true ||
+        review.criticalGaps.some((gap) => exhausted.has(liveReviewGapKey(gap)))
+      )
+    ) {
+      return { ...review, integrity: 'clarification_exhausted' }
+    }
+    return review
+  }
+
+  const first = await invokeReviewTool(transcript, true)
+  try {
+    return {
+      review: applyClarificationBudget(parseLiveInterviewReviewV2(first.result, transcript)),
+      provenance: {
+        modelId: first.modelId,
+        promptVersion: LIVE_INTERVIEW_REVIEW_V2_PROMPT_VERSION,
+        generatedAt: new Date().toISOString(),
+      },
+    }
+  } catch {
+    // The retry carries only a fixed code, never model prose, parser text, or
+    // patient transcript beyond the identical original review input.
+    const retry = await invokeReviewTool(transcript, true, ['LIVE_REVIEW_CONTRACT_INVALID'])
+    try {
+      return {
+        review: applyClarificationBudget(parseLiveInterviewReviewV2(retry.result, transcript)),
         provenance: {
-          modelId,
+          modelId: retry.modelId,
           promptVersion: LIVE_INTERVIEW_REVIEW_V2_PROMPT_VERSION,
-          generatedAt,
+          generatedAt: new Date().toISOString(),
         },
       }
-    : {
-        review: parseLiveInterviewReview(result, transcript),
+    } catch {
+      return {
+        review: inconsistentV2Review(transcript),
         provenance: {
-          modelId,
-          promptVersion: LIVE_INTERVIEW_REVIEW_PROMPT_VERSION,
-          generatedAt,
+          modelId: retry.modelId,
+          promptVersion: LIVE_INTERVIEW_REVIEW_V2_PROMPT_VERSION,
+          generatedAt: new Date().toISOString(),
         },
       }
+    }
+  }
 }

@@ -5,11 +5,13 @@ const {
   queryMock,
   generateReviewMock,
   attestReviewMock,
+  verifyClarificationEvidenceMock,
 } = vi.hoisted(() => ({
   verifyFlushTokenMock: vi.fn(),
   queryMock: vi.fn(),
   generateReviewMock: vi.fn(),
   attestReviewMock: vi.fn(),
+  verifyClarificationEvidenceMock: vi.fn(),
 }))
 
 vi.mock('@/lib/historian/flushToken', () => ({ verifyFlushToken: verifyFlushTokenMock }))
@@ -19,6 +21,9 @@ vi.mock('@/lib/historian/liveReview', () => ({
 }))
 vi.mock('@/lib/historian/liveReviewAttestation', () => ({
   attestLiveInterviewReview: attestReviewMock,
+}))
+vi.mock('@/lib/historian/liveReviewClarificationReceipt', () => ({
+  verifyLiveReviewClarificationEvidence: verifyClarificationEvidenceMock,
 }))
 
 import { POST } from '@/app/api/ai/historian/live-review/route'
@@ -54,6 +59,9 @@ describe('POST /api/ai/historian/live-review', () => {
       review: { version: 1 },
       provenance: {},
       attestation: 'a'.repeat(43),
+    })
+    verifyClarificationEvidenceMock.mockResolvedValue({
+      receipt: { gapKey: 'functional_impact:functional_impact' },
     })
   })
 
@@ -106,13 +114,56 @@ describe('POST /api/ai/historian/live-review', () => {
 
     const response = await POST(request({ interviewPromptVersion: 'comprehensive-v3' }))
     expect(response.status).toBe(200)
-    expect(generateReviewMock).toHaveBeenCalledWith(TRANSCRIPT, { diagnosticDepth: true })
+    expect(generateReviewMock).toHaveBeenCalledWith(TRANSCRIPT, {
+      diagnosticDepth: true,
+      exhaustedGapKeys: [],
+      clarificationBudgetExhausted: false,
+    })
     expect(attestReviewMock).toHaveBeenCalledWith(
       SESSION_ID,
       TRANSCRIPT,
       { review: { version: 2 }, provenance: {} },
       ATTEMPT_ID,
     )
+  })
+
+  it('derives exhausted reviewer gaps only from server-verifiable transcript evidence', async () => {
+    queryMock.mockResolvedValueOnce({
+      rows: [{
+        status: 'in_progress',
+        startup_attempt_id: ATTEMPT_ID,
+        interview_prompt_version: 'comprehensive-v4',
+      }],
+    })
+    const evidence = { synthetic: 'server-signed-clarification-evidence' }
+    const response = await POST(request({ reviewClarificationEvidence: [evidence] }))
+
+    expect(response.status).toBe(200)
+    expect(verifyClarificationEvidenceMock).toHaveBeenCalledWith(
+      SESSION_ID,
+      ATTEMPT_ID,
+      TRANSCRIPT,
+      evidence,
+    )
+    expect(generateReviewMock).toHaveBeenCalledWith(TRANSCRIPT, {
+      diagnosticDepth: true,
+      exhaustedGapKeys: ['functional_impact:functional_impact'],
+      clarificationBudgetExhausted: false,
+    })
+  })
+
+  it('rejects browser-asserted clarification evidence that the server cannot verify', async () => {
+    queryMock.mockResolvedValueOnce({
+      rows: [{
+        status: 'in_progress',
+        startup_attempt_id: ATTEMPT_ID,
+        interview_prompt_version: 'comprehensive-v4',
+      }],
+    })
+    verifyClarificationEvidenceMock.mockRejectedValueOnce(new Error('invalid'))
+    const response = await POST(request({ reviewClarificationEvidence: [{}] }))
+    expect(response.status).toBe(400)
+    expect(generateReviewMock).not.toHaveBeenCalled()
   })
 
   it('rejects noncontiguous or assistant-ended transcript snapshots before model use', async () => {

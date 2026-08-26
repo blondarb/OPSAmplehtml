@@ -134,7 +134,18 @@ export function deriveDiagnosticSufficiency(
     input.reviewArtifact?.review.version === LIVE_INTERVIEW_REVIEW_V2_VERSION
     ? input.reviewArtifact as LiveInterviewReviewArtifactV2
     : null
-  const medication = medicationStatus(input.medicationState)
+  const ledgerMedication = medicationStatus(input.medicationState)
+  // When the independent review contract is unavailable, the deterministic
+  // ledger may still preserve already verified items for display, but it
+  // cannot claim that the final medication inventory was independently
+  // reconciled against the transcript.
+  const medication: DiagnosticSufficiencyV1['medication'] =
+    reviewV2 && reviewV2.review.integrity !== 'valid'
+      ? {
+          status: 'incomplete',
+          unresolved_count: Math.max(1, ledgerMedication.unresolved_count),
+        }
+      : ledgerMedication
   const dimensions: DiagnosticSufficiencyV1['dimensions'] = reviewV2
     ? reviewV2.review.diagnosticDepth.dimensions.map((item) => ({
         dimension: item.dimension,
@@ -161,7 +172,9 @@ export function deriveDiagnosticSufficiency(
 
   const partial = input.completionStatus === 'ended_early' ||
     !['coverage_complete', 'complete_with_uncertainty'].includes(input.terminationReason)
-  const gateAvailable = input.promptVersion === 'comprehensive-v4' && !!reviewV2
+  const gateAvailable = input.promptVersion === 'comprehensive-v4' &&
+    !!reviewV2 &&
+    reviewV2.review.integrity === 'valid'
   const depthSufficient = !!reviewV2?.review.readyToClose &&
     reviewV2.review.diagnosticDepth.depthSufficient &&
     dimensions.every((item) => item.status !== 'missing' && item.status !== 'not_assessed') &&
