@@ -261,6 +261,10 @@ function completeSyntheticAdaptiveTranscript(): HistorianTranscriptEntry[] {
       'I take no prescription, over-the-counter, or supplement medications, so there are no adherence problems or medication side effects to report.',
     ],
     [
+      'What have you tried for the headaches, and what effect did it have?',
+      'I have tried drinking water, sleeping, and resting in a dark quiet room. The dark room helps somewhat, but the headache still lasts four to six hours. I have not tried pain relievers or prescription treatments.',
+    ],
+    [
       'Do you have any allergies or prior allergic reactions?',
       'I report no drug, food, or environmental allergies and no prior allergic reactions. My mother had recurrent headaches, and there is no known family seizure, stroke at a young age, or inherited neurologic disease.',
     ],
@@ -296,7 +300,7 @@ function fixedSaveBody(
     sessionId,
     structured_output: {
       chief_complaint: 'Synthetic recurrent headache history',
-      hpi: 'Synthetic adaptive-v3 fixture history for persistence acceptance only.',
+      hpi: 'Synthetic comprehensive-v4 fixture history for persistence acceptance only.',
       age_years_patient_reported: 45,
       interview_mode: 'comprehensive',
       interview_prompt_version: 'comprehensive-v4',
@@ -331,11 +335,12 @@ function assertGroundedClinicianReport(
   raw: unknown,
   transcript: HistorianTranscriptEntry[],
 ): void {
+  const patientTurnCount = transcript.filter((entry) => entry.role === 'user').length
   if (!isRecord(raw) || raw.version !== 1 || raw.report_status !== 'complete' ||
     typeof raw.input_digest !== 'string' || !/^[0-9a-f]{64}$/.test(raw.input_digest) ||
     !Array.isArray(raw.sections) || raw.sections.length !== CLINICIAN_HISTORY_SECTION_IDS.length ||
     !isRecord(raw.provenance) || raw.provenance.prompt_version !== CLINICIAN_HISTORY_REPORT_PROMPT_VERSION ||
-    !isRecord(raw.completion) || raw.completion.patient_turn_count !== 12 ||
+    !isRecord(raw.completion) || raw.completion.patient_turn_count !== patientTurnCount ||
     !isRecord(raw.medication_reconciliation) || !Array.isArray(raw.medication_reconciliation.items)
   ) throw new HistorianQaAcceptanceError('CLINICIAN_REPORT_SCHEMA_INVALID')
 
@@ -571,12 +576,25 @@ export async function runHistorianQaAcceptance(
     if (
       parsed.review.version !== 2 ||
       parsed.provenance.promptVersion !== LIVE_INTERVIEW_REVIEW_V2_PROMPT_VERSION ||
-      parsed.review.diagnosticDepth.dimensions.length !== LIVE_REVIEW_DEPTH_DIMENSIONS.length ||
-      !parsed.review.diagnosticDepth.depthSufficient
+      parsed.review.diagnosticDepth.dimensions.length !== LIVE_REVIEW_DEPTH_DIMENSIONS.length
     ) throw new Error('wrong review version or depth contract')
     liveReview = parsed
   } catch {
     throw new HistorianQaAcceptanceError('LIVE_REVIEW_ARTIFACT_INVALID')
+  }
+  if (!liveReview.review.readyToClose || !liveReview.review.diagnosticDepth.depthSufficient) {
+    emit([
+      'HISTORIAN_QA_DIAGNOSTIC live_review',
+      `ready_to_close=${liveReview.review.readyToClose}`,
+      `depth_sufficient=${liveReview.review.diagnosticDepth.depthSufficient}`,
+      `missing_domains=${liveReview.review.domains.filter((item) => item.status === 'missing').length}`,
+      `uncertain_domains=${liveReview.review.domains.filter((item) => item.status === 'uncertain').length}`,
+      `critical_gaps=${liveReview.review.criticalGaps.length}`,
+      `missing_depth=${liveReview.review.diagnosticDepth.dimensions.filter((item) => item.status === 'missing').length}`,
+      `uncertain_depth=${liveReview.review.diagnosticDepth.dimensions.filter((item) => item.status === 'uncertain').length}`,
+      `confidence=${liveReview.review.confidence}`,
+      `next_intents=${liveReview.review.nextQuestionIntents.length}`,
+    ].join(' '))
   }
   const expectedTerminationReason = liveInterviewReviewCompletion(liveReview.review)
   if (expectedTerminationReason === 'incomplete') {
@@ -688,7 +706,8 @@ export async function runHistorianQaAcceptance(
     !isRecord(matchingSession.diagnostic_sufficiency) ||
     matchingSession.diagnostic_sufficiency.outcome !== 'sufficient' ||
     matchingSession.diagnostic_sufficiency.ddx_allowed !== true ||
-    matchingSession.diagnostic_sufficiency.patient_turn_count !== 12 ||
+    matchingSession.diagnostic_sufficiency.patient_turn_count !==
+      transcript.filter((entry) => entry.role === 'user').length ||
     !isRecord(matchingSession.final_differential) ||
     !Array.isArray(matchingSession.final_differential.differential) ||
     matchingSession.final_differential.differential.length === 0 ||
