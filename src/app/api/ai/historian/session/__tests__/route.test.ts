@@ -255,6 +255,25 @@ describe('POST /api/ai/historian/session — textMode (Historian Validation Suit
     })
   })
 
+  it('starts an invited Comprehensive v4 session with the adaptive controller', async () => {
+    vi.mocked(resolveHistorianPatientGrant).mockResolvedValueOnce({
+      inviteId: 'invite-v4', tenantId: 'tenant-a', consultId: 'consult-v4', patientId: 'patient-v4',
+      sessionId: '44444444-4444-4444-8444-444444444444', patientName: 'Synthetic Patient',
+      referralReason: 'Synthetic episodic loss of awareness', sessionType: 'new_patient', provider: 'nova',
+      interviewMode: 'comprehensive', interviewPromptVersion: 'comprehensive-v4',
+      status: 'redeemed', grantExpiresAt: new Date(Date.now() + 60_000).toISOString(),
+    })
+
+    const res = await POST(buildReq({}, '', 'historian_patient_grant=opaque-grant'))
+    expect(res.status).toBe(200)
+    const json = await res.json()
+    expect(json.interviewPromptVersion).toBe('comprehensive-v4')
+    expect(json.adaptiveTurnController).toBe(true)
+    expect(json.turnEvidenceController).toBe(false)
+    expect(json.provider).toBe('nova')
+    expect(json.instructions).toContain('Claude conductor')
+  })
+
   it('fails closed when a patient grant cookie is present but invalid', async () => {
     vi.mocked(resolveHistorianPatientGrant).mockResolvedValueOnce(null)
     const res = await POST(buildReq(

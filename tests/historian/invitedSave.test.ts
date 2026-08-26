@@ -15,6 +15,8 @@ import type { HistorianInvitationBinding } from '@/lib/historian/invitationStore
 import { COMPREHENSIVE_HISTORY_DOMAINS } from '@/lib/historianTypes'
 import {
   LIVE_INTERVIEW_REVIEW_PROMPT_VERSION,
+  LIVE_INTERVIEW_REVIEW_V2_PROMPT_VERSION,
+  LIVE_REVIEW_DEPTH_DIMENSIONS,
   type LiveReviewMedicationMention,
 } from '@/lib/historian/liveReviewContract'
 import {
@@ -67,6 +69,11 @@ const v3Binding: HistorianInvitationBinding = {
   ...binding,
   interviewPromptVersion: 'comprehensive-v3',
   startupAttemptId: '22222222-2222-4222-8222-222222222222',
+}
+
+const v4Binding: HistorianInvitationBinding = {
+  ...v3Binding,
+  interviewPromptVersion: 'comprehensive-v4',
 }
 
 function completeV3Transcript() {
@@ -137,6 +144,57 @@ async function attestedCompleteV3Review(
       generatedAt: '2026-08-25T12:00:00.000Z',
     },
   }, v3Binding.startupAttemptId ?? undefined)
+}
+
+async function attestedCompleteV4Review(
+  transcript = completeV3Transcript(),
+  options: { shallow?: boolean } = {},
+) {
+  const patientSeqs = transcript.filter((entry) => entry.role === 'user').map((entry) => entry.seq!)
+  return attestLiveInterviewReview(v4Binding.sessionId, transcript, {
+    review: {
+      version: 2,
+      reviewedThroughSeq: patientSeqs.at(-1)!,
+      domains: COMPREHENSIVE_HISTORY_DOMAINS.map((domain, index) => ({
+        domain: domain.id,
+        status: 'covered' as const,
+        patientSeqs: [patientSeqs[index % patientSeqs.length]],
+      })),
+      criticalGaps: options.shallow
+        ? [{
+            domain: 'presenting_symptom' as const,
+            reason: 'The symptom phenotype remains too shallow.',
+            questionIntent: 'Clarify the symptom quality and severity.',
+          }]
+        : [],
+      contradictions: [],
+      repetitions: [],
+      medications: [],
+      activeSafetyConcern: { present: false, patientSeqs: [] },
+      diagnosticDepth: {
+        dimensions: LIVE_REVIEW_DEPTH_DIMENSIONS.map((dimension, index) => ({
+          dimension,
+          status: options.shallow && dimension === 'phenotype_and_severity'
+            ? 'missing' as const
+            : 'adequate' as const,
+          patientSeqs: options.shallow && dimension === 'phenotype_and_severity'
+            ? []
+            : [patientSeqs[index % patientSeqs.length]],
+        })),
+        depthSufficient: !options.shallow,
+      },
+      readyToClose: !options.shallow,
+      nextQuestionIntents: options.shallow
+        ? ['Clarify the symptom quality and severity.']
+        : [],
+      confidence: 'high',
+    },
+    provenance: {
+      modelId: 'synthetic-independent-reviewer',
+      promptVersion: LIVE_INTERVIEW_REVIEW_V2_PROMPT_VERSION,
+      generatedAt: '2026-08-25T12:00:00.000Z',
+    },
+  }, v4Binding.startupAttemptId ?? undefined)
 }
 
 async function uncertainMedicationV3Fixture() {
@@ -353,8 +411,9 @@ describe('invited historian transactional save', () => {
     const sessionUpdate = queryMock.mock.calls.find(([sql]) =>
       String(sql).includes('UPDATE historian_sessions'),
     )
-    expect(sessionUpdate?.[0]).toContain('AND tenant_id = $13')
-    expect(sessionUpdate?.[0]).toContain('AND consult_id = $14')
+    expect(sessionUpdate?.[0]).toContain('diagnostic_sufficiency = $11::jsonb')
+    expect(sessionUpdate?.[0]).toContain('AND tenant_id = $14')
+    expect(sessionUpdate?.[0]).toContain('AND consult_id = $15')
     expect(sessionUpdate?.[1]).toContain(binding.sessionId)
     expect(sessionUpdate?.[1]).toContain(binding.tenantId)
     expect(sessionUpdate?.[1]).toContain(binding.consultId)
@@ -552,6 +611,16 @@ describe('invited historian transactional save', () => {
       expect(persisted).not.toHaveProperty('medication_changes')
       expect(JSON.stringify(persisted)).not.toContain('trazodone')
       expect(sessionUpdate?.[1]).toContain('comprehensive-v3')
+      expect(sessionUpdate?.[1]?.[10]).toBeNull()
+      const jobInsert = queryMock.mock.calls.find(([sql]) =>
+        String(sql).includes('INSERT INTO historian_eval_jobs'))
+      expect(jobInsert?.[1]).toEqual([
+        v3Binding.tenantId,
+        v3Binding.sessionId,
+        1,
+        'legacy',
+        expect.any(Date),
+      ])
     } finally {
       if (priorSecret === undefined) delete process.env.HISTORIAN_FLUSH_SECRET
       else process.env.HISTORIAN_FLUSH_SECRET = priorSecret
@@ -643,6 +712,95 @@ describe('invited historian transactional save', () => {
         structured_output: {
           interview_prompt_version: 'comprehensive-v3',
           live_review_v1: review,
+        },
+        transcript,
+        question_count: 12,
+      }))
+      expect(result).toMatchObject({ ok: false, status: 409 })
+      expect(getPoolMock).not.toHaveBeenCalled()
+    } finally {
+      if (priorSecret === undefined) delete process.env.HISTORIAN_FLUSH_SECRET
+      else process.env.HISTORIAN_FLUSH_SECRET = priorSecret
+    }
+  })
+
+  it('persists a server-derived v4 sufficiency artifact and report-first job stage', async () => {
+    const priorSecret = process.env.HISTORIAN_FLUSH_SECRET
+    process.env.HISTORIAN_FLUSH_SECRET = 'synthetic-v4-save-attestation-secret'
+    try {
+      const transcript = completeV3Transcript()
+      const review = await attestedCompleteV4Review(transcript)
+      queryMock.mockImplementation(async (sql: string) => {
+        if (sql === 'BEGIN' || sql === 'COMMIT') return { rows: [], rowCount: 0 }
+        if (sql.includes('FOR UPDATE OF invite, session')) {
+          return { rows: [{
+            invite_status: 'in_progress', session_status: 'in_progress',
+            startup_attempt_id: v4Binding.startupAttemptId,
+            grant_expires_at: '2026-08-26T18:00:00.000Z',
+          }], rowCount: 1 }
+        }
+        if (sql.includes('INSERT INTO historian_transcript_events')) {
+          return { rows: [], rowCount: transcript.length }
+        }
+        if (sql.includes('SELECT seq, role, text')) {
+          return {
+            rows: transcript.map(({ seq, role, text }) => ({ seq, role, text })),
+            rowCount: transcript.length,
+          }
+        }
+        if (sql.includes('INSERT INTO historian_eval_jobs')) return { rows: [], rowCount: 1 }
+        if (sql.includes('UPDATE historian_') || sql.includes('UPDATE neurology_consults')) {
+          return { rows: [], rowCount: 1 }
+        }
+        throw new Error(`Unexpected SQL: ${sql}`)
+      })
+
+      const result = await saveInvitedHistorianSession(v4Binding, body({
+        structured_output: {
+          interview_prompt_version: 'comprehensive-v4',
+          live_review_v2: review,
+          medication_reconciliation_v1: completeEmptyMedicationReconciliation(),
+        },
+        transcript,
+        question_count: 12,
+      }))
+      expect(result.ok).toBe(true)
+      const sessionUpdate = queryMock.mock.calls.find(([sql]) =>
+        String(sql).includes('UPDATE historian_sessions'))
+      const sufficiency = JSON.parse(String(sessionUpdate?.[1]?.[10]))
+      expect(sufficiency).toMatchObject({
+        version: 1,
+        outcome: 'sufficient',
+        ddx_allowed: true,
+        patient_turn_count: 12,
+      })
+      expect(String(sessionUpdate?.[1]?.[0])).toContain('live_review_v2')
+      const jobInsert = queryMock.mock.calls.find(([sql]) =>
+        String(sql).includes('INSERT INTO historian_eval_jobs'))
+      expect(jobInsert?.[1]).toEqual([
+        v4Binding.tenantId,
+        v4Binding.sessionId,
+        2,
+        'report_pending',
+        expect.any(Date),
+      ])
+    } finally {
+      if (priorSecret === undefined) delete process.env.HISTORIAN_FLUSH_SECRET
+      else process.env.HISTORIAN_FLUSH_SECRET = priorSecret
+    }
+  })
+
+  it('rejects normal v4 closure when the silent reviewer says case depth is shallow', async () => {
+    const priorSecret = process.env.HISTORIAN_FLUSH_SECRET
+    process.env.HISTORIAN_FLUSH_SECRET = 'synthetic-v4-save-attestation-secret'
+    try {
+      const transcript = completeV3Transcript()
+      const review = await attestedCompleteV4Review(transcript, { shallow: true })
+      const result = await saveInvitedHistorianSession(v4Binding, body({
+        structured_output: {
+          interview_prompt_version: 'comprehensive-v4',
+          live_review_v2: review,
+          medication_reconciliation_v1: completeEmptyMedicationReconciliation(),
         },
         transcript,
         question_count: 12,

@@ -25,7 +25,7 @@ import {
 import {
   deriveLiveReviewStructuredCoverage,
   liveInterviewReviewCompletion,
-  type LiveInterviewReviewArtifactV1,
+  type LiveInterviewReviewArtifact,
 } from '@/lib/historian/liveReviewContract'
 import { verifyLiveInterviewReviewArtifact } from '@/lib/historian/liveReviewAttestation'
 import {
@@ -140,6 +140,12 @@ export async function POST(request: Request) {
     const promptVersion = structuredOutput.interview_prompt_version
     const requestedSessionId: string | undefined =
       typeof body.sessionId === 'string' && body.sessionId ? body.sessionId : undefined
+    if (promptVersion === 'comprehensive-v4') {
+      return NextResponse.json(
+        { error: 'Comprehensive v4 is available only through a clinician-created invitation.' },
+        { status: 409 },
+      )
+    }
     if (promptVersion === 'comprehensive-v3') {
       if (!terminationReason) {
         return NextResponse.json(
@@ -159,7 +165,7 @@ export async function POST(request: Request) {
           { status: 409 },
         )
       }
-      let reviewArtifact: LiveInterviewReviewArtifactV1 | null = null
+      let reviewArtifact: LiveInterviewReviewArtifact | null = null
       if (structuredOutput.live_review_v1 != null) {
         try {
           reviewArtifact = await verifyLiveInterviewReviewArtifact(
@@ -177,6 +183,12 @@ export async function POST(request: Request) {
       if (!terminalPartial && !reviewArtifact) {
         return NextResponse.json(
           { error: 'Normal completion requires a current independent live history review.' },
+          { status: 409 },
+        )
+      }
+      if (reviewArtifact?.review.version !== 1) {
+        return NextResponse.json(
+          { error: 'The independent live history review version does not match Comprehensive v3.' },
           { status: 409 },
         )
       }
@@ -387,7 +399,8 @@ export async function POST(request: Request) {
     // re-fetch historian_sessions.final_differential (rather than trust an
     // in-memory value from the Task 2 stage above) so agreement runs only
     // when that column is actually populated — skipping quietly otherwise.
-    if (data && process.env.HISTORIAN_EVAL_AUTORUN !== 'false') {
+    const permitsLegacyDifferential = completionStatus !== 'ended_early'
+    if (data && permitsLegacyDifferential && process.env.HISTORIAN_EVAL_AUTORUN !== 'false') {
       const transcriptForEval: HistorianTranscriptEntry[] = Array.isArray(body.transcript)
         ? body.transcript
         : []

@@ -99,6 +99,16 @@ describe('persistEvaluation', () => {
     expect(params[8]).toBe(4321)
   })
 
+  it('binds retries to an optional immutable input digest', async () => {
+    const inputDigest = 'a'.repeat(64)
+    await persistEvaluation(baseInput({ inputDigest }))
+    const [sql, params] = queryMock.mock.calls[0]
+    expect(sql).toContain('input_digest')
+    expect(sql).toContain('ON CONFLICT (session_id, evaluator, prompt_version, input_digest)')
+    expect(sql).toContain('WHERE input_digest IS NOT NULL')
+    expect(params[9]).toBe(inputDigest)
+  })
+
   it('defaults rubric_version to null when omitted', async () => {
     const input = baseInput()
     delete (input as { rubricVersion?: string }).rubricVersion

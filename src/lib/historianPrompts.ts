@@ -562,7 +562,10 @@ REFERRAL REASON: ${referralReason ?? 'Not provided'}
     PATIENT CONTEXT: ${patientContext ?? 'Not provided'}`
   }
 
-  if (interviewMode === 'comprehensive' && interviewPromptVersion === 'comprehensive-v3') {
+  if (
+    interviewMode === 'comprehensive' &&
+    (interviewPromptVersion === 'comprehensive-v3' || interviewPromptVersion === 'comprehensive-v4')
+  ) {
     return buildAdaptiveComprehensivePrompt({
       sessionType,
       referralReason,
@@ -745,7 +748,7 @@ export function getHistorianToolDefinition(
       COMPREHENSIVE_V2_SAVE_INTERVIEW_OUTPUT_TOOL,
     ]
   }
-  if (interviewPromptVersion === 'comprehensive-v3') {
+  if (interviewPromptVersion === 'comprehensive-v3' || interviewPromptVersion === 'comprehensive-v4') {
     return [
       REQUEST_ADAPTIVE_HISTORY_QUESTION_TOOL,
       REQUEST_INTERVIEW_CONTROL_TOOL,

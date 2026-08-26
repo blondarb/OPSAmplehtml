@@ -2,7 +2,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import type { VoiceEvent, VoiceProvider } from '@/lib/voice/providerTypes'
 import { COMPREHENSIVE_HISTORY_DOMAINS } from '@/lib/historianTypes'
-import { LIVE_INTERVIEW_REVIEW_PROMPT_VERSION } from '@/lib/historian/liveReviewContract'
+import {
+  LIVE_INTERVIEW_REVIEW_PROMPT_VERSION,
+  LIVE_INTERVIEW_REVIEW_V2_PROMPT_VERSION,
+  LIVE_REVIEW_DEPTH_DIMENSIONS,
+} from '@/lib/historian/liveReviewContract'
 import {
   ADAPTIVE_OPENING_QUESTION,
   ADAPTIVE_PRE_CLOSE_QUESTION,
@@ -47,6 +51,9 @@ describe('Comprehensive v3 adaptive synthetic runtime acceptance', () => {
   let conductorRequests: Array<{ headers: Record<string, string>; body: Record<string, unknown> }>
   let conductorGate: Promise<void> | null
   let releaseConductor: (() => void) | null
+  let sessionPromptVersion: 'comprehensive-v3' | 'comprehensive-v4'
+  let v4DepthSufficient: boolean
+  let liveReviewRequestBodies: Array<Record<string, unknown>>
 
   beforeEach(() => {
     reactHarness.effects.length = 0
@@ -57,6 +64,9 @@ describe('Comprehensive v3 adaptive synthetic runtime acceptance', () => {
     conductorRequests = []
     conductorGate = null
     releaseConductor = null
+    sessionPromptVersion = 'comprehensive-v3'
+    v4DepthSufficient = true
+    liveReviewRequestBodies = []
     Object.defineProperty(globalThis, 'window', {
       configurable: true,
       value: { addEventListener: vi.fn(), removeEventListener: vi.fn() },
@@ -84,14 +94,14 @@ describe('Comprehensive v3 adaptive synthetic runtime acceptance', () => {
           status: 200,
           json: async () => ({
             provider: 'nova',
-            base_instructions: 'Synthetic Comprehensive v3 adaptive instructions.',
+            base_instructions: `Synthetic ${sessionPromptVersion} adaptive instructions.`,
             tools: [],
             relayUrl: 'wss://synthetic.invalid/relay',
             relayToken: 'synthetic-token',
             sessionId: '00000000-0000-4000-8000-000000000063',
             flushToken: 'synthetic-flush-token',
             interviewMode: 'comprehensive',
-            interviewPromptVersion: 'comprehensive-v3',
+            interviewPromptVersion: sessionPromptVersion,
             turnEvidenceController: false,
             adaptiveTurnController: true,
           }),
@@ -100,6 +110,7 @@ describe('Comprehensive v3 adaptive synthetic runtime acceptance', () => {
       if (url === '/api/ai/historian/live-review') {
         reviewCalls += 1
         const requestBody = JSON.parse(String(init?.body))
+        liveReviewRequestBodies.push(requestBody)
         const transcript = requestBody.transcript as Array<{
           seq: number
           role: 'assistant' | 'user'
@@ -113,7 +124,7 @@ describe('Comprehensive v3 adaptive synthetic runtime acceptance', () => {
           status: 200,
           json: async () => ({
             review: {
-              version: 1,
+              version: sessionPromptVersion === 'comprehensive-v4' ? 2 : 1,
               reviewedThroughSeq: patientSeqs.at(-1),
               domains: COMPREHENSIVE_HISTORY_DOMAINS.map((domain, index) => ({
                 domain: domain.id,
@@ -128,15 +139,33 @@ describe('Comprehensive v3 adaptive synthetic runtime acceptance', () => {
                 present: reviewSafetyConcern,
                 patientSeqs: reviewSafetyConcern ? [patientSeqs.at(-1)] : [],
               },
-              readyToClose: !reviewSafetyConcern && patientSeqs.length >= 12,
-              nextQuestionIntents: patientSeqs.length >= 12
+              ...(sessionPromptVersion === 'comprehensive-v4'
+                ? {
+                    diagnosticDepth: {
+                      dimensions: LIVE_REVIEW_DEPTH_DIMENSIONS.map((dimension, index) => ({
+                        dimension,
+                        status: !v4DepthSufficient && index === 1 ? 'missing' : 'adequate',
+                        patientSeqs: !v4DepthSufficient && index === 1
+                          ? []
+                          : [patientSeqs[index % patientSeqs.length]],
+                      })),
+                      depthSufficient: v4DepthSufficient,
+                    },
+                  }
+                : {}),
+              readyToClose: !reviewSafetyConcern && patientSeqs.length >= 12 &&
+                (sessionPromptVersion !== 'comprehensive-v4' || v4DepthSufficient),
+              nextQuestionIntents: patientSeqs.length >= 12 &&
+                (sessionPromptVersion !== 'comprehensive-v4' || v4DepthSufficient)
                 ? []
                 : ['Deepen the patient-specific headache history.'],
               confidence: patientSeqs.length >= 12 ? 'high' : 'medium',
             },
             provenance: {
               modelId: 'synthetic-independent-reviewer',
-              promptVersion: LIVE_INTERVIEW_REVIEW_PROMPT_VERSION,
+              promptVersion: sessionPromptVersion === 'comprehensive-v4'
+                ? LIVE_INTERVIEW_REVIEW_V2_PROMPT_VERSION
+                : LIVE_INTERVIEW_REVIEW_PROMPT_VERSION,
               generatedAt: '2026-08-25T12:00:00.000Z',
             },
             attestation: 'a'.repeat(43),
@@ -382,6 +411,144 @@ describe('Comprehensive v3 adaptive synthetic runtime acceptance', () => {
     }))
     expect(provider.nudgeClosing).toHaveBeenCalledOnce()
     expect(provider.injectSystemText).not.toHaveBeenCalled()
+  })
+
+  it('keeps a v4 interview open until diagnostic depth is sufficient, then saves the v2 review', async () => {
+    sessionPromptVersion = 'comprehensive-v4'
+    v4DepthSufficient = false
+    const onComplete = vi.fn()
+    const session = useRealtimeSession({
+      sessionType: 'new_patient',
+      interviewMode: 'comprehensive',
+      provider: 'nova',
+      enableLocalizer: false,
+      unresponsiveness: { enabled: false, checkInAfterMs: 60_000, giveUpAfterMs: 60_000 },
+      onComplete,
+    })
+    reactHarness.effects.forEach((effect) => effect())
+    await session.startSession()
+
+    const askAndAnswer = async (turn: number, options: { deepen?: boolean } = {}) => {
+      voiceSink?.({
+        type: 'toolCall',
+        toolName: 'request_history_question',
+        toolUseId: `v4-question-${turn}`,
+        segmentId: 1,
+        input: { proposed_text: syntheticAdaptiveProposal(turn) },
+      })
+      const output = lastToolOutput(provider)
+      expect(output).toMatchObject({ success: true, status: 'approved' })
+      expect(output).not.toHaveProperty('completion')
+      voiceSink?.({
+        type: 'assistantTranscript',
+        text: String(output.approved_text),
+        obligationId: String(output.obligation_id),
+        segmentId: 1,
+      })
+      if (options.deepen) v4DepthSufficient = true
+      voiceSink?.({
+        type: 'userTranscript',
+        text: `Synthetic diagnostic-depth answer ${turn}.`,
+        segmentId: 1,
+      })
+      await Promise.resolve()
+      await Promise.resolve()
+      if (turn % 4 === 0) {
+        await vi.waitFor(() => expect(reviewCalls).toBe(turn / 4))
+      }
+    }
+
+    for (let turn = 1; turn <= 12; turn += 1) await askAndAnswer(turn)
+    expect(reviewCalls).toBe(3)
+    expect(liveReviewRequestBodies.every((body) => body.interviewPromptVersion === 'comprehensive-v4')).toBe(true)
+
+    // Twelve broad answers meet the old turn floor, but the v4 reviewer has
+    // a missing chronology dimension. The app must authorize another
+    // patient-specific question instead of returning coverage_ready.
+    await askAndAnswer(13)
+    await askAndAnswer(14)
+    await askAndAnswer(15)
+    await askAndAnswer(16, { deepen: true })
+    expect(reviewCalls).toBe(4)
+
+    voiceSink?.({
+      type: 'toolCall',
+      toolName: 'request_history_question',
+      toolUseId: 'v4-inventory-redirect',
+      segmentId: 1,
+      input: { proposed_text: 'What else would you like your neurologist to know?' },
+    })
+    expect(lastToolOutput(provider)).toMatchObject({
+      success: false,
+      status: 'proposal_rejected',
+      required_text: MEDICATION_INVENTORY_QUESTION,
+    })
+    voiceSink?.({
+      type: 'toolCall',
+      toolName: 'request_history_question',
+      toolUseId: 'v4-inventory',
+      segmentId: 1,
+      input: { proposed_text: MEDICATION_INVENTORY_QUESTION },
+    })
+    let output = lastToolOutput(provider)
+    expect(output).toMatchObject({ success: true, obligation_id: 'medication-inventory' })
+    voiceSink?.({
+      type: 'assistantTranscript', text: MEDICATION_INVENTORY_QUESTION,
+      obligationId: 'medication-inventory', segmentId: 1,
+    })
+    voiceSink?.({ type: 'userTranscript', text: 'No other medicines.', segmentId: 1 })
+    await vi.waitFor(() => expect(reviewCalls).toBe(5))
+
+    voiceSink?.({
+      type: 'toolCall', toolName: 'request_history_question', toolUseId: 'v4-preclose-redirect',
+      segmentId: 1, input: { proposed_text: 'May I ask one more question?' },
+    })
+    await vi.waitFor(() => expect(lastToolOutput(provider)).toMatchObject({
+      success: false, required_text: ADAPTIVE_PRE_CLOSE_QUESTION,
+    }))
+    voiceSink?.({
+      type: 'toolCall', toolName: 'request_history_question', toolUseId: 'v4-preclose',
+      segmentId: 1, input: { proposed_text: ADAPTIVE_PRE_CLOSE_QUESTION },
+    })
+    output = lastToolOutput(provider)
+    expect(output).toMatchObject({ success: true, obligation_id: 'adaptive-preclose' })
+    voiceSink?.({
+      type: 'assistantTranscript', text: ADAPTIVE_PRE_CLOSE_QUESTION,
+      obligationId: 'adaptive-preclose', segmentId: 1,
+    })
+    voiceSink?.({ type: 'userTranscript', text: 'No, that covers it.', segmentId: 1 })
+    await vi.waitFor(() => expect(reviewCalls).toBe(6))
+
+    voiceSink?.({
+      type: 'toolCall', toolName: 'request_history_question', toolUseId: 'v4-ready',
+      segmentId: 1, input: { proposed_text: 'What else would you like your neurologist to know?' },
+    })
+    await vi.waitFor(() => expect(lastToolOutput(provider)).toEqual({
+      success: true, status: 'coverage_ready', completion: 'coverage_complete',
+    }))
+    voiceSink?.({
+      type: 'toolCall', toolName: 'save_interview_output', toolUseId: 'v4-save', segmentId: 1,
+      input: { safety_escalated: false, patient_requested_stop: false },
+    })
+    expect(lastToolOutput(provider)).toEqual({ success: true })
+    voiceSink?.({ type: 'assistantTranscript', text: COMPREHENSIVE_V3_CLOSING_TEXT, segmentId: 1 })
+    await session.endSession()
+
+    expect(onComplete).toHaveBeenCalledWith(expect.objectContaining({
+      endedEarly: false,
+      terminationReason: 'coverage_complete',
+      questionCount: 18,
+      interviewPromptVersion: 'comprehensive-v4',
+      structuredOutput: expect.objectContaining({
+        interview_prompt_version: 'comprehensive-v4',
+        live_review_v2: expect.objectContaining({
+          review: expect.objectContaining({
+            version: 2,
+            diagnosticDepth: expect.objectContaining({ depthSufficient: true }),
+          }),
+        }),
+      }),
+    }))
   })
 
   it('restores Claude as a private rolling clinical conductor every three patient turns', async () => {

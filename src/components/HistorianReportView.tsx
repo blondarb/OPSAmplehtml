@@ -357,7 +357,8 @@ function PhysicianReportTab({
   // highlightIndex prop).
   const [highlightIndex, setHighlightIndex] = useState<number | null>(null)
   const adaptiveReportPending =
-    structuredOutput?.interview_prompt_version === 'comprehensive-v3' &&
+    (structuredOutput?.interview_prompt_version === 'comprehensive-v3' ||
+      structuredOutput?.interview_prompt_version === 'comprehensive-v4') &&
     !narrativeSummary
 
   return (
@@ -428,7 +429,8 @@ function PhysicianReportTab({
       )}
 
       {surface === 'physician' &&
-        structuredOutput?.interview_prompt_version === 'comprehensive-v3' &&
+        (structuredOutput?.interview_prompt_version === 'comprehensive-v3' ||
+          structuredOutput?.interview_prompt_version === 'comprehensive-v4') &&
         structuredOutput.medication_reconciliation_has_uncertainty === true && (
           <div role="alert" style={{
             marginTop: 16,

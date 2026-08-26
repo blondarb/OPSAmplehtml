@@ -48,7 +48,12 @@ import {
   HAIKU_MODEL_ID,
   DEEPSEEK_R1_MODEL_ID,
 } from '@/lib/historian/eval/independentDdx'
-import { TranscriptTooLargeError, MAX_TRANSCRIPT_CHARS } from '@/lib/historian/eval/finalDifferential'
+import {
+  TranscriptTooLargeError,
+  DifferentialGroundingError,
+  GROUNDED_DIFFERENTIAL_SUMMARY,
+  MAX_TRANSCRIPT_CHARS,
+} from '@/lib/historian/eval/finalDifferential'
 import { PROMPT_VERSIONS } from '@/lib/historian/eval/constants'
 
 function entry(overrides: Partial<HistorianTranscriptEntry> = {}): HistorianTranscriptEntry {
@@ -98,7 +103,7 @@ describe('generateIndependentDdx', () => {
 
   // ── Blindness (structural) ────────────────────────────────────────────
 
-  it('has an arity of at most 2 (transcript, chiefComplaint) — no smuggled extra context params', () => {
+  it('keeps the established two-argument call contract; medication authority is optional', () => {
     expect(generateIndependentDdx.length).toBeLessThanOrEqual(2)
   })
 
@@ -114,6 +119,21 @@ describe('generateIndependentDdx', () => {
     expect(bodyText).toContain('"prompt"')
     expect(bodyText).not.toContain('anthropic_version')
     expect(bodyText).not.toContain('"messages"')
+  })
+
+  it('accepts only the application-verified medication summary as additional clinical context', async () => {
+    bedrockRuntime.send.mockResolvedValueOnce(r1Response(`<think>ok</think>\n${VALID_DDX_JSON}`))
+    await generateIndependentDdx(
+      SAMPLE_TRANSCRIPT,
+      'right-sided weakness',
+      'Application-verified medication reconciliation: tirzepatide; dose and frequency unresolved.',
+    )
+
+    const sentInput = bedrockRuntime.send.mock.calls[0][0].input as { body: Uint8Array }
+    const bodyText = new TextDecoder().decode(sentInput.body)
+    expect(bodyText).toContain('Medication authority: Application-verified medication reconciliation: tirzepatide')
+    expect(bodyText).not.toContain('structured HPI')
+    expect(bodyText).not.toContain('final_differential')
   })
 
   // ── Request parameters (review fix, 2026-07-21) ───────────────────────
@@ -158,8 +178,9 @@ describe('generateIndependentDdx', () => {
     const result = await generateIndependentDdx(SAMPLE_TRANSCRIPT)
 
     expect(result.differential).toHaveLength(1)
-    expect(result.differential[0]).toMatchObject({ diagnosis: 'Acute ischemic stroke', icd10: 'I63.9' })
-    expect(result.summary).toBe('Most consistent with acute stroke.')
+    expect(result.differential[0]).toMatchObject({ diagnosis: 'Acute ischemic stroke', icd10: null })
+    expect(result.differential[0].rationale).toBe('')
+    expect(result.summary).toBe(GROUNDED_DIFFERENTIAL_SUMMARY)
     expect(result.retried).toBe(false)
     expect(result.stop_reason).toBe('stop')
     expect(bedrockRuntime.send).toHaveBeenCalledTimes(1)
@@ -189,7 +210,7 @@ describe('generateIndependentDdx', () => {
     expect(() => new Date(result.provenance.generated_at).toISOString()).not.toThrow()
   })
 
-  it('reuses finalDifferential.ts verbatim-quote sanitization — drops a fabricated quote and counts it', async () => {
+  it('retries a response whose only diagnosis lacks a verified patient quote', async () => {
     const withFabricatedQuote = JSON.stringify({
       differential: [
         {
@@ -205,10 +226,32 @@ describe('generateIndependentDdx', () => {
       summary: 's',
     })
     bedrockRuntime.send.mockResolvedValueOnce(r1Response(withFabricatedQuote))
+    bedrockRuntime.send.mockResolvedValueOnce(r1Response(VALID_DDX_JSON))
     const result = await generateIndependentDdx(SAMPLE_TRANSCRIPT)
 
-    expect(result.differential[0].supporting_quotes).toEqual([])
-    expect(result.dropped_quotes).toBe(1)
+    expect(result.differential[0].supporting_quotes).toEqual([
+      { turn: 1, quote: 'Sudden right-sided weakness this morning.' },
+    ])
+    expect(result.retried).toBe(true)
+    expect(bedrockRuntime.send).toHaveBeenCalledTimes(2)
+  })
+
+  it('fails closed after two responses have no verified patient-supported diagnosis', async () => {
+    const ungrounded = JSON.stringify({
+      differential: [{
+        diagnosis: 'Acute ischemic stroke', icd10: 'I63.9', likelihood: 'High',
+        likelihood_pct: 80, rationale: 'model prose',
+        supporting_quotes: [{ turn: 0, quote: 'What brings you in today?' }],
+        contradicting_quotes: [],
+      }],
+      summary: 'model prose',
+    })
+    bedrockRuntime.send.mockResolvedValue(r1Response(ungrounded))
+
+    await expect(generateIndependentDdx(SAMPLE_TRANSCRIPT)).rejects.toBeInstanceOf(
+      DifferentialGroundingError,
+    )
+    expect(bedrockRuntime.send).toHaveBeenCalledTimes(2)
   })
 
   // ── Retry-once-then-fail-closed ────────────────────────────────────────

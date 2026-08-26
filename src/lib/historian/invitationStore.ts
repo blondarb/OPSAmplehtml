@@ -24,7 +24,7 @@ export interface HistorianInvitationBinding {
   sessionType: HistorianSessionType
   provider: 'nova'
   interviewMode: 'comprehensive'
-  interviewPromptVersion: 'comprehensive-v1' | 'comprehensive-v2' | 'comprehensive-v3'
+  interviewPromptVersion: 'comprehensive-v1' | 'comprehensive-v2' | 'comprehensive-v3' | 'comprehensive-v4'
   status: 'redeemed' | 'in_progress' | 'completed'
   startupAttemptId?: string | null
   grantExpiresAt: string
@@ -35,7 +35,7 @@ export interface HistorianInvitationPublicContext {
   referralReason: string | null
   sessionType: HistorianSessionType
   interviewMode: HistorianInterviewMode
-  interviewPromptVersion: 'standard-v1' | 'comprehensive-v1' | 'comprehensive-v2' | 'comprehensive-v3'
+  interviewPromptVersion: 'standard-v1' | 'comprehensive-v1' | 'comprehensive-v2' | 'comprehensive-v3' | 'comprehensive-v4'
   interviewStatus: 'redeemed' | 'in_progress' | 'completed'
 }
 
@@ -48,7 +48,7 @@ export type CreateHistorianInvitationResult =
       expiresAt: string
       patientName: string
       referralReason: string | null
-      interviewPromptVersion: 'comprehensive-v1' | 'comprehensive-v2' | 'comprehensive-v3'
+      interviewPromptVersion: 'comprehensive-v1' | 'comprehensive-v2' | 'comprehensive-v3' | 'comprehensive-v4'
     }
   | { ok: false; reason: 'consult_not_found' | 'patient_identity_unavailable' | 'interview_in_progress' | 'database_error' }
 
@@ -88,7 +88,7 @@ export async function createHistorianInvitation(input: {
   invitedByUserId: string
   replaceActive?: boolean
   /** Default remains v1 until the application-owned controller is explicitly enabled. */
-  promptVersion?: 'comprehensive-v1' | 'comprehensive-v2' | 'comprehensive-v3'
+  promptVersion?: 'comprehensive-v1' | 'comprehensive-v2' | 'comprehensive-v3' | 'comprehensive-v4'
   now?: Date
 }): Promise<CreateHistorianInvitationResult> {
   const now = input.now ?? new Date()
@@ -294,7 +294,7 @@ export async function redeemHistorianInvitation(
       patient_name: string
       referral_reason: string | null
       session_type: HistorianSessionType
-      interview_prompt_version: 'comprehensive-v1' | 'comprehensive-v2' | 'comprehensive-v3'
+      interview_prompt_version: 'comprehensive-v1' | 'comprehensive-v2' | 'comprehensive-v3' | 'comprehensive-v4'
       patient_date_of_birth: Date | string | null
       verification_attempts: number
     }>(
@@ -408,7 +408,7 @@ export async function resolveHistorianPatientGrant(
       session_type: HistorianSessionType
       provider: 'nova'
       interview_mode: 'comprehensive'
-      interview_prompt_version: 'comprehensive-v1' | 'comprehensive-v2' | 'comprehensive-v3'
+      interview_prompt_version: 'comprehensive-v1' | 'comprehensive-v2' | 'comprehensive-v3' | 'comprehensive-v4'
       status: 'redeemed' | 'in_progress' | 'completed'
       startup_attempt_id: string | null
       grant_expires_at: Date | string
@@ -559,7 +559,8 @@ export async function recoverHistorianInvitationStartup(
       row.session_status === 'in_progress' &&
       row.startup_attempt_id === startupAttemptId &&
       (row.interview_prompt_version === 'comprehensive-v2' ||
-        row.interview_prompt_version === 'comprehensive-v3') &&
+        row.interview_prompt_version === 'comprehensive-v3' ||
+        row.interview_prompt_version === 'comprehensive-v4') &&
       Number(row.transcript_count) === 0 &&
       Number(row.question_count) === 0 &&
       row.interview_completion_status == null &&

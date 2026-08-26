@@ -1,6 +1,13 @@
 import crypto from 'crypto'
 import type { Pool } from 'pg'
-import type { HistorianStructuredOutput, HistorianTranscriptEntry } from '@/lib/historianTypes'
+import type {
+  HistorianInterviewPromptVersion,
+  HistorianStructuredOutput,
+  HistorianTerminationReason,
+  HistorianTranscriptEntry,
+} from '@/lib/historianTypes'
+import type { DiagnosticSufficiencyV1 } from '@/lib/historian/diagnosticSufficiency'
+import type { ClinicianHistoryReportV1 } from './clinicianHistoryReport'
 
 export const HISTORIAN_EVAL_JOB_KIND = 'historian_eval' as const
 export const HISTORIAN_EVAL_JOB_VERSION = 1 as const
@@ -18,10 +25,18 @@ export interface ClaimedHistorianEvalJob {
   tenantId: string
   leaseToken: string
   attemptCount: number
+  pipelineVersion: number
+  currentStage: string
   transcript: HistorianTranscriptEntry[]
   chiefComplaint?: string
   structuredOutput: HistorianStructuredOutput | null
   narrativeSummary?: string
+  promptVersion: HistorianInterviewPromptVersion | null
+  completionStatus: 'complete' | 'ended_early' | null
+  terminationReason: HistorianTerminationReason | null
+  diagnosticSufficiency: DiagnosticSufficiencyV1 | null
+  clinicianHistoryReport: ClinicianHistoryReportV1 | null
+  finalDifferential: unknown | null
 }
 
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
@@ -110,6 +125,8 @@ export class HistorianEvalJobService {
         session_id: string
         tenant_id: string
         attempt_count: number
+        pipeline_version: number
+        current_stage: string
       }>(
         `UPDATE historian_eval_jobs
             SET status = 'leased',
@@ -123,7 +140,7 @@ export class HistorianEvalJobService {
               (status IN ('pending', 'retry_wait') AND next_attempt_at <= now())
               OR (status = 'leased' AND lease_expires_at <= now())
             )
-        RETURNING id, session_id, tenant_id, attempt_count`,
+        RETURNING id, session_id, tenant_id, attempt_count, pipeline_version, current_stage`,
         [jobId, leaseToken, boundedLeaseSeconds, HISTORIAN_EVAL_MAX_ATTEMPTS],
       )
       const job = claimed.rows[0]
@@ -137,8 +154,23 @@ export class HistorianEvalJobService {
         referral_reason: string | null
         structured_output: HistorianStructuredOutput | null
         narrative_summary: string | null
+        interview_prompt_version: HistorianInterviewPromptVersion | null
+        interview_completion_status: 'complete' | 'ended_early' | null
+        interview_termination_reason: HistorianTerminationReason | null
+        diagnostic_sufficiency: DiagnosticSufficiencyV1 | null
+        clinician_history_report: ClinicianHistoryReportV1 | null
+        final_differential: unknown | null
       }>(
-        `SELECT transcript, referral_reason, structured_output, narrative_summary
+        `SELECT transcript,
+                referral_reason,
+                structured_output,
+                narrative_summary,
+                interview_prompt_version,
+                interview_completion_status,
+                interview_termination_reason,
+                diagnostic_sufficiency,
+                clinician_history_report,
+                final_differential
            FROM historian_sessions
           WHERE id = $1
             AND tenant_id = $2
@@ -161,10 +193,18 @@ export class HistorianEvalJobService {
         tenantId: job.tenant_id,
         leaseToken,
         attemptCount: job.attempt_count,
+        pipelineVersion: job.pipeline_version,
+        currentStage: job.current_stage,
         transcript,
         chiefComplaint,
         structuredOutput: session.structured_output,
         narrativeSummary: session.narrative_summary?.trim() || undefined,
+        promptVersion: session.interview_prompt_version,
+        completionStatus: session.interview_completion_status,
+        terminationReason: session.interview_termination_reason,
+        diagnosticSufficiency: session.diagnostic_sufficiency,
+        clinicianHistoryReport: session.clinician_history_report,
+        finalDifferential: session.final_differential,
       }
     } catch (error) {
       try {
@@ -178,13 +218,13 @@ export class HistorianEvalJobService {
     }
   }
 
-  async persistFinalDifferential(
+  async persistDiagnosticSufficiency(
     claim: ClaimedHistorianEvalJob,
-    result: unknown,
+    sufficiency: DiagnosticSufficiencyV1,
   ): Promise<void> {
     const updated = await this.pool.query(
       `UPDATE historian_sessions session
-          SET final_differential = $1::jsonb,
+          SET diagnostic_sufficiency = $1::jsonb,
               updated_at = now()
          FROM historian_eval_jobs job
         WHERE session.id = $2
@@ -193,8 +233,115 @@ export class HistorianEvalJobService {
           AND job.session_id = session.id
           AND job.status = 'leased'
           AND job.lease_token = $5
-          AND job.lease_expires_at > now()`,
-      [JSON.stringify(result), claim.sessionId, claim.tenantId, claim.jobId, claim.leaseToken],
+          AND job.lease_expires_at > now()
+          AND (
+            session.diagnostic_sufficiency IS NULL
+            OR session.diagnostic_sufficiency->>'input_digest' = $6
+          )`,
+      [
+        JSON.stringify(sufficiency),
+        claim.sessionId,
+        claim.tenantId,
+        claim.jobId,
+        claim.leaseToken,
+        sufficiency.input_digest,
+      ],
+    )
+    if (updated.rowCount !== 1) {
+      throw new Error('Historian diagnostic sufficiency lost its lease or input digest binding.')
+    }
+  }
+
+  async persistClinicianHistoryReport(
+    claim: ClaimedHistorianEvalJob,
+    report: ClinicianHistoryReportV1,
+  ): Promise<void> {
+    const updated = await this.pool.query(
+      `WITH updated_session AS (
+         UPDATE historian_sessions session
+            SET clinician_history_report = $1::jsonb,
+                updated_at = now()
+           FROM historian_eval_jobs lease
+          WHERE session.id = $2
+            AND session.tenant_id = $3
+            AND lease.id = $4
+            AND lease.session_id = session.id
+            AND lease.status = 'leased'
+            AND lease.lease_token = $5
+            AND lease.lease_expires_at > now()
+            AND (
+              session.clinician_history_report IS NULL
+              OR session.clinician_history_report->>'input_digest' = $6
+            )
+         RETURNING session.id
+       )
+       UPDATE historian_eval_jobs job
+          SET current_stage = 'report_ready',
+              updated_at = now()
+         FROM updated_session
+        WHERE job.id = $4
+          AND job.session_id = updated_session.id
+          AND job.status = 'leased'
+          AND job.lease_token = $5`,
+      [
+        JSON.stringify(report),
+        claim.sessionId,
+        claim.tenantId,
+        claim.jobId,
+        claim.leaseToken,
+        report.input_digest,
+      ],
+    )
+    if (updated.rowCount !== 1) {
+      throw new Error('Historian report persistence lost its lease or input digest binding.')
+    }
+  }
+
+  async persistFinalDifferential(
+    claim: ClaimedHistorianEvalJob,
+    result: unknown,
+    options: { inputDigest?: string; withheld?: boolean } = {},
+  ): Promise<void> {
+    const persisted = options.inputDigest && result && typeof result === 'object'
+      ? { ...(result as Record<string, unknown>), input_digest: options.inputDigest }
+      : result
+    const updated = await this.pool.query(
+      `WITH updated_session AS (
+         UPDATE historian_sessions session
+            SET final_differential = $1::jsonb,
+                updated_at = now()
+           FROM historian_eval_jobs lease
+          WHERE session.id = $2
+            AND session.tenant_id = $3
+            AND lease.id = $4
+            AND lease.session_id = session.id
+            AND lease.status = 'leased'
+            AND lease.lease_token = $5
+            AND lease.lease_expires_at > now()
+            AND (
+              $6::text IS NULL
+              OR session.final_differential IS NULL
+              OR session.final_differential->>'input_digest' = $6
+            )
+         RETURNING session.id
+       )
+       UPDATE historian_eval_jobs job
+          SET current_stage = $7,
+              updated_at = now()
+         FROM updated_session
+        WHERE job.id = $4
+          AND job.session_id = updated_session.id
+          AND job.status = 'leased'
+          AND job.lease_token = $5`,
+      [
+        JSON.stringify(persisted),
+        claim.sessionId,
+        claim.tenantId,
+        claim.jobId,
+        claim.leaseToken,
+        options.inputDigest ?? null,
+        options.withheld ? 'ddx_withheld' : 'ddx_ready',
+      ],
     )
     if (updated.rowCount !== 1) throw new Error('Historian evaluation lease lost before persistence.')
   }
@@ -203,6 +350,7 @@ export class HistorianEvalJobService {
     const result = await this.pool.query(
       `UPDATE historian_eval_jobs
           SET status = 'completed',
+              current_stage = 'completed',
               completed_at = now(),
               lease_token = NULL,
               lease_expires_at = NULL,

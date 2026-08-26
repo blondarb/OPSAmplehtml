@@ -77,19 +77,6 @@ function CompactDifferentialItem({
       <div style={{ display: 'flex', alignItems: 'baseline', gap: 6, flexWrap: 'wrap' }}>
         <span style={{ fontWeight: 700, fontSize: '0.65rem', color: 'var(--text-secondary, #64748b)' }}>#{rank}</span>
         <span style={{ fontWeight: 700, fontSize: '0.8rem', color: 'var(--text-primary, #1e293b)' }}>{item.diagnosis}</span>
-        {item.icd10 && (
-          <code
-            style={{
-              fontSize: '0.62rem',
-              color: 'var(--text-secondary, #64748b)',
-              background: 'rgba(100,116,139,0.12)',
-              borderRadius: 4,
-              padding: '0px 4px',
-            }}
-          >
-            {item.icd10}
-          </code>
-        )}
         <span
           style={{
             fontSize: '0.6rem',
@@ -103,11 +90,6 @@ function CompactDifferentialItem({
           {item.likelihood} · {item.likelihood_pct}% model estimate
         </span>
       </div>
-      {item.rationale && (
-        <p style={{ fontSize: '0.72rem', color: 'var(--text-secondary, #64748b)', margin: '3px 0 0', lineHeight: 1.35 }}>
-          {item.rationale}
-        </p>
-      )}
       <QuoteChips quotes={item.supporting_quotes} onQuoteClick={onQuoteClick} />
     </li>
   )
@@ -117,7 +99,6 @@ function DifferentialColumn({
   title,
   modelBadge,
   differential,
-  summary,
   provenance,
   pendingLabel,
   onQuoteClick,
@@ -125,7 +106,6 @@ function DifferentialColumn({
   title: string
   modelBadge: string
   differential: DifferentialItem[] | undefined
-  summary: string | undefined
   provenance: { model_id: string; prompt_version: string; generated_at: string } | undefined
   pendingLabel: string
   onQuoteClick?: (turn: number) => void
@@ -161,11 +141,6 @@ function DifferentialColumn({
         </p>
       ) : (
         <>
-          {summary && (
-            <p style={{ fontSize: '0.72rem', color: 'var(--text-primary, #1e293b)', lineHeight: 1.4, margin: '0 0 8px' }}>
-              {summary}
-            </p>
-          )}
           <ol style={{ margin: 0, padding: 0 }}>
             {differential.map((item, i) => (
               <CompactDifferentialItem key={i} item={item} rank={i + 1} onQuoteClick={onQuoteClick} />
@@ -308,7 +283,6 @@ export default function DdxComparisonCard({
           title="Pipeline Differential"
           modelBadge="Sonnet"
           differential={finalDifferential?.differential}
-          summary={finalDifferential?.summary}
           provenance={finalDifferential?.provenance}
           pendingLabel="Pipeline differential pending — the post-session review pass has not completed yet."
           onQuoteClick={onQuoteClick}
@@ -318,7 +292,6 @@ export default function DdxComparisonCard({
           title="Independent Differential"
           modelBadge="DeepSeek-R1"
           differential={independentDdx?.differential}
-          summary={independentDdx?.summary}
           provenance={independentDdx?.provenance}
           pendingLabel="Independent differential pending — the cross-family review pass has not completed yet."
           onQuoteClick={onQuoteClick}

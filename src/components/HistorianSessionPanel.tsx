@@ -2,10 +2,12 @@
 
 import { useState } from 'react'
 import type { HistorianSession } from '@/lib/historianTypes'
+import type { FinalDifferential } from '@/lib/historian/eval/finalDifferential'
 import HistorianTranscriptViewer from './historian/HistorianTranscriptViewer'
 import DifferentialCard from './historian/DifferentialCard'
 import DdxComparisonCard from './historian/DdxComparisonCard'
 import HistoryCoverageCard from './historian/HistoryCoverageCard'
+import ClinicianHistoryReportCard from './historian/ClinicianHistoryReportCard'
 
 interface HistorianSessionPanelProps {
   sessions: HistorianSession[]
@@ -21,6 +23,26 @@ function formatDuration(seconds: number): string {
 function formatTime(dateStr: string): string {
   const d = new Date(dateStr)
   return d.toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })
+}
+
+function completedDifferential(
+  value: HistorianSession['final_differential'],
+): FinalDifferential | null {
+  return value && 'differential' in value ? value : null
+}
+
+export function hasLegacyHistorianSummary(session: HistorianSession): boolean {
+  const promptVersion = session.structured_output?.interview_prompt_version
+  return promptVersion !== 'comprehensive-v3' &&
+    promptVersion !== 'comprehensive-v4' &&
+    typeof session.narrative_summary === 'string' &&
+    session.narrative_summary.trim().length > 0
+}
+
+export function historianReportReadyForImport(session: HistorianSession): boolean {
+  // The existing import route understands only the legacy narrative contract;
+  // it is not tenant/patient-bound for the new citation-grounded artifact.
+  return hasLegacyHistorianSummary(session)
 }
 
 export default function HistorianSessionPanel({ sessions, onImport }: HistorianSessionPanelProps) {
@@ -45,12 +67,12 @@ export default function HistorianSessionPanel({ sessions, onImport }: HistorianS
         body: JSON.stringify({ sessionId }),
       })
       const data = await response.json().catch(() => ({}))
-      if (!response.ok) throw new Error(data?.error || 'The differential retry could not be scheduled.')
+      if (!response.ok) throw new Error(data?.error || 'The historian report retry could not be scheduled.')
       setEvaluationOverrides((current) => ({ ...current, [sessionId]: 'pending' }))
     } catch (error) {
       setEvaluationRetryErrors((current) => ({
         ...current,
-        [sessionId]: error instanceof Error ? error.message : 'The differential retry could not be scheduled.',
+        [sessionId]: error instanceof Error ? error.message : 'The historian report retry could not be scheduled.',
       }))
     } finally {
       setRetryingEvaluationId(null)
@@ -128,6 +150,10 @@ export default function HistorianSessionPanel({ sessions, onImport }: HistorianS
         {sessions.map(session => {
           const isExpanded = expandedId === session.id
           const hasRedFlags = session.red_flags && session.red_flags.length > 0
+          const hasSufficiency = !!session.diagnostic_sufficiency
+          const ddxWithheld = hasSufficiency && !session.diagnostic_sufficiency!.ddx_allowed
+          const legacySummaryAvailable = hasLegacyHistorianSummary(session)
+          const importReady = historianReportReadyForImport(session)
           // Prefer joined patient name over text patient_name field
           const displayName = session.patient
             ? `${session.patient.first_name} ${session.patient.last_name}`
@@ -271,17 +297,27 @@ export default function HistorianSessionPanel({ sessions, onImport }: HistorianS
 
                   {/* Summary */}
                   {expandedSection === 'summary' && (
-                    <div>
-                      {session.narrative_summary ? (
-                        <p style={{ fontSize: '0.8rem', color: 'var(--text-primary, #1e293b)', lineHeight: 1.5, margin: 0 }}>
+                    legacySummaryAvailable ? (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                        <div role="status" style={{ padding: '8px 10px', borderRadius: 8, background: '#fffbeb', border: '1px solid #f59e0b', color: '#92400e', fontSize: '0.74rem' }}>
+                          Legacy summary — not citation-grounded. Verify it against the confirmed transcript.
+                        </div>
+                        <p style={{ margin: 0, whiteSpace: 'pre-wrap', fontSize: '0.8rem', lineHeight: 1.5, color: 'var(--text-primary, #1e293b)' }}>
                           {session.narrative_summary}
                         </p>
-                      ) : (
-                        <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary, #64748b)', fontStyle: 'italic', margin: 0 }}>
-                          No summary available.
-                        </p>
-                      )}
-                    </div>
+                      </div>
+                    ) : (
+                      <ClinicianHistoryReportCard
+                        report={session.clinician_history_report}
+                        sufficiency={session.diagnostic_sufficiency}
+                        evaluationStatus={evaluationOverrides[session.id] ?? session.evaluation_status}
+                        terminationReason={session.interview_termination_reason}
+                        onQuoteClick={(patientSeq) => {
+                          setExpandedSection('transcript')
+                          setHighlightIndex(Math.max(0, patientSeq - 1))
+                        }}
+                      />
+                    )
                   )}
 
                   {/* Structured data */}
@@ -295,7 +331,14 @@ export default function HistorianSessionPanel({ sessions, onImport }: HistorianS
                       )}
                       {session.structured_output ? (
                         Object.entries(session.structured_output)
-                          .filter(([key]) => key !== 'history_coverage' && key !== 'prior_studies')
+                          .filter(([key]) => ![
+                            'history_coverage',
+                            'prior_studies',
+                            'live_review_v1',
+                            'live_review_v2',
+                            'history_evidence_v1',
+                            'medication_reconciliation_v1',
+                          ].includes(key))
                           .filter(([, v]) => v && String(v).trim())
                           .map(([key, value]) => (
                             <div key={key}>
@@ -328,19 +371,33 @@ export default function HistorianSessionPanel({ sessions, onImport }: HistorianS
                       the async post-session evaluator completes. */}
                   {expandedSection === 'differential' && (
                     <div>
-                      <DifferentialCard
-                        finalDifferential={session.final_differential}
-                        evaluationStatus={evaluationOverrides[session.id] ?? session.evaluation_status}
-                        evaluationErrorCode={session.evaluation_error_code}
-                        retrying={retryingEvaluationId === session.id}
-                        onRetry={session.evaluation_status === 'failed'
-                          ? () => void retryDifferential(session.id)
-                          : undefined}
-                        onQuoteClick={(turn) => {
-                          setExpandedSection('transcript')
-                          setHighlightIndex(turn)
-                        }}
-                      />
+                      {ddxWithheld ? (
+                        <div role="status" style={{
+                          padding: '12px',
+                          border: '1px solid #f59e0b',
+                          background: '#fffbeb',
+                          color: '#92400e',
+                          borderRadius: 8,
+                          fontSize: '0.8rem',
+                          lineHeight: 1.45,
+                        }}>
+                          Differential withheld. This interview was {session.diagnostic_sufficiency!.outcome === 'insufficient_partial' ? 'partial' : 'not sufficiently complete for a responsible differential'}. Review the citation-grounded report and transcript.
+                        </div>
+                      ) : (
+                        <DifferentialCard
+                          finalDifferential={completedDifferential(session.final_differential)}
+                          evaluationStatus={evaluationOverrides[session.id] ?? session.evaluation_status}
+                          evaluationErrorCode={session.evaluation_error_code}
+                          retrying={retryingEvaluationId === session.id}
+                          onRetry={session.evaluation_status === 'failed'
+                            ? () => void retryDifferential(session.id)
+                            : undefined}
+                          onQuoteClick={(turn) => {
+                            setExpandedSection('transcript')
+                            setHighlightIndex(turn)
+                          }}
+                        />
+                      )}
                       {evaluationRetryErrors[session.id] && (
                         <p role="alert" style={{ color: '#b91c1c', fontSize: '0.75rem', margin: '8px 0 0' }}>
                           {evaluationRetryErrors[session.id]}
@@ -356,15 +413,21 @@ export default function HistorianSessionPanel({ sessions, onImport }: HistorianS
                       query when historian_evaluations exists; DdxComparisonCard
                       renders its own pending state otherwise. */}
                   {expandedSection === 'compare' && (
-                    <DdxComparisonCard
-                      finalDifferential={session.final_differential}
-                      independentDdx={session.independent_ddx}
-                      agreement={session.agreement}
-                      onQuoteClick={(turn) => {
-                        setExpandedSection('transcript')
-                        setHighlightIndex(turn)
-                      }}
-                    />
+                    ddxWithheld ? (
+                      <div role="status" style={{ padding: '12px', border: '1px solid #f59e0b', background: '#fffbeb', color: '#92400e', borderRadius: 8, fontSize: '0.8rem' }}>
+                        Cross-model diagnostic comparison was not run because the differential was withheld.
+                      </div>
+                    ) : (
+                      <DdxComparisonCard
+                        finalDifferential={completedDifferential(session.final_differential)}
+                        independentDdx={session.independent_ddx}
+                        agreement={session.agreement}
+                        onQuoteClick={(turn) => {
+                          setExpandedSection('transcript')
+                          setHighlightIndex(turn)
+                        }}
+                      />
+                    )
                   )}
 
                   {/* Transcript — already gated behind the sub-tab above, so
@@ -383,15 +446,17 @@ export default function HistorianSessionPanel({ sessions, onImport }: HistorianS
                     {onImport && !session.imported_to_note && (
                       <button
                         onClick={() => onImport(session)}
+                        disabled={!importReady}
+                        title={!importReady ? 'Import is not enabled for the citation-grounded report yet.' : undefined}
                         style={{
                           padding: '6px 12px',
                           borderRadius: '6px',
-                          background: '#0d9488',
+                          background: importReady ? '#0d9488' : '#94a3b8',
                           color: '#fff',
                           border: 'none',
                           fontWeight: 600,
                           fontSize: '0.75rem',
-                          cursor: 'pointer',
+                          cursor: importReady ? 'pointer' : 'not-allowed',
                         }}
                       >
                         Import to Note

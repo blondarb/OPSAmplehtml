@@ -6,7 +6,12 @@ import {
   type HistorianQaAcceptanceConfig,
 } from '../../scripts/historian-qa-deployed-acceptance'
 import { COMPREHENSIVE_HISTORY_DOMAINS } from '@/lib/historianTypes'
-import { LIVE_INTERVIEW_REVIEW_PROMPT_VERSION } from '@/lib/historian/liveReviewContract'
+import {
+  LIVE_INTERVIEW_REVIEW_V2_PROMPT_VERSION,
+  LIVE_REVIEW_DEPTH_DIMENSIONS,
+} from '@/lib/historian/liveReviewContract'
+import { CLINICIAN_HISTORY_SECTION_IDS } from '@/lib/historian/eval/clinicianHistoryReport'
+import { CLINICIAN_HISTORY_REQUIRED_COMPLETE_SECTION_IDS } from '@/lib/historian/eval/clinicianHistoryReport'
 
 const config: HistorianQaAcceptanceConfig = {
   enabled: true,
@@ -74,7 +79,7 @@ describe('deployed Historian QA acceptance runner', () => {
           sessionId: 'session-1',
           provider: 'nova',
           interviewMode: 'comprehensive',
-          interviewPromptVersion: 'comprehensive-v3',
+          interviewPromptVersion: 'comprehensive-v4',
           turnEvidenceController: false,
           adaptiveTurnController: true,
           flushToken: 'fake-flush-token',
@@ -89,7 +94,7 @@ describe('deployed Historian QA acceptance runner', () => {
           .map((entry: { seq: number }) => entry.seq)
         return response(200, {
           review: {
-            version: 1,
+            version: 2,
             reviewedThroughSeq: patientSeqs.at(-1),
             domains: COMPREHENSIVE_HISTORY_DOMAINS.map((domain, index) => ({
               domain: domain.id,
@@ -101,13 +106,21 @@ describe('deployed Historian QA acceptance runner', () => {
             repetitions: [],
             medications: [],
             activeSafetyConcern: { present: false, patientSeqs: [] },
+            diagnosticDepth: {
+              dimensions: LIVE_REVIEW_DEPTH_DIMENSIONS.map((dimension, index) => ({
+                dimension,
+                status: 'adequate',
+                patientSeqs: [patientSeqs[index % patientSeqs.length]],
+              })),
+              depthSufficient: true,
+            },
             readyToClose: true,
             nextQuestionIntents: [],
             confidence: 'high',
           },
           provenance: {
             modelId: 'synthetic-independent-reviewer',
-            promptVersion: LIVE_INTERVIEW_REVIEW_PROMPT_VERSION,
+            promptVersion: LIVE_INTERVIEW_REVIEW_V2_PROMPT_VERSION,
             generatedAt: '2026-08-25T12:00:00.000Z',
           },
           attestation: 'a'.repeat(43),
@@ -116,8 +129,8 @@ describe('deployed Historian QA acceptance runner', () => {
       if (url.endsWith('/api/ai/historian/save') && method === 'POST') {
         expect(body.structured_output).toMatchObject({
           interview_mode: 'comprehensive',
-          interview_prompt_version: 'comprehensive-v3',
-          live_review_v1: { attestation: 'a'.repeat(43) },
+          interview_prompt_version: 'comprehensive-v4',
+          live_review_v2: { attestation: 'a'.repeat(43) },
           medication_reconciliation_v1: {
             inventoryStatus: 'answered',
             inventoryPatientSeq: 18,
@@ -140,7 +153,10 @@ describe('deployed Historian QA acceptance runner', () => {
       }
       if (url.includes('/api/ai/historian/invites?consultId=')) {
         return response(200, {
-          invitation: { session_id: 'session-1', evaluation_status: 'completed' },
+          invitation: {
+            session_id: 'session-1', evaluation_status: 'completed',
+            evaluation_stage: 'completed', report_ready: true, differential_ready: true,
+          },
         })
       }
       if (url.includes('/api/ai/historian/save?patient_id=') && cookie) {
@@ -150,11 +166,32 @@ describe('deployed Historian QA acceptance runner', () => {
             patient_id: '10000000-0000-4000-8000-000000000001',
             tenant_id: 'historian-mvp-qa',
             consult_id: '20000000-0000-4000-8000-000000000001',
-            interview_prompt_version: 'comprehensive-v3',
+            interview_prompt_version: 'comprehensive-v4',
             interview_completion_status: 'complete',
             interview_termination_reason: 'coverage_complete',
             evaluation_status: 'completed',
-            final_differential: { summary: 'physician-only synthetic output' },
+            diagnostic_sufficiency: {
+              version: 1, outcome: 'sufficient', ddx_allowed: true, patient_turn_count: 12,
+            },
+            clinician_history_report: {
+              version: 1,
+              report_status: 'complete',
+              input_digest: 'c'.repeat(64),
+              sections: CLINICIAN_HISTORY_SECTION_IDS.map((id) => ({
+                id,
+                claims: CLINICIAN_HISTORY_REQUIRED_COMPLETE_SECTION_IDS.includes(id as never)
+                  ? [{
+                      text: 'This is synthetic test data only.',
+                      citations: [{ patient_seq: 2, quote: 'This is synthetic test data only.' }],
+                    }]
+                  : [],
+              })),
+              medication_reconciliation: { items: [] },
+              limitations: [],
+              completion: { patient_turn_count: 12 },
+              provenance: { prompt_version: 'clinician-history-report-v1' },
+            },
+            final_differential: { differential: [{ diagnosis: 'Synthetic physician-only output' }] },
           }],
         }, { 'Cache-Control': 'no-store' })
       }
@@ -168,7 +205,7 @@ describe('deployed Historian QA acceptance runner', () => {
       emit: (line) => emitted.push(line),
     })
 
-    expect(result).toEqual({ gates: 13, evaluationStatus: 'completed' })
+    expect(result).toEqual({ gates: 14, evaluationStatus: 'completed' })
     expect(emitted.at(-1)).toContain('HISTORIAN_QA_ACCEPTANCE_PASS')
     const output = emitted.join('\n')
     for (const forbidden of [

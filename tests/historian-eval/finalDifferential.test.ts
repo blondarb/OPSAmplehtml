@@ -29,6 +29,9 @@ vi.mock('@/lib/consult/planEvidence', () => ({
 
 import {
   generateFinalDifferential,
+  sanitizeDifferential,
+  DifferentialGroundingError,
+  GROUNDED_DIFFERENTIAL_SUMMARY,
   TranscriptTooLargeError,
   MAX_TRANSCRIPT_CHARS,
   MIN_PATIENT_TURNS,
@@ -216,11 +219,12 @@ describe('generateFinalDifferential', () => {
     expect(result.differential).toHaveLength(1)
     expect(result.differential[0]).toMatchObject({
       diagnosis: 'Migraine without aura',
-      icd10: 'G43.009',
+      icd10: null,
       likelihood: 'High',
       likelihood_pct: 70,
     })
-    expect(result.summary).toBe('Subacute headache most consistent with migraine.')
+    expect(result.summary).toBe(GROUNDED_DIFFERENTIAL_SUMMARY)
+    expect(result.differential[0].rationale).toBe('')
     expect(result.dropped_quotes).toBe(0)
   })
 
@@ -245,10 +249,7 @@ describe('generateFinalDifferential', () => {
       raw: '{}', stopReason: 'end_turn',
     })
     retrievePlanEvidenceMock.mockResolvedValue({ guidelineText: '', citations: [] })
-    invokeBedrockClinicalToolMock.mockResolvedValue({
-      parsed: { differential: [], summary: '' },
-      raw: '{}', stopReason: 'tool_use',
-    })
+    mockHappyPath()
     const result = await generateFinalDifferential(SAMPLE_TRANSCRIPT)
     // Default path (no override) still reports the shared constant.
     expect(result.provenance.model_id).toBe(BEDROCK_MODEL)
@@ -265,9 +266,8 @@ describe('generateFinalDifferential', () => {
     expect(result.dropped_quotes).toBe(0)
   })
 
-  it('drops a quote that is not a verbatim substring of its cited turn, and counts it', async () => {
-    mockHappyPath({
-      differential: [
+  it('drops a diagnosis whose only supporting quote is fabricated, and counts the quote', () => {
+    const result = sanitizeDifferential(SAMPLE_TRANSCRIPT, [
         {
           diagnosis: 'Migraine without aura',
           icd10: 'G43.009',
@@ -279,43 +279,74 @@ describe('generateFinalDifferential', () => {
           ],
           contradicting_quotes: [],
         },
-      ],
-    })
-    const result = await generateFinalDifferential(SAMPLE_TRANSCRIPT)
-    expect(result.differential[0].supporting_quotes).toEqual([])
-    expect(result.dropped_quotes).toBe(1)
+    ])
+    expect(result.items).toEqual([])
+    expect(result.droppedQuotes).toBe(1)
+  })
+
+  it('drops a quote containing the medication-redaction marker even when it is verbatim', async () => {
+    const redactedTranscript: HistorianTranscriptEntry[] = [
+      entry({ role: 'assistant', text: 'What medications do you take?', timestamp: 0, seq: 1 }),
+      entry({ role: 'user', text: 'I take [medication redacted] weekly.', timestamp: 8, seq: 2 }),
+      entry({ role: 'assistant', text: 'What brings you in today?', timestamp: 20, seq: 3 }),
+      entry({ role: 'user', text: 'I have had a throbbing headache for three days.', timestamp: 28, seq: 4 }),
+    ]
+    const result = sanitizeDifferential(redactedTranscript, [
+        {
+          diagnosis: 'Migraine without aura',
+          icd10: null,
+          likelihood: 'High',
+          likelihood_pct: 70,
+          rationale: 'r',
+          supporting_quotes: [{ turn: 1, quote: 'I take [medication redacted] weekly.' }],
+          contradicting_quotes: [],
+        },
+    ])
+    expect(result.items).toEqual([])
+    expect(result.droppedQuotes).toBe(1)
   })
 
   it('drops a quote citing an out-of-range turn index', async () => {
-    mockHappyPath({
-      differential: [
+    const result = sanitizeDifferential(SAMPLE_TRANSCRIPT, [
         {
           diagnosis: 'Migraine without aura', icd10: null, likelihood: 'High',
           likelihood_pct: 70, rationale: 'r',
           supporting_quotes: [{ turn: 99, quote: 'I have had a throbbing headache for three days.' }],
           contradicting_quotes: [],
         },
-      ],
-    })
-    const result = await generateFinalDifferential(SAMPLE_TRANSCRIPT)
-    expect(result.differential[0].supporting_quotes).toEqual([])
-    expect(result.dropped_quotes).toBe(1)
+    ])
+    expect(result.items).toEqual([])
+    expect(result.droppedQuotes).toBe(1)
   })
 
   it('drops a quote with a non-integer turn', async () => {
-    mockHappyPath({
-      differential: [
+    const result = sanitizeDifferential(SAMPLE_TRANSCRIPT, [
         {
           diagnosis: 'Migraine without aura', icd10: null, likelihood: 'High',
           likelihood_pct: 70, rationale: 'r',
           supporting_quotes: [{ turn: 1.5, quote: 'I have had a throbbing headache for three days.' }],
           contradicting_quotes: [],
         },
-      ],
+    ])
+    expect(result.items).toEqual([])
+    expect(result.droppedQuotes).toBe(1)
+  })
+
+  it('rejects an exact historian question as diagnosis support because only patient turns are evidence', async () => {
+    mockHappyPath({
+      differential: [{
+        diagnosis: 'Migraine without aura',
+        icd10: null,
+        likelihood: 'High',
+        likelihood_pct: 70,
+        rationale: 'r',
+        supporting_quotes: [{ turn: 0, quote: 'What brings you in today?' }],
+        contradicting_quotes: [],
+      }],
     })
-    const result = await generateFinalDifferential(SAMPLE_TRANSCRIPT)
-    expect(result.differential[0].supporting_quotes).toEqual([])
-    expect(result.dropped_quotes).toBe(1)
+    await expect(generateFinalDifferential(SAMPLE_TRANSCRIPT)).rejects.toBeInstanceOf(
+      DifferentialGroundingError,
+    )
   })
 
   it('aggregates dropped_quotes across supporting AND contradicting quotes, across multiple items', async () => {
@@ -359,7 +390,13 @@ describe('generateFinalDifferential', () => {
     const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
     const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
 
-    await generateFinalDifferential(SAMPLE_TRANSCRIPT)
+    const result = sanitizeDifferential(SAMPLE_TRANSCRIPT, [{
+      diagnosis: 'Migraine without aura', icd10: null, likelihood: 'High',
+      likelihood_pct: 70, rationale: 'r',
+      supporting_quotes: [{ turn: 1, quote: secretQuote }],
+      contradicting_quotes: [],
+    }])
+    expect(result.items).toEqual([])
 
     const allLogs = [...logSpy.mock.calls, ...warnSpy.mock.calls, ...errorSpy.mock.calls]
       .flat()
@@ -381,7 +418,7 @@ describe('generateFinalDifferential', () => {
       likelihood: 'Low',
       likelihood_pct: 10,
       rationale: 'r',
-      supporting_quotes: [],
+      supporting_quotes: [{ turn: 1, quote: 'I have had a throbbing headache for three days.' }],
       contradicting_quotes: [],
     }))
     mockHappyPath({ differential: many })
@@ -392,8 +429,8 @@ describe('generateFinalDifferential', () => {
   it('drops a differential entry with a missing/blank diagnosis rather than crashing', async () => {
     mockHappyPath({
       differential: [
-        { diagnosis: '', icd10: null, likelihood: 'High', likelihood_pct: 50, rationale: 'r', supporting_quotes: [], contradicting_quotes: [] },
-        { diagnosis: 'Real diagnosis', icd10: null, likelihood: 'High', likelihood_pct: 50, rationale: 'r', supporting_quotes: [], contradicting_quotes: [] },
+        { diagnosis: '', icd10: null, likelihood: 'High', likelihood_pct: 50, rationale: 'r', supporting_quotes: [{ turn: 1, quote: 'I have had a throbbing headache for three days.' }], contradicting_quotes: [] },
+        { diagnosis: 'Real diagnosis', icd10: null, likelihood: 'High', likelihood_pct: 50, rationale: 'r', supporting_quotes: [{ turn: 1, quote: 'I have had a throbbing headache for three days.' }], contradicting_quotes: [] },
       ],
     })
     const result = await generateFinalDifferential(SAMPLE_TRANSCRIPT)
@@ -404,17 +441,17 @@ describe('generateFinalDifferential', () => {
   it('normalizes an unrecognized likelihood value to Moderate rather than passing it through', async () => {
     mockHappyPath({
       differential: [
-        { diagnosis: 'X', icd10: null, likelihood: 'super-duper-high', likelihood_pct: 50, rationale: 'r', supporting_quotes: [], contradicting_quotes: [] },
+        { diagnosis: 'X', icd10: null, likelihood: 'super-duper-high', likelihood_pct: 50, rationale: 'r', supporting_quotes: [{ turn: 1, quote: 'I have had a throbbing headache for three days.' }], contradicting_quotes: [] },
       ],
     })
     const result = await generateFinalDifferential(SAMPLE_TRANSCRIPT)
     expect(result.differential[0].likelihood).toBe('Moderate')
   })
 
-  it('treats a blank icd10 string as null', async () => {
+  it('suppresses model-authored ICD-10 codes until a validated mapping exists', async () => {
     mockHappyPath({
       differential: [
-        { diagnosis: 'X', icd10: '   ', likelihood: 'Low', likelihood_pct: 10, rationale: 'r', supporting_quotes: [], contradicting_quotes: [] },
+        { diagnosis: 'X', icd10: 'G43.009', likelihood: 'Low', likelihood_pct: 10, rationale: 'r', supporting_quotes: [{ turn: 1, quote: 'I have had a throbbing headache for three days.' }], contradicting_quotes: [] },
       ],
     })
     const result = await generateFinalDifferential(SAMPLE_TRANSCRIPT)
@@ -433,12 +470,20 @@ describe('generateFinalDifferential', () => {
     })
     retrievePlanEvidenceMock.mockRejectedValue(new Error('DB unreachable'))
     invokeBedrockClinicalToolMock.mockResolvedValue({
-      parsed: { differential: [], summary: 'no data' },
+      parsed: {
+        differential: [{
+          diagnosis: 'Migraine without aura', icd10: null, likelihood: 'High',
+          likelihood_pct: 70, rationale: 'model prose',
+          supporting_quotes: [{ turn: 1, quote: 'I have had a throbbing headache for three days.' }],
+          contradicting_quotes: [],
+        }],
+        summary: 'model prose',
+      },
       raw: '{}', stopReason: 'tool_use',
     })
 
     await expect(generateFinalDifferential(SAMPLE_TRANSCRIPT)).resolves.toMatchObject({
-      summary: 'no data',
+      summary: GROUNDED_DIFFERENTIAL_SUMMARY,
     })
   })
 
@@ -451,5 +496,20 @@ describe('generateFinalDifferential', () => {
     expect(userContent).toContain('Turn 0')
     expect(userContent).toContain('Turn 1')
     expect(userContent).toContain('I have had a throbbing headache for three days.')
+  })
+
+  it('passes the application-verified medication summary to both model stages as the sole medication authority', async () => {
+    mockHappyPath()
+    const medicationAuthority =
+      'Application-verified medication reconciliation: tirzepatide; dose and frequency unresolved.'
+
+    await generateFinalDifferential(SAMPLE_TRANSCRIPT, 'headache', medicationAuthority)
+
+    const extractionCall = invokeBedrockJSONMock.mock.calls[0][0]
+    expect(extractionCall.messages[0].content).toContain(`Medication authority: ${medicationAuthority}`)
+
+    const finalCall = invokeBedrockClinicalToolMock.mock.calls[0][0]
+    const finalInput = JSON.parse(finalCall.messages[0].content as string)
+    expect(finalInput.trustedMedicationContext).toBe(medicationAuthority)
   })
 })

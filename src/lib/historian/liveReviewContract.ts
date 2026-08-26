@@ -15,6 +15,33 @@ import {
 export const LIVE_INTERVIEW_REVIEW_VERSION = 1 as const
 export const LIVE_INTERVIEW_REVIEW_MIN_PATIENT_TURNS = 12
 export const LIVE_INTERVIEW_REVIEW_PROMPT_VERSION = 'historian-live-review-v1' as const
+export const LIVE_INTERVIEW_REVIEW_V2_VERSION = 2 as const
+export const LIVE_INTERVIEW_REVIEW_V2_PROMPT_VERSION = 'historian-live-review-v2' as const
+
+/**
+ * Case-depth audit dimensions. These are silent evidence checks, never a
+ * patient-facing checklist. The reviewer must cite the patient's own turns
+ * for every adequate or uncertain classification.
+ */
+export const LIVE_REVIEW_DEPTH_DIMENSIONS = [
+  'chief_problem_and_goal',
+  'chronology_and_course',
+  'phenotype_and_severity',
+  'associated_features_and_discriminators',
+  'functional_impact',
+  'relevant_history_and_risk',
+  'treatments_and_response',
+  'prior_evaluation',
+] as const
+
+/** Core diagnostic framing must be established, not merely unresolved. */
+export const LIVE_REVIEW_REQUIRED_ADEQUATE_DEPTH_DIMENSIONS = [
+  'chronology_and_course',
+  'phenotype_and_severity',
+] as const
+
+export type LiveReviewDepthDimension = (typeof LIVE_REVIEW_DEPTH_DIMENSIONS)[number]
+export type LiveReviewDepthStatus = 'adequate' | 'uncertain' | 'missing'
 
 export type LiveReviewCoverageStatus = 'covered' | 'uncertain' | 'missing'
 
@@ -78,6 +105,22 @@ export interface LiveInterviewReviewV1 {
   confidence: 'high' | 'medium' | 'low'
 }
 
+export interface LiveReviewDepthFinding {
+  dimension: LiveReviewDepthDimension
+  status: LiveReviewDepthStatus
+  patientSeqs: number[]
+}
+
+export interface LiveInterviewReviewV2 extends Omit<LiveInterviewReviewV1, 'version'> {
+  version: typeof LIVE_INTERVIEW_REVIEW_V2_VERSION
+  diagnosticDepth: {
+    dimensions: LiveReviewDepthFinding[]
+    depthSufficient: boolean
+  }
+}
+
+export type LiveInterviewReview = LiveInterviewReviewV1 | LiveInterviewReviewV2
+
 export interface LiveInterviewReviewArtifactV1 {
   review: LiveInterviewReviewV1
   provenance: {
@@ -89,10 +132,34 @@ export interface LiveInterviewReviewArtifactV1 {
   attestation: string
 }
 
+export interface LiveInterviewReviewArtifactV2 {
+  review: LiveInterviewReviewV2
+  provenance: {
+    modelId: string
+    promptVersion: typeof LIVE_INTERVIEW_REVIEW_V2_PROMPT_VERSION
+    generatedAt: string
+  }
+  /** Server-only HMAC over this artifact, its session, and cited transcript. */
+  attestation: string
+}
+
+export type LiveInterviewReviewArtifact =
+  | LiveInterviewReviewArtifactV1
+  | LiveInterviewReviewArtifactV2
+
 export type UnsignedLiveInterviewReviewArtifactV1 = Omit<
   LiveInterviewReviewArtifactV1,
   'attestation'
 >
+
+export type UnsignedLiveInterviewReviewArtifactV2 = Omit<
+  LiveInterviewReviewArtifactV2,
+  'attestation'
+>
+
+export type UnsignedLiveInterviewReviewArtifact =
+  | UnsignedLiveInterviewReviewArtifactV1
+  | UnsignedLiveInterviewReviewArtifactV2
 
 export type LiveInterviewReviewCompletion =
   | 'coverage_complete'
@@ -101,6 +168,11 @@ export type LiveInterviewReviewCompletion =
 
 const DOMAIN_IDS = new Set<string>(COMPREHENSIVE_HISTORY_DOMAINS.map(({ id }) => id))
 const STATUS_VALUES = new Set<LiveReviewCoverageStatus>(['covered', 'uncertain', 'missing'])
+const DEPTH_DIMENSION_IDS = new Set<string>(LIVE_REVIEW_DEPTH_DIMENSIONS)
+const REQUIRED_ADEQUATE_DEPTH_DIMENSION_IDS = new Set<string>(
+  LIVE_REVIEW_REQUIRED_ADEQUATE_DEPTH_DIMENSIONS,
+)
+const DEPTH_STATUS_VALUES = new Set<LiveReviewDepthStatus>(['adequate', 'uncertain', 'missing'])
 const CONFIDENCE_VALUES = new Set(['high', 'medium', 'low'])
 const MEDICATION_VALUE_STATUSES = new Set<LiveReviewMedicationValueStatus>([
   'known',
@@ -416,8 +488,111 @@ export function parseLiveInterviewReview(
   }
 }
 
+/**
+ * V2 retains the transcript-cited v1 coverage/medication contract and adds a
+ * case-specific diagnostic-depth audit. The application, not the reviewer,
+ * recomputes the final closure decision.
+ */
+export function parseLiveInterviewReviewV2(
+  raw: unknown,
+  transcript: HistorianTranscriptEntry[],
+): LiveInterviewReviewV2 {
+  if (!isPlainObject(raw) || !hasExactKeys(raw, [
+    'version',
+    'reviewed_through_seq',
+    'domains',
+    'critical_gaps',
+    'contradictions',
+    'repetitions',
+    'medications',
+    'active_safety_concern',
+    'diagnostic_depth',
+    'ready_to_close',
+    'next_question_intents',
+    'confidence',
+  ])) throw new Error('Live review v2 has an invalid top-level schema.')
+  if (raw.version !== LIVE_INTERVIEW_REVIEW_V2_VERSION) {
+    throw new Error('Live review v2 version is unsupported.')
+  }
+  if (!isPlainObject(raw.diagnostic_depth) || !hasExactKeys(
+    raw.diagnostic_depth,
+    ['dimensions', 'depth_sufficient'],
+  )) throw new Error('Live review diagnostic depth has an invalid schema.')
+
+  // Reuse the established v1 parser for every shared transcript-bound field.
+  // Its closure value is treated only as a prerequisite below.
+  const sharedRaw: Record<string, unknown> = { ...raw }
+  delete sharedRaw.diagnostic_depth
+  const base = parseLiveInterviewReview({
+    ...sharedRaw,
+    version: LIVE_INTERVIEW_REVIEW_VERSION,
+  }, transcript)
+
+  const index = transcriptIndex(transcript)
+  if (
+    !Array.isArray(raw.diagnostic_depth.dimensions) ||
+    raw.diagnostic_depth.dimensions.length !== LIVE_REVIEW_DEPTH_DIMENSIONS.length
+  ) throw new Error('Live review must classify every diagnostic-depth dimension exactly once.')
+  const seenDimensions = new Set<string>()
+  const dimensions = raw.diagnostic_depth.dimensions.map((item, itemIndex) => {
+    if (!isPlainObject(item) || !hasExactKeys(item, ['dimension', 'status', 'patient_seqs'])) {
+      throw new Error(`Live review depth dimension ${itemIndex} has an invalid schema.`)
+    }
+    if (
+      typeof item.dimension !== 'string' ||
+      !DEPTH_DIMENSION_IDS.has(item.dimension) ||
+      seenDimensions.has(item.dimension)
+    ) throw new Error('Live review contains an unknown or duplicate depth dimension.')
+    if (
+      typeof item.status !== 'string' ||
+      !DEPTH_STATUS_VALUES.has(item.status as LiveReviewDepthStatus)
+    ) throw new Error('Live review contains an invalid depth status.')
+    seenDimensions.add(item.dimension)
+    const patientSeqs = exactIntegerArray(
+      item.patient_seqs,
+      index.patientSeqs,
+      `Live review depth ${item.dimension}`,
+      item.status === 'missing' ? 0 : 1,
+      20,
+    )
+    if (item.status === 'missing' && patientSeqs.length) {
+      throw new Error('A missing depth dimension cannot claim patient evidence.')
+    }
+    return {
+      dimension: item.dimension as LiveReviewDepthDimension,
+      status: item.status as LiveReviewDepthStatus,
+      patientSeqs,
+    }
+  })
+  if (typeof raw.diagnostic_depth.depth_sufficient !== 'boolean') {
+    throw new Error('Live review depth sufficiency must be boolean.')
+  }
+
+  const applicationDepthSufficient =
+    raw.diagnostic_depth.depth_sufficient &&
+    dimensions.every((item) => item.status !== 'missing') &&
+    dimensions.every((item) => (
+      !REQUIRED_ADEQUATE_DEPTH_DIMENSION_IDS.has(item.dimension) || item.status === 'adequate'
+    )) &&
+    base.criticalGaps.length === 0 &&
+    base.confidence !== 'low'
+  if (!applicationDepthSufficient && base.nextQuestionIntents.length === 0) {
+    throw new Error('An insufficient depth review must provide a next question intent.')
+  }
+
+  return {
+    ...base,
+    version: LIVE_INTERVIEW_REVIEW_V2_VERSION,
+    diagnosticDepth: {
+      dimensions,
+      depthSufficient: applicationDepthSufficient,
+    },
+    readyToClose: base.readyToClose && applicationDepthSufficient,
+  }
+}
+
 export function liveInterviewReviewCompletion(
-  review: LiveInterviewReviewV1 | null | undefined,
+  review: LiveInterviewReview | null | undefined,
 ): LiveInterviewReviewCompletion {
   if (!review?.readyToClose) return 'incomplete'
   return review.domains.some((item) => item.status === 'uncertain') ||
@@ -426,7 +601,7 @@ export function liveInterviewReviewCompletion(
     : 'coverage_complete'
 }
 
-export function deriveLiveReviewStructuredCoverage(review: LiveInterviewReviewV1): {
+export function deriveLiveReviewStructuredCoverage(review: LiveInterviewReview): {
   covered_domains: ComprehensiveHistoryDomain[]
   missing_or_uncertain: Array<{
     domain: ComprehensiveHistoryDomain
@@ -447,7 +622,7 @@ export function deriveLiveReviewStructuredCoverage(review: LiveInterviewReviewV1
 }
 
 /** Validate the camel-case server/persistence artifact at every boundary. */
-export function parseLiveInterviewReviewArtifact(
+function parseLiveInterviewReviewArtifactV1(
   raw: unknown,
   transcript: HistorianTranscriptEntry[],
 ): LiveInterviewReviewArtifactV1 {
@@ -548,4 +723,138 @@ export function parseLiveInterviewReviewArtifact(
     },
     attestation: raw.attestation,
   }
+}
+
+function parseLiveInterviewReviewArtifactV2(
+  raw: unknown,
+  transcript: HistorianTranscriptEntry[],
+): LiveInterviewReviewArtifactV2 {
+  if (!isPlainObject(raw) || !hasExactKeys(raw, ['review', 'provenance', 'attestation'])) {
+    throw new Error('Live review v2 artifact has an invalid schema.')
+  }
+  if (!isPlainObject(raw.review) || !isPlainObject(raw.provenance)) {
+    throw new Error('Live review v2 artifact is malformed.')
+  }
+  if (typeof raw.attestation !== 'string' || !/^[A-Za-z0-9_-]{43}$/.test(raw.attestation)) {
+    throw new Error('Live review v2 attestation is invalid.')
+  }
+  if (!hasExactKeys(raw.provenance, ['modelId', 'promptVersion', 'generatedAt'])) {
+    throw new Error('Live review v2 provenance has an invalid schema.')
+  }
+  if (
+    typeof raw.provenance.modelId !== 'string' ||
+    !raw.provenance.modelId.trim() ||
+    raw.provenance.promptVersion !== LIVE_INTERVIEW_REVIEW_V2_PROMPT_VERSION ||
+    typeof raw.provenance.generatedAt !== 'string' ||
+    !Number.isFinite(Date.parse(raw.provenance.generatedAt))
+  ) throw new Error('Live review v2 provenance is invalid.')
+  if (!hasExactKeys(raw.review, [
+    'version',
+    'reviewedThroughSeq',
+    'domains',
+    'criticalGaps',
+    'contradictions',
+    'repetitions',
+    'medications',
+    'activeSafetyConcern',
+    'diagnosticDepth',
+    'readyToClose',
+    'nextQuestionIntents',
+    'confidence',
+  ])) throw new Error('Live review v2 artifact review has an invalid schema.')
+
+  // Validate and normalize every shared field through the established v1
+  // artifact boundary, then add the independently validated v2 depth block.
+  const {
+    diagnosticDepth,
+    ...sharedReview
+  } = raw.review
+  const shared = parseLiveInterviewReviewArtifactV1({
+    review: { ...sharedReview, version: LIVE_INTERVIEW_REVIEW_VERSION },
+    provenance: {
+      ...raw.provenance,
+      promptVersion: LIVE_INTERVIEW_REVIEW_PROMPT_VERSION,
+    },
+    attestation: raw.attestation,
+  }, transcript)
+  const parsed = parseLiveInterviewReviewV2({
+    version: LIVE_INTERVIEW_REVIEW_V2_VERSION,
+    reviewed_through_seq: shared.review.reviewedThroughSeq,
+    domains: shared.review.domains.map((item) => ({
+      domain: item.domain,
+      status: item.status,
+      patient_seqs: item.patientSeqs,
+    })),
+    critical_gaps: shared.review.criticalGaps.map((item) => ({
+      domain: item.domain,
+      reason: item.reason,
+      question_intent: item.questionIntent,
+    })),
+    contradictions: shared.review.contradictions.map((item) => ({
+      patient_seqs: item.patientSeqs,
+      description: item.description,
+    })),
+    repetitions: shared.review.repetitions.map((item) => ({
+      assistant_seqs: item.assistantSeqs,
+      description: item.description,
+    })),
+    medications: shared.review.medications.map((item) => ({
+      name_span: item.nameSpan,
+      patient_seq: item.patientSeq,
+      dose: {
+        status: item.dose.status,
+        value_span: item.dose.valueSpan,
+        patient_seqs: item.dose.patientSeqs,
+      },
+      frequency: {
+        status: item.frequency.status,
+        value_span: item.frequency.valueSpan,
+        patient_seqs: item.frequency.patientSeqs,
+      },
+    })),
+    active_safety_concern: {
+      present: shared.review.activeSafetyConcern.present,
+      patient_seqs: shared.review.activeSafetyConcern.patientSeqs,
+    },
+    diagnostic_depth: isPlainObject(diagnosticDepth)
+      ? {
+          dimensions: Array.isArray(diagnosticDepth.dimensions)
+            ? diagnosticDepth.dimensions.map((item) => isPlainObject(item)
+              ? {
+                  dimension: item.dimension,
+                  status: item.status,
+                  patient_seqs: item.patientSeqs,
+                }
+              : item)
+            : diagnosticDepth.dimensions,
+          depth_sufficient: diagnosticDepth.depthSufficient,
+        }
+      : diagnosticDepth,
+    ready_to_close: shared.review.readyToClose,
+    next_question_intents: shared.review.nextQuestionIntents,
+    confidence: shared.review.confidence,
+  }, transcript)
+
+  return {
+    review: parsed,
+    provenance: {
+      modelId: raw.provenance.modelId.trim(),
+      promptVersion: LIVE_INTERVIEW_REVIEW_V2_PROMPT_VERSION,
+      generatedAt: new Date(raw.provenance.generatedAt).toISOString(),
+    },
+    attestation: raw.attestation,
+  }
+}
+
+/** Validate either supported camel-case server/persistence artifact. */
+export function parseLiveInterviewReviewArtifact(
+  raw: unknown,
+  transcript: HistorianTranscriptEntry[],
+): LiveInterviewReviewArtifact {
+  if (
+    isPlainObject(raw) &&
+    isPlainObject(raw.review) &&
+    raw.review.version === LIVE_INTERVIEW_REVIEW_V2_VERSION
+  ) return parseLiveInterviewReviewArtifactV2(raw, transcript)
+  return parseLiveInterviewReviewArtifactV1(raw, transcript)
 }

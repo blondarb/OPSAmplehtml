@@ -21,4 +21,15 @@ describe('Historian evaluation worker infrastructure', () => {
     expect(template.match(/DeletionPolicy: RetainExceptOnCreate/g)).toHaveLength(2)
     expect(template.match(/UpdateReplacePolicy: Retain/g)).toHaveLength(2)
   })
+
+  it('gives the report-first pipeline a lease longer than its worker timeout and queue visibility', () => {
+    expect(template).toContain("HISTORIAN_EVAL_LEASE_SECONDS: '840'")
+    expect(template).toMatch(/HistorianEvalQueue:[\s\S]*VisibilityTimeout: 900/)
+    expect(template).toMatch(/HistorianEvalWorkerFunction:[\s\S]*Timeout: 780/)
+  })
+
+  it('describes report generation as preceding any permitted differential', () => {
+    expect(template).toMatch(/report-first evaluation worker/i)
+    expect(template).toMatch(/Produces a cited clinician history report before any permitted full-transcript differential/i)
+  })
 })

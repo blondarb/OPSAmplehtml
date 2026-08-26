@@ -1,14 +1,24 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { SQSEvent } from 'aws-lambda'
 
-const { generateFinalDifferentialMock, runThoroughnessJudgeMock, runIndependentMock } = vi.hoisted(() => ({
+const {
+  generateFinalDifferentialMock,
+  generateClinicianHistoryReportMock,
+  runThoroughnessJudgeMock,
+  runIndependentMock,
+} = vi.hoisted(() => ({
   generateFinalDifferentialMock: vi.fn(),
+  generateClinicianHistoryReportMock: vi.fn(),
   runThoroughnessJudgeMock: vi.fn(),
   runIndependentMock: vi.fn(),
 }))
 
 vi.mock('@/lib/historian/eval/finalDifferential', () => ({
   generateFinalDifferential: generateFinalDifferentialMock,
+}))
+vi.mock('@/lib/historian/eval/clinicianHistoryReport', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/lib/historian/eval/clinicianHistoryReport')>()),
+  generateClinicianHistoryReport: generateClinicianHistoryReportMock,
 }))
 vi.mock('@/lib/historian/eval/thoroughnessJudge', () => ({
   runThoroughnessJudge: runThoroughnessJudgeMock,
@@ -18,67 +28,259 @@ vi.mock('@/lib/historian/eval/independentDdx', () => ({
 }))
 
 import { processHistorianEvalEvent } from '@/workers/historianEvalWorker'
+import { COMPREHENSIVE_HISTORY_DOMAINS } from '@/lib/historianTypes'
+import { LIVE_REVIEW_DEPTH_DIMENSIONS } from '@/lib/historian/liveReviewContract'
+import { createMedicationReconciliationState } from '@/lib/historian/medicationReconciliation'
+import { MEDICATION_INVENTORY_QUESTION } from '@/lib/historian/medicationReconciliation'
+import { ADAPTIVE_PRE_CLOSE_QUESTION } from '@/lib/historian/adaptiveQuestionContract'
+import { buildDiagnosticInputProjection } from '@/lib/historian/eval/diagnosticInput'
 
 const jobId = '11111111-1111-4111-8111-111111111111'
 const event = (body: string): SQSEvent => ({
   Records: [{ messageId: 'message-1', body }] as SQSEvent['Records'],
 })
 
-const claim = {
-  jobId,
-  sessionId: '22222222-2222-4222-8222-222222222222',
-  tenantId: 'tenant-a',
-  leaseToken: '33333333-3333-4333-8333-333333333333',
-  attemptCount: 1,
-  transcript: [
-    { role: 'assistant' as const, text: 'Why were you referred?', timestamp: 0, seq: 0 },
-    { role: 'user' as const, text: 'Walking is harder.', timestamp: 1, seq: 1 },
-  ],
-  chiefComplaint: 'Gait concern',
-  structuredOutput: { chief_complaint: 'Gait concern' },
-  narrativeSummary: 'Synthetic summary.',
+function completeTranscript() {
+  return Array.from({ length: 12 }, (_, index) => [
+    {
+      role: 'assistant' as const,
+      text: index === 10
+        ? MEDICATION_INVENTORY_QUESTION
+        : index === 11
+          ? ADAPTIVE_PRE_CLOSE_QUESTION
+          : `Question ${index + 1}?`,
+      timestamp: index * 2,
+      seq: index * 2 + 1,
+    },
+    {
+      role: 'user' as const,
+      text: index === 10
+        ? 'No other medicines.'
+        : index === 11
+          ? 'No, that covers it.'
+          : `Detailed synthetic answer ${index + 1}.`,
+      timestamp: index * 2 + 1,
+      seq: index * 2 + 2,
+    },
+  ]).flat()
+}
+
+function v2ReviewArtifact() {
+  return {
+    review: {
+      version: 2,
+      reviewedThroughSeq: 24,
+      domains: COMPREHENSIVE_HISTORY_DOMAINS.map((domain, index) => ({
+        domain: domain.id,
+        status: 'covered',
+        patientSeqs: [2 + (index % 12) * 2],
+      })),
+      criticalGaps: [],
+      contradictions: [],
+      repetitions: [],
+      medications: [],
+      activeSafetyConcern: { present: false, patientSeqs: [] },
+      diagnosticDepth: {
+        dimensions: LIVE_REVIEW_DEPTH_DIMENSIONS.map((dimension, index) => ({
+          dimension,
+          status: 'adequate',
+          patientSeqs: [2 + (index % 12) * 2],
+        })),
+        depthSufficient: true,
+      },
+      readyToClose: true,
+      nextQuestionIntents: [],
+      confidence: 'high',
+    },
+    provenance: {
+      modelId: 'synthetic-reviewer',
+      promptVersion: 'historian-live-review-v2',
+      generatedAt: '2026-08-25T12:00:00.000Z',
+    },
+    attestation: 'a'.repeat(43),
+  }
+}
+
+function completeClaim() {
+  const medication = createMedicationReconciliationState()
+  medication.inventoryStatus = 'answered'
+  medication.inventoryPatientSeq = 22
+  return {
+    jobId,
+    sessionId: '22222222-2222-4222-8222-222222222222',
+    tenantId: 'tenant-a',
+    leaseToken: '33333333-3333-4333-8333-333333333333',
+    attemptCount: 1,
+    pipelineVersion: 2,
+    currentStage: 'report_pending',
+    transcript: completeTranscript(),
+    chiefComplaint: 'Gait concern',
+    structuredOutput: {
+      interview_prompt_version: 'comprehensive-v4' as const,
+      live_review_v2: v2ReviewArtifact(),
+      medication_reconciliation_v1: medication,
+    },
+    narrativeSummary: undefined,
+    promptVersion: 'comprehensive-v4' as const,
+    completionStatus: 'complete' as const,
+    terminationReason: 'coverage_complete' as const,
+    diagnosticSufficiency: null,
+    clinicianHistoryReport: null,
+    finalDifferential: null,
+  }
+}
+
+function mockReport() {
+  return {
+    version: 1,
+    report_status: 'complete',
+    input_digest: 'b'.repeat(64),
+    sections: [],
+    medication_reconciliation: createMedicationReconciliationState(),
+    limitations: [],
+    completion: { termination_reason: 'coverage_complete', patient_turn_count: 12, reviewed_through_seq: 24 },
+    provenance: {},
+  }
 }
 
 describe('durable historian evaluation worker', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     delete process.env.HISTORIAN_EVAL_QA_AUTORUN
+    generateClinicianHistoryReportMock.mockResolvedValue(mockReport())
   })
 
-  it('persists the required final differential before completing the durable job', async () => {
+  it('persists sufficiency and report before the allowed differential, then completes', async () => {
+    const claim = completeClaim()
     const order: string[] = []
     const service = {
       claim: vi.fn(async () => claim),
-      persistFinalDifferential: vi.fn(async () => { order.push('persist') }),
+      persistDiagnosticSufficiency: vi.fn(async () => { order.push('sufficiency') }),
+      persistClinicianHistoryReport: vi.fn(async () => { order.push('report') }),
+      persistFinalDifferential: vi.fn(async () => { order.push('ddx') }),
       complete: vi.fn(async () => { order.push('complete') }),
       fail: vi.fn(),
     }
     generateFinalDifferentialMock.mockResolvedValueOnce({
       status: 'ok', differential: [], summary: 'Synthetic', provenance: {}, dropped_quotes: 0,
     })
-    runThoroughnessJudgeMock.mockResolvedValueOnce(undefined)
-    runIndependentMock.mockResolvedValueOnce(undefined)
 
     const result = await processHistorianEvalEvent(
       event(JSON.stringify({ v: 1, kind: 'historian_eval', job_id: jobId })),
       service as never,
     )
     expect(result.batchItemFailures).toEqual([])
-    expect(order).toEqual(['persist', 'complete'])
-    expect(generateFinalDifferentialMock).toHaveBeenCalledWith(claim.transcript, claim.chiefComplaint)
+    expect(order).toEqual(['sufficiency', 'report', 'ddx', 'complete'])
+    const diagnosticProjection = buildDiagnosticInputProjection(
+      claim.transcript,
+      claim.structuredOutput.medication_reconciliation_v1,
+    )
+    expect(generateFinalDifferentialMock).toHaveBeenCalledWith(
+      diagnosticProjection.transcript,
+      claim.chiefComplaint,
+      diagnosticProjection.trustedMedicationContext,
+    )
     expect(runThoroughnessJudgeMock).toHaveBeenCalledTimes(1)
     expect(runIndependentMock).toHaveBeenCalledTimes(1)
+    expect(runIndependentMock).toHaveBeenCalledWith(
+      claim.sessionId,
+      diagnosticProjection.transcript,
+      claim.chiefComplaint,
+      expect.stringMatching(/^[0-9a-f]{64}$/),
+      diagnosticProjection.trustedMedicationContext,
+    )
     expect(service.fail).not.toHaveBeenCalled()
   })
 
-  it('persists a retry decision when required differential generation fails', async () => {
+  it('preserves the legacy pipeline for a migration-era version-1 job', async () => {
+    process.env.HISTORIAN_EVAL_QA_AUTORUN = 'false'
+    const claim = {
+      ...completeClaim(),
+      pipelineVersion: 1,
+      currentStage: 'legacy',
+      promptVersion: 'comprehensive-v3' as const,
+      diagnosticSufficiency: null,
+      clinicianHistoryReport: null,
+      finalDifferential: null,
+    }
+    const legacyDifferential = {
+      status: 'ok', differential: [], summary: 'Legacy result', provenance: {}, dropped_quotes: 0,
+    }
+    generateFinalDifferentialMock.mockResolvedValueOnce(legacyDifferential)
     const service = {
       claim: vi.fn(async () => claim),
+      persistDiagnosticSufficiency: vi.fn(),
+      persistClinicianHistoryReport: vi.fn(),
+      persistFinalDifferential: vi.fn(),
+      complete: vi.fn(),
+      fail: vi.fn(),
+    }
+
+    const result = await processHistorianEvalEvent(
+      event(JSON.stringify({ v: 1, kind: 'historian_eval', job_id: jobId })),
+      service as never,
+    )
+
+    expect(result.batchItemFailures).toEqual([])
+    expect(generateFinalDifferentialMock).toHaveBeenCalledWith(
+      claim.transcript,
+      claim.chiefComplaint,
+    )
+    expect(service.persistFinalDifferential).toHaveBeenCalledWith(claim, legacyDifferential)
+    expect(service.persistDiagnosticSufficiency).not.toHaveBeenCalled()
+    expect(service.persistClinicianHistoryReport).not.toHaveBeenCalled()
+    expect(service.complete).toHaveBeenCalledWith(claim)
+    expect(service.fail).not.toHaveBeenCalled()
+  })
+
+  it('generates a partial report but withholds every DDx model for an interrupted interview', async () => {
+    const base = completeClaim()
+    const claim = {
+      ...base,
+      transcript: base.transcript.slice(0, 6),
+      promptVersion: 'comprehensive-v3' as const,
+      completionStatus: 'ended_early' as const,
+      terminationReason: 'transport_lost' as const,
+      structuredOutput: { interview_prompt_version: 'comprehensive-v3' as const },
+    }
+    const service = {
+      claim: vi.fn(async () => claim),
+      persistDiagnosticSufficiency: vi.fn(),
+      persistClinicianHistoryReport: vi.fn(),
+      persistFinalDifferential: vi.fn(),
+      complete: vi.fn(),
+      fail: vi.fn(),
+    }
+    const result = await processHistorianEvalEvent(
+      event(JSON.stringify({ v: 1, kind: 'historian_eval', job_id: jobId })),
+      service as never,
+    )
+    expect(result.batchItemFailures).toEqual([])
+    expect(generateClinicianHistoryReportMock).toHaveBeenCalledTimes(1)
+    expect(generateFinalDifferentialMock).not.toHaveBeenCalled()
+    expect(runThoroughnessJudgeMock).not.toHaveBeenCalled()
+    expect(runIndependentMock).not.toHaveBeenCalled()
+    expect(service.persistFinalDifferential).toHaveBeenCalledWith(
+      claim,
+      expect.objectContaining({ status: 'withheld_partial' }),
+      expect.objectContaining({ withheld: true }),
+    )
+    expect(service.complete).toHaveBeenCalledTimes(1)
+  })
+
+  it('persists a retry decision when required differential generation fails', async () => {
+    const claim = completeClaim()
+    const service = {
+      claim: vi.fn(async () => claim),
+      persistDiagnosticSufficiency: vi.fn(),
+      persistClinicianHistoryReport: vi.fn(),
       persistFinalDifferential: vi.fn(),
       complete: vi.fn(),
       fail: vi.fn(async () => undefined),
     }
-    generateFinalDifferentialMock.mockRejectedValueOnce(Object.assign(new Error('provider unavailable'), { name: 'ProviderError' }))
+    generateFinalDifferentialMock.mockRejectedValueOnce(
+      Object.assign(new Error('provider unavailable'), { name: 'ProviderError' }),
+    )
 
     const result = await processHistorianEvalEvent(
       event(JSON.stringify({ v: 1, kind: 'historian_eval', job_id: jobId })),

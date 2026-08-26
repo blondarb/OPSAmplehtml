@@ -76,19 +76,20 @@ describe('DifferentialCard', () => {
     expect(markup).toMatch(/retrying automatically/i)
   })
 
-  it('renders ranked diagnoses, likelihood, rationale, and quotes when populated', () => {
+  it('renders ranked diagnoses and grounded quotes while suppressing unverified prose and codes', () => {
     const markup = renderToStaticMarkup(<DifferentialCard finalDifferential={SAMPLE} />)
     expect(markup).toContain('Migraine without aura')
-    expect(markup).toContain('G43.009')
+    expect(markup).not.toContain('G43.009')
     expect(markup).toContain('High')
     expect(markup).toContain('70%')
     expect(markup).toMatch(/uncalibrated model estimates/i)
     expect(markup).toMatch(/not statistical confidence intervals/i)
-    expect(markup).toContain('Throbbing headache with nausea, no red flags.')
+    expect(markup).not.toContain('Throbbing headache with nausea, no red flags.')
     expect(markup).toContain('Turn 1')
     expect(markup).toContain('I have had a throbbing headache for three days.')
     expect(markup).toContain('Tension-type headache')
-    expect(markup).toContain('Subacute headache most consistent with migraine without aura.')
+    expect(markup).not.toContain('Subacute headache most consistent with migraine without aura.')
+    expect(markup).toMatch(/transcript-verified supporting evidence/i)
   })
 
   it('surfaces the dropped-quote count without ever rendering dropped quote text (none is known to the card)', () => {

@@ -104,19 +104,6 @@ function DifferentialItemRow({
         <span style={{ fontWeight: 700, fontSize: '0.85rem', color: 'var(--text-primary, #1e293b)' }}>
           {item.diagnosis}
         </span>
-        {item.icd10 && (
-          <code
-            style={{
-              fontSize: '0.7rem',
-              color: 'var(--text-secondary, #64748b)',
-              background: 'rgba(100,116,139,0.12)',
-              borderRadius: 4,
-              padding: '1px 5px',
-            }}
-          >
-            {item.icd10}
-          </code>
-        )}
         <span
           style={{
             fontSize: '0.65rem',
@@ -130,12 +117,6 @@ function DifferentialItemRow({
           {item.likelihood} · {item.likelihood_pct}% model estimate
         </span>
       </div>
-
-      {item.rationale && (
-        <p style={{ fontSize: '0.8rem', color: 'var(--text-primary, #1e293b)', margin: '4px 0 0', lineHeight: 1.4 }}>
-          {item.rationale}
-        </p>
-      )}
 
       <QuoteList label="Supporting evidence" quotes={item.supporting_quotes} onQuoteClick={onQuoteClick} />
       <QuoteList label="Contradicting evidence" quotes={item.contradicting_quotes} onQuoteClick={onQuoteClick} />
@@ -227,18 +208,16 @@ export default function DifferentialCard({
         </p>
       ) : (
         <>
-          {finalDifferential.summary && (
-            <p
-              style={{
-                fontSize: '0.8rem',
-                color: 'var(--text-primary, #1e293b)',
-                lineHeight: 1.5,
-                margin: '0 0 12px',
-              }}
-            >
-              {finalDifferential.summary}
-            </p>
-          )}
+          <p
+            style={{
+              fontSize: '0.8rem',
+              color: 'var(--text-primary, #1e293b)',
+              lineHeight: 1.5,
+              margin: '0 0 12px',
+            }}
+          >
+            Candidate diagnoses below are shown only with transcript-verified supporting evidence and require physician review.
+          </p>
 
           <ol style={{ margin: 0, padding: 0 }}>
             {finalDifferential.differential.map((item, i) => (

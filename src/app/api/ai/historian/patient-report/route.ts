@@ -69,6 +69,7 @@ function buildUserContent(
   if (
     parts.length === 0 &&
     structuredOutput?.interview_prompt_version !== 'comprehensive-v3' &&
+    structuredOutput?.interview_prompt_version !== 'comprehensive-v4' &&
     transcript &&
     transcript.length > 0
   ) {
@@ -107,7 +108,10 @@ export async function POST(request: Request) {
   // not a model-authored narrative. Until a separate transcript-citing report
   // artifact exists, do not ask another model to turn those sparse controls
   // into prose or accidentally reintroduce a misheard medication name.
-  if (structuredOutput?.interview_prompt_version === 'comprehensive-v3') {
+  if (
+    structuredOutput?.interview_prompt_version === 'comprehensive-v3' ||
+    structuredOutput?.interview_prompt_version === 'comprehensive-v4'
+  ) {
     return fallback()
   }
 

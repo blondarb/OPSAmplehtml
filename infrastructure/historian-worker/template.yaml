@@ -1,7 +1,7 @@
 AWSTemplateFormatVersion: '2010-09-09'
 Transform: AWS::Serverless-2016-10-31
 Description: >
-  Durable post-interview AI Historian differential worker. Queue messages
+  Durable post-interview AI Historian report-first evaluation worker. Queue messages
   contain an opaque evaluation-job UUID only; clinical text remains in the
   tenant-bound database.
 
@@ -61,7 +61,7 @@ Globals:
         RDS_HOST: !Ref RdsHost
         RDS_PORT: !Ref RdsPort
         HISTORIAN_EVAL_QUEUE_URL: !Ref HistorianEvalQueue
-        HISTORIAN_EVAL_LEASE_SECONDS: '360'
+        HISTORIAN_EVAL_LEASE_SECONDS: '840'
     Tags:
       Project: sevaro-clinical
       Component: historian-eval-worker
@@ -130,8 +130,8 @@ Resources:
     Properties:
       CodeUri: ../../
       Handler: src/workers/historianEvalWorker.handler
-      Description: Produces and persists the required full-transcript physician differential.
-      Timeout: 300
+      Description: Produces a cited clinician history report before any permitted full-transcript differential.
+      Timeout: 780
       ReservedConcurrentExecutions: !Ref WorkerMaximumConcurrency
       Policies:
         - Statement:

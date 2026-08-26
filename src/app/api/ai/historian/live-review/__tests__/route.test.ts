@@ -81,7 +81,7 @@ describe('POST /api/ai/historian/live-review', () => {
     const response = await POST(request())
     expect(response.status).toBe(200)
     expect(response.headers.get('cache-control')).toContain('no-store')
-    expect(generateReviewMock).toHaveBeenCalledWith(TRANSCRIPT)
+    expect(generateReviewMock).toHaveBeenCalledWith(TRANSCRIPT, { diagnosticDepth: false })
     expect(attestReviewMock).toHaveBeenCalledWith(
       SESSION_ID,
       TRANSCRIPT,
@@ -89,6 +89,30 @@ describe('POST /api/ai/historian/live-review', () => {
       ATTEMPT_ID,
     )
     expect(await response.json()).toMatchObject({ attestation: 'a'.repeat(43) })
+  })
+
+  it('uses database-bound Comprehensive v4 authority to request diagnostic-depth review', async () => {
+    queryMock.mockResolvedValueOnce({
+      rows: [{
+        status: 'in_progress',
+        startup_attempt_id: ATTEMPT_ID,
+        interview_prompt_version: 'comprehensive-v4',
+      }],
+    })
+    generateReviewMock.mockResolvedValueOnce({ review: { version: 2 }, provenance: {} })
+    attestReviewMock.mockResolvedValueOnce({
+      review: { version: 2 }, provenance: {}, attestation: 'b'.repeat(43),
+    })
+
+    const response = await POST(request({ interviewPromptVersion: 'comprehensive-v3' }))
+    expect(response.status).toBe(200)
+    expect(generateReviewMock).toHaveBeenCalledWith(TRANSCRIPT, { diagnosticDepth: true })
+    expect(attestReviewMock).toHaveBeenCalledWith(
+      SESSION_ID,
+      TRANSCRIPT,
+      { review: { version: 2 }, provenance: {} },
+      ATTEMPT_ID,
+    )
   })
 
   it('rejects noncontiguous or assistant-ended transcript snapshots before model use', async () => {

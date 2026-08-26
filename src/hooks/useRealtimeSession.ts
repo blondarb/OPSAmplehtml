@@ -34,7 +34,7 @@ import {
   deriveLiveReviewStructuredCoverage,
   liveInterviewReviewCompletion,
   parseLiveInterviewReviewArtifact,
-  type LiveInterviewReviewArtifactV1,
+  type LiveInterviewReviewArtifact,
 } from '@/lib/historian/liveReviewContract'
 import {
   approveMedicationQuestion,
@@ -315,7 +315,7 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
   } | null>(null)
   const conductorDuePatientSeqRef = useRef<number | null>(null)
   const patientEvidenceStateRef = useRef<PatientEvidenceState>(createPatientEvidenceState())
-  const liveReviewRef = useRef<LiveInterviewReviewArtifactV1 | null>(null)
+  const liveReviewRef = useRef<LiveInterviewReviewArtifact | null>(null)
   const liveReviewInFlightRef = useRef(false)
   const lastLiveReviewTurnRef = useRef(0)
   const medicationReconciliationRef = useRef<MedicationReconciliationState>(
@@ -679,7 +679,7 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
     }
   }, [options])
 
-  const runLiveReview = useCallback(async (): Promise<LiveInterviewReviewArtifactV1 | null> => {
+  const runLiveReview = useCallback(async (): Promise<LiveInterviewReviewArtifact | null> => {
     if (!adaptiveTurnControllerEnabledRef.current) return null
     if (!runtimeGuardRef.current?.acceptsInterviewActivity()) return null
     if (liveReviewInFlightRef.current) return null
@@ -699,7 +699,11 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
           'Content-Type': 'application/json',
           Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify({ sessionId, transcript: snapshot }),
+        body: JSON.stringify({
+          sessionId,
+          transcript: snapshot,
+          interviewPromptVersion: resolvedInterviewPromptVersionRef.current,
+        }),
       })
       if (!response.ok) return null
       const artifact = parseLiveInterviewReviewArtifact(await response.json(), snapshot)
@@ -1209,8 +1213,12 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
             medicationReconciliationRef.current,
           )
 
+          const adaptivePromptVersion =
+            resolvedInterviewPromptVersionRef.current === 'comprehensive-v4'
+              ? 'comprehensive-v4'
+              : 'comprehensive-v3'
           structuredForSave = {
-            // Comprehensive v3 never persists Nova-authored clinical prose.
+            // Controlled adaptive interviews never persist Nova-authored clinical prose.
             // Until a separate transcript-citing clinician-report generator
             // exists, only application-owned/attested structures cross the
             // save boundary. This prevents a misheard drug name from surviving
@@ -1218,7 +1226,7 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
             // field after current_medications has been corrected.
             current_medications: confirmedMedications || undefined,
             interview_mode: 'comprehensive',
-            interview_prompt_version: 'comprehensive-v3',
+            interview_prompt_version: adaptivePromptVersion,
             medication_reconciliation_v1: medicationReconciliationRef.current,
             medication_reconciliation_has_uncertainty:
               medicationReconciliationHasUncertainty(medicationReconciliationRef.current),
@@ -1226,7 +1234,9 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
               medicationReconciliationUnresolvedCount(medicationReconciliationRef.current),
             ...(reviewIsCurrent
               ? {
-                  live_review_v1: currentReview,
+                  ...(adaptivePromptVersion === 'comprehensive-v4'
+                    ? { live_review_v2: currentReview }
+                    : { live_review_v1: currentReview }),
                   history_coverage: deriveLiveReviewStructuredCoverage(currentReview.review),
                 }
               : {}),
@@ -2222,13 +2232,15 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
         resolvedInterviewModeRef.current === 'comprehensive' &&
         (resolvedInterviewPromptVersion === 'comprehensive-v1' ||
           resolvedInterviewPromptVersion === 'comprehensive-v2' ||
-          resolvedInterviewPromptVersion === 'comprehensive-v3')
+          resolvedInterviewPromptVersion === 'comprehensive-v3' ||
+          resolvedInterviewPromptVersion === 'comprehensive-v4')
           ? resolvedInterviewPromptVersion
           : 'standard-v1'
       const expectsTurnEvidenceController =
         resolvedInterviewPromptVersionRef.current === 'comprehensive-v2'
       const expectsAdaptiveTurnController =
-        resolvedInterviewPromptVersionRef.current === 'comprehensive-v3'
+        resolvedInterviewPromptVersionRef.current === 'comprehensive-v3' ||
+        resolvedInterviewPromptVersionRef.current === 'comprehensive-v4'
       if (expectsTurnEvidenceController !== (resolvedTurnEvidenceController === true)) {
         throw new Error('The server returned an inconsistent interview safety contract.')
       }
@@ -2299,7 +2311,8 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
         !!serverSessionIdRef.current &&
         !!flushTokenRef.current &&
         (resolvedInterviewPromptVersionRef.current === 'comprehensive-v2' ||
-          resolvedInterviewPromptVersionRef.current === 'comprehensive-v3') &&
+          resolvedInterviewPromptVersionRef.current === 'comprehensive-v3' ||
+          resolvedInterviewPromptVersionRef.current === 'comprehensive-v4') &&
         transcriptRef.current.length === 0 &&
         questionCountRef.current === 0 &&
         !safetyEscalatedRef.current
@@ -2546,7 +2559,8 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
     const retryableStartupFailure =
       (terminationReason === 'provider_error' || terminationReason === 'transport_lost') &&
       (resolvedInterviewPromptVersionRef.current === 'comprehensive-v2' ||
-        resolvedInterviewPromptVersionRef.current === 'comprehensive-v3') &&
+        resolvedInterviewPromptVersionRef.current === 'comprehensive-v3' ||
+        resolvedInterviewPromptVersionRef.current === 'comprehensive-v4') &&
       transcriptRef.current.length === 0 &&
       questionCountRef.current === 0 &&
       !safetyEscalatedRef.current

@@ -13,6 +13,7 @@ export type HistorianInterviewPromptVersion =
   | 'comprehensive-v1'
   | 'comprehensive-v2'
   | 'comprehensive-v3'
+  | 'comprehensive-v4'
 
 /** Why an interview stopped; the two coverage outcomes represent completed intakes. */
 export type HistorianTerminationReason =
@@ -110,6 +111,8 @@ export interface HistorianStructuredOutput {
    * coverage or closure readiness.
    */
   live_review_v1?: unknown
+  /** Transcript-bound v4 case-depth review. Server verification is required. */
+  live_review_v2?: unknown
   /**
    * Application-owned medication ledger. Names and values are copied only
    * from transcript-cited reviewer spans and are never silently normalized.
@@ -191,7 +194,14 @@ export interface HistorianSession {
    * pending state in that case. Optional so rows saved before migration
    * 057 keep validating cleanly (same pattern as interview_completion_status).
    */
-  final_differential?: import('./historian/eval/finalDifferential').FinalDifferential | null
+  final_differential?:
+    | import('./historian/eval/finalDifferential').FinalDifferential
+    | import('./historian/diagnosticSufficiency').WithheldFinalDifferentialV1
+    | null
+  /** Server-derived authority for report/DDx generation; never patient-supplied. */
+  diagnostic_sufficiency?: import('./historian/diagnosticSufficiency').DiagnosticSufficiencyV1 | null
+  /** Citation-grounded physician-only report produced by the durable worker. */
+  clinician_history_report?: import('./historian/eval/clinicianHistoryReport').ClinicianHistoryReportV1 | null
   /** Durable post-session DDx job state, returned only on authenticated clinician reads. */
   evaluation_status?: 'pending' | 'leased' | 'retry_wait' | 'completed' | 'failed' | null
   evaluation_attempt_count?: number | null

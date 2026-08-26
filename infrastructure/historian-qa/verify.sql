@@ -13,16 +13,59 @@ BEGIN
           AND data_type = 'uuid'
      )
      OR NOT EXISTS (
+       SELECT 1 FROM information_schema.columns
+        WHERE table_schema = 'public'
+          AND table_name = 'historian_sessions'
+          AND column_name = 'diagnostic_sufficiency'
+          AND data_type = 'jsonb'
+     )
+     OR NOT EXISTS (
+       SELECT 1 FROM information_schema.columns
+        WHERE table_schema = 'public'
+          AND table_name = 'historian_sessions'
+          AND column_name = 'clinician_history_report'
+          AND data_type = 'jsonb'
+     )
+     OR NOT EXISTS (
+       SELECT 1 FROM information_schema.columns
+        WHERE table_schema = 'public'
+          AND table_name = 'historian_eval_jobs'
+          AND column_name = 'pipeline_version'
+          AND data_type = 'integer'
+     )
+     OR NOT EXISTS (
+       SELECT 1 FROM information_schema.columns
+        WHERE table_schema = 'public'
+          AND table_name = 'historian_eval_jobs'
+          AND column_name = 'current_stage'
+          AND data_type = 'text'
+     )
+     OR NOT EXISTS (
+       SELECT 1 FROM information_schema.columns
+        WHERE table_schema = 'public'
+          AND table_name = 'historian_evaluations'
+          AND column_name = 'input_digest'
+          AND data_type = 'text'
+     )
+     OR NOT EXISTS (
+       SELECT 1 FROM pg_indexes
+        WHERE schemaname = 'public'
+          AND indexname = 'uq_historian_evaluations_digest'
+          AND indexdef LIKE '%input_digest%'
+     )
+     OR NOT EXISTS (
        SELECT 1 FROM pg_constraint
         WHERE conname = 'historian_sessions_prompt_version_check'
           AND pg_get_constraintdef(oid) LIKE '%comprehensive-v2%'
           AND pg_get_constraintdef(oid) LIKE '%comprehensive-v3%'
+          AND pg_get_constraintdef(oid) LIKE '%comprehensive-v4%'
      )
      OR NOT EXISTS (
        SELECT 1 FROM pg_constraint
         WHERE conname = 'historian_invites_interview_prompt_version_check'
           AND pg_get_constraintdef(oid) LIKE '%comprehensive-v2%'
           AND pg_get_constraintdef(oid) LIKE '%comprehensive-v3%'
+          AND pg_get_constraintdef(oid) LIKE '%comprehensive-v4%'
      )
      OR NOT EXISTS (
        SELECT 1 FROM pg_constraint

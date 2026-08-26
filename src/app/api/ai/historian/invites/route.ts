@@ -29,13 +29,16 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'consultId is required.' }, { status: 400 })
   }
 
-  // Exact opt-ins only: v3 takes precedence in its isolated QA rollout, v2
-  // remains the fallback, and absent/other values preserve the v1 flow.
-  const promptVersion = process.env.HISTORIAN_ADAPTIVE_INTERVIEW_V1 === 'true'
-    ? 'comprehensive-v3'
-    : process.env.HISTORIAN_TURN_EVIDENCE_CONTROLLER_V1 === 'true'
-      ? 'comprehensive-v2'
-      : 'comprehensive-v1'
+  // Exact opt-ins only: v4 is invitation-only and takes precedence in its
+  // isolated QA rollout. Persisting the selected prompt version keeps saved
+  // sessions and queued jobs stable if the environment flag later changes.
+  const promptVersion = process.env.HISTORIAN_DIAGNOSTIC_DEPTH_V1 === 'true'
+    ? 'comprehensive-v4'
+    : process.env.HISTORIAN_ADAPTIVE_INTERVIEW_V1 === 'true'
+      ? 'comprehensive-v3'
+      : process.env.HISTORIAN_TURN_EVIDENCE_CONTROLLER_V1 === 'true'
+        ? 'comprehensive-v2'
+        : 'comprehensive-v1'
   const result = await createHistorianInvitation({
     tenantId: access.context.tenantId,
     consultId,
@@ -113,8 +116,11 @@ export async function GET(request: Request) {
               invite.session_id,
               session.interview_completion_status,
               session.interview_termination_reason,
-              (session.final_differential IS NOT NULL) AS differential_ready,
-              job.status AS evaluation_status
+              (session.clinician_history_report IS NOT NULL) AS report_ready,
+              (session.final_differential ? 'differential') AS differential_ready,
+              (session.final_differential->>'status') AS differential_status,
+              job.status AS evaluation_status,
+              job.current_stage AS evaluation_stage
          FROM historian_invites invite
          JOIN historian_sessions session ON session.id = invite.session_id
          LEFT JOIN historian_eval_jobs job ON job.session_id = invite.session_id

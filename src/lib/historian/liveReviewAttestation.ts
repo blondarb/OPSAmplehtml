@@ -5,19 +5,28 @@ import {
 } from './flushToken'
 import {
   parseLiveInterviewReviewArtifact,
-  type LiveInterviewReviewArtifactV1,
-  type UnsignedLiveInterviewReviewArtifactV1,
+  type LiveInterviewReviewArtifact,
+  type UnsignedLiveInterviewReviewArtifact,
 } from './liveReviewContract'
 
 const ATTESTATION_PURPOSE = 'live-interview-review'
 
+function stableJson(value: unknown): string {
+  if (Array.isArray(value)) return `[${value.map(stableJson).join(',')}]`
+  if (!value || typeof value !== 'object') return JSON.stringify(value)
+  const object = value as Record<string, unknown>
+  return `{${Object.keys(object).sort().map((key) => (
+    `${JSON.stringify(key)}:${stableJson(object[key])}`
+  )).join(',')}}`
+}
+
 function canonicalAttestationPayload(
   sessionId: string,
   transcript: HistorianTranscriptEntry[],
-  artifact: UnsignedLiveInterviewReviewArtifactV1,
+  artifact: UnsignedLiveInterviewReviewArtifact,
   startupAttemptId?: string,
 ): string {
-  return JSON.stringify({
+  const payload = {
     sessionId,
     startupAttemptId: startupAttemptId ?? null,
     transcript: transcript.map((entry) => ({
@@ -29,15 +38,18 @@ function canonicalAttestationPayload(
       review: artifact.review,
       provenance: artifact.provenance,
     },
-  })
+  }
+  // Preserve the shipped v1 byte contract. V2 uses canonical key ordering so
+  // parser normalization cannot invalidate an otherwise identical artifact.
+  return artifact.review.version === 2 ? stableJson(payload) : JSON.stringify(payload)
 }
 
 export async function attestLiveInterviewReview(
   sessionId: string,
   transcript: HistorianTranscriptEntry[],
-  artifact: UnsignedLiveInterviewReviewArtifactV1,
+  artifact: UnsignedLiveInterviewReviewArtifact,
   startupAttemptId?: string,
-): Promise<LiveInterviewReviewArtifactV1> {
+): Promise<LiveInterviewReviewArtifact> {
   const attestation = await signHistorianServerPayload(
     ATTESTATION_PURPOSE,
     canonicalAttestationPayload(sessionId, transcript, artifact, startupAttemptId),
@@ -55,12 +67,11 @@ export async function verifyLiveInterviewReviewArtifact(
   transcript: HistorianTranscriptEntry[],
   raw: unknown,
   startupAttemptId?: string,
-): Promise<LiveInterviewReviewArtifactV1> {
+): Promise<LiveInterviewReviewArtifact> {
   const parsed = parseLiveInterviewReviewArtifact(raw, transcript)
-  const unsigned: UnsignedLiveInterviewReviewArtifactV1 = {
-    review: parsed.review,
-    provenance: parsed.provenance,
-  }
+  const unsigned: UnsignedLiveInterviewReviewArtifact = parsed.review.version === 2
+    ? { review: parsed.review, provenance: parsed.provenance as Extract<LiveInterviewReviewArtifact, { review: { version: 2 } }>['provenance'] }
+    : { review: parsed.review, provenance: parsed.provenance as Extract<LiveInterviewReviewArtifact, { review: { version: 1 } }>['provenance'] }
   const valid = await verifyHistorianServerPayload(
     ATTESTATION_PURPOSE,
     canonicalAttestationPayload(sessionId, transcript, unsigned, startupAttemptId),

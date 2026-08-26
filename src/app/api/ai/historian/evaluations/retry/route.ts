@@ -40,13 +40,13 @@ export async function POST(request: Request) {
     )
     if (result.rowCount !== 1) {
       return NextResponse.json(
-        { error: 'No failed differential job is available to retry.' },
+        { error: 'No failed historian report job is available to retry.' },
         { status: 409 },
       )
     }
     return NextResponse.json({ status: 'pending' })
   } catch (error) {
     console.error('[historian/evaluations/retry] failed', { sessionId, error })
-    return NextResponse.json({ error: 'The differential retry could not be scheduled.' }, { status: 503 })
+    return NextResponse.json({ error: 'The historian report retry could not be scheduled.' }, { status: 503 })
   }
 }

@@ -46,24 +46,26 @@ function parseTranscript(value: unknown): HistorianTranscriptEntry[] | null {
 async function attemptAuthorityIsCurrent(
   sessionId: string,
   startupAttemptId?: string,
-): Promise<boolean> {
+): Promise<{ current: boolean; promptVersion: string | null }> {
   const pool = await getPool()
   const result = await pool.query<{
     status: string
     startup_attempt_id: string | null
+    interview_prompt_version: string
   }>(
-    `SELECT status, startup_attempt_id
+    `SELECT status, startup_attempt_id, interview_prompt_version
        FROM historian_invites
       WHERE session_id = $1`,
     [sessionId],
   )
   const invitation = result.rows[0]
-  if (!invitation) return true
-  return (
-    invitation.status === 'in_progress' &&
-    !!startupAttemptId &&
-    invitation.startup_attempt_id === startupAttemptId
-  )
+  if (!invitation) return { current: true, promptVersion: null }
+  return {
+    current: invitation.status === 'in_progress' &&
+      !!startupAttemptId &&
+      invitation.startup_attempt_id === startupAttemptId,
+    promptVersion: invitation.interview_prompt_version,
+  }
 }
 
 /**
@@ -88,10 +90,18 @@ export async function POST(request: Request) {
   }
 
   try {
-    if (!await attemptAuthorityIsCurrent(verified.sessionId, verified.startupAttemptId)) {
+    const authority = await attemptAuthorityIsCurrent(
+      verified.sessionId,
+      verified.startupAttemptId,
+    )
+    if (!authority.current) {
       return NextResponse.json({ error: 'Review authority is stale.' }, { status: 403 })
     }
-    const unsignedArtifact = await generateLiveInterviewReview(transcript)
+    const requestedPromptVersion = typeof body.interviewPromptVersion === 'string'
+      ? body.interviewPromptVersion
+      : null
+    const diagnosticDepth = (authority.promptVersion ?? requestedPromptVersion) === 'comprehensive-v4'
+    const unsignedArtifact = await generateLiveInterviewReview(transcript, { diagnosticDepth })
     const artifact = await attestLiveInterviewReview(
       verified.sessionId,
       transcript,

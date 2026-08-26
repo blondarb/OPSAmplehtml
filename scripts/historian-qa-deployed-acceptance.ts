@@ -1,9 +1,16 @@
 import type { HistorianTranscriptEntry } from '../src/lib/historianTypes'
 import {
+  LIVE_INTERVIEW_REVIEW_V2_PROMPT_VERSION,
+  LIVE_REVIEW_DEPTH_DIMENSIONS,
   liveInterviewReviewCompletion,
   parseLiveInterviewReviewArtifact,
-  type LiveInterviewReviewArtifactV1,
+  type LiveInterviewReviewArtifactV2,
 } from '../src/lib/historian/liveReviewContract'
+import {
+  CLINICIAN_HISTORY_REPORT_PROMPT_VERSION,
+  CLINICIAN_HISTORY_REQUIRED_COMPLETE_SECTION_IDS,
+  CLINICIAN_HISTORY_SECTION_IDS,
+} from '../src/lib/historian/eval/clinicianHistoryReport'
 import {
   ADAPTIVE_OPENING_QUESTION,
   ADAPTIVE_PRE_CLOSE_QUESTION,
@@ -263,7 +270,7 @@ function completeSyntheticAdaptiveTranscript(): HistorianTranscriptEntry[] {
 function fixedSaveBody(
   sessionId: string,
   transcript: HistorianTranscriptEntry[],
-  liveReview: LiveInterviewReviewArtifactV1,
+  liveReview: LiveInterviewReviewArtifactV2,
 ): Record<string, unknown> {
   const terminationReason = liveInterviewReviewCompletion(liveReview.review)
   if (terminationReason === 'incomplete') {
@@ -276,8 +283,8 @@ function fixedSaveBody(
       hpi: 'Synthetic adaptive-v3 fixture history for persistence acceptance only.',
       age_years_patient_reported: 45,
       interview_mode: 'comprehensive',
-      interview_prompt_version: 'comprehensive-v3',
-      live_review_v1: liveReview,
+      interview_prompt_version: 'comprehensive-v4',
+      live_review_v2: liveReview,
       medication_reconciliation_v1: {
         version: MEDICATION_RECONCILIATION_VERSION,
         items: [],
@@ -294,8 +301,6 @@ function fixedSaveBody(
         missing_or_uncertain: [],
       },
     },
-    narrative_summary:
-      'SYNTHETIC TEST DATA - NOT FOR CLINICAL CARE. Transcript-reviewed v3 persistence acceptance.',
     transcript,
     red_flags: [],
     safety_escalated: false,
@@ -303,6 +308,51 @@ function fixedSaveBody(
     question_count: transcript.filter((entry) => entry.role === 'assistant').length,
     interview_completion_status: 'complete',
     interview_termination_reason: terminationReason,
+  }
+}
+
+function assertGroundedClinicianReport(
+  raw: unknown,
+  transcript: HistorianTranscriptEntry[],
+): void {
+  if (!isRecord(raw) || raw.version !== 1 || raw.report_status !== 'complete' ||
+    typeof raw.input_digest !== 'string' || !/^[0-9a-f]{64}$/.test(raw.input_digest) ||
+    !Array.isArray(raw.sections) || raw.sections.length !== CLINICIAN_HISTORY_SECTION_IDS.length ||
+    !isRecord(raw.provenance) || raw.provenance.prompt_version !== CLINICIAN_HISTORY_REPORT_PROMPT_VERSION ||
+    !isRecord(raw.completion) || raw.completion.patient_turn_count !== 12 ||
+    !isRecord(raw.medication_reconciliation) || !Array.isArray(raw.medication_reconciliation.items)
+  ) throw new HistorianQaAcceptanceError('CLINICIAN_REPORT_SCHEMA_INVALID')
+
+  const patientTurns = new Map(
+    transcript.filter((entry) => entry.role === 'user').map((entry) => [entry.seq, entry.text]),
+  )
+  const sectionIds = raw.sections.map((section) => isRecord(section) ? section.id : null)
+  if (new Set(sectionIds).size !== CLINICIAN_HISTORY_SECTION_IDS.length ||
+    !CLINICIAN_HISTORY_SECTION_IDS.every((id) => sectionIds.includes(id))) {
+    throw new HistorianQaAcceptanceError('CLINICIAN_REPORT_SECTIONS_INVALID')
+  }
+  const sectionsById = new Map(raw.sections.map((section) => (
+    isRecord(section) && typeof section.id === 'string' ? [section.id, section] : [null, null]
+  )))
+  if (CLINICIAN_HISTORY_REQUIRED_COMPLETE_SECTION_IDS.some((id) => {
+    const section = sectionsById.get(id)
+    return !isRecord(section) || !Array.isArray(section.claims) || section.claims.length === 0
+  })) throw new HistorianQaAcceptanceError('CLINICIAN_REPORT_CORE_SECTIONS_EMPTY')
+  for (const section of raw.sections) {
+    if (!isRecord(section) || !Array.isArray(section.claims)) {
+      throw new HistorianQaAcceptanceError('CLINICIAN_REPORT_CLAIMS_INVALID')
+    }
+    for (const claim of section.claims) {
+      if (!isRecord(claim) || typeof claim.text !== 'string' || !Array.isArray(claim.citations) ||
+        claim.citations.length === 0) {
+        throw new HistorianQaAcceptanceError('CLINICIAN_REPORT_CLAIMS_INVALID')
+      }
+      const exact = claim.citations.some((citation) => isRecord(citation) &&
+        typeof citation.patient_seq === 'number' && typeof citation.quote === 'string' &&
+        patientTurns.get(citation.patient_seq)?.includes(citation.quote) &&
+        claim.text === citation.quote)
+      if (!exact) throw new HistorianQaAcceptanceError('CLINICIAN_REPORT_GROUNDING_INVALID')
+    }
   }
 }
 
@@ -478,7 +528,7 @@ export async function runHistorianQaAcceptance(
     session.body.sessionId !== expectedSessionId ||
     session.body.provider !== 'nova' ||
     session.body.interviewMode !== 'comprehensive' ||
-    session.body.interviewPromptVersion !== 'comprehensive-v3' ||
+    session.body.interviewPromptVersion !== 'comprehensive-v4' ||
     session.body.turnEvidenceController !== false ||
     session.body.adaptiveTurnController !== true
   ) {
@@ -505,9 +555,16 @@ export async function runHistorianQaAcceptance(
     'LIVE_REVIEW_FAILED',
   )
   expectStatus(reviewed, 200, 'LIVE_REVIEW_REJECTED')
-  let liveReview: LiveInterviewReviewArtifactV1
+  let liveReview: LiveInterviewReviewArtifactV2
   try {
-    liveReview = parseLiveInterviewReviewArtifact(reviewed.body, transcript)
+    const parsed = parseLiveInterviewReviewArtifact(reviewed.body, transcript)
+    if (
+      parsed.review.version !== 2 ||
+      parsed.provenance.promptVersion !== LIVE_INTERVIEW_REVIEW_V2_PROMPT_VERSION ||
+      parsed.review.diagnosticDepth.dimensions.length !== LIVE_REVIEW_DEPTH_DIMENSIONS.length ||
+      !parsed.review.diagnosticDepth.depthSufficient
+    ) throw new Error('wrong review version or depth contract')
+    liveReview = parsed
   } catch {
     throw new HistorianQaAcceptanceError('LIVE_REVIEW_ARTIFACT_INVALID')
   }
@@ -580,7 +637,14 @@ export async function runHistorianQaAcceptance(
     evaluationStatus = typeof statusInvitation.evaluation_status === 'string'
       ? statusInvitation.evaluation_status
       : ''
-    if (evaluationStatus === 'completed') break
+    if (evaluationStatus === 'completed') {
+      if (
+        statusInvitation.report_ready !== true ||
+        statusInvitation.differential_ready !== true ||
+        statusInvitation.evaluation_stage !== 'completed'
+      ) throw new HistorianQaAcceptanceError('DURABLE_WORKER_ARTIFACTS_NOT_READY')
+      break
+    }
     if (evaluationStatus === 'failed') {
       throw new HistorianQaAcceptanceError('DURABLE_WORKER_FAILED')
     }
@@ -607,19 +671,27 @@ export async function runHistorianQaAcceptance(
     matchingSession.patient_id !== FIXTURE.patientId ||
     matchingSession.tenant_id !== FIXTURE.tenantId ||
     matchingSession.consult_id !== FIXTURE.consultId ||
-    matchingSession.interview_prompt_version !== 'comprehensive-v3' ||
+    matchingSession.interview_prompt_version !== 'comprehensive-v4' ||
     matchingSession.interview_completion_status !== 'complete' ||
     matchingSession.interview_termination_reason !== expectedTerminationReason ||
     matchingSession.evaluation_status !== 'completed' ||
-    !matchingSession.final_differential ||
+    !isRecord(matchingSession.diagnostic_sufficiency) ||
+    matchingSession.diagnostic_sufficiency.outcome !== 'sufficient' ||
+    matchingSession.diagnostic_sufficiency.ddx_allowed !== true ||
+    matchingSession.diagnostic_sufficiency.patient_turn_count !== 12 ||
+    !isRecord(matchingSession.final_differential) ||
+    !Array.isArray(matchingSession.final_differential.differential) ||
+    matchingSession.final_differential.differential.length === 0 ||
     !report.response.headers.get('cache-control')?.includes('no-store')
   ) {
     throw new HistorianQaAcceptanceError('PHYSICIAN_REPORT_CONTENT_INVALID')
   }
-  gate('authenticated_physician_report_with_differential')
+  assertGroundedClinicianReport(matchingSession.clinician_history_report, transcript)
+  gate('authenticated_citation_grounded_clinician_report')
+  gate('diagnostically_sufficient_physician_differential')
 
   emit(
-    'HISTORIAN_QA_ACCEPTANCE_PASS mode=v3_transcript_reviewed_state_injected_persistence worker=completed physician_report=visible',
+    'HISTORIAN_QA_ACCEPTANCE_PASS mode=v4_diagnostic_depth_state_injected_persistence worker=completed grounded_report=visible differential=permitted',
   )
   return { gates: gateCount, evaluationStatus: 'completed' }
 }

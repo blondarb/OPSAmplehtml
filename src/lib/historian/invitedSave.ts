@@ -17,7 +17,7 @@ import {
 import {
   deriveLiveReviewStructuredCoverage,
   liveInterviewReviewCompletion,
-  type LiveInterviewReviewArtifactV1,
+  type LiveInterviewReviewArtifact,
 } from './liveReviewContract'
 import { verifyLiveInterviewReviewArtifact } from './liveReviewAttestation'
 import {
@@ -29,7 +29,9 @@ import {
   medicationReconciliationTranscriptIsValid,
   medicationReconciliationUnresolvedCount,
   parseMedicationReconciliationState,
+  type MedicationReconciliationState,
 } from './medicationReconciliation'
+import { deriveDiagnosticSufficiency } from './diagnosticSufficiency'
 import { adaptiveCompletionTranscriptIsValid } from './adaptiveQuestionContract'
 import {
   completionStatusForTermination,
@@ -153,8 +155,11 @@ export async function saveInvitedHistorianSession(
   }
 
   let output = structuredOutput(body.structured_output, binding.interviewPromptVersion)
+  const adaptiveInterview =
+    binding.interviewPromptVersion === 'comprehensive-v3' ||
+    binding.interviewPromptVersion === 'comprehensive-v4'
   const narrativeSummary =
-    binding.interviewPromptVersion !== 'comprehensive-v3' &&
+    !adaptiveInterview &&
     typeof body.narrative_summary === 'string'
       ? body.narrative_summary.trim().slice(0, MAX_SUMMARY_CHARS)
       : ''
@@ -191,7 +196,7 @@ export async function saveInvitedHistorianSession(
       error: 'Safety escalation status conflicts with its termination reason.',
     }
   }
-  if (binding.interviewPromptVersion === 'comprehensive-v3') {
+  if (adaptiveInterview) {
     redFlags = safetyEscalated
       ? [{
           flag: 'Patient-stated active safety trigger',
@@ -204,17 +209,21 @@ export async function saveInvitedHistorianSession(
     return { ok: false, status: 409, error: 'Hard-stop reason is invalid before exchange 60.' }
   }
   const completionStatus = completionStatusForTermination(terminationReason)
-  if (binding.interviewPromptVersion === 'comprehensive-v3') {
+  let verifiedReviewArtifact: LiveInterviewReviewArtifact | null = null
+  let verifiedMedicationState: MedicationReconciliationState | null = null
+  if (adaptiveInterview) {
     const terminalPartial =
       terminationReason !== 'coverage_complete' &&
       terminationReason !== 'complete_with_uncertainty'
-    let reviewArtifact: LiveInterviewReviewArtifactV1 | null = null
-    if (output.live_review_v1 != null) {
+    const rawReviewArtifact = binding.interviewPromptVersion === 'comprehensive-v4'
+      ? output.live_review_v2
+      : output.live_review_v1
+    if (rawReviewArtifact != null) {
       try {
-        reviewArtifact = await verifyLiveInterviewReviewArtifact(
+        verifiedReviewArtifact = await verifyLiveInterviewReviewArtifact(
           binding.sessionId,
           transcript,
-          output.live_review_v1,
+          rawReviewArtifact,
           binding.startupAttemptId ?? undefined,
         )
       } catch {
@@ -225,17 +234,16 @@ export async function saveInvitedHistorianSession(
         }
       }
     }
-    if (!terminalPartial && !reviewArtifact) {
+    if (!terminalPartial && !verifiedReviewArtifact) {
       return {
         ok: false,
         status: 409,
         error: 'Normal completion requires a current independent live history review.',
       }
     }
-    let medicationState = null
     if (output.medication_reconciliation_v1 != null) {
       try {
-        medicationState = parseMedicationReconciliationState(
+        verifiedMedicationState = parseMedicationReconciliationState(
           output.medication_reconciliation_v1,
           transcript,
         )
@@ -247,9 +255,22 @@ export async function saveInvitedHistorianSession(
         }
       }
     }
-    const reviewCompletion = liveInterviewReviewCompletion(reviewArtifact?.review)
-    const completion = medicationState
-      ? completionWithMedicationUncertainty(reviewCompletion, medicationState)
+    if (
+      verifiedReviewArtifact &&
+      (
+        (binding.interviewPromptVersion === 'comprehensive-v4' && verifiedReviewArtifact.review.version !== 2) ||
+        (binding.interviewPromptVersion === 'comprehensive-v3' && verifiedReviewArtifact.review.version !== 1)
+      )
+    ) {
+      return {
+        ok: false,
+        status: 409,
+        error: 'The independent live history review version does not match this interview.',
+      }
+    }
+    const reviewCompletion = liveInterviewReviewCompletion(verifiedReviewArtifact?.review)
+    const completion = verifiedMedicationState
+      ? completionWithMedicationUncertainty(reviewCompletion, verifiedMedicationState)
       : reviewCompletion
     if (!terminalPartial && terminationReason !== completion) {
       return {
@@ -261,12 +282,12 @@ export async function saveInvitedHistorianSession(
     if (
       !terminalPartial &&
       (
-        !medicationState ||
-        !medicationReconciliationClosed(medicationState) ||
-        !medicationReconciliationTranscriptIsValid(medicationState, transcript) ||
+        !verifiedMedicationState ||
+        !medicationReconciliationClosed(verifiedMedicationState) ||
+        !medicationReconciliationTranscriptIsValid(verifiedMedicationState, transcript) ||
         !medicationReconciliationMatchesReview(
-          medicationState,
-          reviewArtifact?.review.medications ?? [],
+          verifiedMedicationState,
+          verifiedReviewArtifact?.review.medications ?? [],
         ) ||
         !adaptiveCompletionTranscriptIsValid(transcript)
       )
@@ -279,21 +300,23 @@ export async function saveInvitedHistorianSession(
     }
     output = {
       interview_mode: 'comprehensive',
-      interview_prompt_version: 'comprehensive-v3',
-      current_medications: medicationState
-        ? confirmedMedicationSummary(medicationState) || undefined
+      interview_prompt_version: binding.interviewPromptVersion,
+      current_medications: verifiedMedicationState
+        ? confirmedMedicationSummary(verifiedMedicationState) || undefined
         : undefined,
-      medication_reconciliation_v1: medicationState ?? undefined,
-      medication_reconciliation_has_uncertainty: medicationState
-        ? medicationReconciliationHasUncertainty(medicationState)
+      medication_reconciliation_v1: verifiedMedicationState ?? undefined,
+      medication_reconciliation_has_uncertainty: verifiedMedicationState
+        ? medicationReconciliationHasUncertainty(verifiedMedicationState)
         : false,
-      medication_reconciliation_unresolved_count: medicationState
-        ? medicationReconciliationUnresolvedCount(medicationState)
+      medication_reconciliation_unresolved_count: verifiedMedicationState
+        ? medicationReconciliationUnresolvedCount(verifiedMedicationState)
         : 0,
-      ...(reviewArtifact
+      ...(verifiedReviewArtifact
         ? {
-            live_review_v1: reviewArtifact,
-            history_coverage: deriveLiveReviewStructuredCoverage(reviewArtifact.review),
+            ...(binding.interviewPromptVersion === 'comprehensive-v4'
+              ? { live_review_v2: verifiedReviewArtifact }
+              : { live_review_v1: verifiedReviewArtifact }),
+            history_coverage: deriveLiveReviewStructuredCoverage(verifiedReviewArtifact.review),
           }
         : {}),
     }
@@ -341,6 +364,19 @@ export async function saveInvitedHistorianSession(
     }
   }
 
+  const isV4Pipeline = binding.interviewPromptVersion === 'comprehensive-v4'
+  const diagnosticSufficiency = isV4Pipeline
+    ? deriveDiagnosticSufficiency({
+        transcript,
+        promptVersion: binding.interviewPromptVersion,
+        completionStatus,
+        terminationReason,
+        reviewArtifact: verifiedReviewArtifact,
+        medicationState: verifiedMedicationState,
+        generatedAt: now,
+      })
+    : null
+
   const pool = await getPool()
   const client = await pool.connect()
   try {
@@ -384,7 +420,7 @@ export async function saveInvitedHistorianSession(
       }
     }
     if (
-      binding.interviewPromptVersion === 'comprehensive-v3' &&
+      adaptiveInterview &&
       (
         !binding.startupAttemptId ||
         row.startup_attempt_id !== binding.startupAttemptId
@@ -453,10 +489,11 @@ export async function saveInvitedHistorianSession(
               interview_termination_reason = $9,
               interview_mode = 'comprehensive',
               interview_prompt_version = $10,
-              updated_at = $11
-        WHERE id = $12
-          AND tenant_id = $13
-          AND consult_id = $14`,
+              diagnostic_sufficiency = $11::jsonb,
+              updated_at = $12
+        WHERE id = $13
+          AND tenant_id = $14
+          AND consult_id = $15`,
       [
         JSON.stringify(output),
         narrativeSummary || null,
@@ -468,6 +505,7 @@ export async function saveInvitedHistorianSession(
         completionStatus,
         terminationReason,
         binding.interviewPromptVersion,
+        diagnosticSufficiency ? JSON.stringify(diagnosticSufficiency) : null,
         now,
         binding.sessionId,
         binding.tenantId,
@@ -522,10 +560,19 @@ export async function saveInvitedHistorianSession(
     await ensureInvitedHistorianAlert(client, binding, redFlags, safetyEscalated)
 
     const jobInsert = await client.query(
-      `INSERT INTO historian_eval_jobs (tenant_id, session_id, status, next_attempt_at, created_at, updated_at)
-       VALUES ($1, $2, 'pending', $3, $3, $3)
+      `INSERT INTO historian_eval_jobs (
+         tenant_id, session_id, status, pipeline_version, current_stage,
+         next_attempt_at, created_at, updated_at
+       )
+       VALUES ($1, $2, 'pending', $3, $4, $5, $5, $5)
        ON CONFLICT (session_id) DO NOTHING`,
-      [binding.tenantId, binding.sessionId, now],
+      [
+        binding.tenantId,
+        binding.sessionId,
+        isV4Pipeline ? 2 : 1,
+        isV4Pipeline ? 'report_pending' : 'legacy',
+        now,
+      ],
     )
     await client.query('COMMIT')
 

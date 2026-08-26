@@ -7,6 +7,12 @@ import {
 } from '@/lib/historian/eval/durableJobs'
 
 const jobId = '11111111-1111-4111-8111-111111111111'
+const claim = {
+  jobId,
+  sessionId: '22222222-2222-4222-8222-222222222222',
+  tenantId: '33333333-3333-4333-8333-333333333333',
+  leaseToken: '44444444-4444-4444-8444-444444444444',
+} as never
 
 describe('historian durable evaluation jobs', () => {
   it('uses a versioned opaque-ID-only queue message', () => {
@@ -45,5 +51,50 @@ describe('historian durable evaluation jobs', () => {
     expect(safeHistorianEvalErrorCode(Object.assign(new Error('patient text'), { name: 'Provider Error!' })))
       .toBe('Provider_Error_')
     expect(safeHistorianEvalErrorCode('raw patient text')).toBe('EvaluationError')
+  })
+
+  it('persists the clinician report only under the live lease and advances to report_ready', async () => {
+    const query = vi.fn().mockResolvedValue({ rowCount: 1 })
+    const service = new HistorianEvalJobService({ query } as never)
+    const report = { input_digest: 'a'.repeat(64), version: 1 } as never
+
+    await service.persistClinicianHistoryReport(claim, report)
+
+    const [sql, params] = query.mock.calls[0]
+    expect(String(sql)).toContain("current_stage = 'report_ready'")
+    expect(String(sql)).toContain("lease.status = 'leased'")
+    expect(String(sql)).toContain('lease.lease_token = $5')
+    expect(String(sql)).toContain("session.clinician_history_report->>'input_digest' = $6")
+    expect(params[4]).toBe('44444444-4444-4444-8444-444444444444')
+    expect(params[5]).toBe('a'.repeat(64))
+  })
+
+  it('fails closed when report persistence loses its lease', async () => {
+    const query = vi.fn().mockResolvedValue({ rowCount: 0 })
+    const service = new HistorianEvalJobService({ query } as never)
+    await expect(service.persistClinicianHistoryReport(
+      claim,
+      { input_digest: 'b'.repeat(64), version: 1 } as never,
+    )).rejects.toThrow(/lost its lease/i)
+  })
+
+  it('records an explicitly withheld differential under the same digest and stage', async () => {
+    const query = vi.fn().mockResolvedValue({ rowCount: 1 })
+    const service = new HistorianEvalJobService({ query } as never)
+    const inputDigest = 'c'.repeat(64)
+    await service.persistFinalDifferential(
+      claim,
+      { version: 1, status: 'withheld_partial' },
+      { inputDigest, withheld: true },
+    )
+
+    const [sql, params] = query.mock.calls[0]
+    expect(String(sql)).toContain("session.final_differential->>'input_digest' = $6")
+    expect(params[5]).toBe(inputDigest)
+    expect(params[6]).toBe('ddx_withheld')
+    expect(JSON.parse(params[0])).toMatchObject({
+      status: 'withheld_partial',
+      input_digest: inputDigest,
+    })
   })
 })

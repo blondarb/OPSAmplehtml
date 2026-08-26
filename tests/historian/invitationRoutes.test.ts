@@ -4,10 +4,14 @@ const {
   authorizeClinicalAccessMock,
   createHistorianInvitationMock,
   redeemHistorianInvitationMock,
+  invitationStatusQueryMock,
+  getPoolMock,
 } = vi.hoisted(() => ({
   authorizeClinicalAccessMock: vi.fn(),
   createHistorianInvitationMock: vi.fn(),
   redeemHistorianInvitationMock: vi.fn(),
+  invitationStatusQueryMock: vi.fn(),
+  getPoolMock: vi.fn(),
 }))
 
 vi.mock('@/lib/auth/clinicalAccess', () => ({
@@ -22,9 +26,12 @@ vi.mock('@/lib/api/publicRouteGuard', () => ({
   allowedAppOrigins: () => ['https://neuroplans.example'],
   checkPublicRouteAbuse: () => ({ ok: true }),
 }))
-vi.mock('@/lib/db', () => ({ getPool: vi.fn() }))
+vi.mock('@/lib/db', () => ({ getPool: getPoolMock }))
 
-import { POST as createInvitation } from '@/app/api/ai/historian/invites/route'
+import {
+  GET as getInvitation,
+  POST as createInvitation,
+} from '@/app/api/ai/historian/invites/route'
 import { POST as redeemInvitation } from '@/app/api/ai/historian/invites/redeem/route'
 
 describe('historian invitation routes', () => {
@@ -32,6 +39,9 @@ describe('historian invitation routes', () => {
     vi.clearAllMocks()
     delete process.env.HISTORIAN_ADAPTIVE_INTERVIEW_V1
     delete process.env.HISTORIAN_TURN_EVIDENCE_CONTROLLER_V1
+    delete process.env.HISTORIAN_DIAGNOSTIC_DEPTH_V1
+    getPoolMock.mockResolvedValue({ query: invitationStatusQueryMock })
+    invitationStatusQueryMock.mockResolvedValue({ rows: [] })
   })
 
   it('requires an active clinician/admin membership to create a patient link', async () => {
@@ -128,6 +138,52 @@ describe('historian invitation routes', () => {
       promptVersion: 'comprehensive-v3',
     }))
     expect((await response.json()).invitation.interviewPromptVersion).toBe('comprehensive-v3')
+  })
+
+  it('selects invitation-only v4 ahead of the adaptive v3 flag', async () => {
+    process.env.HISTORIAN_ADAPTIVE_INTERVIEW_V1 = 'true'
+    process.env.HISTORIAN_DIAGNOSTIC_DEPTH_V1 = 'true'
+    authorizeClinicalAccessMock.mockResolvedValueOnce({
+      ok: true,
+      context: { userId: 'clinician-1', email: 'c@example.test', tenantId: 'tenant-a', role: 'clinician' },
+    })
+    createHistorianInvitationMock.mockResolvedValueOnce({
+      ok: true, inviteId: 'invite-1', sessionId: 'session-1', rawToken: 'secret',
+      expiresAt: '2026-08-26T18:00:00.000Z', patientName: 'Synthetic Patient', referralReason: 'Gait concern',
+      interviewPromptVersion: 'comprehensive-v4',
+    })
+    const response = await createInvitation(new Request('https://neuroplans.example/api/ai/historian/invites', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ consultId: 'consult-1' }),
+    }))
+    expect(response.status).toBe(200)
+    expect(createHistorianInvitationMock).toHaveBeenCalledWith(expect.objectContaining({
+      promptVersion: 'comprehensive-v4',
+    }))
+    expect((await response.json()).invitation.interviewPromptVersion).toBe('comprehensive-v4')
+  })
+
+  it('reports citation-report readiness separately from a permitted or withheld differential', async () => {
+    authorizeClinicalAccessMock.mockResolvedValueOnce({
+      ok: true,
+      context: { userId: 'clinician-1', email: 'c@example.test', tenantId: 'tenant-a', role: 'clinician' },
+    })
+    invitationStatusQueryMock.mockResolvedValueOnce({ rows: [{
+      session_id: 'session-1', report_ready: true, differential_ready: false,
+      differential_status: 'withheld_partial', evaluation_status: 'completed', evaluation_stage: 'completed',
+    }] })
+    const response = await getInvitation(new Request(
+      'https://neuroplans.example/api/ai/historian/invites?consultId=consult-1',
+    ))
+    expect(response.status).toBe(200)
+    expect(await response.json()).toMatchObject({ invitation: {
+      report_ready: true,
+      differential_ready: false,
+      differential_status: 'withheld_partial',
+    } })
+    const sql = String(invitationStatusQueryMock.mock.calls[0][0])
+    expect(sql).toContain('clinician_history_report IS NOT NULL')
+    expect(sql).toContain("final_differential ? 'differential'")
+    expect(sql).toContain('job.current_stage AS evaluation_stage')
   })
 
   it('redeems once into an HttpOnly Secure SameSite=Strict four-hour grant', async () => {

@@ -186,7 +186,9 @@ export async function POST(request: Request) {
             : 'comprehensive-v1'
         : 'standard-v1')
     const turnEvidenceController = interviewPromptVersion === 'comprehensive-v2'
-    const adaptiveTurnController = interviewPromptVersion === 'comprehensive-v3'
+    const adaptiveTurnController =
+      interviewPromptVersion === 'comprehensive-v3' ||
+      interviewPromptVersion === 'comprehensive-v4'
     let authorizedTenantId: string | null = invitationBinding?.tenantId ?? null
     if (interviewMode === 'comprehensive' && !invitationBinding) {
       const access = await authorizeClinicalAccess({

@@ -6,8 +6,12 @@ import {
 import {
   LIVE_INTERVIEW_REVIEW_PROMPT_VERSION,
   LIVE_INTERVIEW_REVIEW_VERSION,
+  LIVE_INTERVIEW_REVIEW_V2_PROMPT_VERSION,
+  LIVE_INTERVIEW_REVIEW_V2_VERSION,
+  LIVE_REVIEW_DEPTH_DIMENSIONS,
   parseLiveInterviewReview,
-  type UnsignedLiveInterviewReviewArtifactV1,
+  parseLiveInterviewReviewV2,
+  type UnsignedLiveInterviewReviewArtifact,
 } from './liveReviewContract'
 
 /**
@@ -44,6 +48,17 @@ Grounding requirements:
 - next_question_intents are short private clinical targets, not scripts and not diagnoses. Never include a diagnosis name, treatment, test recommendation, or advice.
 
 Return the tool exactly once. Do not include prose outside the tool call.`
+
+const SYSTEM_PROMPT_V2 = `${SYSTEM_PROMPT}
+
+ADDITIONAL CASE-DEPTH AUDIT:
+- Do not treat this as a checklist-completion task. Decide whether the complaint-led history is deep enough that a physician could responsibly prioritize a provisional neurologic differential from the patient's own account.
+- Classify all eight diagnostic-depth dimensions. "adequate" means case-specific patient evidence is clinically usable; "uncertain" means the patient was asked but does not know, declined, or remains internally conflicting; "missing" means the transcript lacks meaningful patient evidence.
+- Every adequate or uncertain depth dimension must cite exact PATIENT sequence numbers. Missing cites none.
+- depth_sufficient may be true only when every depth dimension is adequate or explicitly uncertain, the chronology and symptom phenotype are clinically discriminating for this presentation, and no case-specific critical gap remains.
+- If depth is not sufficient, provide at least one next_question_intent targeting the highest-value missing discriminator. Keep it non-diagnostic, one-question-at-a-time, and do not prescribe a test or treatment.
+- Low confidence can never support closure.
+- ready_to_close may be true only when the original coverage rules AND this depth audit permit it.`
 
 const INPUT_SCHEMA = {
   type: 'object',
@@ -197,6 +212,45 @@ const INPUT_SCHEMA = {
   ],
 } as const
 
+const INPUT_SCHEMA_V2 = {
+  ...INPUT_SCHEMA,
+  properties: {
+    ...INPUT_SCHEMA.properties,
+    version: { type: 'integer', enum: [LIVE_INTERVIEW_REVIEW_V2_VERSION] },
+    diagnostic_depth: {
+      type: 'object',
+      additionalProperties: false,
+      properties: {
+        dimensions: {
+          type: 'array',
+          minItems: LIVE_REVIEW_DEPTH_DIMENSIONS.length,
+          maxItems: LIVE_REVIEW_DEPTH_DIMENSIONS.length,
+          items: {
+            type: 'object',
+            additionalProperties: false,
+            properties: {
+              dimension: { type: 'string', enum: LIVE_REVIEW_DEPTH_DIMENSIONS },
+              status: { type: 'string', enum: ['adequate', 'uncertain', 'missing'] },
+              patient_seqs: {
+                type: 'array',
+                maxItems: 20,
+                items: { type: 'integer', minimum: 1 },
+              },
+            },
+            required: ['dimension', 'status', 'patient_seqs'],
+          },
+        },
+        depth_sufficient: { type: 'boolean' },
+      },
+      required: ['dimensions', 'depth_sufficient'],
+    },
+  },
+  required: [
+    ...INPUT_SCHEMA.required,
+    'diagnostic_depth',
+  ],
+} as const
+
 function numberedTranscript(transcript: HistorianTranscriptEntry[]): string {
   return transcript
     .map((entry) => `Seq ${entry.seq} (${entry.role === 'user' ? 'Patient' : 'Historian'}): ${entry.text}`)
@@ -205,7 +259,8 @@ function numberedTranscript(transcript: HistorianTranscriptEntry[]): string {
 
 export async function generateLiveInterviewReview(
   transcript: HistorianTranscriptEntry[],
-): Promise<UnsignedLiveInterviewReviewArtifactV1> {
+  options: { diagnosticDepth?: boolean } = {},
+): Promise<UnsignedLiveInterviewReviewArtifact> {
   const latestPatientSeq = [...transcript]
     .reverse()
     .find((entry) => entry.role === 'user')?.seq
@@ -215,12 +270,15 @@ export async function generateLiveInterviewReview(
 
   const { result, modelId } = await invokeBedrockClinicalToolWithMeta<unknown>({
     model: LIVE_INTERVIEW_REVIEW_MODEL,
-    system: SYSTEM_PROMPT,
+    system: options.diagnosticDepth ? SYSTEM_PROMPT_V2 : SYSTEM_PROMPT,
     messages: [{
       role: 'user',
       content: JSON.stringify({
         reviewed_through_seq: latestPatientSeq,
         fixed_domains: COMPREHENSIVE_HISTORY_DOMAINS,
+        ...(options.diagnosticDepth
+          ? { diagnostic_depth_dimensions: LIVE_REVIEW_DEPTH_DIMENSIONS }
+          : {}),
         numbered_transcript: numberedTranscript(transcript),
       }),
     }],
@@ -228,15 +286,25 @@ export async function generateLiveInterviewReview(
     temperature: 0,
     toolName: TOOL_NAME,
     toolDescription: 'Record the silent in-session coverage and quality review. This result is never shown or spoken to the patient.',
-    inputSchema: INPUT_SCHEMA,
+    inputSchema: options.diagnosticDepth ? INPUT_SCHEMA_V2 : INPUT_SCHEMA,
   })
 
-  return {
-    review: parseLiveInterviewReview(result, transcript),
-    provenance: {
-      modelId,
-      promptVersion: LIVE_INTERVIEW_REVIEW_PROMPT_VERSION,
-      generatedAt: new Date().toISOString(),
-    },
-  }
+  const generatedAt = new Date().toISOString()
+  return options.diagnosticDepth
+    ? {
+        review: parseLiveInterviewReviewV2(result, transcript),
+        provenance: {
+          modelId,
+          promptVersion: LIVE_INTERVIEW_REVIEW_V2_PROMPT_VERSION,
+          generatedAt,
+        },
+      }
+    : {
+        review: parseLiveInterviewReview(result, transcript),
+        provenance: {
+          modelId,
+          promptVersion: LIVE_INTERVIEW_REVIEW_PROMPT_VERSION,
+          generatedAt,
+        },
+      }
 }
