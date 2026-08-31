@@ -51,7 +51,7 @@ const SELECT_COLUMNS = `
   nc."localizer_run_count"    AS localizer_run_count
 `
 
-function normaliseRow(row: Record<string, unknown>) {
+function normaliseRow(row: Record<string, unknown>): Record<string, any> {
   return {
     ...row,
     structured_output: coerceJson(row.structured_output),
