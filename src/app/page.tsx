@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { Bot, ClipboardList, Workflow, Layers, Sparkles, Orbit, Gauge, Receipt } from 'lucide-react'
+import { Bot, ClipboardList, Workflow, Layers, Sparkles, Orbit, Gauge, Receipt, Stethoscope } from 'lucide-react'
 import PlatformShell from '@/components/layout/PlatformShell'
 import HeroSection from '@/components/homepage/HeroSection'
 import JourneyTrack from '@/components/homepage/JourneyTrack'
@@ -37,20 +37,36 @@ export default function Home() {
               </span>
               <span className="text-xs text-slate-400">Not part of the product demo — internal use only</span>
             </div>
-            <Link
-              href="/rnd/clara"
-              className="flex items-center gap-3 rounded-xl border border-slate-700 bg-slate-800/60 px-5 py-4 transition hover:border-violet-500 hover:bg-slate-800"
-            >
-              <span className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-violet-500/15">
-                <Bot size={20} className="text-violet-300" />
-              </span>
-              <span>
-                <span className="block text-sm font-semibold text-white">Clara Voice Test</span>
-                <span className="block text-xs text-slate-400">
-                  Password-gated browser mic test against Clara&apos;s neuro-triage classification rulebook. Synthetic scenarios only.
+            <div className="grid gap-3 sm:grid-cols-2">
+              <Link
+                href="/rnd/clara"
+                className="flex items-center gap-3 rounded-xl border border-slate-700 bg-slate-800/60 px-5 py-4 transition hover:border-violet-500 hover:bg-slate-800"
+              >
+                <span className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-violet-500/15">
+                  <Bot size={20} className="text-violet-300" />
                 </span>
-              </span>
-            </Link>
+                <span>
+                  <span className="block text-sm font-semibold text-white">Clara Voice Test</span>
+                  <span className="block text-xs text-slate-400">
+                    Password-gated browser mic test against Clara&apos;s neuro-triage classification rulebook. Synthetic scenarios only.
+                  </span>
+                </span>
+              </Link>
+              <Link
+                href="/rnd/historian"
+                className="flex items-center gap-3 rounded-xl border border-slate-700 bg-slate-800/60 px-5 py-4 transition hover:border-teal-500 hover:bg-slate-800"
+              >
+                <span className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-teal-500/15">
+                  <Stethoscope size={20} className="text-teal-300" />
+                </span>
+                <span>
+                  <span className="block text-sm font-semibold text-white">Historian Runs</span>
+                  <span className="block text-xs text-slate-400">
+                    Every AI Historian interview — depth &amp; cutoff metrics, captured history, differential with reasoning, transcript.
+                  </span>
+                </span>
+              </Link>
+            </div>
           </div>
         </div>
       )}
