@@ -123,7 +123,14 @@ describe('buildHistorianSystemPrompt', () => {
       'new_patient', 'dizziness', 'ctx', undefined, 'dizziness and balance trouble',
     )
     expect(prompt).toMatch(/IF THE PATIENT ASKS WHY THEY WERE REFERRED/)
-    expect(prompt).toMatch(/do not deflect this to the\s+neurologist/i)
+    // Same intent (answer directly, don't deflect), current wording. The literal
+    // "do not deflect this to the neurologist" phrasing was intentionally removed
+    // in 687d7cd — Bedrock's content filter blocked that construction and killed
+    // every Nova voice session — so this asserts the read-back replacement and
+    // guards the forbidden phrase from creeping back.
+    expect(prompt).toMatch(/Read back what the referring clinician\s+wrote/)
+    expect(prompt).toMatch(/answer it directly/i)
+    expect(prompt).not.toMatch(/do not deflect this to the\s+neurologist/i)
   })
 
   it('requires the reason be given as symptoms, never as a suspected diagnosis', () => {
