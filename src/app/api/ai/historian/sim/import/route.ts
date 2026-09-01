@@ -23,6 +23,7 @@
 
 import { NextResponse } from 'next/server'
 import { randomUUID } from 'crypto'
+import { getPersonality } from '@/lib/historian/synthetic/personalities'
 
 interface RunResultLike {
   result?: unknown
@@ -69,11 +70,14 @@ export async function POST(request: Request) {
     // personas). Never fatal: a missing fixture file just yields a null
     // transcript for that case.
     let buildPersonaTranscript: ((f: string) => { transcript: unknown }) | null = null
+    let loadPersonaProfile: ((f: string) => { patientBelief?: unknown; personality?: string }) | null = null
     try {
       const mod = await import('@/lib/historian/eval/personaFixtures')
       buildPersonaTranscript = mod.buildPersonaTranscript
+      loadPersonaProfile = mod.loadPersonaProfile
     } catch {
       buildPersonaTranscript = null
+      loadPersonaProfile = null
     }
 
     const { getPool } = await import('@/lib/db')
@@ -95,6 +99,22 @@ export async function POST(request: Request) {
         }
       }
 
+      // Enrich with the persona's lay belief + the personality it was run
+      // under (best-effort — depends on the fixture files being present).
+      let patientBelief: unknown = null
+      let personality: unknown = null
+      if (c.source !== 'session' && loadPersonaProfile) {
+        try {
+          const profile = loadPersonaProfile(c.caseId)
+          if (profile.patientBelief) patientBelief = profile.patientBelief
+          const p = getPersonality(profile.personality)
+          if (p) personality = { id: p.id, label: p.label, description: p.description }
+        } catch {
+          patientBelief = null
+          personality = null
+        }
+      }
+
       const models = {
         final: c.finalDifferential?.modelId ?? null,
         thoroughness: c.thoroughness?.modelId ?? null,
@@ -107,8 +127,8 @@ export async function POST(request: Request) {
         `INSERT INTO historian_sim_runs
           (batch_id, batch_label, persona_id, persona_label, syndrome, chief_complaint,
            turn_count, transcript, final_differential, independent_ddx, agreement,
-           thoroughness, ground_truth, cost_usd, models, insufficient)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16)`,
+           thoroughness, ground_truth, patient_belief, personality, cost_usd, models, insufficient)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18)`,
         [
           batchId,
           batchLabel,
@@ -123,6 +143,8 @@ export async function POST(request: Request) {
           c.agreement?.result != null ? JSON.stringify(c.agreement.result) : null,
           c.thoroughness?.result != null ? JSON.stringify(c.thoroughness.result) : null,
           c.groundTruth != null ? JSON.stringify(c.groundTruth) : null,
+          patientBelief != null ? JSON.stringify(patientBelief) : null,
+          personality != null ? JSON.stringify(personality) : null,
           costUsd || null,
           JSON.stringify(models),
           c.insufficientTranscript === true,

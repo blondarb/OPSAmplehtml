@@ -56,6 +56,12 @@ CREATE TABLE IF NOT EXISTS historian_sim_runs (
   -- independent differential caught them (top1Hit / top3Hit).
   ground_truth       JSONB,
 
+  -- What the PATIENT believed was going on (lay belief, NOT the true dx) and
+  -- the personality/distractor style the persona was run under. Both drive
+  -- the simulator dashboard's per-persona detail.
+  patient_belief     JSONB,
+  personality        JSONB,
+
   -- Summed evaluator cost for this case (USD), and the models used.
   cost_usd           NUMERIC(12, 6),
   models             JSONB,

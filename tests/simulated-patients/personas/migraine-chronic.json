@@ -1,6 +1,12 @@
 {
   "id": "migraine-chronic",
   "name": "Chronic Migraine with Medication Overuse",
+  "personality": "anxious",
+  "patientBelief": {
+    "suspected": "a brain tumor",
+    "reasoning": "the headaches are almost daily now and nothing I take really works anymore",
+    "worry": "that something serious is being missed"
+  },
   "description": "35F with chronic migraine with aura, medication overuse headache. Presents with increasing frequency and daily analgesic use.",
 
   "demographics": {

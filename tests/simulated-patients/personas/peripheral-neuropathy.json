@@ -1,6 +1,12 @@
 {
   "id": "peripheral-neuropathy",
   "name": "Diabetic Peripheral Neuropathy",
+  "personality": "forgetful",
+  "patientBelief": {
+    "suspected": "poor circulation, or just getting older",
+    "reasoning": "my feet have felt funny for a while now, I can't say exactly how long",
+    "worry": "that I'll get unsteady and have a fall"
+  },
   "description": "55M with progressive numbness and tingling in feet over 6 months. Poorly controlled type 2 diabetes (A1c 9.2).",
 
   "demographics": {

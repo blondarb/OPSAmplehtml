@@ -37,6 +37,8 @@ const JSON_COLUMNS = [
   'agreement',
   'thoroughness',
   'ground_truth',
+  'patient_belief',
+  'personality',
   'models',
 ] as const
 
@@ -49,7 +51,8 @@ function normaliseRow(row: Record<string, unknown>) {
 
 const SELECT = `id, batch_id, batch_label, persona_id, persona_label, syndrome,
   chief_complaint, turn_count, transcript, final_differential, independent_ddx,
-  agreement, thoroughness, ground_truth, cost_usd, models, insufficient, created_at`
+  agreement, thoroughness, ground_truth, patient_belief, personality, cost_usd,
+  models, insufficient, created_at`
 
 export async function GET(request: Request) {
   try {

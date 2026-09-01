@@ -1,6 +1,12 @@
 {
   "id": "ms-relapse",
   "name": "MS Relapse — New Numbness in Legs",
+  "personality": "tangential",
+  "patientBelief": {
+    "suspected": "a pinched nerve in my back",
+    "reasoning": "I've had back trouble before and figured it was flaring up again",
+    "worry": "that I'll end up not being able to walk right"
+  },
   "description": "28F with known relapsing-remitting MS on Ocrevus, presenting with new progressive numbness in both legs over 3 days. Prior history of optic neuritis.",
 
   "demographics": {

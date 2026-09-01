@@ -196,6 +196,11 @@ function PersonaCard({ run, onOpen }: { run: Run; onOpen: () => void }) {
         <span className="text-sm font-semibold text-white">{prettyPersona(run.persona_id)}</span>
         <span className="text-[11px] text-slate-500">{fmtCost(run.cost_usd)}</span>
       </div>
+      {run.personality?.label && (
+        <span className="mt-1 w-fit rounded-full bg-violet-500/15 px-2 py-0.5 text-[10px] font-medium text-violet-300">
+          {run.personality.label}
+        </span>
+      )}
       <div className="mt-2 text-[11px] uppercase tracking-wide text-slate-500">True diagnosis</div>
       <div className="text-sm text-slate-300">{truth[0] || '—'}</div>
       <div className="mt-2 text-[11px] uppercase tracking-wide text-slate-500">Henry&apos;s top call</div>
@@ -272,8 +277,17 @@ function SubHead({ children }: { children: ReactNode }) {
 function TruthTab({ run }: { run: Run }) {
   const gt = run.ground_truth
   const truth: string[] = Array.isArray(gt?.expectedCandidates) ? gt.expectedCandidates : []
+  const belief = run.patient_belief as { suspected?: string; reasoning?: string; worry?: string } | null
+  const personality = run.personality as { label?: string; description?: string } | null
   return (
     <div>
+      {personality?.label && (
+        <div className="mb-3 rounded-xl border border-violet-500/25 bg-violet-500/10 px-3 py-2">
+          <div className="text-[10px] font-semibold uppercase tracking-wide text-violet-300">Personality</div>
+          <div className="text-sm text-slate-100">{personality.label}</div>
+          {personality.description && <div className="text-xs text-slate-400">{personality.description}</div>}
+        </div>
+      )}
       <SubHead>What the case is actually mimicking</SubHead>
       {truth.length ? (
         <ul className="space-y-1">
@@ -296,10 +310,24 @@ function TruthTab({ run }: { run: Run }) {
           <HitDot hit={gt.independent.top3Hit} label="Top-3" />
         </div>
       )}
-      <p className="mt-4 rounded-lg border border-slate-800 bg-slate-900/40 px-3 py-2 text-[11px] text-slate-500">
-        Patient &ldquo;belief&rdquo; (what the persona thinks they have, and why) and personality/distractor
-        modes are a planned enhancement — not captured in this run yet.
-      </p>
+
+      {belief && (belief.suspected || belief.reasoning || belief.worry) && (
+        <>
+          <SubHead>What the patient thinks it is</SubHead>
+          <div className="rounded-xl border border-slate-800 bg-slate-900/60 px-3 py-2.5 text-sm">
+            {belief.suspected && (
+              <div className="text-slate-200">
+                Suspects: <span className="font-medium text-white">{belief.suspected}</span>
+              </div>
+            )}
+            {belief.reasoning && <div className="mt-1 text-slate-400">Because “{belief.reasoning}”</div>}
+            {belief.worry && <div className="mt-1 text-amber-300/90">Worried that “{belief.worry}”</div>}
+          </div>
+          <p className="mt-1 text-[11px] text-slate-500">
+            The persona&apos;s lay belief — a distractor Henry must work past, not the true diagnosis above.
+          </p>
+        </>
+      )}
     </div>
   )
 }

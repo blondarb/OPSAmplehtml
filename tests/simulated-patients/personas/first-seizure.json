@@ -1,6 +1,12 @@
 {
   "id": "first-seizure",
   "name": "First Unprovoked Generalized Tonic-Clonic Seizure",
+  "personality": "reluctant",
+  "patientBelief": {
+    "suspected": "just stress and not sleeping enough",
+    "reasoning": "work has been brutal and I've been running on empty",
+    "worry": "that they'll tell me I can't drive"
+  },
   "description": "22M with witnessed generalized tonic-clonic seizure, no prior seizure history. Tongue laceration, postictal confusion.",
 
   "demographics": {
