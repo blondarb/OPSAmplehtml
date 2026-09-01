@@ -145,6 +145,12 @@ export default function HistorianRunsView() {
               Every AI Historian interview — depth, captured history, differential &amp; reasoning, transcript.
             </p>
           </div>
+          <a
+            href="/rnd/historian/simulator"
+            className="rounded-lg border border-slate-800 px-3.5 py-2 text-sm text-slate-300 transition hover:bg-slate-900"
+          >
+            Simulator →
+          </a>
           <button
             onClick={() => void load()}
             className="rounded-lg border border-slate-700 bg-slate-800 px-4 py-2 text-sm font-semibold text-slate-200 transition hover:border-teal-500 hover:bg-slate-700"
