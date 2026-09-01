@@ -30,9 +30,27 @@ describe('buildHistorianSystemPrompt', () => {
     expect(prompt).toMatch(/Phase 2.*turns? 4/i)
   })
 
-  it('lists the soft turn budget (8-20)', () => {
+  it('lists the deep default turn budget (45-60) with a hard ceiling', () => {
     const prompt = buildHistorianSystemPrompt('new_patient')
-    expect(prompt).toMatch(/8.*20/)
+    expect(prompt).toMatch(/45-60/)
+    expect(prompt).toMatch(/70 turns total/)
+    // Guard the old shallow budget from creeping back — "aim for 8-20 turns"
+    // plus "stop at clinical clarity" is what caused the ~turn-14 cutoff.
+    expect(prompt).not.toMatch(/8-20 turns/)
+  })
+
+  it('honors the HISTORIAN_INTERVIEW_BUDGET env override end-to-end', () => {
+    const prev = process.env.HISTORIAN_INTERVIEW_BUDGET
+    process.env.HISTORIAN_INTERVIEW_BUDGET = '30-40:55'
+    try {
+      const prompt = buildHistorianSystemPrompt('new_patient')
+      expect(prompt).toMatch(/30-40/)
+      expect(prompt).toMatch(/55 turns total/)
+      // Placeholders must be fully substituted — none may leak into the prompt.
+      expect(prompt).not.toMatch(/\{\{(SOFT_MIN|SOFT_MAX|HARD_CAP)\}\}/)
+    } finally {
+      process.env.HISTORIAN_INTERVIEW_BUDGET = prev
+    }
   })
 
   it('instructs the historian not to re-ask already-answered details', () => {
