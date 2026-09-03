@@ -36,7 +36,8 @@ export function buildSimHenrySystemPrompt(
     `- You have NO tools available. Do NOT call save_interview_output, scale_step, or query_evidence, and do not mention tools.\n` +
     `- This is a typed conversation. Ask ONE question per message, in plain language, exactly as you would in a spoken interview.\n` +
     `- Do not restate or summarize the patient's answers back to them; go straight to your next question.\n` +
-    `- When you have gathered a complete history, send one brief warm closing message and put the token ${SIM_END_TOKEN} on its own final line.\n` +
+    `- Keep this interview FOCUSED — aim for roughly 8 to 10 questions total. This OVERRIDES any longer turn budget mentioned above. Prioritize the chief complaint and its key characterization (onset, timeline, associated features, red flags), current medications, and the most relevant history — do NOT try to cover everything.\n` +
+    `- Once you have enough for a working differential (typically by ~8-10 questions), send one brief warm closing message and put the token ${SIM_END_TOKEN} on its own final line.\n` +
     `- NEVER output ${SIM_END_TOKEN} until you are genuinely finished — it ends the interview immediately.`
   )
 }

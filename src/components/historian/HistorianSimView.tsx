@@ -110,7 +110,10 @@ export default function HistorianSimView() {
     void load()
   }, [load])
 
-  const LIVE_MAX_EXCHANGES = 18
+  // Hard safety cap on exchanges. Kept modest so the final transcript stays
+  // small enough for the differential stage to score under the ~30s gateway
+  // limit — sim-Henry is also prompted to wrap up in ~8-10 questions.
+  const LIVE_MAX_EXCHANGES = 12
 
   const openLive = useCallback(async () => {
     setLiveOpen(true)
