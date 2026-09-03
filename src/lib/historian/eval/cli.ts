@@ -91,6 +91,13 @@ export interface HistorianEvalRunOptions {
   live: true
   /** true only in --sessions mode — persists results via persistEvaluation()/a direct final_differential column UPDATE, tolerating 42P01/42703 quiet-skip (repo convention). Always false in --fixtures mode. */
   persist: boolean
+  /**
+   * Skip the cross-model evaluators (DeepSeek-R1 independent differential +
+   * agreement). Used by the on-demand simulator API routes: those two are the
+   * slowest step and push a single serverless request past the ~30s gateway
+   * timeout (504). The batch CLI leaves this false and runs the full suite.
+   */
+  skipCrossModel?: boolean
 }
 
 export interface HistorianEvalCliRuntime {
@@ -645,7 +652,22 @@ export async function runHydratedCase(
   // 3. Independent (DeepSeek-R1) differential — BLIND, transcript + chief complaint only.
   const idStart = Date.now()
   let independentRun: HistorianEvalRunResult<IndependentDifferential>
-  try {
+  if (options.skipCrossModel) {
+    // On-demand: skip the slow R1 pass. Agreement + ground-truth scoring below
+    // already handle a null independent differential gracefully.
+    independentRun = {
+      ok: false,
+      result: null,
+      error: null,
+      skippedReason: 'cross-model 2nd opinion skipped (on-demand run)',
+      latencyMs: 0,
+      costUsd: null,
+      modelId: null,
+      promptVersion: null,
+      rubricVersion: null,
+      inferenceParams: null,
+    }
+  } else try {
     const result = await deps.independentDdxMod.generateIndependentDdx(input.transcript, input.chiefComplaint ?? undefined)
     independentRun = {
       ok: true,

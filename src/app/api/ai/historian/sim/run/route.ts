@@ -65,12 +65,24 @@ export async function POST(request: Request) {
         ? body.batchLabel
         : `On-demand ${new Date().toISOString().slice(0, 16).replace('T', ' ')}`
 
-    // Run the persona through the full evaluator pipeline (reuses the tested
-    // batch runner). persist:false — we persist to historian_sim_runs here.
-    const { DEFAULT_HISTORIAN_EVAL_CASE_RUNNER } = await import('@/lib/historian/eval/cli')
-    const outcome = await DEFAULT_HISTORIAN_EVAL_CASE_RUNNER(
-      { kind: 'fixture', personaFile: persona },
-      { live: true, persist: false },
+    // Run the persona through the evaluator pipeline (reuses runHydratedCase).
+    // skipCrossModel: the slow DeepSeek-R1 independent pass + agreement push a
+    // single request past the ~30s gateway timeout (504) — dropped on-demand.
+    const { buildPersonaTranscript } = await import('@/lib/historian/eval/personaFixtures')
+    const { runHydratedCase } = await import('@/lib/historian/eval/cli')
+    const fixture = buildPersonaTranscript(persona)
+    const outcome = await runHydratedCase(
+      {
+        caseId: persona,
+        source: 'fixture',
+        transcript: fixture.transcript,
+        chiefComplaint: fixture.chiefComplaint || null,
+        narrativeSummary: fixture.narrativeSummary ?? null,
+        syndrome: persona,
+        structuredOutput: null,
+        expectedDDx: fixture.expectedDDx,
+      },
+      { live: true, persist: false, skipCrossModel: true },
     )
 
     const { getPool } = await import('@/lib/db')
