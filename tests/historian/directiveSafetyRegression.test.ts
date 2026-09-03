@@ -47,6 +47,7 @@ describe('directive mode preserves the safety floor', () => {
 
   it('still carries the turn limit when steering is active', () => {
     const prompt = buildHistorianSystemPrompt('new_patient', 'r', 'c', undefined, FOCUS)
-    expect(prompt).toContain('Never exceed 25 turns total')
+    // Turn limit is now an env-tunable hard ceiling (default 70), not a fixed 25.
+    expect(prompt).toMatch(/Do NOT exceed \d+ turns total/)
   })
 })

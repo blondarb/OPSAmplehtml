@@ -21,10 +21,11 @@ describe('referral-directed prompt', () => {
     expect(prompt).toContain('does NOT count toward the referral-directed questions')
   })
 
-  it('states the 6-8 question directive budget and preserves the 25-turn limit', () => {
+  it('states the 6-8 question directive budget and preserves the turn-limit ceiling', () => {
     const prompt = buildHistorianSystemPrompt('new_patient', 'weakness', 'ctx', undefined, FOCUS)
     expect(prompt).toContain('6 to 8')
-    expect(prompt).toContain('Never exceed 25 turns total')
+    // Turn limit is now an env-tunable hard ceiling (default 70), not a fixed 25.
+    expect(prompt).toMatch(/Do NOT exceed \d+ turns total/)
   })
 
   it('instructs the model to follow the patient over the referral', () => {
