@@ -13,7 +13,7 @@ import { describe, expect, it } from 'vitest'
  * about 25" before he had asked anything (observed live 2026-08-07).
  *
  * Not cosmetic: questionCountRef IS the turn budget the model is told to work
- * within ("Never exceed 25 turns"). Three or four phantom turns up front make
+ * within (the env-tunable turn ceiling, default 70). Three or four phantom turns up front make
  * Henry hit the cap early and wrap up, silently dropping history questions. The
  * same file already carries a fix for the Nova speculative/final double-emit
  * that "burned the turn budget at 2x" — this is that bug's sibling.
