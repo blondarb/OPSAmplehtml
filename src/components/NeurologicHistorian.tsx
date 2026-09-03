@@ -4,7 +4,7 @@ import '@/styles/neuro-navigator.css'
 import { useState, useCallback, useEffect, useRef } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
 import { useRealtimeSession } from '@/hooks/useRealtimeSession'
-import { DEMO_SCENARIOS, type DemoScenario, type HistorianStructuredOutput, type HistorianRedFlag, type HistorianTranscriptEntry, type HistorianSessionType, type PatientContext } from '@/lib/historianTypes'
+import { DEMO_SCENARIOS, getInterviewBudget, type DemoScenario, type HistorianStructuredOutput, type HistorianRedFlag, type HistorianTranscriptEntry, type HistorianSessionType, type PatientContext } from '@/lib/historianTypes'
 import { getTenantClient } from '@/lib/tenant'
 import HistorianReportView from './HistorianReportView'
 import HistorianConsentDisclosure from './HistorianConsentDisclosure'
@@ -38,11 +38,12 @@ interface SessionConfig {
 }
 
 /**
- * Interview turn limit, mirrored from CRITICAL RULE 13 in the historian system
- * prompt ("Never exceed 25 turns total"). A turn is one exchange, not one
- * question — keep the label wording in step with that.
+ * Interview turn budget for the "Question N of about X" label, kept in step
+ * with the historian prompt's depth budget (HISTORIAN_INTERVIEW_BUDGET, default
+ * 45-60:70). Uses the soft target (softMax) as the "about X" the patient sees —
+ * a rough expectation, not a hard stop. A turn is one exchange, not one question.
  */
-const TURN_CAP = 25
+const TURN_CAP = getInterviewBudget(process.env.HISTORIAN_INTERVIEW_BUDGET).softMax
 
 const STEP_LABELS = ['Your visit', 'Consent & identity', 'Interview', 'Summary'] as const
 
