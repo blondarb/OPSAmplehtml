@@ -50,6 +50,9 @@ export default function HistorianSimView() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [selected, setSelected] = useState<Run | null>(null)
+  const [running, setRunning] = useState(false)
+  const [progress, setProgress] = useState<{ done: number; total: number; current: string } | null>(null)
+  const [runError, setRunError] = useState<string | null>(null)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -70,6 +73,51 @@ export default function HistorianSimView() {
 
   useEffect(() => {
     void load()
+  }, [load])
+
+  // Fire one request per persona (sequential) so no single request blows the
+  // serverless budget. All share one batchId so they group into one batch.
+  const runBatch = useCallback(async () => {
+    setRunning(true)
+    setRunError(null)
+    try {
+      const listRes = await fetch('/api/ai/historian/sim/run')
+      const listData = await listRes.json()
+      const personas: string[] = Array.isArray(listData.personas) ? listData.personas : []
+      if (personas.length === 0) throw new Error('No personas available to run.')
+
+      const batchId =
+        typeof crypto !== 'undefined' && 'randomUUID' in crypto
+          ? crypto.randomUUID()
+          : `batch-${Date.now()}`
+      const batchLabel = `On-demand ${new Date().toLocaleString()}`
+      const failures: string[] = []
+
+      for (let i = 0; i < personas.length; i++) {
+        setProgress({ done: i, total: personas.length, current: personas[i] })
+        try {
+          const res = await fetch('/api/ai/historian/sim/run', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ persona: personas[i], batchId, batchLabel }),
+          })
+          if (!res.ok) {
+            const body = await res.json().catch(() => ({}))
+            failures.push(`${personas[i]}: ${body.error || res.status}`)
+          }
+        } catch (err: any) {
+          failures.push(`${personas[i]}: ${err?.message || 'request failed'}`)
+        }
+      }
+      setProgress({ done: personas.length, total: personas.length, current: '' })
+      if (failures.length) setRunError(`${failures.length} persona(s) failed — ${failures.join('; ')}`)
+      await load()
+    } catch (err: any) {
+      setRunError(err?.message || 'Run failed')
+    } finally {
+      setRunning(false)
+      setTimeout(() => setProgress(null), 1500)
+    }
   }, [load])
 
   return (
@@ -96,12 +144,46 @@ export default function HistorianSimView() {
             </a>
             <button
               onClick={() => void load()}
-              className="rounded-lg border border-slate-700 bg-slate-800 px-4 py-2 text-sm font-medium text-slate-200 transition hover:border-teal-500 hover:bg-slate-700"
+              disabled={running}
+              className="rounded-lg border border-slate-700 bg-slate-800 px-4 py-2 text-sm font-medium text-slate-200 transition hover:border-teal-500 hover:bg-slate-700 disabled:opacity-40"
             >
               Refresh
             </button>
+            <button
+              onClick={() => void runBatch()}
+              disabled={running}
+              className="rounded-lg bg-teal-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-teal-500 disabled:opacity-50"
+            >
+              {running ? 'Running…' : 'Run simulator'}
+            </button>
           </div>
         </header>
+
+        {progress && (
+          <div className="mb-4 rounded-xl border border-teal-500/30 bg-teal-500/10 px-4 py-3 text-sm text-teal-100">
+            {progress.done < progress.total ? (
+              <>Running <span className="font-medium">{progress.current}</span> — {progress.done + 1} of {progress.total}…</>
+            ) : (
+              <>Batch complete — {progress.total} personas.</>
+            )}
+            <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-slate-800">
+              <div
+                className="h-full rounded-full bg-teal-500 transition-all"
+                style={{ width: `${(progress.done / progress.total) * 100}%` }}
+              />
+            </div>
+          </div>
+        )}
+        {runError && (
+          <div className="mb-4 rounded-xl border border-amber-500/40 bg-amber-500/10 px-4 py-3 text-sm text-amber-200">
+            {runError}
+          </div>
+        )}
+        <p className="mb-4 text-[11px] text-slate-500">
+          &ldquo;Run simulator&rdquo; scores each persona&apos;s scripted transcript through Henry&apos;s evaluators
+          (differential, thoroughness, cost) and incurs Bedrock cost. Live belief/personality-driven conversations
+          are a separate, heavier run.
+        </p>
 
         {loading && <div className="py-20 text-center text-slate-400">Loading simulator runs…</div>}
         {error && (
