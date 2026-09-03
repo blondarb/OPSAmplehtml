@@ -27,6 +27,7 @@
 import * as fs from 'fs'
 import * as path from 'path'
 import type { HistorianTranscriptEntry } from '@/lib/historianTypes'
+import { getBundledPersona, listBundledPersonaIds } from '@/lib/historian/sim/personaData'
 
 const PERSONAS_DIR = path.join(__dirname, '..', '..', '..', '..', 'tests', 'simulated-patients', 'personas')
 
@@ -136,7 +137,13 @@ export interface PersonaTranscriptFixture {
 
 /** List every persona fixture file (basenames, e.g. "acute-stroke.json"). */
 export function listPersonaFiles(): string[] {
-  return fs.readdirSync(PERSONAS_DIR).filter((f) => f.endsWith('.json')).sort()
+  try {
+    const files = fs.readdirSync(PERSONAS_DIR).filter((f) => f.endsWith('.json')).sort()
+    if (files.length > 0) return files
+  } catch {
+    // Deployed runtime (tests/ not present) — fall through to the bundled set.
+  }
+  return listBundledPersonaIds().map((id) => `${id}.json`)
 }
 
 function resolvePersonaPath(personaFile: string): string {
@@ -151,17 +158,18 @@ function resolvePersonaPath(personaFile: string): string {
  */
 function readPersonaJson(personaFile: string): PersonaJSON {
   const fullPath = resolvePersonaPath(personaFile)
-  let raw: string
   try {
-    raw = fs.readFileSync(fullPath, 'utf-8')
+    return JSON.parse(fs.readFileSync(fullPath, 'utf-8')) as PersonaJSON
   } catch (err) {
+    // Deployed runtime (tests/ not on disk) — fall back to the bundled copy.
+    const bundled = getBundledPersona(personaFile)
+    if (bundled) return bundled as PersonaJSON
     throw new Error(
-      `[personaFixtures] Could not read persona fixture "${personaFile}" (resolved to ${fullPath}): ${
+      `[personaFixtures] Could not read persona fixture "${personaFile}" (resolved to ${fullPath}, and not in the bundled set): ${
         err instanceof Error ? err.message : String(err)
       }`,
     )
   }
-  return JSON.parse(raw) as PersonaJSON
 }
 
 /**
