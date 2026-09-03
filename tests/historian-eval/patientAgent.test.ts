@@ -81,6 +81,37 @@ describe('buildPatientSystemPrompt', () => {
     const profile = makeProfile()
     expect(buildPatientSystemPrompt(profile)).toBe(buildPatientSystemPrompt(profile))
   })
+
+  it('weaves in a personality behaviour while pinning it as delivery-only', () => {
+    const prompt = buildPatientSystemPrompt(makeProfile({ personality: 'minimizer' }))
+    // Behaviour text from the personality library is present.
+    expect(prompt.toLowerCase()).toContain('downplay')
+    // And it is explicitly pinned as style-only so it can't rewrite the facts.
+    expect(prompt.toLowerCase()).toMatch(/never the medical facts|changes how you speak/)
+  })
+
+  it('ignores an unknown personality id without crashing', () => {
+    const prompt = buildPatientSystemPrompt(makeProfile({ personality: 'does-not-exist' }))
+    expect(prompt.length).toBeGreaterThan(0)
+    expect(prompt.toLowerCase()).not.toContain('how you come across')
+  })
+
+  it('includes the patient lay belief and pins it as a guess, not fact', () => {
+    const prompt = buildPatientSystemPrompt(
+      makeProfile({
+        patientBelief: { suspected: 'a pinched nerve', reasoning: 'it came on suddenly', worry: 'making a fuss' },
+      }),
+    )
+    expect(prompt).toContain('a pinched nerve')
+    expect(prompt).toContain('it came on suddenly')
+    expect(prompt.toLowerCase()).toMatch(/never state it as fact|may .*be wrong/)
+  })
+
+  it('omits belief and personality sections when absent', () => {
+    const prompt = buildPatientSystemPrompt(makeProfile())
+    expect(prompt.toLowerCase()).not.toContain('your own theory')
+    expect(prompt.toLowerCase()).not.toContain('how you come across')
+  })
 })
 
 describe('toBedrockMessages', () => {

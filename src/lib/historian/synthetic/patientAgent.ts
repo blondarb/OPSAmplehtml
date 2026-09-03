@@ -21,6 +21,7 @@
  */
 import { invokeBedrock } from '@/lib/bedrock'
 import { loadPersonaProfile, type PersonaProfile } from '@/lib/historian/eval/personaFixtures'
+import { getPersonality } from './personalities'
 
 export { loadPersonaProfile, type PersonaProfile }
 
@@ -99,6 +100,33 @@ export function buildPatientSystemPrompt(profile: PersonaProfile): string {
       lines.push(`Q: ${qa.questionPattern}`)
       lines.push(`A: ${qa.response}`)
     }
+    lines.push('')
+  }
+
+  const personality = getPersonality(profile.personality)
+  if (personality) {
+    lines.push(
+      'HOW YOU COME ACROSS (a behaviour style only — it changes HOW you speak, NEVER the medical facts above. ' +
+        'Do not invent, drop, or change any symptom, red flag, medication, or date to fit this style):',
+    )
+    lines.push(personality.behaviorPrompt)
+    lines.push('')
+  }
+
+  const belief = profile.patientBelief
+  if (belief && (belief.suspected || belief.reasoning || belief.worry)) {
+    lines.push(
+      'YOUR OWN THEORY (what YOU privately think might be going on — a lay hunch; you are not a doctor and may ' +
+        'well be wrong):',
+    )
+    if (belief.suspected) lines.push(`- You suspect it might be: ${belief.suspected}`)
+    if (belief.reasoning) lines.push(`- Because: ${belief.reasoning}`)
+    if (belief.worry) lines.push(`- What worries you most: ${belief.worry}`)
+    lines.push(
+      'Only raise this if Henry asks what you think is going on, or if it comes up naturally. Share it as a ' +
+        'worry or guess in plain language — never state it as fact, and never let it override or change the ' +
+        'actual facts above.',
+    )
     lines.push('')
   }
 

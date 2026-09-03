@@ -1,6 +1,12 @@
 {
   "id": "acute-stroke",
   "name": "Acute Ischemic Stroke Presentation",
+  "personality": "minimizer",
+  "patientBelief": {
+    "suspected": "a pinched nerve, or maybe I just slept on it wrong",
+    "reasoning": "it came on suddenly and I figured it would loosen up on its own",
+    "worry": "I don't want to make a fuss over nothing"
+  },
   "description": "68M with sudden onset left-sided weakness and slurred speech 2 hours ago. Known HTN, A-fib on warfarin, DM2.",
 
   "demographics": {

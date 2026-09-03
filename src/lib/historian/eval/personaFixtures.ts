@@ -76,6 +76,19 @@ interface PersonaJSON {
    * field).
    */
   structuredHistory?: Record<string, string>
+  /**
+   * What the PATIENT themselves believes might be going on, and why — a lay
+   * belief, explicitly NOT the true diagnosis (that is `expectedDDx`). Drives
+   * the patient agent's answer when Henry asks "what do you think this is?"
+   * and is surfaced on the simulator dashboard. Optional.
+   */
+  patientBelief?: { suspected?: string; reasoning?: string; worry?: string }
+  /**
+   * Personality / distractor id (see src/lib/historian/synthetic/personalities.ts)
+   * — changes HOW the persona comes across, never the ground-truth facts.
+   * Optional.
+   */
+  personality?: string
 }
 
 /** One ground-truth differential entry from a persona's `expectedDDx`. */
@@ -230,6 +243,16 @@ export interface PersonaProfileHistoryResponse {
   response: string
 }
 
+/** What the patient believes is going on (lay belief) — NOT the true diagnosis. */
+export interface PatientBelief {
+  /** What they suspect they have, in their own lay terms. */
+  suspected?: string
+  /** Why they think that. */
+  reasoning?: string
+  /** What specifically worries them (optional). */
+  worry?: string
+}
+
 export interface PersonaProfile {
   /** Persona fixture id, e.g. "acute-stroke". */
   id: string
@@ -240,6 +263,10 @@ export interface PersonaProfile {
   structuredHistory: Record<string, string>
   /** From intakeData.chief_complaint — used to prime the historian's referral-reason context, not the patient agent's own knowledge. */
   chiefComplaint: string
+  /** Lay belief about what's going on (NOT the true diagnosis). Optional. */
+  patientBelief?: PatientBelief
+  /** Personality/distractor id (see synthetic/personalities.ts). Optional. */
+  personality?: string
 }
 
 export function loadPersonaProfile(personaFile: string): PersonaProfile {
@@ -260,5 +287,17 @@ export function loadPersonaProfile(personaFile: string): PersonaProfile {
     })),
     structuredHistory: persona.structuredHistory ?? {},
     chiefComplaint: persona.intakeData?.chief_complaint?.trim() ?? '',
+    ...(persona.patientBelief && typeof persona.patientBelief === 'object'
+      ? {
+          patientBelief: {
+            ...(persona.patientBelief.suspected ? { suspected: persona.patientBelief.suspected } : {}),
+            ...(persona.patientBelief.reasoning ? { reasoning: persona.patientBelief.reasoning } : {}),
+            ...(persona.patientBelief.worry ? { worry: persona.patientBelief.worry } : {}),
+          },
+        }
+      : {}),
+    ...(typeof persona.personality === 'string' && persona.personality.trim()
+      ? { personality: persona.personality.trim() }
+      : {}),
   }
 }
