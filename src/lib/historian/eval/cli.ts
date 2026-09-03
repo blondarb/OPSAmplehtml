@@ -431,7 +431,7 @@ function insufficientRunResult<T>(reason: string): HistorianEvalRunResult<T> {
   }
 }
 
-interface HydratedCaseInput {
+export interface HydratedCaseInput {
   caseId: string
   source: 'fixture' | 'session'
   transcript: HistorianTranscriptEntry[]
@@ -530,7 +530,7 @@ async function persistSessionResults(
   }
 }
 
-async function runHydratedCase(
+export async function runHydratedCase(
   input: HydratedCaseInput,
   options: HistorianEvalRunOptions,
 ): Promise<HistorianEvalCaseOutcome> {

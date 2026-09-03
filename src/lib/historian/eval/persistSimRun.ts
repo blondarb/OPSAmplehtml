@@ -48,21 +48,27 @@ export async function persistSimCase(
   batchId: string,
   batchLabel: string | null,
   c: SimCaseLike,
+  /**
+   * The actual conversation transcript to store. Provide this for LIVE runs
+   * (the browser-orchestrated AI-to-AI conversation) — otherwise the synthetic
+   * FIXTURE transcript is reconstructed from the persona id (scripted mode).
+   */
+  transcriptOverride?: unknown,
 ): Promise<void> {
   const personaId = c.caseId.replace(/\.json$/, '')
 
   // Best-effort persona enrichment — depends on the fixture files being
   // present at runtime. Never fatal.
-  let transcript: unknown = null
+  let transcript: unknown = transcriptOverride ?? null
   let patientBelief: unknown = null
   let personality: unknown = null
   if (c.source !== 'session') {
     try {
       const mod = await import('@/lib/historian/eval/personaFixtures')
       try {
-        transcript = mod.buildPersonaTranscript(c.caseId).transcript
+        if (transcript == null) transcript = mod.buildPersonaTranscript(c.caseId).transcript
       } catch {
-        transcript = null
+        transcript = transcript ?? null
       }
       try {
         const profile = mod.loadPersonaProfile(c.caseId)

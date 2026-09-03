@@ -54,6 +54,14 @@ export default function HistorianSimView() {
   const [progress, setProgress] = useState<{ done: number; total: number; current: string } | null>(null)
   const [runError, setRunError] = useState<string | null>(null)
 
+  // Live AI-to-AI conversation state.
+  const [liveOpen, setLiveOpen] = useState(false)
+  const [personas, setPersonas] = useState<string[]>([])
+  const [livePersona, setLivePersona] = useState<string>('')
+  const [liveTranscript, setLiveTranscript] = useState<{ role: 'assistant' | 'user'; text: string }[]>([])
+  const [liveStatus, setLiveStatus] = useState<'idle' | 'running' | 'scoring' | 'done' | 'error'>('idle')
+  const [liveError, setLiveError] = useState<string | null>(null)
+
   const load = useCallback(async () => {
     setLoading(true)
     setError(null)
@@ -74,6 +82,70 @@ export default function HistorianSimView() {
   useEffect(() => {
     void load()
   }, [load])
+
+  const LIVE_MAX_EXCHANGES = 18
+
+  const openLive = useCallback(async () => {
+    setLiveOpen(true)
+    if (personas.length === 0) {
+      try {
+        const data = await fetch('/api/ai/historian/sim/run').then((r) => r.json())
+        const list: string[] = Array.isArray(data.personas) ? data.personas : []
+        setPersonas(list)
+        if (list.length) setLivePersona(list[0])
+      } catch {
+        /* leave empty */
+      }
+    }
+  }, [personas.length])
+
+  const runLive = useCallback(async () => {
+    if (!livePersona) return
+    setLiveStatus('running')
+    setLiveError(null)
+    setLiveTranscript([])
+    const convo: { role: 'assistant' | 'user'; text: string }[] = []
+    const batchId =
+      typeof crypto !== 'undefined' && 'randomUUID' in crypto ? crypto.randomUUID() : `live-${Date.now()}`
+    const batchLabel = `Live ${new Date().toLocaleString()}`
+    try {
+      for (let i = 0; i < LIVE_MAX_EXCHANGES; i++) {
+        const h = await fetch('/api/ai/historian/sim/henry-turn', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ transcript: convo, sessionType: 'new_patient' }),
+        }).then((r) => r.json())
+        if (h.error) throw new Error(`Henry: ${h.error}`)
+        if (h.text) {
+          convo.push({ role: 'assistant', text: h.text })
+          setLiveTranscript([...convo])
+        }
+        if (h.done) break
+
+        const p = await fetch('/api/ai/historian/sim/patient-turn', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ persona: livePersona, conversation: convo }),
+        }).then((r) => r.json())
+        if (p.error) throw new Error(`Patient: ${p.error}`)
+        convo.push({ role: 'user', text: p.text || '' })
+        setLiveTranscript([...convo])
+      }
+
+      setLiveStatus('scoring')
+      const s = await fetch('/api/ai/historian/sim/score', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ persona: livePersona, transcript: convo, batchId, batchLabel }),
+      }).then((r) => r.json())
+      if (s.error) throw new Error(`Scoring: ${s.error}`)
+      setLiveStatus('done')
+      await load()
+    } catch (err: any) {
+      setLiveError(err?.message || 'Live run failed')
+      setLiveStatus('error')
+    }
+  }, [livePersona, load])
 
   // Fire one request per persona (sequential) so no single request blows the
   // serverless budget. All share one batchId so they group into one batch.
@@ -151,13 +223,33 @@ export default function HistorianSimView() {
             </button>
             <button
               onClick={() => void runBatch()}
+              disabled={running || liveStatus === 'running' || liveStatus === 'scoring'}
+              className="rounded-lg border border-teal-600/60 px-4 py-2 text-sm font-semibold text-teal-300 transition hover:bg-teal-600/10 disabled:opacity-50"
+            >
+              {running ? 'Running…' : 'Run (scripted)'}
+            </button>
+            <button
+              onClick={() => void openLive()}
               disabled={running}
               className="rounded-lg bg-teal-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-teal-500 disabled:opacity-50"
             >
-              {running ? 'Running…' : 'Run simulator'}
+              Run live interview
             </button>
           </div>
         </header>
+
+        {liveOpen && (
+          <LiveRunPanel
+            personas={personas}
+            persona={livePersona}
+            setPersona={setLivePersona}
+            transcript={liveTranscript}
+            status={liveStatus}
+            error={liveError}
+            onRun={() => void runLive()}
+            onClose={() => setLiveOpen(false)}
+          />
+        )}
 
         {progress && (
           <div className="mb-4 rounded-xl border border-teal-500/30 bg-teal-500/10 px-4 py-3 text-sm text-teal-100">
@@ -567,6 +659,89 @@ function ThoroughnessTab({ run }: { run: Run }) {
             ))}
           </ul>
         </>
+      )}
+    </div>
+  )
+}
+
+function LiveRunPanel({
+  personas,
+  persona,
+  setPersona,
+  transcript,
+  status,
+  error,
+  onRun,
+  onClose,
+}: {
+  personas: string[]
+  persona: string
+  setPersona: (p: string) => void
+  transcript: { role: 'assistant' | 'user'; text: string }[]
+  status: 'idle' | 'running' | 'scoring' | 'done' | 'error'
+  error: string | null
+  onRun: () => void
+  onClose: () => void
+}) {
+  const busy = status === 'running' || status === 'scoring'
+  const statusLabel: Record<typeof status, string> = {
+    idle: 'Ready',
+    running: 'Interview in progress…',
+    scoring: 'Scoring the differential…',
+    done: 'Done — added to the dashboard below',
+    error: 'Error',
+  }
+  return (
+    <div className="mb-6 rounded-2xl border border-teal-500/30 bg-slate-900/60 p-5">
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <h2 className="text-sm font-semibold text-white">Live AI-to-AI interview</h2>
+          <p className="text-[11px] text-slate-500">
+            A synthetic patient (with its belief + personality) is interviewed by Henry in real time, then scored.
+            Beta — text-mode Henry; incurs Bedrock cost.
+          </p>
+        </div>
+        <div className="flex items-center gap-2">
+          <select
+            value={persona}
+            onChange={(e) => setPersona(e.target.value)}
+            disabled={busy}
+            className="rounded-lg border border-slate-700 bg-slate-800 px-3 py-1.5 text-sm text-slate-200 disabled:opacity-50"
+          >
+            {personas.length === 0 && <option value="">No personas</option>}
+            {personas.map((p) => (
+              <option key={p} value={p}>{p.replace(/[-_]/g, ' ')}</option>
+            ))}
+          </select>
+          <button
+            onClick={onRun}
+            disabled={busy || !persona}
+            className="rounded-lg bg-teal-600 px-4 py-1.5 text-sm font-semibold text-white transition hover:bg-teal-500 disabled:opacity-50"
+          >
+            {busy ? 'Running…' : 'Start'}
+          </button>
+          <button onClick={onClose} disabled={busy} className="rounded-lg border border-slate-700 px-3 py-1.5 text-sm text-slate-300 transition hover:bg-slate-800 disabled:opacity-50">
+            Close
+          </button>
+        </div>
+      </div>
+
+      <div className={`mb-2 text-xs ${status === 'error' ? 'text-rose-300' : status === 'done' ? 'text-teal-300' : 'text-slate-400'}`}>
+        {error ? error : statusLabel[status]}
+        {busy && <span className="ml-2 inline-block h-3 w-3 animate-spin rounded-full border-2 border-slate-600 border-t-teal-400 align-middle" />}
+      </div>
+
+      {transcript.length > 0 && (
+        <div className="max-h-96 space-y-2 overflow-y-auto rounded-xl border border-slate-800 bg-slate-950 p-3">
+          {transcript.map((t, i) => (
+            <div key={i} className="text-sm">
+              <span className={`font-semibold ${t.role === 'user' ? 'text-teal-300' : 'text-slate-400'}`}>
+                {t.role === 'user' ? 'Patient' : 'Henry'}:
+              </span>{' '}
+              <span className="text-slate-200">{t.text}</span>
+            </div>
+          ))}
+        </div>
       )}
     </div>
   )
