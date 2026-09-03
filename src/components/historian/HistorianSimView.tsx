@@ -29,6 +29,33 @@ interface Batch {
   created_at: string
 }
 
+// POST helper with legible errors — turns an empty body (a ~30s gateway
+// timeout) or a non-OK response into a clear message instead of the cryptic
+// "Unexpected end of JSON input" from res.json() on an empty body.
+async function postJson(url: string, body: unknown, label: string): Promise<any> {
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  })
+  const text = await res.text()
+  if (!res.ok) {
+    let msg = text
+    try {
+      msg = JSON.parse(text).error || text
+    } catch {
+      /* keep raw text */
+    }
+    throw new Error(`${label} failed (${res.status}): ${(msg || '').slice(0, 200)}`)
+  }
+  if (!text) throw new Error(`${label} returned an empty response — likely a ~30s gateway timeout.`)
+  try {
+    return JSON.parse(text)
+  } catch {
+    throw new Error(`${label} returned a non-JSON response.`)
+  }
+}
+
 function fmtCost(v: unknown): string {
   const n = Number(v)
   if (!Number.isFinite(n) || n === 0) return '—'
@@ -110,35 +137,38 @@ export default function HistorianSimView() {
     const batchLabel = `Live ${new Date().toLocaleString()}`
     try {
       for (let i = 0; i < LIVE_MAX_EXCHANGES; i++) {
-        const h = await fetch('/api/ai/historian/sim/henry-turn', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ transcript: convo, sessionType: 'new_patient' }),
-        }).then((r) => r.json())
-        if (h.error) throw new Error(`Henry: ${h.error}`)
+        const h = await postJson(
+          '/api/ai/historian/sim/henry-turn',
+          { transcript: convo, sessionType: 'new_patient' },
+          'Henry turn',
+        )
         if (h.text) {
           convo.push({ role: 'assistant', text: h.text })
           setLiveTranscript([...convo])
         }
         if (h.done) break
 
-        const p = await fetch('/api/ai/historian/sim/patient-turn', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ persona: livePersona, conversation: convo }),
-        }).then((r) => r.json())
-        if (p.error) throw new Error(`Patient: ${p.error}`)
+        const p = await postJson(
+          '/api/ai/historian/sim/patient-turn',
+          { persona: livePersona, conversation: convo },
+          'Patient turn',
+        )
         convo.push({ role: 'user', text: p.text || '' })
         setLiveTranscript([...convo])
       }
 
+      // Scoring in two stages so neither request exceeds the ~30s gateway limit.
       setLiveStatus('scoring')
-      const s = await fetch('/api/ai/historian/sim/score', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ persona: livePersona, transcript: convo, batchId, batchLabel }),
-      }).then((r) => r.json())
-      if (s.error) throw new Error(`Scoring: ${s.error}`)
+      const diff = await postJson(
+        '/api/ai/historian/sim/score/differential',
+        { persona: livePersona, transcript: convo },
+        'Differential',
+      )
+      await postJson(
+        '/api/ai/historian/sim/score/finalize',
+        { persona: livePersona, transcript: convo, differential: diff.differential, batchId, batchLabel },
+        'Scoring',
+      )
       setLiveStatus('done')
       await load()
     } catch (err: any) {
