@@ -61,7 +61,7 @@ export async function POST(request: Request) {
         structuredOutput: null,
         expectedDDx,
       },
-      { live: true, persist: false },
+      { live: true, persist: false, skipCrossModel: true },
     )
 
     const batchId: string = typeof body?.batchId === 'string' && body.batchId ? body.batchId : randomUUID()
