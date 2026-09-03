@@ -30,6 +30,7 @@
 import { PHASED_INTERVIEW_STRUCTURE } from '@/lib/historianPrompts'
 import { SYNDROME_DISEASE_NAMES } from './rubric'
 import type { HistorianTranscriptEntry, HistorianStructuredOutput } from '@/lib/historianTypes'
+import { getInterviewBudget } from '@/lib/historianTypes'
 
 // ── 1. Diagnosis-leak lexicon ────────────────────────────────────────────────
 
@@ -205,8 +206,15 @@ export interface TurnCapCheckResult {
   exceeded: boolean
 }
 
-/** Existing historian rule (historianPrompts.ts CORE_PROMPT rule 13: "Never exceed 25 turns total"), confirmed as 25 PATIENT turns per the task brief. */
-export const PATIENT_TURN_CAP = 25
+/**
+ * Turn-cap guardrail, aligned with the historian prompt's hard ceiling
+ * (historianPrompts.ts RULE 13 / HISTORIAN_INTERVIEW_BUDGET, default hardCap 70).
+ * Was a fixed 25 when the prompt capped at 25 total turns; the deep-interview
+ * change (target 45-60, ceiling 70) made a 25-turn cap false-flag every normal
+ * run. Uses the budget DEFAULT (not the live env) so this stays a pure,
+ * deterministic constant — it is a coarse runaway guard, not a precise metric.
+ */
+export const PATIENT_TURN_CAP = getInterviewBudget(undefined).hardCap
 
 export function checkTurnCap(transcript: HistorianTranscriptEntry[]): TurnCapCheckResult {
   const patientTurnCount = transcript.filter((t) => t.role === 'user').length
