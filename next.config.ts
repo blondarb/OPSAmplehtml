@@ -100,6 +100,10 @@ const nextConfig: NextConfig = {
     // AI Historian turn-taking / noise handling (hot-revertable without a code change)
     HISTORIAN_TURN_DETECTION_MODE: process.env.HISTORIAN_TURN_DETECTION_MODE,
     HISTORIAN_NOISE_REDUCTION: process.env.HISTORIAN_NOISE_REDUCTION,
+    // Interview depth budget "softMin-softMax:hardCap" (e.g. "45-60:70"). Controls
+    // how deep Henry goes before wrapping up — the fix for the ~turn-14 cutoff.
+    // Hot-tunable without a code change (see getInterviewBudget in historianTypes).
+    HISTORIAN_INTERVIEW_BUDGET: process.env.HISTORIAN_INTERVIEW_BUDGET,
     // Voice provider A/B (OpenAI Realtime vs Nova Sonic). Must be inlined here or
     // the historian session route can't read them at runtime on Amplify SSR.
     // Nova fails closed (provider.start throws) until NOVA_SONIC_RELAY_URL is set.

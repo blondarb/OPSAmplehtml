@@ -258,6 +258,41 @@ export function getNoiseReductionConfig(mode: string | undefined): NoiseReductio
   return { type: 'far_field' }
 }
 
+// ─── Interview depth budget (env-driven) ────────────────────────────────────
+//
+// How many conversational turns Henry aims for. The historian was cutting off
+// shallow (~turn 14) because the prompt told it to "aim for 8-20 turns" and
+// stop at "clinical clarity" — directly contradicting the goal of a thorough
+// ~50-60 turn interview. This makes the depth a hot-tunable knob
+// (HISTORIAN_INTERVIEW_BUDGET, inlined in next.config.ts for Amplify SSR) so it
+// can be adjusted or reverted without a code change.
+//
+// Format: "softMin-softMax:hardCap", e.g. "45-60:70".
+//   softMin/softMax — the target range Henry aims for
+//   hardCap         — a safety ceiling Henry must not exceed
+export interface InterviewBudget {
+  softMin: number
+  softMax: number
+  hardCap: number
+}
+
+/**
+ * Resolve the interview depth budget from HISTORIAN_INTERVIEW_BUDGET. Defaults
+ * to a deep 45-60 turn target (ceiling 70) per Steve's 50-60 depth goal. Falls
+ * back to the default on missing or incoherent config rather than emitting a
+ * nonsensical budget.
+ */
+export function getInterviewBudget(raw: string | undefined): InterviewBudget {
+  const fallback: InterviewBudget = { softMin: 45, softMax: 60, hardCap: 70 }
+  const m = (raw || '').match(/^\s*(\d+)\s*-\s*(\d+)\s*:\s*(\d+)\s*$/)
+  if (!m) return fallback
+  const softMin = parseInt(m[1], 10)
+  const softMax = parseInt(m[2], 10)
+  const hardCap = parseInt(m[3], 10)
+  if (softMin < 1 || softMax < softMin || hardCap < softMax) return fallback
+  return { softMin, softMax, hardCap }
+}
+
 // ─── Tool: query_evidence ───────────────────────────────────────────────────
 
 export type QueryEvidenceArgs = {
