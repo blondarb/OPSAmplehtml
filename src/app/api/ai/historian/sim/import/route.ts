@@ -14,6 +14,7 @@
  */
 
 import { NextResponse } from 'next/server'
+import { requireSimUser } from '@/lib/historian/simAuth'
 import { randomUUID } from 'crypto'
 import { persistSimCase, type SimCaseLike } from '@/lib/historian/eval/persistSimRun'
 
@@ -24,6 +25,9 @@ interface ReportLike {
 }
 
 export async function POST(request: Request) {
+  const denied = await requireSimUser()
+  if (denied) return denied
+
   try {
     const body = await request.json().catch(() => null)
     if (!body) return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 })

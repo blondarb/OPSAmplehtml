@@ -23,12 +23,16 @@
  */
 
 import { NextResponse } from 'next/server'
+import { requireSimUser } from '@/lib/historian/simAuth'
 import { randomUUID } from 'crypto'
 
 // Bedrock evaluators can be slow; give the request real headroom.
 export const maxDuration = 300
 
 export async function GET() {
+  const denied = await requireSimUser()
+  if (denied) return denied
+
   try {
     const { listPersonaFiles } = await import('@/lib/historian/eval/personaFixtures')
     const personas = listPersonaFiles().map((f) => f.replace(/\.json$/, ''))
@@ -42,6 +46,9 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
+  const denied = await requireSimUser()
+  if (denied) return denied
+
   try {
     const body = await request.json().catch(() => null)
     const personaRaw: unknown = body?.persona

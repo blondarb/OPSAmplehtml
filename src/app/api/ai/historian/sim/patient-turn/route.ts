@@ -12,10 +12,14 @@
  */
 
 import { NextResponse } from 'next/server'
+import { requireSimUser } from '@/lib/historian/simAuth'
 
 export const maxDuration = 60
 
 export async function POST(request: Request) {
+  const denied = await requireSimUser()
+  if (denied) return denied
+
   try {
     const body = await request.json().catch(() => null)
     const persona: unknown = body?.persona
