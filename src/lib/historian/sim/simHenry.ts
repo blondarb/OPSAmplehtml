@@ -33,7 +33,8 @@ export function buildSimHenrySystemPrompt(
   return (
     base +
     `\n\nSIMULATION MODE — TEXT INTERVIEW (this section OVERRIDES any tool instructions above):\n` +
-    `- You have NO tools available. Do NOT call save_interview_output, scale_step, or query_evidence, and do not mention tools.\n` +
+    `- You have NO tools available. Do NOT call save_interview_output, scale_step, or query_evidence.\n` +
+    `- Do NOT narrate actions or mention tools/saving in your messages — never write things like "[Calling save_interview_output]", "saving now", or bracketed stage directions. Just speak naturally to the patient.\n` +
     `- This is a typed conversation. Ask ONE question per message, in plain language, exactly as you would in a spoken interview.\n` +
     `- Do not restate or summarize the patient's answers back to them; go straight to your next question.\n` +
     `- Keep this interview FOCUSED — aim for roughly 8 to 10 questions total. This OVERRIDES any longer turn budget mentioned above. Prioritize the chief complaint and its key characterization (onset, timeline, associated features, red flags), current medications, and the most relevant history — do NOT try to cover everything.\n` +
