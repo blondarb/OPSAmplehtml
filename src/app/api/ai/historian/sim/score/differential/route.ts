@@ -37,8 +37,11 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: `Unknown persona "${persona}".` }, { status: 400 })
     }
 
-    const { generateFinalDifferential } = await import('@/lib/historian/eval/finalDifferential')
-    const differential = await generateFinalDifferential(transcript, chiefComplaint)
+    // Lean sim differential (single Claude call, no verbatim-quote grounding)
+    // so this stays well under the ~30s gateway limit. The heavy production
+    // grader (finalDifferential) is left for the offline batch harness.
+    const { generateSimDifferential } = await import('@/lib/historian/sim/simDifferential')
+    const differential = await generateSimDifferential(transcript, chiefComplaint)
 
     return NextResponse.json({ differential })
   } catch (error: any) {

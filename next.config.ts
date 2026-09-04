@@ -104,6 +104,9 @@ const nextConfig: NextConfig = {
     // how deep Henry goes before wrapping up — the fix for the ~turn-14 cutoff.
     // Hot-tunable without a code change (see getInterviewBudget in historianTypes).
     HISTORIAN_INTERVIEW_BUDGET: process.env.HISTORIAN_INTERVIEW_BUDGET,
+    // OpenAI text model for the SIMULATOR's Henry (gpt-4o family — same provider
+    // as the production Realtime voice agent). Default 'gpt-4o' if unset.
+    HISTORIAN_SIM_HENRY_MODEL: process.env.HISTORIAN_SIM_HENRY_MODEL,
     // Voice provider A/B (OpenAI Realtime vs Nova Sonic). Must be inlined here or
     // the historian session route can't read them at runtime on Amplify SSR.
     // Nova fails closed (provider.start throws) until NOVA_SONIC_RELAY_URL is set.
