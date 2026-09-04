@@ -6,6 +6,7 @@ import {
   DEFAULT_MAX_TURNS,
   HARD_MAX_TURNS,
 } from '@/lib/historian/synthetic/cliArgs'
+import { getInterviewBudget } from '@/lib/historianTypes'
 
 describe('parseSyntheticDriverArgs', () => {
   it('applies defaults for --persona', () => {
@@ -59,10 +60,27 @@ describe('parseSyntheticDriverArgs', () => {
     expect(() => parseSyntheticDriverArgs(['--persona', 'x', '--all-personas'])).toThrow(/exactly one of/)
   })
 
-  it('throws on --max-turns above the hard cap of 25', () => {
-    expect(() => parseSyntheticDriverArgs(['--all-personas', '--max-turns', '26'])).toThrow(
-      new RegExp(`cannot exceed ${HARD_MAX_TURNS}`),
-    )
+  it('throws on --max-turns above the hard cap', () => {
+    expect(() =>
+      parseSyntheticDriverArgs(['--all-personas', '--max-turns', String(HARD_MAX_TURNS + 1)]),
+    ).toThrow(/cannot exceed/)
+  })
+
+  it('accepts --max-turns exactly at the hard cap', () => {
+    const opts = parseSyntheticDriverArgs(['--all-personas', '--max-turns', String(HARD_MAX_TURNS)])
+    expect(opts.maxTurns).toBe(HARD_MAX_TURNS)
+  })
+
+  // Drift guard. The harness cap must equal the historian's own hard ceiling,
+  // or synthetic runs truncate silently and the transcript looks like Henry
+  // cutting off early. Asserted against getInterviewBudget directly — a
+  // different module — because the previous version of this test compared
+  // HARD_MAX_TURNS to itself and would have passed at any value, which is
+  // exactly how the cap sat at 25 after the budget moved to 45-60:70.
+  it('tracks the historian interview budget rather than restating it', () => {
+    const budget = getInterviewBudget(process.env.HISTORIAN_INTERVIEW_BUDGET)
+    expect(HARD_MAX_TURNS).toBe(budget.hardCap)
+    expect(DEFAULT_MAX_TURNS).toBe(budget.hardCap)
   })
 
   it('throws on a non-positive or non-integer --max-turns', () => {
