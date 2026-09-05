@@ -18,7 +18,7 @@ interface MockServerHandle {
 /** Minimal shape of the client-sent wire events this test asserts against — avoids `any` while still allowing free-form fields via the index signature. */
 interface SentWireMessage {
   type: string
-  session?: { type?: string; modalities?: string[]; instructions?: string; turn_detection?: unknown; tools?: unknown[] }
+  session?: { type?: string; output_modalities?: string[]; instructions?: string; audio?: unknown; tools?: unknown[] }
   item?: { type?: string; role?: string; content?: unknown; call_id?: string; output?: string }
   response?: Record<string, unknown>
   [key: string]: unknown
@@ -106,9 +106,9 @@ describe('RealtimeTextClient', () => {
     const sessionUpdate = received.find((m) => m.type === 'session.update')
     expect(sessionUpdate?.session).toMatchObject({
       type: 'realtime',
-      modalities: ['text'],
+      output_modalities: ['text'],
       instructions: 'test instructions',
-      turn_detection: null,
+      audio: { input: { turn_detection: null } },
     })
     expect(sessionUpdate?.session?.tools).toEqual([{ type: 'function', name: 'save_interview_output' }])
 
