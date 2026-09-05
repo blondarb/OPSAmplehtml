@@ -46,17 +46,39 @@ export async function POST(request: Request) {
       ...toHenryMessages(transcript),
     ]
 
-    const res = await fetch('https://api.openai.com/v1/chat/completions', {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ model, messages, max_tokens: 400, temperature: 0.6 }),
-    })
-    if (!res.ok) {
+    // Retry transient rate-limit / server errors (429/5xx) with backoff — the
+    // live loop fires many turns in quick succession and occasionally trips
+    // OpenAI's per-minute limit. Honor Retry-After when present.
+    const RETRYABLE = new Set([429, 500, 502, 503, 504])
+    const MAX_ATTEMPTS = 4
+    let data: any = null
+    let lastStatus = 0
+    for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
+      const res = await fetch('https://api.openai.com/v1/chat/completions', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ model, messages, max_tokens: 400, temperature: 0.6 }),
+      })
+      if (res.ok) {
+        data = await res.json()
+        break
+      }
+      lastStatus = res.status
       const errBody = await res.text()
-      console.error('[sim/henry-turn] OpenAI error:', res.status, errBody.slice(0, 300))
-      return NextResponse.json({ error: `OpenAI returned ${res.status}` }, { status: 502 })
+      console.error(`[sim/henry-turn] OpenAI ${res.status} (attempt ${attempt + 1}):`, errBody.slice(0, 200))
+      if (!RETRYABLE.has(res.status) || attempt === MAX_ATTEMPTS - 1) {
+        return NextResponse.json(
+          { error: `OpenAI returned ${res.status}${res.status === 429 ? ' (rate limit — try again)' : ''}` },
+          { status: 502 },
+        )
+      }
+      const retryAfter = Number(res.headers.get('retry-after'))
+      const waitMs = Number.isFinite(retryAfter) && retryAfter > 0 ? retryAfter * 1000 : 800 * 2 ** attempt
+      await new Promise((r) => setTimeout(r, Math.min(waitMs, 8000)))
     }
-    const data = await res.json()
+    if (!data) {
+      return NextResponse.json({ error: `OpenAI unavailable (${lastStatus})` }, { status: 502 })
+    }
     const text: string = data?.choices?.[0]?.message?.content ?? ''
 
     return NextResponse.json({ text: stripSimEndToken(text), done: isSimInterviewDone(text) })
