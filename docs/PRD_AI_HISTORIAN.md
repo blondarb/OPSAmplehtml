@@ -20,6 +20,8 @@
 - The save tool adds optional `alcohol_use`; required fields and the scope-locked referral-clarification prompt are unchanged.
 - Offline checks verify prompt/schema contracts only; interview behavior has not been validated by a live run.
 
+- Review fix (2026-09-05): the Phase 3 "asked directly" save gate now names its two overrides explicitly — PATIENT-INITIATED ENDING and the TURN LIMIT (rule 13) — and rule 13 carries a turn-cap exception so the model never has to resolve an unstated conflict near the safety ceiling.
+
 ## 1. Overview
 
 The AI Neurologic Historian is a voice-powered patient intake interview system that conducts structured neurological history-taking before patients see their neurologist. Using OpenAI's Realtime API over WebRTC, it provides a natural conversational experience where an AI conducts the interview entirely by voice.

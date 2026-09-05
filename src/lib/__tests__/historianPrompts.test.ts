@@ -42,6 +42,8 @@ describe('buildHistorianSystemPrompt', () => {
     expect(prompt).toContain('does NOT shrink')
     expect(prompt).not.toContain('When you have sufficient clarity')
     expect(prompt).toContain('only when the HPI is clinically useful AND every Phase 3 item has been asked directly')
+    expect(prompt).toContain('Two exceptions override this: the PATIENT-INITIATED ENDING rule below and the TURN LIMIT rule (13)')
+    expect(prompt).toContain('the turn ceiling overrides the Phase 3 completion standard')
     expect(prompt).toContain('6. If medications')
     expect(prompt).toContain('A topic counts as covered only if YOU asked the patient about it directly in this interview.')
     expect(prompt).toContain('A fact that appears only in the referral note or PATIENT CONTEXT is NOT covered')
