@@ -354,7 +354,7 @@ export default function NeurologicHistorian({ initialMode, clinicianMirror = fal
     setOpenEnded(false)
     setSelectedScenario(null)
     if (mode === 'short') {
-      setReferralInput({ steer: 'directive', noteText: referralNote })
+      setReferralInput({ steer: 'directive', noteText: referralNote, shortReason: referralNote.trim() })
       return
     }
     setExtracting(true)
@@ -395,6 +395,7 @@ export default function NeurologicHistorian({ initialMode, clinicianMirror = fal
     setOpenEnded(true)
     setSelectedScenario(null)
     setReferralInput(null)
+    setHandoffDisplay(null)
   }
 
   const handleStartInterview = () => {

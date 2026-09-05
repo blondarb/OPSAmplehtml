@@ -3,6 +3,40 @@ import { describe, expect, it } from 'vitest'
 import { buildHistorianReferralContext } from '@/lib/historian/referralContext'
 
 describe('buildHistorianReferralContext', () => {
+  it('uses the trimmed short reason for both reason and focus', () => {
+    const result = buildHistorianReferralContext({
+      steer: 'directive',
+      shortReason: '  I have frequent headaches.  ',
+    })
+    expect(result.referralReason).toBe('I have frequent headaches.')
+    expect(result.referralFocus).toBe('I have frequent headaches.')
+  })
+
+  it('caps the short reason and focus at 200 characters', () => {
+    const result = buildHistorianReferralContext({
+      steer: 'directive',
+      shortReason: `  ${'X'.repeat(250)}  `,
+    })
+    expect(result.referralReason).toBe('X'.repeat(200))
+    expect(result.referralFocus).toBe('X'.repeat(200))
+  })
+
+  it.each(['', '   '])('preserves the fallback for an empty short reason (%j)', (shortReason) => {
+    const result = buildHistorianReferralContext({ steer: 'directive', shortReason })
+    expect(result.referralReason).toBe('Neurological consultation')
+    expect(result.referralFocus).toBeNull()
+  })
+
+  it('keeps triage reason and focus ahead of a short reason', () => {
+    const result = buildHistorianReferralContext({
+      steer: 'directive',
+      shortReason: 'I have frequent headaches.',
+      triage: { subspecialty: 'Neuromuscular', clinicalReasons: ['Progressive weakness'] },
+    })
+    expect(result.referralReason).toBe('Progressive weakness')
+    expect(result.referralFocus).toBe('Neuromuscular — Progressive weakness')
+  })
+
   it('derives the focus from triage subspecialty + first clinical reason', () => {
     const result = buildHistorianReferralContext({
       steer: 'directive',

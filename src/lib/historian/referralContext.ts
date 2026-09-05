@@ -6,6 +6,8 @@ const MAX_NOTE_CHARS = 3_000
 export interface HistorianReferralInput {
   /** Raw referral text. Included by default — see `includeRawNote`. */
   noteText?: string
+  /** Brief patient-entered reason, used only when structured context has no reason. */
+  shortReason?: string
   extraction?: ExtractionKeyFindings
   triage?: {
     tierDisplay?: string
@@ -66,13 +68,18 @@ function deriveFocus(input: HistorianReferralInput): string | null {
 export function buildHistorianReferralContext(
   input: HistorianReferralInput,
 ): HistorianReferralContext {
-  const referralFocus = deriveFocus(input)
-  const referralReason =
+  const derivedFocus = deriveFocus(input)
+  const derivedReason =
     firstNonEmpty([
       input.triage?.clinicalReasons?.[0],
       input.extraction?.chief_complaint,
-      referralFocus ?? undefined,
-    ]) ?? 'Neurological consultation'
+      derivedFocus ?? undefined,
+    ])
+  const shortReason = typeof input.shortReason === 'string'
+    ? input.shortReason.trim().slice(0, 200)
+    : ''
+  const referralReason = derivedReason ?? (shortReason || 'Neurological consultation')
+  const referralFocus = derivedReason ? derivedFocus : (shortReason || null)
 
   const lines: string[] = []
 
