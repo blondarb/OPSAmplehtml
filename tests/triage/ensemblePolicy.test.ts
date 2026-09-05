@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest'
-import type { EmergencyGatewayResult } from '@/lib/triage/emergencyGateway'
+import {
+  runEmergencyGateway,
+  type EmergencyGatewayResult,
+} from '@/lib/triage/emergencyGateway'
 import type { TriageDecisionState } from '@/lib/triage/types'
 import {
   applyAdjudicatorDecision,
@@ -22,7 +25,7 @@ function gateway(
     schedulingLocked: true,
     signals: [],
     lexicalHits: [],
-    version: 'neurology-emergency-gateway-v1',
+    version: 'neurology-emergency-gateway-v4',
   }
 }
 
@@ -44,6 +47,22 @@ const noSignalSafety = {
 }
 
 describe('fuseTriageBranches', () => {
+  it('keeps an appended current emergency through fusion despite an old raw date header', () => {
+    const rawGateway = runEmergencyGateway(
+      'Note date: 2020-01-05. Historical header. Patient has sudden right arm weakness and aphasia now.',
+      { decisionAsOf: '2026-09-05' },
+    )
+    const result = fuseTriageBranches({
+      gateway: gateway(rawGateway.carePathway),
+      safetyBranch: { status: 'complete', result: noSignalSafety },
+      scoringBranch: { status: 'complete', result: scorerDecision },
+    })
+
+    expect(rawGateway.carePathway).toBe('emergency_now')
+    expect(result.carePathway).toBe('emergency_now')
+    expect(result.reviewRequirement).toBe('emergency_action')
+  })
+
   it('never lets two model branches lower a deterministic emergency', () => {
     const result = fuseTriageBranches({
       gateway: gateway('emergency_now'),

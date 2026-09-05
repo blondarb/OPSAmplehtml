@@ -259,6 +259,65 @@ describe("runEmergencyGateway", () => {
     ).toBe(true);
   });
 
+  it("does not turn a denied conditional ED instruction into an emergency", () => {
+    const result = runEmergencyGateway(
+      "No diplopia, no pulsatile tinnitus noted today. Instructed patient to go to the Emergency Department now if: sudden severe headache, vision loss, diplopia, weakness, or any change in mental status.",
+    );
+
+    expect(result.carePathway).toBe("routine_outpatient");
+    expect(
+      result.signals.some((signal) => signal.action === "emergency_now"),
+    ).toBe(false);
+  });
+
+  it("retains an actual finding beside conditional ED instructions", () => {
+    const result = runEmergencyGateway(
+      "Sudden facial droop and aphasia now. Instructed patient to go to the Emergency Department now if symptoms recur.",
+    );
+
+    expect(result.carePathway).toBe("emergency_now");
+    expect(
+      result.signals.some(
+        (signal) =>
+          signal.syndrome === "acute_cerebrovascular" &&
+          signal.assertion === "present",
+      ),
+    ).toBe(true);
+  });
+
+  it("keeps a prior-year labelled note's positive emergency while marking timing unknown", () => {
+    const text =
+      "Note date: 2020-01-05. Patient has sudden right arm weakness and aphasia now.";
+    const result = runEmergencyGateway(text, { decisionAsOf: "2026-09-05" });
+
+    expect(result.carePathway).toBe("emergency_now");
+    expect(result.reviewRequirement).toBe("emergency_action");
+    const signal = result.signals.find(
+      (candidate) => candidate.syndrome === "acute_cerebrovascular",
+    );
+    expect(signal?.assertion).toBe("present");
+    expect(signal?.temporality).toBe("unknown");
+    expect(signal?.evidence[0]?.quote).toContain("sudden right arm weakness");
+    expect(result.lexicalHits[0]?.temporality).toBe("unknown");
+  });
+
+  it.each([
+    "Note date: 2020-01-05. Prior note reviewed. Patient has sudden right arm weakness and aphasia now.",
+    "Note date: 2020-99-99. Patient has sudden right arm weakness and aphasia now.",
+    "Note date: 2020-01-05. Historical header. Patient has sudden right arm weakness and aphasia now. Appended current referral content.",
+  ])("never lets a raw or malformed date lower an appended current emergency: %s", (text) => {
+    const result = runEmergencyGateway(text, { decisionAsOf: "2026-09-05" });
+
+    expect(result.carePathway).toBe("emergency_now");
+    expect(
+      result.signals.some(
+        (signal) =>
+          signal.syndrome === "acute_cerebrovascular" &&
+          signal.assertion === "present",
+      ),
+    ).toBe(true);
+  });
+
   it("does not use an unrelated later non-current statement to erase an emergency", () => {
     const result = runEmergencyGateway(
       "Sudden facial droop and aphasia now. Her chronic shoulder pain is not currently present.",

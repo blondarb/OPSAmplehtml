@@ -1,6 +1,6 @@
 import type { CarePathway, ReviewRequirement } from './types'
 
-export const EMERGENCY_GATEWAY_VERSION = 'neurology-emergency-gateway-v3'
+export const EMERGENCY_GATEWAY_VERSION = 'neurology-emergency-gateway-v4'
 
 export interface SourceLocation {
   packetId?: string
@@ -8,6 +8,8 @@ export interface SourceLocation {
   pageNumber?: number
   extractionMethod?: 'native_text' | 'ocr'
   extractionConfidence?: number | null
+  /** Optional ISO decision date for source-date ambiguity annotation. */
+  decisionAsOf?: string
 }
 
 export type EmergencySyndrome =
@@ -120,7 +122,7 @@ const FAMILY_HISTORY_HEADING = /^\s*(?:family history|fhx)\b/i
 const REMOTE_HISTORY_HEADING =
   /^\s*(?:remote history|past history|past medical history|prior history|historical)\b/i
 const EDUCATION_CONTEXT =
-  /\b(?:discharge instructions?|return instructions?|return precautions?|seek emergency care if|call 911 if|go to (?:the )?(?:ED|ER|emergency department) if|patient education|warning signs? (?:reviewed|include)|copied (?:discharge|instructions?))\b/i
+  /\b(?:discharge instructions?|return instructions?|return precautions?|seek emergency care if|call 911 if|go to (?:the )?(?:ED|ER|emergency department)(?: now)? if|patient education|warning signs? (?:reviewed|include)|copied (?:discharge|instructions?))\b/i
 const EDUCATION_HEADING =
   /^\s*(?:discharge instructions?|return instructions?|return precautions?|patient education|warning signs?)\b/i
 const RULE_OUT = /\b(?:rule out|r\/o|possible|concern(?:ed)? for|suspected)\b/i
@@ -138,6 +140,11 @@ const NONCURRENT_REFERENCE =
   /(?:\b(?:these|those|above|aforementioned|listed|described)\b.{0,100}\b(?:not current|not currently present|not active|historical only)\b)|(?:\b(?:the|these|those) (?:symptoms|findings|features) (?:are|were) (?:not current|not currently present|not active|historical only)\b)/i
 const NEGATED_ACUITY_CHANGE =
   /\b(?:no|not|without)\s+(?:(?:new|sudden|acute|recent|current)(?:\s+or\s+|\s+))+(?:change|changes|symptoms?|worsening|decline)\b/i
+// This recognizes source metadata only, never an event date in ordinary prose.
+// Raw text has no authoritative document boundary, so an older date can only
+// annotate timing ambiguity; it must never lower an emergency assertion/action.
+const LABELLED_DOCUMENT_DATE =
+  /\b(?:note|document|encounter)\s+date\s*:\s*((?:19|20)\d{2}-\d{2}-\d{2})\b/gi
 
 const FOCAL_DEFICIT =
   /\b(?:facial (?:droop|asymmetry)|face droop|(?:left|right) side of (?:his |her |their )?face (?:started )?drooping|aphasia|dysarthria|slurred speech|garbled speech|speech became garbled|gaze deviation|neglect|hemiparesis|focal (?:weakness|numbness|deficit)|one-sided (?:weakness|numbness)|unilateral (?:weakness|numbness)|right-sided (?:weakness|numbness)|left-sided (?:weakness|numbness)|(?:left|right) (?:arm|leg) (?:weakness|numbness)|(?:cannot|can't) move (?:his |her |their )?(?:left|right) (?:arm|leg)|numbness on (?:the )?(?:left|right) side|sudden weakness|ataxia|diplopia|double vision)\b/i
@@ -727,6 +734,52 @@ function sentenceSpans(
   return spans
 }
 
+function calendarYear(value: string | undefined): number | null {
+  if (!value || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return null
+  const [year, month, day] = value.split('-').map(Number)
+  const parsed = new Date(Date.UTC(year, month - 1, day))
+  return parsed.getUTCFullYear() === year &&
+    parsed.getUTCMonth() === month - 1 &&
+    parsed.getUTCDate() === day
+    ? year
+    : null
+}
+
+function hasPriorYearDocumentDate(
+  text: string,
+  span: TextSpan,
+  source?: SourceLocation,
+): boolean {
+  const decisionYear =
+    calendarYear(source?.decisionAsOf) ?? new Date().getUTCFullYear()
+  // Evaluation spans may combine a date header with its first finding, so the
+  // label may be inside the span. It is an ambiguity annotation only, not a
+  // document boundary or authority to lower the safety action.
+  const precedingText = text.slice(0, span.endOffset)
+  let documentYear: number | null = null
+  for (const match of precedingText.matchAll(LABELLED_DOCUMENT_DATE)) {
+    documentYear = calendarYear(match[1])
+  }
+  return documentYear !== null && documentYear < decisionYear
+}
+
+function hasOnlyDirectlyNegatedRuleAnchors(
+  text: string,
+  rule: SyndromeRule,
+): boolean {
+  const matcher = new RegExp(rule.anchor.source, `${rule.anchor.flags.replace(/g/g, '')}g`)
+  let sawAnchor = false
+  for (const match of text.matchAll(matcher)) {
+    sawAnchor = true
+    const matchIndex = match.index ?? 0
+    const prefix = text.slice(Math.max(0, matchIndex - 40), matchIndex)
+    if (!/\b(?:no|without|den(?:y|ies|ied)|negative for)\s*$/i.test(prefix)) {
+      return false
+    }
+  }
+  return sawAnchor
+}
+
 function activeContrastClause(text: string): string | null {
   let activeClause: string | null = null
   for (const match of text.matchAll(/\b(?:but|however|yet)\b/gi)) {
@@ -908,6 +961,10 @@ function isSuppressed(
   const explicitlyCurrent = hasExplicitCurrentFinding(scopedCurrent)
 
   if (PROBLEM_LIST_CONTEXT.test(scopedCurrent) && !explicitlyCurrent) return true
+
+  // Keep a clause whose only relevant anchor is directly denied from being
+  // promoted by nearby timing words (for example, "No diplopia ... today").
+  if (hasOnlyDirectlyNegatedRuleAnchors(scopedCurrent, rule)) return true
 
   if (hasRuleScopedNegation(scopedCurrent, rule)) {
     return true
@@ -1128,7 +1185,9 @@ function collectLexicalHits(
       const temporality =
         experiencer === 'family' || HISTORICAL.test(span.text)
           ? 'historical'
-          : classifyTemporality(span.text)
+          : hasPriorYearDocumentDate(sourceText, span, source)
+            ? 'unknown'
+            : classifyTemporality(span.text)
       const suppressed =
         !matchedRule ||
         isSuppressed(spans, index, span.text, index + 1, rule)
@@ -1258,6 +1317,13 @@ function runEmergencyGatewayInternal(
       )
         ? scopedContext
         : evaluation.span.text
+      // Raw text cannot prove a document boundary. A prior-year date therefore
+      // records ambiguous timing only; it never lowers a present emergency.
+      const datedSourceAmbiguity = hasPriorYearDocumentDate(
+        text,
+        evaluation.span,
+        source,
+      )
       const assertion = classifyAssertion(assertionContext)
       const experiencer = classifyExperiencer(scopedContext)
       const signal: GatewaySignal = {
@@ -1266,7 +1332,9 @@ function runEmergencyGatewayInternal(
         source: 'deterministic',
         action: assertion === 'present' ? 'emergency_now' : 'immediate_clinician_review',
         assertion,
-        temporality: classifyTemporality(scopedContext),
+        temporality: datedSourceAmbiguity
+          ? 'unknown'
+          : classifyTemporality(scopedContext),
         experiencer: experiencer === 'family' ? 'family' : experiencer === 'other' ? 'other' : 'patient',
         evidence: [makeEvidence(text, evaluation.span, source)],
       }
@@ -1388,12 +1456,15 @@ export function runEmergencyGateway(
       (!Number.isFinite(source.extractionConfidence) ||
         source.extractionConfidence < 0 ||
         source.extractionConfidence > 1)
+    const invalidDecisionAsOf =
+      source.decisionAsOf !== undefined && calendarYear(source.decisionAsOf) === null
 
     if (
       invalidIdentifier(source.packetId) ||
       invalidIdentifier(source.documentId) ||
       invalidPage ||
-      invalidConfidence
+      invalidConfidence ||
+      invalidDecisionAsOf
     ) {
       return failClosed('invalid_provenance')
     }

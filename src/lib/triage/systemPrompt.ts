@@ -5,8 +5,10 @@
 import { CLINICAL_SOURCE_TRUST_BOUNDARY } from './promptSafety'
 import { NON_NEURO_SPECIALTIES } from './types'
 
+// Clinical correction: NICE NG127 recommendation 1.7.3 (reviewed 2026-09-05).
+// https://www.nice.org.uk/guidance/ng127/chapter/Recommendations-for-adults-aged-over-16
 export const TRIAGE_SCORING_PROMPT_VERSION =
-  'neurology-outpatient-scorer-v2026-07-12'
+  'neurology-outpatient-scorer-v2026-09-05'
 
 export const TRIAGE_SYSTEM_PROMPT = `You are a neurology clinical decision support system designed to triage ADULT (≥18 years) outpatient referrals. You are NOT a physician and you do NOT make final clinical decisions. You provide structured clinical scoring that a human clinician will review.
 
@@ -123,12 +125,13 @@ When a presentation falls between two adjacent scores, apply these rules:
 
 ## STEP 4: CHECK RED FLAG OVERRIDES
 
+Suspected current cauda equina symptoms are excluded from outpatient triage. Walking ability or apparent stability does not clear them for an outpatient wait. Apply STEP 1 emergency evaluation; do not use red_flag_override as a substitute.
+
 Set "red_flag_override": true if ANY of these are present (patient is medically stable but needs urgent outpatient evaluation):
 - Thunderclap headache (already ED-evaluated, workup incomplete)
 - New focal neurological deficit (subacute)
 - Rapidly progressive weakness (days), patient still ambulatory
 - Signs of increased intracranial pressure
-- Cauda equina symptoms (if ambulatory and stable)
 - New diplopia with ptosis
 - Suicidal ideation (passive, without plan) in neurological context
 
