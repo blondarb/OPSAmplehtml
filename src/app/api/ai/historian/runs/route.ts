@@ -115,7 +115,9 @@ export async function GET(request: Request) {
     const endedEarly = runs.filter((r) => r.interview_completion_status === 'ended_early').length
     const withRedFlags = runs.filter((r) => Array.isArray(r.red_flags) && r.red_flags.length > 0).length
     const withDifferential = runs.filter(
-      (r) => Array.isArray(r.localizer_differential) && r.localizer_differential.length > 0,
+      (r) =>
+        (Array.isArray(r.localizer_differential) && r.localizer_differential.length > 0) ||
+        (Array.isArray(r.final_differential?.differential) && r.final_differential.differential.length > 0),
     ).length
     const escalated = runs.filter((r) => r.safety_escalated).length
 

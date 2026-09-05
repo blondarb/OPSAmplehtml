@@ -12,6 +12,7 @@
  */
 
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
+import { INVESTIGATIONAL_BANNER } from '@/lib/historian/eval/constants'
 import type {
   HistorianSession,
   HistorianStructuredOutput,
@@ -36,6 +37,30 @@ interface RunRow extends HistorianSession {
   localizer_kb_sources?: string[]
   localizer_last_run_at?: string | null
   localizer_run_count?: number | null
+}
+
+export function resolveDifferential(run: RunRow): {
+  entries: DifferentialEntry[]
+  source: 'localizer' | 'final' | null
+  summary?: string
+} {
+  if (Array.isArray(run.localizer_differential) && run.localizer_differential.length > 0) {
+    return { entries: run.localizer_differential, source: 'localizer' }
+  }
+  const final = run.final_differential
+  if (Array.isArray(final?.differential) && final.differential.length > 0) {
+    return {
+      entries: final.differential.map((item) => ({
+        diagnosis: item.diagnosis,
+        icd10: item.icd10,
+        rationale: item.rationale,
+        likelihood: item.likelihood === 'Moderate' ? 'medium' : item.likelihood === 'High' ? 'high' : 'low',
+      })),
+      source: 'final',
+      summary: final.summary,
+    }
+  }
+  return { entries: [], source: null }
 }
 
 interface Metrics {
@@ -251,9 +276,12 @@ function CutoffPanel({ metrics }: { metrics: Metrics }) {
 }
 
 // ─── Runs table ─────────────────────────────────────────────────────────────
-function patientLabel(run: RunRow): string {
+export function patientLabel(run: RunRow): string {
   if (run.patient) return `${run.patient.first_name} ${run.patient.last_name}`.trim()
-  return run.patient_name || 'Unknown'
+  if (!run.patient_name || run.patient_name === 'Unknown' || run.patient_name === 'Demo Patient') {
+    return `Session ${run.id.slice(0, 8)}`
+  }
+  return run.patient_name
 }
 
 function CompletionBadge({ status }: { status: RunRow['interview_completion_status'] }) {
@@ -285,7 +313,7 @@ function RunsTable({ runs, onSelect }: { runs: RunRow[]; onSelect: (r: RunRow) =
         <tbody className="divide-y divide-slate-800 bg-slate-900/40">
           {runs.map((run) => {
             const rf = Array.isArray(run.red_flags) ? run.red_flags.length : 0
-            const ddx = Array.isArray(run.localizer_differential) ? run.localizer_differential.length : 0
+            const ddx = resolveDifferential(run).entries.length
             return (
               <tr
                 key={run.id}
@@ -315,7 +343,7 @@ function RunsTable({ runs, onSelect }: { runs: RunRow[]; onSelect: (r: RunRow) =
 }
 
 // ─── Run detail drawer ──────────────────────────────────────────────────────
-function Section({ title, children }: { title: string; children: ReactNode }) {
+function Section({ title, children }: { title: ReactNode; children: ReactNode }) {
   return (
     <div className="mb-5">
       <h3 className="mb-2 text-xs font-bold uppercase tracking-wide text-teal-400">{title}</h3>
@@ -348,10 +376,10 @@ function FieldList({
   )
 }
 
-function RunDetailDrawer({ run, onClose }: { run: RunRow; onClose: () => void }) {
+export function RunDetailDrawer({ run, onClose }: { run: RunRow; onClose: () => void }) {
   const output = (run.structured_output || {}) as HistorianStructuredOutput
   const redFlags: HistorianRedFlag[] = Array.isArray(run.red_flags) ? run.red_flags : []
-  const ddx: DifferentialEntry[] = Array.isArray(run.localizer_differential) ? run.localizer_differential : []
+  const { entries: ddx, source, summary } = resolveDifferential(run)
   const transcript: HistorianTranscriptEntry[] = Array.isArray(run.transcript) ? run.transcript : []
   const kbSources: string[] = Array.isArray(run.localizer_kb_sources) ? run.localizer_kb_sources : []
   const followUps: string[] = Array.isArray(run.localizer_questions) ? run.localizer_questions : []
@@ -396,7 +424,14 @@ function RunDetailDrawer({ run, onClose }: { run: RunRow; onClose: () => void })
         )}
 
         {ddx.length > 0 && (
-          <Section title="Differential Diagnosis & Reasoning">
+          <Section title={
+            <>
+              Differential Diagnosis &amp; Reasoning
+              <span className="ml-2 rounded bg-slate-800 px-2 py-0.5 text-[10px] font-medium normal-case tracking-normal text-slate-400">
+                {source === 'localizer' ? 'Live localizer' : 'Post-interview eval'}
+              </span>
+            </>
+          }>
             <div className="space-y-2">
               {ddx.map((d, i) => {
                 const like = (d.likelihood || d.confidence || 'low') as string
@@ -416,12 +451,18 @@ function RunDetailDrawer({ run, onClose }: { run: RunRow; onClose: () => void })
                 )
               })}
             </div>
-            {run.localizer_hypothesis && (
+            {source === 'final' && (
+              <>
+                {summary?.trim() && <p className="mt-2 text-sm text-slate-400">{summary}</p>}
+                <p className="mt-2 text-xs text-slate-500">{INVESTIGATIONAL_BANNER}</p>
+              </>
+            )}
+            {source === 'localizer' && run.localizer_hypothesis && (
               <p className="mt-2 text-sm text-slate-400">
                 <span className="font-semibold text-slate-300">Localization:</span> {run.localizer_hypothesis}
               </p>
             )}
-            {followUps.length > 0 && (
+            {source === 'localizer' && followUps.length > 0 && (
               <div className="mt-2 text-sm text-slate-400">
                 <span className="font-semibold text-slate-300">Suggested follow-ups:</span>
                 <ul className="ml-4 mt-1 list-disc space-y-0.5">
@@ -429,7 +470,7 @@ function RunDetailDrawer({ run, onClose }: { run: RunRow; onClose: () => void })
                 </ul>
               </div>
             )}
-            {kbSources.length > 0 && (
+            {source === 'localizer' && kbSources.length > 0 && (
               <p className="mt-2 text-xs text-slate-500">Evidence: {kbSources.join(', ')}</p>
             )}
           </Section>
