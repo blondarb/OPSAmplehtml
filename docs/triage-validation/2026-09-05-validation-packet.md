@@ -2,6 +2,8 @@
 
 Source-only preparation · September 5, 2026 · Synthetic data only until separately approved
 
+**Current implementation and corrections:** see [the administrative package](2026-09-05-administrative-package.md). This packet describes the intended study protocol; the short UI, historical archive and append-only evaluation receipts now exist locally. Adjudication and some statistics remain unfinished.
+
 The first study is a feasibility study of adult outpatient neurology referral decision support. It does not authorize automatic scheduling, patient messages, clinical deployment, or processing real notes in this application. Two independent neurologists label the same frozen source packets before seeing any model answers. A third clinician adjudicates disagreements afterward.
 
 ## What Steve and the reviewers need to do
@@ -32,7 +34,7 @@ The current application form already captures tier, destination, confidence, fac
 
 ## Implemented source controls and activation requirements
 
-Migration `060_triage_validation_governance.sql` introduces a tenant-bound study registry and explicit study membership. It creates no memberships, maps no legacy studies and grants no access. Application study access requires both existing clinical authorization and active study membership. Missing schema or unassigned studies fail closed.
+Migration `061_triage_validation_governance.sql` introduces a tenant-bound study registry and explicit study membership. It creates no memberships, maps no legacy studies and grants no access. Application study access requires both existing clinical authorization and active study membership. Missing schema or unassigned studies fail closed.
 
 Study phases are draft → labeling → unblinded. The database prevents case changes after draft and prevents submitted review changes/deletes. Unblinding requires two assigned reviewer members with submitted ratings for every active case. Administration is separately assigned: being an app admin does not automatically make someone a study administrator. Reviewers always receive source-only cases; collective reviews and results require unblinded phase. The self-service profile cannot assign privileges.
 

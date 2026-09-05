@@ -193,7 +193,7 @@ export async function GET(req: NextRequest) {
     .order('case_number', { ascending: true })
 
   if (casesError) {
-    return NextResponse.json({ error: casesError.message }, { status: 500 })
+    return NextResponse.json({ error: 'Unable to read study cases' }, { status: 500 })
   }
 
   if (!cases || cases.length === 0) {
@@ -203,13 +203,17 @@ export async function GET(req: NextRequest) {
   const caseIds = cases.map((c: any) => c.id)
 
   // Fetch all reviews
-  const { data: reviews, error: reviewsError } = await from('validation_reviews')
+  const { data: allReviews, error: reviewsError } = await from('validation_reviews')
     .select('*')
     .in('case_id', caseIds)
 
   if (reviewsError) {
-    return NextResponse.json({ error: reviewsError.message }, { status: 500 })
+    return NextResponse.json({ error: 'Unable to read study reviews' }, { status: 500 })
   }
+
+  const requestedGroup = req.nextUrl.searchParams.get('reviewer_kind') || 'physician'
+  if (!['physician','triage_nurse','operational'].includes(requestedGroup)) return NextResponse.json({error:'Invalid reviewer group'},{status:400})
+  const reviews = access.studyKind === 'legacy_archive' ? allReviews : (allReviews || []).filter((r: {reviewer_kind?: string; label_context?: string}) => r.reviewer_kind === requestedGroup && r.label_context === 'independent_blinded')
 
   if (!reviews || reviews.length === 0) {
     return NextResponse.json({ error: 'No reviews submitted yet' }, { status: 404 })
@@ -637,6 +641,9 @@ export async function GET(req: NextRequest) {
 
   return NextResponse.json({
     study_name: studyName,
+    phase: access.phase, study_kind: access.studyKind, reviewer_kind: access.studyKind === 'legacy_archive' ? 'historical_unknown' : requestedGroup,
+    ai_comparison_source: 'legacy_case_snapshot',
+    evidence_notice: 'Case snapshot comparisons are historical. Select an exact configuration revision via the evaluations endpoint for new append-only runs.',
     total_cases: eligibleCases.length,
     total_cases_all: cases.length,
     total_reviewers: reviewerIds.length,

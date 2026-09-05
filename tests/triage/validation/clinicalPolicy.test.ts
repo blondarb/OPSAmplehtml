@@ -16,3 +16,11 @@ describe('cauda equina emergency policy', () => {
     expect(fused.schedulingLocked).toBe(true)
   })
 })
+
+describe('guideline-supported clearance boundaries',()=>{
+ it('does not use prior ED attendance or walking ability as emergency clearance',()=>{
+  expect(TRIAGE_SYSTEM_PROMPT).not.toContain('already ED-evaluated, workup incomplete')
+  expect(TRIAGE_SYSTEM_PROMPT).not.toContain('Rapidly progressive weakness (days), patient still ambulatory')
+  expect(TRIAGE_SYSTEM_PROMPT).toContain('an incomplete emergency workup is not outpatient clearance')
+ })
+})

@@ -16,7 +16,7 @@ const request = (body?: unknown) => new NextRequest('http://localhost/api/triage
 describe('validation HTTP boundaries', () => {
   beforeEach(() => {
     vi.clearAllMocks(); chains.length = 0; responses.length = 0
-    gate.mockResolvedValue({ ok: true, context: { userId: 'reviewer-a', tenantId: 'tenant-a' }, studyName: 'study-a', phase: 'labeling' })
+    gate.mockResolvedValue({ ok: true, context: { userId: 'reviewer-a', tenantId: 'tenant-a' }, studyName: 'study-a', phase: 'labeling',memberRole:'reviewer',reviewerKind:'physician',studyKind:'independent' })
     from.mockImplementation(() => {
       const c: any = { then: (resolve: any) => Promise.resolve(responses.shift() || { data: [], error: null }).then(resolve) }
       for (const key of ['select','eq','in','order','insert','single']) c[key] = vi.fn(() => c)
@@ -47,7 +47,7 @@ describe('validation HTTP boundaries', () => {
   })
   it('rejects mixed study batches and caller AI answers', async () => {
     gate.mockResolvedValue({ ok:true, phase:'draft' })
-    for (const extra of [{ study_name:'other' },{ ai_triage_tier:'routine' }]) {
+    for (const extra of [{ study_name:'other' },{ ai_triage_tier:'routine',comfortable_with_wait:'yes',confidence:'high' }]) {
       expect((await addCase(request({ case_number:1,title:'Synthetic',referral_text:'Synthetic case',...extra }))).status).toBe(400)
     }
     expect(from).not.toHaveBeenCalled()
@@ -59,18 +59,19 @@ describe('validation HTTP boundaries', () => {
   })
   it('rejects a case outside the authorized study before writing a review', async () => {
     responses.push({ data:null,error:null })
-    expect((await submit(request({case_id:'other-case',triage_tier:'routine'}))).status).toBe(404)
+    expect((await submit(request({case_id:'other-case',triage_tier:'routine',comfortable_with_wait:'yes',confidence:'high'}))).status).toBe(404)
     expect(chains[0].eq).toHaveBeenCalledWith('study_name','study-a')
     expect(from).toHaveBeenCalledTimes(1)
   })
   it('derives reviewer and returns conflict for an already submitted rating', async () => {
     responses.push({data:{id:'case-a'},error:null},{data:null,error:{code:'23505'}})
-    const r=await submit(request({case_id:'case-a',triage_tier:'routine',reviewer_id:'forged'}))
+    const r=await submit(request({case_id:'case-a',triage_tier:'routine',comfortable_with_wait:'yes',confidence:'high',reviewer_id:'forged'}))
     expect(r.status).toBe(409)
     expect(chains[1].insert.mock.calls[0][0].reviewer_id).toBe('reviewer-a')
   })
-  it.each([auto,seed,rerun])('holds legacy evaluation without DB or model invocation', async handler => {
-    const r = await handler(request({clear_previous:true}))
+  it.each([auto,seed])('rejects clinical intake model calls during source import', async handler => {
+    const r = await handler(request({run_ai:true}))
     expect(r.status).toBe(409); expect(from).not.toHaveBeenCalled()
   })
+  it('rejects the old destructive rerun shape',async()=>{expect((await rerun(request({clear_previous:true}))).status).toBe(400);expect(from).not.toHaveBeenCalled()})
 })

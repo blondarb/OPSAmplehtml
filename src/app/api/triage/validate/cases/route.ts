@@ -35,12 +35,14 @@ export async function GET(req: NextRequest) {
 
   const casesWithStatus = (cases || []).map((c: { id: string; is_calibration: boolean }) => ({
     ...c,
+    title: `Case ${String((c as unknown as { case_number: number }).case_number)}`,
     reviewed: reviewMap.has(c.id),
     review: reviewMap.get(c.id) || undefined,
   }))
 
   return NextResponse.json({
     cases: casesWithStatus,
+    phase: access.phase, study_kind: access.studyKind, member_role: access.memberRole, reviewer_kind: access.reviewerKind,
     total: casesWithStatus.length,
     completed: casesWithStatus.filter((c: { reviewed: boolean }) => c.reviewed).length,
     calibration_count: casesWithStatus.filter((c: { id: string; is_calibration: boolean }) => c.is_calibration).length,

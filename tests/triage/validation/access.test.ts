@@ -46,3 +46,8 @@ describe('study authorization', () => {
     expect(!r.ok && r.response.status).toBe(503)
   })
 })
+
+describe('historical archive permissions',()=>{
+ it('allows explicitly mapped archive reader without pretending old ratings are blinded',async()=>{clinical.mockResolvedValue({ok:true,context:{tenantId:'t',userId:'reader',role:'viewer'}});query.mockResolvedValue({rows:[{phase:'archived',study_kind:'legacy_archive',role:'archive_reader',reviewer_kind:'unknown'}]});expect((await authorizeValidationStudy('legacy','results')).ok).toBe(true)})
+ it('does not give an independent reviewer archive access implicitly',async()=>{clinical.mockResolvedValue({ok:true,context:{tenantId:'t',userId:'r',role:'clinician'}});query.mockResolvedValue({rows:[{phase:'archived',study_kind:'legacy_archive',role:'reviewer',reviewer_kind:'physician'}]});const r=await authorizeValidationStudy('legacy','results');expect(!r.ok&&r.response.status).toBe(403)})
+})

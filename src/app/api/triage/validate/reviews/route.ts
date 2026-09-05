@@ -46,7 +46,7 @@ export async function POST(req: NextRequest) {
   const studyName = req.nextUrl.searchParams.get('study') || 'default'
   const access = await authorizeValidationStudy(studyName)
   if (!access.ok) return access.response
-  if (access.phase !== 'labeling') return lockedValidationResponse()
+  if (access.phase !== 'labeling' || access.memberRole !== 'reviewer' || !['physician','triage_nurse','operational'].includes(access.reviewerKind)) return lockedValidationResponse()
   const user = { id: access.context.userId }
   const body = await req.json().catch(() => null)
   if (!body || typeof body !== 'object' || Array.isArray(body)) {
@@ -64,9 +64,10 @@ export async function POST(req: NextRequest) {
     reasoning,
     started_at,
     duration_seconds,
+    comfortable_with_wait,
   } = body
 
-  if (typeof case_id !== 'string' || !case_id || case_id.length > 100 || !triage_tier) {
+  if (!['high','moderate','low'].includes(confidence) || !['yes','no','uncertain'].includes(comfortable_with_wait) || typeof case_id !== 'string' || !case_id || case_id.length > 100 || !triage_tier) {
     return NextResponse.json(
       { error: 'case_id and triage_tier are required' },
       { status: 400 }
@@ -110,6 +111,9 @@ export async function POST(req: NextRequest) {
     .insert({
       case_id,
       reviewer_id: user.id,
+      comfortable_with_wait,
+      reviewer_kind: access.reviewerKind,
+      label_context: 'independent_blinded',
       triage_tier,
       subspecialty: subspecialty || null,
       redirect_to_non_neuro: redirect_to_non_neuro || false,
