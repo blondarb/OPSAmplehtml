@@ -38,7 +38,8 @@ describe('directive mode preserves the safety floor', () => {
 2. No thanks, no praise, no restating in any question turn — start with the question or a short topic bridge. The single closing message after save_interview_output is the one place to thank the patient.
 3. Plain words; at most one sentence before the question.
 4. If the patient just named a medication, alcohol, a seizure, or an injury, follow that thread next.
-5. Nothing that sounds like a diagnosis or a cause.`
+5. Nothing that sounds like a diagnosis or a cause.
+6. If medications (with dose and start date), alcohol, or family history have not been asked directly yet, one of them is your next question — a referral mention does not count.`
     expect(withFocus.startsWith(without.slice(0, checklistStart))).toBe(true)
     expect(withFocus.endsWith(checklist)).toBe(true)
     expect(without.endsWith(checklist)).toBe(true)

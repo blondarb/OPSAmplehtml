@@ -32,7 +32,26 @@ describe('buildHistorianSystemPrompt', () => {
 2. No thanks, no praise, no restating in any question turn — start with the question or a short topic bridge. The single closing message after save_interview_output is the one place to thank the patient.
 3. Plain words; at most one sentence before the question.
 4. If the patient just named a medication, alcohol, a seizure, or an injury, follow that thread next.
-5. Nothing that sounds like a diagnosis or a cause.`)
+5. Nothing that sounds like a diagnosis or a cause.
+6. If medications (with dose and start date), alcohol, or family history have not been asked directly yet, one of them is your next question — a referral mention does not count.`)
+  })
+
+  it('requires direct background history even with a one-line referral', () => {
+    const prompt = buildHistorianSystemPrompt('new_patient', 'headache', 'Synthetic referral: headache; medications, alcohol, and family history mentioned.')
+    expect(prompt).not.toContain('skip this phase entirely')
+    expect(prompt).toContain('does NOT shrink')
+    expect(prompt).not.toContain('When you have sufficient clarity')
+    expect(prompt).toContain('only when the HPI is clinically useful AND every Phase 3 item has been asked directly')
+    expect(prompt).toContain('Two exceptions override this: the PATIENT-INITIATED ENDING rule below and the TURN LIMIT rule (13)')
+    expect(prompt).toContain('the turn ceiling overrides the Phase 3 completion standard')
+    expect(prompt).toContain('6. If medications')
+    expect(prompt).toContain('A topic counts as covered only if YOU asked the patient about it directly in this interview.')
+    expect(prompt).toContain('A fact that appears only in the referral note or PATIENT CONTEXT is NOT covered')
+    expect(prompt).toContain('Skip an item only if the patient already answered it in this conversation.')
+    expect(prompt).toContain('Current medications — name, dose, how often, when started, who prescribes it, any missed doses')
+    expect(prompt).toContain('\n- Alcohol — how much in a typical week, the most in one sitting, when the last drink was, any shakes or sweats when cutting back')
+    expect(prompt).toContain('Social history (occupation, smoking, other substances)')
+    expect(prompt).toContain('This applies to Phase 3 too: medications, alcohol, or family history listed in the referral still need your own direct question before you call save_interview_output.')
   })
 
   it('includes the safety block (988 / 741741 / 911 escalation)', () => {
@@ -214,6 +233,7 @@ describe('buildHistorianSystemPrompt', () => {
     expect(prompt).toContain('patient-reported and unverified')
     expect(prompt).toContain('Never diagnose, score urgency, clear an emergency')
     expect(prompt).not.toContain('EVERY TURN — CHECK BEFORE YOU SPEAK')
+    expect(prompt).not.toContain('6. If medications')
     expect(prompt).not.toContain('Phase 1')
     expect(prompt).not.toContain('scale_step')
   })
@@ -266,6 +286,15 @@ describe('getHistorianToolDefinition', () => {
     expect(tool!.parameters.required).toEqual(
       expect.arrayContaining(['chief_complaint', 'hpi', 'narrative_summary', 'safety_escalated']),
     )
+  })
+
+  it('exposes optional alcohol_use without changing the required fields', () => {
+    const tool = getTestTools().find((candidate) => candidate.name === 'save_interview_output')!
+    expect(tool.parameters.properties.alcohol_use).toEqual({
+      type: 'string',
+      description: 'Alcohol use as the patient described it: typical week, most in one sitting, last drink, any withdrawal symptoms',
+    })
+    expect(tool.parameters.required).toEqual(['chief_complaint', 'hpi', 'narrative_summary', 'safety_escalated'])
   })
 
   it('query_evidence requires question, allows focus_diagnoses optional', () => {
