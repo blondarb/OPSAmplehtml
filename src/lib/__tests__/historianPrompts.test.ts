@@ -40,6 +40,8 @@ describe('buildHistorianSystemPrompt', () => {
     const prompt = buildHistorianSystemPrompt('new_patient', 'headache', 'Synthetic referral: headache; medications, alcohol, and family history mentioned.')
     expect(prompt).not.toContain('skip this phase entirely')
     expect(prompt).toContain('does NOT shrink')
+    expect(prompt).not.toContain('When you have sufficient clarity')
+    expect(prompt).toContain('only when the HPI is clinically useful AND every Phase 3 item has been asked directly')
     expect(prompt).toContain('6. If medications')
     expect(prompt).toContain('A topic counts as covered only if YOU asked the patient about it directly in this interview.')
     expect(prompt).toContain('A fact that appears only in the referral note or PATIENT CONTEXT is NOT covered')

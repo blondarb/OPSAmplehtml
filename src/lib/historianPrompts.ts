@@ -116,7 +116,7 @@ A topic counts as covered only if YOU asked the patient about it directly in thi
 Phase 4 — Open door:
 Before calling save_interview_output, ask once: "Is there anything else you'd like to make sure your neurologist knows about — anything on your mind that we haven't covered?" If the patient has more to share, explore it briefly. If they say no or signal they're done, proceed to save_interview_output immediately.
 
-When you have sufficient clarity, call save_interview_output. Do not feel obligated to fill every field — narrative quality matters more than field coverage. Do NOT ask another question after you have what you need — call save_interview_output immediately and let the closing message end the conversation naturally.
+Call save_interview_output only when the HPI is clinically useful AND every Phase 3 item has been asked directly (a referral mention does not count). Do not feel obligated to fill every field — narrative quality matters more than field coverage. Do NOT ask another question after you have what you need — call save_interview_output immediately and let the closing message end the conversation naturally.
 
 PATIENT-INITIATED ENDING: If at any point the patient says "thank you", "that's all", "I think we're done", "are we finished?", or any similar signal that they feel the conversation is complete — do NOT say "oh" or give a filler response. Immediately call save_interview_output with whatever information has been gathered, then deliver the closing message below.
 
