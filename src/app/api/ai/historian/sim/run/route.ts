@@ -65,41 +65,24 @@ export async function POST(request: Request) {
         ? body.batchLabel
         : `On-demand ${new Date().toISOString().slice(0, 16).replace('T', ' ')}`
 
-    // Run the persona through the evaluator pipeline (reuses runHydratedCase).
-    // skipCrossModel: the slow DeepSeek-R1 independent pass + agreement push a
-    // single request past the ~30s gateway timeout (504) — dropped on-demand.
+    // Score the persona's scripted fixture transcript through the LEAN sim
+    // pipeline (same path as live runs) so scripted no longer 504s on the
+    // heavy production grader. Cross-model (R1 + agreement) is omitted on-demand.
     const { buildPersonaTranscript } = await import('@/lib/historian/eval/personaFixtures')
-    const { runHydratedCase } = await import('@/lib/historian/eval/cli')
     const fixture = buildPersonaTranscript(persona)
-    const outcome = await runHydratedCase(
-      {
-        caseId: persona,
-        source: 'fixture',
-        transcript: fixture.transcript,
-        chiefComplaint: fixture.chiefComplaint || null,
-        narrativeSummary: fixture.narrativeSummary ?? null,
-        syndrome: persona,
-        structuredOutput: null,
-        expectedDDx: fixture.expectedDDx,
-      },
-      { live: true, persist: false, skipCrossModel: true },
-    )
 
     const { getPool } = await import('@/lib/db')
     const pool = await getPool()
-    const { persistSimCase } = await import('@/lib/historian/eval/persistSimRun')
-    await persistSimCase(pool, batchId, batchLabel, outcome as any)
-
-    const gt: any = (outcome as any).groundTruth
-    return NextResponse.json({
-      batchId,
+    const { scoreAndPersistSimRun } = await import('@/lib/historian/sim/scoreSimTranscript')
+    const result = await scoreAndPersistSimRun({
+      pool,
       persona,
-      ok: Boolean((outcome as any).finalDifferential?.ok),
-      top1Hit: gt?.pipeline?.top1Hit ?? null,
-      costUsd:
-        (Number((outcome as any).finalDifferential?.costUsd) || 0) +
-        (Number((outcome as any).thoroughness?.costUsd) || 0),
+      transcript: fixture.transcript,
+      batchId,
+      batchLabel,
     })
+
+    return NextResponse.json({ batchId, persona, ok: result.ok, top1Hit: result.top1Hit })
   } catch (error: any) {
     const pgCode = (error as { code?: string })?.code
     if (pgCode === '42P01') {

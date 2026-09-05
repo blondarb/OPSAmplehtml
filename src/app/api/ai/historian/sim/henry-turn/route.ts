@@ -40,7 +40,11 @@ export async function POST(request: Request) {
     }
 
     const system = buildSimHenrySystemPrompt(sessionType, referralReason)
-    const model = process.env.HISTORIAN_SIM_HENRY_MODEL || 'gpt-4o'
+    // Default to gpt-4o-mini: far higher rate limits (the account kept 429'ing
+    // on gpt-4o) and cheaper. Still OpenAI/GPT-4o family. Set
+    // HISTORIAN_SIM_HENRY_MODEL=gpt-4o for closer production fidelity once the
+    // account's gpt-4o rate limits are raised.
+    const model = process.env.HISTORIAN_SIM_HENRY_MODEL || 'gpt-4o-mini'
     const messages = [
       { role: 'system', content: system },
       ...toHenryMessages(transcript),
