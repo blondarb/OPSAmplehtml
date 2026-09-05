@@ -91,3 +91,14 @@ Two-lane final review: a Fable whole-branch review (verdict: ready to merge with
 - The patient-portal POSTs (session-create, save, transcript-flush) are unauthenticated by design and have no rate-limiting or CSRF protection — before real PHI: add rate-limiting to the unauthenticated writes, bind the flush token to more than sessionId (IP/origin), and enforce seq monotonicity. Track these on the existing security-audit ledger for OPSAmplehtml; they gate real-patient use, not this merge.
 
 **Follow-on task tracker:** #8 (restore OpenAI quota → re-run P6 live gate). The security follow-ons above should be added to the OPSAmplehtml security-audit ledger, not this sprint's scope.
+
+## Pre-close coverage beta (2026-09-05)
+- `NEXT_PUBLIC_HISTORIAN_PRECLOSE_GATE` defaults OFF; literal `true` at build time enables the beta.
+- Before the first save, a deterministic server check finds up to three missing topics, critical rubric gaps first.
+- Medications, dose/start details, alcohol, family history, and social/occupation require assistant-turn hints; rubric criticals use all turns.
+- Henry receives one internal request to ask the missing topics, one question at a time, then save again.
+- The second save after rejection and any safety-escalated save finalize without a coverage request.
+- Errors, non-200 responses, and the 2500 ms timeout fail open so infrastructure cannot block saving.
+- This is substring coverage, not proof of complete answers or clinical validation; no LLM or database is used by the check.
+
+The hook owns the unified localizer channel: `runLocalizer` calls `pushLocalizerContext` once per eligible cycle for every consumer, skipping speech, safety escalation, and empty payloads; the embedded consumer retains its UI/scale handling without forwarding guidance. For pre-close rejection, OpenAI receives the internal note before the tool result triggers its response; Nova receives the tool result first, then the note as the forcing turn. The Nova ordering must be confirmed on a live session. Henry asks each missing item once, accepts declines or unknown answers without re-asking, and then saves again.
