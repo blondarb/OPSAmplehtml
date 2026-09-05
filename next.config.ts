@@ -78,6 +78,7 @@ const nextConfig: NextConfig = {
   // Amplify SSR compute does not inject app-level env vars at runtime,
   // so we inline them during the build via next.config.
   env: {
+    HISTORIAN_EVAL_MODE: process.env.HISTORIAN_EVAL_MODE,
     // Durable long-packet rollout flag (SAM worker stacks deployed 2026-07-12)
     TRIAGE_LONG_PACKET_DURABLE_ENABLED: process.env.TRIAGE_LONG_PACKET_DURABLE_ENABLED,
     TRIAGE_LONG_PACKET_MAX_ATTEMPTS: process.env.TRIAGE_LONG_PACKET_MAX_ATTEMPTS,

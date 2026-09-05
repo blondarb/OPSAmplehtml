@@ -279,7 +279,7 @@ interface R1InvokeResult {
  * responsible for the retry-once-then-fail-closed policy, not this
  * function.
  */
-async function invokeDeepSeekR1Json(userText: string): Promise<R1InvokeResult> {
+async function invokeDeepSeekR1Json(userText: string, opts: { signal?: AbortSignal } = {}): Promise<R1InvokeResult> {
   // ALL instructional content lives inside the <｜User｜>...<｜Assistant｜>
   // turn, immediately followed by the transcript/chief-complaint content —
   // nothing between <｜begin▁of▁sentence｜> and <｜User｜> — mirroring AWS's
@@ -300,6 +300,7 @@ async function invokeDeepSeekR1Json(userText: string): Promise<R1InvokeResult> {
       accept: 'application/json',
       body: new TextEncoder().encode(body),
     }),
+    { abortSignal: opts.signal },
   )
   const latencyMs = Date.now() - start
 
@@ -401,6 +402,7 @@ function serializedTranscriptLength(transcript: HistorianTranscriptEntry[]): num
 export async function generateIndependentDdx(
   transcript: HistorianTranscriptEntry[],
   chiefComplaint?: string,
+  opts: { signal?: AbortSignal } = {},
 ): Promise<IndependentDifferential> {
   const serializedLength = serializedTranscriptLength(transcript)
   if (serializedLength > MAX_TRANSCRIPT_CHARS) {
@@ -422,7 +424,7 @@ export async function generateIndependentDdx(
   let lastError: unknown
   for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
     try {
-      const { result: raw, stopReason } = await invokeDeepSeekR1Json(userText)
+      const { result: raw, stopReason } = await invokeDeepSeekR1Json(userText, opts)
       if (!isValidDifferentialResponseShape(raw)) {
         lastError = new Error(
           `DeepSeek-R1 output was not differential-shaped (attempt ${attempt + 1}, stop_reason=${stopReason}).`,
@@ -484,10 +486,11 @@ interface AdjudicateToolOutput {
  * misbehaving adjudicator response degrades to "no match" for the
  * unaccounted pairs instead of crashing the caller.
  */
-export const adjudicateEquivalence: Adjudicator = async (pairs) => {
+export const adjudicateEquivalence = async (pairs: Parameters<Adjudicator>[0], opts: { signal?: AbortSignal } = {}): Promise<boolean[]> => {
   if (pairs.length === 0) return []
 
   const { result } = await invokeBedrockClinicalToolWithMeta<AdjudicateToolOutput>({
+    signal: opts.signal,
     system: ADJUDICATE_SYSTEM_PROMPT,
     messages: [
       {
@@ -534,11 +537,12 @@ export async function runIndependentDdxAndAgreement(
   sessionId: string,
   transcript: HistorianTranscriptEntry[],
   chiefComplaint?: string,
+  opts: { signal?: AbortSignal } = {},
 ): Promise<void> {
   const ddxStart = Date.now()
   let independent: IndependentDifferential
   try {
-    independent = await generateIndependentDdx(transcript, chiefComplaint)
+    independent = await generateIndependentDdx(transcript, chiefComplaint, opts)
   } catch (err) {
     if (err instanceof TranscriptTooLargeError) {
       console.warn('[historian/eval] skipping independent ddx — transcript too large for session', sessionId)
@@ -601,7 +605,7 @@ export async function runIndependentDdxAndAgreement(
   const agreementStart = Date.now()
   let agreement: AgreementResult
   try {
-    agreement = await computeAgreement(finalDifferential.differential, independent.differential, adjudicateEquivalence)
+    agreement = await computeAgreement(finalDifferential.differential, independent.differential, (pairs) => adjudicateEquivalence(pairs, opts))
   } catch (err) {
     console.error('[historian/eval] agreement computation failed (non-fatal) for session', sessionId, err)
     return

@@ -85,3 +85,14 @@ stale default (`github_showcase`, a different app's DB).
 
 Note that the sibling `infrastructure/triage-ingestion` stack has no
 `samconfig.toml` and is exposed to the same failure mode.
+
+## Historian post-interview evaluation
+
+`HistorianEvalDispatcherFunction` polls pending sessions every minute and sends
+only session ID and enqueue time to `HistorianEvalWorkQueue`. The worker uses the
+shared RDS pool/secret parameters and runs each evaluator with its own deadline.
+Transient differential/DB failures retry up to three receives, then reach the DLQ;
+permanent failures are acknowledged with an explicit error record where RDS is available.
+Human deployment and Amplify flag/rollback steps are in
+[`HISTORIAN_VALIDATION_ROLLOUT.md`](../../docs/HISTORIAN_VALIDATION_ROLLOUT.md#off-request-evaluation-2026-09-05-human-deployment-required).
+The flag defaults to unset; neither a PR nor an Amplify deployment deploys this stack.

@@ -91,3 +91,18 @@ Two-lane final review: a Fable whole-branch review (verdict: ready to merge with
 - The patient-portal POSTs (session-create, save, transcript-flush) are unauthenticated by design and have no rate-limiting or CSRF protection — before real PHI: add rate-limiting to the unauthenticated writes, bind the flush token to more than sessionId (IP/origin), and enforce seq monotonicity. Track these on the existing security-audit ledger for OPSAmplehtml; they gate real-patient use, not this merge.
 
 **Follow-on task tracker:** #8 (restore OpenAI quota → re-run P6 live gate). The security follow-ons above should be added to the OPSAmplehtml security-audit ledger, not this sprint's scope.
+
+## Off-request evaluation (2026-09-05; human deployment required)
+- Measured on an 81-turn synthetic transcript: final differential 45.5 s, thoroughness 34.6 s, independent DDx 13 s.
+- Amplify SSR has a ~28–30 s request ceiling and freezes after response; awaiting or fire-and-forget cannot reliably finish this chain.
+- Queue mode awaits one pending DB marker; the minute dispatcher sends only `{ sessionId, enqueuedAt }` to SQS.
+- The worker loads the transcript from RDS, then runs differential → thoroughness → independent/agreement with 300/240/240 s budgets.
+- The existing insufficient-transcript generator stub is preserved; the worker records it as an explicit `error/insufficient` outcome.
+- HUMAN: from `infrastructure/triage-worker`, run `sam build && sam deploy`, review the change set, and confirm both new functions and queue.
+- HUMAN: then set Amplify `HISTORIAN_EVAL_MODE=queue` and redeploy; `next.config.ts` forwards this build-time env value into SSR.
+- Default is unset (inline chain); the existing `HISTORIAN_EVAL_AUTORUN=false` override still disables automatic evaluation.
+- Verify a synthetic save with `final_differential->>'status'`: pending → queued → ok/error within ~3 minutes at measured latency; queued may be too brief to observe.
+- That is an observation target, not an SLA: queue backlog/retries can take longer; inspect error classes and the DLQ after three transient failures.
+- Rollback: unset the Amplify env var and redeploy to restore the inline chain; already queued work still completes.
+- Missing column (42703) or unavailable RDS can prevent any marker from being stored; logged persistence failure is not a successful evaluation.
+- Deferred Findings: legacy evaluator log sanitization, other consumers' lifecycle typing/display, and dedicated queue alarms/recovery beyond this contract remain follow-ups.
