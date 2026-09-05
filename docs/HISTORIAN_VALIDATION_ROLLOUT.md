@@ -91,3 +91,7 @@ Two-lane final review: a Fable whole-branch review (verdict: ready to merge with
 - The patient-portal POSTs (session-create, save, transcript-flush) are unauthenticated by design and have no rate-limiting or CSRF protection — before real PHI: add rate-limiting to the unauthenticated writes, bind the flush token to more than sessionId (IP/origin), and enforce seq monotonicity. Track these on the existing security-audit ledger for OPSAmplehtml; they gate real-patient use, not this merge.
 
 **Follow-on task tracker:** #8 (restore OpenAI quota → re-run P6 live gate). The security follow-ons above should be added to the OPSAmplehtml security-audit ledger, not this sprint's scope.
+
+## Flags — attending review (server, A1)
+
+- `HISTORIAN_ATTENDING_ENABLED`: literal `true` enables, default off; `HISTORIAN_ATTENDING_INTERVAL`: positive integer, default/invalid fallback 2. Both are forwarded in `next.config.ts` for Amplify SSR. A2 supplies client consumption; this PR does not activate flags or change Amplify settings.

@@ -17,11 +17,16 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { invokeBedrockJSON } from '@/lib/bedrock'
+import { buildAttendingTranscriptWindow, getAttendingConfig, shouldRunAttending } from '@/lib/consult/attendingGaps'
+import { buildAttendingPrompt } from '@/lib/consult/attendingPrompt'
+import { sanitizeAttendingGaps } from '@/lib/consult/attendingSanitize'
 import { from } from '@/lib/db-query'
 import { getNeuroPlansPool } from '@/lib/db'
 import { retrievePlanEvidence } from '@/lib/consult/planEvidence'
 import { SYMPTOM_EXTRACTOR_PROMPT } from '@/lib/consult/symptomExtractorPrompt'
 import type {
+  AttendingMeta,
+  LocalizerPushPayload,
   LocalizerRequest,
   LocalizerResponse,
   ExtractedSymptoms,
@@ -34,6 +39,7 @@ import type {
 // ── Constants ─────────────────────────────────────────────────────────────────
 
 const LOCALIZER_TIMEOUT_MS = 15000
+const ATTENDING_TIMEOUT_MS = 8000
 const MAX_SUGGESTED_ACTIONS = 4
 const SUGGESTED_ACTION_FIELD_MAX_LEN = 200
 const MAX_EXCLUDED = 4
@@ -304,6 +310,58 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   let questions: GeneratedQuestions | null = null
   let degradedReason: string | undefined
 
+  let attendingGaps: string[] | undefined
+  let attendingMeta: AttendingMeta | undefined
+  const attendingConfig = getAttendingConfig()
+
+  async function runAttending(): Promise<void> {
+    // Preserve the old response shape and avoid inspecting new input when disabled.
+    if (!attendingConfig.enabled) return
+    const turns = body.fullTranscript ?? transcript
+    const gate = {
+      ...attendingConfig,
+      localizerCycle: body.localizerCycle,
+      transcriptTurnCount: Array.isArray(turns) ? turns.length : 0,
+      safetyEscalated: body.safetyEscalated === true,
+    }
+    if (!shouldRunAttending(gate)) {
+      attendingMeta = { ran: false, reason: gate.safetyEscalated ? 'safety'
+        : gate.transcriptTurnCount < 6 ? 'too_short' : 'interval' }
+      return
+    }
+    const started = Date.now()
+    const attendingSignal = AbortSignal.any([signal, AbortSignal.timeout(ATTENDING_TIMEOUT_MS)])
+    attendingMeta = { ran: true }
+    attendingGaps = []
+    try {
+      if (!Array.isArray(turns) || !turns.every(t => t &&
+        (t.role === 'user' || t.role === 'assistant') && typeof t.text === 'string')) {
+        throw new Error('Invalid attending transcript shape')
+      }
+      const { window, dropped_turns } = buildAttendingTranscriptWindow(turns)
+      attendingMeta.dropped_turns = dropped_turns
+      const prompt = buildAttendingPrompt({ transcriptWindow: window, chiefComplaint,
+        sessionType, referralText: referralReason })
+      // Same default Bedrock model as Step 3; no separate provider/model override.
+      const { parsed } = await invokeBedrockJSON<unknown>({
+        system: prompt.system,
+        messages: [{ role: 'user', content: prompt.user }],
+        maxTokens: 900,
+        temperature: 0.3,
+        signal: attendingSignal,
+      })
+      attendingSignal.throwIfAborted()
+      attendingGaps = sanitizeAttendingGaps(parsed).map(gap => gap.question)
+    } catch {
+      attendingMeta.reason = attendingSignal.aborted ? 'timeout' : 'error'
+      console.warn(attendingSignal.aborted
+        ? '[localizer] Step 4 (attending review) timeout'
+        : '[localizer] Step 4 (attending review) failed', { duration_ms: Date.now() - started })
+    } finally {
+      attendingMeta.duration_ms = Date.now() - started
+    }
+  }
+
   const transcriptText = buildTranscriptText(transcript)
 
   try {
@@ -359,32 +417,40 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       }
     }
 
-    // ── Step 3: Question + Differential Generation ─────────────────────────
-    if (symptoms) {
-      try {
-        const generatorInput = JSON.stringify({
-          sessionType,
-          chiefComplaint: chiefComplaint ?? null,
-          extractedSymptoms: symptoms,
-          guidelineContext: kbGeneratedText || '(No guideline context available — use clinical judgment)',
-          transcriptSummary: symptoms.clinicalSummary,
-        })
+    let step3Error: unknown
+    const [generated] = await Promise.all([
+      (async () => {
+        // ── Step 3: Question + Differential Generation ─────────────────────────
+        if (symptoms) {
+          try {
+            const generatorInput = JSON.stringify({
+              sessionType,
+              chiefComplaint: chiefComplaint ?? null,
+              extractedSymptoms: symptoms,
+              guidelineContext: kbGeneratedText || '(No guideline context available — use clinical judgment)',
+              transcriptSummary: symptoms.clinicalSummary,
+            })
 
-        const { parsed } = await invokeBedrockJSON<GeneratedQuestions>({
-          system: QUESTION_GENERATOR_PROMPT,
-          messages: [{ role: 'user', content: generatorInput }],
-          // Bumped from 600 to fit the added evidence_against + excluded fields.
-          maxTokens: 900,
-          temperature: 0.3,
-          signal,
-        })
-        questions = parsed
-      } catch (err) {
-        if (signal.aborted) throw err
-        console.error('[localizer] Step 3 (question generation) failed:', err)
-        degradedReason = degradedReason ?? 'Question generation failed'
-      }
-    }
+            const { parsed } = await invokeBedrockJSON<GeneratedQuestions>({
+              system: QUESTION_GENERATOR_PROMPT,
+              messages: [{ role: 'user', content: generatorInput }],
+              // Bumped from 600 to fit the added evidence_against + excluded fields.
+              maxTokens: 900,
+              temperature: 0.3,
+              signal,
+            })
+            return parsed
+          } catch (err) {
+            if (signal.aborted) throw err
+            console.error('[localizer] Step 3 (question generation) failed:', err)
+            degradedReason = degradedReason ?? 'Question generation failed'
+          }
+        }
+      })().catch(err => { step3Error = err }),
+      runAttending(),
+    ])
+    questions = generated ?? null
+    if (step3Error) throw step3Error
   } catch (err) {
     // Timeout or unrecoverable error — return whatever we have
     const isTimeout = signal.aborted
@@ -435,7 +501,9 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   // ── push_payload: Phase 5 of 2026-05-27 historian upgrade ─────────────────
   // Lightweight summary the client re-serializes into session.update
   // instructions every 3 turns. Additive field — older clients ignore it.
-  const pushPayload = {
+  const pushPayload: LocalizerPushPayload = {
+    ...(attendingGaps !== undefined ? { attending_gaps: attendingGaps } : {}),
+    ...(attendingMeta ? { attending_meta: attendingMeta } : {}),
     top_differentials: (questions?.differential ?? [])
       .slice(0, 3)
       .map((d: any) => `${d.diagnosis ?? d.name ?? 'unknown'} (${d.confidence ?? 'medium'})`),
@@ -445,6 +513,8 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
 
   return NextResponse.json({
     ...response,
+    ...(attendingGaps !== undefined ? { attending_gaps: attendingGaps } : {}),
+    ...(attendingMeta ? { attending_meta: attendingMeta } : {}),
     push_payload: pushPayload,
   })
 }

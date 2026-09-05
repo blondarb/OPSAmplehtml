@@ -1094,3 +1094,34 @@ Gratitude excludes the final Henry turn; repeated three-word openers exclude the
 Lexical heuristics do not establish clinical quality; existing deterministic gates remain authoritative.
 Audit a saved synthetic array of `{role,text}` turns or `{transcript: [...]}` with `npm run historian:audit -- path.json` (exit 1 on style FAIL).
 The synthetic driver's end-of-run summary also reports style without changing its success criteria; live before/after evaluation belongs to the driver.
+
+### 2026-09-05 attending review (server)
+
+Step 4 silently reviews the supplied whole interview for up to three high-yield,
+not-yet-asked questions, including time course, red flags, medication details, and
+family history. It runs alongside Step 3 using the same Bedrock helper/model and
+an 8-second budget bounded by the existing 15-second route deadline. Failure
+returns no gaps and preserves Step 3 results. No model/transcript text is logged
+by Step 4.
+
+`HISTORIAN_ATTENDING_ENABLED=true` enables it (default off).
+`HISTORIAN_ATTENDING_INTERVAL` is a positive integer (default 2; invalid values
+fall back to 2). Safety-escalated interviews and fewer than six transcript turns
+skip review. With `localizerCycle`, every Nth cycle runs; old clients fall back to
+transcript turn count divisible by N × 2. `fullTranscript` is optional and falls
+back to the existing recent transcript. A contiguous suffix of whole turns is
+kept within 60,000 characters including speaker labels/newlines; older turns are
+dropped and counted. An oversized newest turn produces an empty window.
+
+Optional `attending_gaps` contains sanitized patient-facing question strings
+(maximum three, 160 characters each); `attending_meta` records only run status,
+duration, dropped-turn count, and skip/failure reason. Both appear at response
+level and in `push_payload` when applicable; flag-off responses omit both to
+preserve the existing wire shape. Diagnosis names are screened using the existing
+evaluator lexicon plus conservative supplemental terms; migraine names are also
+blocked. This finite lexicon cannot guarantee all medical jargon is removed.
+Referral facts do not count as questions asked, and topics directly asked in the
+supplied window are not gaps. Truncation can hide previously asked questions.
+
+A2 will consume the optional payload in the client; A1 makes no client changes.
+These are synthetic software checks, not clinical validation or activation.
