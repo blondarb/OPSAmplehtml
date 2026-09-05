@@ -44,7 +44,8 @@ export default function ResultsPage() {
     if (!user) return
     async function fetchResults() {
       try {
-        const res = await fetch('/api/triage/validate/results')
+        const study = new URLSearchParams(window.location.search).get('study') || 'default'
+        const res = await fetch(`/api/triage/validate/results?study=${encodeURIComponent(study)}`)
         if (!res.ok) {
           const data = await res.json().catch(() => ({}))
           throw new Error(data.error || 'Failed to fetch results')

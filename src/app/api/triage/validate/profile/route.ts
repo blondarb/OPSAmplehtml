@@ -1,14 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getUser } from '@/lib/cognito/server'
+import { authorizeClinicalAccess, clinicalAccessDeniedMessage } from '@/lib/auth/clinicalAccess'
 import { from } from '@/lib/db-query'
 
 // GET /api/triage/validate/profile — check if current user has a profile
 export async function GET() {
 
-  const user = await getUser()
-  if (!user) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  }
+  const access = await authorizeClinicalAccess({ action: 'triage.validate', allowedRoles: ['clinician', 'admin'] })
+  if (!access.ok) return NextResponse.json({ error: clinicalAccessDeniedMessage(access.reason) }, { status: access.status })
+  const user = { id: access.context.userId }
 
   const { data: profile } = await from('user_profiles')
     .select('*')
@@ -21,13 +20,12 @@ export async function GET() {
 // POST /api/triage/validate/profile — create or update profile
 export async function POST(req: NextRequest) {
 
-  const user = await getUser()
-  if (!user) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  }
+  const access = await authorizeClinicalAccess({ action: 'triage.validate', allowedRoles: ['clinician', 'admin'] })
+  if (!access.ok) return NextResponse.json({ error: clinicalAccessDeniedMessage(access.reason) }, { status: access.status })
+  const user = { id: access.context.userId }
 
   const body = await req.json()
-  const { display_name, role, organization, specialty } = body
+  const { display_name, organization, specialty } = body
 
   if (!display_name || !display_name.trim()) {
     return NextResponse.json(
@@ -36,8 +34,7 @@ export async function POST(req: NextRequest) {
     )
   }
 
-  const validRoles = ['admin', 'clinician', 'investor', 'partner', 'demo']
-  const safeRole = validRoles.includes(role) ? role : 'clinician'
+  const safeRole = access.context.role
 
   const { data, error } = await from('user_profiles')
     .upsert({
@@ -54,7 +51,7 @@ export async function POST(req: NextRequest) {
     .single()
 
   if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 })
+    return NextResponse.json({ error: 'Unable to save reviewer profile' }, { status: 500 })
   }
 
   return NextResponse.json({ profile: data })

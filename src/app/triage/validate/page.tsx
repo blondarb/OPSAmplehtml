@@ -29,6 +29,7 @@ export default function ValidationPage() {
   const [completedCount, setCompletedCount] = useState(0)
   const [selectedCase, setSelectedCase] = useState<ValidationCaseWithStatus | null>(null)
   const [submitting, setSubmitting] = useState(false)
+  const [studyError, setStudyError] = useState('')
   const [submitMessage, setSubmitMessage] = useState('')
 
   // Form state
@@ -112,13 +113,15 @@ export default function ValidationPage() {
 
   const fetchCases = useCallback(async () => {
     try {
-      const res = await fetch('/api/triage/validate/cases')
-      if (!res.ok) throw new Error('Failed to fetch cases')
+      const study = new URLSearchParams(window.location.search).get('study') || 'default'
+      const res = await fetch(`/api/triage/validate/cases?study=${encodeURIComponent(study)}`)
       const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Unable to load this study')
+      setStudyError('')
       setCases(data.cases || [])
       setCompletedCount(data.completed || 0)
-    } catch {
-      // silently fail — empty state shown
+    } catch (error) {
+      setStudyError(error instanceof Error ? error.message : 'Unable to load this study')
     } finally {
       setLoading(false)
     }
@@ -172,7 +175,7 @@ export default function ValidationPage() {
       : null
 
     try {
-      const res = await fetch('/api/triage/validate/reviews', {
+      const res = await fetch(`/api/triage/validate/reviews?study=${encodeURIComponent(selectedCase.study_name)}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -400,10 +403,12 @@ export default function ValidationPage() {
             <p style={{ color: '#94a3b8', fontSize: '0.85rem', lineHeight: 1.6, margin: 0 }}>
               Review each clinical referral note independently. For each case, select the triage tier you believe
               is most appropriate, along with the recommended subspecialty and the clinical factors that influenced
-              your decision. Your responses are blinded — you cannot see other reviewers&apos; answers until all
-              reviews are complete.
+              your decision. Your submitted rating is locked. AI answers and other reviewers&apos; answers remain hidden
+              until the study is formally unblinded.
             </p>
           </div>
+
+          {studyError && <p role="alert">{studyError}</p>}
 
           {/* Progress Bar */}
           <div style={{
@@ -950,7 +955,7 @@ export default function ValidationPage() {
                       </div>
                       <button
                         onClick={handleSubmitReview}
-                        disabled={!selectedTier || submitting}
+                        disabled={!selectedTier || submitting || selectedCase.reviewed}
                         style={{
                           padding: '10px 28px',
                           background: !selectedTier ? '#334155' : '#8B5CF6',
@@ -963,7 +968,7 @@ export default function ValidationPage() {
                           opacity: submitting ? 0.7 : 1,
                         }}
                       >
-                        {submitting ? 'Saving...' : selectedCase.reviewed ? 'Update Review' : 'Submit Review'}
+                        {submitting ? 'Saving...' : selectedCase.reviewed ? 'Review locked' : 'Submit Review'}
                       </button>
                     </div>
                   </div>

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getUser } from '@/lib/cognito/server'
+import { authorizeValidationStudy } from '@/lib/triage/validationAccess'
 import { TriageTier } from '@/lib/triage/types'
 import { from } from '@/lib/db-query'
 
@@ -180,12 +180,9 @@ function consensusTier(tiers: TriageTier[]): TriageTier | null {
 // GET /api/triage/validate/results
 export async function GET(req: NextRequest) {
 
-  const user = await getUser()
-  if (!user) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  }
-
   const studyName = req.nextUrl.searchParams.get('study') || 'default'
+  const access = await authorizeValidationStudy(studyName, 'results')
+  if (!access.ok) return access.response
 
   // Fetch all non-calibration active cases
   const { data: cases, error: casesError } = await from('validation_cases')

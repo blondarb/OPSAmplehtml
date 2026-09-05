@@ -5,6 +5,7 @@ import { getTenantServer } from '@/lib/tenant'
 export type ClinicalRole = 'clinician' | 'scheduler' | 'admin' | 'viewer'
 
 export type ClinicalAction =
+  | 'triage.validate'
   | 'triage.create'
   | 'triage.read'
   | 'triage.link_patient'
