@@ -28,6 +28,9 @@ export interface ValidationReview {
   case_id: string
   reviewer_id: string
   triage_tier: TriageTier
+  comfortable_with_wait?: 'yes' | 'no' | 'uncertain' | null
+  reviewer_kind?: string
+  label_context?: string
   subspecialty: string | null
   redirect_to_non_neuro: boolean
   redirect_specialty: string | null

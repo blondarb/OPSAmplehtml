@@ -23,7 +23,7 @@ function result(
     schedulingLocked: true,
     signals: [],
     lexicalHits: [],
-    version: 'neurology-emergency-gateway-v1',
+    version: 'neurology-emergency-gateway-v4',
     ...overrides,
   }
 }
@@ -128,7 +128,7 @@ describe('persistEmergencyGatewayResult', () => {
         'tenant-1',
         result({
           carePathway: 'routine_outpatient',
-          version: 'neurology-emergency-gateway-v3',
+          version: 'neurology-emergency-gateway-v4',
         }),
         1,
       ),

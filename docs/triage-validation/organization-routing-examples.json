@@ -1,0 +1,43 @@
+{
+  "artifact": "SYNTHETIC ORGANIZATION ROUTING EXAMPLES — NOT LIVE CONFIGURATION",
+  "scope": "Source-only examples for preferred clinical destination versus available local service. IDs are synthetic and contain no patient, organization, provider, or contact data.",
+  "examples": [
+    {
+      "name": "tertiary-many-exact-match",
+      "tenantId": "tenant-synthetic-tertiary",
+      "configVersion": "synthetic-tertiary-v1",
+      "preferredClinicalDestination": "Epilepsy",
+      "availableServiceCapabilities": ["General Neurology", "Epilepsy", "Movement Disorders", "Stroke"],
+      "expectedDisposition": "local_service_available",
+      "expectedServiceId": "service-epilepsy-synthetic"
+    },
+    {
+      "name": "general-few-no-equivalence",
+      "tenantId": "tenant-synthetic-general",
+      "configVersion": "synthetic-general-v1",
+      "preferredClinicalDestination": "Epilepsy",
+      "availableServiceCapabilities": ["General Neurology"],
+      "expectedDisposition": "external_escalation_required",
+      "expectedExternalEscalationContactId": "contact-external-synthetic-general",
+      "rule": "General Neurology is not equivalent to Epilepsy."
+    },
+    {
+      "name": "unavailable-service-no-external-contact",
+      "tenantId": "tenant-synthetic-unavailable",
+      "configVersion": "synthetic-unavailable-v1",
+      "preferredClinicalDestination": "Neuromuscular",
+      "availableServiceCapabilities": ["General Neurology"],
+      "expectedDisposition": "clinician_review_required",
+      "rule": "Missing external escalation configuration fails closed to clinician review."
+    },
+    {
+      "name": "human-override-provenance",
+      "tenantId": "tenant-synthetic-tertiary",
+      "configVersion": "synthetic-tertiary-v1",
+      "actorId": "clinician-synthetic-1",
+      "reasonCode": "service_capacity_reviewed",
+      "expectedProvenance": ["configuration_applied", "human_override"],
+      "invariant": "Care pathway, urgency, and scheduling lock are preserved; only the destination changes."
+    }
+  ]
+}

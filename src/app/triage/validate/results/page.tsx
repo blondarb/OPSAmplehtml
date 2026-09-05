@@ -1,8 +1,8 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { Suspense, useState, useEffect } from 'react'
 import { useAuth } from '@/contexts/AuthContext'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import PlatformShell from '@/components/layout/PlatformShell'
 import FeatureSubHeader from '@/components/layout/FeatureSubHeader'
 import { BarChart3, AlertCircle, Users, CheckCircle2, ArrowRight, ArrowUpRight, RefreshCw, Check } from 'lucide-react'
@@ -26,25 +26,33 @@ function formatPct(n: number): string {
   return `${Math.round(n * 100)}%`
 }
 
-export default function ResultsPage() {
+type ResultsResponse = ValidationResults & {
+  phase?: 'draft' | 'labeling' | 'unblinded' | 'archived'
+  study_kind?: 'independent' | 'legacy_archive'
+}
+
+function ResultsPageContent() {
   const { user, loading: authLoading } = useAuth()
   const router = useRouter()
+  const searchParams = useSearchParams()
+  const study = searchParams.get('study') || 'default'
+  const studyQuery = `?study=${encodeURIComponent(study)}`
 
-  const [results, setResults] = useState<ValidationResults | null>(null)
+  const [results, setResults] = useState<ResultsResponse | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
 
   useEffect(() => {
     if (!authLoading && !user) {
-      router.push('/login?redirect=/triage/validate/results')
+      router.push(`/login?redirect=${encodeURIComponent(`/triage/validate/results${studyQuery}`)}`)
     }
-  }, [user, authLoading, router])
+  }, [user, authLoading, router, studyQuery])
 
   useEffect(() => {
     if (!user) return
     async function fetchResults() {
       try {
-        const res = await fetch('/api/triage/validate/results')
+        const res = await fetch(`/api/triage/validate/results?study=${encodeURIComponent(study)}`)
         if (!res.ok) {
           const data = await res.json().catch(() => ({}))
           throw new Error(data.error || 'Failed to fetch results')
@@ -57,12 +65,12 @@ export default function ResultsPage() {
       }
     }
     fetchResults()
-  }, [user])
+  }, [study, user])
 
   if (authLoading || loading) {
     return (
       <PlatformShell>
-        <FeatureSubHeader title="Validation Results" icon={BarChart3} accentColor="#8B5CF6" homeLink="/triage/validate" />
+        <FeatureSubHeader title="Validation Results" icon={BarChart3} accentColor="#8B5CF6" homeLink={`/triage/validate${studyQuery}`} />
         <div style={{ minHeight: '100vh', background: 'linear-gradient(135deg, #0f172a 0%, #1e293b 100%)', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
           <p style={{ color: '#94a3b8' }}>Loading results...</p>
         </div>
@@ -76,7 +84,7 @@ export default function ResultsPage() {
         title="Validation Results"
         icon={BarChart3}
         accentColor="#8B5CF6"
-        homeLink="/triage/validate"
+        homeLink={`/triage/validate${studyQuery}`}
       />
       <div style={{
         minHeight: '100vh',
@@ -89,7 +97,7 @@ export default function ResultsPage() {
             Inter-Rater Reliability Results
           </h1>
           <p style={{ color: '#94a3b8', fontSize: '0.85rem', margin: '0 0 24px' }}>
-            Statistical analysis of reviewer agreement on triage tier assignments, including comparison with the AI algorithm.
+            Results are available only after the study is formally unblinded.
           </p>
 
           {error && (
@@ -103,7 +111,7 @@ export default function ResultsPage() {
               <AlertCircle size={40} color="#64748b" style={{ marginBottom: '12px' }} />
               <p style={{ color: '#94a3b8', fontSize: '0.9rem', margin: '0 0 16px' }}>{error}</p>
               <Link
-                href="/triage/validate"
+                href={`/triage/validate${studyQuery}`}
                 style={{
                   padding: '8px 20px',
                   background: '#8B5CF6',
@@ -119,8 +127,23 @@ export default function ResultsPage() {
             </div>
           )}
 
-          {results && (
+          {results?.study_kind === 'legacy_archive' && (
+            <section role="note" style={{ background: 'rgba(120, 53, 15, 0.18)', border: '1px solid #a16207', borderRadius: '12px', padding: '16px', marginBottom: '20px' }}>
+              <strong style={{ color: '#fde68a' }}>Historical archive</strong>
+              <p style={{ color: '#fde68a', margin: '8px 0 0' }}>Historical labels are read-only and are not independent validation evidence.</p>
+            </section>
+          )}
+
+          {results && results.phase !== 'unblinded' && results.study_kind !== 'legacy_archive' ? (
+            <section style={{ background: 'rgba(30, 41, 59, 0.8)', border: '1px solid #334155', borderRadius: '12px', padding: '28px' }}>
+              <h2 style={{ color: '#e2e8f0', marginTop: 0 }}>Blinded study results</h2>
+              <p style={{ color: '#cbd5e1', marginBottom: 0 }}>Aggregate metrics, reviewer comparisons, AI output, and algorithm critique remain hidden until the server marks this study unblinded.</p>
+            </section>
+          ) : results && (
             <>
+              <section role="note" style={{ color: '#fde68a', border: '1px solid #a16207', borderRadius: 12, padding: 16, marginBottom: 20 }}>
+                This dashboard contains exploratory legacy statistics and case snapshots. New evaluation receipts are retrieved separately by exact configuration revision. Do not use these agreement scores as a release gate: insufficient-data handling and statistical denominators still require review.
+              </section>
               {/* Summary Cards */}
               {results.insufficient_reviewers ? (
                 <div style={{
@@ -990,4 +1013,8 @@ export default function ResultsPage() {
       </div>
     </PlatformShell>
   )
+}
+
+export default function ResultsPage() {
+  return <Suspense fallback={<main>Loading study results…</main>}><ResultsPageContent /></Suspense>
 }

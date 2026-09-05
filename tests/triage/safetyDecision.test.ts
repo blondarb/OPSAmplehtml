@@ -25,7 +25,7 @@ function gateway(
     schedulingLocked: true,
     signals: [],
     lexicalHits: [],
-    version: 'neurology-emergency-gateway-v1',
+    version: 'neurology-emergency-gateway-v4',
     ...overrides,
   }
 }

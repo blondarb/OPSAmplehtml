@@ -1,0 +1,11 @@
+import { describe, expect, it, vi } from 'vitest'
+import { prepareSyntheticTranslation, validateTranslationPreview } from '@/lib/triage/translationPreview'
+const source = {tenantId:'synthetic-a',sourceId:'fixture-1',declaredLanguage:'es',text:'No debilidad hoy. Dolor desde hace 2 días.'}
+const output = {detectedLanguage:'es',uncertainties:[],segments:[{start:0,end:source.text.length,original:source.text,translated:'No weakness today. Pain for 2 days.'}]}
+describe('review-only translation',()=>{
+ it('retains source, aligned translation and mandatory review even for valid synthetic Spanish',()=>{const r=validateTranslationPreview(source,output,'mock');expect(r.status).toBe('review_required');expect(r.authoritativeForTriage).toBe(false);expect(r.segments[0].original).toBe(source.text)})
+ it('holds omitted or changed source and invalid offsets',()=>{for(const patch of [{original:'debilidad hoy'},{end:source.text.length-1},{start:1}]) expect(validateTranslationPreview(source,{...output,segments:[{...output.segments[0],...patch}]},'mock').status).toBe('held')})
+ it('flags numeral and language conflicts without claiming translation accuracy',()=>{const r=validateTranslationPreview(source,{...output,detectedLanguage:'mul',segments:[{...output.segments[0],translated:'No weakness. Pain for twenty days.'}]},'mock');expect(r.warnings.join(' ')).toContain('Numeral');expect(r.warnings.join(' ')).toContain('conflicting')})
+ it('never invokes a provider when disabled, unsupported, or cross-tenant',async()=>{const invoke=vi.fn();for(const policy of [{enabled:false,tenantId:'synthetic-a',allowedLanguages:['es']},{enabled:true,tenantId:'synthetic-b',allowedLanguages:['es']},{enabled:true,tenantId:'synthetic-a',allowedLanguages:['fr']}]) await expect(prepareSyntheticTranslation(source,{...policy,synthetic:true},invoke)).rejects.toThrow();expect(invoke).not.toHaveBeenCalled()})
+ it('preserves original authority on provider failure',async()=>{const r=await prepareSyntheticTranslation(source,{enabled:true,tenantId:'synthetic-a',allowedLanguages:['es'],synthetic:true},vi.fn().mockRejectedValue(new Error('private')));expect(r.status).toBe('held');expect(JSON.stringify(r)).not.toContain('private');expect(r.authoritativeForTriage).toBe(false)})
+})
