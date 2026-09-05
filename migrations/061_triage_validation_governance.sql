@@ -28,6 +28,10 @@ ALTER TABLE validation_reviews ADD COLUMN comfortable_with_wait text CHECK (comf
 ALTER TABLE validation_reviews ADD COLUMN reviewer_kind text NOT NULL DEFAULT 'unknown';
 ALTER TABLE validation_reviews ADD COLUMN observed_source_sha256 text;
 ALTER TABLE validation_reviews ADD COLUMN label_context text NOT NULL DEFAULT 'legacy_unknown';
+-- The hosted legacy table has no case/reviewer unique constraint. Preserve any
+-- historical duplicates, but enforce one original for each NEW independent label.
+CREATE UNIQUE INDEX triage_independent_review_once ON validation_reviews(case_id,reviewer_id)
+ WHERE label_context='independent_blinded';
 
 CREATE FUNCTION validate_triage_study_registration() RETURNS trigger LANGUAGE plpgsql AS $$
 DECLARE cases_n integer; reviews_n integer; runs_n integer;

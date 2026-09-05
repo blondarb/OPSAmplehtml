@@ -1,7 +1,7 @@
 -- Synthetic-only fixture for an EMPTY disposable PostgreSQL database.
 \set ON_ERROR_STOP on
 CREATE TABLE validation_cases (id uuid PRIMARY KEY DEFAULT gen_random_uuid(),study_name text NOT NULL,referral_text text NOT NULL,patient_age integer,patient_sex text,active boolean NOT NULL DEFAULT true,created_at timestamptz NOT NULL DEFAULT now());
-CREATE TABLE validation_reviews(id uuid PRIMARY KEY DEFAULT gen_random_uuid(),case_id uuid REFERENCES validation_cases(id),reviewer_id text NOT NULL,created_at timestamptz NOT NULL DEFAULT now(),UNIQUE(case_id,reviewer_id));
+CREATE TABLE validation_reviews(id uuid PRIMARY KEY DEFAULT gen_random_uuid(),case_id uuid REFERENCES validation_cases(id),reviewer_id text NOT NULL,created_at timestamptz NOT NULL DEFAULT now());
 CREATE TABLE validation_ai_runs(id uuid PRIMARY KEY DEFAULT gen_random_uuid(),case_id uuid REFERENCES validation_cases(id),ai_triage_tier text,created_at timestamptz NOT NULL DEFAULT now());
 INSERT INTO validation_cases(id,study_name,referral_text) VALUES('00000000-0000-0000-0000-000000000001','legacy','SYNTHETIC ORIGINAL');
 INSERT INTO validation_reviews(case_id,reviewer_id) VALUES('00000000-0000-0000-0000-000000000001','old-identity');
@@ -29,6 +29,11 @@ SELECT expect_locked($q$UPDATE validation_cases SET active=false WHERE study_nam
 INSERT INTO validation_reviews(case_id,reviewer_id,comfortable_with_wait) VALUES('00000000-0000-0000-0000-000000000002','physician-a','yes'),('00000000-0000-0000-0000-000000000002','nurse','no');
 SELECT expect_locked($q$UPDATE triage_validation_studies SET phase='unblinded' WHERE study_name='study-a'$q$);
 INSERT INTO validation_reviews(case_id,reviewer_id,comfortable_with_wait) VALUES('00000000-0000-0000-0000-000000000002','physician-b','uncertain');
+DO $$ BEGIN
+ BEGIN INSERT INTO validation_reviews(case_id,reviewer_id,comfortable_with_wait) VALUES('00000000-0000-0000-0000-000000000002','physician-a','yes');
+ EXCEPTION WHEN unique_violation THEN RETURN; END;
+ RAISE EXCEPTION 'Duplicate independent label accepted';
+END $$;
 UPDATE triage_validation_studies SET phase='unblinded' WHERE study_name='study-a';
 SELECT expect_locked($q$UPDATE validation_reviews SET comfortable_with_wait='yes' WHERE reviewer_id='nurse'$q$);
 SELECT expect_locked($q$UPDATE triage_validation_studies SET phase='labeling' WHERE study_name='study-a'$q$);
