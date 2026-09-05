@@ -1,3 +1,39 @@
+# RESUME NOTICE + SCOPE AMENDMENT (2026-09-05 11:45 MDT)
+
+You already completed the contract below: commit `3f2edf4` on `fix/rnd-historian-final-ddx-display`,
+PR #199 is open against main. Do NOT re-verify the world from scratch. Start with
+`git status && git log --oneline origin/main..HEAD` and trust that work.
+
+A product decision has now been made that changes ONE rule in the contract:
+**When BOTH `localizer_differential` and `final_differential` exist, DISPLAY BOTH. Localizer-wins is
+withdrawn.** Apply exactly this amendment and nothing else:
+
+1. `HistorianRunsView.tsx`: make the helper return every available source in order — localizer
+   first, then final — e.g. `resolveDifferentials(run): Array<{ source: 'localizer' | 'final';
+   label: string; entries: DifferentialEntry[]; summary?: string }>`. Rename or replace the
+   singular helper; leave no dead code. `RunDetailDrawer` renders one Section per returned source,
+   each with its source tag ("Live localizer" / "Post-interview eval"). The localizer-only extras
+   (localization hypothesis, follow-ups, KB sources) stay under the localizer section; the summary
+   paragraph and `INVESTIGATIONAL_BANNER` stay under the final section. When only one source exists
+   the drawer looks exactly as it does now.
+2. Runs-table DDx count: use the final-differential count when present (it sees the full
+   transcript), otherwise the localizer count. `with_differential` in the runs API is already
+   OR-based — leave it.
+3. `tests/historian/runsViewDifferential.test.tsx`: the "both set" case now asserts the drawer
+   markup contains BOTH "Live localizer" AND "Post-interview eval" and a diagnosis from each source.
+   Keep the other cases.
+4. `docs/external-agent-prompts/2026-09-05-final-ddx-display.md`: append this RESUME NOTICE
+   verbatim at the top (the verbatim-copy rule still applies).
+5. PR #199 body (`gh pr edit 199 --body-file …`): replace the localizer-wins / open-decision
+   paragraph with "Both differentials are displayed when both exist (product decision 2026-09-05)."
+6. Gates once each (`npx tsc --noEmit`, `npx vitest run --exclude "tests/simulated-patients/**"`,
+   `npx next build`), quote tails in your report, commit with a conventional message, push to the
+   same branch (PR #199 updates itself). Do NOT open a new PR, do NOT merge.
+When this list is complete, STOP. Everything below is the original contract, kept for context; its
+scope fence and budget still apply.
+
+---
+
 # Contract: show the post-interview final differential on /rnd/historian runs view + non-PHI session label
 
 Repo: blondarb/OPSAmplehtml (Next.js, TypeScript, vitest). You are in an isolated worktree off origin/main on branch `fix/rnd-historian-final-ddx-display`.

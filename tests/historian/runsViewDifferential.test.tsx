@@ -1,10 +1,10 @@
 import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it } from 'vitest'
-import { patientLabel, resolveDifferential, RunDetailDrawer } from '@/components/historian/HistorianRunsView'
+import { patientLabel, resolveDifferentials, RunDetailDrawer } from '@/components/historian/HistorianRunsView'
 import { INVESTIGATIONAL_BANNER } from '@/lib/historian/eval/constants'
 import type { FinalDifferential } from '@/lib/historian/eval/finalDifferential'
 
-type RunRow = Parameters<typeof resolveDifferential>[0]
+type RunRow = Parameters<typeof resolveDifferentials>[0]
 
 const finalDifferential: FinalDifferential = {
   differential: (['High', 'Moderate', 'Low'] as const).map((likelihood, i) => ({
@@ -57,8 +57,9 @@ const render = (run: RunRow) => renderToStaticMarkup(<RunDetailDrawer run={run} 
 describe('runs view differential', () => {
   it('renders the final differential, mapped likelihoods, summary and investigational label', () => {
     const run = makeRun({ final_differential: finalDifferential })
-    expect(resolveDifferential(run)).toEqual({
+    expect(resolveDifferentials(run)).toEqual([{
       source: 'final',
+      label: 'Post-interview eval',
       summary: finalDifferential.summary,
       entries: finalDifferential.differential.map((item, i) => ({
         diagnosis: item.diagnosis,
@@ -66,7 +67,7 @@ describe('runs view differential', () => {
         rationale: item.rationale,
         likelihood: ['high', 'medium', 'low'][i],
       })),
-    })
+    }])
     const markup = render(run)
     for (const item of finalDifferential.differential) {
       expect(markup).toContain(item.diagnosis)
@@ -78,7 +79,7 @@ describe('runs view differential', () => {
     expect(markup).toContain('text-amber-300')
   })
 
-  it('prefers localizer when both exist and preserves localizer extras', () => {
+  it('renders both sources in order and preserves localizer extras', () => {
     const localizer = [{ diagnosis: 'Synthetic localizer diagnosis', confidence: 'high' as const }]
     const run = makeRun({
       final_differential: finalDifferential,
@@ -87,14 +88,17 @@ describe('runs view differential', () => {
       localizer_questions: ['Synthetic follow-up'],
       localizer_kb_sources: ['Synthetic evidence'],
     })
-    expect(resolveDifferential(run)).toEqual({ entries: localizer, source: 'localizer' })
+    expect(resolveDifferentials(run).map(({ source }) => source)).toEqual(['localizer', 'final'])
+    expect(resolveDifferentials(run)[0]).toEqual({ entries: localizer, source: 'localizer', label: 'Live localizer' })
     const markup = render(run)
     for (const text of ['Live localizer', 'Synthetic localizer diagnosis', 'Synthetic localization', 'Synthetic follow-up', 'Synthetic evidence']) {
       expect(markup).toContain(text)
     }
-    expect(markup).not.toContain('Post-interview eval')
-    expect(markup).not.toContain(finalDifferential.summary)
-    expect(markup).not.toContain(INVESTIGATIONAL_BANNER)
+    expect(markup).toContain('Post-interview eval')
+    expect(markup).toContain(finalDifferential.differential[0].diagnosis)
+    expect(markup).toContain(finalDifferential.summary)
+    expect(markup).toContain(INVESTIGATIONAL_BANNER)
+    expect(markup.indexOf('Live localizer')).toBeLessThan(markup.indexOf('Post-interview eval'))
   })
 
   it('hides localizer extras when the source is final and omits an empty summary', () => {
@@ -111,7 +115,7 @@ describe('runs view differential', () => {
 
   it.each([undefined, null, { ...finalDifferential, differential: [] }])('hides the section without entries (%s)', (final) => {
     const run = makeRun({ final_differential: final })
-    expect(resolveDifferential(run)).toEqual({ entries: [], source: null })
+    expect(resolveDifferentials(run)).toEqual([])
     expect(render(run)).not.toContain('Differential Diagnosis')
   })
 })

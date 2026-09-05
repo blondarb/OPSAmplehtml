@@ -39,17 +39,21 @@ interface RunRow extends HistorianSession {
   localizer_run_count?: number | null
 }
 
-export function resolveDifferential(run: RunRow): {
+interface ResolvedDifferential {
   entries: DifferentialEntry[]
-  source: 'localizer' | 'final' | null
+  source: 'localizer' | 'final'
+  label: string
   summary?: string
-} {
+}
+
+export function resolveDifferentials(run: RunRow): ResolvedDifferential[] {
+  const sources: ResolvedDifferential[] = []
   if (Array.isArray(run.localizer_differential) && run.localizer_differential.length > 0) {
-    return { entries: run.localizer_differential, source: 'localizer' }
+    sources.push({ entries: run.localizer_differential, source: 'localizer', label: 'Live localizer' })
   }
   const final = run.final_differential
   if (Array.isArray(final?.differential) && final.differential.length > 0) {
-    return {
+    sources.push({
       entries: final.differential.map((item) => ({
         diagnosis: item.diagnosis,
         icd10: item.icd10,
@@ -57,10 +61,11 @@ export function resolveDifferential(run: RunRow): {
         likelihood: item.likelihood === 'Moderate' ? 'medium' : item.likelihood === 'High' ? 'high' : 'low',
       })),
       source: 'final',
+      label: 'Post-interview eval',
       summary: final.summary,
-    }
+    })
   }
-  return { entries: [], source: null }
+  return sources
 }
 
 interface Metrics {
@@ -313,7 +318,8 @@ function RunsTable({ runs, onSelect }: { runs: RunRow[]; onSelect: (r: RunRow) =
         <tbody className="divide-y divide-slate-800 bg-slate-900/40">
           {runs.map((run) => {
             const rf = Array.isArray(run.red_flags) ? run.red_flags.length : 0
-            const ddx = resolveDifferential(run).entries.length
+            const sources = resolveDifferentials(run)
+            const ddx = (sources.find(({ source }) => source === 'final') ?? sources[0])?.entries.length ?? 0
             return (
               <tr
                 key={run.id}
@@ -379,7 +385,7 @@ function FieldList({
 export function RunDetailDrawer({ run, onClose }: { run: RunRow; onClose: () => void }) {
   const output = (run.structured_output || {}) as HistorianStructuredOutput
   const redFlags: HistorianRedFlag[] = Array.isArray(run.red_flags) ? run.red_flags : []
-  const { entries: ddx, source, summary } = resolveDifferential(run)
+  const differentials = resolveDifferentials(run)
   const transcript: HistorianTranscriptEntry[] = Array.isArray(run.transcript) ? run.transcript : []
   const kbSources: string[] = Array.isArray(run.localizer_kb_sources) ? run.localizer_kb_sources : []
   const followUps: string[] = Array.isArray(run.localizer_questions) ? run.localizer_questions : []
@@ -423,12 +429,12 @@ export function RunDetailDrawer({ run, onClose }: { run: RunRow; onClose: () => 
           </Section>
         )}
 
-        {ddx.length > 0 && (
-          <Section title={
+        {differentials.map(({ entries: ddx, source, label, summary }) => (
+          <Section key={source} title={
             <>
               Differential Diagnosis &amp; Reasoning
               <span className="ml-2 rounded bg-slate-800 px-2 py-0.5 text-[10px] font-medium normal-case tracking-normal text-slate-400">
-                {source === 'localizer' ? 'Live localizer' : 'Post-interview eval'}
+                {label}
               </span>
             </>
           }>
@@ -474,7 +480,7 @@ export function RunDetailDrawer({ run, onClose }: { run: RunRow; onClose: () => 
               <p className="mt-2 text-xs text-slate-500">Evidence: {kbSources.join(', ')}</p>
             )}
           </Section>
-        )}
+        ))}
 
         {run.narrative_summary && (
           <Section title="Narrative Summary">
