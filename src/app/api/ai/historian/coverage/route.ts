@@ -3,6 +3,9 @@ import type { HistorianTranscriptEntry } from '@/lib/historianTypes'
 import { computeCoverageGaps } from '@/lib/historian/eval/coverageGate'
 
 export async function POST(req: Request): Promise<NextResponse> {
+  if (Number(req.headers.get('content-length')) > 200_000) {
+    return NextResponse.json({ error: 'Body exceeds 200000 characters' }, { status: 413 })
+  }
   let body: unknown
   try {
     const raw = await req.text()

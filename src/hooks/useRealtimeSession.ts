@@ -5,7 +5,7 @@ import type { HistorianTranscriptEntry, HistorianStructuredOutput, HistorianRedF
 import type { HistorianReferralInput } from '@/lib/historian/referralContext'
 import type { LocalizerResponse } from '@/lib/consult/localizer-types'
 import type { SaveScaleResponsesArgs } from '@/lib/consult/scales'
-import { decidePreclose, buildPrecloseNote } from '@/lib/historian/precloseGate'
+import { decidePreclose, buildPrecloseNote, orderPrecloseRejectActions, shouldPushLocalizer } from '@/lib/historian/precloseGate'
 import { detectRedFlags } from '@/lib/consult/red-flags/red-flag-detector'
 import type { DetectedFlag } from '@/lib/consult/red-flags/red-flag-types'
 import type { VoiceEvent, VoiceProvider } from '@/lib/voice/providerTypes'
@@ -109,8 +109,8 @@ interface UseRealtimeSessionResult {
   injectScaleAdministration: (instructionBlock: string) => void
   /**
    * Phase 5 of 2026-05-27 historian upgrade — push Localizer findings into
-   * the live session. Called by EmbeddedHistorian after each Localizer run
-   * completes. Non-fatal if push fails.
+   * the live session. Owned by runLocalizer. Non-fatal if push fails.
+   * @deprecated external use — the hook forwards each cycle internally.
    */
   pushLocalizerContext: (payload: {
     top_differentials?: string[]
@@ -389,6 +389,68 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
     }
   }, [])
 
+  /**
+   * Phase 5 of 2026-05-27 historian upgrade — Localizer push channel.
+   *
+   * Called after each Localizer pipeline run completes (every ~3 turns).
+   *
+   * OpenAI: re-serializes BASE_PROMPT + latest delta via
+   * provider.updateInstructions (session.update), OVERWRITING the
+   * instructions field so only the latest delta stays active — preserves the
+   * exact pre-refactor mechanism (no timeline pollution from accumulating
+   * role:"system" messages).
+   *
+   * Nova: has no instructions-overwrite primitive (a second SYSTEM block is
+   * rejected), so the delta is delivered as an advisory user-turn via
+   * injectSystemText, framed explicitly as private/physician-only context the
+   * model must not speak aloud or name to the patient.
+   *
+   * Non-fatal: if the push fails, the interview continues on the prior
+   * instructions. No retries.
+   */
+  const pushLocalizerContext = useCallback(
+    (pushPayload: {
+      top_differentials?: string[]
+      suggested_next_question?: string | null
+      suggested_scale_id?: string | null
+      turn_count?: number
+    }) => {
+      const provider = providerRef.current
+      if (!provider) return
+
+      try {
+        if (provider.updateInstructions) {
+          // OpenAI path — unchanged from before the provider-abstraction refactor.
+          if (!baseInstructionsRef.current) return
+          const delta = [
+            `[LATEST LOCALIZER PUSH${pushPayload.turn_count != null ? ` @ turn ${pushPayload.turn_count}` : ''}]`,
+            `- Top differentials: ${(pushPayload.top_differentials ?? []).join(', ') || '(none yet)'}`,
+            `- Suggested next question: ${pushPayload.suggested_next_question ?? '(none)'}`,
+            `- Suggested scale to consider: ${pushPayload.suggested_scale_id ?? '(none)'}`,
+          ].join('\n')
+          const updatedInstructions = baseInstructionsRef.current + '\n\n' + delta
+          provider.updateInstructions(updatedInstructions)
+        } else {
+          // Nova path — skip injection if AI is mid-speech to avoid
+          // interruption and accidental vocalization of internal context.
+          if (isAiSpeakingRef.current) return
+          const delta = [
+            `[INTERNAL SYSTEM NOTE — do NOT speak any part of this aloud. Do NOT say "I should ask" or narrate your reasoning. Do NOT name any diagnosis or condition to the patient. Use ONLY to silently guide which symptom to ask about next.]`,
+            `[Localizer update${pushPayload.turn_count != null ? ` @ turn ${pushPayload.turn_count}` : ''}]`,
+            `- Differentials (private): ${(pushPayload.top_differentials ?? []).join(', ') || '(none yet)'}`,
+            `- Suggested angle for next question (silent): ${pushPayload.suggested_next_question ?? '(none)'}`,
+            `- Scale to consider (do not name to patient): ${pushPayload.suggested_scale_id ?? '(none)'}`,
+          ].join('\n')
+          provider.injectSystemText(delta)
+        }
+      } catch (err) {
+        console.error('[useRealtimeSession] pushLocalizerContext failed:', err)
+        // Non-fatal — interview continues on previous instructions
+      }
+    },
+    [],
+  )
+
   // ── Localizer: fire async, inject guidance back into session ─────────
   const runLocalizer = useCallback(async () => {
     const localizerEnabled = options.enableLocalizer !== false // default true
@@ -427,14 +489,24 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
         return
       }
 
-      const data: LocalizerResponse = await res.json()
+      const data: LocalizerResponse & { push_payload?: Parameters<typeof pushLocalizerContext>[0] } = await res.json()
 
       // Update state for physician panel
       setLocalizerData(data)
       options.onLocalizerUpdate?.(data)
 
-      // 2026-09-05: pushLocalizerContext is the single channel for localizer guidance.
-      // The consumer forwards this cycle's payload there; do not inject it twice.
+      const pushPayload = data.push_payload
+      if (shouldPushLocalizer({
+        speaking: isAiSpeakingRef.current,
+        safetyEscalated: safetyEscalatedRef.current,
+        payloadEmpty: !pushPayload || !(
+          pushPayload.top_differentials?.some(value => value.trim()) ||
+          pushPayload.suggested_next_question?.trim() ||
+          pushPayload.suggested_scale_id?.trim()
+        ),
+      }) && pushPayload) {
+        pushLocalizerContext(pushPayload)
+      }
     } catch (err: any) {
       // Network/timeout errors must not interrupt the session
       console.warn('[localizer] run failed (session continues):', err?.message)
@@ -442,7 +514,7 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
       localizerInFlightRef.current = false
       setLocalizerLoading(false)
     }
-  }, [options])
+  }, [options, pushLocalizerContext])
 
   // ── Durable transcript flush (Task 1) ─────────────────────────────────
   // Best-effort POST of up to 50 not-yet-durable entries. Returns a Promise
@@ -536,8 +608,14 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
                 if (decision.action === 'reject') {
                   const askNext = decision.askNext
                   precloseRejectedRef.current = true
-                  provider?.sendToolResult(toolUseId, { success: false, reason: 'more_history_needed', ask_next: askNext })
-                  provider?.injectSystemText(buildPrecloseNote(askNext))
+                  // OpenAI needs guidance before its auto-response; Nova needs the note after the result as the forcing turn (mirroring the accept branch); confirm Nova on a live session.
+                  for (const action of orderPrecloseRejectActions(Boolean(provider?.updateInstructions))) {
+                    if (action === 'injectNote') {
+                      provider?.injectSystemText(buildPrecloseNote(askNext))
+                    } else {
+                      provider?.sendToolResult(toolUseId, { success: false, reason: 'more_history_needed', ask_next: askNext })
+                    }
+                  }
                   console.info('[preclose-gate] rejected once', unmatched.map((item: { id: string }) => item.id))
                   return
                 }
@@ -928,6 +1006,7 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
     setInterviewCompleted(false)
     interviewCompletedRef.current = false
     finalizingRef.current = false
+    precloseRejectedRef.current = false
     // Durable transcript flush (Task 1) — reset per session.
     serverSessionIdRef.current = null
     flushTokenRef.current = null
@@ -1046,68 +1125,6 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
     cleanup,
     handleVoiceEvent,
   ])
-
-  /**
-   * Phase 5 of 2026-05-27 historian upgrade — Localizer push channel.
-   *
-   * Called after each Localizer pipeline run completes (every ~3 turns).
-   *
-   * OpenAI: re-serializes BASE_PROMPT + latest delta via
-   * provider.updateInstructions (session.update), OVERWRITING the
-   * instructions field so only the latest delta stays active — preserves the
-   * exact pre-refactor mechanism (no timeline pollution from accumulating
-   * role:"system" messages).
-   *
-   * Nova: has no instructions-overwrite primitive (a second SYSTEM block is
-   * rejected), so the delta is delivered as an advisory user-turn via
-   * injectSystemText, framed explicitly as private/physician-only context the
-   * model must not speak aloud or name to the patient.
-   *
-   * Non-fatal: if the push fails, the interview continues on the prior
-   * instructions. No retries.
-   */
-  const pushLocalizerContext = useCallback(
-    (pushPayload: {
-      top_differentials?: string[]
-      suggested_next_question?: string | null
-      suggested_scale_id?: string | null
-      turn_count?: number
-    }) => {
-      const provider = providerRef.current
-      if (!provider) return
-
-      try {
-        if (provider.updateInstructions) {
-          // OpenAI path — unchanged from before the provider-abstraction refactor.
-          if (!baseInstructionsRef.current) return
-          const delta = [
-            `[LATEST LOCALIZER PUSH${pushPayload.turn_count != null ? ` @ turn ${pushPayload.turn_count}` : ''}]`,
-            `- Top differentials: ${(pushPayload.top_differentials ?? []).join(', ') || '(none yet)'}`,
-            `- Suggested next question: ${pushPayload.suggested_next_question ?? '(none)'}`,
-            `- Suggested scale to consider: ${pushPayload.suggested_scale_id ?? '(none)'}`,
-          ].join('\n')
-          const updatedInstructions = baseInstructionsRef.current + '\n\n' + delta
-          provider.updateInstructions(updatedInstructions)
-        } else {
-          // Nova path — skip injection if AI is mid-speech to avoid
-          // interruption and accidental vocalization of internal context.
-          if (isAiSpeakingRef.current) return
-          const delta = [
-            `[INTERNAL SYSTEM NOTE — do NOT speak any part of this aloud. Do NOT say "I should ask" or narrate your reasoning. Do NOT name any diagnosis or condition to the patient. Use ONLY to silently guide which symptom to ask about next.]`,
-            `[Localizer update${pushPayload.turn_count != null ? ` @ turn ${pushPayload.turn_count}` : ''}]`,
-            `- Differentials (private): ${(pushPayload.top_differentials ?? []).join(', ') || '(none yet)'}`,
-            `- Suggested angle for next question (silent): ${pushPayload.suggested_next_question ?? '(none)'}`,
-            `- Scale to consider (do not name to patient): ${pushPayload.suggested_scale_id ?? '(none)'}`,
-          ].join('\n')
-          provider.injectSystemText(delta)
-        }
-      } catch (err) {
-        console.error('[useRealtimeSession] pushLocalizerContext failed:', err)
-        // Non-fatal — interview continues on previous instructions
-      }
-    },
-    [],
-  )
 
   /**
    * Injects scale administration instructions into the live session as advisory

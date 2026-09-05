@@ -12,5 +12,20 @@ export function decidePreclose(input: {
 }
 
 export function buildPrecloseNote(labels: string[]): string {
-  return `[INTERNAL SYSTEM NOTE — do NOT speak this aloud, do NOT mention it to the patient]: The record is not complete yet. Before finishing, ask the patient about: ${labels.join('; ')}. One question at a time, in your own words. When those are answered, call save_interview_output again.`
+  return `[INTERNAL SYSTEM NOTE — do NOT speak this aloud, do NOT mention it to the patient]: The record is not complete yet. Before finishing, ask the patient about: ${labels.join('; ')}. Ask each listed item once, one question at a time, in your own words. If the patient declines or says they don't know, accept that and move on — do not re-ask. Then call save_interview_output again.`
+}
+
+
+export function orderPrecloseRejectActions(canUpdateInstructions: boolean): readonly ('injectNote' | 'sendToolResult')[] {
+  return canUpdateInstructions
+    ? ['injectNote', 'sendToolResult']
+    : ['sendToolResult', 'injectNote']
+}
+
+export function shouldPushLocalizer(input: {
+  speaking: boolean
+  safetyEscalated: boolean
+  payloadEmpty: boolean
+}): boolean {
+  return !input.speaking && !input.safetyEscalated && !input.payloadEmpty
 }
