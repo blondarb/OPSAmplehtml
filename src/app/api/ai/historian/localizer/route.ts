@@ -28,6 +28,7 @@ import type {
   GeneratedQuestions,
   DifferentialEntry,
   SuggestedAction,
+  ExcludedDiagnosis,
 } from '@/lib/consult/localizer-types'
 
 // ── Constants ─────────────────────────────────────────────────────────────────
@@ -35,6 +36,8 @@ import type {
 const LOCALIZER_TIMEOUT_MS = 15000
 const MAX_SUGGESTED_ACTIONS = 4
 const SUGGESTED_ACTION_FIELD_MAX_LEN = 200
+const MAX_EXCLUDED = 4
+const EXCLUDED_FIELD_MAX_LEN = 200
 
 // ── Prompts ───────────────────────────────────────────────────────────────────
 //
@@ -59,7 +62,14 @@ Return JSON matching this exact shape:
       "diagnosis": "string",
       "icd10": "string or null",
       "rationale": "string",
+      "evidence_against": "string",
       "likelihood": "high | medium | low"
+    }
+  ],
+  "excluded": [
+    {
+      "diagnosis": "string",
+      "reason": "string"
     }
   ],
   "localizationHypothesis": "string",
@@ -85,6 +95,13 @@ Rules for differential:
 - List 2–4 candidate diagnoses, most likely first.
 - Base likelihood on what the patient has reported — not on general prevalence.
 - If insufficient data to rank, default to medium for all.
+- rationale = evidence FOR (why it's on the list). evidence_against = what argues against it or keeps it from ranking higher; use "" if nothing meaningful argues against it. Do not fabricate contradicting evidence.
+
+Rules for excluded (exclusion reasoning — this is important clinical value):
+- List conditions a neurologist would genuinely consider for THIS presentation but rule out, up to 4.
+- reason = the SPECIFIC absent feature or contradicting evidence that rules it out (e.g. "no thunderclap onset or worst-headache-of-life, making subarachnoid hemorrhage unlikely").
+- Only include conditions actually worth considering here — do not pad with implausible diagnoses. Empty array if nothing meaningful was ruled out.
+- Never state an exclusion as certainty a study would be needed to confirm; frame it as clinical reasoning from the history.
 
 Rules for localizationHypothesis:
 - Use neuroanatomical language (e.g. "trigeminal pathway", "cortical spreading depression", "basal ganglia").
@@ -175,6 +192,27 @@ function sanitizeSuggestedActions(actions: unknown): SuggestedAction[] {
 }
 
 /**
+ * Defensively parse the LLM's excluded output into bounded ExcludedDiagnosis
+ * entries. Malformed entries are dropped rather than surfaced.
+ */
+function sanitizeExcluded(excluded: unknown): ExcludedDiagnosis[] {
+  if (!Array.isArray(excluded)) return []
+  const clean: ExcludedDiagnosis[] = []
+  for (const entry of excluded) {
+    if (clean.length >= MAX_EXCLUDED) break
+    if (!entry || typeof entry !== 'object') continue
+    const { diagnosis, reason } = entry as Record<string, unknown>
+    if (typeof diagnosis !== 'string' || !diagnosis.trim()) continue
+    if (typeof reason !== 'string' || !reason.trim()) continue
+    clean.push({
+      diagnosis: diagnosis.trim().slice(0, EXCLUDED_FIELD_MAX_LEN),
+      reason: reason.trim().slice(0, EXCLUDED_FIELD_MAX_LEN),
+    })
+  }
+  return clean
+}
+
+/**
  * Persist the latest localizer results to the neurology_consults table.
  * Non-fatal — if the consult record doesn't exist or the write fails, we log and move on.
  */
@@ -183,7 +221,8 @@ async function persistLocalizerResults(
   differential: DifferentialEntry[],
   followUpQuestions: string[],
   localizationHypothesis: string,
-  kbSources: string[]
+  kbSources: string[],
+  excluded: ExcludedDiagnosis[]
 ): Promise<void> {
   try {
     // Find the consult linked to this historian session
@@ -200,6 +239,7 @@ async function persistLocalizerResults(
     await from('neurology_consults')
       .update({
         localizer_differential: JSON.stringify(differential),
+        localizer_excluded: JSON.stringify(excluded),
         localizer_questions: JSON.stringify(followUpQuestions),
         localizer_hypothesis: localizationHypothesis,
         localizer_kb_sources: JSON.stringify(kbSources),
@@ -333,7 +373,8 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
         const { parsed } = await invokeBedrockJSON<GeneratedQuestions>({
           system: QUESTION_GENERATOR_PROMPT,
           messages: [{ role: 'user', content: generatorInput }],
-          maxTokens: 600,
+          // Bumped from 600 to fit the added evidence_against + excluded fields.
+          maxTokens: 900,
           temperature: 0.3,
           signal,
         })
@@ -365,7 +406,8 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       questions.differential,
       questions.followUpQuestions,
       questions.localizationHypothesis,
-      extractKBSources(kbCitations)
+      extractKBSources(kbCitations),
+      sanitizeExcluded(questions.excluded)
     ).catch((err) => {
       console.error('[localizer] DB persist error (non-fatal):', err)
     })
@@ -377,6 +419,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
 
   const response: LocalizerResponse = {
     differential: questions?.differential ?? [],
+    excluded: sanitizeExcluded(questions?.excluded),
     evidenceSnippets,
     followUpQuestions: questions?.followUpQuestions ?? [],
     contextHint: questions?.contextHint ?? '',

@@ -25,13 +25,20 @@ interface DifferentialEntry {
   name?: string
   icd10?: string | null
   rationale?: string
+  evidence_against?: string
   likelihood?: 'high' | 'medium' | 'low'
   confidence?: 'high' | 'medium' | 'low'
+}
+
+interface ExcludedEntry {
+  diagnosis?: string
+  reason?: string
 }
 
 interface RunRow extends HistorianSession {
   consult_id?: string | null
   localizer_differential?: DifferentialEntry[]
+  localizer_excluded?: ExcludedEntry[]
   localizer_questions?: string[]
   localizer_hypothesis?: string | null
   localizer_kb_sources?: string[]
@@ -44,12 +51,19 @@ interface ResolvedDifferential {
   source: 'localizer' | 'final'
   label: string
   summary?: string
+  /** Conditions considered and ruled out, with reasons (exclusion reasoning). */
+  excluded?: ExcludedEntry[]
 }
 
 export function resolveDifferentials(run: RunRow): ResolvedDifferential[] {
   const sources: ResolvedDifferential[] = []
   if (Array.isArray(run.localizer_differential) && run.localizer_differential.length > 0) {
-    sources.push({ entries: run.localizer_differential, source: 'localizer', label: 'Live localizer' })
+    sources.push({
+      entries: run.localizer_differential,
+      source: 'localizer',
+      label: 'Live localizer',
+      excluded: Array.isArray(run.localizer_excluded) ? run.localizer_excluded : [],
+    })
   }
   const final = run.final_differential
   if (Array.isArray(final?.differential) && final.differential.length > 0) {
@@ -58,11 +72,13 @@ export function resolveDifferentials(run: RunRow): ResolvedDifferential[] {
         diagnosis: item.diagnosis,
         icd10: item.icd10,
         rationale: item.rationale,
+        evidence_against: (item as any).evidence_against,
         likelihood: item.likelihood === 'Moderate' ? 'medium' : item.likelihood === 'High' ? 'high' : 'low',
       })),
       source: 'final',
       label: 'Post-interview eval',
       summary: final.summary,
+      excluded: Array.isArray((final as any)?.excluded) ? (final as any).excluded : [],
     })
   }
   return sources
@@ -429,7 +445,7 @@ export function RunDetailDrawer({ run, onClose }: { run: RunRow; onClose: () => 
           </Section>
         )}
 
-        {differentials.map(({ entries: ddx, source, label, summary }) => (
+        {differentials.map(({ entries: ddx, source, label, summary, excluded }) => (
           <Section key={source} title={
             <>
               Differential Diagnosis &amp; Reasoning
@@ -452,11 +468,35 @@ export function RunDetailDrawer({ run, onClose }: { run: RunRow; onClose: () => 
                         {like}
                       </span>
                     </div>
-                    {d.rationale && <p className="mt-1 text-sm leading-relaxed text-slate-300">{d.rationale}</p>}
+                    {d.rationale && (
+                      <p className="mt-1 text-sm leading-relaxed text-slate-300">
+                        <span className="text-[10px] font-semibold uppercase tracking-wide text-teal-500/80">For · </span>
+                        {d.rationale}
+                      </p>
+                    )}
+                    {d.evidence_against && (
+                      <p className="mt-1 text-sm leading-relaxed text-slate-400">
+                        <span className="text-[10px] font-semibold uppercase tracking-wide text-amber-500/80">Against · </span>
+                        {d.evidence_against}
+                      </p>
+                    )}
                   </div>
                 )
               })}
             </div>
+            {Array.isArray(excluded) && excluded.length > 0 && (
+              <div className="mt-3">
+                <div className="mb-1 text-xs font-semibold uppercase tracking-wide text-slate-400">Considered &amp; ruled out</div>
+                <div className="space-y-1.5">
+                  {excluded.map((e, i) => (
+                    <div key={i} className="rounded-lg border border-slate-800 bg-slate-900/40 px-3 py-2">
+                      <div className="text-sm font-medium text-slate-300 line-through decoration-slate-600">{e.diagnosis}</div>
+                      {e.reason && <div className="mt-0.5 text-xs text-slate-400">Ruled out — {e.reason}</div>}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
             {source === 'final' && (
               <>
                 {summary?.trim() && <p className="mt-2 text-sm text-slate-400">{summary}</p>}

@@ -44,6 +44,7 @@ const SELECT_COLUMNS = `
   ) ELSE NULL END AS patient,
   nc."id"                     AS consult_id,
   nc."localizer_differential" AS localizer_differential,
+  nc."localizer_excluded"     AS localizer_excluded,
   nc."localizer_questions"    AS localizer_questions,
   nc."localizer_hypothesis"   AS localizer_hypothesis,
   nc."localizer_kb_sources"   AS localizer_kb_sources,
@@ -58,6 +59,7 @@ function normaliseRow(row: Record<string, unknown>): Record<string, any> {
     red_flags: coerceJson(row.red_flags) ?? [],
     transcript: coerceJson(row.transcript) ?? [],
     localizer_differential: coerceJson(row.localizer_differential) ?? [],
+    localizer_excluded: coerceJson(row.localizer_excluded) ?? [],
     localizer_questions: coerceJson(row.localizer_questions) ?? [],
     localizer_kb_sources: coerceJson(row.localizer_kb_sources) ?? [],
   }

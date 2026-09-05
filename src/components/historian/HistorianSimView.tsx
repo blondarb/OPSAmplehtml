@@ -557,7 +557,18 @@ function DiffItem({ d }: { d: any }) {
           <div className="h-full rounded-full bg-teal-500/70" style={{ width: `${pct}%` }} />
         </div>
       )}
-      {d.rationale && <p className="mt-2 text-sm leading-relaxed text-slate-300">{d.rationale}</p>}
+      {d.rationale && (
+        <p className="mt-2 text-sm leading-relaxed text-slate-300">
+          <span className="text-[10px] font-semibold uppercase tracking-wide text-teal-500/80">For · </span>
+          {d.rationale}
+        </p>
+      )}
+      {d.evidence_against && (
+        <p className="mt-1 text-sm leading-relaxed text-slate-400">
+          <span className="text-[10px] font-semibold uppercase tracking-wide text-amber-500/80">Against · </span>
+          {d.evidence_against}
+        </p>
+      )}
       {Array.isArray(d.supporting_quotes) && d.supporting_quotes.length > 0 && (
         <div className="mt-2">
           <div className="text-[10px] font-semibold uppercase tracking-wide text-teal-500/80">Supporting</div>
@@ -581,6 +592,7 @@ function DiffItem({ d }: { d: any }) {
 function DifferentialTab({ run }: { run: Run }) {
   const fd = run.final_differential
   const items: any[] = Array.isArray(fd?.differential) ? fd.differential : []
+  const excluded: any[] = Array.isArray(fd?.excluded) ? fd.excluded : []
   return (
     <div>
       {fd?.summary && (
@@ -596,6 +608,20 @@ function DifferentialTab({ run }: { run: Run }) {
         </div>
       ) : (
         <p className="text-sm text-slate-500">No differential recorded for this run.</p>
+      )}
+
+      {excluded.length > 0 && (
+        <>
+          <SubHead>Considered &amp; ruled out</SubHead>
+          <div className="space-y-1.5">
+            {excluded.map((e, i) => (
+              <div key={i} className="rounded-lg border border-slate-800 bg-slate-900/40 px-3 py-2">
+                <div className="text-sm font-medium text-slate-300 line-through decoration-slate-600">{e.diagnosis}</div>
+                {e.reason && <div className="mt-0.5 text-xs text-slate-400">Ruled out — {e.reason}</div>}
+              </div>
+            ))}
+          </div>
+        </>
       )}
     </div>
   )

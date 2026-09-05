@@ -74,10 +74,28 @@ export interface DifferentialEntry {
   diagnosis: string
   /** ICD-10 code if determinable from symptoms (e.g. "G43.109"). */
   icd10?: string
-  /** Why this diagnosis is on the differential given the transcript. */
+  /** Why this diagnosis is on the differential given the transcript (evidence FOR). */
   rationale: string
+  /**
+   * Why this diagnosis is not ranked higher — evidence AGAINST or the gap that
+   * keeps it down. Empty/absent when nothing meaningful argues against it.
+   */
+  evidence_against?: string
   /** Relative ranking confidence: high | medium | low. */
   likelihood: 'high' | 'medium' | 'low'
+}
+
+/**
+ * A condition that was actively CONSIDERED and RULED OUT, with the reason.
+ * This is the "why excluded, not just what's likely" reasoning — the specific
+ * absent feature or contradicting evidence that removed it from the ranked
+ * differential.
+ */
+export interface ExcludedDiagnosis {
+  /** The condition that was considered. */
+  diagnosis: string
+  /** One-sentence reason it was ruled out. */
+  reason: string
 }
 
 /**
@@ -101,6 +119,8 @@ export interface GeneratedQuestions {
   followUpQuestions: string[]
   /** Ranked differential diagnoses (2–4 candidates). */
   differential: DifferentialEntry[]
+  /** Conditions considered and ruled out, with reasons (exclusion reasoning). */
+  excluded?: ExcludedDiagnosis[]
   /**
    * Neuroanatomical localization hypothesis (e.g. "cortical/meningeal irritation
    * vs. trigeminal pathway activation"). Empty string if insufficient data.
@@ -133,6 +153,8 @@ export interface GeneratedQuestions {
 export interface LocalizerResponse {
   /** 2–4 candidate diagnoses, ranked by likelihood. */
   differential: DifferentialEntry[]
+  /** Conditions considered and ruled out, with reasons (exclusion reasoning). */
+  excluded?: ExcludedDiagnosis[]
   /** Evidence Engine excerpts (for the physician observer panel — NOT injected into the session). */
   evidenceSnippets: string[]
   /** 2–3 specific follow-up questions to suggest to the AI historian. */
@@ -169,6 +191,8 @@ export interface LocalizerResponse {
 export interface LocalizerConsultRecord {
   /** Most recent differential from the localizer. */
   localizer_differential: DifferentialEntry[] | null
+  /** Most recent excluded/ruled-out conditions with reasons. */
+  localizer_excluded: ExcludedDiagnosis[] | null
   /** Most recent follow-up questions. */
   localizer_questions: string[] | null
   /** Most recent localization hypothesis. */

@@ -61,6 +61,7 @@ describe('runs view differential', () => {
       source: 'final',
       label: 'Post-interview eval',
       summary: finalDifferential.summary,
+      excluded: [],
       entries: finalDifferential.differential.map((item, i) => ({
         diagnosis: item.diagnosis,
         icd10: item.icd10,
@@ -89,7 +90,7 @@ describe('runs view differential', () => {
       localizer_kb_sources: ['Synthetic evidence'],
     })
     expect(resolveDifferentials(run).map(({ source }) => source)).toEqual(['localizer', 'final'])
-    expect(resolveDifferentials(run)[0]).toEqual({ entries: localizer, source: 'localizer', label: 'Live localizer' })
+    expect(resolveDifferentials(run)[0]).toEqual({ entries: localizer, source: 'localizer', label: 'Live localizer', excluded: [] })
     const markup = render(run)
     for (const text of ['Live localizer', 'Synthetic localizer diagnosis', 'Synthetic localization', 'Synthetic follow-up', 'Synthetic evidence']) {
       expect(markup).toContain(text)
