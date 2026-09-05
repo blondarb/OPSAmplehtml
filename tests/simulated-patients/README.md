@@ -133,6 +133,8 @@ used to. A harness that reads `triage_tier` straight off the POST response gets
 | `first-seizure.json` | 22M witnessed tonic-clonic seizure | URGENT | First seizure, sleep deprivation |
 | `peripheral-neuropathy.json` | 55M progressive foot numbness | ROUTINE | Poorly controlled DM2, A1c 9.2 |
 
+Optional `expectedFollowUps: string[]` lists follow-up keywords (with `|` for alternatives) for manual coverage review; it is metadata, not an authoritative gate.
+
 Each persona includes:
 - **referralText**: realistic referral letter a PCP would send
 - **demographics**: age, sex, contact info

@@ -306,12 +306,14 @@ describe('detectSyndrome', () => {
   // strings from fixtures/personaTranscripts.ts (which read the real
   // tests/simulated-patients/personas/*.json files), not hand-typed
   // approximations that could pass even if the real matcher is broken.
-  const EXPECTED_SYNDROME_BY_PERSONA_FILE: Record<string, string> = {
+  const EXPECTED_SYNDROME_BY_PERSONA_FILE: Record<string, string | null> = {
     'acute-stroke.json': 'acute-stroke',
     'first-seizure.json': 'first-seizure',
     'migraine-chronic.json': 'migraine-chronic',
     'ms-relapse.json': 'ms-relapse',
     'peripheral-neuropathy.json': 'peripheral-neuropathy',
+    // Recurrent spells years after a provoked seizure match none of the five rubric syndromes.
+    'seizure-bupropion-alcohol.json': null,
   }
 
   for (const file of listPersonaFiles()) {

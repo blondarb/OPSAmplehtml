@@ -6,15 +6,16 @@ import {
 } from './fixtures/personaTranscripts'
 
 describe('listPersonaFiles', () => {
-  it('finds all 5 simulated-patient persona files', () => {
+  it('finds all 6 simulated-patient persona files', () => {
     const files = listPersonaFiles()
-    expect(files).toHaveLength(5)
+    expect(files).toHaveLength(6)
     expect(files.sort()).toEqual([
       'acute-stroke.json',
       'first-seizure.json',
       'migraine-chronic.json',
       'ms-relapse.json',
       'peripheral-neuropathy.json',
+      'seizure-bupropion-alcohol.json',
     ])
   })
 })

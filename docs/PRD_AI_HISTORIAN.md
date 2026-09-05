@@ -1074,3 +1074,15 @@ See:
 - Spec: `docs/superpowers/specs/2026-05-27-ai-historian-realtime-upgrade-design.md`
 - Plan: `docs/superpowers/plans/2026-05-27-ai-historian-realtime-upgrade.md`
 - Pre/post baselines: `qa/historian-baselines/`
+
+### Turn-style adherence (2026-09-05)
+
+A 31-turn interview had 10 gratitude openers and a combined medications/allergies question despite existing prohibitions.
+The remedy has four parts: positive turn-start examples, a final per-turn checklist, follow-the-thread guidance, and deterministic style metrics.
+The checklist follows all optional context in the assembled prompt; referral clarification remains unchanged.
+Named medications, alcohol, seizures, injuries, and prior hospital care prompt focused follow-up without interpreting causes.
+The non-authoritative report passes at gratitude rate ≤ 5%, zero compound-question turns, and maximum repeated opener count ≤ 3.
+Gratitude excludes the final Henry turn; repeated three-word openers exclude the greeting; restatements are descriptive only.
+Lexical heuristics do not establish clinical quality; existing deterministic gates remain authoritative.
+Audit a saved synthetic array of `{role,text}` turns or `{transcript: [...]}` with `npm run historian:audit -- path.json` (exit 1 on style FAIL).
+The synthetic driver's end-of-run summary also reports style without changing its success criteria; live before/after evaluation belongs to the driver.

@@ -19,7 +19,10 @@ import migraineChronic from '../../../../tests/simulated-patients/personas/migra
 import msRelapse from '../../../../tests/simulated-patients/personas/ms-relapse.json'
 import peripheralNeuropathy from '../../../../tests/simulated-patients/personas/peripheral-neuropathy.json'
 
+import seizureBupropionAlcohol from '../../../../tests/simulated-patients/personas/seizure-bupropion-alcohol.json'
+
 export const BUNDLED_PERSONAS: Record<string, unknown> = {
+  'seizure-bupropion-alcohol': seizureBupropionAlcohol,
   'acute-stroke': acuteStroke,
   'first-seizure': firstSeizure,
   'migraine-chronic': migraineChronic,
