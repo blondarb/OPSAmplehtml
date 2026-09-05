@@ -10,7 +10,14 @@
  * injection pattern for testability where practical (mirror Task 5's
  * cli.ts approach for arg parsing; the WS loop itself is integration-
  * tested live, not unit-mocked to death)."
+ *
+ * One deliberate exception to "injection-free": the turn limits below read
+ * HISTORIAN_INTERVIEW_BUDGET once at module load, so the harness cannot drift
+ * out of step with the historian's configured depth. See the comment on
+ * INTERVIEW_BUDGET.
  */
+
+import { getInterviewBudget } from '@/lib/historianTypes'
 
 export interface SyntheticDriverOptions {
   persona: string | null
@@ -23,9 +30,24 @@ export interface SyntheticDriverOptions {
 }
 
 export const DEFAULT_BASE_URL = 'http://localhost:3111'
-export const DEFAULT_MAX_TURNS = 25
-/** Hard cap — matches the historian's own CRITICAL RULE 13 turn limit (historianPrompts.ts). */
-export const HARD_MAX_TURNS = 25
+
+// Both turn limits below TRACK the historian's live depth budget rather than
+// restating it. They used to be a bare `25`, matching what CRITICAL RULE 13
+// said at the time; when the budget moved to 45-60:70 the harness kept
+// stopping every synthetic run at 25 and `--max-turns 60` threw outright. The
+// failure was invisible from the outside — a truncated transcript looks
+// exactly like Henry cutting off early, so it reads as a historian bug rather
+// than a harness one. Deriving them keeps the two honest permanently.
+const INTERVIEW_BUDGET = getInterviewBudget(process.env.HISTORIAN_INTERVIEW_BUDGET)
+
+/**
+ * Default turn allowance: the historian's own hard ceiling, so a full-depth
+ * interview runs to completion unless the caller asks for less. Note this is
+ * a real cost change per run — pass `--max-turns` to cap a large sweep.
+ */
+export const DEFAULT_MAX_TURNS = INTERVIEW_BUDGET.hardCap
+/** Hard cap — the historian's own hard ceiling for the configured budget (getInterviewBudget). */
+export const HARD_MAX_TURNS = INTERVIEW_BUDGET.hardCap
 
 export const HELP_TEXT = `AI Historian synthetic conversation driver (P6 — Historian Validation Suite)
 
@@ -101,7 +123,9 @@ export function parseSyntheticDriverArgs(args: string[]): SyntheticDriverOptions
   }
 
   if (maxTurns > HARD_MAX_TURNS) {
-    throw new Error(`--max-turns cannot exceed ${HARD_MAX_TURNS} (matches the historian's own turn-limit rule).`)
+    throw new Error(
+      `--max-turns cannot exceed ${HARD_MAX_TURNS} (the historian's own hard ceiling for the configured interview budget).`,
+    )
   }
   if (!persona && !allPersonas) {
     throw new Error('Specify exactly one of --persona <name> or --all-personas.')

@@ -74,6 +74,8 @@
  */
 import WebSocket, { type RawData } from 'ws'
 
+import { getInterviewBudget } from '@/lib/historianTypes'
+
 /** Loosely-typed inbound/outbound Realtime event JSON — the wire protocol is external and untyped, so fields are narrowed with isRecord()/typeof checks at each use site rather than trusted via `any`. */
 type WireMessage = Record<string, unknown>
 
@@ -130,14 +132,31 @@ export interface RealtimeTextClientOptions {
   tools: unknown[]
   /** Ceiling per exchange, in ms. Default 30_000. */
   responseTimeoutMs?: number
-  /** Whole-session wall-clock ceiling, in ms, checked before starting each new exchange. Default 10 minutes. */
+  /** Whole-session wall-clock ceiling, in ms, checked before starting each new exchange. Defaults to DEFAULT_SESSION_TIMEOUT_MS, which scales with the interview budget. */
   sessionTimeoutMs?: number
   /** Optional sink for every inbound/outbound wire message — verbose logging only, never load-bearing. */
   onWireEvent?: (direction: WireEventDirection, message: Record<string, unknown>) => void
 }
 
 export const DEFAULT_RESPONSE_TIMEOUT_MS = 30_000
-export const DEFAULT_SESSION_TIMEOUT_MS = 10 * 60_000
+
+/**
+ * Rough wall-clock cost of one exchange: the historian's response plus the
+ * Bedrock-generated patient reply. Used only to size the session ceiling.
+ */
+const MS_PER_EXCHANGE = 20_000
+
+/**
+ * Whole-session wall-clock ceiling. Scales with the interview budget for the
+ * same reason the turn cap does (see cliArgs.ts): a fixed 10-minute ceiling
+ * was comfortable at 25 turns but cuts a 70-turn run off mid-interview, and
+ * from the outside that is indistinguishable from the historian stopping
+ * early. Never drops below the original 10 minutes.
+ */
+export const DEFAULT_SESSION_TIMEOUT_MS = Math.max(
+  10 * 60_000,
+  getInterviewBudget(process.env.HISTORIAN_INTERVIEW_BUDGET).hardCap * MS_PER_EXCHANGE,
+)
 
 type Phase = 'idle' | 'connecting' | 'ready' | 'closed'
 
