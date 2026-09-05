@@ -15,6 +15,7 @@
  */
 
 import { NextResponse } from 'next/server'
+import { requireSimUser } from '@/lib/historian/simAuth'
 import { getOpenAIKey } from '@/lib/secrets'
 import {
   buildSimHenrySystemPrompt,
@@ -27,6 +28,9 @@ import type { HistorianSessionType } from '@/lib/historianTypes'
 export const maxDuration = 60
 
 export async function POST(request: Request) {
+  const denied = await requireSimUser()
+  if (denied) return denied
+
   try {
     const body = await request.json().catch(() => null)
     const transcript = Array.isArray(body?.transcript) ? body.transcript : []

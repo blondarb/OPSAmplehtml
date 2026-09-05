@@ -13,11 +13,15 @@
  */
 
 import { NextResponse } from 'next/server'
+import { requireSimUser } from '@/lib/historian/simAuth'
 import type { HistorianTranscriptEntry } from '@/lib/historianTypes'
 
 export const maxDuration = 120
 
 export async function POST(request: Request) {
+  const denied = await requireSimUser()
+  if (denied) return denied
+
   try {
     const body = await request.json().catch(() => null)
     const persona = typeof body?.persona === 'string' ? body.persona.replace(/\.json$/, '').trim() : ''

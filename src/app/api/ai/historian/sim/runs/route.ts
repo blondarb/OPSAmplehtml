@@ -17,6 +17,7 @@
  */
 
 import { NextResponse } from 'next/server'
+import { requireSimUser } from '@/lib/historian/simAuth'
 
 function coerceJson<T>(v: unknown): T | null {
   if (v == null) return null
@@ -55,6 +56,9 @@ const SELECT = `id, batch_id, batch_label, persona_id, persona_label, syndrome,
   models, insufficient, created_at`
 
 export async function GET(request: Request) {
+  const denied = await requireSimUser()
+  if (denied) return denied
+
   try {
     const { searchParams } = new URL(request.url)
     const id = searchParams.get('id')
