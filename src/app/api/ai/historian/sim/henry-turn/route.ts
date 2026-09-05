@@ -6,14 +6,17 @@
  *   'user' = patient). Call with an empty transcript to get Henry's opener.
  * Returns: { text, done }  (done = Henry signalled the interview complete)
  *
- * Stateless: the whole transcript is passed each turn, so the browser can
- * drive a full conversation as a sequence of short requests — no long-running
- * server session, no durable worker. Synthetic-only. Incurs Bedrock cost.
+ * Runs on OpenAI (gpt-4o family) — the SAME provider + base model as the
+ * production Realtime voice agent (gpt-realtime-2), so sim Henry's knowledge
+ * matches production more closely than a cross-provider model would. Same
+ * historian system prompt (text-mode override). Stateless: the whole
+ * transcript is passed each turn so the browser can drive the conversation as
+ * a sequence of short requests. Synthetic-only. Incurs OpenAI cost.
  */
 
 import { NextResponse } from 'next/server'
 import { requireSimUser } from '@/lib/historian/simAuth'
-import { invokeBedrock } from '@/lib/bedrock'
+import { getOpenAIKey } from '@/lib/secrets'
 import {
   buildSimHenrySystemPrompt,
   toHenryMessages,
@@ -35,15 +38,58 @@ export async function POST(request: Request) {
     const referralReason: string | undefined =
       typeof body?.referralReason === 'string' && body.referralReason ? body.referralReason : undefined
 
-    const system = buildSimHenrySystemPrompt(sessionType, referralReason)
-    const messages = toHenryMessages(transcript)
+    const apiKey = await getOpenAIKey()
+    if (!apiKey) {
+      return NextResponse.json({ error: 'OpenAI API key not configured.' }, { status: 500 })
+    }
 
-    const { text } = await invokeBedrock({
-      system,
-      messages,
-      maxTokens: 400,
-      temperature: 0.6,
-    })
+    const system = buildSimHenrySystemPrompt(sessionType, referralReason)
+    // Default to gpt-4o — same OpenAI/GPT-4o family as the production Realtime
+    // voice agent (gpt-realtime-2), for the closest interview fidelity. NOTE:
+    // gpt-4o has lower rate limits, so sustained live runs may still 429 until
+    // the OpenAI account's gpt-4o limits are raised (retry/backoff only rides
+    // out transient bursts). Set HISTORIAN_SIM_HENRY_MODEL=gpt-4o-mini to trade
+    // fidelity for much higher limits.
+    const model = process.env.HISTORIAN_SIM_HENRY_MODEL || 'gpt-4o'
+    const messages = [
+      { role: 'system', content: system },
+      ...toHenryMessages(transcript),
+    ]
+
+    // Retry transient rate-limit / server errors (429/5xx) with backoff — the
+    // live loop fires many turns in quick succession and occasionally trips
+    // OpenAI's per-minute limit. Honor Retry-After when present.
+    const RETRYABLE = new Set([429, 500, 502, 503, 504])
+    const MAX_ATTEMPTS = 4
+    let data: any = null
+    let lastStatus = 0
+    for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
+      const res = await fetch('https://api.openai.com/v1/chat/completions', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ model, messages, max_tokens: 400, temperature: 0.6 }),
+      })
+      if (res.ok) {
+        data = await res.json()
+        break
+      }
+      lastStatus = res.status
+      const errBody = await res.text()
+      console.error(`[sim/henry-turn] OpenAI ${res.status} (attempt ${attempt + 1}):`, errBody.slice(0, 200))
+      if (!RETRYABLE.has(res.status) || attempt === MAX_ATTEMPTS - 1) {
+        return NextResponse.json(
+          { error: `OpenAI returned ${res.status}${res.status === 429 ? ' (rate limit — try again)' : ''}` },
+          { status: 502 },
+        )
+      }
+      const retryAfter = Number(res.headers.get('retry-after'))
+      const waitMs = Number.isFinite(retryAfter) && retryAfter > 0 ? retryAfter * 1000 : 800 * 2 ** attempt
+      await new Promise((r) => setTimeout(r, Math.min(waitMs, 8000)))
+    }
+    if (!data) {
+      return NextResponse.json({ error: `OpenAI unavailable (${lastStatus})` }, { status: 502 })
+    }
+    const text: string = data?.choices?.[0]?.message?.content ?? ''
 
     return NextResponse.json({ text: stripSimEndToken(text), done: isSimInterviewDone(text) })
   } catch (error: any) {

@@ -158,6 +158,8 @@ export default function HistorianSimView() {
         )
         convo.push({ role: 'user', text: p.text || '' })
         setLiveTranscript([...convo])
+        // Small pause to avoid bursting the model's per-minute rate limit.
+        await new Promise((r) => setTimeout(r, 350))
       }
 
       // Scoring in two stages so neither request exceeds the ~30s gateway limit.
