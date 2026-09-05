@@ -32,7 +32,16 @@ describe('directive mode preserves the safety floor', () => {
   it('adds the directive block only at the end, leaving the core prompt intact', () => {
     const withFocus = buildHistorianSystemPrompt('new_patient', 'r', 'c', undefined, FOCUS)
     const without = buildHistorianSystemPrompt('new_patient', 'r', 'c', undefined, null)
-    expect(withFocus.startsWith(without)).toBe(true)
+    const checklistStart = without.indexOf('EVERY TURN — CHECK BEFORE YOU SPEAK')
+    const checklist = `EVERY TURN — CHECK BEFORE YOU SPEAK:
+1. Exactly one thing for the patient to answer.
+2. No thanks, no praise, no restating — start with the question or a short topic bridge.
+3. Plain words; at most one sentence before the question.
+4. If the patient just named a medication, alcohol, a seizure, or an injury, follow that thread next.
+5. Nothing that sounds like a diagnosis or a cause.`
+    expect(withFocus.startsWith(without.slice(0, checklistStart))).toBe(true)
+    expect(withFocus.endsWith(checklist)).toBe(true)
+    expect(without.endsWith(checklist)).toBe(true)
   })
 
   it('frames an untrusted note as background, not as instructions', () => {

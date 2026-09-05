@@ -69,6 +69,7 @@ import * as dotenv from 'dotenv'
 dotenv.config({ path: '.env.local' })
 
 import crypto from 'node:crypto'
+import { auditHenryTurns, type TurnStyleReport } from '../src/lib/historian/eval/turnStyleChecks'
 
 import {
   parseSyntheticDriverArgs,
@@ -162,6 +163,7 @@ export interface PersonaSessionSummary {
   turns: number
   durationMs: number
   saveStatus: 'saved' | 'save_failed' | 'not_reached'
+  turnStyle?: TurnStyleReport
   transcriptValid: boolean
   transcriptIssues: string[]
   /** process.env.HISTORIAN_EVAL_AUTORUN !== 'false' AND save succeeded — the exact condition the save route itself checks before firing the (fire-and-forget) eval chain. Not a confirmation the evaluators actually completed — see the report for the honest caveat on this field. */
@@ -327,6 +329,7 @@ async function runPersonaSession(personaFile: string, opts: RunOptions): Promise
       turns: state.patientTurnCount,
       durationMs: Date.now() - state.startTime,
       saveStatus: saveOk ? 'saved' : 'save_failed',
+      turnStyle: auditHenryTurns(state.transcript),
       transcriptValid: localValidation.valid,
       transcriptIssues: localValidation.issues,
       evalAutorunExpected: saveOk && process.env.HISTORIAN_EVAL_AUTORUN !== 'false',
@@ -416,6 +419,7 @@ async function main(): Promise<number> {
     const summary = await runPersonaWithRetry(personaFile, runOpts)
     summaries.push(summary)
     log(formatSummaryLine(summary))
+    if (summary.turnStyle) log(`[STYLE ${summary.turnStyle.passes ? 'PASS' : 'FAIL'} — non-authoritative] ${JSON.stringify(summary.turnStyle)}`)
   }
 
   const passCount = summaries.filter(summaryOk).length

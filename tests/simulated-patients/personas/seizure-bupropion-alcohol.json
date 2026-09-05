@@ -1,0 +1,235 @@
+{
+  "id": "seizure-bupropion-alcohol",
+  "name": "Synthetic Remote Seizure and Zoning-Out Spells",
+  "personality": "reluctant",
+  "patientBelief": {
+    "suspected": "just being tired",
+    "reasoning": "the spells are brief and work has been busy",
+    "worry": "that people will think I am unreliable"
+  },
+  "description": "Entirely invented 41M with brief zoning-out spells, one generalized seizure six years ago after a weekend of heavy drinking, and later bupropion use; follow-up details are disclosed only when asked.",
+  "demographics": {
+    "age": 41,
+    "sex": "M",
+    "name": "R. Q.",
+    "date_of_birth": "04/12/1985",
+    "email": "synthetic-rq@example.com",
+    "phone": "202-555-0146"
+  },
+  "referralText": "Synthetic referral: 41-year-old man referred for brief zoning-out episodes over the past two months. Partner has noticed pauses in conversation with reduced responsiveness. One generalized convulsive seizure approximately six years ago after a weekend of heavy drinking. Bupropion was started later for mood and smoking cessation. No ongoing event or acute neurological deficit reported. Please characterize the spells and prior history.",
+  "expectedTriage": {
+    "urgency": "urgent",
+    "redFlags": [
+      "recurrent episodes of impaired awareness",
+      "prior seizure"
+    ],
+    "subspecialty": "Epilepsy"
+  },
+  "intakeData": {
+    "patient_name": "R. Q.",
+    "date_of_birth": "04/12/1985",
+    "email": "synthetic-rq@example.com",
+    "phone": "202-555-0146",
+    "chief_complaint": "My partner says I keep zoning out for a little while.",
+    "current_medications": "Wellbutrin.",
+    "allergies": "No known medication allergies.",
+    "medical_history": "One seizure about six years ago; low mood.",
+    "family_history": "No known family history of seizures."
+  },
+  "historyResponses": [
+    {
+      "question_pattern": "What brings you in?",
+      "response": "My partner says I stop talking and zone out sometimes. I thought I was just tired."
+    },
+    {
+      "question_pattern": "When did these spells start?",
+      "response": "About two months ago."
+    },
+    {
+      "question_pattern": "What medications do you take?",
+      "response": "I take Wellbutrin. They started it for my mood and to help me quit smoking."
+    },
+    {
+      "question_pattern": "What dose do you take?",
+      "response": "I don't remember the strength. I'd need to check the bottle."
+    },
+    {
+      "question_pattern": "How often do you take it?",
+      "response": "Once each morning."
+    },
+    {
+      "question_pattern": "When was Wellbutrin started relative to the seizure?",
+      "response": "About two years after that seizure, so around four years ago."
+    },
+    {
+      "question_pattern": "Who prescribes it?",
+      "response": "My primary care clinician at the fictional Juniper Practice."
+    },
+    {
+      "question_pattern": "Does the prescriber know about your seizure?",
+      "response": "I never told them about it. I don't know if it was in the records they received."
+    },
+    {
+      "question_pattern": "Do you take it as prescribed?",
+      "response": "Usually. I forget a morning about once a month."
+    },
+    {
+      "question_pattern": "Tell me about the seizure six years ago.",
+      "response": "I'd been drinking that night. My friend said I went stiff and shook all over. I don't remember it."
+    },
+    {
+      "question_pattern": "How much had you had that weekend?",
+      "response": "It was a heavy weekend. I had about eight beers each evening, including that night."
+    },
+    {
+      "question_pattern": "How much do you drink in a typical week?",
+      "response": "About twelve beers in a typical week."
+    },
+    {
+      "question_pattern": "What is the most you have had in one sitting recently?",
+      "response": "Seven beers at a gathering about two weeks ago."
+    },
+    {
+      "question_pattern": "When was your last drink?",
+      "response": "Two beers last night."
+    },
+    {
+      "question_pattern": "Any shakes or sweats when cutting back?",
+      "response": "Sometimes my hands shake and I get sweaty the morning after a heavy night. I have not had another full-body seizure."
+    },
+    {
+      "question_pattern": "Has anyone suggested you cut down?",
+      "response": "My partner has asked me to cut down."
+    },
+    {
+      "question_pattern": "Was there any warning before the old seizure?",
+      "response": "I do not remember a warning."
+    },
+    {
+      "question_pattern": "What did the witness describe?",
+      "response": "My friend said I suddenly stiffened and then both arms and legs shook."
+    },
+    {
+      "question_pattern": "How long did that seizure last?",
+      "response": "My friend estimated about two minutes."
+    },
+    {
+      "question_pattern": "Did you bite your tongue?",
+      "response": "Yes, the side of my tongue was sore and cut."
+    },
+    {
+      "question_pattern": "Did you lose bladder control?",
+      "response": "My friend said my clothes were wet."
+    },
+    {
+      "question_pattern": "How did you feel afterward?",
+      "response": "Confused for around twenty minutes and then very sleepy."
+    },
+    {
+      "question_pattern": "Were you injured?",
+      "response": "I bruised my shoulder when I fell. I do not recall hitting my head."
+    },
+    {
+      "question_pattern": "What else was going on beforehand?",
+      "response": "I had slept very little that weekend. I was not ill and was not taking regular medicine then."
+    },
+    {
+      "question_pattern": "What did the hospital tell you?",
+      "response": "I stayed overnight at fictional Juniper Hospital. They called it a seizure. I remember a head scan but not the result. I was not sent home on seizure medicine."
+    },
+    {
+      "question_pattern": "What does your partner see during the current spells?",
+      "response": "They say I stare and do not answer briefly, then pick up the conversation. They have not seen shaking."
+    },
+    {
+      "question_pattern": "How long do the current spells last?",
+      "response": "My partner says ten to twenty seconds."
+    },
+    {
+      "question_pattern": "How many episodes have there been?",
+      "response": "About six zoning-out spells in two months, plus that one old full-body seizure."
+    },
+    {
+      "question_pattern": "When was the most recent spell?",
+      "response": "Three days ago."
+    },
+    {
+      "question_pattern": "How do you feel after a current spell?",
+      "response": "I usually feel normal but have missed a bit of the conversation."
+    },
+    {
+      "question_pattern": "Any medication allergies?",
+      "response": "None that I know of."
+    },
+    {
+      "question_pattern": "Any family history of seizures?",
+      "response": "None that I know of."
+    },
+    {
+      "question_pattern": "What kind of work do you do?",
+      "response": "I schedule deliveries in an office."
+    },
+    {
+      "question_pattern": "Do you smoke?",
+      "response": "I stopped about four years ago."
+    },
+    {
+      "question_pattern": "Any recreational drug use?",
+      "response": "No."
+    },
+    {
+      "question_pattern": "Anything else you want the neurologist to know?",
+      "response": "I want to understand these spells. I am not having one right now."
+    }
+  ],
+  "structuredHistory": {
+    "chief_complaint": "Brief zoning-out episodes for two months.",
+    "onset": "Two months ago for current spells; one generalized convulsive seizure about six years ago.",
+    "location": "Current spells involve responsiveness; prior convulsion involved all limbs.",
+    "duration": "Current spells 10-20 seconds; prior convulsion about two minutes.",
+    "character": "Partner sees staring and reduced responsiveness without shaking; prior witness described stiffening then bilateral shaking.",
+    "aggravating_factors": "No established trigger for current spells. Heavy alcohol exposure and little sleep preceded the old seizure; causality is not established.",
+    "relieving_factors": "Episodes end spontaneously.",
+    "timing": "About six current spells, most recently three days ago; only one lifetime generalized convulsion.",
+    "severity": "Brief gaps in conversation now; old seizure included tongue injury, incontinence and confusion.",
+    "associated_symptoms": "Old seizure followed by about twenty minutes of confusion and sleepiness, bruised shoulder. Current spells followed by missed conversation without prolonged confusion.",
+    "current_medications": "Wellbutrin (bupropion) for mood and smoking cessation, started four years ago, two years after the seizure. Dose unknown to persona; do not invent it. Once each morning; misses about once monthly. Prescribed by primary care at fictional Juniper Practice. Persona never told the prescriber about the seizure and does not know whether records included it. Volunteer the name and purpose only; disclose frequency, start timing, adherence, and prescriber awareness only if asked.",
+    "allergies": "No known medication allergies.",
+    "past_medical_history": "One generalized seizure six years ago; low mood. Overnight at fictional Juniper Hospital, head scan recalled but result unknown; no antiseizure medication at discharge. No known head injury or surgery.",
+    "family_history": "No known seizures.",
+    "social_history": "Office delivery scheduler. Quit smoking four years ago. No recreational drugs. About twelve beers per typical week; recent maximum seven in one sitting two weeks ago; last drink two beers last night. Old seizure followed a weekend with about eight beers each evening. Sometimes shakes and sweats after a heavy night; no further generalized seizure. Partner suggests cutting down. Initially say only that drinking occurred; disclose quantities and cutting-back history only if asked.",
+    "review_of_systems": "No ongoing spell, acute focal weakness, fever, or persistent confusion reported."
+  },
+  "narrativeSummary": "Entirely synthetic R. Q., 41M, reports approximately six brief zoning-out episodes over two months, most recently three days ago. Partner describes 10-20 seconds of staring with reduced responsiveness. Six years ago, a single generalized convulsion followed a weekend of heavy drinking and little sleep, with tongue injury, incontinence, and subsequent confusion. Bupropion began two years later for mood and smoking cessation; strength is unknown, frequency is once each morning, and the patient has not told the prescriber about the prior seizure. Alcohol quantities, medication details, and witness descriptions require specific questions. No cause or diagnosis is established by this fixture.",
+  "expectedScales": [],
+  "expectedDDx": [
+    {
+      "diagnosis": "Focal impaired awareness seizures",
+      "likelihood": "high"
+    },
+    {
+      "diagnosis": "Nonepileptic attentional lapses",
+      "likelihood": "medium"
+    },
+    {
+      "diagnosis": "Alcohol-related seizure",
+      "likelihood": "medium"
+    }
+  ],
+  "expectedRedFlags": [
+    "recurrent episodes of impaired awareness",
+    "prior seizure"
+  ],
+  "expectedFollowUps": [
+    "dose",
+    "how often",
+    "prescrib",
+    "last drink",
+    "typical week",
+    "cutting back|cut down",
+    "witness",
+    "how long",
+    "started",
+    "most recent"
+  ]
+}

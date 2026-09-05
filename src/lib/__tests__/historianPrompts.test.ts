@@ -17,6 +17,23 @@ const getTestTools = () =>
   getHistorianToolDefinition() as unknown as TestToolDefinition[]
 
 describe('buildHistorianSystemPrompt', () => {
+  it('pins turn style and keeps the checklist after all optional context', () => {
+    const prompt = buildHistorianSystemPrompt('new_patient', 'brief zoning out', 'synthetic context', undefined, 'zoning out')
+    expect(prompt).toMatch(/ONE question means one thing/)
+    expect(prompt).toMatch(/HOW TO START A TURN/)
+    expect(prompt).toMatch(/FOLLOW THE THREAD/)
+    expect(prompt).toMatch(/EVERY TURN — CHECK BEFORE YOU SPEAK/)
+    const checklistIndex = prompt.indexOf('EVERY TURN — CHECK BEFORE YOU SPEAK')
+    expect(checklistIndex).toBeGreaterThan(prompt.indexOf('REFERRAL REASON:'))
+    expect(checklistIndex).toBeGreaterThan(prompt.indexOf('REFERRAL-DIRECTED PRIORITY:'))
+    expect(prompt.slice(checklistIndex)).toBe(`EVERY TURN — CHECK BEFORE YOU SPEAK:
+1. Exactly one thing for the patient to answer.
+2. No thanks, no praise, no restating — start with the question or a short topic bridge.
+3. Plain words; at most one sentence before the question.
+4. If the patient just named a medication, alcohol, a seizure, or an injury, follow that thread next.
+5. Nothing that sounds like a diagnosis or a cause.`)
+  })
+
   it('includes the safety block (988 / 741741 / 911 escalation)', () => {
     const prompt = buildHistorianSystemPrompt('new_patient')
     expect(prompt).toContain('988')
@@ -195,6 +212,7 @@ describe('buildHistorianSystemPrompt', () => {
     expect(prompt).toContain('symptom_onset')
     expect(prompt).toContain('patient-reported and unverified')
     expect(prompt).toContain('Never diagnose, score urgency, clear an emergency')
+    expect(prompt).not.toContain('EVERY TURN — CHECK BEFORE YOU SPEAK')
     expect(prompt).not.toContain('Phase 1')
     expect(prompt).not.toContain('scale_step')
   })

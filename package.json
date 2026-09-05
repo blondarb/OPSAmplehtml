@@ -14,6 +14,7 @@
     "test:audio:generate": "bash tests/audio/scripts/generate-visit-audio.sh",
     "seed:wearable": "npx tsx scripts/seed-wearable-demo.ts",
     "triage:sentinel": "npx tsx scripts/triage-sentinel.ts",
+    "historian:audit": "npx tsx scripts/historian-transcript-audit.ts",
     "historian:eval": "npx tsx scripts/historian-eval.ts",
     "historian:synthetic": "npx tsx scripts/historian-synthetic-run.ts"
   },
