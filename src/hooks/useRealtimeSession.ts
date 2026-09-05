@@ -5,6 +5,7 @@ import type { HistorianTranscriptEntry, HistorianStructuredOutput, HistorianRedF
 import type { HistorianReferralInput } from '@/lib/historian/referralContext'
 import type { LocalizerResponse } from '@/lib/consult/localizer-types'
 import type { SaveScaleResponsesArgs } from '@/lib/consult/scales'
+import { decidePreclose, buildPrecloseNote } from '@/lib/historian/precloseGate'
 import { detectRedFlags } from '@/lib/consult/red-flags/red-flag-detector'
 import type { DetectedFlag } from '@/lib/consult/red-flags/red-flag-types'
 import type { VoiceEvent, VoiceProvider } from '@/lib/voice/providerTypes'
@@ -245,6 +246,7 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
   // Mirror of interviewCompleted state as a ref so event handlers can read
   // the latest value without stale closure issues (avoids React state timing
   // races in the assistantTranscript handler).
+  const precloseRejectedRef = useRef<boolean>(false)
   const interviewCompletedRef = useRef<boolean>(false)
   const autoEndTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
@@ -431,14 +433,8 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
       setLocalizerData(data)
       options.onLocalizerUpdate?.(data)
 
-      // Inject follow-up questions as advisory guidance into the session —
-      // advisory only, no forced response; the AI picks it up on its next
-      // natural turn. Guard: skip injection if the AI is currently speaking
-      // to avoid mid-sentence interruption and accidental vocalization.
-      if (data.contextHint && providerRef.current && !isAiSpeakingRef.current) {
-        const guidance = `[INTERNAL SYSTEM NOTE — do NOT speak this aloud, do NOT mention it to the patient, use ONLY to guide your next question silently]: ${data.contextHint}`
-        providerRef.current.injectSystemText(guidance)
-      }
+      // 2026-09-05: pushLocalizerContext is the single channel for localizer guidance.
+      // The consumer forwards this cycle's payload there; do not inject it twice.
     } catch (err: any) {
       // Network/timeout errors must not interrupt the session
       console.warn('[localizer] run failed (session continues):', err?.message)
@@ -518,46 +514,78 @@ export function useRealtimeSession(options: UseRealtimeSessionOptions): UseRealt
 
     // ── save_interview_output (existing) ──
     if (toolName === 'save_interview_output') {
-      try {
-        const { narrative_summary, red_flags, safety_escalated, ...structured } = args
-        structuredOutputRef.current = structured
-        narrativeSummaryRef.current = narrative_summary || null
-        if (red_flags && Array.isArray(red_flags)) {
-          redFlagsRef.current = red_flags
+      void (async () => {
+        try {
+          const enabled = process.env.NEXT_PUBLIC_HISTORIAN_PRECLOSE_GATE === 'true'
+          if (enabled && !args.safety_escalated && !safetyEscalatedRef.current && !precloseRejectedRef.current) {
+            try {
+              const response = await fetch('/api/ai/historian/coverage', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ transcript: transcriptRef.current, chiefComplaint: args.chief_complaint }),
+                signal: AbortSignal.timeout(2500),
+              })
+              if (response.status === 200) {
+                const { unmatched } = await response.json()
+                const decision = decidePreclose({
+                  enabled,
+                  safetyEscalated: args.safety_escalated === true || safetyEscalatedRef.current,
+                  alreadyRejected: precloseRejectedRef.current,
+                  unmatched,
+                })
+                if (decision.action === 'reject') {
+                  const askNext = decision.askNext
+                  precloseRejectedRef.current = true
+                  provider?.sendToolResult(toolUseId, { success: false, reason: 'more_history_needed', ask_next: askNext })
+                  provider?.injectSystemText(buildPrecloseNote(askNext))
+                  console.info('[preclose-gate] rejected once', unmatched.map((item: { id: string }) => item.id))
+                  return
+                }
+              }
+            } catch {
+              // Fail open: coverage infrastructure must never block a save.
+            }
+          }
+          const { narrative_summary, red_flags, safety_escalated, ...structured } = args
+          structuredOutputRef.current = structured
+          narrativeSummaryRef.current = narrative_summary || null
+          if (red_flags && Array.isArray(red_flags)) {
+            redFlagsRef.current = red_flags
+          }
+          if (safety_escalated) {
+            safetyEscalatedRef.current = true
+          }
+          // Signal to consumers that the interview has concluded so they can
+          // auto-end the session after the AI's closing line. Set the ref
+          // synchronously (not just via the interviewCompleted-state effect
+          // below, which only runs after the next render) so the immediate
+          // maybeScheduleAutoEnd() call sees it.
+          interviewCompletedRef.current = true
+          setInterviewCompleted(true)
+          // OpenAI's sendToolResult issues its own response.create after the ack
+          // (no modalities — #142) so Henry speaks his closing line. Nova does
+          // NOT self-trigger — it's speech-to-speech and stays silent after the
+          // tool result (same reason it needed a greeting kickoff), which is why
+          // the Nova closing was missing entirely. nudgeClosing() injects the
+          // closing prompt on Nova and is a no-op on OpenAI (which would double-
+          // speak). The closing audio then drains before teardown via the
+          // whenDrained/auto-end sequence below.
+          provider?.sendToolResult(toolUseId, { success: true })
+          provider?.nudgeClosing()
+          // Fix 4 (2026-07-09): this is only a FALLBACK schedule, not the
+          // primary end trigger. The closing line may already be fully spoken
+          // (same-turn ordering — the tool call landed after
+          // response.audio_transcript.done) or may still be coming via the
+          // sendToolResult response.create above (tool-first ordering). Use a
+          // generous delay so that if a follow-up closing response starts
+          // speaking, its aiSpeechStart cancels this timer and aiSpeechStop
+          // schedules the real (short) end once that speech finishes. If no
+          // further speech ever comes, this fallback still ends the session.
+          maybeScheduleAutoEnd(2500)
+        } catch (e) {
+          console.error('Error handling save_interview_output:', e)
         }
-        if (safety_escalated) {
-          safetyEscalatedRef.current = true
-        }
-        // Signal to consumers that the interview has concluded so they can
-        // auto-end the session after the AI's closing line. Set the ref
-        // synchronously (not just via the interviewCompleted-state effect
-        // below, which only runs after the next render) so the immediate
-        // maybeScheduleAutoEnd() call sees it.
-        interviewCompletedRef.current = true
-        setInterviewCompleted(true)
-        // OpenAI's sendToolResult issues its own response.create after the ack
-        // (no modalities — #142) so Henry speaks his closing line. Nova does
-        // NOT self-trigger — it's speech-to-speech and stays silent after the
-        // tool result (same reason it needed a greeting kickoff), which is why
-        // the Nova closing was missing entirely. nudgeClosing() injects the
-        // closing prompt on Nova and is a no-op on OpenAI (which would double-
-        // speak). The closing audio then drains before teardown via the
-        // whenDrained/auto-end sequence below.
-        provider?.sendToolResult(toolUseId, { success: true })
-        provider?.nudgeClosing()
-        // Fix 4 (2026-07-09): this is only a FALLBACK schedule, not the
-        // primary end trigger. The closing line may already be fully spoken
-        // (same-turn ordering — the tool call landed after
-        // response.audio_transcript.done) or may still be coming via the
-        // sendToolResult response.create above (tool-first ordering). Use a
-        // generous delay so that if a follow-up closing response starts
-        // speaking, its aiSpeechStart cancels this timer and aiSpeechStop
-        // schedules the real (short) end once that speech finishes. If no
-        // further speech ever comes, this fallback still ends the session.
-        maybeScheduleAutoEnd(2500)
-      } catch (e) {
-        console.error('Error handling save_interview_output:', e)
-      }
+      })()
       return
     }
 
