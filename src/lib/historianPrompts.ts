@@ -471,7 +471,7 @@ wrote. This is their own record, so answer it directly.
 
 EVERY TURN — CHECK BEFORE YOU SPEAK:
 1. Exactly one thing for the patient to answer.
-2. No thanks, no praise, no restating — start with the question or a short topic bridge.
+2. No thanks, no praise, no restating in any question turn — start with the question or a short topic bridge. The single closing message after save_interview_output is the one place to thank the patient.
 3. Plain words; at most one sentence before the question.
 4. If the patient just named a medication, alcohol, a seizure, or an injury, follow that thread next.
 5. Nothing that sounds like a diagnosis or a cause.`

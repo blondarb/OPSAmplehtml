@@ -48,13 +48,17 @@ describe('auditHenryTurns', () => {
   it.each([
     ['What medication do you take, and do you have allergies?', 1],
     ['Any surgery or family history?', 1],
-    ['Any numbness, tingling?', 1],
+    ['Any numbness, tingling?', 0],
+    ['Any numbness or tingling in your hands?', 0],
+    ['Do you take any medications, and do you have allergies?', 1],
+    ['Any weakness or numbness on one side?', 0],
+    ['Any numbness? Any tingling?', 1],
     ['What happened? When?', 1],
     ['Does the headache come and does the headache go?', 0],
     ['Any allergies or allergic reactions?', 0],
     ['About your medications and allergies. What do you take?', 0],
     ['Tell me about sleep and work.', 0],
-  ])('audits question boundaries and different topic stems: %s', (text, count) => {
+  ])('audits question boundaries and different topic clusters: %s', (text, count) => {
     expect(auditHenryTurns(henry(text)).compound_question_turns).toBe(count)
   })
 

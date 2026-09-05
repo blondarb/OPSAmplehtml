@@ -17,7 +17,27 @@ export interface TurnStyleReport {
 }
 
 const GRATITUDE = /\b(thanks?|thank you|i appreciate (you|that)|that'?s (really |very )?helpful)\b/i
-const TOPIC = /\b(medication|medicine|meds|pill|allerg|surger|operation|family|smok|tobacco|alcohol|drink|drug|sleep|work|job|headache|seizure|numb|tingl|weak|vision|memory|mood|dosage|dose)[a-z]*\b/gi
+// Motor (weak) deliberately shares the sensory cluster for one-sided symptom clarifiers.
+const TOPIC_CLUSTERS = [
+  'numb|tingl|weak',
+  'headache',
+  'memory|mood',
+  'medication|medicine|meds|pill|dose|dosage',
+  'allerg|allergies',
+  'surger|operation',
+  'family',
+  'smok|tobacco',
+  'alcohol|drink',
+  'drug',
+  'sleep',
+  'work|job',
+  'seizure',
+  'vision',
+]
+const topicCluster = new Map(TOPIC_CLUSTERS.flatMap((terms, cluster) =>
+  terms.split('|').map((term) => [term, cluster] as const),
+))
+const TOPIC = new RegExp(`\\b(${TOPIC_CLUSTERS.join('|')})[a-z]*\\b`, 'gi')
 
 function isCompound(text: string): boolean {
   if ((text.match(/\?/g) ?? []).length >= 2) return true
@@ -26,7 +46,7 @@ function isCompound(text: string): boolean {
   return questions.some((question) => {
     const topics = [...question.matchAll(TOPIC)]
     return topics.some((left, i) => topics.slice(i + 1).some((right) =>
-      left[1].toLowerCase() !== right[1].toLowerCase() &&
+      topicCluster.get(left[1].toLowerCase()) !== topicCluster.get(right[1].toLowerCase()) &&
       / and | or |, /i.test(question.slice(left.index! + left[0].length, right.index)),
     ))
   })
