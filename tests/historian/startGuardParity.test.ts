@@ -21,7 +21,7 @@ const SOURCE = readFileSync(
   'utf8',
 )
 
-const ENTRY_POINTS = ['selectedScenario', 'sessionConfig', 'referralInput'] as const
+const ENTRY_POINTS = ['selectedScenario', 'sessionConfig', 'referralInput', 'openEnded'] as const
 
 describe('start-interview guard matches the Start button', () => {
   it('the handler guard covers every entry point', () => {
@@ -33,7 +33,7 @@ describe('start-interview guard matches the Start button', () => {
     // surrounding comment can contain that word.
     const guardLine = body
       .split('\n')
-      .find((line) => line.trim().startsWith('if (!selectedScenario'))
+      .find((line) => line.trim().startsWith('if (!canStartInterview('))
     expect(guardLine, 'early-return guard not found in handleStartInterview').toBeDefined()
     for (const entry of ENTRY_POINTS) {
       expect(guardLine).toContain(entry)
@@ -41,10 +41,10 @@ describe('start-interview guard matches the Start button', () => {
   })
 
   it('the Start button disabled condition covers every entry point', () => {
-    const marker = 'disabled={!selectedScenario'
+    const marker = 'disabled={!canStartInterview('
     const start = SOURCE.indexOf(marker)
     expect(start).toBeGreaterThan(-1)
-    const condition = SOURCE.slice(start, start + 120)
+    const condition = SOURCE.slice(start, SOURCE.indexOf('\n', start))
     for (const entry of ENTRY_POINTS) {
       expect(condition).toContain(entry)
     }
@@ -98,10 +98,10 @@ describe('referred mode does not become a fourth, ungated entry point', () => {
   })
 
   it('the Start button disabled condition does not reference referredMode directly', () => {
-    const marker = 'disabled={!selectedScenario'
+    const marker = 'disabled={!canStartInterview('
     const start = SOURCE.indexOf(marker)
     expect(start).toBeGreaterThan(-1)
-    const condition = SOURCE.slice(start, start + 120)
+    const condition = SOURCE.slice(start, SOURCE.indexOf('\n', start))
     expect(condition).not.toContain('referredMode')
   })
 
@@ -112,7 +112,7 @@ describe('referred mode does not become a fourth, ungated entry point', () => {
     )
     const guardLine = body
       .split('\n')
-      .find((line) => line.trim().startsWith('if (!selectedScenario'))
+      .find((line) => line.trim().startsWith('if (!canStartInterview('))
     expect(guardLine).toBeDefined()
     expect(guardLine).not.toContain('referredMode')
   })

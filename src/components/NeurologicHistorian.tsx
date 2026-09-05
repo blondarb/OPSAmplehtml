@@ -14,6 +14,7 @@ import FeatureSubHeader from '@/components/layout/FeatureSubHeader'
 import VoiceProviderToggle from '@/components/voice/VoiceProviderToggle'
 import { useVoiceProviderPreference } from '@/lib/voice/useVoiceProviderPreference'
 import { Mic } from 'lucide-react'
+import { canStartInterview, referralNoteMode } from '@/lib/historian/intakeGates'
 import { REFERRAL_NOTE_SAMPLES } from '@/lib/historian/referralNoteSamples'
 import type { HistorianReferralInput } from '@/lib/historian/referralContext'
 import {
@@ -94,6 +95,8 @@ export default function NeurologicHistorian({ initialMode, clinicianMirror = fal
 
   const [phase, setPhase] = useState<Phase>(patientIdParam ? 'loading_context' : 'scenario_select')
   const [selectedScenario, setSelectedScenario] = useState<DemoScenario | null>(null)
+  const [openEnded, setOpenEnded] = useState(false)
+  const explicitIntakeChoiceRef = useRef(false)
   const [sessionConfig, setSessionConfig] = useState<SessionConfig | null>(null)
   const [showTranscript, setShowTranscript] = useState(false)
   const [referralNote, setReferralNote] = useState('')
@@ -146,7 +149,11 @@ export default function NeurologicHistorian({ initialMode, clinicianMirror = fal
   // Derive active config from either real patient or demo scenario
   const activeConfig: SessionConfig = sessionConfig || {
     sessionType: selectedScenario?.session_type || 'new_patient',
-    referralReason: selectedScenario?.referral_reason,
+    referralReason: selectedScenario?.referral_reason ?? (
+      referralInput && referralNoteMode(referralInput.noteText ?? '') === 'short'
+        ? referralInput.noteText
+        : undefined
+    ),
     patientName: selectedScenario?.patient_name || 'Demo Patient',
     patientId: null,
   }
@@ -276,7 +283,7 @@ export default function NeurologicHistorian({ initialMode, clinicianMirror = fal
 
   // Auto-select scenario from query param
   useEffect(() => {
-    if (scenarioParam && !selectedScenario) {
+    if (scenarioParam && !selectedScenario && !explicitIntakeChoiceRef.current) {
       const found = DEMO_SCENARIOS.find(s => s.id === scenarioParam)
       if (found) {
         setSelectedScenario(found)
@@ -341,7 +348,15 @@ export default function NeurologicHistorian({ initialMode, clinicianMirror = fal
   }, [interviewCompleted, isAiSpeaking, phase, endSession])
 
   async function handleUseReferralNote() {
-    if (referralNote.trim().length < 50) return
+    const mode = referralNoteMode(referralNote)
+    if (mode === 'empty' || extracting) return
+    explicitIntakeChoiceRef.current = true
+    setOpenEnded(false)
+    setSelectedScenario(null)
+    if (mode === 'short') {
+      setReferralInput({ steer: 'directive', noteText: referralNote })
+      return
+    }
     setExtracting(true)
     try {
       // /api/triage/extract is 202 + POLL, not a synchronous JSON response.
@@ -365,21 +380,26 @@ export default function NeurologicHistorian({ initialMode, clinicianMirror = fal
   }
 
   const handleSelectScenario = (scenario: DemoScenario) => {
+    explicitIntakeChoiceRef.current = true
+    setOpenEnded(false)
     setSelectedScenario(scenario)
-    // The two entry points are mutually exclusive — a canned scenario and a
+    // These entry points are mutually exclusive — a canned scenario and a
     // pasted referral (or a triage handoff) would otherwise both steer the
     // same interview.
     setReferralInput(null)
     setHandoffDisplay(null)
   }
 
+  const handleSelectOpenEnded = () => {
+    explicitIntakeChoiceRef.current = true
+    setOpenEnded(true)
+    setSelectedScenario(null)
+    setReferralInput(null)
+  }
+
   const handleStartInterview = () => {
-    // Allow start with a real patient config, a selected demo scenario, OR a
-    // loaded referral. This guard must stay in step with the Start button's
-    // `disabled` condition — when they disagreed, the button was enabled by a
-    // loaded referral while the handler returned early, so Start silently did
-    // nothing (caught on prod 2026-08-04).
-    if (!selectedScenario && !sessionConfig && !referralInput) return
+    // Keep this four-entry-point guard in sync with the Start button.
+    if (!canStartInterview({ hasScenario: !!selectedScenario, hasSessionConfig: !!sessionConfig, hasReferral: !!referralInput, openEnded })) return
     // Gate: show the consent/disclosure step before any session/mic start.
     // startSession() is invoked only from handleConsentConfirm.
     if (!consentAcknowledged) {
@@ -405,6 +425,7 @@ export default function NeurologicHistorian({ initialMode, clinicianMirror = fal
 
   const handleStartAnother = () => {
     setPhase('scenario_select')
+    setOpenEnded(false)
     setSelectedScenario(null)
     setSessionConfig(null)
     setCompletionData(null)
@@ -427,6 +448,7 @@ export default function NeurologicHistorian({ initialMode, clinicianMirror = fal
         <button
           key={scenario.id}
           onClick={() => handleSelectScenario(scenario)}
+          disabled={extracting}
           aria-pressed={selectedScenario?.id === scenario.id}
           className={`nn-choice${selectedScenario?.id === scenario.id ? ' on' : ''}`}
         >
@@ -449,7 +471,8 @@ export default function NeurologicHistorian({ initialMode, clinicianMirror = fal
       <h3 className="nn-card-title">Or use a referral note</h3>
       <p className="nn-hint">
         Paste a synthetic referral. The interview will open with what the patient
-        was referred for, and ask about that first.
+        was referred for, and ask about that first. A sentence is enough to start.
+        Paste a full referral note for the richest interview.
       </p>
       <div className="nn-actions" style={{ marginBottom: 10 }}>
         {REFERRAL_NOTE_SAMPLES.map((sample) => (
@@ -484,7 +507,7 @@ export default function NeurologicHistorian({ initialMode, clinicianMirror = fal
       <button
         className="nn-btn nn-btn--block"
         style={{ marginTop: 10 }}
-        disabled={extracting || referralNote.trim().length < 50}
+        disabled={extracting || referralNoteMode(referralNote) === 'empty'}
         onClick={handleUseReferralNote}
       >
         {extracting ? 'Reading the referral… (about 30–45s)' : 'Use this referral'}
@@ -499,6 +522,24 @@ export default function NeurologicHistorian({ initialMode, clinicianMirror = fal
         </p>
       )}
     </div>
+  )
+
+  const openEndedCard = (
+    <button
+      type="button"
+      onClick={handleSelectOpenEnded}
+      disabled={extracting}
+      aria-pressed={openEnded}
+      className={`nn-choice${openEnded ? ' on' : ''}`}
+      style={{ width: '100%', marginBottom: 20 }}
+    >
+      <span style={{ display: 'block', fontWeight: 650, marginBottom: 4 }}>
+        Start without a referral
+      </span>
+      <span style={{ display: 'block', fontSize: 'var(--nn-fs-sm)', color: 'var(--nn-ink-2)' }}>
+        Henry will begin by asking what brings you in.
+      </span>
+    </button>
   )
 
   // ── Presentation-only derivations for the stepped patient flow ──
@@ -649,7 +690,7 @@ export default function NeurologicHistorian({ initialMode, clinicianMirror = fal
                 ? 'Review your information below and begin your intake interview.'
                 : referredMode
                   ? 'Loaded from triage — review below and start when ready.'
-                  : 'Pick a demo scenario, or paste a referral note below and the interview will lead with what the patient was referred for.'}
+                  : 'Pick a demo scenario, type a referral reason, or start without a referral.'}
             </p>
 
             {error && (
@@ -709,8 +750,7 @@ export default function NeurologicHistorian({ initialMode, clinicianMirror = fal
               </div>
             )}
 
-            {/* Demo scenario cards + paste-a-referral, unchanged and always
-                visible — today's exact /patient/historian behavior. Not
+            {/* Intake choices. Not
                 rendered when a triage handoff is already loaded (referred
                 mode collapses this behind a disclosure below instead). */}
             {!sessionConfig && !referredMode && (
@@ -723,6 +763,7 @@ export default function NeurologicHistorian({ initialMode, clinicianMirror = fal
                 )}
                 {demoScenarioCards}
                 {referralNoteCard}
+                {openEndedCard}
               </>
             )}
 
@@ -742,6 +783,7 @@ export default function NeurologicHistorian({ initialMode, clinicianMirror = fal
                 <div style={{ marginTop: 16 }}>
                   {demoScenarioCards}
                   {referralNoteCard}
+                  {openEndedCard}
                 </div>
               </details>
             )}
@@ -755,7 +797,7 @@ export default function NeurologicHistorian({ initialMode, clinicianMirror = fal
 
             <button
               onClick={handleStartInterview}
-              disabled={!selectedScenario && !sessionConfig && !referralInput}
+              disabled={!canStartInterview({ hasScenario: !!selectedScenario, hasSessionConfig: !!sessionConfig, hasReferral: !!referralInput, openEnded })}
               className="nn-btn nn-btn--block"
             >
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
