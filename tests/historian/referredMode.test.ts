@@ -44,6 +44,14 @@ describe('referredMode discriminator', () => {
     const body = COMPONENT_SOURCE.slice(start, end)
     expect(body).not.toContain('setHandoffDisplay')
   })
+
+  it('the open-ended path clears the triage handoff display', () => {
+    const start = COMPONENT_SOURCE.indexOf('const handleSelectOpenEnded')
+    expect(start).toBeGreaterThan(-1)
+    const end = COMPONENT_SOURCE.indexOf('const handleStartInterview', start)
+    expect(end).toBeGreaterThan(start)
+    expect(COMPONENT_SOURCE.slice(start, end)).toContain('setHandoffDisplay(null)')
+  })
 })
 
 describe('demo scenario cards and paste box are gated off in referred mode', () => {

@@ -79,6 +79,14 @@ The client connects **directly to OpenAI** via WebRTC. The server only:
 
 **Route**: `/patient/historian`
 
+### Ways to begin
+
+- Paste a full synthetic referral note: notes of 50 or more trimmed characters use the existing extraction step.
+- Type a short reason: any non-empty sentence (or one character) is accepted directly, without extraction.
+- Choose **Start without a referral**: Henry begins by asking what brings the patient in; no referral reason is supplied.
+- Demo scenarios remain available. Choosing a scenario or accepting a referral replaces the open-ended choice.
+- Every choice still proceeds through the existing consent and identity step before the interview starts.
+
 ### 3.2 State Machine
 
 ```
