@@ -25,7 +25,9 @@
  *     stale `OpenAI-Beta: realtime=v1` header (fixed — see
  *     historian-synthetic-run.ts's call-site comment), then on an
  *     account-level `insufficient_quota` block on the production OpenAI
- *     key. This is a documented, tracked assumption, not a verified fact —
+ *     key; then (2026-09-05, quota restored) on `session.modalities` being
+ *     an `unknown_parameter` — fixed by adopting the GA field names in
+ *     the session.update below. This is a documented, tracked assumption, not a verified fact —
  *     `session.update` needing `session.type`, and `response.create` with
  *     an empty `response: {}` object, ARE both confirmed live via that same
  *     already-tested WebRTC code path, independent of the text-shape
@@ -282,10 +284,14 @@ export class RealtimeTextClient {
         type: 'session.update',
         session: {
           type: 'realtime',
-          modalities: ['text'],
+          // GA Realtime schema (live-verified 2026-09-05 once quota was
+          // restored): the field is `output_modalities`, and turn detection
+          // lives under `audio.input`. Top-level `modalities` /
+          // `turn_detection` are rejected with `unknown_parameter`.
+          output_modalities: ['text'],
           instructions: this.instructions,
           tools: this.tools,
-          turn_detection: null,
+          audio: { input: { turn_detection: null } },
         },
       })
       return
