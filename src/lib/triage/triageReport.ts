@@ -1,3 +1,4 @@
+import { clinicalTimingLines } from './clinicalTimingPresentation'
 import { TIER_DISPLAY, type TriageResult } from './types'
 import {
   DATA_CONFLICT_INFORMATION,
@@ -15,6 +16,7 @@ export function buildTriageReport(result: TriageResult): string {
   lines.push('')
   lines.push(`Triage Tier: ${TIER_DISPLAY[result.triage_tier].label}`)
   lines.push(`Recommended Timeframe: ${policy.timeframe}`)
+  lines.push(...clinicalTimingLines(result.clinical_timing))
   lines.push(`Confidence: ${result.confidence}`)
   if (
     typeof result.weighted_score === 'number' &&
@@ -99,9 +101,9 @@ export function buildTriageReport(result: TriageResult): string {
       lines.push(
         'The active emergency action remains in effect. Information gathering must not delay emergency evaluation.',
       )
-    } else if (policy.timeframe === 'Same-day clinician review') {
+    } else if (policy.immediateReview) {
       lines.push(
-        'Information gathering must not delay same-day clinician review.',
+        'Information gathering must not delay immediate clinician review.',
       )
     } else {
       lines.push(
@@ -150,11 +152,6 @@ export function buildTriageReport(result: TriageResult): string {
   if (policy.showPreVisitWorkup && result.suggested_workup.length) {
     lines.push('Suggested Pre-Visit Workup:')
     result.suggested_workup.forEach((workup) => lines.push(`  - ${workup}`))
-    if (policy.timeframe === 'Same-day clinician review') {
-      lines.push(
-        '  Non-blocking: this workup must not delay same-day clinician review.',
-      )
-    }
     lines.push('')
   }
 

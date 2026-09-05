@@ -1,3 +1,4 @@
+import type { ClinicalTimingV1 } from './clinicalTiming'
 // Triage Tiers
 export type TriageTier =
   | 'emergent'
@@ -61,6 +62,7 @@ export type SubspecialtyType =
   | 'Movement Disorders'
   | 'Headache'
   | 'Neuromuscular'
+  | 'MS / Neuroimmunology'
   | 'Cognitive/Memory'
   | 'Stroke'
 
@@ -143,6 +145,7 @@ export const NEURO_SUBSPECIALTIES: readonly SubspecialtyType[] = Object.freeze([
   'Movement Disorders',
   'Headache',
   'Neuromuscular',
+  'MS / Neuroimmunology',
   'Cognitive/Memory',
   'Stroke',
 ])
@@ -247,6 +250,7 @@ export interface TriageResult {
   scheduling_locked?: boolean
   outpatient_finalization_allowed?: boolean
   safety_review?: Record<string, unknown> | null
+  clinical_timing?: ClinicalTimingV1 | null
 }
 
 // API Request

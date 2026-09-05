@@ -218,6 +218,7 @@ describe('triage background safety ordering', () => {
     )
     expect(runGatewayMock).toHaveBeenCalledWith(
       'Raw source says sudden aphasia today in this synthetic referral.',
+      expect.objectContaining({ decisionAsOf: expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/) }),
     )
     expect(runSafetyMock).toHaveBeenCalledWith(
       'Raw source says sudden aphasia today in this synthetic referral.',
@@ -480,6 +481,25 @@ describe('triage background safety ordering', () => {
       expect.objectContaining({ processing_status: 'error' }),
     )
     expect(eqMock).toHaveBeenCalledWith('processing_attempt_count', 7)
+  })
+
+  it.each(['same_day_clinician_review', 'expedited_outpatient'])('C01 announces immediate review from the final persisted %s disposition', async (carePathway) => {
+    runGatewayMock.mockReturnValueOnce({ status: 'completed', failureCode: null,
+      carePathway: 'routine_outpatient', reviewRequirement: 'clinician_confirmation', schedulingLocked: true,
+      signals: [], lexicalHits: [], version: 'synthetic-gateway' })
+    finalizeTriageAttemptMock.mockResolvedValueOnce({ ok: true, triageTier: 'urgent', carePathway,
+      dataQuality: 'partial', reviewRequirement: 'immediate_clinician_review', workflowStatus: 'clinician_review', consultId: null })
+    await processTriageInBackground('triage-1', {
+      gatewayText: 'Synthetic stable source with a concurrently persisted immediate review requirement.',
+      textForScoring: 'Synthetic stable source with a concurrently persisted immediate review requirement.',
+      referral_text: 'Synthetic stable source with a concurrently persisted immediate review requirement.',
+      temperature: 0, createConsultFlag: false, coverageStatus: 'not_applicable', tenantId: 'tenant-1',
+      decisionAt: '2026-09-05T12:00:00Z',
+    })
+    expect(notifyMock).toHaveBeenCalledWith('triage-1', 'urgent',
+      expect.stringContaining('IMMEDIATE CLINICIAN REVIEW'), expect.any(String), null, 'tenant-1')
+    expect(notifyMock.mock.calls.every(call => !String(call[2]).includes('Within 1 Week'))).toBe(true)
+    expect(persistModelSafetyMock.mock.calls[0][0].clinicalTiming.decisionAt).toBe('2026-09-05T12:00:00Z')
   })
 
   it('uses the floor returned by atomic finalization for every downstream consumer', async () => {
@@ -948,6 +968,7 @@ describe('triage background safety ordering', () => {
       'tenant-1',
       packetGateway,
       1,
+      expect.objectContaining({ schemaVersion: 'triage-clinical-timing.v1' }),
     )
     expect(persistModelSafetyMock).toHaveBeenCalledWith(
       expect.objectContaining({ safetyResult: packetSafety }),

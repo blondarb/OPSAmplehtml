@@ -22,6 +22,7 @@ import type {
   SentinelSliceMetrics,
   SentinelTelemetrySummary,
 } from './types'
+import { deriveClinicalTiming, type ClinicalTimingV1 } from '../clinicalTiming'
 
 interface SentinelDispositionClassification {
   exactOrAcceptable: boolean
@@ -160,6 +161,13 @@ function telemetry(
 }
 
 function skippedOutcome(item: SentinelCase): SentinelCaseOutcome {
+  const decisionAt = item.decisionAt ?? '1970-01-01T00:00:00.000Z'
+  const timing = deriveClinicalTiming({
+    sourceText: item.input.kind === 'note' ? item.input.text : item.input.kind === 'missing' ? item.input.reason : item.input.documents.flatMap((document) => document.pages.map((page) => page.text)).join('\n'),
+    decisionAt,
+    decisionTimeZone: 'UTC',
+    carePathway: 'undetermined',
+  })
   return {
     caseId: item.id,
     title: item.title,
@@ -193,6 +201,8 @@ function skippedOutcome(item: SentinelCase): SentinelCaseOutcome {
         reason: 'live_ensemble_only',
       }),
     ],
+    scoringMetadata: null,
+    timingMetadata: timingMetadata(timing),
   }
 }
 
@@ -214,7 +224,9 @@ export function runOfflineSentinelCase(
   } else {
     try {
       if (item.input.kind === 'note') {
-        const gateway = runEmergencyGateway(item.input.text)
+        const gateway = runEmergencyGateway(item.input.text, {
+          decisionAsOf: (item.decisionAt ?? '1970-01-01T00:00:00.000Z').slice(0, 10),
+        })
         actualPathway = gateway.carePathway
         signals = gateway.signals
         if (gateway.status === 'failed') {
@@ -256,6 +268,13 @@ export function runOfflineSentinelCase(
   )
   const evidenceValidation = validateSentinelEvidence(signals, item.input)
   const evidenceIsExact = evidenceValidation.invalidReferences === 0
+  const decisionAt = item.decisionAt ?? '1970-01-01T00:00:00.000Z'
+  const timing = deriveClinicalTiming({
+    sourceText: item.input.kind === 'note' ? item.input.text : item.input.kind === 'missing' ? item.input.reason : item.input.documents.flatMap((document) => document.pages.map((page) => page.text)).join('\n'),
+    decisionAt,
+    decisionTimeZone: 'UTC',
+    carePathway: actualPathway,
+  })
 
   return {
     caseId: item.id,
@@ -288,6 +307,24 @@ export function runOfflineSentinelCase(
         reason: branchReason,
       }),
     ],
+    scoringMetadata: null,
+    timingMetadata: timingMetadata(timing),
+  }
+}
+
+function timingMetadata(timing: ClinicalTimingV1): SentinelCaseOutcome['timingMetadata'] {
+  return {
+    sourceDigest: timing.sourceDigest,
+    decisionAt: timing.decisionAt,
+    decisionTimeZone: timing.decisionTimeZone,
+    chronology: {
+      onset: timing.chronology.onset.state,
+      lastVerifiedStatus: timing.chronology.lastVerifiedStatus.state,
+      completedAssessment: timing.chronology.completedAssessment.state,
+    },
+    actionRequirement: timing.action.requirement,
+    assessmentDeadlineState: timing.assessmentDeadline.state,
+    issues: timing.issues,
   }
 }
 

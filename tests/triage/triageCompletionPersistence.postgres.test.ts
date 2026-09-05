@@ -225,6 +225,34 @@ describeIntegration('finalizeTriageAttempt PostgreSQL transaction behavior', () 
     })
   })
 
+  it.each(['same_day_clinician_review', 'review_requirement_only'])('C01 persists immediate action and suppresses outpatient instructions for %s', async (mode) => {
+    const triageSessionId = randomUUID()
+    await insertPendingSession(triageSessionId)
+    await pool.query("UPDATE triage_sessions SET care_pathway = $2, review_requirement = 'immediate_clinician_review' WHERE id = $1", [triageSessionId, mode === 'review_requirement_only' ? 'routine_outpatient' : mode])
+    const input = { ...completionInput(triageSessionId), suggestedWorkup: ['Synthetic MRI before clinic.'] }
+    const result = await finalizeTriageAttempt(input)
+    expect(result.ok).toBe(true)
+    const consult = (await pool.query('SELECT * FROM neurology_consults WHERE triage_session_id = $1', [triageSessionId])).rows[0]
+    expect(consult.triage_tier_display).toContain('IMMEDIATE CLINICIAN REVIEW')
+    expect(consult.triage_tier_display).not.toContain('Within')
+    expect(consult.triage_summary).not.toContain('Synthetic MRI')
+    expect(consult.triage_summary).not.toContain('General Neurology')
+    expect(consult.triage_subspecialty).toBe('')
+    const session = (await pool.query('SELECT * FROM triage_sessions WHERE id = $1', [triageSessionId])).rows[0]
+    expect(session.suggested_workup).toEqual([])
+    expect(session.scheduling_locked).toBe(true)
+  })
+
+  it('does not copy outpatient recommendations to a consult during conflicting-data hold', async () => {
+    const triageSessionId = randomUUID()
+    await insertPendingSession(triageSessionId)
+    await pool.query("UPDATE triage_sessions SET data_quality = 'conflicting' WHERE id = $1", [triageSessionId])
+    expect((await finalizeTriageAttempt({ ...completionInput(triageSessionId), suggestedWorkup: ['Synthetic MRI before clinic.'] })).ok).toBe(true)
+    const consult = (await pool.query('SELECT * FROM neurology_consults WHERE triage_session_id = $1', [triageSessionId])).rows[0]
+    expect(consult.triage_summary).not.toContain('Synthetic MRI')
+    expect(consult.triage_subspecialty).toBe('')
+  })
+
   it('recovers an eligible orphan without creating a duplicate consult', async () => {
     const triageSessionId = randomUUID()
     const orphanId = randomUUID()

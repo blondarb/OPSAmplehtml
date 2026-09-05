@@ -16,6 +16,7 @@ import {
   type ScoringEmergencyEnvelope,
 } from './scoring'
 import { TRIAGE_SYSTEM_PROMPT, buildTriageUserPrompt } from './systemPrompt'
+import { deriveClinicalTiming } from './clinicalTiming'
 import {
   AITriageResponse,
   DimensionScores,
@@ -35,6 +36,10 @@ export interface TriageInput {
   temperature?: number
   /** Override the default Bedrock model ID for this triage call. */
   model?: string
+  /** Server-captured evaluation/decision clock; never inferred from source text. */
+  decisionAt?: string
+  /** Raw source used only for chronology derivation when scoring uses a summary. */
+  chronologySourceText?: string
 }
 
 export interface TriageResult {
@@ -87,11 +92,22 @@ export async function runTriage(
     : 0
 
   const textForScoring = input.referral_text
+  const clinicalTiming = input.decisionAt
+    ? deriveClinicalTiming({
+        sourceText: input.chronologySourceText ?? input.referral_text,
+        decisionAt: input.decisionAt,
+        decisionTimeZone: 'UTC',
+        // The scorer has not yet produced a disposition. This prompt context
+        // therefore exposes chronology without pre-classifying the referral.
+        carePathway: 'undetermined',
+      })
+    : undefined
 
   const userPrompt = buildTriageUserPrompt(textForScoring, {
     patientAge: input.patient_age ?? undefined,
     patientSex: input.patient_sex ?? undefined,
     referringProviderType: input.referring_provider_type ?? undefined,
+    clinicalTiming,
   })
 
   // 45-second timeout

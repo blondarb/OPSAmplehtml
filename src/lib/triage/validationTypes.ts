@@ -31,6 +31,7 @@ export interface ValidationReview {
   comfortable_with_wait?: 'yes' | 'no' | 'uncertain' | null
   reviewer_kind?: string
   label_context?: string
+  clinical_assessment?: ClinicalAssessment | null
   subspecialty: string | null
   redirect_to_non_neuro: boolean
   redirect_specialty: string | null
@@ -41,6 +42,90 @@ export interface ValidationReview {
   completed_at: string
   duration_seconds: number | null
   created_at: string
+}
+
+export const CLINICAL_ASSESSMENT_ACTIONS = [
+  'emergency_now',
+  'clinician_review_now',
+  'outpatient_assessment',
+  'clarify_before_disposition',
+] as const
+
+export const CLINICAL_ASSESSMENT_ORIGINS = [
+  'decision_time',
+  'symptom_onset',
+  'prior_assessment',
+  'unknown',
+] as const
+
+export const CLINICAL_ASSESSMENT_INTERVAL_UNITS = ['minutes', 'hours', 'days', 'weeks'] as const
+
+/** These actions record an assessment needed at the decision time, with no delay. */
+export const IMMEDIATE_CLINICAL_ASSESSMENT_ACTIONS = [
+  'emergency_now',
+  'clinician_review_now',
+] as const
+
+export const CLINICAL_ASSESSMENT_LEGACY_TIERS = {
+  emergency_now: ['emergent'],
+  clinician_review_now: ['urgent', 'insufficient_data'],
+  outpatient_assessment: ['urgent', 'semi_urgent', 'routine_priority', 'routine', 'non_urgent'],
+  clarify_before_disposition: ['insufficient_data'],
+} as const
+
+export const CLINICAL_ASSESSMENT_DEFAULT_LEGACY_TIER = {
+  emergency_now: 'emergent',
+  clinician_review_now: 'urgent',
+  outpatient_assessment: 'routine',
+  clarify_before_disposition: 'insufficient_data',
+} as const
+
+export type ClinicalAssessmentAction = typeof CLINICAL_ASSESSMENT_ACTIONS[number]
+export type ClinicalAssessmentOrigin = typeof CLINICAL_ASSESSMENT_ORIGINS[number]
+export type ClinicalAssessmentIntervalUnit = typeof CLINICAL_ASSESSMENT_INTERVAL_UNITS[number]
+
+/** A reviewer-owned label, not a final clinical disposition. */
+export interface ClinicalAssessment {
+  version: 'v1'
+  action: ClinicalAssessmentAction
+  latest_safe_assessment: {
+    origin: ClinicalAssessmentOrigin
+    interval?: { value: number; unit: ClinicalAssessmentIntervalUnit }
+    anchor?: string
+  }
+  services: string[]
+  decisive_missing_facts: string[]
+}
+
+export interface ClinicalAssessmentDraft {
+  action: ClinicalAssessmentAction | ''
+  origin: ClinicalAssessmentOrigin | ''
+  intervalValue: string
+  intervalUnit: ClinicalAssessmentIntervalUnit
+  anchor: string
+  services: string[]
+  decisiveMissingFacts: string
+}
+
+export const EMPTY_CLINICAL_ASSESSMENT_DRAFT: ClinicalAssessmentDraft = {
+  action: '', origin: '', intervalValue: '', intervalUnit: 'hours', anchor: '', services: [], decisiveMissingFacts: '',
+}
+
+export function clinicalAssessmentDraftForAction(
+  draft: ClinicalAssessmentDraft,
+  action: ClinicalAssessmentDraft['action'],
+): ClinicalAssessmentDraft {
+  if (IMMEDIATE_CLINICAL_ASSESSMENT_ACTIONS.includes(action as typeof IMMEDIATE_CLINICAL_ASSESSMENT_ACTIONS[number])) {
+    return { ...draft, action, origin: 'decision_time', intervalValue: '0', intervalUnit: 'minutes', anchor: '' }
+  }
+  if (draft.origin === 'decision_time' && draft.intervalValue === '0' && draft.intervalUnit === 'minutes' && !draft.anchor) {
+    return { ...draft, action, origin: '', intervalValue: '', intervalUnit: 'hours' }
+  }
+  return { ...draft, action }
+}
+
+export function clinicalAssessmentTiersForAction(action: ClinicalAssessmentDraft['action']): readonly string[] {
+  return action ? CLINICAL_ASSESSMENT_LEGACY_TIERS[action] : []
 }
 
 // ── Key Clinical Factors (checkbox options for reviewers) ──
@@ -184,6 +269,7 @@ export interface ValidationResults {
   }
   // AI Self-Consistency (multi-run analysis)
   ai_consistency?: AIConsistencyData
+  clinical_assessment_analysis?: ClinicalAssessmentAnalysis | null
   // Model comparison (present when multiple models have been tested)
   model_comparison?: {
     models: string[]
@@ -218,4 +304,27 @@ export interface ValidationResults {
     agreement: boolean | null
     any_redirect: boolean
   }>
+}
+
+export interface ClinicalAssessmentAgreementMetric {
+  cases_compared: number
+  cases_in_agreement: number
+  disagreement_count: number
+  agreement_rate: number | null
+}
+
+export interface ClinicalAssessmentAnalysis {
+  canonical_label: 'clinical_assessment_v1'
+  reviewer_kind: string
+  clinical_validation_established: false
+  ai_action_comparison: 'not_evaluated'
+  coverage: {
+    submitted_reviews: number
+    assessments_recorded: number
+    cases_with_assessment: number
+    cases_with_two_or_more_assessments: number
+  }
+  action_agreement: ClinicalAssessmentAgreementMetric
+  timing_agreement: ClinicalAssessmentAgreementMetric
+  service_destination_agreement: ClinicalAssessmentAgreementMetric
 }
